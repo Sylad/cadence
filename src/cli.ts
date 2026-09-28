@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { check } from './check.js';
 import { audit, auditSince, exemptPlanOnly, nextUp } from './audit.js';
 import { isDay, toDay, type Day } from './dates.js';
+import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, readCommits } from './git.js';
 import { installHook } from './hook.js';
@@ -40,23 +41,28 @@ Un lot --visible attend une entrée Nouveautés (docs/nouveautes/, --dir) avec c
 Un texte qui commence par « - » se passe après « -- » : raf note L1 -- "-5 %".
 Options communes : --file chemin (ou RAF_FILE), RAF_TODAY=AAAA-MM-JJ pour figer la date.`;
 
-export function run(argv: string[], io: Io): number {
+export function run(argv: string[], io: Io): number | Promise<number> {
   try {
-    return dispatch(argv, io);
+    const result = dispatch(argv, io);
+    return result instanceof Promise ? result.catch((e: unknown) => failure(e, io)) : result;
   } catch (e) {
-    if (e instanceof RafError) {
-      io.err(`raf: ${e.message}`);
-      return 2;
-    }
-    if (e instanceof Error && 'code' in e && String(e.code).startsWith('ERR_PARSE_ARGS')) {
-      io.err(`raf: ${e.message} (un texte qui commence par « - » se passe après « -- »)`);
-      return 2;
-    }
-    throw e;
+    return failure(e, io);
   }
 }
 
-function dispatch(argv: string[], io: Io): number {
+function failure(e: unknown, io: Io): number {
+  if (e instanceof RafError) {
+    io.err(`raf: ${e.message}`);
+    return 2;
+  }
+  if (e instanceof Error && 'code' in e && String(e.code).startsWith('ERR_PARSE_ARGS')) {
+    io.err(`raf: ${e.message} (un texte qui commence par « - » se passe après « -- »)`);
+    return 2;
+  }
+  throw e;
+}
+
+function dispatch(argv: string[], io: Io): number | Promise<number> {
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
@@ -78,6 +84,8 @@ function dispatch(argv: string[], io: Io): number {
       since: { type: 'string' },
       idle: { type: 'string' },
       output: { type: 'string', short: 'o' },
+      config: { type: 'string' },
+      'dry-run': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -187,6 +195,15 @@ function dispatch(argv: string[], io: Io): number {
     case 'session':
       if (!gitRoot(io.cwd)) throw new RafError('session : à lancer dans un dépôt git');
       return session(rest, { plan: Plan.load(planPath), root, newsDir, state: stateDir(root), today, out: io.out }, values);
+    case 'deliver': {
+      if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
+      const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
+      if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans le README)`);
+      const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
+      const plan = existsSync(planPath) ? Plan.load(planPath) : null;
+      const ctx = { root, state: stateDir(root), plan, config, today, dryRun: !!values['dry-run'], out: io.out, err: io.err };
+      return deliver(ctx, realDeps(root));
+    }
     case 'news':
       return news(rest, Plan.load(planPath), newsDir, today, values, io);
     default:

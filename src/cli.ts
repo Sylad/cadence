@@ -247,7 +247,10 @@ function postCommit(planPath: string, root: string, io: Io): number {
     if (!head) return 0;
     const refs = extractRefs(`${head.subject}\n${head.body}`, plan.prefix);
     if (refs.length === 0) {
-      if (!/^Merge\b/.test(head.subject)) io.err('raf: commit sans lot — citer un identifiant la prochaine fois (raf now)');
+      const planOnly = exemptPlanOnly({ byLot: new Map(), orphans: [head], unknown: [] }, plan, root).orphans.length === 0;
+      if (!planOnly && !/^Merge\b/.test(head.subject)) {
+        io.err('raf: commit sans lot — citer un identifiant la prochaine fois (raf now)');
+      }
       return 0;
     }
     const lots = new Map(plan.lots().map((l) => [l.id, l]));

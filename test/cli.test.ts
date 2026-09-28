@@ -126,6 +126,7 @@ describe('plan-only commits', () => {
     execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
     commit(dir, 'chore: plan raf');
     expect(raf(dir, 'check').code).toBe(0);
+    expect(raf(dir, 'hook', 'post-commit').err).toBe('');
     writeFileSync(join(dir, 'x.txt'), 'x');
     execFileSync('git', ['add', 'x.txt'], { cwd: dir });
     commit(dir, 'chore: autre chose');

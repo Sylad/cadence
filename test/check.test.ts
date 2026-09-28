@@ -62,3 +62,23 @@ describe('ignore : commits automatiques', () => {
     expect(out.join('\n')).toContain('ignore : motif invalide « [invalide »');
   });
 });
+
+describe('planification', () => {
+  it('un commit qui ne touche que le plan ne « démarre » pas le lot todo qu’il cite', async () => {
+    const { run } = await import('../src/cli.js');
+    const { gitRepo, commit } = await import('./helpers.js');
+    const { execFileSync } = await import('node:child_process');
+    const dir = gitRepo();
+    const io = (out: string[]) => ({ cwd: dir, env: { RAF_TODAY: '2026-09-28' }, out: (l: string) => out.push(l), err: () => {}, now: () => new Date() });
+    run(['init', '--no-hook'], io([]));
+    run(['add', 'Audit'], io([]));
+    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    execFileSync('git', ['commit', '-qm', 'chore(L1): audit planifié'], { cwd: dir });
+    const out: string[] = [];
+    expect(await run(['check'], io(out))).toBe(0);
+    commit(dir, 'feat(L1): vrai travail', '2026-09-28T12:00:00');
+    const out2: string[] = [];
+    expect(await run(['check'], io(out2))).toBe(1);
+    expect(out2.join('\n')).toContain('L1 a 1 commit(s) mais est encore todo');
+  });
+});

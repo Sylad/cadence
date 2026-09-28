@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { check } from './check.js';
-import { audit, auditSince, exemptPlanOnly, nextUp } from './audit.js';
+import { audit, auditSince, exemptPlanOnly, isPlanOnly, nextUp } from './audit.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { ganttData, renderGantt } from './gantt.js';
@@ -299,10 +299,11 @@ function postCommit(planPath: string, newsDir: string, root: string, io: Io): nu
       return 0;
     }
     const lots = new Map(plan.lots().map((l) => [l.id, l]));
+    const planning = isPlanOnly(head.sha, plan, root);
     for (const r of refs) {
       const lot = lots.get(r.lot);
       if (!lot) io.err(`raf: ${r.lot} n'existe pas dans le plan`);
-      else if (lot.status === 'todo') io.err(`raf: ${r.lot} est encore todo — raf start ${r.lot}`);
+      else if (lot.status === 'todo' && !planning) io.err(`raf: ${r.lot} est encore todo — raf start ${r.lot}`);
       else io.err(`raf: ${r.lot} (${lot.status}) ${lot.title}`);
     }
     const entries = loadEntries(newsDir);

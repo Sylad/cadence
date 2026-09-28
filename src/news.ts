@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { isDay, type Day } from './dates.js';
@@ -22,13 +22,14 @@ export interface NewsIssue {
   message: string;
 }
 
+const CAPTURE = /^[\w./-]+\.(?:png|jpe?g|webp|gif)$/i;
 const FRONT = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
 const list = (v: unknown): string[] => (v == null ? [] : Array.isArray(v) ? v.map(String) : [String(v)]);
 
 export function parseEntry(file: string, text: string): Entry {
   const entry: Entry = { file, slug: basename(file).replace(/\.md$/, ''), title: '', date: '', lots: [], captures: [], body: '', problems: [] };
-  const m = FRONT.exec(text);
+  const m = FRONT.exec(text.replace(/^\uFEFF/, '')); // BOM des éditeurs Windows
   if (!m) {
     entry.problems.push('en-tête YAML absent (--- … ---)');
     return entry;
@@ -49,6 +50,8 @@ export function parseEntry(file: string, text: string): Entry {
   for (const c of entry.captures) {
     // Copiées telles quelles sous le dossier de build : un chemin qui sort du dossier écrirait ailleurs.
     if (isAbsolute(c) || c.split(/[\\/]/).includes('..')) entry.problems.push(`capture hors du dossier des Nouveautés : ${c}`);
+    // Noms sages : utilisables tels quels dans une URL, et seulement des images.
+    else if (!CAPTURE.test(c)) entry.problems.push(`capture ${c} : image .png, .jpg, .webp ou .gif, nom en lettres, chiffres, « . _ - / »`);
   }
   if (!entry.title) entry.problems.push('title vide');
   if (!isDay(entry.date)) entry.problems.push(`date « ${entry.date} » n'est pas une date AAAA-MM-JJ`);
@@ -58,9 +61,9 @@ export function parseEntry(file: string, text: string): Entry {
 /** Entrées du dossier, plus récentes d'abord (à date égale, par nom de fichier décroissant). */
 export function loadEntries(dir: string): Entry[] {
   if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .filter((f) => f.endsWith('.md') && f.toLowerCase() !== 'readme.md')
-    .map((f) => parseEntry(f, readFileSync(join(dir, f), 'utf8')))
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((f) => f.isFile() && f.name.endsWith('.md') && f.name.toLowerCase() !== 'readme.md')
+    .map((f) => parseEntry(f.name, readFileSync(join(dir, f.name), 'utf8')))
     .sort((a, b) => (a.date === b.date ? b.file.localeCompare(a.file) : b.date.localeCompare(a.date)));
 }
 
@@ -72,7 +75,8 @@ export function newsIssues(lots: Lot[], entries: Entry[], dir: string): NewsIssu
     for (const p of e.problems) issues.push({ kind: 'bad-entry', message: `${e.file} : ${p}` });
     for (const id of e.lots) if (!ids.has(id)) issues.push({ kind: 'unknown-lot', message: `${e.file} cite ${id}, absent du plan` });
     for (const c of e.captures) {
-      if (!existsSync(resolve(dir, c))) issues.push({ kind: 'missing-capture', message: `${e.file} : capture absente ${c}` });
+      const path = resolve(dir, c);
+      if (!existsSync(path) || !statSync(path).isFile()) issues.push({ kind: 'missing-capture', message: `${e.file} : capture absente ${c}` });
     }
     if (e.problems.length === 0 && e.captures.length === 0 && !e.nocapture) {
       issues.push({ kind: 'no-capture', message: `${e.file} sans capture (ou « nocapture: raison »)` });
@@ -100,7 +104,8 @@ export function slugify(title: string): string {
 }
 
 /** Crée le squelette d'une entrée ; refuse d'écraser un fichier existant. */
-export function newEntry(dir: string, lots: string[], title: string, today: Day): string {
+export function newEntry(dir: string, lots: string[], rawTitle: string, today: Day): string {
+  const title = rawTitle.replace(/\s+/g, ' ').trim(); // un saut de ligne casserait l'en-tête
   const path = join(dir, `${today}-${slugify(title)}.md`);
   if (existsSync(path)) throw new RafError(`${path} existe déjà`);
   mkdirSync(dir, { recursive: true });
@@ -116,7 +121,9 @@ function escapeText(s: string): string {
 }
 
 /** Liens http(s), mailto ou relatifs ; tout autre schéma (javascript:, data:…) reste du texte. */
-const safeUrl = (url: string) => /^(?:https?:\/\/|mailto:)/i.test(url) || !/^[a-z][\w+.-]*:/i.test(url);
+// Les navigateurs retirent les caractères de contrôle en tête d'URL (« \x01javascript: ») : refusés d'office.
+const safeUrl = (url: string) =>
+  !/[\x00-\x20\x7f]/.test(url) && (/^(?:https?:\/\/|mailto:)/i.test(url) || !/^[a-z][\w+.-]*:/i.test(url));
 
 function inline(text: string): string {
   // Segments impairs = code : ni gras ni lien à l'intérieur.

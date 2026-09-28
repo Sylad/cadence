@@ -37,6 +37,8 @@ describe('renderMarkdown', () => {
 
   it('refuses javascript: links', () => {
     expect(renderMarkdown('[x](javascript:alert(1))')).toBe('<p>[x](javascript:alert(1))</p>');
+    expect(renderMarkdown('[x](\x01javascript:alert(1))')).not.toContain('<a');
+    expect(renderMarkdown('[x](JavaScript:alert(1))')).not.toContain('<a');
   });
 });
 
@@ -51,6 +53,15 @@ describe('parseEntry', () => {
     const e = parseEntry('b.md', '---\ntitle: ""\ndate: 29/09\nlots: L8\n---\n');
     expect(e.lots).toEqual(['L8']);
     expect(e.problems).toEqual(['title vide', 'date « 29/09 » n\'est pas une date AAAA-MM-JJ']);
+  });
+
+  it('accepts a UTF-8 BOM and rejects odd capture names', () => {
+    const e = parseEntry('d.md', '\uFEFF---\ntitle: D\ndate: 2026-09-29\ncaptures: [captures/a#1.png, captures, notes.txt, captures/ok.webp]\n---\n');
+    expect(e.problems).toEqual([
+      'capture captures/a#1.png : image .png, .jpg, .webp ou .gif, nom en lettres, chiffres, « . _ - / »',
+      'capture captures : image .png, .jpg, .webp ou .gif, nom en lettres, chiffres, « . _ - / »',
+      'capture notes.txt : image .png, .jpg, .webp ou .gif, nom en lettres, chiffres, « . _ - / »',
+    ]);
   });
 
   it('refuses captures outside the news folder', () => {
@@ -132,6 +143,20 @@ describe('news CLI', () => {
     raf(dir, 'start', 'L1');
     commit(dir, 'feat(L1): écran');
     expect(raf(dir, 'hook', 'post-commit').err).toContain('L1 est visible : cadence news new L1');
+  });
+
+  it('news new flattens a multi-line title; a directory named *.md is ignored; a directory capture is missing', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    raf(dir, 'add', 'Écran');
+    const path = news(dir, 'new', 'L1', '--title', 'deux\nlignes').out;
+    expect(readFileSync(path, 'utf8')).toContain('title: deux lignes\n');
+    mkdirSync(join(dir, 'docs/nouveautes/dossier.md'));
+    mkdirSync(join(dir, 'docs/nouveautes/captures/x.png'), { recursive: true });
+    writeFileSync(path, readFileSync(path, 'utf8').replace('captures: []', 'captures: [captures/x.png]'));
+    const r = news(dir, 'check');
+    expect(r.out).toContain('capture absente captures/x.png');
+    expect(news(dir, 'build').code).toBe(1);
   });
 
   it('build refuses when entries have problems', () => {

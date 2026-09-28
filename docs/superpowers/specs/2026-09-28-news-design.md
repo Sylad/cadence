@@ -16,7 +16,7 @@ et une page HTML autonome.
 |---|---|
 | Lien avec raf | champ `visible: true` sur un lot (`raf add --visible`, ou à la main) |
 | Stockage | un fichier Markdown par entrée, `docs/nouveautes/<date>-<slug>.md`, en-tête YAML |
-| Captures | PNG/JPEG/WebP fournis à la main, dans `docs/nouveautes/captures/` ; aucune dépendance navigateur |
+| Captures | PNG/JPEG/WebP/GIF fournis à la main (noms en `[A-Za-z0-9._/-]`), dans `docs/nouveautes/captures/` ; aucune dépendance navigateur |
 | Rendu | Markdown minimal maison (paragraphes, listes `-`, `**gras**`, `` `code` ``, liens), HTML échappé |
 | Build | `cadence news build -o <dossier>` → `nouveautes.json`, `index.html`, `captures/` copiées |
 | Dépendances | aucune nouvelle (toujours `yaml` seule) |

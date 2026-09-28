@@ -4,9 +4,15 @@ A small working method that lives in your repository. Solo developers and
 AI-assisted sessions lose track of *what is left to do* and *what each commit
 was for*; cadence keeps both in plain files next to the code.
 
-Two tools so far: **raf** (French *reste à faire*, "what is left to do") and
-**news**, a user-facing changelog with screenshots tied to the plan. More will
-follow: session start/close routines, a delivery check.
+Four tools:
+
+- **raf** (French *reste à faire*, "what is left to do"): the plan, linked to your commits;
+- **news**: a user-facing changelog with screenshots, tied to the plan;
+- **session**: the facts to start and to close a work session;
+- **deliver**: wait for the CI of the pushed commit, deploy, then **verify the effect**.
+
+And three [Claude Code](https://claude.com/claude-code) skills that turn them
+into rituals: `session-start`, `session-close`, `deliver`.
 
 ## raf
 
@@ -124,6 +130,79 @@ The Markdown is deliberately small: paragraphs, `-` lists, `**bold**`,
 `` `code` ``, `[links](url)`; everything else is escaped text. The JSON holds
 `{ project, generated, entries: [{ slug, title, date, lots, captures, html }] }`,
 with screenshot paths relative to the JSON file.
+
+## session
+
+```sh
+cadence session start              # notes from the last close, lots in progress (silent ones flagged),
+                                   # work done since yesterday by lot, drift, repo state, 3 proposals
+cadence session start --since "3 days ago" --idle 2
+cadence session close              # today's commits by lot, commits without a lot, lots in progress
+                                   # with no commit today, drift, uncommitted / unpushed work
+                                   # exit 1 while something is still open
+cadence session next "finish L3" "review L4"    # shown by the next session start
+```
+
+Proposals come from the plan only: lots in progress, then ready lots (dependencies
+done), quick wins first. Local state (notes, delivery lock and log) lives in the
+git directory (`.git/cadence/`): never committed, one per clone and worktree.
+
+## deliver
+
+A delivery is done when its checks pass, not when a tool says "success".
+
+```yaml
+# cadence.yaml, at the repository root
+deliver:
+  ci: github              # github | none | { command: "…" }   (default: none)
+  ciTimeout: 1800         # seconds
+  deploy:                 # sh commands, in order, at the repo root
+    - ./scripts/deploy.sh "$CADENCE_SHORT"
+  verify:                 # at least one; retried every 10 s until verifyTimeout
+    - url: https://app.example.com/api/health
+      status: 200         # default 200
+    - url: https://app.example.com/version.txt
+      contains: "${SHORT}"
+    - command: kubectl rollout status deploy/app --timeout=60s
+  verifyTimeout: 300
+```
+
+```sh
+cadence deliver --dry-run    # preconditions, then the resolved steps; nothing runs
+cadence deliver              # 0 delivered and verified · 1 a step failed · 2 refused before acting
+```
+
+- **Preconditions**: no modified tracked file; `HEAD` is on a remote branch (the
+  CI can only build what was pushed); no other delivery running (a lock whose
+  process died is removed with a warning).
+- **CI** `github`: polls `gh run list --commit <sha>` every 15 s; no run after
+  5 minutes is a failure (you probably pushed another commit than the one you
+  deliver); every run must end `success`, `skipped` or `neutral`.
+- Commands get `CADENCE_SHA`, `CADENCE_SHORT` (7 characters) and `CADENCE_BRANCH`;
+  `${SHA}` and `${SHORT}` are replaced in `url` and `contains`.
+- On success the lots cited by the commits since the previous delivery are
+  listed, so you can `raf done` those whose effect you have seen.
+
+## Claude Code skills
+
+As a plugin:
+
+```
+/plugin marketplace add Sylad/cadence
+/plugin install cadence@cadence
+```
+
+gives `/cadence:session-start`, `/cadence:session-close` and `/cadence:deliver`.
+Or copy them into the repository with `cadence skills install` (to
+`.claude/skills/cadence-*`; `--dir` elsewhere, `--force` to overwrite local edits).
+
+- **session-start**: reports the facts briefly, proposes three lots from the
+  plan, then waits for your priority — nothing starts before your answer.
+- **session-close**: plan hygiene, clean repository, memory limited to what the
+  repository does not say, new skills or agents proposed but never created, three
+  lines for next time.
+- **deliver**: dry run, delivery, and on failure the cause fixed rather than a
+  blind retry.
 
 ## License
 

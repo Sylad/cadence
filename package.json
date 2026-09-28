@@ -1,7 +1,7 @@
 {
   "name": "@sylad/cadence",
   "version": "0.2.0",
-  "description": "A small, repo-native working method: a versioned to-do plan (raf) linked to your commits, with a standalone Gantt page.",
+  "description": "A small, repo-native working method: a versioned plan linked to your commits, a changelog with screenshots, session rituals and deliveries proven by their effect.",
   "license": "MIT",
   "author": "Sylvain Ladoire",
   "type": "module",

@@ -6,10 +6,15 @@ import { linkCommits, type Linked } from './link.js';
 import { loadEntries, newsIssues } from './news.js';
 import { isOpen, type Lot, type Plan } from './plan.js';
 
-/** Un commit qui ne touche que le plan (ou la page Gantt) n'a pas besoin de citer un lot. */
+/**
+ * N'ont pas besoin de citer un lot : un commit qui ne touche que le plan (ou la page Gantt), et un
+ * commit automatique dont le sujet correspond à un motif `ignore:` du plan.
+ */
 export function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
   const own = new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html'))]);
+  const { patterns } = plan.ignore;
   const orphans = linked.orphans.filter((c) => {
+    if (patterns.some((re) => re.test(c.subject))) return false;
     const files = changedFiles(root, c.sha);
     return files.length === 0 || !files.every((f) => own.has(f));
   });
@@ -29,7 +34,8 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
   const linked = exemptPlanOnly(linkCommits(lots, readCommits(root, { since: auditSince(plan, opts.since) }), plan.prefix), plan, root);
   // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
   const all = linkCommits(lots, readCommits(root), plan.prefix);
-  return [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...uxIssues(plan)];
+  return [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...uxIssues(plan),
+    ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
 }
 
 /**

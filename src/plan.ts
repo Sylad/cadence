@@ -114,6 +114,22 @@ export class Plan {
     return v == null ? undefined : String(v);
   }
 
+  /** Motifs (expressions régulières sur le sujet) des commits automatiques à ne pas auditer. */
+  get ignore(): { patterns: RegExp[]; invalid: string[] } {
+    const raw = this.doc.get('ignore');
+    const list = isSeq(raw) ? (raw.toJSON() as unknown[]).map(String) : raw == null ? [] : [String(raw)];
+    const patterns: RegExp[] = [];
+    const invalid: string[] = [];
+    for (const src of list) {
+      try {
+        patterns.push(new RegExp(src));
+      } catch {
+        invalid.push(src);
+      }
+    }
+    return { patterns, invalid };
+  }
+
   /** Date d'activation de la revue UX obligatoire des lots visibles ; absente = règle inactive. */
   get uxSince(): Day | undefined {
     const v = this.doc.get('uxSince');

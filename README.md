@@ -65,6 +65,7 @@ version: 1
 project: my-app
 prefix: L
 since: 2026-09-28     # commits before this date are not audited
+ignore: ['^chore\(batch\):']   # optional: subjects of automated commits, never audited
 lots:
   - id: L1
     title: Monthly dedup on merge

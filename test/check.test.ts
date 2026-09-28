@@ -41,3 +41,24 @@ describe('check against a real repository', () => {
     expect(issues.map((i) => i.kind).sort()).toEqual(['bad-dependency', 'cycle']);
   });
 });
+
+describe('ignore : commits automatiques', () => {
+  it('les sujets qui correspondent à un motif « ignore » du plan ne sont pas des commits sans lot', async () => {
+    const { run } = await import('../src/cli.js');
+    const { gitRepo, commit } = await import('./helpers.js');
+    const { readFileSync, writeFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const dir = gitRepo();
+    const io = (out: string[]) => ({ cwd: dir, env: { RAF_TODAY: '2026-09-28' }, out: (l: string) => out.push(l), err: () => {}, now: () => new Date() });
+    run(['init', '--no-hook'], io([]));
+    const plan = join(dir, 'docs/plan/raf.yaml');
+    writeFileSync(plan, readFileSync(plan, 'utf8').replace('lots:', "ignore: ['^chore\\(batch\\):', '[invalide']\nlots:"));
+    commit(dir, 'chore(batch): weekly content refresh', '2026-09-28T10:00:00');
+    commit(dir, 'wip', '2026-09-28T11:00:00');
+    const out: string[] = [];
+    expect(await run(['check'], io(out))).toBe(1);
+    expect(out.join('\n')).not.toContain('weekly content refresh');
+    expect(out.join('\n')).toContain('commit sans lot : ');
+    expect(out.join('\n')).toContain('ignore : motif invalide « [invalide »');
+  });
+});

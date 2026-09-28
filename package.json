@@ -1,0 +1,28 @@
+{
+  "name": "@sylad/cadence",
+  "version": "0.1.0",
+  "description": "A small, repo-native working method: a versioned to-do plan (raf) linked to your commits, with a standalone Gantt page.",
+  "license": "MIT",
+  "author": "Sylvain Ladoire",
+  "type": "module",
+  "bin": {
+    "raf": "bin/raf.js",
+    "cadence": "bin/cadence.js"
+  },
+  "files": ["bin", "dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "yaml": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

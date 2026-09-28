@@ -329,7 +329,7 @@ function news(
     case 'new': {
       if (args.length === 0) throw new RafError('usage : cadence news new <lot…> [--title t]');
       for (const id of args) plan.lot(id);
-      io.out(newEntry(dir, args, values.title ?? plan.lot(args[0]).title, today));
+      io.out(newEntry(dir, args, values.title ?? plan.lot(args[0]).title, today, io.now()));
       return 0;
     }
     case 'list':

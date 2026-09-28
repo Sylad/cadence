@@ -10,6 +10,8 @@ export interface Entry {
   slug: string;
   title: string;
   date: Day;
+  /** Heure de création « AAAA-MM-JJTHH:MM », départage des entrées du même jour. */
+  created?: string;
   lots: string[];
   captures: string[];
   /** Raison de l'absence de capture, quand une capture n'a pas de sens. */
@@ -23,6 +25,7 @@ export interface NewsIssue {
   message: string;
 }
 
+const CREATED = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?$/;
 const CAPTURE = /^[\w./-]+\.(?:png|jpe?g|webp|gif)$/i;
 const FRONT = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
@@ -44,6 +47,11 @@ export function parseEntry(file: string, text: string): Entry {
   }
   entry.title = String(head.title ?? '').trim();
   entry.date = String(head.date ?? '');
+  if (head.created != null) {
+    const created = String(head.created).trim();
+    if (CREATED.test(created)) entry.created = created.replace(' ', 'T');
+    else entry.problems.push(`created « ${created} » n'est pas une heure AAAA-MM-JJTHH:MM`);
+  }
   entry.lots = list(head.lots);
   entry.captures = list(head.captures);
   if (head.nocapture != null && String(head.nocapture).trim()) entry.nocapture = String(head.nocapture).trim();
@@ -61,7 +69,8 @@ export function parseEntry(file: string, text: string): Entry {
 
 /**
  * Entrées du dossier, plus récentes d'abord : par date, puis à date égale par instant de création
- * (date du premier commit du fichier ; pas encore commité = le plus récent), puis par nom de fichier décroissant.
+ * (`created` de l'en-tête, sinon date du premier commit du fichier, pas encore commité = le plus récent),
+ * puis par nom de fichier décroissant.
  */
 export function loadEntries(dir: string): Entry[] {
   if (!existsSync(dir)) return [];
@@ -69,7 +78,7 @@ export function loadEntries(dir: string): Entry[] {
     .filter((f) => f.isFile() && f.name.endsWith('.md') && f.name.toLowerCase() !== 'readme.md')
     .map((f) => parseEntry(f.name, readFileSync(join(dir, f.name), 'utf8')));
   const added = addedTimes(dir);
-  const created = (e: Entry) => added.get(e.file) ?? Infinity;
+  const created = (e: Entry) => (e.created ? Date.parse(e.created) : added.get(e.file) ?? Infinity);
   return entries.sort((a, b) => {
     if (a.date !== b.date) return b.date.localeCompare(a.date);
     const ta = created(a);
@@ -115,15 +124,15 @@ export function slugify(title: string): string {
   );
 }
 
-/** Crée le squelette d'une entrée ; refuse d'écraser un fichier existant. */
-export function newEntry(dir: string, lots: string[], rawTitle: string, today: Day): string {
+/** Crée le squelette d'une entrée, horodatée de `now` ; refuse d'écraser un fichier existant. */
+export function newEntry(dir: string, lots: string[], rawTitle: string, today: Day, now: Date): string {
   const title = rawTitle.replace(/\s+/g, ' ').trim(); // un saut de ligne casserait l'en-tête
   const path = join(dir, `${today}-${slugify(title)}.md`);
   if (existsSync(path)) throw new RafError(`${path} existe déjà`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     path,
-    `---\ntitle: ${stringify(title).trimEnd()}\ndate: ${today}\nlots: [${lots.join(', ')}]\ncaptures: []\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
+    `---\ntitle: ${stringify(title).trimEnd()}\ndate: ${today}\ncreated: ${today}T${now.toTimeString().slice(0, 5)}\nlots: [${lots.join(', ')}]\ncaptures: []\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
   );
   return path;
 }

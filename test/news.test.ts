@@ -110,7 +110,7 @@ describe('news CLI', () => {
     const path = join(dir, 'docs/nouveautes/2026-09-29-montants-francais.md');
     expect(created.out).toBe(path);
     expect(readFileSync(path, 'utf8')).toBe(
-      '---\ntitle: Montants français\ndate: 2026-09-29\nlots: [L1]\ncaptures: []\n# nocapture: raison, quand une capture n\'a pas de sens\n---\nCe qui change pour l\'utilisateur.\n',
+      '---\ntitle: Montants français\ndate: 2026-09-29\ncreated: 2026-09-29T10:12\nlots: [L1]\ncaptures: []\n# nocapture: raison, quand une capture n\'a pas de sens\n---\nCe qui change pour l\'utilisateur.\n',
     );
     expect(news(dir, 'new', 'L1').code).toBe(2); // existe déjà
     expect(news(dir, 'check').out).toContain('sans capture');
@@ -172,7 +172,8 @@ describe('news CLI', () => {
 });
 
 describe('loadEntries order', () => {
-  const entry = (lot: string) => `---\ntitle: ${lot}\ndate: 2026-09-28\nlots: [${lot}]\n---\n`;
+  const entry = (lot: string, created?: string) =>
+    `---\ntitle: ${lot}\ndate: 2026-09-28\nlots: [${lot}]\n${created ? `created: ${created}\n` : ''}---\n`;
   const L18 = '2026-09-28-une-page-nouveautes-ce-qui-change-avec-une-capture.md';
   const L21 = '2026-09-28-un-tableau-de-bord-plus-lisible-surtout-au-telephone.md';
   const add = (dir: string, file: string, lot: string, date: string) => {
@@ -188,6 +189,15 @@ describe('loadEntries order', () => {
     expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['L21', 'L18']);
   });
 
+  it('same day: the created time wins over the commit date; an uncommitted entry without time comes first', () => {
+    const dir = gitRepo();
+    add(dir, L21, 'L21', '2026-09-28T22:21:08+02:00');
+    writeFileSync(join(dir, 'b.md'), entry('LB', '2026-09-28T23:00'));
+    writeFileSync(join(dir, 'a.md'), entry('LA', '2026-09-28T08:00'));
+    writeFileSync(join(dir, 'z.md'), entry('LZ'));
+    expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['LZ', 'LB', 'L21', 'LA']);
+  });
+
   it('the date still comes first; outside git, the file name decides last', () => {
     const dir = tempDir();
     writeFileSync(join(dir, 'a.md'), entry('LA').replace('2026-09-28', '2026-09-29'));
@@ -196,4 +206,7 @@ describe('loadEntries order', () => {
     expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['LA', 'LC', 'LB']);
   });
 
+  it('rejects a malformed created time', () => {
+    expect(parseEntry('x.md', entry('L1', '28/09 22h')).problems).toEqual(['created « 28/09 22h » n\'est pas une heure AAAA-MM-JJTHH:MM']);
+  });
 });

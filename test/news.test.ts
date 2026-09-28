@@ -217,6 +217,13 @@ describe('loadEntries order', () => {
     expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['LA', 'LB', 'LC']);
   });
 
+  it('uses the author date: entries rebased in the same second keep their chronological order', () => {
+    const dir = gitRepo();
+    addAs(dir, L18, 'L18', '2026-09-28T20:07:35+02:00', '2026-09-28T23:00:00+02:00');
+    addAs(dir, L21, 'L21', '2026-09-28T22:21:08+02:00', '2026-09-28T23:00:00+02:00');
+    expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['L21', 'L18']);
+  });
+
   it('same day, no created time: the entry committed last comes first, whatever its file name (L18 then L21)', () => {
     const dir = gitRepo();
     add(dir, L18, 'L18', '2026-09-28T20:07:35+02:00');

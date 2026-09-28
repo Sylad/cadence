@@ -118,7 +118,7 @@ export function isAncestor(cwd: string, a: string, b: string): boolean {
 }
 
 /**
- * Instant (ms) du premier commit qui a ajouté chaque fichier de `dir`, clé = chemin relatif à `dir`.
+ * Instant (ms), date d'auteur (conservée par rebase, amend, cherry-pick), du premier commit qui a ajouté chaque fichier de `dir`, clé = chemin relatif à `dir`.
  * Vide hors d'un dépôt git ; un fichier jamais commité en est absent.
  */
 export function addedTimes(dir: string): Map<string, number> {
@@ -126,17 +126,17 @@ export function addedTimes(dir: string): Map<string, number> {
   let out: string;
   try {
     // quotepath=off + -z : noms accentués tels quels, sans guillemets ni échappement octal.
-    out = git(dir, ['-c', 'core.quotepath=off', 'log', '-z', '--diff-filter=A', '--no-renames', '--relative', '--name-only', `--format=${RECORD}%cI`, '--', '.']);
+    out = git(dir, ['-c', 'core.quotepath=off', 'log', '-z', '--diff-filter=A', '--no-renames', '--relative', '--name-only', `--format=${RECORD}%aI`, '--', '.']);
   } catch {
     return times;
   }
-  // Enregistrement = RECORD date \0 \n nom \0 nom \0 … ; du plus récent au plus ancien : le dernier vu est le premier ajout.
+  // Enregistrement = RECORD date \0 \n nom \0 nom \0 … ; le plus ancien ajout l'emporte.
   for (const record of out.split(RECORD).filter(Boolean)) {
     const [stamp, ...files] = record.split('\0');
     const t = Date.parse(stamp);
     for (const [i, f] of files.entries()) {
       const name = i === 0 ? f.replace(/^\n/, '') : f;
-      if (name) times.set(name, t);
+      if (name) times.set(name, Math.min(t, times.get(name) ?? Infinity));
     }
   }
   return times;

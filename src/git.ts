@@ -52,3 +52,8 @@ export function hooksDir(cwd: string): string {
   const dir = resolve(cwd, git(cwd, ['rev-parse', '--git-path', 'hooks']).trim());
   return basename(dir) === '_' && basename(dirname(dir)) === '.husky' ? dirname(dir) : dir;
 }
+
+/** Fichiers modifiés par un commit, relatifs à la racine du dépôt. */
+export function changedFiles(cwd: string, sha: string): string[] {
+  return git(cwd, ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha]).split('\n').filter(Boolean);
+}

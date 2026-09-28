@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { run } from '../src/cli.js';
 import { commit, gitRepo } from './helpers.js';
 
@@ -114,5 +115,20 @@ describe('adoption date', () => {
     expect(raf(dir, 'check').code).toBe(0);
     commit(dir, 'feat: nouveau travail sans lot', '2026-09-28T08:00:00');
     expect(raf(dir, 'check').out).toContain('commit sans lot');
+  });
+});
+
+describe('plan-only commits', () => {
+  it('do not need to cite a lot', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    raf(dir, 'add', 'A');
+    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    commit(dir, 'chore: plan raf');
+    expect(raf(dir, 'check').code).toBe(0);
+    writeFileSync(join(dir, 'x.txt'), 'x');
+    execFileSync('git', ['add', 'x.txt'], { cwd: dir });
+    commit(dir, 'chore: autre chose');
+    expect(raf(dir, 'check').out).toContain('commit sans lot : ');
   });
 });

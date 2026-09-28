@@ -44,7 +44,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |
-| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default: commits without a lot, unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
+| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default: commits without a lot (commits touching only the plan are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
 | `raf gantt [-o file]` | standalone Gantt page |
 | `raf hook install` | add the (non-blocking, read-only) post-commit hook |
 

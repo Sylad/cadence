@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { check } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { ganttData, renderGantt } from './gantt.js';
-import { gitRoot, readCommits } from './git.js';
+import { changedFiles, gitRoot, readCommits } from './git.js';
 import { installHook } from './hook.js';
-import { linkCommits } from './link.js';
+import { linkCommits, type Linked } from './link.js';
 import { extractRefs, isOpen, Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
 
@@ -140,7 +140,7 @@ function dispatch(argv: string[], io: Io): number {
     case 'check': {
       const plan = Plan.load(planPath);
       const lots = plan.lots();
-      const linked = linkCommits(lots, readCommits(root, { since: auditSince(plan, values.since) }), plan.prefix);
+      const linked = exemptPlanOnly(linkCommits(lots, readCommits(root, { since: auditSince(plan, values.since) }), plan.prefix), plan, root);
       // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
       const all = linkCommits(lots, readCommits(root), plan.prefix);
       const idle = values.idle === undefined ? 7 : Number(values.idle);
@@ -176,6 +176,16 @@ function dispatch(argv: string[], io: Io): number {
     default:
       throw new RafError(`commande inconnue : ${command} (raf --help)`);
   }
+}
+
+/** Un commit qui ne touche que le plan (ou la page Gantt) n'a pas besoin de citer un lot. */
+function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
+  const own = new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html'))]);
+  const orphans = linked.orphans.filter((c) => {
+    const files = changedFiles(root, c.sha);
+    return files.length === 0 || !files.every((f) => own.has(f));
+  });
+  return { ...linked, orphans };
 }
 
 /** Fenêtre de l'audit : --since, sinon la date d'adoption du plan, sinon 30 jours. */
@@ -223,7 +233,8 @@ function now(plan: Plan, root: string, today: Day, io: Io): number {
     for (const l of done) io.out(`  ${l.id}  ${l.title}  (${l.finished})`);
   }
 
-  const issues = check(lots, { ...linkCommits(lots, readCommits(root, { since: auditSince(plan) }), plan.prefix), byLot: linked.byLot }, today);
+  const recent = exemptPlanOnly(linkCommits(lots, readCommits(root, { since: auditSince(plan) }), plan.prefix), plan, root);
+  const issues = check(lots, { ...recent, byLot: linked.byLot }, today);
   if (issues.length) io.out(`\n${issues.length} écart(s) entre le plan et l'historique — raf check`);
   return 0;
 }

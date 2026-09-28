@@ -157,8 +157,9 @@ export function newEntry(dir: string, lots: string[], rawTitle: string, today: D
 }
 
 /**
- * Migration : écrit `created:` dans les entrées lisibles qui n'en ont pas, d'après la date du premier
- * commit du fichier (`now` s'il n'est pas encore commité). Le reste du fichier est laissé tel quel.
+ * Migration : écrit `created:` dans les entrées lisibles qui n'en ont pas (ou l'ont vide), d'après la date
+ * d'auteur du commit qui a ajouté le fichier sous ce nom — un renommage n'est pas suivi — (`now` s'il n'est pas
+ * encore commité). Le reste du fichier est laissé tel quel.
  */
 export function stampEntries(dir: string, now: Date): { file: string; created: string }[] {
   let history: Map<string, number> | undefined;

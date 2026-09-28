@@ -118,7 +118,9 @@ export function isAncestor(cwd: string, a: string, b: string): boolean {
 }
 
 /**
- * Instant (ms), date d'auteur (conservée par rebase, amend, cherry-pick), du premier commit qui a ajouté chaque fichier de `dir`, clé = chemin relatif à `dir`.
+ * Instant (ms), date d'auteur (conservée par rebase, amend, cherry-pick), du commit qui a ajouté chaque fichier
+ * de `dir` SOUS CE NOM (--no-renames : un renommage compte comme un ajout, l'historique antérieur n'est pas suivi),
+ * clé = chemin relatif à `dir`.
  * Vide hors d'un dépôt git ; un fichier jamais commité en est absent.
  */
 export function addedTimes(dir: string): Map<string, number> {

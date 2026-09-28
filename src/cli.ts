@@ -11,6 +11,8 @@ import { linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues } from './news.js';
 import { extractRefs, Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
+import { sessionClose, sessionStart, type SessionCtx } from './session.js';
+import { stateDir, writeNext } from './state.js';
 
 export interface Io {
   cwd: string;
@@ -182,6 +184,9 @@ function dispatch(argv: string[], io: Io): number {
       if (rest[0] === 'post-commit') return postCommit(planPath, newsDir, root, io);
       throw new RafError('usage : raf hook install|post-commit');
     }
+    case 'session':
+      if (!gitRoot(io.cwd)) throw new RafError('session : à lancer dans un dépôt git');
+      return session(rest, { plan: Plan.load(planPath), root, newsDir, state: stateDir(root), today, out: io.out }, values);
     case 'news':
       return news(rest, Plan.load(planPath), newsDir, today, values, io);
     default:
@@ -296,5 +301,22 @@ function news(
     }
     default:
       throw new RafError('usage : cadence news new|list|check|build');
+  }
+}
+
+function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: string; idle?: string }): number {
+  switch (sub) {
+    case 'start': {
+      const idle = values.idle === undefined ? 2 : Number(values.idle);
+      if (!Number.isInteger(idle) || idle < 0) throw new RafError(`--idle invalide : ${values.idle}`);
+      return sessionStart(ctx, { since: values.since ?? '24 hours ago', idle });
+    }
+    case 'close':
+      return sessionClose(ctx, { since: values.since ?? `${ctx.today} 00:00` });
+    case 'next':
+      writeNext(ctx.state, ctx.today, args);
+      return 0;
+    default:
+      throw new RafError('usage : cadence session start [--since …] [--idle 2] | close [--since …] | next "ligne" …');
   }
 }

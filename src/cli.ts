@@ -12,6 +12,7 @@ import { linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues } from './news.js';
 import { extractRefs, Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
+import { installSkills, SKILLS_DIR } from './skills.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { stateDir, writeNext } from './state.js';
 
@@ -203,6 +204,14 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = existsSync(planPath) ? Plan.load(planPath) : null;
       const ctx = { root, state: stateDir(root), plan, config, today, dryRun: !!values['dry-run'], out: io.out, err: io.err };
       return deliver(ctx, realDeps(root));
+    }
+    case 'skills': {
+      if (rest[0] !== 'install') throw new RafError('usage : cadence skills install [--dir .claude/skills] [--force]');
+      const dest = resolve(io.cwd, values.dir ?? join(root, '.claude/skills'));
+      const label = { installed: 'installé', updated: 'mis à jour', unchanged: 'inchangé' };
+      for (const r of installSkills(SKILLS_DIR, dest, !!values.force)) io.out(`${r.name} : ${label[r.status]}`);
+      io.out(dest);
+      return 0;
     }
     case 'news':
       return news(rest, Plan.load(planPath), newsDir, today, values, io);

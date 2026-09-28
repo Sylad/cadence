@@ -1,6 +1,6 @@
 {
   "name": "@sylad/cadence",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A small, repo-native working method: a versioned to-do plan (raf) linked to your commits, with a standalone Gantt page.",
   "license": "MIT",
   "author": "Sylvain Ladoire",
@@ -9,7 +9,7 @@
     "raf": "bin/raf.js",
     "cadence": "bin/cadence.js"
   },
-  "files": ["bin", "dist", "README.md", "LICENSE"],
+  "files": ["bin", "dist", "skills", ".claude-plugin", "README.md", "LICENSE"],
   "engines": { "node": ">=20" },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

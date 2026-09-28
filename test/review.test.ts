@@ -143,7 +143,7 @@ describe('CLI input validation', () => {
 
 describe('single lane', () => {
   it('schedules todo work after lots in progress', () => {
-    const base = { quickwin: false, after: [], notes: [], tasks: [], problems: [] };
+    const base = { quickwin: false, visible: false, after: [], notes: [], tasks: [], problems: [] };
     const bars = schedule(
       [
         { ...base, id: 'L1', title: 'a', status: 'doing', started: '2026-09-28', estimate: 5 },

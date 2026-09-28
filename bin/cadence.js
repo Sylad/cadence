@@ -13,6 +13,8 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = run(args, io);
+} else if (tool === 'news') {
+  process.exitCode = run(['news', ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   console.log(pkg.version);
@@ -20,7 +22,8 @@ if (tool === 'raf') {
   console.log(`cadence — une méthode de travail qui vit dans le dépôt
 
   cadence raf …     plan « reste à faire » relié aux commits (aussi disponible en « raf »)
+  cadence news …    Nouveautés : une entrée avec capture par lot visible, JSON + page autonome
 
-D'autres outils suivront (Nouveautés, reprise, clôture, livraison).`);
+D'autres outils suivront (reprise, clôture, livraison).`);
   process.exitCode = tool ? 2 : 0;
 }

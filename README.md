@@ -4,9 +4,9 @@ A small working method that lives in your repository. Solo developers and
 AI-assisted sessions lose track of *what is left to do* and *what each commit
 was for*; cadence keeps both in plain files next to the code.
 
-The first tool is **raf** (French *reste à faire*, "what is left to do"). More
-will follow: a changelog with screenshots, session start/close routines, a
-delivery check.
+Two tools so far: **raf** (French *reste à faire*, "what is left to do") and
+**news**, a user-facing changelog with screenshots tied to the plan. More will
+follow: session start/close routines, a delivery check.
 
 ## raf
 
@@ -39,7 +39,7 @@ raf gantt                         # docs/plan/gantt.html
 | Command | Effect |
 |---|---|
 | `raf init [--project name] [--prefix L] [--no-hook]` | create the plan and install the hook |
-| `raf add "title" [--estimate d] [--quickwin] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id |
+| `raf add "title" [--estimate d] [--quickwin] [--visible] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
 | `raf now` | what to do next |
@@ -64,6 +64,7 @@ lots:
     status: doing        # todo | doing | done | dropped
     estimate: 2          # working days
     quickwin: false
+    visible: true        # user-facing: a news entry is expected when done
     after: [L0]
     created: 2026-09-28
     started: 2026-09-29
@@ -78,6 +79,51 @@ lots:
 One lane of work. Finished lots use their real dates (or their commits' dates);
 lots in progress run until `max(start + estimate, today)`; lots to do follow in
 file order, after their dependencies, on working days.
+
+## news
+
+What changed *for the user*, one entry per visible lot, each with a screenshot.
+
+- Mark a lot as user-facing with `raf add … --visible` (or `visible: true` in
+  the YAML). `raf done` and the post-commit hook remind you to write its entry;
+  `raf check` fails while a visible lot is done without one.
+- An entry is a Markdown file in `docs/nouveautes/`, with a YAML header.
+  Screenshots are files you take yourself, stored next to the entries.
+- `cadence news build` writes `nouveautes.json` for your app to display, a
+  self-contained `index.html`, and copies the screenshots.
+
+```sh
+raf add "Amounts like 3.000 read as three thousand" --visible   # → L8
+raf start L8 && git commit -m "fix(L8): thousands separator" && raf done L8
+cadence news new L8          # docs/nouveautes/2026-09-29-amounts-like-3-000-….md
+# add docs/nouveautes/captures/l8.png, list it under `captures:`, write the text
+cadence news check           # exit 1 on drift (also part of raf check)
+cadence news build -o frontend/public/nouveautes
+```
+
+```markdown
+---
+title: Amounts like 3.000 read as three thousand
+date: 2026-09-29
+lots: [L8]
+captures: [captures/l8.png]
+# nocapture: reason, when a screenshot makes no sense
+---
+Imported statements now read **3.000** as three thousand, not three.
+```
+
+| Command | Effect |
+|---|---|
+| `cadence news new <lot…> [--title t]` | entry skeleton, dated today, titled after the lot |
+| `cadence news list` | entries, newest first |
+| `cadence news check` | visible lots done without entry, unknown lots, missing or undeclared screenshots, bad headers |
+| `cadence news build [-o dir]` | `nouveautes.json` + `index.html` + screenshots (default `docs/nouveautes/site`) |
+
+`--dir` changes the entries folder (default `docs/nouveautes` at the git root).
+The Markdown is deliberately small: paragraphs, `-` lists, `**bold**`,
+`` `code` ``, `[links](url)`; everything else is escaped text. The JSON holds
+`{ project, generated, entries: [{ slug, title, date, lots, captures, html }] }`,
+with screenshot paths relative to the JSON file.
 
 ## License
 

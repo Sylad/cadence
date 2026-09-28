@@ -7,7 +7,7 @@ import { schedule } from '../src/schedule.js';
 const MONDAY = '2026-09-28';
 
 function lot(id: string, extra: Partial<Lot> = {}): Lot {
-  return { id, title: id, status: 'todo', estimate: 1, quickwin: false, after: [], notes: [], tasks: [], problems: [], ...extra };
+  return { id, title: id, status: 'todo', estimate: 1, quickwin: false, visible: false, after: [], notes: [], tasks: [], problems: [], ...extra };
 }
 const span = (bars: ReturnType<typeof schedule>) => Object.fromEntries(bars.map((b) => [b.lot.id, [b.start, b.end]]));
 

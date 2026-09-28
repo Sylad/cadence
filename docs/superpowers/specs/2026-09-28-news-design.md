@@ -18,7 +18,7 @@ et une page HTML autonome.
 | Stockage | un fichier Markdown par entrée, `docs/nouveautes/<date>-<slug>.md`, en-tête YAML |
 | Captures | PNG/JPEG/WebP fournis à la main, dans `docs/nouveautes/captures/` ; aucune dépendance navigateur |
 | Rendu | Markdown minimal maison (paragraphes, listes `-`, `**gras**`, `` `code` ``, liens), HTML échappé |
-| Build | `cadence news build --out <dossier>` → `nouveautes.json`, `index.html`, `captures/` copiées |
+| Build | `cadence news build -o <dossier>` → `nouveautes.json`, `index.html`, `captures/` copiées |
 | Dépendances | aucune nouvelle (toujours `yaml` seule) |
 
 ## Entrée
@@ -61,7 +61,7 @@ l'adoption ne sont pas concernés : `visible` est opt-in, l'historique n'en a pa
 | `cadence news new <lot…> [--title t]` | crée le squelette d'entrée daté (titre du lot par défaut), affiche le chemin |
 | `cadence news list` | entrées, plus récentes d'abord |
 | `cadence news check` | écarts ci-dessus, code 1 s'il y en a |
-| `cadence news build [--out docs/nouveautes/site]` | JSON + page autonome + captures copiées |
+| `cadence news build [-o docs/nouveautes/site]` | JSON + page autonome + captures copiées |
 
 Options communes : `--dir` (défaut `docs/nouveautes` à la racine git),
 `--file` / `RAF_FILE` pour le plan, `RAF_TODAY`.

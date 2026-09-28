@@ -23,6 +23,8 @@ export interface Lot {
   status: Status;
   estimate: number;
   quickwin: boolean;
+  /** Changement visible par l'utilisateur : une entrée Nouveautés est attendue à la livraison. */
+  visible: boolean;
   after: string[];
   created?: Day;
   started?: Day;
@@ -135,7 +137,7 @@ export class Plan {
     return node as YAMLMap;
   }
 
-  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; after?: string[] } = {}): string {
+  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; after?: string[] } = {}): string {
     const known = new Set(this.lots().map((l) => l.id));
     for (const dep of opts.after ?? []) if (!known.has(dep)) throw new RafError(`dépendance inconnue : ${dep}`);
     const re = new RegExp(`^${escapeRe(this.prefix)}(\\d+)$`);
@@ -143,6 +145,7 @@ export class Plan {
     const id = `${this.prefix}${max + 1}`;
     const entry: Record<string, unknown> = { id, title, status: 'todo', estimate: opts.estimate ?? 1 };
     if (opts.quickwin) entry.quickwin = true;
+    if (opts.visible) entry.visible = true;
     if (opts.after?.length) entry.after = opts.after;
     entry.created = today;
     const node = this.doc.createNode(entry) as YAMLMap;
@@ -226,6 +229,7 @@ function normalizeLot(raw: Record<string, unknown>): Lot {
     status,
     estimate: typeof raw.estimate === 'number' && raw.estimate > 0 ? raw.estimate : 1,
     quickwin: raw.quickwin === true,
+    visible: raw.visible === true,
     after,
     created: asDay('created'),
     started: asDay('started'),

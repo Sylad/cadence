@@ -50,13 +50,14 @@ export function extractRefs(text: string, prefix: string): { lot: string; task?:
   return [...text.matchAll(refPattern(prefix))].map((m) => ({ lot: m[1], task: m[2] }));
 }
 
-function initialContent(project: string, prefix: string): string {
+function initialContent(project: string, prefix: string, since: Day): string {
   return `# Plan « reste à faire » tenu par raf (https://github.com/Sylad/cadence).
 # Édité par le CLI, mais les modifications à la main et les commentaires sont préservés.
 # Un commit appartient à un lot quand son message cite l'identifiant (${prefix}3, ${prefix}3/t1).
 version: 1
 project: ${project}
 prefix: ${prefix}
+since: ${since}       # raf check ignore les commits antérieurs à l'adoption
 lots: []
 `;
 }
@@ -67,10 +68,10 @@ export class Plan {
     private readonly doc: Document,
   ) {}
 
-  static create(path: string, project: string, prefix = 'L'): Plan {
+  static create(path: string, project: string, prefix = 'L', since?: Day): Plan {
     if (existsSync(path)) throw new RafError(`${path} existe déjà`);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, initialContent(project, prefix));
+    writeFileSync(path, initialContent(project, prefix, since ?? new Date().toISOString().slice(0, 10)));
     return Plan.load(path);
   }
 
@@ -95,6 +96,12 @@ export class Plan {
 
   get prefix(): string {
     return String(this.doc.get('prefix') ?? 'L');
+  }
+
+  /** Date d'adoption de raf : les commits plus anciens ne sont pas audités. */
+  get since(): Day | undefined {
+    const v = this.doc.get('since');
+    return v == null ? undefined : String(v);
   }
 
   lots(): Lot[] {

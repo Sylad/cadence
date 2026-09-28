@@ -104,3 +104,15 @@ describe('raf CLI', () => {
     expect(data.generated).toBe('2026-09-28 09:30');
   });
 });
+
+describe('adoption date', () => {
+  it('check ignores commits made before raf init', () => {
+    const dir = gitRepo();
+    commit(dir, 'feat: ancien travail', '2026-09-20T10:00:00');
+    raf(dir, 'init', '--no-hook');
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('since: 2026-09-28');
+    expect(raf(dir, 'check').code).toBe(0);
+    commit(dir, 'feat: nouveau travail sans lot', '2026-09-28T08:00:00');
+    expect(raf(dir, 'check').out).toContain('commit sans lot');
+  });
+});

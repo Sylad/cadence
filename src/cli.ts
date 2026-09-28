@@ -26,7 +26,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf note <id> "texte"
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf list [--status todo|doing|done|dropped]
-  raf check [--since "30 days ago"] [--idle 7]     code 1 s'il y a des écarts
+  raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf gantt [-o docs/plan/gantt.html]
   raf hook install
 
@@ -81,7 +81,7 @@ function dispatch(argv: string[], io: Io): number {
 
   switch (command) {
     case 'init': {
-      const plan = Plan.create(planPath, values.project ?? basename(root), values.prefix ?? 'L');
+      const plan = Plan.create(planPath, values.project ?? basename(root), values.prefix ?? 'L', today);
       io.out(`plan créé : ${plan.path}`);
       if (!values['no-hook'] && gitRoot(io.cwd)) io.out(`hook : ${installHook(io.cwd).path}`);
       return 0;
@@ -134,7 +134,7 @@ function dispatch(argv: string[], io: Io): number {
     case 'check': {
       const plan = Plan.load(planPath);
       const lots = plan.lots();
-      const linked = linkCommits(lots, readCommits(root, { since: values.since ?? '30 days ago' }), plan.prefix);
+      const linked = linkCommits(lots, readCommits(root, { since: auditSince(plan, values.since) }), plan.prefix);
       // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
       const all = linkCommits(lots, readCommits(root), plan.prefix);
       const issues = check(lots, { ...linked, byLot: all.byLot }, today, values.idle ? Number(values.idle) : 7);
@@ -167,6 +167,13 @@ function dispatch(argv: string[], io: Io): number {
     default:
       throw new RafError(`commande inconnue : ${command} (raf --help)`);
   }
+}
+
+/** Fenêtre de l'audit : --since, sinon la date d'adoption du plan, sinon 30 jours. */
+function auditSince(plan: Plan, explicit?: string): string {
+  if (explicit) return explicit;
+  // Une date seule vaudrait « ce jour-là à l'heure actuelle » pour git : minuit explicite.
+  return plan.since ? `${plan.since} 00:00` : '30 days ago';
 }
 
 function describe(l: Lot, commits: number): string {
@@ -207,7 +214,7 @@ function now(plan: Plan, root: string, today: Day, io: Io): number {
     for (const l of done) io.out(`  ${l.id}  ${l.title}  (${l.finished})`);
   }
 
-  const issues = check(lots, { ...linkCommits(lots, readCommits(root, { since: '30 days ago' }), plan.prefix), byLot: linked.byLot }, today);
+  const issues = check(lots, { ...linkCommits(lots, readCommits(root, { since: auditSince(plan) }), plan.prefix), byLot: linked.byLot }, today);
   if (issues.length) io.out(`\n${issues.length} écart(s) entre le plan et l'historique — raf check`);
   return 0;
 }

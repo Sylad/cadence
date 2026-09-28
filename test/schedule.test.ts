@@ -7,7 +7,7 @@ import { schedule } from '../src/schedule.js';
 const MONDAY = '2026-09-28';
 
 function lot(id: string, extra: Partial<Lot> = {}): Lot {
-  return { id, title: id, status: 'todo', estimate: 1, quickwin: false, after: [], notes: [], tasks: [], ...extra };
+  return { id, title: id, status: 'todo', estimate: 1, quickwin: false, after: [], notes: [], tasks: [], problems: [], ...extra };
 }
 const span = (bars: ReturnType<typeof schedule>) => Object.fromEntries(bars.map((b) => [b.lot.id, [b.start, b.end]]));
 
@@ -47,6 +47,20 @@ describe('schedule', () => {
   it('runs a late lot in progress up to today', () => {
     const bars = schedule([lot('L1', { status: 'doing', started: '2026-09-01', estimate: 2 })], new Map(), MONDAY);
     expect(span(bars)).toEqual({ L1: ['2026-09-01', MONDAY] });
+  });
+
+  it('packs half-day lots into the same day', () => {
+    const bars = schedule([lot('L1', { estimate: 0.5 }), lot('L2', { estimate: 0.5 }), lot('L3', { estimate: 0.5 })], new Map(), MONDAY);
+    expect(span(bars)).toEqual({ L1: [MONDAY, MONDAY], L2: [MONDAY, MONDAY], L3: ['2026-09-29', '2026-09-29'] });
+  });
+
+  it('starts after a dependency already in progress', () => {
+    const bars = schedule(
+      [lot('L1', { status: 'doing', started: MONDAY, estimate: 3 }), lot('L2', { after: ['L1'] })],
+      new Map(),
+      MONDAY,
+    );
+    expect(span(bars)).toEqual({ L1: [MONDAY, '2026-09-30'], L2: ['2026-10-01', '2026-10-01'] });
   });
 
   it('does not loop forever on a dependency cycle', () => {

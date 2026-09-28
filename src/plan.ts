@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
-import type { Day } from './dates.js';
+import { isDay, toDay, type Day } from './dates.js';
 
 export const STATUSES = ['todo', 'doing', 'done', 'dropped'] as const;
 export type Status = (typeof STATUSES)[number];
@@ -29,6 +29,8 @@ export interface Lot {
   finished?: Day;
   notes: Note[];
   tasks: Task[];
+  /** Champs écrits à la main illisibles (dates mal formées…), remontés par check. */
+  problems: string[];
 }
 
 export class RafError extends Error {}
@@ -55,7 +57,7 @@ function initialContent(project: string, prefix: string, since: Day): string {
 # Édité par le CLI, mais les modifications à la main et les commentaires sont préservés.
 # Un commit appartient à un lot quand son message cite l'identifiant (${prefix}3, ${prefix}3/t1).
 version: 1
-project: ${project}
+project: ${JSON.stringify(project)}
 prefix: ${prefix}
 since: ${since}       # raf check ignore les commits antérieurs à l'adoption
 lots: []
@@ -66,28 +68,32 @@ export class Plan {
   private constructor(
     readonly path: string,
     private readonly doc: Document,
+    /** false quand le fichier écrit à la main met les « - » en colonne de la clé parente. */
+    private readonly indentSeq: boolean,
   ) {}
 
   static create(path: string, project: string, prefix = 'L', since?: Day): Plan {
     if (existsSync(path)) throw new RafError(`${path} existe déjà`);
+    if (!/^[A-Za-z][A-Za-z_-]*$/.test(prefix)) throw new RafError(`préfixe invalide : ${prefix} (lettres uniquement)`);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, initialContent(project, prefix, since ?? new Date().toISOString().slice(0, 10)));
+    writeFileSync(path, initialContent(project, prefix, since ?? toDay(new Date())));
     return Plan.load(path);
   }
 
   static load(path: string): Plan {
     if (!existsSync(path)) throw new RafError(`pas de plan à ${path} — lancer « raf init »`);
-    const doc = parseDocument(readFileSync(path, 'utf8'));
+    const text = readFileSync(path, 'utf8');
+    const doc = parseDocument(text);
     if (doc.errors.length > 0) throw new RafError(`${path} : ${doc.errors[0].message}`);
     if (!isMap(doc.contents)) throw new RafError(`${path} : la racine doit être un objet`);
     const lots = doc.get('lots');
     if (!isSeq(lots)) doc.set('lots', doc.createNode([]));
     else lots.flow = false; // « lots: [] » écrit par init : passer en style bloc
-    return new Plan(path, doc);
+    return new Plan(path, doc, !/^lots:[^\n]*\n(?:#[^\n]*\n)*- /m.test(text));
   }
 
   save(): void {
-    writeFileSync(this.path, this.doc.toString({ lineWidth: 0 }));
+    writeFileSync(this.path, this.doc.toString({ lineWidth: 0, indentSeq: this.indentSeq }));
   }
 
   get project(): string {
@@ -166,13 +172,15 @@ export class Plan {
   setStatus(ref: string, status: Status, today: Day, opts: { force?: boolean } = {}): void {
     const [lotId, taskId] = ref.split('/');
     if (taskId) {
-      this.taskNode(lotId, taskId).set('status', status);
+      const task = this.taskNode(lotId, taskId);
+      if (String(task.get('status')) === status) throw new RafError(`${ref} est déjà ${status}`);
+      task.set('status', status);
       return;
     }
     const lot = this.lot(lotId);
     const node = this.lotNode(lotId);
     if (lot.status === status) throw new RafError(`${lotId} est déjà ${status}`);
-    if (status === 'doing' && !isOpen(lot.status)) {
+    if (!isOpen(lot.status)) {
       throw new RafError(`${lotId} est ${lot.status} ; le rouvrir à la main dans le YAML si c'est voulu`);
     }
     if (status === 'done') {
@@ -182,15 +190,14 @@ export class Plan {
       }
     }
     node.set('status', status);
-    if (status === 'doing' || (status === 'done' && !lot.started)) {
-      if (!lot.started) node.set('started', today);
-    }
+    if (!lot.started && status !== 'dropped') node.set('started', today);
     if (status === 'done' || status === 'dropped') node.set('finished', today);
   }
 
   note(ref: string, text: string, today: Day): void {
-    const lotId = ref.split('/')[0];
+    const [lotId, taskId] = ref.split('/');
     const lot = this.lotNode(lotId);
+    if (taskId) this.taskNode(lotId, taskId);
     let notes = lot.get('notes');
     if (!isSeq(notes)) {
       notes = this.doc.createNode([]);
@@ -204,17 +211,25 @@ export class Plan {
 
 function normalizeLot(raw: Record<string, unknown>): Lot {
   const status = STATUSES.includes(raw.status as Status) ? (raw.status as Status) : 'todo';
-  const asDay = (v: unknown): Day | undefined => (v == null ? undefined : String(v));
+  const problems: string[] = [];
+  const asDay = (field: string): Day | undefined => {
+    const v = raw[field];
+    if (v == null) return undefined;
+    if (isDay(v)) return v;
+    problems.push(`${field} « ${String(v)} » n'est pas une date AAAA-MM-JJ`);
+    return undefined;
+  };
+  const after = raw.after == null ? [] : Array.isArray(raw.after) ? raw.after.map(String) : [String(raw.after)];
   return {
     id: String(raw.id),
     title: String(raw.title ?? ''),
     status,
     estimate: typeof raw.estimate === 'number' && raw.estimate > 0 ? raw.estimate : 1,
     quickwin: raw.quickwin === true,
-    after: Array.isArray(raw.after) ? raw.after.map(String) : [],
-    created: asDay(raw.created),
-    started: asDay(raw.started),
-    finished: asDay(raw.finished),
+    after,
+    created: asDay('created'),
+    started: asDay('started'),
+    finished: asDay('finished'),
     notes: Array.isArray(raw.notes)
       ? raw.notes.map((n: Record<string, unknown>) => ({ date: String(n.date ?? ''), text: String(n.text ?? '') }))
       : [],
@@ -225,5 +240,6 @@ function normalizeLot(raw: Record<string, unknown>): Lot {
           status: STATUSES.includes(t.status as Status) ? (t.status as Status) : 'todo',
         }))
       : [],
+    problems,
   };
 }

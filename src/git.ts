@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { basename, dirname, resolve } from 'node:path';
 
 export interface Commit {
   sha: string;
@@ -43,18 +44,11 @@ export function readCommits(cwd: string, opts: { since?: string; range?: string 
     });
 }
 
-export function gitDir(cwd: string): string {
-  return git(cwd, ['rev-parse', '--absolute-git-dir']).trim();
-}
-
+/**
+ * Dossier où git exécute réellement les hooks : gère worktrees, core.hooksPath
+ * (y compris « ~/… ») et Husky v9, dont `.husky/_` est généré — les hooks à la main vont dans `.husky/`.
+ */
 export function hooksDir(cwd: string): string {
-  const custom = (() => {
-    try {
-      return git(cwd, ['config', '--get', 'core.hooksPath']).trim();
-    } catch {
-      return '';
-    }
-  })();
-  if (custom) return custom.startsWith('/') ? custom : `${gitRoot(cwd)}/${custom}`;
-  return `${gitDir(cwd)}/hooks`;
+  const dir = resolve(cwd, git(cwd, ['rev-parse', '--git-path', 'hooks']).trim());
+  return basename(dir) === '_' && basename(dirname(dir)) === '.husky' ? dirname(dir) : dir;
 }

@@ -58,3 +58,17 @@ export function diffDays(from: Day, to: Day): number {
 export function maxDay(a: Day, b: Day): Day {
   return a > b ? a : b;
 }
+
+/** The `n`-th working day (0-based) counted from the first working day at or after `base`. */
+export function workdayAt(base: Day, n: number): Day {
+  let d = nextWorkday(base);
+  for (let i = 0; i < n; i++) d = nextWorkday(addDays(d, 1));
+  return d;
+}
+
+/** Number of working days from the first working day at or after `base` through `day` inclusive. */
+export function workdaysThrough(base: Day, day: Day): number {
+  let n = 0;
+  for (let d = nextWorkday(base); d <= day; d = nextWorkday(addDays(d, 1))) n++;
+  return n;
+}

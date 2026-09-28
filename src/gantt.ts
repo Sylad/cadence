@@ -104,15 +104,18 @@ svg text { fill:var(--fg); font-size:12px; }
 svg .axis { fill:var(--muted); }
 svg .grid { stroke:var(--grid); }
 svg .today { stroke:var(--today); stroke-width:2; }
-svg .bar { rx:3; }
+svg .bar { rx:3; ry:3; }
 svg .bar.todo { fill:var(--todo); } svg .bar.doing { fill:var(--doing); } svg .bar.done { fill:var(--done); } svg .bar.dropped { fill:var(--dropped); }
-svg .bar.projected { fill-opacity:.55; stroke-dasharray:4 3; stroke:var(--fg); stroke-opacity:.35; }
+svg .bar.projected { fill-opacity:.45; stroke:currentColor; stroke-width:1; }
+svg .bar.projected.todo { color:var(--todo); }
+svg .weekend { fill:var(--grid); opacity:.45; }
 svg .row:hover .bar { stroke:var(--fg); stroke-opacity:.8; }
 #tip { position:fixed; max-width:360px; padding:8px 10px; border-radius:6px; background:var(--fg); color:var(--bg); font-size:12px; pointer-events:none; z-index:2; }
 #tip p { margin:2px 0; }
 table { width:100%; border-collapse:collapse; margin-top:20px; }
 th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--grid); vertical-align:top; }
 th { color:var(--muted); font-weight:600; }
+td.date { white-space:nowrap; }
 td.st-doing { color:var(--doing); } td.st-done { color:var(--done); } td.st-dropped { color:var(--dropped); }
 `;
 
@@ -155,9 +158,12 @@ const SCRIPT = `
     var max = Math.max.apply(null, bars.map(function (b) { return ms(b.end); }).concat([ms(data.today)])) + 3 * DAY;
     var days = Math.round((max - min) / DAY);
     var x = function (d) { return LABEL + Math.round((ms(d) - min) / DAY) * COL; };
-    var svg = el('svg', { width: LABEL + days * COL + 10, height: HEAD + bars.length * ROW + 10 });
+    var svg = el('svg', { width: LABEL + days * COL + 48, height: HEAD + bars.length * ROW + 10 });
     for (var i = 0; i <= days; i++) {
       var t = new Date(min + i * DAY);
+      if (t.getUTCDay() === 0 || t.getUTCDay() === 6) {
+        svg.appendChild(el('rect', { x: LABEL + i * COL, y: HEAD - 6, width: COL, height: bars.length * ROW + 6, class: 'weekend' }));
+      }
       if (t.getUTCDay() === 1) {
         var gx = LABEL + i * COL;
         svg.appendChild(el('line', { x1: gx, x2: gx, y1: HEAD - 6, y2: HEAD + bars.length * ROW, class: 'grid' }));
@@ -186,7 +192,7 @@ const SCRIPT = `
       var tr = document.createElement('tr');
       var last = b.notes.length ? b.notes[b.notes.length - 1] : null;
       [b.id, (b.quickwin ? '⚡ ' : '') + b.title, LABELS[b.status], String(b.estimate), b.start, b.end, String(b.commits), last ? last.date + ' : ' + last.text : '']
-        .forEach(function (v, i) { var td = document.createElement('td'); td.textContent = v; if (i === 2) td.className = 'st-' + b.status; tr.appendChild(td); });
+        .forEach(function (v, i) { var td = document.createElement('td'); td.textContent = v; if (i === 2) td.className = 'st-' + b.status; if (i === 4 || i === 5) td.className = 'date'; tr.appendChild(td); });
       rows.appendChild(tr);
     });
   }

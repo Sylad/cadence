@@ -1,4 +1,4 @@
-import { addDays, endAfterWorkdays, maxDay, nextWorkday, type Day } from './dates.js';
+import { endAfterWorkdays, maxDay, workdayAt, workdaysThrough, type Day } from './dates.js';
 import type { Commit } from './git.js';
 import type { Lot } from './plan.js';
 
@@ -34,7 +34,14 @@ export function schedule(lots: Lot[], commitsByLot: Map<string, Commit[]>, today
     }
   }
 
-  let cursor = nextWorkday(today);
+  // Les lots à faire se placent en jours ouvrés fractionnaires : deux lots d'une
+  // demi-journée partagent la même journée. Position 0 = premier jour ouvré à partir d'aujourd'hui.
+  const endPos = new Map<string, number>();
+  // Une seule file : la suite commence après les lots en cours.
+  let cursor = Math.max(
+    0,
+    ...[...bars.values()].filter((b) => b.lot.status === 'doing').map((b) => workdaysThrough(today, b.end)),
+  );
   let pending = lots.filter((l) => l.status === 'todo');
   while (pending.length > 0) {
     const ready = (l: Lot) =>
@@ -42,14 +49,22 @@ export function schedule(lots: Lot[], commitsByLot: Map<string, Commit[]>, today
     // Premier lot prêt dans l'ordre du fichier ; en cas de cycle, le premier tout court.
     const lot = pending.find(ready) ?? pending[0];
     pending = pending.filter((l) => l !== lot);
-    let start = cursor;
+    let startPos = cursor;
     for (const d of lot.after) {
       const dep = bars.get(d);
-      if (dep && dep.lot.status !== 'dropped') start = maxDay(start, nextWorkday(addDays(dep.end, 1)));
+      if (!dep || dep.lot.status === 'dropped') continue;
+      startPos = Math.max(startPos, endPos.get(d) ?? workdaysThrough(today, dep.end));
     }
-    const end = endAfterWorkdays(start, lot.estimate);
-    bars.set(lot.id, { lot, start, end, projected: true, commits: count(lot.id) });
-    cursor = nextWorkday(addDays(end, 1));
+    const end = startPos + lot.estimate;
+    endPos.set(lot.id, end);
+    bars.set(lot.id, {
+      lot,
+      start: workdayAt(today, Math.floor(startPos)),
+      end: workdayAt(today, Math.max(Math.floor(startPos), Math.ceil(end) - 1)),
+      projected: true,
+      commits: count(lot.id),
+    });
+    cursor = end;
   }
 
   return lots.flatMap((l) => bars.get(l.id) ?? []);

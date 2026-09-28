@@ -4,7 +4,7 @@ import type { Linked } from './link.js';
 import { isOpen, type Lot } from './plan.js';
 
 export interface Issue {
-  kind: 'orphan-commit' | 'unknown-ref' | 'todo-with-commits' | 'idle' | 'done-open-tasks' | 'bad-dependency' | 'cycle';
+  kind: 'orphan-commit' | 'unknown-ref' | 'todo-with-commits' | 'idle' | 'done-open-tasks' | 'bad-dependency' | 'cycle' | 'bad-field';
   message: string;
 }
 
@@ -36,6 +36,7 @@ export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7): Is
         issues.push({ kind: 'done-open-tasks', message: `${lot.id} terminé avec sous-tâche(s) ouverte(s) : ${open.map((t) => t.id).join(', ')}` });
       }
     }
+    for (const p of lot.problems) issues.push({ kind: 'bad-field', message: `${lot.id} : ${p}` });
     for (const d of lot.after) {
       if (!ids.has(d)) issues.push({ kind: 'bad-dependency', message: `${lot.id} dépend de ${d}, absent du plan` });
     }

@@ -1,8 +1,8 @@
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { check } from './check.js';
-import { toDay, type Day } from './dates.js';
+import { isDay, toDay, type Day } from './dates.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, readCommits } from './git.js';
 import { installHook } from './hook.js';
@@ -31,6 +31,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf hook install
 
 Un commit appartient à un lot quand son message cite l'identifiant : « feat(L3): … », « L3/t1 ».
+Un texte qui commence par « - » se passe après « -- » : raf note L1 -- "-5 %".
 Options communes : --file chemin (ou RAF_FILE), RAF_TODAY=AAAA-MM-JJ pour figer la date.`;
 
 export function run(argv: string[], io: Io): number {
@@ -39,6 +40,10 @@ export function run(argv: string[], io: Io): number {
   } catch (e) {
     if (e instanceof RafError) {
       io.err(`raf: ${e.message}`);
+      return 2;
+    }
+    if (e instanceof Error && 'code' in e && String(e.code).startsWith('ERR_PARSE_ARGS')) {
+      io.err(`raf: ${e.message} (un texte qui commence par « - » se passe après « -- »)`);
       return 2;
     }
     throw e;
@@ -73,6 +78,7 @@ function dispatch(argv: string[], io: Io): number {
     return 0;
   }
   const today: Day = io.env.RAF_TODAY ?? toDay(io.now());
+  if (!isDay(today)) throw new RafError(`RAF_TODAY invalide : ${today} (attendu AAAA-MM-JJ)`);
   const root = gitRoot(io.cwd) ?? io.cwd;
   const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? join(root, 'docs/plan/raf.yaml'));
   const need = (n: number, usage: string) => {
@@ -137,7 +143,9 @@ function dispatch(argv: string[], io: Io): number {
       const linked = linkCommits(lots, readCommits(root, { since: auditSince(plan, values.since) }), plan.prefix);
       // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
       const all = linkCommits(lots, readCommits(root), plan.prefix);
-      const issues = check(lots, { ...linked, byLot: all.byLot }, today, values.idle ? Number(values.idle) : 7);
+      const idle = values.idle === undefined ? 7 : Number(values.idle);
+      if (!Number.isInteger(idle) || idle < 0) throw new RafError(`--idle invalide : ${values.idle}`);
+      const issues = check(lots, { ...linked, byLot: all.byLot }, today, idle);
       for (const i of issues) io.out(`✗ ${i.message}`);
       io.out(issues.length === 0 ? '✓ plan et historique cohérents' : `${issues.length} écart(s)`);
       return issues.length === 0 ? 0 : 1;
@@ -151,6 +159,7 @@ function dispatch(argv: string[], io: Io): number {
         ganttData(plan.project, schedule(lots, linked.byLot, today), today, `${toDay(stamp)} ${stamp.toTimeString().slice(0, 5)}`),
       );
       const out = resolve(io.cwd, values.output ?? join(dirname(planPath), 'gantt.html'));
+      mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out, html);
       io.out(out);
       return 0;

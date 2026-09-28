@@ -10,7 +10,7 @@ export interface Entry {
   slug: string;
   title: string;
   date: Day;
-  /** Horodatage de création « AAAA-MM-JJTHH:MM[±hh:mm] » (sans fuseau = heure locale), départage des entrées du même jour. */
+  /** Horodatage de création « AAAA-MM-JJTHH:MM±hh:mm » (ou Z), fuseau obligatoire ; départage des entrées du même jour. */
   created?: string;
   lots: string[];
   captures: string[];
@@ -27,6 +27,7 @@ export interface NewsIssue {
 
 const CREATED_EMPTY = 'created vide — cadence news stamp';
 const CREATED = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?$/;
+const OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/;
 const CAPTURE = /^[\w./-]+\.(?:png|jpe?g|webp|gif)$/i;
 const FRONT = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
@@ -60,7 +61,9 @@ export function parseEntry(file: string, text: string): Entry {
   if ('created' in head) {
     const created = String(head.created ?? '').trim();
     if (!created) entry.problems.push(CREATED_EMPTY);
-    else if (!CREATED.test(created)) entry.problems.push(`created « ${created} » n'est pas une heure AAAA-MM-JJTHH:MM`);
+    else if (!CREATED.test(created)) entry.problems.push(`created « ${created} » n'est pas une heure AAAA-MM-JJTHH:MM±hh:mm`);
+    // Sans fuseau, l'heure serait lue dans celui de la machine : l'ordre changerait entre le poste et la CI.
+    else if (!OFFSET.test(created)) entry.problems.push(`created « ${created} » sans fuseau : ajouter ±hh:mm ou Z`);
     else if (!validStamp(created)) entry.problems.push(`created « ${created} » n'est pas une heure valide`);
     else entry.created = created.replace(' ', 'T');
   }
@@ -112,7 +115,7 @@ export function newsIssues(lots: Lot[], entries: Entry[], dir: string): NewsIssu
       if (!existsSync(path) || !statSync(path).isFile()) issues.push({ kind: 'missing-capture', message: `${e.file} : capture absente ${c}` });
     }
     if (e.problems.length === 0 && !e.created) {
-      issues.push({ kind: 'no-time', message: `${e.file} sans heure de création (created: AAAA-MM-JJTHH:MM) — cadence news stamp` });
+      issues.push({ kind: 'no-time', message: `${e.file} sans heure de création (created: AAAA-MM-JJTHH:MM±hh:mm) — cadence news stamp` });
     }
     if (e.problems.length === 0 && e.captures.length === 0 && !e.nocapture) {
       issues.push({ kind: 'no-capture', message: `${e.file} sans capture (ou « nocapture: raison »)` });

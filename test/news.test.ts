@@ -78,9 +78,9 @@ describe('newsIssues', () => {
     mkdirSync(join(dir, 'captures'));
     writeFileSync(join(dir, 'captures/ok.png'), 'png');
     const entries = [
-      parseEntry('a.md', '---\ntitle: A\ndate: 2026-09-29\ncreated: 2026-09-29T10:00\nlots: [L1, L9]\ncaptures: [captures/ok.png, captures/absente.png]\n---\n'),
-      parseEntry('b.md', '---\ntitle: B\ndate: 2026-09-29\ncreated: 2026-09-29T10:00\nlots: [L3]\n---\n'),
-      parseEntry('c.md', '---\ntitle: C\ndate: 2026-09-29\ncreated: 2026-09-29T10:00\nlots: [L3]\nnocapture: calcul seul\n---\n'),
+      parseEntry('a.md', '---\ntitle: A\ndate: 2026-09-29\ncreated: 2026-09-29T10:00Z\nlots: [L1, L9]\ncaptures: [captures/ok.png, captures/absente.png]\n---\n'),
+      parseEntry('b.md', '---\ntitle: B\ndate: 2026-09-29\ncreated: 2026-09-29T10:00Z\nlots: [L3]\n---\n'),
+      parseEntry('c.md', '---\ntitle: C\ndate: 2026-09-29\ncreated: 2026-09-29T10:00Z\nlots: [L3]\nnocapture: calcul seul\n---\n'),
     ];
     const lots = [lot('L1', { status: 'done', visible: true }), lot('L2', { status: 'done', visible: true }), lot('L3'), lot('L4', { status: 'done' })];
     expect(newsIssues(lots, entries, dir).map((i) => i.message)).toEqual([
@@ -94,7 +94,7 @@ describe('newsIssues', () => {
   it('flags an entry without creation time (hour and minute)', () => {
     const entries = [parseEntry('d.md', '---\ntitle: D\ndate: 2026-09-29\nnocapture: calcul\n---\n')];
     expect(newsIssues([], entries, gitRepo())).toEqual([
-      { kind: 'no-time', message: 'd.md sans heure de création (created: AAAA-MM-JJTHH:MM) — cadence news stamp' },
+      { kind: 'no-time', message: 'd.md sans heure de création (created: AAAA-MM-JJTHH:MM±hh:mm) — cadence news stamp' },
     ]);
   });
 });
@@ -234,8 +234,8 @@ describe('loadEntries order', () => {
   it('same day: the created time wins over the commit date; an uncommitted entry without time comes first', () => {
     const dir = gitRepo();
     add(dir, L21, 'L21', '2026-09-28T22:21:08+02:00');
-    writeFileSync(join(dir, 'b.md'), entry('LB', '2026-09-28T23:00'));
-    writeFileSync(join(dir, 'a.md'), entry('LA', '2026-09-28T08:00'));
+    writeFileSync(join(dir, 'b.md'), entry('LB', '2026-09-28T23:00+02:00'));
+    writeFileSync(join(dir, 'a.md'), entry('LA', '2026-09-28T08:00+02:00'));
     writeFileSync(join(dir, 'z.md'), entry('LZ'));
     expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['LZ', 'LB', 'L21', 'LA']);
   });
@@ -298,7 +298,13 @@ describe('loadEntries order', () => {
     expect(parseEntry('y.md', entry('L1', '2026-02-30T10:00+01:00')).problems).toEqual(['created « 2026-02-30T10:00+01:00 » n\'est pas une heure valide']);
   });
 
+  it('requires an explicit offset, so the order does not depend on the machine time zone', () => {
+    expect(parseEntry('x.md', entry('L1', '2026-09-28T22:21')).problems).toEqual(['created « 2026-09-28T22:21 » sans fuseau : ajouter ±hh:mm ou Z']);
+    expect(parseEntry('x.md', entry('L1', '2026-09-28T22:21Z')).created).toBe('2026-09-28T22:21Z');
+    expect(parseEntry('x.md', entry('L1', '2026-09-28 22:21-05:00')).created).toBe('2026-09-28T22:21-05:00');
+  });
+
   it('rejects a malformed created time', () => {
-    expect(parseEntry('x.md', entry('L1', '28/09 22h')).problems).toEqual(['created « 28/09 22h » n\'est pas une heure AAAA-MM-JJTHH:MM']);
+    expect(parseEntry('x.md', entry('L1', '28/09 22h')).problems).toEqual(['created « 28/09 22h » n\'est pas une heure AAAA-MM-JJTHH:MM±hh:mm']);
   });
 });

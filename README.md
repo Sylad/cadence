@@ -139,9 +139,10 @@ with screenshot paths relative to the JSON file.
 **Order.** Everywhere (`list`, `build`, the JSON), entries are strictly newest
 first: by `date`, then, on the same day, by creation time. Every entry carries
 it to the minute in its `created` header, which `cadence news new` writes as
-local time with an explicit offset (`2026-09-29T14:32+02:00`; without offset,
-local time is assumed). `news check` (and `raf check`) flags an entry without
-it; `cadence news stamp` fills it in older entries from the date of the first
+local time with an explicit offset (`2026-09-29T14:32+02:00`, or `Z`). The
+offset is required, so the order does not depend on the machine's time zone:
+`news check` (and `raf check`) flags a value without it, and an entry without
+`created`; `cadence news stamp` fills it in older entries from the date of the first
 commit that added the file. Until then, that commit date is used for sorting
 (an entry not committed yet counts as the newest). The file name only breaks
 the remaining ties, since it follows the title, not the chronology. The page

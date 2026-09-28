@@ -84,16 +84,17 @@ export function parseEntry(file: string, text: string): Entry {
 
 /**
  * Entrées du dossier, plus récentes d'abord : par date, puis à date égale par instant de création
- * (`created` de l'en-tête, sinon date du premier commit du fichier, pas encore commité = le plus récent),
- * puis par nom de fichier décroissant.
+ * (`created` de l'en-tête, sinon date d'auteur du commit qui a ajouté le fichier sous ce nom — un renommage
+ * compte comme un ajout — ; pas encore commité = le plus récent), puis par nom de fichier décroissant.
+ * `added` (historique git) n'est appelé que si une entrée n'a pas de `created`.
  */
-export function loadEntries(dir: string): Entry[] {
+export function loadEntries(dir: string, added: () => Map<string, number> = () => addedTimes(dir)): Entry[] {
   if (!existsSync(dir)) return [];
   const entries = readdirSync(dir, { withFileTypes: true })
     .filter((f) => f.isFile() && f.name.endsWith('.md') && f.name.toLowerCase() !== 'readme.md')
     .map((f) => parseEntry(f.name, readFileSync(join(dir, f.name), 'utf8')));
-  const added = addedTimes(dir);
-  const created = (e: Entry) => (e.created ? Date.parse(e.created) : added.get(e.file) ?? Infinity);
+  const history = entries.some((e) => !e.created) ? added() : new Map<string, number>();
+  const created = (e: Entry) => (e.created ? Date.parse(e.created) : history.get(e.file) ?? Infinity);
   return entries.sort((a, b) => {
     if (a.date !== b.date) return b.date.localeCompare(a.date);
     const ta = created(a);
@@ -160,12 +161,13 @@ export function newEntry(dir: string, lots: string[], rawTitle: string, today: D
  * commit du fichier (`now` s'il n'est pas encore commité). Le reste du fichier est laissé tel quel.
  */
 export function stampEntries(dir: string, now: Date): { file: string; created: string }[] {
-  const added = addedTimes(dir);
+  let history: Map<string, number> | undefined;
+  const added = () => (history ??= addedTimes(dir)); // un seul git log, et seulement s'il sert
   const done: { file: string; created: string }[] = [];
-  for (const e of loadEntries(dir)) {
+  for (const e of loadEntries(dir, added)) {
     // Seule une clé created vide est réparée ici ; une heure fausse reste à corriger à la main.
     if (e.created || !e.problems.every((p) => p === CREATED_EMPTY)) continue;
-    const created = toStamp(new Date(added.get(e.file) ?? now.getTime()));
+    const created = toStamp(new Date(added().get(e.file) ?? now.getTime()));
     const path = join(dir, e.file);
     const text = readFileSync(path, 'utf8');
     const lines = text.split('\n');

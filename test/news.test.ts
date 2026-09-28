@@ -304,6 +304,19 @@ describe('loadEntries order', () => {
     expect(parseEntry('x.md', entry('L1', '2026-09-28 22:21-05:00')).created).toBe('2026-09-28T22:21-05:00');
   });
 
+  it('reads git only when an entry lacks created, and uses the history it is given', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'a.md'), entry('LA', '2026-09-28T08:00+02:00'));
+    writeFileSync(join(dir, 'b.md'), entry('LB', '2026-09-28T09:00+02:00'));
+    const never = () => {
+      throw new Error('git lu pour rien');
+    };
+    expect(loadEntries(dir, never).map((e) => e.lots[0])).toEqual(['LB', 'LA']);
+    writeFileSync(join(dir, 'c.md'), entry('LC'));
+    const history = new Map([['c.md', Date.parse('2026-09-28T08:30+02:00')]]);
+    expect(loadEntries(dir, () => history).map((e) => e.lots[0])).toEqual(['LB', 'LC', 'LA']);
+  });
+
   it('rejects a malformed created time', () => {
     expect(parseEntry('x.md', entry('L1', '28/09 22h')).problems).toEqual(['created « 28/09 22h » n\'est pas une heure AAAA-MM-JJTHH:MM±hh:mm']);
   });

@@ -34,5 +34,12 @@ describe('skills install', () => {
     expect(code).toBe(0);
     expect(out.join('\n')).toContain('cadence-deliver : installé');
     expect(readFileSync(join(dir, '.claude/skills/cadence-deliver/SKILL.md'), 'utf8')).toContain('name: cadence-deliver');
+    expect(out.join('\n')).toContain('cadence-ux-reviewer (agent) : installé');
+    expect(readFileSync(join(dir, '.claude/agents/cadence-ux-reviewer.md'), 'utf8')).toMatch(/^---\nname: cadence-ux-reviewer\n/);
+
+    writeFileSync(join(dir, '.claude/agents/cadence-ux-reviewer.md'), 'à la main');
+    const again = await run(['skills', 'install'], { cwd: dir, env: {}, out: () => {}, err: () => {}, now: () => new Date() });
+    expect(again).toBe(2);
+    expect(readFileSync(join(dir, '.claude/agents/cadence-ux-reviewer.md'), 'utf8')).toBe('à la main');
   });
 });

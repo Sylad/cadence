@@ -9,7 +9,7 @@
     "raf": "bin/raf.js",
     "cadence": "bin/cadence.js"
   },
-  "files": ["bin", "dist", "skills", ".claude-plugin", "README.md", "LICENSE"],
+  "files": ["bin", "dist", "skills", "agents", ".claude-plugin", "README.md", "LICENSE"],
   "engines": { "node": ">=20" },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

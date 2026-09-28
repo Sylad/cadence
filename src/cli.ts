@@ -12,7 +12,7 @@ import { linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues } from './news.js';
 import { extractRefs, Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
-import { installSkills, SKILLS_DIR } from './skills.js';
+import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { sharedStateDir, stateDir, writeNext } from './state.js';
 
@@ -223,11 +223,19 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return deliver(ctx, realDeps(root));
     }
     case 'skills': {
-      if (rest[0] !== 'install') throw new RafError('usage : cadence skills install [--dir .claude/skills] [--force]');
-      const dest = resolve(io.cwd, values.dir ?? join(root, '.claude/skills'));
+      if (rest[0] !== 'install') throw new RafError('usage : cadence skills install [--dir .claude] [--force]');
+      // --dir désigne le dossier .claude (défaut : celui du dépôt) : skills/ et agents/ dedans.
+      const base = resolve(io.cwd, values.dir ?? join(root, '.claude'));
       const label = { installed: 'installé', updated: 'mis à jour', unchanged: 'inchangé' };
-      for (const r of installSkills(SKILLS_DIR, dest, !!values.force)) io.out(`${r.name} : ${label[r.status]}`);
-      io.out(dest);
+      const force = !!values.force;
+      // Vérifier les deux avant d'écrire : un conflit d'agent ne doit pas laisser les skills à moitié installés.
+      if (!force) {
+        installSkills(SKILLS_DIR, join(base, 'skills'), false, true);
+        installAgents(AGENTS_DIR, join(base, 'agents'), false, true);
+      }
+      for (const r of installSkills(SKILLS_DIR, join(base, 'skills'), force)) io.out(`${r.name} : ${label[r.status]}`);
+      for (const r of installAgents(AGENTS_DIR, join(base, 'agents'), force)) io.out(`${r.name} (agent) : ${label[r.status]}`);
+      io.out(base);
       return 0;
     }
     case 'news':

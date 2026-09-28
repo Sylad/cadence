@@ -12,7 +12,8 @@ Four tools:
 - **deliver**: wait for the CI of the pushed commit, deploy, then **verify the effect**.
 
 And three [Claude Code](https://claude.com/claude-code) skills that turn them
-into rituals: `session-start`, `session-close`, `deliver`.
+into rituals — `session-start`, `session-close`, `deliver` — plus a `ux-reviewer`
+agent: no user-facing change is done before its usability review.
 
 ## raf
 
@@ -131,6 +132,18 @@ The Markdown is deliberately small: paragraphs, `-` lists, `**bold**`,
 `{ project, generated, entries: [{ slug, title, date, lots, captures, html }] }`,
 with screenshot paths relative to the JSON file.
 
+### UX review
+
+```sh
+raf ux enable                      # from today, a --visible lot needs a UX review before done
+raf ux L4 "compliant after 2 fixes"   # record the verdict (from the ux-reviewer agent)
+raf ux L8 "no screen: calculation fix"
+```
+
+With the rule on, `raf done` refuses a visible lot without a review (`--force`
+to override) and `raf check` reports visible lots finished since `uxSince`
+without one. Plans without `uxSince` are not affected.
+
 ## session
 
 ```sh
@@ -198,9 +211,11 @@ As a plugin:
 /plugin install cadence@cadence
 ```
 
-gives `/cadence:session-start`, `/cadence:session-close` and `/cadence:deliver`.
-Or copy them into the repository with `cadence skills install` (to
-`.claude/skills/cadence-*`; `--dir` elsewhere, `--force` to overwrite local edits).
+gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver` and
+the `ux-reviewer` agent. Or copy them into the repository with
+`cadence skills install` (to `.claude/skills/cadence-*` and
+`.claude/agents/cadence-ux-reviewer.md`; `--dir` for another `.claude` folder,
+`--force` to overwrite local edits).
 
 - **session-start**: reports the facts briefly, proposes three lots from the
   plan, then waits for your priority — nothing starts before your answer.
@@ -209,6 +224,10 @@ Or copy them into the repository with `cadence skills install` (to
   lines for next time.
 - **deliver**: dry run, delivery, and on failure the cause fixed rather than a
   blind retry.
+- **ux-reviewer** (agent): captures at 1440 and 390 px, findings grounded in a
+  named rule (Nielsen, WCAG 2.2 AA) or a measurement, ranked, turned into
+  `raf add --parent` sub-tasks, and a one-line verdict for `raf ux`. It never
+  edits code.
 
 ## License
 

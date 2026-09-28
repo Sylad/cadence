@@ -29,7 +29,7 @@ if (tool === 'raf') {
   cadence session next "ligne" …       notes pour la prochaine session (sans argument : efface)
   cadence deliver [--dry-run] [--config cadence.yaml]
                     CI du sha poussé → déploiement → vérifications de l'effet
-  cadence skills install [--dir .claude/skills] [--force]
-                    installe les skills Claude Code session-start, session-close, deliver`);
+  cadence skills install [--dir .claude] [--force]
+                    installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);
   process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;
 }

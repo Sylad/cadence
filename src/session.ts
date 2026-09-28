@@ -3,13 +3,16 @@ import { diffDays, maxDay, type Day } from './dates.js';
 import { readCommits, repoStatus, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import type { Lot, Plan } from './plan.js';
-import { pidAlive, readLock, readNext } from './state.js';
+import { lockAlive, readLock, readNext } from './state.js';
 
 export interface SessionCtx {
   plan: Plan;
   root: string;
   newsDir: string;
+  /** État du worktree (notes de clôture). */
   state: string;
+  /** État commun aux worktrees (verrou de livraison). */
+  shared: string;
   today: Day;
   out: (line: string) => void;
 }
@@ -33,13 +36,13 @@ function byLotLines(linked: Linked): string[] {
 function lockStatus(state: string): { line: string; live: boolean } | null {
   const lock = readLock(state);
   if (!lock) return null;
-  if (pidAlive(lock.pid)) return { line: `Livraison en cours : ${lock.sha.slice(0, 7)} (pid ${lock.pid}, depuis ${lock.started})`, live: true };
+  if (lockAlive(lock)) return { line: `Livraison en cours : ${lock.sha.slice(0, 7)} (pid ${lock.pid}, depuis ${lock.started})`, live: true };
   return { line: `Verrou de livraison périmé (pid ${lock.pid} mort, sha ${lock.sha.slice(0, 7)}) : cadence deliver le retirera`, live: false };
 }
 
 function repoLine(root: string): { line: string; open: number } {
   const s = repoStatus(root);
-  const bits = [`branche ${s.branch}`];
+  const bits = [s.branch ? `branche ${s.branch}` : 'HEAD détachée'];
   if (s.dirty) bits.push(`${s.dirty} fichier(s) modifié(s)`);
   if (s.untracked) bits.push(`${s.untracked} non suivi(s)`);
   if (!s.upstream) bits.push('pas de branche amont');
@@ -69,7 +72,7 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   const next = readNext(ctx.state);
   if (next) section(out, `Notes de la dernière clôture (${next.date})`, next.lines.map((l) => `- ${l}`));
 
-  const lock = lockStatus(ctx.state);
+  const lock = lockStatus(ctx.shared);
   if (lock) out(`\n${lock.line}`);
 
   const { doing, ready } = nextUp(lots);
@@ -120,7 +123,7 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
   section(out, 'Écarts (raf check)', issues.map((i) => `✗ ${i.message}`));
 
   const repo = repoLine(ctx.root);
-  const lock = lockStatus(ctx.state);
+  const lock = lockStatus(ctx.shared);
   section(out, 'Dépôt', [repo.line, ...(lock ? [lock.line] : [])]);
 
   const open = issues.length + repo.open + (lock?.live ? 1 : 0);

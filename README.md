@@ -144,8 +144,9 @@ cadence session next "finish L3" "review L4"    # shown by the next session star
 ```
 
 Proposals come from the plan only: lots in progress, then ready lots (dependencies
-done), quick wins first. Local state (notes, delivery lock and log) lives in the
-git directory (`.git/cadence/`): never committed, one per clone and worktree.
+done), quick wins first. Local state lives in the git directory, never committed:
+the close notes per worktree, the delivery lock and log in `.git/cadence/`, shared
+by all the worktrees of a clone.
 
 ## deliver
 
@@ -165,6 +166,7 @@ deliver:
       contains: "${SHORT}"
     - command: kubectl rollout status deploy/app --timeout=60s
   verifyTimeout: 300
+  deployTimeout: 1800     # seconds, per deploy command
 ```
 
 ```sh
@@ -174,10 +176,14 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
 
 - **Preconditions**: no modified tracked file; `HEAD` is on a remote branch (the
   CI can only build what was pushed); no other delivery running (a lock whose
-  process died is removed with a warning).
+  process died is removed with a warning); with `ci: github`, `gh` installed and
+  logged in.
+- Every command is killed when it exceeds its budget (CI, `deployTimeout`, what is
+  left of `verifyTimeout`) and reported as "délai dépassé".
 - **CI** `github`: polls `gh run list --commit <sha>` every 15 s; no run after
   5 minutes is a failure (you probably pushed another commit than the one you
-  deliver); every run must end `success`, `skipped` or `neutral`.
+  deliver); every run must end `success`, `skipped` or `neutral`. `gh` errors
+  are retried, and reported with their cause after 5 minutes.
 - Commands get `CADENCE_SHA`, `CADENCE_SHORT` (7 characters) and `CADENCE_BRANCH`;
   `${SHA}` and `${SHORT}` are replaced in `url` and `contains`.
 - On success the lots cited by the commits since the previous delivery are

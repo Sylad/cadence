@@ -20,7 +20,7 @@ Rien de propre à une infrastructure : le déploiement est une commande fournie 
 | Sujet | Choix |
 |---|---|
 | Faits de session | `cadence session start` / `close`, texte français comme le reste du CLI, testés |
-| État local | dans le dossier git (`git rev-parse --git-path cadence`) : jamais commité, propre à chaque clone et worktree |
+| État local | dans le dossier git, jamais commité : notes de clôture par worktree (`--git-path cadence`), verrou et journal des livraisons communs aux worktrees (`--git-common-dir`/cadence) |
 | Notes pour la suite | `cadence session next "…" …` écrit `next.md` dans l'état local ; `session start` les affiche |
 | Configuration de livraison | `cadence.yaml` à la racine du dépôt (`--config`), clé `deliver:` |
 | CI | `ci: github` (sondage de `gh run list --commit`), `ci: none`, ou `ci: { command: "…" }` |
@@ -85,7 +85,9 @@ Déroulé :
 1. **Préconditions**, toutes vérifiées avant d'agir, refus avec code 2 :
    configuration présente et valide ; arbre propre ; `HEAD` contenu dans une branche distante
    (`git branch -r --contains`) — sinon « sha non poussé : la CI n'a rien construit » ;
-   pas de verrou vivant. Un verrou dont le pid est mort est retiré avec un avertissement.
+   pas de verrou vivant ; avec `ci: github`, `gh auth status` réussi. Un verrou dont le pid est mort
+   est retiré avec un avertissement (renommé puis relu : on ne retire que celui qu'on a lu) ; un verrou
+   illisible de moins de 5 s est considéré comme tenu. Le verrou est posé par lien atomique.
 2. **Verrou** `deliver.lock` (pid, sha, début) dans l'état local, retiré à la fin quoi qu'il arrive.
 3. **CI** :
    - `github` : toutes les 15 s, `gh run list --commit <sha> --json databaseId,name,status,conclusion`.
@@ -101,6 +103,12 @@ Déroulé :
 
 `--dry-run` : préconditions (sans verrou), puis affichage des étapes avec les variables résolues ;
 rien n'est exécuté. Codes : 0 livré, 1 échec d'une étape, 2 refus avant d'agir.
+
+Toute commande est tuée au-delà de son budget (`ciTimeout`, `deployTimeout` par commande — défaut
+1800 s —, reste de `verifyTimeout`) : « délai dépassé ». Les erreurs de `gh` sont réessayées et
+remontées avec leur cause (stderr) après 5 min. En HEAD détachée, `CADENCE_BRANCH` est vide. Si la
+livraison précédente n'est pas un ancêtre de HEAD (historique réécrit), les lots livrés ne sont pas
+calculés et le message le dit.
 
 Pour les tests, le sondage GitHub, l'attente et `fetch` sont injectés.
 

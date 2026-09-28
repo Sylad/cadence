@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { headSha, onRemote, repoStatus } from '../src/git.js';
-import { appendDelivery, lastDelivery, pidAlive, readLock, readNext, removeLock, stateDir, writeLock, writeNext } from '../src/state.js';
+import { appendDelivery, lastDelivery, lockAlive, lockPath, pidAlive, readLock, readNext, releaseLock, removeStaleLock, sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -55,14 +55,43 @@ describe('état local', () => {
     expect(readLock(state)).toBeNull();
     expect(writeLock(state, { pid: process.pid, sha: 'abc', started: '2026-09-28T10:00:00.000Z' })).toBe(true);
     expect(writeLock(state, { pid: 1, sha: 'x', started: 'x' })).toBe(false);
-    expect(readLock(state)).toEqual({ pid: process.pid, sha: 'abc', started: '2026-09-28T10:00:00.000Z' });
-    removeLock(state);
+    expect(readLock(state)).toMatchObject({ pid: process.pid, sha: 'abc', started: '2026-09-28T10:00:00.000Z' });
+    releaseLock(state, 1);
+    expect(readLock(state)).not.toBeNull();
+    releaseLock(state, process.pid);
     expect(readLock(state)).toBeNull();
 
     expect(lastDelivery(state)).toBeNull();
     appendDelivery(state, '2026-09-27', 'aaa');
     appendDelivery(state, '2026-09-28', 'bbb');
     expect(lastDelivery(state)).toBe('bbb');
+  });
+
+  it('verrou commun aux worktrees, notes propres à chacun', () => {
+    const dir = gitRepo();
+    commit(dir, 'init');
+    const wt = join(tempDir(), 'wt');
+    git(dir, 'worktree', 'add', '-q', '--detach', wt);
+    expect(sharedStateDir(wt)).toBe(sharedStateDir(dir));
+    expect(stateDir(wt)).not.toBe(stateDir(dir));
+  });
+
+  it('ne retire un verrou périmé que s’il est encore celui qui a été lu', () => {
+    const state = stateDir(gitRepo());
+    const dead = { pid: 2 ** 22 + 12345, sha: 'a', started: 'x' };
+    writeLock(state, dead);
+    const seen = readLock(state)!;
+    writeFileSync(lockPath(state), JSON.stringify({ pid: process.pid, sha: 'b', started: 'y' }));
+    expect(removeStaleLock(state, seen)).toBe(false);
+    expect(readLock(state)?.sha).toBe('b');
+    writeFileSync(lockPath(state), JSON.stringify(dead));
+    expect(removeStaleLock(state, readLock(state)!)).toBe(true);
+    expect(readLock(state)).toBeNull();
+  });
+
+  it('un verrou illisible tout récent est tenu, ancien il est mort', () => {
+    expect(lockAlive({ pid: 0, unreadable: true, ageMs: 100 })).toBe(true);
+    expect(lockAlive({ pid: 0, unreadable: true, ageMs: 60_000 })).toBe(false);
   });
 
   it('détecte un pid mort', () => {

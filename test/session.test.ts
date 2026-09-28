@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { readNext, stateDir, writeLock } from '../src/state.js';
+import { readNext, sharedStateDir, stateDir, writeLock } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 async function cad(dir: string, ...argv: string[]) {
@@ -57,10 +57,10 @@ describe('session start', () => {
 
   it('signale une livraison en cours et un verrou périmé', async () => {
     const dir = await project();
-    writeLock(stateDir(dir), { pid: process.pid, sha: 'abcdef1234', started: '2026-09-28T18:00:00.000Z' });
+    writeLock(sharedStateDir(dir), { pid: process.pid, sha: 'abcdef1234', started: '2026-09-28T18:00:00.000Z' });
     expect((await cad(dir, 'session', 'start')).out).toContain(`Livraison en cours : abcdef1 (pid ${process.pid}, depuis 2026-09-28T18:00:00.000Z)`);
     const other = await project();
-    writeLock(stateDir(other), { pid: 2 ** 22 + 12345, sha: 'abcdef1234', started: 'x' });
+    writeLock(sharedStateDir(other), { pid: 2 ** 22 + 12345, sha: 'abcdef1234', started: 'x' });
     expect((await cad(other, 'session', 'start')).out).toContain('Verrou de livraison périmé');
   });
 

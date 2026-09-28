@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { installSkills, SKILLS_DIR } from '../src/skills.js';
@@ -21,6 +21,10 @@ describe('skills install', () => {
     expect(() => installSkills(SKILLS_DIR, dest, false)).toThrow(/cadence-session-start.*--force/);
     expect(readFileSync(file, 'utf8')).toBe('modifié à la main');
     expect(installSkills(SKILLS_DIR, dest, true).find((r) => r.name === 'cadence-session-start')?.status).toBe('updated');
+
+    const other = join(tempDir(), 'skills');
+    mkdirSync(join(other, 'cadence-deliver'), { recursive: true });
+    expect(() => installSkills(SKILLS_DIR, other, false)).toThrow(/cadence-deliver/);
   });
 
   it('CLI : installe dans .claude/skills du dépôt par défaut', async () => {

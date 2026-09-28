@@ -3,10 +3,10 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { deliver, parseDeliverConfig, type DeliverDeps, type GhRun } from '../src/deliver.js';
+import { deliver, parseDeliverConfig, TIMED_OUT, type DeliverDeps, type GhRun } from '../src/deliver.js';
 import { headSha } from '../src/git.js';
 import { Plan } from '../src/plan.js';
-import { lastDelivery, readLock, stateDir, writeLock } from '../src/state.js';
+import { appendDelivery, lastDelivery, readLock, sharedStateDir as stateDir, writeLock } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -36,6 +36,7 @@ function fakeDeps(over: Partial<DeliverDeps> = {}) {
       return 0;
     },
     gh: () => [{ name: 'ci', status: 'completed', conclusion: 'success' }],
+    ghReady: () => null,
     fetch: async () => ({ status: 200, text: 'ok' }),
     sleep: async (ms) => {
       clock += ms;
@@ -81,7 +82,7 @@ function ctx(dir: string, over: Record<string, unknown> = {}) {
 describe('parseDeliverConfig', () => {
   it('applique les défauts', () => {
     const c = parseDeliverConfig('deliver:\n  verify:\n    - command: "true"\n', 'f');
-    expect(c).toEqual({ ci: 'none', ciTimeout: 1800, deploy: [], verify: [{ command: 'true' }], verifyTimeout: 300 });
+    expect(c).toEqual({ ci: 'none', ciTimeout: 1800, deploy: [], verify: [{ command: 'true' }], verifyTimeout: 300, deployTimeout: 1800 });
   });
   it.each([
     ['foo: 1', /clé deliver absente/],
@@ -92,6 +93,8 @@ describe('parseDeliverConfig', () => {
     ['deliver:\n  verify: [{url: x, command: y}]', /verify\[1\]/],
     ['deliver:\n  ciTimeout: -1\n  verify: [{command: x}]', /ciTimeout/],
     ['deliver: [', /illisible/],
+    ['deliver:\n  ci: {command: " "}\n  verify: [{command: x}]', /ci.command/],
+    ['deliver:\n  deploy: [""]\n  verify: [{command: x}]', /deploy/],
   ])('refuse %j', (text, msg) => {
     expect(() => parseDeliverConfig(text, 'f')).toThrow(msg);
   });
@@ -216,6 +219,55 @@ describe('deliver', () => {
   });
 });
 
+describe('deliver : relecture', () => {
+  it('refuse sans gh authentifié (code 2, avant le verrou)', async () => {
+    const dir = pushedRepo();
+    const { c, err } = ctx(dir);
+    expect(await deliver(c, fakeDeps({ ghReady: () => 'gh auth login' }).deps)).toBe(2);
+    expect(err.join('\n')).toContain('gh auth login');
+    expect(readLock(stateDir(dir))).toBeNull();
+  });
+
+  it('réessaie une erreur gh passagère, abandonne une erreur persistante avec sa cause', async () => {
+    let n = 0;
+    const flaky = fakeDeps({
+      gh: () => {
+        if (++n < 3) throw new Error('HTTP 502');
+        return [{ name: 'ci', status: 'completed', conclusion: 'success' }];
+      },
+    });
+    expect(await deliver(ctx(pushedRepo()).c, flaky.deps)).toBe(0);
+    const down = fakeDeps({ gh: () => { throw new Error('API rate limit exceeded'); } });
+    const { c, err } = ctx(pushedRepo());
+    expect(await deliver(c, down.deps)).toBe(1);
+    expect(err.join('\n')).toContain('gh run list en échec : API rate limit exceeded');
+  });
+
+  it('commande qui dépasse son délai : échec explicite', async () => {
+    const { c, err } = ctx(pushedRepo());
+    expect(await deliver(c, fakeDeps({ exec: () => TIMED_OUT }).deps)).toBe(1);
+    expect(err.join('\n')).toContain('délai dépassé');
+  });
+
+  it('HEAD détachée : CADENCE_BRANCH vide', async () => {
+    const dir = pushedRepo();
+    git(dir, 'checkout', '-q', '--detach');
+    const { deps, execs } = fakeDeps();
+    expect(await deliver(ctx(dir).c, deps)).toBe(0);
+    expect(execs[0].env.CADENCE_BRANCH).toBe('');
+  });
+
+  it('historique réécrit : lots non calculés, annoncés comme tels', async () => {
+    const dir = pushedRepo();
+    appendDelivery(stateDir(dir), '2026-09-27', 'f'.repeat(40));
+    commit(dir, 'feat(L1): cache');
+    git(dir, 'push', '-q');
+    const { c, out } = ctx(dir);
+    expect(await deliver(c, fakeDeps().deps)).toBe(0);
+    expect(out.join('\n')).toContain('lots livrés non calculés');
+  });
+});
+
 describe('cadence deliver (CLI)', () => {
   async function cad(dir: string, ...argv: string[]) {
     const out: string[] = [];
@@ -244,5 +296,18 @@ describe('cadence deliver (CLI)', () => {
     const r = await cad(dir, 'deliver');
     expect(r.code).toBe(0);
     expect(readFileSync(join(dir, '.git/deployed-main'), 'utf8').trim()).toBe(headSha(dir)!.slice(0, 7));
+  });
+
+  it('tue une vérification qui dépasse le délai', async () => {
+    const dir = pushedRepo();
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  verify:\n    - command: sleep 30\n  verifyTimeout: 1\n');
+    git(dir, 'add', 'cadence.yaml');
+    commit(dir, 'chore: config');
+    git(dir, 'push', '-q');
+    const t = Date.now();
+    const r = await cad(dir, 'deliver');
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('délai dépassé');
+    expect(Date.now() - t).toBeLessThan(10_000);
   });
 });

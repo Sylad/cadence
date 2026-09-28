@@ -14,7 +14,7 @@ import { extractRefs, Plan, RafError, STATUSES, type Lot, type Status } from './
 import { schedule } from './schedule.js';
 import { installSkills, SKILLS_DIR } from './skills.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
-import { stateDir, writeNext } from './state.js';
+import { sharedStateDir, stateDir, writeNext } from './state.js';
 
 export interface Io {
   cwd: string;
@@ -195,14 +195,14 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'session':
       if (!gitRoot(io.cwd)) throw new RafError('session : à lancer dans un dépôt git');
-      return session(rest, { plan: Plan.load(planPath), root, newsDir, state: stateDir(root), today, out: io.out }, values);
+      return session(rest, { plan: Plan.load(planPath), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out }, values);
     case 'deliver': {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
       const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans le README)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const plan = existsSync(planPath) ? Plan.load(planPath) : null;
-      const ctx = { root, state: stateDir(root), plan, config, today, dryRun: !!values['dry-run'], out: io.out, err: io.err };
+      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], out: io.out, err: io.err };
       return deliver(ctx, realDeps(root));
     }
     case 'skills': {

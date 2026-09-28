@@ -1,9 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { parse } from 'yaml';
 import type { Day } from './dates.js';
-import { headSha, onRemote, readCommits, repoStatus } from './git.js';
+import { headSha, isAncestor, onRemote, readCommits, repoStatus } from './git.js';
 import { extractRefs, RafError, type Plan } from './plan.js';
-import { appendDelivery, lastDelivery, pidAlive, readLock, removeLock, writeLock } from './state.js';
+import { appendDelivery, lastDelivery, lockAlive, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
 
 export interface VerifyCheck {
   url?: string;
@@ -20,6 +20,8 @@ export interface DeliverConfig {
   verify: VerifyCheck[];
   /** Secondes pendant lesquelles les vérifications sont réessayées. */
   verifyTimeout: number;
+  /** Secondes maximum par commande de déploiement. */
+  deployTimeout: number;
 }
 
 export interface GhRun {
@@ -29,9 +31,15 @@ export interface GhRun {
 }
 
 export interface DeliverDeps {
-  /** Commande sh à la racine du dépôt, variables ajoutées à l'environnement ; renvoie le code de sortie. */
-  exec: (cmd: string, env: Record<string, string>) => number;
+  /**
+   * Commande sh à la racine du dépôt, variables ajoutées à l'environnement ; renvoie le code de sortie,
+   * TIMED_OUT si elle a dépassé `timeoutMs` (elle est alors tuée).
+   */
+  exec: (cmd: string, env: Record<string, string>, timeoutMs: number) => number;
+  /** Runs de la CI pour ce sha ; lève une erreur au message utile (stderr de gh). */
   gh: (sha: string) => GhRun[];
+  /** Précondition de `ci: github` : message d'erreur si gh est absent ou non authentifié, null sinon. */
+  ghReady: () => string | null;
   fetch: (url: string) => Promise<{ status: number; text: string }>;
   sleep: (ms: number) => Promise<void>;
   /** Millisecondes. */
@@ -40,6 +48,7 @@ export interface DeliverDeps {
 
 export interface DeliverCtx {
   root: string;
+  /** État commun à tous les worktrees : verrou et journal des livraisons. */
   state: string;
   plan: Plan | null;
   config: DeliverConfig;
@@ -53,6 +62,10 @@ const POLL_CI = 15_000;
 const CI_APPEAR = 300_000;
 const POLL_VERIFY = 10_000;
 const CI_OK = new Set(['success', 'skipped', 'neutral']);
+const GH_TIMEOUT = 60_000;
+export const TIMED_OUT = 124;
+
+const codeText = (code: number) => (code === TIMED_OUT ? 'délai dépassé' : `code ${code}`);
 
 export function parseDeliverConfig(text: string, file: string): DeliverConfig {
   let raw: unknown;
@@ -70,6 +83,7 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
   if (cfg.ci === 'github' || cfg.ci === 'none') ci = cfg.ci;
   else if (cfg.ci && typeof cfg.ci === 'object' && typeof (cfg.ci as { command?: unknown }).command === 'string') {
     ci = { command: (cfg.ci as { command: string }).command };
+    if (!ci.command.trim()) throw bad('ci.command : commande vide');
   } else if (cfg.ci !== undefined) throw bad('ci : attendu github, none ou { command: "…" }');
 
   const seconds = (key: string, dflt: number) => {
@@ -80,7 +94,7 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
   };
 
   const deploy = cfg.deploy === undefined ? [] : typeof cfg.deploy === 'string' ? [cfg.deploy] : cfg.deploy;
-  if (!Array.isArray(deploy) || !deploy.every((c) => typeof c === 'string')) throw bad('deploy : liste de commandes attendue');
+  if (!Array.isArray(deploy) || !deploy.every((c) => typeof c === 'string' && c.trim())) throw bad('deploy : liste de commandes non vides attendue');
 
   const verify = cfg.verify ?? [];
   if (!Array.isArray(verify) || verify.length === 0) {
@@ -92,7 +106,7 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
     const { url, status, contains, command } = v as Record<string, unknown>;
     if ((url === undefined) === (command === undefined)) throw bad(`${where} : exactement un de url ou command`);
     if (command !== undefined) {
-      if (typeof command !== 'string') throw bad(`${where}.command : texte attendu`);
+      if (typeof command !== 'string' || !command.trim()) throw bad(`${where}.command : commande non vide attendue`);
       return { command };
     }
     if (typeof url !== 'string') throw bad(`${where}.url : texte attendu`);
@@ -101,21 +115,42 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
     return { url, ...(status === undefined ? {} : { status: status as number }), ...(contains === undefined ? {} : { contains }) };
   });
 
-  return { ci, ciTimeout: seconds('ciTimeout', 1800), deploy: deploy as string[], verify: checks, verifyTimeout: seconds('verifyTimeout', 300) };
+  return { ci, ciTimeout: seconds('ciTimeout', 1800), deploy: deploy as string[], verify: checks, verifyTimeout: seconds('verifyTimeout', 300), deployTimeout: seconds('deployTimeout', 1800) };
 }
 
 /** Dépendances réelles : sh, gh, fetch, horloge. */
 export function realDeps(root: string): DeliverDeps {
+  const gh = (args: string[]) => {
+    try {
+      return execFileSync('gh', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: GH_TIMEOUT });
+    } catch (e) {
+      const err = e as NodeJS.ErrnoException & { stderr?: string };
+      if (err.code === 'ENOENT') throw new Error('gh introuvable (https://cli.github.com)');
+      if (err.code === 'ETIMEDOUT') throw new Error(`gh sans réponse après ${GH_TIMEOUT / 1000} s`);
+      throw new Error(String(err.stderr || err.message).trim().split('\n').slice(0, 3).join(' '));
+    }
+  };
   return {
-    exec: (cmd, env) => spawnSync('sh', ['-c', cmd], { cwd: root, env: { ...process.env, ...env }, stdio: ['ignore', 'inherit', 'inherit'] }).status ?? 1,
-    gh: (sha) =>
-      JSON.parse(
-        execFileSync('gh', ['run', 'list', '--commit', sha, '--json', 'name,status,conclusion'], {
-          cwd: root,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-        }),
-      ),
+    exec: (cmd, env, timeoutMs) => {
+      const r = spawnSync('sh', ['-c', cmd], {
+        cwd: root,
+        env: { ...process.env, ...env },
+        stdio: ['ignore', 'inherit', 'inherit'],
+        timeout: Math.max(1_000, timeoutMs),
+        killSignal: 'SIGKILL',
+      });
+      if ((r.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT' || r.signal) return TIMED_OUT;
+      return r.status ?? 1;
+    },
+    gh: (sha) => JSON.parse(gh(['run', 'list', '--commit', sha, '--json', 'name,status,conclusion'])),
+    ghReady: () => {
+      try {
+        gh(['auth', 'status']);
+        return null;
+      } catch (e) {
+        return (e as Error).message;
+      }
+    },
     fetch: async (url) => {
       const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(20_000) });
       return { status: res.status, text: await res.text() };
@@ -148,13 +183,21 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
   if (repo.dirty) return refuse(`${repo.dirty} fichier(s) suivi(s) modifié(s) : commiter et pousser d'abord`);
   if (!onRemote(ctx.root, sha)) return refuse(`${sha.slice(0, 7)} non poussé : la CI n'a rien construit (git push)`);
   const lock = readLock(ctx.state);
-  if (lock && pidAlive(lock.pid)) {
-    return refuse(`livraison déjà en cours (${lock.sha.slice(0, 7)}, pid ${lock.pid}, depuis ${lock.started}) — jamais deux à la fois`);
+  if (lock && lockAlive(lock)) {
+    return refuse(
+      `livraison déjà en cours (${lock.sha.slice(0, 7)}, pid ${lock.pid}, depuis ${lock.started}) — jamais deux à la fois ; ` +
+        `si ce processus n'est plus une livraison : rm ${lockPath(ctx.state)}`,
+    );
+  }
+  if (config.ci === 'github' && !ctx.dryRun) {
+    const why = deps.ghReady();
+    if (why) return refuse(`ci: github exige gh authentifié — ${why}`);
   }
 
-  const env = { CADENCE_SHA: sha, CADENCE_SHORT: sha.slice(0, 7), CADENCE_BRANCH: repo.branch };
+  const branch = repo.branch ?? 'HEAD détachée';
+  const env = { CADENCE_SHA: sha, CADENCE_SHORT: sha.slice(0, 7), CADENCE_BRANCH: repo.branch ?? '' };
   if (ctx.dryRun) {
-    out(`Livraison de ${env.CADENCE_SHORT} (${repo.branch}) — simulation, rien n'est exécuté`);
+    out(`Livraison de ${env.CADENCE_SHORT} (${branch}) — simulation, rien n'est exécuté`);
     out(`  CI : ${typeof config.ci === 'string' ? config.ci : config.ci.command}${config.ci === 'none' ? '' : ` (délai ${config.ciTimeout} s)`}`);
     out('  Déploiement :');
     if (config.deploy.length === 0) out('    (aucune commande)');
@@ -165,9 +208,8 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     return 0;
   }
 
-  if (lock) {
+  if (lock && removeStaleLock(ctx.state, lock)) {
     err(`deliver : verrou périmé retiré (pid ${lock.pid} mort, ${lock.sha.slice(0, 7)})`);
-    removeLock(ctx.state);
   }
   if (!writeLock(ctx.state, { pid: process.pid, sha, started: new Date(deps.now()).toISOString() })) {
     return refuse('une autre livraison vient de démarrer');
@@ -177,27 +219,27 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
       err(`deliver : ${msg}`);
       return 1;
     };
-    out(`Livraison de ${env.CADENCE_SHORT} (${repo.branch})`);
+    out(`Livraison de ${env.CADENCE_SHORT} (${branch})`);
 
     const ci = await waitCi(ctx, deps, sha, env);
     if (ci) return fail(ci);
 
     for (const [i, cmd] of config.deploy.entries()) {
       out(`→ déploiement ${i + 1}/${config.deploy.length} : ${cmd}`);
-      const code = deps.exec(cmd, env);
-      if (code !== 0) return fail(`déploiement en échec (code ${code}) : ${cmd}`);
+      const code = deps.exec(cmd, env, config.deployTimeout * 1000);
+      if (code !== 0) return fail(`déploiement en échec (${codeText(code)}) : ${cmd}`);
     }
 
     const failed = await verifyAll(ctx, deps, sha, env);
     if (failed) return fail(failed);
 
-    const lots = deliveredLots(ctx, lastDelivery(ctx.state), sha);
+    const delivered = deliveredLots(ctx, lastDelivery(ctx.state), sha);
     appendDelivery(ctx.state, ctx.today, sha);
     out(`✓ livré et vérifié : ${env.CADENCE_SHORT}`);
-    if (lots.length) out(`livré : ${lots.join(', ')} — raf done si l'effet est celui attendu`);
+    if (delivered) out(delivered);
     return 0;
   } finally {
-    removeLock(ctx.state);
+    releaseLock(ctx.state, process.pid);
   }
 }
 
@@ -207,21 +249,29 @@ async function waitCi(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Reco
   if (ci === 'none') return null;
   if (typeof ci === 'object') {
     ctx.out(`→ CI : ${ci.command}`);
-    const code = deps.exec(ci.command, env);
-    return code === 0 ? null : `CI en échec (code ${code}) : ${ci.command}`;
+    const code = deps.exec(ci.command, env, ciTimeout * 1000);
+    return code === 0 ? null : `CI en échec (${codeText(code)}) : ${ci.command}`;
   }
   ctx.out(`→ CI : attente des runs GitHub de ${sha.slice(0, 7)}`);
   const start = deps.now();
   let last = '';
+  let failingSince: number | null = null;
   for (;;) {
-    let runs: GhRun[];
+    let runs: GhRun[] = [];
+    let error: string | null = null;
     try {
       runs = deps.gh(sha);
+      failingSince = null;
     } catch (e) {
-      return `gh run list impossible : ${(e as Error).message.split('\n')[0]}`;
+      // Erreur passagère (réseau, quota d'API) : on réessaie ; persistante, on abandonne avec sa cause.
+      error = (e as Error).message;
+      failingSince ??= deps.now();
     }
     const elapsed = deps.now() - start;
-    if (runs.length === 0) {
+    if (error !== null) {
+      if (deps.now() - failingSince! >= CI_APPEAR || elapsed >= ciTimeout * 1000) return `gh run list en échec : ${error}`;
+      ctx.err(`  gh run list en échec, nouvel essai : ${error}`);
+    } else if (runs.length === 0) {
       if (elapsed >= CI_APPEAR) return `aucun run CI pour ce sha après ${CI_APPEAR / 60_000} min (le commit poussé est-il celui que la CI construit ?)`;
     } else {
       const pending = runs.filter((r) => r.status !== 'completed');
@@ -238,10 +288,10 @@ async function waitCi(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Reco
   }
 }
 
-async function tryCheck(c: VerifyCheck, deps: DeliverDeps, sha: string, env: Record<string, string>): Promise<string | null> {
+async function tryCheck(c: VerifyCheck, deps: DeliverDeps, sha: string, env: Record<string, string>, budgetMs: number): Promise<string | null> {
   if (c.command !== undefined) {
-    const code = deps.exec(c.command, env);
-    return code === 0 ? null : `code ${code}`;
+    const code = deps.exec(c.command, env, budgetMs);
+    return code === 0 ? null : codeText(code);
   }
   try {
     const res = await deps.fetch(substitute(c.url!, sha));
@@ -261,7 +311,7 @@ async function verifyAll(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: R
     const label = describeCheck(c, sha);
     ctx.out(`→ vérification ${i + 1}/${ctx.config.verify.length} : ${label}`);
     for (;;) {
-      const reason = await tryCheck(c, deps, sha, env);
+      const reason = await tryCheck(c, deps, sha, env, deadline - deps.now());
       if (reason === null) break;
       if (deps.now() >= deadline) return `vérification en échec après ${ctx.config.verifyTimeout} s : ${label} — ${reason}`;
       await deps.sleep(POLL_VERIFY);
@@ -270,12 +320,17 @@ async function verifyAll(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: R
   return null;
 }
 
-/** Lots cités par les commits entre la livraison précédente et `sha` (rien à la première livraison). */
-function deliveredLots(ctx: DeliverCtx, prev: string | null, sha: string): string[] {
-  if (!ctx.plan || !prev || prev === sha) return [];
+/** Ligne des lots cités depuis la livraison précédente, ou null (première livraison, rien de cité). */
+function deliveredLots(ctx: DeliverCtx, prev: string | null, sha: string): string | null {
+  if (!ctx.plan || !prev || prev === sha) return null;
+  if (!isAncestor(ctx.root, prev, sha)) {
+    return `livraison précédente (${prev.slice(0, 7)}) hors de l'historique de ${sha.slice(0, 7)} (réécrit ?) : lots livrés non calculés`;
+  }
+  const known = new Set(ctx.plan.lots().map((l) => l.id));
   const ids = new Set<string>();
   for (const c of readCommits(ctx.root, { range: `${prev}..${sha}` })) {
-    for (const r of extractRefs(`${c.subject}\n${c.body}`, ctx.plan.prefix)) ids.add(r.lot);
+    for (const r of extractRefs(`${c.subject}\n${c.body}`, ctx.plan.prefix)) if (known.has(r.lot)) ids.add(r.lot);
   }
-  return [...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  if (ids.size === 0) return null;
+  return `livré : ${[...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join(', ')} — raf done si l'effet est celui attendu`;
 }

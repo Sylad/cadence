@@ -19,7 +19,8 @@ export function installSkills(src: string, dest: string, force: boolean): Instal
       const name = `cadence-${d.name}`;
       const text = readFileSync(join(src, d.name, 'SKILL.md'), 'utf8').replace(/^name: .*$/m, `name: ${name}`);
       const target = join(dest, name, 'SKILL.md');
-      const current = existsSync(target) ? readFileSync(target, 'utf8') : null;
+      // Un dossier présent sans SKILL.md compte comme une copie différente : ne pas le fusionner.
+      const current = existsSync(target) ? readFileSync(target, 'utf8') : existsSync(join(dest, name)) ? '' : null;
       return { from: join(src, d.name), name, text, target, current };
     })
     .sort((a, b) => a.name.localeCompare(b.name));

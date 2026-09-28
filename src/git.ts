@@ -72,7 +72,8 @@ export function headSha(cwd: string): string | null {
 }
 
 export interface RepoStatus {
-  branch: string;
+  /** null en HEAD détachée. */
+  branch: string | null;
   /** Fichiers suivis modifiés (index ou arbre de travail). */
   dirty: number;
   untracked: number;
@@ -88,7 +89,7 @@ export function repoStatus(cwd: string): RepoStatus {
   const upstream = tryGit(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
   const ahead = upstream && headSha(cwd) ? Number(tryGit(cwd, ['rev-list', '--count', '@{u}..HEAD']) ?? 0) : 0;
   return {
-    branch: tryGit(cwd, ['symbolic-ref', '--short', '-q', 'HEAD']) ?? 'HEAD détachée',
+    branch: tryGit(cwd, ['symbolic-ref', '--short', '-q', 'HEAD']),
     dirty: lines.length - untracked,
     untracked,
     upstream,
@@ -104,4 +105,14 @@ export function onRemote(cwd: string, sha: string): boolean {
 /** Chemin d'un fichier propre au dépôt local, dans le dossier git (jamais commité, un par worktree). */
 export function gitPath(cwd: string, name: string): string {
   return resolve(cwd, git(cwd, ['rev-parse', '--git-path', name]).trim());
+}
+
+/** Dossier git commun à tous les worktrees du dépôt. */
+export function gitCommonDir(cwd: string): string {
+  return resolve(cwd, git(cwd, ['rev-parse', '--git-common-dir']).trim());
+}
+
+/** `a` est-il un ancêtre de `b` (objets présents) ? */
+export function isAncestor(cwd: string, a: string, b: string): boolean {
+  return tryGit(cwd, ['merge-base', '--is-ancestor', a, b]) !== null;
 }

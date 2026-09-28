@@ -31,5 +31,5 @@ if (tool === 'raf') {
                     CI du sha poussé → déploiement → vérifications de l'effet
   cadence skills install [--dir .claude/skills] [--force]
                     installe les skills Claude Code session-start, session-close, deliver`);
-  process.exitCode = tool ? 2 : 0;
+  process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;
 }

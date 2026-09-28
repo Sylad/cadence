@@ -22,7 +22,10 @@ const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
 /** Commits de la fenêtre reliés aux lots, sans compter comme « sans lot » ceux qui ne touchent que le plan. */
 function period(ctx: SessionCtx, since: string): Linked {
   const commits = readCommits(ctx.root, { since });
-  return exemptPlanOnly(linkCommits(ctx.plan.lots(), commits, ctx.plan.prefix), ctx.plan, ctx.root);
+  const linked = exemptPlanOnly(linkCommits(ctx.plan.lots(), commits, ctx.plan.prefix), ctx.plan, ctx.root);
+  // Comme raf check : un commit antérieur à l'adoption du plan n'avait pas à citer de lot.
+  const adopted = ctx.plan.since;
+  return adopted ? { ...linked, orphans: linked.orphans.filter((c) => c.day >= adopted) } : linked;
 }
 
 function byLotLines(linked: Linked): string[] {

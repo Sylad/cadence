@@ -69,6 +69,15 @@ describe('session start', () => {
   });
 });
 
+describe('session start : adoption du plan', () => {
+  it('ne compte pas comme « sans lot » un commit antérieur à l’adoption', async () => {
+    const dir = await project();
+    commit(dir, 'vieux commit sans lot', '2026-09-26T09:00:00');
+    const { out } = await cad(dir, 'session', 'start', '--since', '2026-09-25');
+    expect(out).not.toContain('sans lot');
+  });
+});
+
 describe('session close', () => {
   it('liste les commits sans lot et les lots en cours sans commit du jour, code 1', async () => {
     const dir = await project();

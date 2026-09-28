@@ -1,14 +1,15 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { check } from './check.js';
+import { audit, auditSince, exemptPlanOnly, nextUp } from './audit.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { ganttData, renderGantt } from './gantt.js';
-import { changedFiles, gitRoot, readCommits } from './git.js';
+import { gitRoot, readCommits } from './git.js';
 import { installHook } from './hook.js';
-import { linkCommits, type Linked } from './link.js';
+import { linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues } from './news.js';
-import { extractRefs, isOpen, Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
+import { extractRefs, Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
 
 export interface Io {
@@ -151,14 +152,9 @@ function dispatch(argv: string[], io: Io): number {
     case 'now':
       return now(Plan.load(planPath), root, today, io);
     case 'check': {
-      const plan = Plan.load(planPath);
-      const lots = plan.lots();
-      const linked = exemptPlanOnly(linkCommits(lots, readCommits(root, { since: auditSince(plan, values.since) }), plan.prefix), plan, root);
-      // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
-      const all = linkCommits(lots, readCommits(root), plan.prefix);
       const idle = values.idle === undefined ? 7 : Number(values.idle);
       if (!Number.isInteger(idle) || idle < 0) throw new RafError(`--idle invalide : ${values.idle}`);
-      const issues = [...check(lots, { ...linked, byLot: all.byLot }, today, idle), ...newsIssues(lots, loadEntries(newsDir), newsDir)];
+      const issues = audit(Plan.load(planPath), root, newsDir, today, { since: values.since, idle });
       for (const i of issues) io.out(`✗ ${i.message}`);
       io.out(issues.length === 0 ? '✓ plan et historique cohérents' : `${issues.length} écart(s)`);
       return issues.length === 0 ? 0 : 1;
@@ -193,23 +189,6 @@ function dispatch(argv: string[], io: Io): number {
   }
 }
 
-/** Un commit qui ne touche que le plan (ou la page Gantt) n'a pas besoin de citer un lot. */
-function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
-  const own = new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html'))]);
-  const orphans = linked.orphans.filter((c) => {
-    const files = changedFiles(root, c.sha);
-    return files.length === 0 || !files.every((f) => own.has(f));
-  });
-  return { ...linked, orphans };
-}
-
-/** Fenêtre de l'audit : --since, sinon la date d'adoption du plan, sinon 30 jours. */
-function auditSince(plan: Plan, explicit?: string): string {
-  if (explicit) return explicit;
-  // Une date seule vaudrait « ce jour-là à l'heure actuelle » pour git : minuit explicite.
-  return plan.since ? `${plan.since} 00:00` : '30 days ago';
-}
-
 function describe(l: Lot, commits: number): string {
   const bits = [`${l.estimate} j`];
   if (commits) bits.push(`${commits} commit(s)`);
@@ -221,18 +200,13 @@ function now(plan: Plan, root: string, today: Day, io: Io): number {
   const lots = plan.lots();
   const linked = linkCommits(lots, readCommits(root), plan.prefix);
   const count = (id: string) => linked.byLot.get(id)?.length ?? 0;
-  const byId = new Map(lots.map((l) => [l.id, l]));
+  const { doing, ready, blocked } = nextUp(lots);
   io.out(`${plan.project} — ${today}`);
 
-  const doing = lots.filter((l) => l.status === 'doing');
   io.out('\nEn cours');
   if (doing.length === 0) io.out('  (rien)');
   for (const l of doing) io.out(`  ${describe(l, count(l.id))}`);
 
-  const ready = lots
-    .filter((l) => l.status === 'todo' && l.after.every((d) => !byId.has(d) || !isOpen(byId.get(d)!.status)))
-    .sort((a, b) => Number(b.quickwin) - Number(a.quickwin));
-  const blocked = lots.filter((l) => l.status === 'todo' && !ready.includes(l));
   io.out('\nÀ suivre');
   if (ready.length === 0) io.out('  (rien de prêt)');
   for (const l of ready.slice(0, 5)) io.out(`  ${describe(l, count(l.id))}`);

@@ -198,6 +198,25 @@ describe('loadEntries order', () => {
     commit(dir, `docs(${lot}): nouveauté`, date);
   };
 
+  const addAs = (dir: string, file: string, lot: string, author: string, committer: string) => {
+    writeFileSync(join(dir, file), entry(lot));
+    execFileSync('git', ['add', file], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-q', '-m', `docs(${lot}): nouveauté`], {
+      cwd: dir,
+      stdio: 'ignore',
+      env: { ...process.env, GIT_AUTHOR_DATE: author, GIT_COMMITTER_DATE: committer },
+    });
+  };
+
+  it('an accented file name committed is found in git (core.quotepath)', () => {
+    const dir = gitRepo();
+    add(dir, '2026-09-28-café.md', 'LC', '2026-09-28T20:00:00+02:00');
+    add(dir, '2026-09-28-b.md', 'LB', '2026-09-28T21:00:00+02:00');
+    writeFileSync(join(dir, '2026-09-28-a.md'), entry('LA'));
+    // café commité en premier : le plus ancien, pas « non commité donc le plus récent ».
+    expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['LA', 'LB', 'LC']);
+  });
+
   it('same day, no created time: the entry committed last comes first, whatever its file name (L18 then L21)', () => {
     const dir = gitRepo();
     add(dir, L18, 'L18', '2026-09-28T20:07:35+02:00');

@@ -125,15 +125,19 @@ export function addedTimes(dir: string): Map<string, number> {
   const times = new Map<string, number>();
   let out: string;
   try {
-    out = git(dir, ['log', '--diff-filter=A', '--no-renames', '--relative', '--name-only', `--format=${RECORD}%cI`, '--', '.']);
+    // quotepath=off + -z : noms accentués tels quels, sans guillemets ni échappement octal.
+    out = git(dir, ['-c', 'core.quotepath=off', 'log', '-z', '--diff-filter=A', '--no-renames', '--relative', '--name-only', `--format=${RECORD}%cI`, '--', '.']);
   } catch {
     return times;
   }
-  // Du plus récent au plus ancien : le dernier vu est le premier ajout.
+  // Enregistrement = RECORD date \0 \n nom \0 nom \0 … ; du plus récent au plus ancien : le dernier vu est le premier ajout.
   for (const record of out.split(RECORD).filter(Boolean)) {
-    const [stamp, ...files] = record.split('\n').map((l) => l.trim()).filter(Boolean);
+    const [stamp, ...files] = record.split('\0');
     const t = Date.parse(stamp);
-    for (const f of files) times.set(f, t);
+    for (const [i, f] of files.entries()) {
+      const name = i === 0 ? f.replace(/^\n/, '') : f;
+      if (name) times.set(name, t);
+    }
   }
   return times;
 }

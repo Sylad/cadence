@@ -30,6 +30,15 @@ const CREATED = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2
 const CAPTURE = /^[\w./-]+\.(?:png|jpe?g|webp|gif)$/i;
 const FRONT = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
+/** Bien formée ET réelle : Date.parse accepte le 30 février (et rend NaN pour 25:70). */
+function validStamp(s: string): boolean {
+  const [y, mo, d, h, mi, sec = 0] = s.match(/\d+/g)!.slice(0, 6).map(Number);
+  const day = new Date(Date.UTC(y, mo - 1, d));
+  return (
+    !Number.isNaN(Date.parse(s.replace(' ', 'T'))) && day.getUTCMonth() === mo - 1 && day.getUTCDate() === d && h < 24 && mi < 60 && sec < 60
+  );
+}
+
 const list = (v: unknown): string[] => (v == null ? [] : Array.isArray(v) ? v.map(String) : [String(v)]);
 
 export function parseEntry(file: string, text: string): Entry {
@@ -51,8 +60,9 @@ export function parseEntry(file: string, text: string): Entry {
   if ('created' in head) {
     const created = String(head.created ?? '').trim();
     if (!created) entry.problems.push(CREATED_EMPTY);
-    else if (CREATED.test(created)) entry.created = created.replace(' ', 'T');
-    else entry.problems.push(`created « ${created} » n'est pas une heure AAAA-MM-JJTHH:MM`);
+    else if (!CREATED.test(created)) entry.problems.push(`created « ${created} » n'est pas une heure AAAA-MM-JJTHH:MM`);
+    else if (!validStamp(created)) entry.problems.push(`created « ${created} » n'est pas une heure valide`);
+    else entry.created = created.replace(' ', 'T');
   }
   entry.lots = list(head.lots);
   entry.captures = list(head.captures);

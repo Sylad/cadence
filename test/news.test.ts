@@ -291,6 +291,13 @@ describe('loadEntries order', () => {
     expect(loadEntries(nd)[0]).toMatchObject({ created: stamp, problems: [] });
   });
 
+  it('rejects a well-formed but impossible created time', () => {
+    const e = parseEntry('x.md', entry('L1', '2026-09-28T25:70+02:00'));
+    expect(e.problems).toEqual(['created « 2026-09-28T25:70+02:00 » n\'est pas une heure valide']);
+    expect(e.created).toBeUndefined();
+    expect(parseEntry('y.md', entry('L1', '2026-02-30T10:00+01:00')).problems).toEqual(['created « 2026-02-30T10:00+01:00 » n\'est pas une heure valide']);
+  });
+
   it('rejects a malformed created time', () => {
     expect(parseEntry('x.md', entry('L1', '28/09 22h')).problems).toEqual(['created « 28/09 22h » n\'est pas une heure AAAA-MM-JJTHH:MM']);
   });

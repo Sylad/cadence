@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { newsIssues, parseEntry, renderMarkdown } from '../src/news.js';
+import { loadEntries, newsIssues, parseEntry, renderMarkdown } from '../src/news.js';
 import type { Lot } from '../src/plan.js';
-import { commit, gitRepo } from './helpers.js';
+import { execFileSync } from 'node:child_process';
+import { commit, gitRepo, tempDir } from './helpers.js';
 
 function cli(dir: string, ...argv: string[]) {
   const out: string[] = [];
@@ -168,4 +169,31 @@ describe('news CLI', () => {
     expect(r.code).toBe(1);
     expect(r.out).toContain('x.md : en-tête YAML absent');
   });
+});
+
+describe('loadEntries order', () => {
+  const entry = (lot: string) => `---\ntitle: ${lot}\ndate: 2026-09-28\nlots: [${lot}]\n---\n`;
+  const L18 = '2026-09-28-une-page-nouveautes-ce-qui-change-avec-une-capture.md';
+  const L21 = '2026-09-28-un-tableau-de-bord-plus-lisible-surtout-au-telephone.md';
+  const add = (dir: string, file: string, lot: string, date: string) => {
+    writeFileSync(join(dir, file), entry(lot));
+    execFileSync('git', ['add', file], { cwd: dir, stdio: 'ignore' });
+    commit(dir, `docs(${lot}): nouveauté`, date);
+  };
+
+  it('same day, no created time: the entry committed last comes first, whatever its file name (L18 then L21)', () => {
+    const dir = gitRepo();
+    add(dir, L18, 'L18', '2026-09-28T20:07:35+02:00');
+    add(dir, L21, 'L21', '2026-09-28T22:21:08+02:00');
+    expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['L21', 'L18']);
+  });
+
+  it('the date still comes first; outside git, the file name decides last', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'a.md'), entry('LA').replace('2026-09-28', '2026-09-29'));
+    writeFileSync(join(dir, 'b.md'), entry('LB'));
+    writeFileSync(join(dir, 'c.md'), entry('LC'));
+    expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['LA', 'LC', 'LB']);
+  });
+
 });

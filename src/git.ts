@@ -116,3 +116,24 @@ export function gitCommonDir(cwd: string): string {
 export function isAncestor(cwd: string, a: string, b: string): boolean {
   return tryGit(cwd, ['merge-base', '--is-ancestor', a, b]) !== null;
 }
+
+/**
+ * Instant (ms) du premier commit qui a ajouté chaque fichier de `dir`, clé = chemin relatif à `dir`.
+ * Vide hors d'un dépôt git ; un fichier jamais commité en est absent.
+ */
+export function addedTimes(dir: string): Map<string, number> {
+  const times = new Map<string, number>();
+  let out: string;
+  try {
+    out = git(dir, ['log', '--diff-filter=A', '--no-renames', '--relative', '--name-only', `--format=${RECORD}%cI`, '--', '.']);
+  } catch {
+    return times;
+  }
+  // Du plus récent au plus ancien : le dernier vu est le premier ajout.
+  for (const record of out.split(RECORD).filter(Boolean)) {
+    const [stamp, ...files] = record.split('\n').map((l) => l.trim()).filter(Boolean);
+    const t = Date.parse(stamp);
+    for (const f of files) times.set(f, t);
+  }
+  return times;
+}

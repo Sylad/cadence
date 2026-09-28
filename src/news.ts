@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSyn
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { isDay, type Day } from './dates.js';
+import { addedTimes } from './git.js';
 import { RafError, type Lot } from './plan.js';
 
 export interface Entry {
@@ -58,13 +59,24 @@ export function parseEntry(file: string, text: string): Entry {
   return entry;
 }
 
-/** Entrées du dossier, plus récentes d'abord (à date égale, par nom de fichier décroissant). */
+/**
+ * Entrées du dossier, plus récentes d'abord : par date, puis à date égale par instant de création
+ * (date du premier commit du fichier ; pas encore commité = le plus récent), puis par nom de fichier décroissant.
+ */
 export function loadEntries(dir: string): Entry[] {
   if (!existsSync(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true })
+  const entries = readdirSync(dir, { withFileTypes: true })
     .filter((f) => f.isFile() && f.name.endsWith('.md') && f.name.toLowerCase() !== 'readme.md')
-    .map((f) => parseEntry(f.name, readFileSync(join(dir, f.name), 'utf8')))
-    .sort((a, b) => (a.date === b.date ? b.file.localeCompare(a.file) : b.date.localeCompare(a.date)));
+    .map((f) => parseEntry(f.name, readFileSync(join(dir, f.name), 'utf8')));
+  const added = addedTimes(dir);
+  const created = (e: Entry) => added.get(e.file) ?? Infinity;
+  return entries.sort((a, b) => {
+    if (a.date !== b.date) return b.date.localeCompare(a.date);
+    const ta = created(a);
+    const tb = created(b);
+    if (ta !== tb) return ta < tb ? 1 : -1;
+    return b.file.localeCompare(a.file);
+  });
 }
 
 export function newsIssues(lots: Lot[], entries: Entry[], dir: string): NewsIssue[] {

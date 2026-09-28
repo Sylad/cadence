@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { run } from '../src/cli.js';
+import { commit, gitRepo } from './helpers.js';
+
+function raf(dir: string, ...argv: string[]) {
+  const out: string[] = [];
+  const err: string[] = [];
+  const code = run(argv, {
+    cwd: dir,
+    env: { RAF_TODAY: '2026-09-28' },
+    out: (l) => out.push(l),
+    err: (l) => err.push(l),
+    now: () => new Date('2026-09-28T09:30:00'),
+  });
+  return { code, out: out.join('\n'), err: err.join('\n') };
+}
+
+describe('raf CLI', () => {
+  it('runs a full lot lifecycle', () => {
+    const dir = gitRepo();
+    expect(raf(dir, 'init', '--project', 'demo').code).toBe(0);
+    expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(true);
+    expect(raf(dir, 'add', 'Cache', 'des', 'prêts', '--estimate', '2').out).toBe('L1');
+    expect(raf(dir, 'add', 'Petit', 'correctif', '--quickwin').out).toBe('L2');
+    expect(raf(dir, 'add', 'Après', 'le', 'cache', '--after', 'L1').out).toBe('L3');
+    expect(raf(dir, 'add', 'sous-tâche', '--parent', 'L1').out).toBe('L1/t1');
+    expect(raf(dir, 'start', 'L1').code).toBe(0);
+    commit(dir, 'feat(L1): cache', '2026-09-28T10:00:00');
+
+    const now = raf(dir, 'now').out;
+    expect(now).toMatch(/En cours\n {2}L1 {2}Cache des prêts {2}\(2 j, 1 commit\(s\), sous-tâches 0\/1\)/);
+    expect(now.indexOf('⚡ L2')).toBeLessThan(now.indexOf('en attente'));
+    expect(now).toContain('en attente de dépendances : L3');
+
+    expect(raf(dir, 'done', 'L1').code).toBe(2);
+    raf(dir, 'done', 'L1/t1');
+    expect(raf(dir, 'done', 'L1').code).toBe(0);
+    raf(dir, 'drop', 'L2', '--reason', 'plus utile');
+    raf(dir, 'note', 'L3', 'à', 'découper');
+    const yaml = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    expect(yaml).toContain('text: "abandonné : plus utile"');
+    expect(yaml).toContain('text: à découper');
+    expect(raf(dir, 'list', '--status', 'todo').out).toMatch(/^L3 +todo +Après le cache$/);
+  });
+
+  it('check exits 1 on drift and 0 when clean', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    raf(dir, 'add', 'A');
+    commit(dir, 'feat(L1): a');
+    expect(raf(dir, 'check').code).toBe(1);
+    raf(dir, 'start', 'L1');
+    const ok = raf(dir, 'check');
+    expect(ok.out).toContain('cohérents');
+    expect(ok.code).toBe(0);
+  });
+
+  it('reports usage errors with code 2', () => {
+    const dir = gitRepo();
+    expect(raf(dir, 'now').err).toMatch(/raf init/);
+    raf(dir, 'init', '--no-hook');
+    expect(raf(dir, 'add', 'x', '--estimate', 'abc').code).toBe(2);
+    expect(raf(dir, 'frobnicate').err).toMatch(/commande inconnue/);
+  });
+
+  it('post-commit only talks, never writes', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    raf(dir, 'add', 'A');
+    const before = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    commit(dir, 'feat(L1): a');
+    expect(raf(dir, 'hook', 'post-commit').err).toContain('L1 est encore todo');
+    commit(dir, 'wip');
+    expect(raf(dir, 'hook', 'post-commit').err).toContain('commit sans lot');
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(before);
+  });
+
+  it('hook install keeps an existing hook and is idempotent', () => {
+    const dir = gitRepo();
+    const hook = join(dir, '.git/hooks/post-commit');
+    writeFileSync(hook, '#!/bin/sh\necho existing\n');
+    raf(dir, 'hook', 'install');
+    expect(raf(dir, 'hook', 'install').out).toContain('déjà présent');
+    const text = readFileSync(hook, 'utf8');
+    expect(text.startsWith('#!/bin/sh\necho existing\n# >>> raf')).toBe(true);
+    expect(text.match(/>>> raf/g)).toHaveLength(1);
+    expect(statSync(hook).mode & 0o111).not.toBe(0);
+  });
+
+  it('gantt writes a self-contained page with escaped data', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook', '--project', 'demo');
+    raf(dir, 'add', '</script><img src=x onerror=alert(1)>');
+    const path = raf(dir, 'gantt').out;
+    const html = readFileSync(path, 'utf8');
+    expect(path).toBe(join(dir, 'docs/plan/gantt.html'));
+    expect(html).not.toMatch(/<script[^>]+src=|<link[^>]+href=|https?:\/\/(?!www\.w3\.org)/);
+    expect(html.match(/<\/script>/g)).toHaveLength(2);
+    const json = /<script type="application\/json" id="raf-data">(.*?)<\/script>/s.exec(html)![1];
+    const data = JSON.parse(json);
+    expect(data.bars[0]).toMatchObject({ id: 'L1', start: '2026-09-28', end: '2026-09-28', projected: true });
+    expect(data.generated).toBe('2026-09-28 09:30');
+  });
+});

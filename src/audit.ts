@@ -32,13 +32,17 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
   return [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...uxIssues(plan)];
 }
 
-/** Lots visibles terminés depuis l'activation de la règle sans revue UX enregistrée. */
+/**
+ * Lots visibles terminés APRÈS le jour d'activation sans revue UX enregistrée. Le jour même est exclu :
+ * à la journée près, on ne distingue pas un lot fermé avant l'activation d'un lot fermé après
+ * (et `raf done` refuse de toute façon dès l'activation).
+ */
 export function uxIssues(plan: Plan): { message: string }[] {
   const since = plan.uxSince;
   if (!since) return [];
   return plan
     .lots()
-    .filter((l) => l.visible && l.status === 'done' && !l.ux && (!l.finished || l.finished >= since))
+    .filter((l) => l.visible && l.status === 'done' && !l.ux && (!l.finished || l.finished > since))
     .map((l) => ({ message: `${l.id} est visible et terminé sans revue UX — raf ux ${l.id} "verdict"` }));
 }
 

@@ -15,7 +15,7 @@ existante reçoit une revue planifiée. Même principe que les Nouveautés : la 
 | Activation | clé `uxSince: AAAA-MM-JJ` du plan, posée par `raf ux enable` ; absente = règle inactive (compatibilité) |
 | Revue enregistrée | `raf ux <lot> "verdict"` → `ux: { date, verdict }` sur le lot |
 | `raf done` | refuse un lot `visible` sans revue quand la règle est active (`--force` pour passer outre) |
-| `raf check` | écart pour un lot `visible` terminé à partir de `uxSince` sans revue |
+| `raf check` | écart pour un lot `visible` terminé après le jour `uxSince` sans revue (le jour même est exclu : à la journée près, avant et après l'activation se confondent) |
 
 Un changement visible sans écran (calcul corrigé) s'enregistre avec un verdict explicite :
 `raf ux L8 "sans écran : correction de calcul"`.

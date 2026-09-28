@@ -141,8 +141,8 @@ raf ux L8 "no screen: calculation fix"
 ```
 
 With the rule on, `raf done` refuses a visible lot without a review (`--force`
-to override) and `raf check` reports visible lots finished since `uxSince`
-without one. Plans without `uxSince` are not affected.
+to override) and `raf check` reports visible lots finished after the `uxSince`
+day without one. Plans without `uxSince` are not affected.
 
 ## session
 

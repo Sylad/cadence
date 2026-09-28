@@ -9,6 +9,17 @@ The repository already carries the state: the plan (`docs/plan/raf.yaml`), the h
 the last close. The only thing missing is the human's priority for today. This skill gathers the facts,
 proposes, and stops.
 
+## Where to run
+
+Every `cadence` / `raf` command works on the git repository of the current directory. When the
+session runs from a parent folder that holds several projects (not itself a repository), run each
+command inside the project concerned: `cd <project> && cadence …`. The projects are the sub-folders
+that contain `docs/plan/raf.yaml`.
+
+With no project named, run `cadence session start` in **each** project that has a plan and report
+one or two lines per project (in progress, drift, notes left at the last close), then propose the
+three most useful items across projects and wait. With a project named, work in that one only.
+
 ## Steps
 
 1. Run `cadence session start` (after a weekend: `--since "3 days ago"`). If `cadence` is not on the

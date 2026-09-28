@@ -11,9 +11,10 @@ Four tools:
 - **session**: the facts to start and to close a work session;
 - **deliver**: wait for the CI of the pushed commit, deploy, then **verify the effect**.
 
-And three [Claude Code](https://claude.com/claude-code) skills that turn them
-into rituals — `session-start`, `session-close`, `deliver` — plus a `ux-reviewer`
-agent: no user-facing change is done before its usability review.
+And four [Claude Code](https://claude.com/claude-code) skills that turn them
+into rituals — `session-start`, `session-close`, `deliver`, and `lead` to pilot
+several projects through subagents — plus a `ux-reviewer` agent: no user-facing
+change is done before its usability review.
 
 ## raf
 
@@ -212,8 +213,8 @@ As a plugin:
 /plugin install cadence@cadence
 ```
 
-gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver` and
-the `ux-reviewer` agent. Or copy them into the repository with
+gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver`,
+`/cadence:lead` and the `ux-reviewer` agent. Or copy them into the repository with
 `cadence skills install` (to `.claude/skills/cadence-*` and
 `.claude/agents/cadence-ux-reviewer.md`; `--dir` for another `.claude` folder,
 `--force` to overwrite local edits).
@@ -225,6 +226,11 @@ the `ux-reviewer` agent. Or copy them into the repository with
   lines for next time.
 - **deliver**: dry run, delivery, and on failure the cause fixed rather than a
   blind retry.
+- **lead**: from a folder holding several projects, one subagent per project
+  gathers the facts, you choose the priorities, each lot is delegated to a
+  subagent with a standard brief (test first, commits citing the lot, no push),
+  reviewed, re-verified by the lead, then delivered one project at a time. Two
+  subagents at most, never two in the same repository.
 - **ux-reviewer** (agent): captures at 1440 and 390 px, findings grounded in a
   named rule (Nielsen, WCAG 2.2 AA) or a measurement, ranked, turned into
   `raf add --parent` sub-tasks, and a one-line verdict for `raf ux`. It never

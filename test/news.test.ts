@@ -275,6 +275,22 @@ describe('loadEntries order', () => {
     expect(loadEntries(nd).map((e) => e.lots[0])).toEqual(['LZ', 'L21', 'L18']);
   });
 
+  it('reports an empty created key; news stamp replaces it instead of adding a second one', () => {
+    const empty = 'created vide — cadence news stamp';
+    for (const v of ['', ' ~', ' null', ' ""']) {
+      expect(parseEntry('x.md', `---\ntitle: X\ndate: 2026-09-28\ncreated:${v}\n---\n`).problems).toEqual([empty]);
+    }
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    const nd = join(dir, 'docs/nouveautes');
+    mkdirSync(nd, { recursive: true });
+    writeFileSync(join(nd, 'x.md'), '---\ntitle: X\ndate: 2026-09-28\ncreated: ~\nlots: [L1]\n---\nTexte.\n');
+    expect(news(dir, 'stamp').code).toBe(0);
+    const stamp = toStamp(new Date('2026-09-29T10:12:00'));
+    expect(readFileSync(join(nd, 'x.md'), 'utf8')).toBe(`---\ntitle: X\ndate: 2026-09-28\ncreated: ${stamp}\nlots: [L1]\n---\nTexte.\n`);
+    expect(loadEntries(nd)[0]).toMatchObject({ created: stamp, problems: [] });
+  });
+
   it('rejects a malformed created time', () => {
     expect(parseEntry('x.md', entry('L1', '28/09 22h')).problems).toEqual(['created « 28/09 22h » n\'est pas une heure AAAA-MM-JJTHH:MM']);
   });

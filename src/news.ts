@@ -25,6 +25,7 @@ export interface NewsIssue {
   message: string;
 }
 
+const CREATED_EMPTY = 'created vide — cadence news stamp';
 const CREATED = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?$/;
 const CAPTURE = /^[\w./-]+\.(?:png|jpe?g|webp|gif)$/i;
 const FRONT = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
@@ -47,9 +48,10 @@ export function parseEntry(file: string, text: string): Entry {
   }
   entry.title = String(head.title ?? '').trim();
   entry.date = String(head.date ?? '');
-  if (head.created != null) {
-    const created = String(head.created).trim();
-    if (CREATED.test(created)) entry.created = created.replace(' ', 'T');
+  if ('created' in head) {
+    const created = String(head.created ?? '').trim();
+    if (!created) entry.problems.push(CREATED_EMPTY);
+    else if (CREATED.test(created)) entry.created = created.replace(' ', 'T');
     else entry.problems.push(`created « ${created} » n'est pas une heure AAAA-MM-JJTHH:MM`);
   }
   entry.lots = list(head.lots);
@@ -148,15 +150,19 @@ export function stampEntries(dir: string, now: Date): { file: string; created: s
   const added = addedTimes(dir);
   const done: { file: string; created: string }[] = [];
   for (const e of loadEntries(dir)) {
-    if (e.created || e.problems.length > 0) continue;
+    // Seule une clé created vide est réparée ici ; une heure fausse reste à corriger à la main.
+    if (e.created || !e.problems.every((p) => p === CREATED_EMPTY)) continue;
     const created = toStamp(new Date(added.get(e.file) ?? now.getTime()));
     const path = join(dir, e.file);
     const text = readFileSync(path, 'utf8');
     const lines = text.split('\n');
     const end = lines.findIndex((l, i) => i > 0 && l.trimEnd() === '---');
-    const dateLine = lines.findIndex((l, i) => i > 0 && i < end && /^date\s*:/.test(l));
+    const key = (name: string) => lines.findIndex((l, i) => i > 0 && i < end && new RegExp(`^${name}\\s*:`).test(l));
+    const existing = key('created');
+    const dateLine = key('date');
     const eol = lines[dateLine >= 0 ? dateLine : 0].endsWith('\r') ? '\r' : '';
-    lines.splice(dateLine >= 0 ? dateLine + 1 : end, 0, `created: ${created}${eol}`);
+    if (existing >= 0) lines[existing] = `created: ${created}${eol}`; // clé vide : remplacée, jamais dupliquée
+    else lines.splice(dateLine >= 0 ? dateLine + 1 : end, 0, `created: ${created}${eol}`);
     writeFileSync(path, lines.join('\n'));
     done.push({ file: e.file, created });
   }

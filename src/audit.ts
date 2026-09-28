@@ -29,7 +29,17 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
   const linked = exemptPlanOnly(linkCommits(lots, readCommits(root, { since: auditSince(plan, opts.since) }), plan.prefix), plan, root);
   // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
   const all = linkCommits(lots, readCommits(root), plan.prefix);
-  return [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir)];
+  return [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...uxIssues(plan)];
+}
+
+/** Lots visibles terminés depuis l'activation de la règle sans revue UX enregistrée. */
+export function uxIssues(plan: Plan): { message: string }[] {
+  const since = plan.uxSince;
+  if (!since) return [];
+  return plan
+    .lots()
+    .filter((l) => l.visible && l.status === 'done' && !l.ux && (!l.finished || l.finished >= since))
+    .map((l) => ({ message: `${l.id} est visible et terminé sans revue UX — raf ux ${l.id} "verdict"` }));
 }
 
 /** Ce qui vient ensuite : lots en cours, puis lots prêts (dépendances closes), gains rapides d'abord. */

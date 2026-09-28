@@ -31,6 +31,8 @@ export interface Lot {
   finished?: Day;
   notes: Note[];
   tasks: Task[];
+  /** Revue d'ergonomie enregistrée par `raf ux`. */
+  ux?: { date: Day; verdict: string };
   /** Champs écrits à la main illisibles (dates mal formées…), remontés par check. */
   problems: string[];
 }
@@ -112,6 +114,31 @@ export class Plan {
     return v == null ? undefined : String(v);
   }
 
+  /** Date d'activation de la revue UX obligatoire des lots visibles ; absente = règle inactive. */
+  get uxSince(): Day | undefined {
+    const v = this.doc.get('uxSince');
+    return v == null ? undefined : String(v);
+  }
+
+  /** Active la revue UX ; false si elle l'était déjà. */
+  enableUx(today: Day): boolean {
+    if (this.uxSince) return false;
+    this.doc.set('uxSince', today);
+    // Placer la clé avant « lots » pour garder les réglages groupés en tête.
+    const map = this.doc.contents as YAMLMap;
+    const idx = map.items.findIndex((p) => String((p.key as { value?: unknown })?.value ?? p.key) === 'uxSince');
+    const lotsIdx = map.items.findIndex((p) => String((p.key as { value?: unknown })?.value ?? p.key) === 'lots');
+    if (idx > lotsIdx && lotsIdx >= 0) map.items.splice(lotsIdx, 0, ...map.items.splice(idx, 1));
+    return true;
+  }
+
+  recordUx(lotId: string, verdict: string, today: Day): void {
+    if (lotId.includes('/')) throw new RafError('la revue UX se note sur un lot, pas une sous-tâche');
+    const node = this.doc.createNode({ date: today, verdict }) as YAMLMap;
+    node.flow = true;
+    this.lotNode(lotId).set('ux', node);
+  }
+
   lots(): Lot[] {
     const raw = (this.doc.get('lots') as YAMLSeq).toJSON() as Record<string, unknown>[];
     return raw.map(normalizeLot);
@@ -191,6 +218,9 @@ export class Plan {
       if (open.length > 0 && !opts.force) {
         throw new RafError(`sous-tâches encore ouvertes : ${open.join(', ')} (--force pour passer outre)`);
       }
+      if (this.uxSince && lot.visible && !lot.ux && !opts.force) {
+        throw new RafError(`${lotId} est visible : revue UX attendue avant done — raf ux ${lotId} "verdict" (--force pour passer outre)`);
+      }
     }
     node.set('status', status);
     if (!lot.started && status !== 'dropped') node.set('started', today);
@@ -244,6 +274,9 @@ function normalizeLot(raw: Record<string, unknown>): Lot {
           status: STATUSES.includes(t.status as Status) ? (t.status as Status) : 'todo',
         }))
       : [],
+    ...(raw.ux && typeof raw.ux === 'object'
+      ? { ux: { date: String((raw.ux as Record<string, unknown>).date ?? ''), verdict: String((raw.ux as Record<string, unknown>).verdict ?? '') } }
+      : {}),
     problems,
   };
 }

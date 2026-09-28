@@ -30,6 +30,8 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf add "titre" [--estimate j] [--quickwin] [--visible] [--after L2,L4] [--parent L3]
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf note <id> "texte"
+  raf ux enable         revue UX obligatoire avant « done » pour les lots --visible
+  raf ux <id> "verdict" enregistre la revue d'ergonomie du lot (agent ux-reviewer)
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf list [--status todo|doing|done|dropped]
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
@@ -149,6 +151,21 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       need(2, 'note <id> "texte"');
       const plan = Plan.load(planPath);
       plan.note(rest[0], rest.slice(1).join(' '), today);
+      plan.save();
+      return 0;
+    }
+    case 'ux': {
+      need(1, 'ux enable | ux <lot> "verdict"');
+      const plan = Plan.load(planPath);
+      if (rest[0] === 'enable') {
+        const changed = plan.enableUx(today);
+        plan.save();
+        io.out(changed ? `revue UX obligatoire pour les lots visibles à partir du ${today}` : `revue UX déjà active depuis le ${plan.uxSince}`);
+        return 0;
+      }
+      need(2, 'ux <lot> "verdict"');
+      plan.lot(rest[0]);
+      plan.recordUx(rest[0], rest.slice(1).join(' '), today);
       plan.save();
       return 0;
     }

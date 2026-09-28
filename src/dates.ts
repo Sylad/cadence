@@ -14,6 +14,15 @@ export function toDay(date: Date): Day {
   return `${y}-${m}-${d}`;
 }
 
+/** Horodatage local à la minute, fuseau explicite : `2026-09-29T10:12+02:00`. */
+export function toStamp(date: Date): string {
+  const two = (n: number) => String(n).padStart(2, '0');
+  const off = -date.getTimezoneOffset();
+  const sign = off < 0 ? '-' : '+';
+  const abs = Math.abs(off);
+  return `${toDay(date)}T${two(date.getHours())}:${two(date.getMinutes())}${sign}${two(Math.floor(abs / 60))}:${two(abs % 60)}`;
+}
+
 function parse(day: Day): Date {
   return new Date(`${day}T00:00:00Z`);
 }

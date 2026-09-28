@@ -9,7 +9,7 @@ import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, readCommits } from './git.js';
 import { installHook } from './hook.js';
 import { linkCommits } from './link.js';
-import { buildNews, loadEntries, newEntry, newsData, newsIssues } from './news.js';
+import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from './news.js';
 import { extractRefs, Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
@@ -37,7 +37,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf gantt [-o docs/plan/gantt.html]
   raf hook install
-  raf news new <lot…> [--title t] | list | check | build [-o dossier]   (aussi « cadence news … »)
+  raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
 Un commit appartient à un lot quand son message cite l'identifiant : « feat(L3): … », « L3/t1 ».
 Un lot --visible attend une entrée Nouveautés (docs/nouveautes/, --dir) avec capture ; raf check le vérifie.
@@ -332,6 +332,12 @@ function news(
       io.out(newEntry(dir, args, values.title ?? plan.lot(args[0]).title, today, io.now()));
       return 0;
     }
+    case 'stamp': {
+      const stamped = stampEntries(dir, io.now());
+      for (const s of stamped) io.out(`${s.file}  created: ${s.created}`);
+      if (stamped.length === 0) io.out('✓ toutes les entrées ont une heure de création');
+      return 0;
+    }
     case 'list':
       for (const e of loadEntries(dir)) io.out(`${e.date}  ${e.title}  (${e.lots.join(', ')})`);
       return 0;
@@ -352,7 +358,7 @@ function news(
       return 0;
     }
     default:
-      throw new RafError('usage : cadence news new|list|check|build');
+      throw new RafError('usage : cadence news new|list|check|stamp|build');
   }
 }
 

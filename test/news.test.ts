@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { loadEntries, newsIssues, parseEntry, renderMarkdown } from '../src/news.js';
+import { toStamp } from '../src/dates.js';
 import type { Lot } from '../src/plan.js';
 import { execFileSync } from 'node:child_process';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -77,9 +78,9 @@ describe('newsIssues', () => {
     mkdirSync(join(dir, 'captures'));
     writeFileSync(join(dir, 'captures/ok.png'), 'png');
     const entries = [
-      parseEntry('a.md', '---\ntitle: A\ndate: 2026-09-29\nlots: [L1, L9]\ncaptures: [captures/ok.png, captures/absente.png]\n---\n'),
-      parseEntry('b.md', '---\ntitle: B\ndate: 2026-09-29\nlots: [L3]\n---\n'),
-      parseEntry('c.md', '---\ntitle: C\ndate: 2026-09-29\nlots: [L3]\nnocapture: calcul seul\n---\n'),
+      parseEntry('a.md', '---\ntitle: A\ndate: 2026-09-29\ncreated: 2026-09-29T10:00\nlots: [L1, L9]\ncaptures: [captures/ok.png, captures/absente.png]\n---\n'),
+      parseEntry('b.md', '---\ntitle: B\ndate: 2026-09-29\ncreated: 2026-09-29T10:00\nlots: [L3]\n---\n'),
+      parseEntry('c.md', '---\ntitle: C\ndate: 2026-09-29\ncreated: 2026-09-29T10:00\nlots: [L3]\nnocapture: calcul seul\n---\n'),
     ];
     const lots = [lot('L1', { status: 'done', visible: true }), lot('L2', { status: 'done', visible: true }), lot('L3'), lot('L4', { status: 'done' })];
     expect(newsIssues(lots, entries, dir).map((i) => i.message)).toEqual([
@@ -88,6 +89,21 @@ describe('newsIssues', () => {
       'b.md sans capture (ou « nocapture: raison »)',
       'L2 est visible et terminé sans entrée Nouveautés — cadence news new L2',
     ]);
+  });
+
+  it('flags an entry without creation time (hour and minute)', () => {
+    const entries = [parseEntry('d.md', '---\ntitle: D\ndate: 2026-09-29\nnocapture: calcul\n---\n')];
+    expect(newsIssues([], entries, gitRepo())).toEqual([
+      { kind: 'no-time', message: 'd.md sans heure de création (created: AAAA-MM-JJTHH:MM) — cadence news stamp' },
+    ]);
+  });
+});
+
+describe('toStamp', () => {
+  it('writes local minute precision with an explicit offset', () => {
+    const d = new Date('2026-09-29T10:12:34');
+    expect(toStamp(d)).toMatch(/^2026-09-29T10:12[+-]\d{2}:\d{2}$/);
+    expect(Date.parse(toStamp(d))).toBe(new Date('2026-09-29T10:12:00').getTime());
   });
 });
 
@@ -110,7 +126,7 @@ describe('news CLI', () => {
     const path = join(dir, 'docs/nouveautes/2026-09-29-montants-francais.md');
     expect(created.out).toBe(path);
     expect(readFileSync(path, 'utf8')).toBe(
-      '---\ntitle: Montants français\ndate: 2026-09-29\ncreated: 2026-09-29T10:12\nlots: [L1]\ncaptures: []\n# nocapture: raison, quand une capture n\'a pas de sens\n---\nCe qui change pour l\'utilisateur.\n',
+      `---\ntitle: Montants français\ndate: 2026-09-29\ncreated: ${toStamp(new Date('2026-09-29T10:12:00'))}\nlots: [L1]\ncaptures: []\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
     );
     expect(news(dir, 'new', 'L1').code).toBe(2); // existe déjà
     expect(news(dir, 'check').out).toContain('sans capture');
@@ -204,6 +220,33 @@ describe('loadEntries order', () => {
     writeFileSync(join(dir, 'b.md'), entry('LB'));
     writeFileSync(join(dir, 'c.md'), entry('LC'));
     expect(loadEntries(dir).map((e) => e.lots[0])).toEqual(['LA', 'LC', 'LB']);
+  });
+
+  it('news stamp writes the first-commit time into entries without one, then nothing more', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    const nd = join(dir, 'docs/nouveautes');
+    mkdirSync(nd, { recursive: true });
+    const addIn = (file: string, lot: string, date: string) => {
+      writeFileSync(join(nd, file), entry(lot).replace('---\n', '---\n# garder ce commentaire\n') + 'Texte.\n');
+      execFileSync('git', ['add', join(nd, file)], { cwd: dir, stdio: 'ignore' });
+      commit(dir, `docs(${lot}): nouveauté`, date);
+    };
+    addIn(L18, 'L18', '2026-09-28T20:07:35+02:00');
+    addIn(L21, 'L21', '2026-09-28T22:21:08+02:00');
+    writeFileSync(join(nd, 'z.md'), entry('LZ', '2026-09-28T23:59'));
+    expect(news(dir, 'check').out).toContain(`${L18} sans heure de création`);
+
+    const r = news(dir, 'stamp');
+    expect(r.code).toBe(0);
+    const l18 = readFileSync(join(nd, L18), 'utf8');
+    expect(l18).toBe(
+      `---\n# garder ce commentaire\ntitle: L18\ndate: 2026-09-28\ncreated: ${toStamp(new Date('2026-09-28T20:07:00+02:00'))}\nlots: [L18]\n---\nTexte.\n`,
+    );
+    expect(r.out.split('\n')).toEqual([`${L21}  created: ${toStamp(new Date('2026-09-28T22:21:00+02:00'))}`, `${L18}  created: ${toStamp(new Date('2026-09-28T20:07:00+02:00'))}`]);
+    expect(news(dir, 'check').out).not.toContain('sans heure');
+    expect(news(dir, 'stamp').out).toBe('✓ toutes les entrées ont une heure de création');
+    expect(loadEntries(nd).map((e) => e.lots[0])).toEqual(['LZ', 'L21', 'L18']);
   });
 
   it('rejects a malformed created time', () => {

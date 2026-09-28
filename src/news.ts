@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { isDay, type Day } from './dates.js';
+import { isDay, toStamp, type Day } from './dates.js';
 import { addedTimes } from './git.js';
 import { RafError, type Lot } from './plan.js';
 
@@ -10,7 +10,7 @@ export interface Entry {
   slug: string;
   title: string;
   date: Day;
-  /** Heure de création « AAAA-MM-JJTHH:MM », départage des entrées du même jour. */
+  /** Horodatage de création « AAAA-MM-JJTHH:MM[±hh:mm] » (sans fuseau = heure locale), départage des entrées du même jour. */
   created?: string;
   lots: string[];
   captures: string[];
@@ -21,11 +21,11 @@ export interface Entry {
 }
 
 export interface NewsIssue {
-  kind: 'bad-entry' | 'unknown-lot' | 'missing-capture' | 'no-capture' | 'visible-without-entry';
+  kind: 'bad-entry' | 'unknown-lot' | 'missing-capture' | 'no-capture' | 'no-time' | 'visible-without-entry';
   message: string;
 }
 
-const CREATED = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?$/;
+const CREATED = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?$/;
 const CAPTURE = /^[\w./-]+\.(?:png|jpe?g|webp|gif)$/i;
 const FRONT = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
@@ -99,6 +99,9 @@ export function newsIssues(lots: Lot[], entries: Entry[], dir: string): NewsIssu
       const path = resolve(dir, c);
       if (!existsSync(path) || !statSync(path).isFile()) issues.push({ kind: 'missing-capture', message: `${e.file} : capture absente ${c}` });
     }
+    if (e.problems.length === 0 && !e.created) {
+      issues.push({ kind: 'no-time', message: `${e.file} sans heure de création (created: AAAA-MM-JJTHH:MM) — cadence news stamp` });
+    }
     if (e.problems.length === 0 && e.captures.length === 0 && !e.nocapture) {
       issues.push({ kind: 'no-capture', message: `${e.file} sans capture (ou « nocapture: raison »)` });
     }
@@ -132,9 +135,32 @@ export function newEntry(dir: string, lots: string[], rawTitle: string, today: D
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     path,
-    `---\ntitle: ${stringify(title).trimEnd()}\ndate: ${today}\ncreated: ${today}T${now.toTimeString().slice(0, 5)}\nlots: [${lots.join(', ')}]\ncaptures: []\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
+    `---\ntitle: ${stringify(title).trimEnd()}\ndate: ${today}\ncreated: ${toStamp(now)}\nlots: [${lots.join(', ')}]\ncaptures: []\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
   );
   return path;
+}
+
+/**
+ * Migration : écrit `created:` dans les entrées lisibles qui n'en ont pas, d'après la date du premier
+ * commit du fichier (`now` s'il n'est pas encore commité). Le reste du fichier est laissé tel quel.
+ */
+export function stampEntries(dir: string, now: Date): { file: string; created: string }[] {
+  const added = addedTimes(dir);
+  const done: { file: string; created: string }[] = [];
+  for (const e of loadEntries(dir)) {
+    if (e.created || e.problems.length > 0) continue;
+    const created = toStamp(new Date(added.get(e.file) ?? now.getTime()));
+    const path = join(dir, e.file);
+    const text = readFileSync(path, 'utf8');
+    const lines = text.split('\n');
+    const end = lines.findIndex((l, i) => i > 0 && l.trimEnd() === '---');
+    const dateLine = lines.findIndex((l, i) => i > 0 && i < end && /^date\s*:/.test(l));
+    const eol = lines[dateLine >= 0 ? dateLine : 0].endsWith('\r') ? '\r' : '';
+    lines.splice(dateLine >= 0 ? dateLine + 1 : end, 0, `created: ${created}${eol}`);
+    writeFileSync(path, lines.join('\n'));
+    done.push({ file: e.file, created });
+  }
+  return done;
 }
 
 function escapeText(s: string): string {

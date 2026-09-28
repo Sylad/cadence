@@ -114,7 +114,7 @@ cadence news build -o frontend/public/nouveautes
 ---
 title: Amounts like 3.000 read as three thousand
 date: 2026-09-29
-created: 2026-09-29T14:32
+created: 2026-09-29T14:32+02:00
 lots: [L8]
 captures: [captures/l8.png]
 # nocapture: reason, when a screenshot makes no sense
@@ -126,7 +126,8 @@ Imported statements now read **3.000** as three thousand, not three.
 |---|---|
 | `cadence news new <lot…> [--title t]` | entry skeleton, dated and timed now (`date`, `created`), titled after the lot |
 | `cadence news list` | entries, newest first (see *Order* below) |
-| `cadence news check` | visible lots done without entry, unknown lots, missing or undeclared screenshots, bad headers |
+| `cadence news check` | visible lots done without entry, unknown lots, missing or undeclared screenshots, entries without creation time, bad headers |
+| `cadence news stamp` | migration: writes `created:` into entries without one, from the file's first commit (now if not committed yet) |
 | `cadence news build [-o dir]` | `nouveautes.json` + `index.html` + screenshots (default `docs/nouveautes/site`) |
 
 `--dir` changes the entries folder (default `docs/nouveautes` at the git root).
@@ -136,11 +137,15 @@ The Markdown is deliberately small: paragraphs, `-` lists, `**bold**`,
 with screenshot paths relative to the JSON file.
 
 **Order.** Everywhere (`list`, `build`, the JSON), entries are strictly newest
-first: by `date`, then, on the same day, by creation time — the `created`
-header that `cadence news new` writes (local time, `YYYY-MM-DDTHH:MM`), or, for
-an entry without it, the date of the first commit that added the file (an
-entry not committed yet counts as the newest). The file name only breaks the
-remaining ties (outside git), since it follows the title, not the chronology.
+first: by `date`, then, on the same day, by creation time. Every entry carries
+it to the minute in its `created` header, which `cadence news new` writes as
+local time with an explicit offset (`2026-09-29T14:32+02:00`; without offset,
+local time is assumed). `news check` (and `raf check`) flags an entry without
+it; `cadence news stamp` fills it in older entries from the date of the first
+commit that added the file. Until then, that commit date is used for sorting
+(an entry not committed yet counts as the newest). The file name only breaks
+the remaining ties, since it follows the title, not the chronology. The page
+and the JSON still show the day only.
 
 ### UX review
 

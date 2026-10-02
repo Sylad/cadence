@@ -70,6 +70,7 @@ function ctx(dir: string, over: Record<string, unknown> = {}) {
       config: CONFIG,
       today: '2026-09-28',
       dryRun: false,
+      args: [] as string[],
       out: (l: string) => out.push(l),
       err: (l: string) => err.push(l),
       ...over,
@@ -268,6 +269,135 @@ describe('deliver : relecture', () => {
   });
 });
 
+describe('deliver : script du projet (L2)', () => {
+  const SCRIPT = parseDeliverConfig('deliver:\n  script: ./livrer.sh "$CADENCE_SHORT"\n', 'cadence.yaml');
+
+  it('lit script seul (vérifications facultatives), refuse script avec ci ou deploy, script vide', () => {
+    expect(SCRIPT).toMatchObject({ script: './livrer.sh "$CADENCE_SHORT"', ci: 'none', deploy: [], verify: [] });
+    expect(() => parseDeliverConfig('deliver:\n  script: x\n  deploy: [y]\n', 'f')).toThrow(/script remplace ci et deploy/);
+    expect(() => parseDeliverConfig('deliver:\n  script: x\n  ci: github\n', 'f')).toThrow(/script remplace ci et deploy/);
+    expect(() => parseDeliverConfig('deliver:\n  script: " "\n', 'f')).toThrow(/script/);
+    expect(() => parseDeliverConfig('deliver:\n  script: [a]\n', 'f')).toThrow(/script/);
+  });
+
+  it('appelle le script avec les arguments de la ligne de commande, sans gh, puis journalise', async () => {
+    const dir = pushedRepo();
+    const { deps, execs } = fakeDeps({ gh: () => { throw new Error('gh appelé'); }, ghReady: () => 'absent' });
+    const { c, out } = ctx(dir, { config: SCRIPT, args: ['api', 'frontend:nouvelle page', '--news', "l'entrée.md", '--', 'map'] });
+    expect(await deliver(c, deps)).toBe(0);
+    expect(execs.map((e) => e.cmd)).toEqual([`./livrer.sh "$CADENCE_SHORT" api 'frontend:nouvelle page' --news 'l'\\''entrée.md' -- map`]);
+    expect(execs[0].env.CADENCE_SHORT).toBe(headSha(dir)!.slice(0, 7));
+    expect(lastDelivery(stateDir(dir))).toBe(headSha(dir));
+    expect(readLock(stateDir(dir))).toBeNull();
+    expect(out.join('\n')).toContain('✓ livré');
+  });
+
+  it('refuse des arguments sans script (code 2, rien exécuté)', async () => {
+    const dir = pushedRepo();
+    const { deps, execs } = fakeDeps();
+    const { c, err } = ctx(dir, { args: ['api'] });
+    expect(await deliver(c, deps)).toBe(2);
+    expect(err.join('\n')).toContain('deliver.script');
+    expect(execs).toEqual([]);
+  });
+
+  it('script en échec : code 1, rien au journal, verrou retiré', async () => {
+    const dir = pushedRepo();
+    const { c, err } = ctx(dir, { config: SCRIPT });
+    expect(await deliver(c, fakeDeps({ exec: () => 3 }).deps)).toBe(1);
+    expect(err.join('\n')).toContain('script de livraison en échec (code 3)');
+    expect(lastDelivery(stateDir(dir))).toBeNull();
+    expect(readLock(stateDir(dir))).toBeNull();
+  });
+
+  it('vérifications de cadence.yaml jouées après le script', async () => {
+    const dir = pushedRepo();
+    const config = parseDeliverConfig('deliver:\n  script: ./livrer.sh\n  verifyTimeout: 20\n  verify:\n    - url: https://app.example/\n', 'f');
+    const { c, err } = ctx(dir, { config });
+    expect(await deliver(c, fakeDeps({ fetch: async () => ({ status: 502, text: '' }) }).deps)).toBe(1);
+    expect(err.join('\n')).toContain('statut 502');
+  });
+
+  it('script qui commite et pousse (horodatage des Nouveautés) : le sha journalisé est la nouvelle tête', async () => {
+    const dir = pushedRepo();
+    expect(await deliver(ctx(dir, { config: SCRIPT }).c, fakeDeps().deps)).toBe(0);
+    commit(dir, 'feat(L1): cache');
+    git(dir, 'push', '-q');
+    const { deps } = fakeDeps({
+      exec: () => {
+        commit(dir, 'nouveautés : horodatées');
+        git(dir, 'push', '-q');
+        return 0;
+      },
+    });
+    const { c, out } = ctx(dir, { config: SCRIPT });
+    expect(await deliver(c, deps)).toBe(0);
+    expect(lastDelivery(stateDir(dir))).toBe(headSha(dir));
+    expect(out.join('\n')).toMatch(/✓ livré : [0-9a-f]{7} \(tête déplacée par le script depuis [0-9a-f]{7}\)/);
+    expect(out.join('\n')).toContain('livré : L1');
+  });
+
+  it('simulation : montre la commande complète, n’exécute rien', async () => {
+    const dir = pushedRepo();
+    const { deps, execs } = fakeDeps();
+    const { c, out } = ctx(dir, { config: SCRIPT, args: ['api'], dryRun: true });
+    expect(await deliver(c, deps)).toBe(0);
+    expect(execs).toEqual([]);
+    expect(out.join('\n')).toContain('Script du projet : ./livrer.sh "$CADENCE_SHORT" api');
+  });
+
+  it('plan en lecture seule : pas de conseil « raf done »', async () => {
+    const dir = pushedRepo();
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'), { format: { lots: 'lots', fields: {}, statuses: {}, estimates: {} } });
+    expect(await deliver(ctx(dir, { config: SCRIPT, plan }).c, fakeDeps().deps)).toBe(0);
+    commit(dir, 'feat(L1): cache');
+    git(dir, 'push', '-q');
+    const { c, out } = ctx(dir, { config: SCRIPT, plan });
+    expect(await deliver(c, fakeDeps().deps)).toBe(0);
+    expect(out.join('\n')).toContain('livré : L1');
+    expect(out.join('\n')).not.toContain('raf done');
+  });
+});
+
+describe('deliver : sha choisi et arbre partagé (L2)', () => {
+  const SCRIPT = parseDeliverConfig('deliver:\n  script: ./livrer.sh "$CADENCE_SHORT"\n  allowDirty: true\n', 'cadence.yaml');
+
+  it('--sha livre un commit antérieur à la tête : variables, journal, lots jusqu’à lui seulement', async () => {
+    const dir = pushedRepo();
+    expect(await deliver(ctx(dir, { config: SCRIPT }).c, fakeDeps().deps)).toBe(0);
+    commit(dir, 'feat(L1): api');
+    const api = headSha(dir)!;
+    commit(dir, 'feat(L9): frontend');
+    git(dir, 'push', '-q');
+    const { deps, execs } = fakeDeps();
+    const { c, out } = ctx(dir, { config: SCRIPT, sha: api.slice(0, 7) });
+    expect(await deliver(c, deps)).toBe(0);
+    expect(execs[0].env).toMatchObject({ CADENCE_SHA: api, CADENCE_SHORT: api.slice(0, 7) });
+    expect(lastDelivery(stateDir(dir))).toBe(api);
+    expect(out.join('\n')).toContain('livré : L1');
+  });
+
+  it('--sha inconnu ou non poussé : refus (code 2)', async () => {
+    const dir = pushedRepo();
+    const a = ctx(dir, { config: SCRIPT, sha: 'deadbeef' });
+    expect(await deliver(a.c, fakeDeps().deps)).toBe(2);
+    expect(a.err.join('\n')).toContain('deadbeef');
+    commit(dir, 'feat(L1): local');
+    const b = ctx(dir, { config: SCRIPT, sha: 'HEAD' });
+    expect(await deliver(b.c, fakeDeps().deps)).toBe(2);
+    expect(b.err.join('\n')).toContain('non poussé');
+  });
+
+  it('allowDirty : un arbre modifié est signalé, pas refusé ; sans la clé il reste refusé', async () => {
+    const dir = pushedRepo();
+    writeFileSync(join(dir, 'README.md'), 'autre session');
+    const { c, err } = ctx(dir, { config: SCRIPT });
+    expect(await deliver(c, fakeDeps().deps)).toBe(0);
+    expect(err.join('\n')).toContain('1 fichier(s) suivi(s) modifié(s) : non livré(s)');
+    expect(() => parseDeliverConfig('deliver:\n  script: x\n  allowDirty: oui\n', 'f')).toThrow(/allowDirty/);
+  });
+});
+
 describe('cadence deliver (CLI)', () => {
   async function cad(dir: string, ...argv: string[]) {
     const out: string[] = [];
@@ -309,5 +439,16 @@ describe('cadence deliver (CLI)', () => {
     expect(r.code).toBe(1);
     expect(r.err).toContain('délai dépassé');
     expect(Date.now() - t).toBeLessThan(10_000);
+  });
+
+  it('script du projet : les arguments après « -- » lui sont passés tels quels', async () => {
+    const dir = pushedRepo();
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  script: sh -c \'printf "%s\\n" "$@" > .git/args\' livrer "$CADENCE_SHORT"\n');
+    git(dir, 'add', 'cadence.yaml');
+    commit(dir, 'chore: config');
+    git(dir, 'push', '-q');
+    const r = await cad(dir, 'deliver', '--', 'api', 'frontend:deux mots', '--news', 'a.md', '--', 'map');
+    expect(r.code).toBe(0);
+    expect(readFileSync(join(dir, '.git/args'), 'utf8').trim().split('\n')).toEqual([headSha(dir)!.slice(0, 7), 'api', 'frontend:deux mots', '--news', 'a.md', '--', 'map']);
   });
 });

@@ -72,6 +72,11 @@ export function headSha(cwd: string): string | null {
   return tryGit(cwd, ['rev-parse', '--verify', '-q', 'HEAD']);
 }
 
+/** Sha complet du commit que désigne `rev` (sha abrégé, branche, tag), null s'il n'existe pas. */
+export function resolveCommit(cwd: string, rev: string): string | null {
+  return tryGit(cwd, ['rev-parse', '--verify', '-q', `${rev}^{commit}`]);
+}
+
 export interface RepoStatus {
   /** null en HEAD détachée. */
   branch: string | null;

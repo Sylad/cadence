@@ -230,6 +230,20 @@ done), quick wins first. Local state lives in the git directory, never committed
 the close notes per worktree, the delivery lock and log in `.git/cadence/`, shared
 by all the worktrees of a clone.
 
+A project that already has its own morning and evening scripts keeps them: name
+them in `cadence.yaml` and their output is added to the report, under "Faits
+propres au projet", before the proposals (start) or the verdict (close).
+
+```yaml
+session:
+  start: ./scripts/morning.sh "$CADENCE_SINCE"    # sh, at the repo root, 120 s at most
+  close: ./scripts/evening.sh "$CADENCE_SINCE"
+```
+
+The commands get `CADENCE_SINCE` (the `--since` in effect) and `CADENCE_TODAY`. They
+add facts and decide nothing: a failing command is reported and changes neither
+the exit code nor the verdict.
+
 ## deliver
 
 A delivery is done when its checks pass, not when a tool says "success".
@@ -271,6 +285,37 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
 - On success the lots cited by the commits since the previous delivery are
   listed, so you can `raf done` those whose effect you have seen.
 
+### A project with its own delivery script
+
+A project that already delivers with its own script (CI wait, deploy, business
+checks) plugs it in instead of rewriting it as `ci` / `deploy` / `verify`:
+
+```yaml
+deliver:
+  script: ./scripts/ship.sh "$CADENCE_SHORT"   # replaces ci and deploy
+  allowDirty: true                             # optional: a modified tree is reported, not refused
+  deployTimeout: 3600                          # seconds, for the whole script
+  verify: []                                   # optional here: the script's own checks count
+```
+
+```sh
+cadence deliver -- api frontend --news docs/changelog/x.md -- map    # everything after the first « -- » goes to the script
+cadence deliver --dry-run -- api                                      # shows the full command, runs nothing
+cadence deliver --sha 6b0d9aa -- api                                  # an earlier pushed commit instead of HEAD
+```
+
+`--sha` (any mode) delivers a pushed commit other than `HEAD` — for a CI that
+builds each service only on the commit that touched it. `allowDirty` suits a
+working tree shared by several sessions when the delivery starts from a pushed
+sha and never from local files; without it a modified tree is refused.
+
+cadence keeps what the script usually lacks: the preconditions (clean tree, pushed
+`HEAD`), the lock (never two deliveries at once), the delivery log and the lots
+delivered. Arguments are quoted for `sh`, so spaces and quotes reach the script
+intact. If the script commits and pushes during the delivery (stamping a
+changelog entry, say), the new `HEAD` is the sha recorded as delivered. Exit code
+0 of the script means delivered; `verify` checks, if any, run after it.
+
 ## Claude Code skills
 
 As a plugin:
@@ -291,6 +336,10 @@ gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver`,
 - **session-close**: plan hygiene, clean repository, memory limited to what the
   repository does not say, new skills or agents proposed but never created, three
   lines for next time.
+- A project with its own tooling keeps it: its plan is read where it is (`plan:`),
+  its delivery script is called by `cadence deliver` (`deliver.script`), its
+  morning and evening scripts feed the session report (`session:`), and its own
+  skills can become one-line aliases of `session-start` / `session-close`.
 - **deliver**: dry run, delivery, and on failure the cause fixed rather than a
   blind retry.
 - **lead**: from a folder holding several projects, one subagent per project

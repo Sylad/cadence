@@ -119,3 +119,34 @@ describe('session next', () => {
 function writeNext(dir: string, lines: string[]) {
   writeFileSync(join(stateDir(dir), 'next.md'), `# 2026-09-27\n${lines.map((l) => `- ${l}`).join('\n')}\n`);
 }
+
+describe('faits propres au projet (L2)', () => {
+  it('session start et close jouent la commande de cadence.yaml, avec CADENCE_SINCE', async () => {
+    const dir = await project();
+    writeFileSync(
+      join(dir, 'cadence.yaml'),
+      'session:\n  start: echo "équipe du lot — depuis $CADENCE_SINCE"\n  close: echo "fiche du jour absente"; exit 3\n',
+    );
+    const start = await cad(dir, 'session', 'start', '--since', '2026-09-27');
+    expect(start.code).toBe(0);
+    expect(start.out).toMatch(/Faits propres au projet\n  équipe du lot — depuis 2026-09-27\n[\s\S]*Propositions/);
+    const close = await cad(dir, 'session', 'close');
+    expect(close.out).toMatch(/Faits propres au projet\n  fiche du jour absente\n  ✗ commande en échec \(code 3\)\n\n✓ prêt à fermer/);
+    // Des faits en plus, pas une condition : l'échec de la commande du projet ne change pas le verdict.
+    expect(close.code).toBe(0);
+  });
+
+  it('refuse une clé session mal formée', async () => {
+    const dir = await project();
+    writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  debut: x\n');
+    const r = await cad(dir, 'session', 'start');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('session.debut');
+  });
+
+  it('sans clé session : rien de plus', async () => {
+    const dir = await project();
+    expect((await cad(dir, 'session', 'start')).out).not.toContain('Faits propres');
+  });
+});
+

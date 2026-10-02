@@ -31,6 +31,9 @@ three most useful items across projects and wait. With a project named, work in 
    - **Drift**: each `✗` line from the check, with the one command that fixes it.
    - **Delivery in progress** or a stale lock: no new delivery until it is resolved.
    - **Notes from the last close**, if any.
+   - **Project facts** ("Faits propres au projet"), when the project plugs its own morning script in
+     (`session.start` in `cadence.yaml`): summarise what bears on today's choice — deadlines, the
+     project's own planning, documentation drift — and leave the rest.
 3. **The plan drives the work.** Propose exactly three items, each with its id and one sentence of
    justification, in the order the command gives them: finish what is in progress, then ready quick
    wins, then the next ready lots. An idea that is not in the plan is only proposed together with the
@@ -46,6 +49,12 @@ report from it as usual, but give the project's own command for every fix or sta
 
 `raf start <id>` on the chosen lot, then the project's usual development workflow. Every commit cites
 the lot id (`feat(L3): …`) so that the history links itself to the plan.
+
+## A project with its own tooling
+
+When the plan is read-only (held by the project's own tool, `plan:` with a field mapping in
+`cadence.yaml`), every plan change — start, note, done — goes through that tool, not `raf`; the
+project's instructions say which command. Its expert agents and its own skills stay in use.
 
 ## Do not
 

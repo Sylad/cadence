@@ -33,6 +33,9 @@ With no project named, run `cadence session close` in each project touched durin
 4. **Skills and agents, on threshold, PROPOSED**: a skill when the same chain of commands was done by
    hand at least twice today; an agent update when an agent got something wrong or its domain moved.
    List them with the benefit; the human decides. Never create them here.
+   When the report has a "Faits propres au projet" section (`session.close` in `cadence.yaml`), treat
+   what it flags as part of this hygiene; with a read-only plan, use the project's own tool wherever
+   these steps say `raf`.
 5. **Clean state**: everything committed and pushed, no delivery running. If the command still exits 1,
    say what remains and do NOT say the session is closed.
 6. **Three lines for next time**: `cadence session next "…" "…" "…"` — the next `session-start` shows them.

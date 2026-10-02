@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { audit, exemptPlanOnly, nextUp, planCommits } from './audit.js';
 import { diffDays, maxDay, type Day } from './dates.js';
 import { repoStatus, type Commit } from './git.js';
@@ -15,6 +16,31 @@ export interface SessionCtx {
   shared: string;
   today: Day;
   out: (line: string) => void;
+  /** Commande du projet (cadence.yaml : session.start / session.close) dont la sortie complète le rapport. */
+  facts?: string;
+}
+
+const FACTS_TIMEOUT = 120_000;
+
+/**
+ * Sortie de la commande du projet, ligne à ligne. Un échec se dit et ne bloque rien : ce sont des
+ * faits en plus, pas une condition de la session.
+ */
+function projectFacts(ctx: SessionCtx, since: string): string[] {
+  if (!ctx.facts) return [];
+  const r = spawnSync('sh', ['-c', ctx.facts], {
+    cwd: ctx.root,
+    env: { ...process.env, CADENCE_SINCE: since, CADENCE_TODAY: ctx.today },
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: FACTS_TIMEOUT,
+    killSignal: 'SIGKILL',
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  const lines = `${r.stdout ?? ''}${r.stderr ?? ''}`.replace(/\s+$/, '').split('\n').filter((l, i, all) => l !== '' || all.length > 1);
+  if (r.error || r.signal) lines.push(`✗ commande interrompue (${r.signal ? `délai de ${FACTS_TIMEOUT / 1000} s dépassé` : r.error!.message}) : ${ctx.facts}`);
+  else if (r.status !== 0) lines.push(`✗ commande en échec (code ${r.status})`);
+  return lines;
 }
 
 const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
@@ -95,6 +121,7 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
 
   section(out, 'Écarts (raf check)', audit(plan, ctx.root, ctx.newsDir, today).map((i) => `✗ ${i.message}`));
   section(out, 'Dépôt', [repoLine(ctx.root).line]);
+  section(out, 'Faits propres au projet', projectFacts(ctx, opts.since));
 
   const proposals = [
     ...doing.map((l) => ({ l, why: 'en cours' })),
@@ -128,6 +155,8 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
   const repo = repoLine(ctx.root);
   const lock = lockStatus(ctx.shared);
   section(out, 'Dépôt', [repo.line, ...(lock ? [lock.line] : [])]);
+
+  section(out, 'Faits propres au projet', projectFacts(ctx, opts.since));
 
   const open = issues.length + repo.open + (lock?.live ? 1 : 0);
   out(open === 0 ? '\n✓ prêt à fermer' : `\n✗ pas fermé : ${open} point(s)`);

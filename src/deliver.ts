@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { parse } from 'yaml';
 import type { Day } from './dates.js';
-import { headSha, isAncestor, onRemote, readCommits, repoStatus } from './git.js';
+import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
 import { RafError, type Plan } from './plan.js';
 import { appendDelivery, lastDelivery, lockAlive, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
 
@@ -14,6 +14,16 @@ export interface VerifyCheck {
 
 export interface DeliverConfig {
   ci: 'github' | 'none' | { command: string };
+  /**
+   * Script de livraison du projet : il porte lui-même la CI, le déploiement et ses contrôles métier.
+   * cadence garde les préconditions, le verrou, le journal et les lots livrés.
+   */
+  script?: string;
+  /**
+   * Un arbre de travail modifié est signalé au lieu d'être refusé : pour un dépôt partagé entre plusieurs
+   * sessions dont la livraison part d'un sha poussé, jamais des fichiers locaux.
+   */
+  allowDirty?: boolean;
   /** Secondes. */
   ciTimeout: number;
   deploy: string[];
@@ -54,6 +64,10 @@ export interface DeliverCtx {
   config: DeliverConfig;
   today: Day;
   dryRun: boolean;
+  /** Commit à livrer (toute révision git) ; HEAD par défaut. */
+  sha?: string;
+  /** Arguments de la ligne de commande, ajoutés au script du projet. */
+  args: string[];
   out: (line: string) => void;
   err: (line: string) => void;
 }
@@ -79,12 +93,21 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
   const cfg = d as Record<string, unknown>;
   const bad = (what: string) => new RafError(`${file} : deliver.${what}`);
 
+  let script: string | undefined;
+  if (cfg.script !== undefined) {
+    if (typeof cfg.script !== 'string' || !cfg.script.trim()) throw bad('script : commande non vide attendue');
+    if (cfg.ci !== undefined || cfg.deploy !== undefined) throw bad('script remplace ci et deploy : garder l\'un ou les autres');
+    script = cfg.script.trim();
+  }
+
   let ci: DeliverConfig['ci'] = 'none';
   if (cfg.ci === 'github' || cfg.ci === 'none') ci = cfg.ci;
   else if (cfg.ci && typeof cfg.ci === 'object' && typeof (cfg.ci as { command?: unknown }).command === 'string') {
     ci = { command: (cfg.ci as { command: string }).command };
     if (!ci.command.trim()) throw bad('ci.command : commande vide');
   } else if (cfg.ci !== undefined) throw bad('ci : attendu github, none ou { command: "…" }');
+
+  if (cfg.allowDirty !== undefined && typeof cfg.allowDirty !== 'boolean') throw bad('allowDirty : true ou false attendu');
 
   const seconds = (key: string, dflt: number) => {
     const v = cfg[key];
@@ -97,7 +120,8 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
   if (!Array.isArray(deploy) || !deploy.every((c) => typeof c === 'string' && c.trim())) throw bad('deploy : liste de commandes non vides attendue');
 
   const verify = cfg.verify ?? [];
-  if (!Array.isArray(verify) || verify.length === 0) {
+  // Avec un script de projet, les contrôles métier sont les siens : ceux de cadence deviennent facultatifs.
+  if (!Array.isArray(verify) || (verify.length === 0 && script === undefined)) {
     throw bad('verify : au moins une vérification (une livraison se prouve par son effet)');
   }
   const checks = verify.map((v, i): VerifyCheck => {
@@ -115,7 +139,16 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
     return { url, ...(status === undefined ? {} : { status: status as number }), ...(contains === undefined ? {} : { contains }) };
   });
 
-  return { ci, ciTimeout: seconds('ciTimeout', 1800), deploy: deploy as string[], verify: checks, verifyTimeout: seconds('verifyTimeout', 300), deployTimeout: seconds('deployTimeout', 1800) };
+  return {
+    ci,
+    ...(script === undefined ? {} : { script }),
+    ...(cfg.allowDirty ? { allowDirty: true } : {}),
+    ciTimeout: seconds('ciTimeout', 1800),
+    deploy: deploy as string[],
+    verify: checks,
+    verifyTimeout: seconds('verifyTimeout', 300),
+    deployTimeout: seconds('deployTimeout', 1800),
+  };
 }
 
 /** Dépendances réelles : sh, gh, fetch, horloge. */
@@ -164,6 +197,11 @@ function substitute(text: string, sha: string): string {
   return text.replaceAll('${SHA}', sha).replaceAll('${SHORT}', sha.slice(0, 7));
 }
 
+/** Argument rendu tel quel au script par sh, quels que soient ses espaces, guillemets ou jokers. */
+function shellQuote(arg: string): string {
+  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`;
+}
+
 function describeCheck(c: VerifyCheck, sha: string): string {
   if (c.command !== undefined) return c.command;
   return `GET ${substitute(c.url!, sha)} → ${c.status ?? 200}${c.contains === undefined ? '' : `, contient « ${substitute(c.contains, sha)} »`}`;
@@ -177,10 +215,16 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     return 2;
   };
 
-  const sha = headSha(ctx.root);
-  if (!sha) return refuse('aucun commit à livrer');
+  const head0 = headSha(ctx.root);
+  const sha = ctx.sha === undefined ? head0 : resolveCommit(ctx.root, ctx.sha);
+  if (!sha) return refuse(ctx.sha === undefined ? 'aucun commit à livrer' : `--sha ${ctx.sha} : commit introuvable`);
+  if (ctx.args.length && config.script === undefined) {
+    return refuse('des arguments ne se passent qu\'à un script de projet (deliver.script dans cadence.yaml)');
+  }
+  const script = config.script === undefined ? null : [config.script, ...ctx.args.map(shellQuote)].join(' ');
   const repo = repoStatus(ctx.root);
-  if (repo.dirty) return refuse(`${repo.dirty} fichier(s) suivi(s) modifié(s) : commiter et pousser d'abord`);
+  if (repo.dirty && !config.allowDirty) return refuse(`${repo.dirty} fichier(s) suivi(s) modifié(s) : commiter et pousser d'abord`);
+  if (repo.dirty) err(`deliver : ${repo.dirty} fichier(s) suivi(s) modifié(s) : non livré(s), seul ${sha.slice(0, 7)} l'est (allowDirty)`);
   if (!onRemote(ctx.root, sha)) return refuse(`${sha.slice(0, 7)} non poussé : la CI n'a rien construit (git push)`);
   const lock = readLock(ctx.state);
   if (lock && lockAlive(lock)) {
@@ -194,15 +238,22 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     if (why) return refuse(`ci: github exige gh authentifié — ${why}`);
   }
 
-  const branch = repo.branch ?? 'HEAD détachée';
-  const env = { CADENCE_SHA: sha, CADENCE_SHORT: sha.slice(0, 7), CADENCE_BRANCH: repo.branch ?? '' };
+  // Un sha choisi n'est pas forcément sur la branche courante : ne pas lui en prêter une.
+  const atHead = sha === head0;
+  const branch = atHead ? (repo.branch ?? 'HEAD détachée') : 'sha choisi, antérieur ou étranger à la tête';
+  const env = { CADENCE_SHA: sha, CADENCE_SHORT: sha.slice(0, 7), CADENCE_BRANCH: atHead ? (repo.branch ?? '') : '' };
   if (ctx.dryRun) {
     out(`Livraison de ${env.CADENCE_SHORT} (${branch}) — simulation, rien n'est exécuté`);
-    out(`  CI : ${typeof config.ci === 'string' ? config.ci : config.ci.command}${config.ci === 'none' ? '' : ` (délai ${config.ciTimeout} s)`}`);
-    out('  Déploiement :');
-    if (config.deploy.length === 0) out('    (aucune commande)');
-    config.deploy.forEach((c, i) => out(`    ${i + 1}. ${c}`));
-    out(`  Vérifications (réessayées pendant ${config.verifyTimeout} s) :`);
+    if (script !== null) {
+      out(`  Script du projet : ${script}`);
+      out(`    (CI, déploiement et contrôles métier sont les siens ; délai ${config.deployTimeout} s)`);
+    } else {
+      out(`  CI : ${typeof config.ci === 'string' ? config.ci : config.ci.command}${config.ci === 'none' ? '' : ` (délai ${config.ciTimeout} s)`}`);
+      out('  Déploiement :');
+      if (config.deploy.length === 0) out('    (aucune commande)');
+      config.deploy.forEach((c, i) => out(`    ${i + 1}. ${c}`));
+    }
+    if (config.verify.length) out(`  Vérifications (réessayées pendant ${config.verifyTimeout} s) :`);
     config.verify.forEach((c, i) => out(`    ${i + 1}. ${describeCheck(c, sha)}`));
     out(`  Variables : ${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(' ')}`);
     return 0;
@@ -221,21 +272,33 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     };
     out(`Livraison de ${env.CADENCE_SHORT} (${branch})`);
 
-    const ci = await waitCi(ctx, deps, sha, env);
-    if (ci) return fail(ci);
+    if (script !== null) {
+      out(`→ script du projet : ${script}`);
+      const code = deps.exec(script, env, config.deployTimeout * 1000);
+      if (code !== 0) return fail(`script de livraison en échec (${codeText(code)}) : ${script}`);
+    } else {
+      const ci = await waitCi(ctx, deps, sha, env);
+      if (ci) return fail(ci);
 
-    for (const [i, cmd] of config.deploy.entries()) {
-      out(`→ déploiement ${i + 1}/${config.deploy.length} : ${cmd}`);
-      const code = deps.exec(cmd, env, config.deployTimeout * 1000);
-      if (code !== 0) return fail(`déploiement en échec (${codeText(code)}) : ${cmd}`);
+      for (const [i, cmd] of config.deploy.entries()) {
+        out(`→ déploiement ${i + 1}/${config.deploy.length} : ${cmd}`);
+        const code = deps.exec(cmd, env, config.deployTimeout * 1000);
+        if (code !== 0) return fail(`déploiement en échec (${codeText(code)}) : ${cmd}`);
+      }
     }
 
     const failed = await verifyAll(ctx, deps, sha, env);
     if (failed) return fail(failed);
 
-    const delivered = deliveredLots(ctx, lastDelivery(ctx.state), sha);
-    appendDelivery(ctx.state, ctx.today, sha);
-    out(`✓ livré et vérifié : ${env.CADENCE_SHORT}`);
+    // Un script de projet peut commiter pendant la livraison (horodatage d'une entrée Nouveautés) :
+    // ce qu'il a livré est alors la nouvelle tête, pas le sha de départ.
+    const head = script === null || !atHead ? sha : (headSha(ctx.root) ?? sha);
+    const moved = head !== sha && isAncestor(ctx.root, sha, head);
+    const final = moved ? head : sha;
+    const delivered = deliveredLots(ctx, lastDelivery(ctx.state), final);
+    appendDelivery(ctx.state, ctx.today, final);
+    if (moved) out(`✓ livré : ${final.slice(0, 7)} (tête déplacée par le script depuis ${env.CADENCE_SHORT})`);
+    else out(`✓ livré${config.verify.length ? ' et vérifié' : ''} : ${env.CADENCE_SHORT}`);
     if (delivered) out(delivered);
     return 0;
   } finally {
@@ -332,5 +395,5 @@ function deliveredLots(ctx: DeliverCtx, prev: string | null, sha: string): strin
     for (const r of ctx.plan.refs(`${c.subject}\n${c.body}`)) if (known.has(r.lot)) ids.add(r.lot);
   }
   if (ids.size === 0) return null;
-  return `livré : ${[...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join(', ')} — raf done si l'effet est celui attendu`;
+  return `livré : ${[...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join(', ')} — ${ctx.plan.readonly ? "à fermer avec l'outil du projet" : 'raf done'} si l'effet est celui attendu`;
 }

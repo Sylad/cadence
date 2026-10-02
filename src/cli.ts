@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { readPlanConfig } from './config.js';
+import { readPlanConfig, readSessionConfig } from './config.js';
 import { audit, exemptPlanOnly, isPlanOnly, nextUp, planCommits } from './audit.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
@@ -91,6 +91,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       output: { type: 'string', short: 'o' },
       config: { type: 'string' },
       'dry-run': { type: 'boolean' },
+      sha: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -219,15 +220,18 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, io);
       throw new RafError('usage : raf hook install|post-commit');
     }
-    case 'session':
+    case 'session': {
       if (!gitRoot(io.cwd)) throw new RafError('session : à lancer dans un dépôt git');
-      return session(rest, { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out }, values);
+      // « next » n'écrit que les notes : la commande du projet ne se joue qu'à la reprise et à la clôture.
+      const facts = rest[0] === 'start' || rest[0] === 'close' ? readSessionConfig(configPath)[rest[0]] : undefined;
+      return session(rest, { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out, facts }, values);
+    }
     case 'deliver': {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans le README)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const plan = existsSync(planPath) ? loadPlan() : null;
-      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], out: io.out, err: io.err };
+      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], sha: values.sha, args: rest, out: io.out, err: io.err };
       return deliver(ctx, realDeps(root));
     }
     case 'skills': {

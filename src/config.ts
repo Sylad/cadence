@@ -68,3 +68,34 @@ function parseFormat(p: Record<string, unknown>, bad: (what: string) => RafError
   }
   return format;
 }
+
+export interface SessionConfig {
+  /** Commande sh, à la racine du dépôt, dont la sortie complète « cadence session start ». */
+  start?: string;
+  /** Idem pour « cadence session close ». */
+  close?: string;
+}
+
+/**
+ * Clé `session:` de cadence.yaml : les faits propres au projet (son script de reprise, de clôture),
+ * joués par cadence au lieu d'être remplacés.
+ */
+export function readSessionConfig(file: string): SessionConfig {
+  if (!existsSync(file)) return {};
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const s = (raw as { session?: unknown } | null)?.session;
+  if (s == null) return {};
+  if (!isObject(s)) throw new RafError(`${file} : session doit être un objet { start, close }`);
+  const config: SessionConfig = {};
+  for (const [k, v] of Object.entries(s)) {
+    if (k !== 'start' && k !== 'close') throw new RafError(`${file} : session.${k} inconnu (attendu : start, close)`);
+    if (typeof v !== 'string' || !v.trim()) throw new RafError(`${file} : session.${k} : commande non vide attendue`);
+    config[k] = v.trim();
+  }
+  return config;
+}

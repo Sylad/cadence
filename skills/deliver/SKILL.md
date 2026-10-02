@@ -18,6 +18,19 @@ deliver:
       contains: "${SHORT}"   # the new version is the one being served
 ```
 
+A project that already has its own delivery script declares it instead — cadence then keeps the
+preconditions, the lock, the log and the delivered lots, and the script keeps the CI wait, the deploy
+and its business checks:
+
+```yaml
+deliver:
+  script: ./scripts/ship.sh "$CADENCE_SHORT"
+```
+
+Its arguments go after `--`: `cadence deliver -- api frontend` (`--sha <rev>` to deliver a pushed
+commit other than HEAD). Ask the human (or the project's own
+delivery skill) which arguments this delivery needs; never guess them.
+
 ## Where to run
 
 Every `cadence` / `raf` command works on the git repository of the current directory. When the
@@ -37,7 +50,7 @@ Deliver one project at a time: the one the human names, or ask.
 3. `cadence deliver`. Exit codes: 0 delivered and verified, 1 a step failed, 2 refused before acting.
 4. On failure: read which step failed and why. Fix the cause, commit, push, deliver again. Never rerun
    blindly, never skip a check to make it pass.
-5. On success: `raf done <id>` for the lots it lists **whose effect you have seen**; if one of them is
+5. On success: `raf done <id>` (or the project's own tool when its plan is read-only) for the lots it lists **whose effect you have seen**; if one of them is
    `visible`, `cadence news build` and deliver the news too.
 
 ## Rules

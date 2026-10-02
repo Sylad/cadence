@@ -120,7 +120,7 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
   section(out, 'Commits de la période', commits.length ? commits : ['(aucun)']);
 
   const quiet = plan.lots().filter((l) => l.status === 'doing' && !recent.byLot.has(l.id));
-  section(out, 'Lots en cours', quiet.map((l) => `${l.id}  ${l.title} — aucun commit sur la période : raf done ou raf note`));
+  section(out, 'Lots en cours', quiet.map((l) => `${l.id}  ${l.title} — aucun commit sur la période : ${plan.readonly ? "le fermer ou l'annoter avec l'outil du projet" : 'raf done ou raf note'}`));
 
   const issues = audit(plan, ctx.root, ctx.newsDir, today);
   section(out, 'Écarts (raf check)', issues.map((i) => `✗ ${i.message}`));

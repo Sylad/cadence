@@ -122,13 +122,16 @@ plan:
   estimates: { S: 0.5, M: 1, L: 3 }   # their effort labels, in working days
 ```
 
-- Fields: `title`, `status`, `estimate`, `quickwin`, `visible`, `after`, `created`, `started`,
+- Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `after`, `created`, `started`,
   `finished`, `notes`, `parent`; one left out is read under its own name. A timestamp counts for
   its day; a note written as plain text is one note.
 - `parent`: an entry `B33/t1-fusion` whose parent is `B33` becomes the sub-task `t1-fusion` of `B33`.
 - Ids need no prefix: a commit belongs to a lot when its message cites one of the plan's ids as a
   whole word (`E-A2`, `NC2.4`, `B33/t1-fusion`).
-- A state missing from `statuses` is reported by `raf check`.
+  An id that is not in the plan cannot be told from ordinary text: such a commit counts as
+  "without a lot", never as an unknown reference.
+- A state missing from `statuses`, or an effort label missing from `estimates`, is reported by
+  `raf check`.
 
 ### Gantt scheduling
 

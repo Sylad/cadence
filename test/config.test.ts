@@ -119,6 +119,9 @@ describe('readPlanConfig', () => {
     ['plan:\n  estimates: { S: petit }\n', /plan\.estimates\.S/],
     ['plan:\n  since: hier\n', /plan\.since/],
     ['plan: [\n', /illisible/],
+    ['plan: 42\n', /plan doit être un chemin ou un objet/],
+    ['plan: ""\n', /plan doit être un chemin ou un objet/],
+    ['plan:\n  path: ""\n', /plan\.path est vide/],
   ])('refuses %j', (text, message) => {
     expect(() => readPlanConfig(write(join(tempDir(), 'cadence.yaml'), text))).toThrow(message);
   });
@@ -156,6 +159,15 @@ describe('a plan in another format', () => {
     expect(plan.lot('A1')).toMatchObject({ status: 'todo', problems: ['état « bloque » sans correspondance (cadence.yaml : plan.statuses)'] });
   });
 
+  it('refuses an entry without an id or that is not an object, reports an unknown effort', () => {
+    const dir = tempDir();
+    const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), CONFIG))!;
+    const load = (text: string) => Plan.load(write(join(dir, 'p.yaml'), text), cfg.settings).lots();
+    expect(() => load('taches:\n- titre: x\n')).toThrow(/entrée n° 1 du plan : identifiant absent/);
+    expect(() => load('taches:\n- id: A1\n-\n')).toThrow(/entrée n° 2 du plan : un objet est attendu/);
+    expect(load('taches:\n- id: A1\n  etat: prevu\n  effort: XL\n')[0].problems).toEqual(['effort « XL » sans correspondance (cadence.yaml : plan.estimates)']);
+  });
+
   it('refuses a file without the list', () => {
     const dir = tempDir();
     const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), CONFIG))!;
@@ -190,6 +202,13 @@ describe('a plan in another format', () => {
 });
 
 describe('raf CLI with cadence.yaml', () => {
+  it('still installs the hook when cadence.yaml is broken', () => {
+    const dir = gitRepo();
+    write(join(dir, 'cadence.yaml'), 'plan:\n  chemin: x\n');
+    expect(raf(dir, 'hook', 'install').code).toBe(0);
+    expect(raf(dir, 'list').code).toBe(2);
+  });
+
   it('follows plan: to a native plan elsewhere and still writes it', () => {
     const dir = gitRepo();
     write(join(dir, 'cadence.yaml'), 'plan: plan/todo.yaml\n');
@@ -227,6 +246,9 @@ describe('raf CLI with cadence.yaml', () => {
     expect(start.out).toContain('demo — reprise du 2026-09-28');
     expect(start.out).toMatch(/1\. B33 {2}Une seule base — en cours/);
 
+    // Aucun conseil vers une commande raf qui refuserait ; un cadence.yaml fautif n'empêche pas d'installer.
+    commit(dir, 'feat(E-A2): décodeur', '2026-09-27T12:00:00');
+    expect(raf(dir, 'check').out).toContain('✗ E-A2 a 1 commit(s) mais est encore todo\n');
     for (const argv of [['start', 'E-A2'], ['note', 'B33', 'x'], ['add', 'x'], ['init']]) {
       const r = raf(dir, ...argv);
       expect(r.code).toBe(2);

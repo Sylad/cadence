@@ -104,8 +104,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const root = gitRoot(io.cwd) ?? io.cwd;
   // cadence.yaml peut dire où est le plan et, s'il est tenu par un autre outil, comment le lire.
   const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
-  const planConfig = readPlanConfig(configPath);
-  const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? join(root, planConfig?.path ?? 'docs/plan/raf.yaml'));
+  // Installer les skills ou le hook ne lit pas le plan : un cadence.yaml fautif ne doit pas l'empêcher.
+  const installing = command === 'skills' || (command === 'hook' && rest[0] === 'install');
+  const planConfig = installing ? null : readPlanConfig(configPath);
+  const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? resolve(root, planConfig?.path ?? 'docs/plan/raf.yaml'));
   const loadPlan = () => Plan.load(planPath, planConfig?.settings);
   const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));
   const need = (n: number, usage: string) => {
@@ -308,7 +310,7 @@ function postCommit(load: (() => Plan) | null, newsDir: string, root: string, io
     for (const r of refs) {
       const lot = lots.get(r.lot);
       if (!lot) io.err(`raf: ${r.lot} n'existe pas dans le plan`);
-      else if (lot.status === 'todo' && !planning) io.err(`raf: ${r.lot} est encore todo — raf start ${r.lot}`);
+      else if (lot.status === 'todo' && !planning) io.err(`raf: ${r.lot} est encore todo${plan.readonly ? '' : ` — raf start ${r.lot}`}`);
       else io.err(`raf: ${r.lot} (${lot.status}) ${lot.title}`);
     }
     const entries = loadEntries(newsDir);

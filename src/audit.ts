@@ -61,8 +61,10 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
     const cs = all.byLot.get(l.id);
     if (l.status === 'todo' && cs) all.byLot.set(l.id, cs.filter((c) => (!adopted || c.day >= adopted) && !isPlanOnly(c.sha, plan, root)));
   }
-  return [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...uxIssues(plan),
+  const issues = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...uxIssues(plan),
     ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
+  // Un plan en lecture seule se corrige avec l'outil du projet : ne pas conseiller une commande raf qui refuserait.
+  return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf (start|ux) .*$/, '') })) : issues;
 }
 
 /**

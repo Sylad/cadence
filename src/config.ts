@@ -29,9 +29,9 @@ export function readPlanConfig(file: string): PlanConfig | null {
   }
   const p = (raw as { plan?: unknown } | null)?.plan;
   if (p == null) return null;
-  if (typeof p === 'string') return { path: p, settings: {} };
   const bad = (what: string) => new RafError(`${file} : plan.${what}`);
-  if (!isObject(p)) throw bad('doit être un chemin ou un objet');
+  if (typeof p === 'string' && p.trim() !== '') return { path: p, settings: {} };
+  if (!isObject(p)) throw new RafError(`${file} : plan doit être un chemin ou un objet`);
   for (const k of Object.keys(p)) if (!KEYS.includes(k)) throw bad(`${k} inconnu (attendu : ${KEYS.join(', ')})`);
 
   const settings: PlanSettings = {};
@@ -43,6 +43,7 @@ export function readPlanConfig(file: string): PlanConfig | null {
   if (p.ignore != null) settings.ignore = list(p.ignore);
   if (p.files != null) settings.files = list(p.files);
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
+  if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
   return { ...(p.path != null ? { path: String(p.path) } : {}), settings };
 }
 

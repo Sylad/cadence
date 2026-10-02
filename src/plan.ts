@@ -41,7 +41,7 @@ export class RafError extends Error {}
 
 export type Ref = { lot: string; task?: string };
 
-export const FIELDS = ['title', 'status', 'estimate', 'quickwin', 'visible', 'after', 'created', 'started', 'finished', 'notes', 'parent'] as const;
+export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'after', 'created', 'started', 'finished', 'notes', 'parent'] as const;
 export type Field = (typeof FIELDS)[number];
 
 /**
@@ -356,7 +356,8 @@ export class Plan {
 
 /** Lit une liste écrite dans un autre format : champs traduits, entrées à parent repliées en sous-tâches. */
 function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] {
-  const entries = raw.map((r) => {
+  const entries = raw.map((r, i) => {
+    if (!r || typeof r !== 'object' || Array.isArray(r)) throw new RafError(`entrée n° ${i + 1} du plan : un objet est attendu`);
     const pick = (field: Field): unknown => {
       for (const key of format.fields[field] ?? [field]) if (r[key] != null) return r[key];
       return undefined;
@@ -366,19 +367,26 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
       const v = pick(field);
       return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) ? v.slice(0, 10) : v;
     };
+    const id = pick('id');
+    if ((typeof id !== 'string' && typeof id !== 'number') || String(id).trim() === '') {
+      throw new RafError(`entrée n° ${i + 1} du plan : identifiant absent`);
+    }
     const problems: string[] = [];
     const theirs = pick('status');
     const mapped = Object.keys(format.statuses).length > 0;
-    if (mapped && theirs != null && !format.statuses[String(theirs)]) {
+    if (mapped && theirs != null && !Object.hasOwn(format.statuses, String(theirs))) {
       problems.push(`état « ${String(theirs)} » sans correspondance (cadence.yaml : plan.statuses)`);
     }
     const effort = pick('estimate');
+    if (typeof effort === 'string' && !(effort in format.estimates)) {
+      problems.push(`effort « ${effort} » sans correspondance (cadence.yaml : plan.estimates)`);
+    }
     const notes = pick('notes');
     const lot = normalizeLot(
       {
-        id: r.id,
+        id,
         title: pick('title'),
-        status: mapped ? format.statuses[String(theirs)] : theirs,
+        status: mapped ? (Object.hasOwn(format.statuses, String(theirs)) ? format.statuses[String(theirs)] : undefined) : theirs,
         estimate: typeof effort === 'string' ? format.estimates[effort] : effort,
         quickwin: pick('quickwin'),
         visible: pick('visible'),
@@ -399,6 +407,7 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
     const into = parent ? top.get(parent) : undefined;
     if (into && lot.id.startsWith(`${into.id}/`)) {
       into.tasks.push({ id: lot.id.slice(into.id.length + 1), title: lot.title, status: lot.status });
+      into.problems.push(...lot.problems.map((p) => `${lot.id} : ${p}`));
     } else {
       lots.push(lot);
     }

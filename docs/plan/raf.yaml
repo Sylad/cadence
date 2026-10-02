@@ -15,11 +15,12 @@ lots:
     finished: 2026-10-02
   - id: L2
     title: "Livraison et rituels d'un projet à outillage propre branchés sur cadence : cadence deliver appelle le script de livraison existant du projet (CI, déploiement, vérifications métier) au lieu de le remplacer ; ses skills de reprise et de clôture deviennent des alias de session-start / session-close ; agents experts du projet conservés"
-    status: doing
+    status: done
     estimate: 1.5
     after: [ L1 ]
     created: 2026-10-02
     started: 2026-10-02
+    finished: 2026-10-02
   - id: L3
     title: "Chef d'orchestre à sessions courtes : un orchestrateur au-dessus de /lead qui lance, par projet ou par lot, une session Claude neuve en ligne de commande avec un brief court, et récupère le résultat dans le plan et les notes de reprise — l'état vit dans les fichiers, jamais dans la conversation (mesure du 02-10 : 75 % de l'usage au-delà de 150 k de contexte, agents repris jusqu'à 440 k). Inclut : budget de tokens par vague, agent neuf dès la 2e passe de corrections, passe unique relecture + UX pour les petits lots, modèle économique pour les tâches mécaniques"
     status: todo

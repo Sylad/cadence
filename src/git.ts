@@ -9,7 +9,8 @@ export interface Commit {
 }
 
 function git(cwd: string, args: string[]): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  // Le journal complet d'un gros dépôt dépasse le Mo par défaut : sans marge, il serait lu comme vide.
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 1024 });
 }
 
 export function gitRoot(cwd: string): string | null {

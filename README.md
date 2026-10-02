@@ -66,7 +66,7 @@ version: 1
 project: my-app
 prefix: L
 since: 2026-09-28     # commits before this date are not audited
-ignore: ['^chore\(batch\):']   # optional: subjects of automated commits, never audited
+ignore: ['^chore\(batch\):']   # optional: subjects of automated commits, neither audited nor counted for a lot
 lots:
   - id: L1
     title: Monthly dedup on merge
@@ -82,6 +82,53 @@ lots:
     tasks:
       - { id: t1, title: write the migration, status: done }
 ```
+
+### A plan elsewhere, or in another format
+
+`cadence.yaml`, at the repository root, can say where the plan is. The short form keeps raf's own
+format, and the plan stays writable:
+
+```yaml
+plan: planning/todo.yaml
+```
+
+A project that already keeps its plan with its own tool is read **without migrating it**: describe
+the file, and `raf now`, `raf list`, `raf check`, `raf gantt` and `cadence session start|close`
+work on it. Such a plan is **read-only** — `raf add|start|done|note|ux` refuse and leave the file
+to the project's tool.
+
+```yaml
+plan:
+  path: docs/plan/taches.yaml
+  project: my-app               # what the file does not say itself: project, since, ignore
+  since: 2026-10-02
+  ignore: ['^plan: ']
+  files: [docs/plan/journal.ndjson]   # kept with the plan: a commit touching only these is a plan commit
+  lots: taches                  # root key holding the list (default: lots)
+  fields:                       # raf field: key in the file (a list = first one present)
+    title: titre
+    status: etat
+    estimate: effort
+    created: cree_le
+    started: demarre_le
+    finished: [livre_le, ferme_le]
+    notes: note
+    parent: parent
+  statuses:                     # raf status: their states
+    todo: [prevu, specifie]
+    doing: [en_cours, teste]
+    done: [deploye, valide]
+    dropped: caduc
+  estimates: { S: 0.5, M: 1, L: 3 }   # their effort labels, in working days
+```
+
+- Fields: `title`, `status`, `estimate`, `quickwin`, `visible`, `after`, `created`, `started`,
+  `finished`, `notes`, `parent`; one left out is read under its own name. A timestamp counts for
+  its day; a note written as plain text is one note.
+- `parent`: an entry `B33/t1-fusion` whose parent is `B33` becomes the sub-task `t1-fusion` of `B33`.
+- Ids need no prefix: a commit belongs to a lot when its message cites one of the plan's ids as a
+  whole word (`E-A2`, `NC2.4`, `B33/t1-fusion`).
+- A state missing from `statuses` is reported by `raf check`.
 
 ### Gantt scheduling
 

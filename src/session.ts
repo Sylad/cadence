@@ -1,6 +1,6 @@
-import { audit, exemptPlanOnly, nextUp } from './audit.js';
+import { audit, exemptPlanOnly, nextUp, planCommits } from './audit.js';
 import { diffDays, maxDay, type Day } from './dates.js';
-import { readCommits, repoStatus, type Commit } from './git.js';
+import { repoStatus, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import type { Lot, Plan } from './plan.js';
 import { lockAlive, readLock, readNext } from './state.js';
@@ -21,8 +21,8 @@ const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
 
 /** Commits de la fenêtre reliés aux lots, sans compter comme « sans lot » ceux qui ne touchent que le plan. */
 function period(ctx: SessionCtx, since: string): Linked {
-  const commits = readCommits(ctx.root, { since });
-  const linked = exemptPlanOnly(linkCommits(ctx.plan.lots(), commits, ctx.plan.prefix), ctx.plan, ctx.root);
+  const commits = planCommits(ctx.plan, ctx.root, { since });
+  const linked = exemptPlanOnly(linkCommits(ctx.plan.lots(), commits, ctx.plan.refs), ctx.plan, ctx.root);
   // Comme raf check : un commit antérieur à l'adoption du plan n'avait pas à citer de lot.
   const adopted = ctx.plan.since;
   return adopted ? { ...linked, orphans: linked.orphans.filter((c) => c.day >= adopted) } : linked;
@@ -69,7 +69,7 @@ function lastActivity(lot: Lot, commits: Commit[]): Day | undefined {
 export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: number }): number {
   const { plan, out, today } = ctx;
   const lots = plan.lots();
-  const all = linkCommits(lots, readCommits(ctx.root), plan.prefix);
+  const all = linkCommits(lots, planCommits(plan, ctx.root), plan.refs);
   out(`${plan.project} — reprise du ${today}`);
 
   const next = readNext(ctx.state);

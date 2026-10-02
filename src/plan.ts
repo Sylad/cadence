@@ -39,6 +39,36 @@ export interface Lot {
 
 export class RafError extends Error {}
 
+export type Ref = { lot: string; task?: string };
+
+export const FIELDS = ['title', 'status', 'estimate', 'quickwin', 'visible', 'after', 'created', 'started', 'finished', 'notes', 'parent'] as const;
+export type Field = (typeof FIELDS)[number];
+
+/**
+ * Plan tenu par un autre outil, lu sans le migrer (cadence.yaml : plan.lots, fields, statuses,
+ * estimates). Un tel plan est en lecture seule : raf ne sait pas l'écrire dans son format.
+ */
+export interface PlanFormat {
+  /** Clé racine qui porte la liste. */
+  lots: string;
+  /** Champ de raf → clés du fichier, la première présente l'emporte. */
+  fields: Partial<Record<Field, string[]>>;
+  /** État du fichier → statut de raf. */
+  statuses: Record<string, Status>;
+  /** Libellé d'effort du fichier → jours. */
+  estimates: Record<string, number>;
+}
+
+/** Réglages venus de cadence.yaml ; ceux du plan lui-même l'emportent quand il les porte. */
+export interface PlanSettings {
+  project?: string;
+  since?: Day;
+  ignore?: string[];
+  /** Fichiers tenus avec le plan (journal…), relatifs à la racine : les toucher n'est pas travailler à un lot. */
+  files?: string[];
+  format?: PlanFormat;
+}
+
 export function isOpen(status: Status): boolean {
   return status === 'todo' || status === 'doing';
 }
@@ -52,7 +82,7 @@ export function refPattern(prefix: string): RegExp {
   return new RegExp(`(?<![\\w/])(${escapeRe(prefix)}\\d+)(?:/(t\\d+))?(?![\\w])`, 'g');
 }
 
-export function extractRefs(text: string, prefix: string): { lot: string; task?: string }[] {
+export function extractRefs(text: string, prefix: string): Ref[] {
   return [...text.matchAll(refPattern(prefix))].map((m) => ({ lot: m[1], task: m[2] }));
 }
 
@@ -74,7 +104,21 @@ export class Plan {
     private readonly doc: Document,
     /** false quand le fichier écrit à la main met les « - » en colonne de la clé parente. */
     private readonly indentSeq: boolean,
+    private readonly settings: PlanSettings = {},
   ) {}
+
+  /** Un plan lu dans un autre format ne change pas : sa lecture et le motif de ses références sont gardés. */
+  private foreign?: { lots: Lot[]; refs: RegExp | null; tasks: Set<string>; ids: Set<string> };
+
+  get readonly(): boolean {
+    return !!this.settings.format;
+  }
+
+  private writable(): void {
+    if (this.readonly) {
+      throw new RafError(`plan en lecture seule : ${this.path} est tenu par un autre outil (cadence.yaml : plan) — le modifier avec l'outil du projet`);
+    }
+  }
 
   static create(path: string, project: string, prefix = 'L', since?: Day): Plan {
     if (existsSync(path)) throw new RafError(`${path} existe déjà`);
@@ -84,24 +128,30 @@ export class Plan {
     return Plan.load(path);
   }
 
-  static load(path: string): Plan {
+  static load(path: string, settings: PlanSettings = {}): Plan {
     if (!existsSync(path)) throw new RafError(`pas de plan à ${path} — lancer « raf init »`);
     const text = readFileSync(path, 'utf8');
     const doc = parseDocument(text);
     if (doc.errors.length > 0) throw new RafError(`${path} : ${doc.errors[0].message}`);
     if (!isMap(doc.contents)) throw new RafError(`${path} : la racine doit être un objet`);
+    if (settings.format) {
+      const key = settings.format.lots;
+      if (!isSeq(doc.get(key))) throw new RafError(`${path} : la clé « ${key} » doit porter la liste des lots (cadence.yaml : plan.lots)`);
+      return new Plan(path, doc, true, settings);
+    }
     const lots = doc.get('lots');
     if (!isSeq(lots)) doc.set('lots', doc.createNode([]));
     else lots.flow = false; // « lots: [] » écrit par init : passer en style bloc
-    return new Plan(path, doc, !/^lots:[^\n]*\n(?:#[^\n]*\n)*- /m.test(text));
+    return new Plan(path, doc, !/^lots:[^\n]*\n(?:#[^\n]*\n)*- /m.test(text), settings);
   }
 
   save(): void {
+    this.writable();
     writeFileSync(this.path, this.doc.toString({ lineWidth: 0, indentSeq: this.indentSeq }));
   }
 
   get project(): string {
-    return String(this.doc.get('project') ?? '');
+    return String(this.doc.get('project') ?? this.settings.project ?? '');
   }
 
   get prefix(): string {
@@ -110,14 +160,15 @@ export class Plan {
 
   /** Date d'adoption de raf : les commits plus anciens ne sont pas audités. */
   get since(): Day | undefined {
-    const v = this.doc.get('since');
+    const v = this.doc.get('since') ?? this.settings.since;
     return v == null ? undefined : String(v);
   }
 
   /** Motifs (expressions régulières sur le sujet) des commits automatiques à ne pas auditer. */
   get ignore(): { patterns: RegExp[]; invalid: string[] } {
     const raw = this.doc.get('ignore');
-    const list = isSeq(raw) ? (raw.toJSON() as unknown[]).map(String) : raw == null ? [] : [String(raw)];
+    const own = isSeq(raw) ? (raw.toJSON() as unknown[]).map(String) : raw == null ? [] : [String(raw)];
+    const list = [...own, ...(this.settings.ignore ?? [])];
     const patterns: RegExp[] = [];
     const invalid: string[] = [];
     for (const src of list) {
@@ -130,6 +181,44 @@ export class Plan {
     return { patterns, invalid };
   }
 
+  /** Fichiers tenus avec le plan, relatifs à la racine du dépôt. */
+  get files(): string[] {
+    return this.settings.files ?? [];
+  }
+
+  /**
+   * Références citées par un texte. Format de raf : préfixe et numéro (`L3`, `L3/t1`). Autre format :
+   * les identifiants du plan eux-mêmes, quelle que soit leur forme (`E-A2`, `NC2.4`, `B33/t1-fusion`).
+   */
+  readonly refs = (text: string): Ref[] => {
+    if (!this.settings.format) return extractRefs(text, this.prefix);
+    const { refs, tasks, ids } = this.read();
+    if (!refs) return [];
+    return [...text.matchAll(refs)].flatMap((m): Ref[] => {
+      if (!m[2]) return [{ lot: m[1] }];
+      if (tasks.has(`${m[1]}/${m[2]}`)) return [{ lot: m[1], task: m[2] }];
+      // « B33/E-A2 » : deux lots séparés par une barre, pas une sous-tâche.
+      return ids.has(m[2]) ? [{ lot: m[1] }, { lot: m[2] }] : [{ lot: m[1] }];
+    });
+  };
+
+  private read(): NonNullable<Plan['foreign']> {
+    if (!this.foreign) {
+      const raw = (this.doc.get(this.settings.format!.lots) as YAMLSeq).toJSON() as Record<string, unknown>[];
+      const lots = foreignLots(raw, this.settings.format!);
+      const ids = lots.map((l) => l.id).sort((a, b) => b.length - a.length);
+      this.foreign = {
+        lots,
+        ids: new Set(ids),
+        tasks: new Set(lots.flatMap((l) => l.tasks.map((t) => `${l.id}/${t.id}`))),
+        refs: ids.length
+          ? new RegExp(`(?<![\\w/.-])(${ids.map(escapeRe).join('|')})(?:/([\\w-]+(?:\\.[\\w-]+)*))?(?![\\w-]|\\.\\w)`, 'g')
+          : null,
+      };
+    }
+    return this.foreign;
+  }
+
   /** Date d'activation de la revue UX obligatoire des lots visibles ; absente = règle inactive. */
   get uxSince(): Day | undefined {
     const v = this.doc.get('uxSince');
@@ -138,6 +227,7 @@ export class Plan {
 
   /** Active la revue UX ; false si elle l'était déjà. */
   enableUx(today: Day): boolean {
+    this.writable();
     if (this.uxSince) return false;
     this.doc.set('uxSince', today);
     // Placer la clé avant « lots » pour garder les réglages groupés en tête.
@@ -149,6 +239,7 @@ export class Plan {
   }
 
   recordUx(lotId: string, verdict: string, today: Day): void {
+    this.writable();
     if (lotId.includes('/')) throw new RafError('la revue UX se note sur un lot, pas une sous-tâche');
     const node = this.doc.createNode({ date: today, verdict }) as YAMLMap;
     node.flow = true;
@@ -156,8 +247,9 @@ export class Plan {
   }
 
   lots(): Lot[] {
+    if (this.settings.format) return this.read().lots;
     const raw = (this.doc.get('lots') as YAMLSeq).toJSON() as Record<string, unknown>[];
-    return raw.map(normalizeLot);
+    return raw.map((r) => normalizeLot(r));
   }
 
   lot(id: string): Lot {
@@ -181,6 +273,7 @@ export class Plan {
   }
 
   add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; after?: string[] } = {}): string {
+    this.writable();
     const known = new Set(this.lots().map((l) => l.id));
     for (const dep of opts.after ?? []) if (!known.has(dep)) throw new RafError(`dépendance inconnue : ${dep}`);
     const re = new RegExp(`^${escapeRe(this.prefix)}(\\d+)$`);
@@ -199,6 +292,7 @@ export class Plan {
   }
 
   addTask(lotId: string, title: string): string {
+    this.writable();
     const lot = this.lotNode(lotId);
     let tasks = lot.get('tasks');
     if (!isSeq(tasks)) {
@@ -216,6 +310,7 @@ export class Plan {
 
   /** `ref` is `L3` or `L3/t1`. */
   setStatus(ref: string, status: Status, today: Day, opts: { force?: boolean } = {}): void {
+    this.writable();
     const [lotId, taskId] = ref.split('/');
     if (taskId) {
       const task = this.taskNode(lotId, taskId);
@@ -244,6 +339,7 @@ export class Plan {
   }
 
   note(ref: string, text: string, today: Day): void {
+    this.writable();
     const [lotId, taskId] = ref.split('/');
     const lot = this.lotNode(lotId);
     if (taskId) this.taskNode(lotId, taskId);
@@ -258,9 +354,60 @@ export class Plan {
   }
 }
 
-function normalizeLot(raw: Record<string, unknown>): Lot {
+/** Lit une liste écrite dans un autre format : champs traduits, entrées à parent repliées en sous-tâches. */
+function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] {
+  const entries = raw.map((r) => {
+    const pick = (field: Field): unknown => {
+      for (const key of format.fields[field] ?? [field]) if (r[key] != null) return r[key];
+      return undefined;
+    };
+    // Un horodatage vaut pour son jour.
+    const day = (field: Field): unknown => {
+      const v = pick(field);
+      return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) ? v.slice(0, 10) : v;
+    };
+    const problems: string[] = [];
+    const theirs = pick('status');
+    const mapped = Object.keys(format.statuses).length > 0;
+    if (mapped && theirs != null && !format.statuses[String(theirs)]) {
+      problems.push(`état « ${String(theirs)} » sans correspondance (cadence.yaml : plan.statuses)`);
+    }
+    const effort = pick('estimate');
+    const notes = pick('notes');
+    const lot = normalizeLot(
+      {
+        id: r.id,
+        title: pick('title'),
+        status: mapped ? format.statuses[String(theirs)] : theirs,
+        estimate: typeof effort === 'string' ? format.estimates[effort] : effort,
+        quickwin: pick('quickwin'),
+        visible: pick('visible'),
+        after: pick('after'),
+        created: day('created'),
+        started: day('started'),
+        finished: day('finished'),
+        notes: typeof notes === 'string' ? [{ text: notes }] : notes,
+      },
+      problems,
+    );
+    const parent = pick('parent');
+    return { lot, parent: parent == null ? undefined : String(parent) };
+  });
+  const top = new Map(entries.filter((e) => !e.parent).map((e) => [e.lot.id, e.lot]));
+  const lots: Lot[] = [];
+  for (const { lot, parent } of entries) {
+    const into = parent ? top.get(parent) : undefined;
+    if (into && lot.id.startsWith(`${into.id}/`)) {
+      into.tasks.push({ id: lot.id.slice(into.id.length + 1), title: lot.title, status: lot.status });
+    } else {
+      lots.push(lot);
+    }
+  }
+  return lots;
+}
+
+function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lot {
   const status = STATUSES.includes(raw.status as Status) ? (raw.status as Status) : 'todo';
-  const problems: string[] = [];
   const asDay = (field: string): Day | undefined => {
     const v = raw[field];
     if (v == null) return undefined;

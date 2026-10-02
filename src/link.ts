@@ -1,5 +1,5 @@
 import type { Commit } from './git.js';
-import { extractRefs, type Lot } from './plan.js';
+import type { Lot, Ref } from './plan.js';
 
 export interface Linked {
   /** Commits per lot id, newest first (same order as the log). */
@@ -14,14 +14,15 @@ export function isMerge(c: Commit): boolean {
   return /^Merge\b/.test(c.subject);
 }
 
-export function linkCommits(lots: Lot[], commits: Commit[], prefix: string): Linked {
+/** `refs` lit les références d'un message : `plan.refs`. */
+export function linkCommits(lots: Lot[], commits: Commit[], refsOf: (text: string) => Ref[]): Linked {
   const ids = new Set(lots.map((l) => l.id));
   const tasks = new Set(lots.flatMap((l) => l.tasks.map((t) => `${l.id}/${t.id}`)));
   const byLot = new Map<string, Commit[]>();
   const orphans: Commit[] = [];
   const unknown: Linked['unknown'] = [];
   for (const c of commits) {
-    const refs = extractRefs(`${c.subject}\n${c.body}`, prefix);
+    const refs = refsOf(`${c.subject}\n${c.body}`);
     if (refs.length === 0) {
       if (!isMerge(c)) orphans.push(c);
       continue;

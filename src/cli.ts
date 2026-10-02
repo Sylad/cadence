@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { check } from './check.js';
-import { audit, auditSince, exemptPlanOnly, isPlanOnly, nextUp } from './audit.js';
+import { readPlanConfig } from './config.js';
+import { audit, exemptPlanOnly, isPlanOnly, nextUp, planCommits } from './audit.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { ganttData, renderGantt } from './gantt.js';
@@ -10,7 +10,7 @@ import { gitRoot, readCommits } from './git.js';
 import { installHook } from './hook.js';
 import { linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from './news.js';
-import { extractRefs, Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
+import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
@@ -42,6 +42,8 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
 Un commit appartient à un lot quand son message cite l'identifiant : « feat(L3): … », « L3/t1 ».
 Un lot --visible attend une entrée Nouveautés (docs/nouveautes/, --dir) avec capture ; raf check le vérifie.
 Un texte qui commence par « - » se passe après « -- » : raf note L1 -- "-5 %".
+Le plan est docs/plan/raf.yaml, ou celui que nomme « plan: » dans cadence.yaml ; un plan tenu par un
+autre outil se lit sans migration (correspondance des champs, voir le README) et reste en lecture seule.
 Options communes : --file chemin (ou RAF_FILE), RAF_TODAY=AAAA-MM-JJ pour figer la date.`;
 
 export function run(argv: string[], io: Io): number | Promise<number> {
@@ -100,7 +102,11 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const today: Day = io.env.RAF_TODAY ?? toDay(io.now());
   if (!isDay(today)) throw new RafError(`RAF_TODAY invalide : ${today} (attendu AAAA-MM-JJ)`);
   const root = gitRoot(io.cwd) ?? io.cwd;
-  const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? join(root, 'docs/plan/raf.yaml'));
+  // cadence.yaml peut dire où est le plan et, s'il est tenu par un autre outil, comment le lire.
+  const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
+  const planConfig = readPlanConfig(configPath);
+  const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? join(root, planConfig?.path ?? 'docs/plan/raf.yaml'));
+  const loadPlan = () => Plan.load(planPath, planConfig?.settings);
   const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));
   const need = (n: number, usage: string) => {
     if (rest.length < n) throw new RafError(`usage : raf ${usage}`);
@@ -108,6 +114,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
 
   switch (command) {
     case 'init': {
+      if (planConfig?.settings.format) throw new RafError(`plan en lecture seule : ${configPath} décrit un plan tenu par un autre outil`);
       const plan = Plan.create(planPath, values.project ?? basename(root), values.prefix ?? 'L', today);
       io.out(`plan créé : ${plan.path}`);
       if (!values['no-hook'] && gitRoot(io.cwd)) io.out(`hook : ${installHook(io.cwd).path}`);
@@ -115,7 +122,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'add': {
       need(1, 'add "titre"');
-      const plan = Plan.load(planPath);
+      const plan = loadPlan();
       let id: string;
       if (values.parent) {
         id = plan.addTask(values.parent, rest.join(' '));
@@ -133,7 +140,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     case 'done':
     case 'drop': {
       need(1, `${command} <id>`);
-      const plan = Plan.load(planPath);
+      const plan = loadPlan();
       const status: Status = command === 'start' ? 'doing' : command === 'done' ? 'done' : 'dropped';
       plan.setStatus(rest[0], status, today, { force: values.force });
       if (command === 'drop' && values.reason) plan.note(rest[0], `abandonné : ${values.reason}`, today);
@@ -149,14 +156,14 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'note': {
       need(2, 'note <id> "texte"');
-      const plan = Plan.load(planPath);
+      const plan = loadPlan();
       plan.note(rest[0], rest.slice(1).join(' '), today);
       plan.save();
       return 0;
     }
     case 'ux': {
       need(1, 'ux enable | ux <lot> "verdict"');
-      const plan = Plan.load(planPath);
+      const plan = loadPlan();
       if (rest[0] === 'enable') {
         const changed = plan.enableUx(today);
         plan.save();
@@ -170,7 +177,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'list': {
-      const plan = Plan.load(planPath);
+      const plan = loadPlan();
       if (values.status && !STATUSES.includes(values.status as Status)) throw new RafError(`statut inconnu : ${values.status}`);
       for (const l of plan.lots().filter((l) => !values.status || l.status === values.status)) {
         io.out(`${l.id.padEnd(6)} ${l.status.padEnd(8)} ${l.quickwin ? '⚡ ' : ''}${l.title}`);
@@ -178,19 +185,19 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'now':
-      return now(Plan.load(planPath), root, today, io);
+      return now(loadPlan(), root, newsDir, today, io);
     case 'check': {
       const idle = values.idle === undefined ? 7 : Number(values.idle);
       if (!Number.isInteger(idle) || idle < 0) throw new RafError(`--idle invalide : ${values.idle}`);
-      const issues = audit(Plan.load(planPath), root, newsDir, today, { since: values.since, idle });
+      const issues = audit(loadPlan(), root, newsDir, today, { since: values.since, idle });
       for (const i of issues) io.out(`✗ ${i.message}`);
       io.out(issues.length === 0 ? '✓ plan et historique cohérents' : `${issues.length} écart(s)`);
       return issues.length === 0 ? 0 : 1;
     }
     case 'gantt': {
-      const plan = Plan.load(planPath);
+      const plan = loadPlan();
       const lots = plan.lots();
-      const linked = linkCommits(lots, readCommits(root), plan.prefix);
+      const linked = linkCommits(lots, planCommits(plan, root), plan.refs);
       const stamp = io.now();
       const html = renderGantt(
         ganttData(plan.project, schedule(lots, linked.byLot, today), today, `${toDay(stamp)} ${stamp.toTimeString().slice(0, 5)}`),
@@ -207,18 +214,17 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         io.out(changed ? `hook installé : ${path}` : `hook déjà présent : ${path}`);
         return 0;
       }
-      if (rest[0] === 'post-commit') return postCommit(planPath, newsDir, root, io);
+      if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, io);
       throw new RafError('usage : raf hook install|post-commit');
     }
     case 'session':
       if (!gitRoot(io.cwd)) throw new RafError('session : à lancer dans un dépôt git');
-      return session(rest, { plan: Plan.load(planPath), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out }, values);
+      return session(rest, { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out }, values);
     case 'deliver': {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
-      const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans le README)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
-      const plan = existsSync(planPath) ? Plan.load(planPath) : null;
+      const plan = existsSync(planPath) ? loadPlan() : null;
       const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], out: io.out, err: io.err };
       return deliver(ctx, realDeps(root));
     }
@@ -239,7 +245,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'news':
-      return news(rest, Plan.load(planPath), newsDir, today, values, io);
+      return news(rest, loadPlan(), newsDir, today, values, io);
     default:
       throw new RafError(`commande inconnue : ${command} (raf --help)`);
   }
@@ -252,9 +258,9 @@ function describe(l: Lot, commits: number): string {
   return `${l.quickwin ? '⚡ ' : ''}${l.id}  ${l.title}  (${bits.join(', ')})`;
 }
 
-function now(plan: Plan, root: string, today: Day, io: Io): number {
+function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): number {
   const lots = plan.lots();
-  const linked = linkCommits(lots, readCommits(root), plan.prefix);
+  const linked = linkCommits(lots, planCommits(plan, root), plan.refs);
   const count = (id: string) => linked.byLot.get(id)?.length ?? 0;
   const { doing, ready, blocked } = nextUp(lots);
   io.out(`${plan.project} — ${today}`);
@@ -278,19 +284,18 @@ function now(plan: Plan, root: string, today: Day, io: Io): number {
     for (const l of done) io.out(`  ${l.id}  ${l.title}  (${l.finished})`);
   }
 
-  const recent = exemptPlanOnly(linkCommits(lots, readCommits(root, { since: auditSince(plan) }), plan.prefix), plan, root);
-  const issues = check(lots, { ...recent, byLot: linked.byLot }, today);
+  const issues = audit(plan, root, newsDir, today);
   if (issues.length) io.out(`\n${issues.length} écart(s) entre le plan et l'historique — raf check`);
   return 0;
 }
 
-function postCommit(planPath: string, newsDir: string, root: string, io: Io): number {
-  if (!existsSync(planPath)) return 0;
+function postCommit(load: (() => Plan) | null, newsDir: string, root: string, io: Io): number {
+  if (!load) return 0;
   try {
-    const plan = Plan.load(planPath);
+    const plan = load();
     const head = readCommits(root, { range: '-1' })[0];
     if (!head) return 0;
-    const refs = extractRefs(`${head.subject}\n${head.body}`, plan.prefix);
+    const refs = plan.refs(`${head.subject}\n${head.body}`);
     if (refs.length === 0) {
       const planOnly = exemptPlanOnly({ byLot: new Map(), orphans: [head], unknown: [] }, plan, root).orphans.length === 0;
       if (!planOnly && !/^Merge\b/.test(head.subject)) {

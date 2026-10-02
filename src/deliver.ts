@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { parse } from 'yaml';
 import type { Day } from './dates.js';
 import { headSha, isAncestor, onRemote, readCommits, repoStatus } from './git.js';
-import { extractRefs, RafError, type Plan } from './plan.js';
+import { RafError, type Plan } from './plan.js';
 import { appendDelivery, lastDelivery, lockAlive, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
 
 export interface VerifyCheck {
@@ -329,7 +329,7 @@ function deliveredLots(ctx: DeliverCtx, prev: string | null, sha: string): strin
   const known = new Set(ctx.plan.lots().map((l) => l.id));
   const ids = new Set<string>();
   for (const c of readCommits(ctx.root, { range: `${prev}..${sha}` })) {
-    for (const r of extractRefs(`${c.subject}\n${c.body}`, ctx.plan.prefix)) if (known.has(r.lot)) ids.add(r.lot);
+    for (const r of ctx.plan.refs(`${c.subject}\n${c.body}`)) if (known.has(r.lot)) ids.add(r.lot);
   }
   if (ids.size === 0) return null;
   return `livré : ${[...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join(', ')} — raf done si l'effet est celui attendu`;

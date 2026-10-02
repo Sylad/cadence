@@ -1,14 +1,26 @@
 import { dirname, join, relative } from 'node:path';
 import { check } from './check.js';
 import type { Day } from './dates.js';
-import { changedFiles, readCommits } from './git.js';
+import { changedFiles, readCommits, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import { loadEntries, newsIssues } from './news.js';
 import { isOpen, type Lot, type Plan } from './plan.js';
 
+/** Le plan, sa page Gantt et les fichiers tenus avec lui (cadence.yaml : plan.files). */
+function ownFiles(plan: Plan, root: string): Set<string> {
+  return new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), ...plan.files]);
+}
+
+/** Commits du dépôt sans les commits automatiques (motifs `ignore`) : ni audités ni comptés pour un lot. */
+export function planCommits(plan: Plan, root: string, opts: { since?: string; range?: string } = {}): Commit[] {
+  const { patterns } = plan.ignore;
+  const commits = readCommits(root, opts);
+  return patterns.length ? commits.filter((c) => !patterns.some((re) => re.test(c.subject))) : commits;
+}
+
 /** Le commit ne touche-t-il que le plan (ou la page Gantt) ? */
 export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
-  const own = new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html'))]);
+  const own = ownFiles(plan, root);
   const files = changedFiles(root, sha);
   return files.length > 0 && files.every((f) => own.has(f));
 }
@@ -18,7 +30,7 @@ export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
  * commit automatique dont le sujet correspond à un motif `ignore:` du plan.
  */
 export function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
-  const own = new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html'))]);
+  const own = ownFiles(plan, root);
   const { patterns } = plan.ignore;
   const orphans = linked.orphans.filter((c) => {
     if (patterns.some((re) => re.test(c.subject))) return false;
@@ -38,14 +50,16 @@ export function auditSince(plan: Plan, explicit?: string): string {
 /** Écarts entre le plan, l'historique et les Nouveautés — ce que `raf check` affiche. */
 export function audit(plan: Plan, root: string, newsDir: string, today: Day, opts: { since?: string; idle?: number } = {}): { message: string }[] {
   const lots = plan.lots();
-  const linked = exemptPlanOnly(linkCommits(lots, readCommits(root, { since: auditSince(plan, opts.since) }), plan.prefix), plan, root);
+  const linked = exemptPlanOnly(linkCommits(lots, planCommits(plan, root, { since: auditSince(plan, opts.since) }), plan.refs), plan, root);
   // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
-  const all = linkCommits(lots, readCommits(root), plan.prefix);
+  const all = linkCommits(lots, planCommits(plan, root), plan.refs);
   // Planifier un lot (commit qui ne touche que le plan) n'est pas y travailler : un lot « todo »
-  // cité seulement par de tels commits n'a pas à être démarré.
+  // cité seulement par de tels commits n'a pas à être démarré. Ni par des commits antérieurs à
+  // l'adoption du plan : citer un identifiant n'engageait alors à rien.
+  const adopted = plan.since;
   for (const l of lots) {
     const cs = all.byLot.get(l.id);
-    if (l.status === 'todo' && cs) all.byLot.set(l.id, cs.filter((c) => !isPlanOnly(c.sha, plan, root)));
+    if (l.status === 'todo' && cs) all.byLot.set(l.id, cs.filter((c) => (!adopted || c.day >= adopted) && !isPlanOnly(c.sha, plan, root)));
   }
   return [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...uxIssues(plan),
     ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];

@@ -7,7 +7,10 @@ description: Lead several cadence projects from a parent folder without loading 
 
 The lead session stays small: it reads summaries, decides with the human, delegates, checks and
 delivers. Project files are read and changed by subagents, each with its own context. The projects
-are the sub-folders of the current directory that contain `docs/plan/raf.yaml`.
+are the sub-folders of the current directory that contain `docs/plan/raf.yaml`, or a `cadence.yaml`
+with a `plan:` key. A project whose `cadence.yaml` maps the fields of a plan kept by its own tool is
+**read-only** for `raf`: it takes part in the tour, and its plan is changed with the project's own
+commands (its CLAUDE.md names them), never with `raf start|done|note`.
 
 ## Limits that always apply
 
@@ -35,7 +38,7 @@ For each chosen lot, the lead runs `cd <project> && raf start <lot>`, then gives
 (fill in the brackets, keep the rest verbatim):
 
 > Work in `<absolute path of the project>` on lot `<id>` — "<title>" — of its plan
-> (`docs/plan/raf.yaml`; read the lot, its notes and sub-tasks, and the project's CLAUDE.md first).
+> (`docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`; read the lot, its notes and sub-tasks, and the project's CLAUDE.md first).
 > Goal: <what done looks like, from the human's words>.
 > Rules: test first; commit each sub-part as soon as its tests pass, with explicit paths (never
 > `git add -A` or `commit -a`), and a message that cites the lot (`feat(<id>): …`); run the project's

@@ -1,0 +1,236 @@
+import { describe, expect, it } from 'vitest';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { run } from '../src/cli.js';
+import { readPlanConfig } from '../src/config.js';
+import { Plan } from '../src/plan.js';
+import { commit, gitRepo, tempDir } from './helpers.js';
+
+const CONFIG = `plan:
+  path: docs/suivi/taches.yaml
+  project: demo
+  since: 2026-09-01
+  ignore: ['^auto: ']
+  files: [docs/suivi/journal.ndjson]
+  lots: taches
+  fields:
+    title: titre
+    status: etat
+    estimate: effort
+    created: cree_le
+    started: demarre_le
+    finished: [livre_le, ferme_le]
+    notes: note
+    parent: parent
+  statuses:
+    todo: [prevu, specifie]
+    doing: en_cours
+    done: [deploye, valide]
+    dropped: caduc
+  estimates: { S: 0.5, M: 1, L: 3 }
+`;
+
+const TACHES = `# tenu par un autre outil
+taches:
+- id: B33
+  titre: Une seule base
+  etat: en_cours
+  effort: L
+  cree_le: '2026-09-09T00:00:00+00:00'
+  demarre_le: '2026-09-10T08:00:00+00:00'
+  note: mesuré sur la prod
+- id: B33/t1-compression
+  titre: Compression
+  etat: deploye
+  parent: B33
+  livre_le: '2026-09-12T10:00:00+00:00'
+- id: B33/t2-fusion
+  titre: Fusion
+  etat: prevu
+  parent: B33
+- id: E-A2
+  titre: TAF
+  etat: specifie
+  effort: S
+- id: NC2.4
+  titre: Scores
+  etat: caduc
+  ferme_le: '2026-09-20T00:00:00+00:00'
+- id: R12a
+  titre: Export
+  etat: valide
+  livre_le: '2026-09-15T00:00:00+00:00'
+`;
+
+function write(file: string, text: string): string {
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text);
+  return file;
+}
+
+function foreign(dir = tempDir()): Plan {
+  const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), CONFIG))!;
+  return Plan.load(write(join(dir, cfg.path!), TACHES), cfg.settings);
+}
+
+function raf(dir: string, ...argv: string[]) {
+  const out: string[] = [];
+  const err: string[] = [];
+  const code = run(argv, {
+    cwd: dir,
+    env: { RAF_TODAY: '2026-09-28' },
+    out: (l) => out.push(l),
+    err: (l) => err.push(l),
+    now: () => new Date('2026-09-28T09:30:00'),
+  });
+  return { code, out: out.join('\n'), err: err.join('\n') };
+}
+
+describe('readPlanConfig', () => {
+  it('returns null without a file or without a plan key', () => {
+    const dir = tempDir();
+    expect(readPlanConfig(join(dir, 'cadence.yaml'))).toBeNull();
+    expect(readPlanConfig(write(join(dir, 'cadence.yaml'), 'deliver:\n  verify: []\n'))).toBeNull();
+  });
+
+  it('accepts the short form: a path, native format, still writable', () => {
+    const cfg = readPlanConfig(write(join(tempDir(), 'cadence.yaml'), 'plan: plan/todo.yaml\n'))!;
+    expect(cfg.path).toBe('plan/todo.yaml');
+    expect(cfg.settings.format).toBeUndefined();
+  });
+
+  it('reads the field mapping and inverts the statuses', () => {
+    const cfg = readPlanConfig(write(join(tempDir(), 'cadence.yaml'), CONFIG))!;
+    expect(cfg.settings).toMatchObject({ project: 'demo', since: '2026-09-01', ignore: ['^auto: '], files: ['docs/suivi/journal.ndjson'] });
+    expect(cfg.settings.format).toMatchObject({
+      lots: 'taches',
+      fields: { title: ['titre'], finished: ['livre_le', 'ferme_le'] },
+      statuses: { prevu: 'todo', specifie: 'todo', en_cours: 'doing', caduc: 'dropped' },
+      estimates: { L: 3 },
+    });
+  });
+
+  it.each([
+    ['plan:\n  chemin: x.yaml\n', /plan\.chemin inconnu/],
+    ['plan:\n  fields: { titre: title }\n', /plan\.fields\.titre inconnu/],
+    ['plan:\n  statuses: { fini: [deploye] }\n', /plan\.statuses\.fini inconnu/],
+    ['plan:\n  statuses: { todo: [a], done: [a] }\n', /« a » correspond à deux statuts/],
+    ['plan:\n  estimates: { S: petit }\n', /plan\.estimates\.S/],
+    ['plan:\n  since: hier\n', /plan\.since/],
+    ['plan: [\n', /illisible/],
+  ])('refuses %j', (text, message) => {
+    expect(() => readPlanConfig(write(join(tempDir(), 'cadence.yaml'), text))).toThrow(message);
+  });
+});
+
+describe('a plan in another format', () => {
+  it('translates fields, statuses, estimates and timestamps', () => {
+    const plan = foreign();
+    expect(plan.project).toBe('demo');
+    expect(plan.since).toBe('2026-09-01');
+    expect(plan.lots().map((l) => `${l.id} ${l.status}`)).toEqual(['B33 doing', 'E-A2 todo', 'NC2.4 dropped', 'R12a done']);
+    expect(plan.lot('B33')).toMatchObject({
+      title: 'Une seule base',
+      estimate: 3,
+      created: '2026-09-09',
+      started: '2026-09-10',
+      notes: [{ text: 'mesuré sur la prod' }],
+      problems: [],
+    });
+    expect(plan.lot('E-A2').estimate).toBe(0.5);
+    expect(plan.lot('NC2.4').finished).toBe('2026-09-20');
+  });
+
+  it('folds entries that name a parent into its sub-tasks', () => {
+    expect(foreign().lot('B33').tasks).toEqual([
+      { id: 't1-compression', title: 'Compression', status: 'done' },
+      { id: 't2-fusion', title: 'Fusion', status: 'todo' },
+    ]);
+  });
+
+  it('reports a status the mapping does not know', () => {
+    const dir = tempDir();
+    const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), CONFIG))!;
+    const plan = Plan.load(write(join(dir, 'p.yaml'), 'taches:\n- id: A1\n  titre: x\n  etat: bloque\n'), cfg.settings);
+    expect(plan.lot('A1')).toMatchObject({ status: 'todo', problems: ['état « bloque » sans correspondance (cadence.yaml : plan.statuses)'] });
+  });
+
+  it('refuses a file without the list', () => {
+    const dir = tempDir();
+    const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), CONFIG))!;
+    expect(() => Plan.load(write(join(dir, 'p.yaml'), 'lots: []\n'), cfg.settings)).toThrow(/« taches »/);
+  });
+
+  it('finds references by the ids of the plan, whatever their shape', () => {
+    const { refs } = foreign();
+    expect(refs('fix(api) (B33/t1-compression) : x — voir E-A2, NC2.4.')).toEqual([
+      { lot: 'B33', task: 't1-compression' },
+      { lot: 'E-A2' },
+      { lot: 'NC2.4' },
+    ]);
+    expect(refs('R12a puis R12 et PRE-A2, NC2.45, docs/B33')).toEqual([{ lot: 'R12a' }]);
+    expect(refs('B33/inconnue et B33/E-A2')).toEqual([{ lot: 'B33' }, { lot: 'B33' }, { lot: 'E-A2' }]);
+  });
+
+  it('is read-only', () => {
+    const plan = foreign();
+    const before = readFileSync(plan.path, 'utf8');
+    for (const write of [
+      () => plan.add('x', '2026-09-28'),
+      () => plan.addTask('B33', 'x'),
+      () => plan.setStatus('E-A2', 'doing', '2026-09-28'),
+      () => plan.note('B33', 'x', '2026-09-28'),
+      () => plan.enableUx('2026-09-28'),
+      () => plan.recordUx('B33', 'ok', '2026-09-28'),
+      () => plan.save(),
+    ]) expect(write).toThrow(/lecture seule/);
+    expect(readFileSync(plan.path, 'utf8')).toBe(before);
+  });
+});
+
+describe('raf CLI with cadence.yaml', () => {
+  it('follows plan: to a native plan elsewhere and still writes it', () => {
+    const dir = gitRepo();
+    write(join(dir, 'cadence.yaml'), 'plan: plan/todo.yaml\n');
+    expect(raf(dir, 'init', '--no-hook').out).toContain(join(dir, 'plan/todo.yaml'));
+    expect(raf(dir, 'add', 'Cache').out).toBe('L1');
+    expect(raf(dir, 'list').out).toMatch(/^L1 +todo +Cache$/);
+  });
+
+  it('reads a foreign plan: now, check and session start, no write', () => {
+    const dir = gitRepo();
+    write(join(dir, 'cadence.yaml'), CONFIG);
+    write(join(dir, 'docs/suivi/taches.yaml'), TACHES);
+    write(join(dir, 'docs/suivi/journal.ndjson'), '{}\n');
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    commit(dir, 'auto: installation', '2026-09-25T10:00:00');
+    write(join(dir, 'docs/suivi/journal.ndjson'), '{}\n{}\n');
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    commit(dir, 'plan: add E-A2 — TAF', '2026-09-26T10:00:00');
+    commit(dir, 'feat(api) (B33/t2-fusion) : fusion', '2026-09-27T10:00:00');
+    commit(dir, 'auto: synchro E-A2', '2026-09-27T11:00:00');
+    // Avant l'adoption (since), citer un lot n'engageait à rien.
+    commit(dir, 'feat: brouillon de E-A2', '2026-08-01T10:00:00');
+
+    const now = raf(dir, 'now');
+    expect(now.code).toBe(0);
+    expect(now.out).toMatch(/En cours\n {2}B33 {2}Une seule base {2}\(3 j, 1 commit\(s\), sous-tâches 1\/2\)/);
+    expect(now.out).toContain('E-A2  TAF');
+
+    // Le commit de plan (plan + journal) ne « démarre » pas E-A2 ; le commit automatique ne compte pour aucun lot.
+    const check = raf(dir, 'check');
+    expect(check.out).toBe('✓ plan et historique cohérents');
+
+    const start = raf(dir, 'session', 'start', '--since', '2026-09-25');
+    expect(start.code).toBe(0);
+    expect(start.out).toContain('demo — reprise du 2026-09-28');
+    expect(start.out).toMatch(/1\. B33 {2}Une seule base — en cours/);
+
+    for (const argv of [['start', 'E-A2'], ['note', 'B33', 'x'], ['add', 'x'], ['init']]) {
+      const r = raf(dir, ...argv);
+      expect(r.code).toBe(2);
+      expect(r.err).toMatch(/lecture seule/);
+    }
+  });
+});

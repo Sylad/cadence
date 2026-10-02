@@ -8,9 +8,10 @@ since: 2026-10-02 # raf check ignore les commits antérieurs à l'adoption
 lots:
   - id: L1
     title: "Plan à chemin configurable (cadence.yaml : plan: …) et correspondance des champs, pour piloter un projet dont le plan porte un autre nom ou un format voisin sans le migrer ; ce projet entre alors dans le tour de /lead, d'abord en lecture seule"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-02
+    started: 2026-10-02
   - id: L2
     title: "Livraison et rituels d'un projet à outillage propre branchés sur cadence : cadence deliver appelle le script de livraison existant du projet (CI, déploiement, vérifications métier) au lieu de le remplacer ; ses skills de reprise et de clôture deviennent des alias de session-start / session-close ; agents experts du projet conservés"
     status: todo

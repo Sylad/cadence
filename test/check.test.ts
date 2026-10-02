@@ -24,7 +24,7 @@ describe('check against a real repository', () => {
     commit(dir, 'fix: L2 corrigé', '2026-09-10T10:00:00');
 
     const lots = plan.lots();
-    const linked = linkCommits(lots, readCommits(dir), plan.prefix);
+    const linked = linkCommits(lots, readCommits(dir), plan.refs);
     const kinds = check(lots, linked, '2026-09-28').map((i) => i.kind).sort();
     expect(kinds).toEqual(['done-open-tasks', 'idle', 'orphan-commit', 'todo-with-commits', 'unknown-ref']);
   });
@@ -80,5 +80,14 @@ describe('planification', () => {
     const out2: string[] = [];
     expect(await run(['check'], io(out2))).toBe(1);
     expect(out2.join('\n')).toContain('L1 a 1 commit(s) mais est encore todo');
+  });
+});
+
+describe('readCommits', () => {
+  it('reads a history larger than the default output buffer', () => {
+    const dir = gitRepo();
+    const body = 'x'.repeat(100_000);
+    for (let i = 0; i < 12; i++) commit(dir, `feat(L1): pas ${i}\n\n${body}`);
+    expect(readCommits(dir)).toHaveLength(12);
   });
 });

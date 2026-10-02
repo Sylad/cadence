@@ -23,7 +23,7 @@ deliver:
 Every `cadence` / `raf` command works on the git repository of the current directory. When the
 session runs from a parent folder that holds several projects (not itself a repository), run each
 command inside the project concerned: `cd <project> && cadence …`. The projects are the sub-folders
-that contain `docs/plan/raf.yaml`.
+that contain `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key.
 
 Deliver one project at a time: the one the human names, or ask.
 

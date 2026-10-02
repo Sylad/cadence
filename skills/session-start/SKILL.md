@@ -5,7 +5,7 @@ description: Start a work session on a repository that uses cadence — gather t
 
 # Session start — resume without reciting
 
-The repository already carries the state: the plan (`docs/plan/raf.yaml`), the history, the notes left at
+The repository already carries the state: the plan (`docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`), the history, the notes left at
 the last close. The only thing missing is the human's priority for today. This skill gathers the facts,
 proposes, and stops.
 
@@ -14,7 +14,7 @@ proposes, and stops.
 Every `cadence` / `raf` command works on the git repository of the current directory. When the
 session runs from a parent folder that holds several projects (not itself a repository), run each
 command inside the project concerned: `cd <project> && cadence …`. The projects are the sub-folders
-that contain `docs/plan/raf.yaml`.
+that contain `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key.
 
 With no project named, run `cadence session start` in **each** project that has a plan and report
 one or two lines per project (in progress, drift, notes left at the last close), then propose the
@@ -37,6 +37,10 @@ three most useful items across projects and wait. With a project named, work in 
    `raf add "…"` that would put it there.
 4. **Stop and wait** for the priority. Start nothing and commit nothing before the answer — the only
    exception is a `raf note <id> "…"` on a silent lot whose cause is already known.
+
+A plan kept by the project's own tool (`cadence.yaml` maps its fields) is **read-only** for `raf`:
+report from it as usual, but give the project's own command for every fix or start — `raf start`,
+`raf done` and `raf note` refuse.
 
 ## After the answer
 

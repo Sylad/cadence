@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { installSkills, SKILLS_DIR } from '../src/skills.js';
+import { AGENTS_DIR, installSkills, SKILLS_DIR } from '../src/skills.js';
 import { gitRepo, tempDir } from './helpers.js';
 
 describe('skills install', () => {
@@ -53,6 +53,29 @@ describe('skills install', () => {
     const agent = readFileSync(join(dir, '.claude/agents/cadence-code-reviewer.md'), 'utf8');
     expect(agent).toMatch(/^---\nname: cadence-code-reviewer\ndescription: .+\ntools: Read, Grep, Glob, Bash\n---\n/);
     expect(agent).toContain('raf review <lot> "…"');
+  });
+
+  it('agent code-reviewer : le contrat amendé après sa première revue réelle', () => {
+    const agent = readFileSync(join(AGENTS_DIR, 'code-reviewer.md'), 'utf8');
+    // Les commits viennent de l'outil ; le grep n'est qu'un repli, avec la garde droite qui écarte NC2.4 de NC2.
+    expect(agent).toContain('`raf commits <id>`');
+    expect(agent).toContain("--grep='(^|[^[:alnum:]_/.-])<id>($|[^[:alnum:]_.-]|\\.($|[^[:alnum:]_]))'");
+    expect(agent).toMatch(/Only\s+when `raf` is not available, fall back to/);
+    expect(agent).not.toContain('<id>($|[^[:alnum:]_-])');
+    const text = agent.replace(/\s+/g, ' ');
+    for (const clause of [
+      'If the repository has no CLAUDE.md, say so in the report',
+      "a parent folder's CLAUDE.md does not count unless it names this project",
+      'in the README, then in the manifest (`package.json` scripts, Makefile, `pyproject.toml`…)',
+      'A linter or coverage tool the project does not have goes under "not verified": it is not a finding',
+      'never run a build whose output directory is used live',
+      'a `bin` entry or a symlink on the PATH points to',
+      'in a temporary directory outside the repository, removed afterwards: the working tree is left as you found it',
+      'When the lot has only a title, also read the bodies of its commits and any spec the lot cites',
+      "on a read-only plan (`cadence.yaml` maps the fields of a file kept by another tool), plain lines for the project's own tool",
+      'Untested code that is practically unreachable, and a rule that holds as written while an edge defeats its purpose, are *minor* — unless they can lose or corrupt data',
+      'It is the last line of the review; extra sections a caller asks for come after it',
+    ]) expect(text).toContain(clause);
   });
 
   it('les skills lead et session-close nomment la porte de revue de code', () => {

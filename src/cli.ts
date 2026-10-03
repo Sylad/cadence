@@ -168,36 +168,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       plan.save();
       return 0;
     }
-    case 'ux': {
-      need(1, 'ux enable | ux <lot> "verdict"');
-      const plan = loadPlan();
-      if (rest[0] === 'enable') {
-        const changed = plan.enableUx(today);
-        plan.save();
-        io.out(changed ? `revue UX obligatoire pour les lots visibles à partir du ${today}` : `revue UX déjà active depuis le ${plan.uxSince}`);
-        return 0;
-      }
-      need(2, 'ux <lot> "verdict"');
-      plan.lot(rest[0]);
-      plan.recordUx(rest[0], rest.slice(1).join(' '), today);
-      plan.save();
-      return 0;
-    }
-    case 'review': {
-      need(1, 'review enable | review <lot> "verdict"');
-      const plan = loadPlan();
-      if (rest[0] === 'enable') {
-        const changed = plan.enableReview(today);
-        plan.save();
-        io.out(changed ? `revue de code obligatoire pour les lots à commits à partir du ${today}` : `revue de code déjà active depuis le ${plan.reviewSince}`);
-        return 0;
-      }
-      need(2, 'review <lot> "verdict"');
-      plan.lot(rest[0]);
-      plan.recordReview(rest[0], rest.slice(1).join(' '), today);
-      plan.save();
-      return 0;
-    }
+    case 'ux':
+    case 'review':
+      return gate(command, rest, loadPlan, today, io);
     case 'list': {
       const plan = loadPlan();
       if (values.status && !STATUSES.includes(values.status as Status)) throw new RafError(`statut inconnu : ${values.status}`);
@@ -274,6 +247,30 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     default:
       throw new RafError(`commande inconnue : ${command} (raf --help)`);
   }
+}
+
+const GATES = {
+  ux: { on: 'revue UX obligatoire pour les lots visibles', already: 'revue UX déjà active' },
+  review: { on: 'revue de code obligatoire pour les lots à commits', already: 'revue de code déjà active' },
+};
+
+/** « raf ux … » et « raf review … » ont la même forme : activer la porte, ou noter le verdict d'un lot. */
+function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, today: Day, io: Io): number {
+  if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
+  const plan = loadPlan();
+  if (rest[0] === 'enable') {
+    const changed = kind === 'ux' ? plan.enableUx(today) : plan.enableReview(today);
+    plan.save();
+    io.out(changed ? `${GATES[kind].on} à partir du ${today}` : `${GATES[kind].already} depuis le ${kind === 'ux' ? plan.uxSince : plan.reviewSince}`);
+    return 0;
+  }
+  if (rest.length < 2) throw new RafError(`usage : raf ${kind} <lot> "verdict"`);
+  // Le plan refuse lui-même une sous-tâche, un verdict vide, un lot inconnu.
+  const verdict = rest.slice(1).join(' ');
+  if (kind === 'ux') plan.recordUx(rest[0], verdict, today);
+  else plan.recordReview(rest[0], verdict, today);
+  plan.save();
+  return 0;
 }
 
 function describe(l: Lot, commits: number): string {

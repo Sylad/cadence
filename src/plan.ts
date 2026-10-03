@@ -271,6 +271,8 @@ export class Plan {
   private recordVerdict(key: 'ux' | 'review', label: string, lotId: string, verdict: string, today: Day): void {
     this.writable();
     if (lotId.includes('/')) throw new RafError(`${label} se note sur un lot, pas une sous-tâche`);
+    // Un verdict vide ouvrirait la porte sans rien dire de la revue.
+    if (verdict.trim() === '') throw new RafError(`verdict vide : ${label} attend son verdict — raf ${key} ${lotId} "verdict"`);
     const node = this.doc.createNode({ date: today, verdict }) as YAMLMap;
     node.flow = true;
     this.lotNode(lotId).set(key, node);

@@ -64,6 +64,32 @@ describe('revue UX', () => {
     expect((await raf(dir, 'ux', 'enable')).out).toContain('déjà');
     await raf(dir, 'add', 'Écran', '--visible');
     expect((await raf(dir, 'ux', 'L1')).code).toBe(2);
-    expect((await raf(dir, 'ux', 'L9', 'ok')).code).toBe(2);
+    expect((await raf(dir, 'ux', 'L9', 'ok')).err).toBe('raf: lot inconnu : L9');
+  });
+
+  it('un verdict vide ou blanc est refusé et n’ouvre pas la porte', async () => {
+    const dir = gitRepo();
+    await raf(dir, 'init', '--no-hook');
+    await raf(dir, 'ux', 'enable');
+    await raf(dir, 'add', 'Écran', '--visible');
+    await raf(dir, 'start', 'L1');
+    for (const blank of [[''], ['   '], ['', ' \t']]) {
+      const r = await raf(dir, 'ux', 'L1', ...blank);
+      expect(r.code).toBe(2);
+      expect(r.err).toBe('raf: verdict vide : la revue UX attend son verdict — raf ux L1 "verdict"');
+    }
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('ux:');
+    expect((await raf(dir, 'done', 'L1')).code).toBe(2);
+  });
+
+  it('la revue UX se note sur un lot : une sous-tâche est refusée avec ce message', async () => {
+    const dir = gitRepo();
+    await raf(dir, 'init', '--no-hook');
+    await raf(dir, 'add', 'Écran', '--visible');
+    await raf(dir, 'add', 'partie', '--parent', 'L1');
+    const r = await raf(dir, 'ux', 'L1/t1', 'ok');
+    expect(r.code).toBe(2);
+    expect(r.err).toBe('raf: la revue UX se note sur un lot, pas une sous-tâche');
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('ux:');
   });
 });

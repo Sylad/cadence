@@ -119,10 +119,28 @@ describe('revue de code', () => {
     await raf(dir, 'add', 'partie', '--parent', 'L1');
     expect((await raf(dir, 'review')).code).toBe(2);
     expect((await raf(dir, 'review', 'L1')).code).toBe(2);
-    expect((await raf(dir, 'review', 'L9', 'ok')).code).toBe(2);
-    expect((await raf(dir, 'review', 'L1/t1', 'ok')).code).toBe(2);
-    expect(() => Plan.load(join(dir, 'docs/plan/raf.yaml')).recordReview('L1/t1', 'ok', '2026-09-28')).toThrow('la revue de code se note sur un lot, pas une sous-tâche');
+    expect((await raf(dir, 'review', 'L9', 'ok')).err).toBe('raf: lot inconnu : L9');
+    const task = await raf(dir, 'review', 'L1/t1', 'ok');
+    expect(task.code).toBe(2);
+    expect(task.err).toBe('raf: la revue de code se note sur un lot, pas une sous-tâche');
     expect(planOf(dir)).not.toContain('review:');
+  });
+
+  it('un verdict vide ou blanc est refusé et n’ouvre pas la porte', async () => {
+    const dir = gitRepo();
+    await raf(dir, 'init', '--no-hook');
+    await raf(dir, 'review', 'enable');
+    await raf(dir, 'add', 'Cache');
+    await raf(dir, 'start', 'L1');
+    commit(dir, 'feat(L1): cache');
+    for (const blank of [[''], ['   '], ['', ' \t']]) {
+      const r = await raf(dir, 'review', 'L1', ...blank);
+      expect(r.code).toBe(2);
+      expect(r.err).toBe('raf: verdict vide : la revue de code attend son verdict — raf review L1 "verdict"');
+    }
+    expect(planOf(dir)).not.toContain('review:');
+    expect((await raf(dir, 'done', 'L1')).code).toBe(2);
+    expect(() => Plan.load(join(dir, 'docs/plan/raf.yaml')).recordReview('L1', ' ', '2026-09-28')).toThrow(/verdict vide/);
   });
 
   it('un verdict écrit à la main dans le YAML est lu', async () => {

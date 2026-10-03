@@ -250,6 +250,48 @@ describe('deliver : relecture', () => {
     expect(err.join('\n')).toContain('délai dépassé');
   });
 
+  it("vérification : l'attente entre deux essais ne dépasse jamais le délai restant", async () => {
+    const config = parseDeliverConfig('deliver:\n  verify:\n    - url: https://app.example/\n  verifyTimeout: 15\n', 'cadence.yaml');
+    const { c, err } = ctx(pushedRepo(), { config });
+    const sleeps: number[] = [];
+    let clock = 0;
+    const f = fakeDeps({
+      fetch: async () => ({ status: 502, text: '' }),
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        clock += ms;
+      },
+      now: () => clock,
+    });
+    expect(await deliver(c, f.deps)).toBe(1);
+    expect(err.join('\n')).toContain('vérification en échec après 15 s');
+    expect(sleeps).toEqual([10_000, 5_000]);
+  });
+
+  it("vérification tuée une milliseconde avant l'échéance : pas d'attente de 10 s au-delà du délai", async () => {
+    const config = parseDeliverConfig('deliver:\n  verify:\n    - command: sleep 30\n  verifyTimeout: 1\n', 'cadence.yaml');
+    const { c, err } = ctx(pushedRepo(), { config });
+    const sleeps: number[] = [];
+    let clock = 0;
+    let runs = 0;
+    const f = fakeDeps({
+      // l'horloge murale lue juste après l'arrêt de la commande peut précéder l'échéance d'un rien
+      exec: () => {
+        clock += ++runs === 1 ? 999 : 1_000;
+        return TIMED_OUT;
+      },
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        clock += ms;
+      },
+      now: () => clock,
+    });
+    expect(await deliver(c, f.deps)).toBe(1);
+    expect(err.join('\n')).toContain('délai dépassé');
+    expect(sleeps).toEqual([1]);
+    expect(clock).toBeLessThan(5_000);
+  });
+
   it('HEAD détachée : CADENCE_BRANCH vide', async () => {
     const dir = pushedRepo();
     git(dir, 'checkout', '-q', '--detach');

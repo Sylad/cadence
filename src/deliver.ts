@@ -376,8 +376,10 @@ async function verifyAll(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: R
     for (;;) {
       const reason = await tryCheck(c, deps, sha, env, deadline - deps.now());
       if (reason === null) break;
-      if (deps.now() >= deadline) return `vérification en échec après ${ctx.config.verifyTimeout} s : ${label} — ${reason}`;
-      await deps.sleep(POLL_VERIFY);
+      const left = deadline - deps.now();
+      if (left <= 0) return `vérification en échec après ${ctx.config.verifyTimeout} s : ${label} — ${reason}`;
+      // jamais au-delà du délai : une commande tuée « à l'échéance » peut rendre la main un rien avant elle
+      await deps.sleep(Math.min(POLL_VERIFY, left));
     }
   }
   return null;

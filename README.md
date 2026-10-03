@@ -302,12 +302,12 @@ qa:
   expectations: docs/quality/pages.md
 ```
 
-Only the agent reads that key; the CLI does not use it. Without an expectations file the agent
-walks the routes it discovers and still runs its universal checks: an error shown, a failed or
-empty API call whose content is missing on screen, a broken or missing content image are defects
-with or without a file; whatever would need an expectation to judge is suspect at most. For
-a route with a parameter, it finds a real value in the app's links or its API responses and says
-how it built the URL. The agent then returns a draft for you to correct — it never writes the file itself.
+Only the agent reads that key; the CLI does not use it. Without an expectations file the agent walks
+the routes it discovers and still runs its universal checks: an error shown, a failed or empty API
+call whose content is missing on screen, a broken or missing content image are defects with or
+without a file; whatever would need an expectation to judge is suspect at most. For a route with a
+parameter, it finds a real value in the app's links or its API responses and says how it built the
+URL. The agent then returns a draft for you to correct — it never writes the file itself.
 
 ## session
 

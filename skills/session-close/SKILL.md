@@ -24,6 +24,9 @@ With no project named, run `cadence session close` in each project touched durin
      otherwise `raf note <id> "where it stands, what blocks"`;
    - a commit without a lot that belongs to one → `raf note <id> "commits: <sha> …"`; nothing if it
      is genuinely outside the plan (docs, chores);
+   - a plan commit reported because it also touches a file generated from the plan (a published
+     plan) → propose to declare that file under `plan.files` in `cadence.yaml`; the files of a commit
+     decide whether it is plan upkeep, never its subject;
    - a finished lot marked `visible` without a news entry → `cadence news new <id>`, written for the
      user, with a screenshot;
    - a lot that `raf done` refuses, or that the check reports as finished, for lack of a review —

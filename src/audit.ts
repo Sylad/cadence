@@ -18,7 +18,7 @@ export function planCommits(plan: Plan, root: string, opts: { since?: string; ra
   return patterns.length ? commits.filter((c) => !patterns.some((re) => re.test(c.subject))) : commits;
 }
 
-/** Le commit ne touche-t-il que le plan (ou la page Gantt) ? */
+/** Commit d'entretien du plan : ne touche-t-il que des fichiers du plan (plan, page Gantt, plan.files) ? */
 export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
   const own = ownFiles(plan, root);
   const files = changedFiles(root, sha);
@@ -26,21 +26,17 @@ export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
 }
 
 /**
- * Sujet d'un commit d'entretien du plan, « chore(plan): … » : il planifie, ferme ou publie des lots,
- * souvent avec un fichier dérivé du plan (plan publié par le projet) que raf ne connaît pas.
- */
-const PLAN_CHORE = /^chore\(plan\)!?:/;
-
-/**
- * N'ont pas besoin de citer un lot : un commit qui ne touche que le plan (ou la page Gantt), un commit
- * d'entretien du plan (« chore(plan): … », quels que soient ses fichiers), et un commit automatique
- * dont le sujet correspond à un motif `ignore:` du plan.
+ * N'ont pas besoin de citer un lot : un commit d'entretien du plan — TOUS ses fichiers sont des fichiers
+ * du plan (le plan, sa page Gantt, ceux que le projet déclare sous plan.files, son plan publié par
+ * exemple) — et un commit automatique dont le sujet correspond à un motif `ignore:` du plan.
+ * Les fichiers décident, jamais le sujet : « chore(plan): … » qui touche un fichier source est un
+ * commit comme un autre.
  */
 export function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
   const own = ownFiles(plan, root);
   const { patterns } = plan.ignore;
   const orphans = linked.orphans.filter((c) => {
-    if (PLAN_CHORE.test(c.subject) || patterns.some((re) => re.test(c.subject))) return false;
+    if (patterns.some((re) => re.test(c.subject))) return false;
     const files = changedFiles(root, c.sha);
     return files.length === 0 || !files.every((f) => own.has(f));
   });

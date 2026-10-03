@@ -28,12 +28,14 @@ reports a page left empty or in error.
   committing never dirties the plan. The id is read as a whole word: `XL3`,
   `L3x` and `L3.4` do not cite `L3`, while `L3.` at the end of a sentence does.
 - `raf check` audits drift between the plan and the history.
-- Plan upkeep needs no lot: a commit that touches only the plan, or whose subject
-  starts with `chore(plan):` whatever it touches (planning lots, closing them,
-  regenerating a page derived from the plan), is never a "commit without a lot".
-  A `chore(plan):` commit that cites a lot and touches other files still counts
-  as work on that lot; to make a derived file part of the plan itself, list it
-  under `plan.files` in `cadence.yaml`.
+- Plan upkeep needs no lot. A commit is plan upkeep when **every file it
+  touches is a plan file**: the plan itself, its Gantt page, or a file the
+  project lists under `plan.files` in `cadence.yaml` (a page it generates from
+  the plan, a journal). Such a commit is never a "commit without a lot", and it
+  does not count as work on the lots it cites: it is absent from `raf commits`,
+  does not start a `todo` lot and does not make a code review stale. The files
+  decide, never the subject: a `chore(plan): …` commit that touches a source
+  file is a commit like any other.
 - `raf gantt` writes a single self-contained HTML page (no server, no CDN).
 
 ```sh
@@ -63,7 +65,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |
-| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default: commits without a lot (commits touching only the plan, and `chore(plan): …` commits, are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
+| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default: commits without a lot (commits touching only plan files are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
 | `raf gantt [-o file]` | standalone Gantt page |
 | `raf hook install` | add the (non-blocking, read-only) post-commit hook |
 
@@ -102,6 +104,18 @@ format, and the plan stays writable:
 ```yaml
 plan: planning/todo.yaml
 ```
+
+A project that publishes its plan (a JSON generated from it and committed with it)
+declares that file, so a commit touching only the plan and its published copy is
+plan upkeep; the plan keeps raf's format and stays writable:
+
+```yaml
+plan:
+  files: [frontend/public/plan-data/plan.json]
+```
+
+Until the file is declared, such a commit is reported as a "commit without a
+lot" when it cites none, and counts as work on the lots it cites.
 
 A project that already keeps its plan with its own tool is read **without migrating it**: describe
 the file, and `raf now`, `raf list`, `raf commits`, `raf check`, `raf gantt` and
@@ -251,8 +265,8 @@ The counterpart of the UX review, off by default. With the rule on, `raf done`
 refuses a lot that has at least one commit citing it and no recorded verdict
 (`--force` to override), and `raf check` reports such lots finished after the
 `reviewSince` day. A lot with no commit has nothing to review; neither does a
-lot whose only commits touch the plan itself, predate the plan's `since` or
-match an `ignore:` pattern — `raf commits <id>` prints exactly the counted set.
+lot whose only commits touch plan files alone (the plan, or a file listed under
+`plan.files`), predate the plan's `since` or match an `ignore:` pattern — `raf commits <id>` prints exactly the counted set.
 
 The verdict is tied to what was reviewed: `raf review` stores it on the lot with
 the sha of the lot's latest counted commit (`review: { date, verdict, commit }`,

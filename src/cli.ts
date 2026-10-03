@@ -44,7 +44,8 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
 Un commit appartient à un lot quand son message cite l'identifiant : « feat(L3): … », « L3/t1 ».
-Un commit qui ne touche que le plan, ou dont le sujet commence par « chore(plan): », n'a pas à en citer.
+Un commit qui ne touche que le plan (et les fichiers déclarés sous plan.files dans cadence.yaml, un plan
+publié par exemple) n'a pas à en citer, et ne compte pas pour les lots qu'il cite ; le sujet n'y change rien.
 Un lot --visible attend une entrée Nouveautés (docs/nouveautes/, --dir) avec capture ; raf check le vérifie.
 Un texte qui commence par « - » se passe après « -- » : raf note L1 -- "-5 %".
 Le plan est docs/plan/raf.yaml, ou celui que nomme « plan: » dans cadence.yaml ; un plan tenu par un

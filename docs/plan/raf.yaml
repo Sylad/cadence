@@ -49,8 +49,11 @@ lots:
     finished: 2026-10-03
   - id: L7
     title: "Publication npm + tag git à chaque version (npm n'a que la 0.2.0 ; 0.3.0 et 0.4.0 jamais publiées) : publier la version courante, taguer, et documenter l'étape de sortie"
-    status: doing
+    status: done
     estimate: 0.5
     quickwin: true
     created: 2026-10-03
     started: 2026-10-03
+    notes:
+      - { date: 2026-10-03, text: "03-10 : 0.5.0 publiée sur npm (latest, gitHead 49d6921, 29 fichiers) après correction d'une course dans deliver révélée par prepublishOnly ; tag v0.5.0 posé et poussé. La publication demande le code à usage unique du compte npm : elle se fait à la main dans un terminal." }
+    finished: 2026-10-03

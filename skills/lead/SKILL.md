@@ -74,9 +74,12 @@ proposed sub-tasks back to the human.
 One project at a time, by the lead: push, then the `deliver` skill (`cadence deliver --dry-run`, then
 `cadence deliver`). Follow the human's standing instructions about confirmation before production.
 
-After a green delivery of a lot marked `visible`, have the `qa-reviewer` agent check the delivered
-app, as a fresh subagent: give it the absolute path of the project, the base URL of the delivered
-app and the lot id. It walks the pages in a real browser against the project's expectations
+After a green delivery that changes what a page shows or what it is served (screen, API, data
+source, configuration of either) — in practice every delivery except docs-, plan- or tests-only
+ones — have the `qa-reviewer` agent check the delivered app, as a fresh subagent: give it the
+absolute path of the project, the base URL of the delivered app and the lot id. The lot need not
+be `visible`: a backend-only lot can empty a page without changing a screen. When the lot touched
+only the backend, the agent starts with the pages that call the changed endpoints. It walks the pages in a real browser against the project's expectations
 (`docs/qa/expectations.md`: per page, what the user must find there) and returns measured
 findings; it reads only, and never logs in. Bring its blocking findings back to the human — a page
 whose main content is missing, or that shows an error, is a defect even when the delivery checks

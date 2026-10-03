@@ -246,11 +246,16 @@ verdict is refused. Plans without `reviewSince` are not affected.
 ### QA review
 
 No gate and no command here: the QA review comes **after** a delivery, and
-`raf done` does not wait for it. The `qa-reviewer` agent opens each page of the
-running app in a real browser and judges it from the user's side. A page can be
-empty while everything else is green — no code changed, a data source went down
-upstream, the unit tests replace the network, `/api/health` answers ok, and the
-"nothing found" on screen is the message the code was written to show.
+`raf done` does not wait for it. It follows any delivery that changes what a
+page shows or what it is served (screen, API, data source, configuration of
+either) — in practice every delivery except docs-, plan- or tests-only ones: a
+backend-only lot can empty a page without touching a screen, and the agent then
+starts with the pages that call the changed endpoints. The `qa-reviewer` agent
+opens each page of the running app in a real browser and judges it from the
+user's side. A page can be empty while everything else is green — no code
+changed, a data source went down upstream, the unit tests replace the network,
+`/api/health` answers ok, and the "nothing found" on screen is the message the
+code was written to show.
 
 The agent cannot tell such an empty state from a normal one by itself: the
 project says what each page must show, in `docs/qa/expectations.md` — one
@@ -417,14 +422,15 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   morning and evening scripts feed the session report (`session:`), and its own
   skills can become one-line aliases of `session-start` / `session-close`.
 - **deliver**: dry run, delivery, and on failure the cause fixed rather than a
-  blind retry; after a green delivery of a visible lot, the `qa-reviewer` agent
-  walks the delivered app.
+  blind retry; after a green delivery that changes what a page shows or what it
+  is served, the `qa-reviewer` agent walks the delivered app.
 - **lead**: from a folder holding several projects, one subagent per project
   gathers the facts, you choose the priorities, each lot is delegated to a
   subagent with a standard brief (test first, commits citing the lot, no push),
   reviewed by the `code-reviewer` agent, re-verified by the lead, then delivered
-  one project at a time; a delivered visible lot is then checked in the running
-  app by the `qa-reviewer` agent, whose blocking findings come back to you. Two
+  one project at a time; a delivery that changes what a page shows or what it is
+  served is then checked in the running app by the `qa-reviewer` agent, whose
+  blocking findings come back to you. Two
   subagents at most, never two in the same repository.
 - **ux-reviewer** (agent): captures at 1440 and 390 px, findings grounded in a
   named rule (Nielsen, WCAG 2.2 AA) or a measurement, ranked, turned into
@@ -439,7 +445,8 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   verdict for `raf review`. It takes the lot's commits from `raf commits`, never
   runs a build whose output is used live, and never edits code.
 - **qa-reviewer** (agent): any web app; given a repository and a base URL (and
-  optionally a lot id, to start with the pages it touched), it opens each page of
+  optionally a lot id, to start with the pages it touched — for a backend-only
+  lot, those that call the changed endpoints), it opens each page of
   the project's expectations file in a real browser at 1440 and 390 px and
   measures: expected content present and non-empty, no error or missing-data
   message, every API call answered 2xx with a non-empty body, no console error,

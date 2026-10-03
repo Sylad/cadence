@@ -22,6 +22,8 @@ const qaAgent = (): { description: string; body: string; section: (title: string
     },
   };
 };
+/** Ce qui déclenche la revue QA : les mêmes mots dans l'agent, les skills lead et deliver, et le README. */
+const QA_TRIGGER = 'changes what a page shows or what it is served (screen, API, data source, configuration of either) — in practice every delivery except docs-, plan- or tests-only ones';
 const skillText = (name: string): string => flat(readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8'));
 /** La section « QA review » du README, jusqu'au titre suivant. */
 const readmeQa = (): string => {
@@ -178,6 +180,10 @@ describe('skills install', () => {
       '- Edit code, the plan or the expectations file, commit, or mark anything done: the session that called you does it. ',
     ].join(' '));
     expect(qa.description).toContain('never an impression');
+    // Déclencheur : toute livraison qui change ce qu'une page montre ou reçoit — pas seulement un lot « visible ».
+    expect(qa.description).toContain(`Use after any delivery that ${QA_TRIGGER} — or to re-check a deployed app.`);
+    expect(qa.description + qa.body).not.toContain('`visible`');
+    expect(qa.section('Inputs')).toContain('then start with the pages that lot touched (its title and notes in the plan, and `raf commits <id>`, tell which) — when the lot touched only the backend, the pages that call the changed endpoints — and walk the others after.');
     expect(qa.description).toContain('Read-only — does not modify code, log in or submit anything.');
   });
 
@@ -189,13 +195,17 @@ describe('skills install', () => {
     expect(skill('session-close')).toContain('`raf review <id> "…"`');
   });
 
-  it('les skills lead et deliver font suivre la livraison d’un lot visible par l’agent qa-reviewer ; session-start n’en parle pas', () => {
+  it('les skills lead et deliver font suivre par l’agent qa-reviewer toute livraison qui change ce qu’une page montre ou reçoit ; session-start n’en parle pas', () => {
     const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8').replace(/\s+/g, ' ');
     const lead = skill('lead');
     // Étape 4 du lead : après la livraison, pas avant ; les constats bloquants remontent à l'humain.
     const delivery = lead.slice(lead.indexOf('## 4. Delivery'), lead.indexOf('## 5. Close'));
-    expect(delivery).toContain('After a green delivery of a lot marked `visible`, have the `qa-reviewer` agent check the delivered app');
-    expect(delivery).toContain('the absolute path of the project, the base URL of the delivered app and the lot id');
+    expect(delivery).toContain(`After a green delivery that ${QA_TRIGGER} — have the \`qa-reviewer\` agent check the delivered app, as a fresh subagent`);
+    expect(delivery).toContain('give it the absolute path of the project, the base URL of the delivered app and the lot id.');
+    // Les deux pannes à l'origine de l'agent venaient de lots sans écran : le lot n'a pas à être « visible ».
+    expect(delivery).toContain('The lot need not be `visible`: a backend-only lot can empty a page without changing a screen.');
+    expect(delivery).toContain('When the lot touched only the backend, the agent starts with the pages that call the changed endpoints.');
+    expect(delivery).not.toContain('lot marked `visible`');
     expect(delivery).toContain('Bring its blocking findings back to the human');
     expect(delivery).toContain('it reads only, and never logs in');
     // Ce n'est pas une porte : raf done ne l'attend pas, un constat devient un nouveau lot.
@@ -203,9 +213,11 @@ describe('skills install', () => {
     expect(delivery).toContain('show it to the human, who corrects it and decides whether it is committed');
     const deliver = skill('deliver');
     const step = deliver.slice(deliver.indexOf(' 6. '), deliver.indexOf('## Rules'));
-    expect(step).toContain('After a green delivery of a `visible` lot, have the `qa-reviewer` agent walk the delivered app in a real browser');
+    expect(step).toContain(`After a green delivery that ${QA_TRIGGER} — have the \`qa-reviewer\` agent walk the delivered app in a real browser, whether the lot is \`visible\` or not:`);
+    expect(step).toContain('When the lot touched only the backend, the agent starts with the pages that call the changed endpoints.');
+    expect(step).not.toContain('delivery of a `visible` lot');
     // Ses entrées, la remontée des constats bloquants, et la livraison qui reste faite.
-    expect(step).toContain('give it the repository path, the base URL and the lot id');
+    expect(step).toContain('give it the repository path, the base URL and the lot id.');
     expect(step).toContain('`docs/qa/expectations.md`');
     expect(step).toContain('Bring its blocking findings to the human.');
     expect(step).toContain('It is not a gate: the delivery stays done, a finding becomes a new lot.');
@@ -230,6 +242,13 @@ describe('skills install', () => {
     expect(agent).toContain('One `## <route>` section per page');
     const text = flat(section);
     expect(text).toContain('No gate and no command here: the QA review comes **after** a delivery, and `raf done` does not wait for it.');
+    expect(text).toContain(`It follows any delivery that ${QA_TRIGGER}:`);
+    expect(text).toContain('a backend-only lot can empty a page without touching a screen, and the agent then starts with the pages that call the changed endpoints.');
+    const skills = flat(readme.slice(readme.indexOf('## Claude Code skills'), readme.indexOf('## Releasing')));
+    expect(skills).toContain('after a green delivery that changes what a page shows or what it is served, the `qa-reviewer` agent walks the delivered app.');
+    expect(skills).toContain('a delivery that changes what a page shows or what it is served is then checked in the running app by the `qa-reviewer` agent, whose blocking findings come back to you.');
+    expect(skills).toContain('optionally a lot id, to start with the pages it touched — for a backend-only lot, those that call the changed endpoints');
+    expect(skills).not.toMatch(/visible lot[^.]*qa-reviewer/);
     // La définition des trois sortes de lignes.
     expect(text).toContain('- `shows:` — content that must be present and non-empty, with a count where one exists;');
     expect(text).toContain('- `never:` — texts that must not appear: error messages, and empty-state messages that mean missing data;');

@@ -5,6 +5,7 @@ version: 1
 project: "cadence"
 prefix: L
 since: 2026-10-02 # raf check ignore les commits antérieurs à l'adoption
+reviewSince: 2026-10-03
 lots:
   - id: L1
     title: "Plan à chemin configurable (cadence.yaml : plan: …) et correspondance des champs, pour piloter un projet dont le plan porte un autre nom ou un format voisin sans le migrer ; ce projet entre alors dans le tour de /lead, d'abord en lecture seule"

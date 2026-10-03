@@ -223,8 +223,8 @@ raf ux L8 "no screen: calculation fix"
 
 With the rule on, `raf done` refuses a visible lot without a review (`--force`
 to override) and `raf check` reports visible lots finished after the `uxSince`
-day without one. An empty verdict is refused. Plans without `uxSince` are not
-affected.
+day without one. An empty verdict is refused, and one left empty or blank by hand
+in the YAML counts as no review. Plans without `uxSince` are not affected.
 
 ### Code review
 
@@ -248,7 +248,8 @@ makes the review stale: `raf done` refuses (`--force` to override), and
 `raf check` reports a finished lot, until the lot is reviewed again and
 `raf review` is rerun. A verdict
 written by hand without a `commit` field is not checked for staleness. An empty
-verdict is refused. Plans without `reviewSince` are not affected.
+verdict is refused, and one left empty or blank by hand in the YAML counts as no
+review. Plans without `reviewSince` are not affected.
 
 ### QA review
 

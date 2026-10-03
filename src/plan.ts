@@ -511,7 +511,10 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
 function asVerdict(raw: unknown): Verdict | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const v = raw as Record<string, unknown>;
-  const verdict: Verdict = { date: String(v.date ?? ''), verdict: String(v.verdict ?? '') };
+  // Écrit à la main sans verdict (clé absente, vide ou blanche) : rien n'a été dit de la revue, la porte
+  // reste fermée — comme `raf ux` et `raf review` refusent d'enregistrer un verdict vide.
+  if (String(v.verdict ?? '').trim() === '') return undefined;
+  const verdict: Verdict = { date: String(v.date ?? ''), verdict: String(v.verdict) };
   // Champ présent mais vide : relu « jusqu'à rien », comme un verdict noté sans commit.
   if ('commit' in v) verdict.commit = v.commit == null || String(v.commit).trim() === '' ? null : String(v.commit).trim();
   return verdict;

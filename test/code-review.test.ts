@@ -155,6 +155,29 @@ describe('revue de code', () => {
     expect((await raf(dir, 'done', 'L1')).code).toBe(0);
   });
 
+  it('un verdict vide, blanc ou absent écrit à la main dans le YAML ne vaut pas revue : done refuse, check le signale', async () => {
+    for (const written of ['{ verdict: "" }', '{ date: 2026-09-28, verdict: "   " }', '{ date: 2026-09-28 }', '{ date: 2026-09-28, verdict: "", commit: null }', '{ date: 2026-09-28, verdict: }']) {
+      const dir = gitRepo();
+      await raf(dir, 'init', '--no-hook');
+      await raf(dir, 'review', 'enable');
+      await raf(dir, 'add', 'Cache');
+      await raf(dir, 'start', 'L1');
+      commit(dir, 'feat(L1): cache');
+      const path = join(dir, 'docs/plan/raf.yaml');
+      writeFileSync(path, planOf(dir).replace('    status: doing\n', `    status: doing\n    review: ${written}\n`));
+      expect(Plan.load(path).lot('L1').review, written).toBeUndefined();
+      const refused = await raf(dir, 'done', 'L1');
+      expect(refused.code, written).toBe(2);
+      // Le message d'un lot sans revue, pas celui d'une revue dépassée.
+      expect(refused.err, written).toContain('L1 a 1 commit(s) : revue de code attendue avant done');
+      expect((await rafOn('2026-09-29', dir, 'done', 'L1', '--force')).code).toBe(0);
+      expect((await rafOn('2026-09-29', dir, 'check')).out, written).toContain('L1 est terminé avec 1 commit(s) sans revue de code');
+      // Un vrai verdict par-dessus lève l'écart.
+      expect((await rafOn('2026-09-29', dir, 'review', 'L1', 'conforme')).code).toBe(0);
+      expect((await rafOn('2026-09-29', dir, 'check')).out).toBe('✓ plan et historique cohérents');
+    }
+  });
+
   it('l’aide cite la porte de revue de code à côté de la porte UX', async () => {
     const help = (await raf(gitRepo(), '--help')).out;
     expect(help).toContain('raf review enable');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { gitRepo } from './helpers.js';
@@ -80,6 +80,23 @@ describe('revue UX', () => {
     }
     expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('ux:');
     expect((await raf(dir, 'done', 'L1')).code).toBe(2);
+  });
+
+  it('un verdict vide ou blanc écrit à la main dans le YAML ne vaut pas revue : done refuse, check le signale', async () => {
+    for (const written of ['{ verdict: "" }', '{ date: 2026-09-28, verdict: "  " }', '{ date: 2026-09-28 }']) {
+      const dir = gitRepo();
+      await raf(dir, 'init', '--no-hook');
+      await raf(dir, 'ux', 'enable');
+      await raf(dir, 'add', 'Écran', '--visible');
+      await raf(dir, 'start', 'L1');
+      const path = join(dir, 'docs/plan/raf.yaml');
+      writeFileSync(path, readFileSync(path, 'utf8').replace('    status: doing\n', `    status: doing\n    ux: ${written}\n`));
+      const refused = await raf(dir, 'done', 'L1');
+      expect(refused.code, written).toBe(2);
+      expect(refused.err, written).toContain('L1 est visible : revue UX attendue avant done');
+      expect((await rafOn('2026-09-29', dir, 'done', 'L1', '--force')).code).toBe(0);
+      expect((await rafOn('2026-09-29', dir, 'check')).out, written).toContain('L1 est visible et terminé sans revue UX');
+    }
   });
 
   it('la revue UX se note sur un lot : une sous-tâche est refusée avec ce message', async () => {

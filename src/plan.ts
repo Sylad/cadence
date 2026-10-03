@@ -89,9 +89,16 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Ce qui ne peut pas suivre un identifiant cité : un point suivi d'un caractère de mot — « L1.4 » n'est
+ * pas le lot L1, « NC2.4 » n'est pas NC2 — alors que le point qui finit une phrase (« voir L1. ») passe.
+ * Même garde pour le format de raf et pour les identifiants d'un plan en lecture seule.
+ */
+const DOTTED = '\\.\\w';
+
 /** Matches `L3` or `L3/t1` as whole words. Group 1 = lot id, group 2 = task id. */
 export function refPattern(prefix: string): RegExp {
-  return new RegExp(`(?<![\\w/])(${escapeRe(prefix)}\\d+)(?:/(t\\d+))?(?![\\w])`, 'g');
+  return new RegExp(`(?<![\\w/])(${escapeRe(prefix)}\\d+)(?:/(t\\d+))?(?!\\w|${DOTTED})`, 'g');
 }
 
 export function extractRefs(text: string, prefix: string): Ref[] {
@@ -224,7 +231,7 @@ export class Plan {
         ids: new Set(ids),
         tasks: new Set(lots.flatMap((l) => l.tasks.map((t) => `${l.id}/${t.id}`))),
         refs: ids.length
-          ? new RegExp(`(?<![\\w/.-])(${ids.map(escapeRe).join('|')})(?:/([\\w-]+(?:\\.[\\w-]+)*))?(?![\\w-]|\\.\\w)`, 'g')
+          ? new RegExp(`(?<![\\w/.-])(${ids.map(escapeRe).join('|')})(?:/([\\w-]+(?:\\.[\\w-]+)*))?(?![\\w-]|${DOTTED})`, 'g')
           : null,
       };
     }

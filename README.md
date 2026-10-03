@@ -25,7 +25,8 @@ reports a page left empty or in error.
   Your comments and hand edits are preserved.
 - A commit belongs to a lot when its message cites the id: `feat(L3): …`,
   `fix: L3/t1 …`. The link is **computed from `git log`**, never stored, so
-  committing never dirties the plan.
+  committing never dirties the plan. The id is read as a whole word: `XL3`,
+  `L3x` and `L3.4` do not cite `L3`, while `L3.` at the end of a sentence does.
 - `raf check` audits drift between the plan and the history.
 - Plan upkeep needs no lot: a commit that touches only the plan, or whose subject
   starts with `chore(plan):` whatever it touches (planning lots, closing them,

@@ -324,6 +324,21 @@ describe('raf commits', () => {
     expect(readFileSync(join(dir, 'suivi/taches.yaml'), 'utf8')).toBe(taches);
   });
 
+  it('plan au format de raf : L1 ne prend pas un commit « feat(L1.4) », qui reste un commit sans lot', async () => {
+    const dir = gitRepo();
+    await raf(dir, 'init', '--no-hook');
+    await raf(dir, 'add', 'Socle');
+    await raf(dir, 'start', 'L1');
+    commit(dir, 'feat(L1): socle', '2026-09-28T10:00:00');
+    commit(dir, 'feat(L1.4): scores', '2026-09-28T11:00:00');
+    commit(dir, 'fix(api): suite de L1.', '2026-09-28T12:00:00');
+
+    expect((await raf(dir, 'commits', 'L1')).out).toMatch(/^[0-9a-f]{7} feat\(L1\): socle\n[0-9a-f]{7} fix\(api\): suite de L1\.$/);
+    const check = await raf(dir, 'check');
+    expect(check.out).toMatch(/commit sans lot : [0-9a-f]{7} feat\(L1\.4\): scores/);
+    expect(check.out).toContain('1 écart(s)');
+  });
+
   it('l’aide la cite', async () => {
     expect((await raf(gitRepo(), '--help')).out).toContain('raf commits <id>');
   });

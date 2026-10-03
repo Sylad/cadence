@@ -99,6 +99,21 @@ describe('extractRefs', () => {
   it('ignores ids glued to other words', () => {
     expect(extractRefs('HTML5 XL3 L3x path/L3', 'L')).toEqual([]);
   });
+  it('does not take « L1.4 » for lot L1 — same right guard as the ids of a read-only plan', () => {
+    expect(extractRefs('feat(L1.4): x', 'L')).toEqual([]);
+    expect(extractRefs('feat(L1.4): x — suite de L12.3 et de L2.b', 'L')).toEqual([]);
+    expect(extractRefs('voir L1.4/t1', 'L')).toEqual([]);
+  });
+  it('still reads an id that ends a sentence, or sits before punctuation', () => {
+    expect(extractRefs('fin de L1. Suite : L2, L3; (L4) L5/t2. L6.', 'L')).toEqual([
+      { lot: 'L1' },
+      { lot: 'L2' },
+      { lot: 'L3' },
+      { lot: 'L4' },
+      { lot: 'L5', task: 't2' },
+      { lot: 'L6' },
+    ]);
+  });
   it('supports a custom prefix', () => {
     expect(extractRefs('fix R16/t1', 'R')).toEqual([{ lot: 'R16', task: 't1' }]);
   });

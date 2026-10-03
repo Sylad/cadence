@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { Plan } from '../src/plan.js';
@@ -160,5 +160,73 @@ describe('revue de code', () => {
     expect(help).toContain('raf review enable');
     expect(help).toContain('raf review <id> "verdict"');
     expect(help).toContain('agent code-reviewer');
+  });
+});
+
+describe('raf commits', () => {
+  const planCommit = (dir: string, message: string) => {
+    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    execFileSync('git', ['commit', '-q', '-m', message], { cwd: dir, env: { ...process.env, GIT_AUTHOR_DATE: '2026-09-28T12:00:00', GIT_COMMITTER_DATE: '2026-09-28T12:00:00' } });
+  };
+
+  it('liste les commits que la porte compte pour le lot, du plus ancien au plus récent', async () => {
+    const dir = gitRepo();
+    await raf(dir, 'init', '--no-hook');
+    const path = join(dir, 'docs/plan/raf.yaml');
+    writeFileSync(path, planOf(dir).replace('lots:', "ignore: ['^auto: ']\nlots:"));
+    await raf(dir, 'review', 'enable');
+    await raf(dir, 'add', 'Cache');
+    await raf(dir, 'add', 'Autre');
+    await raf(dir, 'add', 'Sans commit');
+    await raf(dir, 'add', 'partie', '--parent', 'L1');
+    await raf(dir, 'start', 'L1');
+    commit(dir, 'feat(L1): brouillon d’avant le plan', '2026-09-01T10:00:00');
+    commit(dir, 'feat(L1): cache', '2026-09-28T10:00:00');
+    commit(dir, 'feat(L2): autre', '2026-09-28T10:30:00');
+    commit(dir, 'auto: synchro L1', '2026-09-28T10:45:00');
+    commit(dir, 'fix(L1/t1): cache vidé au redémarrage\n\ncorps du message', '2026-09-28T11:00:00');
+    planCommit(dir, 'chore(plan): L1 en cours');
+
+    const listed = await raf(dir, 'commits', 'L1');
+    expect(listed.code).toBe(0);
+    expect(listed.out).toMatch(/^[0-9a-f]{7} feat\(L1\): cache\n[0-9a-f]{7} fix\(L1\/t1\): cache vidé au redémarrage$/);
+    // Le même ensemble que celui que « raf done » compte.
+    await raf(dir, 'done', 'L1/t1');
+    expect((await raf(dir, 'done', 'L1')).err).toContain('L1 a 2 commit(s)');
+    expect((await raf(dir, 'commits', 'L2')).out).toMatch(/^[0-9a-f]{7} feat\(L2\): autre$/);
+
+    const none = await raf(dir, 'commits', 'L3');
+    expect(none).toEqual({ code: 0, out: '', err: '' });
+  });
+
+  it('exige un lot connu, pas une sous-tâche', async () => {
+    const dir = gitRepo();
+    await raf(dir, 'init', '--no-hook');
+    await raf(dir, 'add', 'Cache');
+    await raf(dir, 'add', 'partie', '--parent', 'L1');
+    expect(await raf(dir, 'commits')).toEqual({ code: 2, out: '', err: 'raf: usage : raf commits <lot>' });
+    expect(await raf(dir, 'commits', 'L9')).toEqual({ code: 2, out: '', err: 'raf: lot inconnu : L9' });
+    expect(await raf(dir, 'commits', 'L1/t1')).toEqual({ code: 2, out: '', err: 'raf: les commits se listent par lot, pas par sous-tâche : L1/t1' });
+  });
+
+  it('plan en lecture seule : NC2 ne prend pas les commits de NC2.4, le fichier ne change pas', async () => {
+    const dir = gitRepo();
+    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: suivi/taches.yaml\n  since: 2026-09-01\n  lots: taches\n  fields: { title: titre, status: etat }\n  statuses: { todo: prevu, doing: en_cours, done: livre }\n');
+    const taches = 'taches:\n- { id: NC2, titre: Socle, etat: en_cours }\n- { id: NC2.4, titre: Scores, etat: en_cours }\n';
+    mkdirSync(join(dir, 'suivi'));
+    writeFileSync(join(dir, 'suivi/taches.yaml'), taches);
+    commit(dir, 'feat(NC2): socle', '2026-09-28T10:00:00');
+    commit(dir, 'feat(NC2.4): scores', '2026-09-28T11:00:00');
+    commit(dir, 'fix(api): suite de NC2.', '2026-09-28T12:00:00');
+    execFileSync('git', ['add', 'suivi/taches.yaml'], { cwd: dir });
+    commit(dir, 'plan: NC2 et NC2.4 en cours', '2026-09-28T13:00:00');
+
+    expect((await raf(dir, 'commits', 'NC2')).out).toMatch(/^[0-9a-f]{7} feat\(NC2\): socle\n[0-9a-f]{7} fix\(api\): suite de NC2\.$/);
+    expect((await raf(dir, 'commits', 'NC2.4')).out).toMatch(/^[0-9a-f]{7} feat\(NC2\.4\): scores$/);
+    expect(readFileSync(join(dir, 'suivi/taches.yaml'), 'utf8')).toBe(taches);
+  });
+
+  it('l’aide la cite', async () => {
+    expect((await raf(gitRepo(), '--help')).out).toContain('raf commits <id>');
   });
 });

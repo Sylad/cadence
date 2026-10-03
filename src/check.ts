@@ -8,7 +8,8 @@ export interface Issue {
   message: string;
 }
 
-const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
+/** Un commit sur une ligne : sha abrégé et sujet. */
+export const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
 
 export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7): Issue[] {
   const issues: Issue[] = [];

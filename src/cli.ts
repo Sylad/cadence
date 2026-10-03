@@ -3,6 +3,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readPlanConfig, readSessionConfig } from './config.js';
 import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits } from './audit.js';
+import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { ganttData, renderGantt } from './gantt.js';
@@ -34,6 +35,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf ux <id> "verdict" enregistre la revue d'ergonomie du lot (agent ux-reviewer)
   raf review enable     revue de code obligatoire avant « done » pour les lots qui ont des commits
   raf review <id> "verdict" enregistre la revue de code du lot (agent code-reviewer)
+  raf commits <id>      les commits du lot que compte la porte de revue de code, du plus ancien au plus récent
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf list [--status todo|doing|done|dropped]
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
@@ -171,6 +173,17 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     case 'ux':
     case 'review':
       return gate(command, rest, loadPlan, today, io);
+    case 'commits': {
+      need(1, 'commits <lot>');
+      const plan = loadPlan();
+      const id = rest[0];
+      if (!plan.lots().some((l) => l.id === id)) {
+        throw new RafError(id.includes('/') ? `les commits se listent par lot, pas par sous-tâche : ${id}` : `lot inconnu : ${id}`);
+      }
+      // Une lecture : le même ensemble que « raf done » et « raf check », plan en lecture seule compris.
+      for (const c of lotWork(plan, root, id).reverse()) io.out(short(c));
+      return 0;
+    }
     case 'list': {
       const plan = loadPlan();
       if (values.status && !STATUSES.includes(values.status as Status)) throw new RafError(`statut inconnu : ${values.status}`);

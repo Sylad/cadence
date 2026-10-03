@@ -13,9 +13,11 @@ Four tools:
 
 And four [Claude Code](https://claude.com/claude-code) skills that turn them
 into rituals — `session-start`, `session-close`, `deliver`, and `lead` to pilot
-several projects through subagents — plus two reviewer agents, each behind an
-opt-in gate: `ux-reviewer` (no user-facing change is done before its usability
-review) and `code-reviewer` (no lot with commits is done before its code review).
+several projects through subagents — plus three reviewer agents: `ux-reviewer`
+(no user-facing change is done before its usability review) and `code-reviewer`
+(no lot with commits is done before its code review), each behind an opt-in
+gate, and `qa-reviewer`, which walks the delivered app in a real browser and
+reports a page left empty or in error.
 
 ## raf
 
@@ -241,6 +243,52 @@ makes the review stale: `raf done` refuses (`--force` to override), and
 written by hand without a `commit` field is not checked for staleness. An empty
 verdict is refused. Plans without `reviewSince` are not affected.
 
+### QA review
+
+No gate and no command here: the QA review comes **after** a delivery, and
+`raf done` does not wait for it. The `qa-reviewer` agent opens each page of the
+running app in a real browser and judges it from the user's side. A page can be
+empty while everything else is green — no code changed, a data source went down
+upstream, the unit tests replace the network, `/api/health` answers ok, and the
+"nothing found" on screen is the message the code was written to show.
+
+The agent cannot tell such an empty state from a normal one by itself: the
+project says what each page must show, in `docs/qa/expectations.md` — one
+`## <route>` section per page, three kinds of lines:
+
+```markdown
+# QA expectations
+
+## /players
+- shows: the squad of the last match — at least 11 players
+- never: "No recent line-up found", "Loading failed"
+- api: /api/squad/last — a non-empty list
+
+## /fixtures/:id   (the first match linked from /fixtures)
+- shows: both team names, the date, the score once the match is played
+- never: "Unknown match"
+- api: /api/fixtures/:id
+```
+
+- `shows:` — content that must be present and non-empty, with a count where one exists;
+- `never:` — texts that must not appear: error messages, and empty-state messages that mean
+  missing data;
+- `api:` — the calls the page depends on: each must answer 2xx with a non-empty body (a 200 with
+  `[]`, `{}` or `null` is a failure).
+
+The rest is free text, written for a reader: a line can be repeated, and a route with a parameter
+names a real value to visit or says where to find one. The file can live elsewhere:
+
+```yaml
+# cadence.yaml
+qa:
+  expectations: docs/quality/pages.md
+```
+
+Only the agent reads that key; the CLI does not use it. Without an expectations file the agent
+walks the routes it discovers, reports what it saw, and returns a draft for you to correct — it
+never writes the file itself.
+
 ## session
 
 ```sh
@@ -354,7 +402,7 @@ As a plugin:
 ```
 
 gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver`,
-`/cadence:lead` and the `ux-reviewer` and `code-reviewer` agents. Or copy them into the
+`/cadence:lead` and the `ux-reviewer`, `code-reviewer` and `qa-reviewer` agents. Or copy them into the
 repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 `.claude/agents/cadence-*.md`; `--dir` for another `.claude` folder,
 `--force` to overwrite local edits).
@@ -369,12 +417,15 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   morning and evening scripts feed the session report (`session:`), and its own
   skills can become one-line aliases of `session-start` / `session-close`.
 - **deliver**: dry run, delivery, and on failure the cause fixed rather than a
-  blind retry.
+  blind retry; after a green delivery of a visible lot, the `qa-reviewer` agent
+  walks the delivered app.
 - **lead**: from a folder holding several projects, one subagent per project
   gathers the facts, you choose the priorities, each lot is delegated to a
   subagent with a standard brief (test first, commits citing the lot, no push),
   reviewed by the `code-reviewer` agent, re-verified by the lead, then delivered
-  one project at a time. Two subagents at most, never two in the same repository.
+  one project at a time; a delivered visible lot is then checked in the running
+  app by the `qa-reviewer` agent, whose blocking findings come back to you. Two
+  subagents at most, never two in the same repository.
 - **ux-reviewer** (agent): captures at 1440 and 390 px, findings grounded in a
   named rule (Nielsen, WCAG 2.2 AA) or a measurement, ranked, turned into
   `raf add --parent` sub-tasks, and a one-line verdict for `raf ux`. It never
@@ -387,6 +438,16 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   scenario; real defects only, ranked, what it could not verify, and a one-line
   verdict for `raf review`. It takes the lot's commits from `raf commits`, never
   runs a build whose output is used live, and never edits code.
+- **qa-reviewer** (agent): any web app; given a repository and a base URL (and
+  optionally a lot id, to start with the pages it touched), it opens each page of
+  the project's expectations file in a real browser at 1440 and 390 px and
+  measures: expected content present and non-empty, no error or missing-data
+  message, every API call answered 2xx with a non-empty body, no console error,
+  no broken content image. Findings are defects (an expectation broken) or
+  suspects (nothing covers it, but it looks like missing data), ranked, each with
+  the route, what was expected, what was measured and the evidence; pages checked
+  N/N, follow-ups as `raf add` lines, what it could not verify, a one-line
+  verdict. Read-only: GET only, no login, nothing submitted; it stops at a PIN.
 
 ## Releasing
 

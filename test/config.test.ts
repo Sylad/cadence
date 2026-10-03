@@ -3,7 +3,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
-import { readPlanConfig } from '../src/config.js';
+import { readPlanConfig, readSessionConfig } from '../src/config.js';
+import { parseDeliverConfig } from '../src/deliver.js';
 import { Plan } from '../src/plan.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
@@ -124,6 +125,16 @@ describe('readPlanConfig', () => {
     ['plan:\n  path: ""\n', /plan\.path est vide/],
   ])('refuses %j', (text, message) => {
     expect(() => readPlanConfig(write(join(tempDir(), 'cadence.yaml'), text))).toThrow(message);
+  });
+
+  it('leaves qa.expectations to the qa-reviewer agent: the key is accepted beside plan, session and deliver, and read by none', () => {
+    const text = 'qa:\n  expectations: docs/quality/pages.md\nplan: plan/todo.yaml\nsession:\n  start: ./morning.sh\ndeliver:\n  verify:\n    - url: https://app.example.com/\n';
+    const file = write(join(tempDir(), 'cadence.yaml'), text);
+    expect(readPlanConfig(file)).toEqual({ path: 'plan/todo.yaml', settings: {} });
+    expect(readSessionConfig(file)).toEqual({ start: './morning.sh' });
+    expect(parseDeliverConfig(text, file).verify).toHaveLength(1);
+    // Seule, la clé ne configure rien pour le CLI : le plan reste celui par défaut.
+    expect(readPlanConfig(write(join(tempDir(), 'cadence.yaml'), 'qa:\n  expectations: docs/quality/pages.md\n'))).toBeNull();
   });
 });
 

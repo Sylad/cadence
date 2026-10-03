@@ -155,4 +155,24 @@ describe('skills install', () => {
     // La re-vérification périodique par commande est un autre lot (L8).
     expect(skill('session-start')).not.toContain('qa-reviewer');
   });
+
+  it('README : section QA review — le format des attentes est celui que lit l’agent, la clé qa.expectations est documentée', () => {
+    const root = join(AGENTS_DIR, '..');
+    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    const agent = readFileSync(join(AGENTS_DIR, 'qa-reviewer.md'), 'utf8');
+    const section = readme.slice(readme.indexOf('### QA review'), readme.indexOf('## session'));
+    expect(readme.indexOf('### Code review')).toBeLessThan(readme.indexOf('### QA review'));
+    expect(section).toContain('`docs/qa/expectations.md`');
+    expect(section).toContain('qa:\n  expectations: ');
+    // Les trois sortes de lignes d'une page : mêmes mots dans l'exemple du README et dans le contrat de l'agent.
+    expect(section).toMatch(/^## \/players$/m);
+    for (const key of ['shows:', 'never:', 'api:']) {
+      expect(section).toMatch(new RegExp(`^- ${key} `, 'm'));
+      expect(agent).toContain(`\`${key}\``);
+    }
+    expect(agent).toContain('One `## <route>` section per page');
+    expect(section.replace(/\s+/g, ' ')).toContain('`raf done` does not wait for it');
+    expect(readme).toContain('`ux-reviewer`, `code-reviewer` and `qa-reviewer` agents');
+    expect(readme).toContain('- **qa-reviewer** (agent)');
+  });
 });

@@ -5,6 +5,30 @@ import { run } from '../src/cli.js';
 import { AGENTS_DIR, installSkills, SKILLS_DIR } from '../src/skills.js';
 import { gitRepo, tempDir } from './helpers.js';
 
+const flat = (text: string): string => text.replace(/\s+/g, ' ');
+/** Le contrat de l'agent QA, en-tête et corps séparés : une clause du corps ne peut pas être tenue par la seule description. */
+const qaAgent = (): { description: string; body: string; section: (title: string) => string } => {
+  const agent = readFileSync(join(AGENTS_DIR, 'qa-reviewer.md'), 'utf8');
+  const end = agent.indexOf('\n---\n', 4);
+  const body = agent.slice(end + 5);
+  return {
+    description: flat(agent.slice(0, end)),
+    body: flat(body),
+    section: (title) => {
+      const start = body.indexOf(`## ${title}\n`);
+      if (start < 0) throw new Error(`section « ${title} » absente de l'agent qa-reviewer`);
+      const next = body.indexOf('\n## ', start + 1);
+      return flat(body.slice(start, next < 0 ? undefined : next));
+    },
+  };
+};
+const skillText = (name: string): string => flat(readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8'));
+/** La section « QA review » du README, jusqu'au titre suivant. */
+const readmeQa = (): string => {
+  const readme = readFileSync(join(AGENTS_DIR, '..', 'README.md'), 'utf8');
+  return readme.slice(readme.indexOf('### QA review'), readme.indexOf('## session'));
+};
+
 describe('skills install', () => {
   it('copie les skills préfixés, idempotent, refuse un écrasement sans --force', () => {
     const dest = join(tempDir(), '.claude/skills');
@@ -131,6 +155,32 @@ describe('skills install', () => {
     expect(text).toContain('a players page with no players is a defect, whatever the cause');
   });
 
+  it('agent qa-reviewer : chaque garantie est épinglée — une clause retirée fait échouer le test', () => {
+    const qa = qaAgent();
+    const method = qa.section('Method');
+    // Lecture seule : aucun verbe d'écriture, aucun contrôle qui change une donnée.
+    expect(method).toContain('**GET only, and nothing that writes**: never log in, never submit a form that writes, never click a control that changes data, never send a POST, PUT, PATCH or DELETE yourself.');
+    // Devant un PIN ou une connexion : ni constat, ni page vérifiée.
+    expect(method).toContain('If a PIN or a login wall is met, say so and stop there for those pages: they go under "not verified", they are neither a finding nor a page checked.');
+    // Le brouillon d'attentes est rendu en texte, jamais écrit dans le dépôt.
+    expect(method).toContain('a DRAFT expectations file as text, for the human to correct: you do not write it into the repository.');
+    const output = qa.section('Output');
+    expect(output).toContain('a page you could not open is counted and named, never dropped');
+    expect(output).toContain('No finding without a measurement.');
+    expect(output).toContain('It is the last line of the report.');
+    // Les quatre interdits, et eux seuls.
+    const bans = qa.section('Do not');
+    expect(bans).toBe([
+      '## Do not',
+      '- Report an impression: a finding you have not measured in the browser is not a finding.',
+      '- Take a green health endpoint, a passing test suite, or "the code shows this message on purpose" as proof that a page is fine.',
+      '- Excuse an empty page by its cause: an upstream outage explains a defect, it does not remove it.',
+      '- Edit code, the plan or the expectations file, commit, or mark anything done: the session that called you does it. ',
+    ].join(' '));
+    expect(qa.description).toContain('never an impression');
+    expect(qa.description).toContain('Read-only — does not modify code, log in or submit anything.');
+  });
+
   it('les skills lead et session-close nomment la porte de revue de code', () => {
     const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8');
     expect(skill('lead')).toContain('The `code-reviewer` agent');
@@ -147,11 +197,18 @@ describe('skills install', () => {
     expect(delivery).toContain('After a green delivery of a lot marked `visible`, have the `qa-reviewer` agent check the delivered app');
     expect(delivery).toContain('the absolute path of the project, the base URL of the delivered app and the lot id');
     expect(delivery).toContain('Bring its blocking findings back to the human');
-    expect(delivery).toContain('It is not a gate');
+    expect(delivery).toContain('it reads only, and never logs in');
+    // Ce n'est pas une porte : raf done ne l'attend pas, un constat devient un nouveau lot.
+    expect(delivery).toContain('It is not a gate: `raf done` does not wait for it, and a finding becomes a new lot, not a reopened one.');
+    expect(delivery).toContain('show it to the human, who corrects it and decides whether it is committed');
     const deliver = skill('deliver');
-    expect(deliver).toContain('After a green delivery of a `visible` lot, have the `qa-reviewer` agent');
-    expect(deliver).toContain('`docs/qa/expectations.md`');
-    expect(deliver).toContain('It is not a gate');
+    const step = deliver.slice(deliver.indexOf(' 6. '), deliver.indexOf('## Rules'));
+    expect(step).toContain('After a green delivery of a `visible` lot, have the `qa-reviewer` agent walk the delivered app in a real browser');
+    // Ses entrées, la remontée des constats bloquants, et la livraison qui reste faite.
+    expect(step).toContain('give it the repository path, the base URL and the lot id');
+    expect(step).toContain('`docs/qa/expectations.md`');
+    expect(step).toContain('Bring its blocking findings to the human.');
+    expect(step).toContain('It is not a gate: the delivery stays done, a finding becomes a new lot.');
     // La re-vérification périodique par commande est un autre lot (L8).
     expect(skill('session-start')).not.toContain('qa-reviewer');
   });
@@ -171,7 +228,16 @@ describe('skills install', () => {
       expect(agent).toContain(`\`${key}\``);
     }
     expect(agent).toContain('One `## <route>` section per page');
-    expect(section.replace(/\s+/g, ' ')).toContain('`raf done` does not wait for it');
+    const text = flat(section);
+    expect(text).toContain('No gate and no command here: the QA review comes **after** a delivery, and `raf done` does not wait for it.');
+    // La définition des trois sortes de lignes.
+    expect(text).toContain('- `shows:` — content that must be present and non-empty, with a count where one exists;');
+    expect(text).toContain('- `never:` — texts that must not appear: error messages, and empty-state messages that mean missing data;');
+    expect(text).toContain('- `api:` — the calls the page depends on: each must answer 2xx with a non-empty body (a 200 with `[]`, `{}` or `null` is a failure).');
+    expect(text).toContain('a route with a parameter names a real value to visit or says where to find one');
+    // Le brouillon revient à l'humain : l'agent n'écrit jamais le fichier.
+    expect(text).toContain('returns a draft for you to correct — it never writes the file itself.');
+    expect(text).toContain('Only the agent reads that key; the CLI does not use it.');
     expect(readme).toContain('`ux-reviewer`, `code-reviewer` and `qa-reviewer` agents');
     expect(readme).toContain('- **qa-reviewer** (agent)');
   });

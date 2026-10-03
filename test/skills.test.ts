@@ -24,6 +24,15 @@ const qaAgent = (): { description: string; body: string; section: (title: string
 };
 /** Ce qui déclenche la revue QA : les mêmes mots dans l'agent, les skills lead et deliver, et le README. */
 const QA_TRIGGER = 'changes what a page shows or what it is served (screen, API, data source, configuration of either) — in practice every delivery except docs-, plan- or tests-only ones';
+/** Le format du fichier d'attentes : le contrat de l'agent et le README disent la même chose, mot pour mot. */
+const QA_FORMAT = [
+  'each must answer 2xx with a non-empty body',
+  'An optional `## *` section holds what every page must show, never show and call.',
+  'A line may end with a condition in plain words, which',
+  '`may be empty when …`, `1440 only`, `390 only` (a line without a width holds at both).',
+  'ontent hidden on the phone by design is not a defect unless a `shows:` line requires it at 390; content pushed outside the visible area (it needs a sideways scroll) is reported as suspect and handed to `ux-reviewer` in one line',
+  'is a failure, unless its line says `may be empty when …`',
+];
 const skillText = (name: string): string => flat(readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8'));
 /** La section « QA review » du README, jusqu'au titre suivant. */
 const readmeQa = (): string => {
@@ -134,9 +143,8 @@ describe('skills install', () => {
       // Ce qui se mesure, aux deux largeurs.
       'in a real browser',
       'at **1440 px** and **390 px** wide',
-      'answered 2xx with a non-empty body where data is expected',
-      'A 200 with an empty or null body',
-      'is a failure',
+      'answered 2xx with a non-empty body: note the status and the response size',
+      'A 200 with an empty or null body (`[]`, `{}`, `null`, 0 bytes) is a failure, unless its line says `may be empty when …`',
       'no console error',
       'no broken image among the content images',
       'never an impression',
@@ -267,7 +275,24 @@ describe('skills install', () => {
     // La définition des trois sortes de lignes.
     expect(text).toContain('- `shows:` — content that must be present and non-empty, with a count where one exists;');
     expect(text).toContain('- `never:` — texts that must not appear: error messages, and empty-state messages that mean missing data;');
-    expect(text).toContain('- `api:` — the calls the page depends on: each must answer 2xx with a non-empty body (a 200 with `[]`, `{}` or `null` is a failure).');
+    expect(text).toContain('- `api:` — the calls the page depends on: each must answer 2xx with a non-empty body (a 200 with `[]`, `{}` or `null` is a failure, unless its line says `may be empty when …`).');
+    // Le format : mêmes clauses dans le README et dans le contrat de l'agent, qui ne dit plus « where data is expected ».
+    const qa = qaAgent();
+    for (const clause of QA_FORMAT) {
+      expect(text).toContain(clause);
+      expect(qa.section('Method')).toContain(clause);
+    }
+    expect(qa.body).not.toContain('where data is expected');
+    expect(text).toContain('A line may end with a condition in plain words, which the agent honours:');
+    expect(qa.section('Method')).toContain('A line may end with a condition in plain words, which you honour:');
+    // L'exemple montre la section commune et les deux sortes de condition.
+    expect(section).toMatch(/^## \*$/m);
+    expect(section).toMatch(/^- api: .+ — may be empty when .+$/m);
+    expect(section).toMatch(/^- shows: .+ — 1440 only$/m);
+    // Route à paramètre sans fichier : une vraie valeur, et la façon dont l'URL a été construite.
+    expect(text).toContain("For a route with a parameter, it finds a real value in the app's links or its API responses and says how it built the URL.");
+    expect(qa.section('Method')).toContain("for a route with a parameter, find a real value in the app's links or its API responses and say how you built the URL");
+    expect(qa.section('Method')).toContain('A route with a parameter names a real value to visit, or says where to find one.');
     expect(text).toContain('a route with a parameter names a real value to visit or says where to find one');
     // Le brouillon revient à l'humain : l'agent n'écrit jamais le fichier.
     expect(text).toContain('returns a draft for you to correct — it never writes the file itself.');

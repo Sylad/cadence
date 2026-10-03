@@ -26,12 +26,16 @@ missing, or the URL does not answer, say so and stop.
 2. **Read the expectations**: `docs/qa/expectations.md`, or the file named by `qa.expectations` in
    `cadence.yaml`. One `## <route>` section per page: what the page `shows:` (the content that
    must be present and non-empty, with a count where one exists), what must `never:` appear (error
-   texts, empty-state messages that mean missing data), and the `api:` calls it depends on. A
-   route with a parameter names a real value to visit, or says where to find one.
+   texts, empty-state messages that mean missing data), and the `api:` calls it depends on (each
+   must answer 2xx with a non-empty body). An optional `## *` section holds what every page must
+   show, never show and call. A line may end with a condition in plain words, which you honour:
+   `may be empty when …`, `1440 only`, `390 only` (a line without a width holds at both). A route
+   with a parameter names a real value to visit, or says where to find one.
 3. **No expectations file: do not guess silently.** Discover the routes (router file, sitemap,
-   navigation links), walk them as in step 4 and report what you saw: the universal checks hold
-   without a file, and anything that would need an expectation to judge is *suspect* at most.
-   Return a DRAFT expectations file as text, for the human to correct: you do not write it into
+   navigation links); for a route with a parameter, find a real value in the app's links or its
+   API responses and say how you built the URL. Walk them as in step 4 and report what you saw:
+   the universal checks hold without a file, and anything that would need an expectation to
+   judge is *suspect* at most. Return a DRAFT expectations file as text, for the human to correct: you do not write it into
    the repository. Say plainly that without expectations an empty state cannot be told from a
    normal one.
 4. **Open each page in a real browser** (Playwright, or the browser tool available), at
@@ -40,10 +44,14 @@ missing, or the URL does not answer, say so and stop.
      count (`.player-card` ×14), not "the list looks fine";
    - no `never:` text on screen, and no other error or missing-data message;
    - every API call of the page — those listed, and those you saw it make to its own backend —
-     answered 2xx with a non-empty body where data is expected: note the status and the response
-     size. A 200 with an empty or null body (`[]`, `{}`, `null`, 0 bytes) is a failure;
+     answered 2xx with a non-empty body: note the status and the response size. A 200 with an
+     empty or null body (`[]`, `{}`, `null`, 0 bytes) is a failure, unless its line says
+     `may be empty when …`;
    - no console error: quote the first line of each;
-   - no broken image among the content images (a failed request, or `naturalWidth` 0).
+   - no broken image among the content images (a failed request, or `naturalWidth` 0);
+   - at 390 px, content hidden on the phone by design is not a defect unless a `shows:` line
+     requires it at 390; content pushed outside the visible area (it needs a sideways scroll) is
+     reported as suspect and handed to `ux-reviewer` in one line.
 5. **GET only, and nothing that writes**: never log in, never submit a form that writes, never
    click a control that changes data, never send a POST, PUT, PATCH or DELETE yourself. If a PIN
    or a login wall is met, say so and stop there for those pages: they go under "not verified",

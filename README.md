@@ -264,9 +264,15 @@ project says what each page must show, in `docs/qa/expectations.md` — one
 ```markdown
 # QA expectations
 
+## *
+- shows: the header and the navigation links
+- never: "Loading failed", "Too Many Requests"
+- api: /api/live/current — may be empty when no match is within 24 hours
+
 ## /players
 - shows: the squad of the last match — at least 11 players
-- never: "No recent line-up found", "Loading failed"
+- shows: the season statistics table, 8 columns — 1440 only
+- never: "No recent line-up found"
 - api: /api/squad/last — a non-empty list
 
 ## /fixtures/:id   (the first match linked from /fixtures)
@@ -279,7 +285,13 @@ project says what each page must show, in `docs/qa/expectations.md` — one
 - `never:` — texts that must not appear: error messages, and empty-state messages that mean
   missing data;
 - `api:` — the calls the page depends on: each must answer 2xx with a non-empty body (a 200 with
-  `[]`, `{}` or `null` is a failure).
+  `[]`, `{}` or `null` is a failure, unless its line says `may be empty when …`).
+
+An optional `## *` section holds what every page must show, never show and call. A line may end
+with a condition in plain words, which the agent honours: `may be empty when …`, `1440 only`,
+`390 only` (a line without a width holds at both). Content hidden on the phone by design is not a
+defect unless a `shows:` line requires it at 390; content pushed outside the visible area (it
+needs a sideways scroll) is reported as suspect and handed to `ux-reviewer` in one line.
 
 The rest is free text, written for a reader: a line can be repeated, and a route with a parameter
 names a real value to visit or says where to find one. The file can live elsewhere:
@@ -293,8 +305,9 @@ qa:
 Only the agent reads that key; the CLI does not use it. Without an expectations file the agent
 walks the routes it discovers and still runs its universal checks: an error shown, a failed or
 empty API call whose content is missing on screen, a broken or missing content image are defects
-with or without a file; whatever would need an expectation to judge is suspect at most. The
-agent then returns a draft for you to correct — it never writes the file itself.
+with or without a file; whatever would need an expectation to judge is suspect at most. For
+a route with a parameter, it finds a real value in the app's links or its API responses and says
+how it built the URL. The agent then returns a draft for you to correct — it never writes the file itself.
 
 ## session
 

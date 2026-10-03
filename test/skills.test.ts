@@ -54,4 +54,12 @@ describe('skills install', () => {
     expect(agent).toMatch(/^---\nname: cadence-code-reviewer\ndescription: .+\ntools: Read, Grep, Glob, Bash\n---\n/);
     expect(agent).toContain('raf review <lot> "…"');
   });
+
+  it('les skills lead et session-close nomment la porte de revue de code', () => {
+    const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8');
+    expect(skill('lead')).toContain('The `code-reviewer` agent');
+    expect(skill('lead')).toContain('`raf review <lot> "…"`');
+    expect(skill('lead')).toContain('do not push, deliver, run `raf done`, `raf ux` or\n> `raf review`.');
+    expect(skill('session-close')).toContain('`raf review <id> "…"`');
+  });
 });

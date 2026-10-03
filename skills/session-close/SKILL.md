@@ -26,6 +26,10 @@ With no project named, run `cadence session close` in each project touched durin
      is genuinely outside the plan (docs, chores);
    - a finished lot marked `visible` without a news entry → `cadence news new <id>`, written for the
      user, with a screenshot;
+   - a lot that `raf done` refuses, or that the check reports as finished, for lack of a review —
+     code review of a lot with commits (`raf review enable`), UX review of a visible lot
+     (`raf ux enable`) → have the `code-reviewer` / `ux-reviewer` agent review it, then record its
+     verdict with `raf review <id> "…"` / `raf ux <id> "…"`; never write a verdict nobody gave;
    - rerun until the check part is clean.
 3. **Memory, filtered** (only if you keep a persistent memory): write down what the repository does
    NOT already say — a trap and its cause, a decision or correction from the human, a collaboration

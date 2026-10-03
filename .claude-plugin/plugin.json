@@ -1,6 +1,6 @@
 {
   "name": "cadence",
-  "description": "A repo-native working method: session start and close rituals driven by a versioned plan (raf), deliveries proven by their effect, and a UX reviewer agent.",
+  "description": "A repo-native working method: session start and close rituals driven by a versioned plan (raf), deliveries proven by their effect, and two reviewer agents (UX, code).",
   "version": "0.4.0",
   "author": { "name": "Sylvain Ladoire" },
   "homepage": "https://github.com/Sylad/cadence",

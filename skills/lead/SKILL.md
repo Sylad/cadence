@@ -10,15 +10,15 @@ delivers. Project files are read and changed by subagents, each with its own con
 are the sub-folders of the current directory that contain `docs/plan/raf.yaml`, or a `cadence.yaml`
 with a `plan:` key. A project whose `cadence.yaml` maps the fields of a plan kept by its own tool is
 **read-only** for `raf`: it takes part in the tour, and its plan is changed with the project's own
-commands (its CLAUDE.md names them), never with `raf start|done|note`.
+commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
 
 ## Limits that always apply
 
 - **At most two subagents running at once.** Queue the rest.
 - **Never two subagents in the same repository at the same time**, and the lead does not commit in a
   repository where a subagent is working.
-- **Deliveries and `raf ux` verdicts are done by the lead, one project at a time** — never by a
-  subagent, never two deliveries in parallel.
+- **Deliveries and `raf ux` / `raf review` verdicts are done by the lead, one project at a time** —
+  never by a subagent, never two deliveries in parallel.
 - A subagent cannot ask the human anything. When it hits an ambiguity it stops and reports; the lead
   brings the question to the human.
 
@@ -42,7 +42,8 @@ For each chosen lot, the lead runs `cd <project> && raf start <lot>`, then gives
 > Goal: <what done looks like, from the human's words>.
 > Rules: test first; commit each sub-part as soon as its tests pass, with explicit paths (never
 > `git add -A` or `commit -a`), and a message that cites the lot (`feat(<id>): …`); run the project's
-> full test suite and build before reporting; do not push, deliver, run `raf done` or `raf ux`.
+> full test suite and build before reporting; do not push, deliver, run `raf done`, `raf ux` or
+> `raf review`.
 > If something is ambiguous or needs a decision, stop and report the question instead of guessing.
 > Report: commits (sha + subject), tests and build results with their numbers, what you could not
 > verify, open questions.
@@ -53,13 +54,18 @@ proposed sub-tasks back to the human.
 
 ## 3. Check
 
-1. A fresh reviewer subagent (most capable model) reviews the lot's commits against its goal and
-   reports real defects only.
+1. The `code-reviewer` agent, as a fresh subagent (most capable model), reviews the lot. Give it
+   the absolute path of the project and the lot id, **not** the author's report: it reads the diff
+   itself from the commits that cite the lot, runs the checks, and returns real defects only,
+   ranked, with what it could not verify and a one-line verdict.
 2. **The lead re-verifies itself**: `git log` shows the commits, the test suite and build pass when
    run by the lead, `raf check` is clean. A subagent is green on what it *could* test; say plainly
    what nobody could verify.
-3. Fix or re-delegate what the review found; then `raf done <lot>` (and `raf ux <lot> "…"` for a
-   visible lot, with the reviewer's verdict).
+3. Fix or re-delegate what the review found; then record the verdict, `raf review <lot> "…"` with
+   the code reviewer's last line brought up to date (and `raf ux <lot> "…"` for a visible lot, with
+   the UX reviewer's), then `raf done <lot>`. Where the gate is on (`raf review enable`, the
+   human's decision for each repository), `raf done` refuses a lot that has commits and no
+   verdict. On a read-only plan the verdict goes into the project's own tool.
 
 ## 4. Delivery
 

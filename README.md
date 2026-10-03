@@ -13,8 +13,9 @@ Four tools:
 
 And four [Claude Code](https://claude.com/claude-code) skills that turn them
 into rituals — `session-start`, `session-close`, `deliver`, and `lead` to pilot
-several projects through subagents — plus a `ux-reviewer` agent: no user-facing
-change is done before its usability review.
+several projects through subagents — plus two reviewer agents, each behind an
+opt-in gate: `ux-reviewer` (no user-facing change is done before its usability
+review) and `code-reviewer` (no lot with commits is done before its code review).
 
 ## raf
 
@@ -94,7 +95,7 @@ plan: planning/todo.yaml
 
 A project that already keeps its plan with its own tool is read **without migrating it**: describe
 the file, and `raf now`, `raf list`, `raf check`, `raf gantt` and `cadence session start|close`
-work on it. Such a plan is **read-only** — `raf add|start|done|note|ux` refuse and leave the file
+work on it. Such a plan is **read-only** — `raf add|start|done|note|ux|review` refuse and leave the file
 to the project's tool.
 
 ```yaml
@@ -213,6 +214,20 @@ With the rule on, `raf done` refuses a visible lot without a review (`--force`
 to override) and `raf check` reports visible lots finished after the `uxSince`
 day without one. Plans without `uxSince` are not affected.
 
+### Code review
+
+```sh
+raf review enable                  # from today, a lot with commits needs a code review before done
+raf review L4 "compliant after 2 fixes"   # record the verdict (from the code-reviewer agent)
+```
+
+The counterpart of the UX review, off by default. With the rule on, `raf done`
+refuses a lot that has at least one commit citing it and no recorded verdict
+(`--force` to override), and `raf check` reports such lots finished after the
+`reviewSince` day. A lot with no commit has nothing to review; neither does a
+lot whose only commits touch the plan itself. The verdict is stored on the lot
+(`review: { date, verdict }`). Plans without `reviewSince` are not affected.
+
 ## session
 
 ```sh
@@ -326,9 +341,9 @@ As a plugin:
 ```
 
 gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver`,
-`/cadence:lead` and the `ux-reviewer` agent. Or copy them into the repository with
-`cadence skills install` (to `.claude/skills/cadence-*` and
-`.claude/agents/cadence-ux-reviewer.md`; `--dir` for another `.claude` folder,
+`/cadence:lead` and the `ux-reviewer` and `code-reviewer` agents. Or copy them into the
+repository with `cadence skills install` (to `.claude/skills/cadence-*` and
+`.claude/agents/cadence-*.md`; `--dir` for another `.claude` folder,
 `--force` to overwrite local edits).
 
 - **session-start**: reports the facts briefly, proposes three lots from the
@@ -345,12 +360,19 @@ gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver`,
 - **lead**: from a folder holding several projects, one subagent per project
   gathers the facts, you choose the priorities, each lot is delegated to a
   subagent with a standard brief (test first, commits citing the lot, no push),
-  reviewed, re-verified by the lead, then delivered one project at a time. Two
-  subagents at most, never two in the same repository.
+  reviewed by the `code-reviewer` agent, re-verified by the lead, then delivered
+  one project at a time. Two subagents at most, never two in the same repository.
 - **ux-reviewer** (agent): captures at 1440 and 390 px, findings grounded in a
   named rule (Nielsen, WCAG 2.2 AA) or a measurement, ranked, turned into
   `raf add --parent` sub-tasks, and a one-line verdict for `raf ux`. It never
   edits code.
+- **code-reviewer** (agent): any stack; given a repository and a lot id, it reads
+  the diff itself from the commits that cite the lot — not the author's summary —
+  and the project's CLAUDE.md for its conventions; findings grounded in a
+  measurement (a failing command, changed code without a test, a duplicated
+  block, dead code) or a named rule, each with `file:line` and a concrete
+  scenario; real defects only, ranked, what it could not verify, and a one-line
+  verdict for `raf review`. It never edits code.
 
 ## License
 

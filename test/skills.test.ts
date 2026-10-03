@@ -43,4 +43,15 @@ describe('skills install', () => {
     expect(again).toBe(2);
     expect(readFileSync(join(dir, '.claude/agents/cadence-ux-reviewer.md'), 'utf8')).toBe('à la main');
   });
+
+  it('CLI : installe aussi l’agent code-reviewer, en lecture seule et sans outil d’écriture', async () => {
+    const dir = gitRepo();
+    const out: string[] = [];
+    const code = await run(['skills', 'install'], { cwd: dir, env: {}, out: (l) => out.push(l), err: () => {}, now: () => new Date() });
+    expect(code).toBe(0);
+    expect(out.join('\n')).toContain('cadence-code-reviewer (agent) : installé');
+    const agent = readFileSync(join(dir, '.claude/agents/cadence-code-reviewer.md'), 'utf8');
+    expect(agent).toMatch(/^---\nname: cadence-code-reviewer\ndescription: .+\ntools: Read, Grep, Glob, Bash\n---\n/);
+    expect(agent).toContain('raf review <lot> "…"');
+  });
 });

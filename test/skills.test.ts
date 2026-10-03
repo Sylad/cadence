@@ -175,4 +175,15 @@ describe('skills install', () => {
     expect(readme).toContain('`ux-reviewer`, `code-reviewer` and `qa-reviewer` agents');
     expect(readme).toContain('- **qa-reviewer** (agent)');
   });
+
+  it('manifestes : trois agents relecteurs annoncés, et la même version aux quatre endroits', () => {
+    const root = join(AGENTS_DIR, '..');
+    const json = (file: string) => JSON.parse(readFileSync(join(root, file), 'utf8'));
+    const version = json('package.json').version;
+    expect(json('.claude-plugin/plugin.json').description).toContain('three reviewer agents (UX, code, QA)');
+    expect(json('.claude-plugin/plugin.json').version).toBe(version);
+    expect(json('.claude-plugin/marketplace.json').plugins[0].version).toBe(version);
+    expect(json('package-lock.json').version).toBe(version);
+    expect(json('package-lock.json').packages[''].version).toBe(version);
+  });
 });

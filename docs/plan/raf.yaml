@@ -35,7 +35,7 @@ lots:
     created: 2026-10-02
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-02
     notes:
@@ -43,6 +43,8 @@ lots:
       - { date: 2026-10-03, text: "03-10 : « cadence deliver » sur un projet à plan propre (maritime-atlas) annonce « livré : Q4, R1, R2, R3, R4 » — R1 à R4 étaient les numéros des réserves UX cités dans les messages de commit, pris pour des lots parce que le plan en a de ce nom ; l'outil du projet, lui, n'a marqué que Q4. La liste des lots livrés d'un plan en lecture seule doit venir de l'outil du projet, ou se limiter aux lots en cours." }
       - { date: 2026-10-03, text: "03-10 : « tâche récurrente » et « raf add --public » sortis du lot (comportement à décider), repris par deux lots à part ; relecture indépendante : exemption chore(plan) à fonder sur les fichiers touchés, pas sur le sujet" }
     started: 2026-10-03
+    review: { date: 2026-10-03, verdict: "conforme — relecture indépendante en deux passes : 7 commits relus, 215 tests, typecheck et compilation verts, chaque test nouveau de comportement échoue sur le code d'avant ; 0 bloquant, 0 majeur ; les deux constats de la première passe sont levés (règle des fichiers à la place du sujet « chore(plan) », deux points du titre repris par deux lots à part) ; 2 mineurs reportés en lots (nom de fichier accentué jamais reconnu comme fichier du plan, page Gantt hors emplacement par défaut absente du README) ; revérifié par le lead : 215 tests et typecheck sur la tête ; le commit de version 0.7.0 (4 fichiers de version) est du lead, non relu par un agent ; non vérifié : un vrai cadence deliver sur un plan en lecture seule", commit: 4a31b2a649cea39eb27277f355ceef9756e67ad3 }
+    finished: 2026-10-03
   - id: L6
     title: 'Porte de revue de code : agent code-reviewer générique (lecture seule, reçoit le lot et lit lui-même le diff, constats fondés sur une mesure ou une règle nommée) + « raf review enable » / « raf review <id> "verdict" », symétriques de « raf ux » — « raf done » refuse un lot à commits sans verdict ; skills lead et session-close mis à jour ; 0.5.0'
     status: done
@@ -88,4 +90,16 @@ lots:
     title: "raf add --public et raf public <id> : titre public d'un lot dans le modèle — écart du 02-10 sorti de L5 ; aujourd'hui écrit à la main dans 59 lots de 7 projets"
     status: todo
     estimate: 1
+    created: 2026-10-03
+  - id: L13
+    title: "changedFiles : lire git diff-tree avec -z et core.quotepath=off — un plan ou un fichier de plan.files au nom accentué n'est jamais reconnu comme fichier du plan (relecture du 03-10, antérieur aux écarts du 02-10)"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-03
+  - id: L14
+    title: "README : la page Gantt n'est fichier du plan qu'à son emplacement par défaut (gantt.html à côté du plan) ; ailleurs, la déclarer sous plan.files"
+    status: todo
+    estimate: 1
+    quickwin: true
     created: 2026-10-03

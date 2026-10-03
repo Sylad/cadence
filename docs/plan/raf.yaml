@@ -49,7 +49,8 @@ lots:
     finished: 2026-10-03
   - id: L7
     title: "Publication npm + tag git à chaque version (npm n'a que la 0.2.0 ; 0.3.0 et 0.4.0 jamais publiées) : publier la version courante, taguer, et documenter l'étape de sortie"
-    status: todo
+    status: doing
     estimate: 0.5
     quickwin: true
     created: 2026-10-03
+    started: 2026-10-03

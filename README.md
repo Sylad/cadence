@@ -388,6 +388,21 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   verdict for `raf review`. It takes the lot's commits from `raf commits`, never
   runs a build whose output is used live, and never edits code.
 
+## Releasing
+
+A version exists in three places and is published in two; a release does all of it, in this order:
+
+1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
+   `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, in the commit that closes the lot.
+2. `npm publish --access public` — `prepublishOnly` runs the type-check and the tests first, `prepare`
+   builds `dist/`; a red suite stops the publication.
+3. `git tag v<version> && git push origin main v<version>`.
+4. Check the effect: `npm view @sylad/cadence version` answers the new version.
+
+The Claude Code plugin is read from the repository, so step 3 is what updates it; npm is what
+`npx @sylad/cadence` and a global install read. Skipping step 2 leaves npm behind without any error —
+0.3.0 and 0.4.0 were never published.
+
 ## License
 
 MIT

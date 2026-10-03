@@ -37,12 +37,16 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-02
+    notes:
+      - { date: 2026-10-03, text: "Relevé le 03-10 (L6) : sur un plan natif, refPattern (src/plan.ts:94) relie « feat(L1.4) » au lot L1 — la garde droite n'exclut pas « .chiffre », alors que le lien des plans en lecture seule (ligne 227) l'exclut ; à aligner. Et un « review: { verdict: \"\" } » écrit à la main ouvre encore la porte." }
   - id: L6
     title: 'Porte de revue de code : agent code-reviewer générique (lecture seule, reçoit le lot et lit lui-même le diff, constats fondés sur une mesure ou une règle nommée) + « raf review enable » / « raf review <id> "verdict" », symétriques de « raf ux » — « raf done » refuse un lot à commits sans verdict ; skills lead et session-close mis à jour ; 0.5.0'
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-03
     started: 2026-10-03
+    review: { date: 2026-10-03, verdict: "conforme après corrections — relecture indépendante : 0 bloquant, 2 majeurs (verdict vide accepté ; grep de l'agent prenant NC2.4 pour NC2) et 3 mineurs, tous corrigés ; revérifié par le lead : 182 tests, typecheck, dist identique à une compilation neuve, essai en dépôt jetable (refus sans verdict, verdict vide, revue périmée par un commit)", commit: 89bb6e07418de438427e95a7e780f9cf5d3e8d04 }
+    finished: 2026-10-03
   - id: L7
     title: "Publication npm + tag git à chaque version (npm n'a que la 0.2.0 ; 0.3.0 et 0.4.0 jamais publiées) : publier la version courante, taguer, et documenter l'étape de sortie"
     status: todo

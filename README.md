@@ -27,6 +27,12 @@ reports a page left empty or in error.
   `fix: L3/t1 …`. The link is **computed from `git log`**, never stored, so
   committing never dirties the plan.
 - `raf check` audits drift between the plan and the history.
+- Plan upkeep needs no lot: a commit that touches only the plan, or whose subject
+  starts with `chore(plan):` whatever it touches (planning lots, closing them,
+  regenerating a page derived from the plan), is never a "commit without a lot".
+  A `chore(plan):` commit that cites a lot and touches other files still counts
+  as work on that lot; to make a derived file part of the plan itself, list it
+  under `plan.files` in `cadence.yaml`.
 - `raf gantt` writes a single self-contained HTML page (no server, no CDN).
 
 ```sh
@@ -56,7 +62,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |
-| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default: commits without a lot (commits touching only the plan are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
+| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default: commits without a lot (commits touching only the plan, and `chore(plan): …` commits, are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
 | `raf gantt [-o file]` | standalone Gantt page |
 | `raf hook install` | add the (non-blocking, read-only) post-commit hook |
 

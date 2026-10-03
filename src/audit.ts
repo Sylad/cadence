@@ -26,14 +26,21 @@ export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
 }
 
 /**
- * N'ont pas besoin de citer un lot : un commit qui ne touche que le plan (ou la page Gantt), et un
- * commit automatique dont le sujet correspond à un motif `ignore:` du plan.
+ * Sujet d'un commit d'entretien du plan, « chore(plan): … » : il planifie, ferme ou publie des lots,
+ * souvent avec un fichier dérivé du plan (plan publié par le projet) que raf ne connaît pas.
+ */
+const PLAN_CHORE = /^chore\(plan\)!?:/;
+
+/**
+ * N'ont pas besoin de citer un lot : un commit qui ne touche que le plan (ou la page Gantt), un commit
+ * d'entretien du plan (« chore(plan): … », quels que soient ses fichiers), et un commit automatique
+ * dont le sujet correspond à un motif `ignore:` du plan.
  */
 export function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
   const own = ownFiles(plan, root);
   const { patterns } = plan.ignore;
   const orphans = linked.orphans.filter((c) => {
-    if (patterns.some((re) => re.test(c.subject))) return false;
+    if (PLAN_CHORE.test(c.subject) || patterns.some((re) => re.test(c.subject))) return false;
     const files = changedFiles(root, c.sha);
     return files.length === 0 || !files.every((f) => own.has(f));
   });

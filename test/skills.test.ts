@@ -173,7 +173,7 @@ describe('skills install', () => {
     // Le brouillon d'attentes est rendu en texte, jamais écrit dans le dépôt.
     expect(method).toContain('a DRAFT expectations file as text, for the human to correct: you do not write it into the repository.');
     // Trois sortes de constat. Les vérifications universelles n'ont pas besoin du fichier d'attentes.
-    expect(method).toContain('- *defect* — a line of the expectations is broken, or a universal check fails with a visible effect on the page: an error message shown, a failed or empty API call whose content is missing on screen, a broken or missing content image. Universal checks need no expectations file: such a failure is a defect even without one;');
+    expect(method).toContain('- *defect* — a line of the expectations is broken, or a universal check fails with a visible effect on the page: an error message shown, a failed API call whose content is missing on screen, a broken or missing content image. Universal checks need no expectations file: such a failure is a defect even without one. An API call that answers 2xx with an empty body is a defect only when an expectation says data is due there; without one it is suspect at most (it may be a normal absence);');
     expect(method).toContain('- *suspect* — something that looks like missing or wrong data and that no expectation settles: an empty list under a heading, a "nothing found" message, a status or label contradicted by the page\'s own data ("eliminated" beside a won match), a stale season label. Say why, and propose the line of expectations that would settle it;');
     expect(method).toContain('- *noise* — a console error or a failed request with no visible effect: reported, ranked minor;');
     expect(method).toContain('- *out of scope* — usability and accessibility belong to `ux-reviewer`, code quality to `code-reviewer`: one line at most, never a finding.');
@@ -342,7 +342,7 @@ describe('skills install', () => {
     // Le brouillon revient à l'humain : l'agent n'écrit jamais le fichier.
     expect(text).toContain('returns a draft for you to correct — it never writes the file itself.');
     // Sans fichier : mêmes règles que dans le contrat de l'agent.
-    expect(text).toContain('Without an expectations file the agent walks the routes it discovers and still runs its universal checks: an error shown, a failed or empty API call whose content is missing on screen, a broken or missing content image are defects with or without a file; whatever would need an expectation to judge is suspect at most.');
+    expect(text).toContain('Without an expectations file the agent walks the routes it discovers and still runs its universal checks: an error shown, a failed API call whose content is missing on screen, a broken or missing content image are defects with or without a file; an empty 2xx body, like whatever else would need an expectation to judge, is suspect at most (it may be a normal absence).');
     expect(text).toContain('Only the agent reads that key; the CLI does not use it.');
     expect(readme).toContain('`ux-reviewer`, `code-reviewer` and `qa-reviewer` agents');
     expect(readme).toContain('- **qa-reviewer** (agent)');

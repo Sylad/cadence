@@ -71,9 +71,11 @@ missing, or the URL does not answer, say so and stop.
    they are neither a finding nor a page checked.
 6. **Classify** what you see:
    - *defect* — a line of the expectations is broken, or a universal check fails with a visible
-     effect on the page: an error message shown, a failed or empty API call whose content is
-     missing on screen, a broken or missing content image. Universal checks need no expectations
-     file: such a failure is a defect even without one;
+     effect on the page: an error message shown, a failed API call whose content is missing on
+     screen, a broken or missing content image. Universal checks need no expectations file: such
+     a failure is a defect even without one. An API call that answers 2xx with an empty body is a
+     defect only when an expectation says data is due there; without one it is suspect at most
+     (it may be a normal absence);
    - *suspect* — something that looks like missing or wrong data and that no expectation
      settles: an empty list under a heading, a "nothing found" message, a status or label
      contradicted by the page's own data ("eliminated" beside a won match), a stale season

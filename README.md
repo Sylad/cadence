@@ -51,6 +51,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf add "title" [--estimate d] [--quickwin] [--visible] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
+| `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |
 | `raf check [--since date] [--idle 7]` | since the plan's adoption date by default: commits without a lot (commits touching only the plan are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
@@ -94,9 +95,10 @@ plan: planning/todo.yaml
 ```
 
 A project that already keeps its plan with its own tool is read **without migrating it**: describe
-the file, and `raf now`, `raf list`, `raf check`, `raf gantt` and `cadence session start|close`
-work on it. Such a plan is **read-only** — `raf add|start|done|note|ux|review` refuse and leave the file
-to the project's tool.
+the file, and `raf now`, `raf list`, `raf commits`, `raf check`, `raf gantt` and
+`cadence session start|close` work on it. Such a plan is **read-only** —
+`raf add|start|done|note|ux|review` refuse and leave the file to the project's tool, and the two
+review gates do not apply to it (a `uxSince` or `reviewSince` written in it is ignored).
 
 ```yaml
 plan:
@@ -212,12 +214,14 @@ raf ux L8 "no screen: calculation fix"
 
 With the rule on, `raf done` refuses a visible lot without a review (`--force`
 to override) and `raf check` reports visible lots finished after the `uxSince`
-day without one. Plans without `uxSince` are not affected.
+day without one. An empty verdict is refused. Plans without `uxSince` are not
+affected.
 
 ### Code review
 
 ```sh
 raf review enable                  # from today, a lot with commits needs a code review before done
+raf commits L4                     # what there is to review: the commits the gate counts for the lot
 raf review L4 "compliant after 2 fixes"   # record the verdict (from the code-reviewer agent)
 ```
 
@@ -225,8 +229,17 @@ The counterpart of the UX review, off by default. With the rule on, `raf done`
 refuses a lot that has at least one commit citing it and no recorded verdict
 (`--force` to override), and `raf check` reports such lots finished after the
 `reviewSince` day. A lot with no commit has nothing to review; neither does a
-lot whose only commits touch the plan itself. The verdict is stored on the lot
-(`review: { date, verdict }`). Plans without `reviewSince` are not affected.
+lot whose only commits touch the plan itself, predate the plan's `since` or
+match an `ignore:` pattern — `raf commits <id>` prints exactly the counted set.
+
+The verdict is tied to what was reviewed: `raf review` stores it on the lot with
+the sha of the lot's latest counted commit (`review: { date, verdict, commit }`,
+`commit: null` when the lot had none). A counted commit made after that one
+makes the review stale: `raf done` refuses (`--force` to override), and
+`raf check` reports a finished lot, until the lot is reviewed again and
+`raf review` is rerun. A verdict
+written by hand without a `commit` field is not checked for staleness. An empty
+verdict is refused. Plans without `reviewSince` are not affected.
 
 ## session
 
@@ -368,11 +381,12 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   edits code.
 - **code-reviewer** (agent): any stack; given a repository and a lot id, it reads
   the diff itself from the commits that cite the lot — not the author's summary —
-  and the project's CLAUDE.md for its conventions; findings grounded in a
+  and the project's CLAUDE.md, when there is one, for its conventions; findings grounded in a
   measurement (a failing command, changed code without a test, a duplicated
   block, dead code) or a named rule, each with `file:line` and a concrete
   scenario; real defects only, ranked, what it could not verify, and a one-line
-  verdict for `raf review`. It never edits code.
+  verdict for `raf review`. It takes the lot's commits from `raf commits`, never
+  runs a build whose output is used live, and never edits code.
 
 ## License
 

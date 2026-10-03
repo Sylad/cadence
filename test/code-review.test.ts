@@ -66,7 +66,7 @@ describe('revue de code', () => {
     const yaml = planOf(dir);
     expect(yaml).toContain('reviewSince: 2026-09-28');
     expect(yaml.indexOf('reviewSince:')).toBeLessThan(yaml.indexOf('lots:'));
-    expect(yaml).toContain('review: { date: 2026-09-28, verdict: conforme après 1 correction }');
+    expect(yaml).toMatch(/review: \{ date: 2026-09-28, verdict: conforme après 1 correction, commit: [0-9a-f]{40} \}/);
     expect((await raf(dir, 'check')).out).toBe('✓ plan et historique cohérents');
   });
 
@@ -140,7 +140,7 @@ describe('revue de code', () => {
     }
     expect(planOf(dir)).not.toContain('review:');
     expect((await raf(dir, 'done', 'L1')).code).toBe(2);
-    expect(() => Plan.load(join(dir, 'docs/plan/raf.yaml')).recordReview('L1', ' ', '2026-09-28')).toThrow(/verdict vide/);
+    expect(() => Plan.load(join(dir, 'docs/plan/raf.yaml')).recordReview('L1', ' ', '2026-09-28', null)).toThrow(/verdict vide/);
   });
 
   it('un verdict écrit à la main dans le YAML est lu', async () => {
@@ -160,6 +160,104 @@ describe('revue de code', () => {
     expect(help).toContain('raf review enable');
     expect(help).toContain('raf review <id> "verdict"');
     expect(help).toContain('agent code-reviewer');
+  });
+});
+
+describe('revue de code liée au commit relu', () => {
+  const head = (dir: string) => execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+  const STALE = 'raf: L1 : la revue de code précède 1 commit(s) du lot, elle est à refaire — raf review L1 "verdict" (--force pour passer outre)';
+
+  async function lotWithCommit() {
+    const dir = gitRepo();
+    await raf(dir, 'init', '--no-hook');
+    await raf(dir, 'review', 'enable');
+    await raf(dir, 'add', 'Cache');
+    await raf(dir, 'start', 'L1');
+    commit(dir, 'feat(L1): cache', '2026-09-28T10:00:00');
+    return dir;
+  }
+
+  it('le verdict note le dernier commit du lot ; un commit ultérieur ferme la porte, une nouvelle revue la rouvre', async () => {
+    const dir = await lotWithCommit();
+    await raf(dir, 'review', 'L1', 'conforme');
+    expect(planOf(dir)).toContain(`review: { date: 2026-09-28, verdict: conforme, commit: ${head(dir)} }`);
+
+    commit(dir, 'fix(L1): oubli', '2026-09-28T11:00:00');
+    const refused = await raf(dir, 'done', 'L1');
+    expect(refused.code).toBe(2);
+    expect(refused.err).toBe(STALE);
+    expect(planOf(dir)).not.toContain('status: done');
+
+    await raf(dir, 'review', 'L1', 'conforme', 'après', 'relecture');
+    expect(planOf(dir)).toContain(`review: { date: 2026-09-28, verdict: conforme après relecture, commit: ${head(dir)} }`);
+    expect((await raf(dir, 'done', 'L1')).code).toBe(0);
+  });
+
+  it('un verdict frais laisse passer done ; --force passe outre un verdict dépassé', async () => {
+    const dir = await lotWithCommit();
+    await raf(dir, 'review', 'L1', 'conforme');
+    expect((await raf(dir, 'done', 'L1')).code).toBe(0);
+
+    const forced = await lotWithCommit();
+    await raf(forced, 'review', 'L1', 'conforme');
+    commit(forced, 'fix(L1): oubli', '2026-09-28T11:00:00');
+    expect((await raf(forced, 'done', 'L1', '--force')).code).toBe(0);
+  });
+
+  it('check signale un lot terminé qui a reçu un commit après sa revue', async () => {
+    const dir = await lotWithCommit();
+    await raf(dir, 'review', 'L1', 'conforme');
+    expect((await rafOn('2026-09-29', dir, 'done', 'L1')).code).toBe(0);
+    expect((await raf(dir, 'check')).out).toBe('✓ plan et historique cohérents');
+
+    commit(dir, 'fix(L1): correctif tardif', '2026-09-29T11:00:00');
+    commit(dir, 'fix(L1): second correctif', '2026-09-29T12:00:00');
+    const check = await rafOn('2026-09-29', dir, 'check');
+    expect(check.code).toBe(1);
+    expect(check.out).toContain('✗ L1 est terminé avec 2 commit(s) postérieur(s) à sa revue de code, à refaire — raf review L1 "verdict"');
+
+    await rafOn('2026-09-29', dir, 'review', 'L1', 'conforme');
+    expect((await rafOn('2026-09-29', dir, 'check')).out).toBe('✓ plan et historique cohérents');
+  });
+
+  it('un commit qui ne touche que le plan, après le verdict, ne le périme pas', async () => {
+    const dir = await lotWithCommit();
+    await raf(dir, 'review', 'L1', 'conforme');
+    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    execFileSync('git', ['commit', '-q', '-m', 'chore(plan): L1 relu'], { cwd: dir, env: { ...process.env, GIT_AUTHOR_DATE: '2026-09-28T12:00:00', GIT_COMMITTER_DATE: '2026-09-28T12:00:00' } });
+    expect((await rafOn('2026-09-29', dir, 'done', 'L1')).code).toBe(0);
+    expect((await rafOn('2026-09-29', dir, 'check')).out).toBe('✓ plan et historique cohérents');
+  });
+
+  it('un verdict noté sans aucun commit ne couvre rien : le premier commit le périme', async () => {
+    const dir = gitRepo();
+    await raf(dir, 'init', '--no-hook');
+    await raf(dir, 'review', 'enable');
+    await raf(dir, 'add', 'Cache');
+    await raf(dir, 'add', 'Jamais commité');
+    await raf(dir, 'start', 'L1');
+    await raf(dir, 'start', 'L2');
+    await raf(dir, 'review', 'L1', 'rien à relire');
+    await raf(dir, 'review', 'L2', 'rien à relire');
+    expect(planOf(dir)).toContain('review: { date: 2026-09-28, verdict: rien à relire, commit: null }');
+    expect((await raf(dir, 'done', 'L2')).code).toBe(0);
+    commit(dir, 'feat(L1): cache', '2026-09-28T10:00:00');
+    expect((await raf(dir, 'done', 'L1')).err).toBe(STALE);
+  });
+
+  it('un verdict écrit à la main sans champ commit n’est jamais périmé ; avec un commit que le lot n’a pas, il l’est', async () => {
+    const handWritten = async (extra: string) => {
+      const dir = await lotWithCommit();
+      writeFileSync(join(dir, 'docs/plan/raf.yaml'), planOf(dir).replace('    status: doing\n', `    status: doing\n    review: { date: 2026-09-28, verdict: conforme${extra} }\n`));
+      commit(dir, 'fix(L1): oubli', '2026-09-28T11:00:00');
+      return dir;
+    };
+    const free = await handWritten('');
+    expect((await rafOn('2026-09-29', free, 'done', 'L1')).code).toBe(0);
+    expect((await rafOn('2026-09-29', free, 'check')).out).toBe('✓ plan et historique cohérents');
+    // Historique réécrit, sha abrégé, faute de frappe : la revue ne se rattache à aucun commit du lot.
+    const lost = await handWritten(', commit: deadbee');
+    expect((await raf(lost, 'done', 'L1')).err).toBe(STALE.replace('1 commit(s)', '2 commit(s)'));
   });
 });
 

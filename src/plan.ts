@@ -14,6 +14,11 @@ export interface Note {
 export interface Verdict {
   date: Day;
   verdict: string;
+  /**
+   * Revue de code : sha du dernier commit compté du lot au moment du verdict, null s'il n'y en avait
+   * aucun. Absent d'un verdict écrit à la main : rien ne dit ce qui a été relu, rien n'est contrôlé.
+   */
+  commit?: string | null;
 }
 
 export interface Task {
@@ -238,7 +243,7 @@ export class Plan {
   }
 
   recordUx(lotId: string, verdict: string, today: Day): void {
-    this.recordVerdict('ux', 'la revue UX', lotId, verdict, today);
+    this.recordVerdict('ux', 'la revue UX', lotId, { date: today, verdict });
   }
 
   /** Date d'activation de la revue de code obligatoire des lots à commits ; absente = règle inactive. */
@@ -252,8 +257,9 @@ export class Plan {
     return this.enableGate('reviewSince', today);
   }
 
-  recordReview(lotId: string, verdict: string, today: Day): void {
-    this.recordVerdict('review', 'la revue de code', lotId, verdict, today);
+  /** `commit` : sha du dernier commit compté du lot (le plan ne lit pas git), null s'il n'en a aucun. */
+  recordReview(lotId: string, verdict: string, today: Day, commit: string | null): void {
+    this.recordVerdict('review', 'la revue de code', lotId, { date: today, verdict, commit });
   }
 
   private enableGate(key: 'uxSince' | 'reviewSince', today: Day): boolean {
@@ -268,12 +274,12 @@ export class Plan {
     return true;
   }
 
-  private recordVerdict(key: 'ux' | 'review', label: string, lotId: string, verdict: string, today: Day): void {
+  private recordVerdict(key: 'ux' | 'review', label: string, lotId: string, entry: Verdict): void {
     this.writable();
     if (lotId.includes('/')) throw new RafError(`${label} se note sur un lot, pas une sous-tâche`);
     // Un verdict vide ouvrirait la porte sans rien dire de la revue.
-    if (verdict.trim() === '') throw new RafError(`verdict vide : ${label} attend son verdict — raf ${key} ${lotId} "verdict"`);
-    const node = this.doc.createNode({ date: today, verdict }) as YAMLMap;
+    if (entry.verdict.trim() === '') throw new RafError(`verdict vide : ${label} attend son verdict — raf ${key} ${lotId} "verdict"`);
+    const node = this.doc.createNode(entry) as YAMLMap;
     node.flow = true;
     this.lotNode(lotId).set(key, node);
   }
@@ -341,10 +347,11 @@ export class Plan {
   }
 
   /**
-   * `ref` is `L3` or `L3/t1`. `commits` : nombre de commits à relire qui citent le lot (le plan ne lit
-   * pas git) ; sans lui, la revue de code n'est pas exigée.
+   * `ref` is `L3` or `L3/t1`. `unreviewed` : nombre de commits du lot que sa revue de code ne couvre
+   * pas (le plan ne lit pas git) — tous sans verdict, ceux postérieurs au commit relu sinon ; sans lui,
+   * la revue de code n'est pas exigée.
    */
-  setStatus(ref: string, status: Status, today: Day, opts: { force?: boolean; commits?: number } = {}): void {
+  setStatus(ref: string, status: Status, today: Day, opts: { force?: boolean; unreviewed?: number } = {}): void {
     this.writable();
     const [lotId, taskId] = ref.split('/');
     if (taskId) {
@@ -367,8 +374,12 @@ export class Plan {
       if (this.uxSince && lot.visible && !lot.ux && !opts.force) {
         throw new RafError(`${lotId} est visible : revue UX attendue avant done — raf ux ${lotId} "verdict" (--force pour passer outre)`);
       }
-      if (this.reviewSince && opts.commits && !lot.review && !opts.force) {
-        throw new RafError(`${lotId} a ${opts.commits} commit(s) : revue de code attendue avant done — raf review ${lotId} "verdict" (--force pour passer outre)`);
+      if (this.reviewSince && opts.unreviewed && !opts.force) {
+        throw new RafError(
+          lot.review
+            ? `${lotId} : la revue de code précède ${opts.unreviewed} commit(s) du lot, elle est à refaire — raf review ${lotId} "verdict" (--force pour passer outre)`
+            : `${lotId} a ${opts.unreviewed} commit(s) : revue de code attendue avant done — raf review ${lotId} "verdict" (--force pour passer outre)`,
+        );
       }
     }
     node.set('status', status);
@@ -493,5 +504,8 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
 function asVerdict(raw: unknown): Verdict | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const v = raw as Record<string, unknown>;
-  return { date: String(v.date ?? ''), verdict: String(v.verdict ?? '') };
+  const verdict: Verdict = { date: String(v.date ?? ''), verdict: String(v.verdict ?? '') };
+  // Champ présent mais vide : relu « jusqu'à rien », comme un verdict noté sans commit.
+  if ('commit' in v) verdict.commit = v.commit == null || String(v.commit).trim() === '' ? null : String(v.commit).trim();
+  return verdict;
 }

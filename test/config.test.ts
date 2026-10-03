@@ -196,7 +196,7 @@ describe('a plan in another format', () => {
       () => plan.enableUx('2026-09-28'),
       () => plan.recordUx('B33', 'ok', '2026-09-28'),
       () => plan.enableReview('2026-09-28'),
-      () => plan.recordReview('B33', 'ok', '2026-09-28'),
+      () => plan.recordReview('B33', 'ok', '2026-09-28', null),
       () => plan.save(),
     ]) expect(write).toThrow(/lecture seule/);
     expect(readFileSync(plan.path, 'utf8')).toBe(before);

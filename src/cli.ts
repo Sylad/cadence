@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readPlanConfig, readSessionConfig } from './config.js';
-import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits } from './audit.js';
+import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
@@ -149,9 +149,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       need(1, `${command} <id>`);
       const plan = loadPlan();
       const status: Status = command === 'start' ? 'doing' : command === 'done' ? 'done' : 'dropped';
-      // Le plan ne lit pas git : lui dire combien de commits citent le lot quand la revue de code est exigée.
-      const commits = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? lotWork(plan, root, rest[0]).length : 0;
-      plan.setStatus(rest[0], status, today, { force: values.force, commits });
+      // Le plan ne lit pas git : lui dire combien de commits du lot sa revue ne couvre pas quand elle est exigée.
+      const unreviewed = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? unreviewedWork(plan, root, rest[0]) : 0;
+      plan.setStatus(rest[0], status, today, { force: values.force, unreviewed });
       if (command === 'drop' && values.reason) plan.note(rest[0], `abandonné : ${values.reason}`, today);
       plan.save();
       io.out(`${rest[0]} → ${status}`);
@@ -172,7 +172,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'ux':
     case 'review':
-      return gate(command, rest, loadPlan, today, io);
+      return gate(command, rest, loadPlan, root, today, io);
     case 'commits': {
       need(1, 'commits <lot>');
       const plan = loadPlan();
@@ -268,7 +268,7 @@ const GATES = {
 };
 
 /** « raf ux … » et « raf review … » ont la même forme : activer la porte, ou noter le verdict d'un lot. */
-function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, today: Day, io: Io): number {
+function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io): number {
   if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
   const plan = loadPlan();
   if (rest[0] === 'enable') {
@@ -281,7 +281,8 @@ function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, to
   // Le plan refuse lui-même une sous-tâche, un verdict vide, un lot inconnu.
   const verdict = rest.slice(1).join(' ');
   if (kind === 'ux') plan.recordUx(rest[0], verdict, today);
-  else plan.recordReview(rest[0], verdict, today);
+  // Le verdict vaut jusqu'au dernier commit compté du lot ; un plan en lecture seule refuse sans lire git.
+  else plan.recordReview(rest[0], verdict, today, plan.readonly ? null : (lotWork(plan, root, rest[0])[0]?.sha ?? null));
   plan.save();
   return 0;
 }

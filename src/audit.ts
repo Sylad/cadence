@@ -4,7 +4,7 @@ import type { Day } from './dates.js';
 import { changedFiles, readCommits, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import { loadEntries, newsIssues } from './news.js';
-import { isOpen, type Lot, type Plan } from './plan.js';
+import { isOpen, type Lot, type Plan, type Verdict } from './plan.js';
 
 /** Le plan, sa page Gantt et les fichiers tenus avec lui (cadence.yaml : plan.files). */
 function ownFiles(plan: Plan, root: string): Set<string> {
@@ -72,9 +72,35 @@ function workCommits(plan: Plan, root: string, commits: Commit[]): Commit[] {
   return commits.filter((c) => (!adopted || c.day >= adopted) && !isPlanOnly(c.sha, plan, root));
 }
 
-/** Commits à relire d'un lot — ce que `raf done` compte quand la revue de code est active. */
+/** Commits liés à un lot, du plus récent au plus ancien, avant tout tri : commits de plan et d'avant l'adoption compris. */
+function lotCommits(plan: Plan, root: string, lotId: string): Commit[] {
+  return linkCommits(plan.lots(), planCommits(plan, root), plan.refs).byLot.get(lotId) ?? [];
+}
+
+/** Commits à relire d'un lot, du plus récent au plus ancien — ce que compte la porte de revue de code et que liste `raf commits`. */
 export function lotWork(plan: Plan, root: string, lotId: string): Commit[] {
-  return workCommits(plan, root, linkCommits(plan.lots(), planCommits(plan, root), plan.refs).byLot.get(lotId) ?? []);
+  return workCommits(plan, root, lotCommits(plan, root, lotId));
+}
+
+/**
+ * Commits à relire que la revue de code d'un lot ne couvre pas, parmi ses commits liés (du plus récent
+ * au plus ancien) : tous sans verdict ; aucun pour un verdict qui ne dit pas quel commit il a relu
+ * (écrit à la main) ; sinon ceux qui suivent le commit relu — tous quand il n'y en avait aucun, ou
+ * quand il n'est plus parmi ceux du lot (historique réécrit) : la revue ne se rattache alors à rien.
+ */
+function unreviewed(plan: Plan, root: string, review: Verdict | undefined, linked: Commit[]): Commit[] {
+  if (!review) return workCommits(plan, root, linked);
+  const reviewed = review.commit;
+  if (reviewed === undefined) return [];
+  const at = reviewed === null ? -1 : linked.findIndex((c) => c.sha === reviewed);
+  // Seuls les commits postérieurs sont examinés : un lot relu à son dernier commit ne coûte aucun appel git.
+  return workCommits(plan, root, at < 0 ? linked : linked.slice(0, at));
+}
+
+/** Nombre de commits d'un lot que sa revue de code ne couvre pas — ce que `raf done` refuse quand la porte est active. */
+export function unreviewedWork(plan: Plan, root: string, lotId: string): number {
+  const lot = plan.lots().find((l) => l.id === lotId);
+  return lot ? unreviewed(plan, root, lot.review, lotCommits(plan, root, lotId)).length : 0;
 }
 
 /**
@@ -92,18 +118,23 @@ export function uxIssues(plan: Plan): { message: string }[] {
 }
 
 /**
- * Lots terminés APRÈS le jour d'activation avec des commits à relire et sans revue de code enregistrée.
- * Même règle de date que `uxIssues` ; un lot sans commit n'a rien à faire relire.
+ * Lots terminés APRÈS le jour d'activation avec des commits à relire que leur revue de code ne couvre
+ * pas : aucun verdict, ou un verdict antérieur à ces commits. Même règle de date que `uxIssues` ; un
+ * lot sans commit n'a rien à faire relire.
  */
 export function reviewIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): { message: string }[] {
   const since = plan.reviewSince;
   if (!since) return [];
   return plan
     .lots()
-    .filter((l) => l.status === 'done' && !l.review && (!l.finished || l.finished > since))
-    .map((l) => ({ id: l.id, commits: workCommits(plan, root, byLot.get(l.id) ?? []).length }))
+    .filter((l) => l.status === 'done' && (!l.finished || l.finished > since))
+    .map((l) => ({ id: l.id, reviewed: !!l.review, commits: unreviewed(plan, root, l.review, byLot.get(l.id) ?? []).length }))
     .filter((l) => l.commits > 0)
-    .map((l) => ({ message: `${l.id} est terminé avec ${l.commits} commit(s) sans revue de code — raf review ${l.id} "verdict"` }));
+    .map((l) => ({
+      message: l.reviewed
+        ? `${l.id} est terminé avec ${l.commits} commit(s) postérieur(s) à sa revue de code, à refaire — raf review ${l.id} "verdict"`
+        : `${l.id} est terminé avec ${l.commits} commit(s) sans revue de code — raf review ${l.id} "verdict"`,
+    }));
 }
 
 /** Ce qui vient ensuite : lots en cours, puis lots prêts (dépendances closes), gains rapides d'abord. */

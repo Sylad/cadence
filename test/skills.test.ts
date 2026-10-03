@@ -78,6 +78,59 @@ describe('skills install', () => {
     ]) expect(text).toContain(clause);
   });
 
+  it('CLI : installe aussi l’agent qa-reviewer, sans liste d’outils (le navigateur disponible dépend de l’installation)', async () => {
+    const dir = gitRepo();
+    const out: string[] = [];
+    const code = await run(['skills', 'install'], { cwd: dir, env: {}, out: (l) => out.push(l), err: () => {}, now: () => new Date() });
+    expect(code).toBe(0);
+    expect(out.join('\n')).toContain('cadence-qa-reviewer (agent) : installé');
+    const agent = readFileSync(join(dir, '.claude/agents/cadence-qa-reviewer.md'), 'utf8');
+    expect(agent).toMatch(/^---\nname: cadence-qa-reviewer\ndescription: .+\n---\n/);
+  });
+
+  it('agent qa-reviewer : le contrat — lecture seule, attentes du projet, constats mesurés', () => {
+    const agent = readFileSync(join(AGENTS_DIR, 'qa-reviewer.md'), 'utf8');
+    const text = agent.replace(/\s+/g, ' ');
+    for (const clause of [
+      // Lecture seule : ni le code, ni le plan, ni les attentes ; GET seulement, arrêt devant un PIN.
+      'You report; you never edit code, the plan or the expectations',
+      'never log in, never submit a form that writes',
+      'GET only',
+      'If a PIN or a login wall is met, say so and stop there for those pages',
+      // Entrées.
+      'The absolute path of the repository and the base URL of the app',
+      'Optionally a lot id: then start with the pages that lot touched',
+      // Le fichier d'attentes, et son absence.
+      '`docs/qa/expectations.md`, or the file named by `qa.expectations` in `cadence.yaml`',
+      'No expectations file: do not guess silently',
+      'return a DRAFT expectations file as text',
+      'without expectations an empty state cannot be told from a normal one',
+      // Ce qui se mesure, aux deux largeurs.
+      'in a real browser',
+      'at **1440 px** and **390 px** wide',
+      'answered 2xx with a non-empty body where data is expected',
+      'A 200 with an empty or null body',
+      'is a failure',
+      'no console error',
+      'no broken image among the content images',
+      'never an impression',
+      // Classement et périmètre.
+      '*defect* — an expectation is broken',
+      '*suspect* — no expectation covers it but it looks like missing data: say why',
+      'usability and accessibility belong to `ux-reviewer`, code quality to `code-reviewer`',
+      "*blocking* (a page's main content is missing, or an error is shown to the user)",
+      // Sortie.
+      '**Pages checked N/N**, with the base URL and the date and time of the run',
+      'one `raf add "…"` line per finding worth doing',
+      "plain lines for the project's own tool",
+      '**Verdict**, one line',
+      '**Not verified**',
+      'in a temporary directory outside the repository',
+    ]) expect(text).toContain(clause);
+    // Une page vide alors que tout est vert : la raison d'être de l'agent reste écrite dans son contrat.
+    expect(text).toContain('a players page with no players is a defect, whatever the cause');
+  });
+
   it('les skills lead et session-close nomment la porte de revue de code', () => {
     const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8');
     expect(skill('lead')).toContain('The `code-reviewer` agent');

@@ -52,6 +52,12 @@ Deliver one project at a time: the one the human names, or ask.
    blindly, never skip a check to make it pass.
 5. On success: `raf done <id>` (or the project's own tool when its plan is read-only) for the lots it lists **whose effect you have seen**; if one of them is
    `visible`, `cadence news build` and deliver the news too.
+6. After a green delivery of a `visible` lot, have the `qa-reviewer` agent walk the delivered app in
+   a real browser: give it the repository path, the base URL and the lot id. It checks each page
+   against `docs/qa/expectations.md` — what the user must find there — and reports a page left
+   empty, an error shown, an API call that failed or came back empty: what the checks of
+   `cadence.yaml` do not see. Bring its blocking findings to the human. It is not a gate: the
+   delivery stays done, a finding becomes a new lot.
 
 ## Rules
 

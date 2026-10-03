@@ -138,4 +138,21 @@ describe('skills install', () => {
     expect(skill('lead')).toContain('do not push, deliver, run `raf done`, `raf ux` or\n> `raf review`.');
     expect(skill('session-close')).toContain('`raf review <id> "…"`');
   });
+
+  it('les skills lead et deliver font suivre la livraison d’un lot visible par l’agent qa-reviewer ; session-start n’en parle pas', () => {
+    const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8').replace(/\s+/g, ' ');
+    const lead = skill('lead');
+    // Étape 4 du lead : après la livraison, pas avant ; les constats bloquants remontent à l'humain.
+    const delivery = lead.slice(lead.indexOf('## 4. Delivery'), lead.indexOf('## 5. Close'));
+    expect(delivery).toContain('After a green delivery of a lot marked `visible`, have the `qa-reviewer` agent check the delivered app');
+    expect(delivery).toContain('the absolute path of the project, the base URL of the delivered app and the lot id');
+    expect(delivery).toContain('Bring its blocking findings back to the human');
+    expect(delivery).toContain('It is not a gate');
+    const deliver = skill('deliver');
+    expect(deliver).toContain('After a green delivery of a `visible` lot, have the `qa-reviewer` agent');
+    expect(deliver).toContain('`docs/qa/expectations.md`');
+    expect(deliver).toContain('It is not a gate');
+    // La re-vérification périodique par commande est un autre lot (L8).
+    expect(skill('session-start')).not.toContain('qa-reviewer');
+  });
 });

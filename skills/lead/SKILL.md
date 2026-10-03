@@ -74,6 +74,16 @@ proposed sub-tasks back to the human.
 One project at a time, by the lead: push, then the `deliver` skill (`cadence deliver --dry-run`, then
 `cadence deliver`). Follow the human's standing instructions about confirmation before production.
 
+After a green delivery of a lot marked `visible`, have the `qa-reviewer` agent check the delivered
+app, as a fresh subagent: give it the absolute path of the project, the base URL of the delivered
+app and the lot id. It walks the pages in a real browser against the project's expectations
+(`docs/qa/expectations.md`: per page, what the user must find there) and returns measured
+findings; it reads only, and never logs in. Bring its blocking findings back to the human — a page
+whose main content is missing, or that shows an error, is a defect even when the delivery checks
+are green — with its proposed follow-up lines. A project without an expectations file gets a draft
+back: show it to the human, who corrects it and decides whether it is committed. It is not a gate:
+`raf done` does not wait for it, and a finding becomes a new lot, not a reopened one.
+
 ## 5. Close
 
 At the end, the `session-close` routine in each project touched, and `cadence session next` lines in

@@ -65,7 +65,9 @@ lots:
     created: 2026-10-03
   - id: L9
     title: "Agent qa-reviewer : après la livraison d'un lot, parcourt les pages de l'app dans un vrai navigateur et signale états vides, messages d'erreur, appels d'API en échec et erreurs de console — constat mesuré, lecture seule ; à cadrer après cadence verify (ce qui se vérifie par une commande ne doit pas coûter un agent)"
-    status: doing
+    status: done
     estimate: 1.5
     created: 2026-10-03
     started: 2026-10-03
+    review: { date: 2026-10-03, verdict: "conforme après corrections — relecture indépendante des 4 premiers commits : 0 bloquant, 0 majeur, 4 mineurs (déclencheur trop étroit, trou de classement, absence normale inexprimable, tests trop lâches), tous corrigés ; premier passage réel de l'agent sur ol-companion en prod (13/13 pages, 8 constats réels) et ses notes de contrat intégrées ; 200 clauses épinglées, 200 suppressions détectées ; revérifié par le lead : 191 tests, typecheck, diff de l'agent relu. La passe de corrections elle-même n'a pas été relue par un agent indépendant et l'agent amendé n'a pas encore retourné sur une app.", commit: 971b668b87bb1788fd6d457520aef3d537d3092a }
+    finished: 2026-10-03

@@ -392,7 +392,10 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
 - Commands get `CADENCE_SHA`, `CADENCE_SHORT` (7 characters) and `CADENCE_BRANCH`;
   `${SHA}` and `${SHORT}` are replaced in `url` and `contains`.
 - On success the lots cited by the commits since the previous delivery are
-  listed, so you can `raf done` those whose effect you have seen.
+  listed, so you can `raf done` those whose effect you have seen. With a
+  read-only plan, only the lots that were in progress when the delivery started
+  are listed: an id quoted in a message for context (a finished lot, a
+  reservation number that looks like one) is not a delivered lot.
 
 ### A project with its own delivery script
 

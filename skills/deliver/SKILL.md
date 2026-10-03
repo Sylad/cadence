@@ -51,7 +51,9 @@ Deliver one project at a time: the one the human names, or ask.
 4. On failure: read which step failed and why. Fix the cause, commit, push, deliver again. Never rerun
    blindly, never skip a check to make it pass.
 5. On success: `raf done <id>` (or the project's own tool when its plan is read-only) for the lots it lists **whose effect you have seen**; if one of them is
-   `visible`, `cadence news build` and deliver the news too.
+   `visible`, `cadence news build` and deliver the news too. With a read-only plan the list holds only
+   the lots that were in progress when the delivery started; the project's own tool has the last word
+   on what it marked delivered.
 6. After a green delivery that changes what a page shows or what it is served (screen, API, data
    source, configuration of either) — in practice every delivery except docs-, plan- or tests-only
    ones — have the `qa-reviewer` agent walk the delivered app in a real browser, whether the lot

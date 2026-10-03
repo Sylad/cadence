@@ -385,13 +385,21 @@ async function verifyAll(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: R
   return null;
 }
 
-/** Ligne des lots cités depuis la livraison précédente, ou null (première livraison, rien de cité). */
+/**
+ * Ligne des lots cités depuis la livraison précédente, ou null (première livraison, rien de cité).
+ *
+ * Plan en lecture seule : seuls les lots EN COURS sont annoncés. Ses identifiants sont de forme libre, et
+ * un message cite volontiers un numéro qui en a la forme (réserve « R1 » d'une revue) ou un lot clos
+ * nommé pour le contexte — les annoncer « livrés » ferait fermer à tort. L'état est celui du départ de
+ * la livraison : le plan a été lu avant que le script du projet ne ferme lui-même les lots qu'il livre.
+ */
 function deliveredLots(ctx: DeliverCtx, prev: string | null, sha: string): string | null {
   if (!ctx.plan || !prev || prev === sha) return null;
   if (!isAncestor(ctx.root, prev, sha)) {
     return `livraison précédente (${prev.slice(0, 7)}) hors de l'historique de ${sha.slice(0, 7)} (réécrit ?) : lots livrés non calculés`;
   }
-  const known = new Set(ctx.plan.lots().map((l) => l.id));
+  const lots = ctx.plan.lots();
+  const known = new Set((ctx.plan.readonly ? lots.filter((l) => l.status === 'doing') : lots).map((l) => l.id));
   const ids = new Set<string>();
   for (const c of readCommits(ctx.root, { range: `${prev}..${sha}` })) {
     for (const r of ctx.plan.refs(`${c.subject}\n${c.body}`)) if (known.has(r.lot)) ids.add(r.lot);

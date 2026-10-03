@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { deliver, parseDeliverConfig, TIMED_OUT, type DeliverDeps, type GhRun } from '../src/deliver.js';
 import { headSha } from '../src/git.js';
-import { Plan } from '../src/plan.js';
+import { Plan, type PlanFormat } from '../src/plan.js';
 import { appendDelivery, lastDelivery, readLock, sharedStateDir as stateDir, writeLock } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
@@ -66,7 +66,8 @@ function ctx(dir: string, over: Record<string, unknown> = {}) {
     c: {
       root: dir,
       state: stateDir(dir),
-      plan: Plan.load(join(dir, 'docs/plan/raf.yaml')),
+      // Un test qui apporte son plan (autre fichier, autre format) n'a pas de plan à l'endroit par défaut.
+      plan: 'plan' in over ? (over.plan as Plan) : Plan.load(join(dir, 'docs/plan/raf.yaml')),
       config: CONFIG,
       today: '2026-09-28',
       dryRun: false,
@@ -388,8 +389,69 @@ describe('deliver : script du projet (L2)', () => {
     expect(out.join('\n')).toContain('Script du projet : ./livrer.sh "$CADENCE_SHORT" api');
   });
 
+  it('plan en lecture seule : seuls les lots en cours au départ de la livraison sont annoncés livrés', async () => {
+    // Cas du 03-10 (maritime-atlas) : « livré : Q4, R1, R2, R3, R4 » — R1 à R4 étaient les numéros des
+    // réserves d'une revue UX cités dans les messages, pris pour les lots (clos) qui portent ce nom.
+    const origin = tempDir();
+    git(origin, 'init', '-q', '--bare', '-b', 'main');
+    const dir = gitRepo();
+    const file = join(dir, 'taches.yaml');
+    const taches = (q4: string) =>
+      `taches:\n- { id: Q4, titre: Mandat UX, etat: ${q4} }\n- { id: Q5, titre: Suite, etat: prevu }\n` +
+      ['R1', 'R2', 'R3', 'R4'].map((id) => `- { id: ${id}, titre: Réserve close, etat: deploye }\n`).join('');
+    writeFileSync(file, taches('en_cours'));
+    git(dir, 'add', 'taches.yaml');
+    commit(dir, 'plan: adoption');
+    git(dir, 'remote', 'add', 'origin', origin);
+    git(dir, 'push', '-q', '-u', 'origin', 'main');
+    const format: PlanFormat = { lots: 'taches', fields: { title: ['titre'], status: ['etat'] }, statuses: { prevu: 'todo', en_cours: 'doing', deploye: 'done' }, estimates: {} };
+    const load = () => Plan.load(file, { format });
+    expect(await deliver(ctx(dir, { config: SCRIPT, plan: load() }).c, fakeDeps().deps)).toBe(0);
+    commit(dir, 'fix(Q4): ux10 — réserves R1 et R2 de la revue levées');
+    commit(dir, 'docs(Q4): registre UX — R3, R4 ; suite prévue en Q5');
+    git(dir, 'push', '-q');
+    // L'outil du projet ferme le lot pendant qu'il livre : cadence a lu le plan avant.
+    const { deps } = fakeDeps({
+      exec: () => {
+        writeFileSync(file, taches('deploye'));
+        return 0;
+      },
+    });
+    const { c, out } = ctx(dir, { config: { ...SCRIPT, allowDirty: true }, plan: load() });
+    expect(await deliver(c, deps)).toBe(0);
+    expect(out.filter((l) => l.startsWith('livré :'))).toEqual(["livré : Q4 — à fermer avec l'outil du projet si l'effet est celui attendu"]);
+  });
+
+  it('plan en lecture seule : aucun lot en cours cité → aucune ligne de lots livrés', async () => {
+    const dir = pushedRepo();
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'), { format: { lots: 'lots', fields: {}, statuses: {}, estimates: {} } });
+    expect(plan.lot('L1').status).toBe('todo');
+    expect(await deliver(ctx(dir, { config: SCRIPT, plan }).c, fakeDeps().deps)).toBe(0);
+    commit(dir, 'feat(L1): cache');
+    git(dir, 'push', '-q');
+    const { c, out } = ctx(dir, { config: SCRIPT, plan });
+    expect(await deliver(c, fakeDeps().deps)).toBe(0);
+    expect(out.join('\n')).toContain('✓ livré');
+    expect(out.join('\n')).not.toContain('livré : L1');
+  });
+
+  it('plan au format de raf : inchangé, un lot cité est annoncé quel que soit son statut', async () => {
+    const dir = pushedRepo();
+    expect(await deliver(ctx(dir).c, fakeDeps().deps)).toBe(0);
+    commit(dir, 'feat(L1): cache');
+    git(dir, 'push', '-q');
+    const { c, out } = ctx(dir);
+    expect(c.plan.lot('L1').status).toBe('todo');
+    expect(await deliver(c, fakeDeps().deps)).toBe(0);
+    expect(out.join('\n')).toContain('livré : L1 — raf done si l\'effet est celui attendu');
+  });
+
   it('plan en lecture seule : pas de conseil « raf done »', async () => {
     const dir = pushedRepo();
+    const path = join(dir, 'docs/plan/raf.yaml');
+    writeFileSync(path, readFileSync(path, 'utf8').replace('status: todo', 'status: doing'));
+    git(dir, 'commit', '-qam', 'plan: lot en cours');
+    git(dir, 'push', '-q');
     const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'), { format: { lots: 'lots', fields: {}, statuses: {}, estimates: {} } });
     expect(await deliver(ctx(dir, { config: SCRIPT, plan }).c, fakeDeps().deps)).toBe(0);
     commit(dir, 'feat(L1): cache');

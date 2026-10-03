@@ -220,6 +220,22 @@ describe('skills install', () => {
       '- Edit code, the plan or the expectations file, commit, or mark anything done: the session that called you does it. ',
     ].join(' '));
     expect(qa.description).toContain('never an impression');
+    expect(qa.description).toContain("Given a repository path and a base URL, it checks each page against the project's expectations file (`docs/qa/expectations.md` — per route, what the user must find, what must never appear, the API calls the page depends on) at a desktop and a phone width;");
+    // Ce que le balayage clause par clause laissait encore passer : entrées, mesures, décompte, fichiers temporaires.
+    expect(qa.body).toContain('You check a running web app the way its user meets it: page by page, in a real browser.');
+    expect(qa.body).toContain('A page can be empty while everything else is green: no code changed, a data source went down upstream, the unit tests replace the network, the health endpoint answers ok, and the message on screen is exactly the one the code was written to show. Neither a test nor a code review calls that a defect. You do:');
+    expect(qa.section('Inputs')).toContain('The absolute path of the repository and the base URL of the app — deployed, or a local server the caller started.');
+    expect(qa.section('Inputs')).toContain('If the path or the URL is missing, or the URL does not answer, say so and stop.');
+    expect(method).toContain("**Read how to reach the app**: the project's CLAUDE.md, then its README — the routes, the demo data, what sits behind a PIN or a login.");
+    expect(method).toContain('- the expected content is present and non-empty — name the selector or the text found and its count (`.player-card` ×14), not "the list looks fine";');
+    expect(method).toContain('- no `never:` text on screen, and no other error or missing-data message;');
+    expect(method).toContain('- every API call of the page — those listed, and those you saw it make to its own backend — answered 2xx with a non-empty body:');
+    expect(method).toContain('- no console error: quote the first line of each;');
+    expect(qa.section('Output')).toContain('The second N is every page of the expectations (or every route discovered): a page you could not open');
+    expect(qa.section('Output')).toContain('- **Proposed follow-ups**: one `raf add "…"` line per finding worth doing;');
+    expect(qa.section('Output')).toContain('Without an expectations file, the draft comes here.');
+    expect(qa.section('Output')).toContain('- **Verdict**, one line, alone — e.g. "6/6 pages as expected", "not as expected: 1 blocking (/players shows no player)",');
+    expect(qa.section('Output')).toContain('Captures and temporary files go in a temporary directory outside the repository, or in the one the caller names; remove them, or list their paths in the report. The working tree is left as you found it.');
     expect(qa.description).toContain('without an expectations file it still runs its universal checks, reports what it saw and returns a draft one.');
     expect(qa.description).toContain('reports empty states, wrong data, error messages, failed or empty API calls, console errors and broken images.');
     // Déclencheur : toute livraison qui change ce qu'une page montre ou reçoit — pas seulement un lot « visible ».
@@ -252,7 +268,9 @@ describe('skills install', () => {
     expect(delivery).toContain('it reads only, and never logs in');
     // Ce n'est pas une porte : raf done ne l'attend pas, un constat devient un nouveau lot.
     expect(delivery).toContain('It is not a gate: `raf done` does not wait for it, and a finding becomes a new lot, not a reopened one.');
-    expect(delivery).toContain('show it to the human, who corrects it and decides whether it is committed');
+    expect(delivery).toContain('A project without an expectations file gets a draft back: show it to the human, who corrects it and decides whether it is committed.');
+    expect(delivery).toContain("It walks the pages in a real browser against the project's expectations (`docs/qa/expectations.md`: per page, what the user must find there) and returns measured findings;");
+    expect(delivery).toContain('Bring its blocking findings back to the human — a page whose main content is missing, or that shows an error, is a defect even when the delivery checks are green — with its proposed follow-up lines.');
     const deliver = skill('deliver');
     const step = deliver.slice(deliver.indexOf(' 6. '), deliver.indexOf('## Rules'));
     expect(step).toContain(`After a green delivery that ${QA_TRIGGER} — have the \`qa-reviewer\` agent walk the delivered app in a real browser, whether the lot is \`visible\` or not:`);
@@ -260,7 +278,7 @@ describe('skills install', () => {
     expect(step).not.toContain('delivery of a `visible` lot');
     // Ses entrées, la remontée des constats bloquants, et la livraison qui reste faite.
     expect(step).toContain('give it the repository path, the base URL and the lot id.');
-    expect(step).toContain('`docs/qa/expectations.md`');
+    expect(step).toContain('It checks each page against `docs/qa/expectations.md` — what the user must find there — and reports a page left empty, an error shown, an API call that failed or came back empty: what the checks of `cadence.yaml` do not see.');
     expect(step).toContain('Bring its blocking findings to the human.');
     expect(step).toContain('It is not a gate: the delivery stays done, a finding becomes a new lot.');
     // La re-vérification périodique par commande est un autre lot (L8).
@@ -294,6 +312,11 @@ describe('skills install', () => {
     // Les trois sortes de constat, comme dans le contrat de l'agent.
     expect(skills).toContain('Findings are defects (a line of the expectations broken, or a universal check failing with a visible effect, with or without an expectations file), suspects (it looks like missing or wrong data and no expectation settles it) or noise (a console error or a failed request with no visible effect, ranked minor)');
     expect(skills).toContain('Read-only: GET only, no login, nothing submitted; it stops at a PIN.');
+    expect(skills).toContain("it opens each page of the project's expectations file in a real browser at 1440 and 390 px and measures: expected content present and non-empty, no error or missing-data message, every API call answered 2xx with a non-empty body, no console error, no broken content image.");
+    expect(skills).toContain('ranked, each with the route, what was expected, what was measured and the evidence; pages checked N/N, follow-ups as `raf add` lines, what it could not verify, a one-line verdict.');
+    expect(text).toContain("The `qa-reviewer` agent opens each page of the running app in a real browser and judges it from the user's side. A page can be empty while everything else is green — no code changed, a data source went down upstream, the unit tests replace the network, `/api/health` answers ok, and the \"nothing found\" on screen is the message the code was written to show.");
+    expect(text).toContain('The agent cannot tell such an empty state from a normal one by itself: the project says what each page must show, in `docs/qa/expectations.md` — one `## <route>` section per page, three kinds of lines:');
+    expect(text).toContain('The rest is free text, written for a reader: a line can be repeated, and');
     // La définition des trois sortes de lignes.
     expect(text).toContain('- `shows:` — content that must be present and non-empty, with a count where one exists;');
     expect(text).toContain('- `never:` — texts that must not appear: error messages, and empty-state messages that mean missing data;');

@@ -11,6 +11,11 @@ export interface Note {
   text: string;
 }
 
+export interface Verdict {
+  date: Day;
+  verdict: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -32,7 +37,9 @@ export interface Lot {
   notes: Note[];
   tasks: Task[];
   /** Revue d'ergonomie enregistrée par `raf ux`. */
-  ux?: { date: Day; verdict: string };
+  ux?: Verdict;
+  /** Revue de code enregistrée par `raf review`. */
+  review?: Verdict;
   /** Champs écrits à la main illisibles (dates mal formées…), remontés par check. */
   problems: string[];
 }
@@ -227,23 +234,46 @@ export class Plan {
 
   /** Active la revue UX ; false si elle l'était déjà. */
   enableUx(today: Day): boolean {
+    return this.enableGate('uxSince', today);
+  }
+
+  recordUx(lotId: string, verdict: string, today: Day): void {
+    this.recordVerdict('ux', 'la revue UX', lotId, verdict, today);
+  }
+
+  /** Date d'activation de la revue de code obligatoire des lots à commits ; absente = règle inactive. */
+  get reviewSince(): Day | undefined {
+    const v = this.doc.get('reviewSince');
+    return v == null ? undefined : String(v);
+  }
+
+  /** Active la revue de code ; false si elle l'était déjà. */
+  enableReview(today: Day): boolean {
+    return this.enableGate('reviewSince', today);
+  }
+
+  recordReview(lotId: string, verdict: string, today: Day): void {
+    this.recordVerdict('review', 'la revue de code', lotId, verdict, today);
+  }
+
+  private enableGate(key: 'uxSince' | 'reviewSince', today: Day): boolean {
     this.writable();
-    if (this.uxSince) return false;
-    this.doc.set('uxSince', today);
+    if (this[key]) return false;
+    this.doc.set(key, today);
     // Placer la clé avant « lots » pour garder les réglages groupés en tête.
     const map = this.doc.contents as YAMLMap;
-    const idx = map.items.findIndex((p) => String((p.key as { value?: unknown })?.value ?? p.key) === 'uxSince');
+    const idx = map.items.findIndex((p) => String((p.key as { value?: unknown })?.value ?? p.key) === key);
     const lotsIdx = map.items.findIndex((p) => String((p.key as { value?: unknown })?.value ?? p.key) === 'lots');
     if (idx > lotsIdx && lotsIdx >= 0) map.items.splice(lotsIdx, 0, ...map.items.splice(idx, 1));
     return true;
   }
 
-  recordUx(lotId: string, verdict: string, today: Day): void {
+  private recordVerdict(key: 'ux' | 'review', label: string, lotId: string, verdict: string, today: Day): void {
     this.writable();
-    if (lotId.includes('/')) throw new RafError('la revue UX se note sur un lot, pas une sous-tâche');
+    if (lotId.includes('/')) throw new RafError(`${label} se note sur un lot, pas une sous-tâche`);
     const node = this.doc.createNode({ date: today, verdict }) as YAMLMap;
     node.flow = true;
-    this.lotNode(lotId).set('ux', node);
+    this.lotNode(lotId).set(key, node);
   }
 
   lots(): Lot[] {
@@ -308,8 +338,11 @@ export class Plan {
     return `${lotId}/${id}`;
   }
 
-  /** `ref` is `L3` or `L3/t1`. */
-  setStatus(ref: string, status: Status, today: Day, opts: { force?: boolean } = {}): void {
+  /**
+   * `ref` is `L3` or `L3/t1`. `commits` : nombre de commits à relire qui citent le lot (le plan ne lit
+   * pas git) ; sans lui, la revue de code n'est pas exigée.
+   */
+  setStatus(ref: string, status: Status, today: Day, opts: { force?: boolean; commits?: number } = {}): void {
     this.writable();
     const [lotId, taskId] = ref.split('/');
     if (taskId) {
@@ -331,6 +364,9 @@ export class Plan {
       }
       if (this.uxSince && lot.visible && !lot.ux && !opts.force) {
         throw new RafError(`${lotId} est visible : revue UX attendue avant done — raf ux ${lotId} "verdict" (--force pour passer outre)`);
+      }
+      if (this.reviewSince && opts.commits && !lot.review && !opts.force) {
+        throw new RafError(`${lotId} a ${opts.commits} commit(s) : revue de code attendue avant done — raf review ${lotId} "verdict" (--force pour passer outre)`);
       }
     }
     node.set('status', status);
@@ -446,9 +482,14 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
           status: STATUSES.includes(t.status as Status) ? (t.status as Status) : 'todo',
         }))
       : [],
-    ...(raw.ux && typeof raw.ux === 'object'
-      ? { ux: { date: String((raw.ux as Record<string, unknown>).date ?? ''), verdict: String((raw.ux as Record<string, unknown>).verdict ?? '') } }
-      : {}),
+    ...(asVerdict(raw.ux) ? { ux: asVerdict(raw.ux) } : {}),
+    ...(asVerdict(raw.review) ? { review: asVerdict(raw.review) } : {}),
     problems,
   };
+}
+
+function asVerdict(raw: unknown): Verdict | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const v = raw as Record<string, unknown>;
+  return { date: String(v.date ?? ''), verdict: String(v.verdict ?? '') };
 }

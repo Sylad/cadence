@@ -195,6 +195,8 @@ describe('a plan in another format', () => {
       () => plan.note('B33', 'x', '2026-09-28'),
       () => plan.enableUx('2026-09-28'),
       () => plan.recordUx('B33', 'ok', '2026-09-28'),
+      () => plan.enableReview('2026-09-28'),
+      () => plan.recordReview('B33', 'ok', '2026-09-28'),
       () => plan.save(),
     ]) expect(write).toThrow(/lecture seule/);
     expect(readFileSync(plan.path, 'utf8')).toBe(before);
@@ -254,5 +256,18 @@ describe('raf CLI with cadence.yaml', () => {
       expect(r.code).toBe(2);
       expect(r.err).toMatch(/lecture seule/);
     }
+  });
+
+  it('leaves a foreign plan untouched by the code review gate, with a clear message', () => {
+    const dir = gitRepo();
+    write(join(dir, 'cadence.yaml'), CONFIG);
+    const path = write(join(dir, 'docs/suivi/taches.yaml'), TACHES);
+    commit(dir, 'feat(B33): fusion', '2026-09-27T10:00:00');
+    for (const argv of [['review', 'enable'], ['review', 'B33', 'conforme'], ['done', 'B33']]) {
+      const r = raf(dir, ...argv);
+      expect(r.code).toBe(2);
+      expect(r.err).toMatch(/^raf: plan en lecture seule : .*taches\.yaml est tenu par un autre outil/);
+    }
+    expect(readFileSync(path, 'utf8')).toBe(TACHES);
   });
 });

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readPlanConfig, readSessionConfig } from './config.js';
-import { audit, exemptPlanOnly, isPlanOnly, nextUp, planCommits } from './audit.js';
+import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits } from './audit.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { ganttData, renderGantt } from './gantt.js';
@@ -32,6 +32,8 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf note <id> "texte"
   raf ux enable         revue UX obligatoire avant « done » pour les lots --visible
   raf ux <id> "verdict" enregistre la revue d'ergonomie du lot (agent ux-reviewer)
+  raf review enable     revue de code obligatoire avant « done » pour les lots qui ont des commits
+  raf review <id> "verdict" enregistre la revue de code du lot (agent code-reviewer)
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf list [--status todo|doing|done|dropped]
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
@@ -145,7 +147,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       need(1, `${command} <id>`);
       const plan = loadPlan();
       const status: Status = command === 'start' ? 'doing' : command === 'done' ? 'done' : 'dropped';
-      plan.setStatus(rest[0], status, today, { force: values.force });
+      // Le plan ne lit pas git : lui dire combien de commits citent le lot quand la revue de code est exigée.
+      const commits = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? lotWork(plan, root, rest[0]).length : 0;
+      plan.setStatus(rest[0], status, today, { force: values.force, commits });
       if (command === 'drop' && values.reason) plan.note(rest[0], `abandonné : ${values.reason}`, today);
       plan.save();
       io.out(`${rest[0]} → ${status}`);
@@ -176,6 +180,21 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       need(2, 'ux <lot> "verdict"');
       plan.lot(rest[0]);
       plan.recordUx(rest[0], rest.slice(1).join(' '), today);
+      plan.save();
+      return 0;
+    }
+    case 'review': {
+      need(1, 'review enable | review <lot> "verdict"');
+      const plan = loadPlan();
+      if (rest[0] === 'enable') {
+        const changed = plan.enableReview(today);
+        plan.save();
+        io.out(changed ? `revue de code obligatoire pour les lots à commits à partir du ${today}` : `revue de code déjà active depuis le ${plan.reviewSince}`);
+        return 0;
+      }
+      need(2, 'review <lot> "verdict"');
+      plan.lot(rest[0]);
+      plan.recordReview(rest[0], rest.slice(1).join(' '), today);
       plan.save();
       return 0;
     }

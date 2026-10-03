@@ -56,15 +56,25 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
   // Planifier un lot (commit qui ne touche que le plan) n'est pas y travailler : un lot « todo »
   // cité seulement par de tels commits n'a pas à être démarré. Ni par des commits antérieurs à
   // l'adoption du plan : citer un identifiant n'engageait alors à rien.
-  const adopted = plan.since;
   for (const l of lots) {
     const cs = all.byLot.get(l.id);
-    if (l.status === 'todo' && cs) all.byLot.set(l.id, cs.filter((c) => (!adopted || c.day >= adopted) && !isPlanOnly(c.sha, plan, root)));
+    if (l.status === 'todo' && cs) all.byLot.set(l.id, workCommits(plan, root, cs));
   }
   const issues = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...uxIssues(plan),
-    ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
+    ...reviewIssues(plan, root, all.byLot), ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
   // Un plan en lecture seule se corrige avec l'outil du projet : ne pas conseiller une commande raf qui refuserait.
-  return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf (start|ux) .*$/, '') })) : issues;
+  return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf (start|ux|review) .*$/, '') })) : issues;
+}
+
+/** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni réduits au plan. */
+function workCommits(plan: Plan, root: string, commits: Commit[]): Commit[] {
+  const adopted = plan.since;
+  return commits.filter((c) => (!adopted || c.day >= adopted) && !isPlanOnly(c.sha, plan, root));
+}
+
+/** Commits à relire d'un lot — ce que `raf done` compte quand la revue de code est active. */
+export function lotWork(plan: Plan, root: string, lotId: string): Commit[] {
+  return workCommits(plan, root, linkCommits(plan.lots(), planCommits(plan, root), plan.refs).byLot.get(lotId) ?? []);
 }
 
 /**
@@ -79,6 +89,21 @@ export function uxIssues(plan: Plan): { message: string }[] {
     .lots()
     .filter((l) => l.visible && l.status === 'done' && !l.ux && (!l.finished || l.finished > since))
     .map((l) => ({ message: `${l.id} est visible et terminé sans revue UX — raf ux ${l.id} "verdict"` }));
+}
+
+/**
+ * Lots terminés APRÈS le jour d'activation avec des commits à relire et sans revue de code enregistrée.
+ * Même règle de date que `uxIssues` ; un lot sans commit n'a rien à faire relire.
+ */
+export function reviewIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): { message: string }[] {
+  const since = plan.reviewSince;
+  if (!since) return [];
+  return plan
+    .lots()
+    .filter((l) => l.status === 'done' && !l.review && (!l.finished || l.finished > since))
+    .map((l) => ({ id: l.id, commits: workCommits(plan, root, byLot.get(l.id) ?? []).length }))
+    .filter((l) => l.commits > 0)
+    .map((l) => ({ message: `${l.id} est terminé avec ${l.commits} commit(s) sans revue de code — raf review ${l.id} "verdict"` }));
 }
 
 /** Ce qui vient ensuite : lots en cours, puis lots prêts (dépendances closes), gains rapides d'abord. */

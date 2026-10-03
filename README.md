@@ -291,8 +291,10 @@ qa:
 ```
 
 Only the agent reads that key; the CLI does not use it. Without an expectations file the agent
-walks the routes it discovers, reports what it saw, and returns a draft for you to correct — it
-never writes the file itself.
+walks the routes it discovers and still runs its universal checks: an error shown, a failed or
+empty API call whose content is missing on screen, a broken or missing content image are defects
+with or without a file; whatever would need an expectation to judge is suspect at most. The
+agent then returns a draft for you to correct — it never writes the file itself.
 
 ## session
 
@@ -450,8 +452,11 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   the project's expectations file in a real browser at 1440 and 390 px and
   measures: expected content present and non-empty, no error or missing-data
   message, every API call answered 2xx with a non-empty body, no console error,
-  no broken content image. Findings are defects (an expectation broken) or
-  suspects (nothing covers it, but it looks like missing data), ranked, each with
+  no broken content image. Findings are defects (a line of the expectations
+  broken, or a universal check failing with a visible effect, with or without an
+  expectations file), suspects (it looks like missing or wrong data and no
+  expectation settles it) or noise (a console error or a failed request with no
+  visible effect, ranked minor), ranked, each with
   the route, what was expected, what was measured and the evidence; pages checked
   N/N, follow-ups as `raf add` lines, what it could not verify, a one-line
   verdict. Read-only: GET only, no login, nothing submitted; it stops at a PIN.

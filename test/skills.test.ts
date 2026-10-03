@@ -129,7 +129,7 @@ describe('skills install', () => {
       // Le fichier d'attentes, et son absence.
       '`docs/qa/expectations.md`, or the file named by `qa.expectations` in `cadence.yaml`',
       'No expectations file: do not guess silently',
-      'return a DRAFT expectations file as text',
+      'Return a DRAFT expectations file as text',
       'without expectations an empty state cannot be told from a normal one',
       // Ce qui se mesure, aux deux largeurs.
       'in a real browser',
@@ -140,11 +140,8 @@ describe('skills install', () => {
       'no console error',
       'no broken image among the content images',
       'never an impression',
-      // Classement et périmètre.
-      '*defect* — an expectation is broken',
-      '*suspect* — no expectation covers it but it looks like missing data: say why',
+      // Périmètre (le classement est épinglé dans le test suivant).
       'usability and accessibility belong to `ux-reviewer`, code quality to `code-reviewer`',
-      "*blocking* (a page's main content is missing, or an error is shown to the user)",
       // Sortie.
       '**Pages checked N/N**, with the base URL and the date and time of the run',
       'one `raf add "…"` line per finding worth doing',
@@ -166,7 +163,20 @@ describe('skills install', () => {
     expect(method).toContain('If a PIN or a login wall is met, say so and stop there for those pages: they go under "not verified", they are neither a finding nor a page checked.');
     // Le brouillon d'attentes est rendu en texte, jamais écrit dans le dépôt.
     expect(method).toContain('a DRAFT expectations file as text, for the human to correct: you do not write it into the repository.');
+    // Trois sortes de constat. Les vérifications universelles n'ont pas besoin du fichier d'attentes.
+    expect(method).toContain('- *defect* — a line of the expectations is broken, or a universal check fails with a visible effect on the page: an error message shown, a failed or empty API call whose content is missing on screen, a broken or missing content image. Universal checks need no expectations file: such a failure is a defect even without one;');
+    expect(method).toContain('- *suspect* — something that looks like missing or wrong data and that no expectation settles: an empty list under a heading, a "nothing found" message, a status or label contradicted by the page\'s own data ("eliminated" beside a won match), a stale season label. Say why, and propose the line of expectations that would settle it;');
+    expect(method).toContain('- *noise* — a console error or a failed request with no visible effect: reported, ranked minor;');
+    expect(method).toContain('- *out of scope* — usability and accessibility belong to `ux-reviewer`, code quality to `code-reviewer`: one line at most, never a finding.');
+    // Les trois rangs ; un contenu faux compte comme un contenu manquant.
+    expect(method).toContain("**Rank** each finding: *blocking* (a page's main content is missing, its main information is false, or an error is shown to the user), *major* (secondary content missing or wrong, a section the page silently drops after a failed or empty API call, a broken content image), *minor* (noise: a console error or a failed request with no visible effect).");
+    // Sans fichier d'attentes : les vérifications universelles tiennent, le reste est suspect au plus.
+    expect(method).toContain('report what you saw: the universal checks hold without a file, and anything that would need an expectation to judge is *suspect* at most.');
+    expect(method).toContain('Say plainly that without expectations an empty state cannot be told from a normal one.');
+    expect(method).not.toContain('never *defect*');
     const output = qa.section('Output');
+    expect(output).toContain('each with: the route, its kind and rank, what was expected — quote the line of the expectations, or name the universal check, or, for a suspect, give the expectation line you propose —, what was measured, and the evidence — status code, response size, the text on screen, the capture.');
+    expect(output).toContain('"no expectations file: 13 pages walked, 1 defect, 8 suspects, draft returned"');
     expect(output).toContain('a page you could not open is counted and named, never dropped');
     expect(output).toContain('No finding without a measurement.');
     expect(output).toContain('It is the last line of the report.');
@@ -180,6 +190,8 @@ describe('skills install', () => {
       '- Edit code, the plan or the expectations file, commit, or mark anything done: the session that called you does it. ',
     ].join(' '));
     expect(qa.description).toContain('never an impression');
+    expect(qa.description).toContain('without an expectations file it still runs its universal checks, reports what it saw and returns a draft one.');
+    expect(qa.description).toContain('reports empty states, wrong data, error messages, failed or empty API calls, console errors and broken images.');
     // Déclencheur : toute livraison qui change ce qu'une page montre ou reçoit — pas seulement un lot « visible ».
     expect(qa.description).toContain(`Use after any delivery that ${QA_TRIGGER} — or to re-check a deployed app.`);
     expect(qa.description + qa.body).not.toContain('`visible`');
@@ -249,6 +261,9 @@ describe('skills install', () => {
     expect(skills).toContain('a delivery that changes what a page shows or what it is served is then checked in the running app by the `qa-reviewer` agent, whose blocking findings come back to you.');
     expect(skills).toContain('optionally a lot id, to start with the pages it touched — for a backend-only lot, those that call the changed endpoints');
     expect(skills).not.toMatch(/visible lot[^.]*qa-reviewer/);
+    // Les trois sortes de constat, comme dans le contrat de l'agent.
+    expect(skills).toContain('Findings are defects (a line of the expectations broken, or a universal check failing with a visible effect, with or without an expectations file), suspects (it looks like missing or wrong data and no expectation settles it) or noise (a console error or a failed request with no visible effect, ranked minor)');
+    expect(skills).toContain('Read-only: GET only, no login, nothing submitted; it stops at a PIN.');
     // La définition des trois sortes de lignes.
     expect(text).toContain('- `shows:` — content that must be present and non-empty, with a count where one exists;');
     expect(text).toContain('- `never:` — texts that must not appear: error messages, and empty-state messages that mean missing data;');
@@ -256,6 +271,8 @@ describe('skills install', () => {
     expect(text).toContain('a route with a parameter names a real value to visit or says where to find one');
     // Le brouillon revient à l'humain : l'agent n'écrit jamais le fichier.
     expect(text).toContain('returns a draft for you to correct — it never writes the file itself.');
+    // Sans fichier : mêmes règles que dans le contrat de l'agent.
+    expect(text).toContain('Without an expectations file the agent walks the routes it discovers and still runs its universal checks: an error shown, a failed or empty API call whose content is missing on screen, a broken or missing content image are defects with or without a file; whatever would need an expectation to judge is suspect at most.');
     expect(text).toContain('Only the agent reads that key; the CLI does not use it.');
     expect(readme).toContain('`ux-reviewer`, `code-reviewer` and `qa-reviewer` agents');
     expect(readme).toContain('- **qa-reviewer** (agent)');

@@ -144,6 +144,7 @@ describe('skills install', () => {
       'in a real browser',
       'at **1440 px** and **390 px** wide',
       'answered 2xx with a non-empty body: note the status and the response size',
+      '**Open each page in a real browser** (Playwright, or the browser tool available), at **1440 px** and **390 px** wide.',
       'A 200 with an empty or null body (`[]`, `{}`, `null`, 0 bytes) is a failure, unless its line says `may be empty when …`',
       'no console error',
       'no broken image among the content images',
@@ -177,12 +178,33 @@ describe('skills install', () => {
     expect(method).toContain('- *noise* — a console error or a failed request with no visible effect: reported, ranked minor;');
     expect(method).toContain('- *out of scope* — usability and accessibility belong to `ux-reviewer`, code quality to `code-reviewer`: one line at most, never a finding.');
     // Les trois rangs ; un contenu faux compte comme un contenu manquant.
-    expect(method).toContain("**Rank** each finding: *blocking* (a page's main content is missing, its main information is false, or an error is shown to the user), *major* (secondary content missing or wrong, a section the page silently drops after a failed or empty API call, a broken content image), *minor* (noise: a console error or a failed request with no visible effect).");
+    expect(method).toContain("**Rank** each finding: *blocking* (a page's main content is missing, its main information is false, or an error is shown to the user), *major* (secondary content missing or wrong, a section silently dropped after a failed or empty API call, a broken content image), *minor* (noise).");
     // Sans fichier d'attentes : les vérifications universelles tiennent, le reste est suspect au plus.
     expect(method).toContain('report what you saw: the universal checks hold without a file, and anything that would need an expectation to judge is *suspect* at most.');
     expect(method).toContain('Say plainly that without expectations an empty state cannot be told from a normal one.');
     expect(method).not.toContain('never *defect*');
+    // La méthode que le premier passage réel a dû inventer, écrite dans l'étape 4.
+    const step4 = method.slice(method.indexOf(' 4. **Open each page'), method.indexOf(' 5. **GET only'));
+    for (const clause of [
+      // « Stabilisée » : jamais l'inactivité du réseau, qu'un flux ou un rafraîchissement périodique n'atteint pas.
+      'Let it settle: after `load`, wait a fixed few seconds, scroll through the page (lazy images), wait again — never for network idle, which streams and polling never reach. Then measure:',
+      // La taille d'une réponse, et l'outil qui sait l'écouter.
+      'note the status and the response size (decoded body bytes; streams — SSE, websockets — are exempt from the size rule).',
+      'This takes a tool that listens to responses (e.g. a Playwright `page.on(\'response\')` listener): if yours cannot give status and size, say so under "not verified" instead of pretending;',
+      // Images de contenu : une pastille de repli n'a pas de balise img.
+      'count the items that should carry an image and have no loaded `<img>` — a fallback badge replacing a failed image has no `<img>` at all;',
+      // États derrière un contrôle : on peut changer la vue, jamais écrire.
+      '- states behind controls: tabs, filters and other controls that only change the view may be used and are part of the page (a tab that triggers its own API call is checked like a page); a control that writes is never used;',
+      // Rythme : un 429 se rejoue seul avant de conclure.
+      '- pacing: pause between pages; when a 429 (or any rate-limit answer) appears, re-run that page ALONE after a quiet minute before concluding — if it reproduces, an ordinary visitor gets it; if not, it was your own pace and it is not a finding;',
+      // Le code source situe une cause, il ne prouve rien.
+      '- the frontend source may be read to LOCATE a cause after a measurement, never as evidence.',
+    ]) expect(step4).toContain(clause);
+    expect(method).not.toContain('wait until its requests have settled');
     const output = qa.section('Output');
+    // N/N : vérifiée aux deux largeurs ; une vérification partielle est comptée et nommée comme telle.
+    expect(output).toContain('A page counts as checked when both widths were measured; a page checked partially (one width, tabs not opened) is counted and named as partial.');
+    expect(output).toContain('a browser tool that was missing or could not give status and size — stated plainly.');
     expect(output).toContain('each with: the route, its kind and rank, what was expected — quote the line of the expectations, or name the universal check, or, for a suspect, give the expectation line you propose —, what was measured, and the evidence — status code, response size, the text on screen, the capture.');
     expect(output).toContain('"no expectations file: 13 pages walked, 1 defect, 8 suspects, draft returned"');
     expect(output).toContain('a page you could not open is counted and named, never dropped');

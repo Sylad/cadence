@@ -32,26 +32,39 @@ missing, or the URL does not answer, say so and stop.
    `may be empty when …`, `1440 only`, `390 only` (a line without a width holds at both). A route
    with a parameter names a real value to visit, or says where to find one.
 3. **No expectations file: do not guess silently.** Discover the routes (router file, sitemap,
-   navigation links); for a route with a parameter, find a real value in the app's links or its
-   API responses and say how you built the URL. Walk them as in step 4 and report what you saw:
-   the universal checks hold without a file, and anything that would need an expectation to
-   judge is *suspect* at most. Return a DRAFT expectations file as text, for the human to correct: you do not write it into
-   the repository. Say plainly that without expectations an empty state cannot be told from a
-   normal one.
-4. **Open each page in a real browser** (Playwright, or the browser tool available), at
-   **1440 px** and **390 px** wide; wait until its requests have settled, then measure:
+   navigation links); for a route with a parameter, find a real value in the app's links or its API
+   responses and say how you built the URL. Walk them as in step 4 and report what you saw: the
+   universal checks hold without a file, and anything that would need an expectation to judge is
+   *suspect* at most. Return a DRAFT expectations file as text, for the human to correct: you do not
+   write it into the repository. Say plainly that without expectations an empty state cannot be told
+   from a normal one.
+4. **Open each page in a real browser** (Playwright, or the browser tool available), at **1440 px**
+   and **390 px** wide. Let it settle: after `load`, wait a fixed few seconds, scroll through the
+   page (lazy images), wait again — never for network idle, which streams and polling never reach.
+   Then measure:
    - the expected content is present and non-empty — name the selector or the text found and its
      count (`.player-card` ×14), not "the list looks fine";
    - no `never:` text on screen, and no other error or missing-data message;
    - every API call of the page — those listed, and those you saw it make to its own backend —
-     answered 2xx with a non-empty body: note the status and the response size. A 200 with an
-     empty or null body (`[]`, `{}`, `null`, 0 bytes) is a failure, unless its line says
-     `may be empty when …`;
+     answered 2xx with a non-empty body: note the status and the response size (decoded body bytes;
+     streams — SSE, websockets — are exempt from the size rule). A 200 with an empty or null body
+     (`[]`, `{}`, `null`, 0 bytes) is a failure, unless its line says `may be empty when …`. This
+     takes a tool that listens to responses (e.g. a Playwright `page.on('response')` listener): if
+     yours cannot give status and size, say so under "not verified" instead of pretending;
    - no console error: quote the first line of each;
-   - no broken image among the content images (a failed request, or `naturalWidth` 0);
+   - no broken image among the content images (a failed request, or `naturalWidth` 0): count the
+     items that should carry an image and have no loaded `<img>` — a fallback badge replacing a
+     failed image has no `<img>` at all;
    - at 390 px, content hidden on the phone by design is not a defect unless a `shows:` line
      requires it at 390; content pushed outside the visible area (it needs a sideways scroll) is
-     reported as suspect and handed to `ux-reviewer` in one line.
+     reported as suspect and handed to `ux-reviewer` in one line;
+   - states behind controls: tabs, filters and other controls that only change the view may be used
+     and are part of the page (a tab that triggers its own API call is checked like a page); a
+     control that writes is never used;
+   - pacing: pause between pages; when a 429 (or any rate-limit answer) appears, re-run that page
+     ALONE after a quiet minute before concluding — if it reproduces, an ordinary visitor gets it;
+     if not, it was your own pace and it is not a finding;
+   - the frontend source may be read to LOCATE a cause after a measurement, never as evidence.
 5. **GET only, and nothing that writes**: never log in, never submit a form that writes, never
    click a control that changes data, never send a POST, PUT, PATCH or DELETE yourself. If a PIN
    or a login wall is met, say so and stop there for those pages: they go under "not verified",
@@ -65,28 +78,27 @@ missing, or the URL does not answer, say so and stop.
      settles: an empty list under a heading, a "nothing found" message, a status or label
      contradicted by the page's own data ("eliminated" beside a won match), a stale season
      label. Say why, and propose the line of expectations that would settle it;
-   - *noise* — a console error or a failed request with no visible effect: reported, ranked
-     minor;
+   - *noise* — a console error or a failed request with no visible effect: reported, ranked minor;
    - *out of scope* — usability and accessibility belong to `ux-reviewer`, code quality to
      `code-reviewer`: one line at most, never a finding.
 7. **Rank** each finding: *blocking* (a page's main content is missing, its main information is
-   false, or an error is shown to the user), *major* (secondary content missing or wrong, a
-   section the page silently drops after a failed or empty API call, a broken content image),
-   *minor* (noise: a console error or a failed request with no visible effect).
+   false, or an error is shown to the user), *major* (secondary content missing or wrong, a section
+   silently dropped after a failed or empty API call, a broken content image), *minor* (noise).
 
 ## Output
 
 A short report:
 
-- **Pages checked N/N**, with the base URL and the date and time of the run, and the two widths.
-  The second N is every page of the expectations (or every route discovered): a page you could
-  not open is counted and named, never dropped.
+- **Pages checked N/N**, with the base URL and the date and time of the run, and the two widths. The
+  second N is every page of the expectations (or every route discovered): a page you could not open
+  is counted and named, never dropped. A page counts as checked when both widths were measured; a
+  page checked partially (one width, tabs not opened) is counted and named as partial.
 - **Findings**, most severe first, each with: the route, its kind and rank, what was expected —
   quote the line of the expectations, or name the universal check, or, for a suspect, give the
   expectation line you propose —, what was measured, and the evidence — status code, response
   size, the text on screen, the capture. No finding without a measurement.
 - **Not verified**: pages behind a PIN or a login, states that need data you could not get, a
-  browser tool that was missing — stated plainly.
+  browser tool that was missing or could not give status and size — stated plainly.
 - **Proposed follow-ups**: one `raf add "…"` line per finding worth doing; on a read-only plan
   (`cadence.yaml` maps the fields of a file kept by another tool), plain lines for the project's
   own tool instead. Without an expectations file, the draft comes here.

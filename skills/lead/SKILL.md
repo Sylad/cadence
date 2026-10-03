@@ -65,7 +65,8 @@ proposed sub-tasks back to the human.
    the code reviewer's last line brought up to date (and `raf ux <lot> "…"` for a visible lot, with
    the UX reviewer's), then `raf done <lot>`. Where the gate is on (`raf review enable`, the
    human's decision for each repository), `raf done` refuses a lot that has commits and no
-   verdict. On a read-only plan the verdict goes into the project's own tool.
+   verdict. A read-only plan has no gate in `raf` (a `uxSince` or `reviewSince` written in it is
+   ignored): the verdict goes into the project's own tool.
 
 ## 4. Delivery
 

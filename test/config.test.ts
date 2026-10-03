@@ -270,4 +270,20 @@ describe('raf CLI with cadence.yaml', () => {
     }
     expect(readFileSync(path, 'utf8')).toBe(TACHES);
   });
+
+  it('ignores uxSince and reviewSince written by hand in a foreign plan: no finding raf could never clear', () => {
+    const dir = gitRepo();
+    write(join(dir, 'cadence.yaml'), CONFIG);
+    const gated = `uxSince: 2026-09-01\nreviewSince: 2026-09-01\n${TACHES}  visible: true\n`;
+    write(join(dir, 'docs/suivi/taches.yaml'), gated);
+    commit(dir, 'feat(R12a): export', '2026-09-14T10:00:00');
+    const plan = Plan.load(join(dir, 'docs/suivi/taches.yaml'), readPlanConfig(join(dir, 'cadence.yaml'))!.settings);
+    expect(plan.lot('R12a')).toMatchObject({ status: 'done', visible: true, finished: '2026-09-15' });
+    expect([plan.uxSince, plan.reviewSince]).toEqual(['2026-09-01', '2026-09-01']);
+
+    // Le reste de l'audit tourne toujours : seules les deux portes sont ignorées.
+    expect(raf(dir, 'check').out).toBe(
+      '✗ B33 en cours sans commit depuis 18 j (Une seule base)\n✗ R12a est visible et terminé sans entrée Nouveautés — cadence news new R12a\n2 écart(s)',
+    );
+  });
 });

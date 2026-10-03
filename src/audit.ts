@@ -60,10 +60,13 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
     const cs = all.byLot.get(l.id);
     if (l.status === 'todo' && cs) all.byLot.set(l.id, workCommits(plan, root, cs));
   }
-  const issues = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...uxIssues(plan),
-    ...reviewIssues(plan, root, all.byLot), ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
+  // Un plan en lecture seule ne reçoit aucun verdict de raf : les deux portes n'y valent pas, même si
+  // uxSince ou reviewSince y sont écrits à la main — l'écart ne pourrait jamais être levé.
+  const gates = plan.readonly ? [] : [...uxIssues(plan), ...reviewIssues(plan, root, all.byLot)];
+  const issues = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...gates,
+    ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
   // Un plan en lecture seule se corrige avec l'outil du projet : ne pas conseiller une commande raf qui refuserait.
-  return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf (start|ux|review) .*$/, '') })) : issues;
+  return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf start .*$/, '') })) : issues;
 }
 
 /** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni réduits au plan. */

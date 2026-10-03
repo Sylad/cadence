@@ -37,3 +37,15 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-02
+  - id: L6
+    title: 'Porte de revue de code : agent code-reviewer générique (lecture seule, reçoit le lot et lit lui-même le diff, constats fondés sur une mesure ou une règle nommée) + « raf review enable » / « raf review <id> "verdict" », symétriques de « raf ux » — « raf done » refuse un lot à commits sans verdict ; skills lead et session-close mis à jour ; 0.5.0'
+    status: doing
+    estimate: 1
+    created: 2026-10-03
+    started: 2026-10-03
+  - id: L7
+    title: "Publication npm + tag git à chaque version (npm n'a que la 0.2.0 ; 0.3.0 et 0.4.0 jamais publiées) : publier la version courante, taguer, et documenter l'étape de sortie"
+    status: todo
+    estimate: 0.5
+    quickwin: true
+    created: 2026-10-03

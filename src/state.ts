@@ -30,14 +30,17 @@ export function readNext(dir: string): Next | null {
   return { date: head.replace(/^# /, '').trim(), lines };
 }
 
-/** Remplace les notes pour la prochaine session ; sans ligne, les efface. */
+/** Remplace les notes pour la prochaine session. Ne les efface jamais : c'est `clearNext`, demandé exprès. */
 export function writeNext(dir: string, date: Day, lines: string[]): void {
-  const file = join(dir, 'next.md');
-  if (lines.length === 0) {
-    rmSync(file, { force: true });
-    return;
-  }
-  writeFileSync(file, `# ${date}\n${lines.map((l) => `- ${l.replace(/\n/g, ' ')}`).join('\n')}\n`);
+  if (lines.length === 0) throw new Error('writeNext : aucune ligne');
+  writeFileSync(join(dir, 'next.md'), `# ${date}\n${lines.map((l) => `- ${l.replace(/\n/g, ' ')}`).join('\n')}\n`);
+}
+
+/** Efface les notes pour la prochaine session ; rend celles qui s'y trouvaient, null s'il n'y en avait pas. */
+export function clearNext(dir: string): Next | null {
+  const previous = readNext(dir);
+  rmSync(join(dir, 'next.md'), { force: true });
+  return previous;
 }
 
 export interface Lock {

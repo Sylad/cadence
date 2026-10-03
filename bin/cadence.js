@@ -26,7 +26,8 @@ if (tool === 'raf') {
   cadence session start [--since "24 hours ago"] [--idle 2]
                     faits de reprise : notes de la veille, en cours, fait depuis, écarts, propositions
   cadence session close [--since …]    faits de clôture ; code 1 tant que ce n'est pas fermé
-  cadence session next "ligne" …       notes pour la prochaine session (sans argument : efface)
+  cadence session next "ligne" …       notes pour la prochaine session (remplacent les précédentes)
+  cadence session next --clear         efface ces notes ; sans ligne ni --clear, la commande refuse
   cadence deliver [--dry-run] [--sha rév] [--config cadence.yaml] [-- arguments du script du projet]
                     CI du sha poussé → déploiement → vérifications de l'effet ;
                     ou le script de livraison du projet (deliver.script), sous verrou et journal

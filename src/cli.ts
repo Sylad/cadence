@@ -15,7 +15,7 @@ import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
-import { sharedStateDir, stateDir, writeNext } from './state.js';
+import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
 
 export interface Io {
   cwd: string;
@@ -96,6 +96,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       config: { type: 'string' },
       'dry-run': { type: 'boolean' },
       sha: { type: 'string' },
+      clear: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -403,7 +404,7 @@ function news(
   }
 }
 
-function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: string; idle?: string }): number {
+function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: string; idle?: string; clear?: boolean }): number {
   switch (sub) {
     case 'start': {
       const idle = values.idle === undefined ? 2 : Number(values.idle);
@@ -412,10 +413,27 @@ function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: st
     }
     case 'close':
       return sessionClose(ctx, { since: values.since ?? `${ctx.today} 00:00` });
-    case 'next':
-      writeNext(ctx.state, ctx.today, args);
+    case 'next': {
+      const lines = args.filter((l) => l.trim() !== '');
+      if (values.clear) {
+        if (lines.length) throw new RafError('session next --clear efface les notes : ne pas lui passer de ligne');
+        const gone = clearNext(ctx.state);
+        ctx.out(gone ? `notes effacées (${gone.lines.length} ligne(s) du ${gone.date})` : 'aucune note à effacer');
+        return 0;
+      }
+      // Lancée sans ligne (variable vide dans un script, agent pressé), la commande effaçait en silence
+      // les notes de la dernière clôture : effacer se demande exprès.
+      if (lines.length === 0) {
+        const kept = readNext(ctx.state);
+        throw new RafError(
+          `session next : aucune ligne — ${kept ? `${kept.lines.length} ligne(s) du ${kept.date} conservée(s)` : "rien n'est écrit"} ; ` +
+            'usage : cadence session next "ligne" … (pour effacer les notes exprès : cadence session next --clear)',
+        );
+      }
+      writeNext(ctx.state, ctx.today, lines);
       return 0;
+    }
     default:
-      throw new RafError('usage : cadence session start [--since …] [--idle 2] | close [--since …] | next "ligne" …');
+      throw new RafError('usage : cadence session start [--since …] [--idle 2] | close [--since …] | next "ligne" … | next --clear');
   }
 }

@@ -107,12 +107,54 @@ describe('session close', () => {
 });
 
 describe('session next', () => {
-  it('écrit puis efface les notes', async () => {
+  it('écrit les notes ; --clear les efface exprès', async () => {
     const dir = await project();
-    await cad(dir, 'session', 'next', 'finir L1', 'relire L2');
+    expect((await cad(dir, 'session', 'next', 'finir L1', 'relire L2')).code).toBe(0);
     expect(readNext(stateDir(dir))).toEqual({ date: '2026-09-28', lines: ['finir L1', 'relire L2'] });
-    await cad(dir, 'session', 'next');
+    const cleared = await cad(dir, 'session', 'next', '--clear');
+    expect(cleared.code).toBe(0);
+    expect(cleared.out).toContain('notes effacées (2 ligne(s) du 2026-09-28)');
     expect(readNext(stateDir(dir))).toBeNull();
+    const again = await cad(dir, 'session', 'next', '--clear');
+    expect(again.code).toBe(0);
+    expect(again.out).toContain('aucune note à effacer');
+  });
+
+  it('sans ligne : refus (code 2), les notes de la dernière clôture restent, et la façon de les effacer est dite', async () => {
+    const dir = await project();
+    writeNext(dir, ['finir L1', 'relire L2']);
+    for (const args of [[], [''], ['  ', '\n']]) {
+      const r = await cad(dir, 'session', 'next', ...args);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain('aucune ligne');
+      expect(r.err).toContain('2 ligne(s) du 2026-09-27 conservée(s)');
+      expect(r.err).toContain('cadence session next --clear');
+      expect(readNext(stateDir(dir))).toEqual({ date: '2026-09-27', lines: ['finir L1', 'relire L2'] });
+    }
+  });
+
+  it('sans ligne et sans notes : refus aussi, rien n’est écrit', async () => {
+    const dir = await project();
+    const r = await cad(dir, 'session', 'next');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('aucune ligne');
+    expect(r.err).toContain('cadence session next --clear');
+    expect(readNext(stateDir(dir))).toBeNull();
+  });
+
+  it('--clear avec des lignes : refus, rien ne change', async () => {
+    const dir = await project();
+    writeNext(dir, ['finir L1']);
+    const r = await cad(dir, 'session', 'next', '--clear', 'autre chose');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('--clear');
+    expect(readNext(stateDir(dir))).toEqual({ date: '2026-09-27', lines: ['finir L1'] });
+  });
+
+  it('une ligne blanche parmi les autres n’est pas écrite', async () => {
+    const dir = await project();
+    expect((await cad(dir, 'session', 'next', 'finir L1', ' ', 'relire L2')).code).toBe(0);
+    expect(readNext(stateDir(dir))).toEqual({ date: '2026-09-28', lines: ['finir L1', 'relire L2'] });
   });
 });
 

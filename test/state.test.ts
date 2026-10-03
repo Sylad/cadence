@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { headSha, onRemote, repoStatus } from '../src/git.js';
-import { appendDelivery, lastDelivery, lockAlive, lockPath, pidAlive, readLock, readNext, releaseLock, removeStaleLock, sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
+import { appendDelivery, clearNext, lastDelivery, lockAlive, lockPath, pidAlive, readLock, readNext, releaseLock, removeStaleLock, sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -49,8 +49,12 @@ describe('état local', () => {
     expect(readNext(state)).toBeNull();
     writeNext(state, '2026-09-28', ['finir L3', 'relire L4']);
     expect(readNext(state)).toEqual({ date: '2026-09-28', lines: ['finir L3', 'relire L4'] });
-    writeNext(state, '2026-09-28', []);
+    // Écrire ne sait pas effacer : c'est clearNext, qui rend ce qu'il retire.
+    expect(() => writeNext(state, '2026-09-28', [])).toThrow('aucune ligne');
+    expect(readNext(state)).toEqual({ date: '2026-09-28', lines: ['finir L3', 'relire L4'] });
+    expect(clearNext(state)).toEqual({ date: '2026-09-28', lines: ['finir L3', 'relire L4'] });
     expect(readNext(state)).toBeNull();
+    expect(clearNext(state)).toBeNull();
 
     expect(readLock(state)).toBeNull();
     expect(writeLock(state, { pid: process.pid, sha: 'abc', started: '2026-09-28T10:00:00.000Z' })).toBe(true);

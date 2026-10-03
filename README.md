@@ -319,8 +319,12 @@ cadence session start --since "3 days ago" --idle 2
 cadence session close              # today's commits by lot, commits without a lot, lots in progress
                                    # with no commit today, drift, uncommitted / unpushed work
                                    # exit 1 while something is still open
-cadence session next "finish L3" "review L4"    # shown by the next session start
+cadence session next "finish L3" "review L4"    # shown by the next session start; replaces the previous notes
+cadence session next --clear       # erase those notes, on purpose
 ```
+
+`cadence session next` without a line refuses (exit 2) and leaves the notes of the
+last close as they are — it used to erase them silently; erasing is `--clear`.
 
 Proposals come from the plan only: lots in progress, then ready lots (dependencies
 done), quick wins first. Local state lives in the git directory, never committed:

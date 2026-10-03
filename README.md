@@ -184,6 +184,15 @@ captures: [captures/l8.png]
 Imported statements now read **3.000** as three thousand, not three.
 ```
 
+A screenshot can say what it shows: write it as `{ file, alt }` instead of a
+bare path, one text per screenshot.
+
+```yaml
+captures:
+  - { file: captures/l8-before.png, alt: "Statement total read as 3 instead of 3,000" }
+  - captures/l8-after.png          # a bare path still works: no alternative text
+```
+
 | Command | Effect |
 |---|---|
 | `cadence news new <lot…> [--title t]` | entry skeleton, dated and timed now (`date`, `created`), titled after the lot |
@@ -196,7 +205,11 @@ Imported statements now read **3.000** as three thousand, not three.
 The Markdown is deliberately small: paragraphs, `-` lists, `**bold**`,
 `` `code` ``, `[links](url)`; everything else is escaped text. The JSON holds
 `{ project, generated, entries: [{ slug, title, date, lots, captures, html }] }`,
-with screenshot paths relative to the JSON file.
+with screenshot paths relative to the JSON file. `captures` is always a list of
+paths; an entry that gives at least one alternative text also carries `alts`,
+the texts in the same order (`""` for a screenshot without one) — an entry
+without any keeps exactly the shape above. The built page puts the text in the
+image's `alt`, and falls back to "Capture : <title>".
 
 **Order.** Everywhere (`list`, `build`, the JSON), entries are strictly newest
 first: by `date`, then, on the same day, by creation time. Every entry carries

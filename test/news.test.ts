@@ -72,6 +72,78 @@ describe('parseEntry', () => {
   });
 });
 
+describe('texte alternatif des captures', () => {
+  const head = (captures: string) => `---\ntitle: Barre du bas\ndate: 2026-09-29\ncreated: 2026-09-29T10:12+02:00\nlots: [L1]\ncaptures:${captures}\n---\nTexte.\n`;
+
+  it('une capture s’écrit comme un chemin, ou comme { file, alt } : les chemins restent une liste de chaînes, les textes les suivent un à un', () => {
+    const e = parseEntry('a.md', head('\n  - { file: captures/avant.png, alt: "Huit cases, libellés tronqués à 320 px" }\n  - captures/apres.png\n  - file: captures/detail.png\n    alt: Pastille de « Plus »   à\n      16 px'));
+    expect(e.problems).toEqual([]);
+    expect(e.captures).toEqual(['captures/avant.png', 'captures/apres.png', 'captures/detail.png']);
+    expect(e.alts).toEqual(['Huit cases, libellés tronqués à 320 px', '', 'Pastille de « Plus » à 16 px']);
+  });
+
+  it('sans texte alternatif : la liste des textes a la longueur des captures, vide partout', () => {
+    expect(parseEntry('a.md', head(' [captures/a.png, captures/b.png]')).alts).toEqual(['', '']);
+    expect(parseEntry('a.md', head(' []')).alts).toEqual([]);
+    expect(parseEntry('a.md', head('\n  - { file: captures/a.png, alt: "  " }')).alts).toEqual(['']);
+    expect(parseEntry('a.md', head('\n  - { file: captures/a.png }')).alts).toEqual(['']);
+  });
+
+  it('signale une capture sans fichier, une clé inconnue, une forme illisible — et garde les contrôles du chemin', () => {
+    const e = parseEntry('a.md', head('\n  - { alt: "sans fichier" }\n  - { file: captures/a.png, atl: "faute de frappe" }\n  - [captures/b.png]\n  - { file: ../secret.png, alt: x }\n  - { file: notes.txt, alt: x }'));
+    expect(e.problems).toEqual([
+      'capture n° 1 : fichier absent — { file: chemin, alt: "texte alternatif" }',
+      'capture captures/a.png : clé inconnue « atl » (attendu : file, alt)',
+      'capture n° 3 illisible : un chemin ou { file: chemin, alt: "texte alternatif" }',
+      'capture hors du dossier des Nouveautés : ../secret.png',
+      'capture notes.txt : image .png, .jpg, .webp ou .gif, nom en lettres, chiffres, « . _ - / »',
+    ]);
+    expect(e.captures).toEqual(['captures/a.png', '../secret.png', 'notes.txt']);
+    expect(e.alts).toEqual(['', 'x', 'x']);
+  });
+
+  it('news build : le JSON garde « captures » en liste de chemins et ajoute « alts » aux seules entrées qui en donnent ; la page écrit le texte dans alt, échappé', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo', '--no-hook');
+    raf(dir, 'add', 'Barre du bas', '--visible');
+    raf(dir, 'add', 'Autre écran', '--visible');
+    mkdirSync(join(dir, 'docs/nouveautes/captures'), { recursive: true });
+    for (const f of ['avant.png', 'apres.png', 'autre.png']) writeFileSync(join(dir, 'docs/nouveautes/captures', f), 'png');
+    writeFileSync(
+      join(dir, 'docs/nouveautes/2026-09-29-barre.md'),
+      head('\n  - { file: captures/avant.png, alt: \'Huit cases, "Plus" tronqué <320 px>\' }\n  - captures/apres.png'),
+    );
+    writeFileSync(join(dir, 'docs/nouveautes/2026-09-28-autre.md'), head(' [captures/autre.png]').replace('Barre du bas', 'Autre écran').replace(/2026-09-29/g, '2026-09-28').replace('L1', 'L2'));
+    expect(news(dir, 'check').out).toBe('✓ Nouveautés cohérentes avec le plan');
+
+    expect(news(dir, 'build', '-o', 'site').code).toBe(0);
+    const json = JSON.parse(readFileSync(join(dir, 'site/nouveautes.json'), 'utf8'));
+    expect(json.entries).toEqual([
+      { slug: '2026-09-29-barre', title: 'Barre du bas', date: '2026-09-29', lots: ['L1'], captures: ['captures/avant.png', 'captures/apres.png'], alts: ['Huit cases, "Plus" tronqué <320 px>', ''], html: '<p>Texte.</p>' },
+      // Aucune capture décrite : l'entrée a exactement la forme d'avant, sans clé « alts ».
+      { slug: '2026-09-28-autre', title: 'Autre écran', date: '2026-09-28', lots: ['L2'], captures: ['captures/autre.png'], html: '<p>Texte.</p>' },
+    ]);
+    expect(existsSync(join(dir, 'site/captures/avant.png'))).toBe(true);
+    const html = readFileSync(join(dir, 'site/index.html'), 'utf8');
+    expect(html).toContain('<img src="captures/avant.png" alt="Huit cases, &quot;Plus&quot; tronqué &lt;320 px&gt;" loading="lazy">');
+    // Sans texte : le repli d'avant, tiré du titre.
+    expect(html).toContain('<img src="captures/apres.png" alt="Capture : Barre du bas" loading="lazy">');
+    expect(html).toContain('<img src="captures/autre.png" alt="Capture : Autre écran" loading="lazy">');
+  });
+
+  it('news check et news build refusent une capture mal écrite', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    raf(dir, 'add', 'Barre du bas', '--visible');
+    mkdirSync(join(dir, 'docs/nouveautes'), { recursive: true });
+    writeFileSync(join(dir, 'docs/nouveautes/2026-09-29-barre.md'), head('\n  - { alt: "sans fichier" }'));
+    const r = news(dir, 'check');
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('2026-09-29-barre.md : capture n° 1 : fichier absent');
+    expect(news(dir, 'build').code).toBe(1);
+  });
+});
+
 describe('newsIssues', () => {
   it('flags visible done lots without entry, unknown lots, missing captures', () => {
     const dir = gitRepo();
@@ -126,7 +198,7 @@ describe('news CLI', () => {
     const path = join(dir, 'docs/nouveautes/2026-09-29-montants-francais.md');
     expect(created.out).toBe(path);
     expect(readFileSync(path, 'utf8')).toBe(
-      `---\ntitle: Montants français\ndate: 2026-09-29\ncreated: ${toStamp(new Date('2026-09-29T10:12:00'))}\nlots: [L1]\ncaptures: []\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
+      `---\ntitle: Montants français\ndate: 2026-09-29\ncreated: ${toStamp(new Date('2026-09-29T10:12:00'))}\nlots: [L1]\ncaptures: []\n# une capture peut dire ce qu'elle montre : captures: [{ file: captures/x.png, alt: "texte alternatif" }]\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
     );
     expect(news(dir, 'new', 'L1').code).toBe(2); // existe déjà
     expect(news(dir, 'check').out).toContain('sans capture');

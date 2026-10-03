@@ -13,7 +13,10 @@ export interface Entry {
   /** Horodatage de création « AAAA-MM-JJTHH:MM±hh:mm » (ou Z), fuseau obligatoire ; départage des entrées du même jour. */
   created?: string;
   lots: string[];
+  /** Chemins des captures, relatifs au dossier des Nouveautés. */
   captures: string[];
+  /** Texte alternatif de chaque capture, dans le même ordre ; « '' » quand l'entrée n'en donne pas. */
+  alts: string[];
   /** Raison de l'absence de capture, quand une capture n'a pas de sens. */
   nocapture?: string;
   body: string;
@@ -42,8 +45,49 @@ function validStamp(s: string): boolean {
 
 const list = (v: unknown): string[] => (v == null ? [] : Array.isArray(v) ? v.map(String) : [String(v)]);
 
+const CAPTURE_KEYS = ['file', 'alt'];
+const CAPTURE_SHAPE = '{ file: chemin, alt: "texte alternatif" }';
+
+/**
+ * Captures de l'en-tête : un chemin, ou `{ file, alt }` quand l'entrée dit ce que l'image montre.
+ * Les chemins restent une liste de chaînes (ce que lit déjà le JSON publié), les textes les suivent un à un.
+ */
+function readCaptures(raw: unknown, problems: string[]): { captures: string[]; alts: string[] } {
+  const captures: string[] = [];
+  const alts: string[] = [];
+  for (const [i, item] of (raw == null ? [] : Array.isArray(raw) ? raw : [raw]).entries()) {
+    let file: string;
+    let alt = '';
+    if (typeof item === 'string' || typeof item === 'number') {
+      file = String(item);
+    } else if (item && typeof item === 'object' && !Array.isArray(item)) {
+      const map = item as Record<string, unknown>;
+      if (map.file == null || String(map.file).trim() === '') {
+        problems.push(`capture n° ${i + 1} : fichier absent — ${CAPTURE_SHAPE}`);
+        continue;
+      }
+      file = String(map.file);
+      // Une ligne : le texte part tel quel dans un attribut alt.
+      alt = map.alt == null ? '' : String(map.alt).replace(/\s+/g, ' ').trim();
+      for (const k of Object.keys(map)) {
+        if (!CAPTURE_KEYS.includes(k)) problems.push(`capture ${file} : clé inconnue « ${k} » (attendu : ${CAPTURE_KEYS.join(', ')})`);
+      }
+    } else {
+      problems.push(`capture n° ${i + 1} illisible : un chemin ou ${CAPTURE_SHAPE}`);
+      continue;
+    }
+    // Copiées telles quelles sous le dossier de build : un chemin qui sort du dossier écrirait ailleurs.
+    if (isAbsolute(file) || file.split(/[\\/]/).includes('..')) problems.push(`capture hors du dossier des Nouveautés : ${file}`);
+    // Noms sages : utilisables tels quels dans une URL, et seulement des images.
+    else if (!CAPTURE.test(file)) problems.push(`capture ${file} : image .png, .jpg, .webp ou .gif, nom en lettres, chiffres, « . _ - / »`);
+    captures.push(file);
+    alts.push(alt);
+  }
+  return { captures, alts };
+}
+
 export function parseEntry(file: string, text: string): Entry {
-  const entry: Entry = { file, slug: basename(file).replace(/\.md$/, ''), title: '', date: '', lots: [], captures: [], body: '', problems: [] };
+  const entry: Entry = { file, slug: basename(file).replace(/\.md$/, ''), title: '', date: '', lots: [], captures: [], alts: [], body: '', problems: [] };
   const m = FRONT.exec(text.replace(/^\uFEFF/, '')); // BOM des éditeurs Windows
   if (!m) {
     entry.problems.push('en-tête YAML absent (--- … ---)');
@@ -68,15 +112,9 @@ export function parseEntry(file: string, text: string): Entry {
     else entry.created = created.replace(' ', 'T');
   }
   entry.lots = list(head.lots);
-  entry.captures = list(head.captures);
   if (head.nocapture != null && String(head.nocapture).trim()) entry.nocapture = String(head.nocapture).trim();
   entry.body = m[2].trim();
-  for (const c of entry.captures) {
-    // Copiées telles quelles sous le dossier de build : un chemin qui sort du dossier écrirait ailleurs.
-    if (isAbsolute(c) || c.split(/[\\/]/).includes('..')) entry.problems.push(`capture hors du dossier des Nouveautés : ${c}`);
-    // Noms sages : utilisables tels quels dans une URL, et seulement des images.
-    else if (!CAPTURE.test(c)) entry.problems.push(`capture ${c} : image .png, .jpg, .webp ou .gif, nom en lettres, chiffres, « . _ - / »`);
-  }
+  Object.assign(entry, readCaptures(head.captures, entry.problems));
   if (!entry.title) entry.problems.push('title vide');
   if (!isDay(entry.date)) entry.problems.push(`date « ${entry.date} » n'est pas une date AAAA-MM-JJ`);
   return entry;
@@ -151,7 +189,7 @@ export function newEntry(dir: string, lots: string[], rawTitle: string, today: D
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     path,
-    `---\ntitle: ${stringify(title).trimEnd()}\ndate: ${today}\ncreated: ${toStamp(now)}\nlots: [${lots.join(', ')}]\ncaptures: []\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
+    `---\ntitle: ${stringify(title).trimEnd()}\ndate: ${today}\ncreated: ${toStamp(now)}\nlots: [${lots.join(', ')}]\ncaptures: []\n# une capture peut dire ce qu'elle montre : captures: [${CAPTURE_SHAPE.replace('chemin', 'captures/x.png')}]\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
   );
   return path;
 }
@@ -230,14 +268,24 @@ export function renderMarkdown(md: string): string {
 export interface NewsData {
   project: string;
   generated: string;
-  entries: { slug: string; title: string; date: Day; lots: string[]; captures: string[]; html: string }[];
+  /** `alts` : texte alternatif de chaque capture, même ordre, « '' » sans texte — absent quand l'entrée n'en donne aucun. */
+  entries: { slug: string; title: string; date: Day; lots: string[]; captures: string[]; alts?: string[]; html: string }[];
 }
 
 export function newsData(project: string, entries: Entry[], generated: string): NewsData {
   return {
     project,
     generated,
-    entries: entries.map((e) => ({ slug: e.slug, title: e.title, date: e.date, lots: e.lots, captures: e.captures, html: renderMarkdown(e.body) })),
+    entries: entries.map((e) => ({
+      slug: e.slug,
+      title: e.title,
+      date: e.date,
+      lots: e.lots,
+      captures: e.captures,
+      // Clé ajoutée seulement quand elle dit quelque chose : une entrée sans texte garde sa forme d'avant.
+      ...(e.alts.some(Boolean) ? { alts: e.alts } : {}),
+      html: renderMarkdown(e.body),
+    })),
   };
 }
 
@@ -267,7 +315,7 @@ function renderNewsPage(data: NewsData): string {
   <h2>${escapeText(e.title)}</h2>
   <p class="meta"><time datetime="${e.date}">${e.date}</time> · ${e.lots.map(escapeText).join(', ')}</p>
   ${e.html}
-  ${e.captures.map((c) => `<a href="${escapeText(c)}"><img src="${escapeText(c)}" alt="Capture : ${escapeText(e.title)}" loading="lazy"></a>`).join('\n  ')}
+  ${e.captures.map((c, i) => `<a href="${escapeText(c)}"><img src="${escapeText(c)}" alt="${escapeText(e.alts?.[i] || `Capture : ${e.title}`)}" loading="lazy"></a>`).join('\n  ')}
 </article>`,
     )
     .join('\n');

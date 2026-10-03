@@ -40,6 +40,7 @@ lots:
     created: 2026-10-02
     notes:
       - { date: 2026-10-03, text: "Relevé le 03-10 (L6) : sur un plan natif, refPattern (src/plan.ts:94) relie « feat(L1.4) » au lot L1 — la garde droite n'exclut pas « .chiffre », alors que le lien des plans en lecture seule (ligne 227) l'exclut ; à aligner. Et un « review: { verdict: \"\" } » écrit à la main ouvre encore la porte." }
+      - { date: 2026-10-03, text: "03-10 : « cadence deliver » sur un projet à plan propre (maritime-atlas) annonce « livré : Q4, R1, R2, R3, R4 » — R1 à R4 étaient les numéros des réserves UX cités dans les messages de commit, pris pour des lots parce que le plan en a de ce nom ; l'outil du projet, lui, n'a marqué que Q4. La liste des lots livrés d'un plan en lecture seule doit venir de l'outil du projet, ou se limiter aux lots en cours." }
   - id: L6
     title: 'Porte de revue de code : agent code-reviewer générique (lecture seule, reçoit le lot et lit lui-même le diff, constats fondés sur une mesure ou une règle nommée) + « raf review enable » / « raf review <id> "verdict" », symétriques de « raf ux » — « raf done » refuse un lot à commits sans verdict ; skills lead et session-close mis à jour ; 0.5.0'
     status: done
@@ -71,3 +72,8 @@ lots:
     started: 2026-10-03
     review: { date: 2026-10-03, verdict: "conforme après corrections — relecture indépendante des 4 premiers commits : 0 bloquant, 0 majeur, 4 mineurs (déclencheur trop étroit, trou de classement, absence normale inexprimable, tests trop lâches), tous corrigés ; premier passage réel de l'agent sur ol-companion en prod (13/13 pages, 8 constats réels) et ses notes de contrat intégrées ; 200 clauses épinglées, 200 suppressions détectées ; revérifié par le lead : 191 tests, typecheck, diff de l'agent relu. La passe de corrections elle-même n'a pas été relue par un agent indépendant et l'agent amendé n'a pas encore retourné sur une app.", commit: 971b668b87bb1788fd6d457520aef3d537d3092a }
     finished: 2026-10-03
+  - id: L10
+    title: "qa-reviewer, amendements du second passage réel (03-10, avec fichier d'attentes) : état du navigateur — comparer d'abord le bundle chargé à celui que référence index.html relu sans cache (visiteur revenu), puis vider le cache ; « GET only » n'est pas « sans effet » (une sonde sur un nom d'actif absent a été mise en cache 4 h par le CDN : ne sonder que les URL de l'app ou ajouter un paramètre anti-cache) ; minute de calme mesurée hors de l'app (about:blank) ; comparaison des textes sans casse ; lire les lots ouverts du plan et rendre les constats déjà planifiés en une ligne ; états simulés par interception : permis, jamais un constat à eux seuls ; liens sortants dans les contrôles universels ; largeur de mise en page mesurée ; rang d'une ligne d'attente cassée sans perte visible"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-03

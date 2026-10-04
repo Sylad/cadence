@@ -149,13 +149,15 @@ lots:
     finished: 2026-10-04
   - id: L18
     title: "README : section deliver (l. 426) et paragraphe « entretien du plan » — les commits d'entretien du plan n'annoncent aucun lot livré (suite de la revue L17)"
-    status: todo
+    status: doing
     estimate: 0.1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04
   - id: L19
     title: "Suites de la revue L8 : budget de temps par vérification (une lente ne rougit plus les suivantes ; restantes « non vérifiées ») ; README borne réelle de session start et délais ≠ deliver ; tuer le groupe de processus (pas d'orphelins) ; un seul intervalle de réessai partagé ; test realDeps quiet"
-    status: todo
+    status: doing
     estimate: 0.5
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04

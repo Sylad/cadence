@@ -72,6 +72,8 @@ export interface LotState {
   small: boolean;
   model: Model;
   readOnlyPlan: boolean;
+  /** Lots du même projet, plus tôt dans la vague, dont celui-ci dépend (`after`) : il attend qu'ils soient prêts. */
+  dependsOn?: string[];
   status: LotStatus;
   /** Passes de correction faites. */
   pass: number;

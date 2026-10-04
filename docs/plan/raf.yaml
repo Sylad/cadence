@@ -42,15 +42,20 @@ lots:
       - { id: t6, title: "commande : préconditions, --dry-run, --status, --resume/--answer, tableau, codes de sortie", status: done }
       - { id: t7, title: "garde-fous raf et deliver sous CADENCE_ORCHESTRATED, verrou d'orchestration", status: done }
       - { id: t8, title: README et skill lead, status: done }
-      - { id: t9, title: "orchestrate : un lot dont la dépendance de vague est suspendue ou en question reste reprenable (pas handed-back) — test budget + --resume", status: todo }
-      - { id: t10, title: "orchestrate : --resume vérifie le verrou de dépôt avant d'agir ; release() ne retire que les hooks posés par cette vague", status: todo }
-      - { id: t11, title: "orchestrate : compter dans le budget les tokens des sessions en échec, quota ou délai dépassé (résultat is_error, sinon journal .jsonl)", status: todo }
-      - { id: t12, title: "orchestrate : test du nettoyage sur SIGINT/SIGTERM (sessions tuées, étapes interrupted, verrous et hook retirés)", status: todo }
-      - { id: t13, title: "orchestrate : lire la config des projets avant de poser hooks et verrous (pas d'exception hors try)", status: todo }
-      - { id: t14, title: "orchestrate : ne pas démarrer un lot (raf start + commit) après incident, quota ou budget épuisé", status: todo }
-      - { id: t15, title: "orchestrate : afficher l'heure de remise du quota (quotaReset) ou retirer le réexport mort", status: todo }
-      - { id: t16, title: "orchestrate : orchestrate.test en asynchrone (ne pas bloquer l'autre créneau ni les signaux)", status: todo }
-    review: { date: 2026-10-04, verdict: "not compliant: 4 majeurs (dépendance de vague perdue à la reprise, hook d'une autre vague retiré, tokens des sessions en échec non comptés, nettoyage sur signal non testé), 4 mineurs", commit: 8fd6183c4f86388bd41b4d4792a371b1130ffeae }
+      - { id: t9, title: "orchestrate : un lot dont la dépendance de vague est suspendue ou en question reste reprenable (pas handed-back) — test budget + --resume", status: done }
+      - { id: t10, title: "orchestrate : --resume vérifie le verrou de dépôt avant d'agir ; release() ne retire que les hooks posés par cette vague", status: done }
+      - { id: t11, title: "orchestrate : compter dans le budget les tokens des sessions en échec, quota ou délai dépassé (résultat is_error, sinon journal .jsonl)", status: done }
+      - { id: t12, title: "orchestrate : test du nettoyage sur SIGINT/SIGTERM (sessions tuées, étapes interrupted, verrous et hook retirés)", status: done }
+      - { id: t13, title: "orchestrate : lire la config des projets avant de poser hooks et verrous (pas d'exception hors try)", status: done }
+      - { id: t14, title: "orchestrate : ne pas démarrer un lot (raf start + commit) après incident, quota ou budget épuisé", status: done }
+      - { id: t15, title: "orchestrate : afficher l'heure de remise du quota (quotaReset) ou retirer le réexport mort", status: done }
+      - { id: t16, title: "orchestrate : orchestrate.test en asynchrone (ne pas bloquer l'autre créneau ni les signaux)", status: done }
+      - { id: t17, title: "orchestrate : --resume rejoue les lots dans l'ordre de wave.lots, pas dans l'ordre alphabétique des fichiers (test L9 → L10)", status: todo }
+      - { id: t18, title: "orchestrate : identifier la session par --session-id <uuid> au lancement ; ne plus deviner le journal par date (une autre session du même dossier est comptée au budget)", status: todo }
+      - { id: t19, title: "orchestrate : refuser (ou poser dans .git/hooks) quand core.hooksPath pointe dans l'arbre suivi : le hook temporaire y devient un fichier du dépôt", status: todo }
+      - { id: t20, title: "orchestrate : compter au budget les tokens d'une étape interrompue par un signal (journal relu au signal ou à --resume)", status: todo }
+      - { id: t21, title: "orchestrate : snapshot (git ls-remote) en asynchrone, comme les commandes du projet", status: todo }
+    review: { date: 2026-10-04, verdict: "not compliant: 2 majeurs (ordre alphabétique des lots à la reprise qui bloque le lot dépendant, budget compté sur le journal d'une autre session après un délai dépassé), 3 mineurs", commit: 54f45b789c897b9daef2deb72603a0571e647d3f }
   - id: L4
     title: "Nettoyage en routine de clôture : session-close liste les fichiers de travail périmés (dossier tmp partagé, captures non référencées, scripts jetables, dossiers temporaires laissés par les tests) et propose leur suppression — au lieu d'un lot à rouvrir dans chaque projet"
     status: todo

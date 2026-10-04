@@ -2,6 +2,7 @@ import { diffDays, type Day } from './dates.js';
 import type { Commit } from './git.js';
 import type { Linked } from './link.js';
 import { isOpen, type Lot } from './plan.js';
+import { isRecurring } from './recurring.js';
 
 export interface Issue {
   kind: 'orphan-commit' | 'unknown-ref' | 'todo-with-commits' | 'idle' | 'done-open-tasks' | 'bad-dependency' | 'cycle' | 'bad-field';
@@ -22,10 +23,12 @@ export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7): Is
 
   for (const lot of lots) {
     const commits = linked.byLot.get(lot.id) ?? [];
-    if (lot.status === 'todo' && commits.length > 0) {
+    // Un lot récurrent reste ouvert par construction : ni todo-avec-commits ni idle.
+    const recurring = isRecurring(lot);
+    if (lot.status === 'todo' && !recurring && commits.length > 0) {
       issues.push({ kind: 'todo-with-commits', message: `${lot.id} a ${commits.length} commit(s) mais est encore todo — raf start ${lot.id}` });
     }
-    if (lot.status === 'doing') {
+    if (lot.status === 'doing' && !recurring) {
       const last = commits[0]?.day ?? lot.started;
       if (last && diffDays(last, today) > idleDays) {
         issues.push({ kind: 'idle', message: `${lot.id} en cours sans commit depuis ${diffDays(last, today)} j (${lot.title})` });

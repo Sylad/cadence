@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
+import { readPlanConfig } from '../src/config.js';
 import { Plan } from '../src/plan.js';
 import { dueLine, dueDays } from '../src/recurring.js';
 import { schedule } from '../src/schedule.js';
-import { gitRepo, tempDir } from './helpers.js';
+import { commit, gitRepo, tempDir } from './helpers.js';
 
 function raf(dir: string, today: string, ...argv: string[]) {
   const out: string[] = [];
@@ -119,5 +120,51 @@ describe('raf — lots récurrents', () => {
     p.add('B', '2026-09-01');
     const bars = schedule(p.lots(), new Map(), '2026-09-08');
     expect(bars.map((b) => b.lot.id)).toEqual(['L2']);
+  });
+});
+
+describe('lot récurrent — écarts', () => {
+  it('un commit citant le lot ne crée aucun écart, ni à todo ni à doing, même une semaine après', () => {
+    const dir = gitRepo();
+    raf(dir, '2026-09-01', 'init', '--project', 'demo');
+    raf(dir, '2026-09-01', 'add', 'Bump deps', '--every', '7');
+    commit(dir, 'chore(L1): bump deps', '2026-09-02T10:00:00');
+    raf(dir, '2026-09-02', 'did', 'L1');
+    const todo = raf(dir, '2026-09-30', 'check');
+    expect(todo.code).toBe(0);
+    expect(todo.out + todo.err).not.toMatch(/L1/);
+    raf(dir, '2026-09-02', 'start', 'L1');
+    const doing = raf(dir, '2026-09-30', 'check');
+    expect(doing.out + doing.err).not.toMatch(/L1/);
+    const close = raf(dir, '2026-09-30', 'session', 'close', '--since', '2026-09-20').out;
+    expect(close).not.toMatch(/Lots en cours/);
+  });
+});
+
+describe('lot récurrent — cas limites', () => {
+  it('did refuse un lot fermé', () => {
+    const p = fresh();
+    p.add('N', '2026-09-01', { every: 7 });
+    p.setStatus('L1', 'done', '2026-09-02', { force: true });
+    expect(() => p.did('L1', '2026-09-03')).toThrow(/L1 est done/);
+    p.add('M', '2026-09-01', { every: 7 });
+    p.setStatus('L2', 'dropped', '2026-09-02', { force: true });
+    expect(() => p.did('L2', '2026-09-03')).toThrow(/L2 est dropped/);
+  });
+
+  it('un plan en lecture seule expose every et last, avec leurs correspondances', () => {
+    const dir = tempDir();
+    const file = join(dir, 'taches.yaml');
+    writeFileSync(
+      file,
+      "taches:\n- id: R1\n  titre: Rotation\n  etat: prevu\n  tous_les: 14\n  fait_le: '2026-09-10T08:00:00+00:00'\n",
+    );
+    const cfg = join(dir, 'cadence.yaml');
+    writeFileSync(
+      cfg,
+      'plan:\n  path: taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, every: tous_les, last: fait_le }\n  statuses: { todo: prevu }\n',
+    );
+    const plan = Plan.load(file, readPlanConfig(cfg)!.settings);
+    expect(plan.lot('R1')).toMatchObject({ every: 14, last: '2026-09-10', status: 'todo' });
   });
 });

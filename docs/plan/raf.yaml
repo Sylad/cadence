@@ -68,16 +68,21 @@ lots:
       - { date: 2026-10-04, text: "revue de la vague 2026-10-04-1920 (après 2 passes) : non conforme, 1 majeur — un dossier illisible (readdir refusé : 0311/0300, ou 0700 à root) est proposé sur la seule date du dossier alors qu'il peut contenir un dépôt. PRINCIPE (lead, 04-10) : on ne propose JAMAIS ce qu'on n'a pas pu mesurer entièrement — tout échec de lecture (readdir, lstat, git) = non proposé ; session close ne plante jamais sur le nettoyage" }
     started: 2026-10-04
     tasks:
-      - { id: t1, title: "MAJEUR : ne jamais proposer un dossier qui est un dépôt git ou en contient un (tracked() part du dossier parent : un clone dans tmp/ est proposé) ; test", status: todo }
-      - { id: t2, title: suivi git vérifié aussi hors du dépôt (git -C <dossier du fichier> ls-files) ; '..xxx' suivi n'est pas « hors du dépôt » (rel === '..' || rel.startsWith('../')) ; tests, status: todo }
-      - { id: t3, title: "« * » n'attrape pas les noms en « . » (.env, .git) sauf motif en « . », comme le shell ; .git jamais proposé ; test", status: todo }
-      - { id: t4, title: "tests : limite du seuil (âge égal à cleanDays non proposé, mutation > en >= tuée) ; ~ résolu sous un homedir temporaire ; README l.692 : nettoyage dans le résumé de session-close", status: todo }
-      - { id: t5, title: "MAJEUR : un dossier illisible (readdir refusé) n'est jamais proposé, ni ce qu'il contient ; tests 0311 contenant un clone + 0700 non lisible", status: todo }
-      - { id: t6, title: "âge d'un dossier = date de modification la plus récente de son contenu ; test dossier ancien dont un fichier est d'aujourd'hui, non proposé", status: todo }
-      - { id: t7, title: jamais un chemin sous un segment .git (n'importe où dans le chemin) ; test avec le motif repo/.*/*, status: todo }
-      - { id: t8, title: "newestMtime / lstat EACCES ou ENOENT d'un enfant : jamais de plantage, l'élément n'est pas proposé ; test", status: todo }
-      - { id: t9, title: "tests t1/t3 : vieillir tout l'arbre (y compris .git) pour que holdsRepo et le filtre .git soient seuls à protéger — mutation de chacun détectée ; test EACCES (clean.test.ts:126) tue la mutation new Date(0)", status: todo }
-      - { id: t10, title: "README l.394-399 : jamais proposés = dépôts git (et dossiers qui en contiennent), noms en « . » non visés, illisibles ; âge = contenu le plus récent d'un dossier", status: todo }
+      - { id: t1, title: "MAJEUR : ne jamais proposer un dossier qui est un dépôt git ou en contient un (tracked() part du dossier parent : un clone dans tmp/ est proposé) ; test", status: done }
+      - { id: t2, title: suivi git vérifié aussi hors du dépôt (git -C <dossier du fichier> ls-files) ; '..xxx' suivi n'est pas « hors du dépôt » (rel === '..' || rel.startsWith('../')) ; tests, status: done }
+      - { id: t3, title: "« * » n'attrape pas les noms en « . » (.env, .git) sauf motif en « . », comme le shell ; .git jamais proposé ; test", status: done }
+      - { id: t4, title: "tests : limite du seuil (âge égal à cleanDays non proposé, mutation > en >= tuée) ; ~ résolu sous un homedir temporaire ; README l.692 : nettoyage dans le résumé de session-close", status: done }
+      - { id: t5, title: "MAJEUR : un dossier illisible (readdir refusé) n'est jamais proposé, ni ce qu'il contient ; tests 0311 contenant un clone + 0700 non lisible", status: done }
+      - { id: t6, title: "âge d'un dossier = date de modification la plus récente de son contenu ; test dossier ancien dont un fichier est d'aujourd'hui, non proposé", status: done }
+      - { id: t7, title: jamais un chemin sous un segment .git (n'importe où dans le chemin) ; test avec le motif repo/.*/*, status: done }
+      - { id: t8, title: "newestMtime / lstat EACCES ou ENOENT d'un enfant : jamais de plantage, l'élément n'est pas proposé ; test", status: done }
+      - { id: t9, title: "tests t1/t3 : vieillir tout l'arbre (y compris .git) pour que holdsRepo et le filtre .git soient seuls à protéger — mutation de chacun détectée ; test EACCES (clean.test.ts:126) tue la mutation new Date(0)", status: done }
+      - { id: t10, title: "README l.394-399 : jamais proposés = dépôts git (et dossiers qui en contiennent), noms en « . » non visés, illisibles ; âge = contenu le plus récent d'un dossier", status: done }
+      - { id: t11, title: "MAJEUR : un dépôt nu ou un dossier git séparé (HEAD + objects/ + refs/, sans entrée .git) n'est jamais proposé, ni un dossier qui en contient un, ni un fichier qui y est ; tests tmp/x.git, tmp/work/mirror.git, --separate-git-dir, motif tmp/*/*", status: todo }
+      - { id: t12, title: "MAJEUR : expand et measure ne descendent jamais dans un lien symbolique attrapé par un joker ; tests lien vers un dossier extérieur et vers la racine (tmp/self → ..)", status: todo }
+      - { id: t13, title: "MAJEUR : test de gitEnv — GIT_INDEX_FILE / GIT_DIR hérités : un fichier suivi n'est pas proposé (mutation « env: gitEnv() retirée » tuée)", status: todo }
+      - { id: t14, title: "tests : dossier de motif non listable présent dans unreadable (clean.test.ts:180) ; nom à métacaractères de pathspec suivi par git non proposé (--literal-pathspecs)", status: todo }
+    review: { date: 2026-10-04, verdict: "non conforme : 3 majeurs (dépôt nu / dossier git séparé proposés, lien symbolique traversé par « * », protection gitEnv non testée), 1 mineur", commit: 7b958edfe744bec038c9762c033a6e56aae3db14 }
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
     status: done
@@ -534,8 +539,10 @@ lots:
     finished: 2026-10-04
   - id: L44
     title: "⚡ Suite de la revue L43 : test/skills.test.ts:259 — retirer le .replace(/\\s+/g, ' ') redondant et l'assertion qui répète la ligne 238 (une seule assertion, commentaire de la l.258 rattaché à la l.238)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: conforme, commit: 5ca94067b758a14af6753fbb26d79c3fe063cf09 }
+    finished: 2026-10-04

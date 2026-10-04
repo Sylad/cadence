@@ -202,12 +202,12 @@ export class Plan {
     return { patterns, invalid };
   }
 
-  /** Fichiers tenus avec le plan, relatifs à la racine du dépôt. */
   /** Fichier de configuration lu pour ce plan, null quand on n'en connaît pas (cadence.yaml à la racine alors). */
   get configFile(): string | null {
     return this.settings.config ?? null;
   }
 
+  /** Fichiers tenus avec le plan, relatifs à la racine du dépôt. */
   get files(): string[] {
     return this.settings.files ?? [];
   }

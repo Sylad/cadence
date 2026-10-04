@@ -236,6 +236,35 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
     expect(orphans((await raf('2026-10-03', 'check', '--config', 'conf/autre.yaml')).out)).toHaveLength(1);
   });
 
+  it('(L16) un cadence.yaml illisible avant ou après le commit compte comme du travail (repli de withoutPlanKey)', async () => {
+    const { raf, write } = await project();
+    await raf('2026-10-03', 'add', 'Livraison');
+    write('chore: déclare le plan publié', 'cadence.yaml', 'plan:\n  files: [a.json]\n');
+    write('chore: YAML cassé', 'cadence.yaml', 'plan:\n  files: [a.json\n');
+    write('chore: YAML réparé', 'cadence.yaml', 'plan:\n  files: [a.json]\n');
+    // Le fichier lu à la tête est valide ; dans l'historique, le commit qui le casse (après) et celui qui le répare (avant) sont du travail.
+    expect(orphans((await raf('2026-10-03', 'check')).out)).toHaveLength(2);
+  });
+
+  it('(L16) commit racine (sans parent) : cadence.yaml à la seule clé plan: est de l’entretien, avec deliver: c’est du travail', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const { run } = await import('../src/cli.js');
+    const root = async (config: string) => {
+      const dir = gitRepo();
+      const out: string[] = [];
+      const opts = { cwd: dir, env: { RAF_TODAY: '2026-10-03' }, out: (l: string) => out.push(l), err: () => {}, now: () => new Date('2026-10-03T12:00:00') };
+      await run(['init', '--no-hook'], opts);
+      writeFileSync(join(dir, 'cadence.yaml'), config);
+      execFileSync('git', ['add', 'docs/plan/raf.yaml', 'cadence.yaml'], { cwd: dir });
+      execFileSync('git', ['commit', '-qm', 'chore: racine'], { cwd: dir, env: { ...process.env, GIT_AUTHOR_DATE: '2026-10-03T12:00:00', GIT_COMMITTER_DATE: '2026-10-03T12:00:00' } });
+      out.length = 0;
+      await run(['check'], opts);
+      return out.join('\n');
+    };
+    expect(orphans(await root('plan:\n  files: [a.json]\n'))).toHaveLength(0);
+    expect(orphans(await root('plan:\n  files: [a.json]\ndeliver:\n  verify: []\n'))).toHaveLength(1);
+  });
+
   it('(e) un commit mixte (plan + fichier source) qui cite un lot compte pour ce lot, quel que soit son sujet', async () => {
     const { raf, touch, declare } = await project();
     declare();

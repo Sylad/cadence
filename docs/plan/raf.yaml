@@ -68,10 +68,12 @@ lots:
     finished: 2026-10-03
   - id: L8
     title: "cadence verify : rejouer les vérifications d'effet de cadence.yaml hors livraison (code de sortie, résumé d'une ligne) ; session start la lance et signale un effet rouge dans les faits du matin — le 03-10, ol-companion servait un effectif vide depuis 38 h (source amont en panne, /api/health vert) et personne ne l'a vu avant Sylvain"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-03
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme (revue 04-10) : 0 bloquant 0 majeur, 247 tests, verify 7/7 ol et 4/4 warhammer en lecture seule ; 5 mineurs (budget par vérification, borne README, orphelins de processus, POLL dupliqué, test quiet) reportés en L19", commit: 485b219101415037db409a2ed2ffcd09d2677b21 }
+    finished: 2026-10-04
   - id: L9
     title: "Agent qa-reviewer : après la livraison d'un lot, parcourt les pages de l'app dans un vrai navigateur et signale états vides, messages d'erreur, appels d'API en échec et erreurs de console — constat mesuré, lecture seule ; à cadrer après cadence verify (ce qui se vérifie par une commande ne doit pas coûter un agent)"
     status: done
@@ -149,5 +151,11 @@ lots:
     title: "README : section deliver (l. 426) et paragraphe « entretien du plan » — les commits d'entretien du plan n'annoncent aucun lot livré (suite de la revue L17)"
     status: todo
     estimate: 0.1
+    quickwin: true
+    created: 2026-10-04
+  - id: L19
+    title: "Suites de la revue L8 : budget de temps par vérification (une lente ne rougit plus les suivantes ; restantes « non vérifiées ») ; README borne réelle de session start et délais ≠ deliver ; tuer le groupe de processus (pas d'orphelins) ; un seul intervalle de réessai partagé ; test realDeps quiet"
+    status: todo
+    estimate: 0.5
     quickwin: true
     created: 2026-10-04

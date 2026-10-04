@@ -207,6 +207,18 @@ describe('staleFiles — rien de ce qui n’a pu être mesuré entièrement', ()
   });
 });
 
+describe('staleFiles — la racine', () => {
+  it('ne propose jamais la racine ni un dossier qui la contient', () => {
+    const tmp = tempDir();
+    const root = join(tmp, 'parent/projet');
+    touch(join(root, 'vieux.png'));
+    touch(join(tmp, 'libre.png'));
+    ageTree(tmp);
+    const r = staleFiles(root, [`${tmp}/*`, `${tmp}/parent/*`, '.'], 7, TODAY);
+    expect(names(r)).toEqual([join(tmp, 'libre.png')]);
+  });
+});
+
 describe('staleFiles — seuil et ~', () => {
   it('un âge égal au seuil n’est pas proposé, un jour de plus l’est', () => {
     const dir = tempDir();

@@ -72,39 +72,63 @@ export function isProcessAlive(pid: number): boolean {
   }
 }
 
+/** Ce qui décide qu'une racine est périmée ; injectable pour les tests. */
+export interface StaleCheck {
+  /** Le processus existe-t-il ? */
+  alive?: (pid: number) => boolean;
+  /** uid de l'utilisateur courant ; `undefined` (win32, pas de getuid) saute la vérification du propriétaire. */
+  uid?: () => number | undefined;
+}
+
 /**
- * Racines `cadence-tests-root-*` d'un run interrompu (Ctrl-C, kill, OOM) dans `realTmp` : un vrai dossier (pas un lien)
- * au bon préfixe, portant NOTRE fichier pid, dont le pid désigne un processus mort. Sans fichier pid lisible,
- * on n'y touche pas (pas à nous, ou en cours de création).
+ * `dir` est-il une racine d'un run interrompu (Ctrl-C, kill, OOM) que nous pouvons prouver nôtre ? Un vrai dossier
+ * (pas un lien) au bon préfixe, appartenant à l'utilisateur courant, portant NOTRE fichier pid (fichier ordinaire),
+ * dont le pid désigne un processus mort. Au moindre doute (illisible, absent, autre propriétaire) : non.
  */
-export function findStaleRoots(realTmp: string, alive: (pid: number) => boolean = isProcessAlive): string[] {
+export function isStaleRoot(dir: string, check: StaleCheck = {}): boolean {
+  const { alive = isProcessAlive, uid = () => process.getuid?.() } = check;
+  if (!basename(dir).startsWith(ROOT_PREFIX)) return false;
+  try {
+    const st = lstatSync(dir);
+    if (!st.isDirectory()) return false; // un lien n'est pas un dossier pour lstat
+    const me = uid();
+    if (me !== undefined && st.uid !== me) return false;
+    const pidFile = join(dir, PID_FILE);
+    if (!lstatSync(pidFile).isFile()) return false;
+    const text = readFileSync(pidFile, 'utf8').trim();
+    if (!/^\d+$/.test(text)) return false;
+    return !alive(Number(text));
+  } catch {
+    return false; // pas de fichier pid (ou illisible) : pas une racine que nous pouvons prouver nôtre
+  }
+}
+
+/** Racines périmées (isStaleRoot) directement dans `realTmp`. */
+export function findStaleRoots(realTmp: string, check: StaleCheck = {}): string[] {
   let names: string[];
   try {
     names = readdirSync(realTmp);
   } catch {
     return [];
   }
-  const stale: string[] = [];
-  for (const name of names.sort()) {
-    if (!name.startsWith(ROOT_PREFIX)) continue;
-    const dir = join(realTmp, name);
-    try {
-      if (!lstatSync(dir).isDirectory()) continue;
-      const text = readFileSync(join(dir, PID_FILE), 'utf8').trim();
-      if (!/^\d+$/.test(text)) continue;
-      if (!alive(Number(text))) stale.push(dir);
-    } catch {
-      // Pas de fichier pid (ou illisible) : ce n'est pas une racine que nous pouvons prouver nôtre.
-    }
-  }
-  return stale;
+  return names
+    .sort()
+    .map((name) => join(realTmp, name))
+    .filter((dir) => isStaleRoot(dir, check));
 }
 
-/** Supprime les racines périmées de findStaleRoots et rend leur liste (chaque racine n'est autorisée que pour elle-même). */
-export function removeStaleRoots(realTmp: string, alive: (pid: number) => boolean = isProcessAlive): string[] {
-  const stale = findStaleRoots(realTmp, alive);
-  for (const dir of stale) removeTree(dir, dir);
-  return stale;
+/**
+ * Supprime les racines périmées de findStaleRoots et rend la liste de celles supprimées. Chaque racine est revérifiée
+ * juste avant sa suppression, et n'est autorisée que pour elle-même (removeTree(dir, dir)).
+ */
+export function removeStaleRoots(realTmp: string, check: StaleCheck = {}): string[] {
+  const removed: string[] = [];
+  for (const dir of findStaleRoots(realTmp, check)) {
+    if (!isStaleRoot(dir, check)) continue;
+    removeTree(dir, dir);
+    removed.push(dir);
+  }
+  return removed;
 }
 
 /** Ce qui reste dans la racine temporaire privée de la suite : doit être vide en fin de run (hors notre fichier pid). */

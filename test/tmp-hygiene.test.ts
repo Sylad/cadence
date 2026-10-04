@@ -95,11 +95,48 @@ describe('dossiers temporaires de la suite (L45)', () => {
     const autrePrefixe = make('autre-morte', '111');
     writeFileSync(join(tmp, `${ROOT_PREFIX}fichier`), 'x'); // un fichier, pas un dossier
     const alive = (pid: number): boolean => pid === 222;
-    expect(findStaleRoots(tmp, alive)).toEqual([morte]);
-    expect(removeStaleRoots(tmp, alive)).toEqual([morte]);
+    expect(findStaleRoots(tmp, { alive })).toEqual([morte]);
+    expect(removeStaleRoots(tmp, { alive })).toEqual([morte]);
     expect(existsSync(morte)).toBe(false);
     for (const d of [vivante, sansPid, pidIllisible, autrePrefixe]) expect(existsSync(d)).toBe(true);
-    expect(removeStaleRoots(join(tmp, 'inexistant'), alive)).toEqual([]);
+    expect(removeStaleRoots(join(tmp, 'inexistant'), { alive })).toEqual([]);
+  });
+
+  it('une racine périmée n\'est supprimée que si elle appartient à l\'utilisateur courant et n\'est pas un lien (L45/t5)', () => {
+    const tmp = tempDir();
+    const morte = join(tmp, `${ROOT_PREFIX}morte`);
+    mkdirSync(morte);
+    writeFileSync(join(morte, PID_FILE), '111');
+    const dead = (): boolean => false;
+    const me = process.getuid?.();
+    // Propriétaire différent (simulé) : on n'y touche pas.
+    if (me !== undefined) {
+      expect(findStaleRoots(tmp, { alive: dead, uid: () => me + 1 })).toEqual([]);
+      expect(removeStaleRoots(tmp, { alive: dead, uid: () => me + 1 })).toEqual([]);
+      expect(existsSync(join(morte, PID_FILE))).toBe(true);
+    }
+    // Sous win32, getuid n'existe pas : la vérification du propriétaire est sautée.
+    expect(findStaleRoots(tmp, { alive: dead, uid: () => undefined })).toEqual([morte]);
+    // Un lien au bon préfixe vers une racine morte n'est pas une racine : ni lui ni sa cible ne sont supprimés.
+    const cible = join(tmp, 'cible');
+    mkdirSync(cible);
+    writeFileSync(join(cible, PID_FILE), '111');
+    rmSync(morte, { recursive: true });
+    symlinkSync(cible, join(tmp, `${ROOT_PREFIX}lien`));
+    expect(removeStaleRoots(tmp, { alive: dead })).toEqual([]);
+    expect(existsSync(join(cible, PID_FILE))).toBe(true);
+  });
+
+  it('removeStaleRoots revérifie chaque racine juste avant de la supprimer (L45/t5)', () => {
+    const tmp = tempDir();
+    const dir = join(tmp, `${ROOT_PREFIX}revit`);
+    mkdirSync(dir);
+    writeFileSync(join(dir, PID_FILE), '111');
+    let calls = 0;
+    const flips = (): boolean => calls++ > 0; // mort au relevé, vivant à la revérification
+    expect(removeStaleRoots(tmp, { alive: flips })).toEqual([]);
+    expect(existsSync(dir)).toBe(true);
+    expect(calls).toBe(2);
   });
 
   it('globalSetup a écrit le pid de ce processus dans la racine privée, que leftovers ignore', () => {

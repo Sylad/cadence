@@ -1,0 +1,62 @@
+import type { LotState, StepState, WaveState } from './state.js';
+
+const k = (n: number) => `${Math.round(n / 1000)} k`;
+const m = (n: number) => `${(n / 1_000_000).toFixed(1).replace('.', ',')} M`;
+
+const LABEL: Record<LotState['status'], string> = {
+  queued: 'en attente',
+  implementing: 'implémentation',
+  reviewing: 'revue',
+  fixing: 'correction',
+  question: 'question',
+  ready: 'prêt à livrer',
+  'handed-back': 'rendu au lead',
+  failed: 'échec',
+  suspended: 'suspendu',
+};
+
+function review(l: LotState): string {
+  if (!l.code) return '—';
+  const fixes = l.pass === 0 ? '' : ` après ${l.pass} correction${l.pass > 1 ? 's' : ''}`;
+  if (l.status === 'ready') return `conforme${fixes}`;
+  return `non conforme (${l.code.bloquants} bloquant, ${l.code.majeurs} majeur)`;
+}
+
+function ux(l: LotState): string {
+  if (!l.visible) return '—';
+  if (l.ux) return l.ux.conforme ? 'conforme (à enregistrer par le lead)' : `non conforme (${l.ux.bloquants + l.ux.majeurs})`;
+  return 'à faire par le lead';
+}
+
+const commits = (l: LotState) => new Set(l.steps.flatMap((s: StepState) => s.commits ?? [])).size;
+const counted = (l: LotState) => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
+const minutes = (l: LotState) => Math.round(l.steps.reduce((n, s) => n + (s.ended ? Date.parse(s.ended) - Date.parse(s.started) : 0), 0) / 60_000);
+
+/** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. */
+export function renderTable(wave: WaveState, lots: LotState[]): string[] {
+  const rows = lots.map((l) => [`${l.project}:${l.lot}`, LABEL[l.status], String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`]);
+  const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée'];
+  const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
+  const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i])).join('  ').trimEnd();
+  const out = [line(head), ...rows.map(line)];
+  const by = (s: LotState['status']) => lots.filter((l) => l.status === s).length;
+  const tail = [`${by('ready')} prêt(s)`, by('question') ? `${by('question')} question(s)` : '', by('handed-back') + by('failed') ? `${by('handed-back') + by('failed')} rendu(s) au lead` : '', by('suspended') ? `${by('suspended')} suspendu(s)` : ''].filter(Boolean);
+  out.push(`vague ${wave.id} : ${k(wave.consumed)} / ${m(wave.budget)} comptés (lecture de cache ${m(wave.cacheRead)}) — ${tail.join(', ')} — ${wave.status}`);
+  for (const l of lots.filter((x) => x.status === 'question')) {
+    out.push(`question : ${l.project}:${l.lot} — « ${l.questions.join(' / ')} » (cadence orchestrate --resume --answer ${l.project}:${l.lot} "…")`);
+  }
+  for (const l of lots.filter((x) => x.status === 'handed-back' || x.status === 'failed' || x.status === 'suspended')) {
+    out.push(`${l.project}:${l.lot} — ${l.outcome ?? LABEL[l.status]}`);
+    for (const c of l.status === 'handed-back' ? l.constats : []) out.push(`    · [${c.gravite}] ${c.fichier ? `${c.fichier}${c.ligne ? `:${c.ligne}` : ''} — ` : ''}${c.texte.split('\n')[0]}`);
+  }
+  for (const l of lots) {
+    if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);
+    for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);
+    for (const p of l.proposals) out.push(`${l.project}:${l.lot} — proposé : ${p}`);
+    if (l.uxVerdict && l.visible) out.push(`${l.project}:${l.lot} — verdict UX pour « raf ux » : ${l.uxVerdict}`);
+  }
+  return out;
+}
+
+/** Heure de remise du quota si le message la donne. */
+export { quotaReset } from './result.js';

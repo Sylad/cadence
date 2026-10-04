@@ -15,6 +15,7 @@ import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } 
 import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
+import { orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, lastDelivery, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
 
@@ -42,6 +43,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf gantt [-o docs/plan/gantt.html]
   raf hook install
+  cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom]   une session claude neuve par étape ; --status [vague] ; --resume [vague] [--budget 1M] [--answer projet:lot "réponse"]
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -59,6 +61,10 @@ Options communes : --file chemin (ou RAF_FILE), RAF_TODAY=AAAA-MM-JJ pour figer 
 
 export function run(argv: string[], io: Io): number | Promise<number> {
   try {
+    // orchestrate a ses propres options (--status et --resume prennent une valeur facultative, --answer en prend deux).
+    if (argv[0] === 'orchestrate') {
+      return orchestrate(argv.slice(1), io, realOrchestrateDeps(io.env)).catch((e: unknown) => failure(e, io));
+    }
     const result = dispatch(argv, io);
     return result instanceof Promise ? result.catch((e: unknown) => failure(e, io)) : result;
   } catch (e) {

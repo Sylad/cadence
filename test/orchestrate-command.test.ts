@@ -1,0 +1,283 @@
+import { describe, expect, it } from 'vitest';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
+import type { ClaudeFn, LaunchOutcome } from '../src/orchestrate/launch.js';
+import { RunStore } from '../src/orchestrate/state.js';
+import { AGENTS_DIR } from '../src/skills.js';
+import { Plan } from '../src/plan.js';
+import { claudeOut, commitFile, git, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
+import { gitRepo, tempDir } from './helpers.js';
+
+
+/** Plusieurs projets sous un même dossier parent, chacun son dépôt git et son plan. */
+function parentWith(projects: Record<string, { title: string; estimate?: number; visible?: boolean; status?: 'doing'; after?: string[] }[]>) {
+  const parent = tempDir();
+  const dirs: Record<string, string> = {};
+  for (const [name, lots] of Object.entries(projects)) {
+    const dir = join(parent, name);
+    mkdirSync(dir);
+    git(dir, 'init', '-q', '-b', 'main');
+    git(dir, 'config', 'user.email', 't@example.com');
+    git(dir, 'config', 'user.name', 'T');
+    git(dir, 'config', 'commit.gpgsign', 'false');
+    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
+    for (const l of lots) {
+      const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible, after: l.after });
+      if (l.status === 'doing') plan.setStatus(id, 'doing', '2026-10-01');
+    }
+    plan.save();
+    git(dir, 'add', '--', 'docs/plan/raf.yaml');
+    git(dir, 'commit', '-q', '-m', 'chore: plan');
+    dirs[name] = dir;
+  }
+  return { parent, dirs };
+}
+
+type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
+
+function fakeDeps(over: Over = {}, tweak: Partial<OrchestrateDeps> = {}): { deps: OrchestrateDeps; calls: { cwd: string; kind: string; model: string }[] } {
+  const calls: { cwd: string; kind: string; model: string }[] = [];
+  const claude: ClaudeFn = async (args, o) => {
+    const kind = kindOf(args);
+    calls.push({ cwd: o.cwd, kind, model: args[args.indexOf('--model') + 1] });
+    const custom = over[kind];
+    if (custom) return custom(o.cwd, args[1]);
+    if (kind === 'implement' || kind === 'fix') {
+      const lot = /on lot `([^`]+)`/.exec(args[1])![1];
+      return claudeOut(workReport({ commits: [commitFile(o.cwd, `${kind}-${Math.random()}.txt`, `${kind === 'fix' ? 'fix' : 'feat'}(${lot}): travail`)] }));
+    }
+    return claudeOut(reviewReport());
+  };
+  return { deps: { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, ...tweak }, calls };
+}
+
+function io(cwd: string, env: Record<string, string> = {}) {
+  const out: string[] = [];
+  const err: string[] = [];
+  const i: OrchestrateIo = { cwd, env: { RAF_TODAY: '2026-10-04', ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') };
+  return { io: i, out, err };
+}
+
+describe('arguments', () => {
+  it('lots, modèle, budget, options à valeur facultative', () => {
+    expect(parseOrchestrateArgs(['ol:L22', 'cadence:L18@haiku', 'L3', '--budget', '1.5M', '--dry-run'])).toMatchObject({
+      lots: [{ project: 'ol', lot: 'L22' }, { project: 'cadence', lot: 'L18', model: 'haiku' }, { lot: 'L3' }],
+      budget: 1_500_000,
+      dryRun: true,
+    });
+    expect(parseOrchestrateArgs(['--status']).status).toBe(true);
+    expect(parseOrchestrateArgs(['--status', '2026-10-04-1412']).status).toBe('2026-10-04-1412');
+    expect(parseOrchestrateArgs(['--resume', '--budget', '1M', '--answer', 'ol:L22', 'SQLite'])).toMatchObject({ resume: true, budget: 1_000_000, answers: [{ project: 'ol', lot: 'L22', text: 'SQLite' }] });
+    expect(parseOrchestrateArgs(['--resume', 'L3']).lots).toEqual([{ project: undefined, lot: 'L3', model: undefined }]);
+    expect(() => parseOrchestrateArgs(['a:L1@gpt'])).toThrow(/modèle inconnu/);
+    expect(() => parseOrchestrateArgs(['--parallel'])).toThrow(/option inconnue/);
+  });
+  it('budget', () => {
+    expect([parseBudget('1500000'), parseBudget('1.5M'), parseBudget('800k'), parseBudget('2M')]).toEqual([1_500_000, 1_500_000, 800_000, 2_000_000]);
+    expect(() => parseBudget('beaucoup')).toThrow(/--budget invalide/);
+  });
+});
+
+describe('refus avant d\'agir (code 2)', () => {
+  const run = async (parent: string, argv: string[], deps = fakeDeps().deps, env: Record<string, string> = {}) => {
+    const r = io(parent, env);
+    const code = await orchestrate(argv, r.io, deps);
+    return { code, ...r };
+  };
+
+  it('lot inconnu, terminé, dépendance non satisfaite, projet inconnu, lot donné deux fois', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux', after: ['L1'] }], b: [{ title: 'x' }] });
+    const plan = Plan.load(join(parent, 'a/docs/plan/raf.yaml'));
+    plan.setStatus('L1', 'dropped', '2026-10-04');
+    plan.save();
+    git(join(parent, 'a'), 'commit', '-qam', 'chore: plan');
+    const r = await run(parent, ['a:L9', 'a:L1', 'zzz:L1', 'b:L1', 'b:L1']);
+    expect(r.code).toBe(2);
+    const err = r.err.join('\n');
+    expect(err).toContain('a:L9 : lot inconnu');
+    expect(err).toContain('a:L1 : le lot est dropped');
+    expect(err).toContain('zzz:L1 : dossier');
+    expect(err).toContain('b:L1 : lot donné deux fois');
+    // rien n'a été écrit
+    expect(existsSync(join(parent, '.cadence'))).toBe(false);
+  });
+
+  it('dépendance ouverte refusée, acceptée si elle est plus tôt dans la vague', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux', after: ['L1'] }] });
+    expect((await run(parent, ['a:L2'])).err.join()).toContain('dépendance(s) ni terminée(s) ni plus tôt dans la vague : L1');
+    expect((await run(parent, ['a:L2', 'a:L1'])).err.join()).toContain('a:L2 : dépendance(s)'); // L1 est après : refus
+    const ok = await run(parent, ['a:L1', 'a:L2', '--dry-run']);
+    expect(ok.code).toBe(0);
+  });
+
+  it('arbre sale, claude absent, claude sans --json-schema, hook pre-push existant, session imbriquée', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    writeFileSync(join(dirs.a, 'docs/plan/raf.yaml'), `${readFileSync(join(dirs.a, 'docs/plan/raf.yaml'), 'utf8')}# sale\n`);
+    expect((await run(parent, ['a:L1'])).err.join()).toMatch(/a : arbre sale, 1 fichier\(s\) suivi\(s\) modifié\(s\) : docs\/plan\/raf\.yaml/);
+    git(dirs.a, 'checkout', '-q', '.');
+    expect((await run(parent, ['a:L1'], fakeDeps({}, { claudeInfo: () => null }).deps)).err.join()).toContain('claude introuvable');
+    expect((await run(parent, ['a:L1'], fakeDeps({}, { claudeInfo: () => ({ version: '1.0.0', jsonSchema: false }) }).deps)).err.join()).toContain("claude 1.0.0 n'a pas --json-schema");
+    writeFileSync(join(dirs.a, '.git/hooks/pre-push'), '#!/bin/sh\nexit 0\n');
+    expect((await run(parent, ['a:L1'])).err.join()).toContain('hook pre-push existe déjà');
+    expect((await run(parent, ['a:L1'], undefined, { CADENCE_ORCHESTRATED: 'w0' })).err.join()).toContain('depuis une session orchestrée');
+  });
+
+  it('plan en lecture seule et lot à faire sans orchestrate.start', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'plan:\n  path: docs/plan/raf.yaml\n  lots: lots\n  fields: { title: title }\n');
+    git(dirs.a, 'add', '--', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: config');
+    const r = await run(parent, ['a:L1']);
+    expect(r.code).toBe(2);
+    expect(r.err.join()).toContain("plan en lecture seule : démarrer le lot avec l'outil du projet");
+  });
+
+  it('une vague déjà en cours dans ce dossier', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    mkdirSync(join(parent, '.cadence'));
+    writeFileSync(join(parent, '.cadence/orchestrate.lock'), JSON.stringify({ pid: process.pid, wave: 'autre', started: 'x' }));
+    expect((await run(parent, ['a:L1'])).err.join()).toContain('une vague est déjà en cours');
+  });
+});
+
+describe('--dry-run', () => {
+  it('rien n\'est lancé ni écrit ; étapes, modèles, commande résolue et briefs rendus', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'petit', estimate: 0.5 }], c: [{ title: 'écran', visible: true }] });
+    const f = fakeDeps();
+    const r = io(parent);
+    const code = await orchestrate(['a:L1', 'b:L1@haiku', 'c:L1', '--dry-run'], r.io, f.deps);
+    expect(code).toBe(0);
+    expect(f.calls).toEqual([]);
+    expect(existsSync(join(parent, '.cadence'))).toBe(false);
+    const text = r.out.join('\n');
+    expect(text).toContain('a:L1');
+    expect(text).toContain('implement (sonnet) → review (opus)');
+    expect(text).toContain('implement (haiku) → review-small (opus) — petit lot');
+    expect(text).toContain('UX à faire par le lead');
+    expect(text).toContain('créneau 1');
+    expect(text).toContain("en attente d'un créneau");
+    expect(text).toContain('claude -p <brief> --output-format json --json-schema <json> --model sonnet');
+    const brief = /brief : (\S+)/.exec(text)![1];
+    expect(readFileSync(brief, 'utf8')).toContain('Work in `');
+    expect(existsSync(join(parent, 'a/.git/hooks/pre-push'))).toBe(false);
+  });
+});
+
+describe('une vague', () => {
+  it('deux projets prêts : code 0, état rangé, hooks et verrous libérés, tableau', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
+    const f = fakeDeps();
+    const r = io(parent);
+    const code = await orchestrate(['a:L1', 'b:L1'], r.io, f.deps);
+    expect(code).toBe(0);
+    const out = r.out.join('\n');
+    expect(out).toMatch(/lot +état +passes +revue +UX +commits +tokens +durée/);
+    expect(out).toMatch(/a:L1 +prêt à livrer +0 +conforme +— +1 /);
+    expect(out).toContain('vague 2026-10-04-1412 : ');
+    expect(out).toContain('2 prêt(s)');
+    const wave = new RunStore(parent, '2026-10-04-1412').readWave()!;
+    expect(wave.status).toBe('done');
+    expect(wave.consumed).toBe(6000);
+    expect(wave.cacheRead).toBe(200_000);
+    for (const d of Object.values(dirs)) {
+      expect(existsSync(join(d, '.git/hooks/pre-push'))).toBe(false);
+      expect(existsSync(join(d, '.git/cadence/orchestrate.lock'))).toBe(false);
+      expect(Plan.load(join(d, 'docs/plan/raf.yaml')).lot('L1').review?.verdict).toContain('orchestré (vague 2026-10-04-1412');
+      expect(Plan.load(join(d, 'docs/plan/raf.yaml')).lot('L1').status).toBe('doing');
+    }
+    expect(existsSync(join(parent, '.cadence/orchestrate.lock'))).toBe(false);
+    expect(readFileSync(join(parent, '.cadence/runs/2026-10-04-1412/journal.log'), 'utf8')).toContain('a:L1 → ready');
+  });
+
+  it('pendant la vague, le hook pre-push est posé ; les verrous sont pris', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    let seen: { hook: boolean; repoLock: boolean; waveLock: boolean } | null = null;
+    const f = fakeDeps({
+      implement: (cwd) => {
+        seen = { hook: existsSync(join(dirs.a, '.git/hooks/pre-push')), repoLock: existsSync(join(dirs.a, '.git/cadence/orchestrate.lock')), waveLock: existsSync(join(parent, '.cadence/orchestrate.lock')) };
+        return claudeOut(workReport({ commits: [commitFile(cwd, 'x.txt', 'feat(L1): x')] }));
+      },
+    });
+    await orchestrate(['a:L1'], io(parent).io, f.deps);
+    expect(seen).toEqual({ hook: true, repoLock: true, waveLock: true });
+  });
+
+  it('un lot rendu au lead : code 1 ; budget atteint : code 3 puis --resume --budget continue jusqu\'à 0', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    const f = fakeDeps();
+    const first = io(parent);
+    const code = await orchestrate(['a:L1', 'a:L2', '--budget', '2000'], first.io, f.deps);
+    expect(code).toBe(3);
+    expect(first.out.join('\n')).toContain('suspendu');
+    expect(new RunStore(parent, '2026-10-04-1412').readWave()!.status).toBe('suspended-budget');
+    const again = io(parent);
+    const code2 = await orchestrate(['--resume', '--budget', '1M'], again.io, f.deps);
+    expect(code2).toBe(0);
+    expect(new RunStore(parent, '2026-10-04-1412').readWave()!.status).toBe('done');
+    expect(f.calls.map((c) => c.kind)).toEqual(['implement', 'review', 'implement', 'review']);
+  });
+
+  it('question puis --answer : le lot reprend, la vague aboutit', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    let n = 0;
+    const f = fakeDeps({
+      implement: (cwd) => (n++ === 0 ? claudeOut(workReport({ questions: ['Quelle base ?'] })) : claudeOut(workReport({ commits: [commitFile(cwd, 'x.txt', 'feat(L1): x')] }))),
+    });
+    const first = io(parent);
+    expect(await orchestrate(['a:L1'], first.io, f.deps)).toBe(1);
+    expect(first.out.join('\n')).toContain('question : a:L1 — « Quelle base ? » (cadence orchestrate --resume --answer a:L1 "…")');
+    expect(new RunStore(parent, '2026-10-04-1412').readWave()!.status).toBe('interrupted');
+    const second = io(parent);
+    expect(await orchestrate(['--resume', '--answer', 'a:L1', 'SQLite'], second.io, f.deps)).toBe(0);
+    expect(new RunStore(parent, '2026-10-04-1412').readLot('a', 'L1')!.answers).toEqual(['SQLite']);
+  });
+
+  it('--resume refuse une réponse à un lot qui n\'attend rien, et une vague terminée', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    await orchestrate(['a:L1'], io(parent).io, f.deps);
+    await expect(orchestrate(['--resume'], io(parent).io, f.deps)).rejects.toThrow(/aucune vague à reprendre/); // plus aucune vague non terminée
+    const r2 = io(parent);
+    expect(await orchestrate(['--resume', '2026-10-04-1412', '--answer', 'a:L1', 'x'], r2.io, f.deps)).toBe(2);
+    expect(r2.err.join()).toContain('le lot n\'attend pas de réponse');
+  });
+
+  it('reprise après coupure : étape running dont la session est morte → interrompue puis relancée ; session vivante → refus', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const store = new RunStore(parent, 'w-coupee');
+    store.writeWave({ id: 'w-coupee', created: 'x', cwd: parent, budget: 1_000_000, consumed: 10, cacheRead: 0, status: 'running', pid: 99_999_999, lots: ['a:L1'] });
+    const { newLot } = await import('../src/orchestrate/state.js');
+    const plan = Plan.load(join(dirs.a, 'docs/plan/raf.yaml'));
+    plan.setStatus('L1', 'doing', '2026-10-04');
+    plan.save();
+    git(dirs.a, 'commit', '-qam', 'plan: L1 démarré');
+    const lot = newLot({ project: 'a', repo: dirs.a, lot: 'L1', title: 'un', visible: false, small: false, model: 'sonnet', readOnlyPlan: false });
+    lot.status = 'implementing';
+    lot.next = 'implement';
+    lot.steps.push({ n: 1, kind: 'implement', model: 'sonnet', status: 'running', pid: process.pid, started: 'x', headBefore: git(dirs.a, 'rev-parse', 'HEAD') });
+    store.writeLot(lot);
+    const f = fakeDeps();
+    const refused = io(parent);
+    expect(await orchestrate(['--resume'], refused.io, f.deps)).toBe(2);
+    expect(refused.err.join()).toContain(`a:L1 : session encore en vie, pid ${process.pid}`);
+    lot.steps[0].pid = 99_999_998;
+    store.writeLot(lot);
+    const r = io(parent);
+    expect(await orchestrate(['--resume'], r.io, f.deps)).toBe(0);
+    const state = store.readLot('a', 'L1')!;
+    expect(state.steps.map((s) => `${s.kind}:${s.status}`)).toEqual(['implement:interrupted', 'implement:ok', 'review:ok']);
+  });
+
+  it('--status relit le tableau depuis l\'état', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    await orchestrate(['a:L1'], io(parent).io, fakeDeps().deps);
+    const r = io(parent);
+    expect(await orchestrate(['--status'], r.io, fakeDeps().deps)).toBe(0);
+    expect(r.out.join('\n')).toContain('a:L1');
+    expect(r.out.join('\n')).toContain('prêt à livrer');
+    expect(readdirSync(join(parent, '.cadence/runs'))).toEqual(['2026-10-04-1412']);
+    const none = io(tempDir());
+    await expect(orchestrate(['--status'], none.io, fakeDeps().deps)).rejects.toThrow(/aucune vague/);
+  });
+});

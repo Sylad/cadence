@@ -132,10 +132,10 @@ export function killSessions(): void {
 }
 
 /** Vrai lanceur : `claude` (ou CADENCE_CLAUDE_BIN) dans son propre groupe de processus, tué en bloc au délai. */
-export function realClaude(bin: string): ClaudeFn {
+export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env): ClaudeFn {
   return (args, opts) =>
     new Promise((resolve) => {
-      const child = spawn(bin, args, { cwd: opts.cwd, env: { ...process.env, ...opts.env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+      const child = spawn(bin, args, { cwd: opts.cwd, env: { ...base, ...opts.env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
       const pid = child.pid;
       if (pid === undefined) {
         child.once('error', (e) => resolve({ code: 127, stdout: '', stderr: String(e.message), timedOut: false }));

@@ -340,7 +340,8 @@ lots:
     finished: 2026-10-04
   - id: L30
     title: "⚡ Suite de la revue L21 : le message stderr « relevé des processus indisponible » précise que le kill n'est dégradé que tant que le relevé échoue (ou signale son retour), avec un test"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04

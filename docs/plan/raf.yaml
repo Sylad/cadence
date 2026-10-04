@@ -230,3 +230,10 @@ lots:
     estimate: 0.1
     quickwin: true
     created: 2026-10-04
+  - id: L24
+    title: "⚡ Les tests de cadence passent aussi depuis une session de vague : CADENCE_ORCHESTRATED hérité retiré de leur environnement (17 échecs relevés par la vague 2026-10-04-1534 sur L21)"
+    status: doing
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04
+    started: 2026-10-04

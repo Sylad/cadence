@@ -78,6 +78,17 @@ describe('raf CLI', () => {
     expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(before);
   });
 
+  it('(L15/t2) post-commit : seule la portée décide des lots annoncés, pas les mentions en passage', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    for (let i = 0; i < 30; i++) raf(dir, 'add', `lot ${i + 1}`);
+    raf(dir, 'start', 'L24');
+    commit(dir, 'chore(L24): lot terminé — (L27) et (L28–L30) planifiés — voir L99');
+    const { err } = raf(dir, 'hook', 'post-commit');
+    expect(err).toContain('L24 (doing)');
+    for (const id of ['L27', 'L28', 'L30', 'L99']) expect(err).not.toContain(id);
+  });
+
   it('hook install keeps an existing hook and is idempotent', () => {
     const dir = gitRepo();
     const hook = join(dir, '.git/hooks/post-commit');

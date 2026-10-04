@@ -24,7 +24,7 @@ function scopeOf(subject: string): string | null {
  * en cite ; sinon, celles du message entier. Les mentions en passage (« page équipe (L27) »), les plages
  * (« L28–L31 ») et le corps du message ne comptent donc pas dès que la portée désigne les lots.
  */
-function citedRefs(c: Commit, refsOf: (text: string) => Ref[]): Ref[] {
+export function citedRefs(c: Commit, refsOf: (text: string) => Ref[]): Ref[] {
   const scope = scopeOf(c.subject);
   const scoped = scope === null ? [] : refsOf(scope);
   return scoped.length > 0 ? scoped : refsOf(`${c.subject}\n${c.body}`);

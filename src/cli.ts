@@ -9,7 +9,7 @@ import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, readCommits } from './git.js';
 import { installHook } from './hook.js';
-import { linkCommits } from './link.js';
+import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from './news.js';
 import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
@@ -337,7 +337,7 @@ function postCommit(load: (() => Plan) | null, newsDir: string, root: string, io
     const plan = load();
     const head = readCommits(root, { range: '-1' })[0];
     if (!head) return 0;
-    const refs = plan.refs(`${head.subject}\n${head.body}`);
+    const refs = citedRefs(head, plan.refs);
     if (refs.length === 0) {
       const planOnly = exemptPlanOnly({ byLot: new Map(), orphans: [head], unknown: [] }, plan, root).orphans.length === 0;
       if (!planOnly && !/^Merge\b/.test(head.subject)) {

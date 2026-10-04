@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -606,6 +606,19 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
     const [sid, pgid] = execFileSync('ps', ['-o', 'sid=,pgid=', '-p', String(process.pid)], { encoding: 'utf8' }).trim().split(/\s+/);
     const probe = 'test "$(ps -o sid= -p $$ | tr -d " ")" = "$WANT_SID" && test "$(ps -o pgid= -p $$ | tr -d " ")" = "$WANT_PGID"';
     expect(await realDeps(tempDir()).exec(probe, { WANT_SID: sid!, WANT_PGID: pgid! }, 5_000)).toBe(0);
+  });
+
+  it('relevé des processus indisponible : le message part une seule fois sur stderr, la commande va au bout', async () => {
+    const write = vi.spyOn(process.stderr, 'write');
+    try {
+      const d = realDeps(tempDir(), () => null);
+      expect(await d.exec('sleep 1; exit 3', {}, 5_000)).toBe(3); // plusieurs relevés (200 ms) pendant la commande
+      const said = write.mock.calls.filter(([m]) => String(m).includes('relevé des processus indisponible'));
+      expect(said).toHaveLength(1);
+      expect(String(said[0]![0])).toContain('seule la commande racine');
+    } finally {
+      write.mockRestore();
+    }
   });
 
   it('garde les codes de sortie (une commande à la fois, attendue)', async () => {

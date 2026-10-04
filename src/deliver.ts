@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { constants } from 'node:os';
 import { parse } from 'yaml';
-import { onTermination, SIGNAL_GRACE_MS, TreeTracker } from './proc.js';
+import { onTermination, readProcs, SIGNAL_GRACE_MS, TreeTracker } from './proc.js';
 import type { Day } from './dates.js';
 import { isPlanOnly } from './audit.js';
 import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
@@ -163,8 +163,8 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
   };
 }
 
-/** Dépendances réelles : sh, gh, fetch, horloge. */
-export function realDeps(root: string): DeliverDeps {
+/** Dépendances réelles : sh, gh, fetch, horloge. `read` : le relevé des processus du suivi (injectable pour les tests). */
+export function realDeps(root: string, read: typeof readProcs = readProcs): DeliverDeps {
   const gh = (args: string[]) => {
     try {
       return execFileSync('gh', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: GH_TIMEOUT });
@@ -197,7 +197,7 @@ export function realDeps(root: string): DeliverDeps {
         // qu'une seconde livraison prend le verrou libéré ou périmé. Ctrl-C et raccrochage : l'arbre a déjà
         // reçu le signal du terminal, un court délai de grâce laisse finir ses trap (et git son index.lock)
         // avant le kill ; SIGTERM (à cadence seul) et le délai : kill immédiat.
-        const tree = new TreeTracker(pid, undefined, () =>
+        const tree = new TreeTracker(pid, read, () =>
           process.stderr.write(
             'deliver : relevé des processus indisponible — le kill est dégradé : seule la commande racine sera tuée, ses descendants survivront\n',
           ),

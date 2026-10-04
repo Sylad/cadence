@@ -370,10 +370,11 @@ lots:
     created: 2026-10-04
   - id: L33
     title: "⚡ orchestrate : le brief d'implémentation demande de TRANCHER les questions d'interprétation mineures (et de les lister en « choix faits » dans le rapport, relus par la revue), de ne s'arrêter que sur un vrai blocage — mesure : vague 2026-10-04-1700, 4 lots / 4 questions, ~45 k par aller-retour"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04
   - id: L34
     title: "⚡ Suites de la revue L23 : README §Releasing (l.717) et en-tête de publish.yml (l.3) disent que le tag est comparé à package.json, .claude-plugin/plugin.json et marketplace.json ; test/publish-workflow.test.ts exécute l'étape de contrôle avec un GITHUB_REF_NAME juste puis faux (pas seulement la présence des chemins)"
     status: todo

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, lutimesSync, mkdirSync, readdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { staleFiles } from '../src/clean.js';
 import { gitRepo, tempDir } from './helpers.js';
@@ -13,6 +13,12 @@ const touch = (file: string, when: Date = OLD) => {
   if (!existsSync(file)) writeFileSync(file, 'x');
   utimesSync(file, when, when);
 };
+/** Vieillit tout un arbre (dossiers et fichiers, `.git` compris) : un `git init` frais est daté d'aujourd'hui. */
+const ageTree = (path: string, when: Date = OLD) => {
+  if (!lstatSync(path).isDirectory()) return lutimesSync(path, when, when);
+  for (const n of readdirSync(path)) ageTree(join(path, n), when);
+  lutimesSync(path, when, when);
+};
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
 const names = (r: { path: string }[]) => r.map((s) => s.path);
 
@@ -22,8 +28,8 @@ describe('staleFiles — dépôts git', () => {
     const clone = join(tmp, 'clone');
     mkdirSync(clone);
     git(clone, 'init', '-q');
-    touch(clone);
     touch(join(tmp, 'libre.png'));
+    ageTree(clone);
     expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
   });
 
@@ -32,7 +38,7 @@ describe('staleFiles — dépôts git', () => {
     const outer = join(tmp, 'outer');
     mkdirSync(join(outer, 'a/b/clone'), { recursive: true });
     git(join(outer, 'a/b/clone'), 'init', '-q');
-    touch(outer);
+    ageTree(outer);
     expect(staleFiles(tmp, [`${tmp}/*`], 7, TODAY)).toEqual([]);
   });
 
@@ -112,10 +118,9 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     const clone = join(tmp, 'repo');
     mkdirSync(clone);
     git(clone, 'init', '-q');
-    touch(join(clone, '.git/hooks/x'));
-    touch(join(clone, '.git/hooks'));
-    touch(join(clone, '.git/objects'));
+    ageTree(clone);
     expect(staleFiles(tmp, [`${tmp}/repo/.*/*`], 7, TODAY)).toEqual([]);
+    expect(staleFiles(tmp, [`${tmp}/repo/.git/*`, `${tmp}/repo/.*`], 7, TODAY)).toEqual([]);
   });
 });
 

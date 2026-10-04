@@ -594,3 +594,9 @@ lots:
     estimate: 1
     quickwin: true
     created: 2026-10-04
+  - id: L48
+    title: "⚡ orchestrate : le brief d'implémentation d'un lot visible inclut l'entrée Nouveautés (cadence news new <lot>, texte factuel côté utilisateur, capture selon la convention du projet) — question évitable posée par ol-companion:L29 (vague 2026-10-04-2201)"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

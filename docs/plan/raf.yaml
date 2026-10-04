@@ -390,10 +390,14 @@ lots:
     finished: 2026-10-04
   - id: L31
     title: "Release : à la prochaine version publiée, prouver l'OIDC (ligne « Signed provenance statement » dans le log du workflow, provenance visible sur npmjs.com) puis proposer à Sylvain « disallow tokens » sur le paquet — sorti de L23 (dépend d'une release, pas de code)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-04
     started: 2026-10-04
+    notes:
+      - { date: 2026-10-04, text: "04-10 : 0.9.0 publiée par OIDC (run 37229884798 relancé) — « Signed provenance statement », sigstore logIndex 3078481275, attestation SLSA v1 au registre. 1er essai refusé (403 OIDC permission denied) : Trusted Publisher créé après le 03-09 = « stage publish » seul par défaut ; Sylvain a coché « npm publish » (voie B, publication directe). Reste à Sylvain : « disallow tokens » sur npmjs.com." }
+    review: { date: 2026-10-04, verdict: "conforme : release seule (version 0.9.0 dans les trois fichiers, suite 577 verte en CI), publication OIDC prouvée au registre", commit: 82343434d0480039c83a32f5f5b85c1d30e9442e }
+    finished: 2026-10-04
   - id: L32
     title: ⚡ raf check signale (avertissement, pas erreur) un lot visible sans titre public — suite de L12 ; documenté dans le README
     status: todo

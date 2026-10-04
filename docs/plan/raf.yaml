@@ -386,6 +386,44 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review:
+      {
+        date: 2026-10-04,
+        verdict: "Lot L34 conforme. Commits relus : adbde5b (test) et bf00993 (doc).
+
+
+          **Ce que j'ai lancé**
+
+          - `npx vitest run test/publish-workflow.test.ts` : 8 tests sur 8 passent.
+
+          - `npm test` : 482 tests passent, dans 26 fichiers.
+
+          - `npm run typecheck` : aucune erreur.
+
+
+          **Ce que j'ai vérifié**
+
+          - **Le test du workflow.** Il exécute le vrai script de l'étape, avec un `GITHUB_REF_NAME` juste puis faux. Il désaligne aussi tour à tour `plugin.json` et `marketplace.json` (`plugins[0].version`). Il vérifie chaque fois le code de sortie et le message qui nomme le fichier fautif. Si une ligne du contrôle est retirée, le cas correspondant passe au rouge. Le test ne peut donc pas réussir à vide.
+
+          - **Les quatre choix de l'auteur.**
+
+          \  - Lire le YAML avec une regex : acceptable. Si l'étape est renommée ou réindentée, le test « trouve le script de l'étape » échoue tout de suite, sans faire tomber les autres en silence. Sa justification est fausse, en revanche : la bibliothèque `yaml` est déjà une dépendance du projet (utilisée dans src/plan.ts, config.ts et audit.ts). Ce n'est pas un défaut.
+
+          \  - Copie temporaire des fichiers : correct. Le dossier est supprimé dans le `finally` et le dépôt n'est jamais modifié.
+
+          \  - Test qui ne pouvait pas être rouge : exact. Le workflow contrôlait déjà les trois fichiers, seule la doc était fausse.
+
+          \  - Deux commits séparés, test puis doc : rien à redire.
+
+          - **La doc.** L'en-tête de publish.yml (l.3-4) et le README §Releasing (aujourd'hui l.731) disent maintenant ce que fait l'étape : le tag est comparé à `package.json`, `.claude-plugin/plugin.json` et `.claude-plugin/marketplace.json`.
+
+
+          **Constats et sous-tâches** : aucun.
+
+
+          compliant — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction)",
+        commit: bf0099364b9b0b6e2f4299e1530633e0d9ca15d7
+      }
   - id: L35
     title: "⚡ Suites de la revue L10 (qa-reviewer) : la section Output dit où va la ligne « already planned » (id + titre, hors Findings et follow-ups) + test qui l'épingle ; « browser state » comparé dans un profil déjà utilisé (contexte persistant), pas un contexte neuf ; liens sortants : ne plus exiger rel=noopener (implicite avec target=_blank depuis Chrome 88 / Firefox 79 / Safari 12.1)"
     status: todo

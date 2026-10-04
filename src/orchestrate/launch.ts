@@ -139,8 +139,9 @@ function classify(out: LaunchOutcome): SessionOutcome {
   try {
     result = parseSession(out.stdout, { structured: true });
   } catch (e) {
-    // Une session arrêtée par le quota peut sortir sans structure : le message reste lisible dans stdout.
-    if (isQuotaMessage(out.stdout)) return { kind: 'quota', message: out.stdout.trim().slice(0, 300), ...spent };
+    // Une session arrêtée par le quota peut sortir sans structure : le message reste lisible dans stdout. Une session
+    // RÉUSSIE sans structure n'est jamais un quota, même si son texte en parle (une revue du code de quota) : relance.
+    if (!lacksStructuredOutput(out.stdout) && isQuotaMessage(out.stdout)) return { kind: 'quota', message: out.stdout.trim().slice(0, 300), ...spent };
     return failed(out.code !== 0 ? `code ${out.code} — ${(e as Error).message}` : (e as Error).message);
   }
   if (result.isError) {

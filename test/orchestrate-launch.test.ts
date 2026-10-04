@@ -203,6 +203,15 @@ describe('relance de mise en forme (L26)', () => {
     expect(direct.kind === 'ok' && direct.firstStdout).toBeUndefined();
   });
 
+  it('une session réussie dont le TEXTE parle de quota n\'est pas un quota : la relance a lieu (vague 2026-10-04-1609, L27)', async () => {
+    const raw = JSON.parse(noStructured());
+    raw.result = '## Revue\n\nLa détection du quota (usage limit, rate limit) reste une regex : mineur.';
+    const { calls, p } = run([JSON.stringify(raw), sample]);
+    const out = await p;
+    expect(calls).toHaveLength(2);
+    expect(out.kind).toBe('ok');
+  });
+
   it('toujours sans structured_output après la relance : échec comme avant, jetons des deux appels comptés, pas de seconde relance', async () => {
     const { calls, p } = run([noStructured()]);
     const out = await p;

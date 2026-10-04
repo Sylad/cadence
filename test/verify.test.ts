@@ -4,27 +4,24 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { parseDeliverConfig, TIMED_OUT, type DeliverDeps } from '../src/deliver.js';
+import { parseDeliverConfig, TIMED_OUT, type CheckDeps } from '../src/deliver.js';
 import { sharedStateDir, appendDelivery } from '../src/state.js';
 import { realCheckDeps, replayChecks, resultLine, summaryLine, verifyCommand } from '../src/verify.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
 
-function fakeDeps(over: Partial<DeliverDeps> = {}) {
+/** Dépendances d'une vérification : ni gh ni CI (le type CheckDeps n'en a pas). */
+function fakeDeps(over: Partial<CheckDeps> = {}) {
   let clock = 0;
   const sleeps: number[] = [];
   const fetched: { url: string; timeoutMs?: number }[] = [];
   const execs: { cmd: string; env: Record<string, string>; timeoutMs: number }[] = [];
-  const deps: DeliverDeps = {
+  const deps: CheckDeps = {
     exec: (cmd, env, timeoutMs) => {
       execs.push({ cmd, env, timeoutMs });
       return 0;
     },
-    gh: () => {
-      throw new Error('gh ne doit jamais être appelé par verify');
-    },
-    ghReady: () => null,
     fetch: async (url, timeoutMs) => {
       fetched.push({ url, timeoutMs });
       return { status: 200, text: 'ok "starters"' };
@@ -48,7 +45,7 @@ const TWO = config(`    - url: https://app.example/api/health
 describe('replayChecks (une seule passe)', () => {
   it('une ligne par vérification, tout vert', async () => {
     const { deps, sleeps } = fakeDeps();
-    const r = await replayChecks(TWO.verify, deps, 'abcdef1234', {}, { retryMs: 0, budgetMs: 60_000 });
+    const r = await replayChecks(TWO.verify, deps, 'abcdef1234', {}, { retryMs: 0, attemptMs: 60_000 });
     expect(r.map((x) => x.reason)).toEqual([null, null]);
     expect(r[1]!.label).toContain('contient « "starters" »');
     expect(sleeps).toEqual([]);
@@ -63,7 +60,7 @@ describe('replayChecks (une seule passe)', () => {
         return { status: 200, text: 'vide' };
       },
     });
-    const r = await replayChecks(TWO.verify, deps, 'abc', {}, { retryMs: 0, budgetMs: 60_000 });
+    const r = await replayChecks(TWO.verify, deps, 'abc', {}, { retryMs: 0, attemptMs: 60_000 });
     expect(calls).toBe(2);
     expect(sleeps).toEqual([]);
     expect(r[0]!.reason).toBeNull();
@@ -74,11 +71,11 @@ describe('replayChecks (une seule passe)', () => {
   it('--retry : réessaie jusqu\'au délai demandé puis rend le dernier constat', async () => {
     let n = 0;
     const { deps } = fakeDeps({ fetch: async () => ({ status: ++n < 3 ? 503 : 200, text: '' }) });
-    const r = await replayChecks([{ url: 'https://x/y' }], deps, 'abc', {}, { retryMs: 60_000, budgetMs: 60_000 });
+    const r = await replayChecks([{ url: 'https://x/y' }], deps, 'abc', {}, { retryMs: 60_000, attemptMs: 60_000 });
     expect(r[0]!.reason).toBeNull();
     expect(n).toBe(3);
     const never = fakeDeps({ fetch: async () => ({ status: 503, text: '' }) });
-    const r2 = await replayChecks([{ url: 'https://x/y' }], never.deps, 'abc', {}, { retryMs: 25_000, budgetMs: 60_000 });
+    const r2 = await replayChecks([{ url: 'https://x/y' }], never.deps, 'abc', {}, { retryMs: 25_000, attemptMs: 60_000 });
     expect(r2[0]!.reason).toContain('statut 503');
     expect(never.sleeps.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(25_000);
   });
@@ -90,7 +87,7 @@ describe('replayChecks (une seule passe)', () => {
       deps,
       'abcdef1234567',
       { CADENCE_SHORT: 'abcdef1' },
-      { retryMs: 0, budgetMs: 5_000 },
+      { retryMs: 0, attemptMs: 5_000 },
     );
     expect(fetched[0]!.url).toBe('https://x/v/abcdef1');
     expect(r[1]!.reason).toBe('délai dépassé');
@@ -99,77 +96,97 @@ describe('replayChecks (une seule passe)', () => {
 
   it('borne chaque vérification par le budget (réseau absent : pas d\'attente de 20 s)', async () => {
     const { deps, fetched } = fakeDeps();
-    await replayChecks([{ url: 'https://x' }], deps, 'abc', {}, { retryMs: 0, budgetMs: 8_000 });
+    await replayChecks([{ url: 'https://x' }], deps, 'abc', {}, { retryMs: 0, attemptMs: 8_000 });
     expect(fetched[0]!.timeoutMs).toBeLessThanOrEqual(8_000);
   });
 });
 
-describe('budget par vérification', () => {
+describe('vérifications en parallèle, chacune avec le budget entier', () => {
   const cmds = (...c: string[]) => c.map((command) => ({ command }));
-  /** Durée simulée de chaque commande : « sleep N » dure N s, tuée à l'échéance (TIMED_OUT). */
-  const sleeper = () => {
+  /** exec qui ne rend la main qu'une fois toutes les commandes lancées (ou après 500 ms) : prouve qu'elles tournent ensemble. */
+  const together = (n: number, codes: Record<string, number> = {}) => {
+    const started: string[] = [];
+    let atRelease = -1;
+    let release!: () => void;
+    const all = new Promise<void>((r) => (release = r)).then(() => {
+      atRelease = started.length;
+    });
+    setTimeout(release, 500);
+    const fake = fakeDeps({
+      exec: async (cmd) => {
+        started.push(cmd);
+        if (started.length === n) release();
+        await all;
+        return codes[cmd] ?? 0;
+      },
+    });
+    return { ...fake, startedAtRelease: () => atRelease };
+  };
+
+  it('toutes lancées avant que la première ne finisse ; résultats dans l\'ordre de cadence.yaml', async () => {
+    const { deps, startedAtRelease } = together(3, { b: 1 });
+    const r = await replayChecks(cmds('a', 'b', 'c'), deps, 'abc', {}, { retryMs: 0, attemptMs: 10_000 });
+    expect(startedAtRelease()).toBe(3);
+    expect(r.map((x) => [x.label, x.reason])).toEqual([['a', null], ['b', 'code 1'], ['c', null]]);
+  });
+
+  it('ordre stable même quand elles finissent à rebours', async () => {
+    const { deps } = fakeDeps({ exec: async (cmd) => (await new Promise((r) => setTimeout(r, cmd === 'a' ? 60 : cmd === 'b' ? 30 : 0)), 0) });
+    const r = await replayChecks(cmds('a', 'b', 'c'), deps, 'abc', {}, { retryMs: 0, attemptMs: 10_000 });
+    expect(r.map((x) => x.label)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('chaque essai reçoit le budget entier, pas une part (ol-companion : 7 vérifications, plus de 1,43 s)', async () => {
+    const seven = config(Array.from({ length: 7 }, (_, i) => `    - command: check-${i}\n`).join(''));
+    const { deps, execs } = fakeDeps();
+    const { effectLines, MORNING_BUDGET_MS } = await import('../src/verify.js');
+    await effectLines(seven, 'abc', deps);
+    expect(execs.map((e) => e.timeoutMs)).toEqual(Array(7).fill(MORNING_BUDGET_MS));
+    const urls = fakeDeps();
+    await effectLines(TWO, 'abc', urls.deps);
+    expect(urls.fetched.map((f) => f.timeoutMs)).toEqual([MORNING_BUDGET_MS, MORNING_BUDGET_MS]);
+  });
+
+  it("une vérification lente (tuée au délai) ne rougit pas les autres, et ne les retarde pas", async () => {
+    const { deps } = fakeDeps({ exec: async (cmd, _env, timeoutMs) => (cmd === 'lente' ? TIMED_OUT : (expect(timeoutMs).toBe(10_000), 0)) });
+    const r = await replayChecks(cmds('lente', 'verify-rollout.sh', 'ok'), deps, 'abc', {}, { retryMs: 0, attemptMs: 10_000 });
+    expect(r.map((x) => x.reason)).toEqual(['délai dépassé', null, null]);
+    expect(resultLine(r[0]!)).toBe('✗ lente — délai dépassé');
+  });
+
+  it('--retry : chaque vérification réessaie de son côté, sans priver les autres de leur essai', async () => {
+    const ran: string[] = [];
     let clock = 0;
-    return fakeDeps({
+    const { deps } = fakeDeps({
       now: () => clock,
       sleep: async (ms) => {
         clock += ms;
       },
-      exec: (cmd, _env, timeoutMs) => {
-        const need = Number(cmd.split(' ')[1]) * 1000;
-        clock += Math.min(need, timeoutMs);
-        return need > timeoutMs ? TIMED_OUT : 0;
-      },
-    }).deps;
-  };
-
-  it("une vérification lente ne rougit pas les suivantes saines (sleep 1.5 après sleep 30)", async () => {
-    const r = await replayChecks(cmds('sleep 30', 'sleep 1.5', 'sleep 0'), sleeper(), 'abc', {}, { retryMs: 0, budgetMs: 10_000 });
-    expect(r[0]!.reason).toBe('délai dépassé'); // la lente est rouge : elle l'est vraiment
-    expect(r[1]!.reason).toBeNull();
-    expect(r[2]!.reason).toBeNull();
-    expect(r.some((x) => x.unverified)).toBe(false);
-  });
-
-  it('budget global épuisé : les restantes sont « non vérifiées », jamais rouges', async () => {
-    let clock = 0;
-    const { deps } = fakeDeps({
-      now: () => clock,
-      exec: (cmd) => {
-        if (cmd === 'hang') clock += 20_000; // ignore son délai
-        return 0;
-      },
+      exec: (cmd) => (ran.push(cmd), cmd === 'red' ? 1 : 0),
     });
-    const r = await replayChecks(cmds('hang', 'a', 'b'), deps, 'abc', {}, { retryMs: 0, budgetMs: 10_000 });
-    expect(r.map((x) => x.unverified === true)).toEqual([false, true, true]);
-    expect(r[1]!.reason).toMatch(/budget/);
-    expect(resultLine(r[1]!)).toMatch(/^\? a — non vérifiée/);
-    expect(summaryLine(r)).toBe('verify : 2 non vérifiées sur 3 vérifications (budget épuisé), 0 effet rouge');
-  });
-
-  it('--retry : une vérification qui réessaie ne prive pas les suivantes de leur essai', async () => {
-    const ran: string[] = [];
-    const { deps } = fakeDeps({ exec: (cmd) => (ran.push(cmd), cmd === 'red' ? 1 : 0) });
-    const r = await replayChecks(cmds('red', 'ok'), deps, 'abc', {}, { retryMs: 30_000, budgetMs: 10_000 + 30_000 * 2 });
-    expect(r[0]!.reason).toBe('code 1');
-    expect(r[1]!.reason).toBeNull();
+    const r = await replayChecks(cmds('red', 'ok'), deps, 'abc', {}, { retryMs: 30_000, attemptMs: 120_000 });
+    expect(r.map((x) => x.reason)).toEqual(['code 1', null]);
     expect(ran.filter((c) => c === 'ok')).toHaveLength(1);
+    expect(ran.filter((c) => c === 'red').length).toBeGreaterThan(1);
   });
 
-  it('--retry : budget global épuisé pendant les réessais → restantes non vérifiées', async () => {
-    const { deps } = fakeDeps({ exec: () => 1 });
-    const r = await replayChecks(cmds('red', 'x', 'y'), deps, 'abc', {}, { retryMs: 30_000, budgetMs: 20_000 });
-    expect(r[0]!.reason).toBe('code 1');
-    expect(r[1]!.unverified).toBe(true);
-    expect(r[2]!.unverified).toBe(true);
-  });
-
-  it('exit 3 quand seul le budget a manqué (ni vert, ni rouge)', async () => {
-    let clock = 0;
-    const { deps } = fakeDeps({ now: () => clock, exec: (cmd) => { if (cmd === 'hang') clock += 999_000; return 0; } });
+  it('cadence verify : 120 s par essai, pas de code 3 ni de « non vérifiée »', async () => {
+    const budgets: number[] = [];
+    const { deps } = fakeDeps({ exec: (cmd, _e, timeoutMs) => (budgets.push(timeoutMs), cmd === 'red' ? 1 : 0) });
     const out: string[] = [];
-    const cfg = config('    - command: hang\n    - command: b\n');
-    expect(await verifyCommand({ config: cfg, sha: 'abc', retry: 0, out: (l) => out.push(l) }, deps)).toBe(3);
-    expect(out[1]).toMatch(/^\? b/);
+    const cfg = config('    - command: ok\n    - command: red\n    - command: ok2\n');
+    expect(await verifyCommand({ config: cfg, sha: 'abc', retry: 0, out: (l) => out.push(l) }, deps)).toBe(1);
+    expect(budgets).toEqual([120_000, 120_000, 120_000]);
+    expect(out).toEqual(['✓ ok', '✗ red — code 1', '✓ ok2', 'verify : 1 effet rouge sur 3 vérifications']);
+    expect(out.join('\n')).not.toMatch(/non vérifiée|\?/);
+  });
+
+  it('pour de vrai : trois « sleep 2 » en session start prennent ~2 s, pas 6', async () => {
+    const { effectLines } = await import('../src/verify.js');
+    const t = Date.now();
+    const lines = await effectLines(config('    - command: sleep 2\n    - command: sleep 2\n    - command: sleep 2\n'), 'abc', realCheckDeps(tempDir(), { quiet: true }));
+    expect(lines).toEqual(['✓ verify : 3/3 vérifications vertes']);
+    expect(Date.now() - t).toBeLessThan(4_500);
   });
 });
 
@@ -293,7 +310,7 @@ describe('effets du matin (session start)', () => {
     expect(lines[2]).toContain('2 effets rouges sur 2');
     const slow = fakeDeps();
     await effectLines(config('    - command: sleep 60\n'), 'abc', slow.deps);
-    expect(slow.execs[0]!.timeoutMs).toBeLessThanOrEqual(10_000);
+    expect(slow.execs[0]!.timeoutMs).toBe(10_000);
   });
 
   it('rien à dire sans verify (projet à script) ; ne lève jamais', async () => {

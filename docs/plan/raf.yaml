@@ -109,3 +109,9 @@ lots:
     estimate: 1
     created: 2026-10-04
     started: 2026-10-04
+    tasks:
+      - { id: t1, title: "cadence.yaml n'est fichier du plan que pour un commit qui ne change que la clé plan: — un changement de deliver/session reste du travail à relire", status: todo }
+      - { id: t2, title: "hook post-commit : appliquer la règle de la portée (citedRefs) au lieu de lire tout le message, avec test", status: todo }
+      - { id: t3, title: "deliveredLots : appliquer la règle de la portée, avec test « (L27) planifié » non annoncé livré", status: todo }
+      - { id: t4, title: "portée reconnue aussi avec espace avant les deux-points : « feat(L24) : … »", status: todo }
+      - { id: t5, title: "fichier du plan : le cadence.yaml effectivement lu (--config), pas seulement celui de la racine", status: todo }

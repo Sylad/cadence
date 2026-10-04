@@ -32,7 +32,7 @@ if (tool === 'raf') {
                     CI du sha poussé → déploiement → vérifications de l'effet ;
                     ou le script de livraison du projet (deliver.script), sous verrou et journal
   cadence verify [--retry secondes] [--sha rév]
-                    rejoue les vérifications d'effet (deliver.verify) hors livraison, une passe ;
+                    rejoue les vérifications d'effet (deliver.verify) hors livraison, une passe, en parallèle ;
                     code 0 tout vert, 1 un effet rouge, 2 rien à vérifier ; « session start » la lance aussi
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);

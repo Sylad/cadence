@@ -31,7 +31,8 @@ export interface Io {
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
 
   raf init [--project nom] [--prefix L] [--no-hook]
-  raf add "titre" [--estimate j] [--quickwin] [--visible] [--after L2,L4] [--parent L3]
+  raf add "titre" [--estimate j] [--quickwin] [--visible] [--public "titre public"] [--after L2,L4] [--parent L3]
+  raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf note <id> "texte"
   raf ux enable         revue UX obligatoire avant « done » pour les lots --visible
@@ -97,6 +98,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       estimate: { type: 'string' },
       quickwin: { type: 'boolean' },
       visible: { type: 'boolean' },
+      public: { type: 'string' },
       dir: { type: 'string' },
       title: { type: 'string' },
       after: { type: 'string' },
@@ -152,12 +154,13 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       let id: string;
       if (values.parent) {
+        if (values.public !== undefined) throw new RafError('--public se pose sur un lot, pas sur une sous-tâche');
         id = plan.addTask(values.parent, rest.join(' '));
       } else {
         const estimate = values.estimate === undefined ? undefined : Number(values.estimate);
         if (estimate !== undefined && !(estimate > 0)) throw new RafError(`estimation invalide : ${values.estimate}`);
         const after = values.after ? values.after.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, after });
+        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, public: values.public, after });
       }
       plan.save();
       io.out(id);
@@ -187,6 +190,14 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       need(2, 'note <id> "texte"');
       const plan = loadPlan();
       plan.note(rest[0], rest.slice(1).join(' '), today);
+      plan.save();
+      return 0;
+    }
+    case 'public': {
+      need(values.clear ? 1 : 2, 'public <id> "titre public" | public <id> --clear');
+      if (values.clear && rest.length > 1) throw new RafError('--clear n\'attend pas de titre');
+      const plan = loadPlan();
+      plan.setPublic(rest[0], values.clear ? null : rest.slice(1).join(' '));
       plan.save();
       return 0;
     }

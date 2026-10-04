@@ -18,6 +18,28 @@ function raf(dir: string, ...argv: string[]) {
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
+describe('raf public', () => {
+  it('add --public pose le titre public ; raf public le change et --clear l\'efface', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    expect(raf(dir, 'add', 'Titre', 'technique', '--visible', '--public', 'Une nouveauté').out).toBe('L1');
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('public: Une nouveauté');
+    expect(raf(dir, 'public', 'L1', 'Autre', 'titre').code).toBe(0);
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('public: Autre titre');
+    expect(raf(dir, 'public', 'L1', '--clear').code).toBe(0);
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('public:');
+  });
+
+  it('raf public refuse sans titre ni --clear, et un lot inconnu', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'A');
+    expect(raf(dir, 'public', 'L1').code).not.toBe(0);
+    expect(raf(dir, 'public', 'L9', 'x').code).not.toBe(0);
+    expect(raf(dir, 'add', 'B', '--parent', 'L1', '--public', 'x').code).not.toBe(0);
+  });
+});
+
 describe('raf CLI', () => {
   it('runs a full lot lifecycle', () => {
     const dir = gitRepo();

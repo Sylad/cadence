@@ -35,6 +35,8 @@ export interface Lot {
   quickwin: boolean;
   /** Changement visible par l'utilisateur : une entrée Nouveautés est attendue à la livraison. */
   visible: boolean;
+  /** Titre public du lot, en langage du public (pages Nouveautés et Plan) ; absent = pas de titre public. */
+  public?: string;
   after: string[];
   created?: Day;
   started?: Day;
@@ -53,7 +55,7 @@ export class RafError extends Error {}
 
 export type Ref = { lot: string; task?: string };
 
-export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'after', 'created', 'started', 'finished', 'notes', 'parent'] as const;
+export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'public', 'after', 'created', 'started', 'finished', 'notes', 'parent'] as const;
 export type Field = (typeof FIELDS)[number];
 
 /**
@@ -324,14 +326,17 @@ export class Plan {
     return node as YAMLMap;
   }
 
-  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; after?: string[] } = {}): string {
+  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; public?: string; after?: string[] } = {}): string {
     this.writable();
     const known = new Set(this.lots().map((l) => l.id));
     for (const dep of opts.after ?? []) if (!known.has(dep)) throw new RafError(`dépendance inconnue : ${dep}`);
     const re = new RegExp(`^${escapeRe(this.prefix)}(\\d+)$`);
     const max = Math.max(0, ...[...known].map((id) => Number(re.exec(id)?.[1] ?? 0)));
     const id = `${this.prefix}${max + 1}`;
-    const entry: Record<string, unknown> = { id, title, status: 'todo', estimate: opts.estimate ?? 1 };
+    const pub = opts.public === undefined ? undefined : cleanPublic(opts.public);
+    const entry: Record<string, unknown> = { id, title };
+    if (pub !== undefined) entry.public = pub;
+    Object.assign(entry, { status: 'todo', estimate: opts.estimate ?? 1 });
     if (opts.quickwin) entry.quickwin = true;
     if (opts.visible) entry.visible = true;
     if (opts.after?.length) entry.after = opts.after;
@@ -401,6 +406,24 @@ export class Plan {
     if (status === 'done' || status === 'dropped') node.set('finished', today);
   }
 
+  /** Pose, remplace (texte) ou efface (null) le titre public d'un lot ; la clé suit `title`. */
+  setPublic(ref: string, text: string | null): void {
+    this.writable();
+    if (ref.includes('/')) throw new RafError(`le titre public se pose sur un lot, pas une sous-tâche : ${ref}`);
+    const node = this.lotNode(ref);
+    if (text === null) {
+      node.delete('public');
+      return;
+    }
+    const value = cleanPublic(text);
+    if (node.has('public')) {
+      node.set('public', value);
+      return;
+    }
+    const at = node.items.findIndex((p) => String((p.key as { value?: unknown })?.value ?? p.key) === 'title');
+    node.items.splice(at + 1, 0, this.doc.createPair('public', value));
+  }
+
   note(ref: string, text: string, today: Day): void {
     this.writable();
     const [lotId, taskId] = ref.split('/');
@@ -453,6 +476,7 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
         estimate: typeof effort === 'string' ? format.estimates[effort] : effort,
         quickwin: pick('quickwin'),
         visible: pick('visible'),
+        public: pick('public'),
         after: pick('after'),
         created: day('created'),
         started: day('started'),
@@ -478,6 +502,13 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
   return lots;
 }
 
+/** Un titre public vide ne dirait rien au public : refusé plutôt qu'écrit. */
+function cleanPublic(text: string): string {
+  const t = text.trim();
+  if (t === '') throw new RafError('titre public vide — raf public <id> "titre" (ou --clear pour l\'effacer)');
+  return t;
+}
+
 function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lot {
   const status = STATUSES.includes(raw.status as Status) ? (raw.status as Status) : 'todo';
   const asDay = (field: string): Day | undefined => {
@@ -495,6 +526,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     estimate: typeof raw.estimate === 'number' && raw.estimate > 0 ? raw.estimate : 1,
     quickwin: raw.quickwin === true,
     visible: raw.visible === true,
+    ...(typeof raw.public === 'string' && raw.public.trim() !== '' ? { public: raw.public.trim() } : {}),
     after,
     created: asDay('created'),
     started: asDay('started'),

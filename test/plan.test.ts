@@ -92,6 +92,51 @@ describe('Plan', () => {
   });
 });
 
+describe('Plan — titre public', () => {
+  it('écrit le titre public à add, juste après title, et le relit', () => {
+    const p = fresh();
+    p.add('Titre technique', T, { visible: true, public: 'Une page Nouveautés' });
+    p.save();
+    const yaml = readFileSync(p.path, 'utf8');
+    expect(yaml).toMatch(/title: Titre technique\n\s+public: Une page Nouveautés\n\s+status: todo/);
+    expect(Plan.load(p.path).lot('L1').public).toBe('Une page Nouveautés');
+  });
+
+  it('setPublic pose, remplace puis efface le titre public, sans toucher au reste', () => {
+    const p = fresh();
+    p.add('A', T);
+    p.setPublic('L1', 'Premier', );
+    p.save();
+    expect(Plan.load(p.path).lot('L1').public).toBe('Premier');
+    const q = Plan.load(p.path);
+    q.setPublic('L1', 'Second: avec deux-points');
+    q.save();
+    expect(Plan.load(p.path).lot('L1').public).toBe('Second: avec deux-points');
+    const r = Plan.load(p.path);
+    r.setPublic('L1', null);
+    r.save();
+    expect(Plan.load(p.path).lot('L1').public).toBeUndefined();
+    expect(readFileSync(p.path, 'utf8')).not.toContain('public');
+  });
+
+  it('refuse un lot inconnu, une sous-tâche et un titre vide', () => {
+    const p = fresh();
+    p.add('A', T);
+    p.addTask('L1', 's');
+    expect(() => p.setPublic('L9', 'x')).toThrow(/lot inconnu/);
+    expect(() => p.setPublic('L1/t1', 'x')).toThrow(/sous-tâche/);
+    expect(() => p.setPublic('L1', '   ')).toThrow(/vide/);
+  });
+
+  it('lit un titre public écrit à la main', () => {
+    const p = fresh();
+    p.add('A', T);
+    p.save();
+    writeFileSync(p.path, readFileSync(p.path, 'utf8').replace('title: A', 'title: A\n    public: "Écrit à la main"'));
+    expect(Plan.load(p.path).lot('L1').public).toBe('Écrit à la main');
+  });
+});
+
 describe('extractRefs', () => {
   it('finds whole-word ids and sub-tasks', () => {
     expect(extractRefs('feat(L3): x — voir L12/t2', 'L')).toEqual([{ lot: 'L3' }, { lot: 'L12', task: 't2' }]);

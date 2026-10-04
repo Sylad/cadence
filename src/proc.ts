@@ -47,14 +47,28 @@ function signal(pid: number, sig: NodeJS.Signals): boolean {
 }
 
 /** Ce qu'on sait d'un processus : son parent, son heure de démarrage (son identité, un pid se réutilise), zombie ou non. */
-interface ProcInfo {
+export interface ProcInfo {
   ppid: number;
   start: string;
   zombie: boolean;
 }
 
-/** Tous les processus visibles : /proc sous Linux (starttime, champ 22 de stat), `ps` ailleurs (lstart). */
-function readProcs(): Map<number, ProcInfo> {
+/** Processus vus par `ps` (macOS, sans /proc) ; null si `ps` échoue — l'appelant garde alors son dernier relevé. */
+export function readPsProcs(run: typeof execFileSync = execFileSync): Map<number, ProcInfo> | null {
+  const procs = new Map<number, ProcInfo>();
+  try {
+    for (const line of run('ps', ['-A', '-o', 'pid=,ppid=,stat=,lstart='], { encoding: 'utf8' }).trim().split('\n')) {
+      const [pid, ppid, stat, ...lstart] = line.trim().split(/\s+/);
+      procs.set(Number(pid), { ppid: Number(ppid), start: lstart.join(' '), zombie: stat!.startsWith('Z') });
+    }
+  } catch {
+    return null;
+  }
+  return procs;
+}
+
+/** Tous les processus visibles : /proc sous Linux (starttime, champ 22 de stat), `ps` ailleurs (lstart) ; null si illisibles. */
+export function readProcs(): Map<number, ProcInfo> | null {
   const procs = new Map<number, ProcInfo>();
   let names: string[] | null = null;
   try {
@@ -74,10 +88,7 @@ function readProcs(): Map<number, ProcInfo> {
       }
     }
   } else {
-    for (const line of execFileSync('ps', ['-A', '-o', 'pid=,ppid=,stat=,lstart='], { encoding: 'utf8' }).trim().split('\n')) {
-      const [pid, ppid, stat, ...lstart] = line.trim().split(/\s+/);
-      procs.set(Number(pid), { ppid: Number(ppid), start: lstart.join(' '), zombie: stat!.startsWith('Z') });
-    }
+    return readPsProcs();
   }
   return procs;
 }
@@ -96,12 +107,30 @@ export const TRACK_INTERVAL_MS = 200;
 export class TreeTracker {
   private readonly known = new Map<number, string>();
   private readonly timer: NodeJS.Timeout;
+  private last = new Map<number, ProcInfo>();
 
-  constructor(root: number) {
-    const info = readProcs().get(root);
+  /** `read` : le relevé des processus (injectable pour les tests) ; son échec laisse le dernier relevé en place. */
+  constructor(
+    root: number,
+    private readonly read: () => Map<number, ProcInfo> | null = readProcs,
+  ) {
+    const info = this.snapshot().get(root);
     if (info) this.known.set(root, info.start);
     this.timer = setInterval(() => this.scan(), TRACK_INTERVAL_MS);
     this.timer.unref();
+  }
+
+  /**
+   * Dernier relevé réussi : un échec de lecture (ps absent ou en erreur) ne plante pas cadence depuis le timer
+   * et ne fait pas croire que tout est mort ; au pire les processus restent suivis, puis tués au délai.
+   */
+  private snapshot(): Map<number, ProcInfo> {
+    try {
+      this.last = this.read() ?? this.last;
+    } catch {
+      // relevé en échec : on garde le précédent
+    }
+    return this.last;
   }
 
   /** Arrête le relevé périodique (la commande est finie, ou son arbre est tué). */
@@ -110,7 +139,7 @@ export class TreeTracker {
   }
 
   /** Relève les nouveaux descendants des processus suivis encore vivants ; rend le relevé. */
-  scan(procs = readProcs()): Map<number, ProcInfo> {
+  scan(procs = this.snapshot()): Map<number, ProcInfo> {
     for (let grew = true; grew; ) {
       grew = false;
       for (const [pid, info] of procs) {

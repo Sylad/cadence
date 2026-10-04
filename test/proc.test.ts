@@ -1,0 +1,74 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readPsProcs, TreeTracker } from '../src/proc.js';
+
+type Procs = NonNullable<ReturnType<typeof readPsProcs>>;
+const table = (...rows: [pid: number, ppid: number, start: string][]): Procs =>
+  new Map(rows.map(([pid, ppid, start]) => [pid, { ppid, start, zombie: false }]));
+
+afterEach(() => vi.restoreAllMocks());
+
+describe('TreeTracker — pid repris', () => {
+  it('un pid réutilisé (autre heure de démarrage) n\'est ni suivi, ni vivant, ni signalé', () => {
+    let procs = table([100, 1, 'A'], [200, 100, 'X']);
+    const tracker = new TreeTracker(100, () => procs);
+    tracker.stop();
+    expect(tracker.alive()).toEqual([100, 200]);
+
+    // 200 est mort, son pid est repris par un autre processus ; 100 est mort, son pid repris lui aussi, avec un enfant
+    procs = table([100, 1, 'B'], [200, 1, 'Y'], [300, 100, 'Z'], [400, 200, 'W']);
+    expect(tracker.alive()).toEqual([]);
+    expect(tracker.scan().has(300)).toBe(true); // présent dans le relevé…
+    expect(tracker.alive()).toEqual([]); // …mais jamais suivi : son parent n'est pas celui qu'on suivait
+
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    tracker.kill();
+    expect(kill).not.toHaveBeenCalled();
+  });
+});
+
+describe('TreeTracker — relevé indisponible (ps en échec)', () => {
+  it('scan et alive ne lèvent pas : le dernier relevé fait foi', () => {
+    let procs: Procs | null = table([100, 1, 'A'], [200, 100, 'X']);
+    const tracker = new TreeTracker(100, () => procs);
+    tracker.stop();
+    tracker.scan();
+    procs = null;
+    expect(() => tracker.scan()).not.toThrow();
+    expect(tracker.alive()).toEqual([100, 200]);
+  });
+
+  it('kill : un relevé qui échoue après le SIGSTOP ne laisse aucun processus arrêté', () => {
+    let procs: Procs | null = table([100, 1, 'A'], [200, 100, 'X']);
+    const tracker = new TreeTracker(100, () => procs);
+    tracker.stop();
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => {
+      sent.push([pid, sig]);
+      procs = null; // ps tombe dès le premier signal
+      return true;
+    });
+    expect(() => tracker.kill()).not.toThrow();
+    for (const pid of [100, 200]) expect(sent).toContainEqual([pid, 'SIGKILL']);
+  });
+
+  it('kill : même si le relevé lève, ce qui est arrêté est tué et rien ne remonte', () => {
+    let calls = 0;
+    const tracker = new TreeTracker(100, () => {
+      if (++calls > 3) throw new Error('boom');
+      return table([100, 1, 'A']);
+    });
+    tracker.stop();
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => (sent.push([pid, sig]), true));
+    expect(() => tracker.kill()).not.toThrow();
+    expect(sent).toContainEqual([100, 'SIGKILL']);
+  });
+
+  it('readPsProcs rend null quand ps échoue', () => {
+    expect(
+      readPsProcs(() => {
+        throw new Error('ps: introuvable');
+      }),
+    ).toBeNull();
+  });
+});

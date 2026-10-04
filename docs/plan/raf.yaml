@@ -442,10 +442,11 @@ lots:
     review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction)", commit: 1eba975075eae623b04b067d1494d23c30801503 }
   - id: L37
     title: "⚡ Suite de la revue L30 : deliver écrit une ligne sur stderr au moment où kill() se rabat sur la racine faute de relevé (blind) — l'utilisateur sait que ce kill-là a pu laisser des descendants"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04
   - id: L38
     title: "⚡ orchestrate : une revue « conforme avec mineurs » enchaîne UNE passe de correction des mineurs dans la vague (session neuve, puis revue courte), au lieu de produire un lot de suites à chaque fois — consigne de Sylvain (04-10) : rien sous le tapis ; mesure : vague 2026-10-04-1700, 4 lots conformes → 4 lots de suites"
     status: doing

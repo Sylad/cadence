@@ -6,9 +6,9 @@ import { linkCommits, type Linked } from './link.js';
 import { loadEntries, newsIssues } from './news.js';
 import { isOpen, type Lot, type Plan, type Verdict } from './plan.js';
 
-/** Le plan, sa page Gantt et les fichiers tenus avec lui (cadence.yaml : plan.files). */
+/** Le plan, sa page Gantt, cadence.yaml (la configuration du plan) et les fichiers tenus avec lui (plan.files). */
 function ownFiles(plan: Plan, root: string): Set<string> {
-  return new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), ...plan.files]);
+  return new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), 'cadence.yaml', ...plan.files]);
 }
 
 /** Commits du dépôt sans les commits automatiques (motifs `ignore`) : ni audités ni comptés pour un lot. */

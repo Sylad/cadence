@@ -107,8 +107,8 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
     const touch = (subject: string, files: string[]) => {
       for (const f of files) {
         mkdirSync(dirname(join(dir, f)), { recursive: true });
-        if (f !== PLAN) writeFileSync(join(dir, f), `${existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf8') : ''}// ${subject}\n`);
-        else writeFileSync(join(dir, f), `${readFileSync(join(dir, f), 'utf8')}# ${subject}\n`);
+        if (f !== PLAN && f !== 'cadence.yaml') writeFileSync(join(dir, f), `${existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf8') : ''}// ${subject}\n`);
+        else writeFileSync(join(dir, f), `${existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf8') : ''}# ${subject}\n`);
       }
       git('add', ...files);
       git('commit', '-qm', subject);
@@ -195,6 +195,16 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
     expect((await raf('2026-10-03', 'start', 'L1')).code).toBe(0);
   });
 
+  it('(f) un commit qui ne touche que cadence.yaml (et le plan) est de l’entretien du plan, pas un commit sans lot', async () => {
+    const { raf, touch } = await project();
+    touch('chore: déclare le plan publié', ['cadence.yaml']);
+    touch('chore: déclare le plan publié, plan à jour', ['cadence.yaml', PLAN]);
+    expect(await raf('2026-10-03', 'check')).toMatchObject({ code: 0, out: '✓ plan et historique cohérents' });
+    expect((await raf('2026-10-03', 'hook', 'post-commit')).err).not.toContain('commit sans lot');
+    touch('chore: config + source', ['cadence.yaml', 'src/app.ts']);
+    expect(orphans((await raf('2026-10-03', 'check')).out)).toHaveLength(1);
+  });
+
   it('(e) un commit mixte (plan + fichier source) qui cite un lot compte pour ce lot, quel que soit son sujet', async () => {
     const { raf, touch, declare } = await project();
     declare();
@@ -227,5 +237,37 @@ describe('readCommits', () => {
     const body = 'x'.repeat(100_000);
     for (let i = 0; i < 12; i++) commit(dir, `feat(L1): pas ${i}\n\n${body}`);
     expect(readCommits(dir)).toHaveLength(12);
+  });
+});
+
+describe('attribution d’un commit à ses lots : la portée prime', () => {
+  const lotsOf = (...subjects: string[]) => {
+    const dir = gitRepo();
+    const plan = Plan.create(join(dir, 'raf.yaml'), 'demo');
+    for (let i = 0; i < 50; i++) plan.add(`lot ${i + 1}`, '2026-09-01');
+    plan.addTask('L3', 'étape');
+    for (const [i, s] of subjects.entries()) commit(dir, s, `2026-09-2${i}T10:00:00`);
+    const linked = linkCommits(plan.lots(), readCommits(dir), plan.refs);
+    return { ids: [...linked.byLot].map(([id]) => id).sort(), linked };
+  };
+
+  it('ne compte que les lots de la portée, pas les mentions en passage ni les plages', () => {
+    expect(lotsOf('chore(L24): lot terminé, page équipe de France (L27) et constats (L28–L31) planifiés').ids).toEqual(['L24']);
+    expect(lotsOf('chore(L31,L32,L33,L36,L42): réglages — L45 à L48 planifiés').ids).toEqual(['L31', 'L32', 'L33', 'L36', 'L42']);
+  });
+
+  it('les références du corps ne comptent pas non plus quand la portée cite un lot', () => {
+    const { ids } = lotsOf('fix(L24): barre du bas à 5 cases\n\nla règle « 8 cases » de L2/L13 est remplacée');
+    expect(ids).toEqual(['L24']);
+  });
+
+  it('une portée peut citer une sous-tâche ; une portée qui cite un lot absent du plan est signalée', () => {
+    expect(lotsOf('feat(L3/t1): x — voir L4').ids).toEqual(['L3']);
+    expect(lotsOf('fix(L99): x — L4').linked.unknown.map((u) => u.ref)).toEqual(['L99']);
+  });
+
+  it('sans portée citant un lot, les formes documentées continuent de compter', () => {
+    expect(lotsOf('fix: L2 corrigé', 'L3/t1 : suite', 'feat(api): L4 et L5').ids).toEqual(['L2', 'L3', 'L4', 'L5']);
+    expect(lotsOf('feat(api): L7 : x').ids).toEqual(['L7']);
   });
 });

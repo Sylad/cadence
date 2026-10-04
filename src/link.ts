@@ -14,6 +14,22 @@ export function isMerge(c: Commit): boolean {
   return /^Merge\b/.test(c.subject);
 }
 
+/** Portée d'un sujet « type(L24,L25)! : … » ; null sans parenthèses. */
+function scopeOf(subject: string): string | null {
+  return /^[\w-]+\(([^)]*)\)!?:/.exec(subject)?.[1] ?? null;
+}
+
+/**
+ * Références qui décident à quels lots appartient un commit : celles de la portée « type(L24) » quand elle
+ * en cite ; sinon, celles du message entier. Les mentions en passage (« page équipe (L27) »), les plages
+ * (« L28–L31 ») et le corps du message ne comptent donc pas dès que la portée désigne les lots.
+ */
+function citedRefs(c: Commit, refsOf: (text: string) => Ref[]): Ref[] {
+  const scope = scopeOf(c.subject);
+  const scoped = scope === null ? [] : refsOf(scope);
+  return scoped.length > 0 ? scoped : refsOf(`${c.subject}\n${c.body}`);
+}
+
 /** `refs` lit les références d'un message : `plan.refs`. */
 export function linkCommits(lots: Lot[], commits: Commit[], refsOf: (text: string) => Ref[]): Linked {
   const ids = new Set(lots.map((l) => l.id));
@@ -22,7 +38,7 @@ export function linkCommits(lots: Lot[], commits: Commit[], refsOf: (text: strin
   const orphans: Commit[] = [];
   const unknown: Linked['unknown'] = [];
   for (const c of commits) {
-    const refs = refsOf(`${c.subject}\n${c.body}`);
+    const refs = citedRefs(c, refsOf);
     if (refs.length === 0) {
       if (!isMerge(c)) orphans.push(c);
       continue;

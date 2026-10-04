@@ -93,6 +93,9 @@ export function readProcs(): Map<number, ProcInfo> | null {
   return procs;
 }
 
+/** Âge au-delà duquel un relevé de secours (le relevé suivant a échoué) n'est plus cru : un pid y a pu être repris. */
+export const MAX_SNAPSHOT_AGE_MS = 1_000;
+
 /** Intervalle du relevé des descendants d'une commande de deliver pendant qu'elle tourne. */
 export const TRACK_INTERVAL_MS = 200;
 
@@ -108,6 +111,7 @@ export class TreeTracker {
   private readonly known = new Map<number, string>();
   private readonly timer: NodeJS.Timeout;
   private last = new Map<number, ProcInfo>();
+  private lastAt = 0;
   /** Racine jamais relevée (ps en échec dès la construction) : kill() se rabat sur son groupe et sur elle. */
   private rootUnknown = false;
 
@@ -125,13 +129,22 @@ export class TreeTracker {
 
   /**
    * Dernier relevé réussi : un échec de lecture (ps absent ou en erreur) ne plante pas cadence depuis le timer
-   * et ne fait pas croire que tout est mort ; au pire les processus restent suivis, puis tués au délai.
+   * et ne fait pas croire que tout est mort. Mais au-delà de MAX_SNAPSHOT_AGE_MS le relevé est périmé : un pid
+   * suivi a pu être repris par un autre processus, qu'on ne signalerait pas à tort — mieux vaut ne rien signaler.
    */
   private snapshot(): Map<number, ProcInfo> {
+    let fresh: Map<number, ProcInfo> | null = null;
     try {
-      this.last = this.read() ?? this.last;
+      fresh = this.read();
     } catch {
-      // relevé en échec : on garde le précédent
+      // relevé en échec
+    }
+    const now = Date.now();
+    if (fresh) {
+      this.last = fresh;
+      this.lastAt = now;
+    } else if (now - this.lastAt > MAX_SNAPSHOT_AGE_MS) {
+      this.last = new Map();
     }
     return this.last;
   }

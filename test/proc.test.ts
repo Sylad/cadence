@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readPsProcs, TreeTracker } from '../src/proc.js';
+import { MAX_SNAPSHOT_AGE_MS, readPsProcs, TreeTracker } from '../src/proc.js';
 
 type Procs = NonNullable<ReturnType<typeof readPsProcs>>;
 const table = (...rows: [pid: number, ppid: number, start: string][]): Procs =>
   new Map(rows.map(([pid, ppid, start]) => [pid, { ppid, start, zombie: false }]));
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 describe('TreeTracker — pid repris', () => {
   it('un pid réutilisé (autre heure de démarrage) n\'est ni suivi, ni vivant, ni signalé', () => {
@@ -94,3 +97,30 @@ describe('TreeTracker — relevé indisponible dès la construction', () => {
     expect(sent.some(([pid]) => pid < 0)).toBe(false);
   });
 });
+
+describe('TreeTracker — relevé périmé (ps en échec prolongé)', () => {
+  it('un pid repris pendant l\'échec de ps n\'est pas signalé d\'après le relevé périmé', () => {
+    vi.useFakeTimers();
+    let procs: Procs | null = table([100, 1, 'A'], [200, 100, 'X']);
+    const tracker = new TreeTracker(100, () => procs);
+    tracker.stop();
+    tracker.scan();
+    procs = null; // ps tombe : le dernier relevé n'est plus qu'un souvenir
+    vi.advanceTimersByTime(MAX_SNAPSHOT_AGE_MS + 1);
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    expect(tracker.alive()).toEqual([]);
+    tracker.kill();
+    expect(kill).not.toHaveBeenCalled();
+  });
+
+  it('un échec bref garde le dernier relevé', () => {
+    vi.useFakeTimers();
+    let procs: Procs | null = table([100, 1, 'A'], [200, 100, 'X']);
+    const tracker = new TreeTracker(100, () => procs);
+    tracker.stop();
+    procs = null;
+    vi.advanceTimersByTime(MAX_SNAPSHOT_AGE_MS - 1);
+    expect(tracker.alive()).toEqual([100, 200]);
+  });
+});
+

@@ -110,8 +110,11 @@ describe('refus avant d\'agir (code 2)', () => {
     expect((await run(parent, ['a:L2'])).err.join()).toContain('dépendance(s) ni terminée(s) ni plus tôt dans la vague : L1');
     expect((await run(parent, ['a:L2', 'a:L1'])).err.join()).toContain('a:L2 : dépendance(s)'); // L1 est après : refus
     const ok = await run(parent, ['a:L1', 'a:L2', '--dry-run']);
-    removeDryRunBriefs(ok.out.join('\n'));
-    expect(ok.code).toBe(0);
+    try {
+      expect(ok.code).toBe(0);
+    } finally {
+      removeDryRunBriefs(ok.out.join('\n'));
+    }
   });
 
   it('arbre sale, claude absent, claude sans --json-schema, hook pre-push existant, session imbriquée', async () => {
@@ -204,23 +207,26 @@ describe('--dry-run', () => {
     const f = fakeDeps();
     const r = io(parent);
     const code = await orchestrate(['a:L1', 'b:L1@haiku', 'c:L1', '--dry-run'], r.io, f.deps);
-    expect(code).toBe(0);
-    expect(f.calls).toEqual([]);
-    expect(existsSync(join(parent, '.cadence'))).toBe(false);
     const text = r.out.join('\n');
-    expect(text).toContain('a:L1');
-    expect(text).toContain('implement (sonnet) → review (opus)');
-    expect(text).toContain('implement (haiku) → review (opus) — petit lot'); // sans écran, la passe unique est une revue de code
-    expect(text).toContain('corrections : 2 passe(s) au plus, en session neuve');
-    expect(text).toContain('revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte');
-    expect(text).toContain('UX à faire par le lead');
-    expect(text).toContain('créneau 1');
-    expect(text).toContain("en attente d'un créneau");
-    expect(text).toContain('claude -p <brief> --output-format json --json-schema <json> --model sonnet');
-    const brief = /brief : (\S+)/.exec(text)![1];
-    expect(readFileSync(brief, 'utf8')).toContain('Work in `');
-    expect(existsSync(join(parent, 'a/.git/hooks/pre-push'))).toBe(false);
-    removeDryRunBriefs(text); // le produit laisse ces briefs à relire ; le test supprime les siens
+    try {
+      expect(code).toBe(0);
+      expect(f.calls).toEqual([]);
+      expect(existsSync(join(parent, '.cadence'))).toBe(false);
+      expect(text).toContain('a:L1');
+      expect(text).toContain('implement (sonnet) → review (opus)');
+      expect(text).toContain('implement (haiku) → review (opus) — petit lot'); // sans écran, la passe unique est une revue de code
+      expect(text).toContain('corrections : 2 passe(s) au plus, en session neuve');
+      expect(text).toContain('revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte');
+      expect(text).toContain('UX à faire par le lead');
+      expect(text).toContain('créneau 1');
+      expect(text).toContain("en attente d'un créneau");
+      expect(text).toContain('claude -p <brief> --output-format json --json-schema <json> --model sonnet');
+      const brief = /^\s*brief : (.+?)\s*$/m.exec(text)![1]!; // ligne entière : un TMPDIR peut contenir des espaces
+      expect(readFileSync(brief, 'utf8')).toContain('Work in `');
+      expect(existsSync(join(parent, 'a/.git/hooks/pre-push'))).toBe(false);
+    } finally {
+      removeDryRunBriefs(text); // le produit laisse ces briefs à relire ; le test supprime les siens, même en échec
+    }
   });
 });
 

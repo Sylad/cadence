@@ -169,9 +169,12 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
   it('--dry-run ne lance rien', async () => {
     const s = setup({});
     const r = await s.cli('proj:L1', '--dry-run');
-    removeDryRunBriefs(r.out);
-    expect(r.code).toBe(0);
-    expect(s.calls()).toEqual([]);
+    try {
+      expect(r.code).toBe(0);
+      expect(s.calls()).toEqual([]);
+    } finally {
+      removeDryRunBriefs(r.out);
+    }
   });
 
   // L3/t12 : vrai processus, vrai signal.

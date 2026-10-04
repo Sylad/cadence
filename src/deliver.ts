@@ -199,7 +199,7 @@ export function realDeps(root: string): DeliverDeps {
         // avant le kill ; SIGTERM (à cadence seul) et le délai : kill immédiat.
         const tree = new TreeTracker(pid, undefined, () =>
           process.stderr.write(
-            'deliver : relevé des processus indisponible — le kill de la commande est dégradé : les descendants non relevés à temps ne seront pas tous tués\n',
+            'deliver : relevé des processus indisponible — le kill est dégradé : seule la commande racine sera tuée, ses descendants survivront\n',
           ),
         );
         // Terminaison en cours : exec ne rend pas la main avant qu'elle ne soit finie — sinon deliver libère

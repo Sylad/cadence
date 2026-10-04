@@ -222,8 +222,8 @@ export class TreeTracker {
       fresh = this.alive(procs).filter((pid) => !seen.has(pid));
     }
     for (const pid of stopped) signal(pid, 'SIGKILL');
-    // Sans relevé (jamais, ou plus), les descendants sont inconnus : au mieux le groupe de la commande (si elle en mène un ; jamais
-    // celui de cadence, dont le pid est autre) et la commande elle-même.
+    // Sans relevé (jamais, ou plus), les descendants sont inconnus : seule la commande racine est tuée. kill(-racine) vise
+    // son groupe, mais sh n'en mène aucun (la commande reste dans le groupe de cadence, L19) : sans effet, les descendants survivent.
     if (this.blind) {
       signal(-this.root, 'SIGKILL');
       signal(this.root, 'SIGKILL');

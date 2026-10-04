@@ -442,6 +442,10 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   a background process still running when the command returns normally (it is
   neither waited for nor killed), and everything if cadence itself is killed
   with `SIGKILL` (`kill -9`, the OOM killer).
+  Where the process list cannot be read (no `/proc` and `ps` failing), cadence
+  falls back on the command's group and its root process: a descendant that left
+  the group (`setsid`) is then not killed, since the command is deliberately
+  kept in cadence's group.
 - Commands run in cadence's own process group and session, attached to the
   terminal: `ssh`, `sudo` or `pinentry` can prompt on `/dev/tty`, and Ctrl-C or
   closing the terminal stops the running command together with cadence (within

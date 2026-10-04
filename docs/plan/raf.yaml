@@ -267,15 +267,16 @@ lots:
     finished: 2026-10-04
   - id: L27
     title: "⚡ Suites de la revue L25/L26 : relance de mise en forme avec --agents/--agent de la revue (outils restreints) + test ; conserver la sortie de la première session (<n>-<kind>.first.json) ; commit annoncé hors plage vérifié contre les commits du lot (lotWork) plutôt que tout ancêtre de HEAD"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "conforme, 1 mineur (commit du lot réduit au plan, cité en reprise, signalé « n'appartient pas au lot ») — orchestré (vague 2026-10-04-1628, 0 passe(s) de correction)", commit: 9fede4293d41afdf56fcaf91a0f99bdac3c6e7e7 }
     tasks:
-      - { id: t1, title: test de l'écriture de <n>-<kind>.first.json quand la relance échoue et quand le quota arrête la session, status: todo }
-      - { id: t2, title: libellé distinct pour un commit cité qui existe mais n'appartient pas au lot (au lieu de « absent de git »), status: todo }
+      - { id: t1, title: test de l'écriture de <n>-<kind>.first.json quand la relance échoue et quand le quota arrête la session, status: done }
+      - { id: t2, title: libellé distinct pour un commit cité qui existe mais n'appartient pas au lot (au lieu de « absent de git »), status: done }
+    finished: 2026-10-04
   - id: L28
     title: "⚡ orchestrate : une session réussie sans structured_output dont le texte cite « quota / rate limit » était classée quota — vague suspendue à tort et relance L26 court-circuitée (vague 2026-10-04-1609, revue de L27)"
     status: doing
@@ -288,3 +289,9 @@ lots:
     tasks:
       - { id: t1, title: readAgents ajoute StructuredOutput aux outils restreints d'un agent (cause réelle des revues sans structured_output), status: done }
       - { id: t2, title: "après une question répondue, une implémentation sans nouveau commit alors que le lot a déjà ses commits (rapport : travail terminé) passe à la revue au lieu d'être rendue au lead « implement sans commit » (vague 2026-10-04-1609, L21 session 3)", status: todo }
+  - id: L29
+    title: "⚡ Suite de la revue L27 : contrôle du commit annoncé hors plage — accepter aussi les commits du lot qui ne touchent que le plan (lotCommits plutôt que lotWork), avec un test de reprise qui cite un commit « plan: … L1 »"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

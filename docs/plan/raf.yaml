@@ -439,6 +439,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction)", commit: 1eba975075eae623b04b067d1494d23c30801503 }
   - id: L37
     title: "⚡ Suite de la revue L30 : deliver écrit une ligne sur stderr au moment où kill() se rabat sur la racine faute de relevé (blind) — l'utilisateur sait que ce kill-là a pu laisser des descendants"
     status: todo

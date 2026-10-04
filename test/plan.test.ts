@@ -119,6 +119,22 @@ describe('Plan — titre public', () => {
     expect(readFileSync(p.path, 'utf8')).not.toContain('public');
   });
 
+  it('setPublic insère la clé juste après title et laisse le reste du lot, et les autres lots, inchangés', () => {
+    const p = fresh();
+    p.add('A', T, { estimate: 2, quickwin: true });
+    p.add('B', T);
+    p.addTask('L1', 'sub');
+    p.save();
+    const avant = readFileSync(p.path, 'utf8');
+    const q = Plan.load(p.path);
+    q.setPublic('L1', 'Public A');
+    q.save();
+    const apres = readFileSync(p.path, 'utf8');
+    expect(apres).toMatch(/title: A\n\s+public: Public A\n\s+status: todo/);
+    expect(apres.replace(/\n\s+public: Public A/, '')).toBe(avant);
+    expect(Plan.load(p.path).lot('L2')).not.toHaveProperty('public');
+  });
+
   it('refuse un lot inconnu, une sous-tâche et un titre vide', () => {
     const p = fresh();
     p.add('A', T);

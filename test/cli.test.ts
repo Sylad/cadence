@@ -40,6 +40,19 @@ describe('raf public', () => {
   });
 });
 
+describe('raf public --clear', () => {
+  it('refuse --clear accompagné d\'un titre sans toucher au titre public existant', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'A', '--public', 'Existant');
+    const avant = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const r = raf(dir, 'public', 'L1', 'Titre', '--clear');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('--clear');
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(avant);
+  });
+});
+
 describe('raf CLI', () => {
   it('runs a full lot lifecycle', () => {
     const dir = gitRepo();

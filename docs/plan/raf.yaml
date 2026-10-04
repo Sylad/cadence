@@ -272,3 +272,10 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+  - id: L28
+    title: "⚡ orchestrate : une session réussie sans structured_output dont le texte cite « quota / rate limit » était classée quota — vague suspendue à tort et relance L26 court-circuitée (vague 2026-10-04-1609, revue de L27)"
+    status: doing
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04
+    started: 2026-10-04

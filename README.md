@@ -394,9 +394,22 @@ session:
 `cadence session close` then lists, under "Nettoyage proposé", the entries matching these
 patterns (`*` stands for part of a name and never crosses a `/`; `~` is the home folder, a
 relative pattern starts at the repo root) that were not modified for more than `cleanDays`
-days, oldest first. Files `git` tracks are never listed. The command deletes nothing and does
-not change the exit code: the `session-close` skill shows the list and removes the entries
-only after the human agrees.
+days, oldest first — a folder's age is that of the most recent entry it contains, at any depth.
+
+An entry is proposed only if it could be measured entirely. Never proposed:
+
+- a git repository, a folder that contains one at any depth, and anything under a `.git` folder;
+- anything `git` tracks, whichever repository it is in;
+- a name starting with `.` unless the pattern itself starts that name with `.` (as in the
+  shell, `tmp/*` does not match `tmp/.env`; `tmp/.cache-*` does);
+- anything that could not be read entirely: a folder that cannot be listed — nor anything
+  inside it, even named in full —, an entry that cannot be examined or vanished during the
+  walk, an entry under a `.git` that `git` could not answer for. These are listed apart,
+  under "Nettoyage : N élément(s) illisible(s), jamais proposé(s)";
+- the repository itself, or a folder that contains it.
+
+The command deletes nothing, never fails on the cleanup and does not change the exit code: the
+`session-close` skill shows the list and removes the entries only after the human agrees.
 
 The commands get `CADENCE_SINCE` (the `--since` in effect) and `CADENCE_TODAY`. They
 add facts and decide nothing: a failing command is reported and changes neither
@@ -692,8 +705,9 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   plan, then waits for your priority — nothing starts before your answer.
 - **session-close**: plan hygiene, clean repository, a cleanup proposal for stale
   working files (`session.clean` patterns, older than `session.cleanDays`; never
-  anything git tracks, a git repository or a hidden `.xxx` name a `*` would not
-  match — it asks before deleting), memory limited to what the
+  anything git tracks, a git repository or a folder holding one, anything under
+  `.git`, a hidden `.xxx` name a `*` would not match, nor anything it could not
+  read entirely — it asks before deleting), memory limited to what the
   repository does not say, new skills or agents proposed but never created, three
   lines for next time.
 - A project with its own tooling keeps it: its plan is read where it is (`plan:`),

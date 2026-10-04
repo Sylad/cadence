@@ -331,4 +331,26 @@ describe('nettoyage en routine de clôture (L4)', () => {
     expect(skill).toContain('only after the human agrees');
     expect(skill).toContain('explicit paths');
   });
+
+  it('README et routine session-close disent exactement ce qui n’est jamais proposé (L4/t10)', () => {
+    const flat = (t: string) => t.replace(/\s+/g, ' ');
+    const skill = flat(readFileSync(join(SKILLS_DIR, 'session-close', 'SKILL.md'), 'utf8'));
+    const readme = flat(readFileSync(join(SKILLS_DIR, '..', 'README.md'), 'utf8'));
+    const rule = 'An entry is proposed only if it could be measured entirely.';
+    expect(readme).toContain(rule);
+    expect(skill).toContain(rule);
+    for (const never of [
+      'a git repository, a folder that contains one at any depth, and anything under a `.git` folder',
+      'anything `git` tracks, whichever repository it is in',
+      'a name starting with `.` unless the pattern itself starts that name with `.`',
+      'anything that could not be read entirely',
+    ]) {
+      expect(readme).toContain(never);
+      expect(skill).toContain(never);
+    }
+    expect(readme).toContain("a folder's age is that of the most recent entry it contains");
+    expect(skill).toContain("a folder's age is that of the most recent entry it contains");
+    expect(readme).toContain('Nettoyage : N élément(s) illisible(s), jamais proposé(s)');
+    expect(skill).toContain('never delete those');
+  });
 });

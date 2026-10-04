@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { CLEAN_DAYS, staleFiles } from './clean.js';
+import { CLEAN_DAYS, scanStale } from './clean.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { audit, exemptPlanOnly, nextUp, planCommits } from './audit.js';
 import { diffDays, maxDay, type Day } from './dates.js';
@@ -170,11 +170,17 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
 
   section(out, 'Faits propres au projet', projectFacts(ctx, opts.since));
 
-  // Une proposition, pas une condition : rien n'est supprimé ici, le skill demande l'accord.
+  // Une proposition, pas une condition : rien n'est supprimé ici, le skill demande l'accord. Le
+  // nettoyage ne change jamais le verdict et ne fait jamais tomber la clôture.
   if (ctx.clean?.patterns.length) {
     const days = ctx.clean.days ?? CLEAN_DAYS;
-    const stale = staleFiles(ctx.root, ctx.clean.patterns, days, today);
-    section(out, `Nettoyage proposé (${stale.length} élément(s) plus vieux de ${days} j)`, stale.map((s) => `${s.path} — ${s.age} j`));
+    try {
+      const { stale, unreadable } = scanStale(ctx.root, ctx.clean.patterns, days, today);
+      section(out, `Nettoyage proposé (${stale.length} élément(s) plus vieux de ${days} j)`, stale.map((s) => `${s.path} — ${s.age} j`));
+      section(out, `Nettoyage : ${unreadable.length} élément(s) illisible(s), jamais proposé(s)`, unreadable);
+    } catch (e) {
+      section(out, "Nettoyage : parcours interrompu, rien n'est proposé", [e instanceof Error ? e.message : String(e)]);
+    }
   }
 
   const open = issues.length + repo.open + (lock?.live ? 1 : 0);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { SKILLS_DIR } from '../src/skills.js';
 import { run } from '../src/cli.js';
@@ -284,6 +284,26 @@ describe('nettoyage en routine de clôture (L4)', () => {
     const { out } = await cad(dir, 'session', 'close');
     expect(out).toContain('libre.png');
     expect(out).not.toContain('..weird');
+  });
+
+  it.skipIf(process.getuid?.() === 0)('un dossier illisible n’est pas proposé : il est signalé, sans bloquer ni faire lever la clôture', async () => {
+    const dir = await project();
+    const shared = tempDir();
+    mkdirSync(join(shared, 'ferme/clone'), { recursive: true });
+    git(join(shared, 'ferme/clone'), 'init', '-q');
+    touch(join(shared, 'ancienne.png'), OLD);
+    utimesSync(join(shared, 'ferme'), OLD, OLD);
+    writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean: [ "${shared}/*" ]\n`);
+    const sans = await cad(dir, 'session', 'close');
+    chmodSync(join(shared, 'ferme'), 0o311);
+    try {
+      const { code, out } = await cad(dir, 'session', 'close');
+      expect(out).toMatch(/Nettoyage proposé \(1 élément\(s\) plus vieux de 7 j\)\n {2}.*ancienne\.png — 18 j\n/);
+      expect(out).toContain(`Nettoyage : 1 élément(s) illisible(s), jamais proposé(s)\n  ${join(shared, 'ferme')}`);
+      expect(code).toBe(sans.code);
+    } finally {
+      chmodSync(join(shared, 'ferme'), 0o755);
+    }
   });
 
   it('aucune section sans motif, ni quand rien n’est périmé', async () => {

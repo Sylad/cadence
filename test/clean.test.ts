@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, lutimesSync, mkdirSync, readdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { staleFiles } from '../src/clean.js';
+import { scanStale, staleFiles } from '../src/clean.js';
 import { gitRepo, tempDir } from './helpers.js';
 
 const TODAY = '2026-09-28';
@@ -21,6 +21,18 @@ const ageTree = (path: string, when: Date = OLD) => {
 };
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
 const names = (r: { path: string }[]) => r.map((s) => s.path);
+
+/** Droits retirés pour un test, rendus après lui : sans eux, le dossier temporaire ne se supprimerait plus. */
+const locked: string[] = [];
+const lock = (path: string, mode: number) => {
+  chmodSync(path, mode);
+  locked.push(path);
+};
+afterEach(() => {
+  for (const p of locked.splice(0).reverse()) chmodSync(p, 0o755);
+});
+/** root lit tout malgré les droits : les tests de lecture refusée n'ont pas de sens sous root. */
+const asRoot = process.getuid?.() === 0;
 
 describe('staleFiles — dépôts git', () => {
   it('ne propose jamais un dossier qui est un dépôt git', () => {
@@ -96,8 +108,9 @@ describe('staleFiles — motifs', () => {
 
   it('.git n’est jamais proposé, même par un motif en « . »', () => {
     const dir = gitRepo();
-    touch(join(dir, '.git'));
     touch(join(dir, '.gitx'));
+    // Tout l'arbre est vieilli, .git compris : seul le refus de .git le protège, pas son contenu frais.
+    ageTree(dir);
     expect(names(staleFiles(dir, [`${dir}/.git*`], 7, TODAY))).toEqual([join(dir, '.gitx')]);
   });
 });
@@ -123,16 +136,74 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     expect(staleFiles(tmp, [`${tmp}/repo/.git/*`, `${tmp}/repo/.*`], 7, TODAY)).toEqual([]);
   });
 
-  it('un dossier illisible ou qui disparaît pendant le parcours ne fait pas lever staleFiles', () => {
+  it('l’âge d’un dossier ancien vient d’un fichier d’aujourd’hui caché profondément : non proposé', () => {
     const tmp = tempDir();
-    touch(join(tmp, 'locked/f'));
-    touch(join(tmp, 'locked'));
-    chmodSync(join(tmp, 'locked'), 0o644);
-    try {
-      expect(() => staleFiles(tmp, [`${tmp}/*`], 7, TODAY)).not.toThrow();
-    } finally {
-      chmodSync(join(tmp, 'locked'), 0o755);
-    }
+    touch(join(tmp, 'ancien/a/b/c/du-jour.txt'), new Date('2026-09-28T08:00:00'));
+    for (const d of ['ancien/a/b/c', 'ancien/a/b', 'ancien/a', 'ancien']) touch(join(tmp, d));
+    touch(join(tmp, 'vieux.png'));
+    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'vieux.png')]);
+  });
+
+  it('un .git au milieu du chemin protège même quand git, lui, répond « non suivi »', () => {
+    // vendor/.git n'est pas un dépôt valide : git remonte au dépôt englobant, qui répond « non suivi ».
+    const repo = gitRepo();
+    touch(join(repo, 'vendor/.git/vieux.png'));
+    ageTree(repo);
+    expect(staleFiles(repo, [`${repo}/vendor/.*/*`, `${repo}/*/.git/vieux.png`], 7, TODAY)).toEqual([]);
+  });
+});
+
+describe('staleFiles — rien de ce qui n’a pu être mesuré entièrement', () => {
+  for (const mode of [0o311, 0o300, 0o000]) {
+    it.skipIf(asRoot)(`un dossier illisible (${mode.toString(8).padStart(4, '0')}) qui contient un clone n’est jamais proposé, ni son contenu`, () => {
+      const tmp = tempDir();
+      mkdirSync(join(tmp, 'ferme/clone'), { recursive: true });
+      git(join(tmp, 'ferme/clone'), 'init', '-q');
+      touch(join(tmp, 'ferme/vieux.png'));
+      touch(join(tmp, 'libre.png'));
+      ageTree(tmp);
+      lock(join(tmp, 'ferme'), mode);
+      const r = staleFiles(tmp, [`${tmp}/*`, `${tmp}/ferme/*`, `${tmp}/ferme/vieux.png`, `${tmp}/ferme/clone`], 7, TODAY);
+      expect(names(r)).toEqual([join(tmp, 'libre.png')]);
+    });
+  }
+
+  it.skipIf(asRoot)('un dossier lisible dont un enfant refuse lstat (droit x retiré) n’est pas proposé, sans lever', () => {
+    const tmp = tempDir();
+    touch(join(tmp, 'sans-x/f'));
+    ageTree(tmp);
+    lock(join(tmp, 'sans-x'), 0o644);
+    // Compter l'enfant illisible comme très vieux (new Date(0)) ou l'ignorer proposerait le dossier.
+    expect(staleFiles(tmp, [`${tmp}/*`], 7, TODAY)).toEqual([]);
+  });
+
+  it.skipIf(asRoot)('le dossier d’un motif qu’on ne peut pas lister ne livre rien, même par un nom écrit en entier', () => {
+    const tmp = tempDir();
+    touch(join(tmp, 'base/vieux.png'));
+    ageTree(tmp);
+    lock(join(tmp, 'base'), 0o311);
+    expect(staleFiles(tmp, [`${tmp}/base/vieux.png`], 7, TODAY)).toEqual([]);
+  });
+
+  it.skipIf(asRoot)('scanStale rend ce qu’il n’a pas pu lire, pour le dire au lieu de le taire', () => {
+    const tmp = tempDir();
+    touch(join(tmp, 'ferme/f'));
+    touch(join(tmp, 'libre.png'));
+    ageTree(tmp);
+    lock(join(tmp, 'ferme'), 0o300);
+    const r = scanStale(tmp, [`${tmp}/*`], 7, TODAY);
+    expect(names(r.stale)).toEqual([join(tmp, 'libre.png')]);
+    expect(r.unreadable).toEqual([join(tmp, 'ferme')]);
+  });
+
+  it('un .git qui n’est pas un dépôt valide : git ne peut pas répondre, rien n’est proposé à côté', () => {
+    const tmp = tempDir();
+    mkdirSync(join(tmp, 'faux/.git'), { recursive: true });
+    touch(join(tmp, 'faux/vieux.png'));
+    ageTree(tmp);
+    const r = scanStale(tmp, [`${tmp}/faux/*.png`], 7, TODAY);
+    expect(r.stale).toEqual([]);
+    expect(r.unreadable).toEqual([join(tmp, 'faux/vieux.png')]);
   });
 });
 

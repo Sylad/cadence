@@ -434,10 +434,11 @@ lots:
     review: { date: 2026-10-04, verdict: "conforme après 1 correctif mineur (commentaire de test orphelin, test/skills.test.ts:258) — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction + passe des mineurs)", commit: 03b8e5292c152e293225437b73c03db6ca13a612 }
   - id: L36
     title: "⚡ Suites de la revue L12 : README — public dans la liste des champs du plan en lecture seule et de plan.fields (l.157-158) ; tests : plan en lecture seule avec fields.public (clé mappée, valeur non textuelle ignorée), setPublic (clé insérée après title, reste du lot inchangé), raf public L1 Titre --clear refusé sans toucher au titre existant"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04
   - id: L37
     title: "⚡ Suite de la revue L30 : deliver écrit une ligne sur stderr au moment où kill() se rabat sur la racine faute de relevé (blind) — l'utilisateur sait que ce kill-là a pu laisser des descendants"
     status: todo

@@ -13,7 +13,7 @@ import { installHook } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from './news.js';
 import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
-import { dueDays, dueLine, isRecurring } from './recurring.js';
+import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
@@ -375,7 +375,7 @@ function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): num
   if (ready.length > 5) io.out(`  … et ${ready.length - 5} autre(s)`);
   if (blocked.length) io.out(`  en attente de dépendances : ${blocked.map((l) => l.id).join(', ')}`);
 
-  const recurring = lots.filter(isRecurring).sort((a, b) => dueDays(b, today) - dueDays(a, today));
+  const recurring = recurringByDue(lots, today);
   if (recurring.length) {
     io.out('\nRécurrent');
     for (const l of recurring) io.out(`  ${l.id}  ${l.title}  (tous les ${l.every} j, ${dueLine(l, today)})`);

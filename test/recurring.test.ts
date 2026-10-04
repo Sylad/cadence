@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readPlanConfig } from '../src/config.js';
 import { Plan } from '../src/plan.js';
-import { dueLine, dueDays } from '../src/recurring.js';
+import { dueLine, dueDays, recurringByDue } from '../src/recurring.js';
 import { schedule } from '../src/schedule.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
@@ -73,6 +73,14 @@ describe('échéance', () => {
   });
 });
 
+describe('recurringByDue', () => {
+  it('ne garde que les lots récurrents ouverts, du plus en retard au moins en retard', () => {
+    const mk = (id: string, every: number, status: string) => ({ id, title: id, status, every, created: '2026-09-01', notes: [] }) as never;
+    const lots = [mk('A', 30, 'todo'), mk('B', 7, 'doing'), mk('C', 7, 'done')];
+    expect(recurringByDue(lots, '2026-09-13').map((l) => l.id)).toEqual(['B', 'A']);
+  });
+});
+
 describe('raf — lots récurrents', () => {
   it('raf now liste « Récurrent » avec le retard et les sort de « À suivre »', () => {
     const dir = gitRepo();
@@ -131,7 +139,9 @@ describe('raf — lots récurrents', () => {
     const r = raf(dir, '2026-09-01', 'add', 'sous', '--parent', 'L1', '--every', '7');
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/--every/);
-    expect(raf(dir, '2026-09-01', 'now').out).not.toContain('L1/t1');
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    expect(plan.lots()).toHaveLength(1);
+    expect(readFileSync(plan.path, 'utf8')).not.toMatch(/every: 7|tasks:/);
   });
 
   it('post-commit sur un lot récurrent todo conseille raf did, pas raf start', () => {

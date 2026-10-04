@@ -16,3 +16,8 @@ export function dueLine(lot: Lot, today: Day): string {
   if (late > 0) return `dû depuis ${late} j`;
   return late === 0 ? "dû aujourd'hui" : `prochain dans ${-late} j`;
 }
+
+/** Les lots récurrents ouverts, du plus en retard au moins en retard — partagé par raf now et session start. */
+export function recurringByDue(lots: Lot[], today: Day): Lot[] {
+  return lots.filter(isRecurring).sort((a, b) => dueDays(b, today) - dueDays(a, today));
+}

@@ -149,11 +149,13 @@ lots:
     finished: 2026-10-04
   - id: L18
     title: "README : section deliver (l. 426) et paragraphe « entretien du plan » — les commits d'entretien du plan n'annoncent aucun lot livré (suite de la revue L17)"
-    status: doing
+    status: done
     estimate: 0.1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme (revue 04-10) : README aligné sur deliveredLots (isPlanOnly), renvoi valide", commit: ef2d86dd44f6d86bbc3e05bf04be76e809fc94f8 }
+    finished: 2026-10-04
   - id: L19
     title: "Suites de la revue L8 : budget de temps par vérification (une lente ne rougit plus les suivantes ; restantes « non vérifiées ») ; README borne réelle de session start et délais ≠ deliver ; tuer le groupe de processus (pas d'orphelins) ; un seul intervalle de réessai partagé ; test realDeps quiet"
     status: doing
@@ -161,3 +163,5 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    notes:
+      - { date: 2026-10-04, text: "revue 04-10 NON CONFORME (1 bloquant, 2 majeurs, 3 mineurs) : (B) exec détaché (setsid) → Ctrl-C/SIGHUP pendant deliver laisse le script orphelin, verrou jugé périmé, seconde livraison concurrente reproduite (incident 17-09) ; (M) plus de /dev/tty pour les commandes deliver (ssh, sudo, pinentry) ; (M) part budget÷N rougit une vérification saine (ol : 1,43 s pour verify-rollout.sh) ; (m) code 3 absent des aides cli.ts:45 et bin/cadence.js:36 ; (m) plancher 1 s contourne « jamais rouge » ; (m) phrase cassée README l.510. Décision lead : deliver revient au exec non détaché ; groupe détaché + relais des signaux réservé à verify ; vérifications de session start en PARALLÈLE, chacune avec le budget entier. ⚠ dist/ installé contient le détachement : aucune livraison cadence avant correction." }

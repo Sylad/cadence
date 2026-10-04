@@ -215,9 +215,9 @@ lots:
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "not compliant: 1 majeur (relevé ps périmé → pid repris signalé), 2 mineurs (end() sans repli groupe+racine, pas de message sur stderr) — revue de la vague 2026-10-04-1534, verdict relu dans le journal", commit: b03a2c4420c1ebc0f1078d22e3a3ac6883b64131 }
     tasks:
-      - { id: t1, title: "proc : un relevé en échec ne doit pas faire signaler des pids d'après un relevé périmé (vérifier l'identité au moment du kill, ou plafonner l'âge du dernier relevé) — test pid repris pendant l'échec de ps", status: todo }
-      - { id: t2, title: "proc : end() applique aussi le repli groupe + racine quand la racine n'a jamais été relevée (Ctrl-C/raccrochage), avec un test ; aligner le README", status: todo }
-      - { id: t3, title: "proc/deliver : signaler sur stderr, une fois, que le relevé des processus est indisponible et que le kill est dégradé", status: todo }
+      - { id: t1, title: "proc : un relevé en échec ne doit pas faire signaler des pids d'après un relevé périmé (vérifier l'identité au moment du kill, ou plafonner l'âge du dernier relevé) — test pid repris pendant l'échec de ps", status: done }
+      - { id: t2, title: "proc : end() applique aussi le repli groupe + racine quand la racine n'a jamais été relevée (Ctrl-C/raccrochage), avec un test ; aligner le README", status: done }
+      - { id: t3, title: "proc/deliver : signaler sur stderr, une fois, que le relevé des processus est indisponible et que le kill est dégradé", status: done }
   - id: L22
     title: Publier @sylad/cadence 0.8.0 sur npm (verify, attribution par la portée, livraisons protégées Ctrl-C/délai/SIGTERM, deliveredLots, noms accentués) — OTP par Sylvain, vérification au registre et tag
     status: done
@@ -279,7 +279,7 @@ lots:
     finished: 2026-10-04
   - id: L28
     title: "⚡ orchestrate : une session réussie sans structured_output dont le texte cite « quota / rate limit » était classée quota — vague suspendue à tort et relance L26 court-circuitée (vague 2026-10-04-1609, revue de L27)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
@@ -288,10 +288,11 @@ lots:
       - { date: 2026-10-04, text: "2e cause trouvée sur la revue de L27 (relance faite, JSON écrit en bloc de code) : un agent aux outils restreints (tools: Read, Grep, Glob, Bash) n'a PAS l'outil StructuredOutput → jamais de structured_output, relance comprise. Sondes réelles Haiku 04-10 : sans tools → OK ; tools restreints → null ; + StructuredOutput → OK. Corrigé dans readAgents." }
     tasks:
       - { id: t1, title: readAgents ajoute StructuredOutput aux outils restreints d'un agent (cause réelle des revues sans structured_output), status: done }
-      - { id: t2, title: "après une question répondue, une implémentation sans nouveau commit alors que le lot a déjà ses commits (rapport : travail terminé) passe à la revue au lieu d'être rendue au lead « implement sans commit » (vague 2026-10-04-1609, L21 session 3)", status: todo }
+      - { id: t2, title: "après une question répondue, une implémentation sans nouveau commit alors que le lot a déjà ses commits (rapport : travail terminé) passe à la revue au lieu d'être rendue au lead « implement sans commit » (vague 2026-10-04-1609, L21 session 3)", status: done }
     review: { date: 2026-10-04, verdict: "conforme, avec 2 mineurs (aucune trace quand la garde alreadyDone s'applique ; sous-tâche t2 encore en todo dans le plan) ; 423 tests verts, tsc vert — orchestré (vague 2026-10-04-1628, 1 passe(s) de correction)", commit: c1708f40761955fdecd81b65642d7031996cb07a }
+    finished: 2026-10-04
   - id: L29
-    title: "⚡ Suite de la revue L27 : contrôle du commit annoncé hors plage — accepter aussi les commits du lot qui ne touchent que le plan (lotCommits plutôt que lotWork), avec un test de reprise qui cite un commit « plan: … L1 »"
+    title: "⚡ Suite de la revue L27 : contrôle du commit annoncé hors plage — accepter aussi les commits du lot qui ne touchent que le plan (lotCommits plutôt que lotWork), avec un test de reprise qui cite un commit « plan: … L1 » ; et un avertissement dans l.warnings quand la garde alreadyDone (cycle.ts:435) fait passer à la revue une implémentation sans nouveau commit, avec test (revue L28)"
     status: todo
     estimate: 1
     quickwin: true

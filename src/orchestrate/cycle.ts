@@ -574,10 +574,17 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   // Les mineurs confiés à la passe ont pu être proposés par une revue non conforme antérieure : si la revue qui la suit est
   // conforme, ils sont traités et ne restent pas en propositions (ceux que cette revue signale encore sont ajoutés juste après).
   if (l.minorPass && !minorPass && summary.conforme && uxOk && l.minorLines?.length) {
-    // Comparés sans le numéro de ligne : le correctif a pu décaler la ligne que la revue conforme signale.
-    // Limite connue : un autre mineur de même fichier et de même texte, à une autre ligne, est confondu avec celui confié (indiscernable d'un décalage) ; un texte reformulé n'est pas reconnu et reste proposé.
-    const treated = new Set(l.minorLines.map(withoutLine));
-    l.proposals = l.proposals.filter((p) => !treated.has(withoutLine(p)));
+    // Chaque mineur confié retire UNE proposition : la même ligne d'abord, sinon une de même fichier et même texte (le correctif a pu décaler la ligne).
+    // Un autre mineur de même fichier et même texte, à une autre ligne, reste donc proposé. Limite connue : un texte reformulé n'est pas reconnu et reste proposé.
+    const left = [...l.proposals];
+    const take = (match: (p: string) => boolean) => {
+      const i = left.findIndex(match);
+      if (i >= 0) left.splice(i, 1);
+      return i >= 0;
+    };
+    const rest = l.minorLines.filter((m) => !take((p) => p === m));
+    for (const m of rest) take((p) => withoutLine(p) === withoutLine(m));
+    l.proposals = left;
     l.minorLines = [];
   }
   addProposals(c, rep, 'code', !minorPass);

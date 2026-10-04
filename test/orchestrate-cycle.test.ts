@@ -880,6 +880,27 @@ describe('propositions : seul ce qui reste non traité (L38/t7)', () => {
     expect(c.lot.proposals).toEqual([]);
   });
 
+  it('deux mineurs de même fichier et même texte à deux lignes : le traité ne retire pas l\'autre, qui reste en proposition', async () => {
+    const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 2, verdict: 'non conforme', constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }, { ...stillMinor, ligne: 1 }, { ...stillMinor, ligne: 9 }] }));
+    // La revue conforme ne signale plus que celui de la ligne 1 : celui de la ligne 9 n'est pas confié à la passe.
+    const only1: Handler = () => claudeOut(reviewReport({ mineurs: 1, verdict: 'conforme avec mineurs', constats: [{ ...stillMinor, ligne: 1 }] }));
+    const h = harness({ script: { implement: [impl()], review: [review1, only1], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:9 — nommage']);
+  });
+
+  it('mineur reformulé par la revue conforme : non reconnu, il reste en proposition (limite connue, côté prudent)', async () => {
+    const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }, stillMinor] }));
+    const reworded: Handler = () => claudeOut(reviewReport({ mineurs: 1, verdict: 'conforme avec mineurs', constats: [{ ...stillMinor, texte: 'nom peu clair' }] }));
+    const h = harness({ script: { implement: [impl()], review: [review1, reworded], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
+  });
+
   it('mineur traité mais que la revue courte signale encore : il reste en proposition', async () => {
     const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', texte: 'bug nommé' }, stillMinor] }));
     const h = harness({ script: { implement: [impl()], review: [review1, minorReview()], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [minorReview()] } });

@@ -563,3 +563,8 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "non conforme : 1 bloquant (removeDryRunBriefs peut supprimer hors de la racine privée quand le chemin temporaire contient un espace), 2 mineurs", commit: 27a560857e943c53c1f618685903fa8e224e94ca }
+    tasks:
+      - { id: t1, title: "BLOQUANT : removeDryRunBriefs lit la ligne entière (chemins avec espaces), refuse toute cible hors de CADENCE_TEST_TMP_ROOT ou non nommée cadence-orchestrate-* (erreur levée), test avec un TMPDIR contenant un espace", status: todo }
+      - { id: t2, title: "globalSetup : signaler et supprimer au démarrage les cadence-tests-root-* laissés par un run interrompu (fichier pid, processus mort)", status: todo }
+      - { id: t3, title: "racine privée portable : poser aussi TEMP/TMP (win32) et ne plus coder le séparateur '/' dans tmp-hygiene.test.ts", status: todo }

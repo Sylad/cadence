@@ -281,3 +281,11 @@ describe('une vague', () => {
     await expect(orchestrate(['--status'], none.io, fakeDeps().deps)).rejects.toThrow(/aucune vague/);
   });
 });
+
+describe('point d\'entrée', () => {
+  it('bin/cadence.js route « orchestrate » vers le CLI et le liste dans son aide', () => {
+    const bin = readFileSync(new URL('../bin/cadence.js', import.meta.url), 'utf8');
+    expect(bin).toMatch(/\[[^\]]*'orchestrate'[^\]]*\]\.includes\(tool\)/);
+    expect(bin).toContain('cadence orchestrate <projet>:<lot>');
+  });
+});

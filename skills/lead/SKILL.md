@@ -45,8 +45,35 @@ A lot that adds or changes a screen is `visible`: after the implementation, have
 `ux-reviewer` agent review it (give it the URL or the way to run the app) and bring its verdict and
 proposed sub-tasks back to the human.
 
+### 2b. A wave through `cadence orchestrate`
+
+Once the human has chosen the lots, the lead runs, **in the background** (it is notified at the end; no
+silent wait, no polling loop — `cadence orchestrate --status` shows where the wave is):
+
+```sh
+cadence orchestrate <project>:<lot> <project>:<lot>@haiku … [--budget 2M]
+```
+
+`cadence orchestrate --dry-run …` first when a precondition is in doubt. The program, not the lead, runs
+for each lot a fresh short session per step — implementation (Sonnet), UX review if the lot is `visible`
+and the project declares how to see its app (`orchestrate.ux` in `cadence.yaml`), code review last
+(Opus, the `code-reviewer` agent), a correction in a new session if the review is not compliant (two
+passes at most) — and records `raf review` itself when the code review is compliant. The state is in
+`.cadence/runs/<wave>/`, not in this conversation. `@haiku` only when the human writes it, for a
+mechanical lot. Exit code: 0 all ready · 1 some lots handed back · 2 refused before acting · 3 wave
+suspended (budget or usage limit; `--resume --budget …` continues).
+
+What the orchestrator does **not** do, and stays with the lead: choose the lots (with the human), bring the
+questions back (`--resume --answer <project>:<lot> "…"`), look at the UX reviewer's captures and record
+`raf ux` (the orchestrator reports its verdict, it never records it), re-verify (section 3, point 2),
+`raf done`, push and deliver. Minor findings and proposed sub-tasks come back in the table: adding them to
+the plan is the lead's decision. If an orchestrated wave is running in a repository, do not commit there
+and do not deliver it (`cadence deliver` refuses).
+
 ## 3. Check
 
+0. After an orchestrated wave the review is already done, by a fresh session: read the table, then go to
+   point 2. For a lot delegated by hand:
 1. The `code-reviewer` agent, as a fresh subagent (most capable model), reviews the lot. Give it
    the absolute path of the project and the lot id, **not** the author's report: it reads the diff
    itself from the commits that cite the lot, runs the checks, and returns real defects only,

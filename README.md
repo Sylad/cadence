@@ -545,6 +545,82 @@ the others: it never changes the exit code, and an unreachable network shows up
 as red lines ("erreur réseau") without blocking the session. No section for a
 project without `deliver.verify`.
 
+## orchestrate
+
+`cadence orchestrate` is a program above `/lead`, not a conversation: for each lot you choose, it runs
+a **fresh** `claude -p` session per step with a short brief, reads the result, writes the state in
+files and moves on. The lead session keeps only the decision (which lots), the final table and the
+questions. Nothing is resumed: a correction is a new session, never the author's reopened.
+
+```sh
+cadence orchestrate finance-tracker:L41 ol-companion:L22 cadence:L18@haiku
+cadence orchestrate L18                      # from inside a project
+cadence orchestrate … --budget 1.5M          # 1500000, 1.5M, 800k; default 2M
+cadence orchestrate … --dry-run              # preconditions + the plan of the wave; nothing is started
+cadence orchestrate --status [<wave>]        # the table, read back from the state (default: the last wave)
+cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"]
+```
+
+You choose the lots; the order is the order given (one queue per repository, two repositories at most
+at the same time). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
+lot (default Sonnet; reviews are always Opus; Haiku only when you write it, for a mechanical lot). Run it
+in the background and read `--status`: it prints one line per transition and the final table.
+
+**Cycle of a lot**: preconditions (clean tracked files, lot `todo` or `doing`, dependencies met) →
+`raf start` (committed alone) → implementation → **UX review** if the lot is `visible` and the app is
+declared → **code review**, which always comes last (a UX fix changes code) → compliant (no blocking, no
+major finding) → `raf review` is recorded by the orchestrator with the sha the review read, then
+"ready to deliver". Not compliant → a correction in a new session, then a new review, **two passes at
+most**, then the lot goes back to you with the findings. A small lot (`estimate` ≤ 0.5 or `quickwin`)
+gets one single Opus pass for code and usability. Failing tests (reported red, or red when
+`orchestrate.test` is run) go straight to a correction.
+
+**What stays with you**: choosing the lots, the questions raised (`--resume --answer`), re-verifying
+after the wave (`git log`, tests, `raf check`), `raf done`, **`raf ux`** (the orchestrator reports the UX
+verdict and screenshots, it does not record it), the push and the deliveries, one project at a time.
+
+**Guards, imposed by the code**: at most two sessions, one per repository (a lock in the repository's
+shared state, `orchestrate.lock`, which also makes `cadence deliver` refuse that repository) and one wave
+per folder; `Agent`, `git push`, `cadence deliver`, `raf done|review|ux` are denied to the sessions; a
+temporary `pre-push` hook, installed for the duration of the wave and removed at its end, refuses any push
+from a session (`CADENCE_ORCHESTRATED` is in their environment; a repository that already has another
+`pre-push` hook is refused before anything starts — `pushurl` is never touched); after every session the
+upstream ref and `git ls-remote` are compared with the "before", and a review that changed `HEAD` or the
+tree is an incident that stops the wave. `raf done|ux|review` and `cadence deliver` refuse when
+`CADENCE_ORCHESTRATED` is set.
+
+**Budget**: the wave counts input + cache writes + output tokens (default 2 M); cache reads are kept and
+shown apart. When the budget (or the usage limit) is reached no new session starts, the running ones
+finish, the wave is *suspended* (exit code 3) and `--resume --budget …` continues. A session that returns
+nothing readable, times out (45 min for work, 25 for a review) or fails is not retried; the lot is handed
+back with the cause. Exit codes: 0 every lot ready · 1 at least one lot handed back (question, failure,
+review still not compliant after two passes) · 2 refused before acting · 3 wave suspended.
+
+State is in `.cadence/runs/<wave>/` of the folder where the command is run (added to `.git/info/exclude`
+when that folder is in a repository): `wave.json`, one `<project>--<lot>.json` per lot (steps, tokens
+kept apart, session ids, commits, verdicts), the JSON output of every session and a `journal.log`. After a
+cut (Ctrl-C, WSL closed) `--resume` replays an interrupted step entirely in a new session whose brief
+lists the commits already present; finished steps are never replayed.
+
+Briefs are the templates of `templates/orchestrate/` (`implement.md` is the `lead` skill's standard
+brief; `--dry-run` writes the rendered ones). A project can declare, in `cadence.yaml`:
+
+```yaml
+orchestrate:
+  test: npm test                         # run by the orchestrator after a work step (optional)
+  ux: http://localhost:4200              # a URL, a launch command, or { url, command } — for the UX review
+  permissionMode: auto                   # default
+  addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use
+  timeouts: { implement: 45, review: 25 }   # minutes
+  # a plan kept by the project's own tool is read-only for raf: the orchestrator calls these instead
+  start: python3 scripts/raf.py start {lot}
+  verdict: python3 scripts/raf.py note {lot} "revue de code : {verdict}"
+```
+
+Without `start`, a read-only plan's `todo` lot is refused (start it with the project's tool); without
+`verdict`, the review verdict stays in the wave's state and you report it. Only the plan's files
+(`plan.path`, `plan.files`) are committed from those commands; anything else dirty stops the lot.
+
 ## Claude Code skills
 
 As a plugin:
@@ -573,9 +649,10 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   blind retry; after a green delivery that changes what a page shows or what it
   is served, the `qa-reviewer` agent walks the delivered app.
 - **lead**: from a folder holding several projects, one subagent per project
-  gathers the facts, you choose the priorities, each lot is delegated to a
-  subagent with a standard brief (test first, commits citing the lot, no push),
-  reviewed by the `code-reviewer` agent, re-verified by the lead, then delivered
+  gathers the facts, you choose the priorities, the lots are delegated with
+  `cadence orchestrate` (fresh short sessions with a standard brief — test first,
+  commits citing the lot, no push — reviewed by the `code-reviewer` agent, see
+  [orchestrate](#orchestrate)), re-verified by the lead, then delivered
   one project at a time; a delivery that changes what a page shows or what it is
   served is then checked in the running app by the `qa-reviewer` agent, whose
   blocking findings come back to you. Two

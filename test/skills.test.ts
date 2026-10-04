@@ -254,7 +254,7 @@ describe('skills install', () => {
     const step6 = step(' 6. **Classify', ' 7. **Rank');
     const step7 = method.slice(method.indexOf(' 7. **Rank'));
     // État du navigateur : le bundle chargé contre celui que référence index.html relu sans cache, puis le cache vidé.
-    expect(step4).toContain("browser state, once before the first page: compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;");
+    expect(step4).toContain("browser state, once before the first page, in a profile already used (a persistent context, not a fresh one): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;");
     // « GET only » n'est pas « sans effet » : un CDN met en cache une sonde sur un actif absent.
     expect(step5).toContain('GET only is not "without effect": a probe on an asset name that does not exist was cached for 4 hours by the CDN and then served to real visitors. Request only URLs the app itself uses, or add a cache-busting query parameter.');
     // La minute de calme se passe hors de l'app.
@@ -272,7 +272,10 @@ describe('skills install', () => {
     // États simulés par interception : permis, jamais un constat à eux seuls.
     expect(step4).toContain('- simulated states: a route you intercept to fail or answer empty may be used to see how the page copes; what it shows is never a finding by itself — only what the real app serves is;');
     // Liens sortants : lus, jamais requêtés.
-    expect(step4).toContain('- outbound links (another origin): each has a real `href` (not empty, not `#`) and, when it opens a new tab, `rel` carrying `noopener` — read from the attributes, never requested;');
+    expect(step4).toContain('- outbound links (another origin): each has a real `href` (not empty, not `#`) — `rel=noopener` is not required, `target=_blank` implies it since Chrome 88, Firefox 79 and Safari 12.1 — read from the attributes, never requested;');
+    expect(step4).not.toContain('carrying `noopener`');
+    // La section Output dit où va la ligne « already planned » : ni dans Findings, ni dans les follow-ups.
+    expect(qaAgent().section('Output')).toContain('- **Already planned**: one line per finding already planned by an open lot — the lot id and its title —, kept out of Findings and of Proposed follow-ups.');
     // Largeur de mise en page mesurée.
     expect(step4).toContain('`document.documentElement.scrollWidth` against `clientWidth` at each width');
     // Rang d'une ligne d'attente cassée sans perte visible.

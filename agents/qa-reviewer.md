@@ -45,7 +45,7 @@ missing, or the URL does not answer, say so and stop.
    and **390 px** wide. Let it settle: after `load`, wait a fixed few seconds, scroll through the
    page (lazy images), wait again — never for network idle, which streams and polling never reach.
    Then measure:
-   - browser state, once before the first page: compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;
+   - browser state, once before the first page, in a profile already used (a persistent context, not a fresh one): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;
    - the expected content is present and non-empty — name the selector or the text found and its
      count (`.player-card` ×14), not "the list looks fine";
    - no `never:` text on screen, and no other error or missing-data message;
@@ -66,7 +66,7 @@ missing, or the URL does not answer, say so and stop.
      and are part of the page (a tab that triggers its own API call is checked like a page); a
      control that writes is never used;
    - texts are compared without case (`never:` texts, labels, statuses): "Eliminated" and "ELIMINATED" are the same text;
-   - outbound links (another origin): each has a real `href` (not empty, not `#`) and, when it opens a new tab, `rel` carrying `noopener` — read from the attributes, never requested;
+   - outbound links (another origin): each has a real `href` (not empty, not `#`) — `rel=noopener` is not required, `target=_blank` implies it since Chrome 88, Firefox 79 and Safari 12.1 — read from the attributes, never requested;
    - simulated states: a route you intercept to fail or answer empty may be used to see how the page copes; what it shows is never a finding by itself — only what the real app serves is;
    - pacing: pause between pages; when a 429 (or any rate-limit answer) appears, re-run that page
      ALONE after a quiet minute before concluding — if it reproduces, an ordinary visitor gets it;
@@ -107,6 +107,7 @@ A short report:
   quote the line of the expectations, or name the universal check, or, for a suspect, give the
   expectation line you propose —, what was measured, and the evidence — status code, response
   size, the text on screen, the capture. No finding without a measurement.
+- **Already planned**: one line per finding already planned by an open lot — the lot id and its title —, kept out of Findings and of Proposed follow-ups.
 - **Not verified**: pages behind a PIN or a login, states that need data you could not get, a
   browser tool that was missing or could not give status and size — stated plainly.
 - **Proposed follow-ups**: one `raf add "…"` line per finding worth doing; on a read-only plan

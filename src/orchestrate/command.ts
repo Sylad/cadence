@@ -293,16 +293,15 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   return execute(wave, pre.lots, store, io, deps, today);
 }
 
-function contexts(lots: LotState[], wctx: WaveCtx): LotCtx[] {
-  return lots.map((lot) => {
-    const env = projectEnv(lot.repo);
-    return { wave: wctx, lot, config: env.config, loadPlan: env.loadPlan };
-  });
+function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx: WaveCtx): LotCtx[] {
+  return lots.map((lot, i) => ({ wave: wctx, lot, config: envs[i].config, loadPlan: envs[i].loadPlan }));
 }
 
 /** Pose les verrous et les hooks, joue la vague, range l'état, rend le tableau et le code de sortie. */
 async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, all: LotState[] = lots): Promise<number> {
   const launch = store.launchDir;
+  // La configuration des projets est lue avant de poser quoi que ce soit : un cadence.yaml illisible ne laisse ni verrou ni hook.
+  const envs = lots.map((lot) => projectEnv(lot.repo));
   mkdirSync(join(launch, '.cadence'), { recursive: true });
   excludeState(launch);
   const waveLock = join(launch, '.cadence', 'orchestrate.lock');
@@ -311,7 +310,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const release = () => {
     for (const f of held) releaseLock(f, process.pid);
     held.length = 0;
-    for (const r of repos) removePrePush(r);
+    for (const r of repos) removePrePush(r, wave.id);
   };
 
   const got = takeLock(waveLock, { pid: process.pid, wave: wave.id, started: new Date().toISOString() });
@@ -331,7 +330,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     }
     held.push(file);
     if (l.stale) io.err(`orchestrate : verrou de dépôt périmé retiré (${basename(r)}, pid ${l.stale.pid} mort)`);
-    const hook = installPrePush(r);
+    const hook = installPrePush(r, wave.id);
     if (!hook.ok) {
       io.err(`orchestrate : ${basename(r)} : ${hook.reason}`);
       release();
@@ -368,7 +367,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   wave.status = 'running';
   wave.pid = process.pid;
   saveWave();
-  const ctxs = contexts(lots, wctx);
+  const ctxs = contexts(lots, envs, wctx);
 
   // Ctrl-C, SIGTERM : les sessions sont tuées en bloc, les étapes marquées interrompues, les verrous et hooks libérés.
   const forget = onTermination(() => {
@@ -431,6 +430,11 @@ async function resume(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, laun
       else s.status = 'interrupted';
     }
     live.push(l);
+  }
+  // Comme au départ : un dépôt tenu par une autre orchestration vivante est refusé avant toute écriture.
+  for (const repo of new Set(live.map((l) => l.repo))) {
+    const busy = activeLock(join(sharedStateDir(repo), REPO_LOCK));
+    if (busy && busy.pid !== process.pid) refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
   }
   if (refusals.length) {
     for (const r of refusals) io.err(`orchestrate : ${r}`);

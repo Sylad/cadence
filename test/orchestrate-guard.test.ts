@@ -48,6 +48,17 @@ describe('hook pre-push temporaire', () => {
   });
 });
 
+describe('hook lié à sa vague (L3/t10)', () => {
+  it('removePrePush(repo, vague) ne retire que le hook posé par cette vague', () => {
+    const dir = gitRepo();
+    installPrePush(dir, 'w-autre');
+    removePrePush(dir, 'w-moi');
+    expect(existsSync(join(dir, '.git/hooks/pre-push'))).toBe(true);
+    removePrePush(dir, 'w-autre');
+    expect(existsSync(join(dir, '.git/hooks/pre-push'))).toBe(false);
+  });
+});
+
 describe('snapshot et détection de push', () => {
   it('un push change la référence amont et le dépôt distant', () => {
     const dir = repoWithRemote();

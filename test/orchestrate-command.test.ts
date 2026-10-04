@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from 'node:path';
 import { orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import type { ClaudeFn, LaunchOutcome } from '../src/orchestrate/launch.js';
+import { installPrePush } from '../src/orchestrate/guard.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { Plan } from '../src/plan.js';
@@ -138,6 +139,60 @@ describe('refus avant d\'agir (code 2)', () => {
     mkdirSync(join(parent, '.cadence'));
     writeFileSync(join(parent, '.cadence/orchestrate.lock'), JSON.stringify({ pid: process.pid, wave: 'autre', started: 'x' }));
     expect((await run(parent, ['a:L1'])).err.join()).toContain('une vague est déjà en cours');
+  });
+});
+
+describe('verrous, hooks et configuration (L3/t10, t13)', () => {
+  it('L3/t10 — échec de verrou de dépôt en cours de pose : le hook d\'une autre vague vivante reste en place', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
+    const f = fakeDeps();
+    const r = io(parent);
+    // Entre les préconditions et la pose : une autre vague vivante prend le dépôt b (verrou + hook).
+    let planted = false;
+    r.io.now = () => {
+      if (!planted) {
+        planted = true;
+        mkdirSync(join(dirs.b, '.git/cadence'), { recursive: true });
+        writeFileSync(join(dirs.b, '.git/cadence/orchestrate.lock'), JSON.stringify({ pid: process.ppid, wave: 'autre', started: 'x' }));
+        installPrePush(dirs.b, 'autre');
+      }
+      return new Date('2026-10-04T14:12:00');
+    };
+    expect(await orchestrate(['a:L1', 'b:L1'], r.io, f.deps)).toBe(2);
+    expect(existsSync(join(dirs.b, '.git/hooks/pre-push'))).toBe(true);
+    expect(readFileSync(join(dirs.b, '.git/hooks/pre-push'), 'utf8')).toContain('# wave: autre');
+    expect(existsSync(join(dirs.a, '.git/hooks/pre-push'))).toBe(false); // le nôtre est retiré
+    expect(f.calls).toEqual([]);
+  });
+
+  it('L3/t10 — --resume refuse un dépôt dont une autre orchestration vivante tient le verrou, sans rien poser', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    expect(await orchestrate(['a:L1', '--budget', '1'], io(parent).io, f.deps)).toBe(3);
+    mkdirSync(join(dirs.a, '.git/cadence'), { recursive: true });
+    writeFileSync(join(dirs.a, '.git/cadence/orchestrate.lock'), JSON.stringify({ pid: process.ppid, wave: 'autre', started: 'x' }));
+    installPrePush(dirs.a, 'autre');
+    const calls = f.calls.length;
+    const again = io(parent);
+    expect(await orchestrate(['--resume', '--budget', '1M'], again.io, f.deps)).toBe(2);
+    expect(again.err.join('\n')).toContain('une orchestration y est déjà en cours (autre');
+    expect(f.calls.length).toBe(calls);
+    expect(readFileSync(join(dirs.a, '.git/hooks/pre-push'), 'utf8')).toContain('# wave: autre'); // le hook de l'autre vague reste
+    expect(readFileSync(join(dirs.a, '.git/cadence/orchestrate.lock'), 'utf8')).toContain('autre'); // pas retiré
+    expect(existsSync(join(parent, '.cadence/orchestrate.lock'))).toBe(false);
+  });
+
+  it('L3/t13 — cadence.yaml illisible à la reprise : ni hook ni verrou laissés', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    expect(await orchestrate(['a:L1', '--budget', '1'], io(parent).io, f.deps)).toBe(3);
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate: [pas, un, objet]\n');
+    git(dirs.a, 'add', '--', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: config');
+    await expect(orchestrate(['--resume', '--budget', '1M'], io(parent).io, f.deps)).rejects.toThrow(/orchestrate doit être un objet/);
+    expect(existsSync(join(dirs.a, '.git/hooks/pre-push'))).toBe(false);
+    expect(existsSync(join(dirs.a, '.git/cadence/orchestrate.lock'))).toBe(false);
+    expect(existsSync(join(parent, '.cadence/orchestrate.lock'))).toBe(false);
   });
 });
 

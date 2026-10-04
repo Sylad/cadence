@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { hostname, tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { cleanupTempDirs, removeDryRunBriefs, tempDir } from './helpers.js';
-import { PID_FILE, ROOT_PREFIX, findStaleRoots, leftovers, removeStaleRoots, removeTree } from './tmp-hygiene.js';
+import { PID_FILE, ROOT_PREFIX, findStaleRoots, leftovers, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
 describe('dossiers temporaires de la suite (L45)', () => {
   it('la suite travaille dans une racine temporaire privée (globalSetup) que sa fin de run vérifie vide', () => {
@@ -85,7 +85,7 @@ describe('dossiers temporaires de la suite (L45)', () => {
       const dir = join(tmp, name);
       mkdirSync(dir);
       writeFileSync(join(dir, 'reste'), 'x');
-      if (pid !== null) writeFileSync(join(dir, PID_FILE), pid);
+      if (pid !== null) writeFileSync(join(dir, PID_FILE), /^\d+$/.test(pid) ? pidFileText(Number(pid)) : pid);
       return dir;
     };
     const morte = make(`${ROOT_PREFIX}morte`, '111');
@@ -106,7 +106,7 @@ describe('dossiers temporaires de la suite (L45)', () => {
     const tmp = tempDir();
     const morte = join(tmp, `${ROOT_PREFIX}morte`);
     mkdirSync(morte);
-    writeFileSync(join(morte, PID_FILE), '111');
+    writeFileSync(join(morte, PID_FILE), pidFileText(111));
     const dead = (): boolean => false;
     const me = process.getuid?.();
     // Propriétaire différent (simulé) : on n'y touche pas.
@@ -120,7 +120,7 @@ describe('dossiers temporaires de la suite (L45)', () => {
     // Un lien au bon préfixe vers une racine morte n'est pas une racine : ni lui ni sa cible ne sont supprimés.
     const cible = join(tmp, 'cible');
     mkdirSync(cible);
-    writeFileSync(join(cible, PID_FILE), '111');
+    writeFileSync(join(cible, PID_FILE), pidFileText(111));
     rmSync(morte, { recursive: true });
     symlinkSync(cible, join(tmp, `${ROOT_PREFIX}lien`));
     expect(removeStaleRoots(tmp, { alive: dead })).toEqual([]);
@@ -131,7 +131,7 @@ describe('dossiers temporaires de la suite (L45)', () => {
     const tmp = tempDir();
     const dir = join(tmp, `${ROOT_PREFIX}revit`);
     mkdirSync(dir);
-    writeFileSync(join(dir, PID_FILE), '111');
+    writeFileSync(join(dir, PID_FILE), pidFileText(111));
     let calls = 0;
     const flips = (): boolean => calls++ > 0; // mort au relevé, vivant à la revérification
     expect(removeStaleRoots(tmp, { alive: flips })).toEqual([]);
@@ -139,9 +139,29 @@ describe('dossiers temporaires de la suite (L45)', () => {
     expect(calls).toBe(2);
   });
 
+  it('une racine périmée n\'est supprimée que si son fichier pid nomme cette machine (L45/t6)', () => {
+    const tmp = tempDir();
+    const make = (name: string, text: string): string => {
+      const dir = join(tmp, `${ROOT_PREFIX}${name}`);
+      mkdirSync(dir);
+      writeFileSync(join(dir, PID_FILE), text);
+      return dir;
+    };
+    const ici = make('ici', pidFileText(111));
+    const ailleurs = make('ailleurs', pidFileText(111, 'autre-machine'));
+    const ancien = make('ancien', '111'); // format d'avant L45/t6 : machine inconnue
+    const dead = (): boolean => false;
+    expect(findStaleRoots(tmp, { alive: dead })).toEqual([ici]);
+    expect(findStaleRoots(tmp, { alive: dead, host: 'autre-machine' })).toEqual([ailleurs]);
+    expect(removeStaleRoots(tmp, { alive: dead })).toEqual([ici]);
+    expect(existsSync(join(ailleurs, PID_FILE))).toBe(true);
+    expect(existsSync(join(ancien, PID_FILE))).toBe(true);
+  });
+
   it('globalSetup a écrit le pid de ce processus dans la racine privée, que leftovers ignore', () => {
     const root = process.env.CADENCE_TEST_TMP_ROOT!;
     expect(existsSync(join(root, PID_FILE))).toBe(true);
+    expect(readFileSync(join(root, PID_FILE), 'utf8').split('\n')).toEqual([expect.stringMatching(/^\d+$/), hostname(), '']);
     expect(leftovers(root)).not.toContain(PID_FILE);
   });
 

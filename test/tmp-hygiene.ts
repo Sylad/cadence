@@ -1,4 +1,5 @@
 import { chmodSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 /**
@@ -62,6 +63,14 @@ function restoreRights(dir: string): void {
 export const ROOT_PREFIX = 'cadence-tests-root-';
 export const PID_FILE = '.cadence-tests.pid';
 
+/**
+ * Contenu du fichier pid : le pid PUIS le nom de la machine, une ligne chacun. Un /tmp partagé (conteneurs, NFS)
+ * montre des racines d'autres machines, dont le pid ne veut rien dire ici : on ne touche qu'aux nôtres.
+ */
+export function pidFileText(pid: number = process.pid, host: string = hostname()): string {
+  return `${pid}\n${host}\n`;
+}
+
 /** Le processus `pid` existe-t-il ? EPERM = il existe (à un autre utilisateur) ; ESRCH = mort. */
 export function isProcessAlive(pid: number): boolean {
   try {
@@ -76,17 +85,19 @@ export function isProcessAlive(pid: number): boolean {
 export interface StaleCheck {
   /** Le processus existe-t-il ? */
   alive?: (pid: number) => boolean;
+  /** Nom de cette machine (défaut os.hostname()) : le fichier pid doit le porter. */
+  host?: string;
   /** uid de l'utilisateur courant ; `undefined` (win32, pas de getuid) saute la vérification du propriétaire. */
   uid?: () => number | undefined;
 }
 
 /**
  * `dir` est-il une racine d'un run interrompu (Ctrl-C, kill, OOM) que nous pouvons prouver nôtre ? Un vrai dossier
- * (pas un lien) au bon préfixe, appartenant à l'utilisateur courant, portant NOTRE fichier pid (fichier ordinaire),
- * dont le pid désigne un processus mort. Au moindre doute (illisible, absent, autre propriétaire) : non.
+ * (pas un lien) au bon préfixe, appartenant à l'utilisateur courant, portant NOTRE fichier pid (fichier ordinaire,
+ * pidFileText) écrit sur CETTE machine, dont le pid désigne un processus mort. Au moindre doute (illisible, absent, autre propriétaire) : non.
  */
 export function isStaleRoot(dir: string, check: StaleCheck = {}): boolean {
-  const { alive = isProcessAlive, uid = () => process.getuid?.() } = check;
+  const { alive = isProcessAlive, uid = () => process.getuid?.(), host = hostname() } = check;
   if (!basename(dir).startsWith(ROOT_PREFIX)) return false;
   try {
     const st = lstatSync(dir);
@@ -95,9 +106,9 @@ export function isStaleRoot(dir: string, check: StaleCheck = {}): boolean {
     if (me !== undefined && st.uid !== me) return false;
     const pidFile = join(dir, PID_FILE);
     if (!lstatSync(pidFile).isFile()) return false;
-    const text = readFileSync(pidFile, 'utf8').trim();
-    if (!/^\d+$/.test(text)) return false;
-    return !alive(Number(text));
+    const [pid, from, ...rest] = readFileSync(pidFile, 'utf8').split('\n');
+    if (!/^\d+$/.test(pid ?? '') || from !== host || rest.join('') !== '') return false;
+    return !alive(Number(pid));
   } catch {
     return false; // pas de fichier pid (ou illisible) : pas une racine que nous pouvons prouver nôtre
   }

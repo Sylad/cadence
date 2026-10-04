@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PID_FILE, ROOT_PREFIX, leftovers, removeStaleRoots, removeTree } from './tmp-hygiene.js';
+import { PID_FILE, ROOT_PREFIX, leftovers, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
 /**
  * Toute la suite travaille dans une racine temporaire PRIVÉE (TMPDIR hérité par les workers et par les
@@ -18,7 +18,7 @@ export default function setup(): () => void {
     console.warn(`[tests] ${stale.length} racine(s) temporaire(s) d'un run interrompu supprimée(s) : ${stale.join(', ')}`);
   }
   const root = mkdtempSync(join(realTmp, ROOT_PREFIX));
-  writeFileSync(join(root, PID_FILE), String(process.pid));
+  writeFileSync(join(root, PID_FILE), pidFileText());
   // os.tmpdir() lit TMPDIR sous POSIX mais TEMP puis TMP sous win32 : on pose les trois.
   const names = ['TMPDIR', 'TEMP', 'TMP'] as const;
   const previous = Object.fromEntries(names.map((n) => [n, process.env[n]]));

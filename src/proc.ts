@@ -116,6 +116,8 @@ export class TreeTracker {
   private rootUnknown = false;
   /** Le dernier relevé a échoué (ps durablement en panne) : l'arbre n'est plus connu, même repli au kill. */
   private degraded = false;
+  /** La commande racine est sortie : son pid peut être repris, il n'est plus ni adopté ni signalé. */
+  private rootGone = false;
 
   private unavailableSaid = false;
 
@@ -171,6 +173,12 @@ export class TreeTracker {
     return this.last;
   }
 
+  /** La commande racine est sortie (reste de l'arbre éventuellement vivant) : plus d'adoption tardive ni de repli sur son pid. */
+  rootExited(): void {
+    this.rootGone = true;
+    this.rootUnknown = false; // plus de racine à adopter tardivement
+  }
+
   /** Rien de fiable sur l'arbre : racine jamais relevée, ou relevé en échec en ce moment. */
   private get blind(): boolean {
     return this.rootUnknown || this.degraded;
@@ -224,7 +232,7 @@ export class TreeTracker {
     for (const pid of stopped) signal(pid, 'SIGKILL');
     // Sans relevé (jamais, ou plus), les descendants sont inconnus : seule la commande racine est tuée. kill(-racine) vise
     // son groupe, mais sh n'en mène aucun (la commande reste dans le groupe de cadence, L19) : sans effet, les descendants survivent.
-    if (this.blind) {
+    if (this.blind && !this.rootGone) {
       signal(-this.root, 'SIGKILL');
       signal(this.root, 'SIGKILL');
     }
@@ -240,7 +248,7 @@ export class TreeTracker {
     // Racine jamais relevée : on ne voit rien de l'arbre, seule la racine (notre enfant, son pid ne se réutilise
     // pas tant qu'elle n'est pas réaperçue) dit si quelque chose tourne encore — et le kill à l'échéance se
     // replie sur elle et son groupe.
-    while (this.alive().length > 0 || (this.blind && signal(this.root, 0))) {
+    while (this.alive().length > 0 || (this.blind && !this.rootGone && signal(this.root, 0))) {
       if (Date.now() >= deadline) return this.kill();
       await new Promise((r) => setTimeout(r, 50));
     }

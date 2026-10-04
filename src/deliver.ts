@@ -213,6 +213,7 @@ export function realDeps(root: string): DeliverDeps {
         }, Math.max(1_000, timeoutMs));
         child.once('exit', (code, signal) => {
           clearTimeout(timer);
+          tree.rootExited(); // son pid peut être repris : plus d'adoption tardive de la racine pendant la grâce
           const result = timedOut ? TIMED_OUT : signal ? 128 + (constants.signals[signal] ?? 0) : (code ?? 1);
           const settle = () => {
             tree.stop();

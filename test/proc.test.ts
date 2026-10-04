@@ -197,3 +197,27 @@ describe('TreeTracker — relevé indisponible signalé', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('TreeTracker — racine sortie', () => {
+  it('une racine relevée après sa sortie (pid repris) n\'est ni adoptée ni signalée', async () => {
+    let procs: Procs | null = null;
+    const tracker = new TreeTracker(100, () => procs);
+    tracker.stop();
+    tracker.rootExited(); // la commande est sortie : son pid peut être repris
+    procs = table([100, 1, 'AUTRE']); // ps revient, un autre processus porte le pid 100
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => (sent.push([pid, sig]), true));
+    expect(tracker.alive()).toEqual([]);
+    await tracker.end(120);
+    tracker.kill();
+    expect(sent).toEqual([]);
+  });
+
+  it('la racine relevée tard avant sa sortie est toujours adoptée', () => {
+    let procs: Procs | null = null;
+    const tracker = new TreeTracker(100, () => procs);
+    tracker.stop();
+    procs = table([100, 1, 'A']);
+    expect(tracker.alive()).toEqual([100]);
+  });
+});

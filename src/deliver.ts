@@ -197,7 +197,11 @@ export function realDeps(root: string): DeliverDeps {
         // qu'une seconde livraison prend le verrou libéré ou périmé. Ctrl-C et raccrochage : l'arbre a déjà
         // reçu le signal du terminal, un court délai de grâce laisse finir ses trap (et git son index.lock)
         // avant le kill ; SIGTERM (à cadence seul) et le délai : kill immédiat.
-        const tree = new TreeTracker(pid);
+        const tree = new TreeTracker(pid, undefined, () =>
+          process.stderr.write(
+            'deliver : relevé des processus indisponible — le kill de la commande est dégradé : les descendants non relevés à temps ne seront pas tous tués\n',
+          ),
+        );
         // Terminaison en cours : exec ne rend pas la main avant qu'elle ne soit finie — sinon deliver libère
         // le verrou pendant la grâce, alors que des descendants tournent encore.
         let ending: Promise<void> | null = null;

@@ -115,10 +115,16 @@ export class TreeTracker {
   /** Racine jamais relevée (ps en échec dès la construction) : kill() se rabat sur son groupe et sur elle. */
   private rootUnknown = false;
 
-  /** `read` : le relevé des processus (injectable pour les tests) ; son échec laisse le dernier relevé en place. */
+  private unavailableSaid = false;
+
+  /**
+   * `read` : le relevé des processus (injectable pour les tests) ; son échec laisse le dernier relevé en place.
+   * `onUnavailable` : appelé une seule fois, au premier échec du relevé (le kill est alors dégradé).
+   */
   constructor(
     private readonly root: number,
     private readonly read: () => Map<number, ProcInfo> | null = readProcs,
+    private readonly onUnavailable: () => void = () => {},
   ) {
     const info = this.snapshot().get(root);
     if (info) this.known.set(root, info.start);
@@ -138,6 +144,14 @@ export class TreeTracker {
       fresh = this.read();
     } catch {
       // relevé en échec
+    }
+    if (!fresh && !this.unavailableSaid) {
+      this.unavailableSaid = true;
+      try {
+        this.onUnavailable();
+      } catch {
+        // un message raté ne doit rien casser
+      }
     }
     const now = Date.now();
     if (fresh) {

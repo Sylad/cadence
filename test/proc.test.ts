@@ -124,3 +124,24 @@ describe('TreeTracker — relevé périmé (ps en échec prolongé)', () => {
   });
 });
 
+describe('TreeTracker — relevé indisponible signalé', () => {
+  it('prévient une seule fois, au premier échec', () => {
+    let procs: Procs | null = table([100, 1, 'A']);
+    const warn = vi.fn();
+    const tracker = new TreeTracker(100, () => procs, warn);
+    tracker.stop();
+    expect(warn).not.toHaveBeenCalled();
+    procs = null;
+    tracker.scan();
+    tracker.scan();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('prévient aussi quand le relevé lève, dès la construction', () => {
+    const warn = vi.fn();
+    const tracker = new TreeTracker(100, () => { throw new Error('boom'); }, warn);
+    tracker.stop();
+    tracker.scan();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+});

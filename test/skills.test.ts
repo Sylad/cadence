@@ -245,6 +245,35 @@ describe('skills install', () => {
     expect(qa.description).toContain('Read-only — does not modify code, log in or submit anything.');
   });
 
+  it('agent qa-reviewer : amendements du second passage réel (L10) — chaque clause est épinglée', () => {
+    const method = qaAgent().section('Method');
+    const step = (from: string, to: string): string => method.slice(method.indexOf(from), method.indexOf(to));
+    const step1 = step(' 1. **Read how', ' 2. **Read the expectations');
+    const step4 = step(' 4. **Open each page', ' 5. **GET only');
+    const step5 = step(' 5. **GET only', ' 6. **Classify');
+    const step6 = step(' 6. **Classify', ' 7. **Rank');
+    const step7 = method.slice(method.indexOf(' 7. **Rank'));
+    // État du navigateur : le bundle chargé contre celui que référence index.html relu sans cache, puis le cache vidé.
+    expect(step4).toContain("browser state, once before the first page: compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;");
+    // « GET only » n'est pas « sans effet » : un CDN met en cache une sonde sur un actif absent.
+    expect(step5).toContain('GET only is not "without effect": a probe on an asset name that does not exist was cached for 4 hours by the CDN and then served to real visitors. Request only URLs the app itself uses, or add a cache-busting query parameter.');
+    // La minute de calme se passe hors de l'app.
+    expect(step4).toContain('the quiet minute is spent on `about:blank`, never on the app, whose polling would keep calling its backend;');
+    // Comparaison des textes sans casse.
+    expect(step4).toContain('- texts are compared without case (`never:` texts, labels, statuses): "Eliminated" and "ELIMINATED" are the same text;');
+    // Les lots ouverts du plan : un constat déjà planifié tient en une ligne.
+    expect(step1).toContain('Read the open lots of the plan (status `todo` or `doing`)');
+    expect(step6).toContain('a finding already planned by an open lot is returned in one line — the lot id and its title — not as a new finding and not as a follow-up;');
+    // États simulés par interception : permis, jamais un constat à eux seuls.
+    expect(step4).toContain('- simulated states: a route you intercept to fail or answer empty may be used to see how the page copes; what it shows is never a finding by itself — only what the real app serves is;');
+    // Liens sortants : lus, jamais requêtés.
+    expect(step4).toContain('- outbound links (another origin): each has a real `href` (not empty, not `#`) and, when it opens a new tab, `rel` carrying `noopener` — read from the attributes, never requested;');
+    // Largeur de mise en page mesurée.
+    expect(step4).toContain('`document.documentElement.scrollWidth` against `clientWidth` at each width');
+    // Rang d'une ligne d'attente cassée sans perte visible.
+    expect(step7).toContain('A broken line of the expectations with no visible loss on the page (the content is on screen by another path) is *minor*');
+  });
+
   it('les skills lead et session-close nomment la porte de revue de code', () => {
     const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8');
     expect(skill('lead')).toContain('The `code-reviewer` agent');

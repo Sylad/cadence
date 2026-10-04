@@ -23,6 +23,7 @@ missing, or the URL does not answer, say so and stop.
 
 1. **Read how to reach the app**: the project's CLAUDE.md, then its README — the routes, the demo
    data, what sits behind a PIN or a login.
+   Read the open lots of the plan (status `todo` or `doing`), to know what is already planned.
 2. **Read the expectations**: `docs/qa/expectations.md`, or the file named by `qa.expectations` in
    `cadence.yaml`. One `## <route>` section per page: what the page `shows:` (the content that
    must be present and non-empty, with a count where one exists), what must `never:` appear (error
@@ -42,6 +43,7 @@ missing, or the URL does not answer, say so and stop.
    and **390 px** wide. Let it settle: after `load`, wait a fixed few seconds, scroll through the
    page (lazy images), wait again — never for network idle, which streams and polling never reach.
    Then measure:
+   - browser state, once before the first page: compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;
    - the expected content is present and non-empty — name the selector or the text found and its
      count (`.player-card` ×14), not "the list looks fine";
    - no `never:` text on screen, and no other error or missing-data message;
@@ -56,19 +58,22 @@ missing, or the URL does not answer, say so and stop.
      items that should carry an image and have no loaded `<img>` — a fallback badge replacing a
      failed image has no `<img>` at all;
    - at 390 px, content hidden on the phone by design is not a defect unless a `shows:` line
-     requires it at 390; content pushed outside the visible area (it needs a sideways scroll) is
-     reported as suspect and handed to `ux-reviewer` in one line;
+     requires it at 390; content pushed outside the visible area (it needs a sideways scroll) is reported as suspect and handed to `ux-reviewer` in one line;
+   - the layout width is measured, not judged by eye: `document.documentElement.scrollWidth` against `clientWidth` at each width;
    - states behind controls: tabs, filters and other controls that only change the view may be used
      and are part of the page (a tab that triggers its own API call is checked like a page); a
      control that writes is never used;
+   - texts are compared without case (`never:` texts, labels, statuses): "Eliminated" and "ELIMINATED" are the same text;
+   - outbound links (another origin): each has a real `href` (not empty, not `#`) and, when it opens a new tab, `rel` carrying `noopener` — read from the attributes, never requested;
+   - simulated states: a route you intercept to fail or answer empty may be used to see how the page copes; what it shows is never a finding by itself — only what the real app serves is;
    - pacing: pause between pages; when a 429 (or any rate-limit answer) appears, re-run that page
      ALONE after a quiet minute before concluding — if it reproduces, an ordinary visitor gets it;
-     if not, it was your own pace and it is not a finding;
+     if not, it was your own pace and it is not a finding; the quiet minute is spent on `about:blank`, never on the app, whose polling would keep calling its backend;
    - the frontend source may be read to LOCATE a cause after a measurement, never as evidence.
 5. **GET only, and nothing that writes**: never log in, never submit a form that writes, never
    click a control that changes data, never send a POST, PUT, PATCH or DELETE yourself. If a PIN
    or a login wall is met, say so and stop there for those pages: they go under "not verified",
-   they are neither a finding nor a page checked.
+   they are neither a finding nor a page checked. GET only is not "without effect": a probe on an asset name that does not exist was cached for 4 hours by the CDN and then served to real visitors. Request only URLs the app itself uses, or add a cache-busting query parameter.
 6. **Classify** what you see:
    - *defect* — a line of the expectations is broken, or a universal check fails with a visible
      effect on the page: an error message shown, a failed API call whose content is missing on
@@ -81,11 +86,12 @@ missing, or the URL does not answer, say so and stop.
      contradicted by the page's own data ("eliminated" beside a won match), a stale season
      label. Say why, and propose the line of expectations that would settle it;
    - *noise* — a console error or a failed request with no visible effect: reported, ranked minor;
+   - *already planned* — a finding already planned by an open lot is returned in one line — the lot id and its title — not as a new finding and not as a follow-up;
    - *out of scope* — usability and accessibility belong to `ux-reviewer`, code quality to
      `code-reviewer`: one line at most, never a finding.
 7. **Rank** each finding: *blocking* (a page's main content is missing, its main information is
    false, or an error is shown to the user), *major* (secondary content missing or wrong, a section
-   silently dropped after a failed or empty API call, a broken content image), *minor* (noise).
+   silently dropped after a failed or empty API call, a broken content image), *minor* (noise). A broken line of the expectations with no visible loss on the page (the content is on screen by another path) is *minor* too.
 
 ## Output
 

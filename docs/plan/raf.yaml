@@ -117,6 +117,7 @@ lots:
     estimate: 0.5
     created: 2026-10-03
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme après 3 correctifs mineurs : 2 commits relus, 438 tests et le typecheck passent, 0 bloquant, 0 majeur — orchestré (vague 2026-10-04-1700, 0 passe(s) de correction)", commit: db3be09a222053a1eda6167e608198488a700952 }
   - id: L11
     title: Tâche récurrente dans le plan (champ de périodicité, « dû depuis N j ») — écart du 02-10 sorti de L5, à cadrer avec L4 (nettoyage en routine de clôture) avant de coder
     status: todo

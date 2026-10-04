@@ -431,7 +431,9 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     stop(c, 'handed-back', `dépôt sale après ${kind} : ${dirt.join(', ')}`);
     return;
   }
-  if (commits.length === 0) {
+  // Après une réponse du lead, la session peut n'avoir plus rien à commiter : le travail du lot est déjà dans git.
+  const alreadyDone = kind === 'implement' && l.answers.length > 0 && lotWork(plan, l.repo, l.lot).length > 0;
+  if (commits.length === 0 && !alreadyDone) {
     stop(c, 'handed-back', `${kind} sans commit`);
     return;
   }

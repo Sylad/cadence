@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { RafError } from '../plan.js';
-import { isQuotaMessage, parseSession, type SessionResult } from './result.js';
+import { isQuotaMessage, parseSession, salvageUsage, tokensOf, type SessionResult, type Tokens } from './result.js';
 
 export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small';
 export type Model = 'sonnet' | 'opus' | 'haiku';
@@ -84,8 +84,8 @@ export function readAgents(dir: string): Record<string, AgentDef> {
 
 export type SessionOutcome =
   | { kind: 'ok'; result: SessionResult }
-  | { kind: 'quota'; message: string; result?: SessionResult }
-  | { kind: 'failed'; cause: string; stdout: string; stderr: string };
+  | { kind: 'quota'; message: string; result?: SessionResult; tokens?: Tokens; sessionId?: string }
+  | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string };
 
 /** Lance une session et range son issue : ok, quota atteint, ou échec nommé (jamais de nouvel essai ici). */
 export async function runSession(
@@ -99,18 +99,21 @@ export async function runSession(
     timeoutMs: spec.timeoutMs,
     onSpawn: deps.onSpawn,
   });
-  const failed = (cause: string): SessionOutcome => ({ kind: 'failed', cause, stdout: out.stdout, stderr: out.stderr });
+  // Une session en échec a consommé des tokens : ceux de sa sortie, quand elle en donne, vont au budget.
+  const salvaged = salvageUsage(out.stdout);
+  const spent = salvaged ? { tokens: salvaged.tokens, sessionId: salvaged.sessionId } : {};
+  const failed = (cause: string): SessionOutcome => ({ kind: 'failed', cause, stdout: out.stdout, stderr: out.stderr, ...spent });
   if (out.timedOut) return failed('délai dépassé');
   let result: SessionResult;
   try {
     result = parseSession(out.stdout, { structured: true });
   } catch (e) {
     // Une session arrêtée par le quota peut sortir sans structure : le message reste lisible dans stdout.
-    if (isQuotaMessage(out.stdout)) return { kind: 'quota', message: out.stdout.trim().slice(0, 300) };
+    if (isQuotaMessage(out.stdout)) return { kind: 'quota', message: out.stdout.trim().slice(0, 300), ...spent };
     return failed(out.code !== 0 ? `code ${out.code} — ${(e as Error).message}` : (e as Error).message);
   }
   if (result.isError) {
-    if (isQuotaMessage(result.result)) return { kind: 'quota', message: result.result, result };
+    if (isQuotaMessage(result.result)) return { kind: 'quota', message: result.result, result, ...spent };
     return failed(`${result.subtype || 'erreur'} : ${result.result.slice(0, 300)}${out.code !== 0 ? ` (code ${out.code})` : ''}`);
   }
   if (out.code !== 0) return failed(`code ${out.code}`);
@@ -191,4 +194,42 @@ export function peakContext(claudeHome: string, cwd: string, sessionId: string):
     }
   }
   return peak;
+}
+
+/**
+ * Consommation d'une session relue dans son journal : somme des tours (un message écrit sur plusieurs lignes n'est
+ * compté qu'une fois). Par identifiant de session, sinon la session la plus récente du dossier depuis `since` (ms) —
+ * une session tuée (délai) n'a rien rendu sur sa sortie. Null si rien n'est lisible.
+ */
+export function journalTokens(claudeHome: string, cwd: string, find: { sessionId?: string; since?: number }): { tokens: Tokens; sessionId: string } | null {
+  const dir = projectLogDir(claudeHome, cwd);
+  let id = find.sessionId;
+  if (!id) {
+    if (!existsSync(dir) || find.since === undefined) return null;
+    const recent = readdirSync(dir)
+      .filter((n) => n.endsWith('.jsonl'))
+      .map((n) => ({ n, t: statSync(join(dir, n)).mtimeMs }))
+      .filter((f) => f.t >= find.since!)
+      .sort((a, b) => b.t - a.t)[0];
+    if (!recent) return null;
+    id = recent.n.slice(0, -'.jsonl'.length);
+  }
+  const file = join(dir, `${id}.jsonl`);
+  if (!existsSync(file)) return null;
+  const byMessage = new Map<string, number[]>();
+  let anon = 0;
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    try {
+      const m = JSON.parse(line)?.message;
+      const u = m?.usage;
+      if (!u) continue;
+      byMessage.set(typeof m.id === 'string' ? m.id : `anon-${anon++}`, [u.input_tokens ?? 0, u.cache_creation_input_tokens ?? 0, u.cache_read_input_tokens ?? 0, u.output_tokens ?? 0]);
+    } catch {
+      // ligne partielle
+    }
+  }
+  if (byMessage.size === 0) return null;
+  const sum = [0, 0, 0, 0];
+  for (const v of byMessage.values()) v.forEach((n, i) => (sum[i] += n));
+  return { tokens: tokensOf(sum[0], sum[1], sum[2], sum[3]), sessionId: id };
 }

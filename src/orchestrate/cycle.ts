@@ -9,7 +9,7 @@ import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { objective, renderBrief, type BriefVars } from './briefs.js';
-import { peakContext, runSession, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
+import { journalTokens, peakContext, runSession, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { checkShape, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type ReviewReport, type WorkReport } from './schemas.js';
@@ -228,6 +228,17 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const dir = w.store.lotDir(l.project, l.lot);
   const base = `${n}-${kind}`;
 
+  if (outcome.kind !== 'ok') {
+    // Une session en échec, au quota ou tuée au délai a consommé des tokens : ceux de sa sortie, sinon ceux de son journal.
+    const spent = outcome.tokens ? { tokens: outcome.tokens, sessionId: outcome.sessionId } : w.claudeHome ? journalTokens(w.claudeHome, l.repo, { sessionId: outcome.sessionId, since: Date.parse(step.started) - 1000 }) : null;
+    if (spent) {
+      step.tokens = spent.tokens;
+      if (spent.sessionId) step.sessionId = spent.sessionId;
+      w.budget.add(spent.tokens);
+      w.saveWave();
+      if (w.claudeHome && spent.sessionId) step.peakContext = peakContext(w.claudeHome, l.repo, spent.sessionId);
+    }
+  }
   if (outcome.kind === 'failed') {
     writeFileSync(join(dir, `${base}.json`), outcome.stdout);
     writeFileSync(join(dir, `${base}.err`), outcome.stderr);

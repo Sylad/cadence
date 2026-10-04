@@ -78,3 +78,24 @@ export function quotaReset(text: string): Date | null {
   const m = /\|(\d{9,})\s*$/.exec(text.trim());
   return m ? new Date(Number(m[1]) * 1000) : null;
 }
+
+const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
+
+export const tokensOf = (input: number, cacheWrite: number, cacheRead: number, output: number): Tokens => ({ input, cacheWrite, cacheRead, output, counted: input + cacheWrite + output });
+
+/**
+ * Consommation lue sans rien exiger : une session en échec (is_error, code ≠ 0, sortie incomplète) a quand même
+ * consommé des tokens, que le budget doit compter. Null quand la sortie n'a aucun `usage` lisible.
+ */
+export function salvageUsage(stdout: string): { tokens: Tokens; sessionId?: string } | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(stdout);
+  } catch {
+    return null;
+  }
+  if (!isObject(raw) || !isObject(raw.usage)) return null;
+  const u = raw.usage;
+  const tokens = tokensOf(num(u.input_tokens), num(u.cache_creation_input_tokens), num(u.cache_read_input_tokens), num(u.output_tokens));
+  return { tokens, sessionId: typeof raw.session_id === 'string' ? raw.session_id : undefined };
+}

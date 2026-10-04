@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
+import { projectLogDir } from '../src/orchestrate/launch.js';
+import { tempDir } from './helpers.js';
 import { claudeOut, commitFile, git, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 
 /** Une implémentation qui commite un fichier citant le lot. */
@@ -393,5 +395,52 @@ describe('plan en lecture seule', () => {
     await runLot(c);
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toMatch(/arbre sale \(fichiers hors plan\) : src\.txt/);
+  });
+});
+
+describe('tokens des sessions en échec (L3/t11)', () => {
+  const usage = { input_tokens: 7, cache_creation_input_tokens: 200, cache_read_input_tokens: 9000, output_tokens: 30 };
+  const failedOut = (over: Record<string, unknown>, code = 0) => ({ code, stdout: JSON.stringify({ is_error: true, subtype: 'error_during_execution', result: 'boom', session_id: 's-ko', num_turns: 1, duration_ms: 1, usage, ...over }), stderr: '', timedOut: false });
+
+  it('is_error : les tokens de la sortie vont au budget', async () => {
+    const h = harness({ script: { implement: [() => failedOut({})] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(h.wave.budget.consumed).toBe(237);
+    expect(h.wave.budget.cacheRead).toBe(9000);
+    expect(c.lot.steps[0].tokens?.counted).toBe(237);
+  });
+
+  it('code de sortie non nul avec une sortie lisible : comptés', async () => {
+    const good = claudeOut(workReport(), { input: 5, cacheWrite: 50, cacheRead: 0, output: 5 });
+    const h = harness({ script: { implement: [() => ({ ...good, code: 3 })] } });
+    await runLot(h.lot('L1'));
+    expect(h.wave.budget.consumed).toBe(60);
+  });
+
+  it('quota atteint : comptés', async () => {
+    const h = harness({ script: { implement: [() => failedOut({ subtype: 'success', result: 'Claude AI usage limit reached|1759600000' }, 1)] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('suspended');
+    expect(h.wave.budget.consumed).toBe(237);
+  });
+
+  it('délai dépassé (rien sur la sortie) : relus dans le journal de la session', async () => {
+    const h = harness({ script: { implement: [(call) => {
+      const dir = projectLogDir(h.wave.claudeHome!, call.opts.cwd);
+      mkdirSync(dir, { recursive: true });
+      const line = (id: string, i: number, w: number, r: number, o: number) => JSON.stringify({ type: 'assistant', message: { id, usage: { input_tokens: i, cache_creation_input_tokens: w, cache_read_input_tokens: r, output_tokens: o } } });
+      // le même message écrit sur deux lignes ne compte qu'une fois
+      writeFileSync(join(dir, 'tue.jsonl'), [line('m1', 10, 100, 0, 5), line('m1', 10, 100, 0, 5), line('m2', 4, 20, 110, 6)].join('\n'));
+      return { code: 0, stdout: '', stderr: '', timedOut: true };
+    }] } });
+    h.wave.claudeHome = tempDir();
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.outcome).toMatch(/délai dépassé/);
+    expect(h.wave.budget.consumed).toBe(10 + 100 + 5 + 4 + 20 + 6);
+    expect(h.wave.budget.cacheRead).toBe(110);
   });
 });

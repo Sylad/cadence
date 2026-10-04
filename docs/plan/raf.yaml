@@ -175,4 +175,5 @@ lots:
     created: 2026-10-04
     notes:
       - { date: 2026-10-04, text: "à faire avec : README l.420-421 — au délai, tout processus lancé par la commande (sh fait un fork, cas courant d'un deliver.script) peut survivre, pas seulement un enfant en arrière-plan (mineur de la re-revue de L19)" }
+      - { date: 2026-10-04, text: "revue 04-10 : conforme après 1 correction — (M) aucun test ne couvre un petit-enfant (mutation killTree à 1 niveau passe tous les tests ; livrer.sh pousse le gitops depuis ce niveau) ; (m) Ctrl-C/SIGHUP : trap et index.lock n'ont plus le temps (verify-cache.sh de finance a un trap EXIT). Décision lead : test petit-enfant (délai ET SIGTERM) + délai de grâce court (≈2 s) avant killTree sur SIGINT/SIGHUP uniquement ; délai dépassé et SIGTERM inchangés ; README à jour." }
     started: 2026-10-04

@@ -508,10 +508,11 @@ lots:
     review: { date: 2026-10-04, verdict: "compliant — orchestré (vague 2026-10-04-1920, 0 passe(s) de correction)", commit: 0e5f15ef97da077db7ea8858aac8ec457ce8ba87 }
   - id: L42
     title: "⚡ Suites de la vague 2026-10-04-1807 sur L11 (tâche récurrente) — VÉRIFIER d'abord chaque point : raf check ne signale ni todo-with-commits ni idle pour un lot récurrent, session close ne conseille pas raf done ; hook post-commit propose raf did ; session start trie « Récurrent » par retard via une fonction partagée avec raf now ; tests : every/last par plan.fields en lecture seule, raf did refusé sur done/dropped, add --every --parent refusé, « sans rien écrire » vérifié en relisant le plan"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04
   - id: L43
     title: "⚡ Suites de la vague 2026-10-04-1807 sur L35 et L37 — VÉRIFIER d'abord : qa-reviewer nomme le profil de l'étape browser state (userDataDir réservé à la QA, conservé entre les passes, jamais le profil personnel) et l'exclut du nettoyage ; test/skills.test.ts:258 commentaire sans assertion ; test deliver « relevé indisponible au délai » vérifie aussi la ligne L30"
     status: todo

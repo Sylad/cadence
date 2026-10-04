@@ -869,6 +869,17 @@ describe('propositions : seul ce qui reste non traité (L38/t7)', () => {
     expect(c.lot.proposals).toEqual([]);
   });
 
+  it('mineur proposé par la revue non conforme, repris par la revue conforme à une autre ligne : traité par la passe, il ne reste pas en proposition', async () => {
+    const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }, stillMinor] }));
+    const shifted: Handler = () => claudeOut(reviewReport({ mineurs: 1, verdict: 'conforme avec mineurs', constats: [{ ...stillMinor, ligne: 7 }] }));
+    const h = harness({ script: { implement: [impl()], review: [review1, shifted], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review-small']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual([]);
+  });
+
   it('mineur traité mais que la revue courte signale encore : il reste en proposition', async () => {
     const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', texte: 'bug nommé' }, stillMinor] }));
     const h = harness({ script: { implement: [impl()], review: [review1, minorReview()], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [minorReview()] } });

@@ -390,6 +390,8 @@ function propose(c: LotCtx, text: string): void {
 
 const minorLine = (source: string, k: { fichier?: string; ligne?: number; texte: string }) => `[mineur ${source}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`;
 
+const withoutLine = (line: string) => line.replace(/^(\[mineur \w+\] .*?):\d+ — /, '$1 — ');
+
 function addProposals(c: LotCtx, rep: ReviewReport, source: string, withMinors = true): void {
   if (withMinors) for (const k of rep.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine(source, k));
   for (const t of rep.sousTaches) propose(c, `[sous-tâche ${source}] ${t}`);
@@ -566,7 +568,9 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   // Les mineurs confiés à la passe ont pu être proposés par une revue non conforme antérieure : si la revue qui la suit est
   // conforme, ils sont traités et ne restent pas en propositions (ceux que cette revue signale encore sont ajoutés juste après).
   if (l.minorPass && !minorPass && summary.conforme && uxOk && l.minorLines?.length) {
-    l.proposals = l.proposals.filter((p) => !l.minorLines!.includes(p));
+    // Comparés sans le numéro de ligne : le correctif a pu décaler la ligne que la revue conforme signale.
+    const treated = new Set(l.minorLines.map(withoutLine));
+    l.proposals = l.proposals.filter((p) => !treated.has(withoutLine(p)));
     l.minorLines = [];
   }
   addProposals(c, rep, 'code', !minorPass);

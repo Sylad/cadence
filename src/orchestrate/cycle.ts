@@ -563,9 +563,16 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   const noBudget = wanted && w.budget.exhausted && !w.incident && !w.quota.hit;
   const minorPass = wanted && !noBudget;
   if (noBudget) l.warnings.push('budget atteint : la passe des mineurs n\'a pas eu lieu, mineurs rendus en propositions');
+  // Les mineurs confiés à la passe ont pu être proposés par une revue non conforme antérieure : si la revue qui la suit est
+  // conforme, ils sont traités et ne restent pas en propositions (ceux que cette revue signale encore sont ajoutés juste après).
+  if (l.minorPass && !minorPass && summary.conforme && uxOk && l.minorLines?.length) {
+    l.proposals = l.proposals.filter((p) => !l.minorLines!.includes(p));
+    l.minorLines = [];
+  }
   addProposals(c, rep, 'code', !minorPass);
   if (minorPass) {
     l.minorPass = true;
+    l.minorLines = rep.constats.filter((k) => k.gravite === 'mineur').map((k) => minorLine('code', k));
     l.minorFix = true;
     l.constats = minors;
     l.next = 'fix';

@@ -239,6 +239,8 @@ Un fichier par lot, `<projet>--<lot>.json` (deux projets peuvent avoir chacun un
 - `choix` : décisions d'interprétation des sessions d'écriture, jointes au brief des revues et rendues
   au tableau (`choix fait : …`). `minorPass` : la passe des mineurs a été décidée (elle ne se rejoue
   pas) ; `minorFix` : vrai jusqu'à la fin de sa session `fix`, qui reçoit alors le brief `fix-minors.md`.
+  `minorLines` : les mineurs confiés à la passe, retirés de `proposals` si la revue courte qui la suit
+  est conforme (un mineur d'une revue non conforme antérieure, corrigé par la passe, n'y reste pas).
   `proposals` : mineurs non traités et sous-tâches proposées, rendus au lead.
 - `status` ∈ `queued | implementing | reviewing | fixing | question | ready | handed-back |
   failed | suspended` ; `outcome` est la phrase du tableau.

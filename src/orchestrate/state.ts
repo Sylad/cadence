@@ -83,6 +83,8 @@ export interface LotState {
   minorPass?: boolean;
   /** Vrai entre la décision de la passe des mineurs et la fin de sa session `fix` : celle-ci reçoit le brief des mineurs, pas celui des défauts. */
   minorFix?: boolean;
+  /** Mineurs confiés à la passe des mineurs (lignes de proposition) : retirés des propositions si la revue courte qui la suit est conforme. */
+  minorLines?: string[];
   /** Prochaine étape à jouer ; null = cycle terminé. Relue à la reprise. */
   next: StepKind | null;
   startedSha?: string;

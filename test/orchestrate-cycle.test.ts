@@ -856,6 +856,39 @@ describe('passe des mineurs interrompue puis reprise (L38/t6)', () => {
   });
 });
 
+describe('propositions : seul ce qui reste non traité (L38/t7)', () => {
+  const stillMinor = { gravite: 'mineur', fichier: 'a.txt', ligne: 1, texte: 'nommage' };
+
+  it('mineur d\'une revue non conforme, corrigé ensuite par la passe des mineurs : il ne reste pas en proposition', async () => {
+    const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }, stillMinor] }));
+    const h = harness({ script: { implement: [impl()], review: [review1, minorReview()], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review-small']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual([]);
+  });
+
+  it('mineur traité mais que la revue courte signale encore : il reste en proposition', async () => {
+    const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', texte: 'bug nommé' }, stillMinor] }));
+    const h = harness({ script: { implement: [impl()], review: [review1, minorReview()], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [minorReview()] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
+  });
+
+  it('passe des mineurs refusée (sans commit) : le mineur d\'une revue non conforme reste en proposition', async () => {
+    const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', texte: 'bug nommé' }, stillMinor] }));
+    const rejected: Handler = () => claudeOut(workReport({ choix: ['mineur refusé'] }));
+    const h = harness({ script: { implement: [impl()], review: [review1, minorReview()], fix: [fix('b.txt'), rejected] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
+  });
+});
+
 describe('brief de la revue courte (L38/t3)', () => {
   it('lot non visible : revue courte de code, ni « This lot is small » ni revue d\'ergonomie', async () => {
     const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [fix('b.txt')], 'review-small': [ok] } });

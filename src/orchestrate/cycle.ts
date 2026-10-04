@@ -412,7 +412,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     // Reprise : le rapport cite aussi les commits d'une session précédente du lot, hors de la plage de celle-ci.
     const full = /^[0-9a-f]{4,40}$/i.test(a.sha) ? resolveCommit(l.repo, a.sha) : null;
     if (full && lotWork(plan, l.repo, l.lot).some((k) => k.sha === full)) continue;
-    l.warnings.push(`commit annoncé absent de git : ${a.sha} ${a.sujet}`);
+    l.warnings.push(full ? `commit annoncé n'appartient pas à ${l.lot} : ${a.sha} ${a.sujet}` : `commit annoncé absent de git : ${a.sha} ${a.sujet}`);
   }
   for (const k of commits) {
     if (isPlanOnly(k.sha, plan, l.repo)) continue;

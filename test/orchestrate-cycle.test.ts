@@ -249,7 +249,7 @@ describe('contrôles autour des sessions', () => {
     expect(absent[0]).toContain('deadbee');
   });
 
-  it('un commit annoncé hors plage mais étranger au lot (ancêtre de HEAD) reste « absent de git » (L27)', async () => {
+  it('un commit annoncé hors plage, existant mais étranger au lot : « n\'appartient pas au lot », pas « absent de git » (L27)', async () => {
     let foreign = { sha: '', sujet: '' };
     const h0: Handler = (call) => {
       const b = commitFile(call.opts.cwd, 'b.txt', 'feat(L1): b');
@@ -259,9 +259,10 @@ describe('contrôles autour des sessions', () => {
     foreign = commitFile(h.repo, 'x.txt', 'feat(L9): autre lot');
     const c = h.lot('L1');
     await runLot(c);
-    const absent = c.lot.warnings.filter((w) => w.includes('annoncé absent de git'));
-    expect(absent).toHaveLength(1);
-    expect(absent[0]).toContain('autre lot');
+    expect(c.lot.warnings.filter((w) => w.includes('annoncé absent de git'))).toHaveLength(0);
+    const foreignW = c.lot.warnings.filter((w) => w.includes("commit annoncé n'appartient pas à L1"));
+    expect(foreignW).toHaveLength(1);
+    expect(foreignW[0]).toContain('autre lot');
   });
 
   it('implémentation sans aucun commit : rendu au lead', async () => {

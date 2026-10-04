@@ -16,6 +16,7 @@ import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
+import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, lastDelivery, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
 
@@ -130,6 +131,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? resolve(root, planConfig?.path ?? 'docs/plan/raf.yaml'));
   const loadPlan = () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
   const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));
+  // Une session d'orchestration ne ferme pas un lot, n'enregistre pas de verdict à la place du lead et ne livre pas.
+  if (io.env.CADENCE_ORCHESTRATED && (command === 'done' || command === 'ux' || command === 'review' || command === 'deliver')) {
+    throw new RafError(`${command} refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead`);
+  }
   const need = (n: number, usage: string) => {
     if (rest.length < n) throw new RafError(`usage : raf ${usage}`);
   };
@@ -253,6 +258,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'deliver': {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
+      const orchestrating = activeLock(join(sharedStateDir(root), REPO_LOCK));
+      if (orchestrating) throw new RafError(`deliver : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — livrer une fois la vague finie`);
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans le README)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const plan = existsSync(planPath) ? loadPlan() : null;

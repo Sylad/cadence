@@ -124,6 +124,30 @@ describe('TreeTracker — relevé périmé (ps en échec prolongé)', () => {
   });
 });
 
+describe('TreeTracker — end() sans racine relevée', () => {
+  it('à l\'échéance de la grâce, le repli groupe + racine est appliqué', async () => {
+    const tracker = new TreeTracker(100, () => null);
+    tracker.stop();
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => (sent.push([pid, sig]), true)); // la racine « vit » toujours
+    await tracker.end(120);
+    expect(sent).toContainEqual([-100, 'SIGKILL']);
+    expect(sent).toContainEqual([100, 'SIGKILL']);
+  });
+
+  it('rend la main sans rien tuer quand la racine est déjà partie', async () => {
+    const tracker = new TreeTracker(100, () => null);
+    tracker.stop();
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => {
+      sent.push([pid, sig]);
+      throw new Error('ESRCH');
+    });
+    await tracker.end(5_000);
+    expect(sent.some(([, sig]) => sig === 'SIGKILL')).toBe(false);
+  });
+});
+
 describe('TreeTracker — relevé indisponible signalé', () => {
   it('prévient une seule fois, au premier échec', () => {
     let procs: Procs | null = table([100, 1, 'A']);

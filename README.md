@@ -430,7 +430,10 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   signal from the terminal: cadence gives the whole followed set, not just the
   command, up to 2 seconds to finish (a script's `trap`, git removing its
   `index.lock`), carries on the moment none of it is alive, and kills what is
-  left after the 2 seconds, a background child that ignores Ctrl-C included.
+  left after the 2 seconds, a background child that ignores Ctrl-C included. If
+  the command was never listed (process list unreadable from the start), the
+  grace lasts as long as the command itself is alive, and what remains after
+  2 seconds is killed through the same fallback (its group and itself).
   A delay overrun and `SIGTERM` give no grace: a script's own `trap` does not
   get to finish there. The lock is held until the followed set is empty: when
   cadence dies of the signal it dies after the tree, and its stale lock, which
@@ -445,7 +448,9 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   Where the process list cannot be read (no `/proc` and `ps` failing), cadence
   falls back on the command's group and its root process: a descendant that left
   the group (`setsid`) is then not killed, since the command is deliberately
-  kept in cadence's group.
+  kept in cadence's group. A list that fails for more than a second is no longer
+  trusted (a followed pid may have been recycled): nothing is signalled from it.
+  cadence says so once on stderr when the list is unavailable.
 - Commands run in cadence's own process group and session, attached to the
   terminal: `ssh`, `sudo` or `pinentry` can prompt on `/dev/tty`, and Ctrl-C or
   closing the terminal stops the running command together with cadence (within

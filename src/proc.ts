@@ -37,7 +37,7 @@ export function onTermination(cleanup: (sig: NodeJS.Signals) => void | Promise<v
   };
 }
 
-function signal(pid: number, sig: NodeJS.Signals): boolean {
+function signal(pid: number, sig: NodeJS.Signals | 0): boolean {
   try {
     process.kill(pid, sig);
     return true;
@@ -224,7 +224,10 @@ export class TreeTracker {
   async end(graceMs: number): Promise<void> {
     this.stop();
     const deadline = Date.now() + graceMs;
-    while (this.alive().length > 0) {
+    // Racine jamais relevée : on ne voit rien de l'arbre, seule la racine (notre enfant, son pid ne se réutilise
+    // pas tant qu'elle n'est pas réaperçue) dit si quelque chose tourne encore — et le kill à l'échéance se
+    // replie sur elle et son groupe.
+    while (this.alive().length > 0 || (this.rootUnknown && signal(this.root, 0))) {
       if (Date.now() >= deadline) return this.kill();
       await new Promise((r) => setTimeout(r, 50));
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { cleanupTempDirs, removeDryRunBriefs, tempDir } from './helpers.js';
@@ -106,6 +106,47 @@ describe('dossiers temporaires de la suite (L45)', () => {
     const root = process.env.CADENCE_TEST_TMP_ROOT!;
     expect(existsSync(join(root, PID_FILE))).toBe(true);
     expect(leftovers(root)).not.toContain(PID_FILE);
+  });
+
+  it('un lien sous la racine vers un dossier extérieur ne fait rien supprimer dehors (L45/t4)', () => {
+    const dehors = mkdtempSync(join(realTmpOutsideRoot(), 'cadence-l45-dehors-'));
+    try {
+      mkdirSync(join(dehors, 'cadence-orchestrate-x'));
+      writeFileSync(join(dehors, 'cadence-orchestrate-x', 'b.md'), 'x');
+      mkdirSync(join(dehors, 'victime'));
+      writeFileSync(join(dehors, 'victime', 'v'), 'x');
+      chmodSync(dehors, 0o750);
+      const sous = tempDir();
+      symlinkSync(dehors, join(sous, 'lien'));
+      // Entrée 1 : removeDryRunBriefs, le chemin lu passe par le lien.
+      expect(() => removeDryRunBriefs(`    brief : ${join(sous, 'lien', 'cadence-orchestrate-x', 'b.md')}\n`)).toThrow(/hors de la racine/);
+      expect(existsSync(join(dehors, 'cadence-orchestrate-x', 'b.md'))).toBe(true);
+      // Entrée 2 : removeTree, racine par défaut puis racine explicite (cas d'une racine périmée).
+      expect(() => removeTree(join(sous, 'lien', 'victime'))).toThrow(/hors de la racine/);
+      expect(() => removeTree(join(sous, 'lien', 'victime'), sous)).toThrow(/hors de la racine/);
+      expect(existsSync(join(dehors, 'victime', 'v'))).toBe(true);
+      // Le lien lui-même est supprimé comme un lien ; ce qu'il désigne reste intact (droits compris).
+      removeTree(sous);
+      expect(existsSync(sous)).toBe(false);
+      expect(existsSync(join(dehors, 'victime', 'v'))).toBe(true);
+      expect(statSync(dehors).mode & 0o777).toBe(0o750);
+    } finally {
+      rmSync(dehors, { recursive: true, force: true });
+    }
+  });
+
+  it('removeTree sur un lien de la racine ne supprime que le lien (L45/t4)', () => {
+    const dehors = mkdtempSync(join(realTmpOutsideRoot(), 'cadence-l45-dehors-'));
+    try {
+      writeFileSync(join(dehors, 'v'), 'x');
+      const lien = join(tempDir(), 'cadence-orchestrate-lien');
+      symlinkSync(dehors, lien);
+      removeDryRunBriefs(`    brief : ${join(lien, 'b.md')}\n`);
+      expect(existsSync(lien)).toBe(false);
+      expect(existsSync(join(dehors, 'v'))).toBe(true);
+    } finally {
+      rmSync(dehors, { recursive: true, force: true });
+    }
   });
 
   it('removeTree refuse tout chemin hors de la racine privée', () => {

@@ -13,6 +13,7 @@ import { installHook } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from './news.js';
 import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
+import { dueDays, dueLine, isRecurring } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
@@ -31,10 +32,11 @@ export interface Io {
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
 
   raf init [--project nom] [--prefix L] [--no-hook]
-  raf add "titre" [--estimate j] [--quickwin] [--visible] [--public "titre public"] [--after L2,L4] [--parent L3]
+  raf add "titre" [--estimate j] [--quickwin] [--visible] [--public "titre public"] [--every jours] [--after L2,L4] [--parent L3]
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf note <id> "texte"
+  raf did <id> ["texte"]   un lot récurrent (--every) a été refait : le « dû depuis N j » repart de aujourd'hui
   raf ux enable         revue UX obligatoire avant « done » pour les lots --visible
   raf ux <id> "verdict" enregistre la revue d'ergonomie du lot (agent ux-reviewer)
   raf review enable     revue de code obligatoire avant « done » pour les lots qui ont des commits
@@ -99,6 +101,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       quickwin: { type: 'boolean' },
       visible: { type: 'boolean' },
       public: { type: 'string' },
+      every: { type: 'string' },
       dir: { type: 'string' },
       title: { type: 'string' },
       after: { type: 'string' },
@@ -155,12 +158,15 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       let id: string;
       if (values.parent) {
         if (values.public !== undefined) throw new RafError('--public se pose sur un lot, pas sur une sous-tâche');
+        if (values.every !== undefined) throw new RafError('--every se pose sur un lot, pas sur une sous-tâche');
         id = plan.addTask(values.parent, rest.join(' '));
       } else {
         const estimate = values.estimate === undefined ? undefined : Number(values.estimate);
         if (estimate !== undefined && !(estimate > 0)) throw new RafError(`estimation invalide : ${values.estimate}`);
         const after = values.after ? values.after.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, public: values.public, after });
+        const every = values.every === undefined ? undefined : Number(values.every);
+        if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new RafError(`périodicité invalide : ${values.every} (un nombre entier de jours)`);
+        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, public: values.public, every, after });
       }
       plan.save();
       io.out(id);
@@ -191,6 +197,14 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       plan.note(rest[0], rest.slice(1).join(' '), today);
       plan.save();
+      return 0;
+    }
+    case 'did': {
+      need(1, 'did <id> ["texte"]');
+      const plan = loadPlan();
+      plan.did(rest[0], today, rest.slice(1).join(' '));
+      plan.save();
+      io.out(`${rest[0]} refait le ${today}`);
       return 0;
     }
     case 'public': {
@@ -360,6 +374,12 @@ function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): num
   for (const l of ready.slice(0, 5)) io.out(`  ${describe(l, count(l.id))}`);
   if (ready.length > 5) io.out(`  … et ${ready.length - 5} autre(s)`);
   if (blocked.length) io.out(`  en attente de dépendances : ${blocked.map((l) => l.id).join(', ')}`);
+
+  const recurring = lots.filter(isRecurring).sort((a, b) => dueDays(b, today) - dueDays(a, today));
+  if (recurring.length) {
+    io.out('\nRécurrent');
+    for (const l of recurring) io.out(`  ${l.id}  ${l.title}  (tous les ${l.every} j, ${dueLine(l, today)})`);
+  }
 
   const done = lots
     .filter((l) => l.status === 'done' && l.finished)

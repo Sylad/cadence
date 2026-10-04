@@ -37,6 +37,10 @@ export interface Lot {
   visible: boolean;
   /** Titre public du lot, en langage du public (pages Nouveautés et Plan) ; absent = pas de titre public. */
   public?: string;
+  /** Périodicité en jours : le lot est récurrent, il reste `todo` et se refait (`raf did`). */
+  every?: number;
+  /** Dernier passage d'un lot récurrent ; absent = jamais fait. */
+  last?: Day;
   after: string[];
   created?: Day;
   started?: Day;
@@ -55,7 +59,7 @@ export class RafError extends Error {}
 
 export type Ref = { lot: string; task?: string };
 
-export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'public', 'after', 'created', 'started', 'finished', 'notes', 'parent'] as const;
+export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'parent'] as const;
 export type Field = (typeof FIELDS)[number];
 
 /**
@@ -326,7 +330,7 @@ export class Plan {
     return node as YAMLMap;
   }
 
-  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; public?: string; after?: string[] } = {}): string {
+  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; public?: string; every?: number; after?: string[] } = {}): string {
     this.writable();
     const known = new Set(this.lots().map((l) => l.id));
     for (const dep of opts.after ?? []) if (!known.has(dep)) throw new RafError(`dépendance inconnue : ${dep}`);
@@ -334,11 +338,15 @@ export class Plan {
     const max = Math.max(0, ...[...known].map((id) => Number(re.exec(id)?.[1] ?? 0)));
     const id = `${this.prefix}${max + 1}`;
     const pub = opts.public === undefined ? undefined : cleanPublic(opts.public);
+    if (opts.every !== undefined && !(Number.isInteger(opts.every) && opts.every > 0)) {
+      throw new RafError(`périodicité invalide : ${opts.every} (un nombre entier de jours, 1 au moins)`);
+    }
     const entry: Record<string, unknown> = { id, title };
     if (pub !== undefined) entry.public = pub;
     Object.assign(entry, { status: 'todo', estimate: opts.estimate ?? 1 });
     if (opts.quickwin) entry.quickwin = true;
     if (opts.visible) entry.visible = true;
+    if (opts.every !== undefined) entry.every = opts.every;
     if (opts.after?.length) entry.after = opts.after;
     entry.created = today;
     const node = this.doc.createNode(entry) as YAMLMap;
@@ -424,6 +432,17 @@ export class Plan {
     node.items.splice(at + 1, 0, this.doc.createPair('public', value));
   }
 
+  /** Un lot récurrent a été refait : `last` passe à aujourd'hui, avec une note si `text` est donné. */
+  did(ref: string, today: Day, text?: string): void {
+    this.writable();
+    if (ref.includes('/')) throw new RafError(`la périodicité se pose sur un lot, pas une sous-tâche : ${ref}`);
+    const lot = this.lot(ref);
+    if (lot.every === undefined) throw new RafError(`${ref} n'est pas récurrent — raf add --every <jours> pour en créer un`);
+    if (!isOpen(lot.status)) throw new RafError(`${ref} est ${lot.status}`);
+    this.lotNode(ref).set('last', today);
+    if (text?.trim()) this.note(ref, text.trim(), today);
+  }
+
   note(ref: string, text: string, today: Day): void {
     this.writable();
     const [lotId, taskId] = ref.split('/');
@@ -477,6 +496,8 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
         quickwin: pick('quickwin'),
         visible: pick('visible'),
         public: pick('public'),
+        every: pick('every'),
+        last: day('last'),
         after: pick('after'),
         created: day('created'),
         started: day('started'),
@@ -519,6 +540,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     return undefined;
   };
   const after = raw.after == null ? [] : Array.isArray(raw.after) ? raw.after.map(String) : [String(raw.after)];
+  const last = asDay('last');
   return {
     id: String(raw.id),
     title: String(raw.title ?? ''),
@@ -527,6 +549,8 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     quickwin: raw.quickwin === true,
     visible: raw.visible === true,
     ...(typeof raw.public === 'string' && raw.public.trim() !== '' ? { public: raw.public.trim() } : {}),
+    ...(Number.isInteger(raw.every) && (raw.every as number) > 0 ? { every: raw.every as number } : {}),
+    ...(last ? { last } : {}),
     after,
     created: asDay('created'),
     started: asDay('started'),

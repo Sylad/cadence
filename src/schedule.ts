@@ -1,6 +1,7 @@
 import { endAfterWorkdays, maxDay, workdayAt, workdaysThrough, type Day } from './dates.js';
 import type { Commit } from './git.js';
 import type { Lot } from './plan.js';
+import { isRecurring } from './recurring.js';
 
 export interface Bar {
   lot: Lot;
@@ -15,7 +16,9 @@ export interface Bar {
  * One lane of work: finished lots use their real dates, lots in progress run to
  * max(estimate, today), lots to do follow in file order after their dependencies.
  */
-export function schedule(lots: Lot[], commitsByLot: Map<string, Commit[]>, today: Day): Bar[] {
+export function schedule(all: Lot[], commitsByLot: Map<string, Commit[]>, today: Day): Bar[] {
+  // Un lot récurrent ne se termine pas : il n'a pas de place dans la file.
+  const lots = all.filter((l) => !isRecurring(l));
   const bars = new Map<string, Bar>();
   const firstCommit = (id: string) => commitsByLot.get(id)?.at(-1)?.day;
   const lastCommit = (id: string) => commitsByLot.get(id)?.[0]?.day;

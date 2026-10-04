@@ -66,6 +66,7 @@ raf gantt                         # docs/plan/gantt.html
 |---|---|
 | `raf init [--project name] [--prefix L] [--no-hook]` | create the plan and install the hook |
 | `raf add "title" [--estimate d] [--quickwin] [--visible] [--public "title"] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id (`--public`: the lot's title in the public's words, written as `public:` right after `title:`) |
+| `raf add "title" --every <days>` · `raf did <id> ["text"]` | recurring lot: `every` (days) and `last` (last time done) fields; the lot stays `todo`, `raf now` and `session start` list it under « Récurrent » with « dû depuis N j » / « prochain dans N j »; `raf did` resets the count (spec: `docs/superpowers/specs/2026-10-04-L11-tache-recurrente.md`) |
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
@@ -156,7 +157,7 @@ plan:
   estimates: { S: 0.5, M: 1, L: 3 }   # their effort labels, in working days
 ```
 
-- Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `public`, `after`, `created`, `started`,
+- Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `public`, `every`, `last`, `after`, `created`, `started`,
   `finished`, `notes`, `parent`; one left out is read under its own name. A timestamp counts for
   its day; a note written as plain text is one note.
 - `parent`: an entry `B33/t1-fusion` whose parent is `B33` becomes the sub-task `t1-fusion` of `B33`.

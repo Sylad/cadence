@@ -5,6 +5,7 @@ import { parse } from 'yaml';
 import { changedFiles, fileAt, readCommits, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import { loadEntries, newsIssues } from './news.js';
+import { isRecurring } from './recurring.js';
 import { isOpen, type Lot, type Plan, type Verdict } from './plan.js';
 
 /** Chemin de la configuration lue, relatif à la racine : celui de --config, sinon cadence.yaml. */
@@ -165,7 +166,9 @@ export function reviewIssues(plan: Plan, root: string, byLot: Map<string, Commit
 }
 
 /** Ce qui vient ensuite : lots en cours, puis lots prêts (dépendances closes), gains rapides d'abord. */
-export function nextUp(lots: Lot[]): { doing: Lot[]; ready: Lot[]; blocked: Lot[] } {
+export function nextUp(all: Lot[]): { doing: Lot[]; ready: Lot[]; blocked: Lot[] } {
+  // Les lots récurrents ont leur propre section (raf now) : ils ne sont ni « en cours » ni « à suivre ».
+  const lots = all.filter((l) => !isRecurring(l));
   const byId = new Map(lots.map((l) => [l.id, l]));
   const doing = lots.filter((l) => l.status === 'doing');
   const ready = lots

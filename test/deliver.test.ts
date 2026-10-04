@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { deliver, parseDeliverConfig, TIMED_OUT, type DeliverDeps, type GhRun } from '../src/deliver.js';
+import { deliver, parseDeliverConfig, realDeps, TIMED_OUT, type DeliverDeps, type GhRun } from '../src/deliver.js';
 import { headSha } from '../src/git.js';
 import { Plan, type PlanFormat } from '../src/plan.js';
 import { appendDelivery, lastDelivery, readLock, sharedStateDir as stateDir, writeLock } from '../src/state.js';
@@ -585,5 +587,57 @@ describe('cadence deliver (CLI)', () => {
     const r = await cad(dir, 'deliver', '--', 'api', 'frontend:deux mots', '--news', 'a.md', '--', 'map');
     expect(r.code).toBe(0);
     expect(readFileSync(join(dir, '.git/args'), 'utf8').trim().split('\n')).toEqual([headSha(dir)!.slice(0, 7), 'api', 'frontend:deux mots', '--news', 'a.md', '--', 'map']);
+  });
+});
+
+describe('realDeps.exec', () => {
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  it("un délai dépassé tue TOUT le groupe : aucun enfant (sleep) ne survit", async () => {
+    const dir = tempDir();
+    const pidFile = join(dir, 'child.pid');
+    // sh lance un petit-enfant détaché de son stdin, note son pid et attend : tuer sh seul l'orpheline
+    const code = realDeps(dir, { quiet: true }).exec(`sleep 30 & echo $! > '${pidFile}'; wait`, {}, 1_000);
+    expect(code).toBe(TIMED_OUT);
+    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    expect(pid).toBeGreaterThan(1);
+    for (let i = 0; i < 40 && alive(pid); i++) await new Promise((r) => setTimeout(r, 50));
+    const survived = alive(pid);
+    if (survived) process.kill(pid, 'SIGKILL');
+    expect(survived).toBe(false);
+  });
+
+  it('garde le comportement synchrone et les codes de sortie', () => {
+    const dir = tempDir();
+    const d = realDeps(dir, { quiet: true });
+    expect(d.exec('true', {}, 5_000)).toBe(0);
+    expect(d.exec('exit 7', {}, 5_000)).toBe(7);
+    expect(d.exec('echo $CADENCE_X >/dev/null; test "$CADENCE_X" = oui', { CADENCE_X: 'oui' }, 5_000)).toBe(0);
+  });
+
+  it('quiet coupe réellement la sortie des commandes (stdout du processus capturé)', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'cadence-quiet-'));
+    try {
+      const script = join(tmp, 'probe.ts');
+      writeFileSync(
+        script,
+        `import { realDeps } from ${JSON.stringify(join(process.cwd(), 'src/deliver.ts'))};\n` +
+          `const quiet = process.argv[2] === 'quiet';\n` +
+          `process.exit(realDeps(${JSON.stringify(tmp)}, { quiet }).exec('echo BRUIT-SOUS-PROCESSUS; echo BRUIT-ERR >&2', {}, 5000));\n`,
+      );
+      const run = (mode: string) =>
+        execFileSync(join(process.cwd(), 'node_modules/.bin/vite-node'), [script, mode], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      expect(run('loud')).toContain('BRUIT-SOUS-PROCESSUS'); // témoin : la sonde voit bien la sortie
+      expect(run('quiet')).not.toContain('BRUIT-SOUS-PROCESSUS');
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

@@ -729,7 +729,7 @@ A version exists in three places and is published in two; a release does all of 
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, in the commit that closes the lot.
 2. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,
    which publishes to npm through Trusted Publishing (OIDC, no token stored anywhere): it checks the tag
-   matches `package.json`, then `npm publish --provenance`, where `prepublishOnly` runs the type-check and the
+   matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, then `npm publish --provenance`, where `prepublishOnly` runs the type-check and the
    tests and `prepare` builds `dist/`; a red suite stops the publication. The trusted publisher is declared
    once on npmjs.com (package settings → Trusted Publisher → GitHub Actions, `Sylad/cadence`, `publish.yml`).
 3. Watch the run: `gh run watch` (or `gh run list --workflow publish.yml`).

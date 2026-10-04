@@ -1,6 +1,7 @@
 # Publication sur npm par la publication de confiance (Trusted Publishing, OIDC) :
 # aucun jeton stocké, npm vérifie que la publication vient de ce workflow de Sylad/cadence.
-# Déclenchée par un tag v<version> qui doit correspondre à la version de package.json.
+# Déclenchée par un tag v<version> qui doit correspondre à la version de package.json,
+# de .claude-plugin/plugin.json et de .claude-plugin/marketplace.json.
 name: publish
 
 on:

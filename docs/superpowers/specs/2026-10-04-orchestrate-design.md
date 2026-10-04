@@ -100,16 +100,24 @@ préconditions → raf start → implémentation (Sonnet)
    au dernier commit serait périmée (règle du verdict lié au commit).
 5. **Conforme** = 0 bloquant et 0 majeur dans la sortie structurée de la revue de code (les mineurs
    ne bloquent pas). **Passe des mineurs** (L38) : une revue conforme qui porte des constats mineurs
-   enchaîne UNE passe de correction de ces mineurs (session Sonnet neuve, brief `fix.md`, hors des 2
-   passes de défauts), puis une revue courte (`review-small`) ; celle-ci conclut même avec de
-   nouveaux mineurs, rendus au lead comme propositions. Les sous-tâches proposées restent rendues au lead.
+   enchaîne UNE passe de correction de ces mineurs, hors des 2 passes de défauts : session Sonnet
+   neuve, brief `fix-minors.md` (pas de « stop and ask » : l'auteur corrige ce qui est juste et liste
+   en `choix`, avec la raison, les mineurs qu'il refuse), puis une revue courte (`review-small`, brief
+   `review-recheck.md`, revue de code seule) qui conclut même avec de nouveaux mineurs, rendus au lead
+   comme propositions. Une passe sans commit (ou qui pose une question, rendue en proposition)
+   conclut sur la revue conforme d'origine : `ready`, verdict enregistré avec le sha qu'elle a lu,
+   mineurs non traités en propositions. Même conclusion quand le budget est épuisé juste après la
+   revue conforme (aucune session pour jouer la passe). Les sous-tâches proposées restent rendues au lead.
+   Pour un lot visible non petit, l'UX est rejouée après la passe (comme après toute correction : le code
+   a changé) et son verdict reste celui de l'agent UX ; la revue courte ne l'écrase pas.
 6. **Correction** : session Sonnet **neuve** (jamais la session d'implémentation reprise), brief
    `fix.md` avec les constats de la dernière revue (code et UX ensemble, une seule session) et la
-   liste des commits du lot ; puis nouvelle revue. **2 passes de correction au plus**, puis la main
+   liste des commits du lot ; puis nouvelle revue (UX rejouée d'abord pour un lot visible). **2 passes de correction au plus**, puis la main
    est rendue au lead.
 7. **Petit lot** (`estimate ≤ 0.5` ou `quickwin`) : une **passe unique** relecture + UX — une seule
-   session Opus, agent `code-reviewer`, brief `review-small.md` qui ajoute, pour un lot visible, la
-   grille de l'`ux-reviewer` (captures 1440 / 390, règle nommée). Mêmes règles de conformité et de
+   session Opus, agent `code-reviewer`, brief `review-small.md` qui ajoute la grille de
+   l'`ux-reviewer` (captures 1440 / 390, règle nommée) ; un petit lot non visible reçoit le brief
+   `review.md` (revue de code ordinaire, sans ergonomie). Mêmes règles de conformité et de
    corrections ensuite.
 8. **Haiku** : seulement quand Sylvain l'écrit (`L18@haiku`), pour un lot mécanique (README,
    renommage, montée de version). Le « Haiku au tour » de la règle du 03-10 disparaît : le tour
@@ -117,7 +125,9 @@ préconditions → raf start → implémentation (Sonnet)
 
 ### Briefs
 
-Gabarits Markdown versionnés dans `templates/orchestrate/` (ajouté à `files` du paquet), rendus par
+Gabarits Markdown versionnés dans `templates/orchestrate/` (ajouté à `files` du paquet), **lus une
+fois au début de la vague (et à sa reprise)** puis rendus depuis cet instantané : un lot qui modifie un
+gabarit pendant la vague ne change pas les briefs de cette vague (L39). Rendus par
 substitution de `{{chemin}}`, `{{lot}}`, `{{titre}}`, `{{objectif}}`, `{{constats}}`, `{{commits}}`,
 `{{reponse}}`. `implement.md` **est** le brief de `skills/lead` §2, mot pour mot, plus deux lignes :
 pas de sous-agent, et le rapport final rendu dans la sortie structurée. `skills/lead` renvoie vers
@@ -170,7 +180,9 @@ coup, pour la mesure ; il n'entre pas dans le budget.
 Sorties structurées (schémas JSON dans `src/orchestrate/schemas.ts`) :
 
 - implémentation / correction : `commits[] {sha, sujet}`, `tests {commande, resultat}`,
-  `build {commande, resultat}`, `nonVerifie[]`, `questions[]`, `resume` (5 lignes au plus) ;
+  `build {commande, resultat}`, `nonVerifie[]`, `questions[]`, `choix[]` (décisions d'interprétation
+  prises seul, avec l'alternative écartée, et — passe des mineurs — les mineurs refusés avec la raison ;
+  facultatif pour lire un ancien rapport), `resume` (5 lignes au plus) ;
 - revue de code (et passe unique) : `bloquants`, `majeurs`, `mineurs` (nombres), `constats[]
   {gravite, fichier, ligne, texte}`, `sousTaches[]`, `nonVerifie[]`, `verdict` (la ligne pour
   `raf review`) ;
@@ -217,11 +229,17 @@ Un fichier par lot, `<projet>--<lot>.json` (deux projets peuvent avoir chacun un
     { "n": 2, "kind": "review", "model": "opus", "status": "running", "pid": 41390 }
   ],
   "verdict": null, "uxVerdict": null,
-  "questions": [], "answers": [],
+  "questions": [], "choix": [], "answers": [],
+  "minorPass": false, "minorFix": false,
+  "proposals": [],
   "outcome": null
 }
 ```
 
+- `choix` : décisions d'interprétation des sessions d'écriture, jointes au brief des revues et rendues
+  au tableau (`choix fait : …`). `minorPass` : la passe des mineurs a été décidée (elle ne se rejoue
+  pas) ; `minorFix` : vrai jusqu'à la fin de sa session `fix`, qui reçoit alors le brief `fix-minors.md`.
+  `proposals` : mineurs non traités et sous-tâches proposées, rendus au lead.
 - `status` ∈ `queued | implementing | reviewing | fixing | question | ready | handed-back |
   failed | suspended` ; `outcome` est la phrase du tableau.
 - Écriture atomique (fichier temporaire + renommage) après chaque transition ; le dossier
@@ -239,7 +257,9 @@ Un fichier par lot, `<projet>--<lot>.json` (deux projets peuvent avoir chacun un
 
 - **`raf review <lot> "<verdict>"`** enregistré par l'orchestrateur quand la dernière revue de code est
   conforme, après avoir vérifié qu'aucun commit du lot n'est postérieur à la session de revue. Le
-  verdict est la ligne de l'agent suivie de `— orchestré (vague <id>, <n> passe(s) de correction)`,
+  verdict est la ligne de l'agent suivie de `— orchestré (vague <id>, <n> passe(s) de correction)`
+  (`+ passe des mineurs` quand elle a eu lieu, `+ passe des mineurs sans commit` quand elle n'a rien
+  commité : le verdict est alors celui de la revue conforme d'origine),
   puis un commit d'entretien du plan, chemin explicite. Le sha retenu par `raf review` est donc
   celui que la revue a lu.
 - **Mineurs et sous-tâches proposées** : écrits dans l'état et le tableau, **pas** ajoutés au plan

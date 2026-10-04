@@ -585,10 +585,21 @@ in the background and read `--status`: it prints one line per transition and the
 `raf start` (committed alone) → implementation → **UX review** if the lot is `visible` and the app is
 declared → **code review**, which always comes last (a UX fix changes code) → compliant (no blocking, no
 major finding) → `raf review` is recorded by the orchestrator with the sha the review read, then
-"ready to deliver". Not compliant → a correction in a new session, then a new review, **two passes at
-most**, then the lot goes back to you with the findings. A small lot (`estimate` ≤ 0.5 or `quickwin`)
-gets one single Opus pass for code and usability. Failing tests (reported red, or red when
+"ready to deliver". Not compliant → a correction in a new session, then a new review (the UX review of a
+visible lot is replayed too, the code having changed), **two passes at most**, then the lot goes back to
+you with the findings. A small lot (`estimate` ≤ 0.5 or `quickwin`) gets one single Opus pass for code and
+usability (code only when the lot is not `visible`). Failing tests (reported red, or red when
 `orchestrate.test` is run) go straight to a correction.
+
+**Compliant with minor findings**: the minors are not left for a follow-up lot. One **minors pass** runs
+before concluding: a new Sonnet session with its own brief (`fix-minors.md`) fixes the minors that are right
+and lists in `choix`, with the reason, the ones it rejects (it never stops to ask); it does not count among the
+two defect passes. A short code re-review follows (for a visible lot, after the UX review replayed), and
+concludes even when it finds new minors, which are returned to you as proposals (no second minors pass).
+When the pass makes no commit (every minor judged wrong), the lot concludes on the original compliant
+review: `ready`, verdict recorded with the sha that review read (`… + passe des mineurs sans commit`),
+the untreated minors returned as proposals. Same when the budget is exhausted right after a compliant
+review with minors: it concludes on that review instead of staying suspended.
 
 **Choices, not questions**: the author brief tells the session to decide minor interpretation questions itself and to list them under `choix` in its report; the reviewer receives that list to re-read, and the final table prints each one (`choix fait : …`). A session stops with a question only on a real blocker (scope, architecture, costly to undo, not settled by the plan or CLAUDE.md).
 

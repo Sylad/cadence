@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { run } from '../src/cli.js';
+import { projectLogDir } from '../src/orchestrate/launch.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
 import { gitRepo, tempDir } from './helpers.js';
@@ -116,7 +117,8 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const s = setup({ implement: [{ ...impl, sleepMs: 60_000 }] });
     const bin = fileURLToPath(new URL('../bin/cadence.js', import.meta.url));
     const logFile = s.calls;
-    const env = { ...process.env, ...s.env };
+    const claudeHome = tempDir();
+    const env = { ...process.env, ...s.env, CLAUDE_CONFIG_DIR: claudeHome };
     const child = spawn(process.execPath, [bin, 'orchestrate', 'proj:L1'], { cwd: s.parent, env, stdio: 'ignore' });
     const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
     const waitFor = async (what: string, ok: () => boolean) => {
@@ -130,6 +132,13 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const sessionPid = () => store()?.readLot('proj', 'L1')?.steps[0]?.pid;
     await waitFor('session lancée', () => logFile().length === 1 && !!sessionPid() && existsSync(join(s.dir, '.git/hooks/pre-push')));
     const pid = sessionPid()!;
+    // L3/t20 : la session tuée a consommé des tokens, lisibles dans son journal (identifiant passé par --session-id)
+    const sid = store()!.readLot('proj', 'L1')!.steps[0].sessionId!;
+    expect(s.calls()[0].sessionId).toBe(sid);
+    const logs = projectLogDir(claudeHome, realpathSync(s.dir));
+    mkdirSync(logs, { recursive: true });
+    writeFileSync(join(logs, `${sid}.jsonl`), JSON.stringify({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 10, cache_creation_input_tokens: 100, cache_read_input_tokens: 7, output_tokens: 5 } } }));
+    writeFileSync(join(logs, 'autre-conversation.jsonl'), JSON.stringify({ type: 'assistant', message: { id: 'z', usage: { input_tokens: 9_999_999, output_tokens: 1 } } }));
     expect(existsSync(join(s.parent, '.cadence/orchestrate.lock'))).toBe(true);
     expect(existsSync(join(s.dir, '.git/cadence/orchestrate.lock'))).toBe(true);
 
@@ -142,6 +151,9 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(lot.steps.map((x) => x.status)).toEqual(['interrupted']);
     expect(lot.status).toBe('suspended');
     expect(st.readWave()!.status).toBe('interrupted');
+    expect(st.readWave()!.consumed).toBe(115);
+    expect(st.readWave()!.cacheRead).toBe(7);
+    expect(lot.steps[0].tokens).toMatchObject({ counted: 115 });
     expect(existsSync(join(s.parent, '.cadence/orchestrate.lock'))).toBe(false);
     expect(existsSync(join(s.dir, '.git/cadence/orchestrate.lock'))).toBe(false);
     expect(existsSync(join(s.dir, '.git/hooks/pre-push'))).toBe(false);

@@ -33,6 +33,20 @@ export class Budget {
   }
 }
 
+/**
+ * Compte au budget les tokens d'une étape tuée (signal) ou retrouvée morte (reprise), relus dans le journal de sa
+ * session (`--session-id`). Une étape déjà comptée (`tokens`) ne l'est jamais deux fois. Vrai quand quelque chose a été compté.
+ */
+export function countInterrupted(claudeHome: string | undefined, repo: string, step: StepState, budget: Budget): boolean {
+  if (!claudeHome || !step.sessionId || step.tokens) return false;
+  const spent = journalTokens(claudeHome, repo, step.sessionId);
+  if (!spent) return false;
+  step.tokens = spent.tokens;
+  step.peakContext = peakContext(claudeHome, repo, step.sessionId);
+  budget.add(spent.tokens);
+  return true;
+}
+
 export interface WaveCtx {
   id: string;
   store: RunStore;

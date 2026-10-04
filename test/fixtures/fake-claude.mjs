@@ -32,7 +32,7 @@ used[kind] = index + 1;
 writeFileSync(stateFile, JSON.stringify(used));
 const action = (scenario[kind] ?? [])[index] ?? scenario[`${kind}*`] ?? {};
 
-const entry = { kind, lot, cwd: process.cwd(), model: flag('--model'), orchestrated: process.env.CADENCE_ORCHESTRATED ?? null, resume: argv.includes('--resume') };
+const entry = { kind, lot, cwd: process.cwd(), model: flag('--model'), orchestrated: process.env.CADENCE_ORCHESTRATED ?? null, resume: argv.includes('--resume'), sessionId: flag('--session-id') };
 const commits = [];
 for (const c of action.commits ?? []) {
   writeFileSync(join(process.cwd(), c.file), `${Math.random()}\n`);

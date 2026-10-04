@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
-import type { ClaudeFn, LaunchOutcome } from '../src/orchestrate/launch.js';
+import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -256,6 +256,25 @@ describe('une vague', () => {
     });
     await orchestrate(['a:L1'], io(parent).io, f.deps);
     expect(seen).toEqual({ hook: true, repoLock: true, waveLock: true });
+  });
+
+  it('L3/t20 — --resume compte au budget l\'étape tuée par un signal, relue dans le journal de sa session', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const claudeHome = tempDir();
+    const f = fakeDeps({}, { claudeHome });
+    expect(await orchestrate(['a:L1', '--budget', '1'], io(parent).io, f.deps)).toBe(3);
+    const store = new RunStore(parent, '2026-10-04-1412');
+    const lot = store.readLot('a', 'L1')!;
+    lot.steps.push({ n: lot.steps.length + 1, kind: 'implement', model: 'sonnet', status: 'running', pid: 2_999_999, sessionId: 'tuee-par-signal', started: '2026-10-04T14:13:00.000Z' });
+    store.writeLot(lot);
+    const dir = projectLogDir(claudeHome, realpathSync(dirs.a));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'tuee-par-signal.jsonl'), JSON.stringify({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 10, cache_creation_input_tokens: 100, cache_read_input_tokens: 7, output_tokens: 5 } } }));
+    expect(await orchestrate(['--resume', '--budget', '1M'], io(parent).io, f.deps)).toBe(0);
+    const after = new RunStore(parent, '2026-10-04-1412');
+    const steps = after.readLot('a', 'L1')!.steps;
+    expect(steps.find((x) => x.sessionId === 'tuee-par-signal')).toMatchObject({ status: 'interrupted', tokens: { counted: 115 } });
+    expect(after.readWave()!.consumed).toBe(steps.reduce((n, x) => n + (x.tokens?.counted ?? 0), 0));
   });
 
   it('un lot rendu au lead : code 1 ; budget atteint : code 3 puis --resume --budget continue jusqu\'à 0', async () => {

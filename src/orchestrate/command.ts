@@ -10,7 +10,7 @@ import { Plan, RafError, isOpen } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { objective, renderBrief, type BriefVars } from './briefs.js';
-import { Budget, type LotCtx, type WaveCtx } from './cycle.js';
+import { Budget, countInterrupted, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, killSessions, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -373,7 +373,11 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const forget = onTermination(() => {
     killSessions();
     for (const c of ctxs) {
-      for (const s of c.lot.steps) if (s.status === 'running') s.status = 'interrupted';
+      for (const s of c.lot.steps) {
+        if (s.status === 'running') s.status = 'interrupted';
+        // Les tokens d'une session tuée comptent : relus dans son journal.
+        if (s.status === 'interrupted') countInterrupted(deps.claudeHome, c.lot.repo, s, budget);
+      }
       if (c.lot.status === 'implementing' || c.lot.status === 'reviewing' || c.lot.status === 'fixing') c.lot.status = 'suspended';
       store.writeLot(c.lot);
     }
@@ -440,6 +444,12 @@ async function resume(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, laun
     for (const r of refusals) io.err(`orchestrate : ${r}`);
     return 2;
   }
+  // Une étape interrompue (signal, crash) dont les tokens n'ont pas été comptés : relue dans le journal de sa session.
+  const recovered = new Budget(0);
+  for (const l of live) for (const s of l.steps) if (s.status === 'interrupted') countInterrupted(deps.claudeHome, l.repo, s, recovered);
+  wave.consumed += recovered.consumed;
+  wave.cacheRead += recovered.cacheRead;
+  if (recovered.consumed || recovered.cacheRead) store.writeWave(wave);
   for (const l of live) {
     if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';
     store.writeLot(l);

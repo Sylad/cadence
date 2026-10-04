@@ -422,6 +422,21 @@ describe('deliver : script du projet (L2)', () => {
     expect(out.filter((l) => l.startsWith('livré :'))).toEqual(["livré : Q4 — à fermer avec l'outil du projet si l'effet est celui attendu"]);
   });
 
+  it('(L15/t3) la portée décide des lots livrés : « chore(L1): … (L2) planifié » n\'annonce que L1', async () => {
+    const dir = pushedRepo();
+    const file = join(dir, 'docs/plan/raf.yaml');
+    expect(await deliver(ctx(dir, { config: SCRIPT, plan: Plan.load(file) }).c, fakeDeps().deps)).toBe(0);
+    const plan = Plan.load(file);
+    plan.add('Suite', '2026-09-28');
+    plan.save();
+    git(dir, 'add', '.');
+    commit(dir, 'chore(L1): cache livré — (L2) planifié et (L2–L3) à suivre');
+    git(dir, 'push', '-q');
+    const { c, out } = ctx(dir, { config: SCRIPT, plan: Plan.load(file) });
+    expect(await deliver(c, fakeDeps().deps)).toBe(0);
+    expect(out.filter((l) => l.startsWith('livré :'))).toEqual(['livré : L1 — raf done si l\'effet est celui attendu']);
+  });
+
   it('plan en lecture seule : aucun lot en cours cité → aucune ligne de lots livrés', async () => {
     const dir = pushedRepo();
     const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'), { format: { lots: 'lots', fields: {}, statuses: {}, estimates: {} } });

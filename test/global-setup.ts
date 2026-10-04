@@ -16,6 +16,7 @@ export default function setup(): () => void {
   const previous = process.env.TMPDIR;
   process.env.TMPDIR = root;
   process.env.CADENCE_TEST_TMP_ROOT = root;
+  process.env.CADENCE_TEST_REAL_TMP = realTmp;
   return () => {
     if (previous === undefined) delete process.env.TMPDIR;
     else process.env.TMPDIR = previous;

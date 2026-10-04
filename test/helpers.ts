@@ -1,9 +1,9 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { addDays, toDay } from '../src/dates.js';
-import { removeTree } from './tmp-hygiene.js';
+import { assertInside, removeTree } from './tmp-hygiene.js';
 
 const created: string[] = [];
 
@@ -53,5 +53,15 @@ export const cleanAt = (offset: number, time = '10:00:00'): Date => new Date(`${
  * on retrouve les lignes « brief : <chemin> » et on supprime le dossier qui les contient.
  */
 export function removeDryRunBriefs(output: string): void {
-  for (const m of output.matchAll(/brief : (\S+)/g)) removeTree(dirname(m[1]!));
+  const root = process.env.CADENCE_TEST_TMP_ROOT;
+  // Ligne entière (un chemin temporaire peut contenir des espaces : /Users/John Doe/tmp, C:\\Users\\Sylvain Ladoire\\…).
+  const targets = [...output.matchAll(/^\s*brief : (.+?)\s*$/gm)].map((m) => dirname(m[1]!));
+  // Tout est validé AVANT la première suppression : une seule cible suspecte et rien n'est supprimé.
+  for (const dir of targets) {
+    assertInside(dir, root);
+    if (!basename(dir).startsWith('cadence-orchestrate-')) {
+      throw new Error(`Suppression refusée : ${dir} n'est pas un dossier cadence-orchestrate-*.`);
+    }
+  }
+  for (const dir of targets) removeTree(dir);
 }

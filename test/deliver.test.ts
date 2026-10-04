@@ -630,6 +630,7 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
       const said = write.mock.calls.filter(([m]) => String(m).includes('descendants ont pu survivre'));
       expect(said).toHaveLength(1);
       expect(String(said[0]![0])).toContain('replié sur la commande racine');
+      expect(write.mock.calls.filter(([m]) => String(m).includes('relevé des processus indisponible'))).toHaveLength(1); // le message de L30 reste présent
     } finally {
       write.mockRestore();
     }

@@ -105,13 +105,21 @@ lots:
     created: 2026-10-03
   - id: L15
     title: "Attribution d'un commit à ses lots : la portée « type(L24) » prime ; mentions en passage et plages (L28–L31, L45 à L48) ne comptent pas ; un commit qui ne touche que cadence.yaml est de l'entretien du plan"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-04
     started: 2026-10-04
     tasks:
-      - { id: t1, title: "cadence.yaml n'est fichier du plan que pour un commit qui ne change que la clé plan: — un changement de deliver/session reste du travail à relire", status: todo }
-      - { id: t2, title: "hook post-commit : appliquer la règle de la portée (citedRefs) au lieu de lire tout le message, avec test", status: todo }
-      - { id: t3, title: "deliveredLots : appliquer la règle de la portée, avec test « (L27) planifié » non annoncé livré", status: todo }
-      - { id: t4, title: "portée reconnue aussi avec espace avant les deux-points : « feat(L24) : … »", status: todo }
-      - { id: t5, title: "fichier du plan : le cadence.yaml effectivement lu (--config), pas seulement celui de la racine", status: todo }
+      - { id: t1, title: "cadence.yaml n'est fichier du plan que pour un commit qui ne change que la clé plan: — un changement de deliver/session reste du travail à relire", status: done }
+      - { id: t2, title: "hook post-commit : appliquer la règle de la portée (citedRefs) au lieu de lire tout le message, avec test", status: done }
+      - { id: t3, title: "deliveredLots : appliquer la règle de la portée, avec test « (L27) planifié » non annoncé livré", status: done }
+      - { id: t4, title: "portée reconnue aussi avec espace avant les deux-points : « feat(L24) : … »", status: done }
+      - { id: t5, title: "fichier du plan : le cadence.yaml effectivement lu (--config), pas seulement celui de la racine", status: done }
+    review: { date: 2026-10-04, verdict: "conforme (re-revue 04-10) : 3 majeurs + 2 mineurs de la 1re revue corrigés et testés, 225 tests, tsc vert, raf check vert sur cadence/ol/warhammer ; 2 mineurs (JSDoc déplacé, test YAML illisible) reportés en gain rapide", commit: 080e8a6dc25882a3b1f3650c233240c34adf3d18 }
+    finished: 2026-10-04
+  - id: L16
+    title: "Suites de la revue L15 : JSDoc de files remis au-dessus de get files (plan.ts:205) ; test « cadence.yaml illisible ou commit racine compte comme du travail »"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-04

@@ -702,7 +702,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   broken, or a universal check failing with a visible effect, with or without an
   expectations file), suspects (it looks like missing or wrong data and no
   expectation settles it) or noise (a console error or a failed request with no
-  visible effect, ranked minor), ranked, each with
+  visible effect, ranked minor) or already planned (an open lot covers it: returned in one line, the lot id and its title), ranked, each with
   the route, what was expected, what was measured and the evidence; pages checked
   N/N, follow-ups as `raf add` lines, what it could not verify, a one-line
   verdict. Read-only: GET only, no login, nothing submitted; it stops at a PIN.

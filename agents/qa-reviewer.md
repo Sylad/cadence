@@ -23,7 +23,9 @@ missing, or the URL does not answer, say so and stop.
 
 1. **Read how to reach the app**: the project's CLAUDE.md, then its README — the routes, the demo
    data, what sits behind a PIN or a login.
-   Read the open lots of the plan (status `todo` or `doing`), to know what is already planned.
+   Read the open lots of the plan (status `todo` or `doing`) with `raf list --status todo` and
+   `raf list --status doing`, or the project's own tool when the plan is read-only, to know what is
+   already planned.
 2. **Read the expectations**: `docs/qa/expectations.md`, or the file named by `qa.expectations` in
    `cadence.yaml`. One `## <route>` section per page: what the page `shows:` (the content that
    must be present and non-empty, with a count where one exists), what must `never:` appear (error

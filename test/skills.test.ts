@@ -262,8 +262,13 @@ describe('skills install', () => {
     // Comparaison des textes sans casse.
     expect(step4).toContain('- texts are compared without case (`never:` texts, labels, statuses): "Eliminated" and "ELIMINATED" are the same text;');
     // Les lots ouverts du plan : un constat déjà planifié tient en une ligne.
-    expect(step1).toContain('Read the open lots of the plan (status `todo` or `doing`)');
+    expect(step1).toContain('Read the open lots of the plan (status `todo` or `doing`) with `raf list --status todo` and `raf list --status doing`, or the project\'s own tool when the plan is read-only');
     expect(step6).toContain('a finding already planned by an open lot is returned in one line — the lot id and its title — not as a new finding and not as a follow-up;');
+    // README : « déjà planifié » est une quatrième sorte de constat, avant le hors-périmètre.
+    const readme = readFileSync(join(AGENTS_DIR, '../README.md'), 'utf8').replace(/\s+/g, ' ');
+    expect(readme).toContain('visible effect, ranked minor) or already planned (an open lot covers it: returned in one line, the lot id and its title)');
+    expect(step6.indexOf('*already planned*')).toBeGreaterThan(step6.indexOf('*noise*'));
+    expect(step6.indexOf('*already planned*')).toBeLessThan(step6.indexOf('*out of scope*'));
     // États simulés par interception : permis, jamais un constat à eux seuls.
     expect(step4).toContain('- simulated states: a route you intercept to fail or answer empty may be used to see how the page copes; what it shows is never a finding by itself — only what the real app serves is;');
     // Liens sortants : lus, jamais requêtés.

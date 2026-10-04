@@ -188,10 +188,18 @@ lots:
     created: 2026-10-04
   - id: L22
     title: Publier @sylad/cadence 0.8.0 sur npm (verify, attribution par la portée, livraisons protégées Ctrl-C/délai/SIGTERM, deliveredLots, noms accentués) — OTP par Sylvain, vérification au registre et tag
-    status: doing
+    status: done
     estimate: 0.1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     notes:
       - { date: 2026-10-04, text: "0.8.0 publiée par Sylvain (npm login + npm publish, 12:18:53Z, latest) ; tag v0.8.0 poussé ; run CI publish.yml 37201737911 : 273 tests verts, puis refus « cannot publish over 0.8.0 » (déjà publiée) — la publication de confiance sera prouvée pour de bon à la 0.8.1/0.9.0" }
+    review: { date: 2026-10-04, verdict: "conforme (revue 04-10) : versions 0.8.0 cohérentes ×4, workflow conforme à la publication de confiance, contrôle tag↔version, aucun secret, README exact ; OIDC pas encore prouvé (run 37201737911 refusé car 0.8.0 déjà publiée) ; 2 mineurs (npm@latest non épinglé, tag non comparé aux fichiers du plugin) reportés en L23", commit: 1aa4236fb4f57b98b872477f076eb0267dd1e12d }
+    finished: 2026-10-04
+  - id: L23
+    title: "Suites de la revue L22 : publish.yml épingle npm@^11.5.1 ; contrôle du tag aussi contre .claude-plugin/plugin.json et marketplace.json ; à la prochaine release, prouver l'OIDC (ligne « Signed provenance statement » dans le log, provenance visible sur npmjs.com) puis proposer « disallow tokens »"
+    status: todo
+    estimate: 0.1
+    quickwin: true
+    created: 2026-10-04

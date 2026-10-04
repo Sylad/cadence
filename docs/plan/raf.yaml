@@ -24,12 +24,13 @@ lots:
     finished: 2026-10-02
   - id: L3
     title: "Chef d'orchestre à sessions courtes : un orchestrateur au-dessus de /lead qui lance, par projet ou par lot, une session Claude neuve en ligne de commande avec un brief court, et récupère le résultat dans le plan et les notes de reprise — l'état vit dans les fichiers, jamais dans la conversation (mesure du 02-10 : 75 % de l'usage au-delà de 150 k de contexte, agents repris jusqu'à 440 k). Inclut : budget de tokens par vague, agent neuf dès la 2e passe de corrections, passe unique relecture + UX pour les petits lots, modèle économique pour les tâches mécaniques"
-    status: todo
+    status: doing
     estimate: 3
     after: [ L2 ]
     created: 2026-10-02
     notes:
       - { date: 2026-10-04, text: "décisions de Sylvain (04-10) : 1) c'est lui qui choisit les lots de chaque vague ; 2) l'orchestrateur enregistre lui-même raf review quand la revue est conforme ; 3) budget par défaut 2 M tokens par vague (--budget). Approche validée : cadence orchestrate <projet>:<lot>…, sessions claude -p neuves par étape (impl Sonnet → revue Opus neuve → UX si visible → correction en session neuve, 2 passes max), ≤2 sessions, 1 par dépôt, état dans .cadence/runs/<vague>/<lot>.json avec tokens (--output-format json), livraisons restent au lead. Spec à écrire puis UNE validation avant code." }
+    started: 2026-10-04
   - id: L4
     title: "Nettoyage en routine de clôture : session-close liste les fichiers de travail périmés (dossier tmp partagé, captures non référencées, scripts jetables, dossiers temporaires laissés par les tests) et propose leur suppression — au lieu d'un lot à rouvrir dans chaque projet"
     status: todo
@@ -67,9 +68,10 @@ lots:
     finished: 2026-10-03
   - id: L8
     title: "cadence verify : rejouer les vérifications d'effet de cadence.yaml hors livraison (code de sortie, résumé d'une ligne) ; session start la lance et signale un effet rouge dans les faits du matin — le 03-10, ol-companion servait un effectif vide depuis 38 h (source amont en panne, /api/health vert) et personne ne l'a vu avant Sylvain"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-03
+    started: 2026-10-04
   - id: L9
     title: "Agent qa-reviewer : après la livraison d'un lot, parcourt les pages de l'app dans un vrai navigateur et signale états vides, messages d'erreur, appels d'API en échec et erreurs de console — constat mesuré, lecture seule ; à cadrer après cadence verify (ce qui se vérifie par une commande ne doit pas coûter un agent)"
     status: done

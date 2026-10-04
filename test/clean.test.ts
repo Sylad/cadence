@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, lutimesSync, mkdirSync, readdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { addDays, toDay } from '../src/dates.js';
 import { scanStale, staleFiles } from '../src/clean.js';
 import { CLEAN_TODAY, cleanAt, gitRepo, tempDir } from './helpers.js';
 
@@ -267,6 +268,22 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     touch(join(tmp, 'vieux/a'));
     touch(join(tmp, 'vieux'));
     expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'vieux')]);
+  });
+
+  // `tar xf`, `cp -a`, `rsync -a` rendent un mtime ancien à un fichier créé à l'instant ; son ctime,
+  // lui, ne se fixe pas : l'âge est le plus récent des deux.
+  it('un fichier arrivé à l’instant avec un mtime ancien (tar xf, cp -a) n’est pas proposé : l’âge tient compte du ctime', () => {
+    const tmp = tempDir();
+    const trèsVieux = new Date(Date.now() - 100 * 86_400_000);
+    touch(join(tmp, 'extrait/dossier/a.txt'), trèsVieux);
+    touch(join(tmp, 'extrait/dossier'), trèsVieux);
+    touch(join(tmp, 'extrait'), trèsVieux);
+    touch(join(tmp, 'copie.png'), trèsVieux);
+    const aujourdhui = toDay(new Date());
+    // Trois jours après leur création réelle : sous le seuil de 7 j, malgré un mtime de 100 j.
+    expect(staleFiles(tmp, [`${tmp}/*`], 7, addDays(aujourdhui, 3))).toEqual([]);
+    // Le ctime ne fait pas rajeunir indéfiniment : passé le seuil, l'âge est celui du ctime (pas 100 j).
+    expect(staleFiles(tmp, [`${tmp}/*`], 7, addDays(aujourdhui, 10)).map((s) => s.age)).toEqual([10, 10]);
   });
 
   it('ne propose rien sous un dossier .git, même atteint par un motif caché', () => {

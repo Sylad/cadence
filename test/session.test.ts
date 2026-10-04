@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { SKILLS_DIR } from '../src/skills.js';
 import { run } from '../src/cli.js';
 import { readNext, sharedStateDir, stateDir, writeLock } from '../src/state.js';
-import { commit, gitRepo, tempDir } from './helpers.js';
+import { CLEAN_TODAY, cleanAt, commit, gitRepo, tempDir } from './helpers.js';
 
 async function cad(dir: string, ...argv: string[]) {
   const out: string[] = [];
@@ -195,8 +195,21 @@ describe('faits propres au projet (L2)', () => {
 
 
 describe('nettoyage en routine de clôture (L4)', () => {
-  const OLD = new Date('2026-09-10T10:00:00');
-  const RECENT = new Date('2026-09-27T10:00:00');
+  // Le ctime d'un fichier ne se fixe pas (voir CLEAN_TODAY) : la clôture se joue ici à un « aujourd'hui » lointain.
+  const cadLate = async (dir: string, ...argv: string[]) => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await run(argv, {
+      cwd: dir,
+      env: { RAF_TODAY: CLEAN_TODAY },
+      out: (l) => out.push(l),
+      err: (l) => err.push(l),
+      now: () => new Date(`${CLEAN_TODAY}T18:30:00`),
+    });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  };
+  const OLD = cleanAt(-18);
+  const RECENT = cleanAt(-1);
   const touch = (file: string, when: Date) => {
     mkdirSync(dirname(file), { recursive: true });
     if (!existsSync(file)) writeFileSync(file, 'x');
@@ -210,24 +223,25 @@ describe('nettoyage en routine de clôture (L4)', () => {
     touch(join(shared, 'capture-du-jour.png'), RECENT);
     mkdirSync(join(shared, 'tmp-test-abc'));
     utimesSync(join(shared, 'tmp-test-abc'), OLD, OLD);
+    const sans = await cadLate(dir, 'session', 'close');
     writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean:\n    - "${shared}/*.png"\n    - "${shared}/tmp-test-*"\n`);
-    const { code, out } = await cad(dir, 'session', 'close');
+    const { code, out } = await cadLate(dir, 'session', 'close');
     expect(out).toMatch(/Nettoyage proposé \(2 élément\(s\) plus vieux de 7 j\)\n/);
     expect(out).toContain(`${join(shared, 'ancienne-capture.png')} — 18 j`);
     expect(out).toContain(`${join(shared, 'tmp-test-abc')} — 18 j`);
     expect(out).not.toContain('capture-du-jour');
     // Rien n'est supprimé : la commande propose, le skill demande l'accord.
     expect(existsSync(join(shared, 'ancienne-capture.png'))).toBe(true);
-    // Une proposition, pas une condition de fermeture.
-    expect(code).toBe(0);
+    // Une proposition, pas une condition de fermeture : même code de sortie que sans motif.
+    expect(code).toBe(sans.code);
     expect(out).not.toMatch(/✗.*Nettoyage/);
   });
 
   it('cleanDays règle le seuil ; un motif relatif part de la racine du dépôt ; ~ désigne le dossier personnel', async () => {
     const dir = await project();
-    touch(join(dir, 'tmp/vieux.log'), new Date('2026-09-26T10:00:00'));
+    touch(join(dir, 'tmp/vieux.log'), cleanAt(-2));
     writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  cleanDays: 1\n  clean: [ "tmp/*", "~/cadence-inexistant-xyz/*" ]\n');
-    const { out } = await cad(dir, 'session', 'close');
+    const { out } = await cadLate(dir, 'session', 'close');
     expect(out).toMatch(/Nettoyage proposé \(1 élément\(s\) plus vieux de 1 j\)/);
     expect(out).toContain(`${join(dir, 'tmp/vieux.log')} — 2 j`);
   });
@@ -240,7 +254,7 @@ describe('nettoyage en routine de clôture (L4)', () => {
     const avant = process.env.HOME;
     process.env.HOME = home;
     try {
-      const { out } = await cad(dir, 'session', 'close');
+      const { out } = await cadLate(dir, 'session', 'close');
       expect(out).toMatch(/Nettoyage proposé \(1 élément\(s\)/);
       expect(out).toContain(`${join(home, 'partage/tmp/ancienne.png')} — 18 j`);
     } finally {
@@ -256,7 +270,7 @@ describe('nettoyage en routine de clôture (L4)', () => {
     git(dir, 'add', 'tmp/suivi.png');
     git(dir, 'commit', '-qm', 'chore: capture suivie');
     writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  clean: [ "tmp/*" ]\n');
-    const { out } = await cad(dir, 'session', 'close');
+    const { out } = await cadLate(dir, 'session', 'close');
     expect(out).toContain('libre.png');
     expect(out).not.toContain('suivi.png');
   });
@@ -269,7 +283,7 @@ describe('nettoyage en routine de clôture (L4)', () => {
     git(autre, 'add', 'suivi.png');
     git(autre, 'commit', '-qm', 'chore: capture suivie');
     writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean: [ "${autre}/*" ]\n`);
-    const { out } = await cad(dir, 'session', 'close');
+    const { out } = await cadLate(dir, 'session', 'close');
     expect(out).toContain('libre.png');
     expect(out).not.toContain('suivi.png');
   });
@@ -281,7 +295,7 @@ describe('nettoyage en routine de clôture (L4)', () => {
     git(dir, 'add', '..weird');
     git(dir, 'commit', '-qm', 'chore: fichier suivi');
     writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  clean: [ "tmp/*", "..*" ]\n');
-    const { out } = await cad(dir, 'session', 'close');
+    const { out } = await cadLate(dir, 'session', 'close');
     expect(out).toContain('libre.png');
     expect(out).not.toContain('..weird');
   });
@@ -294,10 +308,10 @@ describe('nettoyage en routine de clôture (L4)', () => {
     touch(join(shared, 'ancienne.png'), OLD);
     utimesSync(join(shared, 'ferme'), OLD, OLD);
     writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean: [ "${shared}/*" ]\n`);
-    const sans = await cad(dir, 'session', 'close');
+    const sans = await cadLate(dir, 'session', 'close');
     chmodSync(join(shared, 'ferme'), 0o311);
     try {
-      const { code, out } = await cad(dir, 'session', 'close');
+      const { code, out } = await cadLate(dir, 'session', 'close');
       expect(out).toMatch(/Nettoyage proposé \(1 élément\(s\) plus vieux de 7 j\)\n {2}.*ancienne\.png — 18 j\n/);
       expect(out).toContain(`Nettoyage : 1 élément(s) illisible(s), jamais proposé(s)\n  ${join(shared, 'ferme')}`);
       expect(code).toBe(sans.code);
@@ -308,19 +322,19 @@ describe('nettoyage en routine de clôture (L4)', () => {
 
   it('aucune section sans motif, ni quand rien n’est périmé', async () => {
     const dir = await project();
-    expect((await cad(dir, 'session', 'close')).out).not.toContain('Nettoyage');
+    expect((await cadLate(dir, 'session', 'close')).out).not.toContain('Nettoyage');
     const shared = tempDir();
     touch(join(shared, 'frais.png'), RECENT);
     writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean: [ "${shared}/*" ]\n`);
-    expect((await cad(dir, 'session', 'close')).out).not.toContain('Nettoyage');
+    expect((await cadLate(dir, 'session', 'close')).out).not.toContain('Nettoyage');
   });
 
   it('refuse un clean ou un cleanDays mal formé', async () => {
     const dir = await project();
     writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  clean: 3\n');
-    expect((await cad(dir, 'session', 'close')).code).toBe(2);
+    expect((await cadLate(dir, 'session', 'close')).code).toBe(2);
     writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  clean: [ "tmp/*" ]\n  cleanDays: 0\n');
-    const r = await cad(dir, 'session', 'close');
+    const r = await cadLate(dir, 'session', 'close');
     expect(r.code).toBe(2);
     expect(r.err).toContain('session.cleanDays');
   });

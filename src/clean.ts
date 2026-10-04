@@ -15,7 +15,7 @@ import { diffDays, toDay, type Day } from './dates.js';
 
 export interface Stale {
   path: string;
-  /** Jours depuis la modification la plus récente de l'élément (de son contenu, pour un dossier). */
+  /** Jours depuis le dernier changement (mtime ou ctime) de l'élément (de son contenu, pour un dossier). */
   age: number;
 }
 
@@ -110,6 +110,13 @@ function insideGitDir(path: string): boolean | null {
 }
 
 /**
+ * Dernier changement d'un élément : le plus récent de son mtime et de son ctime. Le mtime se fixe
+ * (`tar xf`, `cp -a`, `rsync -a` gardent celui de la source) ; le ctime, lui, vaut toujours l'arrivée
+ * de l'élément ici.
+ */
+const lastChange = (st: { mtimeMs: number; ctimeMs: number }): number => Math.max(st.mtimeMs, st.ctimeMs);
+
+/**
  * Date de modification la plus récente (ms) d'un chemin et, pour un dossier, de tout son contenu
  * (liens non suivis). `null` quand on ne peut pas l'affirmer périmé : un dépôt git est rencontré
  * (une entrée `.git`, dossier ou fichier, ou un dossier git reconnu à son contenu), ou une lecture échoue — ce chemin est alors noté illisible.
@@ -122,7 +129,7 @@ function measure(path: string, unreadable: Set<string>): number | null {
     unreadable.add(path);
     return null;
   }
-  if (!st.isDirectory()) return st.mtimeMs;
+  if (!st.isDirectory()) return lastChange(st);
   let names: string[];
   try {
     names = readdirSync(path);
@@ -131,7 +138,7 @@ function measure(path: string, unreadable: Set<string>): number | null {
     return null;
   }
   if (names.includes('.git') || gitDirNames((n) => names.includes(n))) return null;
-  let newest = st.mtimeMs;
+  let newest = lastChange(st);
   for (const n of names) {
     const m = measure(join(path, n), unreadable);
     if (m === null) return null;

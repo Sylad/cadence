@@ -394,7 +394,9 @@ session:
 `cadence session close` then lists, under "Nettoyage proposé", the entries matching these
 patterns (`*` stands for part of a name and never crosses a `/`; `~` is the home folder, a
 relative pattern starts at the repo root) that were not modified for more than `cleanDays`
-days, oldest first — a folder's age is that of the most recent entry it contains, at any depth.
+days, oldest first — a folder's age is that of the most recent entry it contains, at any depth,
+and an entry's age runs from the later of its modification time and its status-change time (ctime):
+what `tar xf`, `cp -a` or `rsync -a` just brought in with an old modification time is not old.
 
 An entry is proposed only if it could be measured entirely. Never proposed:
 

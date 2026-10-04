@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
@@ -269,6 +269,20 @@ describe('contrôles autour des sessions', () => {
     await runLot(c);
     expect(c.lot.status).toBe('failed');
     expect(h.wave.incident).toMatch(/push détecté/);
+  });
+
+  it('une session qui supprime le hook de garde exclu de git : incident (L3/t19)', async () => {
+    const killer: Handler = (call) => {
+      rmSync(join(call.opts.cwd, '.githooks/pre-push'));
+      return claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }));
+    };
+    const hh = harness({ script: { implement: [killer] } });
+    git(hh.repo, 'config', 'core.hooksPath', '.githooks');
+    installPrePush(hh.repo, 'w1');
+    const c = hh.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(hh.wave.incident).toMatch(/hook pre-push de garde a été supprimé/);
   });
 
   it('avec le hook pre-push posé, le push de la session échoue', async () => {

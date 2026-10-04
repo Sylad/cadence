@@ -318,6 +318,13 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
     w.saveWave();
     return stop(c, 'failed', `incident : ${w.incident}`);
   }
+  if (before.guard && !after.guard) {
+    step.status = 'failed';
+    step.cause = 'le hook pre-push de garde a disparu';
+    w.incident = `le hook pre-push de garde a été supprimé pendant ${lotKey(l.project, l.lot)} (${kind})`;
+    w.saveWave();
+    return stop(c, 'failed', `incident : ${w.incident}`);
+  }
   if (!write && (before.head !== after.head || before.tracked.join() !== after.tracked.join() || before.untracked.join() !== after.untracked.join())) {
     step.status = 'failed';
     step.cause = 'le dépôt a changé pendant une revue';

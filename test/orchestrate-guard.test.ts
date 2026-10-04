@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { canInstallPrePush, installPrePush, pushed, removePrePush, snapshot } from '../src/orchestrate/guard.js';
+import { readFileSync, rmSync } from 'node:fs';
 import { readOrchestrateConfig } from '../src/config.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
@@ -107,5 +108,58 @@ describe('cadence.yaml : orchestrate', () => {
     expect(read('orchestrate:\n  parallel: 3\n')).toThrow(/orchestrate\.parallel inconnu/);
     expect(read('orchestrate:\n  timeouts: { implement: 0 }\n')).toThrow(/timeouts\.implement/);
     expect(read('orchestrate:\n  start: ""\n')).toThrow(/start/);
+  });
+});
+
+
+describe('core.hooksPath dans l\'arbre suivi (L3/t19)', () => {
+  function trackedHooksRepo() {
+    const dir = gitRepo();
+    mkdirSync(join(dir, '.githooks'));
+    writeFileSync(join(dir, '.githooks/post-commit'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    git(dir, 'add', '--', '.githooks/post-commit');
+    git(dir, 'config', 'core.hooksPath', '.githooks');
+    commit(dir, 'chore: init');
+    return dir;
+  }
+  const status = (dir: string) => execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: dir, encoding: 'utf8' });
+  const exclude = (dir: string) => (existsSync(join(dir, '.git/info/exclude')) ? readFileSync(join(dir, '.git/info/exclude'), 'utf8') : '');
+
+  it('le hook est posé dans le dossier, exclu de git pendant la vague, et l\'arbre est identique après', () => {
+    const dir = trackedHooksRepo();
+    const excludeBefore = exclude(dir);
+    expect(installPrePush(dir, 'w1')).toEqual({ ok: true });
+    expect(existsSync(join(dir, '.githooks/pre-push'))).toBe(true);
+    expect(status(dir)).toBe('');
+    expect(snapshot(dir, { remote: false }).untracked).toEqual([]);
+    removePrePush(dir, 'w1');
+    expect(existsSync(join(dir, '.githooks/pre-push'))).toBe(false);
+    expect(status(dir)).toBe('');
+    expect(exclude(dir)).toBe(excludeBefore);
+  });
+
+  it('un hook pre-push suivi du projet est toujours refusé', () => {
+    const dir = trackedHooksRepo();
+    writeFileSync(join(dir, '.githooks/pre-push'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    git(dir, 'add', '--', '.githooks/pre-push');
+    expect(canInstallPrePush(dir)).toMatch(/existe déjà/);
+    expect(installPrePush(dir, 'w1')).toMatchObject({ ok: false });
+  });
+
+  it('hooksPath hors de l\'arbre ou .git/hooks : aucune ligne d\'exclusion', () => {
+    const dir = gitRepo();
+    const before = exclude(dir);
+    installPrePush(dir, 'w1');
+    expect(exclude(dir)).toBe(before);
+    removePrePush(dir, 'w1');
+  });
+
+  it('la suppression du hook est vue par le snapshot (le statut, lui, ne la voit plus)', () => {
+    const dir = trackedHooksRepo();
+    installPrePush(dir, 'w1');
+    expect(snapshot(dir, { remote: false }).guard).toBe(true);
+    rmSync(join(dir, '.githooks/pre-push'));
+    expect(status(dir)).toBe('');
+    expect(snapshot(dir, { remote: false }).guard).toBe(false);
   });
 });

@@ -1,7 +1,8 @@
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
-import { hooksDir, headSha } from '../git.js';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative } from 'node:path';
+import { gitCommonDir, gitRoot, hooksDir, headSha } from '../git.js';
 
 const MARK = '# cadence orchestrate — hook pre-push temporaire (retiré à la fin de la vague)';
 
@@ -21,6 +22,42 @@ exit 0
 const hookPath = (repo: string) => join(hooksDir(repo), 'pre-push');
 
 /**
+ * Ligne d'exclusion du hook quand `core.hooksPath` pointe dans l'arbre suivi (maritime-atlas : `.githooks`) :
+ * sans elle le hook temporaire serait un fichier non suivi du dépôt. null quand le hook est hors de l'arbre
+ * (`.git/hooks`, dossier extérieur) : rien à exclure.
+ */
+function excludeLine(repo: string): string | null {
+  const root = gitRoot(repo);
+  if (!root) return null;
+  const rel = relative(root, hookPath(repo));
+  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null;
+  const dotGit = relative(root, gitCommonDir(repo));
+  if (rel === dotGit || rel.startsWith(`${dotGit}/`)) return null;
+  return `/${rel.split('\\').join('/')}`;
+}
+
+const excludeFile = (repo: string) => join(gitCommonDir(repo), 'info', 'exclude');
+
+function addExclude(repo: string): void {
+  const line = excludeLine(repo);
+  if (!line) return;
+  const file = excludeFile(repo);
+  mkdirSync(join(gitCommonDir(repo), 'info'), { recursive: true });
+  const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  if (text.split('\n').includes(line)) return;
+  appendFileSync(file, `${text === '' || text.endsWith('\n') ? '' : '\n'}${line}\n`);
+}
+
+function removeExclude(repo: string): void {
+  const line = excludeLine(repo);
+  const file = excludeFile(repo);
+  if (!line || !existsSync(file)) return;
+  const lines = readFileSync(file, 'utf8').split('\n');
+  if (!lines.includes(line)) return;
+  writeFileSync(file, lines.filter((l) => l !== line).join('\n'));
+}
+
+/**
  * Pose le hook pre-push temporaire. Refus (raison) quand un autre hook pre-push existe : le remplacer
  * modifierait un fichier suivi (husky) ou sauterait une règle du projet. Un hook laissé par une vague
  * interrompue (même marque) est simplement remplacé.
@@ -30,6 +67,8 @@ export function installPrePush(repo: string, wave = '?'): { ok: true } | { ok: f
   if (existsSync(file) && !readFileSync(file, 'utf8').includes(MARK)) {
     return { ok: false, reason: `un hook pre-push existe déjà (${file}) : l'orchestrateur ne le remplace pas` };
   }
+  mkdirSync(dirname(file), { recursive: true });
+  addExclude(repo);
   writeFileSync(file, hook(wave));
   chmodSync(file, 0o755);
   return { ok: true };
@@ -43,6 +82,7 @@ export function removePrePush(repo: string, wave?: string): void {
   if (!text.includes(MARK)) return;
   if (wave !== undefined && !text.split('\n').includes(waveLine(wave))) return;
   rmSync(file, { force: true });
+  removeExclude(repo);
 }
 
 /** Pourrait-on poser le hook ? (préconditions, sans écrire) */
@@ -60,6 +100,12 @@ function out(repo: string, args: string[], timeout = 20_000): string | null {
   }
 }
 
+/** Le hook temporaire (reconnu à sa marque) est-il en place ? */
+export function guardPresent(repo: string): boolean {
+  const file = hookPath(repo);
+  return existsSync(file) && readFileSync(file, 'utf8').includes(MARK);
+}
+
 /** Ce qui change quand une session pousse : la référence amont locale et les têtes du dépôt distant. */
 export interface Snapshot {
   head: string | null;
@@ -68,6 +114,8 @@ export interface Snapshot {
   untracked: string[];
   upstream: string | null;
   remote: string | null;
+  /** Le hook pre-push de la vague est en place (un hook exclu de git n'apparaît plus dans le statut). */
+  guard: boolean;
 }
 
 export function snapshot(repo: string, opts: { remote?: boolean } = {}): Snapshot {
@@ -78,6 +126,7 @@ export function snapshot(repo: string, opts: { remote?: boolean } = {}): Snapsho
     tracked: lines.filter((l) => !l.startsWith('??') && keep(l)),
     untracked: lines.filter((l) => l.startsWith('??') && keep(l)).map((l) => l.slice(3)),
     upstream: out(repo, ['rev-parse', '-q', '--verify', '@{u}']),
+    guard: guardPresent(repo),
     remote: opts.remote === false ? null : out(repo, ['ls-remote', '--heads']),
   };
 }

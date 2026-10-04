@@ -572,3 +572,9 @@ lots:
       - { id: t5, title: "MAJEUR : findStaleRoots n'accepte qu'un dossier appartenant à l'uid courant (lstat.uid === process.getuid(), sauf win32), en plus du préfixe et du pid mort ; test", status: todo }
       - { id: t6, title: "fichier pid : y noter aussi le nom de la machine ; ne supprimer une racine périmée que si elle vient de cette machine ; test", status: todo }
       - { id: t7, title: "orchestrate-command.test.ts:220 lit le brief avec \\S+ (casse un TMPDIR avec espace) : ligne entière ; nettoyage des briefs en try/finally (orchestrate-command:113, :223, orchestrate-e2e:172) ; vérifier la suite avec un TMPDIR contenant un espace", status: todo }
+  - id: L46
+    title: "⚡ test/deliver.test.ts : les scripts shell des tests SIGINT/SIGHUP (l.653, l.754) mettent ${logs} hors guillemets — 3 échecs avec un TMPDIR contenant un espace ; guillemets corrects, suite verte avec un TMPDIR à espace (mesure 04-10, revue L45)"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

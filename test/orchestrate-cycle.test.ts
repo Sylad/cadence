@@ -918,6 +918,32 @@ describe('correction ordinaire interrompue puis reprise (L40)', () => {
     expect(h.plan().lot('L1').review?.commit).toBe(git(h.repo, 'log', '--format=%H', '--grep=fix(L1)', '-1'));
   });
 
+  it('tests rouges juste après l\'implémentation (aucune revue encore) : le commit de la correction coupée est relu', async () => {
+    const commitThenQuota: Handler = (call) => {
+      commitFile(call.opts.cwd, 'b.txt', 'fix(L1): bug nommé');
+      return quotaOut();
+    };
+    const nothingLeft: Handler = () => claudeOut(workReport({ choix: ['rien à corriger de plus'] }));
+    const h = harness({ script: { implement: [impl()], fix: [commitThenQuota, nothingLeft], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'test -f b.txt' });
+    await runLot(c);
+    expect(c.lot.status).toBe('suspended');
+    h.wave.quota = { hit: false };
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'fix', 'review']);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('deux passes sans coupure : la seconde sans commit est rendue au lead, pas prise pour une reprise', async () => {
+    const nothing: Handler = () => claudeOut(workReport());
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt'), nothing], 'review-small': [ok] } });
+    const c = h.lot('L1', {}, { test: 'test -f c.txt' });
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toBe('fix sans commit');
+    expect(c.lot.warnings.join('\n')).not.toContain('reprise sans nouveau commit');
+  });
+
   it('correction sans commit et HEAD inchangé depuis la revue : toujours rendue au lead', async () => {
     const nothing: Handler = () => claudeOut(workReport());
     const h = harness({ script: { implement: [impl()], review: [major], fix: [nothing] } });

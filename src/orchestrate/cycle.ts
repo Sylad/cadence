@@ -461,7 +461,13 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     return;
   }
   // Reprise : une session précédente de l'étape (correction ordinaire ou passe des mineurs) a pu commiter avant d'être coupée ; la revue d'origine ne vaut alors plus.
-  const headMoved = kind === 'fix' && commits.length === 0 && !!l.code?.head && git(l.repo, 'rev-parse', 'HEAD') !== l.code.head;
+  // Référence : le HEAD de départ de la première session coupée de la série qui précède celle-ci (pas la revue, qui peut ne pas exister encore).
+  let resumedFrom: string | undefined;
+  for (const s of l.steps.slice(0, -1).reverse()) {
+    if (s.kind !== 'fix' || s.status !== 'interrupted') break;
+    resumedFrom = s.headBefore;
+  }
+  const headMoved = kind === 'fix' && commits.length === 0 && !!resumedFrom && git(l.repo, 'rev-parse', 'HEAD') !== resumedFrom;
   if (minorsPass && commits.length === 0 && !headMoved) {
     // Rien à corriger (mineurs jugés faux, listés en « choix ») : la revue conforme d'origine vaut, HEAD n'a pas bougé.
     for (const k of l.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine('code', k));

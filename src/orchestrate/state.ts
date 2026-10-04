@@ -84,6 +84,8 @@ export interface LotState {
   code?: ReviewSummary;
   ux?: ReviewSummary;
   uxNote?: string;
+  /** Réponse de l'humain à une question, jointe au brief de la prochaine session puis effacée. */
+  pendingAnswer?: string | null;
   verdict: string | null;
   uxVerdict: string | null;
   questions: string[];

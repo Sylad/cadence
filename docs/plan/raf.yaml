@@ -237,24 +237,37 @@ lots:
     created: 2026-10-04
   - id: L24
     title: "⚡ Les tests de cadence passent aussi depuis une session de vague : CADENCE_ORCHESTRATED hérité retiré de leur environnement (17 échecs relevés par la vague 2026-10-04-1534 sur L21)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: conforme, commit: 3d03a552272dd1b91d87475a0360e2f51dec69b8 }
+    finished: 2026-10-04
   - id: L25
     title: "⚡ orchestrate : « commit annoncé absent de git » faux positif à la reprise — un commit d'une session précédente du même lot (ancêtre de HEAD) est cité par le rapport ; vérifier contre les commits du lot, pas la seule plage de la session (cycle.ts:398-404, vague 2026-10-04-1534)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme, 1 mineur (contrôle par ancêtre de HEAD plutôt que par commits du lot) — reporté en L27", commit: bb4b7c5ac5d0d16c24b4ef92cd32359e8a69a80a }
+    finished: 2026-10-04
   - id: L26
     title: "⚡ orchestrate : une revue qui finit en texte sans structured_output (end_turn, 7 tours, verdict présent dans le texte) fait échouer le lot — relance de mise en forme, ou schéma prioritaire sur la consigne « ligne de verdict » de l'agent (vague 2026-10-04-1534, L21)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     notes:
       - { date: 2026-10-04, text: "décision de Sylvain (04-10) : option A — si structured_output manque, UNE relance de mise en forme de la même session (claude -p --resume <id> --json-schema, consigne : rendre le rapport au format demandé, rien d'autre) ; seule entorse admise à « jamais de session reprise », comptée au budget ; échec si toujours absent" }
+      - { date: 2026-10-04, text: "mesure réelle du lead (04-10, Haiku) : usage d'une relance --resume = l'appel seul, PAS cumulé (sortie 189 vs 468) → la somme est juste ; même session_id ; mais la relance réécrit tout le contexte en cache (38 k écriture, 0 lecture) : son coût ≈ le contexte entier" }
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme, 2 mineurs (relance sans --agent, sortie de la première session non conservée) — reportés en L27", commit: cc25920e6fe87aa0fbaaa87a4e73a0a27f8f228b }
+    finished: 2026-10-04
+  - id: L27
+    title: "⚡ Suites de la revue L25/L26 : relance de mise en forme avec --agents/--agent de la revue (outils restreints) + test ; conserver la sortie de la première session (<n>-<kind>.first.json) ; commit annoncé hors plage vérifié contre les commits du lot (lotWork) plutôt que tout ancêtre de HEAD"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

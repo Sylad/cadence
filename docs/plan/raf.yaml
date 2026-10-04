@@ -31,6 +31,7 @@ lots:
     notes:
       - { date: 2026-10-04, text: "décisions de Sylvain (04-10) : 1) c'est lui qui choisit les lots de chaque vague ; 2) l'orchestrateur enregistre lui-même raf review quand la revue est conforme ; 3) budget par défaut 2 M tokens par vague (--budget). Approche validée : cadence orchestrate <projet>:<lot>…, sessions claude -p neuves par étape (impl Sonnet → revue Opus neuve → UX si visible → correction en session neuve, 2 passes max), ≤2 sessions, 1 par dépôt, état dans .cadence/runs/<vague>/<lot>.json avec tokens (--output-format json), livraisons restent au lead. Spec à écrire puis UNE validation avant code." }
       - { date: 2026-10-04, text: "validation de Sylvain (04-10, « ok l3ok ») de la spec 1ca5bc8 avec : budget = entrée + écriture de cache + sortie (lecture de cache affichée à part) ; pas de raf ux automatique (le lead l'enregistre) ; plans en lecture seule : outil du projet via orchestrate.start / orchestrate.verdict déclarés dans cadence.yaml ; push bloqué par un hook pre-push temporaire posé pendant la vague (PAS de pushurl modifié) ; ordre UX puis revue de code (toujours en dernier) retenu." }
+      - { date: 2026-10-04, text: "décision de Sylvain (04-10) : un dépôt qui a déjà son propre hook pre-push (husky…) → orchestrate refuse le lot (code 2) plutôt que de le remplacer" }
     started: 2026-10-04
     tasks:
       - { id: t1, title: "lanceur de session claude -p : arguments, garde, délai, parseur épinglé sur un échantillon réel, compteurs", status: done }

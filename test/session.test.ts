@@ -232,6 +232,23 @@ describe('nettoyage en routine de clôture (L4)', () => {
     expect(out).toContain(`${join(dir, 'tmp/vieux.log')} — 2 j`);
   });
 
+  it('~ désigne le dossier personnel : un fichier périmé qui s’y trouve est listé', async () => {
+    const dir = await project();
+    const home = tempDir();
+    touch(join(home, 'partage/tmp/ancienne.png'), OLD);
+    writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  clean: [ "~/partage/tmp/*" ]\n');
+    const avant = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const { out } = await cad(dir, 'session', 'close');
+      expect(out).toMatch(/Nettoyage proposé \(1 élément\(s\)/);
+      expect(out).toContain(`${join(home, 'partage/tmp/ancienne.png')} — 18 j`);
+    } finally {
+      if (avant === undefined) delete process.env.HOME;
+      else process.env.HOME = avant;
+    }
+  });
+
   it('ne propose jamais un fichier suivi par git', async () => {
     const dir = await project();
     touch(join(dir, 'tmp/suivi.png'), OLD);

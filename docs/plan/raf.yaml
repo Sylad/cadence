@@ -419,7 +419,7 @@ lots:
       - { id: t5, title: "README (cycle d'un lot), spec (schéma choix[], état, format du verdict) et dry-run : décrire la passe des mineurs et choix", status: done }
       - { id: t6, title: "passe des mineurs sans commit après reprise : conclure seulement si HEAD = l.code.head, sinon revue courte (cycle.ts:461) ; test quota pendant la passe des mineurs puis reprise", status: done }
       - { id: t7, title: "mineur rendu en proposition par une revue non conforme puis traité par la passe des mineurs : le retirer de proposals (cycle.ts:563) ; test", status: done }
-      - { id: t8, title: "propositions : retirer le mineur confié à la passe même si sa ligne a changé ou s'il est reformulé (comparer sans le numéro de ligne, ou ranger dans minorLines les [mineur code] déjà proposés que la revue conforme signale de nouveau) ; test avec ligne décalée (cycle.ts:568)", status: todo }
+      - { id: t8, title: "propositions : retirer le mineur confié à la passe même si sa ligne a changé (comparer sans le numéro de ligne) ; test avec ligne décalée (cycle.ts:568) — un texte reformulé n'est PAS reconnu (comparaison approximative écartée) : il reste en propositions", status: todo }
       - { id: t9, title: "README (599-601) et spec (107-109) : une passe sans commit conclut sur la revue d'origine seulement si HEAD n'a pas bougé depuis ; sinon (reprise après coupure) revue courte du commit de la session coupée", status: todo }
   - id: L39
     title: "⚡ orchestrate : gabarits de briefs lus une fois au début de la vague (instantané), pas à chaque étape — un lot qui modifie templates/orchestrate pendant la vague cassait les revues suivantes (« valeur manquante pour {{choix}} », vague 2026-10-04-1729, L33/L38) ; test"

@@ -569,6 +569,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   // conforme, ils sont traités et ne restent pas en propositions (ceux que cette revue signale encore sont ajoutés juste après).
   if (l.minorPass && !minorPass && summary.conforme && uxOk && l.minorLines?.length) {
     // Comparés sans le numéro de ligne : le correctif a pu décaler la ligne que la revue conforme signale.
+    // Limite connue : un autre mineur de même fichier et de même texte, à une autre ligne, est confondu avec celui confié (indiscernable d'un décalage) ; un texte reformulé n'est pas reconnu et reste proposé.
     const treated = new Set(l.minorLines.map(withoutLine));
     l.proposals = l.proposals.filter((p) => !treated.has(withoutLine(p)));
     l.minorLines = [];

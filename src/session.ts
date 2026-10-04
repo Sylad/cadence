@@ -18,6 +18,8 @@ export interface SessionCtx {
   out: (line: string) => void;
   /** Commande du projet (cadence.yaml : session.start / session.close) dont la sortie complète le rapport. */
   facts?: string;
+  /** Lignes de `cadence verify` rejouée à la reprise (déjà calculées : la reprise reste synchrone). */
+  effects?: string[];
 }
 
 const FACTS_TIMEOUT = 120_000;
@@ -121,6 +123,7 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
 
   section(out, 'Écarts (raf check)', audit(plan, ctx.root, ctx.newsDir, today).map((i) => `✗ ${i.message}`));
   section(out, 'Dépôt', [repoLine(ctx.root).line]);
+  section(out, 'Effets en production (cadence verify)', ctx.effects ?? []);
   section(out, 'Faits propres au projet', projectFacts(ctx, opts.since));
 
   const proposals = [

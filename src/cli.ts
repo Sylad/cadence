@@ -6,7 +6,7 @@ import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits, unrevi
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
-import { verifyCommand } from './verify.js';
+import { effectLines, verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, headSha, readCommits, resolveCommit } from './git.js';
 import { installHook } from './hook.js';
@@ -237,7 +237,12 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (!gitRoot(io.cwd)) throw new RafError('session : à lancer dans un dépôt git');
       // « next » n'écrit que les notes : la commande du projet ne se joue qu'à la reprise et à la clôture.
       const facts = rest[0] === 'start' || rest[0] === 'close' ? readSessionConfig(configPath)[rest[0]] : undefined;
-      return session(rest, { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out, facts }, values);
+      const sctx: SessionCtx = { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out, facts };
+      if (rest[0] !== 'start') return session(rest, sctx, values);
+      // La reprise rejoue les vérifications d'effet (un essai, borné) : un effet rouge d'hier se lit avec les faits du matin.
+      const effects = morningEffects(configPath, root);
+      if (effects === null) return session(rest, sctx, values);
+      return Promise.resolve(effects).then((lines) => session(rest, { ...sctx, effects: lines }, values));
     }
     case 'deliver': {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
@@ -418,6 +423,24 @@ function news(
     }
     default:
       throw new RafError('usage : cadence news new|list|check|stamp|build');
+  }
+}
+
+/**
+ * Reprise : lignes d'effets à rejouer, ou null quand il n'y a rien à vérifier (sans cadence.yaml, sans deliver,
+ * script sans verify) — la reprise reste alors synchrone. Ne lève jamais.
+ */
+function morningEffects(configPath: string, root: string): Promise<string[]> | string[] | null {
+  if (!existsSync(configPath)) return null;
+  const text = readFileSync(configPath, 'utf8');
+  if (!/^deliver\s*:/m.test(text)) return null;
+  try {
+    const config = parseDeliverConfig(text, configPath);
+    if (config.verify.length === 0) return null;
+    const sha = lastDelivery(sharedStateDir(root)) ?? headSha(root) ?? '';
+    return effectLines(config, sha, realDeps(root, { quiet: true }));
+  } catch (e) {
+    return [`✗ ${(e as Error).message}`];
   }
 }
 

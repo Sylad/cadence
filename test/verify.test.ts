@@ -210,3 +210,76 @@ describe('cadence verify (CLI)', () => {
     expect(r.err).toBe('');
   });
 });
+
+describe('effets du matin (session start)', () => {
+  it('vert : une ligne ; rouge : les effets rouges puis le résumé ; borné à 10 s', async () => {
+    const { effectLines } = await import('../src/verify.js');
+    const ok = fakeDeps();
+    expect(await effectLines(TWO, 'abcdef1234', ok.deps)).toEqual(['✓ verify : 2/2 vérifications vertes']);
+    const red = fakeDeps({ fetch: async (u) => ({ status: u.endsWith('lineup') ? 200 : 500, text: '' }) });
+    const lines = await effectLines(TWO, 'abcdef1234', red.deps);
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toMatch(/^✗ GET .*health.*statut 500/);
+    expect(lines[1]).toMatch(/^✗ GET .*lineup.*absent|^✗ GET .*lineup/);
+    expect(lines[2]).toContain('2 effets rouges sur 2');
+    const slow = fakeDeps();
+    await effectLines(config('    - command: sleep 60\n'), 'abc', slow.deps);
+    expect(slow.execs[0]!.timeoutMs).toBeLessThanOrEqual(10_000);
+  });
+
+  it('rien à dire sans verify (projet à script) ; ne lève jamais', async () => {
+    const { effectLines } = await import('../src/verify.js');
+    const cfg = parseDeliverConfig('deliver:\n  script: ./livrer.sh\n', 'cadence.yaml');
+    expect(await effectLines(cfg, 'abc', fakeDeps().deps)).toEqual([]);
+    const boom = fakeDeps({ fetch: async () => { throw new Error('ENETUNREACH'); } });
+    const lines = await effectLines(TWO, 'abc', boom.deps);
+    expect(lines.some((l) => l.includes('ENETUNREACH'))).toBe(true);
+  });
+});
+
+describe('cadence session start : effets', () => {
+  async function cad(dir: string, ...argv: string[]) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-10-04' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T08:00:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  }
+  async function project(yaml: string | null) {
+    const dir = gitRepo();
+    await cad(dir, 'init', '--project', 'demo', '--no-hook');
+    if (yaml !== null) writeFileSync(join(dir, 'cadence.yaml'), yaml);
+    git(dir, 'add', '.');
+    commit(dir, 'chore: plan');
+    return dir;
+  }
+
+  it('signale un effet rouge dans le rapport sans changer le code de sortie', async () => {
+    const dir = await project('deliver:\n  verify:\n    - command: "true"\n    - command: "exit 3"\n');
+    const r = await cad(dir, 'session', 'start');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('Effets en production');
+    expect(r.out).toContain('✗ exit 3 — code 3');
+    expect(r.out).toContain('verify : 1 effet rouge sur 2 vérifications');
+  });
+
+  it('tout vert : une ligne ; réseau absent : un constat, la session continue', async () => {
+    const green = await cad(await project('deliver:\n  verify:\n    - command: "true"\n'), 'session', 'start');
+    expect(green.out).toContain('✓ verify : 1/1 vérifications vertes');
+    const down = await cad(await project('deliver:\n  verify:\n    - url: http://127.0.0.1:1/api/health\n'), 'session', 'start');
+    expect(down.code).toBe(0);
+    expect(down.out).toContain('erreur réseau');
+    expect(down.out).toContain('En cours');
+  });
+
+  it('pas de section sans cadence.yaml, sans deliver, ou avec un script sans verify ; config invalide : une ligne', async () => {
+    for (const y of [null, 'session:\n  start: echo x\n', 'deliver:\n  script: ./livrer.sh\n']) {
+      const r = await cad(await project(y), 'session', 'start');
+      expect(r.code).toBe(0);
+      expect(r.out).not.toContain('Effets en production');
+    }
+    const bad = await cad(await project('deliver:\n  verify:\n    - { url: x, command: y }\n'), 'session', 'start');
+    expect(bad.code).toBe(0);
+    expect(bad.out).toContain('Effets en production');
+    expect(bad.out).toContain('verify[1]');
+  });
+});

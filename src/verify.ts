@@ -78,3 +78,21 @@ export async function verifyCommand(ctx: VerifyCtx, deps: DeliverDeps): Promise<
   out(summaryLine(results));
   return results.some((r) => r.reason !== null) ? 1 : 0;
 }
+
+/** Délai total des vérifications de « session start » : la reprise ne doit pas attendre un réseau absent. */
+export const MORNING_BUDGET_MS = 10_000;
+
+/**
+ * Lignes « Effets en production » du rapport de reprise : un seul essai par vérification, borné. Rien à dire
+ * (liste vide) pour un projet sans verify ; ne lève jamais — c'est un fait de plus, pas une condition.
+ */
+export async function effectLines(config: DeliverConfig, sha: string, deps: DeliverDeps): Promise<string[]> {
+  if (config.verify.length === 0) return [];
+  try {
+    const results = await replayChecks(config.verify, deps, sha, verifyEnv(sha), { retryMs: 0, budgetMs: MORNING_BUDGET_MS });
+    const red = results.filter((r) => r.reason !== null);
+    return red.length === 0 ? [`✓ ${summaryLine(results)}`] : [...red.map(resultLine), summaryLine(results)];
+  } catch (e) {
+    return [`✗ verify : ${(e as Error).message}`];
+  }
+}

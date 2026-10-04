@@ -580,3 +580,4 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "compliant — orchestré (vague 2026-10-04-2132, 0 passe(s) de correction)", commit: 6fd9b24daad96db08c54478457fb2baa03a29881 }

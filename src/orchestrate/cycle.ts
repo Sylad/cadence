@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { lotWork } from '../audit.js';
@@ -9,7 +9,7 @@ import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { objective, renderBrief, type BriefVars } from './briefs.js';
-import { journalTokens, peakContext, runSession, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
+import { journalTokens, peakContext, runSession, trackGroup, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { checkShape, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type ReviewReport, type WorkReport } from './schemas.js';
@@ -102,20 +102,53 @@ function commitPlan(c: LotCtx, message: string): string | null {
 
 const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g, '\\$&');
 
-function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000): { code: number; output: string } {
-  const r = spawnSync('sh', ['-c', command], { cwd: c.lot.repo, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
-  return { code: r.status ?? 1, output: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+/** Commande du projet, asynchrone : la boucle d'événements reste libre (délai de l'autre créneau, signaux). Son groupe est tué au délai et au signal. */
+function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000): Promise<{ code: number; output: string }> {
+  return new Promise((resolve) => {
+    const child = spawn('sh', ['-c', command], { cwd: c.lot.repo, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const pid = child.pid;
+    if (pid === undefined) {
+      child.once('error', (e) => resolve({ code: 127, output: String(e.message) }));
+      return;
+    }
+    const untrack = trackGroup(pid);
+    const chunks: Buffer[] = [];
+    let size = 0;
+    const keep = (d: Buffer) => {
+      if (size < 64 * 1024 * 1024) chunks.push(d);
+      size += d.length;
+    };
+    child.stdout!.on('data', keep);
+    child.stderr!.on('data', keep);
+    const timer = setTimeout(() => {
+      try {
+        process.kill(-pid, 'SIGKILL');
+      } catch {
+        // déjà mort
+      }
+    }, timeoutMs);
+    child.once('close', (code, signal) => {
+      clearTimeout(timer);
+      untrack();
+      try {
+        process.kill(-pid, 'SIGKILL');
+      } catch {
+        // groupe vide
+      }
+      resolve({ code: code ?? (signal ? 137 : 1), output: Buffer.concat(chunks).toString('utf8') });
+    });
+  });
 }
 
 /** Démarre le lot : raf start (plan écrit par raf) ou la commande du projet (plan en lecture seule), puis commit du plan. */
-function startLot(c: LotCtx): string | null {
+async function startLot(c: LotCtx): Promise<string | null> {
   const plan = c.loadPlan();
   const lot = plan.lot(c.lot.lot);
   if (!isOpen(lot.status)) return `le lot est ${lot.status}`;
   if (lot.status === 'todo') {
     if (plan.readonly) {
       if (!c.config.start) return 'plan en lecture seule : démarrer le lot avec l\'outil du projet';
-      const r = sh(c, c.config.start.replaceAll('{lot}', c.lot.lot));
+      const r = await sh(c, c.config.start.replaceAll('{lot}', c.lot.lot));
       if (r.code !== 0) return `orchestrate.start en échec (code ${r.code}) : ${r.output.trim().split('\n').slice(-3).join(' ')}`;
     } else {
       plan.setStatus(c.lot.lot, 'doing', c.wave.today);
@@ -372,7 +405,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   if (!rep.tests.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` });
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
   if (red.length === 0 && c.config.test) {
-    const r = sh(c, c.config.test);
+    const r = await sh(c, c.config.test);
     if (r.code !== 0) red.push({ source: 'tests', gravite: 'bloquant', texte: `${c.config.test} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
   }
   if (red.length) {
@@ -473,7 +506,7 @@ async function conclude(c: LotCtx, code: ReviewSummary): Promise<void> {
       return;
     }
   } else if (c.config.verdict) {
-    const r = sh(c, c.config.verdict.replaceAll('{lot}', l.lot).replaceAll('{verdict}', shEscape(verdict)));
+    const r = await sh(c, c.config.verdict.replaceAll('{lot}', l.lot).replaceAll('{verdict}', shEscape(verdict)));
     if (r.code !== 0) l.warnings.push(`orchestrate.verdict en échec (code ${r.code}) : le lead reporte le verdict`);
     else {
       const dirty = commitPlan(c, `plan: ${l.lot} revue de code notée (orchestrate ${c.wave.id})`);
@@ -505,7 +538,7 @@ export async function runLot(c: LotCtx): Promise<void> {
         stop(c, 'handed-back', `dépôt sale avant le lot : ${trackedPaths(before).join(', ')}`);
         return;
       }
-      const why = startLot(c);
+      const why = await startLot(c);
       if (why) {
         stop(c, 'handed-back', why);
         return;

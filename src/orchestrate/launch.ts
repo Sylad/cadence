@@ -122,6 +122,12 @@ export async function runSession(
 
 const live = new Set<number>();
 
+/** Suit un groupe de processus lancé par l'orchestrateur (commande du projet) : tué avec les sessions au signal. */
+export function trackGroup(pid: number): () => void {
+  live.add(pid);
+  return () => live.delete(pid);
+}
+
 /** Tue les groupes de processus des sessions en cours (Ctrl-C, SIGTERM de l'orchestrateur). */
 export function killSessions(): void {
   for (const pid of live) {

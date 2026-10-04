@@ -466,3 +466,16 @@ describe('lot non démarré quand la vague est arrêtée (L3/t14)', () => {
     });
   }
 });
+
+describe('commande orchestrate.test asynchrone (L3/t16)', () => {
+  it('la boucle d\'événements reste libre pendant la commande de tests', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'sleep 1' });
+    let ticks = 0;
+    const timer = setInterval(() => ticks++, 50);
+    await runLot(c);
+    clearInterval(timer);
+    expect(c.lot.status).toBe('ready');
+    expect(ticks).toBeGreaterThanOrEqual(10); // spawnSync bloquait : un seul tour, après la commande
+  });
+});

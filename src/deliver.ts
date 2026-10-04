@@ -1,5 +1,7 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { constants } from 'node:os';
 import { parse } from 'yaml';
+import { killTree, onTermination } from './proc.js';
 import type { Day } from './dates.js';
 import { isPlanOnly } from './audit.js';
 import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
@@ -45,9 +47,9 @@ export interface GhRun {
 export interface DeliverDeps {
   /**
    * Commande sh à la racine du dépôt, variables ajoutées à l'environnement ; renvoie le code de sortie,
-   * TIMED_OUT si elle a dépassé `timeoutMs` (elle est alors tuée).
+   * TIMED_OUT si elle a dépassé `timeoutMs` (elle est alors tuée, avec tous ses descendants).
    */
-  exec: (cmd: string, env: Record<string, string>, timeoutMs: number) => number;
+  exec: (cmd: string, env: Record<string, string>, timeoutMs: number) => number | Promise<number>;
   /** Runs de la CI pour ce sha ; lève une erreur au message utile (stderr de gh). */
   gh: (sha: string) => GhRun[];
   /** Précondition de `ci: github` : message d'erreur si gh est absent ou non authentifié, null sinon. */
@@ -60,12 +62,10 @@ export interface DeliverDeps {
 }
 
 /**
- * Ce dont une vérification a besoin. `exec` peut être asynchrone : celui de `cadence verify` et de
- * « session start » l'est (groupe détaché, vérifications en parallèle) ; celui de deliver est synchrone.
+ * Ce dont une vérification a besoin. Celui de `cadence verify` et de « session start » lance ses commandes
+ * en groupe détaché, en parallèle ; celui de deliver, au premier plan, l'une après l'autre.
  */
-export type CheckDeps = Pick<DeliverDeps, 'fetch' | 'sleep' | 'now'> & {
-  exec: (cmd: string, env: Record<string, string>, timeoutMs: number) => number | Promise<number>;
-};
+export type CheckDeps = Pick<DeliverDeps, 'exec' | 'fetch' | 'sleep' | 'now'>;
 
 export interface DeliverCtx {
   root: string;
@@ -176,20 +176,35 @@ export function realDeps(root: string): DeliverDeps {
     }
   };
   return {
-    exec: (cmd, env, timeoutMs) => {
-      const r = spawnSync('sh', ['-c', cmd], {
-        cwd: root,
-        env: { ...process.env, ...env },
-        stdio: ['ignore', 'inherit', 'inherit'],
-        timeout: Math.max(1_000, timeoutMs),
-        killSignal: 'SIGKILL',
-        // PAS de groupe détaché : la commande reste dans le groupe de premier plan et la session de cadence.
-        // Ctrl-C et le raccrochage l'atteignent avec cadence (sinon un script orphelin livre encore pendant
-        // qu'une seconde livraison prend le verrou du mort), et /dev/tty reste là pour ssh, sudo, pinentry.
-      });
-      if ((r.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT' || r.signal) return TIMED_OUT;
-      return r.status ?? 1;
-    },
+    exec: (cmd, env, timeoutMs) =>
+      new Promise((resolve) => {
+        const child = spawn('sh', ['-c', cmd], {
+          cwd: root,
+          env: { ...process.env, ...env },
+          stdio: ['ignore', 'inherit', 'inherit'],
+          // PAS de groupe détaché : la commande reste dans le groupe de premier plan et la session de cadence.
+          // Ctrl-C et le raccrochage l'atteignent avec cadence, et /dev/tty reste là pour ssh, sudo, pinentry.
+        });
+        const pid = child.pid;
+        if (pid === undefined) {
+          child.once('error', () => resolve(127));
+          return;
+        }
+        // Au délai, ou si cadence est tué (Ctrl-C, SIGTERM, raccrochage) : TOUT l'arbre de la commande meurt
+        // avant que cadence ne rende la main ou ne meure — sh fait un fork par commande, et un descendant
+        // survivant livrerait encore pendant qu'une seconde livraison prend le verrou libéré ou périmé.
+        const forget = onTermination(() => killTree(pid));
+        let timedOut = false;
+        const timer = setTimeout(() => {
+          timedOut = true;
+          killTree(pid);
+        }, Math.max(1_000, timeoutMs));
+        child.once('exit', (code, signal) => {
+          clearTimeout(timer);
+          forget();
+          resolve(timedOut ? TIMED_OUT : signal ? 128 + (constants.signals[signal] ?? 0) : (code ?? 1));
+        });
+      }),
     gh: (sha) => JSON.parse(gh(['run', 'list', '--commit', sha, '--json', 'name,status,conclusion'])),
     ghReady: () => {
       try {
@@ -289,7 +304,7 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
 
     if (script !== null) {
       out(`→ script du projet : ${script}`);
-      const code = deps.exec(script, env, config.deployTimeout * 1000);
+      const code = await deps.exec(script, env, config.deployTimeout * 1000);
       if (code !== 0) return fail(`script de livraison en échec (${codeText(code)}) : ${script}`);
     } else {
       const ci = await waitCi(ctx, deps, sha, env);
@@ -297,7 +312,7 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
 
       for (const [i, cmd] of config.deploy.entries()) {
         out(`→ déploiement ${i + 1}/${config.deploy.length} : ${cmd}`);
-        const code = deps.exec(cmd, env, config.deployTimeout * 1000);
+        const code = await deps.exec(cmd, env, config.deployTimeout * 1000);
         if (code !== 0) return fail(`déploiement en échec (${codeText(code)}) : ${cmd}`);
       }
     }
@@ -327,7 +342,7 @@ async function waitCi(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Reco
   if (ci === 'none') return null;
   if (typeof ci === 'object') {
     ctx.out(`→ CI : ${ci.command}`);
-    const code = deps.exec(ci.command, env, ciTimeout * 1000);
+    const code = await deps.exec(ci.command, env, ciTimeout * 1000);
     return code === 0 ? null : `CI en échec (${codeText(code)}) : ${ci.command}`;
   }
   ctx.out(`→ CI : attente des runs GitHub de ${sha.slice(0, 7)}`);

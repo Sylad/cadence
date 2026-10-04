@@ -602,18 +602,18 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
     return ok();
   };
 
-  it('une commande de deliver reste dans la session et le groupe de premier plan de cadence (tty, Ctrl-C)', () => {
+  it('une commande de deliver reste dans la session et le groupe de premier plan de cadence (tty, Ctrl-C)', async () => {
     const [sid, pgid] = execFileSync('ps', ['-o', 'sid=,pgid=', '-p', String(process.pid)], { encoding: 'utf8' }).trim().split(/\s+/);
     const probe = 'test "$(ps -o sid= -p $$ | tr -d " ")" = "$WANT_SID" && test "$(ps -o pgid= -p $$ | tr -d " ")" = "$WANT_PGID"';
-    expect(realDeps(tempDir()).exec(probe, { WANT_SID: sid!, WANT_PGID: pgid! }, 5_000)).toBe(0);
+    expect(await realDeps(tempDir()).exec(probe, { WANT_SID: sid!, WANT_PGID: pgid! }, 5_000)).toBe(0);
   });
 
-  it('garde le comportement synchrone et les codes de sortie', () => {
+  it('garde les codes de sortie (une commande à la fois, attendue)', async () => {
     const d = realDeps(tempDir());
-    expect(d.exec('true', {}, 5_000)).toBe(0);
-    expect(d.exec('exit 7', {}, 5_000)).toBe(7);
-    expect(d.exec('test "$CADENCE_X" = oui', { CADENCE_X: 'oui' }, 5_000)).toBe(0);
-    expect(d.exec('sleep 5', {}, 300)).toBe(TIMED_OUT);
+    expect(await d.exec('true', {}, 5_000)).toBe(0);
+    expect(await d.exec('exit 7', {}, 5_000)).toBe(7);
+    expect(await d.exec('test "$CADENCE_X" = oui', { CADENCE_X: 'oui' }, 5_000)).toBe(0);
+    expect(await d.exec('sleep 5', {}, 300)).toBe(TIMED_OUT);
   });
 
   it.each(['SIGINT', 'SIGHUP'] as const)(
@@ -660,4 +660,93 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
     },
     30_000,
   );
+});
+
+describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const until = async (ok: () => boolean, ms: number) => {
+    for (let t = 0; t < ms && !ok(); t += 50) await new Promise((r) => setTimeout(r, 50));
+    return ok();
+  };
+  const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const lines = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8').trim().split('\n') : []);
+
+  /**
+   * Dépôt poussé dont le script de livraison est un fichier ./livrer.sh — sh fait un fork pour chaque commande.
+   * Première exécution : note son pid, dort `sleep` s puis « bumpe » ; les suivantes bumpent tout de suite.
+   */
+  function scriptRepo(logs: string, sleep: number, extra = ''): string {
+    const dir = pushedRepo();
+    writeFileSync(
+      join(dir, 'livrer.sh'),
+      `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then echo $$ > '${logs}/first'; sleep ${sleep}; fi\necho bumped >> '${logs}/bumps'\n`,
+      { mode: 0o755 },
+    );
+    writeFileSync(join(dir, 'cadence.yaml'), `deliver:\n  script: ./livrer.sh\n${extra}`);
+    git(dir, 'add', 'livrer.sh', 'cadence.yaml');
+    commit(dir, 'chore: config');
+    git(dir, 'push', '-q');
+    return dir;
+  }
+
+  it('realDeps.exec : au délai, aucun descendant de la commande ne survit (le fork de sh compris)', async () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'livrer.sh'), `#!/bin/sh\nsleep 3\necho bumped > '${dir}/bumped'\n`, { mode: 0o755 });
+    const t = Date.now();
+    expect(await realDeps(dir).exec('./livrer.sh', {}, 1_000)).toBe(TIMED_OUT);
+    expect(Date.now() - t).toBeLessThan(2_500);
+    await pause(3_000);
+    expect(existsSync(join(dir, 'bumped'))).toBe(false);
+  }, 15_000);
+
+  it('(a) script tué au deployTimeout : ses descendants meurent avec lui, une seconde livraison ne court jamais en même temps', async () => {
+    const logs = tempDir();
+    const dir = scriptRepo(logs, 3, '  deployTimeout: 1\n');
+    const cad = () => run(['deliver'], { cwd: dir, env: {}, out: () => {}, err: () => {}, now: () => new Date() });
+    expect(await cad()).toBe(1); // délai dépassé
+    expect(await cad()).toBe(0); // la seconde bumpe tout de suite
+    await pause(3_000); // au-delà du réveil du sleep du premier script
+    expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
+  }, 20_000);
+
+  it('(b) SIGTERM envoyé à cadence seul pendant le script : le script et ses descendants meurent, un seul bump', async () => {
+    const logs = tempDir();
+    const dir = scriptRepo(logs, 3);
+    const probe = join(logs, 'probe.ts');
+    writeFileSync(
+      probe,
+      `import { run } from ${JSON.stringify(join(process.cwd(), 'src/cli.ts'))};\n` +
+        `process.exitCode = await run(['deliver'], { cwd: ${JSON.stringify(dir)}, env: process.env, out: () => {}, err: () => {}, now: () => new Date() });\n`,
+    );
+    const first = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
+    const exited = new Promise<void>((r) => first.on('exit', () => r()));
+    try {
+      expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
+      const scriptPid = Number(readFileSync(join(logs, 'first'), 'utf8').trim());
+      const t = Date.now();
+      process.kill(first.pid!, 'SIGTERM'); // à cadence SEUL, pas au groupe
+      await exited;
+      expect(Date.now() - t).toBeLessThan(2_000); // tué sans attendre la fin du script
+      const survived = !(await until(() => !alive(scriptPid), 2_000));
+      expect(survived).toBe(false);
+
+      const second = await run(['deliver'], { cwd: dir, env: {}, out: () => {}, err: () => {}, now: () => new Date() });
+      expect(second).toBe(0);
+      await pause(3_000);
+      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
+    } finally {
+      try {
+        process.kill(-first.pid!, 'SIGKILL');
+      } catch {
+        // déjà mort
+      }
+    }
+  }, 30_000);
 });

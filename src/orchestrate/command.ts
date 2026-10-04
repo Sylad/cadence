@@ -17,7 +17,7 @@ import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { runPool } from './pool.js';
 import { schemaFor } from './schemas.js';
 import { excludeState, lotKey, newLot, RunStore, type LotState, type WaveState } from './state.js';
-import { renderTable } from './table.js';
+import { quotaText, renderTable } from './table.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -392,7 +392,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     release();
   }
   if (wctx.incident) io.err(`orchestrate : incident — ${wctx.incident}`);
-  if (wctx.quota.hit) io.err(`orchestrate : quota atteint — ${wctx.quota.message ?? ''}`.trim());
+  if (wctx.quota.hit) io.err(`orchestrate : quota atteint — ${quotaText(wctx.quota.message ?? '')}`.trim());
   for (const line of renderTable(wave, all)) io.out(line);
   if (wave.status === 'suspended-budget' || wave.status === 'suspended-quota') return 3;
   return all.every((l) => l.status === 'ready') ? 0 : 1;

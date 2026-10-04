@@ -1,3 +1,4 @@
+import { quotaReset } from './result.js';
 import type { LotState, StepState, WaveState } from './state.js';
 
 const k = (n: number) => `${Math.round(n / 1000)} k`;
@@ -58,5 +59,12 @@ export function renderTable(wave: WaveState, lots: LotState[]): string[] {
   return out;
 }
 
-/** Heure de remise du quota si le message la donne. */
-export { quotaReset } from './result.js';
+const two = (n: number) => String(n).padStart(2, '0');
+
+/** Le message de quota lisible : sans l'horodatage brut après « | », avec l'heure de remise locale quand il la donne. */
+export function quotaText(message: string): string {
+  const reset = quotaReset(message);
+  const text = message.trim().replace(/\|\d{9,}\s*$/, '').trim();
+  if (!reset) return text;
+  return `${text} — remise le ${reset.getFullYear()}-${two(reset.getMonth() + 1)}-${two(reset.getDate())} à ${two(reset.getHours())}:${two(reset.getMinutes())}`;
+}

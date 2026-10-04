@@ -78,6 +78,8 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const r = await s.cli('proj:L1');
     expect(r.code).toBe(3);
     expect(r.err).toContain('quota atteint');
+    expect(r.err).toMatch(/limit reached — remise le \d{4}-\d{2}-\d{2} à \d{2}:\d{2}/); // L3/t15
+    expect(r.err).not.toContain('|1759600000');
     expect(JSON.parse(readFileSync(join(s.parent, '.cadence/runs/2026-10-04-1412/wave.json'), 'utf8')).status).toBe('suspended-quota');
     expect(s.calls()).toHaveLength(1);
   });

@@ -296,7 +296,8 @@ lots:
     finished: 2026-10-04
   - id: L29
     title: "⚡ Suite de la revue L27 : contrôle du commit annoncé hors plage — accepter aussi les commits du lot qui ne touchent que le plan (lotCommits plutôt que lotWork), avec un test de reprise qui cite un commit « plan: … L1 » ; et un avertissement dans l.warnings quand la garde alreadyDone (cycle.ts:435) fait passer à la revue une implémentation sans nouveau commit, avec test (revue L28)"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04

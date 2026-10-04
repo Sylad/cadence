@@ -114,6 +114,8 @@ export class TreeTracker {
   private lastAt = 0;
   /** Racine jamais relevée (ps en échec dès la construction) : kill() se rabat sur son groupe et sur elle. */
   private rootUnknown = false;
+  /** Le dernier relevé a échoué (ps durablement en panne) : l'arbre n'est plus connu, même repli au kill. */
+  private degraded = false;
 
   private unavailableSaid = false;
 
@@ -154,13 +156,24 @@ export class TreeTracker {
       }
     }
     const now = Date.now();
+    this.degraded = !fresh;
     if (fresh) {
       this.last = fresh;
       this.lastAt = now;
+      const root = fresh.get(this.root);
+      if (this.rootUnknown && root) {
+        this.known.set(this.root, root.start); // ps est revenu : la racine est enfin relevée
+        this.rootUnknown = false;
+      }
     } else if (now - this.lastAt > MAX_SNAPSHOT_AGE_MS) {
       this.last = new Map();
     }
     return this.last;
+  }
+
+  /** Rien de fiable sur l'arbre : racine jamais relevée, ou relevé en échec en ce moment. */
+  private get blind(): boolean {
+    return this.rootUnknown || this.degraded;
   }
 
   /** Arrête le relevé périodique (la commande est finie, ou son arbre est tué). */
@@ -209,9 +222,9 @@ export class TreeTracker {
       fresh = this.alive(procs).filter((pid) => !seen.has(pid));
     }
     for (const pid of stopped) signal(pid, 'SIGKILL');
-    // Sans relevé, les descendants sont inconnus : au mieux le groupe de la commande (si elle en mène un ; jamais
+    // Sans relevé (jamais, ou plus), les descendants sont inconnus : au mieux le groupe de la commande (si elle en mène un ; jamais
     // celui de cadence, dont le pid est autre) et la commande elle-même.
-    if (this.rootUnknown) {
+    if (this.blind) {
       signal(-this.root, 'SIGKILL');
       signal(this.root, 'SIGKILL');
     }
@@ -227,7 +240,7 @@ export class TreeTracker {
     // Racine jamais relevée : on ne voit rien de l'arbre, seule la racine (notre enfant, son pid ne se réutilise
     // pas tant qu'elle n'est pas réaperçue) dit si quelque chose tourne encore — et le kill à l'échéance se
     // replie sur elle et son groupe.
-    while (this.alive().length > 0 || (this.rootUnknown && signal(this.root, 0))) {
+    while (this.alive().length > 0 || (this.blind && signal(this.root, 0))) {
       if (Date.now() >= deadline) return this.kill();
       await new Promise((r) => setTimeout(r, 50));
     }

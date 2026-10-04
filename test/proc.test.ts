@@ -107,10 +107,38 @@ describe('TreeTracker — relevé périmé (ps en échec prolongé)', () => {
     tracker.scan();
     procs = null; // ps tombe : le dernier relevé n'est plus qu'un souvenir
     vi.advanceTimersByTime(MAX_SNAPSHOT_AGE_MS + 1);
-    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => (sent.push([pid, sig]), true));
     expect(tracker.alive()).toEqual([]);
     tracker.kill();
-    expect(kill).not.toHaveBeenCalled();
+    expect(sent.some(([pid]) => pid === 200)).toBe(false); // le pid 200 a pu être repris : jamais signalé
+  });
+
+  it('ps durablement en panne : au délai, au moins la racine et son groupe sont tués', () => {
+    vi.useFakeTimers();
+    let procs: Procs | null = table([100, 1, 'A'], [200, 100, 'X']);
+    const tracker = new TreeTracker(100, () => procs);
+    tracker.stop();
+    tracker.scan();
+    procs = null;
+    vi.advanceTimersByTime(MAX_SNAPSHOT_AGE_MS + 1);
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => (sent.push([pid, sig]), true));
+    tracker.kill();
+    expect(sent).toContainEqual([-100, 'SIGKILL']);
+    expect(sent).toContainEqual([100, 'SIGKILL']);
+    expect(sent.every(([pid]) => pid !== 0 && Math.abs(pid) !== process.pid)).toBe(true);
+  });
+
+  it('ps rétabli : pas de repli, jamais le groupe de cadence', () => {
+    let procs: Procs | null = null;
+    const tracker = new TreeTracker(100, () => procs);
+    tracker.stop();
+    procs = table([100, 1, 'A']);
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => (sent.push([pid, sig]), true));
+    tracker.kill();
+    expect(sent.some(([pid]) => pid < 0)).toBe(false);
   });
 
   it('un échec bref garde le dernier relevé', () => {

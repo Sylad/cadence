@@ -433,7 +433,11 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   left after the 2 seconds, a background child that ignores Ctrl-C included. If
   the command was never listed (process list unreadable from the start), the
   grace lasts as long as the command itself is alive, and what remains after
-  2 seconds is killed through the same fallback (its group and itself).
+  2 seconds is killed through the same fallback (its group and itself). The
+  same fallback applies when the process list fails while the command runs and
+  is still failing when the kill comes (the last listing is not trusted after
+  1 second): the command's group and the command are killed, and cadence says
+  once on stderr that the kill is degraded.
   A delay overrun and `SIGTERM` give no grace: a script's own `trap` does not
   get to finish there. The lock is held until the followed set is empty: when
   cadence dies of the signal it dies after the tree, and its stale lock, which

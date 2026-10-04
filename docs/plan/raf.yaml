@@ -63,6 +63,8 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-10-02
+    notes:
+      - { date: 2026-10-04, text: "cadrage tranché par le lead (04-10) : indépendant de L11 — la routine session-close propose le nettoyage à chaque clôture" }
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
     status: done
@@ -120,6 +122,8 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-03
+    notes:
+      - { date: 2026-10-04, text: "cadrage tranché par le lead (04-10, consigne de Sylvain : je tranche) : L11 et L4 INDÉPENDANTS — L11 = périodicité générique dans raf (champ du plan + « dû depuis N j »), spec courte relue avant code ; le nettoyage de L4 se fait à chaque clôture (session-close), pas comme tâche récurrente" }
   - id: L12
     title: "raf add --public et raf public <id> : titre public d'un lot dans le modèle — écart du 02-10 sorti de L5 ; aujourd'hui écrit à la main dans 59 lots de 7 projets"
     status: doing
@@ -345,3 +349,20 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+  - id: L31
+    title: "Release : à la prochaine version publiée, prouver l'OIDC (ligne « Signed provenance statement » dans le log du workflow, provenance visible sur npmjs.com) puis proposer à Sylvain « disallow tokens » sur le paquet — sorti de L23 (dépend d'une release, pas de code)"
+    status: todo
+    estimate: 1
+    created: 2026-10-04
+  - id: L32
+    title: ⚡ raf check signale (avertissement, pas erreur) un lot visible sans titre public — suite de L12 ; documenté dans le README
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04
+  - id: L33
+    title: "⚡ orchestrate : le brief d'implémentation demande de TRANCHER les questions d'interprétation mineures (et de les lister en « choix faits » dans le rapport, relus par la revue), de ne s'arrêter que sur un vrai blocage — mesure : vague 2026-10-04-1700, 4 lots / 4 questions, ~45 k par aller-retour"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

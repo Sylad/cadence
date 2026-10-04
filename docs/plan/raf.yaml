@@ -65,12 +65,19 @@ lots:
     created: 2026-10-02
     notes:
       - { date: 2026-10-04, text: "cadrage tranché par le lead (04-10) : indépendant de L11 — la routine session-close propose le nettoyage à chaque clôture" }
+      - { date: 2026-10-04, text: "revue de la vague 2026-10-04-1920 (après 2 passes) : non conforme, 1 majeur — un dossier illisible (readdir refusé : 0311/0300, ou 0700 à root) est proposé sur la seule date du dossier alors qu'il peut contenir un dépôt. PRINCIPE (lead, 04-10) : on ne propose JAMAIS ce qu'on n'a pas pu mesurer entièrement — tout échec de lecture (readdir, lstat, git) = non proposé ; session close ne plante jamais sur le nettoyage" }
     started: 2026-10-04
     tasks:
       - { id: t1, title: "MAJEUR : ne jamais proposer un dossier qui est un dépôt git ou en contient un (tracked() part du dossier parent : un clone dans tmp/ est proposé) ; test", status: todo }
       - { id: t2, title: suivi git vérifié aussi hors du dépôt (git -C <dossier du fichier> ls-files) ; '..xxx' suivi n'est pas « hors du dépôt » (rel === '..' || rel.startsWith('../')) ; tests, status: todo }
       - { id: t3, title: "« * » n'attrape pas les noms en « . » (.env, .git) sauf motif en « . », comme le shell ; .git jamais proposé ; test", status: todo }
       - { id: t4, title: "tests : limite du seuil (âge égal à cleanDays non proposé, mutation > en >= tuée) ; ~ résolu sous un homedir temporaire ; README l.692 : nettoyage dans le résumé de session-close", status: todo }
+      - { id: t5, title: "MAJEUR : un dossier illisible (readdir refusé) n'est jamais proposé, ni ce qu'il contient ; tests 0311 contenant un clone + 0700 non lisible", status: todo }
+      - { id: t6, title: "âge d'un dossier = date de modification la plus récente de son contenu ; test dossier ancien dont un fichier est d'aujourd'hui, non proposé", status: todo }
+      - { id: t7, title: jamais un chemin sous un segment .git (n'importe où dans le chemin) ; test avec le motif repo/.*/*, status: todo }
+      - { id: t8, title: "newestMtime / lstat EACCES ou ENOENT d'un enfant : jamais de plantage, l'élément n'est pas proposé ; test", status: todo }
+      - { id: t9, title: "tests t1/t3 : vieillir tout l'arbre (y compris .git) pour que holdsRepo et le filtre .git soient seuls à protéger — mutation de chacun détectée ; test EACCES (clean.test.ts:126) tue la mutation new Date(0)", status: todo }
+      - { id: t10, title: "README l.394-399 : jamais proposés = dépôts git (et dossiers qui en contiennent), noms en « . » non visés, illisibles ; âge = contenu le plus récent d'un dossier", status: todo }
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
     status: done
@@ -500,25 +507,34 @@ lots:
     finished: 2026-10-04
   - id: L41
     title: "⚡ Suites de la vague 2026-10-04-1807 sur orchestrate (L38, L40) — VÉRIFIER d'abord chaque point, en « choix » si déjà corrigé : propositions — deux mineurs au même texte sur deux lignes ne sont pas confondus (cycle.ts:572) ; mineur reformulé après t8 ; headMoved vrai sans coupure (tests rouges → passe sans commit) : ne déclarer « correction reprise » que si une session de l'étape a été coupée, référence = headBefore de la 1re session de l'étape fix interrompue ; spec l.108-111 alignée ; test/orchestrate-cycle.test.ts:918 c.lot.review?.commit"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "compliant — orchestré (vague 2026-10-04-1920, 0 passe(s) de correction)", commit: 0e5f15ef97da077db7ea8858aac8ec457ce8ba87 }
+    finished: 2026-10-04
   - id: L42
     title: "⚡ Suites de la vague 2026-10-04-1807 sur L11 (tâche récurrente) — VÉRIFIER d'abord chaque point : raf check ne signale ni todo-with-commits ni idle pour un lot récurrent, session close ne conseille pas raf done ; hook post-commit propose raf did ; session start trie « Récurrent » par retard via une fonction partagée avec raf now ; tests : every/last par plan.fields en lecture seule, raf did refusé sur done/dropped, add --every --parent refusé, « sans rien écrire » vérifié en relisant le plan"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-1920, 0 passe(s) de correction)", commit: d924743b421819b12ec232038cb1f1ba9cd513b2 }
+    finished: 2026-10-04
   - id: L43
     title: "⚡ Suites de la vague 2026-10-04-1807 sur L35 et L37 — VÉRIFIER d'abord : qa-reviewer nomme le profil de l'étape browser state (userDataDir réservé à la QA, conservé entre les passes, jamais le profil personnel) et l'exclut du nettoyage ; test/skills.test.ts:258 commentaire sans assertion ; test deliver « relevé indisponible au délai » vérifie aussi la ligne L30"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "conforme — 1 mineur (assertion skills.test.ts:259 redondante avec la ligne 238) — orchestré (vague 2026-10-04-1920, 0 passe(s) de correction + passe des mineurs)", commit: 4675d055a7151b76782f9fafe1d2a4b05de404a8 }
+    finished: 2026-10-04
+  - id: L44
+    title: "⚡ Suite de la revue L43 : test/skills.test.ts:259 — retirer le .replace(/\\s+/g, ' ') redondant et l'assertion qui répète la ligne 238 (une seule assertion, commentaire de la l.258 rattaché à la l.238)"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

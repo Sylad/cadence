@@ -34,19 +34,12 @@ progress, then drift that blocks a delivery, then ready quick wins. **Stop and w
 
 ## 2. Delegation
 
-For each chosen lot, the lead runs `cd <project> && raf start <lot>`, then gives a subagent this brief
-(fill in the brackets, keep the rest verbatim):
-
-> Work in `<absolute path of the project>` on lot `<id>` — "<title>" — of its plan
-> (`docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`; read the lot, its notes and sub-tasks, and the project's CLAUDE.md first).
-> Goal: <what done looks like, from the human's words>.
-> Rules: test first; commit each sub-part as soon as its tests pass, with explicit paths (never
-> `git add -A` or `commit -a`), and a message that cites the lot (`feat(<id>): …`); run the project's
-> full test suite and build before reporting; do not push, deliver, run `raf done`, `raf ux` or
-> `raf review`.
-> If something is ambiguous or needs a decision, stop and report the question instead of guessing.
-> Report: commits (sha + subject), tests and build results with their numbers, what you could not
-> verify, open questions.
+The default way to delegate is **`cadence orchestrate`** (section 2b): a program, not a conversation, that runs
+one fresh short session per step. When the lead delegates by hand, the brief is the template
+`templates/orchestrate/implement.md` of the cadence package — the single source, tested; `cadence
+orchestrate --dry-run <project>:<lot>` writes it rendered for the lot. The lead runs
+`cd <project> && raf start <lot>`, fills `{{chemin}}`, `{{lot}}`, `{{titre}}` and `{{objectif}}` (what done
+looks like, from the human's words), and keeps the rest verbatim.
 
 A lot that adds or changes a screen is `visible`: after the implementation, have the
 `ux-reviewer` agent review it (give it the URL or the way to run the app) and bring its verdict and

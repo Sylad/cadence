@@ -84,7 +84,7 @@ export function staleFiles(root: string, patterns: string[], days: number, today
   const seen = new Map<string, Stale>();
   for (const pattern of patterns) {
     for (const path of expand(pattern, root)) {
-      if (seen.has(path) || path === root || basename(path) === '.git') continue;
+      if (seen.has(path) || path === root || path.split('/').includes('.git')) continue;
       const age = diffDays(toDay(lstatSync(path).mtime), today);
       if (age > days && !holdsRepo(path) && !tracked(path)) seen.set(path, { path, age });
     }

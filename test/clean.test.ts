@@ -96,6 +96,19 @@ describe('staleFiles — motifs', () => {
   });
 });
 
+describe('staleFiles — contenu des dossiers et .git', () => {
+  it('ne propose rien sous un dossier .git, même atteint par un motif caché', () => {
+    const tmp = tempDir();
+    const clone = join(tmp, 'repo');
+    mkdirSync(clone);
+    git(clone, 'init', '-q');
+    touch(join(clone, '.git/hooks/x'));
+    touch(join(clone, '.git/hooks'));
+    touch(join(clone, '.git/objects'));
+    expect(staleFiles(tmp, [`${tmp}/repo/.*/*`], 7, TODAY)).toEqual([]);
+  });
+});
+
 describe('staleFiles — seuil et ~', () => {
   it('un âge égal au seuil n’est pas proposé, un jour de plus l’est', () => {
     const dir = tempDir();

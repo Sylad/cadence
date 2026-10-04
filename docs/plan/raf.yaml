@@ -521,3 +521,4 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme — 1 mineur (assertion skills.test.ts:259 redondante avec la ligne 238) — orchestré (vague 2026-10-04-1920, 0 passe(s) de correction + passe des mineurs)", commit: 4675d055a7151b76782f9fafe1d2a4b05de404a8 }

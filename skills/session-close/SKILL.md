@@ -48,7 +48,7 @@ With no project named, run `cadence session close` in each project touched durin
    contains one; anything `git` tracks, whichever repository it is in; a name starting with `.`
    unless the pattern itself starts that name with `.`; anything behind a symbolic link a `*`
    matched (the link itself may be proposed: remove the link, never `rm -r` through it — a segment
-   written in full does follow its link); the repository itself or a folder that contains it;
+   written in full before the first `*` does follow its link); the repository itself or a folder that contains it;
    anything that could not be read entirely — those are listed apart as "illisible(s)": tell the
    human, never delete those, and never widen the list by hand to entries the report did not
    propose.

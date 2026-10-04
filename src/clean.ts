@@ -44,7 +44,9 @@ const segmentRe = (seg: string): RegExp =>
  * Comme le shell, un nom en « . » n'est atteint que par un segment de motif qui commence par « . ».
  * Contrairement au shell, on ne descend jamais dans un lien symbolique attrapé par un segment à `*` :
  * `tmp/*` peut rendre le lien `tmp/lien` lui-même, mais un segment suivant ne lit jamais ce qu'il désigne.
- * Un segment écrit en entier suit le lien, comme `cd` : celui qui l'écrit désigne cet endroit-là.
+ * Cela vaut pour tout ce qui suit un `*`, segments écrits en entier compris (dans `tmp/<étoile>/out`, `out` ne suit pas) :
+ * seuls les segments écrits en entier AVANT le premier `*` suivent un lien, comme `cd` — celui qui les écrit
+ * désigne cet endroit-là.
  */
 function expand(pattern: string, root: string, unreadable: Set<string>): string[] {
   const full = pattern === '~' || pattern.startsWith('~/') ? join(homedir(), pattern.slice(1)) : pattern;
@@ -66,7 +68,7 @@ function expand(pattern: string, root: string, unreadable: Set<string>): string[
       for (const n of names) if (re.test(n) && (part.startsWith('.') || !n.startsWith('.'))) next.push(join(base, n));
     }
     found = next;
-    wild = part.includes('*');
+    wild = wild || part.includes('*');
   }
   return found;
 }

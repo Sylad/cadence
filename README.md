@@ -409,8 +409,10 @@ An entry is proposed only if it could be measured entirely. Never proposed:
 - anything reached through a symbolic link matched by a `*` segment: unlike the shell, the walk
   never descends into such a link (`tmp/*/*` lists nothing behind `tmp/link → ../outside`), and a
   folder's age never looks behind a link; the link itself can be proposed, as a link — removing it
-  leaves its target alone. A segment written in full follows the link, as `cd` would
-  (`~/shared/*` with `~/shared` a link lists the target's entries);
+  leaves its target alone. Only segments written in full *before* the first `*` follow a link, as
+  `cd` would (`~/shared/*` with `~/shared` a link lists the target's entries); once a `*` has been
+  crossed no link is followed any more, even on a segment written in full (`tmp/*/out/*` with
+  `tmp/run1/out → /elsewhere` lists nothing behind `out`);
 - anything that could not be read entirely: a folder that cannot be listed — nor anything
   inside it, even named in full —, an entry that cannot be examined or vanished during the
   walk, an entry under a `.git` that `git` could not answer for. These are listed apart,

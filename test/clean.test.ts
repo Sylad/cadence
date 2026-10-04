@@ -205,6 +205,16 @@ describe('staleFiles — motifs', () => {
     expect(staleFiles(root, ['tmp/*/*', 'tmp/*/*/*'], 7, TODAY)).toEqual([]);
   });
 
+  it('une fois un « * » franchi, un segment écrit en entier ne suit plus un lien non plus (tmp/*/out/*)', () => {
+    const tmp = tempDir();
+    const dehors = tempDir();
+    touch(join(dehors, 'precieux/these.docx'));
+    mkdirSync(join(tmp, 'run1'));
+    symlinkSync(join(dehors, 'precieux'), join(tmp, 'run1/out'));
+    ageTree(tmp);
+    expect(staleFiles(tmp, [`${tmp}/*/out/*`, `${tmp}/*/out/these.docx`], 7, TODAY)).toEqual([]);
+  });
+
   it('un segment écrit en entier suit le lien symbolique, comme cd', () => {
     const tmp = tempDir();
     const dehors = tempDir();

@@ -383,7 +383,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     release();
   });
   try {
-    await runPool(ctxs);
+    await runPool(ctxs, undefined, all);
   } finally {
     forget();
     const finished = (l: LotState) => l.status === 'ready' || l.status === 'handed-back' || l.status === 'failed';

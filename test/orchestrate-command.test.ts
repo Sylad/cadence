@@ -233,6 +233,40 @@ describe('une vague', () => {
     expect(new RunStore(parent, '2026-10-04-1412').readLot('a', 'L1')!.answers).toEqual(['SQLite']);
   });
 
+  it('L3/t9 — lot dépendant d\'un lot suspendu : reste reprenable, tourne après lui à la reprise', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux', after: ['L1'] }] });
+    const f = fakeDeps();
+    const first = io(parent);
+    expect(await orchestrate(['a:L1', 'a:L2', '--budget', '1'], first.io, f.deps)).toBe(3);
+    const store = new RunStore(parent, '2026-10-04-1412');
+    expect(store.readLot('a', 'L1')!.status).toBe('suspended');
+    expect(store.readLot('a', 'L2')!.status).not.toBe('handed-back');
+    expect(store.readWave()!.status).toBe('suspended-budget');
+    const again = io(parent);
+    expect(await orchestrate(['--resume', '--budget', '1M'], again.io, f.deps)).toBe(0);
+    expect(store.readLot('a', 'L1')!.status).toBe('ready');
+    expect(store.readLot('a', 'L2')!.status).toBe('ready');
+    expect(f.calls.map((c) => c.kind)).toEqual(['implement', 'review', 'implement', 'review']);
+  });
+
+  it('L3/t9 — lot dépendant d\'un lot en question : attend, puis tourne après --answer', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux', after: ['L1'] }] });
+    let n = 0;
+    const f = fakeDeps({
+      implement: (cwd, brief) => {
+        const lot = /on lot `([^`]+)`/.exec(brief)![1];
+        return lot === 'L1' && n++ === 0 ? claudeOut(workReport({ questions: ['Quelle base ?'] })) : claudeOut(workReport({ commits: [commitFile(cwd, `${lot}-${Math.random()}.txt`, `feat(${lot}): x`)] }));
+      },
+    });
+    expect(await orchestrate(['a:L1', 'a:L2'], io(parent).io, f.deps)).toBe(1);
+    const store = new RunStore(parent, '2026-10-04-1412');
+    expect(store.readLot('a', 'L1')!.status).toBe('question');
+    expect(store.readLot('a', 'L2')!.status).not.toBe('handed-back');
+    expect(store.readWave()!.status).toBe('interrupted');
+    expect(await orchestrate(['--resume', '--answer', 'a:L1', 'SQLite'], io(parent).io, f.deps)).toBe(0);
+    expect(store.readLot('a', 'L2')!.status).toBe('ready');
+  });
+
   it('--resume refuse une réponse à un lot qui n\'attend rien, et une vague terminée', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }] });
     const f = fakeDeps();

@@ -500,10 +500,11 @@ lots:
     finished: 2026-10-04
   - id: L41
     title: "⚡ Suites de la vague 2026-10-04-1807 sur orchestrate (L38, L40) — VÉRIFIER d'abord chaque point, en « choix » si déjà corrigé : propositions — deux mineurs au même texte sur deux lignes ne sont pas confondus (cycle.ts:572) ; mineur reformulé après t8 ; headMoved vrai sans coupure (tests rouges → passe sans commit) : ne déclarer « correction reprise » que si une session de l'étape a été coupée, référence = headBefore de la 1re session de l'étape fix interrompue ; spec l.108-111 alignée ; test/orchestrate-cycle.test.ts:918 c.lot.review?.commit"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04
   - id: L42
     title: "⚡ Suites de la vague 2026-10-04-1807 sur L11 (tâche récurrente) — VÉRIFIER d'abord chaque point : raf check ne signale ni todo-with-commits ni idle pour un lot récurrent, session close ne conseille pas raf done ; hook post-commit propose raf did ; session start trie « Récurrent » par retard via une fonction partagée avec raf now ; tests : every/last par plan.fields en lecture seule, raf did refusé sur done/dropped, add --every --parent refusé, « sans rien écrire » vérifié en relisant le plan"
     status: todo

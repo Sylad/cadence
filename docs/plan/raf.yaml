@@ -289,6 +289,7 @@ lots:
     tasks:
       - { id: t1, title: readAgents ajoute StructuredOutput aux outils restreints d'un agent (cause réelle des revues sans structured_output), status: done }
       - { id: t2, title: "après une question répondue, une implémentation sans nouveau commit alors que le lot a déjà ses commits (rapport : travail terminé) passe à la revue au lieu d'être rendue au lead « implement sans commit » (vague 2026-10-04-1609, L21 session 3)", status: todo }
+    review: { date: 2026-10-04, verdict: "conforme, avec 2 mineurs (aucune trace quand la garde alreadyDone s'applique ; sous-tâche t2 encore en todo dans le plan) ; 423 tests verts, tsc vert — orchestré (vague 2026-10-04-1628, 1 passe(s) de correction)", commit: c1708f40761955fdecd81b65642d7031996cb07a }
   - id: L29
     title: "⚡ Suite de la revue L27 : contrôle du commit annoncé hors plage — accepter aussi les commits du lot qui ne touchent que le plan (lotCommits plutôt que lotWork), avec un test de reprise qui cite un commit « plan: … L1 »"
     status: todo

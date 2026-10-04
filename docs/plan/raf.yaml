@@ -78,11 +78,17 @@ lots:
       - { id: t8, title: "newestMtime / lstat EACCES ou ENOENT d'un enfant : jamais de plantage, l'élément n'est pas proposé ; test", status: done }
       - { id: t9, title: "tests t1/t3 : vieillir tout l'arbre (y compris .git) pour que holdsRepo et le filtre .git soient seuls à protéger — mutation de chacun détectée ; test EACCES (clean.test.ts:126) tue la mutation new Date(0)", status: done }
       - { id: t10, title: "README l.394-399 : jamais proposés = dépôts git (et dossiers qui en contiennent), noms en « . » non visés, illisibles ; âge = contenu le plus récent d'un dossier", status: done }
-      - { id: t11, title: "MAJEUR : un dépôt nu ou un dossier git séparé (HEAD + objects/ + refs/, sans entrée .git) n'est jamais proposé, ni un dossier qui en contient un, ni un fichier qui y est ; tests tmp/x.git, tmp/work/mirror.git, --separate-git-dir, motif tmp/*/*", status: todo }
-      - { id: t12, title: "MAJEUR : expand et measure ne descendent jamais dans un lien symbolique attrapé par un joker ; tests lien vers un dossier extérieur et vers la racine (tmp/self → ..)", status: todo }
-      - { id: t13, title: "MAJEUR : test de gitEnv — GIT_INDEX_FILE / GIT_DIR hérités : un fichier suivi n'est pas proposé (mutation « env: gitEnv() retirée » tuée)", status: todo }
-      - { id: t14, title: "tests : dossier de motif non listable présent dans unreadable (clean.test.ts:180) ; nom à métacaractères de pathspec suivi par git non proposé (--literal-pathspecs)", status: todo }
-    review: { date: 2026-10-04, verdict: "non conforme : 3 majeurs (dépôt nu / dossier git séparé proposés, lien symbolique traversé par « * », protection gitEnv non testée), 1 mineur", commit: 7b958edfe744bec038c9762c033a6e56aae3db14 }
+      - { id: t11, title: "MAJEUR : un dépôt nu ou un dossier git séparé (HEAD + objects/ + refs/, sans entrée .git) n'est jamais proposé, ni un dossier qui en contient un, ni un fichier qui y est ; tests tmp/x.git, tmp/work/mirror.git, --separate-git-dir, motif tmp/*/*", status: done }
+      - { id: t12, title: "MAJEUR : expand et measure ne descendent jamais dans un lien symbolique attrapé par un joker ; tests lien vers un dossier extérieur et vers la racine (tmp/self → ..)", status: done }
+      - { id: t13, title: "MAJEUR : test de gitEnv — GIT_INDEX_FILE / GIT_DIR hérités : un fichier suivi n'est pas proposé (mutation « env: gitEnv() retirée » tuée)", status: done }
+      - { id: t14, title: "tests : dossier de motif non listable présent dans unreadable (clean.test.ts:180) ; nom à métacaractères de pathspec suivi par git non proposé (--literal-pathspecs)", status: done }
+      - { id: t15, title: "MAJEUR : après un segment à *, ne plus jamais suivre de lien même sur un segment écrit en entier (wild collant, clean.ts:69) ; test tmp/*/out/* avec out → dossier extérieur ; README l.405-409 aligné", status: todo }
+      - { id: t16, title: "MAJEUR : test d'un dossier contenant un arbre de travail lié ou un sous-module (.git fichier) — tue la mutation qui retire names.includes('.git') (clean.ts:131)", status: todo }
+      - { id: t17, title: "âge = max(mtime, ctime) pour qu'une archive extraite ou un cp -a du jour ne soit pas proposé ; test ; README", status: todo }
+      - { id: t18, title: "README l.403 / SKILL.md:48 — nommer la limite du dépôt nu à arbre de travail extérieur (core.worktree / --work-tree), non détecté", status: todo }
+      - { id: t19, title: skill session-close — relancer cadence session close juste avant de supprimer et ne supprimer que ce qui est encore proposé, status: todo }
+      - { id: t20, title: test ~ seul qui puisse échouer (mutation pattern === '~' tuée), status: todo }
+    review: { date: 2026-10-04, verdict: "non conforme : 2 majeurs (lien suivi après un « * » sur un segment écrit en entier, garde .git-fichier non testée), 4 mineurs", commit: bd9b31ca995908b98bb0f7d1a3f48e50d3c3bec3 }
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
     status: done

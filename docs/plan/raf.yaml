@@ -60,7 +60,7 @@ lots:
     finished: 2026-10-04
   - id: L4
     title: "Nettoyage en routine de clôture : session-close liste les fichiers de travail périmés (dossier tmp partagé, captures non référencées, scripts jetables, dossiers temporaires laissés par les tests) et propose leur suppression — au lieu d'un lot à rouvrir dans chaque projet"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-02
     notes:
@@ -90,8 +90,9 @@ lots:
       - { id: t20, title: test ~ seul qui puisse échouer (mutation pattern === '~' tuée), status: done }
       - { id: t21, title: "test session clean : référence de clôture à 0 (lot L1 fermé ou date sans écart, cadence.yaml commité) ou ✓ prêt à fermer vérifié — session.test.ts:236 et :317 doivent tuer la mutation « nettoyage compté dans open »", status: done }
       - { id: t22, title: "test t17 (clean.test.ts:282) : jour de référence tiré du ctime réel, pas de l'horloge, pour tenir à minuit", status: done }
-      - { id: t23, title: "test/session-clean-failure.test.ts:32-38 : même faiblesse que t21 — référence de clôture à 0 et « ✓ prêt à fermer » exigés, mutation « échec du nettoyage compté dans open » tuée", status: todo }
+      - { id: t23, title: "test/session-clean-failure.test.ts:32-38 : même faiblesse que t21 — référence de clôture à 0 et « ✓ prêt à fermer » exigés, mutation « échec du nettoyage compté dans open » tuée", status: done }
     review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-2052, 0 passe(s) de correction)", commit: 4d345abf77e9839212a02f74cd756887572efdd6 }
+    finished: 2026-10-04
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
     status: done

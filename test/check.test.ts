@@ -266,6 +266,10 @@ describe('attribution d’un commit à ses lots : la portée prime', () => {
     expect(lotsOf('fix(L99): x — L4').linked.unknown.map((u) => u.ref)).toEqual(['L99']);
   });
 
+  it('(L15/t4) la portée est reconnue aussi avec une espace avant les deux-points', () => {
+    expect(lotsOf('feat(L24) : barre du bas — voir L27 et (L28) planifié').ids).toEqual(['L24']);
+  });
+
   it('sans portée citant un lot, les formes documentées continuent de compter', () => {
     expect(lotsOf('fix: L2 corrigé', 'L3/t1 : suite', 'feat(api): L4 et L5').ids).toEqual(['L2', 'L3', 'L4', 'L5']);
     expect(lotsOf('feat(api): L7 : x').ids).toEqual(['L7']);

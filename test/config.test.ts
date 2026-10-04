@@ -156,6 +156,17 @@ describe('a plan in another format', () => {
     expect(plan.lot('NC2.4').finished).toBe('2026-09-20');
   });
 
+  it('reads the public title from the field mapped to `public`, trimmed, and ignores a blank or non-string one', () => {
+    const dir = tempDir();
+    const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), 'plan:\n  lots: taches\n  fields: { title: titre, status: etat, public: titre_public }\n  statuses: { todo: prevu }\n'))!;
+    const plan = Plan.load(
+      write(join(dir, 'p.yaml'), "taches:\n- { id: A1, titre: x, etat: prevu, titre_public: '  Cartes plus nettes ' }\n- { id: A2, titre: y, etat: prevu, titre_public: '   ' }\n- { id: A3, titre: z, etat: prevu, titre_public: 7 }\n- { id: A4, titre: w, etat: prevu }\n"),
+      cfg.settings,
+    );
+    expect(plan.lot('A1').public).toBe('Cartes plus nettes');
+    for (const id of ['A2', 'A3', 'A4']) expect(plan.lot(id)).not.toHaveProperty('public');
+  });
+
   it('folds entries that name a parent into its sub-tasks', () => {
     expect(foreign().lot('B33').tasks).toEqual([
       { id: 't1-compression', title: 'Compression', status: 'done' },

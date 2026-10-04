@@ -11,7 +11,7 @@ const lot = (extra: Partial<Lot> = {}): Lot => ({
 });
 
 describe('gabarits', () => {
-  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '' };
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '' };
 
   it('implement.md est le brief du lead (§2) plus deux lignes, rendu sans accolades restantes', () => {
     const out = renderBrief('implement', vars);
@@ -21,7 +21,10 @@ describe('gabarits', () => {
     expect(out).toContain('test first; commit each sub-part as soon as its tests pass, with explicit paths (never');
     expect(out).toContain('`git add -A` or `commit -a`), and a message that cites the lot (`feat(L9): …`)');
     expect(out).toContain('do not push, deliver, run `raf done`, `raf ux` or');
-    expect(out).toContain('If something is ambiguous or needs a decision, stop and report the question instead of guessing.');
+    expect(out).toContain('Decide minor interpretation questions yourself');
+    expect(out).toContain('list each one under "choix" in your report');
+    expect(out).toContain('Stop and ask (under "questions") only on a real blocker');
+    expect(out).not.toContain('instead of guessing');
     expect(out).toContain('Report: commits (sha + subject), tests and build results with their numbers, what you could not');
     expect(out).toContain('do not launch subagents');
     expect(out).toContain('structured output');
@@ -42,6 +45,13 @@ describe('gabarits', () => {
     const out = renderBrief('review-small', { ...vars, ux: 'App: http://localhost:4200' });
     expect(out).toContain('single pass');
     expect(out).toContain('http://localhost:4200');
+  });
+
+  it('les revues reçoivent les choix faits de l\'auteur pour les relire, sans son résumé', () => {
+    const out = renderBrief('review', { ...vars, choix: '- A plutôt que B', reponse: 'une réponse' });
+    expect(out).toContain('- A plutôt que B');
+    const small = renderBrief('review-small', { ...vars, choix: '- A plutôt que B' });
+    expect(small).toContain('- A plutôt que B');
   });
 
   it('fix.md liste les constats et les commits du lot', () => {

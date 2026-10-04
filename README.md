@@ -590,6 +590,8 @@ most**, then the lot goes back to you with the findings. A small lot (`estimate`
 gets one single Opus pass for code and usability. Failing tests (reported red, or red when
 `orchestrate.test` is run) go straight to a correction.
 
+**Choices, not questions**: the author brief tells the session to decide minor interpretation questions itself and to list them under `choix` in its report; the reviewer receives that list to re-read, and the final table prints each one (`choix fait : …`). A session stops with a question only on a real blocker (scope, architecture, costly to undo, not settled by the plan or CLAUDE.md).
+
 **What stays with you**: choosing the lots, the questions raised (`--resume --answer`), re-verifying
 after the wave (`git log`, tests, `raf check`), `raf done`, **`raf ux`** (the orchestrator reports the UX
 verdict and screenshots, it does not record it), the push and the deliveries, one project at a time.

@@ -14,6 +14,7 @@ export const WORK_SCHEMA = {
     build: result,
     nonVerifie: strings,
     questions: strings,
+    choix: strings,
     resume: str,
   },
   required: ['commits', 'tests', 'build', 'nonVerifie', 'questions', 'resume'],
@@ -42,6 +43,8 @@ export interface WorkReport {
   build: { commande: string; resultat: string; vert: boolean };
   nonVerifie: string[];
   questions: string[];
+  /** Choix d'interprétation faits par l'auteur ; absent d'un ancien rapport. */
+  choix?: string[];
   resume: string;
 }
 

@@ -93,6 +93,8 @@ export interface LotState {
   verdict: string | null;
   uxVerdict: string | null;
   questions: string[];
+  /** Choix d'interprétation faits par les sessions d'écriture, relus par la revue et rendus au lead. */
+  choix: string[];
   answers: string[];
   /** Mineurs et sous-tâches proposées, rendus au lead (pas ajoutés au plan). */
   proposals: string[];
@@ -113,7 +115,7 @@ export interface NewLot {
 }
 
 export function newLot(o: NewLot): LotState {
-  return { ...o, status: 'queued', pass: 0, next: null, steps: [], constats: [], verdict: null, uxVerdict: null, questions: [], answers: [], proposals: [], warnings: [], outcome: null };
+  return { ...o, status: 'queued', pass: 0, next: null, steps: [], constats: [], verdict: null, uxVerdict: null, questions: [], choix: [], answers: [], proposals: [], warnings: [], outcome: null };
 }
 
 export const lotKey = (project: string, lot: string) => `${project}:${lot}`;

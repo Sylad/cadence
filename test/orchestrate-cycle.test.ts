@@ -107,6 +107,26 @@ describe('corrections', () => {
   });
 });
 
+describe('choix faits', () => {
+  it('les choix du rapport d\'implémentation sont gardés et joints au brief de la revue', async () => {
+    const h = harness({ script: { implement: [impl('x.txt', { choix: ['SQLite plutôt que PostgreSQL'] })], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.choix).toEqual(['SQLite plutôt que PostgreSQL']);
+    const review = h.calls.find((k) => k.kind === 'review')!;
+    expect(review.brief).toContain('- SQLite plutôt que PostgreSQL');
+    expect(review.brief).toContain('re-read each choice');
+  });
+
+  it('sans champ « choix » (ancien rapport) le lot passe, la revue ne reçoit rien', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.choix).toEqual([]);
+  });
+});
+
 describe('lot visible : UX puis code', () => {
   it('UX d\'abord, revue de code en dernier ; correction issue de l\'UX suivie d\'une revue de code', async () => {
     const uxBad: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'ui.css', texte: 'contraste 2:1 (WCAG 1.4.3)' }], verdict: 'UX non conforme' }));

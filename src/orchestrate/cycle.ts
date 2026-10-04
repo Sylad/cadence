@@ -200,11 +200,16 @@ function uxText(c: LotCtx): string {
     .join(' ');
 }
 
+function choixText(choix: string[]): string {
+  if (!choix.length) return '';
+  return ['The author decided these interpretation questions on its own; re-read each choice against the lot, its notes and the code, and report a finding if one is wrong or changes the scope:', ...choix.map((x) => `- ${x}`)].join('\n');
+}
+
 function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
-  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c) };
+  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []) };
   if (kind === 'implement' || kind === 'fix') {
     const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
     if (kind === 'fix') {
@@ -418,6 +423,9 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     if (isPlanOnly(k.sha, plan, l.repo)) continue;
     if (!citedRefs(k, plan.refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} : ${short(k)}`);
   }
+  save(c);
+
+  for (const x of rep.choix ?? []) if (!(l.choix ??= []).includes(x)) l.choix.push(x);
   save(c);
 
   if (rep.questions.length) {

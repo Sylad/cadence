@@ -16,6 +16,8 @@ export interface BriefVars {
   reponse: string;
   constats: string;
   ux: string;
+  /** Choix d'interprétation faits par l'auteur, à relire par la revue (vide : aucune ligne). */
+  choix: string;
 }
 
 const FILES: Record<StepKind, string> = {

@@ -444,3 +444,25 @@ describe('tokens des sessions en échec (L3/t11)', () => {
     expect(h.wave.budget.cacheRead).toBe(110);
   });
 });
+
+describe('lot non démarré quand la vague est arrêtée (L3/t14)', () => {
+  const cases: [string, (h: ReturnType<typeof harness>) => void, string][] = [
+    ['budget épuisé', (h) => { h.wave.budget.consumed = h.wave.budget.limit; }, 'budget atteint'],
+    ['quota atteint', (h) => { h.wave.quota = { hit: true }; }, 'quota atteint'],
+    ['incident', (h) => { h.wave.incident = 'push détecté'; }, 'vague arrêtée : push détecté'],
+  ];
+  for (const [name, arm, why] of cases) {
+    it(`${name} : ni raf start ni commit du plan, le lot reste à faire et suspendu`, async () => {
+      const h = harness({ script: {} });
+      arm(h);
+      const head = git(h.repo, 'rev-parse', 'HEAD');
+      const c = h.lot('L1');
+      await runLot(c);
+      expect(c.lot.status).toBe('suspended');
+      expect(c.lot.outcome).toBe(why);
+      expect(h.plan().lot('L1').status).toBe('todo');
+      expect(git(h.repo, 'rev-parse', 'HEAD')).toBe(head);
+      expect(h.calls).toEqual([]);
+    });
+  }
+});

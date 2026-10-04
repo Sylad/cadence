@@ -175,13 +175,20 @@ function briefFor(c: LotCtx, kind: StepKind): string {
 
 type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot };
 
+/** Pourquoi plus aucune session ne doit partir (incident, quota, budget), sinon null. */
+function halted(w: WaveCtx): string | null {
+  if (w.incident) return `vague arrêtée : ${w.incident}`;
+  if (w.quota.hit) return 'quota atteint';
+  if (w.budget.exhausted) return 'budget atteint';
+  return null;
+}
+
 /** Une session : budget et quota vérifiés avant, état écrit avant et après, journal gardé, contrôles du dépôt après. */
 async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const w = c.wave;
   const l = c.lot;
-  if (w.incident) return suspend(c, `vague arrêtée : ${w.incident}`);
-  if (w.quota.hit) return suspend(c, 'quota atteint');
-  if (w.budget.exhausted) return suspend(c, 'budget atteint');
+  const halt = halted(w);
+  if (halt) return suspend(c, halt);
 
   const write = kind === 'implement' || kind === 'fix';
   const model: Model = write ? l.model : 'opus';
@@ -487,6 +494,12 @@ export async function runLot(c: LotCtx): Promise<void> {
     if (TERMINAL.has(l.status)) return;
     if (l.status === 'question' && !l.pendingAnswer) return;
     if (l.next === null && l.steps.length === 0) {
+      // Pas de raf start ni de commit du plan pour un lot qu'aucune session ne suivrait.
+      const halt = halted(c.wave);
+      if (halt) {
+        suspend(c, halt);
+        return;
+      }
       const before = snapshot(l.repo, { remote: false });
       if (before.tracked.length) {
         stop(c, 'handed-back', `dépôt sale avant le lot : ${trackedPaths(before).join(', ')}`);

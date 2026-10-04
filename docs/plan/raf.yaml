@@ -513,6 +513,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-1920, 0 passe(s) de correction)", commit: d924743b421819b12ec232038cb1f1ba9cd513b2 }
   - id: L43
     title: "⚡ Suites de la vague 2026-10-04-1807 sur L35 et L37 — VÉRIFIER d'abord : qa-reviewer nomme le profil de l'étape browser state (userDataDir réservé à la QA, conservé entre les passes, jamais le profil personnel) et l'exclut du nettoyage ; test/skills.test.ts:258 commentaire sans assertion ; test deliver « relevé indisponible au délai » vérifie aussi la ligne L30"
     status: todo

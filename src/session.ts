@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { CLEAN_DAYS, staleFiles } from './clean.js';
-import { dueLine, isRecurring } from './recurring.js';
+import { dueDays, dueLine, isRecurring } from './recurring.js';
 import { audit, exemptPlanOnly, nextUp, planCommits } from './audit.js';
 import { diffDays, maxDay, type Day } from './dates.js';
 import { repoStatus, type Commit } from './git.js';
@@ -128,7 +128,10 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   section(
     out,
     'Récurrent',
-    lots.filter(isRecurring).map((l) => `${l.id}  ${l.title} — ${dueLine(l, today)}`),
+    lots
+      .filter(isRecurring)
+      .sort((a, b) => dueDays(b, today) - dueDays(a, today))
+      .map((l) => `${l.id}  ${l.title} — ${dueLine(l, today)}`),
   );
   section(out, 'Écarts (raf check)', audit(plan, ctx.root, ctx.newsDir, today).map((i) => `✗ ${i.message}`));
   section(out, 'Dépôt', [repoLine(ctx.root).line]);

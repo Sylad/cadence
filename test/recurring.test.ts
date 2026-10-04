@@ -114,6 +114,36 @@ describe('raf — lots récurrents', () => {
     expect(out.split('Propositions')[1] ?? '').not.toContain('L1');
   });
 
+  it('session start trie « Récurrent » par retard décroissant', () => {
+    const dir = gitRepo();
+    raf(dir, '2026-09-01', 'init', '--project', 'demo');
+    raf(dir, '2026-09-01', 'add', 'Lointain', '--every', '30');
+    raf(dir, '2026-09-01', 'add', 'Retard', '--every', '7');
+    const out = raf(dir, '2026-09-13', 'session', 'start', '--since', '2026-09-01').out;
+    expect(out.indexOf('Retard — dû depuis 5 j')).toBeGreaterThan(-1);
+    expect(out.indexOf('Retard — dû depuis 5 j')).toBeLessThan(out.indexOf('Lointain — prochain dans'));
+  });
+
+  it('add --parent --every est refusé (code 2), sans rien écrire', () => {
+    const dir = gitRepo();
+    raf(dir, '2026-09-01', 'init', '--project', 'demo');
+    raf(dir, '2026-09-01', 'add', 'Lot');
+    const r = raf(dir, '2026-09-01', 'add', 'sous', '--parent', 'L1', '--every', '7');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/--every/);
+    expect(raf(dir, '2026-09-01', 'now').out).not.toContain('L1/t1');
+  });
+
+  it('post-commit sur un lot récurrent todo conseille raf did, pas raf start', () => {
+    const dir = gitRepo();
+    raf(dir, '2026-09-01', 'init', '--project', 'demo', '--no-hook');
+    raf(dir, '2026-09-01', 'add', 'Nettoyer', '--every', '7');
+    commit(dir, 'chore(L1): nettoyage', '2026-09-02T10:00:00');
+    const { err } = raf(dir, '2026-09-02', 'hook', 'post-commit');
+    expect(err).toContain('raf did L1');
+    expect(err).not.toContain('raf start');
+  });
+
   it('le planning ne place pas les lots récurrents dans la file', () => {
     const p = fresh();
     p.add('N', '2026-09-01', { every: 7 });

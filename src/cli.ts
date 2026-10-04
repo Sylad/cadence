@@ -267,7 +267,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         io.out(changed ? `hook installé : ${path}` : `hook déjà présent : ${path}`);
         return 0;
       }
-      if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, io);
+      if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io);
       throw new RafError('usage : raf hook install|post-commit');
     }
     case 'session': {
@@ -395,7 +395,7 @@ function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): num
   return 0;
 }
 
-function postCommit(load: (() => Plan) | null, newsDir: string, root: string, io: Io): number {
+function postCommit(load: (() => Plan) | null, newsDir: string, root: string, today: Day, io: Io): number {
   if (!load) return 0;
   try {
     const plan = load();
@@ -414,6 +414,7 @@ function postCommit(load: (() => Plan) | null, newsDir: string, root: string, io
     for (const r of refs) {
       const lot = lots.get(r.lot);
       if (!lot) io.err(`raf: ${r.lot} n'existe pas dans le plan`);
+      else if (isRecurring(lot)) io.err(`raf: ${r.lot} est récurrent (${dueLine(lot, today)})${plan.readonly ? '' : ` — raf did ${r.lot}`}`);
       else if (lot.status === 'todo' && !planning) io.err(`raf: ${r.lot} est encore todo${plan.readonly ? '' : ` — raf start ${r.lot}`}`);
       else io.err(`raf: ${r.lot} (${lot.status}) ${lot.title}`);
     }

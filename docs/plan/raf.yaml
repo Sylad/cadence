@@ -91,7 +91,7 @@ lots:
       - { id: t21, title: "test session clean : référence de clôture à 0 (lot L1 fermé ou date sans écart, cadence.yaml commité) ou ✓ prêt à fermer vérifié — session.test.ts:236 et :317 doivent tuer la mutation « nettoyage compté dans open »", status: done }
       - { id: t22, title: "test t17 (clean.test.ts:282) : jour de référence tiré du ctime réel, pas de l'horloge, pour tenir à minuit", status: done }
       - { id: t23, title: "test/session-clean-failure.test.ts:32-38 : même faiblesse que t21 — référence de clôture à 0 et « ✓ prêt à fermer » exigés, mutation « échec du nettoyage compté dans open » tuée", status: todo }
-    review: { date: 2026-10-04, verdict: "conforme après 2 corrections : 0 bloquant, 1 majeur (test de clôture sans référence à 0), 1 mineur (test t17 à minuit)", commit: 241cba9189cedccc6853963514f4d9d52cfa0125 }
+    review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-2052, 0 passe(s) de correction)", commit: 4d345abf77e9839212a02f74cd756887572efdd6 }
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
     status: done

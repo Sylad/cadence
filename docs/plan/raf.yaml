@@ -213,6 +213,11 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "not compliant: 1 majeur (relevé ps périmé → pid repris signalé), 2 mineurs (end() sans repli groupe+racine, pas de message sur stderr) — revue de la vague 2026-10-04-1534, verdict relu dans le journal", commit: b03a2c4420c1ebc0f1078d22e3a3ac6883b64131 }
+    tasks:
+      - { id: t1, title: "proc : un relevé en échec ne doit pas faire signaler des pids d'après un relevé périmé (vérifier l'identité au moment du kill, ou plafonner l'âge du dernier relevé) — test pid repris pendant l'échec de ps", status: todo }
+      - { id: t2, title: "proc : end() applique aussi le repli groupe + racine quand la racine n'a jamais été relevée (Ctrl-C/raccrochage), avec un test ; aligner le README", status: todo }
+      - { id: t3, title: "proc/deliver : signaler sur stderr, une fois, que le relevé des processus est indisponible et que le kill est dégradé", status: todo }
   - id: L22
     title: Publier @sylad/cadence 0.8.0 sur npm (verify, attribution par la portée, livraisons protégées Ctrl-C/délai/SIGTERM, deliveredLots, noms accentués) — OTP par Sylvain, vérification au registre et tag
     status: done
@@ -239,6 +244,12 @@ lots:
     started: 2026-10-04
   - id: L25
     title: "⚡ orchestrate : « commit annoncé absent de git » faux positif à la reprise — un commit d'une session précédente du même lot (ancêtre de HEAD) est cité par le rapport ; vérifier contre les commits du lot, pas la seule plage de la session (cycle.ts:398-404, vague 2026-10-04-1534)"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04
+  - id: L26
+    title: "⚡ orchestrate : une revue qui finit en texte sans structured_output (end_turn, 7 tours, verdict présent dans le texte) fait échouer le lot — relance de mise en forme, ou schéma prioritaire sur la consigne « ligne de verdict » de l'agent (vague 2026-10-04-1534, L21)"
     status: todo
     estimate: 1
     quickwin: true

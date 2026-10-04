@@ -170,7 +170,7 @@ lots:
     finished: 2026-10-04
   - id: L20
     title: "deliver : un script tué au deployTimeout laisse ses descendants (sh fait un fork) et cadence libère le verrou → seconde livraison concurrente possible (risque antérieur à L19) — tuer les descendants au délai sans détacher, ou garder le verrou tant que le groupe vit ; SIGTERM envoyé à cadence seul idem ; test"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-04
     notes:
@@ -178,3 +178,11 @@ lots:
       - { date: 2026-10-04, text: "revue 04-10 : conforme après 1 correction — (M) aucun test ne couvre un petit-enfant (mutation killTree à 1 niveau passe tous les tests ; livrer.sh pousse le gitops depuis ce niveau) ; (m) Ctrl-C/SIGHUP : trap et index.lock n'ont plus le temps (verify-cache.sh de finance a un trap EXIT). Décision lead : test petit-enfant (délai ET SIGTERM) + délai de grâce court (≈2 s) avant killTree sur SIGINT/SIGHUP uniquement ; délai dépassé et SIGTERM inchangés ; README à jour." }
       - { date: 2026-10-04, text: "re-revue 04-10 NON CONFORME (3 majeurs, reproduits) : (1) Ctrl-C : enfant en arrière-plan qui ignore INT, sh déjà mort → endTree rend la main à vide, seconde livraison concurrente ; (2) verrou libéré pendant le délai de grâce (deliver.ts:204-208 résout sur exit de la racine) ; (3) kill à l'échéance de endTree non testé (mutation proc.ts:127 verte). 3e passe → main rendue à Sylvain, qui valide (04-10) la recommandation du lead : SUIVI CONTINU des descendants pendant l'exécution (relevé /proc périodique, pid + heure de démarrage mémorisés), au signal/délai tuer tous les suivis encore vivants (heure de démarrage vérifiée), verrou tenu jusqu'à arbre vide, test du kill à l'échéance." }
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme (revue finale 04-10, HEAD 81d8e0d) : 9 scénarios rejoués sur build (Ctrl-C avec enfant en arrière-plan, seconde livraison refusée pendant la grâce, kill à l'échéance, délai et SIGTERM avec petit-enfant, SIGHUP, vrai pty) — un seul bump partout ; mutations détectées ; 273 tests ×3 ; CPU du suivi ≈3,7 % d'un cœur ; 2 mineurs (test pid réutilisé, branche ps non protégée) reportés en L21", commit: 81d8e0d277230fac5566c4c0c2f9202d056852fb }
+    finished: 2026-10-04
+  - id: L21
+    title: "Suites de la revue L20 : test unitaire TreeTracker pour un pid repris (heure de démarrage différente → ni suivi ni signalé) ; relevé ps (sans /proc, macOS) protégé — un échec de ps ne plante pas cadence depuis le timer et ne laisse aucun processus en SIGSTOP"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-04

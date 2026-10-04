@@ -390,9 +390,10 @@ lots:
     finished: 2026-10-04
   - id: L31
     title: "Release : à la prochaine version publiée, prouver l'OIDC (ligne « Signed provenance statement » dans le log du workflow, provenance visible sur npmjs.com) puis proposer à Sylvain « disallow tokens » sur le paquet — sorti de L23 (dépend d'une release, pas de code)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-04
+    started: 2026-10-04
   - id: L32
     title: ⚡ raf check signale (avertissement, pas erreur) un lot visible sans titre public — suite de L12 ; documenté dans le README
     status: todo

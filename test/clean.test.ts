@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, lutimesSync, mkdirSync, readdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, lutimesSync, mkdirSync, readdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { staleFiles } from '../src/clean.js';
 import { gitRepo, tempDir } from './helpers.js';
@@ -121,6 +121,18 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     ageTree(clone);
     expect(staleFiles(tmp, [`${tmp}/repo/.*/*`], 7, TODAY)).toEqual([]);
     expect(staleFiles(tmp, [`${tmp}/repo/.git/*`, `${tmp}/repo/.*`], 7, TODAY)).toEqual([]);
+  });
+
+  it('un dossier illisible ou qui disparaît pendant le parcours ne fait pas lever staleFiles', () => {
+    const tmp = tempDir();
+    touch(join(tmp, 'locked/f'));
+    touch(join(tmp, 'locked'));
+    chmodSync(join(tmp, 'locked'), 0o644);
+    try {
+      expect(() => staleFiles(tmp, [`${tmp}/*`], 7, TODAY)).not.toThrow();
+    } finally {
+      chmodSync(join(tmp, 'locked'), 0o755);
+    }
   });
 });
 

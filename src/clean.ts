@@ -66,7 +66,13 @@ function holdsRepo(path: string): boolean {
 
 /** Date de modification la plus récente d'un chemin ou, pour un dossier, de tout son contenu (liens non suivis). */
 function newestMtime(path: string): Date {
-  const st = lstatSync(path);
+  let st;
+  try {
+    st = lstatSync(path);
+  } catch {
+    // Illisible ou disparu pendant le parcours : on ne peut pas affirmer qu'il est périmé, il compte comme récent.
+    return new Date();
+  }
   let newest = st.mtime;
   if (!st.isDirectory()) return newest;
   let names: string[];

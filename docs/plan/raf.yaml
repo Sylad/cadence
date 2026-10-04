@@ -131,6 +131,7 @@ lots:
     estimate: 1
     created: 2026-10-03
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme après 2 corrections mineures (README : public absent de la liste des champs ; refus de --clear accompagné d'un titre non testé) — orchestré (vague 2026-10-04-1700, 1 passe(s) de correction)", commit: 1396b5fad1bb9d8271a61f68d243d32c5c384412 }
   - id: L13
     title: "changedFiles : lire git diff-tree avec -z et core.quotepath=off — un plan ou un fichier de plan.files au nom accentué n'est jamais reconnu comme fichier du plan (relecture du 03-10, antérieur aux écarts du 02-10)"
     status: done

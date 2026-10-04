@@ -1,10 +1,7 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
+import { onTermination } from './proc.js';
 import { describeCheck, realDeps, retryCheck, TIMED_OUT, type CheckDeps, type DeliverConfig, type VerifyCheck } from './deliver.js';
-
-/** Groupes des vérifications en cours : cadence leur relaie Ctrl-C, SIGTERM et le raccrochage avant de sortir. */
-const groups = new Set<number>();
-const RELAYED = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 
 function killGroup(pgid: number, sig: NodeJS.Signals): void {
   try {
@@ -12,23 +9,6 @@ function killGroup(pgid: number, sig: NodeJS.Signals): void {
   } catch {
     // groupe déjà vide
   }
-}
-
-function relay(sig: NodeJS.Signals): void {
-  for (const pgid of groups) killGroup(pgid, sig);
-  groups.clear();
-  for (const s of RELAYED) process.removeListener(s, relay);
-  process.kill(process.pid, sig); // puis sortie comme sans relais : tué par le même signal
-}
-
-function track(pgid: number): void {
-  if (groups.size === 0) for (const s of RELAYED) process.on(s, relay);
-  groups.add(pgid);
-}
-
-function untrack(pgid: number): void {
-  groups.delete(pgid);
-  if (groups.size === 0) for (const s of RELAYED) process.removeListener(s, relay);
 }
 
 /**
@@ -50,7 +30,8 @@ function execGroup(root: string, cmd: string, env: Record<string, string>, timeo
       child.once('error', () => resolve(127));
       return;
     }
-    track(pgid);
+    // Ctrl-C, SIGTERM ou raccrochage reçu par cadence : relayé au groupe avant de sortir.
+    const forget = onTermination((sig) => killGroup(pgid, sig));
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
@@ -58,7 +39,7 @@ function execGroup(root: string, cmd: string, env: Record<string, string>, timeo
     }, timeoutMs);
     child.once('exit', (code, signal) => {
       clearTimeout(timer);
-      untrack(pgid);
+      forget();
       if (timedOut) killGroup(pgid, 'SIGKILL'); // sh mort avant ses enfants : le groupe est vidé quand même
       resolve(timedOut ? TIMED_OUT : signal ? 128 + (constants.signals[signal] ?? 0) : (code ?? 1));
     });

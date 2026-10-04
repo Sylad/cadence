@@ -235,10 +235,11 @@ lots:
     finished: 2026-10-04
   - id: L23
     title: "Suites de la revue L22 : publish.yml épingle npm@^11.5.1 ; contrôle du tag aussi contre .claude-plugin/plugin.json et marketplace.json ; à la prochaine release, prouver l'OIDC (ligne « Signed provenance statement » dans le log, provenance visible sur npmjs.com) puis proposer « disallow tokens »"
-    status: todo
+    status: doing
     estimate: 0.1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04
   - id: L24
     title: "⚡ Les tests de cadence passent aussi depuis une session de vague : CADENCE_ORCHESTRATED hérité retiré de leur environnement (17 échecs relevés par la vague 2026-10-04-1534 sur L21)"
     status: done

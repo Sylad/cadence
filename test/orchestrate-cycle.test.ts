@@ -686,6 +686,175 @@ describe('commande orchestrate.test asynchrone (L3/t16)', () => {
   });
 });
 
+const minorFinding = { gravite: 'mineur', fichier: 'a.txt', ligne: 1, texte: 'nommage' };
+const minorReview = (over: Record<string, unknown> = {}): Handler => () => claudeOut(reviewReport({ mineurs: 1, constats: [minorFinding], ...over }));
+
+describe('passe des mineurs (L38/t1)', () => {
+  it('sans commit (mineur jugé faux) : le lot conclut sur la revue conforme d\'origine, mineurs en propositions, choix gardé', async () => {
+    const rejected: Handler = () => claudeOut(workReport({ choix: ['mineur « nommage » refusé : le nom suit la convention du module'] }));
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [rejected] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.outcome).toBe('prêt à livrer');
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
+    expect(c.lot.choix).toEqual(['mineur « nommage » refusé : le nom suit la convention du module']);
+    expect(c.lot.minorFix).toBeFalsy();
+    const lot = h.plan().lot('L1');
+    expect(lot.review?.verdict).toContain('passe des mineurs sans commit');
+    expect(lot.review?.commit).toBe(git(h.repo, 'log', '--format=%H', '--grep=feat(L1)', '-1'));
+    expect(c.lot.warnings).toEqual([expect.stringContaining('passe des mineurs sans commit')]);
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
+  });
+
+  it('question posée par la passe des mineurs sans commit : le lot conclut quand même, la question est rendue en proposition', async () => {
+    const ask: Handler = () => claudeOut(workReport({ questions: ['Le mineur « nommage » est faux, on le garde ?'] }));
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [ask] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.questions).toEqual([]);
+    expect(c.lot.proposals).toContain('[question passe des mineurs] Le mineur « nommage » est faux, on le garde ?');
+    expect(c.lot.proposals).toContain('[mineur code] a.txt:1 — nommage');
+  });
+
+  it('la passe a son propre brief : pas de « stop and report the question », les mineurs refusés vont en choix ; la revue courte relit ces choix', async () => {
+    const partly: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.txt', 'fix(L1): b')], choix: ['mineur « autre » refusé : hors périmètre'] }));
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [partly], 'review-small': [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small']);
+    const brief = h.calls[2].brief;
+    expect(brief).toContain('found only minor findings');
+    expect(brief).toContain('[mineur] a.txt:1 — nommage');
+    expect(brief).toContain('Do not stop to ask');
+    expect(brief).not.toContain('stop and report the question');
+    expect(h.calls[3].brief).toContain('- mineur « autre » refusé : hors périmètre');
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.choix).toEqual(['mineur « autre » refusé : hors périmètre']);
+  });
+
+  it('dépôt sale après la passe des mineurs : rendu au lead (rien n\'est conclu sur du travail non commité)', async () => {
+    const dirty: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'a.txt'), 'modifié\n');
+      return claudeOut(workReport());
+    };
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [dirty] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(h.plan().lot('L1').review).toBeUndefined();
+  });
+
+  it('tests rouges après la passe des mineurs : correction de défauts avec le brief des défauts, pas celui des mineurs', async () => {
+    const red: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.txt', 'fix(L1): b')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }));
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [red, fix('c.txt')], 'review-small': [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'fix', 'review-small']);
+    expect(h.calls[2].brief).toContain('found only minor findings');
+    expect(h.calls[3].brief).toContain('found the defects below');
+    expect(c.lot.pass).toBe(1);
+    expect(c.lot.status).toBe('ready');
+  });
+});
+
+describe('lot visible et passe des mineurs (L38/t2)', () => {
+  const uxOk: Handler = () => claudeOut(reviewReport({ verdict: 'ergonomie conforme (UX)' }));
+  const withUx = { ux: { url: 'http://localhost:4200' } };
+
+  it('le verdict de l\'agent UX n\'est pas écrasé par la revue courte ; l\'UX est rejouée après la passe des mineurs', async () => {
+    const h = harness({
+      lots: [{ title: 'Écran', visible: true }],
+      script: { implement: [impl()], ux: [uxOk, uxOk], review: [minorReview({ verdict: 'code conforme avec un mineur' })], fix: [fix('b.txt')], 'review-small': [() => claudeOut(reviewReport({ verdict: 'relecture courte conforme' }))] },
+    });
+    const c = h.lot('L1', { visible: true }, withUx);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'ux', 'review', 'fix', 'ux', 'review-small']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.uxVerdict).toBe('ergonomie conforme (UX)');
+    expect(c.lot.ux?.verdict).toBe('ergonomie conforme (UX)');
+    expect(c.lot.code?.verdict).toBe('relecture courte conforme');
+    expect(h.calls[5].brief).toContain('short re-review');
+  });
+
+  it('UX rejouée après une correction de défaut, même quand elle était conforme avant', async () => {
+    const h = harness({
+      lots: [{ title: 'Écran', visible: true }],
+      script: { implement: [impl()], ux: [uxOk, uxOk], review: [major, ok], fix: [fix('b.txt')] },
+    });
+    const c = h.lot('L1', { visible: true }, withUx);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'ux', 'review', 'fix', 'ux', 'review']);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('une UX non conforme après la passe des mineurs mène à une correction de défaut, pas à un verdict', async () => {
+    const uxBad: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'ui.css', texte: 'contraste 2:1 (WCAG 1.4.3)' }], verdict: 'UX non conforme' }));
+    const h = harness({
+      lots: [{ title: 'Écran', visible: true }],
+      script: { implement: [impl()], ux: [uxOk, uxBad, uxOk], review: [minorReview()], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok, ok] },
+    });
+    const c = h.lot('L1', { visible: true }, withUx);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'ux', 'review', 'fix', 'ux', 'review-small', 'fix', 'ux', 'review-small']);
+    expect(h.calls[6].brief).toContain('contraste 2:1 (WCAG 1.4.3)');
+    expect(c.lot.pass).toBe(1);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('petit lot visible : la passe unique porte toujours le verdict d\'ergonomie, y compris après la passe des mineurs', async () => {
+    const h = harness({
+      lots: [{ title: 'petit', estimate: 0.5, visible: true }],
+      script: { implement: [impl()], 'review-small': [minorReview({ verdict: 'passe unique' }), () => claudeOut(reviewReport({ verdict: 'passe unique 2' }))], fix: [fix('b.txt')] },
+    });
+    const c = h.lot('L1', { small: true, visible: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review-small', 'fix', 'review-small']);
+    expect(h.calls[3].brief).toContain('single pass');
+    expect(c.lot.uxVerdict).toBe('passe unique 2');
+  });
+});
+
+describe('brief de la revue courte (L38/t3)', () => {
+  it('lot non visible : revue courte de code, ni « This lot is small » ni revue d\'ergonomie', async () => {
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [fix('b.txt')], 'review-small': [ok] } });
+    await runLot(h.lot('L1', {}, { ux: { command: 'npm start' } }));
+    const brief = h.calls[3].brief;
+    expect(brief).toContain('short re-review');
+    expect(brief).not.toContain('This lot is small');
+    expect(brief).not.toContain('usability');
+    expect(brief).not.toContain('Start the app');
+  });
+
+  it('petit lot non visible : une revue de code ordinaire (pas de revue d\'ergonomie annoncée)', async () => {
+    const h = harness({ lots: [{ title: 'petit', estimate: 0.5 }], script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', { small: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(h.calls[1].brief).not.toContain('usability');
+    expect(c.lot.status).toBe('ready');
+  });
+});
+
+describe('budget épuisé après une revue conforme avec mineurs (L38/t4)', () => {
+  it('le lot conclut sur la revue conforme (prêt, verdict enregistré), mineurs en propositions, au lieu de rester suspendu', async () => {
+    const h = harness({ budget: 3000, script: { implement: [impl()], review: [minorReview()] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(h.wave.budget.exhausted).toBe(true);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
+    expect(c.lot.warnings.join('\n')).toContain('passe des mineurs');
+    const lot = h.plan().lot('L1');
+    expect(lot.review?.verdict).toContain('orchestré');
+    expect(lot.review?.verdict).not.toContain('passe des mineurs');
+    expect(lot.review?.commit).toBe(git(h.repo, 'log', '--format=%H', '--grep=feat(L1)', '-1'));
+  });
+});
+
 describe('gabarits : instantané de la vague (L39)', () => {
   it('un gabarit modifié (ou cassé) pendant la vague ne change pas les briefs de cette vague', async () => {
     const dir = tempDir();

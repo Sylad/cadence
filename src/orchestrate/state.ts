@@ -81,6 +81,8 @@ export interface LotState {
   pass: number;
   /** Vrai une fois la passe unique de correction des mineurs lancée (revue conforme avec mineurs) ; elle ne se rejoue pas. */
   minorPass?: boolean;
+  /** Vrai entre la décision de la passe des mineurs et la fin de sa session `fix` : celle-ci reçoit le brief des mineurs, pas celui des défauts. */
+  minorFix?: boolean;
   /** Prochaine étape à jouer ; null = cycle terminé. Relue à la reprise. */
   next: StepKind | null;
   startedSha?: string;

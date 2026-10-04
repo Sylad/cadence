@@ -104,6 +104,34 @@ describe('schémas', () => {
   });
 });
 
+describe('variantes de la passe des mineurs (L38)', () => {
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: 'abc1234 feat(L9): x', reponse: '', constats: '- [mineur] a.txt:1 — nommage', ux: '', choix: '' };
+
+  it('la correction des mineurs ne dit jamais de s\'arrêter pour poser la question, et demande de lister les mineurs refusés en choix', () => {
+    const out = renderBrief('fix-minors', vars);
+    expect(out).toContain('found only minor');
+    expect(out).toContain('- [mineur] a.txt:1 — nommage');
+    expect(out).toContain('abc1234 feat(L9): x');
+    expect(out).toContain('Do not stop to ask');
+    expect(out).toContain('list it under\n"choix"');
+    expect(out).not.toContain('stop and report the question');
+    expect(out).not.toContain('defects');
+    expect(out).not.toMatch(/\{\{/);
+  });
+
+  it('la revue courte qui la suit est une revue de code : ni « small lot » ni revue d\'ergonomie, les choix relus', () => {
+    const out = renderBrief('review-recheck', { ...vars, choix: '- A plutôt que B', ux: 'Start the app with: npm start' });
+    expect(out).toContain('short re-review');
+    expect(out).toContain('This is a code review only');
+    expect(out).not.toContain('This lot is small');
+    expect(out).not.toContain('single pass');
+    expect(out).not.toContain('usability');
+    expect(out).not.toContain('Start the app');
+    expect(out).toContain('- A plutôt que B');
+    expect(out).toContain('read-only');
+  });
+});
+
 describe('instantané des gabarits (L39)', () => {
   const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '' };
 
@@ -111,7 +139,7 @@ describe('instantané des gabarits (L39)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cadence-tpl-'));
     cpSync(TEMPLATES_DIR, dir, { recursive: true });
     const snap = loadTemplates(dir);
-    expect(Object.keys(snap).sort()).toEqual(['fix', 'implement', 'review', 'review-small', 'ux']);
+    expect(Object.keys(snap).sort()).toEqual(['fix', 'fix-minors', 'implement', 'review', 'review-recheck', 'review-small', 'ux']);
     writeFileSync(join(dir, 'review.md'), 'changé {{lot}}\n');
     expect(renderBrief('review', vars, snap)).toContain('Review lot `L9`');
     expect(renderBrief('review', vars, dir)).toBe('changé L9\n');

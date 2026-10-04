@@ -9,7 +9,7 @@ import { readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
-import { objective, renderBrief, type BriefVars, type Templates } from './briefs.js';
+import { objective, renderBrief, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, runSession, trackGroup, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
@@ -206,6 +206,13 @@ function choixText(choix: string[]): string {
   return ['The author decided these interpretation questions on its own; re-read each choice against the lot, its notes and the code, and report a finding if one is wrong or changes the scope:', ...choix.map((x) => `- ${x}`)].join('\n');
 }
 
+/** Gabarit d'une étape : la passe des mineurs et la revue courte qui la suit ont chacune le leur. */
+function briefName(l: LotState, kind: StepKind): BriefName {
+  if (kind === 'fix' && l.minorFix) return 'fix-minors';
+  if (kind === 'review-small' && l.minorPass && !(l.small && l.visible)) return 'review-recheck';
+  return kind;
+}
+
 function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
@@ -224,7 +231,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     }
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
-  return renderBrief(kind, vars, c.wave.templates);
+  return renderBrief(briefName(l, kind), vars, c.wave.templates);
 }
 
 type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot };
@@ -377,12 +384,15 @@ function summarize(rep: ReviewReport, head: string): ReviewSummary {
   return { conforme: bloquants === 0 && majeurs === 0, bloquants, majeurs, mineurs: Math.max(rep.mineurs, count('mineur')), verdict: rep.verdict.trim(), sousTaches: rep.sousTaches, nonVerifie: rep.nonVerifie, head };
 }
 
+function propose(c: LotCtx, text: string): void {
+  if (!c.lot.proposals.includes(text)) c.lot.proposals.push(text);
+}
+
+const minorLine = (source: string, k: { fichier?: string; ligne?: number; texte: string }) => `[mineur ${source}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`;
+
 function addProposals(c: LotCtx, rep: ReviewReport, source: string, withMinors = true): void {
-  const add = (t: string) => {
-    if (!c.lot.proposals.includes(t)) c.lot.proposals.push(t);
-  };
-  if (withMinors) for (const k of rep.constats.filter((k) => k.gravite === 'mineur')) add(`[mineur ${source}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`);
-  for (const t of rep.sousTaches) add(`[sous-tâche ${source}] ${t}`);
+  if (withMinors) for (const k of rep.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine(source, k));
+  for (const t of rep.sousTaches) propose(c, `[sous-tâche ${source}] ${t}`);
 }
 
 function minorConstats(rep: ReviewReport): Constat[] {
@@ -402,8 +412,10 @@ function badReport(c: LotCtx, step: StepState, e: unknown): null {
 /** Étape d'écriture (implémentation, correction) : contrôles, puis étape suivante décidée. */
 async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const l = c.lot;
+  const minorsPass = kind === 'fix' && l.minorFix === true;
   const done = await session(c, kind);
   if (!done) return;
+  l.minorFix = false; // la passe des mineurs est jouée : la suite se décide sur son rapport
   let rep: WorkReport;
   try {
     rep = checkShape<WorkReport>(done.report, WORK_SCHEMA);
@@ -433,7 +445,9 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   for (const x of rep.choix ?? []) if (!(l.choix ??= []).includes(x)) l.choix.push(x);
   save(c);
 
-  if (rep.questions.length) {
+  // La passe des mineurs ne bloque jamais le lot (revue conforme déjà acquise) : une question est rendue en proposition.
+  if (minorsPass) for (const q of rep.questions) propose(c, `[question passe des mineurs] ${q}`);
+  if (!minorsPass && rep.questions.length) {
     l.questions = rep.questions;
     l.next = kind;
     transition(c, 'question', rep.questions[0]);
@@ -442,6 +456,15 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const dirt = [...trackedPaths(done.after), ...done.after.untracked.filter((f) => !done.before.untracked.includes(f))];
   if (dirt.length) {
     stop(c, 'handed-back', `dépôt sale après ${kind} : ${dirt.join(', ')}`);
+    return;
+  }
+  if (minorsPass && commits.length === 0) {
+    // Rien à corriger (mineurs jugés faux, listés en « choix ») : la revue conforme d'origine vaut, HEAD n'a pas bougé.
+    for (const k of l.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine('code', k));
+    l.constats = [];
+    l.warnings.push('passe des mineurs sans commit : le lot conclut sur la revue conforme d\'origine, mineurs rendus en propositions');
+    if (l.code) await conclude(c, l.code, ' sans commit');
+    else stop(c, 'handed-back', 'passe des mineurs sans commit, mais aucune revue conforme gardée');
     return;
   }
   // Après une réponse du lead, la session peut n'avoir plus rien à commiter : le travail du lot est déjà dans git.
@@ -468,18 +491,24 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   save(c);
 }
 
+/** Revue de code qui clôt le cycle : complète, ou courte une fois la passe des mineurs jouée. */
+const codeReview = (l: LotState): StepKind => (l.minorPass ? 'review-small' : 'review');
+
+/**
+ * Première étape après un travail d'écriture. Le code vient de changer : l'UX d'un lot visible est donc toujours rejouée
+ * (une revue antérieure serait périmée), puis une revue de code clôt le cycle.
+ */
 function firstReview(c: LotCtx): StepKind {
   const l = c.lot;
-  if (l.minorPass) return 'review-small'; // après la passe des mineurs : revue courte, la revue complète a déjà eu lieu
-  if (l.small) return 'review-small';
+  if (l.small) return l.visible || l.minorPass ? 'review-small' : 'review'; // passe unique code + ergonomie ; sans écran, une revue de code
   if (l.visible) {
     if (!c.config.ux) {
       l.uxNote = 'UX à faire par le lead (aucune application déclarée : cadence.yaml orchestrate.ux)';
-      return 'review';
+      return codeReview(l);
     }
-    if (!l.ux || !l.ux.conforme) return 'ux';
+    return 'ux';
   }
-  return 'review';
+  return codeReview(l);
 }
 
 /** Une passe de correction de plus, ou la main rendue au lead quand les deux sont faites. */
@@ -512,23 +541,29 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
     addProposals(c, rep, 'ux');
     l.uxVerdict = summary.verdict;
     l.constats = blockingConstats(rep, 'ux');
-    l.next = 'review'; // la revue de code clôt toujours le cycle
+    l.next = codeReview(l); // la revue de code clôt toujours le cycle
     save(c);
     return;
   }
   l.code = summary;
-  const uxOk = kind === 'review-small' || !l.ux || l.ux.conforme;
-  const minors = minorConstats(rep);
-  // Revue conforme avec mineurs : une seule passe de correction des mineurs, avant de conclure (rien sous le tapis).
-  const minorPass = summary.conforme && uxOk && !l.minorPass && minors.length > 0;
-  addProposals(c, rep, 'code', !minorPass);
-  if (kind === 'review-small' && l.visible) {
-    // La passe unique porte aussi l'ergonomie : son verdict vaut pour les deux.
+  const w = c.wave;
+  if (l.small && l.visible) {
+    // La passe unique d'un petit lot porte aussi l'ergonomie : son verdict vaut pour les deux. Sur un lot non petit, le verdict UX reste celui de l'agent UX.
     l.ux = summary;
     l.uxVerdict = summary.verdict;
   }
+  const uxOk = l.small || !l.ux || l.ux.conforme;
+  const minors = minorConstats(rep);
+  // Revue conforme avec mineurs : une seule passe de correction des mineurs, avant de conclure (rien sous le tapis).
+  // Budget épuisé : la passe n'aurait aucune session pour la jouer, le lot conclut sur la revue conforme et rend les mineurs.
+  const wanted = summary.conforme && uxOk && !l.minorPass && minors.length > 0;
+  const noBudget = wanted && w.budget.exhausted && !w.incident && !w.quota.hit;
+  const minorPass = wanted && !noBudget;
+  if (noBudget) l.warnings.push('budget atteint : la passe des mineurs n\'a pas eu lieu, mineurs rendus en propositions');
+  addProposals(c, rep, 'code', !minorPass);
   if (minorPass) {
     l.minorPass = true;
+    l.minorFix = true;
     l.constats = minors;
     l.next = 'fix';
     save(c);
@@ -538,7 +573,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
     await conclude(c, summary);
     return;
   }
-  const constats = [...blockingConstats(rep, 'code'), ...(kind === 'review' && l.ux && !l.ux.conforme ? uxConstatsKept(c) : [])];
+  const constats = [...blockingConstats(rep, 'code'), ...(!l.small && l.ux && !l.ux.conforme ? uxConstatsKept(c) : [])];
   toFix(c, constats, 'revue non conforme');
 }
 
@@ -548,10 +583,10 @@ function uxConstatsKept(c: LotCtx): Constat[] {
 }
 
 /** Revue conforme : le verdict est enregistré avec le sha relu, puis le commit du plan. `raf done` reste au lead. */
-async function conclude(c: LotCtx, code: ReviewSummary): Promise<void> {
+async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise<void> {
   const l = c.lot;
   const plan = c.loadPlan();
-  const verdict = `${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction${l.minorPass ? ' + passe des mineurs' : ''})`;
+  const verdict = `${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction${l.minorPass ? ` + passe des mineurs${minorNote}` : ''})`;
   l.verdict = verdict;
   const newer = lotWork(plan, l.repo, l.lot)[0]?.sha ?? null;
   if (code.head && newer !== null && git(l.repo, 'rev-parse', 'HEAD') !== code.head) {

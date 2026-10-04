@@ -209,7 +209,9 @@ describe('--dry-run', () => {
     const text = r.out.join('\n');
     expect(text).toContain('a:L1');
     expect(text).toContain('implement (sonnet) → review (opus)');
-    expect(text).toContain('implement (haiku) → review-small (opus) — petit lot');
+    expect(text).toContain('implement (haiku) → review (opus) — petit lot'); // sans écran, la passe unique est une revue de code
+    expect(text).toContain('corrections : 2 passe(s) au plus, en session neuve');
+    expect(text).toContain('revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte');
     expect(text).toContain('UX à faire par le lead');
     expect(text).toContain('créneau 1');
     expect(text).toContain("en attente d'un créneau");

@@ -20,15 +20,17 @@ export interface BriefVars {
   choix: string;
 }
 
-/** Un gabarit : un par étape. */
-export type BriefName = StepKind;
+/** Un gabarit : un par étape, plus deux variantes (passe des mineurs, revue courte qui la suit). */
+export type BriefName = StepKind | 'fix-minors' | 'review-recheck';
 
 const FILES: Record<BriefName, string> = {
   implement: 'implement.md',
   fix: 'fix.md',
+  'fix-minors': 'fix-minors.md',
   review: 'review.md',
   ux: 'ux.md',
   'review-small': 'review-small.md',
+  'review-recheck': 'review-recheck.md',
 };
 
 /** Texte des gabarits, lu une fois : une vague rend tous ses briefs depuis le même instantané. */

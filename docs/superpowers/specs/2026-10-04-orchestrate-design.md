@@ -107,7 +107,9 @@ préconditions → raf start → implémentation (Sonnet)
    comme propositions. Une passe sans commit (ou qui pose une question, rendue en proposition)
    conclut sur la revue conforme d'origine seulement si HEAD n'a pas bougé depuis (sinon, reprise après
    une session coupée qui avait commité : revue courte de ce commit) : `ready`, verdict enregistré avec le sha qu'elle a lu,
-   mineurs non traités en propositions. Même conclusion quand le budget est épuisé juste après la
+   mineurs non traités en propositions. Même règle pour une correction ordinaire coupée après un commit
+   (L40) : reprise sans nouveau commit et HEAD ≠ sha de la dernière revue de code → revue, pas « fix sans commit ».
+   Même conclusion quand le budget est épuisé juste après la
    revue conforme (aucune session pour jouer la passe). Les sous-tâches proposées restent rendues au lead.
    Pour un lot visible non petit, l'UX est rejouée après la passe (comme après toute correction : le code
    a changé) et son verdict reste celui de l'agent UX ; la revue courte ne l'écrase pas.

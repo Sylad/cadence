@@ -900,6 +900,34 @@ describe('propositions : seul ce qui reste non traité (L38/t7)', () => {
   });
 });
 
+describe('correction ordinaire interrompue puis reprise (L40)', () => {
+  it('commit de la correction puis quota ; la session neuve ne trouve plus rien : le commit est relu, pas rendu au lead', async () => {
+    const commitThenQuota: Handler = (call) => {
+      commitFile(call.opts.cwd, 'b.txt', 'fix(L1): bug nommé');
+      return quotaOut();
+    };
+    const nothingLeft: Handler = () => claudeOut(workReport({ choix: ['rien à corriger de plus'] }));
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [commitThenQuota, nothingLeft] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('suspended');
+    h.wave.quota = { hit: false };
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'fix', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.review?.commit ?? h.plan().lot('L1').review?.commit).toBe(git(h.repo, 'log', '--format=%H', '--grep=fix(L1)', '-1'));
+  });
+
+  it('correction sans commit et HEAD inchangé depuis la revue : toujours rendue au lead', async () => {
+    const nothing: Handler = () => claudeOut(workReport());
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [nothing] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toBe('fix sans commit');
+  });
+});
+
 describe('brief de la revue courte (L38/t3)', () => {
   it('lot non visible : revue courte de code, ni « This lot is small » ni revue d\'ergonomie', async () => {
     const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [fix('b.txt')], 'review-small': [ok] } });

@@ -460,8 +460,8 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     stop(c, 'handed-back', `dépôt sale après ${kind} : ${dirt.join(', ')}`);
     return;
   }
-  // Reprise : une session précédente de la passe a pu commiter avant d'être coupée ; la revue conforme d'origine ne vaut alors plus.
-  const headMoved = minorsPass && commits.length === 0 && !!l.code?.head && git(l.repo, 'rev-parse', 'HEAD') !== l.code.head;
+  // Reprise : une session précédente de l'étape (correction ordinaire ou passe des mineurs) a pu commiter avant d'être coupée ; la revue d'origine ne vaut alors plus.
+  const headMoved = kind === 'fix' && commits.length === 0 && !!l.code?.head && git(l.repo, 'rev-parse', 'HEAD') !== l.code.head;
   if (minorsPass && commits.length === 0 && !headMoved) {
     // Rien à corriger (mineurs jugés faux, listés en « choix ») : la revue conforme d'origine vaut, HEAD n'a pas bougé.
     for (const k of l.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine('code', k));
@@ -477,7 +477,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     stop(c, 'handed-back', `${kind} sans commit`);
     return;
   }
-  if (headMoved) l.warnings.push('passe des mineurs reprise sans nouveau commit : un commit d\'une session précédente est relu par la revue courte');
+  if (headMoved) l.warnings.push(`${minorsPass ? 'passe des mineurs' : 'correction'} reprise sans nouveau commit : un commit d'une session précédente est relu par la revue`);
   else if (commits.length === 0) l.warnings.push(`${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
   const red: Constat[] = [];

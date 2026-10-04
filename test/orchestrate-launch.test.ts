@@ -106,7 +106,8 @@ describe('agents du paquet', () => {
     const agents = readAgents(AGENTS_DIR);
     expect(Object.keys(agents)).toEqual(expect.arrayContaining(['code-reviewer', 'ux-reviewer']));
     expect(agents['code-reviewer'].prompt).toContain('You review the code of one lot');
-    expect(agents['code-reviewer'].tools).toEqual(['Read', 'Grep', 'Glob', 'Bash']);
+    // StructuredOutput ajouté : sans lui, un agent aux outils restreints ne rend jamais structured_output (sonde réelle du 04-10)
+    expect(agents['code-reviewer'].tools).toEqual(['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput']);
     expect(agents['code-reviewer'].description).toMatch(/Code reviewer/);
   });
 });

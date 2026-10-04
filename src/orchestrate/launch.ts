@@ -78,7 +78,8 @@ export function readAgents(dir: string): Record<string, AgentDef> {
     out[meta.name] = {
       description: meta.description,
       prompt: m[2].trim(),
-      ...(meta.tools ? { tools: String(meta.tools).split(',').map((t) => t.trim()).filter(Boolean) } : {}),
+      // Outils restreints : StructuredOutput ajouté, sinon --json-schema reste sans effet (la session finit en texte).
+      ...(meta.tools ? { tools: [...String(meta.tools).split(',').map((t) => t.trim()).filter(Boolean), 'StructuredOutput'] } : {}),
     };
   }
   return out;

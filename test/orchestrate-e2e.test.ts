@@ -107,6 +107,26 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(s.calls().map((c) => [c.kind, c.resume])).toEqual([['implement', false], ['review', false], ['review', true]]);
     const state = JSON.parse(readFileSync(join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1.json'), 'utf8'));
     expect(state.steps.find((st: { kind: string }) => st.kind === 'review').tokens.counted).toBe(115 + 117);
+    // (L27) la relance a échoué : la sortie de la première session est tout de même écrite à côté du rapport d'échec
+    const dir = join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1');
+    const first = JSON.parse(readFileSync(join(dir, '2-review.first.json'), 'utf8'));
+    expect(first.session_id).toBe('fake-review-0');
+    expect('structured_output' in first).toBe(false);
+    expect(existsSync(join(dir, '2-review.json'))).toBe(true);
+  });
+
+  it('quota atteint pendant la relance de mise en forme : lot suspendu, sortie de la première session conservée (L27)', async () => {
+    const s = setup({ implement: [impl], review: [{ noStructured: true, resumeUsageLimit: true }] });
+    const r = await s.cli('proj:L1');
+    expect(s.calls().map((c) => [c.kind, c.resume])).toEqual([['implement', false], ['review', false], ['review', true]]);
+    expect(r.out).toContain('quota');
+    const dir = join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1');
+    const first = JSON.parse(readFileSync(join(dir, '2-review.first.json'), 'utf8'));
+    expect(first.session_id).toBe('fake-review-0');
+    expect('structured_output' in first).toBe(false);
+    const state = JSON.parse(readFileSync(join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1.json'), 'utf8'));
+    expect(state.status).toBe('suspended');
+    expect(state.steps.find((st: { kind: string }) => st.kind === 'review').status).toBe('interrupted');
   });
 
   it('une implémentation sans structured_output est relancée aussi : tous les types d\'étape à schéma (L26)', async () => {

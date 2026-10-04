@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Faux `claude` des tests de bout en bout (CADENCE_CLAUDE_BIN). Lit un scénario JSON (FAKE_CLAUDE_SCENARIO) :
 // { "<étape>": [ action, … ] } consommé dans l'ordre, une action par appel de cette étape.
-// action : { commits: [{file, message}], structured, tokens, exit, garbage, sleepMs, push, usageLimit, noStructured, resumeNoStructured }
+// action : { commits: [{file, message}], structured, tokens, exit, garbage, sleepMs, push, usageLimit, noStructured, resumeNoStructured, resumeUsageLimit }
 // noStructured : réponse réussie en texte, sans structured_output ; l'appel suivant en --resume de cette session rend alors
-// le rapport au format (resumeNoStructured : il n'y arrive pas non plus). Un --resume est journalisé (resume: true).
+// le rapport au format (resumeNoStructured : il n'y arrive pas non plus ; resumeUsageLimit : la relance se heurte au quota). Un --resume est journalisé (resume: true).
 // "{lot}" dans un message est remplacé par le lot du brief. Chaque appel est journalisé (FAKE_CLAUDE_LOG).
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -33,7 +33,7 @@ const used = existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, 'utf8'))
 used.pending ??= {};
 const index = resumeId ? Number(/-(\d+)$/.exec(resumeId)[1]) : (used[kind] ?? 0);
 if (!resumeId) used[kind] = index + 1;
-const action = resumeId ? { structured: used.pending[resumeId]?.structured, noStructured: used.pending[resumeId]?.resumeNoStructured, tokens: { output: 7 } } : ((scenario[kind] ?? [])[index] ?? scenario[`${kind}*`] ?? {});
+const action = resumeId ? { structured: used.pending[resumeId]?.structured, noStructured: used.pending[resumeId]?.resumeNoStructured, usageLimit: used.pending[resumeId]?.resumeUsageLimit, tokens: { output: 7 } } : ((scenario[kind] ?? [])[index] ?? scenario[`${kind}*`] ?? {});
 
 const entry = { kind, lot, cwd: process.cwd(), model: flag('--model'), orchestrated: process.env.CADENCE_ORCHESTRATED ?? null, resume: argv.includes('--resume'), resumeId: resumeId ?? null, sessionId: flag('--session-id'), schema: flag('--json-schema') ?? null, argv };
 const commits = [];
@@ -72,7 +72,7 @@ if (action.usageLimit) {
 }
 if (action.noStructured) {
   // Le texte d'une revue qui n'a pas rendu sa structure ; la relance rendra `structured`.
-  used.pending[out.session_id] = { structured, resumeNoStructured: action.resumeNoStructured };
+  used.pending[out.session_id] = { structured, resumeNoStructured: action.resumeNoStructured, resumeUsageLimit: action.resumeUsageLimit };
   writeFileSync(stateFile, JSON.stringify(used));
   delete out.structured_output;
   out.result = '## Revue\n\nverdict en texte';

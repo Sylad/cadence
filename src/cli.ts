@@ -6,7 +6,7 @@ import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits, unrevi
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
-import { effectLines, verifyCommand } from './verify.js';
+import { effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, headSha, readCommits, resolveCommit } from './git.js';
 import { installHook } from './hook.js';
@@ -261,7 +261,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const sha = values.sha ? (resolveCommit(root, values.sha) ?? '') : (lastDelivery(sharedStateDir(root)) ?? headSha(root) ?? '');
       if (values.sha && !sha) throw new RafError(`--sha ${values.sha} : commit introuvable`);
-      return verifyCommand({ config, sha, retry, out: io.out }, realDeps(root));
+      return verifyCommand({ config, sha, retry, out: io.out }, realCheckDeps(root));
     }
     case 'skills': {
       if (rest[0] !== 'install') throw new RafError('usage : cadence skills install [--dir .claude] [--force]');
@@ -439,7 +439,7 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
     const config = parseDeliverConfig(text, configPath);
     if (config.verify.length === 0) return null;
     const sha = lastDelivery(sharedStateDir(root)) ?? headSha(root) ?? '';
-    return effectLines(config, sha, realDeps(root, { quiet: true }));
+    return effectLines(config, sha, realCheckDeps(root, { quiet: true }));
   } catch (e) {
     return [`✗ ${(e as Error).message}`];
   }

@@ -1,4 +1,75 @@
-import { describeCheck, retryCheck, type DeliverConfig, type DeliverDeps, type VerifyCheck } from './deliver.js';
+import { spawn } from 'node:child_process';
+import { constants } from 'node:os';
+import { describeCheck, realDeps, retryCheck, TIMED_OUT, type CheckDeps, type DeliverConfig, type VerifyCheck } from './deliver.js';
+
+/** Groupes des vérifications en cours : cadence leur relaie Ctrl-C, SIGTERM et le raccrochage avant de sortir. */
+const groups = new Set<number>();
+const RELAYED = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+
+function killGroup(pgid: number, sig: NodeJS.Signals): void {
+  try {
+    process.kill(-pgid, sig);
+  } catch {
+    // groupe déjà vide
+  }
+}
+
+function relay(sig: NodeJS.Signals): void {
+  for (const pgid of groups) killGroup(pgid, sig);
+  groups.clear();
+  for (const s of RELAYED) process.removeListener(s, relay);
+  process.kill(process.pid, sig); // puis sortie comme sans relais : tué par le même signal
+}
+
+function track(pgid: number): void {
+  if (groups.size === 0) for (const s of RELAYED) process.on(s, relay);
+  groups.add(pgid);
+}
+
+function untrack(pgid: number): void {
+  groups.delete(pgid);
+  if (groups.size === 0) for (const s of RELAYED) process.removeListener(s, relay);
+}
+
+/**
+ * Une commande de vérification, en groupe de processus détaché (nouvelle session, sans tty) : au délai,
+ * TOUT le groupe est tué (aucun enfant orphelin) ; un signal reçu par cadence lui est relayé. Asynchrone :
+ * les vérifications tournent en parallèle. Réservé aux vérifications (verify, session start) — jamais
+ * aux commandes de deliver, qui gardent le groupe de premier plan et le tty.
+ */
+function execGroup(root: string, cmd: string, env: Record<string, string>, timeoutMs: number, quiet: boolean): Promise<number> {
+  return new Promise((resolve) => {
+    const child = spawn('sh', ['-c', cmd], {
+      cwd: root,
+      env: { ...process.env, ...env },
+      stdio: quiet ? 'ignore' : ['ignore', 'inherit', 'inherit'],
+      detached: true,
+    });
+    const pgid = child.pid;
+    if (pgid === undefined) {
+      child.once('error', () => resolve(127));
+      return;
+    }
+    track(pgid);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killGroup(pgid, 'SIGKILL');
+    }, timeoutMs);
+    child.once('exit', (code, signal) => {
+      clearTimeout(timer);
+      untrack(pgid);
+      if (timedOut) killGroup(pgid, 'SIGKILL'); // sh mort avant ses enfants : le groupe est vidé quand même
+      resolve(timedOut ? TIMED_OUT : signal ? 128 + (constants.signals[signal] ?? 0) : (code ?? 1));
+    });
+  });
+}
+
+/** Dépendances réelles des vérifications. `quiet` : sortie des commandes non relayée (rapport de session start). */
+export function realCheckDeps(root: string, opts: { quiet?: boolean } = {}): CheckDeps {
+  const { fetch, sleep, now } = realDeps(root);
+  return { fetch, sleep, now, exec: (cmd, env, timeoutMs) => execGroup(root, cmd, env, timeoutMs, !!opts.quiet) };
+}
 
 export interface VerifyResult {
   label: string;
@@ -17,7 +88,7 @@ export interface VerifyResult {
  */
 export async function replayChecks(
   checks: VerifyCheck[],
-  deps: DeliverDeps,
+  deps: CheckDeps,
   sha: string,
   env: Record<string, string>,
   opts: { retryMs: number; budgetMs: number },
@@ -71,7 +142,7 @@ export interface VerifyCtx {
 }
 
 /** `cadence verify` : 0 tout vert, 1 un effet rouge, 2 rien à vérifier, 3 budget épuisé (aucun rouge, mais des non vérifiées). */
-export async function verifyCommand(ctx: VerifyCtx, deps: DeliverDeps): Promise<number> {
+export async function verifyCommand(ctx: VerifyCtx, deps: CheckDeps): Promise<number> {
   const { config, out } = ctx;
   if (config.verify.length === 0) {
     out(
@@ -97,7 +168,7 @@ export const MORNING_BUDGET_MS = 10_000;
  * Lignes « Effets en production » du rapport de reprise : un seul essai par vérification, borné. Rien à dire
  * (liste vide) pour un projet sans verify ; ne lève jamais — c'est un fait de plus, pas une condition.
  */
-export async function effectLines(config: DeliverConfig, sha: string, deps: DeliverDeps): Promise<string[]> {
+export async function effectLines(config: DeliverConfig, sha: string, deps: CheckDeps): Promise<string[]> {
   if (config.verify.length === 0) return [];
   try {
     const results = await replayChecks(config.verify, deps, sha, verifyEnv(sha), { retryMs: 0, budgetMs: MORNING_BUDGET_MS });

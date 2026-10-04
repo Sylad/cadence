@@ -59,6 +59,14 @@ export interface DeliverDeps {
   now: () => number;
 }
 
+/**
+ * Ce dont une vérification a besoin. `exec` peut être asynchrone : celui de `cadence verify` et de
+ * « session start » l'est (groupe détaché, vérifications en parallèle) ; celui de deliver est synchrone.
+ */
+export type CheckDeps = Pick<DeliverDeps, 'fetch' | 'sleep' | 'now'> & {
+  exec: (cmd: string, env: Record<string, string>, timeoutMs: number) => number | Promise<number>;
+};
+
 export interface DeliverCtx {
   root: string;
   /** État commun à tous les worktrees : verrou et journal des livraisons. */
@@ -156,8 +164,7 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
 }
 
 /** Dépendances réelles : sh, gh, fetch, horloge. */
-/** `quiet` : la sortie des commandes n'est pas relayée (session start ne doit pas polluer son rapport). */
-export function realDeps(root: string, opts: { quiet?: boolean } = {}): DeliverDeps {
+export function realDeps(root: string): DeliverDeps {
   const gh = (args: string[]) => {
     try {
       return execFileSync('gh', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: GH_TIMEOUT });
@@ -173,7 +180,7 @@ export function realDeps(root: string, opts: { quiet?: boolean } = {}): DeliverD
       const r = spawnSync('sh', ['-c', cmd], {
         cwd: root,
         env: { ...process.env, ...env },
-        stdio: opts.quiet ? 'ignore' : ['ignore', 'inherit', 'inherit'],
+        stdio: ['ignore', 'inherit', 'inherit'],
         timeout: Math.max(1_000, timeoutMs),
         killSignal: 'SIGKILL',
         // PAS de groupe détaché : la commande reste dans le groupe de premier plan et la session de cadence.
@@ -360,9 +367,9 @@ async function waitCi(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Reco
 }
 
 /** Un essai d'une vérification : cause de l'échec, ou null. Partagé par deliver et `cadence verify`. */
-export async function tryCheck(c: VerifyCheck, deps: DeliverDeps, sha: string, env: Record<string, string>, budgetMs: number): Promise<string | null> {
+export async function tryCheck(c: VerifyCheck, deps: CheckDeps, sha: string, env: Record<string, string>, budgetMs: number): Promise<string | null> {
   if (c.command !== undefined) {
-    const code = deps.exec(c.command, env, budgetMs);
+    const code = await deps.exec(c.command, env, budgetMs);
     return code === 0 ? null : codeText(code);
   }
   try {
@@ -383,7 +390,7 @@ export async function tryCheck(c: VerifyCheck, deps: DeliverDeps, sha: string, e
  */
 export async function retryCheck(
   c: VerifyCheck,
-  deps: DeliverDeps,
+  deps: CheckDeps,
   sha: string,
   env: Record<string, string>,
   until: number,

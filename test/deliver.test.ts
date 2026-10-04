@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
@@ -587,27 +585,6 @@ describe('cadence deliver (CLI)', () => {
     const r = await cad(dir, 'deliver', '--', 'api', 'frontend:deux mots', '--news', 'a.md', '--', 'map');
     expect(r.code).toBe(0);
     expect(readFileSync(join(dir, '.git/args'), 'utf8').trim().split('\n')).toEqual([headSha(dir)!.slice(0, 7), 'api', 'frontend:deux mots', '--news', 'a.md', '--', 'map']);
-  });
-});
-
-describe('realDeps.exec', () => {
-  it('quiet coupe réellement la sortie des commandes (stdout du processus capturé)', () => {
-    const tmp = mkdtempSync(join(tmpdir(), 'cadence-quiet-'));
-    try {
-      const script = join(tmp, 'probe.ts');
-      writeFileSync(
-        script,
-        `import { realDeps } from ${JSON.stringify(join(process.cwd(), 'src/deliver.ts'))};\n` +
-          `const quiet = process.argv[2] === 'quiet';\n` +
-          `process.exit(realDeps(${JSON.stringify(tmp)}, { quiet }).exec('echo BRUIT-SOUS-PROCESSUS; echo BRUIT-ERR >&2', {}, 5000));\n`,
-      );
-      const run = (mode: string) =>
-        execFileSync(join(process.cwd(), 'node_modules/.bin/vite-node'), [script, mode], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-      expect(run('loud')).toContain('BRUIT-SOUS-PROCESSUS'); // témoin : la sonde voit bien la sortie
-      expect(run('quiet')).not.toContain('BRUIT-SOUS-PROCESSUS');
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
   });
 });
 

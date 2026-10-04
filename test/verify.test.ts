@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { parseDeliverConfig, TIMED_OUT, type DeliverDeps } from '../src/deliver.js';
 import { sharedStateDir, appendDelivery } from '../src/state.js';
-import { replayChecks, resultLine, summaryLine, verifyCommand } from '../src/verify.js';
-import { commit, gitRepo } from './helpers.js';
+import { realCheckDeps, replayChecks, resultLine, summaryLine, verifyCommand } from '../src/verify.js';
+import { commit, gitRepo, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
 
@@ -351,4 +351,87 @@ describe('cadence session start : effets', () => {
     expect(bad.out).toContain('Effets en production');
     expect(bad.out).toContain('verify[1]');
   });
+});
+
+describe('realCheckDeps.exec : vérifications en groupe détaché (verify, session start)', () => {
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const until = async (ok: () => boolean, ms: number) => {
+    for (let t = 0; t < ms && !ok(); t += 50) await new Promise((r) => setTimeout(r, 50));
+    return ok();
+  };
+  const viteNode = () => join(process.cwd(), 'node_modules/.bin/vite-node');
+
+  it('codes de sortie, variables, délai dépassé', async () => {
+    const d = realCheckDeps(tempDir(), { quiet: true });
+    expect(await d.exec('true', {}, 5_000)).toBe(0);
+    expect(await d.exec('exit 7', {}, 5_000)).toBe(7);
+    expect(await d.exec('test "$CADENCE_X" = oui', { CADENCE_X: 'oui' }, 5_000)).toBe(0);
+    expect(await d.exec('sleep 5', {}, 300)).toBe(TIMED_OUT);
+  });
+
+  it('un délai dépassé tue TOUT le groupe : aucun enfant (sleep) ne survit', async () => {
+    const dir = tempDir();
+    const pidFile = join(dir, 'child.pid');
+    expect(await realCheckDeps(dir, { quiet: true }).exec(`sleep 30 & echo $! > '${pidFile}'; wait`, {}, 1_000)).toBe(TIMED_OUT);
+    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    const survived = !(await until(() => !alive(pid), 2_000));
+    if (survived) process.kill(pid, 'SIGKILL');
+    expect(survived).toBe(false);
+  });
+
+  it('quiet coupe réellement la sortie des commandes (stdout du processus capturé)', () => {
+    const tmp = tempDir();
+    const script = join(tmp, 'probe.ts');
+    writeFileSync(
+      script,
+      `import { realCheckDeps } from ${JSON.stringify(join(process.cwd(), 'src/verify.ts'))};\n` +
+        `const quiet = process.argv[2] === 'quiet';\n` +
+        `process.exitCode = await realCheckDeps(${JSON.stringify(tmp)}, { quiet }).exec('echo BRUIT-SOUS-PROCESSUS; echo BRUIT-ERR >&2', {}, 5000);\n`,
+    );
+    const probe = (mode: string) => execFileSync(viteNode(), [script, mode], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    expect(probe('loud')).toContain('BRUIT-SOUS-PROCESSUS'); // témoin : la sonde voit bien la sortie
+    expect(probe('quiet')).not.toContain('BRUIT-SOUS-PROCESSUS');
+  });
+
+  it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)(
+    '%s reçu par cadence : relayé au groupe de la vérification, qui meurt avec lui',
+    async (sig) => {
+      const tmp = tempDir();
+      const pidFile = join(tmp, 'check.pid');
+      const script = join(tmp, 'probe.ts');
+      writeFileSync(
+        script,
+        `import { realCheckDeps } from ${JSON.stringify(join(process.cwd(), 'src/verify.ts'))};\n` +
+          `process.exitCode = await realCheckDeps(${JSON.stringify(tmp)}, { quiet: true }).exec("echo $$ > '${pidFile}'; exec sleep 30", {}, 60_000);\n`,
+      );
+      const child = spawn(viteNode(), [script], { detached: true, stdio: 'ignore' });
+      const exited = new Promise<NodeJS.Signals | null>((r) => child.on('exit', (_c, s) => r(s)));
+      let checkPid = 0;
+      try {
+        expect(await until(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim() !== '', 15_000)).toBe(true);
+        checkPid = Number(readFileSync(pidFile, 'utf8').trim());
+        // la vérification est dans sa propre session : le signal du terminal ne l'atteint pas directement
+        process.kill(-child.pid!, sig);
+        expect(await exited).toBe(sig); // cadence sort comme sans relais : tué par le même signal
+        const survived = !(await until(() => !alive(checkPid), 2_000));
+        expect(survived).toBe(false);
+      } finally {
+        for (const pid of [-child.pid!, checkPid]) {
+          try {
+            if (pid) process.kill(pid, 'SIGKILL');
+          } catch {
+            // déjà mort
+          }
+        }
+      }
+    },
+    30_000,
+  );
 });

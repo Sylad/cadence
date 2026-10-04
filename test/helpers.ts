@@ -1,11 +1,22 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { addDays, toDay } from '../src/dates.js';
+import { removeTree } from './tmp-hygiene.js';
 
+const created: string[] = [];
+
+/** Dossier temporaire du test, supprimé à la fin du fichier de test (voir setup-env.ts). */
 export function tempDir(): string {
-  return mkdtempSync(join(tmpdir(), 'cadence-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cadence-'));
+  created.push(dir);
+  return dir;
+}
+
+/** Supprime les dossiers créés par tempDir() dans ce fichier de test, droits rendus avant suppression. */
+export function cleanupTempDirs(): void {
+  for (const dir of created.splice(0)) removeTree(dir);
 }
 
 export function gitRepo(): string {
@@ -35,3 +46,12 @@ export function commit(dir: string, message: string, date = '2026-09-28T10:00:00
 export const CLEAN_TODAY = addDays(toDay(new Date()), 30);
 /** Date du jour CLEAN_TODAY décalé de `offset` jours (négatif = passé). */
 export const cleanAt = (offset: number, time = '10:00:00'): Date => new Date(`${addDays(CLEAN_TODAY, offset)}T${time}`);
+
+/**
+ * `cadence orchestrate --dry-run` laisse exprès un dossier /tmp/cadence-orchestrate-* pour que l'humain relise
+ * les briefs (comportement du produit). Un test qui le lance supprime le sien : il passe la sortie de la commande,
+ * on retrouve les lignes « brief : <chemin> » et on supprime le dossier qui les contient.
+ */
+export function removeDryRunBriefs(output: string): void {
+  for (const m of output.matchAll(/brief : (\S+)/g)) removeTree(dirname(m[1]!));
+}

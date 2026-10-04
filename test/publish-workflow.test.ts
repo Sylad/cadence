@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
+import { tempDir } from './helpers.js';
 import { join } from 'node:path';
 
 const root = join(import.meta.dirname, '..');
@@ -28,7 +28,7 @@ describe('étape de contrôle du tag', () => {
 
   // Exécute le script de l'étape tel quel, dans une copie des trois fichiers de version.
   const runStep = (tag: string, edit?: (dir: string) => void) => {
-    const dir = mkdtempSync(join(tmpdir(), 'cadence-publish-'));
+    const dir = tempDir();
     try {
       mkdirSync(join(dir, '.claude-plugin'));
       for (const f of files) cpSync(join(root, f), join(dir, f));

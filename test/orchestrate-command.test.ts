@@ -9,7 +9,7 @@ import { AGENTS_DIR } from '../src/skills.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { Plan } from '../src/plan.js';
 import { claudeOut, commitFile, git, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
-import { gitRepo, tempDir } from './helpers.js';
+import { gitRepo, removeDryRunBriefs, tempDir } from './helpers.js';
 
 
 /** Plusieurs projets sous un même dossier parent, chacun son dépôt git et son plan. */
@@ -110,6 +110,7 @@ describe('refus avant d\'agir (code 2)', () => {
     expect((await run(parent, ['a:L2'])).err.join()).toContain('dépendance(s) ni terminée(s) ni plus tôt dans la vague : L1');
     expect((await run(parent, ['a:L2', 'a:L1'])).err.join()).toContain('a:L2 : dépendance(s)'); // L1 est après : refus
     const ok = await run(parent, ['a:L1', 'a:L2', '--dry-run']);
+    removeDryRunBriefs(ok.out.join('\n'));
     expect(ok.code).toBe(0);
   });
 
@@ -219,6 +220,7 @@ describe('--dry-run', () => {
     const brief = /brief : (\S+)/.exec(text)![1];
     expect(readFileSync(brief, 'utf8')).toContain('Work in `');
     expect(existsSync(join(parent, 'a/.git/hooks/pre-push'))).toBe(false);
+    removeDryRunBriefs(text); // le produit laisse ces briefs à relire ; le test supprime les siens
   });
 });
 

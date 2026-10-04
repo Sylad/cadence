@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tempDir } from './helpers.js';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TEMPLATES_DIR, loadTemplates, objective, renderBrief } from '../src/orchestrate/briefs.js';
@@ -136,7 +136,7 @@ describe('instantané des gabarits (L39)', () => {
   const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '' };
 
   it('loadTemplates lit tous les gabarits une fois ; renderBrief rend depuis l\'instantané sans relire le disque', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cadence-tpl-'));
+    const dir = tempDir();
     cpSync(TEMPLATES_DIR, dir, { recursive: true });
     const snap = loadTemplates(dir);
     expect(Object.keys(snap).sort()).toEqual(['fix', 'fix-minors', 'implement', 'review', 'review-recheck', 'review-small', 'ux']);
@@ -146,7 +146,7 @@ describe('instantané des gabarits (L39)', () => {
   });
 
   it('un gabarit absent est une erreur nommée, avant tout rendu', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cadence-tpl-'));
+    const dir = tempDir();
     cpSync(TEMPLATES_DIR, dir, { recursive: true });
     rmSync(join(dir, 'ux.md'));
     expect(() => loadTemplates(dir)).toThrow(/gabarit ux\.md illisible/);

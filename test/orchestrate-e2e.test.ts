@@ -7,7 +7,7 @@ import { run } from '../src/cli.js';
 import { projectLogDir } from '../src/orchestrate/launch.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
-import { gitRepo, tempDir } from './helpers.js';
+import { gitRepo, removeDryRunBriefs, tempDir } from './helpers.js';
 
 const FAKE = fileURLToPath(new URL('./fixtures/fake-claude.mjs', import.meta.url));
 const SAMPLE = fileURLToPath(new URL('./fixtures/claude-result.sample.json', import.meta.url));
@@ -169,6 +169,7 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
   it('--dry-run ne lance rien', async () => {
     const s = setup({});
     const r = await s.cli('proj:L1', '--dry-run');
+    removeDryRunBriefs(r.out);
     expect(r.code).toBe(0);
     expect(s.calls()).toEqual([]);
   });

@@ -682,13 +682,15 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
    * Dépôt poussé dont le script de livraison est un fichier ./livrer.sh — sh fait un fork pour chaque commande.
    * Première exécution : note son pid, dort `sleep` s puis « bumpe » ; les suivantes bumpent tout de suite.
    */
-  function scriptRepo(logs: string, sleep: number, extra = ''): string {
+  function scriptRepo(logs: string, sleep: number, extra = '', grandchild = false): string {
     const dir = pushedRepo();
-    writeFileSync(
-      join(dir, 'livrer.sh'),
-      `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then echo $$ > '${logs}/first'; sleep ${sleep}; fi\necho bumped >> '${logs}/bumps'\n`,
-      { mode: 0o755 },
-    );
+    // grandchild : le bump est fait par un PETIT-ENFANT (sous-shell puis `sh -c` imbriqué, comme livrer.sh qui pousse le gitops)
+    const first = grandchild
+      ? `echo $$ > '${logs}/first'; ( sh -c "sleep ${sleep}; echo bumped >> '${logs}/bumps'" ); exit 0`
+      : `echo $$ > '${logs}/first'; sleep ${sleep}`;
+    writeFileSync(join(dir, 'livrer.sh'), `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then ${first}; fi\necho bumped >> '${logs}/bumps'\n`, {
+      mode: 0o755,
+    });
     writeFileSync(join(dir, 'cadence.yaml'), `deliver:\n  script: ./livrer.sh\n${extra}`);
     git(dir, 'add', 'livrer.sh', 'cadence.yaml');
     commit(dir, 'chore: config');
@@ -706,9 +708,9 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
     expect(existsSync(join(dir, 'bumped'))).toBe(false);
   }, 15_000);
 
-  it('(a) script tué au deployTimeout : ses descendants meurent avec lui, une seconde livraison ne court jamais en même temps', async () => {
+  it.each([false, true])('(a) script tué au deployTimeout (bump par un petit-enfant : %s) : ses descendants meurent avec lui, une seconde livraison ne court jamais en même temps', async (grandchild) => {
     const logs = tempDir();
-    const dir = scriptRepo(logs, 3, '  deployTimeout: 1\n');
+    const dir = scriptRepo(logs, 3, '  deployTimeout: 1\n', grandchild);
     const cad = () => run(['deliver'], { cwd: dir, env: {}, out: () => {}, err: () => {}, now: () => new Date() });
     expect(await cad()).toBe(1); // délai dépassé
     expect(await cad()).toBe(0); // la seconde bumpe tout de suite
@@ -716,9 +718,9 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
     expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
   }, 20_000);
 
-  it('(b) SIGTERM envoyé à cadence seul pendant le script : le script et ses descendants meurent, un seul bump', async () => {
+  it.each([false, true])('(b) SIGTERM envoyé à cadence seul pendant le script (bump par un petit-enfant : %s) : le script et ses descendants meurent, un seul bump', async (grandchild) => {
     const logs = tempDir();
-    const dir = scriptRepo(logs, 3);
+    const dir = scriptRepo(logs, 3, '', grandchild);
     const probe = join(logs, 'probe.ts');
     writeFileSync(
       probe,

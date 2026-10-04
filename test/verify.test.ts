@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { parseDeliverConfig, TIMED_OUT, type DeliverDeps } from '../src/deliver.js';
 import { sharedStateDir, appendDelivery } from '../src/state.js';
-import { replayChecks, summaryLine, verifyCommand } from '../src/verify.js';
+import { replayChecks, resultLine, summaryLine, verifyCommand } from '../src/verify.js';
 import { commit, gitRepo } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -101,6 +101,75 @@ describe('replayChecks (une seule passe)', () => {
     const { deps, fetched } = fakeDeps();
     await replayChecks([{ url: 'https://x' }], deps, 'abc', {}, { retryMs: 0, budgetMs: 8_000 });
     expect(fetched[0]!.timeoutMs).toBeLessThanOrEqual(8_000);
+  });
+});
+
+describe('budget par vérification', () => {
+  const cmds = (...c: string[]) => c.map((command) => ({ command }));
+  /** Durée simulée de chaque commande : « sleep N » dure N s, tuée à l'échéance (TIMED_OUT). */
+  const sleeper = () => {
+    let clock = 0;
+    return fakeDeps({
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+      },
+      exec: (cmd, _env, timeoutMs) => {
+        const need = Number(cmd.split(' ')[1]) * 1000;
+        clock += Math.min(need, timeoutMs);
+        return need > timeoutMs ? TIMED_OUT : 0;
+      },
+    }).deps;
+  };
+
+  it("une vérification lente ne rougit pas les suivantes saines (sleep 1.5 après sleep 30)", async () => {
+    const r = await replayChecks(cmds('sleep 30', 'sleep 1.5', 'sleep 0'), sleeper(), 'abc', {}, { retryMs: 0, budgetMs: 10_000 });
+    expect(r[0]!.reason).toBe('délai dépassé'); // la lente est rouge : elle l'est vraiment
+    expect(r[1]!.reason).toBeNull();
+    expect(r[2]!.reason).toBeNull();
+    expect(r.some((x) => x.unverified)).toBe(false);
+  });
+
+  it('budget global épuisé : les restantes sont « non vérifiées », jamais rouges', async () => {
+    let clock = 0;
+    const { deps } = fakeDeps({
+      now: () => clock,
+      exec: (cmd) => {
+        if (cmd === 'hang') clock += 20_000; // ignore son délai
+        return 0;
+      },
+    });
+    const r = await replayChecks(cmds('hang', 'a', 'b'), deps, 'abc', {}, { retryMs: 0, budgetMs: 10_000 });
+    expect(r.map((x) => x.unverified === true)).toEqual([false, true, true]);
+    expect(r[1]!.reason).toMatch(/budget/);
+    expect(resultLine(r[1]!)).toMatch(/^\? a — non vérifiée/);
+    expect(summaryLine(r)).toBe('verify : 2 non vérifiées sur 3 vérifications (budget épuisé), 0 effet rouge');
+  });
+
+  it('--retry : une vérification qui réessaie ne prive pas les suivantes de leur essai', async () => {
+    const ran: string[] = [];
+    const { deps } = fakeDeps({ exec: (cmd) => (ran.push(cmd), cmd === 'red' ? 1 : 0) });
+    const r = await replayChecks(cmds('red', 'ok'), deps, 'abc', {}, { retryMs: 30_000, budgetMs: 10_000 + 30_000 * 2 });
+    expect(r[0]!.reason).toBe('code 1');
+    expect(r[1]!.reason).toBeNull();
+    expect(ran.filter((c) => c === 'ok')).toHaveLength(1);
+  });
+
+  it('--retry : budget global épuisé pendant les réessais → restantes non vérifiées', async () => {
+    const { deps } = fakeDeps({ exec: () => 1 });
+    const r = await replayChecks(cmds('red', 'x', 'y'), deps, 'abc', {}, { retryMs: 30_000, budgetMs: 20_000 });
+    expect(r[0]!.reason).toBe('code 1');
+    expect(r[1]!.unverified).toBe(true);
+    expect(r[2]!.unverified).toBe(true);
+  });
+
+  it('exit 3 quand seul le budget a manqué (ni vert, ni rouge)', async () => {
+    let clock = 0;
+    const { deps } = fakeDeps({ now: () => clock, exec: (cmd) => { if (cmd === 'hang') clock += 999_000; return 0; } });
+    const out: string[] = [];
+    const cfg = config('    - command: hang\n    - command: b\n');
+    expect(await verifyCommand({ config: cfg, sha: 'abc', retry: 0, out: (l) => out.push(l) }, deps)).toBe(3);
+    expect(out[1]).toMatch(/^\? b/);
   });
 });
 

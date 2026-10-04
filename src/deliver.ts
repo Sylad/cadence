@@ -77,7 +77,8 @@ export interface DeliverCtx {
 
 const POLL_CI = 15_000;
 const CI_APPEAR = 300_000;
-const POLL_VERIFY = 10_000;
+/** Intervalle de réessai d'une vérification : celui de deliver ET de `cadence verify --retry`. */
+export const POLL_VERIFY = 10_000;
 const CI_OK = new Set(['success', 'skipped', 'neutral']);
 const GH_TIMEOUT = 60_000;
 export const TIMED_OUT = 124;
@@ -372,20 +373,37 @@ export async function tryCheck(c: VerifyCheck, deps: DeliverDeps, sha: string, e
   }
 }
 
+/**
+ * UNE boucle de réessai, pour deliver et pour `cadence verify` : essaie, puis réessaie toutes les POLL_VERIFY
+ * tant que `until` n'est pas atteint. `attemptMs()` donne le délai de chaque essai. Rend la dernière cause
+ * d'échec, ou null dès que l'effet est celui attendu.
+ */
+export async function retryCheck(
+  c: VerifyCheck,
+  deps: DeliverDeps,
+  sha: string,
+  env: Record<string, string>,
+  until: number,
+  attemptMs: () => number,
+): Promise<string | null> {
+  for (;;) {
+    const reason = await tryCheck(c, deps, sha, env, attemptMs());
+    if (reason === null) return null;
+    const left = until - deps.now();
+    if (left <= 0) return reason;
+    // jamais au-delà du délai : une commande tuée « à l'échéance » peut rendre la main un rien avant elle
+    await deps.sleep(Math.min(POLL_VERIFY, left));
+  }
+}
+
 /** Chaque vérification est réessayée jusqu'au délai commun ; message d'échec ou null. */
 async function verifyAll(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Record<string, string>): Promise<string | null> {
   const deadline = deps.now() + ctx.config.verifyTimeout * 1000;
   for (const [i, c] of ctx.config.verify.entries()) {
     const label = describeCheck(c, sha);
     ctx.out(`→ vérification ${i + 1}/${ctx.config.verify.length} : ${label}`);
-    for (;;) {
-      const reason = await tryCheck(c, deps, sha, env, deadline - deps.now());
-      if (reason === null) break;
-      const left = deadline - deps.now();
-      if (left <= 0) return `vérification en échec après ${ctx.config.verifyTimeout} s : ${label} — ${reason}`;
-      // jamais au-delà du délai : une commande tuée « à l'échéance » peut rendre la main un rien avant elle
-      await deps.sleep(Math.min(POLL_VERIFY, left));
-    }
+    const reason = await retryCheck(c, deps, sha, env, deadline, () => deadline - deps.now());
+    if (reason !== null) return `vérification en échec après ${ctx.config.verifyTimeout} s : ${label} — ${reason}`;
   }
   return null;
 }

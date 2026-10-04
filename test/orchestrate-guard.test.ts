@@ -138,6 +138,29 @@ describe('core.hooksPath dans l\'arbre suivi (L3/t19)', () => {
     expect(exclude(dir)).toBe(excludeBefore);
   });
 
+  it('hook supprimé ou remplacé par une session : la ligne d\'exclusion est retirée quand même', () => {
+    for (const replace of [false, true]) {
+      const dir = trackedHooksRepo();
+      const excludeBefore = exclude(dir);
+      expect(installPrePush(dir, 'w1')).toEqual({ ok: true });
+      rmSync(join(dir, '.githooks/pre-push'));
+      if (replace) writeFileSync(join(dir, '.githooks/pre-push'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+      removePrePush(dir, 'w1');
+      expect(exclude(dir)).toBe(excludeBefore);
+      // un fichier qui n'est pas le nôtre reste, et redevient visible à git
+      expect(existsSync(join(dir, '.githooks/pre-push'))).toBe(replace);
+      expect(status(dir)).toBe(replace ? '?? .githooks/pre-push\n' : '');
+    }
+  });
+
+  it('le hook d\'une autre vague garde sa ligne d\'exclusion', () => {
+    const dir = trackedHooksRepo();
+    expect(installPrePush(dir, 'w-autre')).toEqual({ ok: true });
+    removePrePush(dir, 'w-moi');
+    expect(existsSync(join(dir, '.githooks/pre-push'))).toBe(true);
+    expect(status(dir)).toBe('');
+  });
+
   it('un hook pre-push suivi du projet est toujours refusé', () => {
     const dir = trackedHooksRepo();
     writeFileSync(join(dir, '.githooks/pre-push'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });

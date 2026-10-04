@@ -74,14 +74,20 @@ export function installPrePush(repo: string, wave = '?'): { ok: true } | { ok: f
   return { ok: true };
 }
 
-/** Retire le hook s'il est le nôtre ; avec `wave`, seulement s'il a été posé par cette vague (jamais celui d'une autre vague vivante). */
+/**
+ * Retire le hook s'il est le nôtre ; avec `wave`, seulement s'il a été posé par cette vague (jamais celui d'une
+ * autre vague vivante, qui garde aussi sa ligne d'exclusion). Hook supprimé ou remplacé par une session : la ligne
+ * d'exclusion part quand même, sinon un futur pre-push du projet resterait invisible à git.
+ */
 export function removePrePush(repo: string, wave?: string): void {
   const file = hookPath(repo);
-  if (!existsSync(file)) return;
-  const text = readFileSync(file, 'utf8');
-  if (!text.includes(MARK)) return;
-  if (wave !== undefined && !text.split('\n').includes(waveLine(wave))) return;
-  rmSync(file, { force: true });
+  if (existsSync(file)) {
+    const text = readFileSync(file, 'utf8');
+    if (text.includes(MARK)) {
+      if (wave !== undefined && !text.split('\n').includes(waveLine(wave))) return;
+      rmSync(file, { force: true });
+    }
+  }
   removeExclude(repo);
 }
 

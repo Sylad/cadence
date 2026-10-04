@@ -99,3 +99,64 @@ export function readSessionConfig(file: string): SessionConfig {
   }
   return config;
 }
+
+export interface OrchestrateConfig {
+  /** Plan en lecture seule : commande (sh, racine du dépôt) qui démarre un lot ; `{lot}` y est remplacé. */
+  start?: string;
+  /** Commande qui note le verdict de la revue de code ; `{lot}` et `{verdict}` y sont remplacés. */
+  verdict?: string;
+  /** Commande de tests du projet, lancée par l'orchestrateur après une implémentation ou une correction. */
+  test?: string;
+  /** Comment voir l'application pour une revue UX : une URL, une commande de lancement, ou les deux. */
+  ux?: { url?: string; command?: string };
+  permissionMode: string;
+  addDirs: string[];
+  /** Millisecondes. */
+  timeouts: { work: number; review: number };
+}
+
+const ORCH_KEYS = ['start', 'verdict', 'test', 'ux', 'permissionMode', 'addDirs', 'timeouts'];
+
+/** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
+export function readOrchestrateConfig(file: string): OrchestrateConfig {
+  const config: OrchestrateConfig = { permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  if (!existsSync(file)) return config;
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const o = (raw as { orchestrate?: unknown } | null)?.orchestrate;
+  if (o == null) return config;
+  const bad = (what: string) => new RafError(`${file} : orchestrate.${what}`);
+  if (!isObject(o)) throw new RafError(`${file} : orchestrate doit être un objet`);
+  for (const k of Object.keys(o)) if (!ORCH_KEYS.includes(k)) throw bad(`${k} inconnu (attendu : ${ORCH_KEYS.join(', ')})`);
+  for (const k of ['start', 'verdict', 'test'] as const) {
+    if (o[k] == null) continue;
+    if (typeof o[k] !== 'string' || !(o[k] as string).trim()) throw bad(`${k} : commande non vide attendue`);
+    config[k] = (o[k] as string).trim();
+  }
+  if (o.ux != null) {
+    if (typeof o.ux === 'string' && o.ux.trim()) config.ux = /^https?:\/\//.test(o.ux.trim()) ? { url: o.ux.trim() } : { command: o.ux.trim() };
+    else if (isObject(o.ux) && (o.ux.url != null || o.ux.command != null)) {
+      for (const k of Object.keys(o.ux)) if (k !== 'url' && k !== 'command') throw bad(`ux.${k} inconnu (attendu : url, command)`);
+      config.ux = {};
+      for (const k of ['url', 'command'] as const) if (o.ux[k] != null) config.ux[k] = String(o.ux[k]);
+    } else throw bad('ux : une URL, une commande, ou { url, command }');
+  }
+  if (o.permissionMode != null) {
+    if (typeof o.permissionMode !== 'string' || !o.permissionMode.trim()) throw bad('permissionMode : texte non vide attendu');
+    config.permissionMode = o.permissionMode.trim();
+  }
+  if (o.addDirs != null) config.addDirs = list(o.addDirs);
+  if (o.timeouts != null) {
+    if (!isObject(o.timeouts)) throw bad('timeouts doit être un objet { implement, review } (minutes)');
+    for (const [k, v] of Object.entries(o.timeouts)) {
+      if (k !== 'implement' && k !== 'review') throw bad(`timeouts.${k} inconnu (attendu : implement, review)`);
+      if (typeof v !== 'number' || !(v > 0)) throw bad(`timeouts.${k} : nombre de minutes positif attendu`);
+      config.timeouts[k === 'implement' ? 'work' : 'review'] = v * 60_000;
+    }
+  }
+  return config;
+}

@@ -22,13 +22,17 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      # La publication de confiance demande npm ≥ 11.5.1.
-      - run: npm install -g npm@latest
+      # La publication de confiance demande npm ≥ 11.5.1 ; épinglé sur la majeure 11 pour ne pas subir une 12.
+      - run: npm install -g npm@^11.5.1
 
-      - name: Le tag correspond à package.json
+      - name: Le tag correspond à package.json et aux fichiers du plugin
         run: |
-          test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME" \
-            || { echo "tag $GITHUB_REF_NAME ≠ version de package.json"; exit 1; }
+          for f in package.json .claude-plugin/plugin.json; do
+            test "v$(node -p "require('./$f').version")" = "$GITHUB_REF_NAME" \
+              || { echo "tag $GITHUB_REF_NAME ≠ version de $f"; exit 1; }
+          done
+          test "v$(node -p "require('./.claude-plugin/marketplace.json').plugins[0].version")" = "$GITHUB_REF_NAME" \
+            || { echo "tag $GITHUB_REF_NAME ≠ version de .claude-plugin/marketplace.json"; exit 1; }
 
       # Les tests créent des dépôts git jetables : il leur faut une identité.
       - run: |

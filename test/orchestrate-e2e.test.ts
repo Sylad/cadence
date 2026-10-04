@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { run } from '../src/cli.js';
+import { RunStore } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
 import { gitRepo, tempDir } from './helpers.js';
 
@@ -44,7 +45,7 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
     const code = await run(['orchestrate', ...argv], { cwd: parent, env: { ...process.env, ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') });
     return { code, out: out.join('\n'), err: err.join('\n') };
   };
-  return { parent, dir, bare, calls, cli };
+  return { parent, dir, bare, calls, cli, env };
 }
 
 const impl = { commits: [{ file: 'a.txt', message: 'feat({lot}): travail' }] };
@@ -109,4 +110,41 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(r.code).toBe(0);
     expect(s.calls()).toEqual([]);
   });
+
+  // L3/t12 : vrai processus, vrai signal.
+  it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)('%s : sessions tuées, étapes et vague interrompues, verrous et hook retirés', async (signal) => {
+    const s = setup({ implement: [{ ...impl, sleepMs: 60_000 }] });
+    const bin = fileURLToPath(new URL('../bin/cadence.js', import.meta.url));
+    const logFile = s.calls;
+    const env = { ...process.env, ...s.env };
+    const child = spawn(process.execPath, [bin, 'orchestrate', 'proj:L1'], { cwd: s.parent, env, stdio: 'ignore' });
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
+    const waitFor = async (what: string, ok: () => boolean) => {
+      for (let i = 0; i < 300 && !ok(); i++) await new Promise((r) => setTimeout(r, 50));
+      if (!ok()) {
+        child.kill('SIGKILL');
+        throw new Error(`délai : ${what}`);
+      }
+    };
+    const store = () => RunStore.last(s.parent);
+    const sessionPid = () => store()?.readLot('proj', 'L1')?.steps[0]?.pid;
+    await waitFor('session lancée', () => logFile().length === 1 && !!sessionPid() && existsSync(join(s.dir, '.git/hooks/pre-push')));
+    const pid = sessionPid()!;
+    expect(existsSync(join(s.parent, '.cadence/orchestrate.lock'))).toBe(true);
+    expect(existsSync(join(s.dir, '.git/cadence/orchestrate.lock'))).toBe(true);
+
+    child.kill(signal);
+    const end = await exited;
+    expect(end.signal).toBe(signal); // cadence meurt du signal, comme sans nettoyage
+
+    const st = store()!;
+    const lot = st.readLot('proj', 'L1')!;
+    expect(lot.steps.map((x) => x.status)).toEqual(['interrupted']);
+    expect(lot.status).toBe('suspended');
+    expect(st.readWave()!.status).toBe('interrupted');
+    expect(existsSync(join(s.parent, '.cadence/orchestrate.lock'))).toBe(false);
+    expect(existsSync(join(s.dir, '.git/cadence/orchestrate.lock'))).toBe(false);
+    expect(existsSync(join(s.dir, '.git/hooks/pre-push'))).toBe(false);
+    expect(() => process.kill(pid, 0)).toThrow(); // la session est morte
+  }, 20_000);
 });

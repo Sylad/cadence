@@ -213,11 +213,14 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
-    review: { date: 2026-10-04, verdict: "not compliant: 1 majeur (relevé ps périmé → pid repris signalé), 2 mineurs (end() sans repli groupe+racine, pas de message sur stderr) — revue de la vague 2026-10-04-1534, verdict relu dans le journal", commit: b03a2c4420c1ebc0f1078d22e3a3ac6883b64131 }
+    review: { date: 2026-10-04, verdict: "not compliant: 1 majeur (README promet le repli sur le groupe de la commande, sans effet : ses descendants survivent au kill dégradé), 2 mineurs (racine adoptée tard sans contrôle de vie dans end(), message stderr de deliver non testé)", commit: 1d7db65cd59ace309496d610d81e944ba6d99e62 }
     tasks:
       - { id: t1, title: "proc : un relevé en échec ne doit pas faire signaler des pids d'après un relevé périmé (vérifier l'identité au moment du kill, ou plafonner l'âge du dernier relevé) — test pid repris pendant l'échec de ps", status: done }
       - { id: t2, title: "proc : end() applique aussi le repli groupe + racine quand la racine n'a jamais été relevée (Ctrl-C/raccrochage), avec un test ; aligner le README", status: done }
       - { id: t3, title: "proc/deliver : signaler sur stderr, une fois, que le relevé des processus est indisponible et que le kill est dégradé", status: done }
+      - { id: t4, title: "README (435-440, 448-451) et commentaire proc.ts:225 : en mode dégradé seule la commande racine est tuée — kill(-root) est sans effet (sh n'est chef d'aucun groupe, L19), ses descendants survivent ; le dire aussi dans le message stderr", status: todo }
+      - { id: t5, title: "proc : n'adopter une racine relevée tardivement que si la commande n'est pas sortie (pas pendant end() après l'exit), avec un test", status: todo }
+      - { id: t6, title: "deliver : rendre le relevé de realDeps injectable et tester que le message « relevé des processus indisponible » part sur stderr une seule fois", status: todo }
   - id: L22
     title: Publier @sylad/cadence 0.8.0 sur npm (verify, attribution par la portée, livraisons protégées Ctrl-C/délai/SIGTERM, deliveredLots, noms accentués) — OTP par Sylvain, vérification au registre et tag
     status: done

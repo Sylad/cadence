@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 import { lotWork } from '../audit.js';
 import type { OrchestrateConfig } from '../config.js';
 import type { Day } from '../dates.js';
-import { isAncestor, readCommits, resolveCommit, type Commit } from '../git.js';
+import { readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
@@ -306,6 +306,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
     return stop(c, 'failed', `${kind} sans résultat : ${outcome.cause}`);
   }
   if (outcome.kind === 'quota') {
+    if (outcome.firstStdout !== undefined) writeFileSync(join(dir, `${base}.first.json`), outcome.firstStdout);
     step.status = 'interrupted';
     step.cause = outcome.message;
     w.quota = { hit: true, message: outcome.message };
@@ -410,7 +411,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     if ([...real].some((s) => s.startsWith(a.sha) || a.sha.startsWith(s.slice(0, 7)))) continue;
     // Reprise : le rapport cite aussi les commits d'une session précédente du lot, hors de la plage de celle-ci.
     const full = /^[0-9a-f]{4,40}$/i.test(a.sha) ? resolveCommit(l.repo, a.sha) : null;
-    if (full && isAncestor(l.repo, full, 'HEAD')) continue;
+    if (full && lotWork(plan, l.repo, l.lot).some((k) => k.sha === full)) continue;
     l.warnings.push(`commit annoncé absent de git : ${a.sha} ${a.sujet}`);
   }
   for (const k of commits) {

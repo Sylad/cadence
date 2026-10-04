@@ -86,7 +86,7 @@ export function readAgents(dir: string): Record<string, AgentDef> {
 
 export type SessionOutcome =
   | { kind: 'ok'; result: SessionResult; /** Sortie brute de la première session, quand une relance de mise en forme a eu lieu. */ firstStdout?: string }
-  | { kind: 'quota'; message: string; result?: SessionResult; tokens?: Tokens; sessionId?: string }
+  | { kind: 'quota'; message: string; result?: SessionResult; tokens?: Tokens; sessionId?: string; firstStdout?: string }
   | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string; firstStdout?: string };
 
 /** Consigne de la relance de mise en forme : rendre le rapport déjà établi au format demandé, rien d'autre. */

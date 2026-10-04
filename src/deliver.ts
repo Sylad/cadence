@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { parse } from 'yaml';
 import type { Day } from './dates.js';
+import { isPlanOnly } from './audit.js';
 import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
 import { citedRefs } from './link.js';
 import { RafError, type Plan } from './plan.js';
@@ -403,6 +404,7 @@ function deliveredLots(ctx: DeliverCtx, prev: string | null, sha: string): strin
   const known = new Set((ctx.plan.readonly ? lots.filter((l) => l.status === 'doing') : lots).map((l) => l.id));
   const ids = new Set<string>();
   for (const c of readCommits(ctx.root, { range: `${prev}..${sha}` })) {
+    if (isPlanOnly(c.sha, ctx.plan, ctx.root)) continue; // entretien du plan : ne livre rien, même s'il cite des lots
     for (const r of citedRefs(c, ctx.plan.refs)) if (known.has(r.lot)) ids.add(r.lot);
   }
   if (ids.size === 0) return null;

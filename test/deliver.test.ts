@@ -437,6 +437,21 @@ describe('deliver : script du projet (L2)', () => {
     expect(out.filter((l) => l.startsWith('livré :'))).toEqual(['livré : L1 — raf done si l\'effet est celui attendu']);
   });
 
+  it('un commit d\'entretien du plan n\'annonce aucun lot livré (cas warhammer 883be18 : « rattaché à L2 »)', async () => {
+    const dir = pushedRepo();
+    expect(await deliver(ctx(dir).c, fakeDeps().deps)).toBe(0);
+    commit(dir, 'feat(L1): cache');
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    plan.add('Suite', '2026-09-28');
+    plan.save();
+    git(dir, 'add', 'docs/plan/raf.yaml');
+    commit(dir, 'plan: L1 terminé — mineur de relecture rattaché à L2');
+    git(dir, 'push', '-q');
+    const { c, out } = ctx(dir);
+    expect(await deliver(c, fakeDeps().deps)).toBe(0);
+    expect(out.filter((l) => l.startsWith('livré :'))).toEqual(['livré : L1 — raf done si l\'effet est celui attendu']);
+  });
+
   it('plan en lecture seule : aucun lot en cours cité → aucune ligne de lots livrés', async () => {
     const dir = pushedRepo();
     const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'), { format: { lots: 'lots', fields: {}, statuses: {}, estimates: {} } });

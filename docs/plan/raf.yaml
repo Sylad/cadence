@@ -301,3 +301,35 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review:
+      {
+        date: 2026-10-04,
+        verdict: "Je n'ai trouvé aucun défaut : le lot L29 est conforme. Il compte un seul commit à relire, 9eac197 « fix(L29): commit annoncé hors plage contrôlé sur lotCommits (commits de plan inclus) ; avertissement quand alreadyDone passe à la revue sans nouveau commit ». Il modifie src/audit.ts, src/orchestrate/cycle.ts et test/orchestrate-cycle.test.ts.
+
+
+          **Ce que j'ai lancé**
+
+          - `npx tsc --noEmit` : aucune erreur.
+
+          - `npx vitest run` : les 24 fichiers et les 428 tests passent.
+
+
+          **Les deux nouveaux tests échouent bien sans le correctif.** Je les ai vérifiés dans une copie temporaire du dépôt, dans /tmp, supprimée ensuite. J'y ai remis `lotWork` à la place de `lotCommits` dans cycle.ts:414 et retiré la ligne d'avertissement de cycle.ts:440. Les deux tests marqués « L29 » échouent alors (2 échecs sur 2).
+
+
+          **Les deux points du lot sont faits :**
+
+          1. **Commit annoncé hors plage.** Le contrôle passe sur `lotCommits`, désormais exporté depuis audit.ts:103. Il accepte maintenant les commits du lot qui ne touchent que le plan. Le test crée un vrai commit « plan: L1 démarré » avant la session, donc hors de la plage `headBefore..HEAD`. Il vérifie qu'aucun avertissement « n'appartient pas » ou « absent de git » n'apparaît.
+
+          2. **Garde alreadyDone sans nouveau commit.** Quand la garde fait passer le lot à la revue sans nouveau commit, un avertissement s'ajoute à `l.warnings` (cycle.ts:440). Le test vérifie qu'il est absent après la première session, puis présent une seule fois après la reprise répondue.
+
+
+          **Interface (lue dans le code seulement).** L'avertissement s'affiche dans le tableau avec ⚠ (table.ts:55). Son message dit ce qui s'est passé (aucun nouveau commit) et ce qui en découle (revue sur les commits déjà faits du lot). Je n'en tire aucun constat au regard de la visibilité de l'état du système (heuristique Nielsen n° 1).
+
+
+          Je n'ai rien modifié dans le dépôt.
+
+
+          conforme — orchestré (vague 2026-10-04-1650, 0 passe(s) de correction)",
+        commit: 9eac1975057ae838c3fef8455bba601c682634f8
+      }

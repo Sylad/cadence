@@ -246,6 +246,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme après 2 corrections mineures (doc du contrôle du tag en retard, test qui ne vérifie que la présence des chemins) ; volet OIDC à prouver à la prochaine release — orchestré (vague 2026-10-04-1700, 0 passe(s) de correction)", commit: 3e47c49a497f775a5b505a4f0df6467905176741 }
   - id: L24
     title: "⚡ Les tests de cadence passent aussi depuis une session de vague : CADENCE_ORCHESTRATED hérité retiré de leur environnement (17 échecs relevés par la vague 2026-10-04-1534 sur L21)"
     status: done

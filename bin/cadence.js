@@ -13,7 +13,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'skills'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -31,6 +31,9 @@ if (tool === 'raf') {
   cadence deliver [--dry-run] [--sha rév] [--config cadence.yaml] [-- arguments du script du projet]
                     CI du sha poussé → déploiement → vérifications de l'effet ;
                     ou le script de livraison du projet (deliver.script), sous verrou et journal
+  cadence verify [--retry secondes] [--sha rév]
+                    rejoue les vérifications d'effet (deliver.verify) hors livraison, une passe ;
+                    code 0 tout vert, 1 un effet rouge, 2 rien à vérifier ; « session start » la lance aussi
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);
   process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;

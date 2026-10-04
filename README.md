@@ -460,6 +460,42 @@ intact. If the script commits and pushes during the delivery (stamping a
 changelog entry, say), the new `HEAD` is the sha recorded as delivered. Exit code
 0 of the script means delivered; `verify` checks, if any, run after it.
 
+### verify: replay the effect checks, outside a delivery
+
+A green delivery says the effect was right *then*. `cadence verify` replays the
+`deliver.verify` checks of `cadence.yaml` at any time — no CI, no deploy, no lock,
+no journal entry, nothing written.
+
+```sh
+cadence verify                # one pass, one line per check, then a one-line summary
+cadence verify --retry 60     # retry each failing check for up to 60 s (deliver's 300 s is not applied)
+cadence verify --sha 6b0d9aa  # the sha that replaces ${SHA} / ${SHORT} (default: last delivery, else HEAD)
+```
+
+```
+✓ GET https://ol.example/api/health → 200
+✗ GET https://ol.example/api/lineup → 200, contient « "starters" » — « "starters" » absent de la réponse
+verify : 1 effet rouge sur 2 vérifications
+```
+
+Exit code: **0** every check green · **1** at least one red effect · **2** nothing
+to verify or invalid configuration. The check code is deliver's own (`url` /
+`status` / `contains` / `command`, same messages, same time limits). A project with
+a delivery script (`deliver.script`) and no `verify` declares no effect checks —
+`verify` says so and exits 2 (its script's own checks stay its business); add
+`deliver.verify` to replay some.
+
+Make `verify` count: a health endpoint stays green while the data is wrong (a
+lineup served empty for 38 h behind a green `/api/health`). Add a check on the
+content that matters, e.g. `url: …/api/lineup` with `contains: '"starters"'`.
+
+`cadence session start` runs the same checks (one try each, 10 s in total, command
+output muted) and adds an **"Effets en production"** section to the morning report:
+a single `✓` line when everything is green, the red effects and the summary
+otherwise. It is a fact like the others: it never changes the exit code, and an
+unreachable network shows up as red lines ("erreur réseau") without blocking the
+session. No section for a project without `deliver.verify`.
+
 ## Claude Code skills
 
 As a plugin:

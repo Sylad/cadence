@@ -30,6 +30,9 @@ three most useful items across projects and wait. With a project named, work in 
    - **Done since**: 3 to 6 lines, grouped by lot, not by commit. Mention commits without a lot.
    - **Drift**: each `✗` line from the check, with the one command that fixes it.
    - **Delivery in progress** or a stale lock: no new delivery until it is resolved.
+   - **Effects in production** ("Effets en production"): a red `✗` line is the first thing to say —
+     a delivered feature that no longer works outranks any new lot; re-run `cadence verify` to confirm
+     (a network blip also shows as red).
    - **Notes from the last close**, if any.
    - **Project facts** ("Faits propres au projet"), when the project plugs its own morning script in
      (`session.start` in `cadence.yaml`): summarise what bears on today's choice — deadlines, the

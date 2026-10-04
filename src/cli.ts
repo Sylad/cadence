@@ -42,6 +42,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf gantt [-o docs/plan/gantt.html]
   raf hook install
+  cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
 Un commit appartient à un lot quand son message cite l'identifiant : « feat(L3): … », « L3/t1 ».

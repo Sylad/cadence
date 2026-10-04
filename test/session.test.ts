@@ -210,6 +210,26 @@ describe('nettoyage en routine de clôture (L4)', () => {
   };
   const OLD = cleanAt(-18);
   const RECENT = cleanAt(-1);
+  /**
+   * Dépôt dont la clôture vaut 0 à CLEAN_TODAY : plan commité, aucun lot en cours (project() en laisse un
+   * silencieux depuis 40 j, donc déjà « ✗ pas fermé »). Sert de référence aux tests « le nettoyage ne ferme
+   * ni ne bloque » : une référence déjà à 1 laisserait survivre un nettoyage compté dans les points ouverts.
+   */
+  const closedProject = async () => {
+    const dir = gitRepo();
+    await cad(dir, 'init', '--project', 'demo', '--no-hook');
+    await cad(dir, 'add', 'Cache');
+    git(dir, 'add', '.');
+    commit(dir, 'chore: plan', '2026-09-20T09:00:00');
+    return dir;
+  };
+  /** Écrit le cadence.yaml du test et le commite : un fichier non commité serait lui-même un point ouvert. */
+  const configure = (dir: string, yaml: string) => {
+    writeFileSync(join(dir, 'cadence.yaml'), yaml);
+    git(dir, 'add', 'cadence.yaml');
+    commit(dir, 'chore: configuration', '2026-09-21T09:00:00');
+  };
+  const READY = /\n✓ prêt à fermer$/;
   const touch = (file: string, when: Date) => {
     mkdirSync(dirname(file), { recursive: true });
     if (!existsSync(file)) writeFileSync(file, 'x');
@@ -217,14 +237,16 @@ describe('nettoyage en routine de clôture (L4)', () => {
   };
 
   it('liste les fichiers périmés des motifs session.clean, sans rien supprimer ni bloquer la clôture', async () => {
-    const dir = await project();
+    const dir = await closedProject();
     const shared = tempDir();
     touch(join(shared, 'ancienne-capture.png'), OLD);
     touch(join(shared, 'capture-du-jour.png'), RECENT);
     mkdirSync(join(shared, 'tmp-test-abc'));
     utimesSync(join(shared, 'tmp-test-abc'), OLD, OLD);
     const sans = await cadLate(dir, 'session', 'close');
-    writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean:\n    - "${shared}/*.png"\n    - "${shared}/tmp-test-*"\n`);
+    expect(sans.code).toBe(0);
+    expect(sans.out).toMatch(READY);
+    configure(dir, `session:\n  clean:\n    - "${shared}/*.png"\n    - "${shared}/tmp-test-*"\n`);
     const { code, out } = await cadLate(dir, 'session', 'close');
     expect(out).toMatch(/Nettoyage proposé \(2 élément\(s\) plus vieux de 7 j\)\n/);
     expect(out).toContain(`${join(shared, 'ancienne-capture.png')} — 18 j`);
@@ -232,9 +254,10 @@ describe('nettoyage en routine de clôture (L4)', () => {
     expect(out).not.toContain('capture-du-jour');
     // Rien n'est supprimé : la commande propose, le skill demande l'accord.
     expect(existsSync(join(shared, 'ancienne-capture.png'))).toBe(true);
-    // Une proposition, pas une condition de fermeture : même code de sortie que sans motif.
-    expect(code).toBe(sans.code);
-    expect(out).not.toMatch(/✗.*Nettoyage/);
+    // Une proposition, pas une condition de fermeture : la référence ferme à 0, le nettoyage proposé aussi.
+    expect(code).toBe(0);
+    expect(out).toMatch(READY);
+    expect(out).not.toMatch(/✗/);
   });
 
   it('cleanDays règle le seuil ; un motif relatif part de la racine du dépôt ; ~ désigne le dossier personnel', async () => {
@@ -301,20 +324,24 @@ describe('nettoyage en routine de clôture (L4)', () => {
   });
 
   it.skipIf(process.getuid?.() === 0)('un dossier illisible n’est pas proposé : il est signalé, sans bloquer ni faire lever la clôture', async () => {
-    const dir = await project();
+    const dir = await closedProject();
     const shared = tempDir();
     mkdirSync(join(shared, 'ferme/clone'), { recursive: true });
     git(join(shared, 'ferme/clone'), 'init', '-q');
     touch(join(shared, 'ancienne.png'), OLD);
     utimesSync(join(shared, 'ferme'), OLD, OLD);
-    writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean: [ "${shared}/*" ]\n`);
+    configure(dir, `session:\n  clean: [ "${shared}/*" ]\n`);
     const sans = await cadLate(dir, 'session', 'close');
+    expect(sans.code).toBe(0);
+    expect(sans.out).toMatch(READY);
     chmodSync(join(shared, 'ferme'), 0o311);
     try {
       const { code, out } = await cadLate(dir, 'session', 'close');
       expect(out).toMatch(/Nettoyage proposé \(1 élément\(s\) plus vieux de 7 j\)\n {2}.*ancienne\.png — 18 j\n/);
       expect(out).toContain(`Nettoyage : 1 élément(s) illisible(s), jamais proposé(s)\n  ${join(shared, 'ferme')}`);
-      expect(code).toBe(sans.code);
+      // Illisible = signalé, pas compté : la référence ferme à 0, la clôture aussi.
+      expect(code).toBe(0);
+      expect(out).toMatch(READY);
     } finally {
       chmodSync(join(shared, 'ferme'), 0o755);
     }

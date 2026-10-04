@@ -27,9 +27,13 @@ reports a page left empty or in error.
   `fix: L3/t1 …`. The link is **computed from `git log`**, never stored, so
   committing never dirties the plan. The id is read as a whole word: `XL3`,
   `L3x` and `L3.4` do not cite `L3`, while `L3.` at the end of a sentence does.
+  When the subject has a scope that cites lots (`feat(L3): …`,
+  `chore(L31,L32): …`), **the scope alone decides**: a passing mention
+  (`page équipe (L27)`), a range (`L28–L31`, `L45 à L48`) or the body does not
+  count. Without a scope citing a lot, the whole message is read as before.
 - `raf check` audits drift between the plan and the history.
 - Plan upkeep needs no lot. A commit is plan upkeep when **every file it
-  touches is a plan file**: the plan itself, its Gantt page, or a file the
+  touches is a plan file**: the plan itself, its Gantt page, `cadence.yaml`, or a file the
   project lists under `plan.files` in `cadence.yaml` (a page it generates from
   the plan, a journal). Such a commit is never a "commit without a lot", and it
   does not count as work on the lots it cites: it is absent from `raf commits`,

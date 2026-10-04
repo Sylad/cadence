@@ -613,14 +613,18 @@ A version exists in three places and is published in two; a release does all of 
 
 1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, in the commit that closes the lot.
-2. `npm publish --access public` — `prepublishOnly` runs the type-check and the tests first, `prepare`
-   builds `dist/`; a red suite stops the publication.
-3. `git tag v<version> && git push origin main v<version>`.
+2. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,
+   which publishes to npm through Trusted Publishing (OIDC, no token stored anywhere): it checks the tag
+   matches `package.json`, then `npm publish --provenance`, where `prepublishOnly` runs the type-check and the
+   tests and `prepare` builds `dist/`; a red suite stops the publication. The trusted publisher is declared
+   once on npmjs.com (package settings → Trusted Publisher → GitHub Actions, `Sylad/cadence`, `publish.yml`).
+3. Watch the run: `gh run watch` (or `gh run list --workflow publish.yml`).
 4. Check the effect: `npm view @sylad/cadence version` answers the new version.
 
-The Claude Code plugin is read from the repository, so step 3 is what updates it; npm is what
-`npx @sylad/cadence` and a global install read. Skipping step 2 leaves npm behind without any error —
-0.3.0 and 0.4.0 were never published.
+The Claude Code plugin is read from the repository, so pushing `main` is what updates it; npm is what
+`npx @sylad/cadence` and a global install read, and only the tag publishes there. A missing tag, or a red
+publish run, leaves npm behind without any other error — 0.3.0 and 0.4.0 were never published — hence
+step 4.
 
 ## License
 

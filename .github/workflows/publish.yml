@@ -1,0 +1,40 @@
+# Publication sur npm par la publication de confiance (Trusted Publishing, OIDC) :
+# aucun jeton stocké, npm vérifie que la publication vient de ce workflow de Sylad/cadence.
+# Déclenchée par un tag v<version> qui doit correspondre à la version de package.json.
+name: publish
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write   # jeton d'identité GitHub, échangé contre un droit de publication par npm
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # La publication de confiance demande npm ≥ 11.5.1.
+      - run: npm install -g npm@latest
+
+      - name: Le tag correspond à package.json
+        run: |
+          test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME" \
+            || { echo "tag $GITHUB_REF_NAME ≠ version de package.json"; exit 1; }
+
+      # Les tests créent des dépôts git jetables : il leur faut une identité.
+      - run: |
+          git config --global user.name "cadence-ci"
+          git config --global user.email "cadence-ci@users.noreply.github.com"
+
+      - run: npm ci
+      # prepublishOnly relance typecheck + tests, prepare construit dist/ : une suite rouge arrête tout.
+      - run: npm publish --access public --provenance

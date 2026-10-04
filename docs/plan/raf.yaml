@@ -534,7 +534,8 @@ lots:
     finished: 2026-10-04
   - id: L44
     title: "⚡ Suite de la revue L43 : test/skills.test.ts:259 — retirer le .replace(/\\s+/g, ' ') redondant et l'assertion qui répète la ligne 238 (une seule assertion, commentaire de la l.258 rattaché à la l.238)"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04

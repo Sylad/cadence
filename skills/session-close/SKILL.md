@@ -37,15 +37,18 @@ With no project named, run `cadence session close` in each project touched durin
 3. **Stale working files** (report section "Nettoyage proposé", from `session.clean` in `cadence.yaml`):
    list them to the human — shared tmp folder, screenshots no one refers to, throwaway scripts,
    folders left by tests — and delete them only after the human agrees, with explicit paths (never a
-   wildcard `rm`, never a file `git` tracks). Before proposing a screenshot, check nothing still
+   wildcard `rm`, never a file `git` tracks). The agreement can be old by then: right before
+   deleting, re-run `cadence session close` (or the scan) and delete only the entries that are
+   still proposed, never one the human named from memory. Delete a proposed symbolic link as a
+   link (`rm path`, no trailing `/`, never `rm -r` through it). Before proposing a screenshot, check nothing still
    refers to it (plan, news, docs). Anything kept: leave it, it will be listed again next close. No
    section: nothing to do; a project with no `session.clean` can propose adding it.
    An entry is proposed only if it could be measured entirely. Age: a folder's age is that of the
-   most recent entry it contains. The report never proposes: a git repository, a folder that
+   most recent entry it contains, an entry's age counting from the later of its modification and status-change times. The report never proposes: a git repository, a folder that
    contains one at any depth, and anything under a `.git` folder; a git directory without a `.git`
    entry (bare repository, mirror, `--separate-git-dir`, worktree admin folder — recognised by
    `HEAD` with `objects` and `refs`, or with `commondir`), anything inside it or a folder that
-   contains one; anything `git` tracks, whichever repository it is in; a name starting with `.`
+   contains one; anything `git` tracks, in any repository that has a `.git` entry above it (one limit: a bare repository driven with an external work tree, `git --git-dir=~/.dotfiles --work-tree=~`, leaves no `.git` beside its files — their tracked files can be proposed, so check a proposed entry is not one); a name starting with `.`
    unless the pattern itself starts that name with `.`; anything behind a symbolic link a `*`
    matched (the link itself may be proposed: remove the link, never `rm -r` through it — a segment
    written in full before the first `*` does follow its link); the repository itself or a folder that contains it;

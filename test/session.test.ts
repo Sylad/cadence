@@ -355,7 +355,7 @@ describe('nettoyage en routine de clôture (L4)', () => {
     expect(skill).toContain(rule);
     for (const never of [
       'a git repository, a folder that contains one at any depth, and anything under a `.git` folder',
-      'anything `git` tracks, whichever repository it is in',
+      'anything `git` tracks, in any repository that has a `.git` entry above it',
       'a name starting with `.` unless the pattern itself starts that name with `.`',
       'anything that could not be read entirely',
     ]) {
@@ -366,5 +366,19 @@ describe('nettoyage en routine de clôture (L4)', () => {
     expect(skill).toContain("a folder's age is that of the most recent entry it contains");
     expect(readme).toContain('Nettoyage : N élément(s) illisible(s), jamais proposé(s)');
     expect(skill).toContain('never delete those');
+    // La limite du dépôt nu à arbre de travail externe est nommée des deux côtés (L4/t18).
+    for (const t of [readme, skill]) {
+      expect(t).toContain('--git-dir=~/.dotfiles --work-tree=~');
+      expect(t).toContain('leaves no `.git` beside');
+    }
+    expect(readme).not.toContain('whichever repository');
+    expect(skill).not.toContain('whichever repository');
+  });
+
+  it('la routine session-close relance le scan avant de supprimer et supprime un lien comme un lien (L4/t19)', () => {
+    const skill = readFileSync(join(SKILLS_DIR, 'session-close', 'SKILL.md'), 'utf8').replace(/\s+/g, ' ');
+    expect(skill).toContain('right before deleting, re-run `cadence session close` (or the scan) and delete only the entries that are still proposed');
+    expect(skill).toContain('Delete a proposed symbolic link as a link');
+    expect(skill).toContain('never `rm -r` through it');
   });
 });

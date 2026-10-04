@@ -405,7 +405,10 @@ An entry is proposed only if it could be measured entirely. Never proposed:
   --mirror`, `backup.git/`), a `--separate-git-dir`, a worktree's admin folder —, recognised by
   its content as git does (`HEAD` with `objects` and `refs`, or `HEAD` with `commondir`): neither
   it, nor anything inside it, nor a folder that contains one;
-- anything `git` tracks, whichever repository it is in;
+- anything `git` tracks, in any repository that has a `.git` entry above it. One limit, stated
+  plainly: a bare repository driven with an external work tree (`git --git-dir=~/.dotfiles
+  --work-tree=~`) leaves no `.git` beside the files, so its tracked files cannot be recognised and
+  can be proposed — never point a pattern at such a work tree;
 - a name starting with `.` unless the pattern itself starts that name with `.` (as in the
   shell, `tmp/*` does not match `tmp/.env`; `tmp/.cache-*` does);
 - anything reached through a symbolic link matched by a `*` segment: unlike the shell, the walk

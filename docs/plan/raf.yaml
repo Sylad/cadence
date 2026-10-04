@@ -237,3 +237,9 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+  - id: L25
+    title: "⚡ orchestrate : « commit annoncé absent de git » faux positif à la reprise — un commit d'une session précédente du même lot (ancêtre de HEAD) est cité par le rapport ; vérifier contre les commits du lot, pas la seule plage de la session (cycle.ts:398-404, vague 2026-10-04-1534)"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

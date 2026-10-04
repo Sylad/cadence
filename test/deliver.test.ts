@@ -650,7 +650,7 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
       const logs = tempDir();
       const dir = pushedRepo();
       // le sh du script note son pid, dort, puis « bumpe » : ce qu'ont fait deux livraisons concurrentes le 04-10
-      writeFileSync(join(dir, 'cadence.yaml'), `deliver:\n  script: sh -c 'echo $$ >> ${logs}/pids; sleep 3; echo bumped >> ${logs}/log'\n`);
+      writeFileSync(join(dir, 'cadence.yaml'), `deliver:\n  script: sh -c 'echo $$ >> "${logs}/pids"; sleep 3; echo bumped >> "${logs}/log"'\n`);
       git(dir, 'add', 'cadence.yaml');
       commit(dir, 'chore: config');
       git(dir, 'push', '-q');
@@ -751,7 +751,7 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
     const dir = pushedRepo();
     writeFileSync(
       join(dir, 'livrer.sh'),
-      `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then\n  echo $$ > '${logs}/first'\n  trap 'echo trap-start >> '${logs}/trap'; sleep 0.2; echo trap-done >> '${logs}/trap'; exit 130' INT\n  sleep 3\n  ( sh -c "sleep 0; echo bumped >> '${logs}/bumps'" )\nelse\n  echo bumped >> '${logs}/bumps'\nfi\n`,
+      `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then\n  echo $$ > '${logs}/first'\n  trap 'echo trap-start >> "${logs}/trap"; sleep 0.2; echo trap-done >> "${logs}/trap"; exit 130' INT\n  sleep 3\n  ( sh -c "sleep 0; echo bumped >> '${logs}/bumps'" )\nelse\n  echo bumped >> '${logs}/bumps'\nfi\n`,
       { mode: 0o755 },
     );
     writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  script: ./livrer.sh\n');

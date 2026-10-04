@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir } from '../src/orchestrate/launch.js';
@@ -682,5 +683,28 @@ describe('commande orchestrate.test asynchrone (L3/t16)', () => {
     clearInterval(timer);
     expect(c.lot.status).toBe('ready');
     expect(ticks).toBeGreaterThanOrEqual(10); // spawnSync bloquait : un seul tour, après la commande
+  });
+});
+
+describe('gabarits : instantané de la vague (L39)', () => {
+  it('un gabarit modifié (ou cassé) pendant la vague ne change pas les briefs de cette vague', async () => {
+    const dir = tempDir();
+    cpSync(TEMPLATES_DIR, dir, { recursive: true });
+    const edit: Handler = (call) => {
+      // le lot modifie templates/orchestrate pendant la vague : nouveau nom de variable, gabarit supprimé
+      writeFileSync(join(dir, 'review.md'), 'Nouveau gabarit {{variable_inconnue}}\n');
+      rmSync(join(dir, 'fix.md'));
+      return impl()(call);
+    };
+    const h = harness({ templatesDir: dir, script: { implement: [edit], review: [major, ok], fix: [fix('b.txt')] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
+    for (const call of h.calls.filter((k) => k.kind === 'review')) {
+      expect(call.brief).toContain('Review lot `L1`');
+      expect(call.brief).not.toContain('Nouveau gabarit');
+    }
+    expect(h.calls[2].brief).toContain('found the defects below');
   });
 });

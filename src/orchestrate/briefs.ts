@@ -20,7 +20,10 @@ export interface BriefVars {
   choix: string;
 }
 
-const FILES: Record<StepKind, string> = {
+/** Un gabarit : un par étape. */
+export type BriefName = StepKind;
+
+const FILES: Record<BriefName, string> = {
   implement: 'implement.md',
   fix: 'fix.md',
   review: 'review.md',
@@ -28,9 +31,28 @@ const FILES: Record<StepKind, string> = {
   'review-small': 'review-small.md',
 };
 
-/** Rend le gabarit d'une étape par substitution de `{{nom}}`. Un nom sans valeur est une erreur. */
-export function renderBrief(kind: StepKind, vars: BriefVars, dir = TEMPLATES_DIR): string {
-  const text = readFileSync(join(dir, FILES[kind]), 'utf8');
+/** Texte des gabarits, lu une fois : une vague rend tous ses briefs depuis le même instantané. */
+export type Templates = Record<BriefName, string>;
+
+/** Lit tous les gabarits du dossier. Un gabarit absent est une erreur, avant que quoi que ce soit ne parte. */
+export function loadTemplates(dir = TEMPLATES_DIR): Templates {
+  const out = {} as Templates;
+  for (const [name, file] of Object.entries(FILES) as [BriefName, string][]) {
+    try {
+      out[name] = readFileSync(join(dir, file), 'utf8');
+    } catch (e) {
+      throw new RafError(`gabarit ${file} illisible dans ${dir} : ${(e as Error).message}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Rend le gabarit d'une étape par substitution de `{{nom}}`. Un nom sans valeur est une erreur.
+ * `source` : un instantané (`loadTemplates`, ce que fait une vague) ou un dossier lu à l'appel.
+ */
+export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
+  const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
     const v = (vars as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TEMPLATES_DIR, objective, renderBrief } from '../src/orchestrate/briefs.js';
+import { TEMPLATES_DIR, loadTemplates, objective, renderBrief } from '../src/orchestrate/briefs.js';
 import { WORK_SCHEMA, REVIEW_SCHEMA, checkShape } from '../src/orchestrate/schemas.js';
 import type { Lot } from '../src/plan.js';
 
@@ -99,5 +101,26 @@ describe('schémas', () => {
     expect(() => checkShape({ ...ok, questions: undefined }, WORK_SCHEMA)).toThrow(/questions/);
     expect(() => checkShape({ ...ok, resume: 3 }, WORK_SCHEMA)).toThrow(/resume/);
     expect(() => checkShape({ bloquants: 0 }, REVIEW_SCHEMA)).toThrow(/majeurs/);
+  });
+});
+
+describe('instantané des gabarits (L39)', () => {
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '' };
+
+  it('loadTemplates lit tous les gabarits une fois ; renderBrief rend depuis l\'instantané sans relire le disque', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadence-tpl-'));
+    cpSync(TEMPLATES_DIR, dir, { recursive: true });
+    const snap = loadTemplates(dir);
+    expect(Object.keys(snap).sort()).toEqual(['fix', 'implement', 'review', 'review-small', 'ux']);
+    writeFileSync(join(dir, 'review.md'), 'changé {{lot}}\n');
+    expect(renderBrief('review', vars, snap)).toContain('Review lot `L9`');
+    expect(renderBrief('review', vars, dir)).toBe('changé L9\n');
+  });
+
+  it('un gabarit absent est une erreur nommée, avant tout rendu', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadence-tpl-'));
+    cpSync(TEMPLATES_DIR, dir, { recursive: true });
+    rmSync(join(dir, 'ux.md'));
+    expect(() => loadTemplates(dir)).toThrow(/gabarit ux\.md illisible/);
   });
 });

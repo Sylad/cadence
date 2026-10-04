@@ -9,7 +9,7 @@ import { readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
-import { objective, renderBrief, type BriefVars } from './briefs.js';
+import { objective, renderBrief, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, runSession, trackGroup, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
@@ -56,7 +56,8 @@ export interface WaveCtx {
   today: Day;
   /** ~/.claude : pour relire le pic de contexte des sessions. */
   claudeHome?: string;
-  templatesDir?: string;
+  /** Gabarits des briefs, lus une fois au début de la vague (et à sa reprise) : modifier un fichier en cours de vague ne change rien. */
+  templates: Templates;
   quota: { hit: boolean; message?: string };
   /** Push ou revue qui a modifié le dépôt : la vague s'arrête. */
   incident: string | null;
@@ -223,7 +224,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     }
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
-  return renderBrief(kind, vars, c.wave.templatesDir);
+  return renderBrief(kind, vars, c.wave.templates);
 }
 
 type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot };

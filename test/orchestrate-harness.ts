@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readOrchestrateConfig, type OrchestrateConfig } from '../src/config.js';
+import { loadTemplates, TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { Budget, type LotCtx, type WaveCtx } from '../src/orchestrate/cycle.js';
 import type { AgentDef, ClaudeFn, LaunchOpts } from '../src/orchestrate/launch.js';
 import { newLot, RunStore, type LotState } from '../src/orchestrate/state.js';
@@ -58,8 +59,8 @@ export function kindOf(args: string[]): Call['kind'] {
   const brief = args[1];
   const agent = args.includes('--agent') ? args[args.indexOf('--agent') + 1] : null;
   if (agent === 'ux-reviewer') return 'ux';
-  if (agent === 'code-reviewer') return brief.includes('single pass') ? 'review-small' : 'review';
-  return brief.includes('found the defects below') ? 'fix' : 'implement';
+  if (agent === 'code-reviewer') return brief.includes('single pass') || brief.includes('short re-review') ? 'review-small' : 'review';
+  return brief.includes('found the defects below') || brief.includes('found only minor findings') ? 'fix' : 'implement';
 }
 
 export type Handler = (call: Call) => ReturnType<ClaudeFn> | { code: number; stdout: string; stderr: string; timedOut: boolean };
@@ -86,7 +87,7 @@ export interface Harness {
  * Dépôt jetable avec un plan, lots donnés ; le lanceur est un scénario : `script[kind]` est la file des
  * réponses de chaque type d'étape. Rien ne lance le vrai claude.
  */
-export function harness(opts: { lots?: { title: string; visible?: boolean; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number } = {}): Harness {
+export function harness(opts: { lots?: { title: string; visible?: boolean; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number; templatesDir?: string } = {}): Harness {
   const repo = gitRepo();
   const planFile = join(repo, 'docs/plan/raf.yaml');
   const plan = Plan.create(planFile, 'demo', 'L', '2026-09-01');
@@ -116,6 +117,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; estim
     budget: new Budget(opts.budget ?? 2_000_000),
     claude,
     agents,
+    templates: loadTemplates(opts.templatesDir ?? TEMPLATES_DIR),
     today: '2026-10-04',
     quota: { hit: false },
     incident: null,

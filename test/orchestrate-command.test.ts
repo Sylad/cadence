@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
+import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { Plan } from '../src/plan.js';
 import { claudeOut, commitFile, git, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
 import { gitRepo, tempDir } from './helpers.js';
@@ -290,6 +291,20 @@ describe('une vague', () => {
     expect(code2).toBe(0);
     expect(new RunStore(parent, '2026-10-04-1412').readWave()!.status).toBe('done');
     expect(f.calls.map((c) => c.kind)).toEqual(['implement', 'review', 'implement', 'review']);
+  });
+
+  it('L39 — les gabarits sont lus une fois par exécution : un fichier modifié entre deux exécutions n\'est pris qu\'à la reprise', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    const dir = tempDir();
+    cpSync(TEMPLATES_DIR, dir, { recursive: true });
+    const reviews: string[] = [];
+    const f = fakeDeps({ review: (_cwd, brief) => { reviews.push(brief); return claudeOut(reviewReport()); } }, { templatesDir: dir });
+    expect(await orchestrate(['a:L1', 'a:L2', '--budget', '2000'], io(parent).io, f.deps)).toBe(3);
+    writeFileSync(join(dir, 'review.md'), 'GABARIT RELU {{lot}}\n');
+    expect(await orchestrate(['--resume', '--budget', '1M'], io(parent).io, f.deps)).toBe(0);
+    expect(reviews).toHaveLength(2);
+    expect(reviews[0]).toContain('Review lot `L1`');
+    expect(reviews[1]).toBe('GABARIT RELU L2\n');
   });
 
   it('question puis --answer : le lot reprend, la vague aboutit', async () => {

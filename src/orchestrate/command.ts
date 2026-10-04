@@ -9,7 +9,7 @@ import { onTermination } from '../proc.js';
 import { Plan, RafError, isOpen } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
-import { objective, renderBrief, type BriefVars } from './briefs.js';
+import { loadTemplates, objective, renderBrief, type BriefVars } from './briefs.js';
 import { Budget, countInterrupted, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, killSessions, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
@@ -302,6 +302,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const launch = store.launchDir;
   // La configuration des projets est lue avant de poser quoi que ce soit : un cadence.yaml illisible ne laisse ni verrou ni hook.
   const envs = lots.map((lot) => projectEnv(lot.repo));
+  // Les gabarits aussi : lus une fois, rendus depuis cet instantané jusqu'à la fin de la vague (ou jusqu'à sa reprise).
+  const templates = loadTemplates(deps.templatesDir);
   mkdirSync(join(launch, '.cadence'), { recursive: true });
   excludeState(launch);
   const waveLock = join(launch, '.cadence', 'orchestrate.lock');
@@ -355,7 +357,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     agents: agentsOf(deps),
     today,
     claudeHome: deps.claudeHome,
-    templatesDir: deps.templatesDir,
+    templates,
     quota: { hit: false },
     incident: null,
     log: (line) => {

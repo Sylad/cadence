@@ -401,7 +401,8 @@ lots:
     created: 2026-10-04
   - id: L38
     title: "⚡ orchestrate : une revue « conforme avec mineurs » enchaîne UNE passe de correction des mineurs dans la vague (session neuve, puis revue courte), au lieu de produire un lot de suites à chaque fois — consigne de Sylvain (04-10) : rien sous le tapis ; mesure : vague 2026-10-04-1700, 4 lots conformes → 4 lots de suites"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04

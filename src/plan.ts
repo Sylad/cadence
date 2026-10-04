@@ -79,6 +79,8 @@ export interface PlanSettings {
   /** Fichiers tenus avec le plan (journal…), relatifs à la racine : les toucher n'est pas travailler à un lot. */
   files?: string[];
   format?: PlanFormat;
+  /** Fichier de configuration effectivement lu (--config), absolu ; cadence.yaml à la racine par défaut. */
+  config?: string;
 }
 
 export function isOpen(status: Status): boolean {
@@ -201,6 +203,11 @@ export class Plan {
   }
 
   /** Fichiers tenus avec le plan, relatifs à la racine du dépôt. */
+  /** Fichier de configuration lu pour ce plan, null quand on n'en connaît pas (cadence.yaml à la racine alors). */
+  get configFile(): string | null {
+    return this.settings.config ?? null;
+  }
+
   get files(): string[] {
     return this.settings.files ?? [];
   }

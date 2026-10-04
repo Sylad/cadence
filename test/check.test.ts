@@ -118,7 +118,14 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
     await raf('2026-10-03', 'init', '--no-hook');
     git('add', PLAN);
     git('commit', '-qm', 'chore: adoption');
-    return { raf, touch, declare };
+    /** Écrit un fichier et le commite seul. */
+    const write = (subject: string, file: string, text: string) => {
+      mkdirSync(dirname(join(dir, file)), { recursive: true });
+      writeFileSync(join(dir, file), text);
+      git('add', file);
+      git('commit', '-qm', subject);
+    };
+    return { raf, touch, declare, write };
   }
 
   const orphans = (out: string) => out.split('\n').filter((l) => l.includes('commit sans lot'));
@@ -203,6 +210,30 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
     expect((await raf('2026-10-03', 'hook', 'post-commit')).err).not.toContain('commit sans lot');
     touch('chore: config + source', ['cadence.yaml', 'src/app.ts']);
     expect(orphans((await raf('2026-10-03', 'check')).out)).toHaveLength(1);
+  });
+
+  it('(L15/t1) cadence.yaml n’est du plan que pour la clé plan: — deliver/session sont du travail', async () => {
+    const { raf, write } = await project();
+    await raf('2026-10-03', 'add', 'Livraison');
+    write('chore: déclare le plan publié', 'cadence.yaml', 'plan:\n  files: [a.json]\n');
+    write('chore: plan.files étendu', 'cadence.yaml', 'plan:\n  files: [a.json, b.json]\n');
+    expect(await raf('2026-10-03', 'check')).toMatchObject({ code: 0, out: '✓ plan et historique cohérents' });
+    write('chore: vérifications de livraison', 'cadence.yaml', 'plan:\n  files: [a.json, b.json]\ndeliver:\n  verify: []\n');
+    expect(orphans((await raf('2026-10-03', 'check')).out)).toHaveLength(1);
+    expect((await raf('2026-10-03', 'hook', 'post-commit')).err).toContain('commit sans lot');
+    write('fix(L1): deliver.verify réglé', 'cadence.yaml', 'plan:\n  files: [a.json, b.json]\ndeliver:\n  verify: [x]\n');
+    expect((await raf('2026-10-03', 'commits', 'L1')).out).toMatch(/fix\(L1\): deliver.verify réglé/);
+    // Plan et deliver changés ensemble : du travail.
+    write('chore: les deux', 'cadence.yaml', 'plan:\n  files: [a.json]\ndeliver:\n  verify: [y]\n');
+    expect(orphans((await raf('2026-10-03', 'check')).out)).toHaveLength(2);
+  });
+
+  it('(L15/t5) le fichier de config effectivement lu (--config) est un fichier du plan, pas cadence.yaml de la racine', async () => {
+    const { raf, write } = await project();
+    write('chore: config ailleurs', 'conf/autre.yaml', 'plan:\n  files: [a.json]\n');
+    expect(await raf('2026-10-03', 'check', '--config', 'conf/autre.yaml')).toMatchObject({ code: 0 });
+    write('chore: cadence.yaml racine', 'cadence.yaml', 'plan:\n  files: [a.json]\n');
+    expect(orphans((await raf('2026-10-03', 'check', '--config', 'conf/autre.yaml')).out)).toHaveLength(1);
   });
 
   it('(e) un commit mixte (plan + fichier source) qui cite un lot compte pour ce lot, quel que soit son sujet', async () => {

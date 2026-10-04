@@ -33,7 +33,8 @@ reports a page left empty or in error.
   count. Without a scope citing a lot, the whole message is read as before.
 - `raf check` audits drift between the plan and the history.
 - Plan upkeep needs no lot. A commit is plan upkeep when **every file it
-  touches is a plan file**: the plan itself, its Gantt page, `cadence.yaml`, or a file the
+  touches is a plan file**: the plan itself, its Gantt page, the `plan:` key of the config file in use (`cadence.yaml`, or
+  the `--config` file; a change to `deliver:`/`session:` is work), or a file the
   project lists under `plan.files` in `cadence.yaml` (a page it generates from
   the plan, a journal). Such a commit is never a "commit without a lot", and it
   does not count as work on the lots it cites: it is absent from `raf commits`,

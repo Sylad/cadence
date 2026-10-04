@@ -1,14 +1,37 @@
 import { dirname, join, relative } from 'node:path';
 import { check } from './check.js';
 import type { Day } from './dates.js';
-import { changedFiles, readCommits, type Commit } from './git.js';
+import { parse } from 'yaml';
+import { changedFiles, fileAt, readCommits, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import { loadEntries, newsIssues } from './news.js';
 import { isOpen, type Lot, type Plan, type Verdict } from './plan.js';
 
-/** Le plan, sa page Gantt, cadence.yaml (la configuration du plan) et les fichiers tenus avec lui (plan.files). */
+/** Chemin de la configuration lue, relatif à la racine : celui de --config, sinon cadence.yaml. */
+function configRel(plan: Plan, root: string): string {
+  return plan.configFile ? relative(root, plan.configFile) : 'cadence.yaml';
+}
+
+/** Le plan, sa page Gantt, la configuration lue (cadence.yaml) et les fichiers tenus avec lui (plan.files). */
 function ownFiles(plan: Plan, root: string): Set<string> {
-  return new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), 'cadence.yaml', ...plan.files]);
+  return new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), configRel(plan, root), ...plan.files]);
+}
+
+function withoutPlanKey(text: string | null): string | null {
+  if (text === null) return '{}';
+  try {
+    const { plan: _plan, ...rest } = (parse(text) ?? {}) as Record<string, unknown>;
+    return JSON.stringify(rest, (_k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => x.localeCompare(y))) : v));
+  } catch {
+    return null;
+  }
+}
+
+/** Le commit ne change de la configuration que la clé `plan:` ? Un fichier illisible avant ou après compte comme du travail. */
+function onlyPlanKeyChanged(root: string, sha: string, file: string): boolean {
+  const before = withoutPlanKey(fileAt(root, `${sha}^`, file));
+  const after = withoutPlanKey(fileAt(root, sha, file));
+  return before !== null && before === after;
 }
 
 /** Commits du dépôt sans les commits automatiques (motifs `ignore`) : ni audités ni comptés pour un lot. */
@@ -18,28 +41,26 @@ export function planCommits(plan: Plan, root: string, opts: { since?: string; ra
   return patterns.length ? commits.filter((c) => !patterns.some((re) => re.test(c.subject))) : commits;
 }
 
-/** Commit d'entretien du plan : ne touche-t-il que des fichiers du plan (plan, page Gantt, plan.files) ? */
+/**
+ * Commit d'entretien du plan : TOUS ses fichiers sont des fichiers du plan (le plan, sa page Gantt,
+ * plan.files — son plan publié par exemple — et la configuration lue, mais celle-ci seulement quand la
+ * clé `plan:` est la seule à changer : deliver/session/… sont du travail). Les fichiers décident,
+ * jamais le sujet : « chore(plan): … » qui touche un fichier source est un commit comme un autre.
+ */
 export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
   const own = ownFiles(plan, root);
+  const config = configRel(plan, root);
   const files = changedFiles(root, sha);
-  return files.length > 0 && files.every((f) => own.has(f));
+  return files.length > 0 && files.every((f) => own.has(f) && (f !== config || onlyPlanKeyChanged(root, sha, f)));
 }
 
 /**
- * N'ont pas besoin de citer un lot : un commit d'entretien du plan — TOUS ses fichiers sont des fichiers
- * du plan (le plan, sa page Gantt, ceux que le projet déclare sous plan.files, son plan publié par
- * exemple) — et un commit automatique dont le sujet correspond à un motif `ignore:` du plan.
- * Les fichiers décident, jamais le sujet : « chore(plan): … » qui touche un fichier source est un
- * commit comme un autre.
+ * N'ont pas besoin de citer un lot : un commit d'entretien du plan (cf. isPlanOnly) et un commit
+ * automatique dont le sujet correspond à un motif `ignore:` du plan.
  */
 export function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
-  const own = ownFiles(plan, root);
   const { patterns } = plan.ignore;
-  const orphans = linked.orphans.filter((c) => {
-    if (patterns.some((re) => re.test(c.subject))) return false;
-    const files = changedFiles(root, c.sha);
-    return files.length === 0 || !files.every((f) => own.has(f));
-  });
+  const orphans = linked.orphans.filter((c) => !patterns.some((re) => re.test(c.subject)) && !isPlanOnly(c.sha, plan, root));
   return { ...linked, orphans };
 }
 

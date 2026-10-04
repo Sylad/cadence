@@ -59,6 +59,15 @@ export function changedFiles(cwd: string, sha: string): string[] {
   return git(cwd, ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha]).split('\n').filter(Boolean);
 }
 
+/** Contenu d'un fichier à un commit (`<sha>^` pour l'état d'avant) ; null s'il n'existe pas à ce commit. */
+export function fileAt(cwd: string, rev: string, file: string): string | null {
+  try {
+    return git(cwd, ['show', `${rev}:${file}`]);
+  } catch {
+    return null;
+  }
+}
+
 function tryGit(cwd: string, args: string[]): string | null {
   try {
     return git(cwd, args).trim();

@@ -432,7 +432,8 @@ lots:
     finished: 2026-10-04
   - id: L40
     title: "⚡ orchestrate : une passe de correction ORDINAIRE qui commite puis est coupée (quota, signal) et dont la reprise ne commite rien est rendue au lead « fix sans commit » (cycle.ts:474) au lieu d'être relue — même règle que L38/t6 (HEAD a bougé depuis la revue → revue) ; test"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04

@@ -437,3 +437,4 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "compliant after 1 minor fix (spec l.108-111 still describes the reference as the review sha) — orchestré (vague 2026-10-04-1807, 1 passe(s) de correction + passe des mineurs)", commit: a635ee6f84b2b1590f11319caa6578c5f7940c05 }

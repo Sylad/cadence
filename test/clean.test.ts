@@ -106,6 +106,29 @@ describe('staleFiles — dépôts git', () => {
     expect(staleFiles(tmp, [`${tmp}/*`, `${tmp}/*/*`], 7, TODAY)).toEqual([]);
   });
 
+  // Dans un hook git (pre-commit…), GIT_INDEX_FILE et GIT_DIR sont hérités : git répondrait pour un
+  // autre index ou un autre dépôt, et un fichier suivi passerait pour « non suivi ».
+  for (const variable of ['GIT_INDEX_FILE', 'GIT_DIR'] as const) {
+    it(`un fichier suivi reste protégé malgré un ${variable} hérité (index ou dépôt vide)`, () => {
+      const repo = gitRepo();
+      touch(join(repo, 'suivi.png'));
+      git(repo, 'add', 'suivi.png');
+      git(repo, 'commit', '-qm', 'chore: suivi');
+      touch(join(repo, 'suivi.png'));
+      const vide = gitRepo();
+      const valeur = variable === 'GIT_DIR' ? join(vide, '.git') : join(vide, 'index-vide');
+      if (variable === 'GIT_INDEX_FILE') execFileSync('git', ['read-tree', '--empty'], { cwd: vide, env: { ...process.env, GIT_INDEX_FILE: valeur } });
+      const avant = process.env[variable];
+      process.env[variable] = valeur;
+      try {
+        expect(staleFiles(repo, [`${repo}/*.png`], 7, TODAY)).toEqual([]);
+      } finally {
+        if (avant === undefined) delete process.env[variable];
+        else process.env[variable] = avant;
+      }
+    });
+  }
+
   it('un fichier suivi qu’on atteint par un lien symbolique reste protégé', () => {
     const root = tempDir();
     const autre = gitRepo();

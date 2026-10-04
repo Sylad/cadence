@@ -265,6 +265,24 @@ describe('contrôles autour des sessions', () => {
     expect(foreignW[0]).toContain('autre lot');
   });
 
+  it('un commit de plan du lot (« plan: … L1 »), cité en reprise hors plage, n\'est pas signalé étranger au lot (L29)', async () => {
+    let planned = { sha: '', sujet: '' };
+    const h0: Handler = (call) => {
+      const b = commitFile(call.opts.cwd, 'b.txt', 'feat(L1): b');
+      return claudeOut(workReport({ commits: [planned, b] }));
+    };
+    const h = harness({ script: { implement: [h0], review: [ok] } });
+    const planFile = join(h.repo, 'docs/plan/raf.yaml');
+    writeFileSync(planFile, `${readFileSync(planFile, 'utf8')}# note\n`);
+    git(h.repo, 'add', '--', 'docs/plan/raf.yaml');
+    git(h.repo, 'commit', '-q', '-m', 'plan: L1 démarré', '--', 'docs/plan/raf.yaml');
+    planned = { sha: git(h.repo, 'rev-parse', 'HEAD'), sujet: 'plan: L1 démarré' };
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.warnings.filter((w) => w.includes("n'appartient pas") || w.includes('absent de git'))).toHaveLength(0);
+  });
+
   it('implémentation sans aucun commit : rendu au lead', async () => {
     const h = harness({ script: { implement: [() => claudeOut(workReport())] } });
     const c = h.lot('L1');
@@ -287,6 +305,22 @@ describe('contrôles autour des sessions', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'implement', 'review']);
     expect(c.lot.status).toBe('ready');
+  });
+
+  it("la garde alreadyDone qui passe à la revue sans nouveau commit le signale dans warnings (L29)", async () => {
+    const ask: Handler = (call) => {
+      const a = commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a');
+      return claudeOut(workReport({ commits: [a], questions: ['SQLite ?'] }));
+    };
+    const h = harness({ script: { implement: [ask, () => claudeOut(workReport())], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.warnings.filter((w) => w.includes('sans nouveau commit'))).toHaveLength(0);
+    c.lot.pendingAnswer = 'oui';
+    c.lot.answers.push('oui');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.warnings.filter((w) => w.includes('sans nouveau commit'))).toHaveLength(1);
   });
 
   it('sans réponse, une implémentation sans commit reste rendue au lead même si le lot a des commits (L28)', async () => {

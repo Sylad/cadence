@@ -2,7 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
-import { lotWork } from '../audit.js';
+import { lotCommits, lotWork } from '../audit.js';
 import type { OrchestrateConfig } from '../config.js';
 import type { Day } from '../dates.js';
 import { readCommits, resolveCommit, type Commit } from '../git.js';
@@ -411,7 +411,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     if ([...real].some((s) => s.startsWith(a.sha) || a.sha.startsWith(s.slice(0, 7)))) continue;
     // Reprise : le rapport cite aussi les commits d'une session précédente du lot, hors de la plage de celle-ci.
     const full = /^[0-9a-f]{4,40}$/i.test(a.sha) ? resolveCommit(l.repo, a.sha) : null;
-    if (full && lotWork(plan, l.repo, l.lot).some((k) => k.sha === full)) continue;
+    if (full && lotCommits(plan, l.repo, l.lot).some((k) => k.sha === full)) continue;
     l.warnings.push(full ? `commit annoncé n'appartient pas à ${l.lot} : ${a.sha} ${a.sujet}` : `commit annoncé absent de git : ${a.sha} ${a.sujet}`);
   }
   for (const k of commits) {
@@ -437,6 +437,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     stop(c, 'handed-back', `${kind} sans commit`);
     return;
   }
+  if (commits.length === 0) l.warnings.push(`${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
   const red: Constat[] = [];
   if (!rep.tests.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` });

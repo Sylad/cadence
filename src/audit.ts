@@ -100,7 +100,7 @@ function workCommits(plan: Plan, root: string, commits: Commit[]): Commit[] {
 }
 
 /** Commits liés à un lot, du plus récent au plus ancien, avant tout tri : commits de plan et d'avant l'adoption compris. */
-function lotCommits(plan: Plan, root: string, lotId: string): Commit[] {
+export function lotCommits(plan: Plan, root: string, lotId: string): Commit[] {
   return linkCommits(plan.lots(), planCommits(plan, root), plan.refs).byLot.get(lotId) ?? [];
 }
 

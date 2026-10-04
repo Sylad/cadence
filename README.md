@@ -38,7 +38,8 @@ reports a page left empty or in error.
   project lists under `plan.files` in `cadence.yaml` (a page it generates from
   the plan, a journal). Such a commit is never a "commit without a lot", and it
   does not count as work on the lots it cites: it is absent from `raf commits`,
-  does not start a `todo` lot and does not make a code review stale. The files
+  does not start a `todo` lot, does not make a code review stale, and
+  `cadence deliver` does not announce the lots it cites as delivered. The files
   decide, never the subject: a `chore(plan): …` commit that touches a source
   file is a commit like any other.
 - `raf gantt` writes a single self-contained HTML page (no server, no CDN).
@@ -428,7 +429,9 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   listed, so you can `raf done` those whose effect you have seen. With a
   read-only plan, only the lots that were in progress when the delivery started
   are listed: an id quoted in a message for context (a finished lot, a
-  reservation number that looks like one) is not a delivered lot.
+  reservation number that looks like one) is not a delivered lot. Plan upkeep
+  commits (see "Plan upkeep needs no lot") are skipped in that list: they cite
+  lots without delivering anything.
 
 ### A project with its own delivery script
 

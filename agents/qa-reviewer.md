@@ -45,7 +45,7 @@ missing, or the URL does not answer, say so and stop.
    and **390 px** wide. Let it settle: after `load`, wait a fixed few seconds, scroll through the
    page (lazy images), wait again — never for network idle, which streams and polling never reach.
    Then measure:
-   - browser state, once before the first page, in a profile already used (a persistent context, not a fresh one): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;
+   - browser state, once before the first page, in a profile already used (a persistent context, not a fresh one — a `userDataDir` reserved for QA and kept between passes, never the user's own browser profile): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;
    - the expected content is present and non-empty — name the selector or the text found and its
      count (`.player-card` ×14), not "the list looks fine";
    - no `never:` text on screen, and no other error or missing-data message;
@@ -118,7 +118,7 @@ A short report:
   returned". It is the last line of the report.
 
 Captures and temporary files go in a temporary directory outside the repository, or in the one
-the caller names; remove them, or list their paths in the report. The working tree is left as you
+the caller names; remove them, or list their paths in the report — except the QA browser profile, which is kept for the next pass. The working tree is left as you
 found it.
 
 ## Do not

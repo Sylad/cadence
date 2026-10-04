@@ -61,6 +61,7 @@ describe('parseSession (échantillon réel de claude -p --output-format json)', 
 
 const spec: StepSpec = {
   kind: 'review',
+  sessionId: '11111111-2222-4333-8444-555555555555',
   brief: 'BRIEF',
   model: 'opus',
   schema: { type: 'object' },
@@ -87,6 +88,7 @@ describe('buildArgs', () => {
     const dis = args.slice(args.indexOf('--disallowedTools') + 1);
     expect(dis).toEqual(expect.arrayContaining(['Agent', 'Bash(git push:*)', 'Bash(cadence deliver:*)', 'Bash(raf done:*)', 'Bash(raf review:*)', 'Bash(raf ux:*)']));
     expect(at('--add-dir')).toBe('/tmp/x');
+    expect(at('--session-id')).toBe('11111111-2222-4333-8444-555555555555');
     expect(args).not.toContain('--resume');
     expect(args).not.toContain('-r');
   });

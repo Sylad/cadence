@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { RafError } from '../plan.js';
@@ -10,6 +10,8 @@ export type Model = 'sonnet' | 'opus' | 'haiku';
 
 export interface StepSpec {
   kind: StepKind;
+  /** Identifiant de la session (uuid), passé à `claude --session-id` : son journal se retrouve sans deviner. */
+  sessionId: string;
   brief: string;
   model: Model;
   /** Schéma JSON de la sortie structurée de l'étape. */
@@ -57,7 +59,7 @@ export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): str
     if (!agents[spec.agent]) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
     args.push('--agents', JSON.stringify(agents), '--agent', spec.agent);
   }
-  args.push('--permission-mode', spec.permissionMode);
+  args.push('--session-id', spec.sessionId, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);
   args.push('--disallowedTools', ...DISALLOWED);
   return args;
@@ -203,23 +205,13 @@ export function peakContext(claudeHome: string, cwd: string, sessionId: string):
 }
 
 /**
- * Consommation d'une session relue dans son journal : somme des tours (un message écrit sur plusieurs lignes n'est
- * compté qu'une fois). Par identifiant de session, sinon la session la plus récente du dossier depuis `since` (ms) —
- * une session tuée (délai) n'a rien rendu sur sa sortie. Null si rien n'est lisible.
+ * Consommation d'une session relue dans son journal, par son identifiant (`--session-id`) : somme des tours (un
+ * message écrit sur plusieurs lignes n'est compté qu'une fois). Une session tuée (délai, signal) n'a rien rendu sur
+ * sa sortie. Jamais de session devinée par date : un autre journal du même dossier n'est pas le sien. Null si rien n'est lisible.
  */
-export function journalTokens(claudeHome: string, cwd: string, find: { sessionId?: string; since?: number }): { tokens: Tokens; sessionId: string } | null {
+export function journalTokens(claudeHome: string, cwd: string, sessionId: string): { tokens: Tokens; sessionId: string } | null {
   const dir = projectLogDir(claudeHome, cwd);
-  let id = find.sessionId;
-  if (!id) {
-    if (!existsSync(dir) || find.since === undefined) return null;
-    const recent = readdirSync(dir)
-      .filter((n) => n.endsWith('.jsonl'))
-      .map((n) => ({ n, t: statSync(join(dir, n)).mtimeMs }))
-      .filter((f) => f.t >= find.since!)
-      .sort((a, b) => b.t - a.t)[0];
-    if (!recent) return null;
-    id = recent.n.slice(0, -'.jsonl'.length);
-  }
+  const id = sessionId;
   const file = join(dir, `${id}.jsonl`);
   if (!existsSync(file)) return null;
   const byMessage = new Map<string, number[]>();

@@ -249,7 +249,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const brief = renderBrief(s.kind, vars, deps.templatesDir);
       writeFileSync(file, brief);
       const args = buildArgs(
-        { kind: s.kind, brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: env.config.addDirs, timeoutMs: 0 },
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: env.config.addDirs, timeoutMs: 0 },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : claude ${args.join(' ')}`);

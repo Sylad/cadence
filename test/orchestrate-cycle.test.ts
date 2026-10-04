@@ -427,21 +427,40 @@ describe('tokens des sessions en échec (L3/t11)', () => {
     expect(h.wave.budget.consumed).toBe(237);
   });
 
-  it('délai dépassé (rien sur la sortie) : relus dans le journal de la session', async () => {
+  it('délai dépassé (rien sur la sortie) : relus dans le journal de SA session (--session-id), jamais celui d\'une autre conversation du dossier', async () => {
+    let id = '';
     const h = harness({ script: { implement: [(call) => {
+      id = call.args[call.args.indexOf('--session-id') + 1];
       const dir = projectLogDir(h.wave.claudeHome!, call.opts.cwd);
       mkdirSync(dir, { recursive: true });
-      const line = (id: string, i: number, w: number, r: number, o: number) => JSON.stringify({ type: 'assistant', message: { id, usage: { input_tokens: i, cache_creation_input_tokens: w, cache_read_input_tokens: r, output_tokens: o } } });
+      const line = (mid: string, i: number, w: number, r: number, o: number) => JSON.stringify({ type: 'assistant', message: { id: mid, usage: { input_tokens: i, cache_creation_input_tokens: w, cache_read_input_tokens: r, output_tokens: o } } });
       // le même message écrit sur deux lignes ne compte qu'une fois
-      writeFileSync(join(dir, 'tue.jsonl'), [line('m1', 10, 100, 0, 5), line('m1', 10, 100, 0, 5), line('m2', 4, 20, 110, 6)].join('\n'));
+      writeFileSync(join(dir, `${id}.jsonl`), [line('m1', 10, 100, 0, 5), line('m1', 10, 100, 0, 5), line('m2', 4, 20, 110, 6)].join('\n'));
+      // une autre conversation du même dossier (celle du lead), plus récente et énorme
+      writeFileSync(join(dir, 'autre-conversation.jsonl'), line('x1', 45_000_000, 0, 0, 0));
       return { code: 0, stdout: '', stderr: '', timedOut: true };
     }] } });
     h.wave.claudeHome = tempDir();
     const c = h.lot('L1');
     await runLot(c);
     expect(c.lot.outcome).toMatch(/délai dépassé/);
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(c.lot.steps[0].sessionId).toBe(id);
     expect(h.wave.budget.consumed).toBe(10 + 100 + 5 + 4 + 20 + 6);
     expect(h.wave.budget.cacheRead).toBe(110);
+    expect(c.lot.steps[0].peakContext).toBe(134);
+  });
+
+  it('délai dépassé sans journal de la session : rien n\'est compté, aucune autre session devinée', async () => {
+    const h = harness({ script: { implement: [(call) => {
+      const dir = projectLogDir(h.wave.claudeHome!, call.opts.cwd);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'autre.jsonl'), JSON.stringify({ type: 'assistant', message: { id: 'x', usage: { input_tokens: 999, output_tokens: 1 } } }));
+      return { code: 0, stdout: '', stderr: '', timedOut: true };
+    }] } });
+    h.wave.claudeHome = tempDir();
+    await runLot(h.lot('L1'));
+    expect(h.wave.budget.consumed).toBe(0);
   });
 });
 

@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { lotWork } from '../audit.js';
@@ -227,7 +228,8 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const model: Model = write ? l.model : 'opus';
   const before = snapshot(l.repo);
   const n = l.steps.length + 1;
-  const step: StepState = { n, kind, model, status: 'running', started: new Date().toISOString(), headBefore: before.head ?? undefined };
+  const sessionId = randomUUID();
+  const step: StepState = { n, kind, model, status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
   l.steps.push(step);
   const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing' } as const;
   transition(c, label[kind]);
@@ -245,6 +247,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const outcome = await runSession(
     {
       kind,
+      sessionId,
       brief,
       model,
       schema: schemaFor(kind),
@@ -270,7 +273,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
 
   if (outcome.kind !== 'ok') {
     // Une session en échec, au quota ou tuée au délai a consommé des tokens : ceux de sa sortie, sinon ceux de son journal.
-    const spent = outcome.tokens ? { tokens: outcome.tokens, sessionId: outcome.sessionId } : w.claudeHome ? journalTokens(w.claudeHome, l.repo, { sessionId: outcome.sessionId, since: Date.parse(step.started) - 1000 }) : null;
+    const spent = outcome.tokens ? { tokens: outcome.tokens, sessionId: outcome.sessionId } : w.claudeHome ? journalTokens(w.claudeHome, l.repo, outcome.sessionId ?? sessionId) : null;
     if (spent) {
       step.tokens = spent.tokens;
       if (spent.sessionId) step.sessionId = spent.sessionId;

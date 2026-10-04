@@ -267,7 +267,8 @@ lots:
     finished: 2026-10-04
   - id: L27
     title: "⚡ Suites de la revue L25/L26 : relance de mise en forme avec --agents/--agent de la revue (outils restreints) + test ; conserver la sortie de la première session (<n>-<kind>.first.json) ; commit annoncé hors plage vérifié contre les commits du lot (lotWork) plutôt que tout ancêtre de HEAD"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04

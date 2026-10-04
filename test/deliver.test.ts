@@ -565,7 +565,7 @@ describe('cadence deliver (CLI)', () => {
 
   it('tue une vérification qui dépasse le délai', async () => {
     const dir = pushedRepo();
-    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  verify:\n    - command: sleep 30\n  verifyTimeout: 1\n');
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  verify:\n    - command: exec sleep 30\n  verifyTimeout: 1\n');
     git(dir, 'add', 'cadence.yaml');
     commit(dir, 'chore: config');
     git(dir, 'push', '-q');

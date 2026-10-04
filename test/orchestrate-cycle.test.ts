@@ -915,7 +915,7 @@ describe('correction ordinaire interrompue puis reprise (L40)', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'fix', 'review']);
     expect(c.lot.status).toBe('ready');
-    expect(c.lot.review?.commit ?? h.plan().lot('L1').review?.commit).toBe(git(h.repo, 'log', '--format=%H', '--grep=fix(L1)', '-1'));
+    expect(h.plan().lot('L1').review?.commit).toBe(git(h.repo, 'log', '--format=%H', '--grep=fix(L1)', '-1'));
   });
 
   it('correction sans commit et HEAD inchangé depuis la revue : toujours rendue au lead', async () => {

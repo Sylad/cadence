@@ -2,9 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { hostname, tmpdir } from 'node:os';
-import { join, sep } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cleanupTempDirs, removeDryRunBriefs, tempDir } from './helpers.js';
 import { PID_FILE, ROOT_PREFIX, findStaleRoots, isStaleRoot, leftovers, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
+
+/**
+ * isStaleRoot dans un processus enfant à délai : un fichier pid FIFO ferait bloquer un readFileSync dans le worker,
+ * que le délai de Vitest ne peut pas interrompre (npm test figé, sans message). Ici le blocage devient un échec nommé.
+ */
+function isStaleRootIsolated(dir: string, label: string): boolean {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const script = join(tempDir(), 'is-stale-root.ts');
+  writeFileSync(
+    script,
+    `import { isStaleRoot } from ${JSON.stringify(join(here, 'tmp-hygiene.ts'))};\n` +
+      `process.stdout.write(String(isStaleRoot(process.argv[2]!, { alive: () => false })));\n`,
+  );
+  try {
+    return execFileSync(resolve(here, '../node_modules/.bin/vite-node'), [script, dir], { timeout: 20_000, killSignal: 'SIGKILL', encoding: 'utf8' }) === 'true';
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ETIMEDOUT') throw new Error(`isStaleRoot bloque sur le cas « ${label} » (fichier pid non ordinaire lu sans lstat)`);
+    throw e;
+  }
+}
 
 describe('dossiers temporaires de la suite (L45)', () => {
   it('la suite travaille dans une racine temporaire privée (globalSetup) que sa fin de run vérifie vide', () => {
@@ -158,8 +179,9 @@ describe('dossiers temporaires de la suite (L45)', () => {
     const enTrop = make('entrop', (f) => writeFileSync(f, `${pidFileText(111)}en trop\n`));
     const enTropVide = make('entropvide', (f) => writeFileSync(f, `${pidFileText(111)}\nquelque chose`));
     expect(isStaleRoot(bon, { alive: dead })).toBe(true);
-    for (const d of [lien, dossier, fifo, enTrop, enTropVide]) expect(isStaleRoot(d, { alive: dead }), d).toBe(false);
-    expect(findStaleRoots(tmp, { alive: dead })).toEqual([bon]);
+    for (const d of [lien, dossier, enTrop, enTropVide]) expect(isStaleRoot(d, { alive: dead }), d).toBe(false);
+    expect(isStaleRootIsolated(fifo, 'FIFO')).toBe(false);
+    expect(isStaleRootIsolated(bon, 'témoin')).toBe(true);
   });
 
   it('une racine périmée n\'est supprimée que si son fichier pid nomme cette machine (L45/t6)', () => {

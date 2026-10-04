@@ -690,7 +690,10 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 
 - **session-start**: reports the facts briefly, proposes three lots from the
   plan, then waits for your priority — nothing starts before your answer.
-- **session-close**: plan hygiene, clean repository, memory limited to what the
+- **session-close**: plan hygiene, clean repository, a cleanup proposal for stale
+  working files (`session.clean` patterns, older than `session.cleanDays`; never
+  anything git tracks, a git repository or a hidden `.xxx` name a `*` would not
+  match — it asks before deleting), memory limited to what the
   repository does not say, new skills or agents proposed but never created, three
   lines for next time.
 - A project with its own tooling keeps it: its plan is read where it is (`plan:`),

@@ -563,8 +563,12 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
-    review: { date: 2026-10-04, verdict: "non conforme : 1 bloquant (removeDryRunBriefs peut supprimer hors de la racine privée quand le chemin temporaire contient un espace), 2 mineurs", commit: 27a560857e943c53c1f618685903fa8e224e94ca }
+    review: { date: 2026-10-04, verdict: "non conforme : 2 majeurs (suppression qui suit un lien hors de la racine ; racine périmée sans vérification du propriétaire), 2 mineurs", commit: c1e4e4e0076d468165f2d37e2f4f20e553493b52 }
     tasks:
-      - { id: t1, title: "BLOQUANT : removeDryRunBriefs lit la ligne entière (chemins avec espaces), refuse toute cible hors de CADENCE_TEST_TMP_ROOT ou non nommée cadence-orchestrate-* (erreur levée), test avec un TMPDIR contenant un espace", status: todo }
-      - { id: t2, title: "globalSetup : signaler et supprimer au démarrage les cadence-tests-root-* laissés par un run interrompu (fichier pid, processus mort)", status: todo }
-      - { id: t3, title: "racine privée portable : poser aussi TEMP/TMP (win32) et ne plus coder le séparateur '/' dans tmp-hygiene.test.ts", status: todo }
+      - { id: t1, title: "BLOQUANT : removeDryRunBriefs lit la ligne entière (chemins avec espaces), refuse toute cible hors de CADENCE_TEST_TMP_ROOT ou non nommée cadence-orchestrate-* (erreur levée), test avec un TMPDIR contenant un espace", status: done }
+      - { id: t2, title: "globalSetup : signaler et supprimer au démarrage les cadence-tests-root-* laissés par un run interrompu (fichier pid, processus mort)", status: done }
+      - { id: t3, title: "racine privée portable : poser aussi TEMP/TMP (win32) et ne plus coder le séparateur '/' dans tmp-hygiene.test.ts", status: done }
+      - { id: t4, title: "MAJEUR : assertInside/removeTree comparent les chemins RÉELS (realpath du parent de la cible vs realpath de la racine), pas le texte — un lien sous la racine fait aujourd'hui supprimer hors racine ; test avec lien vers un dossier extérieur au bac à sable", status: todo }
+      - { id: t5, title: "MAJEUR : findStaleRoots n'accepte qu'un dossier appartenant à l'uid courant (lstat.uid === process.getuid(), sauf win32), en plus du préfixe et du pid mort ; test", status: todo }
+      - { id: t6, title: "fichier pid : y noter aussi le nom de la machine ; ne supprimer une racine périmée que si elle vient de cette machine ; test", status: todo }
+      - { id: t7, title: "orchestrate-command.test.ts:220 lit le brief avec \\S+ (casse un TMPDIR avec espace) : ligne entière ; nettoyage des briefs en try/finally (orchestrate-command:113, :223, orchestrate-e2e:172) ; vérifier la suite avec un TMPDIR contenant un espace", status: todo }

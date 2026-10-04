@@ -287,3 +287,4 @@ lots:
       - { date: 2026-10-04, text: "2e cause trouvée sur la revue de L27 (relance faite, JSON écrit en bloc de code) : un agent aux outils restreints (tools: Read, Grep, Glob, Bash) n'a PAS l'outil StructuredOutput → jamais de structured_output, relance comprise. Sondes réelles Haiku 04-10 : sans tools → OK ; tools restreints → null ; + StructuredOutput → OK. Corrigé dans readAgents." }
     tasks:
       - { id: t1, title: readAgents ajoute StructuredOutput aux outils restreints d'un agent (cause réelle des revues sans structured_output), status: done }
+      - { id: t2, title: "après une question répondue, une implémentation sans nouveau commit alors que le lot a déjà ses commits (rapport : travail terminé) passe à la revue au lieu d'être rendue au lead « implement sans commit » (vague 2026-10-04-1609, L21 session 3)", status: todo }

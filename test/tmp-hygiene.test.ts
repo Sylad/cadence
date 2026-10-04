@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { hostname, tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { cleanupTempDirs, removeDryRunBriefs, tempDir } from './helpers.js';
-import { PID_FILE, ROOT_PREFIX, findStaleRoots, leftovers, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
+import { PID_FILE, ROOT_PREFIX, findStaleRoots, isStaleRoot, leftovers, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
 describe('dossiers temporaires de la suite (L45)', () => {
   it('la suite travaille dans une racine temporaire privée (globalSetup) que sa fin de run vérifie vide', () => {
@@ -137,6 +138,28 @@ describe('dossiers temporaires de la suite (L45)', () => {
     expect(removeStaleRoots(tmp, { alive: flips })).toEqual([]);
     expect(existsSync(dir)).toBe(true);
     expect(calls).toBe(2);
+  });
+
+  it('un fichier pid qui est un lien, un dossier ou un FIFO, ou qui a des lignes en trop, ne prouve rien (L45/t8)', () => {
+    const tmp = tempDir();
+    const dead = (): boolean => false;
+    const make = (name: string, fill: (pidFile: string, dir: string) => void): string => {
+      const dir = join(tmp, `${ROOT_PREFIX}${name}`);
+      mkdirSync(dir);
+      fill(join(dir, PID_FILE), dir);
+      return dir;
+    };
+    const bon = make('bon', (f) => writeFileSync(f, pidFileText(111)));
+    const vrai = join(tmp, 'vrai-pid');
+    writeFileSync(vrai, pidFileText(111));
+    const lien = make('lien', (f) => symlinkSync(vrai, f));
+    const dossier = make('dossier', (f) => mkdirSync(f));
+    const fifo = make('fifo', (f) => execFileSync('mkfifo', [f]));
+    const enTrop = make('entrop', (f) => writeFileSync(f, `${pidFileText(111)}en trop\n`));
+    const enTropVide = make('entropvide', (f) => writeFileSync(f, `${pidFileText(111)}\nquelque chose`));
+    expect(isStaleRoot(bon, { alive: dead })).toBe(true);
+    for (const d of [lien, dossier, fifo, enTrop, enTropVide]) expect(isStaleRoot(d, { alive: dead }), d).toBe(false);
+    expect(findStaleRoots(tmp, { alive: dead })).toEqual([bon]);
   });
 
   it('une racine périmée n\'est supprimée que si son fichier pid nomme cette machine (L45/t6)', () => {

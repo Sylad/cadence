@@ -72,3 +72,25 @@ describe('TreeTracker — relevé indisponible (ps en échec)', () => {
     ).toBeNull();
   });
 });
+
+describe('TreeTracker — relevé indisponible dès la construction', () => {
+  it('kill : repli sur le groupe de la commande et sur sa racine', () => {
+    const tracker = new TreeTracker(100, () => null);
+    tracker.stop();
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => (sent.push([pid, sig]), true));
+    expect(() => tracker.kill()).not.toThrow();
+    expect(sent).toContainEqual([-100, 'SIGKILL']);
+    expect(sent).toContainEqual([100, 'SIGKILL']);
+    expect(sent.every(([pid]) => pid !== 0 && Math.abs(pid) !== process.pid)).toBe(true);
+  });
+
+  it('kill : pas de repli quand la racine a été relevée (jamais le groupe de cadence)', () => {
+    const tracker = new TreeTracker(100, () => table([100, 1, 'A']));
+    tracker.stop();
+    const sent: [number, unknown][] = [];
+    vi.spyOn(process, 'kill').mockImplementation((pid, sig) => (sent.push([pid, sig]), true));
+    tracker.kill();
+    expect(sent.some(([pid]) => pid < 0)).toBe(false);
+  });
+});

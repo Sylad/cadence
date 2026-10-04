@@ -108,14 +108,17 @@ export class TreeTracker {
   private readonly known = new Map<number, string>();
   private readonly timer: NodeJS.Timeout;
   private last = new Map<number, ProcInfo>();
+  /** Racine jamais relevée (ps en échec dès la construction) : kill() se rabat sur son groupe et sur elle. */
+  private rootUnknown = false;
 
   /** `read` : le relevé des processus (injectable pour les tests) ; son échec laisse le dernier relevé en place. */
   constructor(
-    root: number,
+    private readonly root: number,
     private readonly read: () => Map<number, ProcInfo> | null = readProcs,
   ) {
     const info = this.snapshot().get(root);
     if (info) this.known.set(root, info.start);
+    else this.rootUnknown = true;
     this.timer = setInterval(() => this.scan(), TRACK_INTERVAL_MS);
     this.timer.unref();
   }
@@ -179,6 +182,12 @@ export class TreeTracker {
       fresh = this.alive(procs).filter((pid) => !seen.has(pid));
     }
     for (const pid of stopped) signal(pid, 'SIGKILL');
+    // Sans relevé, les descendants sont inconnus : au mieux le groupe de la commande (si elle en mène un ; jamais
+    // celui de cadence, dont le pid est autre) et la commande elle-même.
+    if (this.rootUnknown) {
+      signal(-this.root, 'SIGKILL');
+      signal(this.root, 'SIGKILL');
+    }
   }
 
   /**

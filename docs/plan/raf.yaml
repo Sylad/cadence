@@ -447,6 +447,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction + passe des mineurs)", commit: 007e25cec7c42d95c040ce691539ecddffe0c5bb }
   - id: L38
     title: "⚡ orchestrate : une revue « conforme avec mineurs » enchaîne UNE passe de correction des mineurs dans la vague (session neuve, puis revue courte), au lieu de produire un lot de suites à chaque fois — consigne de Sylvain (04-10) : rien sous le tapis ; mesure : vague 2026-10-04-1700, 4 lots conformes → 4 lots de suites"
     status: doing

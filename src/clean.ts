@@ -42,17 +42,22 @@ const segmentRe = (seg: string): RegExp =>
  * Chemins qui correspondent au motif. Chaque niveau est lu par readdir, noms écrits en entier compris :
  * un dossier qu'on ne peut pas lister ne livre rien (et est noté illisible, sauf s'il n'existe pas).
  * Comme le shell, un nom en « . » n'est atteint que par un segment de motif qui commence par « . ».
+ * Contrairement au shell, on ne descend jamais dans un lien symbolique attrapé par un segment à `*` :
+ * `tmp/*` peut rendre le lien `tmp/lien` lui-même, mais un segment suivant ne lit jamais ce qu'il désigne.
+ * Un segment écrit en entier suit le lien, comme `cd` : celui qui l'écrit désigne cet endroit-là.
  */
 function expand(pattern: string, root: string, unreadable: Set<string>): string[] {
   const full = pattern === '~' || pattern.startsWith('~/') ? join(homedir(), pattern.slice(1)) : pattern;
   const parts = resolve(root, full).split('/').filter((p) => p !== '');
   let found = ['/'];
+  let wild = false;
   for (const part of parts) {
     const re = segmentRe(part);
     const next: string[] = [];
     for (const base of found) {
       let names: string[];
       try {
+        if (wild && lstatSync(base).isSymbolicLink()) continue;
         names = readdirSync(base);
       } catch (e) {
         if (!missing(e)) unreadable.add(base);
@@ -61,6 +66,7 @@ function expand(pattern: string, root: string, unreadable: Set<string>): string[
       for (const n of names) if (re.test(n) && (part.startsWith('.') || !n.startsWith('.'))) next.push(join(base, n));
     }
     found = next;
+    wild = part.includes('*');
   }
   return found;
 }

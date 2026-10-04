@@ -41,13 +41,16 @@ With no project named, run `cadence session close` in each project touched durin
    refers to it (plan, news, docs). Anything kept: leave it, it will be listed again next close. No
    section: nothing to do; a project with no `session.clean` can propose adding it.
    An entry is proposed only if it could be measured entirely. Age: a folder's age is that of the
-   most recent entry it contains. The report never proposes: a git repository, a folder that contains one
-   at any depth, and anything under a `.git` folder; a git directory without a `.git` entry (bare
-   repository, mirror, `--separate-git-dir`, worktree admin folder — recognised by `HEAD` with
-   `objects` and `refs`, or with `commondir`), anything inside it or a folder that contains one; anything `git` tracks, whichever repository it is
-   in; a name starting with `.` unless the pattern itself starts that name with `.`; anything that
-   could not be read entirely — those are listed apart as "illisible(s)": tell the human, never
-   delete those, and never widen the list by hand to entries the report did not propose.
+   most recent entry it contains. The report never proposes: a git repository, a folder that
+   contains one at any depth, and anything under a `.git` folder; a git directory without a `.git`
+   entry (bare repository, mirror, `--separate-git-dir`, worktree admin folder — recognised by
+   `HEAD` with `objects` and `refs`, or with `commondir`), anything inside it or a folder that
+   contains one; anything `git` tracks, whichever repository it is in; a name starting with `.`
+   unless the pattern itself starts that name with `.`; anything behind a symbolic link a `*`
+   matched (the link itself may be proposed: remove the link, never `rm -r` through it — a segment
+   written in full does follow its link); anything that could not be read entirely — those are
+   listed apart as "illisible(s)": tell the human, never delete those, and never widen the list by
+   hand to entries the report did not propose.
 4. **Memory, filtered** (only if you keep a persistent memory): write down what the repository does
    NOT already say — a trap and its cause, a decision or correction from the human, a collaboration
    rule. Test: "do `git log` or the docs already say it?" → then no memory.

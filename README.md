@@ -406,6 +406,11 @@ An entry is proposed only if it could be measured entirely. Never proposed:
 - anything `git` tracks, whichever repository it is in;
 - a name starting with `.` unless the pattern itself starts that name with `.` (as in the
   shell, `tmp/*` does not match `tmp/.env`; `tmp/.cache-*` does);
+- anything reached through a symbolic link matched by a `*` segment: unlike the shell, the walk
+  never descends into such a link (`tmp/*/*` lists nothing behind `tmp/link → ../outside`), and a
+  folder's age never looks behind a link; the link itself can be proposed, as a link — removing it
+  leaves its target alone. A segment written in full follows the link, as `cd` would
+  (`~/shared/*` with `~/shared` a link lists the target's entries);
 - anything that could not be read entirely: a folder that cannot be listed — nor anything
   inside it, even named in full —, an entry that cannot be examined or vanished during the
   walk, an entry under a `.git` that `git` could not answer for. These are listed apart,
@@ -710,7 +715,8 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 - **session-close**: plan hygiene, clean repository, a cleanup proposal for stale
   working files (`session.clean` patterns, older than `session.cleanDays`; never
   anything git tracks, a git repository or a folder holding one, anything under
-  `.git`, a bare repository or separate git directory or anything inside one, a hidden `.xxx` name a `*` would not match, nor anything it could not
+  `.git`, a bare repository or separate git directory or anything inside one,
+  anything behind a symbolic link a `*` matched (only the link itself), a hidden `.xxx` name a `*` would not match, nor anything it could not
   read entirely — it asks before deleting), memory limited to what the
   repository does not say, new skills or agents proposed but never created, three
   lines for next time.

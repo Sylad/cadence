@@ -147,6 +147,36 @@ describe('staleFiles — motifs', () => {
     expect(staleFiles(dir, [`${dir}/*/vieux.png`], 7, TODAY)).toEqual([]);
   });
 
+  it('« * » ne descend jamais dans un lien symbolique vers un dossier extérieur ; le lien seul peut être proposé', () => {
+    const tmp = tempDir();
+    const dehors = tempDir();
+    touch(join(dehors, 'precieux/these.txt'));
+    // Le contenu de la cible est d'aujourd'hui : un lien mesuré à travers ne serait jamais proposé.
+    touch(join(dehors, 'precieux/du-jour.txt'), new Date('2026-09-28T08:00:00'));
+    symlinkSync(join(dehors, 'precieux'), join(tmp, 'lien'));
+    lutimesSync(join(tmp, 'lien'), OLD, OLD);
+    expect(staleFiles(tmp, [`${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/*/these.txt`], 7, TODAY)).toEqual([]);
+    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'lien')]);
+  });
+
+  it('« * » ne descend jamais dans un lien vers un ancêtre (tmp/self → ..) : la racine n’est pas reparcourue', () => {
+    const root = tempDir();
+    touch(join(root, 'vieux.png'));
+    mkdirSync(join(root, 'tmp'));
+    symlinkSync('..', join(root, 'tmp/self'));
+    lutimesSync(join(root, 'tmp/self'), OLD, OLD);
+    ageTree(join(root, 'tmp'));
+    expect(staleFiles(root, ['tmp/*/*', 'tmp/*/*/*'], 7, TODAY)).toEqual([]);
+  });
+
+  it('un segment écrit en entier suit le lien symbolique, comme cd', () => {
+    const tmp = tempDir();
+    const dehors = tempDir();
+    touch(join(dehors, 'vieux.png'));
+    symlinkSync(dehors, join(tmp, 'partage'));
+    expect(names(staleFiles(tmp, [`${tmp}/partage/*`], 7, TODAY))).toEqual([join(tmp, 'partage/vieux.png')]);
+  });
+
   it('.git n’est jamais proposé, même par un motif en « . »', () => {
     const dir = gitRepo();
     touch(join(dir, '.gitx'));

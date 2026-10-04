@@ -198,6 +198,46 @@ describe('TreeTracker — relevé indisponible signalé', () => {
   });
 });
 
+describe('TreeTracker — repli du kill signalé', () => {
+  const mute = () => vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+  it('prévient quand kill() se rabat sur la racine faute de relevé (jamais relevée)', () => {
+    mute();
+    const blind = vi.fn();
+    const tracker = new TreeTracker(100, () => null, () => {}, blind);
+    tracker.kill();
+    expect(blind).toHaveBeenCalledTimes(1);
+  });
+
+  it('prévient aussi quand le relevé tombe en panne après avoir réussi', () => {
+    mute();
+    let procs: Procs | null = table([100, 1, 'A']);
+    const blind = vi.fn();
+    const tracker = new TreeTracker(100, () => procs, () => {}, blind);
+    procs = null;
+    tracker.kill();
+    expect(blind).toHaveBeenCalledTimes(1);
+  });
+
+  it('se tait quand le relevé est fiable, ou quand la racine est déjà sortie', () => {
+    mute();
+    const blind = vi.fn();
+    const ok = new TreeTracker(100, () => table([100, 1, 'A']), () => {}, blind);
+    ok.kill();
+    const gone = new TreeTracker(100, () => null, () => {}, blind);
+    gone.rootExited();
+    gone.kill();
+    expect(blind).not.toHaveBeenCalled();
+  });
+
+  it('un message qui lève ne casse pas le kill', () => {
+    const sent = mute();
+    const tracker = new TreeTracker(100, () => null, () => {}, () => { throw new Error('stderr fermé'); });
+    expect(() => tracker.kill()).not.toThrow();
+    expect(sent).toHaveBeenCalledWith(100, 'SIGKILL');
+  });
+});
+
 describe('TreeTracker — racine sortie', () => {
   it('une racine relevée après sa sortie (pid repris) n\'est ni adoptée ni signalée', async () => {
     let procs: Procs | null = null;

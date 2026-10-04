@@ -622,6 +622,19 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
     }
   });
 
+  it('relevé indisponible au délai : une ligne sur stderr dit que le kill s\'est replié sur la racine (descendants possibles)', async () => {
+    const write = vi.spyOn(process.stderr, 'write');
+    try {
+      const d = realDeps(tempDir(), () => null);
+      expect(await d.exec('sleep 5', {}, 300)).toBe(TIMED_OUT);
+      const said = write.mock.calls.filter(([m]) => String(m).includes('descendants ont pu survivre'));
+      expect(said).toHaveLength(1);
+      expect(String(said[0]![0])).toContain('replié sur la commande racine');
+    } finally {
+      write.mockRestore();
+    }
+  });
+
   it('garde les codes de sortie (une commande à la fois, attendue)', async () => {
     const d = realDeps(tempDir());
     expect(await d.exec('true', {}, 5_000)).toBe(0);

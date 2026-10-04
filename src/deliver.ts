@@ -197,10 +197,17 @@ export function realDeps(root: string, read: typeof readProcs = readProcs): Deli
         // qu'une seconde livraison prend le verrou libéré ou périmé. Ctrl-C et raccrochage : l'arbre a déjà
         // reçu le signal du terminal, un court délai de grâce laisse finir ses trap (et git son index.lock)
         // avant le kill ; SIGTERM (à cadence seul) et le délai : kill immédiat.
-        const tree = new TreeTracker(pid, read, () =>
-          process.stderr.write(
-            'deliver : relevé des processus indisponible — le kill n\'est dégradé que tant que le relevé échoue : seule la commande racine sera tuée, ses descendants survivront\n',
-          ),
+        const tree = new TreeTracker(
+          pid,
+          read,
+          () =>
+            process.stderr.write(
+              'deliver : relevé des processus indisponible — le kill n\'est dégradé que tant que le relevé échoue : seule la commande racine sera tuée, ses descendants survivront\n',
+            ),
+          () =>
+            process.stderr.write(
+              'deliver : kill replié sur la commande racine faute de relevé des processus — des descendants ont pu survivre\n',
+            ),
         );
         // Terminaison en cours : exec ne rend pas la main avant qu'elle ne soit finie — sinon deliver libère
         // le verrou pendant la grâce, alors que des descendants tournent encore.

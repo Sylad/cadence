@@ -124,11 +124,13 @@ export class TreeTracker {
   /**
    * `read` : le relevé des processus (injectable pour les tests) ; son échec laisse le dernier relevé en place.
    * `onUnavailable` : appelé une seule fois, au premier échec du relevé (le kill est alors dégradé).
+   * `onBlindKill` : appelé au moment où kill() se rabat sur la racine faute de relevé (des descendants ont pu survivre).
    */
   constructor(
     private readonly root: number,
     private readonly read: () => Map<number, ProcInfo> | null = readProcs,
     private readonly onUnavailable: () => void = () => {},
+    private readonly onBlindKill: () => void = () => {},
   ) {
     const info = this.snapshot().get(root);
     if (info) this.known.set(root, info.start);
@@ -233,6 +235,11 @@ export class TreeTracker {
     // Sans relevé (jamais, ou plus), les descendants sont inconnus : seule la commande racine est tuée. kill(-racine) vise
     // son groupe, mais sh n'en mène aucun (la commande reste dans le groupe de cadence, L19) : sans effet, les descendants survivent.
     if (this.blind && !this.rootGone) {
+      try {
+        this.onBlindKill();
+      } catch {
+        // un message raté ne doit rien casser
+      }
       signal(-this.root, 'SIGKILL');
       signal(this.root, 'SIGKILL');
     }

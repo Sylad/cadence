@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -591,37 +591,6 @@ describe('cadence deliver (CLI)', () => {
 });
 
 describe('realDeps.exec', () => {
-  const alive = (pid: number) => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  it("un délai dépassé tue TOUT le groupe : aucun enfant (sleep) ne survit", async () => {
-    const dir = tempDir();
-    const pidFile = join(dir, 'child.pid');
-    // sh lance un petit-enfant détaché de son stdin, note son pid et attend : tuer sh seul l'orpheline
-    const code = realDeps(dir, { quiet: true }).exec(`sleep 30 & echo $! > '${pidFile}'; wait`, {}, 1_000);
-    expect(code).toBe(TIMED_OUT);
-    const pid = Number(readFileSync(pidFile, 'utf8').trim());
-    expect(pid).toBeGreaterThan(1);
-    for (let i = 0; i < 40 && alive(pid); i++) await new Promise((r) => setTimeout(r, 50));
-    const survived = alive(pid);
-    if (survived) process.kill(pid, 'SIGKILL');
-    expect(survived).toBe(false);
-  });
-
-  it('garde le comportement synchrone et les codes de sortie', () => {
-    const dir = tempDir();
-    const d = realDeps(dir, { quiet: true });
-    expect(d.exec('true', {}, 5_000)).toBe(0);
-    expect(d.exec('exit 7', {}, 5_000)).toBe(7);
-    expect(d.exec('echo $CADENCE_X >/dev/null; test "$CADENCE_X" = oui', { CADENCE_X: 'oui' }, 5_000)).toBe(0);
-  });
-
   it('quiet coupe réellement la sortie des commandes (stdout du processus capturé)', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'cadence-quiet-'));
     try {
@@ -640,4 +609,78 @@ describe('realDeps.exec', () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
+});
+
+describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const until = async (ok: () => boolean, ms: number) => {
+    for (let t = 0; t < ms && !ok(); t += 50) await new Promise((r) => setTimeout(r, 50));
+    return ok();
+  };
+
+  it('une commande de deliver reste dans la session et le groupe de premier plan de cadence (tty, Ctrl-C)', () => {
+    const [sid, pgid] = execFileSync('ps', ['-o', 'sid=,pgid=', '-p', String(process.pid)], { encoding: 'utf8' }).trim().split(/\s+/);
+    const probe = 'test "$(ps -o sid= -p $$ | tr -d " ")" = "$WANT_SID" && test "$(ps -o pgid= -p $$ | tr -d " ")" = "$WANT_PGID"';
+    expect(realDeps(tempDir()).exec(probe, { WANT_SID: sid!, WANT_PGID: pgid! }, 5_000)).toBe(0);
+  });
+
+  it('garde le comportement synchrone et les codes de sortie', () => {
+    const d = realDeps(tempDir());
+    expect(d.exec('true', {}, 5_000)).toBe(0);
+    expect(d.exec('exit 7', {}, 5_000)).toBe(7);
+    expect(d.exec('test "$CADENCE_X" = oui', { CADENCE_X: 'oui' }, 5_000)).toBe(0);
+    expect(d.exec('sleep 5', {}, 300)).toBe(TIMED_OUT);
+  });
+
+  it.each(['SIGINT', 'SIGHUP'] as const)(
+    '%s au groupe de premier plan pendant le script : le script meurt avec cadence, jamais deux livraisons à la fois',
+    async (sig) => {
+      const logs = tempDir();
+      const dir = pushedRepo();
+      // le sh du script note son pid, dort, puis « bumpe » : ce qu'ont fait deux livraisons concurrentes le 04-10
+      writeFileSync(join(dir, 'cadence.yaml'), `deliver:\n  script: sh -c 'echo $$ >> ${logs}/pids; sleep 3; echo bumped >> ${logs}/log'\n`);
+      git(dir, 'add', 'cadence.yaml');
+      commit(dir, 'chore: config');
+      git(dir, 'push', '-q');
+
+      const probe = join(logs, 'probe.ts');
+      writeFileSync(
+        probe,
+        `import { run } from ${JSON.stringify(join(process.cwd(), 'src/cli.ts'))};\n` +
+          `process.exitCode = await run(['deliver'], { cwd: ${JSON.stringify(dir)}, env: process.env, out: () => {}, err: () => {}, now: () => new Date() });\n`,
+      );
+      // groupe à lui, comme un terminal donne le sien à la commande de premier plan
+      const first = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
+      const exited = new Promise<void>((r) => first.on('exit', () => r()));
+      try {
+        expect(await until(() => existsSync(join(logs, 'pids')), 15_000)).toBe(true);
+        const scriptPid = Number(readFileSync(join(logs, 'pids'), 'utf8').trim());
+        process.kill(-first.pid!, sig); // ce que fait le terminal : tout le groupe de premier plan
+        await exited;
+        const survived = !(await until(() => !alive(scriptPid), 2_000));
+        if (survived) process.kill(scriptPid, 'SIGKILL');
+        expect(survived).toBe(false);
+
+        // seconde livraison : le verrou du mort est périmé, mais plus rien ne tourne en parallèle
+        const second = await run(['deliver'], { cwd: dir, env: {}, out: () => {}, err: () => {}, now: () => new Date() });
+        expect(second).toBe(0);
+        await new Promise((r) => setTimeout(r, 500));
+        expect(readFileSync(join(logs, 'log'), 'utf8').trim().split('\n')).toEqual(['bumped']);
+      } finally {
+        try {
+          process.kill(-first.pid!, 'SIGKILL');
+        } catch {
+          // déjà mort
+        }
+      }
+    },
+    30_000,
+  );
 });

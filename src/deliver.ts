@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync, type SpawnSyncOptions } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { parse } from 'yaml';
 import type { Day } from './dates.js';
 import { isPlanOnly } from './audit.js';
@@ -176,20 +176,11 @@ export function realDeps(root: string, opts: { quiet?: boolean } = {}): DeliverD
         stdio: opts.quiet ? 'ignore' : ['ignore', 'inherit', 'inherit'],
         timeout: Math.max(1_000, timeoutMs),
         killSignal: 'SIGKILL',
-        // Nouveau groupe de processus : le délai tue sh, puis tout le groupe (sinon ses enfants survivent, orphelins).
-        // (honoré par spawnSync à l'exécution, absent de ses types — d'où le cast)
-        detached: true,
-      } as SpawnSyncOptions);
-      if ((r.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT' || r.signal) {
-        if (r.pid) {
-          try {
-            process.kill(-r.pid, 'SIGKILL');
-          } catch {
-            // groupe déjà vide
-          }
-        }
-        return TIMED_OUT;
-      }
+        // PAS de groupe détaché : la commande reste dans le groupe de premier plan et la session de cadence.
+        // Ctrl-C et le raccrochage l'atteignent avec cadence (sinon un script orphelin livre encore pendant
+        // qu'une seconde livraison prend le verrou du mort), et /dev/tty reste là pour ssh, sudo, pinentry.
+      });
+      if ((r.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT' || r.signal) return TIMED_OUT;
       return r.status ?? 1;
     },
     gh: (sha) => JSON.parse(gh(['run', 'list', '--commit', sha, '--json', 'name,status,conclusion'])),

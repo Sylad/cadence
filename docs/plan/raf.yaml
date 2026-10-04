@@ -123,3 +123,9 @@ lots:
     estimate: 0.25
     quickwin: true
     created: 2026-10-04
+  - id: L17
+    title: "deliveredLots : ignorer les commits d'entretien du plan (isPlanOnly) — le 04-10 la livraison warhammer 883be18 a annoncé « livré : L50, L54 » pour un commit « plan: … rattaché à L54 » ; test"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-04

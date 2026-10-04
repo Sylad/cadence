@@ -66,6 +66,11 @@ lots:
     notes:
       - { date: 2026-10-04, text: "cadrage tranché par le lead (04-10) : indépendant de L11 — la routine session-close propose le nettoyage à chaque clôture" }
     started: 2026-10-04
+    tasks:
+      - { id: t1, title: "MAJEUR : ne jamais proposer un dossier qui est un dépôt git ou en contient un (tracked() part du dossier parent : un clone dans tmp/ est proposé) ; test", status: todo }
+      - { id: t2, title: suivi git vérifié aussi hors du dépôt (git -C <dossier du fichier> ls-files) ; '..xxx' suivi n'est pas « hors du dépôt » (rel === '..' || rel.startsWith('../')) ; tests, status: todo }
+      - { id: t3, title: "« * » n'attrape pas les noms en « . » (.env, .git) sauf motif en « . », comme le shell ; .git jamais proposé ; test", status: todo }
+      - { id: t4, title: "tests : limite du seuil (âge égal à cleanDays non proposé, mutation > en >= tuée) ; ~ résolu sous un homedir temporaire ; README l.692 : nettoyage dans le résumé de session-close", status: todo }
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
     status: done
@@ -122,13 +127,14 @@ lots:
     finished: 2026-10-04
   - id: L11
     title: Tâche récurrente dans le plan (champ de périodicité, « dû depuis N j ») — écart du 02-10 sorti de L5, à cadrer avec L4 (nettoyage en routine de clôture) avant de coder
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-03
     notes:
       - { date: 2026-10-04, text: "cadrage tranché par le lead (04-10, consigne de Sylvain : je tranche) : L11 et L4 INDÉPENDANTS — L11 = périodicité générique dans raf (champ du plan + « dû depuis N j »), spec courte relue avant code ; le nettoyage de L4 se fait à chaque clôture (session-close), pas comme tâche récurrente" }
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "conforme — re-revue : 4 commits relus (3835326, 2ad94c2, 92b36f1, 89b5305), 514 tests et typecheck verts ; les constats corrigés le sont bien : post-commit conseille raf did, « Récurrent » trié par retard, garde --every sur sous-tâche testée, pas d'écart todo-avec-commits ni idle pour un lot récurrent ; choix d'interprétation cohérents avec le lot ; 1 mineur nouveau (assertion « sans rien écrire » qui ne peut pas échouer, test/recurring.test.ts:134) — orchestré (vague 2026-10-04-1807, 1 passe(s) de correction + passe des mineurs)", commit: 89b5305ac5830c66afab8d66f1ebb3d5e8489666 }
+    finished: 2026-10-04
   - id: L12
     title: "raf add --public et raf public <id> : titre public d'un lot dans le modèle — écart du 02-10 sorti de L5 ; aujourd'hui écrit à la main dans 59 lots de 7 projets"
     status: done
@@ -384,7 +390,7 @@ lots:
     finished: 2026-10-04
   - id: L34
     title: "⚡ Suites de la revue L23 : README §Releasing (l.717) et en-tête de publish.yml (l.3) disent que le tag est comparé à package.json, .claude-plugin/plugin.json et marketplace.json ; test/publish-workflow.test.ts exécute l'étape de contrôle avec un GITHUB_REF_NAME juste puis faux (pas seulement la présence des chemins)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
@@ -427,30 +433,34 @@ lots:
           compliant — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction)",
         commit: bf0099364b9b0b6e2f4299e1530633e0d9ca15d7
       }
+    finished: 2026-10-04
   - id: L35
     title: "⚡ Suites de la revue L10 (qa-reviewer) : la section Output dit où va la ligne « already planned » (id + titre, hors Findings et follow-ups) + test qui l'épingle ; « browser state » comparé dans un profil déjà utilisé (contexte persistant), pas un contexte neuf ; liens sortants : ne plus exiger rel=noopener (implicite avec target=_blank depuis Chrome 88 / Firefox 79 / Safari 12.1)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "conforme après 1 correctif mineur (commentaire de test orphelin, test/skills.test.ts:258) — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction + passe des mineurs)", commit: 03b8e5292c152e293225437b73c03db6ca13a612 }
+    finished: 2026-10-04
   - id: L36
     title: "⚡ Suites de la revue L12 : README — public dans la liste des champs du plan en lecture seule et de plan.fields (l.157-158) ; tests : plan en lecture seule avec fields.public (clé mappée, valeur non textuelle ignorée), setPublic (clé insérée après title, reste du lot inchangé), raf public L1 Titre --clear refusé sans toucher au titre existant"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction)", commit: 1eba975075eae623b04b067d1494d23c30801503 }
+    finished: 2026-10-04
   - id: L37
     title: "⚡ Suite de la revue L30 : deliver écrit une ligne sur stderr au moment où kill() se rabat sur la racine faute de relevé (blind) — l'utilisateur sait que ce kill-là a pu laisser des descendants"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction + passe des mineurs)", commit: 007e25cec7c42d95c040ce691539ecddffe0c5bb }
+    finished: 2026-10-04
   - id: L38
     title: "⚡ orchestrate : une revue « conforme avec mineurs » enchaîne UNE passe de correction des mineurs dans la vague (session neuve, puis revue courte), au lieu de produire un lot de suites à chaque fois — consigne de Sylvain (04-10) : rien sous le tapis ; mesure : vague 2026-10-04-1700, 4 lots conformes → 4 lots de suites"
     status: doing
@@ -480,9 +490,28 @@ lots:
     finished: 2026-10-04
   - id: L40
     title: "⚡ orchestrate : une passe de correction ORDINAIRE qui commite puis est coupée (quota, signal) et dont la reprise ne commite rien est rendue au lead « fix sans commit » (cycle.ts:474) au lieu d'être relue — même règle que L38/t6 (HEAD a bougé depuis la revue → revue) ; test"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: "compliant after 1 minor fix (spec l.108-111 still describes the reference as the review sha) — orchestré (vague 2026-10-04-1807, 1 passe(s) de correction + passe des mineurs)", commit: a635ee6f84b2b1590f11319caa6578c5f7940c05 }
+    finished: 2026-10-04
+  - id: L41
+    title: "⚡ Suites de la vague 2026-10-04-1807 sur orchestrate (L38, L40) — VÉRIFIER d'abord chaque point, en « choix » si déjà corrigé : propositions — deux mineurs au même texte sur deux lignes ne sont pas confondus (cycle.ts:572) ; mineur reformulé après t8 ; headMoved vrai sans coupure (tests rouges → passe sans commit) : ne déclarer « correction reprise » que si une session de l'étape a été coupée, référence = headBefore de la 1re session de l'étape fix interrompue ; spec l.108-111 alignée ; test/orchestrate-cycle.test.ts:918 c.lot.review?.commit"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04
+  - id: L42
+    title: "⚡ Suites de la vague 2026-10-04-1807 sur L11 (tâche récurrente) — VÉRIFIER d'abord chaque point : raf check ne signale ni todo-with-commits ni idle pour un lot récurrent, session close ne conseille pas raf done ; hook post-commit propose raf did ; session start trie « Récurrent » par retard via une fonction partagée avec raf now ; tests : every/last par plan.fields en lecture seule, raf did refusé sur done/dropped, add --every --parent refusé, « sans rien écrire » vérifié en relisant le plan"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04
+  - id: L43
+    title: "⚡ Suites de la vague 2026-10-04-1807 sur L35 et L37 — VÉRIFIER d'abord : qa-reviewer nomme le profil de l'étape browser state (userDataDir réservé à la QA, conservé entre les passes, jamais le profil personnel) et l'exclut du nettoyage ; test/skills.test.ts:258 commentaire sans assertion ; test deliver « relevé indisponible au délai » vérifie aussi la ligne L30"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

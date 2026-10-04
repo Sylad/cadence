@@ -85,16 +85,21 @@ export function readAgents(dir: string): Record<string, AgentDef> {
 }
 
 export type SessionOutcome =
-  | { kind: 'ok'; result: SessionResult }
+  | { kind: 'ok'; result: SessionResult; /** Sortie brute de la première session, quand une relance de mise en forme a eu lieu. */ firstStdout?: string }
   | { kind: 'quota'; message: string; result?: SessionResult; tokens?: Tokens; sessionId?: string }
-  | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string };
+  | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string; firstStdout?: string };
 
 /** Consigne de la relance de mise en forme : rendre le rapport déjà établi au format demandé, rien d'autre. */
 export const FORMAT_RETRY_PROMPT = 'Return your report now in the required format (the JSON structure of the schema), exactly as you concluded it. Do not do any further work, do not add anything else.';
 
-/** Arguments de la relance : même session (--resume), mêmes schéma, modèle, mode de permission, dossiers et interdits. */
-export function buildRetryArgs(spec: StepSpec, sessionId: string): string[] {
-  const args = ['-p', FORMAT_RETRY_PROMPT, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, '--resume', sessionId, '--permission-mode', spec.permissionMode];
+/** Arguments de la relance : même session (--resume), mêmes schéma, modèle, agent (outils restreints), mode de permission, dossiers et interdits. */
+export function buildRetryArgs(spec: StepSpec, sessionId: string, agents: Record<string, AgentDef>): string[] {
+  const args = ['-p', FORMAT_RETRY_PROMPT, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model];
+  if (spec.agent) {
+    if (!agents[spec.agent]) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
+    args.push('--agents', JSON.stringify(agents), '--agent', spec.agent);
+  }
+  args.push('--resume', sessionId, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);
   args.push('--disallowedTools', ...DISALLOWED);
   return args;
@@ -117,11 +122,11 @@ export async function runSession(
   const missing = first.kind === 'failed' && !out.timedOut && out.code === 0 ? lacksStructuredOutput(out.stdout) : null;
   if (!missing) return first;
   const spentFirst = first.kind === 'failed' ? first.tokens : undefined;
-  const second = classify(await launch(buildRetryArgs(spec, missing.sessionId)));
+  const second = classify(await launch(buildRetryArgs(spec, missing.sessionId, deps.agents)));
   const total = (t?: Tokens): Tokens | undefined => (spentFirst && t ? sumTokens(spentFirst, t) : (t ?? spentFirst));
-  if (second.kind === 'ok') return { kind: 'ok', result: { ...second.result, tokens: total(second.result.tokens)!, formattingRetry: true } };
+  if (second.kind === 'ok') return { kind: 'ok', result: { ...second.result, tokens: total(second.result.tokens)!, formattingRetry: true }, firstStdout: out.stdout };
   const tokens = total(second.tokens);
-  return { ...second, ...(tokens ? { tokens } : {}), sessionId: second.sessionId ?? missing.sessionId };
+  return { ...second, firstStdout: out.stdout, ...(tokens ? { tokens } : {}), sessionId: second.sessionId ?? missing.sessionId };
 }
 
 function classify(out: LaunchOutcome): SessionOutcome {

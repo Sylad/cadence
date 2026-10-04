@@ -92,6 +92,10 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const review = state.steps.find((st: { kind: string }) => st.kind === 'review');
     expect(review.formatRetry).toBe(true);
     expect(review.tokens.counted).toBe(115 + 117);
+    // (L27) la sortie de la première session reste lisible à côté du rapport récupéré
+    const dir = join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1');
+    const first = JSON.parse(readFileSync(join(dir, `${review.report.replace('.json', '')}.first.json`), 'utf8'));
+    expect('structured_output' in first).toBe(false);
     expect(state.steps.find((st: { kind: string }) => st.kind === 'implement').formatRetry).toBeUndefined();
   });
 

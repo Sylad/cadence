@@ -297,6 +297,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
     }
   }
   if (outcome.kind === 'failed') {
+    if (outcome.firstStdout !== undefined) writeFileSync(join(dir, `${base}.first.json`), outcome.firstStdout);
     writeFileSync(join(dir, `${base}.json`), outcome.stdout);
     writeFileSync(join(dir, `${base}.err`), outcome.stderr);
     step.report = `${base}.json`;
@@ -315,6 +316,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   }
 
   const res = outcome.result;
+  if (outcome.firstStdout !== undefined) writeFileSync(join(dir, `${base}.first.json`), outcome.firstStdout);
   writeFileSync(join(dir, `${base}.json`), JSON.stringify({ ...res, structured: res.structured }, null, 2));
   step.report = `${base}.json`;
   step.sessionId = res.sessionId;

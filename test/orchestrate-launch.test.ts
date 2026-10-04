@@ -158,9 +158,9 @@ describe('relance de mise en forme (L26)', () => {
     raw.session_id = 'sess-texte';
     return JSON.stringify(raw);
   };
-  const run = (outs: string[], over: Partial<StepSpec> = {}) => {
+  const run = (outs: string[], over: Partial<StepSpec> = {}, agents: Record<string, { description: string; prompt: string; tools?: string[] }> = {}) => {
     const calls: string[][] = [];
-    const p = runSession({ ...spec, kind: 'review', agent: undefined, ...over }, { claude: async (args) => (calls.push(args), { code: 0, stdout: outs[calls.length - 1] ?? outs[outs.length - 1], stderr: '', timedOut: false }), agents: {} });
+    const p = runSession({ ...spec, kind: 'review', agent: undefined, ...over }, { claude: async (args) => (calls.push(args), { code: 0, stdout: outs[calls.length - 1] ?? outs[outs.length - 1], stderr: '', timedOut: false }), agents });
     return { calls, p };
   };
 
@@ -182,6 +182,25 @@ describe('relance de mise en forme (L26)', () => {
     const one = JSON.parse(sample).usage;
     const firstUsage = JSON.parse(noStructured()).usage;
     expect(out.result.tokens.counted).toBe(one.input_tokens + one.cache_creation_input_tokens + one.output_tokens + firstUsage.input_tokens + firstUsage.cache_creation_input_tokens + firstUsage.output_tokens);
+  });
+
+  it('(L27) revue : la relance reprend --agents/--agent de la première session (outils restreints)', async () => {
+    const agents = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'Grep'] } };
+    const { calls, p } = run([noStructured(), sample], { agent: 'code-reviewer' }, agents);
+    await p;
+    const [first, retry] = calls;
+    expect(retry[retry.indexOf('--agents') + 1]).toBe(first[first.indexOf('--agents') + 1]);
+    expect(JSON.parse(retry[retry.indexOf('--agents') + 1])['code-reviewer'].tools).toEqual(['Read', 'Grep']);
+    expect(retry[retry.indexOf('--agent') + 1]).toBe('code-reviewer');
+  });
+
+  it('(L27) la sortie de la première session est conservée, en succès comme en échec', async () => {
+    const ok = await run([noStructured(), sample]).p;
+    expect(ok.kind === 'ok' && ok.firstStdout).toBe(noStructured());
+    const ko = await run([noStructured()]).p;
+    expect(ko.kind === 'failed' && ko.firstStdout).toBe(noStructured());
+    const direct = await run([sample]).p;
+    expect(direct.kind === 'ok' && direct.firstStdout).toBeUndefined();
   });
 
   it('toujours sans structured_output après la relance : échec comme avant, jetons des deux appels comptés, pas de seconde relance', async () => {

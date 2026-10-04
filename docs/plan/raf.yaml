@@ -33,14 +33,23 @@ lots:
       - { date: 2026-10-04, text: "validation de Sylvain (04-10, « ok l3ok ») de la spec 1ca5bc8 avec : budget = entrée + écriture de cache + sortie (lecture de cache affichée à part) ; pas de raf ux automatique (le lead l'enregistre) ; plans en lecture seule : outil du projet via orchestrate.start / orchestrate.verdict déclarés dans cadence.yaml ; push bloqué par un hook pre-push temporaire posé pendant la vague (PAS de pushurl modifié) ; ordre UX puis revue de code (toujours en dernier) retenu." }
     started: 2026-10-04
     tasks:
-      - { id: t1, title: "lanceur de session claude -p : arguments, garde, délai, parseur épinglé sur un échantillon réel, compteurs", status: todo }
-      - { id: t2, title: "état des vagues et verrous (vague, dépôt), écriture atomique, reprise", status: todo }
-      - { id: t3, title: "gabarits de briefs, schémas des sorties structurées, skill lead qui y renvoie", status: todo }
-      - { id: t4, title: "cycle d'un lot : revues UX puis code, corrections en session neuve, petit lot, raf review automatique, plans en lecture seule, hook pre-push", status: todo }
-      - { id: t5, title: "ordonnanceur : deux créneaux, une file par dépôt, budget", status: todo }
-      - { id: t6, title: "commande : préconditions, --dry-run, --status, --resume/--answer, tableau, codes de sortie", status: todo }
-      - { id: t7, title: "garde-fous raf et deliver sous CADENCE_ORCHESTRATED, verrou d'orchestration", status: todo }
-      - { id: t8, title: README et skill lead, status: todo }
+      - { id: t1, title: "lanceur de session claude -p : arguments, garde, délai, parseur épinglé sur un échantillon réel, compteurs", status: done }
+      - { id: t2, title: "état des vagues et verrous (vague, dépôt), écriture atomique, reprise", status: done }
+      - { id: t3, title: "gabarits de briefs, schémas des sorties structurées, skill lead qui y renvoie", status: done }
+      - { id: t4, title: "cycle d'un lot : revues UX puis code, corrections en session neuve, petit lot, raf review automatique, plans en lecture seule, hook pre-push", status: done }
+      - { id: t5, title: "ordonnanceur : deux créneaux, une file par dépôt, budget", status: done }
+      - { id: t6, title: "commande : préconditions, --dry-run, --status, --resume/--answer, tableau, codes de sortie", status: done }
+      - { id: t7, title: "garde-fous raf et deliver sous CADENCE_ORCHESTRATED, verrou d'orchestration", status: done }
+      - { id: t8, title: README et skill lead, status: done }
+      - { id: t9, title: "orchestrate : un lot dont la dépendance de vague est suspendue ou en question reste reprenable (pas handed-back) — test budget + --resume", status: todo }
+      - { id: t10, title: "orchestrate : --resume vérifie le verrou de dépôt avant d'agir ; release() ne retire que les hooks posés par cette vague", status: todo }
+      - { id: t11, title: "orchestrate : compter dans le budget les tokens des sessions en échec, quota ou délai dépassé (résultat is_error, sinon journal .jsonl)", status: todo }
+      - { id: t12, title: "orchestrate : test du nettoyage sur SIGINT/SIGTERM (sessions tuées, étapes interrupted, verrous et hook retirés)", status: todo }
+      - { id: t13, title: "orchestrate : lire la config des projets avant de poser hooks et verrous (pas d'exception hors try)", status: todo }
+      - { id: t14, title: "orchestrate : ne pas démarrer un lot (raf start + commit) après incident, quota ou budget épuisé", status: todo }
+      - { id: t15, title: "orchestrate : afficher l'heure de remise du quota (quotaReset) ou retirer le réexport mort", status: todo }
+      - { id: t16, title: "orchestrate : orchestrate.test en asynchrone (ne pas bloquer l'autre créneau ni les signaux)", status: todo }
+    review: { date: 2026-10-04, verdict: "not compliant: 4 majeurs (dépendance de vague perdue à la reprise, hook d'une autre vague retiré, tokens des sessions en échec non comptés, nettoyage sur signal non testé), 4 mineurs", commit: 8fd6183c4f86388bd41b4d4792a371b1130ffeae }
   - id: L4
     title: "Nettoyage en routine de clôture : session-close liste les fichiers de travail périmés (dossier tmp partagé, captures non référencées, scripts jetables, dossiers temporaires laissés par les tests) et propose leur suppression — au lieu d'un lot à rouvrir dans chaque projet"
     status: todo

@@ -429,6 +429,7 @@ describe('deliver : script du projet (L2)', () => {
     const plan = Plan.load(file);
     plan.add('Suite', '2026-09-28');
     plan.save();
+    writeFileSync(join(dir, 'README.md'), 'demo v2\n'); // un fichier source : pas de l'entretien du plan
     git(dir, 'add', '.');
     commit(dir, 'chore(L1): cache livré — (L2) planifié et (L2–L3) à suivre');
     git(dir, 'push', '-q');

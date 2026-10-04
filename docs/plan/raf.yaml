@@ -410,15 +410,17 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
-    review: { date: 2026-10-04, verdict: "non conforme : 1 majeur (passe des mineurs interrompue puis reprise sans nouveau commit → rendu au lead, commit de correction jamais relu), 1 mineur (mineur corrigé laissé en proposition)", commit: b0c6024a4a4ca7ca9818326256757c682d673d7f }
+    review: { date: 2026-10-04, verdict: "conforme avec 2 mineurs (t7 ne retire que la ligne identique au caractère près ; README et spec non alignés sur la règle HEAD de t6) — corrigés en t8, t9", commit: bfe6019cd609a560c3ca3b24b84df76f8221ae4f }
     tasks:
       - { id: t1, title: "passe des mineurs sans commit (ou question « mineur faux ») : conclure sur la revue conforme d'origine, mineurs non traités rendus en propositions, au lieu de handed-back ; brief de correction des mineurs sans « stop and ask » ; tests", status: done }
       - { id: t2, title: "après la passe des mineurs, lot visible non petit : garder le verdict de l'agent UX (ne pas l'écraser par review-small) et rejouer ux/review après une correction de défaut ; test", status: done }
       - { id: t3, title: "revue courte après passe des mineurs : brief qui ne dit pas « This lot is small » et sans revue d'ergonomie pour un lot non visible", status: done }
       - { id: t4, title: "budget épuisé juste après une revue conforme avec mineurs : le lot conclut sur la revue conforme (ready, verdict enregistré, mineurs en propositions) au lieu de rester suspended ; test", status: done }
       - { id: t5, title: "README (cycle d'un lot), spec (schéma choix[], état, format du verdict) et dry-run : décrire la passe des mineurs et choix", status: done }
-      - { id: t6, title: "passe des mineurs sans commit après reprise : conclure seulement si HEAD = l.code.head, sinon revue courte (cycle.ts:461) ; test quota pendant la passe des mineurs puis reprise", status: todo }
-      - { id: t7, title: "mineur rendu en proposition par une revue non conforme puis traité par la passe des mineurs : le retirer de proposals (cycle.ts:563) ; test", status: todo }
+      - { id: t6, title: "passe des mineurs sans commit après reprise : conclure seulement si HEAD = l.code.head, sinon revue courte (cycle.ts:461) ; test quota pendant la passe des mineurs puis reprise", status: done }
+      - { id: t7, title: "mineur rendu en proposition par une revue non conforme puis traité par la passe des mineurs : le retirer de proposals (cycle.ts:563) ; test", status: done }
+      - { id: t8, title: "propositions : retirer le mineur confié à la passe même si sa ligne a changé ou s'il est reformulé (comparer sans le numéro de ligne, ou ranger dans minorLines les [mineur code] déjà proposés que la revue conforme signale de nouveau) ; test avec ligne décalée (cycle.ts:568)", status: todo }
+      - { id: t9, title: "README (599-601) et spec (107-109) : une passe sans commit conclut sur la revue d'origine seulement si HEAD n'a pas bougé depuis ; sinon (reprise après coupure) revue courte du commit de la session coupée", status: todo }
   - id: L39
     title: "⚡ orchestrate : gabarits de briefs lus une fois au début de la vague (instantané), pas à chaque étape — un lot qui modifie templates/orchestrate pendant la vague cassait les revues suivantes (« valeur manquante pour {{choix}} », vague 2026-10-04-1729, L33/L38) ; test"
     status: done
@@ -428,3 +430,9 @@ lots:
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: conforme, commit: c86641d504c69ed22e80ea4d5e2e11e2d548fd8b }
     finished: 2026-10-04
+  - id: L40
+    title: "⚡ orchestrate : une passe de correction ORDINAIRE qui commite puis est coupée (quota, signal) et dont la reprise ne commite rien est rendue au lead « fix sans commit » (cycle.ts:474) au lieu d'être relue — même règle que L38/t6 (HEAD a bougé depuis la revue → revue) ; test"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

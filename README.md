@@ -417,13 +417,24 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   process died is removed with a warning); with `ci: github`, `gh` installed and
   logged in.
 - Every command is killed when it exceeds its budget (CI, `deployTimeout`, what is
-  left of `verifyTimeout`) and reported as "délai dépassé" (its `sh` is killed; a
-  child it sent to the background may outlive it).
+  left of `verifyTimeout`) and reported as "délai dépassé". Killed means the
+  whole tree: `sh` forks for each command of a script, so every descendant is
+  first stopped (`SIGSTOP`, the tree is re-read until nothing new appears), then
+  killed (`SIGKILL`), before cadence moves on or releases the lock. If cadence
+  receives Ctrl-C, `SIGTERM` or a hangup while a command runs, it kills that
+  tree the same way, then dies of the signal; its lock is then stale and the
+  next delivery removes it, with nothing of the first one left running. A
+  script's own `trap` does not get to finish. What cadence cannot reach still
+  outlives it and may run concurrently with the next delivery: a process
+  re-parented away from the command before cadence acts (its parent exited
+  first — a daemon's double fork, `nohup … &` from a script that then returns,
+  a background child that ignores Ctrl-C after its shell died of it), a process
+  of another user (`sudo`), and everything if cadence itself is killed with
+  `SIGKILL` (`kill -9`, the OOM killer).
 - Commands run in cadence's own process group and session, attached to the
   terminal: `ssh`, `sudo` or `pinentry` can prompt on `/dev/tty`, and Ctrl-C or
-  closing the terminal stops the running command together with cadence — no
-  orphaned script keeps delivering while a second delivery takes over the lock
-  of the dead one.
+  closing the terminal stops the running command together with cadence (within
+  the limits above).
 - **CI** `github`: polls `gh run list --commit <sha>` every 15 s; no run after
   5 minutes is a failure (you probably pushed another commit than the one you
   deliver); every run must end `success`, `skipped` or `neutral`. `gh` errors

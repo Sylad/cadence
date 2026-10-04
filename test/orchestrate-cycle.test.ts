@@ -817,6 +817,45 @@ describe('lot visible et passe des mineurs (L38/t2)', () => {
   });
 });
 
+const quotaOut = () => ({ code: 1, stdout: JSON.stringify({ is_error: true, subtype: 'success', result: 'Claude AI usage limit reached|1759600000', session_id: 's', num_turns: 1, duration_ms: 1, usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 } }), stderr: '', timedOut: false });
+
+describe('passe des mineurs interrompue puis reprise (L38/t6)', () => {
+  it('commit de la passe puis quota ; la session neuve ne trouve plus rien : le commit est relu par la revue courte, pas rendu au lead', async () => {
+    const commitThenQuota: Handler = (call) => {
+      commitFile(call.opts.cwd, 'b.txt', 'fix(L1): nommage');
+      return quotaOut();
+    };
+    const nothingLeft: Handler = () => claudeOut(workReport({ choix: ['rien à corriger de plus'] }));
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [commitThenQuota, nothingLeft], 'review-small': [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('suspended');
+    expect(c.lot.minorFix).toBe(true);
+    h.wave.quota = { hit: false };
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'fix', 'review-small']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.outcome).toBe('prêt à livrer');
+    const lot = h.plan().lot('L1');
+    expect(lot.review?.verdict).toContain('orchestré');
+    expect(lot.review?.commit).toBe(git(h.repo, 'log', '--format=%H', '--grep=fix(L1)', '-1'));
+    expect(c.lot.proposals).toEqual([]);
+  });
+
+  it('reprise sans commit et HEAD inchangé depuis la revue conforme : conclusion sur la revue d\'origine (comportement t1 gardé)', async () => {
+    const quotaOnly: Handler = () => quotaOut();
+    const rejected: Handler = () => claudeOut(workReport({ choix: ['mineur refusé'] }));
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [quotaOnly, rejected] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    h.wave.quota = { hit: false };
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'fix']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
+  });
+});
+
 describe('brief de la revue courte (L38/t3)', () => {
   it('lot non visible : revue courte de code, ni « This lot is small » ni revue d\'ergonomie', async () => {
     const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [fix('b.txt')], 'review-small': [ok] } });

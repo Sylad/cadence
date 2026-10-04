@@ -265,6 +265,16 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
     expect(orphans(await root('plan:\n  files: [a.json]\ndeliver:\n  verify: []\n'))).toHaveLength(1);
   });
 
+  it('(L13) un fichier de plan.files au nom accentué ou avec espace est reconnu (git diff-tree -z, quotepath=off)', async () => {
+    const { raf, write } = await project();
+    write('chore: déclare les journaux', 'cadence.yaml', 'plan:\n  files: [docs/plan/journal-été.ndjson, docs/plan/mon journal.ndjson]\n');
+    write('chore: journal accentué', 'docs/plan/journal-été.ndjson', '{}\n');
+    write('chore: journal avec espace', 'docs/plan/mon journal.ndjson', '{}\n');
+    expect(await raf('2026-10-03', 'check')).toMatchObject({ code: 0, out: '✓ plan et historique cohérents' });
+    write('chore: autre fichier accentué', 'docs/été.txt', 'x\n');
+    expect(orphans((await raf('2026-10-03', 'check')).out)).toHaveLength(1);
+  });
+
   it('(e) un commit mixte (plan + fichier source) qui cite un lot compte pour ce lot, quel que soit son sujet', async () => {
     const { raf, touch, declare } = await project();
     declare();

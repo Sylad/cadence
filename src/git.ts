@@ -54,9 +54,10 @@ export function hooksDir(cwd: string): string {
   return basename(dir) === '_' && basename(dirname(dir)) === '.husky' ? dirname(dir) : dir;
 }
 
-/** Fichiers modifiés par un commit, relatifs à la racine du dépôt. */
+/** Fichiers modifiés par un commit, relatifs à la racine du dépôt (noms accentués ou à espaces compris). */
 export function changedFiles(cwd: string, sha: string): string[] {
-  return git(cwd, ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha]).split('\n').filter(Boolean);
+  // -z : noms séparés par NUL, jamais échappés ; quotepath=off en plus pour les sorties qui citeraient quand même.
+  return git(cwd, ['-c', 'core.quotepath=off', 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', sha]).split('\0').filter(Boolean);
 }
 
 /** Contenu d'un fichier à un commit (`<sha>^` pour l'état d'avant) ; null s'il n'existe pas à ce commit. */

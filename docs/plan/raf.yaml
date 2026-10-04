@@ -370,14 +370,15 @@ lots:
     created: 2026-10-04
   - id: L33
     title: "⚡ orchestrate : le brief d'implémentation demande de TRANCHER les questions d'interprétation mineures (et de les lister en « choix faits » dans le rapport, relus par la revue), de ne s'arrêter que sur un vrai blocage — mesure : vague 2026-10-04-1700, 4 lots / 4 questions, ~45 k par aller-retour"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
-    review: { date: 2026-10-04, verdict: conforme avec 1 mineur à corriger (test de la ligne « choix fait » du tableau) — corrigé en L33/t1, commit: a26eb21cba3939ad06a66cfb729c7302a3fdfad1 }
+    review: { date: 2026-10-04, verdict: conforme, commit: c1200853c454e626effdea5831f1abf88ff26893 }
     tasks:
-      - { id: t1, title: "test de renderTable : un lot avec choix rend « choix fait : … »", status: todo }
+      - { id: t1, title: "test de renderTable : un lot avec choix rend « choix fait : … »", status: done }
+    finished: 2026-10-04
   - id: L34
     title: "⚡ Suites de la revue L23 : README §Releasing (l.717) et en-tête de publish.yml (l.3) disent que le tag est comparé à package.json, .claude-plugin/plugin.json et marketplace.json ; test/publish-workflow.test.ts exécute l'étape de contrôle avec un GITHUB_REF_NAME juste puis faux (pas seulement la présence des chemins)"
     status: todo
@@ -409,17 +410,21 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
-    review: { date: 2026-10-04, verdict: "non conforme : 2 majeurs (lot conforme rendu au lead quand la passe des mineurs ne commite rien ; verdict UX écrasé par la revue courte), 3 mineurs", commit: 8059a8a3a8b21915259eb8761b87a42e5b0ccbcc }
+    review: { date: 2026-10-04, verdict: "non conforme : 1 majeur (passe des mineurs interrompue puis reprise sans nouveau commit → rendu au lead, commit de correction jamais relu), 1 mineur (mineur corrigé laissé en proposition)", commit: b0c6024a4a4ca7ca9818326256757c682d673d7f }
     tasks:
-      - { id: t1, title: "passe des mineurs sans commit (ou question « mineur faux ») : conclure sur la revue conforme d'origine, mineurs non traités rendus en propositions, au lieu de handed-back ; brief de correction des mineurs sans « stop and ask » ; tests", status: todo }
-      - { id: t2, title: "après la passe des mineurs, lot visible non petit : garder le verdict de l'agent UX (ne pas l'écraser par review-small) et rejouer ux/review après une correction de défaut ; test", status: todo }
-      - { id: t3, title: "revue courte après passe des mineurs : brief qui ne dit pas « This lot is small » et sans revue d'ergonomie pour un lot non visible", status: todo }
-      - { id: t4, title: "budget épuisé juste après une revue conforme avec mineurs : le lot conclut sur la revue conforme (ready, verdict enregistré, mineurs en propositions) au lieu de rester suspended ; test", status: todo }
-      - { id: t5, title: "README (cycle d'un lot), spec (schéma choix[], état, format du verdict) et dry-run : décrire la passe des mineurs et choix", status: todo }
+      - { id: t1, title: "passe des mineurs sans commit (ou question « mineur faux ») : conclure sur la revue conforme d'origine, mineurs non traités rendus en propositions, au lieu de handed-back ; brief de correction des mineurs sans « stop and ask » ; tests", status: done }
+      - { id: t2, title: "après la passe des mineurs, lot visible non petit : garder le verdict de l'agent UX (ne pas l'écraser par review-small) et rejouer ux/review après une correction de défaut ; test", status: done }
+      - { id: t3, title: "revue courte après passe des mineurs : brief qui ne dit pas « This lot is small » et sans revue d'ergonomie pour un lot non visible", status: done }
+      - { id: t4, title: "budget épuisé juste après une revue conforme avec mineurs : le lot conclut sur la revue conforme (ready, verdict enregistré, mineurs en propositions) au lieu de rester suspended ; test", status: done }
+      - { id: t5, title: "README (cycle d'un lot), spec (schéma choix[], état, format du verdict) et dry-run : décrire la passe des mineurs et choix", status: done }
+      - { id: t6, title: "passe des mineurs sans commit après reprise : conclure seulement si HEAD = l.code.head, sinon revue courte (cycle.ts:461) ; test quota pendant la passe des mineurs puis reprise", status: todo }
+      - { id: t7, title: "mineur rendu en proposition par une revue non conforme puis traité par la passe des mineurs : le retirer de proposals (cycle.ts:563) ; test", status: todo }
   - id: L39
     title: "⚡ orchestrate : gabarits de briefs lus une fois au début de la vague (instantané), pas à chaque étape — un lot qui modifie templates/orchestrate pendant la vague cassait les revues suivantes (« valeur manquante pour {{choix}} », vague 2026-10-04-1729, L33/L38) ; test"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: conforme, commit: c86641d504c69ed22e80ea4d5e2e11e2d548fd8b }
+    finished: 2026-10-04

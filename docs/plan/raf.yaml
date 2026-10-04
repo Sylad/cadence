@@ -244,13 +244,17 @@ lots:
     started: 2026-10-04
   - id: L25
     title: "⚡ orchestrate : « commit annoncé absent de git » faux positif à la reprise — un commit d'une session précédente du même lot (ancêtre de HEAD) est cité par le rapport ; vérifier contre les commits du lot, pas la seule plage de la session (cycle.ts:398-404, vague 2026-10-04-1534)"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04
   - id: L26
     title: "⚡ orchestrate : une revue qui finit en texte sans structured_output (end_turn, 7 tours, verdict présent dans le texte) fait échouer le lot — relance de mise en forme, ou schéma prioritaire sur la consigne « ligne de verdict » de l'agent (vague 2026-10-04-1534, L21)"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    notes:
+      - { date: 2026-10-04, text: "décision de Sylvain (04-10) : option A — si structured_output manque, UNE relance de mise en forme de la même session (claude -p --resume <id> --json-schema, consigne : rendre le rapport au format demandé, rien d'autre) ; seule entorse admise à « jamais de session reprise », comptée au budget ; échec si toujours absent" }
+    started: 2026-10-04

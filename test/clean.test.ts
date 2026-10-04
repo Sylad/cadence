@@ -65,6 +65,32 @@ describe('staleFiles — dépôts git', () => {
     expect(names(staleFiles(root, [`${autre}/*`], 7, TODAY))).toEqual([join(autre, 'libre.png')]);
   });
 
+  // Ici le dossier porte un FICHIER `.git` (« gitdir: … ») : le travail non commité qu'il contient
+  // n'est dans aucun dépôt que git retrouverait en remontant depuis le dossier parent.
+  it('un arbre de travail lié (git worktree add) avec du travail non commité n’est jamais proposé', () => {
+    const tmp = tempDir();
+    const repo = gitRepo();
+    git(repo, 'commit', '-q', '--allow-empty', '-m', 'chore: init');
+    const wt = join(tmp, 'wt');
+    git(repo, 'worktree', 'add', '-q', wt);
+    expect(lstatSync(join(wt, '.git')).isFile()).toBe(true);
+    touch(join(wt, 'travail-non-commite.txt'));
+    touch(join(tmp, 'libre.png'));
+    ageTree(wt);
+    ageTree(join(tmp, 'libre.png'));
+    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
+  });
+
+  it('un dossier à fichier .git façon sous-module avec du travail non commité n’est jamais proposé', () => {
+    const tmp = tempDir();
+    mkdirSync(join(tmp, 'sub'));
+    writeFileSync(join(tmp, 'sub/.git'), 'gitdir: ../../.git/modules/sub\n');
+    touch(join(tmp, 'sub/travail-non-commite.txt'));
+    touch(join(tmp, 'libre.png'));
+    ageTree(join(tmp, 'sub'));
+    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
+  });
+
   // Sans entrée `.git` : un dossier git se reconnaît à son contenu, comme git le fait (HEAD + objects/ + refs/).
   it('un dépôt nu n’est jamais proposé, ni ce qu’il contient', () => {
     const tmp = tempDir();

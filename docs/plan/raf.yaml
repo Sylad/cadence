@@ -605,3 +605,21 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-04
+  - id: L50
+    title: "⚡ orchestrate : les fichiers que Playwright MCP écrit dans le dépôt (.playwright-mcp/*.yml, captures) rendent le lot « dépôt sale » et le renvoient au lead (ol-companion:L29, vague 2026-10-04-2201) — exclus le temps de la vague (.git/info/exclude, comme le hook) et nettoyés à la fin, ou dossier de sortie Playwright hors dépôt ; test"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04
+  - id: L51
+    title: "⚡ orchestrate : le tableau affiche « non conforme (0 bloquant, 0 majeur) » pour un lot rendu au lead pour une autre cause (dépôt sale) — la colonne revue dit la vraie cause ou le dernier verdict réel ; test"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04
+  - id: L52
+    title: "⚡ orchestrate : les sessions s'arrêtent encore sur des non-questions (« je n'ai pas de question », « faut-il scinder ce commit ? », « la revue portait sur un état antérieur ») — le brief interdit de s'arrêter pour une question d'organisation ou de constat contesté : trancher, lister en choix, continuer ; un constat contesté est relu par la revue suivante, pas par le lead (vague 2026-10-04-2201 : 4 questions évitables, ~1,2 M tokens pour 0 lot prêt)"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

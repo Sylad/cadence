@@ -410,7 +410,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
-    review: { date: 2026-10-04, verdict: "conforme avec 2 mineurs (t7 ne retire que la ligne identique au caractère près ; README et spec non alignés sur la règle HEAD de t6) — corrigés en t8, t9", commit: bfe6019cd609a560c3ca3b24b84df76f8221ae4f }
+    review: { date: 2026-10-04, verdict: "conforme — orchestré (vague 2026-10-04-1807, 0 passe(s) de correction + passe des mineurs)", commit: 4f2ce454341c2bd9586a6f97b5ef89d5c52f282a }
     tasks:
       - { id: t1, title: "passe des mineurs sans commit (ou question « mineur faux ») : conclure sur la revue conforme d'origine, mineurs non traités rendus en propositions, au lieu de handed-back ; brief de correction des mineurs sans « stop and ask » ; tests", status: done }
       - { id: t2, title: "après la passe des mineurs, lot visible non petit : garder le verdict de l'agent UX (ne pas l'écraser par review-small) et rejouer ux/review après une correction de défaut ; test", status: done }

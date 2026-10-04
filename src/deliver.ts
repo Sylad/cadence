@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { constants } from 'node:os';
 import { parse } from 'yaml';
-import { killTree, onTermination } from './proc.js';
+import { endTree, killTree, onTermination, SIGNAL_GRACE_MS } from './proc.js';
 import type { Day } from './dates.js';
 import { isPlanOnly } from './audit.js';
 import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
@@ -193,7 +193,9 @@ export function realDeps(root: string): DeliverDeps {
         // Au délai, ou si cadence est tué (Ctrl-C, SIGTERM, raccrochage) : TOUT l'arbre de la commande meurt
         // avant que cadence ne rende la main ou ne meure — sh fait un fork par commande, et un descendant
         // survivant livrerait encore pendant qu'une seconde livraison prend le verrou libéré ou périmé.
-        const forget = onTermination(() => killTree(pid));
+        // Ctrl-C et raccrochage : l'arbre a déjà reçu le signal du terminal, un court délai de grâce laisse finir
+        // ses trap (et git son index.lock) avant le kill ; SIGTERM (à cadence seul) et le délai : kill immédiat.
+        const forget = onTermination((sig) => (sig === 'SIGTERM' ? killTree(pid) : endTree(pid, SIGNAL_GRACE_MS)));
         let timedOut = false;
         const timer = setTimeout(() => {
           timedOut = true;

@@ -718,6 +718,48 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
     expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
   }, 20_000);
 
+  it('SIGINT au groupe de premier plan : le trap du script a le temps de finir (délai de grâce), puis plus aucun descendant ni livraison concurrente', async () => {
+    const logs = tempDir();
+    const dir = pushedRepo();
+    writeFileSync(
+      join(dir, 'livrer.sh'),
+      `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then\n  echo $$ > '${logs}/first'\n  trap 'echo trap-start >> '${logs}/trap'; sleep 0.2; echo trap-done >> '${logs}/trap'; exit 130' INT\n  sleep 3\n  ( sh -c "sleep 0; echo bumped >> '${logs}/bumps'" )\nelse\n  echo bumped >> '${logs}/bumps'\nfi\n`,
+      { mode: 0o755 },
+    );
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  script: ./livrer.sh\n');
+    git(dir, 'add', 'livrer.sh', 'cadence.yaml');
+    commit(dir, 'chore: config');
+    git(dir, 'push', '-q');
+    const probe = join(logs, 'probe.ts');
+    writeFileSync(
+      probe,
+      `import { run } from ${JSON.stringify(join(process.cwd(), 'src/cli.ts'))};\n` +
+        `process.exitCode = await run(['deliver'], { cwd: ${JSON.stringify(dir)}, env: process.env, out: () => {}, err: () => {}, now: () => new Date() });\n`,
+    );
+    const first = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
+    const exited = new Promise<void>((r) => first.on('exit', () => r()));
+    try {
+      expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
+      await pause(300); // le trap est posé
+      const scriptPid = Number(readFileSync(join(logs, 'first'), 'utf8').trim());
+      process.kill(-first.pid!, 'SIGINT'); // ce que fait le terminal
+      await exited;
+      expect(lines(join(logs, 'trap'))).toEqual(['trap-start', 'trap-done']); // le trap est allé au bout
+      expect(alive(scriptPid)).toBe(false);
+
+      const second = await run(['deliver'], { cwd: dir, env: {}, out: () => {}, err: () => {}, now: () => new Date() });
+      expect(second).toBe(0);
+      await pause(3_000);
+      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
+    } finally {
+      try {
+        process.kill(-first.pid!, 'SIGKILL');
+      } catch {
+        // déjà mort
+      }
+    }
+  }, 30_000);
+
   it.each([false, true])('(b) SIGTERM envoyé à cadence seul pendant le script (bump par un petit-enfant : %s) : le script et ses descendants meurent, un seul bump', async (grandchild) => {
     const logs = tempDir();
     const dir = scriptRepo(logs, 3, '', grandchild);

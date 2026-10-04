@@ -616,6 +616,7 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
       const said = write.mock.calls.filter(([m]) => String(m).includes('relevé des processus indisponible'));
       expect(said).toHaveLength(1);
       expect(String(said[0]![0])).toContain('seule la commande racine');
+      expect(String(said[0]![0])).toContain('tant que le relevé échoue'); // dégradé seulement pendant la panne, pas pour toute la commande
     } finally {
       write.mockRestore();
     }

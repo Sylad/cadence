@@ -421,11 +421,16 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   whole tree: `sh` forks for each command of a script, so every descendant is
   first stopped (`SIGSTOP`, the tree is re-read until nothing new appears), then
   killed (`SIGKILL`), before cadence moves on or releases the lock. If cadence
-  receives Ctrl-C, `SIGTERM` or a hangup while a command runs, it kills that
-  tree the same way, then dies of the signal; its lock is then stale and the
-  next delivery removes it, with nothing of the first one left running. A
-  script's own `trap` does not get to finish. What cadence cannot reach still
-  outlives it and may run concurrently with the next delivery: a process
+  receives `SIGTERM` while a command runs, it kills that tree at once, then
+  dies of the signal. On Ctrl-C or a hangup the tree has already received the
+  signal from the terminal: cadence first gives it up to 2 seconds to finish
+  (a script's `trap`, git removing its `index.lock`), returns the moment the
+  tree is empty, kills what is left after the 2 seconds, then dies of the
+  signal. A delay overrun and `SIGTERM` give no grace: a script's own `trap`
+  does not get to finish there. The lock of a killed cadence is stale and the
+  next delivery removes it, with nothing of the first one left running. What
+  cadence cannot reach still outlives it and may run concurrently with the next
+  delivery: a process
   re-parented away from the command before cadence acts (its parent exited
   first — a daemon's double fork, `nohup … &` from a script that then returns,
   a background child that ignores Ctrl-C after its shell died of it), a process

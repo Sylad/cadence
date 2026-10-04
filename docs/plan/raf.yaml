@@ -381,10 +381,11 @@ lots:
     finished: 2026-10-04
   - id: L34
     title: "⚡ Suites de la revue L23 : README §Releasing (l.717) et en-tête de publish.yml (l.3) disent que le tag est comparé à package.json, .claude-plugin/plugin.json et marketplace.json ; test/publish-workflow.test.ts exécute l'étape de contrôle avec un GITHUB_REF_NAME juste puis faux (pas seulement la présence des chemins)"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04
   - id: L35
     title: "⚡ Suites de la revue L10 (qa-reviewer) : la section Output dit où va la ligne « already planned » (id + titre, hors Findings et follow-ups) + test qui l'épingle ; « browser state » comparé dans un profil déjà utilisé (contexte persistant), pas un contexte neuf ; liens sortants : ne plus exiger rel=noopener (implicite avec target=_blank depuis Chrome 88 / Firefox 79 / Safari 12.1)"
     status: todo

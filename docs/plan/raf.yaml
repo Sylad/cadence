@@ -375,6 +375,9 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: conforme avec 1 mineur à corriger (test de la ligne « choix fait » du tableau) — corrigé en L33/t1, commit: a26eb21cba3939ad06a66cfb729c7302a3fdfad1 }
+    tasks:
+      - { id: t1, title: "test de renderTable : un lot avec choix rend « choix fait : … »", status: todo }
   - id: L34
     title: "⚡ Suites de la revue L23 : README §Releasing (l.717) et en-tête de publish.yml (l.3) disent que le tag est comparé à package.json, .claude-plugin/plugin.json et marketplace.json ; test/publish-workflow.test.ts exécute l'étape de contrôle avec un GITHUB_REF_NAME juste puis faux (pas seulement la présence des chemins)"
     status: todo
@@ -406,9 +409,17 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "non conforme : 2 majeurs (lot conforme rendu au lead quand la passe des mineurs ne commite rien ; verdict UX écrasé par la revue courte), 3 mineurs", commit: 8059a8a3a8b21915259eb8761b87a42e5b0ccbcc }
+    tasks:
+      - { id: t1, title: "passe des mineurs sans commit (ou question « mineur faux ») : conclure sur la revue conforme d'origine, mineurs non traités rendus en propositions, au lieu de handed-back ; brief de correction des mineurs sans « stop and ask » ; tests", status: todo }
+      - { id: t2, title: "après la passe des mineurs, lot visible non petit : garder le verdict de l'agent UX (ne pas l'écraser par review-small) et rejouer ux/review après une correction de défaut ; test", status: todo }
+      - { id: t3, title: "revue courte après passe des mineurs : brief qui ne dit pas « This lot is small » et sans revue d'ergonomie pour un lot non visible", status: todo }
+      - { id: t4, title: "budget épuisé juste après une revue conforme avec mineurs : le lot conclut sur la revue conforme (ready, verdict enregistré, mineurs en propositions) au lieu de rester suspended ; test", status: todo }
+      - { id: t5, title: "README (cycle d'un lot), spec (schéma choix[], état, format du verdict) et dry-run : décrire la passe des mineurs et choix", status: todo }
   - id: L39
     title: "⚡ orchestrate : gabarits de briefs lus une fois au début de la vague (instantané), pas à chaque étape — un lot qui modifie templates/orchestrate pendant la vague cassait les revues suivantes (« valeur manquante pour {{choix}} », vague 2026-10-04-1729, L33/L38) ; test"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04

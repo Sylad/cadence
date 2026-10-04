@@ -64,6 +64,24 @@ function holdsRepo(path: string): boolean {
   return entries.some((e) => e.isDirectory() && holdsRepo(join(path, e.name)));
 }
 
+/** Date de modification la plus récente d'un chemin ou, pour un dossier, de tout son contenu (liens non suivis). */
+function newestMtime(path: string): Date {
+  const st = lstatSync(path);
+  let newest = st.mtime;
+  if (!st.isDirectory()) return newest;
+  let names: string[];
+  try {
+    names = readdirSync(path);
+  } catch {
+    return newest;
+  }
+  for (const n of names) {
+    const m = newestMtime(join(path, n));
+    if (m > newest) newest = m;
+  }
+  return newest;
+}
+
 /** Vrai si git suit ce chemin (ou un fichier dessous), dans le dépôt qui le contient : on ne propose jamais de supprimer du versionné. */
 function tracked(path: string): boolean {
   const git = (cwd: string, args: string[]) =>
@@ -85,7 +103,7 @@ export function staleFiles(root: string, patterns: string[], days: number, today
   for (const pattern of patterns) {
     for (const path of expand(pattern, root)) {
       if (seen.has(path) || path === root || path.split('/').includes('.git')) continue;
-      const age = diffDays(toDay(lstatSync(path).mtime), today);
+      const age = diffDays(toDay(newestMtime(path)), today);
       if (age > days && !holdsRepo(path) && !tracked(path)) seen.set(path, { path, age });
     }
   }

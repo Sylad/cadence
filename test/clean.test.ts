@@ -97,6 +97,16 @@ describe('staleFiles — motifs', () => {
 });
 
 describe('staleFiles — contenu des dossiers et .git', () => {
+  it('l’âge d’un dossier est la date la plus récente de son contenu', () => {
+    const tmp = tempDir();
+    touch(join(tmp, 'travail/notes.md'), new Date('2026-09-27T10:00:00'));
+    touch(join(tmp, 'travail'));
+    touch(join(tmp, 'vieux/a/b.txt'));
+    touch(join(tmp, 'vieux/a'));
+    touch(join(tmp, 'vieux'));
+    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'vieux')]);
+  });
+
   it('ne propose rien sous un dossier .git, même atteint par un motif caché', () => {
     const tmp = tempDir();
     const clone = join(tmp, 'repo');

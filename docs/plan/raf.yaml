@@ -563,7 +563,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
-    review: { date: 2026-10-04, verdict: conforme après 1 correction mineure (2 garde-fous de isStaleRoot non testés) ; aucun chemin de suppression hors racine trouvé, commit: 10a2183bb2771edfee9649d47ddd47fe0d449edf }
+    review: { date: 2026-10-04, verdict: "conforme : la correction mineure t8 est faite, les deux garde-fous (l.108 et l.110 de test/tmp-hygiene.ts) sont maintenant couverts par des tests qui échouent quand on les casse, et la passe n'a rien cassé — orchestré (vague 2026-10-04-2132, 0 passe(s) de correction + passe des mineurs)", commit: 458d86f00fd87b6352eb558657939138aaa5e556 }
     tasks:
       - { id: t1, title: "BLOQUANT : removeDryRunBriefs lit la ligne entière (chemins avec espaces), refuse toute cible hors de CADENCE_TEST_TMP_ROOT ou non nommée cadence-orchestrate-* (erreur levée), test avec un TMPDIR contenant un espace", status: done }
       - { id: t2, title: "globalSetup : signaler et supprimer au démarrage les cadence-tests-root-* laissés par un run interrompu (fichier pid, processus mort)", status: done }

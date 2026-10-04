@@ -82,13 +82,15 @@ lots:
       - { id: t12, title: "MAJEUR : expand et measure ne descendent jamais dans un lien symbolique attrapé par un joker ; tests lien vers un dossier extérieur et vers la racine (tmp/self → ..)", status: done }
       - { id: t13, title: "MAJEUR : test de gitEnv — GIT_INDEX_FILE / GIT_DIR hérités : un fichier suivi n'est pas proposé (mutation « env: gitEnv() retirée » tuée)", status: done }
       - { id: t14, title: "tests : dossier de motif non listable présent dans unreadable (clean.test.ts:180) ; nom à métacaractères de pathspec suivi par git non proposé (--literal-pathspecs)", status: done }
-      - { id: t15, title: "MAJEUR : après un segment à *, ne plus jamais suivre de lien même sur un segment écrit en entier (wild collant, clean.ts:69) ; test tmp/*/out/* avec out → dossier extérieur ; README l.405-409 aligné", status: todo }
-      - { id: t16, title: "MAJEUR : test d'un dossier contenant un arbre de travail lié ou un sous-module (.git fichier) — tue la mutation qui retire names.includes('.git') (clean.ts:131)", status: todo }
-      - { id: t17, title: "âge = max(mtime, ctime) pour qu'une archive extraite ou un cp -a du jour ne soit pas proposé ; test ; README", status: todo }
-      - { id: t18, title: "README l.403 / SKILL.md:48 — nommer la limite du dépôt nu à arbre de travail extérieur (core.worktree / --work-tree), non détecté", status: todo }
-      - { id: t19, title: skill session-close — relancer cadence session close juste avant de supprimer et ne supprimer que ce qui est encore proposé, status: todo }
-      - { id: t20, title: test ~ seul qui puisse échouer (mutation pattern === '~' tuée), status: todo }
-    review: { date: 2026-10-04, verdict: "non conforme : 2 majeurs (lien suivi après un « * » sur un segment écrit en entier, garde .git-fichier non testée), 4 mineurs", commit: bd9b31ca995908b98bb0f7d1a3f48e50d3c3bec3 }
+      - { id: t15, title: "MAJEUR : après un segment à *, ne plus jamais suivre de lien même sur un segment écrit en entier (wild collant, clean.ts:69) ; test tmp/*/out/* avec out → dossier extérieur ; README l.405-409 aligné", status: done }
+      - { id: t16, title: "MAJEUR : test d'un dossier contenant un arbre de travail lié ou un sous-module (.git fichier) — tue la mutation qui retire names.includes('.git') (clean.ts:131)", status: done }
+      - { id: t17, title: "âge = max(mtime, ctime) pour qu'une archive extraite ou un cp -a du jour ne soit pas proposé ; test ; README", status: done }
+      - { id: t18, title: "README l.403 / SKILL.md:48 — nommer la limite du dépôt nu à arbre de travail extérieur (core.worktree / --work-tree), non détecté", status: done }
+      - { id: t19, title: skill session-close — relancer cadence session close juste avant de supprimer et ne supprimer que ce qui est encore proposé, status: done }
+      - { id: t20, title: test ~ seul qui puisse échouer (mutation pattern === '~' tuée), status: done }
+      - { id: t21, title: "test session clean : référence de clôture à 0 (lot L1 fermé ou date sans écart, cadence.yaml commité) ou ✓ prêt à fermer vérifié — session.test.ts:236 et :317 doivent tuer la mutation « nettoyage compté dans open »", status: todo }
+      - { id: t22, title: "test t17 (clean.test.ts:282) : jour de référence tiré du ctime réel, pas de l'horloge, pour tenir à minuit", status: todo }
+    review: { date: 2026-10-04, verdict: "conforme après 2 corrections : 0 bloquant, 1 majeur (test de clôture sans référence à 0), 1 mineur (test t17 à minuit)", commit: 241cba9189cedccc6853963514f4d9d52cfa0125 }
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
     status: done
@@ -552,3 +554,9 @@ lots:
     started: 2026-10-04
     review: { date: 2026-10-04, verdict: conforme, commit: 5ca94067b758a14af6753fbb26d79c3fe063cf09 }
     finished: 2026-10-04
+  - id: L45
+    title: "⚡ La suite de tests nettoie ses dossiers temporaires : tempDir() (test/helpers.ts) les enregistre et les supprime après chaque fichier de test (afterAll/afterEach), droits restaurés avant suppression — mesure 04-10 : 124 182 dossiers /tmp/cadence-* laissés ; test qui vérifie qu'aucun cadence-* créé par la suite ne reste"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

@@ -272,6 +272,10 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "not compliant: 1 majeur (écriture de .first.json en échec ou quota non testée), 1 mineur (libellé « absent de git » pour un commit étranger au lot) — revue de la vague 2026-10-04-1609, verdict relu dans le texte (structured_output absent, cause corrigée en L28/t1)", commit: 8da326197c5b6a4648df9f0c35d077b16ab16b9a }
+    tasks:
+      - { id: t1, title: test de l'écriture de <n>-<kind>.first.json quand la relance échoue et quand le quota arrête la session, status: todo }
+      - { id: t2, title: libellé distinct pour un commit cité qui existe mais n'appartient pas au lot (au lieu de « absent de git »), status: todo }
   - id: L28
     title: "⚡ orchestrate : une session réussie sans structured_output dont le texte cite « quota / rate limit » était classée quota — vague suspendue à tort et relance L26 court-circuitée (vague 2026-10-04-1609, revue de L27)"
     status: doing

@@ -103,3 +103,9 @@ lots:
     estimate: 1
     quickwin: true
     created: 2026-10-03
+  - id: L15
+    title: "Attribution d'un commit à ses lots : la portée « type(L24) » prime ; mentions en passage et plages (L28–L31, L45 à L48) ne comptent pas ; un commit qui ne touche que cadence.yaml est de l'entretien du plan"
+    status: doing
+    estimate: 1
+    created: 2026-10-04
+    started: 2026-10-04

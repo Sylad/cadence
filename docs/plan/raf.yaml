@@ -50,12 +50,13 @@ lots:
       - { id: t14, title: "orchestrate : ne pas démarrer un lot (raf start + commit) après incident, quota ou budget épuisé", status: done }
       - { id: t15, title: "orchestrate : afficher l'heure de remise du quota (quotaReset) ou retirer le réexport mort", status: done }
       - { id: t16, title: "orchestrate : orchestrate.test en asynchrone (ne pas bloquer l'autre créneau ni les signaux)", status: done }
-      - { id: t17, title: "orchestrate : --resume rejoue les lots dans l'ordre de wave.lots, pas dans l'ordre alphabétique des fichiers (test L9 → L10)", status: todo }
-      - { id: t18, title: "orchestrate : identifier la session par --session-id <uuid> au lancement ; ne plus deviner le journal par date (une autre session du même dossier est comptée au budget)", status: todo }
-      - { id: t19, title: "orchestrate : refuser (ou poser dans .git/hooks) quand core.hooksPath pointe dans l'arbre suivi : le hook temporaire y devient un fichier du dépôt", status: todo }
-      - { id: t20, title: "orchestrate : compter au budget les tokens d'une étape interrompue par un signal (journal relu au signal ou à --resume)", status: todo }
-      - { id: t21, title: "orchestrate : snapshot (git ls-remote) en asynchrone, comme les commandes du projet", status: todo }
-    review: { date: 2026-10-04, verdict: "not compliant: 2 majeurs (ordre alphabétique des lots à la reprise qui bloque le lot dépendant, budget compté sur le journal d'une autre session après un délai dépassé), 3 mineurs", commit: 54f45b789c897b9daef2deb72603a0571e647d3f }
+      - { id: t17, title: "orchestrate : --resume rejoue les lots dans l'ordre de wave.lots, pas dans l'ordre alphabétique des fichiers (test L9 → L10)", status: done }
+      - { id: t18, title: "orchestrate : identifier la session par --session-id <uuid> au lancement ; ne plus deviner le journal par date (une autre session du même dossier est comptée au budget)", status: done }
+      - { id: t19, title: "orchestrate : refuser (ou poser dans .git/hooks) quand core.hooksPath pointe dans l'arbre suivi : le hook temporaire y devient un fichier du dépôt", status: done }
+      - { id: t20, title: "orchestrate : compter au budget les tokens d'une étape interrompue par un signal (journal relu au signal ou à --resume)", status: done }
+      - { id: t21, title: "orchestrate : snapshot (git ls-remote) en asynchrone, comme les commandes du projet", status: done }
+      - { id: t22, title: "orchestrate : removePrePush retire la ligne de .git/info/exclude même quand le hook a été supprimé ou remplacé par une session (sinon un futur .githooks/pre-push reste invisible à git)", status: todo }
+    review: { date: 2026-10-04, verdict: compliant after 1 fix (1 mineur) — revue 3 sur t17–t21 ; correctif en L3/t22, commit: 2ac2f37fe805063e3f269596af2579674710e805 }
   - id: L4
     title: "Nettoyage en routine de clôture : session-close liste les fichiers de travail périmés (dossier tmp partagé, captures non référencées, scripts jetables, dossiers temporaires laissés par les tests) et propose leur suppression — au lieu d'un lot à rouvrir dans chaque projet"
     status: todo

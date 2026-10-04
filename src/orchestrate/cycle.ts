@@ -376,12 +376,16 @@ function summarize(rep: ReviewReport, head: string): ReviewSummary {
   return { conforme: bloquants === 0 && majeurs === 0, bloquants, majeurs, mineurs: Math.max(rep.mineurs, count('mineur')), verdict: rep.verdict.trim(), sousTaches: rep.sousTaches, nonVerifie: rep.nonVerifie, head };
 }
 
-function addProposals(c: LotCtx, rep: ReviewReport, source: string): void {
+function addProposals(c: LotCtx, rep: ReviewReport, source: string, withMinors = true): void {
   const add = (t: string) => {
     if (!c.lot.proposals.includes(t)) c.lot.proposals.push(t);
   };
-  for (const k of rep.constats.filter((k) => k.gravite === 'mineur')) add(`[mineur ${source}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`);
+  if (withMinors) for (const k of rep.constats.filter((k) => k.gravite === 'mineur')) add(`[mineur ${source}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`);
   for (const t of rep.sousTaches) add(`[sous-tâche ${source}] ${t}`);
+}
+
+function minorConstats(rep: ReviewReport): Constat[] {
+  return rep.constats.filter((k) => k.gravite === 'mineur').map((k) => ({ source: 'code', gravite: k.gravite, fichier: k.fichier, ligne: k.ligne, texte: k.texte }));
 }
 
 function blockingConstats(rep: ReviewReport, source: 'code' | 'ux'): Constat[] {
@@ -465,6 +469,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
 
 function firstReview(c: LotCtx): StepKind {
   const l = c.lot;
+  if (l.minorPass) return 'review-small'; // après la passe des mineurs : revue courte, la revue complète a déjà eu lieu
   if (l.small) return 'review-small';
   if (l.visible) {
     if (!c.config.ux) {
@@ -511,13 +516,23 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
     return;
   }
   l.code = summary;
-  addProposals(c, rep, 'code');
+  const uxOk = kind === 'review-small' || !l.ux || l.ux.conforme;
+  const minors = minorConstats(rep);
+  // Revue conforme avec mineurs : une seule passe de correction des mineurs, avant de conclure (rien sous le tapis).
+  const minorPass = summary.conforme && uxOk && !l.minorPass && minors.length > 0;
+  addProposals(c, rep, 'code', !minorPass);
   if (kind === 'review-small' && l.visible) {
     // La passe unique porte aussi l'ergonomie : son verdict vaut pour les deux.
     l.ux = summary;
     l.uxVerdict = summary.verdict;
   }
-  const uxOk = kind === 'review-small' || !l.ux || l.ux.conforme;
+  if (minorPass) {
+    l.minorPass = true;
+    l.constats = minors;
+    l.next = 'fix';
+    save(c);
+    return;
+  }
   if (summary.conforme && uxOk) {
     await conclude(c, summary);
     return;
@@ -535,7 +550,7 @@ function uxConstatsKept(c: LotCtx): Constat[] {
 async function conclude(c: LotCtx, code: ReviewSummary): Promise<void> {
   const l = c.lot;
   const plan = c.loadPlan();
-  const verdict = `${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction)`;
+  const verdict = `${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction${l.minorPass ? ' + passe des mineurs' : ''})`;
   l.verdict = verdict;
   const newer = lotWork(plan, l.repo, l.lot)[0]?.sha ?? null;
   if (code.head && newer !== null && git(l.repo, 'rev-parse', 'HEAD') !== code.head) {

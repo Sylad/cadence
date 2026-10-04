@@ -96,14 +96,52 @@ describe('corrections', () => {
     expect(kinds(h)).toContain('fix');
   });
 
-  it('les mineurs et sous-tâches proposées sont rendus au lead, pas ajoutés au plan', async () => {
+  it('revue conforme avec mineurs → UNE passe de correction des mineurs (session neuve), puis revue courte', async () => {
     const minor: Handler = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', fichier: 'a.txt', ligne: 1, texte: 'nommage' }], sousTaches: ['ajouter un test'] }));
-    const h = harness({ script: { implement: [impl()], review: [minor] } });
+    const h = harness({ script: { implement: [impl()], review: [minor], fix: [fix('b.txt')], 'review-small': [ok] } });
     const c = h.lot('L1');
     await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small']);
     expect(c.lot.status).toBe('ready');
-    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage', '[sous-tâche code] ajouter un test']);
+    expect(c.lot.pass).toBe(0); // la passe des mineurs ne consomme pas les passes de correction des défauts
+    expect(h.calls[2].model).toBe('sonnet');
+    expect(h.calls[2].args).not.toContain('--resume');
+    expect(h.calls[2].brief).toContain('[mineur] a.txt:1 — nommage');
+    expect(h.calls[3].model).toBe('opus');
+    // le mineur corrigé n'est plus proposé ; la sous-tâche reste rendue au lead
+    expect(c.lot.proposals).toEqual(['[sous-tâche code] ajouter un test']);
     expect(h.plan().lot('L1').tasks).toEqual([]);
+    expect(h.plan().lot('L1').review?.verdict).toContain('passe des mineurs');
+    expect(h.plan().lot('L1').review?.commit).toBe(git(h.repo, 'log', '--format=%H', '--grep=fix(L1)', '-1'));
+  });
+
+  it('la revue courte qui suit la passe des mineurs conclut même avec de nouveaux mineurs : rendus au lead, pas de seconde passe', async () => {
+    const minor: Handler = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', texte: 'encore' }] }));
+    const h = harness({ script: { implement: [impl()], review: [minor], fix: [fix('b.txt')], 'review-small': [minor] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual(['[mineur code] encore']);
+  });
+
+  it('un défaut majeur trouvé par la revue courte suit le chemin des corrections (passes comptées)', async () => {
+    const minor: Handler = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', texte: 'm' }] }));
+    const h = harness({ script: { implement: [impl()], review: [minor], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [major, ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small', 'fix', 'review-small']);
+    expect(c.lot.pass).toBe(1);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('une sous-tâche seule (sans constat mineur) ne déclenche aucune passe', async () => {
+    const sub: Handler = () => claudeOut(reviewReport({ sousTaches: ['ajouter un test'] }));
+    const h = harness({ script: { implement: [impl()], review: [sub] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.proposals).toEqual(['[sous-tâche code] ajouter un test']);
   });
 });
 

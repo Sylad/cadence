@@ -99,7 +99,10 @@ préconditions → raf start → implémentation (Sonnet)
    code qui clôt le cycle** : une correction issue de l'UX change du code, et une revue antérieure
    au dernier commit serait périmée (règle du verdict lié au commit).
 5. **Conforme** = 0 bloquant et 0 majeur dans la sortie structurée de la revue de code (les mineurs
-   sont rendus au lead comme lots ou sous-tâches proposés, comme dans les verdicts de L5 à L17).
+   ne bloquent pas). **Passe des mineurs** (L38) : une revue conforme qui porte des constats mineurs
+   enchaîne UNE passe de correction de ces mineurs (session Sonnet neuve, brief `fix.md`, hors des 2
+   passes de défauts), puis une revue courte (`review-small`) ; celle-ci conclut même avec de
+   nouveaux mineurs, rendus au lead comme propositions. Les sous-tâches proposées restent rendues au lead.
 6. **Correction** : session Sonnet **neuve** (jamais la session d'implémentation reprise), brief
    `fix.md` avec les constats de la dernière revue (code et UX ensemble, une seule session) et la
    liste des commits du lot ; puis nouvelle revue. **2 passes de correction au plus**, puis la main

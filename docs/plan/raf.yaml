@@ -60,11 +60,12 @@ lots:
     finished: 2026-10-04
   - id: L4
     title: "Nettoyage en routine de clôture : session-close liste les fichiers de travail périmés (dossier tmp partagé, captures non référencées, scripts jetables, dossiers temporaires laissés par les tests) et propose leur suppression — au lieu d'un lot à rouvrir dans chaque projet"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-02
     notes:
       - { date: 2026-10-04, text: "cadrage tranché par le lead (04-10) : indépendant de L11 — la routine session-close propose le nettoyage à chaque clôture" }
+    started: 2026-10-04
   - id: L5
     title: "Écarts relevés le 02-10 en pilotant 8 projets : « session next » sans argument efface les notes (demander confirmation) ; « raf check » compte un commit de plan pur comme « commit sans lot » (prévoir chore(plan) ou un lot d'entretien) ; « raf news » sans champ de texte alternatif par capture ; pas de tâche récurrente ; « raf add » sans option --public"
     status: done

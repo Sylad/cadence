@@ -19,13 +19,17 @@ export default function setup(): () => void {
   }
   const root = mkdtempSync(join(realTmp, ROOT_PREFIX));
   writeFileSync(join(root, PID_FILE), String(process.pid));
-  const previous = process.env.TMPDIR;
-  process.env.TMPDIR = root;
+  // os.tmpdir() lit TMPDIR sous POSIX mais TEMP puis TMP sous win32 : on pose les trois.
+  const names = ['TMPDIR', 'TEMP', 'TMP'] as const;
+  const previous = Object.fromEntries(names.map((n) => [n, process.env[n]]));
+  for (const n of names) process.env[n] = root;
   process.env.CADENCE_TEST_TMP_ROOT = root;
   process.env.CADENCE_TEST_REAL_TMP = realTmp;
   return () => {
-    if (previous === undefined) delete process.env.TMPDIR;
-    else process.env.TMPDIR = previous;
+    for (const n of names) {
+      if (previous[n] === undefined) delete process.env[n];
+      else process.env[n] = previous[n];
+    }
     const left = leftovers(root);
     removeTree(root);
     if (left.length) {

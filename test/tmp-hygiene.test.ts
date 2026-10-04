@@ -10,6 +10,8 @@ describe('dossiers temporaires de la suite (L45)', () => {
     const root = process.env.CADENCE_TEST_TMP_ROOT;
     expect(root).toBeTruthy();
     expect(tmpdir()).toBe(root);
+    // os.tmpdir() lit TEMP/TMP sous win32 : les trois variables pointent la racine privée (L45/t3).
+    for (const name of ['TMPDIR', 'TEMP', 'TMP']) expect(process.env[name]).toBe(root);
     expect(tempDir().startsWith(`${root}${sep}`)).toBe(true);
   });
 

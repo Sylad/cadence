@@ -37,11 +37,31 @@ function expand(pattern: string, root: string): string[] {
         continue;
       }
       const re = segmentRe(part);
-      for (const n of names) if (re.test(n)) next.push(join(base, n));
+      // Comme le shell : `*` n'attrape pas un nom en « . » sauf si le motif commence lui-même par « . ».
+      for (const n of names) if (re.test(n) && (part.startsWith('.') || !n.startsWith('.'))) next.push(join(base, n));
     }
     found = next;
   }
   return found;
+}
+
+/** Vrai si ce chemin est un dépôt git ou en contient un, à n'importe quelle profondeur : un clone n'est jamais à supprimer. */
+function holdsRepo(path: string): boolean {
+  let st;
+  try {
+    st = lstatSync(path);
+  } catch {
+    return false;
+  }
+  if (!st.isDirectory()) return false;
+  let entries;
+  try {
+    entries = readdirSync(path, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  if (entries.some((e) => e.name === '.git')) return true;
+  return entries.some((e) => e.isDirectory() && holdsRepo(join(path, e.name)));
 }
 
 /** Vrai si git suit ce chemin (ou un fichier dessous), dans le dépôt qui le contient : on ne propose jamais de supprimer du versionné. */
@@ -64,9 +84,9 @@ export function staleFiles(root: string, patterns: string[], days: number, today
   const seen = new Map<string, Stale>();
   for (const pattern of patterns) {
     for (const path of expand(pattern, root)) {
-      if (seen.has(path) || path === root) continue;
+      if (seen.has(path) || path === root || basename(path) === '.git') continue;
       const age = diffDays(toDay(lstatSync(path).mtime), today);
-      if (age > days && !tracked(path)) seen.set(path, { path, age });
+      if (age > days && !holdsRepo(path) && !tracked(path)) seen.set(path, { path, age });
     }
   }
   return [...seen.values()].sort((a, b) => b.age - a.age || a.path.localeCompare(b.path));

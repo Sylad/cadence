@@ -52,7 +52,8 @@ export interface DeliverDeps {
   gh: (sha: string) => GhRun[];
   /** Précondition de `ci: github` : message d'erreur si gh est absent ou non authentifié, null sinon. */
   ghReady: () => string | null;
-  fetch: (url: string) => Promise<{ status: number; text: string }>;
+  /** `timeoutMs` : délai de la requête (20 s par défaut). */
+  fetch: (url: string, timeoutMs?: number) => Promise<{ status: number; text: string }>;
   sleep: (ms: number) => Promise<void>;
   /** Millisecondes. */
   now: () => number;
@@ -154,7 +155,8 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
 }
 
 /** Dépendances réelles : sh, gh, fetch, horloge. */
-export function realDeps(root: string): DeliverDeps {
+/** `quiet` : la sortie des commandes n'est pas relayée (session start ne doit pas polluer son rapport). */
+export function realDeps(root: string, opts: { quiet?: boolean } = {}): DeliverDeps {
   const gh = (args: string[]) => {
     try {
       return execFileSync('gh', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: GH_TIMEOUT });
@@ -170,7 +172,7 @@ export function realDeps(root: string): DeliverDeps {
       const r = spawnSync('sh', ['-c', cmd], {
         cwd: root,
         env: { ...process.env, ...env },
-        stdio: ['ignore', 'inherit', 'inherit'],
+        stdio: opts.quiet ? 'ignore' : ['ignore', 'inherit', 'inherit'],
         timeout: Math.max(1_000, timeoutMs),
         killSignal: 'SIGKILL',
       });
@@ -186,8 +188,8 @@ export function realDeps(root: string): DeliverDeps {
         return (e as Error).message;
       }
     },
-    fetch: async (url) => {
-      const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(20_000) });
+    fetch: async (url, timeoutMs = 20_000) => {
+      const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(Math.max(1_000, Math.min(20_000, timeoutMs))) });
       return { status: res.status, text: await res.text() };
     },
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -204,7 +206,7 @@ function shellQuote(arg: string): string {
   return /^[A-Za-z0-9_@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`;
 }
 
-function describeCheck(c: VerifyCheck, sha: string): string {
+export function describeCheck(c: VerifyCheck, sha: string): string {
   if (c.command !== undefined) return c.command;
   return `GET ${substitute(c.url!, sha)} → ${c.status ?? 200}${c.contains === undefined ? '' : `, contient « ${substitute(c.contains, sha)} »`}`;
 }
@@ -353,13 +355,14 @@ async function waitCi(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Reco
   }
 }
 
-async function tryCheck(c: VerifyCheck, deps: DeliverDeps, sha: string, env: Record<string, string>, budgetMs: number): Promise<string | null> {
+/** Un essai d'une vérification : cause de l'échec, ou null. Partagé par deliver et `cadence verify`. */
+export async function tryCheck(c: VerifyCheck, deps: DeliverDeps, sha: string, env: Record<string, string>, budgetMs: number): Promise<string | null> {
   if (c.command !== undefined) {
     const code = deps.exec(c.command, env, budgetMs);
     return code === 0 ? null : codeText(code);
   }
   try {
-    const res = await deps.fetch(substitute(c.url!, sha));
+    const res = await deps.fetch(substitute(c.url!, sha), budgetMs);
     const want = c.status ?? 200;
     if (res.status !== want) return `statut ${res.status} (attendu ${want})`;
     if (c.contains !== undefined && !res.text.includes(substitute(c.contains, sha))) return `« ${substitute(c.contains, sha)} » absent de la réponse`;

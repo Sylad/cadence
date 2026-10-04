@@ -6,8 +6,9 @@ import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits, unrevi
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
+import { verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
-import { gitRoot, readCommits } from './git.js';
+import { gitRoot, headSha, readCommits, resolveCommit } from './git.js';
 import { installHook } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from './news.js';
@@ -15,7 +16,7 @@ import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
-import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
+import { clearNext, lastDelivery, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
 
 export interface Io {
   cwd: string;
@@ -101,6 +102,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       config: { type: 'string' },
       'dry-run': { type: 'boolean' },
       sha: { type: 'string' },
+      retry: { type: 'string' },
       clear: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -244,6 +246,16 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = existsSync(planPath) ? loadPlan() : null;
       const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], sha: values.sha, args: rest, out: io.out, err: io.err };
       return deliver(ctx, realDeps(root));
+    }
+    case 'verify': {
+      if (!gitRoot(io.cwd)) throw new RafError('verify : à lancer dans un dépôt git');
+      if (!existsSync(configPath)) throw new RafError(`pas de configuration : ${configPath} (voir « cadence.yaml » dans le README)`);
+      const retry = values.retry === undefined ? 0 : Number(values.retry);
+      if (!Number.isFinite(retry) || retry < 0) throw new RafError(`--retry invalide : ${values.retry} (secondes, 0 ou plus)`);
+      const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
+      const sha = values.sha ? (resolveCommit(root, values.sha) ?? '') : (lastDelivery(sharedStateDir(root)) ?? headSha(root) ?? '');
+      if (values.sha && !sha) throw new RafError(`--sha ${values.sha} : commit introuvable`);
+      return verifyCommand({ config, sha, retry, out: io.out }, realDeps(root));
     }
     case 'skills': {
       if (rest[0] !== 'install') throw new RafError('usage : cadence skills install [--dir .claude] [--force]');

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { SKILLS_DIR } from '../src/skills.js';
 import { run } from '../src/cli.js';
 import { readNext, sharedStateDir, stateDir, writeLock } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -192,3 +193,80 @@ describe('faits propres au projet (L2)', () => {
   });
 });
 
+
+describe('nettoyage en routine de clôture (L4)', () => {
+  const OLD = new Date('2026-09-10T10:00:00');
+  const RECENT = new Date('2026-09-27T10:00:00');
+  const touch = (file: string, when: Date) => {
+    mkdirSync(dirname(file), { recursive: true });
+    if (!existsSync(file)) writeFileSync(file, 'x');
+    utimesSync(file, when, when);
+  };
+
+  it('liste les fichiers périmés des motifs session.clean, sans rien supprimer ni bloquer la clôture', async () => {
+    const dir = await project();
+    const shared = tempDir();
+    touch(join(shared, 'ancienne-capture.png'), OLD);
+    touch(join(shared, 'capture-du-jour.png'), RECENT);
+    mkdirSync(join(shared, 'tmp-test-abc'));
+    utimesSync(join(shared, 'tmp-test-abc'), OLD, OLD);
+    writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean:\n    - "${shared}/*.png"\n    - "${shared}/tmp-test-*"\n`);
+    const { code, out } = await cad(dir, 'session', 'close');
+    expect(out).toMatch(/Nettoyage proposé \(2 élément\(s\) plus vieux de 7 j\)\n/);
+    expect(out).toContain(`${join(shared, 'ancienne-capture.png')} — 18 j`);
+    expect(out).toContain(`${join(shared, 'tmp-test-abc')} — 18 j`);
+    expect(out).not.toContain('capture-du-jour');
+    // Rien n'est supprimé : la commande propose, le skill demande l'accord.
+    expect(existsSync(join(shared, 'ancienne-capture.png'))).toBe(true);
+    // Une proposition, pas une condition de fermeture.
+    expect(code).toBe(0);
+    expect(out).not.toMatch(/✗.*Nettoyage/);
+  });
+
+  it('cleanDays règle le seuil ; un motif relatif part de la racine du dépôt ; ~ désigne le dossier personnel', async () => {
+    const dir = await project();
+    touch(join(dir, 'tmp/vieux.log'), new Date('2026-09-26T10:00:00'));
+    writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  cleanDays: 1\n  clean: [ "tmp/*", "~/cadence-inexistant-xyz/*" ]\n');
+    const { out } = await cad(dir, 'session', 'close');
+    expect(out).toMatch(/Nettoyage proposé \(1 élément\(s\) plus vieux de 1 j\)/);
+    expect(out).toContain(`${join(dir, 'tmp/vieux.log')} — 2 j`);
+  });
+
+  it('ne propose jamais un fichier suivi par git', async () => {
+    const dir = await project();
+    touch(join(dir, 'tmp/suivi.png'), OLD);
+    touch(join(dir, 'tmp/libre.png'), OLD);
+    git(dir, 'add', 'tmp/suivi.png');
+    git(dir, 'commit', '-qm', 'chore: capture suivie');
+    writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  clean: [ "tmp/*" ]\n');
+    const { out } = await cad(dir, 'session', 'close');
+    expect(out).toContain('libre.png');
+    expect(out).not.toContain('suivi.png');
+  });
+
+  it('aucune section sans motif, ni quand rien n’est périmé', async () => {
+    const dir = await project();
+    expect((await cad(dir, 'session', 'close')).out).not.toContain('Nettoyage');
+    const shared = tempDir();
+    touch(join(shared, 'frais.png'), RECENT);
+    writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean: [ "${shared}/*" ]\n`);
+    expect((await cad(dir, 'session', 'close')).out).not.toContain('Nettoyage');
+  });
+
+  it('refuse un clean ou un cleanDays mal formé', async () => {
+    const dir = await project();
+    writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  clean: 3\n');
+    expect((await cad(dir, 'session', 'close')).code).toBe(2);
+    writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  clean: [ "tmp/*" ]\n  cleanDays: 0\n');
+    const r = await cad(dir, 'session', 'close');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('session.cleanDays');
+  });
+
+  it('la routine session-close demande l’accord avant de supprimer, chemins explicites', () => {
+    const skill = readFileSync(join(SKILLS_DIR, 'session-close', 'SKILL.md'), 'utf8').replace(/\s+/g, ' ');
+    expect(skill).toContain('**Stale working files**');
+    expect(skill).toContain('only after the human agrees');
+    expect(skill).toContain('explicit paths');
+  });
+});

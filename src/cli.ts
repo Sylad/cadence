@@ -259,8 +259,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     case 'session': {
       if (!gitRoot(io.cwd)) throw new RafError('session : à lancer dans un dépôt git');
       // « next » n'écrit que les notes : la commande du projet ne se joue qu'à la reprise et à la clôture.
-      const facts = rest[0] === 'start' || rest[0] === 'close' ? readSessionConfig(configPath)[rest[0]] : undefined;
-      const sctx: SessionCtx = { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out, facts };
+      const sconf = rest[0] === 'start' || rest[0] === 'close' ? readSessionConfig(configPath) : {};
+      const facts = rest[0] === 'start' || rest[0] === 'close' ? sconf[rest[0]] : undefined;
+      const clean = rest[0] === 'close' && sconf.clean ? { patterns: sconf.clean, days: sconf.cleanDays } : undefined;
+      const sctx: SessionCtx = { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out, facts, clean };
       if (rest[0] !== 'start') return session(rest, sctx, values);
       // La reprise rejoue les vérifications d'effet (un essai, borné) : un effet rouge d'hier se lit avec les faits du matin.
       const effects = morningEffects(configPath, root);

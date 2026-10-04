@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { CLEAN_DAYS, staleFiles } from './clean.js';
 import { audit, exemptPlanOnly, nextUp, planCommits } from './audit.js';
 import { diffDays, maxDay, type Day } from './dates.js';
 import { repoStatus, type Commit } from './git.js';
@@ -20,6 +21,8 @@ export interface SessionCtx {
   facts?: string;
   /** Lignes de `cadence verify` rejouée à la reprise (déjà calculées : la reprise reste synchrone). */
   effects?: string[];
+  /** Motifs de fichiers de travail à proposer au nettoyage de clôture (cadence.yaml : session.clean). */
+  clean?: { patterns: string[]; days?: number };
 }
 
 const FACTS_TIMEOUT = 120_000;
@@ -160,6 +163,13 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
   section(out, 'Dépôt', [repo.line, ...(lock ? [lock.line] : [])]);
 
   section(out, 'Faits propres au projet', projectFacts(ctx, opts.since));
+
+  // Une proposition, pas une condition : rien n'est supprimé ici, le skill demande l'accord.
+  if (ctx.clean?.patterns.length) {
+    const days = ctx.clean.days ?? CLEAN_DAYS;
+    const stale = staleFiles(ctx.root, ctx.clean.patterns, days, today);
+    section(out, `Nettoyage proposé (${stale.length} élément(s) plus vieux de ${days} j)`, stale.map((s) => `${s.path} — ${s.age} j`));
+  }
 
   const open = issues.length + repo.open + (lock?.live ? 1 : 0);
   out(open === 0 ? '\n✓ prêt à fermer' : `\n✗ pas fermé : ${open} point(s)`);

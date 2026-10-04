@@ -1,0 +1,69 @@
+import { existsSync, lstatSync, readdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { isAbsolute, join, relative } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { diffDays, toDay, type Day } from './dates.js';
+
+export interface Stale {
+  path: string;
+  /** Jours depuis la dernière modification. */
+  age: number;
+}
+
+export const CLEAN_DAYS = 7;
+
+/** `*` ne remplace que des caractères d'un nom : un motif ne traverse jamais un `/`. */
+const segmentRe = (seg: string): RegExp =>
+  new RegExp(`^${seg.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')}$`);
+
+function expand(pattern: string, root: string): string[] {
+  const home = homedir();
+  const full = pattern === '~' || pattern.startsWith('~/') ? join(home, pattern.slice(1)) : pattern;
+  const abs = isAbsolute(full) ? full : join(root, full);
+  const parts = abs.split('/').filter((p) => p !== '');
+  let found = ['/'];
+  for (const part of parts) {
+    const next: string[] = [];
+    for (const base of found) {
+      if (!part.includes('*')) {
+        const p = join(base, part);
+        if (existsSync(p)) next.push(p);
+        continue;
+      }
+      let names: string[];
+      try {
+        names = readdirSync(base);
+      } catch {
+        continue;
+      }
+      const re = segmentRe(part);
+      for (const n of names) if (re.test(n)) next.push(join(base, n));
+    }
+    found = next;
+  }
+  return found;
+}
+
+/** Vrai si git suit ce chemin (ou un fichier dessous) : on ne propose jamais de supprimer du versionné. */
+function tracked(root: string, path: string): boolean {
+  const rel = relative(root, path);
+  if (rel.startsWith('..') || isAbsolute(rel) || rel === '') return false;
+  const r = spawnSync('git', ['ls-files', '--', rel], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  return r.status === 0 && r.stdout.trim() !== '';
+}
+
+/**
+ * Éléments qui correspondent aux motifs et n'ont pas été modifiés depuis plus de `days` jours,
+ * du plus vieux au plus récent. Ne supprime rien.
+ */
+export function staleFiles(root: string, patterns: string[], days: number, today: Day): Stale[] {
+  const seen = new Map<string, Stale>();
+  for (const pattern of patterns) {
+    for (const path of expand(pattern, root)) {
+      if (seen.has(path) || path === root) continue;
+      const age = diffDays(toDay(lstatSync(path).mtime), today);
+      if (age > days && !tracked(root, path)) seen.set(path, { path, age });
+    }
+  }
+  return [...seen.values()].sort((a, b) => b.age - a.age || a.path.localeCompare(b.path));
+}

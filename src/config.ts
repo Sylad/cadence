@@ -74,6 +74,10 @@ export interface SessionConfig {
   start?: string;
   /** Idem pour « cadence session close ». */
   close?: string;
+  /** Motifs (chemin ou `*` dans un nom ; `~` et chemins relatifs à la racine admis) des fichiers de travail à proposer au nettoyage de clôture. */
+  clean?: string[];
+  /** Âge, en jours, au-delà duquel un élément de `clean` est jugé périmé (7 par défaut). */
+  cleanDays?: number;
 }
 
 /**
@@ -90,12 +94,19 @@ export function readSessionConfig(file: string): SessionConfig {
   }
   const s = (raw as { session?: unknown } | null)?.session;
   if (s == null) return {};
-  if (!isObject(s)) throw new RafError(`${file} : session doit être un objet { start, close }`);
+  if (!isObject(s)) throw new RafError(`${file} : session doit être un objet { start, close, clean, cleanDays }`);
   const config: SessionConfig = {};
   for (const [k, v] of Object.entries(s)) {
-    if (k !== 'start' && k !== 'close') throw new RafError(`${file} : session.${k} inconnu (attendu : start, close)`);
-    if (typeof v !== 'string' || !v.trim()) throw new RafError(`${file} : session.${k} : commande non vide attendue`);
-    config[k] = v.trim();
+    if (k === 'clean') {
+      if (!Array.isArray(v) || v.some((p) => typeof p !== 'string' || !p.trim())) throw new RafError(`${file} : session.clean : liste de motifs non vides attendue`);
+      config.clean = v.map((p: string) => p.trim());
+    } else if (k === 'cleanDays') {
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) throw new RafError(`${file} : session.cleanDays : nombre entier de jours (≥ 1) attendu`);
+      config.cleanDays = v;
+    } else if (k === 'start' || k === 'close') {
+      if (typeof v !== 'string' || !v.trim()) throw new RafError(`${file} : session.${k} : commande non vide attendue`);
+      config[k] = v.trim();
+    } else throw new RafError(`${file} : session.${k} inconnu (attendu : start, close, clean, cleanDays)`);
   }
   return config;
 }

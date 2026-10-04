@@ -384,6 +384,19 @@ session:
   close: ./scripts/evening.sh "$CADENCE_SINCE"
 ```
 
+```yaml
+session:
+  clean: [ "~/projects/tmp/*", "tmp/*", "test-output-*" ]   # working files to propose for removal at close
+  cleanDays: 7                                              # older than this many days (default 7)
+```
+
+`cadence session close` then lists, under "Nettoyage proposé", the entries matching these
+patterns (`*` stands for part of a name and never crosses a `/`; `~` is the home folder, a
+relative pattern starts at the repo root) that were not modified for more than `cleanDays`
+days, oldest first. Files `git` tracks are never listed. The command deletes nothing and does
+not change the exit code: the `session-close` skill shows the list and removes the entries
+only after the human agrees.
+
 The commands get `CADENCE_SINCE` (the `--since` in effect) and `CADENCE_TODAY`. They
 add facts and decide nothing: a failing command is reported and changes neither
 the exit code nor the verdict.

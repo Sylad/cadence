@@ -129,6 +129,19 @@ describe('staleFiles — dépôts git', () => {
     });
   }
 
+  it('un fichier suivi dont le nom porte des métacaractères de pathspec (* ? [ :( ) n’est pas proposé', () => {
+    // Sans --literal-pathspecs, git lit « :x.png » comme « x.png » et « :(icase)Y.png » comme une magie :
+    // il répondrait « non suivi ».
+    const repo = gitRepo();
+    const noms = ['st*r.png', 'a?b.png', '[x].png', ':x.png', ':(icase)Y.png'];
+    for (const n of noms) touch(join(repo, n));
+    git(repo, 'add', '--', ...noms.map((n) => `:(literal)${n}`));
+    git(repo, 'commit', '-qm', 'chore: suivis');
+    touch(join(repo, 'libre.png'));
+    for (const n of noms) touch(join(repo, n));
+    expect(names(staleFiles(repo, [`${repo}/*.png`], 7, TODAY))).toEqual([join(repo, 'libre.png')]);
+  });
+
   it('un fichier suivi qu’on atteint par un lien symbolique reste protégé', () => {
     const root = tempDir();
     const autre = gitRepo();
@@ -276,7 +289,9 @@ describe('staleFiles — rien de ce qui n’a pu être mesuré entièrement', ()
     touch(join(tmp, 'base/vieux.png'));
     ageTree(tmp);
     lock(join(tmp, 'base'), 0o311);
-    expect(staleFiles(tmp, [`${tmp}/base/vieux.png`], 7, TODAY)).toEqual([]);
+    const r = scanStale(tmp, [`${tmp}/base/vieux.png`], 7, TODAY);
+    expect(r.stale).toEqual([]);
+    expect(r.unreadable).toEqual([join(tmp, 'base')]);
   });
 
   it.skipIf(asRoot)('scanStale rend ce qu’il n’a pas pu lire, pour le dire au lieu de le taire', () => {

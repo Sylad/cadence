@@ -261,6 +261,31 @@ describe('nettoyage en routine de clôture (L4)', () => {
     expect(out).not.toContain('suivi.png');
   });
 
+  it('ne propose jamais un fichier suivi par un autre dépôt git, même visé par un motif absolu', async () => {
+    const dir = await project();
+    const autre = gitRepo();
+    touch(join(autre, 'suivi.png'), OLD);
+    touch(join(autre, 'libre.png'), OLD);
+    git(autre, 'add', 'suivi.png');
+    git(autre, 'commit', '-qm', 'chore: capture suivie');
+    writeFileSync(join(dir, 'cadence.yaml'), `session:\n  clean: [ "${autre}/*" ]\n`);
+    const { out } = await cad(dir, 'session', 'close');
+    expect(out).toContain('libre.png');
+    expect(out).not.toContain('suivi.png');
+  });
+
+  it('un fichier suivi dont le nom commence par .. reste protégé', async () => {
+    const dir = await project();
+    touch(join(dir, '..weird'), OLD);
+    touch(join(dir, 'tmp/libre.png'), OLD);
+    git(dir, 'add', '..weird');
+    git(dir, 'commit', '-qm', 'chore: fichier suivi');
+    writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  clean: [ "tmp/*", "..*" ]\n');
+    const { out } = await cad(dir, 'session', 'close');
+    expect(out).toContain('libre.png');
+    expect(out).not.toContain('..weird');
+  });
+
   it('aucune section sans motif, ni quand rien n’est périmé', async () => {
     const dir = await project();
     expect((await cad(dir, 'session', 'close')).out).not.toContain('Nettoyage');

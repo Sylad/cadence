@@ -1,6 +1,6 @@
-import { existsSync, lstatSync, readdirSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join, relative } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { diffDays, toDay, type Day } from './dates.js';
 
@@ -44,11 +44,15 @@ function expand(pattern: string, root: string): string[] {
   return found;
 }
 
-/** Vrai si git suit ce chemin (ou un fichier dessous) : on ne propose jamais de supprimer du versionné. */
-function tracked(root: string, path: string): boolean {
-  const rel = relative(root, path);
-  if (rel.startsWith('..') || isAbsolute(rel) || rel === '') return false;
-  const r = spawnSync('git', ['ls-files', '--', rel], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+/** Vrai si git suit ce chemin (ou un fichier dessous), dans le dépôt qui le contient : on ne propose jamais de supprimer du versionné. */
+function tracked(path: string): boolean {
+  const git = (cwd: string, args: string[]) =>
+    spawnSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const top = git(dirname(path), ['rev-parse', '--show-toplevel']);
+  if (top.status !== 0) return false;
+  const rel = relative(top.stdout.trim(), join(realpathSync(dirname(path)), basename(path)));
+  if (rel === '' || rel === '..' || rel.startsWith('../') || isAbsolute(rel)) return false;
+  const r = git(top.stdout.trim(), ['ls-files', '--', rel]);
   return r.status === 0 && r.stdout.trim() !== '';
 }
 
@@ -62,7 +66,7 @@ export function staleFiles(root: string, patterns: string[], days: number, today
     for (const path of expand(pattern, root)) {
       if (seen.has(path) || path === root) continue;
       const age = diffDays(toDay(lstatSync(path).mtime), today);
-      if (age > days && !tracked(root, path)) seen.set(path, { path, age });
+      if (age > days && !tracked(path)) seen.set(path, { path, age });
     }
   }
   return [...seen.values()].sort((a, b) => b.age - a.age || a.path.localeCompare(b.path));

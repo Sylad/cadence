@@ -65,6 +65,47 @@ describe('staleFiles — dépôts git', () => {
     expect(names(staleFiles(root, [`${autre}/*`], 7, TODAY))).toEqual([join(autre, 'libre.png')]);
   });
 
+  // Sans entrée `.git` : un dossier git se reconnaît à son contenu, comme git le fait (HEAD + objects/ + refs/).
+  it('un dépôt nu n’est jamais proposé, ni ce qu’il contient', () => {
+    const tmp = tempDir();
+    git(tmp, 'init', '-q', '--bare', 'backup.git');
+    touch(join(tmp, 'libre.png'));
+    ageTree(tmp);
+    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
+    expect(staleFiles(tmp, [`${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/backup.git/HEAD`], 7, TODAY)).toEqual([]);
+  });
+
+  it('un dossier qui contient un miroir (clone --mirror) n’est jamais proposé, ni le miroir, ni son contenu', () => {
+    const tmp = tempDir();
+    const source = gitRepo();
+    touch(join(source, 'a.txt'));
+    git(source, 'add', 'a.txt');
+    git(source, 'commit', '-qm', 'chore: a');
+    mkdirSync(join(tmp, 'work'));
+    git(join(tmp, 'work'), 'clone', '-q', '--mirror', source, 'mirror.git');
+    ageTree(tmp);
+    expect(staleFiles(tmp, [`${tmp}/*`, `${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/*/*/*/*`], 7, TODAY)).toEqual([]);
+  });
+
+  it('un dossier git séparé (--separate-git-dir) n’est jamais proposé, ni ce qu’il contient', () => {
+    const tmp = tempDir();
+    const travail = tempDir();
+    execFileSync('git', ['init', '-q', '--separate-git-dir', join(tmp, 'gitdir'), travail], { stdio: 'ignore' });
+    touch(join(tmp, 'libre.png'));
+    ageTree(tmp);
+    expect(names(staleFiles(tmp, [`${tmp}/*`, `${tmp}/*/*`, `${tmp}/*/*/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
+  });
+
+  it('un dossier d’administration d’arbre de travail (HEAD + commondir) n’est jamais proposé, ni ce qu’il contient', () => {
+    const tmp = tempDir();
+    const repo = gitRepo();
+    git(repo, 'commit', '-q', '--allow-empty', '-m', 'chore: init');
+    git(repo, 'worktree', 'add', '-q', join(tempDir(), 'wt'));
+    execFileSync('cp', ['-r', join(repo, '.git/worktrees/wt'), join(tmp, 'admin')]);
+    ageTree(tmp);
+    expect(staleFiles(tmp, [`${tmp}/*`, `${tmp}/*/*`], 7, TODAY)).toEqual([]);
+  });
+
   it('un fichier suivi qu’on atteint par un lien symbolique reste protégé', () => {
     const root = tempDir();
     const autre = gitRepo();

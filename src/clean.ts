@@ -8,8 +8,8 @@ import { diffDays, toDay, type Day } from './dates.js';
  * Nettoyage proposé à la clôture : une règle unique, « mesurer entièrement ou ne pas proposer ».
  * Un élément n'est proposé que si tout ce qui le concerne a pu être lu — le dossier du motif listé,
  * chaque entrée de son contenu examinée, la réponse de git obtenue — et que rien de ce qu'on y a lu
- * ne le protège : dépôt git (ou dossier qui en contient un), chemin sous un segment `.git`,
- * fichier suivi par git. Une lecture refusée ou un élément disparu pendant le parcours ne fait
+ * ne le protège : dépôt git (ou dossier qui en contient un), dossier git sans entrée `.git` (dépôt nu,
+ * miroir, `--separate-git-dir`) ou chemin qui y est, chemin sous un segment `.git`, fichier suivi par git. Une lecture refusée ou un élément disparu pendant le parcours ne fait
  * jamais lever : l'élément n'est pas proposé et son chemin est rendu dans `unreadable`.
  */
 
@@ -66,9 +66,45 @@ function expand(pattern: string, root: string, unreadable: Set<string>): string[
 }
 
 /**
+ * Vrai si les noms d'un dossier en font un dossier git aux yeux de git lui-même — HEAD avec objects
+ * et refs (dépôt nu, miroir, `--separate-git-dir`, `.git`), ou HEAD avec commondir (administration
+ * d'un arbre de travail). Le type des entrées n'est pas vérifié : dans le doute, on protège.
+ */
+const gitDirNames = (has: (name: string) => boolean): boolean =>
+  has('HEAD') && ((has('objects') && has('refs')) || has('commondir'));
+
+/**
+ * Vrai si le dossier réel de ce chemin, ou l'un de ses ancêtres jusqu'à `/`, est un dossier git
+ * (voir `gitDirNames`) ; `null` si on ne peut pas le savoir (chemin introuvable, lecture refusée).
+ */
+function insideGitDir(path: string): boolean | null {
+  let dir: string;
+  try {
+    dir = realpathSync(dirname(path));
+  } catch {
+    return null;
+  }
+  for (let d = dir; ; d = dirname(d)) {
+    let unknown = false;
+    const has = (n: string): boolean => {
+      try {
+        lstatSync(join(d, n));
+        return true;
+      } catch (e) {
+        if (!missing(e)) unknown = true;
+        return false;
+      }
+    };
+    if (gitDirNames(has)) return true;
+    if (unknown) return null;
+    if (d === dirname(d)) return false;
+  }
+}
+
+/**
  * Date de modification la plus récente (ms) d'un chemin et, pour un dossier, de tout son contenu
  * (liens non suivis). `null` quand on ne peut pas l'affirmer périmé : un dépôt git est rencontré
- * (une entrée `.git`, dossier ou fichier), ou une lecture échoue — ce chemin est alors noté illisible.
+ * (une entrée `.git`, dossier ou fichier, ou un dossier git reconnu à son contenu), ou une lecture échoue — ce chemin est alors noté illisible.
  */
 function measure(path: string, unreadable: Set<string>): number | null {
   let st;
@@ -86,7 +122,7 @@ function measure(path: string, unreadable: Set<string>): number | null {
     unreadable.add(path);
     return null;
   }
-  if (names.includes('.git')) return null;
+  if (names.includes('.git') || gitDirNames((n) => names.includes(n))) return null;
   let newest = st.mtimeMs;
   for (const n of names) {
     const m = measure(join(path, n), unreadable);
@@ -157,6 +193,9 @@ export function scanStale(root: string, patterns: string[], days: number, today:
       if (done.has(path)) continue;
       done.add(path);
       if (holdsRoot(path, root) || path.split('/').includes('.git')) continue;
+      const inGit = insideGitDir(path);
+      if (inGit === null) unreadable.add(path);
+      if (inGit !== false) continue;
       const newest = measure(path, unreadable);
       if (newest === null) continue;
       const age = diffDays(toDay(new Date(newest)), today);

@@ -54,4 +54,19 @@ describe('scanStale — lectures qui échouent en cours de parcours', () => {
       failing.clear();
     }
   });
+
+  it('un ancêtre dont on ne peut pas dire s’il est un dossier git (HEAD en EACCES) : rien n’est proposé', () => {
+    const tmp = tempDir();
+    mkdirSync(join(tmp, 'peut-etre'));
+    writeFileSync(join(tmp, 'peut-etre/vieux.png'), 'x');
+    old(join(tmp, 'peut-etre/vieux.png'));
+    failing.set(join(tmp, 'peut-etre/HEAD'), 'EACCES');
+    try {
+      const r = scanStale(tmp, [`${tmp}/*/*.png`], 7, TODAY);
+      expect(r.stale).toEqual([]);
+      expect(r.unreadable).toEqual([join(tmp, 'peut-etre/vieux.png')]);
+    } finally {
+      failing.clear();
+    }
+  });
 });

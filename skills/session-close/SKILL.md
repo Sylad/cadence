@@ -42,7 +42,9 @@ With no project named, run `cadence session close` in each project touched durin
    section: nothing to do; a project with no `session.clean` can propose adding it.
    An entry is proposed only if it could be measured entirely. Age: a folder's age is that of the
    most recent entry it contains. The report never proposes: a git repository, a folder that contains one
-   at any depth, and anything under a `.git` folder; anything `git` tracks, whichever repository it is
+   at any depth, and anything under a `.git` folder; a git directory without a `.git` entry (bare
+   repository, mirror, `--separate-git-dir`, worktree admin folder — recognised by `HEAD` with
+   `objects` and `refs`, or with `commondir`), anything inside it or a folder that contains one; anything `git` tracks, whichever repository it is
    in; a name starting with `.` unless the pattern itself starts that name with `.`; anything that
    could not be read entirely — those are listed apart as "illisible(s)": tell the human, never
    delete those, and never widen the list by hand to entries the report did not propose.

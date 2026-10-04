@@ -399,6 +399,10 @@ days, oldest first — a folder's age is that of the most recent entry it contai
 An entry is proposed only if it could be measured entirely. Never proposed:
 
 - a git repository, a folder that contains one at any depth, and anything under a `.git` folder;
+- a git directory without a `.git` entry — a bare repository (`git init --bare`, `git clone
+  --mirror`, `backup.git/`), a `--separate-git-dir`, a worktree's admin folder —, recognised by
+  its content as git does (`HEAD` with `objects` and `refs`, or `HEAD` with `commondir`): neither
+  it, nor anything inside it, nor a folder that contains one;
 - anything `git` tracks, whichever repository it is in;
 - a name starting with `.` unless the pattern itself starts that name with `.` (as in the
   shell, `tmp/*` does not match `tmp/.env`; `tmp/.cache-*` does);
@@ -706,7 +710,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 - **session-close**: plan hygiene, clean repository, a cleanup proposal for stale
   working files (`session.clean` patterns, older than `session.cleanDays`; never
   anything git tracks, a git repository or a folder holding one, anything under
-  `.git`, a hidden `.xxx` name a `*` would not match, nor anything it could not
+  `.git`, a bare repository or separate git directory or anything inside one, a hidden `.xxx` name a `*` would not match, nor anything it could not
   read entirely — it asks before deleting), memory limited to what the
   repository does not say, new skills or agents proposed but never created, three
   lines for next time.

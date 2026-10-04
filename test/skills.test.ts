@@ -249,7 +249,9 @@ describe('skills install', () => {
     const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8');
     expect(skill('lead')).toContain('The `code-reviewer` agent');
     expect(skill('lead')).toContain('`raf review <lot> "…"`');
-    expect(skill('lead')).toContain('do not push, deliver, run `raf done`, `raf ux` or\n> `raf review`.');
+    // Le brief du lead vit dans le gabarit d'orchestrate (source unique), que le skill cite.
+    expect(skill('lead')).toContain('templates/orchestrate/implement.md');
+    expect(readFileSync(join(SKILLS_DIR, '../templates/orchestrate/implement.md'), 'utf8')).toContain('do not push, deliver, run `raf done`, `raf ux` or\n`raf review`.');
     expect(skill('session-close')).toContain('`raf review <id> "…"`');
   });
 

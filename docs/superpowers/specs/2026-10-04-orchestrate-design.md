@@ -105,7 +105,8 @@ préconditions → raf start → implémentation (Sonnet)
    en `choix`, avec la raison, les mineurs qu'il refuse), puis une revue courte (`review-small`, brief
    `review-recheck.md`, revue de code seule) qui conclut même avec de nouveaux mineurs, rendus au lead
    comme propositions. Une passe sans commit (ou qui pose une question, rendue en proposition)
-   conclut sur la revue conforme d'origine : `ready`, verdict enregistré avec le sha qu'elle a lu,
+   conclut sur la revue conforme d'origine seulement si HEAD n'a pas bougé depuis (sinon, reprise après
+   une session coupée qui avait commité : revue courte de ce commit) : `ready`, verdict enregistré avec le sha qu'elle a lu,
    mineurs non traités en propositions. Même conclusion quand le budget est épuisé juste après la
    revue conforme (aucune session pour jouer la passe). Les sous-tâches proposées restent rendues au lead.
    Pour un lot visible non petit, l'UX est rejouée après la passe (comme après toute correction : le code

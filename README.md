@@ -596,8 +596,9 @@ before concluding: a new Sonnet session with its own brief (`fix-minors.md`) fix
 and lists in `choix`, with the reason, the ones it rejects (it never stops to ask); it does not count among the
 two defect passes. A short code re-review follows (for a visible lot, after the UX review replayed), and
 concludes even when it finds new minors, which are returned to you as proposals (no second minors pass).
-When the pass makes no commit (every minor judged wrong), the lot concludes on the original compliant
-review: `ready`, verdict recorded with the sha that review read (`… + passe des mineurs sans commit`),
+When the pass makes no commit (every minor judged wrong) and HEAD has not moved since the compliant review,
+the lot concludes on that original review (if HEAD moved, e.g. a resume after a cut-off session that had
+committed, a short re-review of that commit runs instead): `ready`, verdict recorded with the sha that review read (`… + passe des mineurs sans commit`),
 the untreated minors returned as proposals. Same when the budget is exhausted right after a compliant
 review with minors: it concludes on that review instead of staying suspended.
 

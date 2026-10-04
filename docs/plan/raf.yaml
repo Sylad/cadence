@@ -279,3 +279,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    notes:
+      - { date: 2026-10-04, text: "2e cause trouvée sur la revue de L27 (relance faite, JSON écrit en bloc de code) : un agent aux outils restreints (tools: Read, Grep, Glob, Bash) n'a PAS l'outil StructuredOutput → jamais de structured_output, relance comprise. Sondes réelles Haiku 04-10 : sans tools → OK ; tools restreints → null ; + StructuredOutput → OK. Corrigé dans readAgents." }
+    tasks:
+      - { id: t1, title: readAgents ajoute StructuredOutput aux outils restreints d'un agent (cause réelle des revues sans structured_output), status: todo }

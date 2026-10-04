@@ -233,6 +233,22 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.warnings.some((w) => w.includes('annoncé absent de git') && w.includes('deadbee'))).toBe(true);
   });
 
+  it('reprise : un commit d\'une session précédente du lot, cité par le rapport, n\'est pas « absent de git » (L25)', async () => {
+    let earlier = { sha: '', sujet: '' };
+    const resumed: Handler = (call) => {
+      const b = commitFile(call.opts.cwd, 'b.txt', 'feat(L1): b');
+      return claudeOut(workReport({ commits: [earlier, b, { sha: 'deadbee', sujet: 'fantôme' }] }));
+    };
+    const h = harness({ script: { implement: [resumed], review: [ok] } });
+    earlier = commitFile(h.repo, 'a.txt', 'feat(L1): a (session précédente)');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    const absent = c.lot.warnings.filter((w) => w.includes('annoncé absent de git'));
+    expect(absent).toHaveLength(1);
+    expect(absent[0]).toContain('deadbee');
+  });
+
   it('implémentation sans aucun commit : rendu au lead', async () => {
     const h = harness({ script: { implement: [() => claudeOut(workReport())] } });
     const c = h.lot('L1');

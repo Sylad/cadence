@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 import { lotWork } from '../audit.js';
 import type { OrchestrateConfig } from '../config.js';
 import type { Day } from '../dates.js';
-import { readCommits, type Commit } from '../git.js';
+import { isAncestor, readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
@@ -401,7 +401,11 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   // La liste de git fait foi ; l'écart avec celle du rapport est signalé.
   const real = new Set(commits.map((k) => k.sha));
   for (const a of rep.commits) {
-    if (![...real].some((s) => s.startsWith(a.sha) || a.sha.startsWith(s.slice(0, 7)))) l.warnings.push(`commit annoncé absent de git : ${a.sha} ${a.sujet}`);
+    if ([...real].some((s) => s.startsWith(a.sha) || a.sha.startsWith(s.slice(0, 7)))) continue;
+    // Reprise : le rapport cite aussi les commits d'une session précédente du lot, hors de la plage de celle-ci.
+    const full = /^[0-9a-f]{4,40}$/i.test(a.sha) ? resolveCommit(l.repo, a.sha) : null;
+    if (full && isAncestor(l.repo, full, 'HEAD')) continue;
+    l.warnings.push(`commit annoncé absent de git : ${a.sha} ${a.sujet}`);
   }
   for (const k of commits) {
     if (isPlanOnly(k.sha, plan, l.repo)) continue;

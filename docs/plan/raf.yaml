@@ -30,6 +30,7 @@ lots:
     created: 2026-10-02
     notes:
       - { date: 2026-10-04, text: "décisions de Sylvain (04-10) : 1) c'est lui qui choisit les lots de chaque vague ; 2) l'orchestrateur enregistre lui-même raf review quand la revue est conforme ; 3) budget par défaut 2 M tokens par vague (--budget). Approche validée : cadence orchestrate <projet>:<lot>…, sessions claude -p neuves par étape (impl Sonnet → revue Opus neuve → UX si visible → correction en session neuve, 2 passes max), ≤2 sessions, 1 par dépôt, état dans .cadence/runs/<vague>/<lot>.json avec tokens (--output-format json), livraisons restent au lead. Spec à écrire puis UNE validation avant code." }
+      - { date: 2026-10-04, text: "validation de Sylvain (04-10, « ok l3ok ») de la spec 1ca5bc8 avec : budget = entrée + écriture de cache + sortie (lecture de cache affichée à part) ; pas de raf ux automatique (le lead l'enregistre) ; plans en lecture seule : outil du projet via orchestrate.start / orchestrate.verdict déclarés dans cadence.yaml ; push bloqué par un hook pre-push temporaire posé pendant la vague (PAS de pushurl modifié) ; ordre UX puis revue de code (toujours en dernier) retenu." }
     started: 2026-10-04
   - id: L4
     title: "Nettoyage en routine de clôture : session-close liste les fichiers de travail périmés (dossier tmp partagé, captures non référencées, scripts jetables, dossiers temporaires laissés par les tests) et propose leur suppression — au lieu d'un lot à rouvrir dans chaque projet"
@@ -165,3 +166,8 @@ lots:
     started: 2026-10-04
     notes:
       - { date: 2026-10-04, text: "revue 04-10 NON CONFORME (1 bloquant, 2 majeurs, 3 mineurs) : (B) exec détaché (setsid) → Ctrl-C/SIGHUP pendant deliver laisse le script orphelin, verrou jugé périmé, seconde livraison concurrente reproduite (incident 17-09) ; (M) plus de /dev/tty pour les commandes deliver (ssh, sudo, pinentry) ; (M) part budget÷N rougit une vérification saine (ol : 1,43 s pour verify-rollout.sh) ; (m) code 3 absent des aides cli.ts:45 et bin/cadence.js:36 ; (m) plancher 1 s contourne « jamais rouge » ; (m) phrase cassée README l.510. Décision lead : deliver revient au exec non détaché ; groupe détaché + relais des signaux réservé à verify ; vérifications de session start en PARALLÈLE, chacune avec le budget entier. ⚠ dist/ installé contient le détachement : aucune livraison cadence avant correction." }
+  - id: L20
+    title: "deliver : un script tué au deployTimeout laisse ses descendants (sh fait un fork) et cadence libère le verrou → seconde livraison concurrente possible (risque antérieur à L19) — tuer les descendants au délai sans détacher, ou garder le verrou tant que le groupe vit ; SIGTERM envoyé à cadence seul idem ; test"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-04

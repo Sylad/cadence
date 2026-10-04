@@ -128,6 +128,7 @@ lots:
     notes:
       - { date: 2026-10-04, text: "cadrage tranché par le lead (04-10, consigne de Sylvain : je tranche) : L11 et L4 INDÉPENDANTS — L11 = périodicité générique dans raf (champ du plan + « dû depuis N j »), spec courte relue avant code ; le nettoyage de L4 se fait à chaque clôture (session-close), pas comme tâche récurrente" }
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme — re-revue : 4 commits relus (3835326, 2ad94c2, 92b36f1, 89b5305), 514 tests et typecheck verts ; les constats corrigés le sont bien : post-commit conseille raf did, « Récurrent » trié par retard, garde --every sur sous-tâche testée, pas d'écart todo-avec-commits ni idle pour un lot récurrent ; choix d'interprétation cohérents avec le lot ; 1 mineur nouveau (assertion « sans rien écrire » qui ne peut pas échouer, test/recurring.test.ts:134) — orchestré (vague 2026-10-04-1807, 1 passe(s) de correction + passe des mineurs)", commit: 89b5305ac5830c66afab8d66f1ebb3d5e8489666 }
   - id: L12
     title: "raf add --public et raf public <id> : titre public d'un lot dans le modèle — écart du 02-10 sorti de L5 ; aujourd'hui écrit à la main dans 59 lots de 7 projets"
     status: done

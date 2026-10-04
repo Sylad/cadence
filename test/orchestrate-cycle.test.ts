@@ -297,6 +297,30 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.outcome).toBe('implement sans commit');
   });
 
+  it("après une réponse, une implémentation sans commit alors que le lot n'a aucun commit reste rendue au lead (L28)", async () => {
+    const ask: Handler = () => claudeOut(workReport({ questions: ['SQLite ?'] }));
+    const h = harness({ script: { implement: [ask, () => claudeOut(workReport())] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    c.lot.pendingAnswer = 'oui';
+    c.lot.answers.push('oui');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'implement']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toBe('implement sans commit');
+  });
+
+  it('une correction sans commit reste rendue au lead même si le lot a reçu une réponse et a des commits (L28)', async () => {
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [() => claudeOut(workReport())] } });
+    const c = h.lot('L1');
+    c.lot.answers.push('oui');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toBe('fix sans commit');
+  });
+
   it('une revue qui modifie le dépôt : incident, vague arrêtée, rien enregistré', async () => {
     const touchy: Handler = (call) => {
       commitFile(call.opts.cwd, 'intrus.txt', 'fix(L1): la revue a corrigé');

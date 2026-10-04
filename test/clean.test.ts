@@ -3,10 +3,10 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, lutimesSync, mkdirSync, readdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { scanStale, staleFiles } from '../src/clean.js';
-import { gitRepo, tempDir } from './helpers.js';
+import { CLEAN_TODAY, cleanAt, gitRepo, tempDir } from './helpers.js';
 
-const TODAY = '2026-09-28';
-const OLD = new Date('2026-09-10T10:00:00');
+const TODAY = CLEAN_TODAY;
+const OLD = cleanAt(-18);
 
 const touch = (file: string, when: Date = OLD) => {
   mkdirSync(dirname(file), { recursive: true });
@@ -214,7 +214,7 @@ describe('staleFiles — motifs', () => {
     const dehors = tempDir();
     touch(join(dehors, 'precieux/these.txt'));
     // Le contenu de la cible est d'aujourd'hui : un lien mesuré à travers ne serait jamais proposé.
-    touch(join(dehors, 'precieux/du-jour.txt'), new Date('2026-09-28T08:00:00'));
+    touch(join(dehors, 'precieux/du-jour.txt'), cleanAt(0, '08:00:00'));
     symlinkSync(join(dehors, 'precieux'), join(tmp, 'lien'));
     lutimesSync(join(tmp, 'lien'), OLD, OLD);
     expect(staleFiles(tmp, [`${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/*/these.txt`], 7, TODAY)).toEqual([]);
@@ -261,7 +261,7 @@ describe('staleFiles — motifs', () => {
 describe('staleFiles — contenu des dossiers et .git', () => {
   it('l’âge d’un dossier est la date la plus récente de son contenu', () => {
     const tmp = tempDir();
-    touch(join(tmp, 'travail/notes.md'), new Date('2026-09-27T10:00:00'));
+    touch(join(tmp, 'travail/notes.md'), cleanAt(-1));
     touch(join(tmp, 'travail'));
     touch(join(tmp, 'vieux/a/b.txt'));
     touch(join(tmp, 'vieux/a'));
@@ -281,7 +281,7 @@ describe('staleFiles — contenu des dossiers et .git', () => {
 
   it('l’âge d’un dossier ancien vient d’un fichier d’aujourd’hui caché profondément : non proposé', () => {
     const tmp = tempDir();
-    touch(join(tmp, 'ancien/a/b/c/du-jour.txt'), new Date('2026-09-28T08:00:00'));
+    touch(join(tmp, 'ancien/a/b/c/du-jour.txt'), cleanAt(0, '08:00:00'));
     for (const d of ['ancien/a/b/c', 'ancien/a/b', 'ancien/a', 'ancien']) touch(join(tmp, d));
     touch(join(tmp, 'vieux.png'));
     expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'vieux.png')]);
@@ -367,8 +367,8 @@ describe('staleFiles — la racine', () => {
 describe('staleFiles — seuil et ~', () => {
   it('un âge égal au seuil n’est pas proposé, un jour de plus l’est', () => {
     const dir = tempDir();
-    touch(join(dir, 'egal.png'), new Date('2026-09-21T10:00:00'));
-    touch(join(dir, 'plus.png'), new Date('2026-09-20T10:00:00'));
+    touch(join(dir, 'egal.png'), cleanAt(-7));
+    touch(join(dir, 'plus.png'), cleanAt(-8));
     const r = staleFiles(dir, [`${dir}/*`], 7, TODAY);
     expect(r.map((s) => [s.path, s.age])).toEqual([[join(dir, 'plus.png'), 8]]);
   });
@@ -376,10 +376,12 @@ describe('staleFiles — seuil et ~', () => {
   it('~ se résout sous le dossier personnel courant', () => {
     const home = tempDir();
     touch(join(home, 'partage/vieux.png'));
+    // Tout est vieilli, le dossier personnel compris : « ~ » seul le désigne lui-même, « ~/… » ce qu'il contient.
+    ageTree(home);
     const avant = process.env.HOME;
     process.env.HOME = home;
     try {
-      expect(names(staleFiles(tempDir(), ['~/partage/*', '~'], 7, TODAY))).toEqual([join(home, 'partage/vieux.png')]);
+      expect(names(staleFiles(tempDir(), ['~/partage/*', '~'], 7, TODAY))).toEqual([home, join(home, 'partage/vieux.png')]);
     } finally {
       if (avant === undefined) delete process.env.HOME;
       else process.env.HOME = avant;

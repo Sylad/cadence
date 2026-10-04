@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { lutimesSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { scanStale } from '../src/clean.js';
-import { tempDir } from './helpers.js';
+import { CLEAN_TODAY, cleanAt, tempDir } from './helpers.js';
 
 /*
  * Erreurs de lecture qu'un vrai système de fichiers ne produit pas à la demande : un élément qui
@@ -20,8 +20,8 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...fs, lstatSync };
 });
 
-const TODAY = '2026-09-28';
-const OLD = new Date('2026-09-10T10:00:00');
+const TODAY = CLEAN_TODAY;
+const OLD = cleanAt(-18);
 const old = (path: string) => lutimesSync(path, OLD, OLD);
 
 describe('scanStale — lectures qui échouent en cours de parcours', () => {

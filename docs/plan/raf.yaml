@@ -406,3 +406,9 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+  - id: L39
+    title: "⚡ orchestrate : gabarits de briefs lus une fois au début de la vague (instantané), pas à chaque étape — un lot qui modifie templates/orchestrate pendant la vague cassait les revues suivantes (« valeur manquante pour {{choix}} », vague 2026-10-04-1729, L33/L38) ; test"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-04

@@ -6,7 +6,7 @@
     {
       "name": "cadence",
       "description": "Session start and close rituals driven by a versioned plan (raf), and deliveries proven by their effect. Needs the cadence CLI (npm i -g @sylad/cadence).",
-      "version": "0.8.0",
+      "version": "0.9.0",
       "source": "./",
       "author": { "name": "Sylvain Ladoire" }
     }

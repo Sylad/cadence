@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, lutimesSync, mkdirSync, readdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { addDays, toDay } from '../src/dates.js';
+import { addDays, diffDays, toDay } from '../src/dates.js';
 import { scanStale, staleFiles } from '../src/clean.js';
 import { CLEAN_TODAY, cleanAt, gitRepo, tempDir } from './helpers.js';
 
@@ -279,11 +279,18 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     touch(join(tmp, 'extrait/dossier'), trèsVieux);
     touch(join(tmp, 'extrait'), trèsVieux);
     touch(join(tmp, 'copie.png'), trèsVieux);
-    const aujourdhui = toDay(new Date());
+    // Jour de référence tiré du ctime réel (pas de l'horloge lue après coup : minuit peut passer entre
+    // les touch et cette ligne). Le ctime du dernier fichier créé est le plus récent de l'arbre.
+    const ctimeDay = (path: string) => toDay(new Date(lstatSync(path).ctimeMs));
+    const création = ctimeDay(join(tmp, 'copie.png'));
     // Trois jours après leur création réelle : sous le seuil de 7 j, malgré un mtime de 100 j.
-    expect(staleFiles(tmp, [`${tmp}/*`], 7, addDays(aujourdhui, 3))).toEqual([]);
+    expect(staleFiles(tmp, [`${tmp}/*`], 7, addDays(création, 3))).toEqual([]);
     // Le ctime ne fait pas rajeunir indéfiniment : passé le seuil, l'âge est celui du ctime (pas 100 j).
-    expect(staleFiles(tmp, [`${tmp}/*`], 7, addDays(aujourdhui, 10)).map((s) => s.age)).toEqual([10, 10]);
+    // Chaque âge se mesure à son propre ctime, au cas où la création des deux entrées enjambe minuit.
+    const plusTard = addDays(création, 10);
+    const trouvés = staleFiles(tmp, [`${tmp}/*`], 7, plusTard);
+    expect(trouvés.map((s) => s.path).sort()).toEqual([join(tmp, 'copie.png'), join(tmp, 'extrait')]);
+    for (const s of trouvés) expect(s.age).toBe(diffDays(ctimeDay(s.path), plusTard));
   });
 
   it('ne propose rien sous un dossier .git, même atteint par un motif caché', () => {

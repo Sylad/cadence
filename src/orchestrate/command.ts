@@ -140,12 +140,12 @@ function resolveTargets(args: Args, io: OrchestrateIo, refusals: string[]): Targ
   return out;
 }
 
-function trackedDirty(repo: string): string[] {
-  return snapshot(repo, { remote: false }).tracked.map((l) => l.slice(3));
+async function trackedDirty(repo: string): Promise<string[]> {
+  return (await snapshot(repo, { remote: false })).tracked.map((l) => l.slice(3));
 }
 
 /** Préconditions : tout ce qui peut être refusé l'est ici, avant d'agir, sans verrou ni écriture. */
-function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean } = {}): { refusals: string[]; lots: LotState[] } {
+async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
   const refusals: string[] = [];
   if (io.env.CADENCE_ORCHESTRATED) refusals.push(`orchestrate ne se lance pas depuis une session orchestrée (vague ${io.env.CADENCE_ORCHESTRATED})`);
   const info = deps.claudeInfo();
@@ -193,7 +193,7 @@ function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps: Orche
     byProject.set(t.project, [...earlier, t.lot]);
     if (!repoChecked.has(t.repo)) {
       repoChecked.add(t.repo);
-      const dirty = trackedDirty(t.repo);
+      const dirty = await trackedDirty(t.repo);
       if (dirty.length) refusals.push(`${basename(t.repo)} : arbre sale, ${dirty.length} fichier(s) suivi(s) modifié(s) : ${dirty.join(', ')}`);
       const hook = canInstallPrePush(t.repo);
       if (hook) refusals.push(`${basename(t.repo)} : ${hook}`);
@@ -275,7 +275,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.lots.length === 0) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--dry-run] | --status [vague] | --resume [vague] [--answer projet:lot "réponse"]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
-  const pre = preflight(args, targets, io, deps, launch);
+  const pre = await preflight(args, targets, io, deps, launch);
   refusals.push(...pre.refusals);
   const budget = args.budget ?? DEFAULT_BUDGET;
   if (refusals.length) {
@@ -448,7 +448,7 @@ async function resume(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, laun
   const dirty = new Set<string>();
   for (const l of live) if (!dirty.has(l.repo)) {
     dirty.add(l.repo);
-    const d = trackedDirty(l.repo);
+    const d = await trackedDirty(l.repo);
     if (d.length) refusals.push(`${basename(l.repo)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
   }
   if (refusals.length) {

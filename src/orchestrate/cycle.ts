@@ -88,11 +88,11 @@ function trackedPaths(s: Snapshot): string[] {
 }
 
 /** Commit d'entretien du plan, chemins explicites. Rend un message d'arbre sale quand autre chose que le plan a bougé. */
-function commitPlan(c: LotCtx, message: string): string | null {
+async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
   const repo = c.lot.repo;
   const plan = c.loadPlan();
   const own = new Set([relative(repo, plan.path), ...plan.files]);
-  const dirty = trackedPaths(snapshot(repo, { remote: false }));
+  const dirty = trackedPaths(await snapshot(repo, { remote: false }));
   if (dirty.length === 0) return null;
   const foreign = dirty.filter((f) => !own.has(f));
   if (foreign.length) return `arbre sale (fichiers hors plan) : ${foreign.join(', ')}`;
@@ -155,7 +155,7 @@ async function startLot(c: LotCtx): Promise<string | null> {
       plan.setStatus(c.lot.lot, 'doing', c.wave.today);
       plan.save();
     }
-    const dirty = commitPlan(c, `plan: ${c.lot.lot} démarré (orchestrate ${c.wave.id})`);
+    const dirty = await commitPlan(c, `plan: ${c.lot.lot} démarré (orchestrate ${c.wave.id})`);
     if (dirty) return dirty;
   }
   return null;
@@ -226,7 +226,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
 
   const write = kind === 'implement' || kind === 'fix';
   const model: Model = write ? l.model : 'opus';
-  const before = snapshot(l.repo);
+  const before = await snapshot(l.repo);
   const n = l.steps.length + 1;
   const sessionId = randomUUID();
   const step: StepState = { n, kind, model, status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
@@ -309,7 +309,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   w.saveWave();
   if (w.claudeHome) step.peakContext = peakContext(w.claudeHome, l.repo, res.sessionId);
 
-  const after = snapshot(l.repo);
+  const after = await snapshot(l.repo);
   step.headAfter = after.head ?? undefined;
   if (pushed(before, after)) {
     step.status = 'failed';
@@ -510,7 +510,7 @@ async function conclude(c: LotCtx, code: ReviewSummary): Promise<void> {
   if (!plan.readonly) {
     plan.recordReview(l.lot, verdict, c.wave.today, newer);
     plan.save();
-    const dirty = commitPlan(c, `plan: ${l.lot} revue de code enregistrée (orchestrate ${c.wave.id})`);
+    const dirty = await commitPlan(c, `plan: ${l.lot} revue de code enregistrée (orchestrate ${c.wave.id})`);
     if (dirty) {
       stop(c, 'handed-back', dirty);
       return;
@@ -519,7 +519,7 @@ async function conclude(c: LotCtx, code: ReviewSummary): Promise<void> {
     const r = await sh(c, c.config.verdict.replaceAll('{lot}', l.lot).replaceAll('{verdict}', shEscape(verdict)));
     if (r.code !== 0) l.warnings.push(`orchestrate.verdict en échec (code ${r.code}) : le lead reporte le verdict`);
     else {
-      const dirty = commitPlan(c, `plan: ${l.lot} revue de code notée (orchestrate ${c.wave.id})`);
+      const dirty = await commitPlan(c, `plan: ${l.lot} revue de code notée (orchestrate ${c.wave.id})`);
       if (dirty) {
         stop(c, 'handed-back', dirty);
         return;
@@ -543,7 +543,7 @@ export async function runLot(c: LotCtx): Promise<void> {
         suspend(c, halt);
         return;
       }
-      const before = snapshot(l.repo, { remote: false });
+      const before = await snapshot(l.repo, { remote: false });
       if (before.tracked.length) {
         stop(c, 'handed-back', `dépôt sale avant le lot : ${trackedPaths(before).join(', ')}`);
         return;
@@ -553,7 +553,7 @@ export async function runLot(c: LotCtx): Promise<void> {
         stop(c, 'handed-back', why);
         return;
       }
-      l.startedSha = snapshot(l.repo, { remote: false }).head ?? undefined;
+      l.startedSha = (await snapshot(l.repo, { remote: false })).head ?? undefined;
       l.next = 'implement';
       save(c);
     }

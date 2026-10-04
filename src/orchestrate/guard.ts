@@ -1,8 +1,8 @@
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
-import { gitCommonDir, gitRoot, hooksDir, headSha } from '../git.js';
+import { gitCommonDir, gitRoot, hooksDir } from '../git.js';
 
 const MARK = '# cadence orchestrate — hook pre-push temporaire (retiré à la fin de la vague)';
 
@@ -91,13 +91,12 @@ export function canInstallPrePush(repo: string): string | null {
   return existsSync(file) && !readFileSync(file, 'utf8').includes(MARK) ? `un hook pre-push existe déjà (${file}) : l'orchestrateur ne le remplace pas` : null;
 }
 
-function out(repo: string, args: string[], timeout = 20_000): string | null {
-  try {
+/** git sans bloquer la boucle d'événements (un `ls-remote` peut durer 20 s) ; null en cas d'échec ou de délai. */
+function out(repo: string, args: string[], timeout = 20_000): Promise<string | null> {
+  return new Promise((resolve) => {
     // trimEnd seulement : la première colonne d'un `status --porcelain` peut être une espace.
-    return execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout }).trimEnd();
-  } catch {
-    return null;
-  }
+    execFile('git', args, { cwd: repo, encoding: 'utf8', timeout, maxBuffer: 1024 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : stdout.trimEnd()));
+  });
 }
 
 /** Le hook temporaire (reconnu à sa marque) est-il en place ? */
@@ -118,16 +117,22 @@ export interface Snapshot {
   guard: boolean;
 }
 
-export function snapshot(repo: string, opts: { remote?: boolean } = {}): Snapshot {
-  const lines = (out(repo, ['status', '--porcelain', '--untracked-files=all']) ?? '').split('\n').filter(Boolean);
+export async function snapshot(repo: string, opts: { remote?: boolean } = {}): Promise<Snapshot> {
+  const [status, head, upstream, remote] = await Promise.all([
+    out(repo, ['status', '--porcelain', '--untracked-files=all']),
+    out(repo, ['rev-parse', '--verify', '-q', 'HEAD']),
+    out(repo, ['rev-parse', '-q', '--verify', '@{u}']),
+    opts.remote === false ? Promise.resolve(null) : out(repo, ['ls-remote', '--heads']),
+  ]);
+  const lines = (status ?? '').split('\n').filter(Boolean);
   const keep = (l: string) => !/^.. \.cadence\//.test(l) && !/^\?\? \.cadence\//.test(l);
   return {
-    head: headSha(repo),
+    head: head?.trim() || null,
     tracked: lines.filter((l) => !l.startsWith('??') && keep(l)),
     untracked: lines.filter((l) => l.startsWith('??') && keep(l)).map((l) => l.slice(3)),
-    upstream: out(repo, ['rev-parse', '-q', '--verify', '@{u}']),
+    upstream,
     guard: guardPresent(repo),
-    remote: opts.remote === false ? null : out(repo, ['ls-remote', '--heads']),
+    remote,
   };
 }
 

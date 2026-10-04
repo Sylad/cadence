@@ -61,18 +61,18 @@ describe('hook lié à sa vague (L3/t10)', () => {
 });
 
 describe('snapshot et détection de push', () => {
-  it('un push change la référence amont et le dépôt distant', () => {
+  it('un push change la référence amont et le dépôt distant', async () => {
     const dir = repoWithRemote();
-    const before = snapshot(dir);
+    const before = await snapshot(dir);
     expect(before.remote).toContain('refs/heads/main');
-    expect(pushed(before, snapshot(dir))).toBe(false);
+    expect(pushed(before, await snapshot(dir))).toBe(false);
     commit(dir, 'feat(L1): x');
-    expect(pushed(before, snapshot(dir))).toBe(false); // un commit local n'est pas un push
+    expect(pushed(before, await snapshot(dir))).toBe(false); // un commit local n'est pas un push
     git(dir, 'push', '-q');
-    expect(pushed(before, snapshot(dir))).toBe(true);
+    expect(pushed(before, await snapshot(dir))).toBe(true);
   });
 
-  it('suivi modifié, non suivi, .cadence/ exclu', () => {
+  it('suivi modifié, non suivi, .cadence/ exclu', async () => {
     const dir = gitRepo();
     writeFileSync(join(dir, 'a.txt'), '1');
     git(dir, 'add', 'a.txt');
@@ -81,7 +81,7 @@ describe('snapshot et détection de push', () => {
     writeFileSync(join(dir, 'new.txt'), 'x');
     mkdirSync(join(dir, '.cadence'));
     writeFileSync(join(dir, '.cadence/state'), 'x');
-    const s = snapshot(dir);
+    const s = await snapshot(dir);
     expect(s.tracked).toEqual([' M a.txt']);
     expect(s.untracked).toEqual(['new.txt']);
     expect(s.upstream).toBeNull();
@@ -125,13 +125,13 @@ describe('core.hooksPath dans l\'arbre suivi (L3/t19)', () => {
   const status = (dir: string) => execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: dir, encoding: 'utf8' });
   const exclude = (dir: string) => (existsSync(join(dir, '.git/info/exclude')) ? readFileSync(join(dir, '.git/info/exclude'), 'utf8') : '');
 
-  it('le hook est posé dans le dossier, exclu de git pendant la vague, et l\'arbre est identique après', () => {
+  it('le hook est posé dans le dossier, exclu de git pendant la vague, et l\'arbre est identique après', async () => {
     const dir = trackedHooksRepo();
     const excludeBefore = exclude(dir);
     expect(installPrePush(dir, 'w1')).toEqual({ ok: true });
     expect(existsSync(join(dir, '.githooks/pre-push'))).toBe(true);
     expect(status(dir)).toBe('');
-    expect(snapshot(dir, { remote: false }).untracked).toEqual([]);
+    expect((await snapshot(dir, { remote: false })).untracked).toEqual([]);
     removePrePush(dir, 'w1');
     expect(existsSync(join(dir, '.githooks/pre-push'))).toBe(false);
     expect(status(dir)).toBe('');
@@ -154,12 +154,34 @@ describe('core.hooksPath dans l\'arbre suivi (L3/t19)', () => {
     removePrePush(dir, 'w1');
   });
 
-  it('la suppression du hook est vue par le snapshot (le statut, lui, ne la voit plus)', () => {
+  it('la suppression du hook est vue par le snapshot (le statut, lui, ne la voit plus)', async () => {
     const dir = trackedHooksRepo();
     installPrePush(dir, 'w1');
-    expect(snapshot(dir, { remote: false }).guard).toBe(true);
+    expect((await snapshot(dir, { remote: false })).guard).toBe(true);
     rmSync(join(dir, '.githooks/pre-push'));
     expect(status(dir)).toBe('');
-    expect(snapshot(dir, { remote: false }).guard).toBe(false);
+    expect((await snapshot(dir, { remote: false })).guard).toBe(false);
+  });
+});
+
+
+describe('snapshot asynchrone (L3/t21)', () => {
+  it('git ls-remote ne bloque pas la boucle d\'événements', async () => {
+    const dir = repoWithRemote();
+    const bin = tempDir();
+    const real = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
+    writeFileSync(join(bin, 'git'), `#!/bin/sh\n[ "$1" = ls-remote ] && sleep 0.5\nexec ${real} "$@"\n`, { mode: 0o755 });
+    const path = process.env.PATH;
+    process.env.PATH = `${bin}:${path}`;
+    try {
+      let ticks = 0;
+      const timer = setInterval(() => ticks++, 20);
+      const s = await snapshot(dir);
+      clearInterval(timer);
+      expect(s.remote).toContain('refs/heads/main');
+      expect(ticks).toBeGreaterThan(10);
+    } finally {
+      process.env.PATH = path;
+    }
   });
 });

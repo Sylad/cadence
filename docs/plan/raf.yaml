@@ -575,7 +575,8 @@ lots:
       - { id: t8, title: "test isStaleRoot : un .cadence-tests.pid qui est un lien, un dossier ou un FIFO, ou avec des lignes en trop, ne prouve rien (mutations tmp-hygiene.ts:108 et :110 aujourd'hui vertes)", status: todo }
   - id: L46
     title: "⚡ test/deliver.test.ts : les scripts shell des tests SIGINT/SIGHUP (l.653, l.754) mettent ${logs} hors guillemets — 3 échecs avec un TMPDIR contenant un espace ; guillemets corrects, suite verte avec un TMPDIR à espace (mesure 04-10, revue L45)"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-04

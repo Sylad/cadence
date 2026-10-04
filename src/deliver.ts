@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { constants } from 'node:os';
 import { parse } from 'yaml';
-import { endTree, killTree, onTermination, SIGNAL_GRACE_MS } from './proc.js';
+import { onTermination, SIGNAL_GRACE_MS, TreeTracker } from './proc.js';
 import type { Day } from './dates.js';
 import { isPlanOnly } from './audit.js';
 import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
@@ -190,21 +190,33 @@ export function realDeps(root: string): DeliverDeps {
           child.once('error', () => resolve(127));
           return;
         }
-        // Au délai, ou si cadence est tué (Ctrl-C, SIGTERM, raccrochage) : TOUT l'arbre de la commande meurt
-        // avant que cadence ne rende la main ou ne meure — sh fait un fork par commande, et un descendant
-        // survivant livrerait encore pendant qu'une seconde livraison prend le verrou libéré ou périmé.
-        // Ctrl-C et raccrochage : l'arbre a déjà reçu le signal du terminal, un court délai de grâce laisse finir
-        // ses trap (et git son index.lock) avant le kill ; SIGTERM (à cadence seul) et le délai : kill immédiat.
-        const forget = onTermination((sig) => (sig === 'SIGTERM' ? killTree(pid) : endTree(pid, SIGNAL_GRACE_MS)));
+        // L'arbre de la commande est suivi pendant toute son exécution (relevé périodique, pid + heure de
+        // démarrage) : un enfant dont le parent meurt reste connu. Au délai, ou si cadence est tué (Ctrl-C,
+        // SIGTERM, raccrochage), TOUS les processus suivis encore vivants meurent avant que cadence ne rende la
+        // main ou ne meure — sh fait un fork par commande, et un descendant survivant livrerait encore pendant
+        // qu'une seconde livraison prend le verrou libéré ou périmé. Ctrl-C et raccrochage : l'arbre a déjà
+        // reçu le signal du terminal, un court délai de grâce laisse finir ses trap (et git son index.lock)
+        // avant le kill ; SIGTERM (à cadence seul) et le délai : kill immédiat.
+        const tree = new TreeTracker(pid);
+        // Terminaison en cours : exec ne rend pas la main avant qu'elle ne soit finie — sinon deliver libère
+        // le verrou pendant la grâce, alors que des descendants tournent encore.
+        let ending: Promise<void> | null = null;
+        const forget = onTermination((sig) => (ending = sig === 'SIGTERM' ? Promise.resolve(tree.kill()) : tree.end(SIGNAL_GRACE_MS)));
         let timedOut = false;
         const timer = setTimeout(() => {
           timedOut = true;
-          killTree(pid);
+          tree.kill();
         }, Math.max(1_000, timeoutMs));
         child.once('exit', (code, signal) => {
           clearTimeout(timer);
-          forget();
-          resolve(timedOut ? TIMED_OUT : signal ? 128 + (constants.signals[signal] ?? 0) : (code ?? 1));
+          const result = timedOut ? TIMED_OUT : signal ? 128 + (constants.signals[signal] ?? 0) : (code ?? 1);
+          const settle = () => {
+            tree.stop();
+            forget();
+            resolve(result);
+          };
+          if (ending) void ending.then(settle);
+          else settle();
         });
       }),
     gh: (sha) => JSON.parse(gh(['run', 'list', '--commit', sha, '--json', 'name,status,conclusion'])),

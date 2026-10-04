@@ -794,3 +794,113 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
     }
   }, 30_000);
 });
+
+describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’arbre vide (re-revue L20)', () => {
+  const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const until = async (ok: () => boolean, ms: number) => {
+    for (let t = 0; t < ms && !ok(); t += 50) await pause(50);
+    return ok();
+  };
+  const lines = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8').trim().split('\n') : []);
+  const cad = (dir: string) => run(['deliver'], { cwd: dir, env: {}, out: () => {}, err: () => {}, now: () => new Date() });
+
+  /** Dépôt poussé dont ./livrer.sh joue `first` à la première livraison, et bumpe tout de suite aux suivantes. */
+  function scriptRepo(logs: string, first: string): string {
+    const dir = pushedRepo();
+    writeFileSync(
+      join(dir, 'livrer.sh'),
+      `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then\n  echo $$ > '${logs}/first'\n${first}\nelse\n  echo bumped >> '${logs}/bumps'\nfi\n`,
+      { mode: 0o755 },
+    );
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  script: ./livrer.sh\n');
+    git(dir, 'add', 'livrer.sh', 'cadence.yaml');
+    commit(dir, 'chore: config');
+    git(dir, 'push', '-q');
+    return dir;
+  }
+
+  /** Première livraison dans un groupe à elle (le groupe de premier plan d'un terminal), lancée par vite-node. */
+  function startFirst(logs: string, dir: string) {
+    const probe = join(logs, 'probe.ts');
+    writeFileSync(
+      probe,
+      `import { run } from ${JSON.stringify(join(process.cwd(), 'src/cli.ts'))};\n` +
+        `process.exitCode = await run(['deliver'], { cwd: ${JSON.stringify(dir)}, env: process.env, out: () => {}, err: () => {}, now: () => new Date() });\n`,
+    );
+    const child = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
+    const exited = new Promise<number>((r) => child.on('exit', () => r(Date.now())));
+    const cleanup = () => {
+      try {
+        process.kill(-child.pid!, 'SIGKILL');
+      } catch {
+        // déjà mort
+      }
+    };
+    return { child, exited, cleanup };
+  }
+
+  it('(a) Ctrl-C : un enfant en arrière-plan qui ignore SIGINT, son shell mort, est tué au plus tard à l’échéance de la grâce — un seul bump', async () => {
+    const logs = tempDir();
+    // `&` dans un sh non interactif : l'enfant ignore SIGINT ; le script, lui, meurt du signal dans `wait`
+    const dir = scriptRepo(logs, `  sh -c "sleep 3; echo bumped >> '${logs}/bumps'" &\n  wait`);
+    const first = startFirst(logs, dir);
+    try {
+      expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
+      await pause(600); // au moins deux relevés du suivi : l'enfant est connu
+      const t = Date.now();
+      process.kill(-first.child.pid!, 'SIGINT'); // ce que fait le terminal
+      const end = await first.exited;
+      expect(end - t).toBeLessThan(2_000 + 1_000); // la grâce, pas la fin de l'enfant
+      expect(await cad(dir)).toBe(0); // seconde livraison : bumpe tout de suite
+      await pause(3_500); // au-delà du réveil de l'enfant de la première
+      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
+    } finally {
+      first.cleanup();
+    }
+  }, 30_000);
+
+  it('(b) Ctrl-C : le verrou reste tenu pendant la grâce, même après la sortie du script — une seconde livraison est refusée, un seul bump', async () => {
+    const logs = tempDir();
+    // le script sort après son trap (0,3 s) ; son enfant en arrière-plan (SIGINT ignoré) bumpe ~1 s après Ctrl-C, dans la grâce
+    const dir = scriptRepo(
+      logs,
+      `  trap 'sleep 0.3; exit 130' INT\n  sh -c "sleep 1.4; echo bumped >> '${logs}/bumps'" &\n  while :; do wait; done`,
+    );
+    const first = startFirst(logs, dir);
+    try {
+      expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
+      await pause(400);
+      const t = Date.now();
+      process.kill(-first.child.pid!, 'SIGINT');
+      await pause(Math.max(0, t + 600 - Date.now())); // le trap est fini, le script est sorti ; l'enfant vit encore
+      const second = await cad(dir);
+      expect(second).toBe(2); // verrou vivant : refusée
+      await first.exited;
+      await pause(1_500);
+      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
+    } finally {
+      first.cleanup();
+    }
+  }, 30_000);
+
+  it('(c) Ctrl-C : un descendant qui ignore SIGINT sous un parent vivant est tué à l’échéance de la grâce (~2 s) — un seul bump', async () => {
+    const logs = tempDir();
+    // le script attend son enfant (trap posé : il ne meurt pas du signal) ; l'enfant ignore SIGINT et bumperait à 4 s
+    const dir = scriptRepo(logs, `  trap 'echo int' INT\n  sh -c "trap '' INT; sleep 4; echo bumped >> '${logs}/bumps'"`);
+    const first = startFirst(logs, dir);
+    try {
+      expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
+      await pause(400);
+      const t = Date.now();
+      process.kill(-first.child.pid!, 'SIGINT');
+      const end = await first.exited;
+      expect(end - t).toBeGreaterThanOrEqual(1_800); // la grâce entière
+      expect(end - t).toBeLessThan(3_000); // mais pas la fin de l'enfant (4 s)
+      expect(await cad(dir)).toBe(0);
+      await pause(3_000);
+      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
+    } finally {
+      first.cleanup();
+    }
+  }, 30_000);
+});

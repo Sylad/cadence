@@ -140,6 +140,7 @@ plan:
   lots: taches                  # root key holding the list (default: lots)
   fields:                       # raf field: key in the file (a list = first one present)
     title: titre
+    public: titre_public        # the lot's title for the public; read when it is text, else ignored
     status: etat
     estimate: effort
     created: cree_le
@@ -155,7 +156,7 @@ plan:
   estimates: { S: 0.5, M: 1, L: 3 }   # their effort labels, in working days
 ```
 
-- Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `after`, `created`, `started`,
+- Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `public`, `after`, `created`, `started`,
   `finished`, `notes`, `parent`; one left out is read under its own name. A timestamp counts for
   its day; a note written as plain text is one note.
 - `parent`: an entry `B33/t1-fusion` whose parent is `B33` becomes the sub-task `t1-fusion` of `B33`.

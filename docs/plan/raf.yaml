@@ -213,7 +213,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
-    review: { date: 2026-10-04, verdict: "not compliant: 1 majeur (README promet le repli sur le groupe de la commande, sans effet : ses descendants survivent au kill dégradé), 2 mineurs (racine adoptée tard sans contrôle de vie dans end(), message stderr de deliver non testé)", commit: 1d7db65cd59ace309496d610d81e944ba6d99e62 }
+    review: { date: 2026-10-04, verdict: "compliant after 1 minor fix — orchestré (vague 2026-10-04-1650, 0 passe(s) de correction)", commit: a37ecff492ff5abde0cb2d2bf04579cc25a557c4 }
     tasks:
       - { id: t1, title: "proc : un relevé en échec ne doit pas faire signaler des pids d'après un relevé périmé (vérifier l'identité au moment du kill, ou plafonner l'âge du dernier relevé) — test pid repris pendant l'échec de ps", status: done }
       - { id: t2, title: "proc : end() applique aussi le repli groupe + racine quand la racine n'a jamais été relevée (Ctrl-C/raccrochage), avec un test ; aligner le README", status: done }

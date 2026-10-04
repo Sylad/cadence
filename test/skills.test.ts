@@ -256,7 +256,7 @@ describe('skills install', () => {
     // État du navigateur : le bundle chargé contre celui que référence index.html relu sans cache, puis le cache vidé.
     expect(step4).toContain("browser state, once before the first page, in a profile already used (a persistent context, not a fresh one — a `userDataDir` reserved for QA and kept between passes, never the user's own browser profile): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;");
     // Le profil QA survit aux passes : il est exclu du nettoyage des fichiers temporaires.
-    expect(qaAgent().section('Output').replace(/\s+/g, ' ')).toContain('except the QA browser profile, which is kept for the next pass.');
+    expect(qaAgent().section('Output')).toContain('except the QA browser profile, which is kept for the next pass.');
     // « GET only » n'est pas « sans effet » : un CDN met en cache une sonde sur un actif absent.
     expect(step5).toContain('GET only is not "without effect": a probe on an asset name that does not exist was cached for 4 hours by the CDN and then served to real visitors. Request only URLs the app itself uses, or add a cache-busting query parameter.');
     // La minute de calme se passe hors de l'app.

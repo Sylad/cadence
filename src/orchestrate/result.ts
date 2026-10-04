@@ -19,6 +19,8 @@ export interface SessionResult {
   tokens: Tokens;
   /** Sortie demandée par --json-schema (`structured_output`), absente d'une erreur. */
   structured?: unknown;
+  /** Vrai quand la sortie structurée vient de l'unique relance de mise en forme (jetons des deux appels additionnés). */
+  formattingRetry?: boolean;
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -99,3 +101,17 @@ export function salvageUsage(stdout: string): { tokens: Tokens; sessionId?: stri
   const tokens = tokensOf(num(u.input_tokens), num(u.cache_creation_input_tokens), num(u.cache_read_input_tokens), num(u.output_tokens));
   return { tokens, sessionId: typeof raw.session_id === 'string' ? raw.session_id : undefined };
 }
+
+/** Session réussie (pas d'erreur, `success`) qui a fini en texte sans `structured_output` : seul cas d'une relance de mise en forme. */
+export function lacksStructuredOutput(stdout: string): { sessionId: string } | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(stdout);
+  } catch {
+    return null;
+  }
+  if (!isObject(raw) || raw.is_error !== false || raw.subtype !== 'success' || 'structured_output' in raw) return null;
+  return typeof raw.session_id === 'string' && raw.session_id ? { sessionId: raw.session_id } : null;
+}
+
+export const sumTokens = (a: Tokens, b: Tokens): Tokens => tokensOf(a.input + b.input, a.cacheWrite + b.cacheWrite, a.cacheRead + b.cacheRead, a.output + b.output);

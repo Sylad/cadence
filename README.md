@@ -554,7 +554,8 @@ project without `deliver.verify`.
 `cadence orchestrate` is a program above `/lead`, not a conversation: for each lot you choose, it runs
 a **fresh** `claude -p` session per step with a short brief, reads the result, writes the state in
 files and moves on. The lead session keeps only the decision (which lots), the final table and the
-questions. Nothing is resumed: a correction is a new session, never the author's reopened.
+questions. Nothing is resumed: a correction is a new session, never the author's reopened. The one
+exception is a **formatting retry** (below).
 
 ```sh
 cadence orchestrate finance-tracker:L41 ol-companion:L22 cadence:L18@haiku
@@ -599,6 +600,14 @@ finish, the wave is *suspended* (exit code 3) and `--resume --budget …` contin
 nothing readable, times out (45 min for work, 25 for a review) or fails is not retried; the lot is handed
 back with the cause. Exit codes: 0 every lot ready · 1 at least one lot handed back (question, failure,
 review still not compliant after two passes) · 2 refused before acting · 3 wave suspended.
+
+**Formatting retry** (the only `--resume` of a session): when a session ends successfully but in plain text,
+without the `structured_output` the schema asks for (the verdict is there, not in the required shape), the
+orchestrator resumes **that same session once** (`claude -p --resume <session-id> --json-schema <same schema>`,
+same model, permission mode and denied tools) with a short prompt that only asks for the report in the required
+format. It applies to every step that has a schema (implementation, correction, reviews). The tokens of the
+retry count in the wave budget and in the step (`formatRetry: true`); if the output is still missing after it,
+the step fails as usual — never a second retry.
 
 State is in `.cadence/runs/<wave>/` of the folder where the command is run (added to `.git/info/exclude`
 when that folder is in a repository): `wave.json`, one `<project>--<lot>.json` per lot (steps, tokens

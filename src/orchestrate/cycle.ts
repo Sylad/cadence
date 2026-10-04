@@ -319,6 +319,10 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   step.report = `${base}.json`;
   step.sessionId = res.sessionId;
   step.tokens = res.tokens;
+  if (res.formattingRetry) {
+    step.formatRetry = true;
+    w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} : rapport sans sortie structurée, relance de mise en forme`);
+  }
   w.budget.add(res.tokens);
   w.saveWave();
   if (w.claudeHome) step.peakContext = peakContext(w.claudeHome, l.repo, res.sessionId);

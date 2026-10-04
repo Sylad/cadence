@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Faux `claude` des tests de bout en bout (CADENCE_CLAUDE_BIN). Lit un scénario JSON (FAKE_CLAUDE_SCENARIO) :
 // { "<étape>": [ action, … ] } consommé dans l'ordre, une action par appel de cette étape.
-// action : { commits: [{file, message}], structured, tokens, exit, garbage, sleepMs, push, usageLimit }
+// action : { commits: [{file, message}], structured, tokens, exit, garbage, sleepMs, push, usageLimit, noStructured, resumeNoStructured }
+// noStructured : réponse réussie en texte, sans structured_output ; l'appel suivant en --resume de cette session rend alors
+// le rapport au format (resumeNoStructured : il n'y arrive pas non plus). Un --resume est journalisé (resume: true).
 // "{lot}" dans un message est remplacé par le lot du brief. Chaque appel est journalisé (FAKE_CLAUDE_LOG).
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -20,19 +22,20 @@ if (argv[0] === '--help') {
 const flag = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined);
 const brief = argv[1];
 const agent = flag('--agent');
-const kind = agent === 'ux-reviewer' ? 'ux' : agent === 'code-reviewer' ? (brief.includes('single pass') ? 'review-small' : 'review') : brief.includes('found the defects below') ? 'fix' : 'implement';
+const resumeId = flag('--resume');
+const kind = resumeId ? /^fake-(.+)-\d+$/.exec(resumeId)?.[1] : agent === 'ux-reviewer' ? 'ux' : agent === 'code-reviewer' ? (brief.includes('single pass') ? 'review-small' : 'review') : brief.includes('found the defects below') ? 'fix' : 'implement';
 const lot = /on lot `([^`]+)`|[Rr]eview lot `([^`]+)`|of lot `([^`]+)`/.exec(brief)?.slice(1).find(Boolean) ?? '?';
 
 const scenarioFile = process.env.FAKE_CLAUDE_SCENARIO;
 const scenario = JSON.parse(readFileSync(scenarioFile, 'utf8'));
 const stateFile = `${scenarioFile}.state`;
 const used = existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, 'utf8')) : {};
-const index = used[kind] ?? 0;
-used[kind] = index + 1;
-writeFileSync(stateFile, JSON.stringify(used));
-const action = (scenario[kind] ?? [])[index] ?? scenario[`${kind}*`] ?? {};
+used.pending ??= {};
+const index = resumeId ? Number(/-(\d+)$/.exec(resumeId)[1]) : (used[kind] ?? 0);
+if (!resumeId) used[kind] = index + 1;
+const action = resumeId ? { structured: used.pending[resumeId]?.structured, noStructured: used.pending[resumeId]?.resumeNoStructured, tokens: { output: 7 } } : ((scenario[kind] ?? [])[index] ?? scenario[`${kind}*`] ?? {});
 
-const entry = { kind, lot, cwd: process.cwd(), model: flag('--model'), orchestrated: process.env.CADENCE_ORCHESTRATED ?? null, resume: argv.includes('--resume'), sessionId: flag('--session-id') };
+const entry = { kind, lot, cwd: process.cwd(), model: flag('--model'), orchestrated: process.env.CADENCE_ORCHESTRATED ?? null, resume: argv.includes('--resume'), resumeId: resumeId ?? null, sessionId: flag('--session-id'), schema: flag('--json-schema') ?? null, argv };
 const commits = [];
 for (const c of action.commits ?? []) {
   writeFileSync(join(process.cwd(), c.file), `${Math.random()}\n`);
@@ -66,6 +69,15 @@ if (action.usageLimit) {
   delete out.structured_output;
   console.log(JSON.stringify(out));
   process.exit(1);
+}
+if (action.noStructured) {
+  // Le texte d'une revue qui n'a pas rendu sa structure ; la relance rendra `structured`.
+  used.pending[out.session_id] = { structured, resumeNoStructured: action.resumeNoStructured };
+  writeFileSync(stateFile, JSON.stringify(used));
+  delete out.structured_output;
+  out.result = '## Revue\n\nverdict en texte';
+  console.log(JSON.stringify(out));
+  process.exit(action.exit ?? 0);
 }
 out.structured_output = structured;
 out.result = JSON.stringify(structured);

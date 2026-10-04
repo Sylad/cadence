@@ -41,6 +41,8 @@ export interface StepState {
   /** Fichier de la sortie JSON de la session, dans le dossier du lot. */
   report?: string;
   cause?: string;
+  /** Vrai quand la sortie structurée vient de la relance de mise en forme (jetons de la relance compris dans `tokens`). */
+  formatRetry?: boolean;
 }
 
 export interface Constat {

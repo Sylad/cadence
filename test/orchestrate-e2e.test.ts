@@ -75,6 +75,43 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(s.calls()).toHaveLength(1);
   });
 
+  it('revue finie en texte sans structured_output : une relance --resume de la même session, rapport récupéré, jetons comptés (L26)', async () => {
+    const s = setup({ implement: [impl], review: [{ noStructured: true }] });
+    const r = await s.cli('proj:L1');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('prêt à livrer');
+    const calls = s.calls();
+    expect(calls.map((c) => [c.kind, c.resume])).toEqual([['implement', false], ['review', false], ['review', true]]);
+    const retry = calls[2];
+    expect(retry.resumeId).toBe('fake-review-0');
+    expect(retry.model).toBe('opus');
+    expect(retry.schema).toBe(calls[1].schema);
+    expect(retry.argv).toEqual(expect.arrayContaining(['--permission-mode', '--disallowedTools']));
+    const state = JSON.parse(readFileSync(join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1.json'), 'utf8'));
+    const review = state.steps.find((st: { kind: string }) => st.kind === 'review');
+    expect(review.formatRetry).toBe(true);
+    expect(review.tokens.counted).toBe(115 + 117);
+    expect(state.steps.find((st: { kind: string }) => st.kind === 'implement').formatRetry).toBeUndefined();
+  });
+
+  it('toujours sans structured_output après la relance : échec comme avant, une seule relance, jetons des deux appels (L26)', async () => {
+    const s = setup({ implement: [impl], review: [{ noStructured: true, resumeNoStructured: true }] });
+    const r = await s.cli('proj:L1');
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('structured_output');
+    expect(s.calls().map((c) => [c.kind, c.resume])).toEqual([['implement', false], ['review', false], ['review', true]]);
+    const state = JSON.parse(readFileSync(join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1.json'), 'utf8'));
+    expect(state.steps.find((st: { kind: string }) => st.kind === 'review').tokens.counted).toBe(115 + 117);
+  });
+
+  it('une implémentation sans structured_output est relancée aussi : tous les types d\'étape à schéma (L26)', async () => {
+    const s = setup({ implement: [{ ...impl, noStructured: true }], review: [{}] });
+    const r = await s.cli('proj:L1');
+    expect(r.code).toBe(0);
+    expect(s.calls().map((c) => [c.kind, c.resume])).toEqual([['implement', false], ['implement', true], ['review', false]]);
+  });
+
   it('limite d\'usage : code 3, vague suspendue-quota, aucun nouvel appel', async () => {
     const s = setup({ implement: [{ usageLimit: true }] });
     const r = await s.cli('proj:L1');

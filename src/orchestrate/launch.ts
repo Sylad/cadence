@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { RafError } from '../plan.js';
-import { isQuotaMessage, parseSession, salvageUsage, tokensOf, type SessionResult, type Tokens } from './result.js';
+import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
 export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small';
 export type Model = 'sonnet' | 'opus' | 'haiku';
@@ -47,7 +47,7 @@ export interface LaunchOpts {
   onSpawn?: (pid: number) => void;
 }
 
-/** Le lanceur : injecté dans les tests, `realClaude` en vrai. Jamais `--resume` d'une session de travail. */
+/** Le lanceur : injecté dans les tests, `realClaude` en vrai. Jamais `--resume` d'une session de travail, sauf la relance de mise en forme. */
 export type ClaudeFn = (args: string[], opts: LaunchOpts) => Promise<LaunchOutcome>;
 
 /** Outils interdits à toute session : pas de sous-agent, pas de push, de livraison ni de verdict. */
@@ -89,18 +89,42 @@ export type SessionOutcome =
   | { kind: 'quota'; message: string; result?: SessionResult; tokens?: Tokens; sessionId?: string }
   | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string };
 
-/** Lance une session et range son issue : ok, quota atteint, ou échec nommé (jamais de nouvel essai ici). */
+/** Consigne de la relance de mise en forme : rendre le rapport déjà établi au format demandé, rien d'autre. */
+export const FORMAT_RETRY_PROMPT = 'Return your report now in the required format (the JSON structure of the schema), exactly as you concluded it. Do not do any further work, do not add anything else.';
+
+/** Arguments de la relance : même session (--resume), mêmes schéma, modèle, mode de permission, dossiers et interdits. */
+export function buildRetryArgs(spec: StepSpec, sessionId: string): string[] {
+  const args = ['-p', FORMAT_RETRY_PROMPT, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, '--resume', sessionId, '--permission-mode', spec.permissionMode];
+  for (const d of spec.addDirs) args.push('--add-dir', d);
+  args.push('--disallowedTools', ...DISALLOWED);
+  return args;
+}
+
+/**
+ * Lance une session et range son issue : ok, quota atteint, ou échec nommé (jamais de nouvel essai ici), à une
+ * exception près : une session réussie qui finit en texte sans `structured_output` est relancée UNE fois, par
+ * `--resume` de la même session, pour qu'elle rende son rapport au format demandé. Les jetons de la relance
+ * s'ajoutent à ceux de la session ; toujours rien après elle, c'est l'échec habituel.
+ */
 export async function runSession(
   spec: StepSpec,
   deps: { claude: ClaudeFn; agents: Record<string, AgentDef>; onSpawn?: (pid: number) => void },
 ): Promise<SessionOutcome> {
-  const args = buildArgs(spec, deps.agents);
-  const out = await deps.claude(args, {
-    cwd: spec.cwd,
-    env: { CADENCE_ORCHESTRATED: spec.wave },
-    timeoutMs: spec.timeoutMs,
-    onSpawn: deps.onSpawn,
-  });
+  const launch = (args: string[]) =>
+    deps.claude(args, { cwd: spec.cwd, env: { CADENCE_ORCHESTRATED: spec.wave }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
+  const out = await launch(buildArgs(spec, deps.agents));
+  const first = classify(out);
+  const missing = first.kind === 'failed' && !out.timedOut && out.code === 0 ? lacksStructuredOutput(out.stdout) : null;
+  if (!missing) return first;
+  const spentFirst = first.kind === 'failed' ? first.tokens : undefined;
+  const second = classify(await launch(buildRetryArgs(spec, missing.sessionId)));
+  const total = (t?: Tokens): Tokens | undefined => (spentFirst && t ? sumTokens(spentFirst, t) : (t ?? spentFirst));
+  if (second.kind === 'ok') return { kind: 'ok', result: { ...second.result, tokens: total(second.result.tokens)!, formattingRetry: true } };
+  const tokens = total(second.tokens);
+  return { ...second, ...(tokens ? { tokens } : {}), sessionId: second.sessionId ?? missing.sessionId };
+}
+
+function classify(out: LaunchOutcome): SessionOutcome {
   // Une session en échec a consommé des tokens : ceux de sa sortie, quand elle en donne, vont au budget.
   const salvaged = salvageUsage(out.stdout);
   const spent = salvaged ? { tokens: salvaged.tokens, sessionId: salvaged.sessionId } : {};

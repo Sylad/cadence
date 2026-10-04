@@ -150,6 +150,63 @@ describe('runSession (lanceur injecté)', () => {
   });
 });
 
+describe('relance de mise en forme (L26)', () => {
+  const noStructured = () => {
+    const raw = JSON.parse(sample);
+    delete raw.structured_output;
+    raw.result = '## Revue\n\nverdict en texte';
+    raw.session_id = 'sess-texte';
+    return JSON.stringify(raw);
+  };
+  const run = (outs: string[], over: Partial<StepSpec> = {}) => {
+    const calls: string[][] = [];
+    const p = runSession({ ...spec, kind: 'review', agent: undefined, ...over }, { claude: async (args) => (calls.push(args), { code: 0, stdout: outs[calls.length - 1] ?? outs[outs.length - 1], stderr: '', timedOut: false }), agents: {} });
+    return { calls, p };
+  };
+
+  it('sans structured_output, une seule relance : --resume de la même session, même schéma et mêmes drapeaux, jetons additionnés', async () => {
+    const { calls, p } = run([noStructured(), sample]);
+    const out = await p;
+    expect(calls).toHaveLength(2);
+    const [first, retry] = calls;
+    expect(retry).toContain('--resume');
+    expect(retry[retry.indexOf('--resume') + 1]).toBe('sess-texte');
+    expect(retry).not.toContain('--session-id');
+    for (const f of ['--json-schema', '--model', '--permission-mode']) expect(retry[retry.indexOf(f) + 1]).toBe(first[first.indexOf(f) + 1]);
+    expect(retry.slice(retry.indexOf('--disallowedTools'))).toEqual(first.slice(first.indexOf('--disallowedTools')));
+    expect(retry[retry.indexOf('-p') + 1]).toMatch(/required format/);
+    expect(out.kind).toBe('ok');
+    if (out.kind !== 'ok') return;
+    expect(out.result.structured).toEqual({ resume: 'ok', n: 1 });
+    expect(out.result.formattingRetry).toBe(true);
+    const one = JSON.parse(sample).usage;
+    const firstUsage = JSON.parse(noStructured()).usage;
+    expect(out.result.tokens.counted).toBe(one.input_tokens + one.cache_creation_input_tokens + one.output_tokens + firstUsage.input_tokens + firstUsage.cache_creation_input_tokens + firstUsage.output_tokens);
+  });
+
+  it('toujours sans structured_output après la relance : échec comme avant, jetons des deux appels comptés, pas de seconde relance', async () => {
+    const { calls, p } = run([noStructured()]);
+    const out = await p;
+    expect(calls).toHaveLength(2);
+    expect(out.kind).toBe('failed');
+    if (out.kind !== 'failed') return;
+    expect(out.cause).toMatch(/structured_output/);
+    const u = JSON.parse(noStructured()).usage;
+    expect(out.tokens?.counted).toBe(2 * (u.input_tokens + u.cache_creation_input_tokens + u.output_tokens));
+  });
+
+  it('pas de relance pour une session en erreur, un délai ou une sortie illisible', async () => {
+    const raw = JSON.parse(sample);
+    raw.is_error = true;
+    delete raw.structured_output;
+    for (const out of [JSON.stringify(raw), 'pas du json', '']) {
+      const { calls, p } = run([out]);
+      await p;
+      expect(calls).toHaveLength(1);
+    }
+  });
+});
+
 describe('pic de contexte', () => {
   it('relu dans le journal .jsonl de la session', () => {
     const home = tempDir();

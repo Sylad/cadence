@@ -33,7 +33,7 @@ pic ; session lead sous 60 k de moyenne pour une vague de 4 lots ; aucun agent r
 |---|---|
 | Nature | sous-commande du CLI (`src/orchestrate/`), aucune dépendance nouvelle (`child_process`) |
 | Choix des lots | **Sylvain**, à chaque vague (décision 04-10) ; l'orchestrateur ne choisit rien |
-| Session | `claude -p` neuve par étape, jamais `--resume` d'une session de travail |
+| Session | `claude -p` neuve par étape, jamais `--resume` d'une session de travail — seule entorse (L26) : UNE relance de mise en forme (`--resume <id> --json-schema`) quand `structured_output` manque d'une session réussie ; jetons comptés, sinon échec |
 | Modèles | implémentation et corrections Sonnet ; revues Opus ; Haiku sur demande explicite (`@haiku`) |
 | Concurrence | ≤ 2 sessions, 1 par dépôt, imposé par le code (ordonnanceur + verrous) |
 | Budget | 2 M tokens par vague par défaut (`--budget`, décision 04-10) |

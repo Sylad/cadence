@@ -122,11 +122,12 @@ lots:
     finished: 2026-10-04
   - id: L11
     title: Tâche récurrente dans le plan (champ de périodicité, « dû depuis N j ») — écart du 02-10 sorti de L5, à cadrer avec L4 (nettoyage en routine de clôture) avant de coder
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-03
     notes:
       - { date: 2026-10-04, text: "cadrage tranché par le lead (04-10, consigne de Sylvain : je tranche) : L11 et L4 INDÉPENDANTS — L11 = périodicité générique dans raf (champ du plan + « dû depuis N j »), spec courte relue avant code ; le nettoyage de L4 se fait à chaque clôture (session-close), pas comme tâche récurrente" }
+    started: 2026-10-04
   - id: L12
     title: "raf add --public et raf public <id> : titre public d'un lot dans le modèle — écart du 02-10 sorti de L5 ; aujourd'hui écrit à la main dans 59 lots de 7 projets"
     status: done

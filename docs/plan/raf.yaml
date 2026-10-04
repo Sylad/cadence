@@ -352,6 +352,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
+    review: { date: 2026-10-04, verdict: "conforme (1 constat mineur d'ergonomie, hors du strict périmètre) — orchestré (vague 2026-10-04-1700, 0 passe(s) de correction)", commit: 26b4fd95b8ecd6db6d18ab36562bb99773b04508 }
   - id: L31
     title: "Release : à la prochaine version publiée, prouver l'OIDC (ligne « Signed provenance statement » dans le log du workflow, provenance visible sur npmjs.com) puis proposer à Sylvain « disallow tokens » sur le paquet — sorti de L23 (dépend d'une release, pas de code)"
     status: todo

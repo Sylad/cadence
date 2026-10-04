@@ -159,15 +159,20 @@ lots:
     finished: 2026-10-04
   - id: L19
     title: "Suites de la revue L8 : budget de temps par vérification (une lente ne rougit plus les suivantes ; restantes « non vérifiées ») ; README borne réelle de session start et délais ≠ deliver ; tuer le groupe de processus (pas d'orphelins) ; un seul intervalle de réessai partagé ; test realDeps quiet"
-    status: doing
+    status: done
     estimate: 0.5
     quickwin: true
     created: 2026-10-04
     started: 2026-10-04
     notes:
       - { date: 2026-10-04, text: "revue 04-10 NON CONFORME (1 bloquant, 2 majeurs, 3 mineurs) : (B) exec détaché (setsid) → Ctrl-C/SIGHUP pendant deliver laisse le script orphelin, verrou jugé périmé, seconde livraison concurrente reproduite (incident 17-09) ; (M) plus de /dev/tty pour les commandes deliver (ssh, sudo, pinentry) ; (M) part budget÷N rougit une vérification saine (ol : 1,43 s pour verify-rollout.sh) ; (m) code 3 absent des aides cli.ts:45 et bin/cadence.js:36 ; (m) plancher 1 s contourne « jamais rouge » ; (m) phrase cassée README l.510. Décision lead : deliver revient au exec non détaché ; groupe détaché + relais des signaux réservé à verify ; vérifications de session start en PARALLÈLE, chacune avec le budget entier. ⚠ dist/ installé contient le détachement : aucune livraison cadence avant correction." }
+    review: { date: 2026-10-04, verdict: "conforme (re-revue 04-10) : Ctrl-C/SIGHUP pendant deliver rejoués (un seul bump), /dev/tty rendu, relais des signaux de verify vérifié par mutation, vérifications parallèles à délai entier ; 264 tests ; 1 mineur (README l.420 minimise le risque du délai) reporté en L20", commit: 8d31c3a0c8978d5e6a25fbb38b0e31bb9125947a }
+    finished: 2026-10-04
   - id: L20
     title: "deliver : un script tué au deployTimeout laisse ses descendants (sh fait un fork) et cadence libère le verrou → seconde livraison concurrente possible (risque antérieur à L19) — tuer les descendants au délai sans détacher, ou garder le verrou tant que le groupe vit ; SIGTERM envoyé à cadence seul idem ; test"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-04
+    notes:
+      - { date: 2026-10-04, text: "à faire avec : README l.420-421 — au délai, tout processus lancé par la commande (sh fait un fork, cas courant d'un deliver.script) peut survivre, pas seulement un enfant en arrière-plan (mineur de la re-revue de L19)" }
+    started: 2026-10-04

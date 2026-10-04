@@ -30,6 +30,13 @@ describe('RunStore', () => {
     expect(store.lots().map((l) => l.project).sort()).toEqual(['a', 'b']);
   });
 
+  it('lots() suit l\'ordre de la vague, pas l\'ordre alphabétique des fichiers (L9 avant L10)', () => {
+    const store = new RunStore(tempDir(), 'w');
+    store.writeWave({ ...wave('w'), lots: ['a:L9', 'a:L10', 'a:L3', 'a:L12'] });
+    for (const lot of ['L10', 'L12', 'L3', 'L9']) store.writeLot(newLot({ project: 'a', repo: '/a', lot, title: '', visible: false, small: false, model: 'sonnet', readOnlyPlan: false }));
+    expect(store.lots().map((l) => l.lot)).toEqual(['L9', 'L10', 'L3', 'L12']);
+  });
+
   it('journal : une ligne par transition', () => {
     const store = new RunStore(tempDir(), 'w');
     store.journal('a:L1 → implementing');

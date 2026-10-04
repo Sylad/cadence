@@ -68,4 +68,13 @@ describe('ordonnanceur', () => {
     expect(s.ctxs[1].lot.status).toBe('handed-back');
     expect(s.ctxs[1].lot.outcome).toBe('dépendance non prête dans la vague : L1');
   });
+
+  it('un lot en attente est revisité quand sa dépendance, jouée après lui, devient prête (L10 avant L9)', async () => {
+    const s = setup();
+    s.ctxs[1].lot.dependsOn = ['L1'];
+    await runPool([s.ctxs[1], s.ctxs[0]]);
+    expect(s.ctxs[0].lot.status).toBe('ready');
+    expect(s.ctxs[1].lot.status).toBe('ready');
+    expect(s.ctxs[1].lot.outcome).not.toMatch(/en attente/);
+  });
 });

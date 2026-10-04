@@ -179,11 +179,18 @@ export class RunStore {
     return existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as LotState) : null;
   }
 
+  /** Les lots de la vague, dans l'ordre donné au lancement (`wave.lots`) : une reprise rejoue les dépendances avant les dépendants. */
   lots(): LotState[] {
-    return readdirSync(this.dir)
+    const all = readdirSync(this.dir)
       .filter((n) => n.endsWith('.json') && n !== 'wave.json')
       .sort()
       .map((n) => JSON.parse(readFileSync(join(this.dir, n), 'utf8')) as LotState);
+    const order = this.readWave()?.lots ?? [];
+    const rank = (l: LotState) => {
+      const i = order.indexOf(lotKey(l.project, l.lot));
+      return i < 0 ? order.length : i;
+    };
+    return all.map((l, i) => ({ l, i })).sort((a, b) => rank(a.l) - rank(b.l) || a.i - b.i).map((x) => x.l);
   }
 
   journal(line: string): void {

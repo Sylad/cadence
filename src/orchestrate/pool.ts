@@ -15,7 +15,11 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
 
   const worker = async () => {
     for (let queue = pending.shift(); queue; queue = pending.shift()) {
-      for (const c of queue) {
+      // Un lot en attente est revisité tant qu'un tour de la file en fait avancer un autre (sa dépendance peut venir après lui).
+      for (let todo = queue, progress = true; todo.length && progress; ) {
+        const waiting: LotCtx[] = [];
+        progress = false;
+        for (const c of todo) {
         const state = (id: string) => [...ctxs.map((o) => o.lot), ...known].find((o) => o.project === c.lot.project && o.lot === id)?.status;
         const missing = (c.lot.dependsOn ?? []).filter((id) => state(id) !== 'ready');
         if (missing.length && c.lot.steps.length === 0 && (c.lot.status === 'queued' || c.lot.status === 'suspended')) {
@@ -26,16 +30,21 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
             c.lot.outcome = `en attente de : ${missing.join(', ')}`;
             c.wave.store.writeLot(c.lot);
             c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} — ${c.lot.outcome}`);
+            waiting.push(c);
             continue;
           }
           c.lot.status = 'handed-back';
           c.lot.outcome = `dépendance non prête dans la vague : ${missing.join(', ')}`;
           c.wave.store.writeLot(c.lot);
           c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} → handed-back — ${c.lot.outcome}`);
+          progress = true;
           continue;
         }
         if (c.lot.outcome?.startsWith('en attente de : ')) c.lot.outcome = null;
+        progress = true;
         await runLot(c);
+        }
+        todo = waiting;
       }
     }
   };

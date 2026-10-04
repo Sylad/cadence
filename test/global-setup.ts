@@ -1,7 +1,7 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { leftovers, removeTree } from './tmp-hygiene.js';
+import { PID_FILE, ROOT_PREFIX, leftovers, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
 /**
  * Toute la suite travaille dans une racine temporaire PRIVÉE (TMPDIR hérité par les workers et par les
@@ -12,7 +12,13 @@ import { leftovers, removeTree } from './tmp-hygiene.js';
  */
 export default function setup(): () => void {
   const realTmp = tmpdir();
-  const root = mkdtempSync(join(realTmp, 'cadence-tests-root-'));
+  // Un run précédent interrompu (Ctrl-C, kill, OOM) a laissé sa racine : on le dit, une ligne, puis on la supprime.
+  const stale = removeStaleRoots(realTmp);
+  if (stale.length) {
+    console.warn(`[tests] ${stale.length} racine(s) temporaire(s) d'un run interrompu supprimée(s) : ${stale.join(', ')}`);
+  }
+  const root = mkdtempSync(join(realTmp, ROOT_PREFIX));
+  writeFileSync(join(root, PID_FILE), String(process.pid));
   const previous = process.env.TMPDIR;
   process.env.TMPDIR = root;
   process.env.CADENCE_TEST_TMP_ROOT = root;

@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } 
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { cleanupTempDirs, removeDryRunBriefs, tempDir } from './helpers.js';
-import { leftovers, removeTree } from './tmp-hygiene.js';
+import { PID_FILE, ROOT_PREFIX, findStaleRoots, leftovers, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
 describe('dossiers temporaires de la suite (L45)', () => {
   it('la suite travaille dans une racine temporaire privée (globalSetup) que sa fin de run vérifie vide', () => {
@@ -75,6 +75,35 @@ describe('dossiers temporaires de la suite (L45)', () => {
     const root = process.env.CADENCE_TEST_TMP_ROOT!;
     expect(() => removeDryRunBriefs(`    brief : ${join(root, 'x.md')}\n`)).toThrow();
     expect(existsSync(root)).toBe(true);
+  });
+
+  it('findStaleRoots ne désigne que les racines à nous (préfixe + fichier pid) dont le processus est mort (L45/t2)', () => {
+    const tmp = tempDir();
+    const make = (name: string, pid: string | null): string => {
+      const dir = join(tmp, name);
+      mkdirSync(dir);
+      writeFileSync(join(dir, 'reste'), 'x');
+      if (pid !== null) writeFileSync(join(dir, PID_FILE), pid);
+      return dir;
+    };
+    const morte = make(`${ROOT_PREFIX}morte`, '111');
+    const vivante = make(`${ROOT_PREFIX}vivante`, '222');
+    const sansPid = make(`${ROOT_PREFIX}sanspid`, null);
+    const pidIllisible = make(`${ROOT_PREFIX}illisible`, 'abc');
+    const autrePrefixe = make('autre-morte', '111');
+    writeFileSync(join(tmp, `${ROOT_PREFIX}fichier`), 'x'); // un fichier, pas un dossier
+    const alive = (pid: number): boolean => pid === 222;
+    expect(findStaleRoots(tmp, alive)).toEqual([morte]);
+    expect(removeStaleRoots(tmp, alive)).toEqual([morte]);
+    expect(existsSync(morte)).toBe(false);
+    for (const d of [vivante, sansPid, pidIllisible, autrePrefixe]) expect(existsSync(d)).toBe(true);
+    expect(removeStaleRoots(join(tmp, 'inexistant'), alive)).toEqual([]);
+  });
+
+  it('globalSetup a écrit le pid de ce processus dans la racine privée, que leftovers ignore', () => {
+    const root = process.env.CADENCE_TEST_TMP_ROOT!;
+    expect(existsSync(join(root, PID_FILE))).toBe(true);
+    expect(leftovers(root)).not.toContain(PID_FILE);
   });
 
   it('removeTree refuse tout chemin hors de la racine privée', () => {

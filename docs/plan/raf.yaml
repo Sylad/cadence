@@ -186,3 +186,10 @@ lots:
     estimate: 0.25
     quickwin: true
     created: 2026-10-04
+  - id: L22
+    title: Publier @sylad/cadence 0.8.0 sur npm (verify, attribution par la portée, livraisons protégées Ctrl-C/délai/SIGTERM, deliveredLots, noms accentués) — OTP par Sylvain, vérification au registre et tag
+    status: doing
+    estimate: 0.1
+    quickwin: true
+    created: 2026-10-04
+    started: 2026-10-04

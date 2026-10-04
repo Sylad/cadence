@@ -1,6 +1,6 @@
 {
   "name": "@sylad/cadence",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "A small, repo-native working method: a versioned plan linked to your commits, a changelog with screenshots, session rituals and deliveries proven by their effect.",
   "license": "MIT",
   "author": "Sylvain Ladoire",
@@ -9,8 +9,18 @@
     "raf": "bin/raf.js",
     "cadence": "bin/cadence.js"
   },
-  "files": ["bin", "dist", "skills", "agents", ".claude-plugin", "README.md", "LICENSE"],
-  "engines": { "node": ">=20" },
+  "files": [
+    "bin",
+    "dist",
+    "skills",
+    "agents",
+    ".claude-plugin",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",

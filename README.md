@@ -416,7 +416,8 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   process died is removed with a warning); with `ci: github`, `gh` installed and
   logged in.
 - Every command is killed when it exceeds its budget (CI, `deployTimeout`, what is
-  left of `verifyTimeout`) and reported as "délai dépassé".
+  left of `verifyTimeout`) and reported as "délai dépassé". The whole process
+  group is killed, so no child of the command survives it.
 - **CI** `github`: polls `gh run list --commit <sha>` every 15 s; no run after
   5 minutes is a failure (you probably pushed another commit than the one you
   deliver); every run must end `success`, `skipped` or `neutral`. `gh` errors
@@ -479,7 +480,17 @@ verify : 1 effet rouge sur 2 vérifications
 ```
 
 Exit code: **0** every check green · **1** at least one red effect · **2** nothing
-to verify or invalid configuration. The check code is deliver's own (`url` /
+to verify or invalid configuration · **3** no red effect, but the time budget ran
+out before some checks were tried (they are printed `?` and "non vérifiée", never
+red).
+
+Time limits differ from deliver's. `verify` has one budget for the whole run
+(120 s, plus the `--retry` time for each check) and gives each check an equal share
+of what is left: a slow check is killed at its share ("délai dépassé") and does not
+eat the others' time. Retries repeat every 10 s (deliver's interval) up to `--retry`
+seconds per check. deliver, by contrast, retries each check until
+`verifyTimeout` (300 s by default) is spent, and stops at the first check that
+never turns green. The check code is deliver's own (`url` /
 `status` / `contains` / `command`, same messages, same time limits). A project with
 a delivery script (`deliver.script`) and no `verify` declares no effect checks —
 `verify` says so and exits 2 (its script's own checks stay its business); add
@@ -489,10 +500,13 @@ Make `verify` count: a health endpoint stays green while the data is wrong (a
 lineup served empty for 38 h behind a green `/api/health`). Add a check on the
 content that matters, e.g. `url: …/api/lineup` with `contains: '"starters"'`.
 
-`cadence session start` runs the same checks (one try each, 10 s in total, command
-output muted) and adds an **"Effets en production"** section to the morning report:
+`cadence session start` runs the same checks (one try each, command output muted)
+within a 10 s budget shared between them: a check already started may overrun it
+by up to 1 s (the floor of a single try), so the real bound is about 11 s, and the
+checks the budget did not reach are listed as `?` "non vérifiée" (neither green nor
+red). It is not deliver's `verifyTimeout`, and there is no retry and adds an **"Effets en production"** section to the morning report:
 a single `✓` line when everything is green, the red effects and the summary
-otherwise. It is a fact like the others: it never changes the exit code, and an
+otherwise (plus the `?` lines). It is a fact like the others: it never changes the exit code, and an
 unreachable network shows up as red lines ("erreur réseau") without blocking the
 session. No section for a project without `deliver.verify`.
 

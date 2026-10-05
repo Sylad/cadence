@@ -684,3 +684,30 @@ lots:
     estimate: 0.25
     quickwin: true
     created: 2026-10-05
+  - id: L59
+    title: "skill lead : les sessions d'une vague orchestrate comptent dans la limite de deux sous-agents (vécu 05-10 : 3 à 4 sessions en parallèle, 25 % de l'usage)"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-05
+  - id: L60
+    title: "orchestrate.ux : déclarer dans cadence.yaml des projets à app (ccc, evatosorus, avatar-pandora, warhammer, finance, ol, maritime) comment voir l'app, pour que la vague fasse la revue UX elle-même (05-10 : toutes faites à la main par le lead)"
+    status: todo
+    estimate: 1
+    created: 2026-10-05
+  - id: L61
+    title: "orchestrate : lancer une vague depuis une copie figée de dist/ et des gabarits (instantané au démarrage) pour pouvoir orchestrer cadence lui-même et modifier les gabarits sans toucher une vague en cours (05-10 : L53-L57 tous délégués à la main)"
+    status: todo
+    estimate: 1
+    created: 2026-10-05
+  - id: L62
+    title: "orchestrate : un lot dont le travail est dans un dépôt voisin non cadence (ex. B64 dans aetherwx-gitops) — clé de lot ou de projet listant les dépôts de travail ; commits et revue lus dans ces dépôts"
+    status: todo
+    estimate: 1.5
+    created: 2026-10-05
+  - id: L63
+    title: Publier 0.10.0 (L53 revue directe, L54 sha attendu par verify, L55, L56 fix sans commit → revue, L57 questions mineures)
+    status: doing
+    estimate: 0.1
+    created: 2026-10-05
+    started: 2026-10-05

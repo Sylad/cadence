@@ -415,12 +415,33 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.outcome).toBe('implement sans commit');
   });
 
-  it('une correction sans commit reste rendue au lead même si le lot a reçu une réponse et a des commits (L28)', async () => {
-    const h = harness({ script: { implement: [impl()], review: [major], fix: [() => claudeOut(workReport())] } });
+  it('une correction sans nouveau commit sur un lot déjà commité enchaîne sur une revue neuve, avec avertissement (L56)', async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [() => claudeOut(workReport())] } });
     const c = h.lot('L1');
-    c.lot.answers.push('oui');
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'review', 'fix']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.pass).toBe(1);
+    expect(c.lot.warnings).toContain('fix sans nouveau commit : revue lancée sur les commits du lot');
+  });
+
+  it('deux corrections sans commit de suite : le plafond de passes est atteint, rendu au lead (L56)', async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, major, major], fix: [() => claudeOut(workReport()), () => claudeOut(workReport())] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('après 2 passe(s) de correction');
+  });
+
+  it('une correction sans commit sur un lot sans aucun commit reste rendue au lead (L56)', async () => {
+    const h = harness({ script: { fix: [() => claudeOut(workReport())] } });
+    const c = h.lot('L1');
+    c.lot.next = 'fix';
+    c.lot.pass = 1;
+    c.lot.constats = [{ source: 'code', gravite: 'majeur', texte: 'bug nommé' }];
+    await runLot(c);
+    expect(kinds(h)).toEqual(['fix']);
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toBe('fix sans commit');
   });
@@ -966,23 +987,13 @@ describe('correction ordinaire interrompue puis reprise (L40)', () => {
     expect(c.lot.status).toBe('ready');
   });
 
-  it('deux passes sans coupure : la seconde sans commit est rendue au lead, pas prise pour une reprise', async () => {
+  it('deux passes sans coupure : la seconde sans commit relance une revue (lot commité), jamais prise pour une reprise (L56)', async () => {
     const nothing: Handler = () => claudeOut(workReport());
-    const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt'), nothing], 'review-small': [ok] } });
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [fix('b.txt'), nothing] } });
     const c = h.lot('L1', {}, { test: 'test -f c.txt' });
     await runLot(c);
-    expect(c.lot.status).toBe('handed-back');
-    expect(c.lot.outcome).toBe('fix sans commit');
     expect(c.lot.warnings.join('\n')).not.toContain('reprise sans nouveau commit');
-  });
-
-  it('correction sans commit et HEAD inchangé depuis la revue : toujours rendue au lead', async () => {
-    const nothing: Handler = () => claudeOut(workReport());
-    const h = harness({ script: { implement: [impl()], review: [major], fix: [nothing] } });
-    const c = h.lot('L1');
-    await runLot(c);
-    expect(c.lot.status).toBe('handed-back');
-    expect(c.lot.outcome).toBe('fix sans commit');
+    expect(c.lot.warnings).toContain('fix sans nouveau commit : revue lancée sur les commits du lot');
   });
 });
 

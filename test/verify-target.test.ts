@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { parseDeliverConfig } from '../src/deliver.js';
 import { appendDelivery, sharedStateDir } from '../src/state.js';
@@ -88,5 +90,28 @@ describe('cadence verify : sha attendu (L54)', () => {
     const code = await run(['verify'], { cwd: repo, env: { RAF_TODAY: '2026-10-05' }, out: (l: string) => out.push(l), err: () => {}, now: () => new Date('2026-10-05T10:00:00') });
     expect(code).toBe(0);
     expect(out[0]).toContain('1 commit(s) non poussé(s) — l\'effet vérifié est celui de origin/main');
+  });
+});
+
+describe('cadence session start : sha attendu (L54)', () => {
+  it('ci: none sans deploy : vise la tête amont et affiche la note des commits non poussés', async () => {
+    const repo = withRemote();
+    const cad = async (...argv: string[]) => {
+      const out: string[] = [];
+      const code = await run(argv, { cwd: repo, env: { RAF_TODAY: '2026-10-05' }, out: (l: string) => out.push(l), err: () => {}, now: () => new Date('2026-10-05T10:00:00') });
+      return { code, out: out.join('\n') };
+    };
+    await cad('init', '--project', 'demo', '--no-hook');
+    git(repo, 'add', '.');
+    commit(repo, 'chore: plan');
+    git(repo, 'push', '-q');
+    const pushed = headSha(repo)!.slice(0, 7);
+    writeFileSync(join(repo, 'cadence.yaml'), `deliver:\n  ci: none\n  verify:\n    - command: test "$CADENCE_SHORT" = ${pushed}\n`);
+    git(repo, 'add', 'cadence.yaml');
+    commit(repo, 'local un');
+    const r = await cad('session', 'start');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("1 commit(s) non poussé(s) — l'effet vérifié est celui de origin/main");
+    expect(r.out).toContain('✓ verify : 1/1 vérifications vertes');
   });
 });

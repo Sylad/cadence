@@ -18,6 +18,15 @@ const ok: Handler = () => claudeOut(reviewReport());
 const major: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }], verdict: 'non conforme' }));
 const kinds = (h: ReturnType<typeof harness>) => h.calls.map((c) => c.kind);
 
+/** Enregistre dans le plan une revue de code du lot, rattachée au commit donné (HEAD par défaut), et la commite. */
+function recordReview(h: ReturnType<typeof harness>, verdict: string, commit = git(h.repo, 'rev-parse', 'HEAD')): void {
+  const plan = h.plan();
+  plan.recordReview('L1', verdict, '2026-10-04', commit);
+  plan.save();
+  git(h.repo, 'add', '--', 'docs/plan/raf.yaml');
+  git(h.repo, 'commit', '-q', '-m', 'plan: L1 revue', '--', 'docs/plan/raf.yaml');
+}
+
 describe('cycle nominal', () => {
   it('implémentation Sonnet → revue Opus neuve conforme → raf review écrit avec le sha relu, raf done non appelé', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
@@ -300,6 +309,7 @@ describe('contrôles autour des sessions', () => {
     };
     const h = harness({ script: { implement: [resumed], review: [ok] } });
     earlier = commitFile(h.repo, 'a.txt', 'feat(L1): a (session précédente)');
+    recordReview(h, 'conforme : rien à signaler'); // revue à jour : l'implémentation n'est pas sautée (L53)
     const c = h.lot('L1');
     await runLot(c);
     expect(c.lot.status).toBe('ready');
@@ -382,12 +392,15 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.warnings.filter((w) => w.includes('sans nouveau commit'))).toHaveLength(1);
   });
 
-  it('sans réponse, une implémentation sans commit reste rendue au lead même si le lot a des commits (L28)', async () => {
-    const h = harness({ script: { implement: [() => claudeOut(workReport())] } });
+  it('une implémentation sans nouveau commit sur un lot déjà commité passe à la revue, sans réponse du lead (L53)', async () => {
+    const h = harness({ script: { implement: [() => claudeOut(workReport())], review: [ok] } });
     commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    recordReview(h, 'conforme : rien à signaler'); // revue à jour et conforme : l'étape implement n'est pas sautée
     const c = h.lot('L1');
     await runLot(c);
-    expect(c.lot.outcome).toBe('implement sans commit');
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.warnings.filter((w) => w.includes('sans nouveau commit'))).toHaveLength(1);
   });
 
   it("après une réponse, une implémentation sans commit alors que le lot n'a aucun commit reste rendue au lead (L28)", async () => {
@@ -1033,5 +1046,66 @@ describe('gabarits : instantané de la vague (L39)', () => {
       expect(call.brief).not.toContain('Nouveau gabarit');
     }
     expect(h.calls[2].brief).toContain('found the defects below');
+  });
+});
+
+describe('lot déjà implémenté : revue directe (L53)', () => {
+  it('lot commité sans revue : l\'étape implement est sautée, la revue part directement', async () => {
+    const h = harness({ script: { review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['review']);
+    expect(h.calls[0].model).toBe('opus');
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.warnings).toEqual([expect.stringContaining('lot déjà implémenté')]);
+    expect(h.plan().lot('L1').review?.verdict).toContain('conforme');
+  });
+
+  it('lot commité avec revue non conforme : revue directe, puis la passe de correction habituelle', async () => {
+    const h = harness({ script: { review: [major, ok], fix: [fix('b.txt')] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    recordReview(h, 'non conforme : un bug nommé');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['review', 'fix', 'review']);
+    expect(c.lot.pass).toBe(1);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('lot commité avec une revue conforme plus ancienne que son dernier commit : revue directe', async () => {
+    const h = harness({ script: { review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    recordReview(h, 'conforme : rien à signaler');
+    commitFile(h.repo, 'b.txt', 'feat(L1): b');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['review']);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('revue directe d\'un lot visible avec application déclarée : l\'UX est rejouée avant la revue de code', async () => {
+    const h = harness({ lots: [{ title: 'Un lot', visible: true }], script: { ux: [ok], review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:1' } });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['ux', 'review']);
+  });
+
+  it('lot neuf (aucun commit) : comportement inchangé, implement puis revue', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.warnings).toEqual([]);
+  });
+
+  it('lot commité dont la revue est conforme et à jour : l\'implémentation n\'est pas sautée', async () => {
+    const h = harness({ script: { implement: [impl('b.txt')], review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    recordReview(h, 'conforme : rien à signaler');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
   });
 });

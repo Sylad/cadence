@@ -2,7 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
-import { lotCommits, lotWork } from '../audit.js';
+import { lotCommits, lotWork, unreviewedWork } from '../audit.js';
 import type { OrchestrateConfig } from '../config.js';
 import type { Day } from '../dates.js';
 import { readCommits, resolveCommit, type Commit } from '../git.js';
@@ -70,6 +70,19 @@ export interface LotCtx {
   lot: LotState;
   config: OrchestrateConfig;
   loadPlan: () => Plan;
+}
+
+const NON_CONFORME = /non[\s-]conforme|non[\s-]compliant|not\s+compliant/i;
+
+/**
+ * Lot déjà implémenté qui n'attend qu'une revue : il a des commits à relire et sa revue de code est absente, plus
+ * ancienne que son dernier commit, ou dit « non conforme ». Une session implement n'aurait rien à y faire.
+ */
+export function awaitsReview(plan: Plan, repo: string, lotId: string): boolean {
+  const lot = plan.lots().find((x) => x.id === lotId);
+  if (!lot || lotWork(plan, repo, lotId).length === 0) return false;
+  if (!lot.review || unreviewedWork(plan, repo, lotId) > 0) return true;
+  return NON_CONFORME.test(lot.review.verdict);
 }
 
 const TERMINAL = new Set(['ready', 'handed-back', 'failed']);
@@ -477,8 +490,8 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     else stop(c, 'handed-back', 'passe des mineurs sans commit, mais aucune revue conforme gardée');
     return;
   }
-  // Après une réponse du lead, la session peut n'avoir plus rien à commiter : le travail du lot est déjà dans git.
-  const alreadyDone = kind === 'implement' && l.answers.length > 0 && lotWork(plan, l.repo, l.lot).length > 0;
+  // La session peut n'avoir plus rien à commiter (réponse du lead, lot commité avant la vague) : le travail du lot est déjà dans git.
+  const alreadyDone = kind === 'implement' && lotWork(plan, l.repo, l.lot).length > 0;
   if (commits.length === 0 && !alreadyDone && !headMoved) {
     stop(c, 'handed-back', `${kind} sans commit`);
     return;
@@ -669,7 +682,11 @@ export async function runLot(c: LotCtx): Promise<void> {
         return;
       }
       l.startedSha = (await snapshot(l.repo, { remote: false })).head ?? undefined;
-      l.next = 'implement';
+      if (awaitsReview(c.loadPlan(), l.repo, l.lot)) {
+        // Lot déjà implémenté (commits citant le lot, revue absente, périmée ou non conforme) : pas de session implement, revue directe.
+        l.warnings.push('lot déjà implémenté : étape implement sautée, revue directe');
+        l.next = firstReview(c);
+      } else l.next = 'implement';
       save(c);
     }
     while (l.next && !TERMINAL.has(l.status)) {

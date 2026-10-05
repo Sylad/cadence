@@ -177,6 +177,32 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     }
   });
 
+  it('--dry-run d\'un lot déjà commité sans revue : étapes = review seule, rien n\'est lancé (L53)', async () => {
+    const s = setup({});
+    writeFileSync(join(s.dir, 'a.txt'), 'x\n');
+    git(s.dir, 'add', '--', 'a.txt');
+    git(s.dir, 'commit', '-q', '-m', 'feat(L1): travail déjà fait', '--', 'a.txt');
+    const r = await s.cli('proj:L1', '--dry-run');
+    try {
+      expect(r.code).toBe(0);
+      expect(r.out).toContain('étapes : review (opus) — lot déjà implémenté');
+      expect(r.out).not.toContain('implement (');
+      expect(s.calls()).toEqual([]);
+    } finally {
+      removeDryRunBriefs(r.out);
+    }
+  });
+
+  it('lot commité sans revue : la vague saute implement et va en revue (L53)', async () => {
+    const s = setup({ review: [{}] });
+    writeFileSync(join(s.dir, 'a.txt'), 'x\n');
+    git(s.dir, 'add', '--', 'a.txt');
+    git(s.dir, 'commit', '-q', '-m', 'feat(L1): travail déjà fait', '--', 'a.txt');
+    const r = await s.cli('proj:L1');
+    expect(r.code).toBe(0);
+    expect(s.calls().map((c) => c.kind)).toEqual(['review']);
+  });
+
   // L3/t12 : vrai processus, vrai signal.
   it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)('%s : sessions tuées, étapes et vague interrompues, verrous et hook retirés', async (signal) => {
     const s = setup({ implement: [{ ...impl, sleepMs: 60_000 }] });

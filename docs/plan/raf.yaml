@@ -713,3 +713,9 @@ lots:
     started: 2026-10-05
     review: { date: 2026-10-05, verdict: "conforme — montée de version seule (package.json, lock, plugin.json, marketplace.json à 0.10.0), relue par le lead ; 604 tests, tsc 0 ; publication vérifiée au registre ensuite", commit: 37f02014b506a9bc3b166707824ac277e44084e8 }
     finished: 2026-10-05
+  - id: L64
+    title: "publish.yml : deux runs pour un même push du tag v0.10.0 (2 s d'écart, cause inconnue) → le 2e en 409 rouge alors que la version est publiée ; ajouter concurrency par ref et sauter npm publish si la version est déjà au registre (run vert, message explicite)"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-05

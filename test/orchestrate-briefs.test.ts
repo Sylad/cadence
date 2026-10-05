@@ -63,6 +63,21 @@ describe('gabarits', () => {
     expect(out).toContain('fix(L9): …');
   });
 
+  it('les gabarits d\'écriture portent la règle « question = seulement ce qu\'elle change »', () => {
+    for (const kind of ['implement', 'fix', 'fix-minors'] as const) {
+      const out = renderBrief(kind, vars);
+      expect(out, kind).toContain('A question is legitimate only if it names what it would change');
+      expect(out, kind).toContain('scope of the lot, the architecture, or a costly rollback');
+      expect(out, kind).toContain('otherwise it is a choice: decide, write the alternative you did not take, go on');
+      expect(out, kind).toContain('a spacing, colour or label value');
+      expect(out, kind).toContain('the URL of a link');
+      expect(out, kind).toContain('a News entry for a visible lot (yes, always)');
+      expect(out, kind).toContain('a written rule of the project\'s CLAUDE.md (apply it)');
+      expect(out, kind).toContain('who launches the review or UX pass (never the session');
+      expect(out, kind).toContain('"not my job to touch the plan" is not a question');
+    }
+  });
+
   it('reprise et réponse sont ajoutées à l\'implémentation quand elles existent', () => {
     const out = renderBrief('implement', { ...vars, commits: 'A previous session was interrupted.', reponse: 'Answer: oui' });
     expect(out).toContain('A previous session was interrupted.');

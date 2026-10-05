@@ -10,6 +10,11 @@ reading of an ambiguous line of the lot) and list each one under "choix" in your
 alternative you did not take — the reviewer re-reads them. Stop and ask (under "questions") only on a real blocker:
 a decision that changes the scope or the architecture, is costly to undo, or that the plan, its notes
 and the project's CLAUDE.md do not settle.
+A question is legitimate only if it names what it would change: the scope of the lot, the architecture, or a costly rollback (data, production, public API);
+otherwise it is a choice: decide, write the alternative you did not take, go on. Minor choices to settle yourself:
+a spacing, colour or label value when a measurement or a rule justifies it; the URL of a link (the most general official page if a precise one is not certain);
+a News entry for a visible lot (yes, always); a written rule of the project's CLAUDE.md (apply it); who launches the review or UX pass (never the session: the program and the lead do).
+"not my job to touch the plan" is not a question: say it in the report.
 If the lot's commits already cover its open sub-tasks, do not ask whether to continue: make no commit and say so
 in your report (the review that follows re-reads those commits). If they do not cover them all, implement the rest.
 Report: commits (sha + subject), tests and build results with their numbers, what you could not

@@ -643,6 +643,11 @@ lots:
     finished: 2026-10-05
   - id: L54
     title: "verify : ${SHORT} attendu = dernier commit hors plan, alors que Cloudflare Pages construit chaque push (commits chore(plan) compris) → faux rouge permanent sur avatar-pandora (attend f95b791, sert 7080faa) et evatosorus ; aligner le sha attendu sur la tête poussée, et distinguer « HEAD non poussé » de « poussé pas encore servi »"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-05
+    started: 2026-10-05
+    tasks:
+      - { id: t1, title: "test : session start (morningEffects, cli.ts:488-489) vise la tête amont et affiche la note des commits non poussés — aucune mutation n'est détectée aujourd'hui", status: todo }
+      - { id: t2, title: "expectedTarget : ne prendre @{u} que si la branche courante est la branche par défaut de l'amont (origin/HEAD) ; sinon dernière livraison (faux rouge permanent sur une branche poussée -u, Pages ne publie que main) ; test", status: todo }
+      - { id: t3, title: "expectedTarget : bascule vers @{u} réservée à ci: none (décision lead) ; README et tests alignés", status: todo }

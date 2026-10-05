@@ -79,6 +79,76 @@ describe('expectedTarget (L54)', () => {
   });
 });
 
+describe('expectedTarget : branche par défaut et ci (L54)', () => {
+  const GITHUB = parseDeliverConfig('deliver:\n  ci: github\n  verify:\n    - url: https://site.example/\n', 'cadence.yaml');
+  const CMD = parseDeliverConfig('deliver:\n  ci:\n    command: ./ci.sh\n  verify:\n    - url: https://site.example/\n', 'cadence.yaml');
+
+  it('branche de travail poussée avec -u : dernière livraison (Pages ne publie que la branche de production)', () => {
+    const repo = withRemote();
+    const first = headSha(repo)!;
+    git(repo, 'remote', 'set-head', 'origin', 'main');
+    git(repo, 'checkout', '-q', '-b', 'work');
+    commit(repo, 'w');
+    git(repo, 'push', '-q', '-u', 'origin', 'work');
+    expect(expectedTarget(repo, NO_DEPLOY, first)).toEqual({ sha: first, note: null });
+    expect(expectedTarget(repo, NO_DEPLOY, null).sha).toBe(headSha(repo));
+  });
+
+  it('branche de travail sans origin/HEAD local : repli sur les noms main/master, donc dernière livraison', () => {
+    const repo = withRemote();
+    const first = headSha(repo)!;
+    git(repo, 'checkout', '-q', '-b', 'work');
+    commit(repo, 'w');
+    git(repo, 'push', '-q', '-u', 'origin', 'work');
+    expect(expectedTarget(repo, NO_DEPLOY, first)).toEqual({ sha: first, note: null });
+  });
+
+  it('branche par défaut selon origin/HEAD : amont, même si elle ne s\'appelle ni main ni master', () => {
+    const repo = withRemote();
+    git(repo, 'checkout', '-q', '-b', 'prod');
+    commit(repo, 'p');
+    git(repo, 'push', '-q', '-u', 'origin', 'prod');
+    const pushed = headSha(repo)!;
+    git(repo, 'remote', 'set-head', 'origin', 'prod');
+    commit(repo, 'local');
+    expect(expectedTarget(repo, NO_DEPLOY, null).sha).toBe(pushed);
+  });
+
+  it('origin/HEAD présent et différent : une branche main suivie n\'est PAS la branche par défaut', () => {
+    const repo = withRemote();
+    git(repo, 'checkout', '-q', '-b', 'prod');
+    commit(repo, 'p');
+    git(repo, 'push', '-q', '-u', 'origin', 'prod');
+    git(repo, 'remote', 'set-head', 'origin', 'prod');
+    git(repo, 'checkout', '-q', 'main');
+    git(repo, 'branch', '-q', '-u', 'origin/main');
+    expect(expectedTarget(repo, NO_DEPLOY, 'abc1234')).toEqual({ sha: 'abc1234', note: null });
+  });
+
+  it('repli sans origin/HEAD : master compte comme branche de production', () => {
+    const repo = gitRepo();
+    git(repo, 'checkout', '-q', '-b', 'master');
+    const bare = tempDir();
+    git(bare, 'init', '-q', '--bare', '-b', 'master');
+    git(repo, 'remote', 'add', 'origin', bare);
+    commit(repo, 'm');
+    git(repo, 'push', '-q', '-u', 'origin', 'master');
+    const pushed = headSha(repo)!;
+    commit(repo, 'local');
+    expect(expectedTarget(repo, NO_DEPLOY, 'abc1234').sha).toBe(pushed);
+  });
+
+  it('ci: github ou ci.command sans deploy : dernière livraison (la bascule vers l\'amont est réservée à ci: none)', () => {
+    const repo = withRemote();
+    const first = headSha(repo)!;
+    commit(repo, 'x');
+    git(repo, 'push', '-q');
+    expect(expectedTarget(repo, GITHUB, first)).toEqual({ sha: first, note: null });
+    expect(expectedTarget(repo, CMD, first)).toEqual({ sha: first, note: null });
+    expect(expectedTarget(repo, GITHUB, null).sha).toBe(headSha(repo));
+  });
+});
+
 describe('cadence verify : sha attendu (L54)', () => {
   it('verify annonce les commits non poussés et vise la tête distante', async () => {
     const repo = withRemote();

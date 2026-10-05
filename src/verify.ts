@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
-import { headSha, repoStatus, upstreamHead } from './git.js';
+import { headSha, repoStatus, upstreamHead, upstreamIsDefaultBranch } from './git.js';
 import { lastDelivery, sharedStateDir } from './state.js';
 import { onTermination } from './proc.js';
 import { describeCheck, realDeps, retryCheck, TIMED_OUT, type CheckDeps, type DeliverConfig, type VerifyCheck } from './deliver.js';
@@ -97,17 +97,19 @@ export function verifyEnv(sha: string): Record<string, string> {
 
 /**
  * Sha attendu par les vérifications (${SHA} / ${SHORT}) et note éventuelle pour le compte rendu.
- * - Avec une commande ou un script de livraison : la dernière livraison, à défaut la tête (inchangé).
- * - Sans aucun des deux, la livraison EST le push (Cloudflare Pages construit chaque push, plan compris) :
- *   la tête de la branche amont suivie (état local de la référence, aucun réseau). Des commits locaux non
- *   poussés ne changent pas ce sha mais sont dits dans la note : l'effet vérifié est celui de l'amont.
- * - Sans amont : repli sur la dernière livraison, à défaut la tête.
+ * - Par défaut : la dernière livraison, à défaut la tête (inchangé).
+ * - `ci: none` SANS commande ni script de livraison : la livraison EST le push (Cloudflare Pages construit chaque
+ *   push, plan compris), donc la tête de la branche amont suivie (état local de la référence, aucun réseau) —
+ *   mais seulement si cet amont est la branche de production du dépôt distant : une branche de travail poussée
+ *   avec -u n'est pas publiée, elle garde la règle par défaut. Des commits locaux non poussés ne changent pas
+ *   ce sha mais sont dits dans la note.
+ * - Sans amont : règle par défaut.
  */
 export function expectedTarget(root: string, config: DeliverConfig, last: string | null): { sha: string; note: string | null } {
   const fallback = last ?? headSha(root) ?? '';
-  if (config.script !== undefined || config.deploy.length > 0) return { sha: fallback, note: null };
+  if (config.script !== undefined || config.deploy.length > 0 || config.ci !== 'none') return { sha: fallback, note: null };
   const up = upstreamHead(root);
-  if (!up) return { sha: fallback, note: null };
+  if (!up || !upstreamIsDefaultBranch(root, up.ref)) return { sha: fallback, note: null };
   const ahead = repoStatus(root).ahead;
   return { sha: up.sha, note: ahead > 0 ? `${ahead} commit(s) non poussé(s) — l'effet vérifié est celui de ${up.ref}` : null };
 }

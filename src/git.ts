@@ -120,6 +120,21 @@ export function upstreamHead(cwd: string): { ref: string; sha: string } | null {
   return ref && sha ? { ref, sha } : null;
 }
 
+/**
+ * L'amont suivi est-il la branche de production du dépôt distant ? Lu sans réseau : `refs/remotes/<remote>/HEAD`
+ * (origin/HEAD, posé par clone ou `git remote set-head`). Absent (dépôt créé par init + push) : repli sur les
+ * noms usuels, main puis master.
+ */
+export function upstreamIsDefaultBranch(cwd: string, upstreamRef: string): boolean {
+  const slash = upstreamRef.indexOf('/');
+  if (slash < 0) return false;
+  const remote = upstreamRef.slice(0, slash);
+  const head = tryGit(cwd, ['symbolic-ref', '-q', '--short', `refs/remotes/${remote}/HEAD`]);
+  if (head) return head === upstreamRef;
+  const branch = upstreamRef.slice(slash + 1);
+  return branch === 'main' || branch === 'master';
+}
+
 /** Le commit est-il contenu dans une branche distante connue localement ? */
 export function onRemote(cwd: string, sha: string): boolean {
   return (tryGit(cwd, ['branch', '-r', '--contains', sha]) ?? '').length > 0;

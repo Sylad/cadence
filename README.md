@@ -570,16 +570,21 @@ verify : 1 effet rouge sur 2 vérifications
 Exit code: **0** every check green · **1** at least one red effect · **2** nothing
 to verify or invalid configuration.
 
-**Which sha is expected.** With deploy commands (`deliver.deploy`) or a delivery
-script, `${SHA}` / `${SHORT}` is the last recorded delivery (else `HEAD`). A project
-with **neither** — a host that builds every push, like Cloudflare Pages — delivers
-by pushing, and every push counts, plan-maintenance commits included: the expected
-sha is then the head of the tracked upstream branch (`origin/<branch>`, as last
-fetched — `verify` does no network git), not the last delivery. When local `HEAD`
-is ahead of it, the report says so first — `2 commit(s) non poussé(s) — l'effet
-vérifié est celui de origin/main` — so a red there reads "waiting for a push", not
-"broken effect". No upstream: last delivery, else `HEAD`. `session start` uses the
-same rule; `--sha` always wins.
+**Which sha is expected.** By default `${SHA}` / `${SHORT}` is the last recorded
+delivery (else `HEAD`). One case differs: a project with `ci: none` (the default) and
+**neither** deploy commands (`deliver.deploy`) nor a delivery script — a host that
+builds every push, like Cloudflare Pages — delivers by pushing, and every push counts,
+plan-maintenance commits included. The expected sha is then the head of the tracked
+upstream branch (`origin/<branch>`, as last fetched — `verify` does no network git),
+**provided that upstream is the remote's production branch**: read without network from
+`refs/remotes/origin/HEAD` (set by `git clone` or `git remote set-head origin <branch>`);
+when that reference does not exist locally (repository created with `git init` + push),
+`main` then `master` are taken as the production branch. A work branch pushed with `-u`
+is not published by such a host, so it keeps the default rule. A project with `ci: github`
+or a `ci.command` and no deploy also keeps the last delivery. When local `HEAD` is ahead
+of the upstream, the report says so first — `2 commit(s) non poussé(s) — l'effet vérifié
+est celui de origin/main` — so a red there reads "waiting for a push", not "broken
+effect". `session start` uses the same rule; `--sha` always wins.
 
 Time limits differ from deliver's. `verify` runs all the checks **in parallel**,
 each try with the whole 120 s limit (a `url` request gives up after 20 s; a slow

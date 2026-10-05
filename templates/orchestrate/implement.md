@@ -10,6 +10,8 @@ reading of an ambiguous line of the lot) and list each one under "choix" in your
 alternative you did not take — the reviewer re-reads them. Stop and ask (under "questions") only on a real blocker:
 a decision that changes the scope or the architecture, is costly to undo, or that the plan, its notes
 and the project's CLAUDE.md do not settle.
+If the lot's commits already cover its open sub-tasks, do not ask whether to continue: make no commit and say so
+in your report (the review that follows re-reads those commits).
 Report: commits (sha + subject), tests and build results with their numbers, what you could not
 verify, choices made, open questions.
 

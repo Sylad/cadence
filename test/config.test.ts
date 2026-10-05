@@ -127,14 +127,15 @@ describe('readPlanConfig', () => {
     expect(() => readPlanConfig(write(join(tempDir(), 'cadence.yaml'), text))).toThrow(message);
   });
 
-  it('leaves qa.expectations to the qa-reviewer agent: the key is accepted beside plan, session and deliver, and read by none', () => {
+  it('reads qa.expectations as the file kept with the plan (L65): accepted beside plan, session and deliver', () => {
     const text = 'qa:\n  expectations: docs/quality/pages.md\nplan: plan/todo.yaml\nsession:\n  start: ./morning.sh\ndeliver:\n  verify:\n    - url: https://app.example.com/\n';
     const file = write(join(tempDir(), 'cadence.yaml'), text);
-    expect(readPlanConfig(file)).toEqual({ path: 'plan/todo.yaml', settings: {} });
+    expect(readPlanConfig(file)).toEqual({ path: 'plan/todo.yaml', settings: { qaExpectations: 'docs/quality/pages.md' } });
     expect(readSessionConfig(file)).toEqual({ start: './morning.sh' });
     expect(parseDeliverConfig(text, file).verify).toHaveLength(1);
-    // Seule, la clé ne configure rien pour le CLI : le plan reste celui par défaut.
-    expect(readPlanConfig(write(join(tempDir(), 'cadence.yaml'), 'qa:\n  expectations: docs/quality/pages.md\n'))).toBeNull();
+    // Seule, la clé ne déplace pas le plan (pas de path) : il reste celui par défaut.
+    expect(readPlanConfig(write(join(tempDir(), 'cadence.yaml'), 'qa:\n  expectations: docs/quality/pages.md\n'))).toEqual({ settings: { qaExpectations: 'docs/quality/pages.md' } });
+    expect(readPlanConfig(write(join(tempDir(), 'cadence.yaml'), 'session:\n  start: x\n'))).toBeNull();
   });
 });
 

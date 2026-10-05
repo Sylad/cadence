@@ -27,14 +27,17 @@ export function readPlanConfig(file: string): PlanConfig | null {
   } catch (e) {
     throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
   }
-  const p = (raw as { plan?: unknown } | null)?.plan;
-  if (p == null) return null;
+  const doc = raw as { plan?: unknown; qa?: unknown } | null;
+  const qa = isObject(doc?.qa) && typeof doc.qa.expectations === 'string' && doc.qa.expectations.trim() !== '' ? doc.qa.expectations.trim() : undefined;
+  const p = doc?.plan;
+  if (p == null) return qa ? { settings: { qaExpectations: qa } } : null;
   const bad = (what: string) => new RafError(`${file} : plan.${what}`);
-  if (typeof p === 'string' && p.trim() !== '') return { path: p, settings: {} };
+  if (typeof p === 'string' && p.trim() !== '') return { path: p, settings: { ...(qa ? { qaExpectations: qa } : {}) } };
   if (!isObject(p)) throw new RafError(`${file} : plan doit être un chemin ou un objet`);
   for (const k of Object.keys(p)) if (!KEYS.includes(k)) throw bad(`${k} inconnu (attendu : ${KEYS.join(', ')})`);
 
   const settings: PlanSettings = {};
+  if (qa) settings.qaExpectations = qa;
   if (p.project != null) settings.project = String(p.project);
   if (p.since != null) {
     if (!isDay(p.since)) throw bad(`since « ${String(p.since)} » n'est pas une date AAAA-MM-JJ`);

@@ -56,7 +56,7 @@ Quand la portée du sujet cite des lots — « feat(L3): … », « chore(L31,L3
 mention en passage (« page équipe (L27) »), une plage (« L28–L31 », « L45 à L48 ») ou le corps n'y comptent pas.
 Sans portée citant un lot, tout le message est lu : « fix: L3 corrigé », « L3/t1 ».
 Un commit qui ne touche que le plan, la clé plan: de cadence.yaml (deliver/session sont du travail) (et les fichiers déclarés sous plan.files, un plan
-publié par exemple) n'a pas à en citer, et ne compte pas pour les lots qu'il cite ; le sujet n'y change rien.
+publié par exemple, ainsi que le fichier d'attendus QA : docs/qa/expectations.md ou qa.expectations) n'a pas à en citer, et ne compte pas pour les lots qu'il cite ; le sujet n'y change rien.
 Un lot --visible attend une entrée Nouveautés (docs/nouveautes/, --dir) avec capture ; raf check le vérifie.
 Un texte qui commence par « - » se passe après « -- » : raf note L1 -- "-5 %".
 Le plan est docs/plan/raf.yaml, ou celui que nomme « plan: » dans cadence.yaml ; un plan tenu par un

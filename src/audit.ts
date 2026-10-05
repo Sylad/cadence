@@ -15,7 +15,7 @@ function configRel(plan: Plan, root: string): string {
 
 /** Le plan, sa page Gantt, la configuration lue (cadence.yaml) et les fichiers tenus avec lui (plan.files). */
 function ownFiles(plan: Plan, root: string): Set<string> {
-  return new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), configRel(plan, root), ...plan.files]);
+  return new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), configRel(plan, root), ...plan.maintained]);
 }
 
 function withoutPlanKey(text: string | null): string | null {
@@ -44,7 +44,7 @@ export function planCommits(plan: Plan, root: string, opts: { since?: string; ra
 
 /**
  * Commit d'entretien du plan : TOUS ses fichiers sont des fichiers du plan (le plan, sa page Gantt,
- * plan.files — son plan publié par exemple — et la configuration lue, mais celle-ci seulement quand la
+ * plan.files — son plan publié par exemple —, les attendus QA et la configuration lue, mais celle-ci seulement quand la
  * clé `plan:` est la seule à changer : deliver/session/… sont du travail). Les fichiers décident,
  * jamais le sujet : « chore(plan): … » qui touche un fichier source est un commit comme un autre.
  */

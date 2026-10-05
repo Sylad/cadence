@@ -125,7 +125,7 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
       git('add', file);
       git('commit', '-qm', subject);
     };
-    return { raf, touch, declare, write };
+    return { raf, touch, declare, write, dir };
   }
 
   const orphans = (out: string) => out.split('\n').filter((l) => l.includes('commit sans lot'));
@@ -153,6 +153,25 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
     expect(await raf('2026-10-03', 'check')).toMatchObject({ code: 0, out: '✓ plan et historique cohérents' });
     expect((await raf('2026-10-03', 'session', 'close', '--since', '2026-10-01')).out).not.toContain('sans lot');
     expect((await raf('2026-10-03', 'session', 'start', '--since', '2026-10-01')).out).not.toContain('sans lot');
+  });
+
+  it('(L65) les attendus QA (docs/qa/expectations.md) sont tenus avec le plan : seuls, sans lot, ce n’est pas un « commit sans lot » — warhammer40k c3c6a29', async () => {
+    const { raf, touch } = await project();
+    touch('docs(qa): attendus QA — brouillon du qa-reviewer', ['docs/qa/expectations.md']);
+    expect((await raf('2026-10-03', 'hook', 'post-commit')).err).not.toContain('commit sans lot');
+    expect(await raf('2026-10-03', 'check')).toMatchObject({ code: 0, out: '✓ plan et historique cohérents' });
+    // mêlés à du code, ils ne sont plus de l'entretien
+    touch('feat: écran joueurs', ['docs/qa/expectations.md', 'src/app.ts']);
+    expect((await raf('2026-10-03', 'check')).out).toContain('commit sans lot');
+  });
+
+  it('(L65) qa.expectations de cadence.yaml déplace le fichier d’attendus ; l’ancien chemin redevient un fichier comme un autre', async () => {
+    const { raf, touch, dir } = await project();
+    writeFileSync(join(dir, 'cadence.yaml'), 'qa:\n  expectations: docs/quality/pages.md\n');
+    touch('docs(qa): attendus', ['docs/quality/pages.md']);
+    expect((await raf('2026-10-03', 'check')).out).not.toContain('commit sans lot');
+    touch('docs: ancien chemin', ['docs/qa/expectations.md']);
+    expect((await raf('2026-10-03', 'check')).out).toContain('commit sans lot');
   });
 
   it('(c) plan + fichier généré NON déclaré, sans lot : signalé, même sous « chore(plan): … » — forme mesurée le 03-10 (ol-companion b7017e3, cbc4ffc ; warhammer40k f785f48)', async () => {

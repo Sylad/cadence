@@ -106,7 +106,7 @@ function trackedPaths(s: Snapshot): string[] {
 async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
   const repo = c.lot.repo;
   const plan = c.loadPlan();
-  const own = new Set([relative(repo, plan.path), ...plan.files]);
+  const own = new Set([relative(repo, plan.path), ...plan.maintained]);
   const dirty = trackedPaths(await snapshot(repo, { remote: false }));
   if (dirty.length === 0) return null;
   const foreign = dirty.filter((f) => !own.has(f));

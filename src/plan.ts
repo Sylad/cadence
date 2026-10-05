@@ -84,6 +84,8 @@ export interface PlanSettings {
   ignore?: string[];
   /** Fichiers tenus avec le plan (journal…), relatifs à la racine : les toucher n'est pas travailler à un lot. */
   files?: string[];
+  /** Fichier d'attendus QA (clé `qa.expectations` de cadence.yaml) : tenu avec le plan, docs/qa/expectations.md par défaut. */
+  qaExpectations?: string;
   format?: PlanFormat;
   /** Fichier de configuration effectivement lu (--config), absolu ; cadence.yaml à la racine par défaut. */
   config?: string;
@@ -216,6 +218,16 @@ export class Plan {
   /** Fichiers tenus avec le plan, relatifs à la racine du dépôt. */
   get files(): string[] {
     return this.settings.files ?? [];
+  }
+
+  /** Fichier d'attendus QA du `qa-reviewer`, relatif à la racine du dépôt. */
+  get qaExpectations(): string {
+    return this.settings.qaExpectations ?? 'docs/qa/expectations.md';
+  }
+
+  /** Tout ce qui est tenu avec le plan sans être du travail : plan.files et le fichier d'attendus QA. Source unique de l'audit et de l'orchestrateur. */
+  get maintained(): string[] {
+    return [...this.files, this.qaExpectations];
   }
 
   /**

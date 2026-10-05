@@ -726,3 +726,6 @@ lots:
     quickwin: true
     created: 2026-10-05
     started: 2026-10-05
+    tasks:
+      - { id: t1, title: "orchestrate : test de commitPlan — fichier d'attendus QA (et plan.files) sale au démarrage d'un lot, commité avec le plan, pas d'arbre sale", status: todo }
+      - { id: t2, title: "qa.expectations : normaliser le chemin (./, absolu sous la racine) et refuser une valeur non-chaîne comme les autres clés de cadence.yaml", status: todo }

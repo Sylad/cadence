@@ -8,7 +8,7 @@ import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
-import { gitRoot, headSha, readCommits, resolveCommit } from './git.js';
+import { gitRoot, readCommits, resolveCommit } from './git.js';
 import { installHook } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from './news.js';
@@ -19,7 +19,7 @@ import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.j
 import { orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
-import { clearNext, lastDelivery, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
+import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
 
 export interface Io {
   cwd: string;

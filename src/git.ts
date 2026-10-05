@@ -126,13 +126,18 @@ export function upstreamHead(cwd: string): { ref: string; sha: string } | null {
  * noms usuels, main puis master.
  */
 export function upstreamIsDefaultBranch(cwd: string, upstreamRef: string): boolean {
-  const slash = upstreamRef.indexOf('/');
-  if (slash < 0) return false;
-  const remote = upstreamRef.slice(0, slash);
+  // Le remote vient de la config de la branche, pas d'une coupe de `@{u}` au premier « / » : un remote peut contenir un
+  // « / » (gh/origin) et un amont local (branche locale suivie) a pour remote « . » — jamais la branche de production.
+  const branch = tryGit(cwd, ['symbolic-ref', '-q', '--short', 'HEAD']);
+  if (!branch) return false;
+  const remote = tryGit(cwd, ['config', '--get', `branch.${branch}.remote`]);
+  const merge = tryGit(cwd, ['config', '--get', `branch.${branch}.merge`]);
+  if (!remote || remote === '.' || !merge) return false;
+  const upstreamBranch = merge.replace(/^refs\/heads\//, '');
+  if (upstreamRef !== `${remote}/${upstreamBranch}`) return false;
   const head = tryGit(cwd, ['symbolic-ref', '-q', '--short', `refs/remotes/${remote}/HEAD`]);
   if (head) return head === upstreamRef;
-  const branch = upstreamRef.slice(slash + 1);
-  return branch === 'main' || branch === 'master';
+  return upstreamBranch === 'main' || upstreamBranch === 'master';
 }
 
 /** Le commit est-il contenu dans une branche distante connue localement ? */

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { parseDeliverConfig } from '../src/deliver.js';
 import { appendDelivery, sharedStateDir } from '../src/state.js';
-import { headSha } from '../src/git.js';
+import { headSha, upstreamHead, upstreamIsDefaultBranch } from '../src/git.js';
 import { expectedTarget, effectLines } from '../src/verify.js';
 import { cleanupTempDirs, commit, gitRepo, tempDir } from './helpers.js';
 
@@ -183,5 +183,44 @@ describe('cadence session start : sha attendu (L54)', () => {
     expect(r.code).toBe(0);
     expect(r.out).toContain("1 commit(s) non poussé(s) — l'effet vérifié est celui de origin/main");
     expect(r.out).toContain('✓ verify : 1/1 vérifications vertes');
+  });
+});
+
+describe('upstreamIsDefaultBranch : remote lu dans la config de la branche (L55)', () => {
+  it('amont LOCAL foo/main (branche locale suivie, remote « . ») : jamais la branche de production', () => {
+    const repo = withRemote();
+    git(repo, 'branch', 'foo/main');
+    git(repo, 'checkout', '-q', '-b', 'work');
+    git(repo, 'branch', '-q', '-u', 'foo/main');
+    expect(upstreamHead(repo)!.ref).toBe('foo/main');
+    expect(upstreamIsDefaultBranch(repo, 'foo/main')).toBe(false);
+    expect(expectedTarget(repo, NO_DEPLOY, 'abc1234')).toEqual({ sha: 'abc1234', note: null });
+  });
+
+  it('remote nommé gh/origin : reconnu, repli sur main', () => {
+    const repo = gitRepo();
+    const bare = tempDir();
+    git(bare, 'init', '-q', '--bare', '-b', 'main');
+    git(repo, 'remote', 'add', 'gh/origin', bare);
+    commit(repo, 'feat: un');
+    git(repo, 'push', '-q', '-u', 'gh/origin', 'main');
+    expect(upstreamHead(repo)!.ref).toBe('gh/origin/main');
+    expect(upstreamIsDefaultBranch(repo, 'gh/origin/main')).toBe(true);
+    const pushed = headSha(repo)!;
+    commit(repo, 'local');
+    expect(expectedTarget(repo, NO_DEPLOY, 'abc1234').sha).toBe(pushed);
+  });
+
+  it('remote nommé gh/origin avec HEAD distant différent : main n\'est pas la branche de production', () => {
+    const repo = gitRepo();
+    const bare = tempDir();
+    git(bare, 'init', '-q', '--bare', '-b', 'main');
+    git(repo, 'remote', 'add', 'gh/origin', bare);
+    commit(repo, 'feat: un');
+    git(repo, 'push', '-q', '-u', 'gh/origin', 'main');
+    git(repo, 'push', '-q', 'gh/origin', 'main:prod');
+    git(repo, 'fetch', '-q', 'gh/origin');
+    git(repo, 'remote', 'set-head', 'gh/origin', 'prod');
+    expect(upstreamIsDefaultBranch(repo, 'gh/origin/main')).toBe(false);
   });
 });

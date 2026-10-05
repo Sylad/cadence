@@ -721,15 +721,16 @@ lots:
     created: 2026-10-05
   - id: L65
     title: "raf check : le fichier d'attendus QA (docs/qa/expectations.md, brouillon du qa-reviewer committé par le lead, skill lead §4) est tenu avec le plan — un commit qui ne touche que lui n'a pas à citer de lot ; vécu 05-10 warhammer40k c3c6a29 « commit sans lot » ; test + README + aide CLI"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-05
     started: 2026-10-05
     tasks:
-      - { id: t1, title: "orchestrate : test de commitPlan — fichier d'attendus QA (et plan.files) sale au démarrage d'un lot, commité avec le plan, pas d'arbre sale", status: todo }
-      - { id: t2, title: "qa.expectations : normaliser le chemin (./, absolu sous la racine) et refuser une valeur non-chaîne comme les autres clés de cadence.yaml", status: todo }
+      - { id: t1, title: "orchestrate : test de commitPlan — fichier d'attendus QA (et plan.files) sale au démarrage d'un lot, commité avec le plan, pas d'arbre sale", status: done }
+      - { id: t2, title: "qa.expectations : normaliser le chemin (./, absolu sous la racine) et refuser une valeur non-chaîne comme les autres clés de cadence.yaml", status: done }
     review: { date: 2026-10-05, verdict: "conforme — 0 bloquant, 0 majeur ; 1 mineur (chemin absolu de qa.expectations résolu depuis le dossier du --config) reporté en L66 ; 614 tests, typecheck et build verts", commit: f3e4875b6f92170ee8c27399e71c9d3417d7cec8 }
+    finished: 2026-10-05
   - id: L66
     title: "qa.expectations : résoudre un chemin absolu depuis la racine git, pas depuis le dossier du --config (absolu sous <repo>/config/ → x.md au lieu de config/x.md, <repo>/docs/qa.md refusé) — mineur de la revue L65"
     status: todo

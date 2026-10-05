@@ -643,11 +643,19 @@ lots:
     finished: 2026-10-05
   - id: L54
     title: "verify : ${SHORT} attendu = dernier commit hors plan, alors que Cloudflare Pages construit chaque push (commits chore(plan) compris) → faux rouge permanent sur avatar-pandora (attend f95b791, sert 7080faa) et evatosorus ; aligner le sha attendu sur la tête poussée, et distinguer « HEAD non poussé » de « poussé pas encore servi »"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-05
     started: 2026-10-05
     tasks:
-      - { id: t1, title: "test : session start (morningEffects, cli.ts:488-489) vise la tête amont et affiche la note des commits non poussés — aucune mutation n'est détectée aujourd'hui", status: todo }
-      - { id: t2, title: "expectedTarget : ne prendre @{u} que si la branche courante est la branche par défaut de l'amont (origin/HEAD) ; sinon dernière livraison (faux rouge permanent sur une branche poussée -u, Pages ne publie que main) ; test", status: todo }
-      - { id: t3, title: "expectedTarget : bascule vers @{u} réservée à ci: none (décision lead) ; README et tests alignés", status: todo }
+      - { id: t1, title: "test : session start (morningEffects, cli.ts:488-489) vise la tête amont et affiche la note des commits non poussés — aucune mutation n'est détectée aujourd'hui", status: done }
+      - { id: t2, title: "expectedTarget : ne prendre @{u} que si la branche courante est la branche par défaut de l'amont (origin/HEAD) ; sinon dernière livraison (faux rouge permanent sur une branche poussée -u, Pages ne publie que main) ; test", status: done }
+      - { id: t3, title: "expectedTarget : bascule vers @{u} réservée à ci: none (décision lead) ; README et tests alignés", status: done }
+    review: { date: 2026-10-05, verdict: "conforme : 599 tests, tsc 0, mutations de session start et de la règle détectées ; 2 mineurs reportés en L55 (amont local foo/main pris pour la branche de production, git.ts:128 ; imports morts cli.ts:11/22) — vérifié en réel : verify 1/1 vert sur avatar-pandora, evatosorus, claude-code-codex", commit: 2ccad3c167a441302c2939119feafbc229e387b5 }
+    finished: 2026-10-05
+  - id: L55
+    title: "upstreamIsDefaultBranch : lire le remote via branch.<b>.remote au lieu de couper @{u} au 1er « / » (amont local foo/main pris pour la branche de production ; remote « gh/origin » jamais reconnu), test ; retirer les imports morts headSha/lastDelivery de cli.ts:11/22 — mineurs de la revue L54"
+    status: todo
+    estimate: 0.5
+    quickwin: true
+    created: 2026-10-05

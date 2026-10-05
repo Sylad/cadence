@@ -655,15 +655,17 @@ lots:
     finished: 2026-10-05
   - id: L55
     title: "upstreamIsDefaultBranch : lire le remote via branch.<b>.remote au lieu de couper @{u} au 1er « / » (amont local foo/main pris pour la branche de production ; remote « gh/origin » jamais reconnu), test ; retirer les imports morts headSha/lastDelivery de cli.ts:11/22 — mineurs de la revue L54"
-    status: todo
+    status: doing
     estimate: 0.5
     quickwin: true
     created: 2026-10-05
+    started: 2026-10-05
   - id: L56
     title: "orchestrate : une passe fix sans nouveau commit sur un lot déjà commité est rendue au lead « fix sans commit » au lieu de repasser en revue (pendant de L53 côté fix) — vécu 05-10 sur warhammer L60 après réponse du lead"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-05
+    started: 2026-10-05
   - id: L57
     title: "orchestrate : les sessions posent en « question » des choix mineurs que le brief leur demande de trancher (padding 4 px, URL d'un lien, entrée Nouveautés à faire ou non, revue à lancer par qui) — 3 reprises et ~590 k tokens sur 2 petits lots le 05-10 ; durcir le gabarit (exemples de mineurs, question = seulement portée/architecture/coût de retour) et/ou classer une question mineure en « choix » côté programme"
     status: todo

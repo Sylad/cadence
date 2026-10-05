@@ -707,7 +707,9 @@ lots:
     created: 2026-10-05
   - id: L63
     title: Publier 0.10.0 (L53 revue directe, L54 sha attendu par verify, L55, L56 fix sans commit → revue, L57 questions mineures)
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-05
     started: 2026-10-05
+    review: { date: 2026-10-05, verdict: "conforme — montée de version seule (package.json, lock, plugin.json, marketplace.json à 0.10.0), relue par le lead ; 604 tests, tsc 0 ; publication vérifiée au registre ensuite", commit: 37f02014b506a9bc3b166707824ac277e44084e8 }
+    finished: 2026-10-05

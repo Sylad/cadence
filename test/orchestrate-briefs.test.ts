@@ -25,7 +25,9 @@ describe('gabarits', () => {
     expect(out).toContain('do not push, deliver, run `raf done`, `raf ux` or');
     expect(out).toContain('Decide minor interpretation questions yourself');
     expect(out).toContain('list each one under "choix" in your report');
-    expect(out).toContain('Stop and ask (under "questions") only on a real blocker');
+    expect(out).toContain('Stop and ask (under "questions") only on a real blocker.');
+    expect(out).toContain('AND the plan, its notes and the project\'s CLAUDE.md do not settle it');
+    expect(out).not.toContain('or that the plan, its notes');
     expect(out).not.toContain('instead of guessing');
     expect(out).toContain('Report: commits (sha + subject), tests and build results with their numbers, what you could not');
     expect(out).toContain('do not launch subagents');
@@ -66,12 +68,21 @@ describe('gabarits', () => {
   it('les gabarits d\'écriture portent la règle « question = seulement ce qu\'elle change »', () => {
     for (const kind of ['implement', 'fix', 'fix-minors'] as const) {
       const out = renderBrief(kind, vars);
-      expect(out, kind).toContain('A question is legitimate only if it names what it would change');
-      expect(out, kind).toContain('scope of the lot, the architecture, or a costly rollback');
-      expect(out, kind).toContain('otherwise it is a choice: decide, write the alternative you did not take, go on');
+      if (kind !== 'fix-minors') {
+        expect(out, kind).toContain('A question is legitimate only if it names what it would change');
+        expect(out, kind).toContain('scope of the lot, the architecture, or a costly rollback');
+        expect(out, kind).toContain('otherwise it is a choice: decide, write the alternative you did not take, go on');
+      } else {
+        expect(out, kind).not.toContain('A question is legitimate');
+        expect(out, kind).toContain('writing the alternative you did not take');
+      }
       expect(out, kind).toContain('a spacing, colour or label value');
       expect(out, kind).toContain('the URL of a link');
-      expect(out, kind).toContain('a News entry for a visible lot (yes, always)');
+      if (kind === 'implement') expect(out, kind).toContain('a News entry for a visible lot (yes, always)');
+      else {
+        expect(out, kind).toContain('a News entry: only if a finding asks for it');
+        expect(out, kind).not.toContain('yes, always');
+      }
       expect(out, kind).toContain('a written rule of the project\'s CLAUDE.md (apply it)');
       expect(out, kind).toContain('who launches the review or UX pass (never the session');
       expect(out, kind).toContain('"not my job to touch the plan" is not a question');

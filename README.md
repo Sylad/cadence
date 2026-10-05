@@ -671,7 +671,7 @@ committed, a short re-review of that commit runs instead): `ready`, verdict reco
 the untreated minors returned as proposals. Same when the budget is exhausted right after a compliant
 review with minors: it concludes on that review instead of staying suspended.
 
-**Choices, not questions**: the author brief tells the session to decide minor interpretation questions itself and to list them under `choix` in its report; the reviewer receives that list to re-read, and the final table prints each one (`choix fait : …`). A session stops with a question only on a real blocker (scope, architecture, costly to undo, not settled by the plan or CLAUDE.md).
+**Choices, not questions**: the author brief tells the session to decide minor interpretation questions itself and to list them under `choix` in its report; the reviewer receives that list to re-read, and the final table prints each one (`choix fait : …`). A session stops with a question only on a real blocker: a decision that changes the scope or the architecture or is costly to undo, AND that the plan, its notes and CLAUDE.md do not settle; everything else is a choice.
 
 **What stays with you**: choosing the lots, the questions raised (`--resume --answer`), re-verifying
 after the wave (`git log`, tests, `raf check`), `raf done`, **`raf ux`** (the orchestrator reports the UX

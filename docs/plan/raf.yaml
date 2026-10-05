@@ -672,10 +672,12 @@ lots:
     finished: 2026-10-05
   - id: L57
     title: "orchestrate : les sessions posent en « question » des choix mineurs que le brief leur demande de trancher (padding 4 px, URL d'un lien, entrée Nouveautés à faire ou non, revue à lancer par qui) — 3 reprises et ~590 k tokens sur 2 petits lots le 05-10 ; durcir le gabarit (exemples de mineurs, question = seulement portée/architecture/coût de retour) et/ou classer une question mineure en « choix » côté programme"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-05
     started: 2026-10-05
+    review: { date: 2026-10-05, verdict: "conforme — revue (Opus) : 3 mineurs (règle de question unique, pas de question en passe des mineurs, Nouveautés seulement sur constat) corrigés en 90fc863, revue courte conforme ; 604 tests, tsc 0 (lead, 3 passages + 1)", commit: 90fc8637bd2a2ed918e19a840f0557f9425791fe }
+    finished: 2026-10-05
   - id: L58
     title: "Mineurs revue L56 : test orchestrate-cycle.test.ts:990-996 « deux passes sans coupure » — faire réellement partir la revue (test vert après la 1re correction, attendre kinds et statut) ou corriger le titre ; retirer le garde toujours vrai (kind === 'implement' || kind === 'fix') de cycle.ts:482"
     status: todo

@@ -174,6 +174,13 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
     expect((await raf('2026-10-03', 'check')).out).toContain('commit sans lot');
   });
 
+  it('(L65/t2) qa.expectations écrit « ./docs/quality/pages.md » désigne le même fichier que git rapporte', async () => {
+    const { raf, touch, dir } = await project();
+    writeFileSync(join(dir, 'cadence.yaml'), "qa:\n  expectations: ./docs/quality/pages.md\n");
+    touch('docs(qa): attendus', ['docs/quality/pages.md']);
+    expect((await raf('2026-10-03', 'check')).out).not.toContain('commit sans lot');
+  });
+
   it('(c) plan + fichier généré NON déclaré, sans lot : signalé, même sous « chore(plan): … » — forme mesurée le 03-10 (ol-companion b7017e3, cbc4ffc ; warhammer40k f785f48)', async () => {
     const { raf, touch, declare } = await project();
     touch('chore(plan): titres publics pour les 18 lots visibles ouverts — la page Plan montre ce qui se prépare', [PLAN, PUBLISHED]);

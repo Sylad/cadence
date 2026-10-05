@@ -137,6 +137,25 @@ describe('readPlanConfig', () => {
     expect(readPlanConfig(write(join(tempDir(), 'cadence.yaml'), 'qa:\n  expectations: docs/quality/pages.md\n'))).toEqual({ settings: { qaExpectations: 'docs/quality/pages.md' } });
     expect(readPlanConfig(write(join(tempDir(), 'cadence.yaml'), 'session:\n  start: x\n'))).toBeNull();
   });
+
+  it('(L65/t2) normalise qa.expectations : ./ retiré, chemin absolu sous la racine rendu relatif, séparateurs posix', () => {
+    const dir = tempDir();
+    const of = (v: string) => readPlanConfig(write(join(dir, 'cadence.yaml'), `qa:\n  expectations: '${v}'\n`))?.settings.qaExpectations;
+    expect(of('./docs/quality/pages.md')).toBe('docs/quality/pages.md');
+    expect(of('docs\\quality\\pages.md')).toBe('docs/quality/pages.md');
+    expect(of('docs//quality/./pages.md')).toBe('docs/quality/pages.md');
+    expect(of(join(dir, 'docs/quality/pages.md'))).toBe('docs/quality/pages.md');
+  });
+
+  it.each([
+    ['qa:\n  expectations: 42\n', /qa\.expectations doit être un chemin/],
+    ['qa:\n  expectations: [a.md]\n', /qa\.expectations doit être un chemin/],
+    ['qa: docs/qa.md\n', /qa doit être un objet/],
+    ['qa:\n  expectations: /ailleurs/pages.md\n', /hors du dépôt/],
+    ['qa:\n  expectations: ../pages.md\n', /hors du dépôt/],
+  ])('(L65/t2) refuses %j', (text, message) => {
+    expect(() => readPlanConfig(write(join(tempDir(), 'cadence.yaml'), text))).toThrow(message);
+  });
 });
 
 describe('a plan in another format', () => {

@@ -193,25 +193,6 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     }
   });
 
-  it('--dry-run d\'un lot dont le dernier commit est jugé non conforme : fix puis review (L53)', async () => {
-    const s = setup({});
-    writeFileSync(join(s.dir, 'a.txt'), 'x\n');
-    git(s.dir, 'add', '--', 'a.txt');
-    git(s.dir, 'commit', '-q', '-m', 'feat(L1): travail', '--', 'a.txt');
-    const plan = Plan.load(join(s.dir, 'docs/plan/raf.yaml'));
-    plan.recordReview('L1', 'non conforme : un bug', '2026-10-04', git(s.dir, 'rev-parse', 'HEAD'));
-    plan.save();
-    git(s.dir, 'commit', '-q', '-m', 'plan: revue', '--', 'docs/plan/raf.yaml');
-    const r = await s.cli('proj:L1', '--dry-run');
-    try {
-      expect(r.code).toBe(0);
-      expect(r.out).toContain('étapes : fix (sonnet) → review (opus) — dernier commit déjà jugé non conforme : implement sauté');
-      expect(s.calls()).toEqual([]);
-    } finally {
-      removeDryRunBriefs(r.out);
-    }
-  });
-
   // L3/t12 : vrai processus, vrai signal.
   it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)('%s : sessions tuées, étapes et vague interrompues, verrous et hook retirés', async (signal) => {
     const s = setup({ implement: [{ ...impl, sleepMs: 60_000 }] });

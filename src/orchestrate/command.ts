@@ -10,7 +10,7 @@ import { Plan, RafError, isOpen } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { loadTemplates, objective, renderBrief, type BriefVars } from './briefs.js';
-import { Budget, MAX_PASSES, pendingFix, countInterrupted, type LotCtx, type WaveCtx } from './cycle.js';
+import { Budget, MAX_PASSES, countInterrupted, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, killSessions, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -235,14 +235,13 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     io.out(`  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
-    const fixOnly = pendingFix(env.loadPlan(), l.repo, l.lot) !== null;
-    const steps: { kind: 'implement' | 'fix' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: fixOnly ? 'fix' : 'implement', model: l.model }];
+    const steps: { kind: 'implement' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: 'implement', model: l.model }];
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: 'opus' });
     else {
       if (l.visible && env.config.ux) steps.push({ kind: 'ux', model: 'opus' });
       steps.push({ kind: 'review', model: 'opus' });
     }
-    io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${fixOnly ? ' — dernier commit déjà jugé non conforme : implement sauté' : ''}${l.small ? ' — petit lot' : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
+    io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus, en session neuve`);
     io.out('  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
     const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '' };

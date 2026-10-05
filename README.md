@@ -635,16 +635,11 @@ you with the findings. A small lot (`estimate` ≤ 0.5 or `quickwin`) gets one s
 usability (code only when the lot is not `visible`). Failing tests (reported red, or red when
 `orchestrate.test` is run) go straight to a correction.
 
-**A lot whose last commit was already judged non-compliant**: when the recorded code review (`raf review`) is
-non-compliant ("non conforme", "pas conforme", "non-compliant", "not compliant"; a verdict that *starts* with
-"conforme"/"compliant" is compliant) and covers the lot's last commit, the wave skips the implementation session and goes
-straight to a correction pass, with that verdict as its finding (`orchestrate.test` is run first; a red result is added
-to the findings), then the usual review. In every other case the implementation runs normally: commits without a
-review, a review older than the last commit, or a read-only plan (a project whose plan is mapped by `cadence.yaml plan:`
-has no review field), so a lot with only a spec commit is still implemented. An implementation session that ends without
-a new commit on a lot that already has commits goes on to the review (warning `implement sans nouveau commit`) instead
-of being handed back. `--dry-run` shows the path (`étapes : fix (sonnet) → review (opus) — dernier commit déjà jugé non
-conforme : implement sauté`).
+**A lot that already has commits** (a spec commit, an interrupted wave, a lot committed by hand, a lot sent back after a
+review) still starts with the implementation session: its brief tells it to read the lot, its notes and its open
+sub-tasks, which carry the findings of any earlier review. If that session ends without a new commit on a lot that
+already has commits, the wave goes on to the review (warning `implement sans nouveau commit`) instead of handing the
+lot back; with no commit on the lot at all it is handed back as `implement sans commit`.
 
 **Compliant with minor findings**: the minors are not left for a follow-up lot. One **minors pass** runs
 before concluding: a new Sonnet session with its own brief (`fix-minors.md`) fixes the minors that are right

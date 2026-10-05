@@ -2,7 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
-import { lotCommits, lotWork, unreviewedWork } from '../audit.js';
+import { lotCommits, lotWork } from '../audit.js';
 import type { OrchestrateConfig } from '../config.js';
 import type { Day } from '../dates.js';
 import { readCommits, resolveCommit, type Commit } from '../git.js';
@@ -70,28 +70,6 @@ export interface LotCtx {
   lot: LotState;
   config: OrchestrateConfig;
   loadPlan: () => Plan;
-}
-
-const NON_CONFORME = /\b(?:non[\s\-\u2010\u2011]?conform|non[\s\-\u2010\u2011]?compliant|pas\s+conforme|not\s+compliant)/i;
-const CONFORME_EN_TETE = /^[\s*_#>`"'(\[]*(?:conforme|compliant)\b/i;
-
-/** Le verdict enregistré est-il non conforme ? Un verdict qui COMMENCE par conforme / compliant est conforme, même s'il cite un point non conforme levé. */
-export function isNonConforme(verdict: string): boolean {
-  return !CONFORME_EN_TETE.test(verdict) && NON_CONFORME.test(verdict);
-}
-
-/**
- * Lot dont le dernier commit a déjà été relu et jugé non conforme : l'étape implement n'a rien à y faire, la passe de
- * correction part directement avec les constats de ce verdict. Rend ces constats, ou null dans tous les autres cas
- * (aucun commit, revue absente ou périmée, verdict conforme ou rattaché à aucun commit, plan en lecture seule sans champ review).
- */
-export function pendingFix(plan: Plan, repo: string, lotId: string): Constat[] | null {
-  const lot = plan.lots().find((x) => x.id === lotId);
-  const review = lot?.review;
-  if (!lot || !review || typeof review.commit !== 'string') return null;
-  if (lotWork(plan, repo, lotId).length === 0 || unreviewedWork(plan, repo, lotId) > 0) return null;
-  if (!isNonConforme(review.verdict)) return null;
-  return [{ source: 'code', gravite: 'majeur', texte: `verdict de la revue enregistrée (${review.commit.slice(0, 7)}) : ${review.verdict}` }];
 }
 
 const TERMINAL = new Set(['ready', 'handed-back', 'failed']);
@@ -433,14 +411,6 @@ function badReport(c: LotCtx, step: StepState, e: unknown): null {
   return stop(c, 'failed', `${step.kind} : ${(e as Error).message}`);
 }
 
-/** Lance `orchestrate.test` (sauf si un rouge est déjà acquis) ; rend le constat bloquant s'il échoue. */
-async function redTests(c: LotCtx, skip: boolean): Promise<Constat[]> {
-  if (skip || !c.config.test) return [];
-  const r = await sh(c, c.config.test);
-  if (r.code === 0) return [];
-  return [{ source: 'tests', gravite: 'bloquant', texte: `${c.config.test} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` }];
-}
-
 /** Étape d'écriture (implémentation, correction) : contrôles, puis étape suivante décidée. */
 async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const l = c.lot;
@@ -519,7 +489,10 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const red: Constat[] = [];
   if (!rep.tests.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` });
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
-  red.push(...(await redTests(c, red.length > 0)));
+  if (red.length === 0 && c.config.test) {
+    const r = await sh(c, c.config.test);
+    if (r.code !== 0) red.push({ source: 'tests', gravite: 'bloquant', texte: `${c.config.test} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
+  }
   if (red.length) {
     toFix(c, red, 'tests rouges');
     return;
@@ -696,13 +669,7 @@ export async function runLot(c: LotCtx): Promise<void> {
         return;
       }
       l.startedSha = (await snapshot(l.repo, { remote: false })).head ?? undefined;
-      const verdictFix = pendingFix(c.loadPlan(), l.repo, l.lot);
-      if (verdictFix) {
-        // Dernier commit déjà relu et jugé non conforme : pas de session implement, ni de nouvelle revue — la correction, avec les constats du verdict.
-        l.warnings.push('lot déjà relu et jugé non conforme : étape implement sautée, correction directe');
-        const red = await redTests(c, false);
-        toFix(c, [...verdictFix, ...red], red.length ? 'verdict non conforme et tests rouges' : 'verdict non conforme');
-      } else l.next = 'implement';
+      l.next = 'implement';
       save(c);
     }
     while (l.next && !TERMINAL.has(l.status)) {

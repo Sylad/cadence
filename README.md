@@ -36,7 +36,8 @@ reports a page left empty or in error.
   touches is a plan file**: the plan itself, its Gantt page (only at its default place, `gantt.html` next to the plan — written elsewhere with `raf gantt -o`, declare it under `plan.files`), the `plan:` key of the config file in use (`cadence.yaml`, or
   the `--config` file; a change to `deliver:`/`session:` is work), or a file the
   project lists under `plan.files` in `cadence.yaml` (a page it generates from
-  the plan, a journal). Such a commit is never a "commit without a lot", and it
+  the plan, a journal), or the QA expectations file (`docs/qa/expectations.md`,
+  or the file named by `qa.expectations`; the lead commits the `qa-reviewer`'s draft of it). Such a commit is never a "commit without a lot", and it
   does not count as work on the lots it cites: it is absent from `raf commits`,
   does not start a `todo` lot, does not make a code review stale, and
   `cadence deliver` does not announce the lots it cites as delivered. The files
@@ -274,8 +275,8 @@ The counterpart of the UX review, off by default. With the rule on, `raf done`
 refuses a lot that has at least one commit citing it and no recorded verdict
 (`--force` to override), and `raf check` reports such lots finished after the
 `reviewSince` day. A lot with no commit has nothing to review; neither does a
-lot whose only commits touch plan files alone (the plan, or a file listed under
-`plan.files`), predate the plan's `since` or match an `ignore:` pattern — `raf commits <id>` prints exactly the counted set.
+lot whose only commits touch plan files alone (the plan, a file listed under
+`plan.files`, or the QA expectations file), predate the plan's `since` or match an `ignore:` pattern — `raf commits <id>` prints exactly the counted set.
 
 The verdict is tied to what was reviewed: `raf review` stores it on the lot with
 the sha of the lot's latest counted commit (`review: { date, verdict, commit }`,
@@ -346,7 +347,7 @@ qa:
   expectations: docs/quality/pages.md
 ```
 
-Only the agent reads that key; the CLI does not use it. Without an expectations file the agent walks
+The agent reads that key, and so does `raf check`: a commit touching only that file is plan upkeep (no lot to cite, see above). Without an expectations file the agent walks
 the routes it discovers and still runs its universal checks: an error shown, a failed API call
 whose content is missing on screen, a broken or missing content image are defects with or without a
 file; an empty 2xx body, like whatever else would need an expectation to judge, is suspect at most
@@ -725,7 +726,7 @@ orchestrate:
 
 Without `start`, a read-only plan's `todo` lot is refused (start it with the project's tool); without
 `verdict`, the review verdict stays in the wave's state and you report it. Only the plan's files
-(`plan.path`, `plan.files`) are committed from those commands; anything else dirty stops the lot.
+(`plan.path`, `plan.files`, the QA expectations file) are committed from those commands; anything else dirty stops the lot.
 
 ## Claude Code skills
 

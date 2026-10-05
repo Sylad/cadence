@@ -383,7 +383,7 @@ describe('skills install', () => {
     expect(text).toContain('returns a draft for you to correct — it never writes the file itself.');
     // Sans fichier : mêmes règles que dans le contrat de l'agent.
     expect(text).toContain('Without an expectations file the agent walks the routes it discovers and still runs its universal checks: an error shown, a failed API call whose content is missing on screen, a broken or missing content image are defects with or without a file; an empty 2xx body, like whatever else would need an expectation to judge, is suspect at most (it may be a normal absence).');
-    expect(text).toContain('Only the agent reads that key; the CLI does not use it.');
+    expect(text).toContain('The agent reads that key, and so does `raf check`: a commit touching only that file is plan upkeep (no lot to cite, see above).');
     expect(readme).toContain('`ux-reviewer`, `code-reviewer` and `qa-reviewer` agents');
     expect(readme).toContain('- **qa-reviewer** (agent)');
   });

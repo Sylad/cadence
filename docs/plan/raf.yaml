@@ -623,3 +623,8 @@ lots:
     estimate: 1
     quickwin: true
     created: 2026-10-04
+  - id: L53
+    title: "orchestrate : un lot déjà implémenté qui n'attend qu'une revue neuve (commits présents, revue précédente non conforme ou absente) est rendu au lead « implement sans commit » au lieu de passer à la revue — vécu 05-10 sur 3 lots (finance L3, ol L29, warhammer L54), puis en question sur L3 quand les sous-tâches ouvertes étaient déjà couvertes par des commits"
+    status: todo
+    estimate: 1
+    created: 2026-10-05

@@ -737,3 +737,9 @@ lots:
     estimate: 1
     quickwin: true
     created: 2026-10-05
+  - id: L67
+    title: Publier 0.10.1 — attendus QA tenus avec le plan dans raf check (L65)
+    status: doing
+    estimate: 1
+    created: 2026-10-05
+    started: 2026-10-05

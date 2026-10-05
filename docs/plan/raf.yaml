@@ -739,7 +739,9 @@ lots:
     created: 2026-10-05
   - id: L67
     title: Publier 0.10.1 — attendus QA tenus avec le plan dans raf check (L65)
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-05
     started: 2026-10-05
+    review: { date: 2026-10-05, verdict: "conforme : release seule (version 0.10.1 dans les trois fichiers, 614 tests verts en local et dans le run publish.yml 37352678905), 0.10.1 publiée par OIDC et lue au registre", commit: 98371929c122a3cb2efcfb0aa9aec37384aae5b2 }
+    finished: 2026-10-05

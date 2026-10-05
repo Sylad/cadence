@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { Plan } from '../src/plan.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
@@ -614,6 +615,36 @@ describe('plan en lecture seule', () => {
     await runLot(c);
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toMatch(/arbre sale \(fichiers hors plan\) : src\.txt/);
+  });
+
+  it('(L65/t1) un fichier d\'attendus QA et un plan.files modifiés au démarrage sont commités avec le plan ; un fichier étranger arrête toujours le lot', async () => {
+    const setup = (start: string) => {
+      const h = harness({ script: { implement: [impl()], review: [ok] } });
+      mkdirSync(join(h.repo, 'docs/qa'), { recursive: true });
+      for (const f of ['docs/qa/expectations.md', 'journal.ndjson', 'src.txt']) writeFileSync(join(h.repo, f), 'v0\n');
+      git(h.repo, 'add', '--', 'docs/qa/expectations.md', 'journal.ndjson', 'src.txt');
+      git(h.repo, 'commit', '-q', '-m', 'chore: fichiers');
+      const c = h.lot('L1', { readOnlyPlan: true }, { start });
+      c.loadPlan = () => {
+        const p = Plan.load(join(h.repo, 'docs/plan/raf.yaml'), { files: ['journal.ndjson'] });
+        Object.defineProperty(p, 'readonly', { get: () => true });
+        return p;
+      };
+      return { h, c };
+    };
+    const ok1 = setup('echo v1 >> docs/qa/expectations.md && echo v1 >> journal.ndjson');
+    await runLot(ok1.c);
+    expect(ok1.c.lot.outcome ?? '').not.toMatch(/arbre sale/);
+    expect(ok1.c.lot.status).toBe('ready');
+    const first = git(ok1.h.repo, 'log', '--format=%s', '--grep=démarré').split('\n')[0];
+    expect(first).toBe('plan: L1 démarré (orchestrate w1)');
+    expect(git(ok1.h.repo, 'show', '--name-only', '--format=', '--grep=démarré', '-n1')).toBe('docs/qa/expectations.md\njournal.ndjson');
+    expect(git(ok1.h.repo, 'status', '--porcelain')).toBe('');
+
+    const ko = setup('echo v1 >> docs/qa/expectations.md && echo v1 >> src.txt');
+    await runLot(ko.c);
+    expect(ko.c.lot.status).toBe('handed-back');
+    expect(ko.c.lot.outcome).toMatch(/arbre sale \(fichiers hors plan\) : src\.txt/);
   });
 });
 

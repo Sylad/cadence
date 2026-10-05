@@ -655,19 +655,29 @@ lots:
     finished: 2026-10-05
   - id: L55
     title: "upstreamIsDefaultBranch : lire le remote via branch.<b>.remote au lieu de couper @{u} au 1er « / » (amont local foo/main pris pour la branche de production ; remote « gh/origin » jamais reconnu), test ; retirer les imports morts headSha/lastDelivery de cli.ts:11/22 — mineurs de la revue L54"
-    status: doing
+    status: done
     estimate: 0.5
     quickwin: true
     created: 2026-10-05
     started: 2026-10-05
+    review: { date: 2026-10-05, verdict: "conforme — aucun défaut ; 603 tests, tsc 0 (relancés par le lead)", commit: 6b5afa106e7d35b066a7fa585aed5802a8ece83f }
+    finished: 2026-10-05
   - id: L56
     title: "orchestrate : une passe fix sans nouveau commit sur un lot déjà commité est rendue au lead « fix sans commit » au lieu de repasser en revue (pendant de L53 côté fix) — vécu 05-10 sur warhammer L60 après réponse du lead"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-05
     started: 2026-10-05
+    review: { date: 2026-10-05, verdict: "conforme après 2 mineurs (reportés en L58 : test « deux passes sans coupure » qui ne fait pas partir la revue, garde toujours vrai cycle.ts:482) ; 603 tests, tsc 0 (relancés par le lead)", commit: 8064919e223f8f0294db954de6953181a0f15fb8 }
+    finished: 2026-10-05
   - id: L57
     title: "orchestrate : les sessions posent en « question » des choix mineurs que le brief leur demande de trancher (padding 4 px, URL d'un lien, entrée Nouveautés à faire ou non, revue à lancer par qui) — 3 reprises et ~590 k tokens sur 2 petits lots le 05-10 ; durcir le gabarit (exemples de mineurs, question = seulement portée/architecture/coût de retour) et/ou classer une question mineure en « choix » côté programme"
     status: todo
     estimate: 1
+    created: 2026-10-05
+  - id: L58
+    title: "Mineurs revue L56 : test orchestrate-cycle.test.ts:990-996 « deux passes sans coupure » — faire réellement partir la revue (test vert après la 1re correction, attendre kinds et statut) ou corriger le titre ; retirer le garde toujours vrai (kind === 'implement' || kind === 'fix') de cycle.ts:482"
+    status: todo
+    estimate: 0.25
+    quickwin: true
     created: 2026-10-05

@@ -745,3 +745,8 @@ lots:
     started: 2026-10-05
     review: { date: 2026-10-05, verdict: "conforme : release seule (version 0.10.1 dans les trois fichiers, 614 tests verts en local et dans le run publish.yml 37352678905), 0.10.1 publiée par OIDC et lue au registre", commit: 98371929c122a3cb2efcfb0aa9aec37384aae5b2 }
     finished: 2026-10-05
+  - id: L68
+    title: "orchestrate : accepter un id de sous-tâche (projet:Q4/accueil-4-ux18) — aujourd'hui « lot invalide », ce qui oblige à déléguer à la main les sous-tâches d'un plan à ids préfixés (maritime-atlas, 05-10)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-05

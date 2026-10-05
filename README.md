@@ -635,13 +635,16 @@ you with the findings. A small lot (`estimate` ≤ 0.5 or `quickwin`) gets one s
 usability (code only when the lot is not `visible`). Failing tests (reported red, or red when
 `orchestrate.test` is run) go straight to a correction.
 
-**A lot already implemented**: when the lot already has commits citing its id and its code review is absent,
-older than its last commit, or says "non conforme", the wave does not start an implementation session (it would
-find nothing to do and hand the lot back as "implement sans commit"): it goes straight to the review (UX first
-for a visible lot with a declared app), and a non-compliant review triggers the usual correction passes.
-`--dry-run` shows the chosen path (`étapes : review (opus) — lot déjà implémenté`). An implementation session that
-ends without a new commit on a lot that already has commits also goes on to the review (warning
-`implement sans nouveau commit`), instead of being handed back.
+**A lot whose last commit was already judged non-compliant**: when the recorded code review (`raf review`) is
+non-compliant ("non conforme", "pas conforme", "non-compliant", "not compliant"; a verdict that *starts* with
+"conforme"/"compliant" is compliant) and covers the lot's last commit, the wave skips the implementation session and goes
+straight to a correction pass, with that verdict as its finding (`orchestrate.test` is run first; a red result is added
+to the findings), then the usual review. In every other case the implementation runs normally: commits without a
+review, a review older than the last commit, or a read-only plan (a project whose plan is mapped by `cadence.yaml plan:`
+has no review field), so a lot with only a spec commit is still implemented. An implementation session that ends without
+a new commit on a lot that already has commits goes on to the review (warning `implement sans nouveau commit`) instead
+of being handed back. `--dry-run` shows the path (`étapes : fix (sonnet) → review (opus) — dernier commit déjà jugé non
+conforme : implement sauté`).
 
 **Compliant with minor findings**: the minors are not left for a follow-up lot. One **minors pass** runs
 before concluding: a new Sonnet session with its own brief (`fix-minors.md`) fixes the minors that are right

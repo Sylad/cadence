@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
-import { runLot } from '../src/orchestrate/cycle.js';
+import { isNonConforme, runLot } from '../src/orchestrate/cycle.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir } from '../src/orchestrate/launch.js';
 import { tempDir } from './helpers.js';
@@ -309,7 +309,6 @@ describe('contrôles autour des sessions', () => {
     };
     const h = harness({ script: { implement: [resumed], review: [ok] } });
     earlier = commitFile(h.repo, 'a.txt', 'feat(L1): a (session précédente)');
-    recordReview(h, 'conforme : rien à signaler'); // revue à jour : l'implémentation n'est pas sautée (L53)
     const c = h.lot('L1');
     await runLot(c);
     expect(c.lot.status).toBe('ready');
@@ -395,7 +394,6 @@ describe('contrôles autour des sessions', () => {
   it('une implémentation sans nouveau commit sur un lot déjà commité passe à la revue, sans réponse du lead (L53)', async () => {
     const h = harness({ script: { implement: [() => claudeOut(workReport())], review: [ok] } });
     commitFile(h.repo, 'a.txt', 'feat(L1): a');
-    recordReview(h, 'conforme : rien à signaler'); // revue à jour et conforme : l'étape implement n'est pas sautée
     const c = h.lot('L1');
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
@@ -1049,58 +1047,35 @@ describe('gabarits : instantané de la vague (L39)', () => {
   });
 });
 
-describe('lot déjà implémenté : revue directe (L53)', () => {
-  it('lot commité sans revue : l\'étape implement est sautée, la revue part directement', async () => {
-    const h = harness({ script: { review: [ok] } });
-    commitFile(h.repo, 'a.txt', 'feat(L1): a');
-    const c = h.lot('L1');
-    await runLot(c);
-    expect(kinds(h)).toEqual(['review']);
-    expect(h.calls[0].model).toBe('opus');
-    expect(c.lot.status).toBe('ready');
-    expect(c.lot.warnings).toEqual([expect.stringContaining('lot déjà implémenté')]);
-    expect(h.plan().lot('L1').review?.verdict).toContain('conforme');
-  });
-
-  it('lot commité avec revue non conforme : revue directe, puis la passe de correction habituelle', async () => {
-    const h = harness({ script: { review: [major, ok], fix: [fix('b.txt')] } });
-    commitFile(h.repo, 'a.txt', 'feat(L1): a');
-    recordReview(h, 'non conforme : un bug nommé');
-    const c = h.lot('L1');
-    await runLot(c);
-    expect(kinds(h)).toEqual(['review', 'fix', 'review']);
-    expect(c.lot.pass).toBe(1);
-    expect(c.lot.status).toBe('ready');
-  });
-
-  it('lot commité avec une revue conforme plus ancienne que son dernier commit : revue directe', async () => {
-    const h = harness({ script: { review: [ok] } });
-    commitFile(h.repo, 'a.txt', 'feat(L1): a');
-    recordReview(h, 'conforme : rien à signaler');
-    commitFile(h.repo, 'b.txt', 'feat(L1): b');
-    const c = h.lot('L1');
-    await runLot(c);
-    expect(kinds(h)).toEqual(['review']);
-    expect(c.lot.status).toBe('ready');
-  });
-
-  it('revue directe d\'un lot visible avec application déclarée : l\'UX est rejouée avant la revue de code', async () => {
-    const h = harness({ lots: [{ title: 'Un lot', visible: true }], script: { ux: [ok], review: [ok] } });
-    commitFile(h.repo, 'a.txt', 'feat(L1): a');
-    const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:1' } });
-    await runLot(c);
-    expect(kinds(h)).toEqual(['ux', 'review']);
-  });
-
-  it('lot neuf (aucun commit) : comportement inchangé, implement puis revue', async () => {
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
+describe('lot déjà relu et non conforme : correction directe (L53)', () => {
+  it('commit de spec seul, sans revue (plan en lecture seule : jamais de champ review) : implement tourne', async () => {
+    const h = harness({ script: { implement: [impl('b.txt')], review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'docs(L1): spec');
     const c = h.lot('L1');
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(c.lot.warnings).toEqual([]);
   });
 
-  it('lot commité dont la revue est conforme et à jour : l\'implémentation n\'est pas sautée', async () => {
+  it('vague interrompue après un 1er commit, relancée sans --resume : implement tourne', async () => {
+    const h = harness({ script: { implement: [impl('b.txt')], review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    const c = h.lot('L1', { status: 'queued' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('revue conforme plus ancienne que le dernier commit : implement tourne', async () => {
+    const h = harness({ script: { implement: [impl('c.txt')], review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    recordReview(h, 'non conforme : un bug nommé');
+    commitFile(h.repo, 'b.txt', 'feat(L1): b');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('revue conforme à jour : implement tourne', async () => {
     const h = harness({ script: { implement: [impl('b.txt')], review: [ok] } });
     commitFile(h.repo, 'a.txt', 'feat(L1): a');
     recordReview(h, 'conforme : rien à signaler');
@@ -1108,4 +1083,57 @@ describe('lot déjà implémenté : revue directe (L53)', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
   });
+
+  it('verdict non conforme couvrant le dernier commit : correction directe avec ses constats, sans revue avant', async () => {
+    const h = harness({ script: { fix: [fix('b.txt')], review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    recordReview(h, 'non conforme : un bug nommé');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['fix', 'review']);
+    expect(h.calls[0].brief).toContain('un bug nommé');
+    expect(c.lot.pass).toBe(1);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.warnings).toEqual([expect.stringContaining('implement sautée')]);
+  });
+
+  it('verdict non conforme à jour et tests rouges : correction, avec la sortie des tests parmi ses constats', async () => {
+    const h = harness({ script: { fix: [fix('b.txt')], review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    recordReview(h, 'non conforme : un bug nommé');
+    const c = h.lot('L1', {}, { test: 'echo boom-rouge; exit 1' });
+    await runLot(c);
+    expect(h.calls[0].kind).toBe('fix');
+    expect(h.calls[0].brief).toContain('boom-rouge');
+    expect(h.calls[0].brief).toContain('un bug nommé');
+  });
+
+  it('une implémentation sans nouveau commit sur un lot déjà commité passe à la revue (alreadyDone)', async () => {
+    const h = harness({ script: { implement: [() => claudeOut(workReport())], review: [ok] } });
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.warnings.filter((w) => w.includes('sans nouveau commit'))).toHaveLength(1);
+  });
+
+  it('lot neuf (aucun commit) : implement puis revue', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.warnings).toEqual([]);
+  });
+});
+
+describe('isNonConforme (L53)', () => {
+  it.each([
+    'non conforme : un bug', 'Non-conforme', 'nonconforme', 'non\u2011conforme', 'pas conforme', 'non-conformité relevée',
+    'non-compliant', 'Not compliant: one major', 'non compliant', 'nonconformité',
+  ])('« %s » est non conforme', (v) => expect(isNonConforme(v)).toBe(true));
+
+  it.each([
+    'conforme : rien à signaler', 'conforme — le point non conforme précédent est levé', 'Compliant after 3 fixes: 1 major, 2 minor',
+    '**Conforme**, le point non-compliant est levé', 'compliant', 'rien à dire',
+  ])('« %s » est conforme', (v) => expect(isNonConforme(v)).toBe(false));
 });

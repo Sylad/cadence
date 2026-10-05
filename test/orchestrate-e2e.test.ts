@@ -177,30 +177,39 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     }
   });
 
-  it('--dry-run d\'un lot déjà commité sans revue : étapes = review seule, rien n\'est lancé (L53)', async () => {
+  it('--dry-run d\'un lot déjà commité sans revue : implement reste dans les étapes, rien n\'est lancé (L53)', async () => {
     const s = setup({});
     writeFileSync(join(s.dir, 'a.txt'), 'x\n');
     git(s.dir, 'add', '--', 'a.txt');
-    git(s.dir, 'commit', '-q', '-m', 'feat(L1): travail déjà fait', '--', 'a.txt');
+    git(s.dir, 'commit', '-q', '-m', 'docs(L1): spec', '--', 'a.txt');
     const r = await s.cli('proj:L1', '--dry-run');
     try {
       expect(r.code).toBe(0);
-      expect(r.out).toContain('étapes : review (opus) — lot déjà implémenté');
-      expect(r.out).not.toContain('implement (');
+      expect(r.out).toContain('étapes : implement (sonnet) → review (opus)');
+      expect(r.out).not.toContain('implement sauté');
       expect(s.calls()).toEqual([]);
     } finally {
       removeDryRunBriefs(r.out);
     }
   });
 
-  it('lot commité sans revue : la vague saute implement et va en revue (L53)', async () => {
-    const s = setup({ review: [{}] });
+  it('--dry-run d\'un lot dont le dernier commit est jugé non conforme : fix puis review (L53)', async () => {
+    const s = setup({});
     writeFileSync(join(s.dir, 'a.txt'), 'x\n');
     git(s.dir, 'add', '--', 'a.txt');
-    git(s.dir, 'commit', '-q', '-m', 'feat(L1): travail déjà fait', '--', 'a.txt');
-    const r = await s.cli('proj:L1');
-    expect(r.code).toBe(0);
-    expect(s.calls().map((c) => c.kind)).toEqual(['review']);
+    git(s.dir, 'commit', '-q', '-m', 'feat(L1): travail', '--', 'a.txt');
+    const plan = Plan.load(join(s.dir, 'docs/plan/raf.yaml'));
+    plan.recordReview('L1', 'non conforme : un bug', '2026-10-04', git(s.dir, 'rev-parse', 'HEAD'));
+    plan.save();
+    git(s.dir, 'commit', '-q', '-m', 'plan: revue', '--', 'docs/plan/raf.yaml');
+    const r = await s.cli('proj:L1', '--dry-run');
+    try {
+      expect(r.code).toBe(0);
+      expect(r.out).toContain('étapes : fix (sonnet) → review (opus) — dernier commit déjà jugé non conforme : implement sauté');
+      expect(s.calls()).toEqual([]);
+    } finally {
+      removeDryRunBriefs(r.out);
+    }
   });
 
   // L3/t12 : vrai processus, vrai signal.

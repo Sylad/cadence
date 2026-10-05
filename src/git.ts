@@ -113,6 +113,13 @@ export function repoStatus(cwd: string): RepoStatus {
   };
 }
 
+/** Branche amont suivie (« origin/main ») et son sha tel que connu localement (sans réseau), null sans amont. */
+export function upstreamHead(cwd: string): { ref: string; sha: string } | null {
+  const ref = tryGit(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
+  const sha = ref ? tryGit(cwd, ['rev-parse', '--verify', '-q', '@{u}']) : null;
+  return ref && sha ? { ref, sha } : null;
+}
+
 /** Le commit est-il contenu dans une branche distante connue localement ? */
 export function onRemote(cwd: string, sha: string): boolean {
   return (tryGit(cwd, ['branch', '-r', '--contains', sha]) ?? '').length > 0;

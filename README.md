@@ -558,7 +558,7 @@ no journal entry, nothing written.
 ```sh
 cadence verify                # one pass, one line per check, then a one-line summary
 cadence verify --retry 60     # retry each failing check for up to 60 s (deliver's 300 s is not applied)
-cadence verify --sha 6b0d9aa  # the sha that replaces ${SHA} / ${SHORT} (default: last delivery, else HEAD)
+cadence verify --sha 6b0d9aa  # the sha that replaces ${SHA} / ${SHORT} (default: see below)
 ```
 
 ```
@@ -569,6 +569,17 @@ verify : 1 effet rouge sur 2 vérifications
 
 Exit code: **0** every check green · **1** at least one red effect · **2** nothing
 to verify or invalid configuration.
+
+**Which sha is expected.** With deploy commands (`deliver.deploy`) or a delivery
+script, `${SHA}` / `${SHORT}` is the last recorded delivery (else `HEAD`). A project
+with **neither** — a host that builds every push, like Cloudflare Pages — delivers
+by pushing, and every push counts, plan-maintenance commits included: the expected
+sha is then the head of the tracked upstream branch (`origin/<branch>`, as last
+fetched — `verify` does no network git), not the last delivery. When local `HEAD`
+is ahead of it, the report says so first — `2 commit(s) non poussé(s) — l'effet
+vérifié est celui de origin/main` — so a red there reads "waiting for a push", not
+"broken effect". No upstream: last delivery, else `HEAD`. `session start` uses the
+same rule; `--sha` always wins.
 
 Time limits differ from deliver's. `verify` runs all the checks **in parallel**,
 each try with the whole 120 s limit (a `url` request gives up after 20 s; a slow

@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
+import { headSha, repoStatus, upstreamHead } from './git.js';
+import { lastDelivery, sharedStateDir } from './state.js';
 import { onTermination } from './proc.js';
 import { describeCheck, realDeps, retryCheck, TIMED_OUT, type CheckDeps, type DeliverConfig, type VerifyCheck } from './deliver.js';
 
@@ -93,10 +95,32 @@ export function verifyEnv(sha: string): Record<string, string> {
   return { CADENCE_SHA: sha, CADENCE_SHORT: sha.slice(0, 7), CADENCE_BRANCH: '' };
 }
 
+/**
+ * Sha attendu par les vérifications (${SHA} / ${SHORT}) et note éventuelle pour le compte rendu.
+ * - Avec une commande ou un script de livraison : la dernière livraison, à défaut la tête (inchangé).
+ * - Sans aucun des deux, la livraison EST le push (Cloudflare Pages construit chaque push, plan compris) :
+ *   la tête de la branche amont suivie (état local de la référence, aucun réseau). Des commits locaux non
+ *   poussés ne changent pas ce sha mais sont dits dans la note : l'effet vérifié est celui de l'amont.
+ * - Sans amont : repli sur la dernière livraison, à défaut la tête.
+ */
+export function expectedTarget(root: string, config: DeliverConfig, last: string | null): { sha: string; note: string | null } {
+  const fallback = last ?? headSha(root) ?? '';
+  if (config.script !== undefined || config.deploy.length > 0) return { sha: fallback, note: null };
+  const up = upstreamHead(root);
+  if (!up) return { sha: fallback, note: null };
+  const ahead = repoStatus(root).ahead;
+  return { sha: up.sha, note: ahead > 0 ? `${ahead} commit(s) non poussé(s) — l'effet vérifié est celui de ${up.ref}` : null };
+}
+
+/** Sha attendu de la reprise et de `cadence verify` sans --sha. */
+export const defaultTarget = (root: string, config: DeliverConfig) => expectedTarget(root, config, lastDelivery(sharedStateDir(root)));
+
 export interface VerifyCtx {
   config: DeliverConfig;
-  /** Sha qui remplace ${SHA} / ${SHORT} : la dernière livraison, à défaut la tête. */
+  /** Sha qui remplace ${SHA} / ${SHORT} (voir expectedTarget). */
   sha: string;
+  /** Ligne d'information (commits non poussés), affichée avant les résultats. */
+  note?: string | null;
   /** Secondes de réessai ; 0 = une seule passe. */
   retry: number;
   out: (line: string) => void;
@@ -117,6 +141,7 @@ export async function verifyCommand(ctx: VerifyCtx, deps: CheckDeps): Promise<nu
     );
     return 2;
   }
+  if (ctx.note) out(ctx.note);
   const results = await replayChecks(config.verify, deps, ctx.sha, verifyEnv(ctx.sha), { retryMs: ctx.retry * 1000, attemptMs: VERIFY_ATTEMPT_MS });
   for (const r of results) out(resultLine(r));
   out(summaryLine(results));
@@ -133,13 +158,14 @@ export const MORNING_BUDGET_MS = 10_000;
  * Lignes « Effets en production » du rapport de reprise : un seul essai par vérification, borné. Rien à dire
  * (liste vide) pour un projet sans verify ; ne lève jamais — c'est un fait de plus, pas une condition.
  */
-export async function effectLines(config: DeliverConfig, sha: string, deps: CheckDeps): Promise<string[]> {
+export async function effectLines(config: DeliverConfig, sha: string, deps: CheckDeps, note: string | null = null): Promise<string[]> {
   if (config.verify.length === 0) return [];
+  const head = note ? [note] : [];
   try {
     const results = await replayChecks(config.verify, deps, sha, verifyEnv(sha), { retryMs: 0, attemptMs: MORNING_BUDGET_MS });
     const shown = results.filter((r) => r.reason !== null);
-    return shown.length === 0 ? [`✓ ${summaryLine(results)}`] : [...shown.map(resultLine), summaryLine(results)];
+    return shown.length === 0 ? [...head, `✓ ${summaryLine(results)}`] : [...head, ...shown.map(resultLine), summaryLine(results)];
   } catch (e) {
-    return [`✗ verify : ${(e as Error).message}`];
+    return [...head, `✗ verify : ${(e as Error).message}`];
   }
 }

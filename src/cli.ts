@@ -6,7 +6,7 @@ import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits, unrevi
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
-import { effectLines, realCheckDeps, verifyCommand } from './verify.js';
+import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, headSha, readCommits, resolveCommit } from './git.js';
 import { installHook } from './hook.js';
@@ -299,9 +299,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const retry = values.retry === undefined ? 0 : Number(values.retry);
       if (!Number.isFinite(retry) || retry < 0) throw new RafError(`--retry invalide : ${values.retry} (secondes, 0 ou plus)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
-      const sha = values.sha ? (resolveCommit(root, values.sha) ?? '') : (lastDelivery(sharedStateDir(root)) ?? headSha(root) ?? '');
-      if (values.sha && !sha) throw new RafError(`--sha ${values.sha} : commit introuvable`);
-      return verifyCommand({ config, sha, retry, out: io.out }, realCheckDeps(root));
+      const target = values.sha ? { sha: resolveCommit(root, values.sha) ?? '', note: null } : defaultTarget(root, config);
+      if (values.sha && !target.sha) throw new RafError(`--sha ${values.sha} : commit introuvable`);
+      return verifyCommand({ config, sha: target.sha, note: target.note, retry, out: io.out }, realCheckDeps(root));
     }
     case 'skills': {
       if (rest[0] !== 'install') throw new RafError('usage : cadence skills install [--dir .claude] [--force]');
@@ -485,8 +485,8 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
   try {
     const config = parseDeliverConfig(text, configPath);
     if (config.verify.length === 0) return null;
-    const sha = lastDelivery(sharedStateDir(root)) ?? headSha(root) ?? '';
-    return effectLines(config, sha, realCheckDeps(root, { quiet: true }));
+    const target = defaultTarget(root, config);
+    return effectLines(config, target.sha, realCheckDeps(root, { quiet: true }), target.note);
   } catch (e) {
     return [`✗ ${(e as Error).message}`];
   }

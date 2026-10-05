@@ -625,16 +625,22 @@ lots:
     created: 2026-10-04
   - id: L53
     title: "orchestrate : un lot déjà implémenté qui n'attend qu'une revue neuve (commits présents, revue précédente non conforme ou absente) est rendu au lead « implement sans commit » au lieu de passer à la revue — vécu 05-10 sur 3 lots (finance L3, ol L29, warhammer L54), puis en question sur L3 quand les sous-tâches ouvertes étaient déjà couvertes par des commits"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-05
     started: 2026-10-05
     tasks:
-      - { id: t1, title: "awaitsReview : ne sauter implement QUE si un verdict non conforme couvre le dernier commit (→ correction directe) ; présence de commits sans revue (plan en lecture seule, commit de spec seul, vague interrompue) → implement tourne, et sans nouveau commit enchaîne sur la revue ; tests de ces cas", status: todo }
-      - { id: t2, title: "revue directe : lancer orchestrate.test avant la revue quand implement est sauté (rouge → correction directe, comme après work())", status: todo }
-      - { id: t3, title: "NON_CONFORME : couvrir pas conforme / nonconforme / non-conformité / trait d'union insécable, tester non-compliant et not compliant, et ne pas lire « non conforme … levé » comme non conforme", status: todo }
-      - { id: t4, title: "simplification (décision lead après 2e revue) : supprimer le saut d'implement (pendingFix, isNonConforme, correction directe, chemin dry-run « fix → review ») — implement tourne toujours, son brief porte objectif + sous-tâches (constats de revue) ; alreadyDone (sans nouveau commit sur lot commité → revue) reste la seule nouveauté ; README/gabarit/dry-run alignés", status: todo }
-      - { id: t5, title: "tests L53 : titres l.1051 (lecture seule non simulée → simuler readonly) et l.1068 à corriger, doublon l.394/l.1111 à retirer, tests du chemin supprimé retirés", status: todo }
+      - { id: t1, title: "awaitsReview : ne sauter implement QUE si un verdict non conforme couvre le dernier commit (→ correction directe) ; présence de commits sans revue (plan en lecture seule, commit de spec seul, vague interrompue) → implement tourne, et sans nouveau commit enchaîne sur la revue ; tests de ces cas", status: dropped }
+      - { id: t2, title: "revue directe : lancer orchestrate.test avant la revue quand implement est sauté (rouge → correction directe, comme après work())", status: dropped }
+      - { id: t3, title: "NON_CONFORME : couvrir pas conforme / nonconforme / non-conformité / trait d'union insécable, tester non-compliant et not compliant, et ne pas lire « non conforme … levé » comme non conforme", status: dropped }
+      - { id: t4, title: "simplification (décision lead après 2e revue) : supprimer le saut d'implement (pendingFix, isNonConforme, correction directe, chemin dry-run « fix → review ») — implement tourne toujours, son brief porte objectif + sous-tâches (constats de revue) ; alreadyDone (sans nouveau commit sur lot commité → revue) reste la seule nouveauté ; README/gabarit/dry-run alignés", status: done }
+      - { id: t5, title: "tests L53 : titres l.1051 (lecture seule non simulée → simuler readonly) et l.1068 à corriger, doublon l.394/l.1111 à retirer, tests du chemin supprimé retirés", status: done }
+    notes:
+      - { date: 2026-10-05, text: "[L53/t1] abandonné : remplacée par t4 (saut d'implement supprimé, décision lead après 2e revue)" }
+      - { date: 2026-10-05, text: "[L53/t2] abandonné : remplacée par t4 (saut d'implement supprimé, décision lead après 2e revue)" }
+      - { date: 2026-10-05, text: "[L53/t3] abandonné : remplacée par t4 (saut d'implement supprimé, décision lead après 2e revue)" }
+    review: { date: 2026-10-05, verdict: "conforme — 3e revue (Opus) sur l'effet net : implement tourne toujours ; sans nouveau commit sur un lot commité → revue ; 585 tests, tsc 0 ; non vérifié : vraie vague claude", commit: 103b440f77fbbfd3cee16675afefb370d6629d70 }
+    finished: 2026-10-05
   - id: L54
     title: "verify : ${SHORT} attendu = dernier commit hors plan, alors que Cloudflare Pages construit chaque push (commits chore(plan) compris) → faux rouge permanent sur avatar-pandora (attend f95b791, sert 7080faa) et evatosorus ; aligner le sha attendu sur la tête poussée, et distinguer « HEAD non poussé » de « poussé pas encore servi »"
     status: todo

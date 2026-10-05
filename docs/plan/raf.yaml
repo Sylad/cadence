@@ -629,6 +629,10 @@ lots:
     estimate: 1
     created: 2026-10-05
     started: 2026-10-05
+    tasks:
+      - { id: t1, title: "awaitsReview : ne sauter implement QUE si un verdict non conforme couvre le dernier commit (→ correction directe) ; présence de commits sans revue (plan en lecture seule, commit de spec seul, vague interrompue) → implement tourne, et sans nouveau commit enchaîne sur la revue ; tests de ces cas", status: todo }
+      - { id: t2, title: "revue directe : lancer orchestrate.test avant la revue quand implement est sauté (rouge → correction directe, comme après work())", status: todo }
+      - { id: t3, title: "NON_CONFORME : couvrir pas conforme / nonconforme / non-conformité / trait d'union insécable, tester non-compliant et not compliant, et ne pas lire « non conforme … levé » comme non conforme", status: todo }
   - id: L54
     title: "verify : ${SHORT} attendu = dernier commit hors plan, alors que Cloudflare Pages construit chaque push (commits chore(plan) compris) → faux rouge permanent sur avatar-pandora (attend f95b791, sert 7080faa) et evatosorus ; aligner le sha attendu sur la tête poussée, et distinguer « HEAD non poussé » de « poussé pas encore servi »"
     status: todo

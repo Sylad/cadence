@@ -773,7 +773,7 @@ lots:
     estimate: 1
     created: 2026-10-06
     started: 2026-10-06
-    review: { date: 2026-10-06, verdict: "Conforme : les 2 constats mineurs sont corrigés, aucune régression. Commits relus : les 11 de `raf commits L71` (de 22021a8 à 64d774d), en lisant de près les deux commits de correction, 2c4fc46 et 64d774d. Commandes lancées : `tsc --noEmit` passe ; `vitest run` passe (34 fichiers, 652 tests). L'arbre de travail est propre. Constat 1 (dossier réservé orphelin) : corrigé dans command.ts, lignes 346 à 358. Le dossier n'est supprimé que si `wave.json` est absent, que `execute` rende un code ou lève une erreur. `execute` écrit `wave.json` (`saveWave`, ligne 455) avant toute session et avant de poser `onTermination` : une vague démarrée garde donc toujours son dossier. Le nouveau test échouerait sans la correction : le dossier resterait et le second `--wave nuit` serait refusé. Constat 2 : seuls les commentaires de pool.ts ont changé, sans effet sur le comportement. Les choix d'interprétation relus ne changent pas le périmètre du lot. Le passage sur le dossier vide laissé par t1 est dépassé par la correction du constat 1, et il ne figure ni dans le README ni dans le CHANGELOG. Aucun nouveau défaut. Verdict pour `raf review L71` : compliant — orchestré (vague 2026-10-06-1222, 2 passe(s) de correction + passe des mineurs)", commit: 64d774d757a6448ae71c36bac48c29452b43306f }
+    review: { date: 2026-10-06, verdict: "conforme — orchestré (vague 2026-10-06-1222, 2 passes de correction) ; commit de version 804d504 relu par le lead (versions, CHANGELOG, README : aucun code)", commit: 804d504b88e33a54bbfe7de4440a455ead8ee98d }
     tasks:
       - { id: t1, title: "identifiant de vague réservé atomiquement (mkdir sans recursive, EEXIST → suffixe suivant ; --wave déjà existant refusé) + test deux vagues même dossier", status: done }
       - { id: t2, title: "plafond réellement global : avant de prendre un créneau, compter TOUS les créneaux vivants (quel que soit leur index) et attendre si ce compte ≥ son propre plafond ; --status affiche le plafond de chaque vague ; README sans « never exceeds » faux", status: done }
@@ -784,3 +784,8 @@ lots:
     notes:
       - { date: 2026-10-06, text: "Lead 06-10 : tout corriger (outil standard, rien sous le tapis) ; décision t2 = compter tous les créneaux vivants avant de prendre, pas le min des plafonds." }
     finished: 2026-10-06
+  - id: L72
+    title: "Releasing vs porte de revue : le README fait bumper la version « dans le commit qui clôt le lot », mais ce commit cite le lot après sa revue → raf check exige une nouvelle revue (vécu 0.11.0, 06-10). Trancher : commit de version exempté comme le plan (fichiers de version + CHANGELOG seuls), ou bump avant la revue"
+    status: todo
+    estimate: 1
+    created: 2026-10-06

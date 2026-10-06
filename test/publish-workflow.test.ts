@@ -73,3 +73,64 @@ describe('versions du plugin', () => {
     expect(read('.claude-plugin/marketplace.json').plugins[0].version).toBe(version);
   });
 });
+
+describe('notes de version', () => {
+  const step = workflow.match(/- name: Le CHANGELOG a une section pour le tag\n\s+run: \|\n((?:\s{10}.*\n|\n)+)/)?.[1];
+  const changelog = '# Changelog\n\n## [1.2.0] - 2026-01-02\n\n### Added\n- thing (L1)\n\n## [1.1.0] - 2026-01-01\n\n- older\n';
+
+  // Exécute le script de l'étape tel quel, dans un dossier avec un CHANGELOG donné.
+  const runNotes = (tag: string, text: string) => {
+    const dir = tempDir();
+    try {
+      writeFileSync(join(dir, 'CHANGELOG.md'), text);
+      const r = spawnSync('bash', ['-e', '-c', step!], { cwd: dir, env: { ...process.env, GITHUB_REF_NAME: tag, RUNNER_TEMP: dir }, encoding: 'utf8' });
+      let notes: string | undefined;
+      try { notes = readFileSync(join(dir, 'release-notes.md'), 'utf8'); } catch { /* aucune note écrite */ }
+      return { ...r, notes };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('trouve le script de l\'étape', () => {
+    expect(step).toBeTruthy();
+  });
+
+  it('écrit la section du tag, rien des autres', () => {
+    const r = runNotes('v1.2.0', changelog);
+    expect(r.status).toBe(0);
+    expect(r.notes).toContain('thing (L1)');
+    expect(r.notes).not.toContain('older');
+    expect(r.notes).not.toContain('## [');
+  });
+
+  it('prend aussi la dernière section du fichier', () => {
+    expect(runNotes('v1.1.0', changelog).notes).toContain('older');
+  });
+
+  it('refuse un tag sans section', () => {
+    const r = runNotes('v1.3.0', changelog);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('CHANGELOG.md');
+  });
+
+  it('refuse une section vide', () => {
+    expect(runNotes('v1.2.0', '## [1.2.0] - 2026-01-02\n\n## [1.1.0]\n- x\n').status).toBe(1);
+  });
+
+  it('ne prend pas 1.2.0 pour un préfixe de 1.2.01 ou 11.2.0', () => {
+    expect(runNotes('v1.2.0', '## [11.2.0]\n- x\n').status).toBe(1);
+  });
+
+  it('crée la release GitHub avec ces notes, après la publication', () => {
+    expect(workflow).toMatch(/contents: write/);
+    const publish = workflow.indexOf('npm publish');
+    const release = workflow.indexOf('gh release create');
+    expect(release).toBeGreaterThan(publish);
+    expect(workflow).toContain('--notes-file');
+  });
+
+  it('contrôle le CHANGELOG avant toute publication', () => {
+    expect(workflow.indexOf('Le CHANGELOG a une section')).toBeLessThan(workflow.indexOf('npm publish'));
+  });
+});

@@ -1,7 +1,8 @@
 # Publication sur npm par la publication de confiance (Trusted Publishing, OIDC) :
 # aucun jeton stocké, npm vérifie que la publication vient de ce workflow de Sylad/cadence.
 # Déclenchée par un tag v<version> qui doit correspondre à la version de package.json,
-# de .claude-plugin/plugin.json et de .claude-plugin/marketplace.json.
+# de .claude-plugin/plugin.json et de .claude-plugin/marketplace.json, et CHANGELOG.md doit avoir
+# une section « ## [x.y.z] » pour cette version : elle devient le texte de la release GitHub.
 name: publish
 
 on:
@@ -9,7 +10,7 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: read
+  contents: write   # crée la release GitHub avec la section du CHANGELOG
   id-token: write   # jeton d'identité GitHub, échangé contre un droit de publication par npm
 
 jobs:
@@ -35,6 +36,14 @@ jobs:
           test "v$(node -p "require('./.claude-plugin/marketplace.json').plugins[0].version")" = "$GITHUB_REF_NAME" \
             || { echo "tag $GITHUB_REF_NAME ≠ version de .claude-plugin/marketplace.json"; exit 1; }
 
+      # Pas de tag sans notes de version : la section « ## [x.y.z] » est extraite, elle servira de texte à la release.
+      - name: Le CHANGELOG a une section pour le tag
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '/^## \[/ { on = (index($0, "## [" v "]") == 1); if (on) next } on' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/release-notes.md" \
+            || { echo "CHANGELOG.md n'a pas de section « ## [$v] » non vide"; exit 1; }
+
       # Les tests créent des dépôts git jetables : il leur faut une identité.
       - run: |
           git config --global user.name "cadence-ci"
@@ -43,3 +52,9 @@ jobs:
       - run: npm ci
       # prepublishOnly relance typecheck + tests, prepare construit dist/ : une suite rouge arrête tout.
       - run: npm publish --access public --provenance
+
+      # Après la publication seulement : pas de release pour une version qui n'est pas sur npm.
+      - name: Release GitHub avec la section du CHANGELOG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag

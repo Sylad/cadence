@@ -789,3 +789,8 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-06
+  - id: L73
+    title: "raf check : pouvoir acquitter un commit sans lot déjà poussé (chore d'outillage, ex. warhammer 9d5853a .gitignore) sans réécrire l'historique — sinon session close reste « pas fermé » indéfiniment (06-10)"
+    status: todo
+    estimate: 1
+    created: 2026-10-06

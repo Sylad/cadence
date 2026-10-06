@@ -821,6 +821,9 @@ A version exists in three places and is published in two; a release does all of 
    once on npmjs.com (package settings → Trusted Publisher → GitHub Actions, `Sylad/cadence`, `publish.yml`).
 3. Watch the run: `gh run watch` (or `gh run list --workflow publish.yml`).
 4. Check the effect: `npm view @sylad/cadence version` answers the new version.
+   If the package is on npm but the GitHub release is missing (the release step failed after `npm publish`),
+   re-running the job fails at `npm publish`: create the release by hand with
+   `gh release create v<version> --title v<version> --notes-file <the section of CHANGELOG.md> --verify-tag`.
 
 The Claude Code plugin is read from the repository, so pushing `main` is what updates it; npm is what
 `npx @sylad/cadence` and a global install read, and only the tag publishes there. A missing tag, or a red

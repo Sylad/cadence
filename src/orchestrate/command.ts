@@ -9,6 +9,7 @@ import { onTermination } from '../proc.js';
 import { Plan, RafError, isOpen } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
+import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from './registry.js';
 import { loadTemplates, objective, renderBrief, type BriefVars } from './briefs.js';
 import { Budget, MAX_PASSES, countInterrupted, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
@@ -29,6 +30,8 @@ export interface OrchestrateIo {
 
 export interface OrchestrateDeps {
   claude: ClaudeFn;
+  /** Intervalle (ms) d'attente d'un créneau de session libre ; défaut 2 s. */
+  slotPollMs?: number;
   /** Version de claude et présence de --json-schema ; null si claude est absent. */
   claudeInfo: () => { version: string; jsonSchema: boolean } | null;
   agentsDir: string;
@@ -37,6 +40,8 @@ export interface OrchestrateDeps {
 }
 
 export const DEFAULT_BUDGET = 2_000_000;
+/** Sessions simultanées, toutes vagues confondues (`--max-sessions`, ou CADENCE_MAX_SESSIONS). */
+export const DEFAULT_MAX_SESSIONS = 2;
 
 export interface Args {
   lots: { project?: string; lot: string; model?: Model }[];
@@ -44,6 +49,7 @@ export interface Args {
   status?: string | true;
   resume?: string | true;
   budget?: number;
+  maxSessions?: number;
   wave?: string;
   answers: { project?: string; lot: string; text: string }[];
 }
@@ -55,6 +61,11 @@ export function parseBudget(text: string): number {
   const n = Number(m[1].replace(',', '.')) * ({ '': 1, k: 1e3, m: 1e6 }[m[2].toLowerCase() as '' | 'k' | 'm']);
   if (!(n > 0)) throw new RafError(`--budget invalide : ${text}`);
   return Math.round(n);
+}
+
+export function parseMaxSessions(text: string, what = '--max-sessions'): number {
+  if (!/^\d+$/.test(text.trim()) || Number(text) < 1) throw new RafError(`${what} invalide : ${text} (entier ≥ 1)`);
+  return Number(text);
 }
 
 const LOT_LIKE = /^(?:[\w.-]+:)?[A-Za-z]+\d+(?:@\w+)?$/;
@@ -82,6 +93,7 @@ export function parseOrchestrateArgs(argv: string[]): Args {
       if (v !== undefined) i++;
       a[t === '--status' ? 'status' : 'resume'] = v ?? true;
     } else if (t === '--budget') a.budget = parseBudget(value(t));
+    else if (t === '--max-sessions') a.maxSessions = parseMaxSessions(value(t));
     else if (t === '--wave') a.wave = value(t);
     else if (t === '--answer') {
       const target = lotArg(value(t));
@@ -151,8 +163,6 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
   const info = deps.claudeInfo();
   if (!info) refusals.push('claude introuvable (CADENCE_CLAUDE_BIN, ou claude dans le PATH)');
   else if (!info.jsonSchema) refusals.push(`claude ${info.version} n'a pas --json-schema : mettre claude à jour`);
-  const held = activeLock(join(launch, '.cadence', 'orchestrate.lock'));
-  if (held && !opts.resume) refusals.push(`une vague est déjà en cours dans ${launch} (${held.wave}, pid ${held.pid})`);
 
   const lots: LotState[] = [];
   const repoChecked = new Set<string>();
@@ -259,6 +269,23 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
   }
 }
 
+function maxSessions(args: Args, io: OrchestrateIo): number {
+  if (args.maxSessions !== undefined) return args.maxSessions;
+  const env = io.env.CADENCE_MAX_SESSIONS;
+  return env ? parseMaxSessions(env, 'CADENCE_MAX_SESSIONS') : DEFAULT_MAX_SESSIONS;
+}
+
+/** Vagues vivantes (toutes, quel que soit leur dossier de départ) et dépôts qu'elles tiennent. */
+function liveLines(cap: number): string[] {
+  const home = cadenceHome();
+  const waves = liveWaves(home);
+  if (waves.length === 0) return [];
+  const slots = liveSlots(home).length;
+  const lines = [`vagues en cours : ${waves.length} · sessions : ${slots}/${cap}`];
+  for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · dépôts : ${w.repos.join(', ')}`);
+  return lines;
+}
+
 /** Point d'entrée de `cadence orchestrate`. 0 prêts · 1 rendus au lead · 2 refus avant d'agir · 3 suspendue (budget, quota). */
 export async function orchestrate(argv: string[], io: OrchestrateIo, deps: OrchestrateDeps): Promise<number> {
   const args = parseOrchestrateArgs(argv);
@@ -267,13 +294,17 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
 
   if (args.status !== undefined) {
     const store = typeof args.status === 'string' ? RunStore.find(launch, args.status) : RunStore.last(launch);
+    const live = liveLines(maxSessions(args, io));
+    for (const line of live) io.out(line);
+    if (!store && live.length) return 0;
     if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');
+    if (live.length) io.out('');
     for (const line of renderTable(store.readWave()!, store.lots())) io.out(line);
     return 0;
   }
   if (args.resume !== undefined) return resume(args, io, deps, launch, today);
 
-  if (args.lots.length === 0) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--dry-run] | --status [vague] | --resume [vague] [--answer projet:lot "réponse"]');
+  if (args.lots.length === 0) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] | --status [vague] | --resume [vague] [--answer projet:lot "réponse"]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);
@@ -291,7 +322,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   const store = new RunStore(launch, id);
   const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)) };
   for (const l of pre.lots) store.writeLot(l);
-  return execute(wave, pre.lots, store, io, deps, today);
+  return execute(wave, pre.lots, store, io, deps, today, maxSessions(args, io));
 }
 
 function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx: WaveCtx): LotCtx[] {
@@ -299,7 +330,7 @@ function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx:
 }
 
 /** Pose les verrous et les hooks, joue la vague, range l'état, rend le tableau et le code de sortie. */
-async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, all: LotState[] = lots): Promise<number> {
+async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, cap: number, all: LotState[] = lots): Promise<number> {
   const launch = store.launchDir;
   // La configuration des projets est lue avant de poser quoi que ce soit : un cadence.yaml illisible ne laisse ni verrou ni hook.
   const envs = lots.map((lot) => projectEnv(lot.repo));
@@ -307,22 +338,16 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const templates = loadTemplates(deps.templatesDir);
   mkdirSync(join(launch, '.cadence'), { recursive: true });
   excludeState(launch);
-  const waveLock = join(launch, '.cadence', 'orchestrate.lock');
+  const home = cadenceHome();
   const held: string[] = [];
   const repos = [...new Set(lots.map((l) => l.repo))];
   const release = () => {
     for (const f of held) releaseLock(f, process.pid);
     held.length = 0;
+    unregisterWave(home, process.pid);
     for (const r of repos) removePrePush(r, wave.id);
   };
 
-  const got = takeLock(waveLock, { pid: process.pid, wave: wave.id, started: new Date().toISOString() });
-  if (!got.ok) {
-    io.err(`orchestrate : une vague est déjà en cours dans ${launch} (${got.held.wave}, pid ${got.held.pid})`);
-    return 2;
-  }
-  held.push(waveLock);
-  if (got.stale) io.err(`orchestrate : verrou de vague périmé retiré (${got.stale.wave}, pid ${got.stale.pid} mort)`);
   for (const r of repos) {
     const file = join(sharedStateDir(r), REPO_LOCK);
     const l = takeLock(file, { pid: process.pid, wave: wave.id, started: new Date().toISOString() });
@@ -341,6 +366,21 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     }
   }
 
+  registerWave(home, { pid: process.pid, wave: wave.id, started: new Date().toISOString(), cwd: launch, repos });
+
+  // Plafond de sessions simultanées, toutes vagues confondues : chaque session attend un créneau libre avant de partir.
+  const claude: ClaudeFn = async (args, o) => {
+    const free = await acquireSlot(home, cap, {
+      wave: wave.id,
+      pollMs: deps.slotPollMs,
+      onWait: (h) => wctx.log(`en attente d'un créneau de session (${h.length}/${cap} en cours : ${[...new Set(h.map((x) => x.wave))].join(', ')})`),
+    });
+    try {
+      return await deps.claude(args, o);
+    } finally {
+      free();
+    }
+  };
   const budget = new Budget(wave.budget);
   budget.consumed = wave.consumed;
   budget.cacheRead = wave.cacheRead;
@@ -354,7 +394,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     id: wave.id,
     store,
     budget,
-    claude: deps.claude,
+    claude,
     agents: agentsOf(deps),
     today,
     claudeHome: deps.claudeHome,
@@ -389,7 +429,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     release();
   });
   try {
-    await runPool(ctxs, undefined, all);
+    await runPool(ctxs, cap, all);
   } finally {
     forget();
     const finished = (l: LotState) => l.status === 'ready' || l.status === 'handed-back' || l.status === 'failed';
@@ -412,8 +452,8 @@ async function resume(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, laun
   const refusals: string[] = [];
   const info = deps.claudeInfo();
   if (!info) refusals.push('claude introuvable (CADENCE_CLAUDE_BIN, ou claude dans le PATH)');
-  const alive = activeLock(join(launch, '.cadence', 'orchestrate.lock'));
-  if (alive && alive.pid !== process.pid) refusals.push(`la vague ${alive.wave} tourne encore (pid ${alive.pid})`);
+  const alive = liveWaves(cadenceHome()).find((w) => w.wave === wave.id && w.cwd === launch && w.pid !== process.pid);
+  if (alive) refusals.push(`la vague ${alive.wave} tourne encore (pid ${alive.pid})`);
   if (wave.status === 'done') refusals.push(`la vague ${wave.id} est terminée`);
 
   const lots = store.lots();
@@ -472,7 +512,7 @@ async function resume(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, laun
     for (const line of renderTable(wave, lots)) io.out(line);
     return 0;
   }
-  return execute(wave, live, store, io, deps, today, lots);
+  return execute(wave, live, store, io, deps, today, maxSessions(args, io), lots);
 }
 
 /** Dépendances réelles : `claude` (ou CADENCE_CLAUDE_BIN), agents et gabarits du paquet, journaux de ~/.claude. */

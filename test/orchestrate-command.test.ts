@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
+import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
@@ -139,11 +140,24 @@ describe('refus avant d\'agir (code 2)', () => {
     expect(r.err.join()).toContain("plan en lecture seule : démarrer le lot avec l'outil du projet");
   });
 
-  it('une vague déjà en cours dans ce dossier', async () => {
-    const { parent } = parentWith({ a: [{ title: 'un' }] });
-    mkdirSync(join(parent, '.cadence'));
-    writeFileSync(join(parent, '.cadence/orchestrate.lock'), JSON.stringify({ pid: process.pid, wave: 'autre', started: 'x' }));
-    expect((await run(parent, ['a:L1'])).err.join()).toContain('une vague est déjà en cours');
+  it('L71 — une vague vivante sur un autre dépôt du même dossier ne gêne pas ; sur le même dépôt, refus', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
+    mkdirSync(join(dirs.b, '.git/cadence'), { recursive: true });
+    writeFileSync(join(dirs.b, '.git/cadence/orchestrate.lock'), JSON.stringify({ pid: process.ppid, wave: 'autre', started: 'x' }));
+    expect((await run(parent, ['a:L1'])).code).toBe(0);
+    const same = await run(parent, ['b:L1']);
+    expect(same.code).toBe(2);
+    expect(same.err.join()).toContain('b : une orchestration y est déjà en cours (autre');
+    expect(same.err.join()).not.toContain('une vague est déjà en cours');
+  });
+
+  it('L71 — un verrou de dépôt de pid mort est retiré', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    mkdirSync(join(dirs.a, '.git/cadence'), { recursive: true });
+    writeFileSync(join(dirs.a, '.git/cadence/orchestrate.lock'), JSON.stringify({ pid: 999999999, wave: 'morte', started: 'x' }));
+    const r = await run(parent, ['a:L1']);
+    expect(r.code).toBe(0);
+    expect(r.err.join()).toContain('verrou de dépôt périmé retiré');
   });
 });
 
@@ -184,7 +198,6 @@ describe('verrous, hooks et configuration (L3/t10, t13)', () => {
     expect(f.calls.length).toBe(calls);
     expect(readFileSync(join(dirs.a, '.git/hooks/pre-push'), 'utf8')).toContain('# wave: autre'); // le hook de l'autre vague reste
     expect(readFileSync(join(dirs.a, '.git/cadence/orchestrate.lock'), 'utf8')).toContain('autre'); // pas retiré
-    expect(existsSync(join(parent, '.cadence/orchestrate.lock'))).toBe(false);
   });
 
   it('L3/t13 — cadence.yaml illisible à la reprise : ni hook ni verrou laissés', async () => {
@@ -197,7 +210,69 @@ describe('verrous, hooks et configuration (L3/t10, t13)', () => {
     await expect(orchestrate(['--resume', '--budget', '1M'], io(parent).io, f.deps)).rejects.toThrow(/orchestrate doit être un objet/);
     expect(existsSync(join(dirs.a, '.git/hooks/pre-push'))).toBe(false);
     expect(existsSync(join(dirs.a, '.git/cadence/orchestrate.lock'))).toBe(false);
-    expect(existsSync(join(parent, '.cadence/orchestrate.lock'))).toBe(false);
+  });
+});
+
+describe('plafond de sessions simultanées et --status (L71)', () => {
+  const run = async (parent: string, argv: string[], deps = fakeDeps().deps, env: Record<string, string> = {}) => {
+    const r = io(parent, env);
+    return { code: await orchestrate(argv, r.io, deps), ...r };
+  };
+
+  it('--max-sessions et CADENCE_MAX_SESSIONS : entier ≥ 1', async () => {
+    expect(parseOrchestrateArgs(['a:L1', '--max-sessions', '3']).maxSessions).toBe(3);
+    expect(() => parseOrchestrateArgs(['--max-sessions', '0'])).toThrow(/--max-sessions invalide/);
+    expect(() => parseOrchestrateArgs(['--max-sessions', 'x'])).toThrow(/entier/);
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    await expect(run(parent, ['--status'], fakeDeps().deps, { CADENCE_MAX_SESSIONS: 'abc' })).rejects.toThrow(/CADENCE_MAX_SESSIONS invalide/);
+  });
+
+  it('une vague attend un créneau libre avant chaque session, puis part', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const home = cadenceHome();
+    const x = await acquireSlot(home, 2, { wave: 'x' });
+    const y = await acquireSlot(home, 2, { wave: 'y' });
+    const f = fakeDeps();
+    f.deps.slotPollMs = 10;
+    const r = io(parent);
+    const done = orchestrate(['a:L1'], r.io, f.deps);
+    await new Promise((res) => setTimeout(res, 150));
+    expect(f.calls).toEqual([]); // plafond atteint : aucune session
+    expect(r.out.join('\n')).toContain("en attente d'un créneau de session (2/2 en cours : x, y)");
+    x();
+    expect(await done).toBe(0);
+    expect(f.calls.length).toBeGreaterThan(0);
+    y();
+    expect(liveSlots(home)).toEqual([]); // tous les créneaux de la vague sont rendus
+  });
+
+  it('le plafond est celui du drapeau : --max-sessions 1 garde un créneau pour une seule session à la fois', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
+    let running = 0;
+    let peak = 0;
+    const track = (cwd: string, kind: 'implement') => async () => {
+      running++;
+      peak = Math.max(peak, running);
+      await new Promise((res) => setTimeout(res, 40));
+      running--;
+      return claudeOut(workReport({ commits: [commitFile(cwd, `${kind}-${Math.random()}.txt`, 'feat(L1): x')] }));
+    };
+    const f = fakeDeps({ implement: (cwd) => track(cwd, 'implement')() });
+    f.deps.slotPollMs = 5;
+    expect((await run(parent, ['a:L1', 'b:L1', '--max-sessions', '1'], f.deps)).code).toBe(0);
+    expect(peak).toBe(1);
+  });
+
+  it('--status liste les vagues vivantes et les dépôts tenus, même sans vague dans ce dossier', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-06-1100', started: '2026-10-06T11:00:00Z', cwd: '/ailleurs', repos: ['/x/ol-companion', '/x/cadence'] });
+    const r = await run(parent, ['--status']);
+    expect(r.code).toBe(0);
+    const out = r.out.join('\n');
+    expect(out).toContain('vagues en cours : 1 · sessions : 0/2');
+    expect(out).toContain('2026-10-06-1100 (pid ' + process.ppid);
+    expect(out).toContain('lancée depuis /ailleurs · dépôts : /x/ol-companion, /x/cadence');
+    unregisterWave(cadenceHome(), process.ppid);
   });
 });
 
@@ -252,21 +327,22 @@ describe('une vague', () => {
       expect(Plan.load(join(d, 'docs/plan/raf.yaml')).lot('L1').review?.verdict).toContain('orchestré (vague 2026-10-04-1412');
       expect(Plan.load(join(d, 'docs/plan/raf.yaml')).lot('L1').status).toBe('doing');
     }
-    expect(existsSync(join(parent, '.cadence/orchestrate.lock'))).toBe(false);
     expect(readFileSync(join(parent, '.cadence/runs/2026-10-04-1412/journal.log'), 'utf8')).toContain('a:L1 → ready');
   });
 
   it('pendant la vague, le hook pre-push est posé ; les verrous sont pris', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
-    let seen: { hook: boolean; repoLock: boolean; waveLock: boolean } | null = null;
+    let seen: { hook: boolean; repoLock: boolean; registered: boolean } | null = null;
     const f = fakeDeps({
       implement: (cwd) => {
-        seen = { hook: existsSync(join(dirs.a, '.git/hooks/pre-push')), repoLock: existsSync(join(dirs.a, '.git/cadence/orchestrate.lock')), waveLock: existsSync(join(parent, '.cadence/orchestrate.lock')) };
+        seen = { hook: existsSync(join(dirs.a, '.git/hooks/pre-push')), repoLock: existsSync(join(dirs.a, '.git/cadence/orchestrate.lock')), registered: liveWaves(cadenceHome()).some((w) => w.pid === process.pid && w.repos.includes(dirs.a)) };
         return claudeOut(workReport({ commits: [commitFile(cwd, 'x.txt', 'feat(L1): x')] }));
       },
     });
     await orchestrate(['a:L1'], io(parent).io, f.deps);
-    expect(seen).toEqual({ hook: true, repoLock: true, waveLock: true });
+    expect(seen).toEqual({ hook: true, repoLock: true, registered: true });
+    expect(liveWaves(cadenceHome())).toEqual([]); // retirée à la fin
+    expect(existsSync(join(parent, '.cadence/orchestrate.lock'))).toBe(false); // plus de verrou par dossier
   });
 
   it('L3/t20 — --resume compte au budget l\'étape tuée par un signal, relue dans le journal de sa session', async () => {

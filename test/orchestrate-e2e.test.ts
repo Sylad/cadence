@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { run } from '../src/cli.js';
+import { cadenceHome, liveWaves } from '../src/orchestrate/registry.js';
 import { projectLogDir } from '../src/orchestrate/launch.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
@@ -211,7 +212,7 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     };
     const store = () => RunStore.last(s.parent);
     const sessionPid = () => store()?.readLot('proj', 'L1')?.steps[0]?.pid;
-    await waitFor('session lancée', () => logFile().length === 1 && !!sessionPid() && existsSync(join(s.dir, '.git/hooks/pre-push')));
+    await waitFor('session lancée', () => logFile().length === 1 && !!sessionPid() && existsSync(join(s.dir, '.git/hooks/pre-push')) && liveWaves(cadenceHome()).length === 1);
     const pid = sessionPid()!;
     // L3/t20 : la session tuée a consommé des tokens, lisibles dans son journal (identifiant passé par --session-id)
     const sid = store()!.readLot('proj', 'L1')!.steps[0].sessionId!;
@@ -220,7 +221,7 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     mkdirSync(logs, { recursive: true });
     writeFileSync(join(logs, `${sid}.jsonl`), JSON.stringify({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 10, cache_creation_input_tokens: 100, cache_read_input_tokens: 7, output_tokens: 5 } } }));
     writeFileSync(join(logs, 'autre-conversation.jsonl'), JSON.stringify({ type: 'assistant', message: { id: 'z', usage: { input_tokens: 9_999_999, output_tokens: 1 } } }));
-    expect(existsSync(join(s.parent, '.cadence/orchestrate.lock'))).toBe(true);
+    expect(liveWaves(cadenceHome()).map((w) => w.pid)).toEqual([child.pid]);
     expect(existsSync(join(s.dir, '.git/cadence/orchestrate.lock'))).toBe(true);
 
     child.kill(signal);
@@ -235,7 +236,7 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(st.readWave()!.consumed).toBe(115);
     expect(st.readWave()!.cacheRead).toBe(7);
     expect(lot.steps[0].tokens).toMatchObject({ counted: 115 });
-    expect(existsSync(join(s.parent, '.cadence/orchestrate.lock'))).toBe(false);
+    expect(liveWaves(cadenceHome())).toEqual([]);
     expect(existsSync(join(s.dir, '.git/cadence/orchestrate.lock'))).toBe(false);
     expect(existsSync(join(s.dir, '.git/hooks/pre-push'))).toBe(false);
     expect(() => process.kill(pid, 0)).toThrow(); // la session est morte

@@ -769,17 +769,18 @@ lots:
       - { date: 2026-10-06, text: "06-10 aussi : la vague warhammer40k:L64 (t1–t5 implémentées, revue conforme) a laissé les 5 sous-tâches en todo → raf done L64 refusé, le lead les a closes à la main. L'orchestrateur devrait clore (ou proposer de clore) les sous-tâches couvertes par des commits qui les citent quand la revue est conforme. Et : un backend dev (nest) lancé par une session d'implémentation est resté vivant après la vague (2 fois) — tuer les process enfants en fin de session." }
   - id: L71
     title: "orchestrate : verrou par DÉPÔT au lieu du dossier parent — deux vagues dans des dépôts différents coexistent sous un plafond global de sessions simultanées (2 par défaut, réglable) ; même dépôt = toujours refusé (index git, plan et dérivés, tests/build partagés). Plus tard si besoin : worktree par lot à fichiers disjoints + fusion des plans (06-10, refus vécu cadence:L69 × warhammer40k:L64)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-06
     started: 2026-10-06
     review: { date: 2026-10-06, verdict: "Conforme : les 2 constats mineurs sont corrigés, aucune régression. Commits relus : les 11 de `raf commits L71` (de 22021a8 à 64d774d), en lisant de près les deux commits de correction, 2c4fc46 et 64d774d. Commandes lancées : `tsc --noEmit` passe ; `vitest run` passe (34 fichiers, 652 tests). L'arbre de travail est propre. Constat 1 (dossier réservé orphelin) : corrigé dans command.ts, lignes 346 à 358. Le dossier n'est supprimé que si `wave.json` est absent, que `execute` rende un code ou lève une erreur. `execute` écrit `wave.json` (`saveWave`, ligne 455) avant toute session et avant de poser `onTermination` : une vague démarrée garde donc toujours son dossier. Le nouveau test échouerait sans la correction : le dossier resterait et le second `--wave nuit` serait refusé. Constat 2 : seuls les commentaires de pool.ts ont changé, sans effet sur le comportement. Les choix d'interprétation relus ne changent pas le périmètre du lot. Le passage sur le dossier vide laissé par t1 est dépassé par la correction du constat 1, et il ne figure ni dans le README ni dans le CHANGELOG. Aucun nouveau défaut. Verdict pour `raf review L71` : compliant — orchestré (vague 2026-10-06-1222, 2 passe(s) de correction + passe des mineurs)", commit: 64d774d757a6448ae71c36bac48c29452b43306f }
     tasks:
-      - { id: t1, title: "identifiant de vague réservé atomiquement (mkdir sans recursive, EEXIST → suffixe suivant ; --wave déjà existant refusé) + test deux vagues même dossier", status: todo }
-      - { id: t2, title: "plafond réellement global : avant de prendre un créneau, compter TOUS les créneaux vivants (quel que soit leur index) et attendre si ce compte ≥ son propre plafond ; --status affiche le plafond de chaque vague ; README sans « never exceeds » faux", status: todo }
-      - { id: t3, title: "identité du porteur des créneaux et du registre = pid + heure de démarrage (src/proc.ts ProcInfo.start), pid réutilisé = porteur mort ; le journal d'attente dit depuis combien de temps on attend", status: todo }
-      - { id: t4, title: "registerWave : ignorer les .tmp au nettoyage, appeler registerWave sous la protection de release() (hooks retirés si le démarrage échoue)", status: todo }
-      - { id: t5, title: "test : --resume refusé quand la vague est vivante dans le registre", status: todo }
-      - { id: t6, title: "README:704 (une vague par dépôt, pas un dépôt par vague) et aide bin/cadence.js avec --max-sessions", status: todo }
+      - { id: t1, title: "identifiant de vague réservé atomiquement (mkdir sans recursive, EEXIST → suffixe suivant ; --wave déjà existant refusé) + test deux vagues même dossier", status: done }
+      - { id: t2, title: "plafond réellement global : avant de prendre un créneau, compter TOUS les créneaux vivants (quel que soit leur index) et attendre si ce compte ≥ son propre plafond ; --status affiche le plafond de chaque vague ; README sans « never exceeds » faux", status: done }
+      - { id: t3, title: "identité du porteur des créneaux et du registre = pid + heure de démarrage (src/proc.ts ProcInfo.start), pid réutilisé = porteur mort ; le journal d'attente dit depuis combien de temps on attend", status: done }
+      - { id: t4, title: "registerWave : ignorer les .tmp au nettoyage, appeler registerWave sous la protection de release() (hooks retirés si le démarrage échoue)", status: done }
+      - { id: t5, title: "test : --resume refusé quand la vague est vivante dans le registre", status: done }
+      - { id: t6, title: "README:704 (une vague par dépôt, pas un dépôt par vague) et aide bin/cadence.js avec --max-sessions", status: done }
     notes:
       - { date: 2026-10-06, text: "Lead 06-10 : tout corriger (outil standard, rien sous le tapis) ; décision t2 = compter tous les créneaux vivants avant de prendre, pas le min des plafonds." }
+    finished: 2026-10-06

@@ -301,8 +301,9 @@ describe("identifiant de vague réservé atomiquement (L71/t1)", () => {
     const [x, y] = await Promise.all([run(parent, ['a:L1']), run(parent, ['b:L1'])]);
     expect([x.code, y.code]).toEqual([0, 0]);
     expect(readdirSync(join(parent, '.cadence/runs')).sort()).toEqual(['2026-10-04-1412', '2026-10-04-1412-2']);
-    expect(new RunStore(parent, '2026-10-04-1412').readWave()!.lots).toEqual(['a:L1']);
-    expect(new RunStore(parent, '2026-10-04-1412-2').readWave()!.lots).toEqual(['b:L1']);
+    // L'ordre de réservation entre deux run() parallèles n'est pas promis : on vérifie l'ensemble.
+    const lots = ['2026-10-04-1412', '2026-10-04-1412-2'].map((id) => new RunStore(parent, id).readWave()!.lots);
+    expect(lots.sort()).toEqual([['a:L1'], ['b:L1']]);
   });
 
   it("--wave déjà existant : refus avant d'agir, la vague existante est intacte", async () => {

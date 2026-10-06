@@ -752,15 +752,21 @@ lots:
     created: 2026-10-05
   - id: L69
     title: "Notes de version : CHANGELOG.md rétroactif par version (v0.1→v0.10.1, « disponible depuis vX »), section What's new du README qui y renvoie, publish.yml refuse un tag sans section et crée la release GitHub avec la section de la version"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-06
     notes:
       - { date: 2026-10-06, text: "Cadrage lead 06-10 (demande de Sylvain : impossible de savoir ce qu'apporte une nouvelle version). 1) CHANGELOG.md à la racine, format Keep a Changelog, en anglais comme le README, une section par tag existant (git tag), plus récente en tête, rédigée pour l'utilisateur (ce qu'il peut faire de neuf / ce qui change pour lui, pas la liste des commits), chaque entrée cite ses lots ; reconstruire depuis git log entre tags + le plan. 2) README : section courte « What's new » près du haut = points marquants de la dernière version + lien vers CHANGELOG.md ; la section Releasing ajoute l'étape « écrire la section CHANGELOG dans le commit qui bumpe la version ». 3) publish.yml : refuse le tag si CHANGELOG.md n'a pas de section ## [x.y.z], et crée la release GitHub (gh release create, permission contents: write) avec le texte de cette section. 4) Un test (vitest) vérifie que la version de package.json a sa section dans CHANGELOG.md. Pas de bump de version dans ce lot." }
     started: 2026-10-06
     review: { date: 2026-10-06, verdict: "conforme : les 3 constats mineurs sont corrigés, aucune régression — orchestré (vague 2026-10-06-1016, 0 passe(s) de correction + passe des mineurs)", commit: 02425e5b8354ad9edb0a1eb5e28dfb1a51957d21 }
+    finished: 2026-10-06
   - id: L70
     title: "orchestrate : un dossier .playwright-mcp/ laissé par le MCP Playwright rend le lot au lead (« dépôt sale après implement », 2 fois le 06-10 sur warhammer) — le brief impose les sorties Playwright hors du dépôt (--output-dir / tmp) et/ou cadence init ajoute .playwright-mcp/ au .gitignore"
+    status: todo
+    estimate: 1
+    created: 2026-10-06
+  - id: L71
+    title: "orchestrate : verrou par DÉPÔT au lieu du dossier parent — deux vagues dans des dépôts différents coexistent sous un plafond global de sessions simultanées (2 par défaut, réglable) ; même dépôt = toujours refusé (index git, plan et dérivés, tests/build partagés). Plus tard si besoin : worktree par lot à fichiers disjoints + fusion des plans (06-10, refus vécu cadence:L69 × warhammer40k:L64)"
     status: todo
     estimate: 1
     created: 2026-10-06

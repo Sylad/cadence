@@ -19,6 +19,16 @@ several projects through subagents — plus three reviewer agents: `ux-reviewer`
 gate, and `qa-reviewer`, which walks the delivered app in a real browser and
 reports a page left empty or in error.
 
+## What's new
+
+**0.10.1**: the QA expectations file (`docs/qa/expectations.md`) is kept with the plan —
+a commit that only touches it no longer has to cite a lot. **0.10.0**: `cadence orchestrate`
+sends an already-committed lot straight to review, and sessions only ask questions that
+name what they would change. **0.9.0**: `cadence orchestrate` itself, recurring lots, public
+titles and a safe clean-up at session close.
+
+Every version, with what it brings and since when: [CHANGELOG.md](CHANGELOG.md).
+
 ## raf
 
 - The plan is a YAML file in the repo (`docs/plan/raf.yaml`), edited by the CLI.
@@ -802,10 +812,12 @@ A version exists in three places and is published in two; a release does all of 
 
 1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, in the commit that closes the lot.
+   Write the version's section of `CHANGELOG.md` (`## [x.y.z] - date`, what changes for the user, lots cited)
+   and refresh the « What's new » summary of this README in that same commit.
 2. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,
    which publishes to npm through Trusted Publishing (OIDC, no token stored anywhere): it checks the tag
-   matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, then `npm publish --provenance`, where `prepublishOnly` runs the type-check and the
-   tests and `prepare` builds `dist/`; a red suite stops the publication. The trusted publisher is declared
+   matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` and that `CHANGELOG.md` has a `## [x.y.z]` section for it (no section, no publication), then `npm publish --provenance`, where `prepublishOnly` runs the type-check and the
+   tests and `prepare` builds `dist/`; a red suite stops the publication; then it creates the GitHub release with that CHANGELOG section as its text. The trusted publisher is declared
    once on npmjs.com (package settings → Trusted Publisher → GitHub Actions, `Sylad/cadence`, `publish.yml`).
 3. Watch the run: `gh run watch` (or `gh run list --workflow publish.yml`).
 4. Check the effect: `npm view @sylad/cadence version` answers the new version.

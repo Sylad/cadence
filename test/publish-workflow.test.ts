@@ -120,6 +120,7 @@ describe('notes de version', () => {
 
   it('ne prend pas 1.2.0 pour un préfixe de 1.2.01 ou 11.2.0', () => {
     expect(runNotes('v1.2.0', '## [11.2.0]\n- x\n').status).toBe(1);
+    expect(runNotes('v1.2.0', '## [1.2.01]\n- x\n').status).toBe(1);
   });
 
   it('crée la release GitHub avec ces notes, après la publication', () => {

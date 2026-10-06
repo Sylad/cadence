@@ -1,8 +1,8 @@
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { pidAlive } from '../state.js';
-import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
+import { processStart } from '../proc.js';
+import { activeLock, holderAlive, releaseLock, takeLock, type OLock } from './lock.js';
 
 /**
  * État commun à toutes les vagues de l'utilisateur, quel que soit le dossier d'où elles partent : le registre
@@ -19,6 +19,10 @@ export interface LiveWave {
   started: string;
   cwd: string;
   repos: string[];
+  /** Plafond de sessions simultanées que cette vague s'applique (`--max-sessions`). */
+  cap?: number;
+  /** Heure de démarrage du processus : avec le pid, l'identité de la vague (un pid se réutilise). */
+  start?: string;
 }
 
 const wavesDir = (home: string) => join(home, 'waves');
@@ -27,7 +31,10 @@ const slotsDir = (home: string) => join(home, 'slots');
 function readWave(file: string): LiveWave | null {
   try {
     const raw = JSON.parse(readFileSync(file, 'utf8'));
-    return { pid: Number(raw.pid), wave: String(raw.wave), started: String(raw.started), cwd: String(raw.cwd), repos: Array.isArray(raw.repos) ? raw.repos.map(String) : [] };
+    const w: LiveWave = { pid: Number(raw.pid), wave: String(raw.wave), started: String(raw.started), cwd: String(raw.cwd), repos: Array.isArray(raw.repos) ? raw.repos.map(String) : [] };
+    if (raw.cap !== undefined) w.cap = Number(raw.cap);
+    if (raw.start !== undefined) w.start = String(raw.start);
+    return w;
   } catch {
     return null;
   }
@@ -44,17 +51,19 @@ export function liveWaves(home: string): LiveWave[] {
   const out: LiveWave[] = [];
   for (const n of names) {
     const w = readWave(join(wavesDir(home), n));
-    if (w && pidAlive(w.pid)) out.push(w);
+    if (w && holderAlive(w.pid, w.start)) out.push(w);
   }
   return out.sort((a, b) => a.started.localeCompare(b.started));
 }
 
-/** Inscrit la vague ; écarte au passage les entrées de processus morts. */
-export function registerWave(home: string, w: LiveWave): void {
+/** Inscrit la vague ; écarte au passage les entrées de processus morts (les `.tmp` d'une inscription en cours ne sont pas touchés). */
+export function registerWave(home: string, given: LiveWave): void {
+  const w: LiveWave = { ...given, start: given.start ?? processStart(given.pid) ?? undefined };
   mkdirSync(wavesDir(home), { recursive: true });
   for (const n of readdirSync(wavesDir(home))) {
+    if (!n.endsWith('.json')) continue;
     const old = readWave(join(wavesDir(home), n));
-    if (!old || !pidAlive(old.pid)) rmSync(join(wavesDir(home), n), { force: true });
+    if (!old || !holderAlive(old.pid, old.start)) rmSync(join(wavesDir(home), n), { force: true });
   }
   const file = join(wavesDir(home), `${w.pid}.json`);
   writeFileSync(`${file}.tmp`, JSON.stringify(w));
@@ -76,23 +85,50 @@ export function liveSlots(home: string): OLock[] {
   return names.map((n) => activeLock(join(slotsDir(home), n))).filter((l): l is OLock => l !== null);
 }
 
+/** Index de créneau le plus haut essayé : le plafond de chaque vague est le sien, les fichiers sont communs. */
+const MAX_SLOT_INDEX = 64;
+
+/** Intervalle des rappels d'attente dans le journal. */
+const WAIT_REPORT_MS = 60_000;
+
 /**
- * Attend un créneau libre parmi `cap` (premier libre, un pid mort est repris) et rend sa libération. `onWait`
- * est appelé une seule fois, quand on commence à attendre, avec les porteurs.
+ * Attend que le nombre de sessions vivantes, TOUTES vagues confondues et quel que soit l'index de leur créneau,
+ * soit sous `cap` (le plafond de cette vague), puis prend le premier créneau libre (un pid mort est repris) et
+ * rend sa libération. Chaque vague applique SON plafond au total commun : avec des plafonds différents, la
+ * vague au plafond le plus haut peut porter le total au-dessus du plafond de l'autre, qui attend alors.
+ * Deux vagues qui prennent en même temps se départagent au recomptage : si le total dépasse `cap` une fois
+ * le créneau pris, il est rendu et l'attente reprend.
+ *
+ * `onWait(holders, waitedMs)` : appelé quand on commence à attendre (0 ms), puis toutes les minutes.
+ * `onGot(waitedMs)` : appelé à l'obtention, seulement si on a attendu.
  */
-export async function acquireSlot(home: string, cap: number, opts: { wave: string; pollMs?: number; onWait?: (holders: OLock[]) => void }): Promise<() => void> {
+export async function acquireSlot(
+  home: string,
+  cap: number,
+  opts: { wave: string; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number) => void; onGot?: (waitedMs: number) => void },
+): Promise<() => void> {
   mkdirSync(slotsDir(home), { recursive: true });
-  let warned = false;
+  const t0 = Date.now();
+  let reportedAt: number | null = null;
+  const pollMs = opts.pollMs ?? 2000;
   for (;;) {
-    for (let k = 0; k < cap; k++) {
-      const file = join(slotsDir(home), `slot-${k}.lock`);
-      const got = takeLock(file, { pid: process.pid, wave: opts.wave, started: new Date().toISOString() });
-      if (got.ok) return () => releaseLock(file, process.pid);
+    if (liveSlots(home).length < cap) {
+      for (let k = 0; k < MAX_SLOT_INDEX; k++) {
+        const file = join(slotsDir(home), `slot-${k}.lock`);
+        const got = takeLock(file, { pid: process.pid, wave: opts.wave, started: new Date().toISOString() });
+        if (!got.ok) continue;
+        if (liveSlots(home).length <= cap) {
+          if (reportedAt !== null) opts.onGot?.(Date.now() - t0);
+          return () => releaseLock(file, process.pid);
+        }
+        releaseLock(file, process.pid); // pris à plusieurs en même temps : on rend, on retente
+        break;
+      }
     }
-    if (!warned) {
-      warned = true;
-      opts.onWait?.(liveSlots(home));
+    if (reportedAt === null || Date.now() - reportedAt >= (opts.reportMs ?? WAIT_REPORT_MS)) {
+      reportedAt = Date.now();
+      opts.onWait?.(liveSlots(home), reportedAt - t0);
     }
-    await new Promise((r) => setTimeout(r, opts.pollMs ?? 2000));
+    await new Promise((r) => setTimeout(r, pollMs + Math.random() * pollMs * 0.25));
   }
 }

@@ -93,6 +93,23 @@ export function readProcs(): Map<number, ProcInfo> | null {
   return procs;
 }
 
+/** Heure de démarrage d'un processus (son identité : un pid se réutilise) ; null s'il est mort ou illisible. */
+export function processStart(pid: number): string | null {
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19] ?? null;
+  } catch {
+    // pas de /proc (macOS) ou processus sorti : ps
+  }
+  try {
+    const out = execFileSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return out || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Âge au-delà duquel un relevé de secours (le relevé suivant a échoué) n'est plus cru : un pid y a pu être repris. */
 export const MAX_SNAPSHOT_AGE_MS = 1_000;
 

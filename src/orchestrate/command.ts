@@ -280,14 +280,19 @@ function maxSessions(args: Args, io: OrchestrateIo): number {
   return env ? parseMaxSessions(env, 'CADENCE_MAX_SESSIONS') : DEFAULT_MAX_SESSIONS;
 }
 
+function duration(ms: number): string {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
+}
+
 /** Vagues vivantes (toutes, quel que soit leur dossier de départ) et dépôts qu'elles tiennent. */
-function liveLines(cap: number): string[] {
+function liveLines(): string[] {
   const home = cadenceHome();
   const waves = liveWaves(home);
   if (waves.length === 0) return [];
   const slots = liveSlots(home).length;
-  const lines = [`vagues en cours : ${waves.length} · sessions : ${slots}/${cap}`];
-  for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · dépôts : ${w.repos.join(', ')}`);
+  const lines = [`vagues en cours : ${waves.length} · sessions en cours : ${slots}`];
+  for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · plafond ${w.cap ?? '?'} · dépôts : ${w.repos.join(', ')}`);
   return lines;
 }
 
@@ -299,7 +304,8 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
 
   if (args.status !== undefined) {
     const store = typeof args.status === 'string' ? RunStore.find(launch, args.status) : RunStore.last(launch);
-    const live = liveLines(maxSessions(args, io));
+    maxSessions(args, io); // une valeur invalide est refusée ici aussi
+    const live = liveLines();
     for (const line of live) io.out(line);
     if (!store && live.length) return 0;
     if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');
@@ -359,8 +365,12 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const release = () => {
     for (const f of held) releaseLock(f, process.pid);
     held.length = 0;
-    unregisterWave(home, process.pid);
     for (const r of repos) removePrePush(r, wave.id);
+    try {
+      unregisterWave(home, process.pid);
+    } catch {
+      // registre illisible : l'entrée d'un processus mort est écartée à la prochaine inscription
+    }
   };
 
   for (const r of repos) {
@@ -381,14 +391,20 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     }
   }
 
-  registerWave(home, { pid: process.pid, wave: wave.id, started: new Date().toISOString(), cwd: launch, repos });
+  try {
+    registerWave(home, { pid: process.pid, wave: wave.id, started: new Date().toISOString(), cwd: launch, repos, cap });
+  } catch (e) {
+    release(); // verrous et hooks ne restent pas posés si le démarrage échoue
+    throw e;
+  }
 
   // Plafond de sessions simultanées, toutes vagues confondues : chaque session attend un créneau libre avant de partir.
   const claude: ClaudeFn = async (args, o) => {
     const free = await acquireSlot(home, cap, {
       wave: wave.id,
       pollMs: deps.slotPollMs,
-      onWait: (h) => wctx.log(`en attente d'un créneau de session (${h.length}/${cap} en cours : ${[...new Set(h.map((x) => x.wave))].join(', ')})`),
+      onWait: (h, ms) => wctx.log(`en attente d'un créneau de session depuis ${duration(ms)} (${h.length}/${cap} en cours : ${[...new Set(h.map((x) => x.wave))].join(', ')})`),
+      onGot: (ms) => wctx.log(`créneau de session obtenu après ${duration(ms)} d'attente`),
     });
     try {
       return await deps.claude(args, o);

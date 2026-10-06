@@ -238,10 +238,11 @@ describe('plafond de sessions simultanées et --status (L71)', () => {
     const done = orchestrate(['a:L1'], r.io, f.deps);
     await new Promise((res) => setTimeout(res, 150));
     expect(f.calls).toEqual([]); // plafond atteint : aucune session
-    expect(r.out.join('\n')).toContain("en attente d'un créneau de session (2/2 en cours : x, y)");
+    expect(r.out.join('\n')).toMatch(/en attente d'un créneau de session depuis \d+ s \(2\/2 en cours : x, y\)/);
     x();
     expect(await done).toBe(0);
     expect(f.calls.length).toBeGreaterThan(0);
+    expect(r.out.join('\n')).toMatch(/créneau de session obtenu après \d+ s d'attente/);
     y();
     expect(liveSlots(home)).toEqual([]); // tous les créneaux de la vague sont rendus
   });
@@ -265,13 +266,13 @@ describe('plafond de sessions simultanées et --status (L71)', () => {
 
   it('--status liste les vagues vivantes et les dépôts tenus, même sans vague dans ce dossier', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }] });
-    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-06-1100', started: '2026-10-06T11:00:00Z', cwd: '/ailleurs', repos: ['/x/ol-companion', '/x/cadence'] });
+    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-06-1100', started: '2026-10-06T11:00:00Z', cwd: '/ailleurs', repos: ['/x/ol-companion', '/x/cadence'], cap: 3 });
     const r = await run(parent, ['--status']);
     expect(r.code).toBe(0);
     const out = r.out.join('\n');
-    expect(out).toContain('vagues en cours : 1 · sessions : 0/2');
+    expect(out).toContain('vagues en cours : 1 · sessions en cours : 0');
     expect(out).toContain('2026-10-06-1100 (pid ' + process.ppid);
-    expect(out).toContain('lancée depuis /ailleurs · dépôts : /x/ol-companion, /x/cadence');
+    expect(out).toContain('lancée depuis /ailleurs · plafond 3 · dépôts : /x/ol-companion, /x/cadence');
     unregisterWave(cadenceHome(), process.ppid);
   });
 });
@@ -301,6 +302,43 @@ describe("identifiant de vague réservé atomiquement (L71/t1)", () => {
     expect(again.err.join()).toContain('--wave ma-vague : cette vague existe déjà');
     expect(f.calls).toEqual([]);
     expect(readFileSync(join(parent, '.cadence/runs/ma-vague/wave.json'), 'utf8')).toBe(before);
+  });
+});
+
+describe('démarrage et reprise sous le registre (L71/t4, t5)', () => {
+  it("L71/t4 — registerWave qui échoue : verrous et hooks retirés, rien n'est lancé", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const home = tempDir();
+    writeFileSync(join(home, 'fichier'), 'x'); // CADENCE_HOME sous un fichier : le registre ne peut pas être écrit
+    const saved = process.env.CADENCE_HOME;
+    process.env.CADENCE_HOME = join(home, 'fichier', 'home');
+    const f = fakeDeps();
+    try {
+      await expect(orchestrate(['a:L1'], io(parent).io, f.deps)).rejects.toThrow();
+    } finally {
+      process.env.CADENCE_HOME = saved;
+    }
+    expect(existsSync(join(dirs.a, '.git/hooks/pre-push'))).toBe(false);
+    expect(existsSync(join(dirs.a, '.git/cadence/orchestrate.lock'))).toBe(false);
+    expect(f.calls).toEqual([]);
+  });
+
+  it('L71/t5 — --resume refusé quand la vague est vivante dans le registre, sans rien poser', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    expect(await orchestrate(['a:L1', '--budget', '1'], io(parent).io, f.deps)).toBe(3);
+    const wave = new RunStore(parent, '2026-10-04-1412').readWave()!;
+    registerWave(cadenceHome(), { pid: process.ppid, wave: wave.id, started: 'x', cwd: parent, repos: [dirs.a] });
+    const calls = f.calls.length;
+    const again = io(parent);
+    try {
+      expect(await orchestrate(['--resume', '--budget', '1M'], again.io, f.deps)).toBe(2);
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+    expect(again.err.join('\n')).toContain(`la vague ${wave.id} tourne encore (pid ${process.ppid})`);
+    expect(f.calls.length).toBe(calls);
+    expect(existsSync(join(dirs.a, '.git/cadence/orchestrate.lock'))).toBe(false);
   });
 });
 

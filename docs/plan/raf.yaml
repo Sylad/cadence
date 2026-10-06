@@ -794,3 +794,38 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-06
+  - id: L74
+    title: "orchestrate : MCP minimaux par étape (--strict-mcp-config ; Playwright seulement pour UX et sondes) — chaque claude -p chargeait context7 @latest, Serena via uvx git+, Playwright @latest (mesuré 06-10)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-07
+  - id: L75
+    title: "orchestrate : tests et build lancés par le programme avant la revue, résultats passés au relecteur — la revue Opus de ccc L27 a reconstruit base+head et relancé la suite 2×, puis attendu 10 min en boucle (06-10)"
+    status: todo
+    estimate: 1
+    created: 2026-10-07
+  - id: L76
+    title: "orchestrate : lots empilés sur main — le tableau final indique « livrable jusqu'à <sha> » (dernier commit d'un lot prêt sous un lot rendu), comme fait à la main pour ol L36 et ccc L26 avec deliver --sha (06-10)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-07
+  - id: L77
+    title: "orchestrate : contrôle préalable « livrable déjà présent ? » avant d'ouvrir une session d'implémentation — warhammer L59 et L65 étaient déjà faits par d'autres lots (06-10)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-07
+  - id: L78
+    title: "orchestrate : budget par lot dérivé de l'estimate, en plus du budget de vague — 2 M mangés par 6 lots, 7 lots à 0 (06-10)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-07
+  - id: L79
+    title: "orchestrate : retirer un lot d'une vague en cours (--drop <projet:lot>) et --stop-after-current — le 06-10 il a fallu une sentinelle sur journal.log + SIGTERM pour écarter ccc L29"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-07
+  - id: L80
+    title: "orchestrate : environnement par projet (Node via .nvmrc ou orchestrate.env dans cadence.yaml) — Astro exige Node 22, le node par défaut est 20 (evatosorus, ccc, 06-10)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-07

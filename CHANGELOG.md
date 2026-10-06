@@ -20,6 +20,18 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence verify`, commit attribution by scope | [0.8.0](#080---2026-10-04) |
 | `cadence orchestrate`, recurring lots, public titles, safe clean-up at close | [0.9.0](#090---2026-10-04) |
 
+## [Unreleased]
+
+### Changed
+- `cadence orchestrate` locks per **repository** instead of per parent folder: two
+  waves on different repositories now run side by side, even when started from the
+  same folder; the same repository is still always refused. (L71)
+- Sessions of all live waves share a cap of simultaneous sessions (2 by default;
+  `--max-sessions N` or `CADENCE_MAX_SESSIONS`); a session waits for a free slot
+  instead of exceeding it. (L71)
+- `cadence orchestrate --status` lists the live waves and the repositories they hold.
+  (L71)
+
 ## [0.10.1] - 2026-10-05
 
 ### Changed

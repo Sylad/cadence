@@ -642,13 +642,14 @@ exception is a **formatting retry** (below).
 cadence orchestrate finance-tracker:L41 ol-companion:L22 cadence:L18@haiku
 cadence orchestrate L18                      # from inside a project
 cadence orchestrate … --budget 1.5M          # 1500000, 1.5M, 800k; default 2M
+cadence orchestrate … --max-sessions 3       # sessions running at the same moment, all waves together; default 2
 cadence orchestrate … --dry-run              # preconditions + the plan of the wave; nothing is started
-cadence orchestrate --status [<wave>]        # the table, read back from the state (default: the last wave)
+cadence orchestrate --status [<wave>]        # the live waves and the repositories they hold, then the table (default: the last wave of this folder)
 cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"]
 ```
 
-You choose the lots; the order is the order given (one queue per repository, two repositories at most
-at the same time). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
+You choose the lots; the order is the order given (one queue per repository, as many repositories at the
+same time as the session cap allows — 2 by default). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
 lot (default Sonnet; reviews are always Opus; Haiku only when you write it, for a mechanical lot). Run it
 in the background and read `--status`: it prints one line per transition and the final table.
 
@@ -688,9 +689,20 @@ review with minors: it concludes on that review instead of staying suspended.
 after the wave (`git log`, tests, `raf check`), `raf done`, **`raf ux`** (the orchestrator reports the UX
 verdict and screenshots, it does not record it), the push and the deliveries, one project at a time.
 
-**Guards, imposed by the code**: at most two sessions, one per repository (a lock in the repository's
-shared state, `orchestrate.lock`, which also makes `cadence deliver` refuse that repository) and one wave
-per folder; `Agent`, `git push`, `cadence deliver`, `raf done|review|ux` are denied to the sessions; a
+**Several waves at once**: the lock is per **repository** (a lock in the repository's shared state,
+`orchestrate.lock`, which also makes `cadence deliver` refuse that repository), not per folder. A wave is
+refused only when one of its repositories is held by a live wave (`<repo> : une orchestration y est déjà en
+cours`; the lock of a dead process is detected and cleared); two waves on different repositories run side by
+side, even when started from the same parent folder. They share a **cap on simultaneous sessions**, counted
+across all live waves: 2 by default, `--max-sessions N` (or `CADENCE_MAX_SESSIONS=N`) to change it — give
+every wave the same value, each one takes its slots among its own N. A session that finds no free slot
+**waits** (it never exceeds the cap, and the wave is not refused; the journal says `en attente d'un créneau
+de session`). The registry of live waves and the slots live under `~/.cadence/orchestrate/` (`CADENCE_HOME`
+to move it): `cadence orchestrate --status` lists, from any folder, the live waves, the repositories each
+holds and the slots in use.
+
+**Guards, imposed by the code**: at most the capped number of sessions at once, one repository per wave at
+a time (above); `Agent`, `git push`, `cadence deliver`, `raf done|review|ux` are denied to the sessions; a
 temporary `pre-push` hook, installed for the duration of the wave and removed at its end, refuses any push
 from a session (`CADENCE_ORCHESTRATED` is in their environment; a repository that already has another
 `pre-push` hook is refused before anything starts — `pushurl` is never touched); after every session the

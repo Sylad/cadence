@@ -296,6 +296,12 @@ function liveLines(): string[] {
   return lines;
 }
 
+/** Refus d'une `--wave` déjà existante, identique en simulation et au vrai lancement. */
+function waveExists(wave: string, io: OrchestrateIo): number {
+  io.err(`orchestrate : --wave ${wave} : cette vague existe déjà`);
+  return 2;
+}
+
 /** Point d'entrée de `cadence orchestrate`. 0 prêts · 1 rendus au lead · 2 refus avant d'agir · 3 suspendue (budget, quota). */
 export async function orchestrate(argv: string[], io: OrchestrateIo, deps: OrchestrateDeps): Promise<number> {
   const args = parseOrchestrateArgs(argv);
@@ -307,7 +313,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     maxSessions(args, io); // une valeur invalide est refusée ici aussi
     const live = liveLines();
     for (const line of live) io.out(line);
-    if (!store && live.length) return 0;
+    if (!store && live.length && args.status === true) return 0; // sans identifiant : les vagues vivantes suffisent
     if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');
     if (live.length) io.out('');
     for (const line of renderTable(store.readWave()!, store.lots())) io.out(line);
@@ -328,18 +334,12 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.wave !== undefined && !WAVE_ID_RE.test(args.wave)) throw new RafError(`--wave invalide : ${args.wave}`);
   if (args.dryRun) {
     const id = waveId(io, args.wave, launch);
-    if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) {
-      io.err(`orchestrate : --wave ${id} : cette vague existe déjà`);
-      return 2;
-    }
+    if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
     dryRun(pre.lots, io, deps, budget, id);
     return 0;
   }
   const store = RunStore.reserve(launch, args.wave ?? defaultWaveBase(io), { exact: args.wave !== undefined });
-  if (!store) {
-    io.err(`orchestrate : --wave ${args.wave} : cette vague existe déjà`);
-    return 2;
-  }
+  if (!store) return waveExists(args.wave!, io);
   const id = store.id;
   const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)) };
   for (const l of pre.lots) store.writeLot(l);

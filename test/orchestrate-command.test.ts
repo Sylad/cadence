@@ -277,6 +277,19 @@ describe('plafond de sessions simultanées et --status (L71)', () => {
   });
 });
 
+describe('--status <id> inconnu malgré une vague vivante ailleurs (L71)', () => {
+  it('refuse « vague inconnue » au lieu de lister les vagues vivantes avec le code 0', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-06-1100', started: '2026-10-06T11:00:00Z', cwd: '/ailleurs', repos: ['/x/ol-companion'], cap: 2 });
+    try {
+      const r = io(parent);
+      await expect(orchestrate(['--status', '2026-10-06-143'], r.io, fakeDeps().deps)).rejects.toThrow(/vague inconnue : 2026-10-06-143/);
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+  });
+});
+
 describe("identifiant de vague réservé atomiquement (L71/t1)", () => {
   const run = async (parent: string, argv: string[], deps = fakeDeps().deps) => {
     const r = io(parent);
@@ -302,6 +315,17 @@ describe("identifiant de vague réservé atomiquement (L71/t1)", () => {
     expect(again.err.join()).toContain('--wave ma-vague : cette vague existe déjà');
     expect(f.calls).toEqual([]);
     expect(readFileSync(join(parent, '.cadence/runs/ma-vague/wave.json'), 'utf8')).toBe(before);
+  });
+
+  it("--dry-run --wave déjà existant : même refus que le vrai lancement, rien n'est écrit", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    expect((await run(parent, ['a:L1', '--wave', 'ma-vague'])).code).toBe(0);
+    const f = fakeDeps();
+    const again = await run(parent, ['a:L1', '--wave', 'ma-vague', '--dry-run'], f.deps);
+    expect(again.code).toBe(2);
+    expect(again.err.join()).toContain('--wave ma-vague : cette vague existe déjà');
+    expect(again.out).toEqual([]);
+    expect(f.calls).toEqual([]);
   });
 });
 

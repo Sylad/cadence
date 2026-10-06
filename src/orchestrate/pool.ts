@@ -1,12 +1,13 @@
 import { runLot, type LotCtx } from './cycle.js';
 import { lotKey, type LotState } from './state.js';
 
-/** Deux sessions au plus en même temps (imposé ici, pas de --parallel) : deux dépôts à la fois. */
+/** Valeur de repli de `runPool` quand l'appelant ne donne pas de plafond ; le réglage réel est DEFAULT_MAX_SESSIONS, `--max-sessions` ou CADENCE_MAX_SESSIONS (command.ts). */
 export const SLOTS = 2;
 
 /**
- * Ordonnanceur : une file par dépôt, les lots d'un dépôt l'un après l'autre dans l'ordre donné, deux dépôts
- * au plus en parallèle. Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
+ * Ordonnanceur : une file par dépôt, les lots d'un dépôt l'un après l'autre dans l'ordre donné, `slots` dépôts
+ * au plus en parallèle (le plafond global des sessions de toutes
+ * les vagues est tenu par command.ts). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
  */
 export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] = []): Promise<void> {
   const queues = new Map<string, LotCtx[]>();

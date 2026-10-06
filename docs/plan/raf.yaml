@@ -773,3 +773,13 @@ lots:
     estimate: 1
     created: 2026-10-06
     started: 2026-10-06
+    review: { date: 2026-10-06, verdict: "non conforme : 1 majeur (deux vagues du même dossier peuvent partager .cadence/runs/<id>), 5 mineurs (plafond = max des plafonds, attente sans fin sur pid réutilisé, course .tmp de registerWave, --resume sans test, doc) → t1-t6", commit: 65606dcd2aef8343f2a97db6924168546936847e }
+    tasks:
+      - { id: t1, title: "identifiant de vague réservé atomiquement (mkdir sans recursive, EEXIST → suffixe suivant ; --wave déjà existant refusé) + test deux vagues même dossier", status: todo }
+      - { id: t2, title: "plafond réellement global : avant de prendre un créneau, compter TOUS les créneaux vivants (quel que soit leur index) et attendre si ce compte ≥ son propre plafond ; --status affiche le plafond de chaque vague ; README sans « never exceeds » faux", status: todo }
+      - { id: t3, title: "identité du porteur des créneaux et du registre = pid + heure de démarrage (src/proc.ts ProcInfo.start), pid réutilisé = porteur mort ; le journal d'attente dit depuis combien de temps on attend", status: todo }
+      - { id: t4, title: "registerWave : ignorer les .tmp au nettoyage, appeler registerWave sous la protection de release() (hooks retirés si le démarrage échoue)", status: todo }
+      - { id: t5, title: "test : --resume refusé quand la vague est vivante dans le registre", status: todo }
+      - { id: t6, title: "README:704 (une vague par dépôt, pas un dépôt par vague) et aide bin/cadence.js avec --max-sessions", status: todo }
+    notes:
+      - { date: 2026-10-06, text: "Lead 06-10 : tout corriger (outil standard, rien sous le tapis) ; décision t2 = compter tous les créneaux vivants avant de prendre, pas le min des plafonds." }

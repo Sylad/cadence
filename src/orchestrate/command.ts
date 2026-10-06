@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { readOrchestrateConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
@@ -343,7 +343,19 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   const id = store.id;
   const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)) };
   for (const l of pre.lots) store.writeLot(l);
-  return execute(wave, pre.lots, store, io, deps, today, maxSessions(args, io));
+  // Une vague qui n'a pas atteint `wave.json` (refus au verrou, démarrage en échec) ne laisse pas son dossier réservé :
+  // le même `--wave` se relance, et `reserve` ne le prend pas pour une vague existante.
+  const abandon = () => {
+    if (!existsSync(join(store.dir, 'wave.json'))) rmSync(store.dir, { recursive: true, force: true });
+  };
+  try {
+    const code = await execute(wave, pre.lots, store, io, deps, today, maxSessions(args, io));
+    abandon();
+    return code;
+  } catch (e) {
+    abandon();
+    throw e;
+  }
 }
 
 function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx: WaveCtx): LotCtx[] {

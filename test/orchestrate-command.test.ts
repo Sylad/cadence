@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
@@ -316,6 +316,21 @@ describe("identifiant de vague réservé atomiquement (L71/t1)", () => {
     expect(again.err.join()).toContain('--wave ma-vague : cette vague existe déjà');
     expect(f.calls).toEqual([]);
     expect(readFileSync(join(parent, '.cadence/runs/ma-vague/wave.json'), 'utf8')).toBe(before);
+  });
+
+  it("--wave dont le démarrage échoue avant wave.json : aucun dossier orphelin, le même nom se relance", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const home = tempDir();
+    writeFileSync(join(home, 'fichier'), 'x'); // CADENCE_HOME sous un fichier : le registre ne peut pas être écrit
+    const saved = process.env.CADENCE_HOME;
+    process.env.CADENCE_HOME = join(home, 'fichier', 'home');
+    try {
+      await expect(run(parent, ['a:L1', '--wave', 'nuit'])).rejects.toThrow();
+    } finally {
+      process.env.CADENCE_HOME = saved;
+    }
+    expect(existsSync(join(parent, '.cadence/runs/nuit'))).toBe(false);
+    expect((await run(parent, ['a:L1', '--wave', 'nuit'])).code).toBe(0);
   });
 
   it("--dry-run --wave déjà existant : même refus que le vrai lancement, rien n'est écrit", async () => {

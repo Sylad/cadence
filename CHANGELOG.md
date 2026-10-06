@@ -19,8 +19,15 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `qa-reviewer` agent | [0.6.0](#060---2026-10-03) |
 | `cadence verify`, commit attribution by scope | [0.8.0](#080---2026-10-04) |
 | `cadence orchestrate`, recurring lots, public titles, safe clean-up at close | [0.9.0](#090---2026-10-04) |
+| Changelog and GitHub releases | [0.11.0](#0110---2026-10-06) |
+| Parallel waves on different repositories, shared session cap (`--max-sessions`) | [0.11.0](#0110---2026-10-06) |
 
-## [Unreleased]
+## [0.11.0] - 2026-10-06
+
+### Added
+- `CHANGELOG.md` and a « What's new » section in the README: what each release brings,
+  and since which version each feature exists; every tag gets a GitHub release with
+  its changelog section, and a tag without a section is not published. (L69)
 
 ### Changed
 - `cadence orchestrate` locks per **repository** instead of per parent folder: two

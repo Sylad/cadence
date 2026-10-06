@@ -21,11 +21,12 @@ reports a page left empty or in error.
 
 ## What's new
 
-**0.10.1**: the QA expectations file (`docs/qa/expectations.md`) is kept with the plan —
+**0.11.0**: waves on different repositories run side by side under a shared cap of
+simultaneous sessions (`--max-sessions`, 2 by default), and every release now has its
+changelog section and GitHub release. **0.10.1**: the QA expectations file (`docs/qa/expectations.md`) is kept with the plan —
 a commit that only touches it no longer has to cite a lot. **0.10.0**: `cadence orchestrate`
 sends an already-committed lot straight to review, and sessions only ask questions that
-name what they would change. **0.9.0**: `cadence orchestrate` itself, recurring lots, public
-titles and a safe clean-up at session close.
+name what they would change.
 
 Every version, with what it brings and since when: [CHANGELOG.md](CHANGELOG.md).
 

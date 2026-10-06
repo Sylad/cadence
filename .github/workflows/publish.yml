@@ -17,7 +17,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      # Le jeton en écriture ne reste pas dans .git/config, où npm ci et les scripts de build pourraient le lire ;
+      # gh lit GH_TOKEN.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:

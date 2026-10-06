@@ -131,6 +131,10 @@ describe('notes de version', () => {
     expect(workflow).toContain('--notes-file');
   });
 
+  it('ne laisse pas le jeton en écriture dans .git/config', () => {
+    expect(workflow).toMatch(/actions\/checkout@v4\n\s+with:\n\s+persist-credentials: false/);
+  });
+
   it('contrôle le CHANGELOG avant toute publication', () => {
     expect(workflow.indexOf('Le CHANGELOG a une section')).toBeLessThan(workflow.indexOf('npm publish'));
   });

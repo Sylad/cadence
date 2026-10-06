@@ -105,19 +105,20 @@ const WAIT_REPORT_MS = 60_000;
 export async function acquireSlot(
   home: string,
   cap: number,
-  opts: { wave: string; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number) => void; onGot?: (waitedMs: number) => void },
+  opts: { wave: string; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number) => void; onGot?: (waitedMs: number) => void },
 ): Promise<() => void> {
   mkdirSync(slotsDir(home), { recursive: true });
   const t0 = Date.now();
   let reportedAt: number | null = null;
   const pollMs = opts.pollMs ?? 2000;
+  const live = opts.slots ?? liveSlots; // injectable : les tests simulent une vague qui prend un créneau entre les deux comptées
   for (;;) {
-    if (liveSlots(home).length < cap) {
+    if (live(home).length < cap) {
       for (let k = 0; k < MAX_SLOT_INDEX; k++) {
         const file = join(slotsDir(home), `slot-${k}.lock`);
         const got = takeLock(file, { pid: process.pid, wave: opts.wave, started: new Date().toISOString() });
         if (!got.ok) continue;
-        if (liveSlots(home).length <= cap) {
+        if (live(home).length <= cap) {
           if (reportedAt !== null) opts.onGot?.(Date.now() - t0);
           return () => releaseLock(file, process.pid);
         }
@@ -127,7 +128,7 @@ export async function acquireSlot(
     }
     if (reportedAt === null || Date.now() - reportedAt >= (opts.reportMs ?? WAIT_REPORT_MS)) {
       reportedAt = Date.now();
-      opts.onWait?.(liveSlots(home), reportedAt - t0);
+      opts.onWait?.(live(home), reportedAt - t0);
     }
     await new Promise((r) => setTimeout(r, pollMs + Math.random() * pollMs * 0.25));
   }

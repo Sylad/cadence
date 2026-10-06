@@ -97,6 +97,21 @@ describe('plafond réellement global (L71/t2)', () => {
 });
 
 describe('identité du porteur : pid + heure de démarrage (L71/t3)', () => {
+  it('course : le total dépasse le plafond une fois le créneau pris → le créneau est rendu, on retente ; au plafond exact on passe', async () => {
+    const home = tempDir();
+    const lock = (n: number) => Array.from({ length: n }, () => ({ pid: process.pid, wave: 'x', started: 'x' }));
+    // comptée 1 (< 2) → prise → recomptée 3 (> 2, une autre vague a pris) → rendu, onWait (compte 0) → comptée 1 → prise → recomptée 2 (= plafond) → obtenu
+    const seen = [1, 3, 0, 1, 2];
+    let calls = 0;
+    const slots = () => lock(seen[calls++]!) as ReturnType<typeof liveSlots>;
+    const rendu: boolean[] = [];
+    const release = await acquireSlot(home, 2, { wave: 'a', pollMs: 5, slots, onWait: () => rendu.push(!existsSync(join(home, 'slots/slot-0.lock'))) });
+    expect(calls).toBe(5);
+    expect(rendu).toEqual([true]); // à l'attente, le créneau pris en trop a été rendu
+    expect(existsSync(join(home, 'slots/slot-0.lock'))).toBe(true);
+    release();
+  });
+
   it('un créneau dont le pid existe mais a une autre heure de démarrage (pid réutilisé) est repris', async () => {
     const home = tempDir();
     mkdirSync(join(home, 'slots'), { recursive: true });

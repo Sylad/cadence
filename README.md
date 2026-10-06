@@ -695,13 +695,17 @@ refused only when one of its repositories is held by a live wave (`<repo> : une 
 cours`; the lock of a dead process is detected and cleared); two waves on different repositories run side by
 side, even when started from the same parent folder. They share a **cap on simultaneous sessions**, counted
 across all live waves: 2 by default, `--max-sessions N` (or `CADENCE_MAX_SESSIONS=N`) to change it — give
-every wave the same value, each one takes its slots among its own N. A session that finds no free slot
-**waits** (it never exceeds the cap, and the wave is not refused; the journal says `en attente d'un créneau
-de session`). The registry of live waves and the slots live under `~/.cadence/orchestrate/` (`CADENCE_HOME`
+every wave the same value: each wave counts ALL live sessions, whatever their slot, and waits while that
+count has reached ITS OWN cap, so with different caps the highest one can push the total past the lowest
+(which then waits). A session that finds no free slot **waits** (the wave is not refused; the journal says
+`en attente d'un créneau de session depuis …`, repeated every minute, then `créneau de session obtenu après …`).
+A slot or a registry entry is owned by a pid **and** its start time: a reused pid is a dead owner. Wave
+identifiers are reserved atomically (`-2`, `-3` suffix when two waves start in the same minute; an existing
+`--wave` is refused). The registry of live waves and the slots live under `~/.cadence/orchestrate/` (`CADENCE_HOME`
 to move it): `cadence orchestrate --status` lists, from any folder, the live waves, the repositories each
-holds and the slots in use.
+holds, the cap of each wave and the slots in use.
 
-**Guards, imposed by the code**: at most the capped number of sessions at once, one repository per wave at
+**Guards, imposed by the code**: a global cap of simultaneous sessions, one wave per repository at
 a time (above); `Agent`, `git push`, `cadence deliver`, `raf done|review|ux` are denied to the sessions; a
 temporary `pre-push` hook, installed for the duration of the wave and removed at its end, refuses any push
 from a session (`CADENCE_ORCHESTRATED` is in their environment; a repository that already has another

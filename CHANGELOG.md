@@ -28,8 +28,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
   same folder; the same repository is still always refused. (L71)
 - Sessions of all live waves share a cap of simultaneous sessions (2 by default;
   `--max-sessions N` or `CADENCE_MAX_SESSIONS`); a session waits for a free slot
-  instead of exceeding it. (L71)
-- `cadence orchestrate --status` lists the live waves and the repositories they hold.
+  instead of exceeding it; each wave counts every live slot against its own cap, and
+  the wait is logged with its duration. (L71)
+- Wave identifiers are reserved atomically; slots and registry entries are owned by
+  pid + start time (a reused pid is a dead owner). (L71)
+- `cadence orchestrate --status` lists the live waves, the repositories they hold and their cap.
   (L71)
 
 ## [0.10.1] - 2026-10-05

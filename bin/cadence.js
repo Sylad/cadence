@@ -34,8 +34,9 @@ if (tool === 'raf') {
   cadence verify [--retry secondes] [--sha rév]
                     rejoue les vérifications d'effet (deliver.verify) hors livraison, une passe, en parallèle ;
                     code 0 tout vert, 1 un effet rouge, 2 rien à vérifier ; « session start » la lance aussi
-  cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run]
-                    une session claude neuve par étape (implémentation, revues, corrections) ; --status, --resume
+  cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--max-sessions 2] [--wave id] [--dry-run]
+                    une session claude neuve par étape (implémentation, revues, corrections) ; --status, --resume ;
+                    --max-sessions : sessions simultanées, toutes vagues confondues (CADENCE_MAX_SESSIONS)
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);
   process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;

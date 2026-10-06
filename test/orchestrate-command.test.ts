@@ -276,6 +276,34 @@ describe('plafond de sessions simultanées et --status (L71)', () => {
   });
 });
 
+describe("identifiant de vague réservé atomiquement (L71/t1)", () => {
+  const run = async (parent: string, argv: string[], deps = fakeDeps().deps) => {
+    const r = io(parent);
+    return { code: await orchestrate(argv, r.io, deps), ...r };
+  };
+
+  it('deux vagues lancées ensemble du même dossier, à la même minute : deux identifiants, deux dossiers', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
+    const [x, y] = await Promise.all([run(parent, ['a:L1']), run(parent, ['b:L1'])]);
+    expect([x.code, y.code]).toEqual([0, 0]);
+    expect(readdirSync(join(parent, '.cadence/runs')).sort()).toEqual(['2026-10-04-1412', '2026-10-04-1412-2']);
+    expect(new RunStore(parent, '2026-10-04-1412').readWave()!.lots).toEqual(['a:L1']);
+    expect(new RunStore(parent, '2026-10-04-1412-2').readWave()!.lots).toEqual(['b:L1']);
+  });
+
+  it("--wave déjà existant : refus avant d'agir, la vague existante est intacte", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
+    expect((await run(parent, ['a:L1', '--wave', 'ma-vague'])).code).toBe(0);
+    const before = readFileSync(join(parent, '.cadence/runs/ma-vague/wave.json'), 'utf8');
+    const f = fakeDeps();
+    const again = await run(parent, ['b:L1', '--wave', 'ma-vague'], f.deps);
+    expect(again.code).toBe(2);
+    expect(again.err.join()).toContain('--wave ma-vague : cette vague existe déjà');
+    expect(f.calls).toEqual([]);
+    expect(readFileSync(join(parent, '.cadence/runs/ma-vague/wave.json'), 'utf8')).toBe(before);
+  });
+});
+
 describe('--dry-run', () => {
   it('rien n\'est lancé ni écrit ; étapes, modèles, commande résolue et briefs rendus', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'petit', estimate: 0.5 }], c: [{ title: 'écran', visible: true }] });

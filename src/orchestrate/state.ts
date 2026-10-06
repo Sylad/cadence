@@ -145,6 +145,26 @@ export class RunStore {
     mkdirSync(this.dir, { recursive: true });
   }
 
+  /**
+   * Réserve l'identifiant de vague : `mkdir` sans `recursive` échoue (EEXIST) si une autre vague l'a pris, même à
+   * la même seconde. Sans identifiant demandé, on passe au suffixe suivant (`-2`, `-3`…) ; avec un identifiant
+   * demandé, null (refus : jamais deux vagues dans le même dossier d'état).
+   */
+  static reserve(launchDir: string, base: string, opts: { exact?: boolean } = {}): RunStore | null {
+    mkdirSync(RunStore.runsDir(launchDir), { recursive: true });
+    for (let i = 1; ; i++) {
+      const id = i === 1 ? base : `${base}-${i}`;
+      try {
+        mkdirSync(join(RunStore.runsDir(launchDir), id));
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+        if (opts.exact) return null;
+        continue;
+      }
+      return new RunStore(launchDir, id);
+    }
+  }
+
   static runsDir(launchDir: string): string {
     return join(launchDir, '.cadence', 'runs');
   }

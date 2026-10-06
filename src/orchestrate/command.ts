@@ -222,13 +222,18 @@ function agentsOf(deps: OrchestrateDeps): Record<string, AgentDef> {
   return readAgents(deps.agentsDir);
 }
 
-function waveId(io: OrchestrateIo, requested: string | undefined, launch: string): string {
-  if (requested) {
-    if (!/^[\w.-]+$/.test(requested)) throw new RafError(`--wave invalide : ${requested}`);
-    return requested;
-  }
+const WAVE_ID_RE = /^[\w.-]+$/;
+
+/** Identifiant par défaut : jour et minute de lancement ; le suffixe qui départage deux vagues vient de `RunStore.reserve`. */
+function defaultWaveBase(io: OrchestrateIo): string {
   const n = io.now();
-  const base = `${toDay(n)}-${String(n.getHours()).padStart(2, '0')}${String(n.getMinutes()).padStart(2, '0')}`;
+  return `${toDay(n)}-${String(n.getHours()).padStart(2, '0')}${String(n.getMinutes()).padStart(2, '0')}`;
+}
+
+/** Identifiant d'une simulation : le premier libre, sans rien réserver ni écrire. */
+function waveId(io: OrchestrateIo, requested: string | undefined, launch: string): string {
+  if (requested) return requested;
+  const base = defaultWaveBase(io);
   let id = base;
   for (let i = 2; existsSync(join(RunStore.runsDir(launch), id)); i++) id = `${base}-${i}`;
   return id;
@@ -314,12 +319,22 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     for (const r of refusals) io.err(`orchestrate : ${r}`);
     return 2;
   }
-  const id = waveId(io, args.wave, launch);
+  if (args.wave !== undefined && !WAVE_ID_RE.test(args.wave)) throw new RafError(`--wave invalide : ${args.wave}`);
   if (args.dryRun) {
+    const id = waveId(io, args.wave, launch);
+    if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) {
+      io.err(`orchestrate : --wave ${id} : cette vague existe déjà`);
+      return 2;
+    }
     dryRun(pre.lots, io, deps, budget, id);
     return 0;
   }
-  const store = new RunStore(launch, id);
+  const store = RunStore.reserve(launch, args.wave ?? defaultWaveBase(io), { exact: args.wave !== undefined });
+  if (!store) {
+    io.err(`orchestrate : --wave ${args.wave} : cette vague existe déjà`);
+    return 2;
+  }
+  const id = store.id;
   const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)) };
   for (const l of pre.lots) store.writeLot(l);
   return execute(wave, pre.lots, store, io, deps, today, maxSessions(args, io));

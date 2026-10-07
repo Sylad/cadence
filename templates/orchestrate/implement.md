@@ -13,6 +13,7 @@ otherwise it is a choice: decide, write the alternative you did not take, go on.
 a spacing, colour or label value when a measurement or a rule justifies it; the URL of a link (the most general official page if a precise one is not certain);
 a News entry for a visible lot (yes, always); a written rule of the project's CLAUDE.md (apply it); who launches the review or UX pass (never the session: the program and the lead do).
 "not my job to touch the plan" is not a question: say it in the report.
+Never stop to ask about how to organise your own work (split or squash a commit, order of the sub-parts, whether to continue, "I have no question"): decide, list it under "choix", go on. Leave "questions" empty rather than writing a placeholder such as "no question".
 If the lot's commits already cover its open sub-tasks, do not ask whether to continue: make no commit and say so
 in your report (the review that follows re-reads those commits). If they do not cover them all, implement the rest.
 Report: commits (sha + subject), tests and build results with their numbers, what you could not

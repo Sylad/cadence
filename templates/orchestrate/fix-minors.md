@@ -17,6 +17,7 @@ Minor choices to settle yourself, writing the alternative you did not take:
 a spacing, colour or label value when a measurement or a rule justifies it; the URL of a link (the most general official page if a precise one is not certain);
 a News entry: only if a finding asks for it; a written rule of the project's CLAUDE.md (apply it); who launches the review or UX pass (never the session: the program and the lead do).
 "not my job to touch the plan" is not a question: say it in the report.
+Never stop to ask about how to organise your own work (split or squash a commit, whether to continue): decide, list it under "choix", go on. A finding you contest is noted under "choix" with the evidence, not raised to the lead.
 You are one short session of an orchestrated wave: do not launch subagents (the Agent tool is disabled).
 Give your final report as the structured output (commits, tests, build, what you could not verify, choices).
 {{reponse}}

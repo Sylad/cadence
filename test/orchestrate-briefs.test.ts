@@ -15,6 +15,23 @@ const lot = (extra: Partial<Lot> = {}): Lot => ({
 describe('gabarits', () => {
   const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '' };
 
+  it('implement, fix et fix-minors interdisent de s\'arrêter sur une question d\'organisation (L52)', () => {
+    for (const kind of ['implement', 'fix', 'fix-minors'] as const) {
+      const out = renderBrief(kind, vars);
+      expect(out, kind).toContain('Never stop to ask about how to organise your own work');
+      expect(out, kind).toContain('split or squash a commit');
+    }
+    expect(renderBrief('implement', vars)).toContain('Leave "questions" empty rather than writing a placeholder');
+  });
+
+  it('fix et fix-minors : un constat contesté est noté en choix avec ses preuves, relu par la revue suivante, pas remonté au lead (L52)', () => {
+    const fix = renderBrief('fix', vars);
+    expect(fix).toContain('A finding you contest');
+    expect(fix).toContain('not a question and not a reason to stop');
+    expect(fix).toContain('the next fresh review re-reads it');
+    expect(renderBrief('fix-minors', vars)).toContain('A finding you contest is noted under "choix"');
+  });
+
   it('ux.md : captures et snapshots dans le dossier du serveur Playwright de la vague, noms relatifs (L74)', () => {
     const out = renderBrief('ux', vars);
     expect(out).toContain("output directory, which lies in the orchestrator's run directory, outside the repository");

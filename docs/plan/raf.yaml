@@ -843,6 +843,7 @@ lots:
     tasks:
       - { id: t1, title: "orchestrate --resume : re-résoudre le .nvmrc de chaque lot vivant et refuser comme au départ (version désinstallée, .nvmrc modifié, vague d'avant L80) — plus de repli silencieux ; test de reprise", status: todo }
       - { id: t2, title: "session .nvmrc : ne mettre en tête du PATH que node/npm/npx/corepack (dossier de liens dédié dans le dossier de la vague), pour ne pas masquer raf/cadence/claude en service ; README", status: todo }
+      - { id: t3, title: "resolveNode : refuser une version dont le bin ne contient pas node (dossier vide ou cassé) — sinon dossier de liens vide = repli silencieux sur le Node par défaut", status: todo }
   - id: L81
     title: "⚡ Test instable orchestrate-registry.test.ts:149 (L71/t3, attente 0 ms exacte) : rouge sous charge en suite complète, passe seul → npm test / prepublishOnly rouge"
     status: done

@@ -15,6 +15,14 @@ const lot = (extra: Partial<Lot> = {}): Lot => ({
 describe('gabarits', () => {
   const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '' };
 
+  it('ux.md : captures et snapshots dans le dossier du serveur Playwright de la vague, noms relatifs (L74)', () => {
+    const out = renderBrief('ux', vars);
+    expect(out).toContain("output directory, which lies in the orchestrator's run directory, outside the repository");
+    expect(out).toContain('relative file name');
+    expect(out).not.toContain('.playwright-mcp');
+    expect(out).not.toMatch(/pass `?--output-dir/); // le serveur est lancé avec son --output-dir : la session ne le prescrit pas
+  });
+
   it('implement.md est le brief du lead (§2) plus deux lignes, rendu sans accolades restantes', () => {
     const out = renderBrief('implement', vars);
     expect(out).toContain('Work in `/r/p` on lot `L9` — "Un titre" — of its plan');
@@ -52,7 +60,7 @@ describe('gabarits', () => {
   });
 
   it('les briefs qui peuvent ouvrir un navigateur donnent une consigne Playwright applicable (noms relatifs, .playwright-mcp/)', () => {
-    for (const kind of ['implement', 'fix', 'fix-minors', 'ux', 'review-small'] as const) {
+    for (const kind of ['implement', 'fix', 'fix-minors', 'review-small'] as const) {
       const out = renderBrief(kind, vars);
       expect(out, kind).toContain('Playwright');
       expect(out, kind).toContain('relative file name');

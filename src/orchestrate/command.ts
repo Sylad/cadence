@@ -10,7 +10,7 @@ import { Plan, RafError, isOpen } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from './registry.js';
-import { loadTemplates, objective, renderBrief, type BriefVars } from './briefs.js';
+import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { Budget, MAX_PASSES, countInterrupted, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
@@ -273,7 +273,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus, en session neuve`);
     io.out('  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
-    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '' };
+    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', news: l.visible ? newsText(l.lot) : '' };
     for (const s of steps) {
       const file = join(tmp, `${l.project}--${l.lot}--${s.kind}.md`);
       const brief = renderBrief(s.kind, vars, deps.templatesDir);

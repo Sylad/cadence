@@ -198,6 +198,16 @@ describe('lot visible : UX puis code', () => {
     expect(h.plan().lot('L1').review).toBeDefined();
   });
 
+  it('le brief d\'implémentation d\'un lot visible porte l\'entrée Nouveautés ; celui d\'un lot sans écran, non (L48)', async () => {
+    const hv = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
+    await runLot(hv.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' } }));
+    expect(hv.calls[0].brief).toContain('cadence news new L1');
+    expect(hv.calls[1].brief).not.toContain('news new'); // ux : pas de consigne d'écriture
+    const hn = harness({ lots: [{ title: 'Sans écran' }], script: { implement: [impl()], review: [ok] } });
+    await runLot(hn.lot('L1'));
+    expect(hn.calls[0].brief).not.toContain('news new');
+  });
+
   it('chaque session reçoit --strict-mcp-config et son fichier dans le dossier du lot ; lot visible : Playwright pour implement et ux (pas review), captures dans la vague (L74)', async () => {
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
     const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' } });

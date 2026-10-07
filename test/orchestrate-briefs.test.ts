@@ -3,7 +3,7 @@ import { cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tempDir } from './helpers.js';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TEMPLATES_DIR, loadTemplates, objective, renderBrief } from '../src/orchestrate/briefs.js';
+import { TEMPLATES_DIR, loadTemplates, newsText, objective, renderBrief } from '../src/orchestrate/briefs.js';
 import { WORK_SCHEMA, REVIEW_SCHEMA, checkShape } from '../src/orchestrate/schemas.js';
 import type { Lot } from '../src/plan.js';
 
@@ -13,7 +13,7 @@ const lot = (extra: Partial<Lot> = {}): Lot => ({
 });
 
 describe('gabarits', () => {
-  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '' };
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', news: '' };
 
   it('implement, fix et fix-minors interdisent de s\'arrêter sur une question d\'organisation (L52)', () => {
     for (const kind of ['implement', 'fix', 'fix-minors'] as const) {
@@ -121,7 +121,7 @@ describe('gabarits', () => {
       }
       expect(out, kind).toContain('a spacing, colour or label value');
       expect(out, kind).toContain('the URL of a link');
-      if (kind === 'implement') expect(out, kind).toContain('a News entry for a visible lot (yes, always)');
+      if (kind === 'implement') expect(out, kind).not.toContain('yes, always'); // la News d'un lot visible n'est plus un choix mineur : consigne {{news}} (L48)
       else {
         expect(out, kind).toContain('a News entry: only if a finding asks for it');
         expect(out, kind).not.toContain('yes, always');
@@ -174,7 +174,7 @@ describe('schémas', () => {
 });
 
 describe('variantes de la passe des mineurs (L38)', () => {
-  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: 'abc1234 feat(L9): x', reponse: '', constats: '- [mineur] a.txt:1 — nommage', ux: '', choix: '' };
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: 'abc1234 feat(L9): x', reponse: '', constats: '- [mineur] a.txt:1 — nommage', ux: '', choix: '', news: '' };
 
   it('la correction des mineurs ne dit jamais de s\'arrêter pour poser la question, et demande de lister les mineurs refusés en choix', () => {
     const out = renderBrief('fix-minors', vars);
@@ -202,7 +202,7 @@ describe('variantes de la passe des mineurs (L38)', () => {
 });
 
 describe('instantané des gabarits (L39)', () => {
-  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '' };
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', news: '' };
 
   it('loadTemplates lit tous les gabarits une fois ; renderBrief rend depuis l\'instantané sans relire le disque', () => {
     const dir = tempDir();
@@ -219,5 +219,26 @@ describe('instantané des gabarits (L39)', () => {
     cpSync(TEMPLATES_DIR, dir, { recursive: true });
     rmSync(join(dir, 'ux.md'));
     expect(() => loadTemplates(dir)).toThrow(/gabarit ux\.md illisible/);
+  });
+});
+
+describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
+  const base = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '' };
+
+  it('lot visible : commande cadence news new <lot>, texte factuel côté utilisateur, capture ou nocapture, jamais une question', () => {
+    const out = renderBrief('implement', { ...base, news: newsText('L9') });
+    expect(out).toContain('cadence news new L9');
+    expect(out).toContain('docs/nouveautes/');
+    expect(out).toContain('what changes for the user');
+    expect(out).toContain('docs/nouveautes/captures/');
+    expect(out).toContain('nocapture');
+    expect(out).toContain('cadence news check');
+    expect(out).not.toMatch(/\{\{/);
+  });
+
+  it('lot non visible : aucune mention des Nouveautés', () => {
+    const out = renderBrief('implement', { ...base, news: '' });
+    expect(out).not.toContain('news new');
+    expect(out).not.toContain('nouveautes');
   });
 });

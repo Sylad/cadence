@@ -738,7 +738,9 @@ cut (Ctrl-C, WSL closed) `--resume` replays an interrupted step entirely in a ne
 lists the commits already present; finished steps are never replayed.
 
 Briefs are the templates of `templates/orchestrate/` (`implement.md` is the `lead` skill's standard
-brief; `--dry-run` writes the rendered ones). A project can declare, in `cadence.yaml`:
+brief; `--dry-run` writes the rendered ones). The `implement` brief of a `visible` lot also carries the
+News instruction (`cadence news new <lot>`, factual user-side text, a screenshot in `docs/nouveautes/captures/` or
+`nocapture:`, `cadence news check` green); a lot that is not `visible` gets nothing. A project can declare, in `cadence.yaml`:
 
 ```yaml
 orchestrate:

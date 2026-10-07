@@ -17,8 +17,10 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
 - **At most two subagents running at once.** Queue the rest. The sessions of an orchestrated wave
   (section 2b) count toward this limit: orchestrate sessions plus subagents never exceed two. A wave
   already caps itself (`--max-sessions`, 2 by default, shared by every wave); before starting a
-  subagent, check `cadence orchestrate --status` for live sessions, and while a wave runs, start
-  none beyond the free slots. Never raise `--max-sessions` above two to speed a wave up.
+  subagent, check `cadence orchestrate --status`, and while a wave runs, start none beyond the free
+  slots. Count the free slots from what `--status` shows per wave, not from the live sessions (a
+  wave's steps take a slot and give it back between two steps): 2 − Σ min(cap, number of repositories
+  of the wave that still have lots). Never raise `--max-sessions` above two to speed a wave up.
 - **Never two subagents in the same repository at the same time**, and the lead does not commit in a
   repository where a subagent is working.
 - **Deliveries and `raf ux` / `raf review` verdicts are done by the lead, one project at a time** —

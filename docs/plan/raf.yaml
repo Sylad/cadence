@@ -905,6 +905,7 @@ lots:
       - { date: 2026-10-07, text: "Issue #2 (07-10) demande la même chose : raf ignore <sha> | \"<sujet exact>\" [--reason] qui écrit l'exemption datée et motivée dans une section dédiée du plan, raf check --ignored pour les lister ; couvrir aussi un id cité inconnu (cas warhammer/ol du 07-10)" }
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #2 » dans son corps (issue GitHub)." }
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "compliant — orchestré (vague 2026-10-07-2131, 0 passe(s) de correction + passe des mineurs)", commit: 982b646569b98283f33db9cdaef58398cebe83bf }
   - id: L74
     title: "orchestrate : MCP minimaux par étape (--strict-mcp-config ; Playwright seulement pour UX et sondes) — chaque claude -p chargeait context7 @latest, Serena via uvx git+, Playwright @latest (mesuré 06-10)"
     status: done

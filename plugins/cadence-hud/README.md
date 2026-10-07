@@ -3,7 +3,7 @@
 Bande au-dessus du prompt de Claude Code (terminal et app de bureau), rafraîchie toutes les 5 s :
 
 ```
-ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │  7j  61 % ↻ 6 j 15 h  │  $1.23  │  ⚙ 2 agents nom, nom
+ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │  7j  61 % ↻ 6 j 15 h  │  $1.23  │  fable 410k $0.95 · sonnet 85k $0.12  │  ⚙ 2 agents nom, nom
 ⟳ cadence · 2026-10-07-2131 en cours  │  budget ▱▱▱▱▱▱▱▱▱▱   1 % 14k/2M  │  1 session/2
   L112  implémente  implement@sonnet 34 s         global-setup coupe le cache de compilation de Node…
   L75   corrige     fix@sonnet 3 min +1 ✝ · p2    raf show aligne les lignes suivantes d'une note…
@@ -14,6 +14,12 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
 - `ctx` — contexte de la session, coloré vert / orange / rouge (seuils 50 % et 75 %) ;
 - `5h`, `7j` — fenêtres de quota (seuils 60 % et 85 %) et temps avant remise à zéro, en jours au-delà de 24 h ;
 - `$1.23` — coût de la session ;
+- `fable 410k $0.95 · sonnet 85k $0.12` — consommation **par modèle** sur la session, du plus cher au moins cher :
+  tokens traités (entrée + sortie + cache) et part du coût. Alimentée à chaque fin de tour (boucle principale et
+  sous-agents) : les tokens sont ceux que l'API a rapportés pour le modèle qui a répondu ; la part de coût est ce
+  que le total de `/cost` a gagné depuis la fin de tour précédente, donc approximative quand deux tours finissent
+  ensemble, mais la somme des parts reste le total. Les fenêtres de quota (`5h`, `7j`) restent celles que l'API
+  renvoie : elle n'en publie pas de propre à un modèle ;
 - `⚙ 2 agents nom, nom` — sous-agents de CETTE session en cours ;
 - par vague `cadence orchestrate` vivante : un en-tête (projet si tous les lots sont du même, identifiant, statut,
   budget consommé / plafond, sessions en cours / plafond), puis un **tableau des lots actifs** à colonnes alignées —

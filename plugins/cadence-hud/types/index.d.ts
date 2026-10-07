@@ -10,6 +10,12 @@ export type Usage = {
 
 export type AgentsSummary = { running: number; names: string[] }
 
+/** Ce qu'un modèle a consommé sur la session : tokens (entrée + sortie + cache) et dollars qui lui sont attribués. */
+export type ModelSpend = { tokens: number; usd: number }
+
+/** La consommation par modèle, par nom court (`fable`, `sonnet`…), et le dernier total de coût déjà réparti. */
+export type ModelsSummary = { byModel: Record<string, ModelSpend>; usdSeen: number }
+
 export type WaveStep = {
   kind: string
   model: string
@@ -52,6 +58,7 @@ declare module 'claude-code' {
     'cadence-hud': {
       usage: Usage | null
       agents: AgentsSummary
+      models: ModelsSummary
       waves: Wave[]
       error: string | null
       isHidden: boolean

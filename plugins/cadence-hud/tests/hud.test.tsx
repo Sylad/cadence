@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotCounts, lotText, wavePercent } from '../hooks/format'
+import { ago, bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotCounts, lotText, modelsText, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -91,7 +91,7 @@ const seed = (on: On, values: Record<string, unknown>) =>
     e.plugin === PLUGIN && e.key in values ? { value: { value: values[e.key], version: 1 } } : next(e),
   )
 
-const EMPTY = { agents: { running: 0, names: [] }, error: null, isHidden: false }
+const EMPTY = { agents: { running: 0, names: [] }, models: { byModel: {}, usdSeen: 0 }, error: null, isHidden: false }
 
 test('la bande dessine le contexte et la vague sur chaque surface', async ($, on) => {
   seed(on, {
@@ -171,5 +171,29 @@ test('la dernière vague terminée reste en gris, sur une ligne, sans ses lots',
   expect(await ui.find({ type: 'Text', text: /2 prêts · 1 échec · 1 suspendu/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^L107$/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /session/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('la consommation par modèle se lit, du plus cher au moins cher', () => {
+  expect(shortModel('claude-fable-5-1')).toBe('fable')
+  expect(shortModel('claude-sonnet-5-5')).toBe('sonnet')
+  expect(shortModel('us.anthropic.claude-opus-5-5-v1:0')).toBe('opus')
+  expect(shortModel('gpt-x')).toBe('gpt-x')
+  expect(
+    modelsText({ byModel: { sonnet: { tokens: 85_300, usd: 0.12 }, fable: { tokens: 410_000, usd: 0.95 } }, usdSeen: 1.07 }),
+  ).toBe('fable 410k $0.95 · sonnet 85k $0.12')
+  expect(modelsText({ byModel: {}, usdSeen: 0 })).toBe('')
+})
+
+test('la bande montre la part de chaque modèle à côté du coût', async ($, on) => {
+  seed(on, {
+    ...EMPTY,
+    usage: { percent: 9, tokens: 90_000, window: 1_000_000, usd: 1.07, limits: [] },
+    models: { byModel: { fable: { tokens: 410_000, usd: 0.95 }, sonnet: { tokens: 85_300, usd: 0.12 } }, usdSeen: 1.07 },
+    waves: [],
+    now: 0,
+  })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /fable 410k \$0\.95 · sonnet 85k \$0\.12/ })).toBeDefined()
   await ui.unmount()
 })

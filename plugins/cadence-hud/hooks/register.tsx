@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Register, Timer } from 'claude-code'
 
-import type { AgentsSummary, Usage, Wave, WaveLot } from '../types'
+import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
 import {
   ago,
@@ -14,7 +14,9 @@ import {
   limitLabel,
   lotCells,
   lotCounts,
+  modelsText,
   pad,
+  shortModel,
   untilReset,
   wavePercent,
   waveSessions,
@@ -26,6 +28,7 @@ const REFRESH_MS = 5_000
 
 const usage = atom({ plugin: 'cadence-hud', key: 'usage' } as const, null)
 const agents = atom({ plugin: 'cadence-hud', key: 'agents' } as const, { running: 0, names: [] })
+const models = atom({ plugin: 'cadence-hud', key: 'models' } as const, { byModel: {}, usdSeen: 0 })
 const waves = atom({ plugin: 'cadence-hud', key: 'waves' } as const, [])
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
@@ -100,6 +103,28 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // Chaque fin de tour (boucle principale et sous-agents) attribue ses tokens au modèle qui a répondu, et la
+  // part du coût de session apparue depuis la dernière fin de tour. Deux tours qui finissent ensemble se
+  // partagent le coût au mieux ; la somme des parts reste égale au total de /cost.
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    const used = e.usage
+    if (!used) return result
+    const total = await $.session
+      .usage()
+      .then(u => u.cost?.usd)
+      .catch(() => undefined)
+    const name = shortModel(used.model)
+    const tokens = used.input_tokens + used.output_tokens + used.cache_read_input_tokens + used.cache_creation_input_tokens
+    await update($, models, (m: ModelsSummary) => {
+      const seen = total !== undefined && total > m.usdSeen ? total : m.usdSeen
+      const usd = seen - m.usdSeen
+      const before = m.byModel[name] ?? { tokens: 0, usd: 0 }
+      return { byModel: { ...m.byModel, [name]: { tokens: before.tokens + tokens, usd: before.usd + usd } }, usdSeen: seen }
+    })
+    return result
+  })
+
   on('command.run', { command: 'hud' }, async $ => {
     const hidden = !(await read($, isHidden))
     await update($, isHidden, () => hidden)
@@ -110,9 +135,10 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, w, problem, at] = await Promise.all([
+    const [u, a, m, w, problem, at] = await Promise.all([
       read($, usage),
       read($, agents),
+      read($, models),
       read($, waves),
       read($, error),
       read($, now),
@@ -145,6 +171,12 @@ export const register: Register = on => {
           <Text>
             {sep}
             <Text dimColor>${u.usd.toFixed(2)}</Text>
+          </Text>
+        )}
+        {Object.keys(m.byModel).length > 0 && (
+          <Text>
+            {sep}
+            <Text dimColor>{fit(modelsText(m), 60)}</Text>
           </Text>
         )}
         {a.running > 0 && (

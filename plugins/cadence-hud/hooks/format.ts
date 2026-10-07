@@ -1,6 +1,6 @@
 import type { ThemeKey } from 'claude-code'
 
-import type { Wave, WaveLot } from '../types'
+import type { ModelsSummary, Wave, WaveLot } from '../types'
 
 /** Couleur d'un taux d'occupation (contexte, fenêtre, budget) : vert, puis orange, puis rouge. */
 export const colorOfPercent = (percent: number | undefined, warn = 60, bad = 85): ThemeKey =>
@@ -166,3 +166,16 @@ export const ago = (iso: string | undefined, now: number): string => {
   if (!Number.isFinite(t)) return ''
   return `il y a ${duration(Math.max(0, now - t))}`
 }
+
+/** Le nom court d'un identifiant de modèle : `claude-fable-5-1` → `fable`, `claude-sonnet-5-5` → `sonnet`, autre → l'identifiant. */
+export const shortModel = (id: string): string => {
+  const m = /^(?:[a-z0-9]+\.)?(?:anthropic\.)?claude-([a-z]+)/i.exec(id)
+  return m ? m[1]!.toLowerCase() : id
+}
+
+/** "fable 410k $0.95 · sonnet 85k $0.12", du plus cher au moins cher ; vide sans modèle. */
+export const modelsText = (models: ModelsSummary): string =>
+  Object.entries(models.byModel)
+    .sort(([, a], [, b]) => b.usd - a.usd || b.tokens - a.tokens)
+    .map(([name, m]) => `${name} ${k(m.tokens)} $${m.usd.toFixed(2)}`)
+    .join(' · ')

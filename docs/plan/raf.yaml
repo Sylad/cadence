@@ -984,7 +984,8 @@ lots:
     created: 2026-10-07
   - id: L92
     title: "test/global-setup.ts : en cas d'échec de tsc, inclure sa sortie stdout (diagnostics fichier:ligne) dans l'erreur levée — sinon une erreur de type n'affiche que « Command failed » et bloque toute la suite — mineur de la 3e revue L61"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07

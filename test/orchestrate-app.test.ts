@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
-import { startApp } from '../src/orchestrate/app.js';
+import { startApp, uxLockFile } from '../src/orchestrate/app.js';
 import { fakeApp } from './fake-app.js';
 
 const setup = fakeApp;
@@ -103,5 +104,121 @@ describe('signal de la vague (L60)', () => {
     await stopApps();
     expect(alive(pid)).toBe(false);
     await app.stop(); // déjà arrêtée : sans effet
+  });
+});
+
+describe('verrou par hôte:port de l\'URL (L60)', () => {
+  const opts = (t: Awaited<ReturnType<typeof fakeApp>>, timeoutMs = 15_000) => ({ command: t.command, url: t.url, cwd: t.dir, log: t.log, timeoutMs, every: 50, killAfterMs: 400 });
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it('le nom du verrou suit hôte et port ; le verrou est rendu après l\'arrêt, après « port occupé » et après un échec', async () => {
+    expect(uxLockFile('http://127.0.0.1:4200/x')).toMatch(/cadence-ux-127\.0\.0\.1-4200\.lock$/);
+    expect(uxLockFile('https://example.org/')).toMatch(/cadence-ux-example\.org-443\.lock$/);
+    const t = await fakeApp(0);
+    const lock = uxLockFile(t.url);
+    const app = await startApp(opts(t));
+    expect(app.state).toEqual({ kind: 'ready' });
+    expect(readFileSync(lock, 'utf8').trim()).toBe(String(process.pid));
+    await app.stop();
+    expect(existsSync(lock)).toBe(false);
+
+    const dead = await fakeApp(-1);
+    const bad = await startApp(opts(dead, 600));
+    expect(bad.state.kind).toBe('unverified');
+    expect(existsSync(uxLockFile(dead.url))).toBe(false);
+
+    const busy = await fakeApp(0);
+    const srv: Server = createServer((_q, r) => r.end('autre')).listen(busy.port);
+    await new Promise((r) => srv.once('listening', r));
+    try {
+      expect((await startApp(opts(busy))).state).toEqual({ kind: 'busy' });
+      expect(existsSync(uxLockFile(busy.url))).toBe(false);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('un verrou d\'un pid mort est repris', async () => {
+    const t = await fakeApp(0);
+    const gone = spawnSync('true');
+    // pid d'un processus terminé : on prend un pid qui ne vit plus
+    const pid = (gone.pid as number) || 999_999;
+    writeFileSync(uxLockFile(t.url), String(pid));
+    const app = await startApp(opts(t));
+    expect(app.state).toEqual({ kind: 'ready' });
+    expect(readFileSync(uxLockFile(t.url), 'utf8').trim()).toBe(String(process.pid));
+    await app.stop();
+  });
+
+  it('même URL, deux lots : le second attend l\'arrêt du premier, sans rien lancer, puis démarre', async () => {
+    const a = await fakeApp(0);
+    const b = await fakeApp(0, { port: a.port });
+    const first = await startApp(opts(a));
+    expect(first.state).toEqual({ kind: 'ready' });
+    const second = startApp(opts(b));
+    await sleep(500);
+    expect(existsSync(join(b.dir, 'pid'))).toBe(false);
+    await first.stop();
+    const run = await second;
+    expect(run.state).toEqual({ kind: 'ready' });
+    await run.stop();
+  });
+
+  it('même URL tenue au-delà du délai : non vérifiée « url tenue par une autre vague », rien lancé, le détenteur intact', async () => {
+    const a = await fakeApp(0);
+    const b = await fakeApp(0, { port: a.port });
+    const first = await startApp(opts(a));
+    const second = await startApp(opts(b, 700));
+    expect(second.state.kind === 'unverified' && second.state.cause).toContain('url tenue par une autre vague');
+    expect(existsSync(join(b.dir, 'pid'))).toBe(false);
+    expect(alive(pidOf(a.dir))).toBe(true);
+    expect(readFileSync(uxLockFile(a.url), 'utf8').trim()).toBe(String(process.pid));
+    await first.stop();
+  });
+
+  it('deux processus sur la même URL : celui qui n\'a pas le verrou attend la fin de l\'autre', async () => {
+    const pkg = process.env.CADENCE_TEST_PACKAGE as string;
+    const a = await fakeApp(0);
+    const b = await fakeApp(0, { port: a.port });
+    const script = `
+      import { startApp } from ${JSON.stringify(join(pkg, 'dist/orchestrate/app.js'))};
+      const o = JSON.parse(process.argv[1]);
+      const app = await startApp(o);
+      console.log(JSON.stringify(app.state));
+      process.stdin.on('data', async () => { await app.stop(); process.exit(0); });
+    `;
+    const child = spawn(process.execPath, ['--input-type=module', '-e', script, JSON.stringify(opts(a))], { stdio: ['pipe', 'pipe', 'inherit'] });
+    try {
+      await new Promise<void>((r, j) => {
+        child.stdout.once('data', (d) => (String(d).includes('ready') ? r() : j(new Error(String(d)))));
+        child.once('exit', () => j(new Error('le processus fils s\'est arrêté')));
+      });
+      expect(readFileSync(uxLockFile(a.url), 'utf8').trim()).toBe(String(child.pid));
+      const second = startApp(opts(b));
+      await sleep(500);
+      expect(existsSync(join(b.dir, 'pid'))).toBe(false);
+      child.stdin.write('stop\n');
+      const run = await second;
+      expect(run.state).toEqual({ kind: 'ready' });
+      expect(readFileSync(uxLockFile(a.url), 'utf8').trim()).toBe(String(process.pid));
+      await run.stop();
+      expect(existsSync(uxLockFile(a.url))).toBe(false);
+    } finally {
+      child.kill('SIGKILL');
+    }
+  });
+
+  it('prête seulement si le groupe lancé vit encore quand l\'URL répond', async () => {
+    const t = await fakeApp(0);
+    // la commande s'arrête aussitôt ; un autre serveur prend l'URL après le 1er sondage
+    const other: Server = createServer((_q, r) => r.end('autre'));
+    const timer = setTimeout(() => other.listen(t.port), 100);
+    try {
+      const app = await startApp({ ...opts(t), command: 'exit 0', every: 400 });
+      expect(app.state.kind).toBe('unverified');
+    } finally {
+      clearTimeout(timer);
+      other.close();
+    }
   });
 });

@@ -772,12 +772,19 @@ with the command and stop it). The object form `{ command, url, timeout? }` make
 the UX session. Before the `ux` step (and before the `review-small` single pass of a small `visible` lot, which follows
 the same rule) the orchestrator:
 
+0. takes a lock on the `host:port` of `url` (a file `cadence-ux-<host>-<port>.lock` in the OS temp folder, created
+   exclusively, containing the pid of the orchestrator; a lock whose pid is dead is taken over). Another wave — in
+   this process or another — that declares the same URL waits for it, and the wait counts in `timeout`; past it the
+   note is « UX non vérifiée : url tenue par une autre vague » and nothing is started. The lock is given back after
+   the app is stopped. Declaring **distinct ports per project** is still recommended: the lock serialises two waves
+   on one URL, it does not make them fast;
 1. probes `url`; if it already answers it does **not** start anything, notes « port occupé » (`uxNote`: the UX is not
    verified) and the lot goes on;
 2. starts `command` with `sh -c` from the repository root, in its own detached process group, its output in
    `<wave>/<project>--<lot>/ux-app.log` (the command carries its own prefixes, e.g. `cd web && PORT=4300 npm start`;
    there is no `env`, `cwd` or account/PIN key);
-3. probes `url` until an HTTP status below 500, for `timeout` seconds (default 300). A command that exits early, or
+3. probes `url` until an HTTP status below 500, for `timeout` seconds (default 300); the answer only counts while
+   the process group it started is still alive. A command that exits early, or
    no answer in time, means « UX not verified » with the end of the log in the note: the UX session is skipped,
    the lot goes on to the code review — it is never a failure of the wave (the single pass of a small lot still runs,
    on the code alone, its brief saying the app could not be verified);
@@ -788,6 +795,10 @@ the same rule) the orchestrator:
 orchestrate:
   ux: { command: 'cd web && PORT=4300 npm start', url: 'http://localhost:4300', timeout: 120 }
 ```
+
+In the object form `url` must start with `http://` or `https://`, and `timeout` is only accepted together with both
+`command` and `url` (the program only waits when it starts the app). A wave stopped (incident, quota, budget) before
+the step suspends the lot without starting the app.
 
 **Node per project (`.nvmrc`)**: when a project has a `.nvmrc` at its root, every session the
 orchestrator launches for it (implementation, UX and code reviews, corrections) runs with the matching Node

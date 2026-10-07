@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process';
-import { closeSync, openSync, readFileSync } from 'node:fs';
+import { closeSync, openSync, readFileSync, rmSync, statSync, writeSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pidAlive } from '../state.js';
 import { withoutLaunchVars } from './snapshot.js';
 
 /** Défaut de `orchestrate.ux.timeout` : secondes d'attente de la réponse de l'application. */
@@ -64,17 +67,81 @@ function tail(file: string): string {
   }
 }
 
+/** Verrou inter-processus de l'URL : deux vagues (deux processus) qui déclarent la même URL ne lancent pas deux applications sur le même port. */
+export function uxLockFile(url: string): string {
+  const u = new URL(url);
+  const port = u.port || (u.protocol === 'https:' ? '443' : '80');
+  return join(tmpdir(), `cadence-ux-${u.hostname.replace(/[^\w.-]/g, '_')}-${port}.lock`);
+}
+
+/** Création exclusive du verrou (contenu : notre pid). Un verrou d'un pid mort est repris. Faux quand un processus vivant le tient. */
+function takeUrlLock(file: string): boolean {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const fd = openSync(file, 'wx');
+      writeSync(fd, String(process.pid));
+      closeSync(fd);
+      return true;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+    }
+    let text: string;
+    let age: number;
+    try {
+      text = readFileSync(file, 'utf8').trim();
+      age = Date.now() - statSync(file).mtimeMs;
+    } catch {
+      continue; // rendu entre-temps
+    }
+    // Un fichier vide est un verrou en cours de pose : on ne le vole qu'au bout de 5 s (pose interrompue).
+    if (text === '' ? age < 5_000 : pidAlive(Number(text))) return false;
+    rmSync(file, { force: true });
+  }
+  return false;
+}
+
+function releaseUrlLock(file: string): void {
+  try {
+    if (Number(readFileSync(file, 'utf8').trim()) === process.pid) rmSync(file, { force: true });
+  } catch {
+    /* déjà rendu */
+  }
+}
+
 /**
- * Lance l'application de la revue UX : sonde l'URL (qui répond déjà : rien n'est lancé), lance la commande depuis `cwd`
- * dans son propre groupe de processus (sortie dans `log`), puis sonde jusqu'à une réponse HTTP < 500 ou au délai.
+ * Lance l'application de la revue UX : prend le verrou de l'URL (attente comptée dans le délai), sonde l'URL (qui répond
+ * déjà : rien n'est lancé), lance la commande depuis `cwd` dans son propre groupe de processus (sortie dans `log`),
+ * puis sonde jusqu'à une réponse HTTP < 500 — le groupe lancé encore vivant — ou au délai. Le verrou est rendu à `stop`.
  */
 export async function startApp(o: AppOpts): Promise<AppRun> {
   const none = async () => {};
-  if (await responds(o.url)) return { state: { kind: 'busy' }, stop: none };
+  const deadline = Date.now() + o.timeoutMs;
+  const lock = uxLockFile(o.url);
+  while (!takeUrlLock(lock)) {
+    if (Date.now() >= deadline) return { state: { kind: 'unverified', cause: `url tenue par une autre vague (${o.url})` }, stop: none };
+    await sleep(o.every ?? 500);
+  }
+  const release = () => releaseUrlLock(lock);
+  try {
+    return await launch(o, deadline, release);
+  } catch (e) {
+    release();
+    throw e;
+  }
+}
+
+/** `release` rend le verrou : dès que rien ne tourne (busy, échec), sinon à la fin de `stop`, une fois le groupe disparu. */
+async function launch(o: AppOpts, deadline: number, release: () => void): Promise<AppRun> {
+  const none = async () => {};
+  if (await responds(o.url)) {
+    release();
+    return { state: { kind: 'busy' }, stop: none };
+  }
   let fd: number;
   try {
     fd = openSync(o.log, 'a');
   } catch (e) {
+    release();
     return { state: { kind: 'unverified', cause: `journal ${o.log} : ${(e as Error).message}` }, stop: none };
   }
   const child = spawn('sh', ['-c', o.command], { cwd: o.cwd, env: withoutLaunchVars(process.env), stdio: ['ignore', fd, fd], detached: true });
@@ -82,6 +149,7 @@ export async function startApp(o: AppOpts): Promise<AppRun> {
   const pid = child.pid;
   if (pid === undefined) {
     const cause = await new Promise<string>((r) => child.once('error', (e) => r(e.message)));
+    release();
     return { state: { kind: 'unverified', cause: `lancement impossible : ${cause}` }, stop: none };
   }
   const gone: { why?: string } = {};
@@ -89,16 +157,23 @@ export async function startApp(o: AppOpts): Promise<AppRun> {
   child.once('close', (code, sig) => (gone.why = `la commande s'est arrêtée (${sig ?? `code ${code}`})`));
   const stop = async () => {
     live.delete(stop);
-    if (!signal(pid, 'SIGTERM')) return;
-    const limit = Date.now() + (o.killAfterMs ?? APP_KILL_AFTER_MS);
-    while (Date.now() < limit && signal(pid, 0)) await sleep(50);
-    signal(pid, 'SIGKILL');
-    for (let i = 0; i < 40 && signal(pid, 0); i++) await sleep(25); // le SIGKILL n'est pas instantané : le groupe disparu, pas seulement signalé
+    try {
+      if (!signal(pid, 'SIGTERM')) return;
+      const limit = Date.now() + (o.killAfterMs ?? APP_KILL_AFTER_MS);
+      while (Date.now() < limit && signal(pid, 0)) await sleep(50);
+      signal(pid, 'SIGKILL');
+      for (let i = 0; i < 40 && signal(pid, 0); i++) await sleep(25); // le SIGKILL n'est pas instantané : le groupe disparu, pas seulement signalé
+    } finally {
+      release(); // après l'arrêt de l'application seulement : l'autre vague ne trouve pas un port encore tenu
+    }
   };
   live.add(stop);
-  const deadline = Date.now() + o.timeoutMs;
   for (;;) {
-    if (await responds(o.url)) return { state: { kind: 'ready' }, stop };
+    if (await responds(o.url)) {
+      if (signal(pid, 0)) return { state: { kind: 'ready' }, stop };
+      gone.why ??= 'la commande s\'est arrêtée alors que l\'URL répond (autre processus ?)'; // la réponse n'est pas la nôtre
+      break;
+    }
     if (gone.why || Date.now() >= deadline) break;
     await sleep(o.every ?? 500);
   }

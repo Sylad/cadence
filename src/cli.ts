@@ -63,6 +63,16 @@ Le plan est docs/plan/raf.yaml, ou celui que nomme « plan: » dans cadence.yaml
 autre outil se lit sans migration (correspondance des champs, voir le README) et reste en lecture seule.
 Options communes : --file chemin (ou RAF_FILE), RAF_TODAY=AAAA-MM-JJ pour figer la date.`;
 
+/** Ajoute `line` au .gitignore de `root` s'il n'y est pas déjà (avec ou sans `/` initial ou final). Rend vrai si écrit. */
+function ensureGitignore(root: string, line: string): boolean {
+  const file = join(root, '.gitignore');
+  const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const norm = (l: string) => l.trim().replace(/^\//, '').replace(/\/$/, '');
+  if (text.split('\n').some((l) => norm(l) === norm(line))) return false;
+  writeFileSync(file, `${text}${text === '' || text.endsWith('\n') ? '' : '\n'}${line}\n`);
+  return true;
+}
+
 export function run(argv: string[], io: Io): number | Promise<number> {
   try {
     // orchestrate a ses propres options (--status et --resume prennent une valeur facultative, --answer en prend deux).
@@ -149,6 +159,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (planConfig?.settings.format) throw new RafError(`plan en lecture seule : ${configPath} décrit un plan tenu par un autre outil`);
       const plan = Plan.create(planPath, values.project ?? basename(root), values.prefix ?? 'L', today);
       io.out(`plan créé : ${plan.path}`);
+      if (ensureGitignore(root, '.playwright-mcp/')) io.out('.gitignore : .playwright-mcp/');
       if (!values['no-hook'] && gitRoot(io.cwd)) io.out(`hook : ${installHook(io.cwd).path}`);
       return 0;
     }

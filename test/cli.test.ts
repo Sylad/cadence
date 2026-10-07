@@ -53,6 +53,27 @@ describe('raf public --clear', () => {
   });
 });
 
+describe('raf init : .gitignore', () => {
+  it('ajoute .playwright-mcp/ au .gitignore, sans doublon ni perte du contenu existant', () => {
+    const dir = gitRepo();
+    writeFileSync(join(dir, '.gitignore'), 'node_modules');
+    raf(dir, 'init', '--no-hook');
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('node_modules\n.playwright-mcp/\n');
+    raf(dir, 'init', '--no-hook');
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('node_modules\n.playwright-mcp/\n');
+  });
+
+  it('crée le .gitignore absent et respecte une entrée déjà posée', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('.playwright-mcp/\n');
+    const dir2 = gitRepo();
+    writeFileSync(join(dir2, '.gitignore'), '/.playwright-mcp\n');
+    raf(dir2, 'init', '--no-hook');
+    expect(readFileSync(join(dir2, '.gitignore'), 'utf8')).toBe('/.playwright-mcp\n');
+  });
+});
+
 describe('raf CLI', () => {
   it('runs a full lot lifecycle', () => {
     const dir = gitRepo();

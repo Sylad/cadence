@@ -51,6 +51,15 @@ describe('gabarits', () => {
     expect(out).toContain('http://localhost:4200');
   });
 
+  it('les briefs qui peuvent ouvrir un navigateur imposent les sorties Playwright hors du dépôt', () => {
+    for (const kind of ['implement', 'fix', 'fix-minors', 'ux', 'review-small'] as const) {
+      const out = renderBrief(kind, vars);
+      expect(out, kind).toContain('.playwright-mcp');
+      expect(out, kind).toContain('--output-dir');
+      expect(out, kind).toContain('/tmp');
+    }
+  });
+
   it('les revues reçoivent les choix faits de l\'auteur pour les relire, sans son résumé', () => {
     const out = renderBrief('review', { ...vars, choix: '- A plutôt que B', reponse: 'une réponse' });
     expect(out).toContain('- A plutôt que B');

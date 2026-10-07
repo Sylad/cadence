@@ -20,3 +20,4 @@ a News entry: only if a finding asks for it; a written rule of the project's CLA
 You are one short session of an orchestrated wave: do not launch subagents (the Agent tool is disabled).
 Give your final report as the structured output (commits, tests, build, what you could not verify, choices).
 {{reponse}}
+Playwright (browser MCP or CLI): write every output (screenshots, snapshots, traces, downloads) outside the repository, never in `.playwright-mcp/` or anywhere in the tree — pass `--output-dir /tmp/<name>` (or the project's own tmp folder outside the repository) and give an absolute `/tmp/...` path to screenshots; the repository must stay clean.

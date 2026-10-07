@@ -9,3 +9,4 @@ Give your report as the structured output: counts of blocking / major / minor fi
 findings included, each tied to a named rule — Nielsen heuristic or WCAG 2.2 AA criterion — or a
 measurement), each finding (severity, file, line, text), proposed sub-tasks, what you could not
 verify, and the one-line verdict for `raf review {{lot}}`.
+Playwright (browser MCP or CLI): write every output (screenshots, snapshots, traces, downloads) outside the repository, never in `.playwright-mcp/` or anywhere in the tree — pass `--output-dir /tmp/<name>` (or the project's own tmp folder outside the repository) and give an absolute `/tmp/...` path to screenshots; the repository must stay clean.

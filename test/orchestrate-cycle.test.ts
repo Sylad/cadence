@@ -447,6 +447,19 @@ describe('contrôles autour des sessions', () => {
     expect(h.calls[2].brief).toContain('(build): green');
   });
 
+  it('tests rouges avec build déclaré : build non lancé, un seul constat, correction (L75)', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'test -f b.txt || { echo boom >&2; exit 3; }', build: 'test -f b.txt || { echo BUILD_LANCE >&2; exit 9; }' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    const brief = h.calls[1].brief;
+    expect(brief).toContain('en échec (code 3)');
+    expect(brief).not.toContain('BUILD_LANCE');
+    expect(brief).not.toContain('code 9');
+    expect(brief.split('en échec (code').length - 1).toBe(1);
+    expect(c.lot.pass).toBe(1);
+  });
+
   it('HEAD a bougé entre les contrôles et la revue (lot repris après un commit extérieur) : la revue ne reçoit pas de résultat périmé (L75)', async () => {
     const h = harness({ budget: 1000, script: { implement: [impl()], review: [ok] } });
     const c = h.lot('L1', {}, { test: 'true', build: 'true' });

@@ -35,7 +35,7 @@ progress, then drift that blocks a delivery, then ready quick wins. **Stop and w
 ## 2. Delegation
 
 The default way to delegate is **`cadence orchestrate`** (section 2b): a program, not a conversation, that runs
-one fresh short session per step. When the lead delegates by hand, the brief is the template
+one fresh short session per step; the wave runs from a frozen copy of the cadence package, so it can orchestrate cadence itself and its templates can be edited meanwhile. When the lead delegates by hand, the brief is the template
 `templates/orchestrate/implement.md` of the cadence package — the single source, tested. The lead runs
 `cd <project> && raf start <lot>`, then starts from the brief written by `cadence orchestrate --dry-run
 <project>:<lot>`: it is already rendered (`{{chemin}}`, `{{lot}}`, `{{titre}}`, `{{objectif}}` and `{{news}}`,

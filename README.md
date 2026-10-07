@@ -686,6 +686,15 @@ review with minors: it concludes on that review instead of staying suspended.
 
 **Choices, not questions**: the author brief tells the session to decide minor interpretation questions itself and to list them under `choix` in its report; the reviewer receives that list to re-read, and the final table prints each one (`choix fait : …`). A session stops with a question only on a real blocker: a decision that changes the scope or the architecture or is costly to undo, AND that the plan, its notes and CLAUDE.md do not settle; everything else is a choice.
 
+**Frozen copy of the tool (L61)**: at the real start of a wave (not with `--dry-run` or `--status`), cadence copies the
+parts of its package that run the wave (`bin/`, `dist/`, `templates/`, `agents/`, `skills/`, `package.json`; `node_modules`
+is linked, not copied) into `.cadence/runs/<wave>/tool/` and relaunches the orchestrate process from that copy (the
+parent process waits, relays the signals and exits with the same code or signal). Code, brief templates and agents
+therefore come from the snapshot: a wave can orchestrate cadence itself, and a session of the wave may edit
+`templates/` or rebuild `dist/` without touching the wave running. `--resume` relaunches from the snapshot of the
+resumed wave, never from the current `dist/`; a wave without a snapshot (started before L61) resumes with the current
+package and a warning. The copy is removed with the wave folder. The wave's pid in `--status` is the relaunched process.
+
 **What stays with you**: choosing the lots, the questions raised (`--resume --answer`), re-verifying
 after the wave (`git log`, tests, `raf check`), `raf done`, **`raf ux`** (the orchestrator reports the UX
 verdict and screenshots, it does not record it), the push and the deliveries, one project at a time.

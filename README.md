@@ -19,6 +19,9 @@ several projects through subagents — plus three reviewer agents: `ux-reviewer`
 gate, and `qa-reviewer`, which walks the delivered app in a real browser and
 reports a page left empty or in error.
 
+And a second plugin, [`cadence-hud`](#cadence-hud): a status band above the Claude
+Code prompt that shows the session's context, quota, cost and the orchestrate waves running.
+
 ## What's new
 
 **0.11.0**: waves on different repositories run side by side under a shared cap of
@@ -947,6 +950,37 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   the route, what was expected, what was measured and the evidence; pages checked
   N/N, follow-ups as `raf add` lines, what it could not verify, a one-line
   verdict. Read-only: GET only, no login, nothing submitted; it stops at a PIN.
+
+## cadence-hud
+
+A band above the Claude Code prompt (terminal and desktop app), refreshed every 5 s:
+
+```
+ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │  7j  61 % ↻ 6 j 15 h  │  $1.23  │  fable 410k $0.95 · sonnet 85k $0.12  │  ⚙ 2 agents
+⟳ cadence · 2026-10-07-2131 en cours  │  budget ▱▱▱▱▱▱▱▱▱▱   1 % 14k/2M  │  1 session/2
+  L112  implémente  implement@sonnet 34 s         global-setup coupe le cache de compilation de Node…
+```
+
+Context of the session (green / orange / red at 50 and 75 %), the 5-hour and 7-day quota
+windows with the time to their reset, the cost of the session and its split per model, the
+subagents of this session, and every live `cadence orchestrate` wave: budget, sessions, one
+aligned line per active lot (status, step, model, elapsed, start of the title), the lots still
+waiting. When no wave is running, the last finished one stays on a grey line until the next
+starts. Waves are read from disk (`~/.cadence/orchestrate/waves/`, then `.cadence/runs/`); no
+cadence command is run, and the CLI is not required.
+
+Install it as a plugin from the same marketplace:
+
+```
+/plugin marketplace add Sylad/cadence
+/plugin install cadence-hud@cadence
+```
+
+`/hud` hides or shows the band. The source lives in [`plugins/cadence-hud`](plugins/cadence-hud/README.md)
+(its own README has the details of every cell); it is not part of the npm package. To work on it:
+`claude plugin validate plugins/cadence-hud`, `claude plugin test plugins/cadence-hud`, and
+`tsc -p plugins/cadence-hud` once Claude Code has loaded the plugin at least once (it generates
+the `.claude-plugin/types` the tsconfig extends).
 
 ## Releasing
 

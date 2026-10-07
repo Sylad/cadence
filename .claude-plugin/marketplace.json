@@ -1,14 +1,27 @@
 {
   "name": "cadence",
   "description": "cadence — a repo-native working method for Claude Code sessions",
-  "owner": { "name": "Sylvain Ladoire" },
+  "owner": {
+    "name": "Sylvain Ladoire"
+  },
   "plugins": [
     {
       "name": "cadence",
       "description": "Session start and close rituals driven by a versioned plan (raf), and deliveries proven by their effect. Needs the cadence CLI (npm i -g @sylad/cadence).",
       "version": "0.11.0",
       "source": "./",
-      "author": { "name": "Sylvain Ladoire" }
+      "author": {
+        "name": "Sylvain Ladoire"
+      }
+    },
+    {
+      "name": "cadence-hud",
+      "description": "A status band above the Claude Code prompt: context, 5 h / 7 d quota windows, cost per model, agents of the session and the running cadence orchestrate waves. No CLI needed.",
+      "version": "0.2.0",
+      "source": "./plugins/cadence-hud",
+      "author": {
+        "name": "Sylvain Ladoire"
+      }
     }
   ]
 }

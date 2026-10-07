@@ -65,3 +65,10 @@ export function removeDryRunBriefs(output: string): void {
   }
   for (const dir of targets) removeTree(dir);
 }
+
+/** Paquet jetable construit depuis src/ par le global-setup (jamais le dist/ en service) : voir test/global-setup.ts. */
+export function testPackage(): string {
+  const pkg = process.env.CADENCE_TEST_PACKAGE;
+  if (!pkg) throw new Error('CADENCE_TEST_PACKAGE absent : le global-setup de vitest construit le paquet jetable.');
+  return pkg;
+}

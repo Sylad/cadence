@@ -3,14 +3,13 @@ import { execFileSync, spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { run } from '../src/cli.js';
 import { orchestrate, realOrchestrateDeps } from '../src/orchestrate/command.js';
 import { spawnReexec } from '../src/orchestrate/snapshot.js';
 import { cadenceHome, liveWaves } from '../src/orchestrate/registry.js';
 import { projectLogDir } from '../src/orchestrate/launch.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
-import { gitRepo, removeDryRunBriefs, tempDir } from './helpers.js';
+import { gitRepo, removeDryRunBriefs, tempDir, testPackage } from './helpers.js';
 
 const FAKE = fileURLToPath(new URL('./fixtures/fake-claude.mjs', import.meta.url));
 const SAMPLE = fileURLToPath(new URL('./fixtures/claude-result.sample.json', import.meta.url));
@@ -46,7 +45,10 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
   const cli = async (...argv: string[]) => {
     const out: string[] = [];
     const err: string[] = [];
-    const code = await run(['orchestrate', ...argv], { cwd: parent, env: { ...process.env, ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') });
+    const e = { ...process.env, ...env };
+    // L61/t5 : le fils est relancé depuis le paquet jetable construit depuis src/, jamais depuis le dist/ en service.
+    const deps = { ...realOrchestrateDeps(e), snapshot: { packageRoot: testPackage(), reexec: spawnReexec } };
+    const code = await orchestrate(argv, { cwd: parent, env: e, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') }, deps);
     return { code, out: out.join('\n'), err: err.join('\n') };
   };
   return { parent, dir, bare, calls, cli, env };
@@ -83,7 +85,8 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const out: string[] = [];
     const err: string[] = [];
     const env = { ...process.env, ...s.env, CADENCE_SNAPSHOT: '/une/autre/vague/tool', CADENCE_WAVE_RESERVED: '2000-01-01-0000' };
-    const code = await run(['orchestrate', 'proj:L1'], { cwd: s.parent, env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') });
+    const deps = { ...realOrchestrateDeps(env), snapshot: { packageRoot: testPackage(), reexec: spawnReexec } };
+    const code = await orchestrate(['proj:L1'], { cwd: s.parent, env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') }, deps);
     expect(err.join('\n')).toBe('');
     expect(code).toBe(0);
     expect(existsSync(join(s.parent, '.cadence/runs/2026-10-04-1412/wave.json'))).toBe(true);
@@ -220,7 +223,7 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
   // L3/t12 : vrai processus, vrai signal.
   it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)('%s : sessions tuées, étapes et vague interrompues, verrous et hook retirés', async (signal) => {
     const s = setup({ implement: [{ ...impl, sleepMs: 60_000 }] });
-    const bin = fileURLToPath(new URL('../bin/cadence.js', import.meta.url));
+    const bin = join(testPackage(), 'bin/cadence.js');
     const logFile = s.calls;
     const claudeHome = tempDir();
     const env = { ...process.env, ...s.env, CLAUDE_CONFIG_DIR: claudeHome };
@@ -270,13 +273,11 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
   }, 20_000);
 });
 
-const REPO = fileURLToPath(new URL('..', import.meta.url));
-
-/** Une copie du paquet construit (dist/ du dépôt) qu'on peut modifier sans toucher au vrai : le « paquet courant » d'une vague. */
+/** Une copie du paquet jetable (construit depuis src/) qu'on peut modifier sans toucher au vrai : le « paquet courant » d'une vague. */
 function livePackage(): string {
   const pkg = tempDir();
-  for (const n of ['bin', 'dist', 'templates', 'agents', 'skills', 'package.json']) cpSync(join(REPO, n), join(pkg, n), { recursive: true });
-  symlinkSync(join(REPO, 'node_modules'), join(pkg, 'node_modules'), 'dir');
+  for (const n of ['bin', 'dist', 'templates', 'agents', 'skills', 'package.json']) cpSync(join(testPackage(), n), join(pkg, n), { recursive: true });
+  symlinkSync(join(testPackage(), 'node_modules'), join(pkg, 'node_modules'), 'dir');
   return pkg;
 }
 

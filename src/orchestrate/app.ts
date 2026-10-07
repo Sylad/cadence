@@ -144,11 +144,16 @@ export async function startApp(o: AppOpts): Promise<AppRun> {
   const none = async () => {};
   const deadline = Date.now() + o.timeoutMs;
   const lock = uxLockFile(o.url);
+  const held = { state: { kind: 'unverified', cause: `url tenue par une autre vague (${o.url})` }, stop: none } as const;
   while (!takeUrlLock(lock)) {
-    if (Date.now() >= deadline) return { state: { kind: 'unverified', cause: `url tenue par une autre vague (${o.url})` }, stop: none };
+    if (Date.now() >= deadline) return held;
     await sleep(o.every ?? 500);
   }
   const release = () => releaseUrlLock(lock);
+  if (Date.now() >= deadline) {
+    release(); // obtenu après le délai : toute l'attente a été passée à celle du verrou, il ne reste rien pour lancer l'application
+    return held;
+  }
   try {
     return await launch(o, deadline, release);
   } catch (e) {

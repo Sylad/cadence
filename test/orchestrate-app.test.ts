@@ -253,6 +253,21 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
     await app.stop();
   });
 
+  it('verrou obtenu après le délai : rien n\'est lancé, verrou rendu, « url tenue par une autre vague »', async () => {
+    const t = await fakeApp(0);
+    const lock = uxLockFile(t.url);
+    writeFileSync(lock, String(process.pid));
+    const timer = setTimeout(() => rmSync(lock, { force: true }), 100); // rendu avant le délai, mais repris après : la sonde suivante tombe à 1 s
+    try {
+      const app = await startApp({ ...opts(t), timeoutMs: 400, every: 1_000 });
+      expect(app.state.kind === 'unverified' && app.state.cause).toContain('url tenue par une autre vague');
+      expect(existsSync(join(t.dir, 'pid'))).toBe(false);
+      expect(existsSync(lock)).toBe(false);
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+
   it('délai dépassé après une attente du verrou : le message annonce le délai restant, pas le délai complet', async () => {
     const t = await fakeApp(-1);
     const lock = uxLockFile(t.url);

@@ -1133,6 +1133,7 @@ lots:
     notes:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #1 » dans son corps (issue GitHub)." }
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme : les 3 constats mineurs sont traités, 843 tests et le typecheck passent, aucun nouveau défaut — orchestré (vague 2026-10-07-1921, 1 passe(s) de correction + passe des mineurs)", commit: 4b7d76ea27d2ba81c5abdd9d862619b920599fae }
   - id: L103
     title: "cadence session start --all / session close --all depuis un dossier non dépôt : balayer les sous-dossiers (profondeur 1, --depth n) qui ont docs/plan/raf.yaml ou cadence.yaml avec plan:, une section par projet ; le skill lead et session-start l'utilisent au lieu de la boucle shell (issue #3)"
     status: todo

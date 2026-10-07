@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
-import { readPlanConfig, readSessionConfig } from '../src/config.js';
+import { readNewsConfig, readPlanConfig, readSessionConfig } from '../src/config.js';
 import { parseDeliverConfig } from '../src/deliver.js';
 import { Plan } from '../src/plan.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -353,5 +353,24 @@ describe('raf CLI with cadence.yaml', () => {
     expect(raf(dir, 'check').out).toBe(
       '✗ B33 en cours sans commit depuis 18 j (Une seule base)\n✗ R12a est visible et terminé sans entrée Nouveautés — cadence news new R12a\n2 écart(s)',
     );
+  });
+});
+
+describe('readNewsConfig', () => {
+  const read = (yaml: string) => {
+    const f = join(tempDir(), 'cadence.yaml');
+    writeFileSync(f, yaml);
+    return readNewsConfig(f);
+  };
+  it('lit news.publicTitleMax ; absent = pas de limite déclarée', () => {
+    expect(read('news:\n  publicTitleMax: 80\n')).toEqual({ publicTitleMax: 80 });
+    expect(read('deliver: {}\n')).toEqual({});
+    expect(readNewsConfig(join(tempDir(), 'absent.yaml'))).toEqual({});
+  });
+  it('refuse une valeur ou une clé fautive', () => {
+    expect(() => read('news:\n  publicTitleMax: 0\n')).toThrow(/publicTitleMax/);
+    expect(() => read('news:\n  publicTitleMax: abc\n')).toThrow(/publicTitleMax/);
+    expect(() => read('news:\n  publicTitleMaxx: 80\n')).toThrow(/inconnu/);
+    expect(() => read('news: 3\n')).toThrow(/news/);
   });
 });

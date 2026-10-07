@@ -103,6 +103,30 @@ function parseFormat(p: Record<string, unknown>, bad: (what: string) => RafError
   return format;
 }
 
+export interface NewsConfig {
+  /** Longueur maximale (caractères) d'un titre public, celle que la page Plan du site applique au build. Absente : aucune limite déclarée. */
+  publicTitleMax?: number;
+}
+
+/** Clé `news:` de cadence.yaml. */
+export function readNewsConfig(file: string): NewsConfig {
+  if (!existsSync(file)) return {};
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const n = (raw as { news?: unknown } | null)?.news;
+  if (n == null) return {};
+  if (!isObject(n)) throw new RafError(`${file} : news doit être un objet { publicTitleMax }`);
+  for (const k of Object.keys(n)) if (k !== 'publicTitleMax') throw new RafError(`${file} : news.${k} inconnu (attendu : publicTitleMax)`);
+  const max = n.publicTitleMax;
+  if (max == null) return {};
+  if (typeof max !== 'number' || !Number.isInteger(max) || max < 1) throw new RafError(`${file} : news.publicTitleMax : nombre entier de caractères (≥ 1) attendu`);
+  return { publicTitleMax: max };
+}
+
 export interface SessionConfig {
   /** Commande sh, à la racine du dépôt, dont la sortie complète « cadence session start ». */
   start?: string;

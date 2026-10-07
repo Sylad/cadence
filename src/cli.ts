@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { readPlanConfig, readSessionConfig } from './config.js';
+import { readNewsConfig, readPlanConfig, readSessionConfig } from './config.js';
 import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
@@ -11,7 +11,7 @@ import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, readCommits, resolveCommit } from './git.js';
 import { installHook } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
-import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from './news.js';
+import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
 import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
@@ -150,6 +150,12 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? resolve(root, planConfig?.path ?? 'docs/plan/raf.yaml'));
   const loadPlan = () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
   const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));
+  // Limite DÉCLARÉE (news.publicTitleMax) : sans clé, seul « raf check » avertit ; avec, la pose d'un titre public est refusée.
+  const refuseLongTitle = (text: string) => {
+    const max = readNewsConfig(configPath).publicTitleMax;
+    const m = max === undefined ? null : publicTitleTooLong(text, max);
+    if (m) throw new RafError(m);
+  };
   // Une session d'orchestration ne ferme pas un lot, n'enregistre pas de verdict à la place du lead et ne livre pas.
   if (io.env.CADENCE_ORCHESTRATED && (command === 'done' || command === 'ux' || command === 'review' || command === 'deliver')) {
     throw new RafError(`${command} refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead`);
@@ -181,6 +187,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         const after = values.after ? values.after.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
         const every = values.every === undefined ? undefined : Number(values.every);
         if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new RafError(`périodicité invalide : ${values.every} (un nombre entier de jours)`);
+        if (values.public !== undefined) refuseLongTitle(values.public);
         id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, public: values.public, every, after });
       }
       plan.save();
@@ -193,6 +200,11 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       need(1, `${command} <id>`);
       const plan = loadPlan();
       const status: Status = command === 'start' ? 'doing' : command === 'done' ? 'done' : 'dropped';
+      // Le titre public part au site : un titre au-delà de la limite déclarée y ferait échouer le build.
+      if (status === 'done' && !rest[0].includes('/')) {
+        const pub = plan.lots().find((l) => l.id === rest[0])?.public;
+        if (pub) refuseLongTitle(pub);
+      }
       // Le plan ne lit pas git : lui dire combien de commits du lot sa revue ne couvre pas quand elle est exigée.
       const unreviewed = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? unreviewedWork(plan, root, rest[0]) : 0;
       plan.setStatus(rest[0], status, today, { force: values.force, unreviewed });
@@ -226,6 +238,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       need(values.clear ? 1 : 2, 'public <id> "titre public" | public <id> --clear');
       if (values.clear && rest.length > 1) throw new RafError('--clear n\'attend pas de titre');
       const plan = loadPlan();
+      if (!values.clear) refuseLongTitle(rest.slice(1).join(' '));
       plan.setPublic(rest[0], values.clear ? null : rest.slice(1).join(' '));
       plan.save();
       return 0;
@@ -379,7 +392,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'news':
-      return news(rest, loadPlan(), newsDir, today, values, io);
+      return news(rest, loadPlan(), newsDir, today, values, io, refuseLongTitle);
     default:
       throw new RafError(`commande inconnue : ${command} (raf --help)`);
   }
@@ -500,13 +513,16 @@ function news(
   today: Day,
   values: { title?: string; output?: string },
   io: Io,
+  refuseLongTitle: (text: string) => void,
 ): number {
   const lots = plan.lots();
   switch (sub) {
     case 'new': {
       if (args.length === 0) throw new RafError('usage : cadence news new <lot…> [--title t]');
       for (const id of args) plan.lot(id);
-      io.out(newEntry(dir, args, values.title ?? plan.lot(args[0]).public ?? plan.lot(args[0]).title, today, io.now()));
+      const title = values.title ?? plan.lot(args[0]).public ?? plan.lot(args[0]).title;
+      refuseLongTitle(title);
+      io.out(newEntry(dir, args, title, today, io.now()));
       return 0;
     }
     case 'stamp': {

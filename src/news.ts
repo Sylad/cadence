@@ -28,6 +28,15 @@ export interface NewsIssue {
   message: string;
 }
 
+/** Limite avertie par `raf check` quand cadence.yaml n'en déclare pas (news.publicTitleMax). */
+export const PUBLIC_TITLE_DEFAULT = 80;
+
+/** Message quand un titre public dépasse `max` caractères, sinon null. */
+export function publicTitleTooLong(text: string, max: number): string | null {
+  const n = text.trim().length;
+  return n > max ? `titre public de ${n} caractères, au-delà de la limite de ${max} (news.publicTitleMax) que la page Plan applique au build : « ${text.trim()} »` : null;
+}
+
 const CREATED_EMPTY = 'created vide — cadence news stamp';
 const CREATED = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?$/;
 const OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/;

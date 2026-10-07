@@ -353,3 +353,56 @@ describe('raf show', () => {
     expect(raf(dir, 'show').code).not.toBe(0);
   });
 });
+
+describe('titre public trop long (L106)', () => {
+  const long = 'x'.repeat(88);
+  const setup = (yaml?: string) => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    if (yaml !== undefined) writeFileSync(join(dir, 'cadence.yaml'), yaml);
+    raf(dir, 'add', 'A', '--visible');
+    return dir;
+  };
+
+  it('raf public, add --public et news new refusent au-delà de news.publicTitleMax', () => {
+    const dir = setup('news:\n  publicTitleMax: 80\n');
+    const r = raf(dir, 'public', 'L1', long);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('88');
+    expect(r.err).toContain('80');
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('public:');
+    expect(raf(dir, 'add', 'B', '--public', long).code).not.toBe(0);
+    expect(raf(dir, 'news', 'new', 'L1', '--title', long).code).not.toBe(0);
+    expect(raf(dir, 'public', 'L1', 'y'.repeat(80)).code).toBe(0);
+    expect(raf(dir, 'news', 'new', 'L1', '--title', 'z'.repeat(80)).code).toBe(0);
+  });
+
+  it('raf done refuse un lot dont le titre public dépasse la limite déclarée', () => {
+    const dir = setup();
+    expect(raf(dir, 'public', 'L1', long).code).toBe(0); // sans clé : rien n'est refusé
+    expect(raf(dir, 'done', 'L1').code).toBe(0);
+    const dir2 = setup('news:\n  publicTitleMax: 60\n');
+    writeFileSync(join(dir2, 'docs/plan/raf.yaml'), readFileSync(join(dir2, 'docs/plan/raf.yaml'), 'utf8').replace('title: A', `title: A\n    public: ${'y'.repeat(70)}`));
+    const r = raf(dir2, 'done', 'L1');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('70');
+    expect(readFileSync(join(dir2, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('status: done');
+  });
+
+  it('raf check signale, avec 80 par défaut sans clé', () => {
+    const dir = setup();
+    raf(dir, 'public', 'L1', long);
+    const r = raf(dir, 'check');
+    expect(r.out).toContain('L1');
+    expect(r.out).toContain('titre public');
+    expect(r.out).toContain('88');
+    raf(dir, 'public', 'L1', 'court');
+    expect(raf(dir, 'check').out).not.toContain('titre public');
+  });
+
+  it('la clé news.publicTitleMax règle aussi le seuil de raf check', () => {
+    const dir = setup('news:\n  publicTitleMax: 100\n');
+    raf(dir, 'public', 'L1', long);
+    expect(raf(dir, 'check').out).not.toContain('titre public');
+  });
+});

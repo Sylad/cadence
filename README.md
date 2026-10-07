@@ -467,6 +467,17 @@ deliver:
   deployTimeout: 1800     # seconds, per deploy command
 ```
 
+A public title (`public:`) longer than the site's Plan page accepts fails its build. Declare the limit
+in `cadence.yaml` and it is caught before the push:
+
+```yaml
+news:
+  publicTitleMax: 80      # characters; `raf check` warns at 80 even without the key
+```
+
+With the key, `raf public`, `raf add --public`, `raf done` (on a lot whose public title is too long) and
+`cadence news new` (its title) refuse above it; without it, only `raf check` warns.
+
 ```sh
 cadence deliver --dry-run    # preconditions, then the resolved steps; nothing runs
 cadence deliver              # 0 delivered and verified · 1 a step failed · 2 refused before acting

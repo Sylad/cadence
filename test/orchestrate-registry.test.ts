@@ -137,20 +137,29 @@ describe('identité du porteur : pid + heure de démarrage (L71/t3)', () => {
     expect(liveWaves(home)[0]!.start).toEqual(expect.any(String));
   });
 
+  /** Attend (au plus 10 s) qu'une condition devienne vraie : seule la durée de l'attente dépend de la charge, pas le résultat. */
+  const until = async (cond: () => boolean) => {
+    for (let i = 0; i < 1000 && !cond(); i++) await new Promise((r) => setTimeout(r, 10));
+    expect(cond()).toBe(true);
+  };
+
   it("le journal d'attente dit depuis combien de temps on attend, puis l'obtention", async () => {
     const home = tempDir();
     const a = await acquireSlot(home, 1, { wave: 'a' });
     const waits: number[] = [];
     const got: number[] = [];
-    const p = acquireSlot(home, 1, { wave: 'b', pollMs: 10, reportMs: 30, onWait: (_h, ms) => waits.push(ms), onGot: (ms) => got.push(ms) });
-    await new Promise((r) => setTimeout(r, 120));
+    let t = 1_000_000; // horloge pilotée : aucune dépendance au temps réel ni à la charge de la machine
+    const p = acquireSlot(home, 1, { wave: 'b', pollMs: 10, reportMs: 30, now: () => t, onWait: (_h, ms) => waits.push(ms), onGot: (ms) => got.push(ms) });
+    await until(() => waits.length >= 1);
+    await new Promise((r) => setTimeout(r, 40)); // quelques passes de plus : l'horloge n'a pas bougé, aucun nouveau compte-rendu
+    expect(waits).toEqual([0]); // dès le début de l'attente, 0 ms, pas de nouveau compte-rendu tant que reportMs n'est pas écoulé
+    t += 50;
+    await until(() => waits.length >= 2);
+    expect(waits).toEqual([0, 50]);
+    t += 50;
     a();
     (await p)();
-    expect(waits[0]).toBe(0);
-    expect(waits.length).toBeGreaterThan(1);
-    expect(waits[1]).toBeGreaterThanOrEqual(30);
-    expect(got).toHaveLength(1);
-    expect(got[0]).toBeGreaterThanOrEqual(100);
+    expect(got).toEqual([100]);
   });
 });
 

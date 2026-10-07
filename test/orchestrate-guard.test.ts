@@ -87,6 +87,17 @@ describe('snapshot et détection de push', () => {
     expect(s.upstream).toBeNull();
     expect(s.remote).toBeNull(); // pas de dépôt distant : rien à comparer
   });
+
+  it('.playwright-mcp/ non ignoré par git n\'est pas un dépôt sale, tout autre fichier non suivi l\'est', async () => {
+    const dir = gitRepo();
+    commit(dir, 'chore: init');
+    mkdirSync(join(dir, '.playwright-mcp'));
+    writeFileSync(join(dir, '.playwright-mcp/console-1.log'), 'x');
+    writeFileSync(join(dir, '.playwright-mcp/page.png'), 'x');
+    expect((await snapshot(dir, { remote: false })).untracked).toEqual([]);
+    writeFileSync(join(dir, 'autre.png'), 'x');
+    expect((await snapshot(dir, { remote: false })).untracked).toEqual(['autre.png']);
+  });
 });
 
 describe('cadence.yaml : orchestrate', () => {

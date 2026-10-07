@@ -131,7 +131,8 @@ export async function snapshot(repo: string, opts: { remote?: boolean } = {}): P
     opts.remote === false ? Promise.resolve(null) : out(repo, ['ls-remote', '--heads']),
   ]);
   const lines = (status ?? '').split('\n').filter(Boolean);
-  const keep = (l: string) => !/^.. \.cadence\//.test(l) && !/^\?\? \.cadence\//.test(l);
+  // .cadence/ (état de l'outil) et .playwright-mcp/ (sorties du MCP Playwright, écrites dans le dossier courant, qu'un dépôt déjà initialisé n'ignore pas forcément) ne comptent jamais comme un dépôt sale.
+  const keep = (l: string) => !/^.. (\.cadence|\.playwright-mcp)\//.test(l);
   return {
     head: head?.trim() || null,
     tracked: lines.filter((l) => !l.startsWith('??') && keep(l)),

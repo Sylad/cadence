@@ -136,6 +136,26 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it("--dry-run : le brief implement d'un lot visible porte cadence news new <lot>, celui d'un lot sans écran non ; aucun {{…}} ne reste (L48/t3)", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un', visible: true }], b: [{ title: 'sans écran' }] });
+    const r = await run(parent, ['a:L1', 'b:L1', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      const brief = (project: string) => {
+        const line = out.split('\n').find((l) => l.includes('brief :') && l.includes(`${project}--L1--implement.md`))!;
+        return readFileSync(line.replace(/^\s*brief : /, '').trim(), 'utf8');
+      };
+      const a = brief('a');
+      const b = brief('b');
+      expect(a).toContain('cadence news new L1');
+      expect(b).not.toContain('news new');
+      expect(a).not.toMatch(/\{\{/);
+      expect(b).not.toMatch(/\{\{/);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it('--dry-run : petit lot visible, review-small charge Playwright (et le dit) ; petit lot sans écran, aucun (L74/t6)', async () => {
     const { parent } = parentWith({ a: [{ title: 'petit', estimate: 0.5, visible: true }], b: [{ title: 'petit sans écran', estimate: 0.5 }] });
     const r = await run(parent, ['a:L1', 'b:L1', '--dry-run']);

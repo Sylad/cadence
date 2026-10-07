@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ensureGitignore, run } from '../src/cli.js';
-import { commit, gitRepo } from './helpers.js';
+import { commit, gitRepo, tempDir } from './helpers.js';
+import { projectEnv } from '../src/orchestrate/command.js';
 
 function raf(dir: string, ...argv: string[]) {
   const out: string[] = [];
@@ -205,5 +206,47 @@ describe('plan-only commits', () => {
     execFileSync('git', ['add', 'x.txt'], { cwd: dir });
     commit(dir, 'chore: autre chose');
     expect(raf(dir, 'check').out).toContain('commit sans lot : ');
+  });
+});
+
+describe('(L94) --config hors du dépôt, qa.expectations absolu dans le dépôt', () => {
+  it('raf check accepte le chemin absolu, lu depuis la racine du dépôt de travail, et le fichier est tenu avec le plan', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    raf(dir, 'add', 'A');
+    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    commit(dir, 'chore: plan raf');
+    mkdirSync(join(dir, 'docs/quality'), { recursive: true });
+    writeFileSync(join(dir, 'docs/quality/pages.md'), 'attendus\n');
+    execFileSync('git', ['add', 'docs/quality/pages.md'], { cwd: dir });
+    commit(dir, 'docs(qa): attendus');
+    const outside = tempDir();
+    const config = join(outside, 'cadence.yaml');
+    writeFileSync(config, `qa:\n  expectations: ${join(dir, 'docs/quality/pages.md')}\n`);
+    const r = raf(dir, 'check', '--config', config);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(r.out).not.toContain('commit sans lot');
+    // sans la config, le même fichier est un fichier comme un autre : le commit est sans lot
+    expect(raf(dir, 'check').out).toContain('commit sans lot');
+  });
+
+  it('un chemin absolu hors du dépôt de travail reste refusé', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    const outside = tempDir();
+    const config = join(outside, 'cadence.yaml');
+    writeFileSync(config, `qa:\n  expectations: ${join(outside, 'pages.md')}\n`);
+    const r = raf(dir, 'check', '--config', config);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('hors du dépôt');
+  });
+
+  it('projectEnv (orchestrate) passe la racine du projet : qa.expectations absolu dans le dépôt est accepté', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    writeFileSync(join(dir, 'cadence.yaml'), `qa:\n  expectations: ${join(dir, 'docs/quality/pages.md')}\n`);
+    const env = projectEnv(dir);
+    expect(env.loadPlan().qaExpectations).toBe('docs/quality/pages.md');
   });
 });

@@ -810,6 +810,9 @@ lots:
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
+    tasks:
+      - { id: t1, title: "briefs implement/fix/fix-minors/review-small : décrire le navigateur réellement disponible (aucun MCP pour un lot non visible) ; plus de « browser MCP » ni de .playwright-mcp/ là où il n'est pas chargé", status: todo }
+      - { id: t2, title: "lot visible : implement et fix chargent aussi Playwright (--output-dir dans le dossier de la vague), pour les lots de revue UX (evatosorus L3, jobmail L2, warhammer L2) ; dry-run et README", status: todo }
   - id: L75
     title: "orchestrate : tests et build lancés par le programme avant la revue, résultats passés au relecteur — la revue Opus de ccc L27 a reconstruit base+head et relancé la suite 2×, puis attendu 10 min en boucle (06-10)"
     status: todo

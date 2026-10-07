@@ -836,9 +836,10 @@ lots:
     created: 2026-10-07
   - id: L80
     title: "orchestrate : environnement par projet (Node via .nvmrc ou orchestrate.env dans cadence.yaml) — Astro exige Node 22, le node par défaut est 20 (evatosorus, ccc, 06-10)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-07
+    started: 2026-10-07
   - id: L81
     title: "⚡ Test instable orchestrate-registry.test.ts:149 (L71/t3, attente 0 ms exacte) : rouge sous charge en suite complète, passe seul → npm test / prepublishOnly rouge"
     status: done

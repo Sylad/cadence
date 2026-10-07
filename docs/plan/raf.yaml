@@ -596,7 +596,7 @@ lots:
     created: 2026-10-04
   - id: L48
     title: "⚡ orchestrate : le brief d'implémentation d'un lot visible inclut l'entrée Nouveautés (cadence news new <lot>, texte factuel côté utilisateur, capture selon la convention du projet) — question évitable posée par ol-companion:L29 (vague 2026-10-04-2201)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
@@ -606,9 +606,10 @@ lots:
       - { id: t2, title: "titre de l'entrée côté utilisateur : cadence news new <lot> prend lot.public par défaut quand il existe (--title l'emporte) ; newsText dit que le titre est côté utilisateur (public du lot, sinon réécrit avec --title) ; tests", status: done }
       - { id: t3, title: "test : le --dry-run d'un lot visible écrit un brief implement contenant « cadence news new <lot> », celui d'un lot non visible non (command.ts:276)", status: done }
       - { id: t4, title: "capture de l'entrée : le brief donne le chemin absolu du dossier de sortie Playwright de la vague et l'étape implement a --add-dir sur ce dossier pour pouvoir copier la capture dans docs/nouveautes/captures/ ; test du dry-run", status: done }
-      - { id: t5, title: "dry-run : le brief rendu (base de la délégation à la main) ne cite aucun dossier Playwright de vague — newsText sans chemin y dit d'enregistrer la capture sous le dossier temporaire et de la copier dans docs/nouveautes/captures/ ; skill lead aligné ; test qu'aucun chemin .cadence/runs n'apparaît dans le brief du dry-run", status: todo }
-      - { id: t6, title: "fix et fix-minors d'un lot visible : le brief donne le chemin absolu du dossier Playwright de la vague (même source playwrightDir que implement), cohérent avec le --add-dir déjà posé ; test", status: todo }
-    review: { date: 2026-10-07, verdict: "non conforme : 1 majeur (brief du dry-run cite un dossier Playwright de vague fictif), 1 mineur (fix a --add-dir sans le chemin)", commit: e239715126d9603cc6a41ec5b8dc60251f78de72 }
+      - { id: t5, title: "dry-run : le brief rendu (base de la délégation à la main) ne cite aucun dossier Playwright de vague — newsText sans chemin y dit d'enregistrer la capture sous le dossier temporaire et de la copier dans docs/nouveautes/captures/ ; skill lead aligné ; test qu'aucun chemin .cadence/runs n'apparaît dans le brief du dry-run", status: done }
+      - { id: t6, title: "fix et fix-minors d'un lot visible : le brief donne le chemin absolu du dossier Playwright de la vague (même source playwrightDir que implement), cohérent avec le --add-dir déjà posé ; test", status: done }
+    review: { date: 2026-10-07, verdict: "conforme avec 2 mineurs (README l.743 pas à jour, paragraphe Browser d'implement.md hors vague) — reportés en L91", commit: 41d490b9283a620371a5539903e375ae1ad2c81f }
+    finished: 2026-10-07
   - id: L49
     title: "Suivi visible d'une vague pour l'humain : (1) le skill lead nomme la tâche de fond « vague <id> : projet:lot, … » et arme un suivi (Monitor) qui pousse chaque transition (lot → état, question, prêt, rendu) dans la conversation ; (2) cadence orchestrate --status --watch (tableau rafraîchi dans un terminal) ; (3) à étudier : une ligne de statut Claude Code (barre d'état) « vague : 2/4 prêts, 1 question, 1,1 M / 2 M » — retour de Sylvain 04-10 : « je vois une tâche en cours, pas quels projets ni où on en est »"
     status: todo
@@ -960,4 +961,10 @@ lots:
     title: "Test instable non identifié : 1 échec sur 7 passages de la suite complète le 07-10 (sous charge, une revue lançait la suite en parallèle), 6 passages suivants verts dont 3 en JSON — relancer sous charge (2 suites en parallèle) avec --reporter=json pour le nommer, puis le traiter comme L81/L85"
     status: todo
     estimate: 1
+    created: 2026-10-07
+  - id: L91
+    title: "Doc des briefs Nouveautés hors vague : README l.743 (dry-run sans dossier de vague ; fix/fix-minors d'un lot visible ont le dossier Playwright et --add-dir) et paragraphe Browser d'implement.md qui promet un serveur lancé par l'orchestrateur même en délégation à la main (contredit « capture sous le dossier temporaire ») — mineurs de la 3e revue L48"
+    status: todo
+    estimate: 1
+    quickwin: true
     created: 2026-10-07

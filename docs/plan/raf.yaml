@@ -809,10 +809,11 @@ lots:
     finished: 2026-10-05
   - id: L66
     title: "qa.expectations : résoudre un chemin absolu depuis la racine git, pas depuis le dossier du --config (absolu sous <repo>/config/ → x.md au lieu de config/x.md, <repo>/docs/qa.md refusé) — mineur de la revue L65"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-05
+    started: 2026-10-07
   - id: L67
     title: Publier 0.10.1 — attendus QA tenus avec le plan dans raf check (L65)
     status: done

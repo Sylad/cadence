@@ -762,19 +762,21 @@ lots:
     finished: 2026-10-06
   - id: L70
     title: "orchestrate : un dossier .playwright-mcp/ laissé par le MCP Playwright rend le lot au lead (« dépôt sale après implement », 2 fois le 06-10 sur warhammer) — le brief impose les sorties Playwright hors du dépôt (--output-dir / tmp) et/ou cadence init ajoute .playwright-mcp/ au .gitignore"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-06
     notes:
       - { date: 2026-10-06, text: "06-10 aussi : la vague warhammer40k:L64 (t1–t5 implémentées, revue conforme) a laissé les 5 sous-tâches en todo → raf done L64 refusé, le lead les a closes à la main. L'orchestrateur devrait clore (ou proposer de clore) les sous-tâches couvertes par des commits qui les citent quand la revue est conforme. Et : un backend dev (nest) lancé par une session d'implémentation est resté vivant après la vague (2 fois) — tuer les process enfants en fin de session." }
     started: 2026-10-07
     tasks:
-      - { id: t1, title: "briefs : consigne Playwright applicable (noms relatifs, sorties sous .playwright-mcp/, jamais /tmp ni --output-dir : refusés par le MCP 0.0.76 checkFile)", status: todo }
-      - { id: t2, title: "orchestrate : .playwright-mcp/ ignoré dans le contrôle « dépôt sale » (implement et commitPlan), pour les dépôts déjà initialisés sans entrée .gitignore", status: todo }
-      - { id: t3, title: "README raf init : mentionner l'ajout de .playwright-mcp/ au .gitignore", status: todo }
-      - { id: t4, title: "snapshot : filtrer aussi les chemins entre guillemets de git status (.playwright-mcp/ avec accent ou espace), test avec un nom accentué", status: todo }
-      - { id: t5, title: "test raf init .gitignore : la ré-exécution doit atteindre ensureGitignore (fonction testée directement ou plan supprimé, code de sortie vérifié)", status: todo }
-      - { id: t6, title: "README orchestrate : .playwright-mcp/, comme .cadence/, ne compte jamais comme dépôt sale", status: todo }
+      - { id: t1, title: "briefs : consigne Playwright applicable (noms relatifs, sorties sous .playwright-mcp/, jamais /tmp ni --output-dir : refusés par le MCP 0.0.76 checkFile)", status: done }
+      - { id: t2, title: "orchestrate : .playwright-mcp/ ignoré dans le contrôle « dépôt sale » (implement et commitPlan), pour les dépôts déjà initialisés sans entrée .gitignore", status: done }
+      - { id: t3, title: "README raf init : mentionner l'ajout de .playwright-mcp/ au .gitignore", status: done }
+      - { id: t4, title: "snapshot : filtrer aussi les chemins entre guillemets de git status (.playwright-mcp/ avec accent ou espace), test avec un nom accentué", status: done }
+      - { id: t5, title: "test raf init .gitignore : la ré-exécution doit atteindre ensureGitignore (fonction testée directement ou plan supprimé, code de sortie vérifié)", status: done }
+      - { id: t6, title: "README orchestrate : .playwright-mcp/, comme .cadence/, ne compte jamais comme dépôt sale", status: done }
+    review: { date: 2026-10-07, verdict: "conforme (3e passe) — briefs : noms relatifs sous .playwright-mcp/ ; snapshot ignore .playwright-mcp/ et .cadence/, chemins entre guillemets compris ; ensureGitignore idempotent testé ; README à jour. Non vérifié : vague réelle avec le MCP Playwright", commit: 5f6b66fb42e4cf1acd480fbdf6f3e04ebdd24064 }
+    finished: 2026-10-07
   - id: L71
     title: "orchestrate : verrou par DÉPÔT au lieu du dossier parent — deux vagues dans des dépôts différents coexistent sous un plafond global de sessions simultanées (2 par défaut, réglable) ; même dépôt = toujours refusé (index git, plan et dérivés, tests/build partagés). Plus tard si besoin : worktree par lot à fichiers disjoints + fusion des plans (06-10, refus vécu cadence:L69 × warhammer40k:L64)"
     status: done

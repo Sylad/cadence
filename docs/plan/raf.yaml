@@ -713,6 +713,7 @@ lots:
     quickwin: true
     created: 2026-10-05
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme : aucun constat. Commit relu : bf5f25d. vitest : 781/781 verts (37 fichiers), tsc --noEmit sans erreur. Mutation faite dans une copie temporaire : avec l'ancien garde `kind === 'implement'`, le test « deux passes sans coupure » échoue, il peut donc échouer. Les trois choix de l'auteur tiennent : la revue part bien (kinds attendus [implement, review, fix, fix, review], statut final ready) ; la commande de test du lot reste verte, comme le demande le titre, et seul le rapport de la 1re correction annonce ses tests rouges ; le garde retiré était toujours vrai, puisque `kind` est typé `'implement' | 'fix'` dans `work()`. — orchestré (vague 2026-10-07-1234, 0 passe(s) de correction)", commit: bf5f25d67353bf975b674d9206666e8b7b592058 }
   - id: L59
     title: "skill lead : les sessions d'une vague orchestrate comptent dans la limite de deux sous-agents (vécu 05-10 : 3 à 4 sessions en parallèle, 25 % de l'usage)"
     status: doing

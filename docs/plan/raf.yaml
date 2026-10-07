@@ -1079,7 +1079,8 @@ lots:
     finished: 2026-10-07
   - id: L97
     title: "linkNewFile (state.ts:89) : ne renvoyer false que sur EEXIST, relancer EPERM/EMLINK & co (régression dbb921b : un tmpdir sans liens physiques fait attendre le verrou UX jusqu'au délai sans dire pourquoi) ; test ; + test takeUrlLock verrou remplacé entre lecture et renommage (app.ts:118-125) — mineurs revue L96"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07

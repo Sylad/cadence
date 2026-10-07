@@ -136,6 +136,21 @@ describe('core.hooksPath dans l\'arbre suivi (L3/t19)', () => {
   const status = (dir: string) => execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: dir, encoding: 'utf8' });
   const exclude = (dir: string) => (existsSync(join(dir, '.git/info/exclude')) ? readFileSync(join(dir, '.git/info/exclude'), 'utf8') : '');
 
+  it('.playwright-mcp/ et .cadence/ : les noms que git cite entre guillemets (accents, espaces) ne sont pas sales non plus', async () => {
+    const dir = gitRepo();
+    commit(dir, 'chore: init');
+    mkdirSync(join(dir, '.playwright-mcp'));
+    mkdirSync(join(dir, '.cadence'));
+    writeFileSync(join(dir, '.playwright-mcp/réglages.png'), 'x');
+    writeFileSync(join(dir, '.playwright-mcp/a b.png'), 'x');
+    writeFileSync(join(dir, '.cadence/é f.json'), 'x');
+    expect((await snapshot(dir, { remote: false })).untracked).toEqual([]);
+    writeFileSync(join(dir, 'dehors é.png'), 'x');
+    const s = await snapshot(dir, { remote: false });
+    expect(s.untracked).toHaveLength(1);
+    expect(s.untracked[0]).toContain('dehors');
+  });
+
   it('le hook est posé dans le dossier, exclu de git pendant la vague, et l\'arbre est identique après', async () => {
     const dir = trackedHooksRepo();
     const excludeBefore = exclude(dir);

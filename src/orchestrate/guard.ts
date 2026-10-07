@@ -132,7 +132,7 @@ export async function snapshot(repo: string, opts: { remote?: boolean } = {}): P
   ]);
   const lines = (status ?? '').split('\n').filter(Boolean);
   // .cadence/ (état de l'outil) et .playwright-mcp/ (sorties du MCP Playwright, écrites dans le dossier courant, qu'un dépôt déjà initialisé n'ignore pas forcément) ne comptent jamais comme un dépôt sale.
-  const keep = (l: string) => !/^.. (\.cadence|\.playwright-mcp)\//.test(l);
+  const keep = (l: string) => !/^.. "?(\.cadence|\.playwright-mcp)\//.test(l);
   return {
     head: head?.trim() || null,
     tracked: lines.filter((l) => !l.startsWith('??') && keep(l)),

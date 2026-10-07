@@ -13,7 +13,7 @@ import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregiste
 import { loadTemplates, objective, renderBrief, type BriefVars } from './briefs.js';
 import { Budget, MAX_PASSES, countInterrupted, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
-import { buildArgs, killSessions, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
+import { buildArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { runPool } from './pool.js';
 import { schemaFor } from './schemas.js';
@@ -279,11 +279,13 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const brief = renderBrief(s.kind, vars, deps.templatesDir);
       writeFileSync(file, brief);
       const args = buildArgs(
-        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: env.config.addDirs, timeoutMs: 0 },
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: env.config.addDirs, timeoutMs: 0, mcpConfig: '<mcp>' },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : claude ${args.join(' ')}`);
       io.out(`    brief : ${file}`);
+      const servers = Object.keys(mcpServersFor(s.kind, ''));
+      io.out(`    mcp : ${servers.length ? `${servers.join(', ')} (captures dans le dossier de la vague : <vague>/${l.project}--${l.lot}/playwright)` : 'aucun'}`);
     }
   }
 }

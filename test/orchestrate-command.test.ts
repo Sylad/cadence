@@ -118,6 +118,24 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it('--dry-run dit, par étape, les serveurs MCP chargés (L74)', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un', visible: true }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  ux:\n    url: http://localhost:4200\n');
+    git(dirs.a, 'add', '--', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: config');
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      expect(out).toMatch(/  ux : claude [^\n]*--strict-mcp-config[^\n]*\n    brief : [^\n]*\n    mcp : playwright \(captures dans le dossier de la vague : <vague>\/a--L1\/playwright\)/);
+      const implement = out.slice(out.indexOf('  implement :'), out.indexOf('  review :'));
+      expect(implement).toContain('--strict-mcp-config --mcp-config <mcp>');
+      expect(implement).toContain('    mcp : aucun');
+      expect(out).toMatch(/  review : claude [^\n]*--strict-mcp-config[^\n]*\n    brief : [^\n]*\n    mcp : aucun/);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it('arbre sale, claude absent, claude sans --json-schema, hook pre-push existant, session imbriquée', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
     writeFileSync(join(dirs.a, 'docs/plan/raf.yaml'), `${readFileSync(join(dirs.a, 'docs/plan/raf.yaml'), 'utf8')}# sale\n`);

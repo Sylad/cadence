@@ -923,6 +923,8 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "Référence de mesure avant la vague performance (07-10, vagues 1234 → 1921) : petit lot (≤ 0,25 j) = 4 à 14 min et 60 à 260 k tokens ; suite complète 63 s relancée plusieurs fois par session (implémentation, revue, correction) ; L32 ccc 87 min / 396 k avec 2 corrections. À comparer après L75 + L77 + L78 + L108, mêmes colonnes de cadence orchestrate --status." }
   - id: L76
     title: "orchestrate : lots empilés sur main — le tableau final indique « livrable jusqu'à <sha> » (dernier commit d'un lot prêt sous un lot rendu), comme fait à la main pour ol L36 et ccc L26 avec deliver --sha (06-10)"
     status: todo
@@ -933,6 +935,8 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "07-10 : encore deux cas — cadence L47 (fait par L45) et L100 (fait par la correction de L99) : sessions d'implémentation ouvertes pour rien (33 k et 39 k tokens)." }
   - id: L78
     title: "orchestrate : budget par lot dérivé de l'estimate, en plus du budget de vague — 2 M mangés par 6 lots, 7 lots à 0 (06-10)"
     status: todo
@@ -1171,6 +1175,17 @@ lots:
     created: 2026-10-07
   - id: L107
     title: "raf show : les lignes suivantes d'une note sur plusieurs lignes sont décalées sous « notes : » (aujourd'hui en colonne 0, cli.ts:245) ; aide et README sans « en entier / in full », ou affichage des sous-tâches et de l'estimation — revue L102"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-07
+  - id: L108
+    title: "orchestrate : revue proportionnée à la taille du lot — lot ≤ 0,25 j (estimate) : une seule revue (Sonnet, agent code-reviewer, mêmes critères), pas de passe « mineurs », mineurs rendus au lead en notes ; lot plus gros : chaîne actuelle (Opus, 2 corrections, passe mineurs). Seuil et modèles dans cadence.yaml (orchestrate.review), défaut ci-dessus ; un bloquant ou majeur sur un petit lot déclenche quand même une correction et une revue Opus. Tests ; README. Décision Sylvain 07-10 : qualité oui, overkill non"
+    status: todo
+    estimate: 1
+    created: 2026-10-07
+  - id: L109
+    title: "skill lead + brief de revue : couper la cascade de mineurs — un mineur ne devient un lot que s'il décrit un bug observable (sortie fausse, crash, régression mesurée) ; sinon il reste une note du lot d'origine. Vécu 07-10 : L60 → L96 → L97 → L99 → L100 (L100 déjà fait, abandonné). Test sur le texte du skill"
     status: todo
     estimate: 0.25
     quickwin: true

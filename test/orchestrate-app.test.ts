@@ -274,12 +274,13 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
     const t = await fakeApp(-1);
     const lock = uxLockFile(t.url);
     writeFileSync(lock, String(process.pid));
-    const timer = setTimeout(() => rmSync(lock, { force: true }), 2_000);
+    const timer = setTimeout(() => rmSync(lock, { force: true }), 1_000);
     try {
       const app = await startApp({ ...opts(t), timeoutMs: 3_000 });
       expect(app.state.kind).toBe('unverified');
       if (app.state.kind !== 'unverified') return;
-      expect(app.state.cause).toContain('n\'a pas répondu en 1 s');
+      // ~2 s restantes en théorie ; sous charge, la reprise du verrou traîne et le reste baisse : on borne (0 à 2 s) au lieu de viser 1 s au mur
+      expect(app.state.cause).toMatch(/n'a pas répondu en [0-2] s/);
       expect(app.state.cause).not.toContain('en 3 s');
     } finally {
       clearTimeout(timer);

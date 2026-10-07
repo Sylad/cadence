@@ -95,12 +95,15 @@ jobs:
           fi
 
       # Après la publication seulement : pas de release pour une version qui n'est pas sur npm.
+      # Seul « release not found » veut dire « absente » ; toute autre erreur de gh release view (réseau, 5xx) est fatale.
       - name: Release GitHub avec la section du CHANGELOG
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+          if out="$(gh release view "$GITHUB_REF_NAME" 2>&1)"; then
             echo "La release $GITHUB_REF_NAME existe déjà : rien à créer."
-          else
+          elif printf '%s' "$out" | grep -q 'release not found'; then
             gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag
+          else
+            echo "$out"; exit 1
           fi

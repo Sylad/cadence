@@ -252,6 +252,58 @@ describe('doublon de run pour un même tag (L64)', () => {
     });
   });
 
+  describe('étape release GitHub (faux gh)', () => {
+    const release = workflow.match(/- name: Release GitHub avec la section du CHANGELOG\n\s+env:\n[^\n]*\n\s+run: \|\n((?:\s{10}.*\n|\n)+)/)?.[1];
+
+    // Exécute le script de l'étape avec un faux `gh` : `release view` répond view, les autres appels sont journalisés.
+    const runRelease = (view: { out: string; code: number }) => {
+      const dir = tempDir();
+      try {
+        mkdirSync(join(dir, 'bin'));
+        writeFileSync(
+          join(dir, 'bin', 'gh'),
+          `#!/bin/sh\necho "$@" >> "${dir}/gh-calls"\nif [ "$1 $2" = "release view" ]; then\n  echo "${view.out}" >&2\n  exit ${view.code}\nfi\n`,
+          { mode: 0o755 },
+        );
+        writeFileSync(join(dir, 'gh-calls'), '');
+        const r = spawnSync('bash', ['-e', '-c', release!], {
+          cwd: dir,
+          env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, GITHUB_REF_NAME: 'v1.2.3', RUNNER_TEMP: dir },
+          encoding: 'utf8',
+        });
+        return { ...r, calls: readFileSync(join(dir, 'gh-calls'), 'utf8').trim().split('\n') };
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    };
+
+    it('trouve le script de l\'étape', () => {
+      expect(release).toBeTruthy();
+    });
+
+    it('release présente : aucun create', () => {
+      const r = runRelease({ out: '', code: 0 });
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain('existe déjà');
+      expect(r.calls.some((c) => c.startsWith('release create'))).toBe(false);
+    });
+
+    it('release absente : create avec le titre, les notes et --verify-tag', () => {
+      const r = runRelease({ out: 'release not found', code: 1 });
+      expect(r.status).toBe(0);
+      const create = r.calls.find((c) => c.startsWith('release create'));
+      expect(create).toMatch(/^release create v1\.2\.3 --title v1\.2\.3 --notes-file \S*release-notes\.md --verify-tag$/);
+    });
+
+    it('erreur de gh release view autre que « introuvable » (réseau, 5xx) : échoue, ne dit pas « existe », ne crée rien', () => {
+      const r = runRelease({ out: 'error connecting to api.github.com', code: 1 });
+      expect(r.status).toBe(1);
+      expect(r.stdout).not.toContain('existe déjà');
+      expect(r.stdout).toContain('error connecting');
+      expect(r.calls.some((c) => c.startsWith('release create'))).toBe(false);
+    });
+  });
+
   it('le commentaire sur prepublishOnly accompagne npm publish, et dit qu\'il est sauté si la version est déjà publiée', () => {
     const comment = workflow.indexOf('prepublishOnly');
     expect(comment).toBeGreaterThan(workflow.indexOf('id: registry'));

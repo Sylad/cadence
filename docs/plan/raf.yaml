@@ -612,6 +612,10 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-07
+    tasks:
+      - { id: t1, title: "cleanPlaywrightOutput : lstat, ne jamais suivre un lien symbolique (racine ou entrée) ni parcourir une racine suivie par git (ls-files sur le chemin lui-même) ; tests lien non suivi et lien suivi — bloquant de la 1re revue", status: todo }
+      - { id: t2, title: "info/exclude restauré à l'octet : retirer le saut de ligne ajouté, supprimer le fichier si la vague l'a créé ; test", status: todo }
+    review: { date: 2026-10-07, verdict: "non conforme : 1 bloquant (suppression hors .playwright-mcp/ et d'un fichier suivi via lien symbolique), 1 mineur", commit: 007bc197a1be44a431818f1356d215e1201402a4 }
   - id: L51
     title: "⚡ orchestrate : le tableau affiche « non conforme (0 bloquant, 0 majeur) » pour un lot rendu au lead pour une autre cause (dépôt sale) — la colonne revue dit la vraie cause ou le dernier verdict réel ; test"
     status: doing
@@ -619,6 +623,9 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-07
+    tasks:
+      - { id: t1, title: "table : byReview exige une dernière revue au statut ok (revue failed/interrupted = autre cause) ; tests statuts failed/suspended", status: todo }
+    review: { date: 2026-10-07, verdict: "non conforme : 1 majeur (revue en échec ou suspendue non signalée comme autre cause)", commit: 64377ab56b01c1c5bcdfed215d685c6fe9e5741f }
   - id: L52
     title: "⚡ orchestrate : les sessions s'arrêtent encore sur des non-questions (« je n'ai pas de question », « faut-il scinder ce commit ? », « la revue portait sur un état antérieur ») — le brief interdit de s'arrêter pour une question d'organisation ou de constat contesté : trancher, lister en choix, continuer ; un constat contesté est relu par la revue suivante, pas par le lead (vague 2026-10-04-2201 : 4 questions évitables, ~1,2 M tokens pour 0 lot prêt)"
     status: done

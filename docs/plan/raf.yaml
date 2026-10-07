@@ -725,9 +725,12 @@ lots:
     created: 2026-10-05
   - id: L61
     title: "orchestrate : lancer une vague depuis une copie figée de dist/ et des gabarits (instantané au démarrage) pour pouvoir orchestrer cadence lui-même et modifier les gabarits sans toucher une vague en cours (05-10 : L53-L57 tous délégués à la main)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-05
+    notes:
+      - { date: 2026-10-07, text: "Décisions du lead (07-10) avant délégation : (1) au lancement d'une vague (pas en --dry-run ni --status), copier dans .cadence/runs/<vague>/tool/ les dossiers du paquet qui servent à l'exécution (bin/, dist/, templates/, agents/, skills/ si lus, package.json) ; node_modules = lien symbolique vers celui du paquet ; (2) le processus orchestrate se relance aussitôt depuis cette copie (node <copie>/bin/cadence.js … avec une variable d'environnement qui empêche une 2e copie), pour que code, gabarits et agents viennent tous de l'instantané ; (3) --resume relance depuis l'instantané de la vague reprise, jamais depuis le dist/ courant ; vague sans instantané (antérieure) = comportement actuel avec un avertissement ; (4) la copie est supprimée avec le dossier de la vague (pas de nettoyage séparé) ; (5) tests : un gabarit modifié après le lancement n'est pas vu par la vague ; --resume reprend l'instantané ; le dry-run ne copie rien ; README (section orchestrate) mis à jour et la phrase « cadence ne peut pas s'orchestrer lui-même » retirée du skill lead si elle y est." }
+    started: 2026-10-07
   - id: L62
     title: "orchestrate : un lot dont le travail est dans un dépôt voisin non cadence (ex. B64 dans aetherwx-gitops) — clé de lot ou de projet listant les dépôts de travail ; commits et revue lus dans ces dépôts"
     status: todo

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, utimesSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { startApp, uxLockFile } from '../src/orchestrate/app.js';
@@ -221,4 +221,19 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
       other.close();
     }
   });
+
+  it('verrou vide (pose en cours) : respecté tant qu\'il est récent, volé au bout de 5 s', async () => {
+    const t = await fakeApp(0);
+    const lock = uxLockFile(t.url);
+    writeFileSync(lock, '');
+    const waiting = await startApp({ ...opts(t), timeoutMs: 600 });
+    expect(waiting.state.kind === 'unverified' && waiting.state.cause).toContain('url tenue par une autre vague');
+    expect(existsSync(join(t.dir, 'pid'))).toBe(false);
+    const old = new Date(Date.now() - 6_000);
+    utimesSync(lock, old, old);
+    const app = await startApp(opts(t));
+    expect(app.state).toEqual({ kind: 'ready' });
+    await app.stop();
+  });
+
 });

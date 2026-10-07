@@ -901,6 +901,7 @@ lots:
     notes:
       - { date: 2026-10-07, text: "07-10 : 2 nouveaux cas poussés — warhammer40k d59d988 et ol-companion 07222c4 citent « cadence L95 » dans un commit plan → « L95 inconnu » (erreur du lead) ; un acquittement doit couvrir aussi un id cité inconnu, pas seulement un commit sans lot" }
       - { date: 2026-10-07, text: "Issue #2 (07-10) demande la même chose : raf ignore <sha> | \"<sujet exact>\" [--reason] qui écrit l'exemption datée et motivée dans une section dédiée du plan, raf check --ignored pour les lister ; couvrir aussi un id cité inconnu (cas warhammer/ol du 07-10)" }
+      - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #2 » dans son corps (issue GitHub)." }
   - id: L74
     title: "orchestrate : MCP minimaux par étape (--strict-mcp-config ; Playwright seulement pour UX et sondes) — chaque claude -p chargeait context7 @latest, Serena via uvx git+, Playwright @latest (mesuré 06-10)"
     status: done
@@ -1128,19 +1129,27 @@ lots:
     estimate: 0.5
     quickwin: true
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #1 » dans son corps (issue GitHub)." }
   - id: L103
     title: "cadence session start --all / session close --all depuis un dossier non dépôt : balayer les sous-dossiers (profondeur 1, --depth n) qui ont docs/plan/raf.yaml ou cadence.yaml avec plan:, une section par projet ; le skill lead et session-start l'utilisent au lieu de la boucle shell (issue #3)"
     status: todo
     estimate: 1
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #3 » dans son corps (issue GitHub)." }
   - id: L104
     title: "Hook de commit sur un lot encore todo : par défaut l'avertissement actuel ; option hook.autostart dans cadence.yaml — refuse (échouer bruyamment, message raf start <id>) ou start (raf start fait par le hook, plan inclus dans le même commit, en pre-commit, pas d'amend après coup) ; tests des trois modes (issue #4)"
     status: todo
     estimate: 1
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #4 » dans son corps (issue GitHub)." }
   - id: L105
     title: "session close sans session.clean : une ligne « aucun motif de nettoyage déclaré » avec un exemple de session.clean (chemins relatifs ou absolus, âge minimal), une fois par clôture (issue #5)"
     status: todo
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #5 » dans son corps (issue GitHub)." }

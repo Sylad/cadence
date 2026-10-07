@@ -22,6 +22,17 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | Changelog and GitHub releases | [0.11.0](#0110---2026-10-06) |
 | Parallel waves on different repositories, shared session cap (`--max-sessions`) | [0.11.0](#0110---2026-10-06) |
 
+## [Unreleased]
+
+### Added
+- `orchestrate.ux` accepts `{ command, url, timeout? }`: with both `command` and
+  `url`, the orchestrator itself starts the app before the UX step (and before the
+  single pass of a small visible lot) and stops it afterwards, so the wave does the
+  UX review without the lead. If the URL already answers nothing is started and the
+  lot notes « port occupé »; if the app does not answer within `timeout` seconds
+  (default 300) the UX review is skipped with the end of the log, and the lot goes
+  on to the code review — never a failed wave. (L60)
+
 ## [0.11.0] - 2026-10-06
 
 ### Added

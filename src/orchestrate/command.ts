@@ -6,6 +6,7 @@ import { readOrchestrateConfig, readPlanConfig, type OrchestrateConfig } from '.
 import { isDay, toDay, type Day } from '../dates.js';
 import { gitRoot, hooksDir } from '../git.js';
 import { onTermination } from '../proc.js';
+import { stopApps } from './app.js';
 import { Plan, RafError, isOpen } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
@@ -512,8 +513,9 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const ctxs = contexts(lots, envs, wctx);
 
   // Ctrl-C, SIGTERM : les sessions sont tuées en bloc, les étapes marquées interrompues, les verrous et hooks libérés.
-  const forget = onTermination(() => {
+  const forget = onTermination(async () => {
     killSessions();
+    await stopApps(); // les applications de la revue UX : SIGTERM, SIGKILL après 10 s
     for (const c of ctxs) {
       for (const s of c.lot.steps) {
         if (s.status === 'running') s.status = 'interrupted';

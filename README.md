@@ -757,13 +757,36 @@ News instruction (`cadence news new <lot>`, factual user-side text, a screenshot
 ```yaml
 orchestrate:
   test: npm test                         # run by the orchestrator after a work step (optional)
-  ux: http://localhost:4200              # a URL, a launch command, or { url, command } — for the UX review
+  ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default
   addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use
   timeouts: { implement: 45, review: 25 }   # minutes
   # a plan kept by the project's own tool is read-only for raf: the orchestrator calls these instead
   start: python3 scripts/raf.py start {lot}
   verdict: python3 scripts/raf.py note {lot} "revue de code : {verdict}"
+```
+
+**`orchestrate.ux`, who starts the app**: a string is a URL if it starts with `http://` or `https://`, a launch
+command otherwise; both forms behave as before (the `ux` brief gives the URL, or tells the session to start the app
+with the command and stop it). The object form `{ command, url, timeout? }` makes **the program** start the app, not
+the UX session. Before the `ux` step (and before the `review-small` single pass of a small `visible` lot, which follows
+the same rule) the orchestrator:
+
+1. probes `url`; if it already answers it does **not** start anything, notes « port occupé » (`uxNote`: the UX is not
+   verified) and the lot goes on;
+2. starts `command` with `sh -c` from the repository root, in its own detached process group, its output in
+   `<wave>/<project>--<lot>/ux-app.log` (the command carries its own prefixes, e.g. `cd web && PORT=4300 npm start`;
+   there is no `env`, `cwd` or account/PIN key);
+3. probes `url` until an HTTP status below 500, for `timeout` seconds (default 300). A command that exits early, or
+   no answer in time, means « UX not verified » with the end of the log in the note: the UX session is skipped,
+   the lot goes on to the code review — it is never a failure of the wave (the single pass of a small lot still runs,
+   on the code alone, its brief saying the app could not be verified);
+4. gives the session « The running app is at `<url>` », with no instruction to start anything;
+5. at the end of the step — success, error or SIGTERM of the wave — kills the group: SIGTERM, then SIGKILL after 10 s.
+
+```yaml
+orchestrate:
+  ux: { command: 'cd web && PORT=4300 npm start', url: 'http://localhost:4300', timeout: 120 }
 ```
 
 **Node per project (`.nvmrc`)**: when a project has a `.nvmrc` at its root, every session the

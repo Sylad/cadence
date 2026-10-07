@@ -125,3 +125,16 @@ describe('application de la revue UX lancée par le programme (L60)', () => {
     await app.stop();
   });
 });
+
+describe('signal de la vague (L60)', () => {
+  it('stopApps arrête les applications en cours : SIGTERM, puis SIGKILL de celle qui l\'ignore', async () => {
+    const { stopApps } = await import('../src/orchestrate/app.js');
+    const t = await setup(0, { stubborn: true });
+    const app = await startApp({ command: t.command, url: t.url, cwd: t.dir, log: t.log, timeoutMs: 15_000, every: 50, killAfterMs: 400 });
+    expect(app.state).toEqual({ kind: 'ready' });
+    const pid = pidOf(t.dir);
+    await stopApps();
+    expect(alive(pid)).toBe(false);
+    await app.stop(); // déjà arrêtée : sans effet
+  });
+});

@@ -26,15 +26,11 @@ export interface AppOpts {
   every?: number;
 }
 
-const live = new Set<number>();
+const live = new Set<() => Promise<void>>();
 
-/** Au signal de la vague : SIGTERM aux applications lancées, SIGKILL de ce qui reste 10 s plus tard (le minuteur garde le processus en vie). */
-export function killApps(killAfterMs = APP_KILL_AFTER_MS): void {
-  for (const pid of live) {
-    signal(pid, 'SIGTERM');
-    setTimeout(() => signal(pid, 'SIGKILL'), killAfterMs);
-  }
-  live.clear();
+/** Au signal de la vague : arrête les applications lancées (SIGTERM, puis SIGKILL après le délai). L'appelant l'attend avant de mourir. */
+export async function stopApps(): Promise<void> {
+  await Promise.all([...live].map((stop) => stop()));
 }
 
 function signal(pid: number, sig: NodeJS.Signals | 0): boolean {
@@ -88,18 +84,18 @@ export async function startApp(o: AppOpts): Promise<AppRun> {
     const cause = await new Promise<string>((r) => child.once('error', (e) => r(e.message)));
     return { state: { kind: 'unverified', cause: `lancement impossible : ${cause}` }, stop: none };
   }
-  live.add(pid);
   const gone: { why?: string } = {};
   child.once('error', (e) => (gone.why = `lancement impossible : ${e.message}`));
   child.once('close', (code, sig) => (gone.why = `la commande s'est arrêtée (${sig ?? `code ${code}`})`));
   const stop = async () => {
-    live.delete(pid);
+    live.delete(stop);
     if (!signal(pid, 'SIGTERM')) return;
     const limit = Date.now() + (o.killAfterMs ?? APP_KILL_AFTER_MS);
     while (Date.now() < limit && signal(pid, 0)) await sleep(50);
     signal(pid, 'SIGKILL');
     for (let i = 0; i < 40 && signal(pid, 0); i++) await sleep(25); // le SIGKILL n'est pas instantané : le groupe disparu, pas seulement signalé
   };
+  live.add(stop);
   const deadline = Date.now() + o.timeoutMs;
   for (;;) {
     if (await responds(o.url)) return { state: { kind: 'ready' }, stop };

@@ -7,7 +7,9 @@ import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { isNonQuestion, runLot } from '../src/orchestrate/cycle.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir } from '../src/orchestrate/launch.js';
+import { createServer } from 'node:http';
 import { tempDir } from './helpers.js';
+import { fakeApp } from './fake-app.js';
 import { claudeOut, commitFile, git, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 
 /** Une implémentation qui commite un fichier citant le lot. */
@@ -281,13 +283,19 @@ describe('lot visible : UX puis code', () => {
 
   it('brief ux rendu avec orchestrate.ux : la consigne de captures est celle de l\'étape (noms relatifs, dossier de la vague), jamais un dossier tmp ni un chemin absolu (L74/t3)', async () => {
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
-    const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200', command: 'npm start' } });
+    const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' } });
     await runLot(c);
     const brief = h.calls.find((x) => x.kind === 'ux')!.brief;
     expect(brief).toContain('http://localhost:4200');
     expect(brief).toContain('1440');
     expect(brief).toContain('relative file name');
     expect(brief).not.toMatch(/tmp folder|shared tmp|OS temp/i);
+  });
+
+  it('command seule : le brief garde la consigne de lancement, le programme ne lance rien (L60)', async () => {
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
+    await runLot(h.lot('L1', { visible: true }, { ux: { command: 'npm start' } }));
+    expect(h.calls.find((x) => x.kind === 'ux')!.brief).toContain('Start the app with: npm start');
   });
 
   it('sans application déclarée : pas de session UX, « à faire par le lead »', async () => {
@@ -1354,5 +1362,92 @@ describe('lot déjà commité : implement tourne toujours (L53)', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(c.lot.warnings).toEqual([]);
+  });
+});
+
+describe('le programme lance l\'application de la revue UX (L60)', () => {
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  it('prête : brief « The running app is at <url> » sans consigne de lancement, journal dans le dossier du lot, application tuée après l\'étape', async () => {
+    const app = await fakeApp(200);
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
+    let during = false;
+    h.wave.claude = ((orig) => async (args: string[], o: Parameters<typeof orig>[1]) => {
+      if (args.includes('ux-reviewer')) during = alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')));
+      return orig(args, o);
+    })(h.wave.claude);
+    const c = h.lot('L1', { visible: true }, { ux: { command: app.command, url: app.url, timeout: 20 } });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'ux', 'review']);
+    const brief = h.calls.find((x) => x.kind === 'ux')!.brief;
+    expect(brief).toContain(`The running app is at ${app.url}`);
+    expect(brief).not.toContain('Start the app');
+    expect(during).toBe(true);
+    expect(readFileSync(join(h.store.dir, 'demo--L1', 'ux-app.log'), 'utf8')).toContain('faux serveur lancé');
+    expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.uxNote).toBeUndefined();
+  });
+
+  it('jamais prête : pas de session UX, note avec la fin du journal, le lot continue vers la revue de code, jamais d\'échec', async () => {
+    const app = await fakeApp(-1);
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', { visible: true }, { ux: { command: app.command, url: app.url, timeout: 0.8 } });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.uxNote).toMatch(/UX non vérifiée.*n'a pas répondu[\s\S]*faux serveur lancé/);
+    expect(c.lot.status).toBe('ready');
+    expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false);
+  });
+
+  it('port déjà pris : rien n\'est lancé, « port occupé », le lot continue', async () => {
+    const app = await fakeApp(0);
+    const srv = createServer((_q, r) => r.end('autre')).listen(Number(new URL(app.url).port));
+    await new Promise((r) => srv.once('listening', r));
+    try {
+      const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], review: [ok] } });
+      const c = h.lot('L1', { visible: true }, { ux: { command: app.command, url: app.url, timeout: 5 } });
+      await runLot(c);
+      expect(kinds(h)).toEqual(['implement', 'review']);
+      expect(c.lot.uxNote).toMatch(/port occupé/);
+      expect(existsSync(join(app.dir, 'pid'))).toBe(false);
+      expect(c.lot.status).toBe('ready');
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('étape en erreur : l\'application est tuée quand même', async () => {
+    const app = await fakeApp(0);
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [() => ({ code: 1, stdout: '', stderr: 'boum', timedOut: false })] } });
+    const c = h.lot('L1', { visible: true }, { ux: { command: app.command, url: app.url, timeout: 20 } });
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false);
+  });
+
+  it('petit lot visible (review-small) : même règle — brief avec l\'URL, application tuée ; port non tenu : la passe a lieu sur le code seul', async () => {
+    const app = await fakeApp(0);
+    const h = harness({ lots: [{ title: 'petit', estimate: 0.5, visible: true }], script: { implement: [impl()], 'review-small': [ok] } });
+    const c = h.lot('L1', { small: true, visible: true }, { ux: { command: app.command, url: app.url, timeout: 20 } });
+    await runLot(c);
+    expect(h.calls.find((x) => x.kind === 'review-small')!.brief).toContain(`The running app is at ${app.url}`);
+    expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false);
+
+    const dead = await fakeApp(-1);
+    const h2 = harness({ lots: [{ title: 'petit', estimate: 0.5, visible: true }], script: { implement: [impl()], 'review-small': [ok] } });
+    const c2 = h2.lot('L1', { small: true, visible: true }, { ux: { command: dead.command, url: dead.url, timeout: 0.8 } });
+    await runLot(c2);
+    expect(kinds(h2)).toEqual(['implement', 'review-small']);
+    expect(h2.calls[1].brief).toContain('could not be verified');
+    expect(c2.lot.uxNote).toMatch(/UX non vérifiée/);
+    expect(c2.lot.status).toBe('ready');
   });
 });

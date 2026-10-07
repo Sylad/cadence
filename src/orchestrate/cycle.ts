@@ -10,6 +10,7 @@ import { readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
+import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, newsText, objective, renderBrief, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
@@ -71,6 +72,8 @@ export interface LotCtx {
   lot: LotState;
   config: OrchestrateConfig;
   loadPlan: () => Plan;
+  /** Issue du lancement de l'application par le programme, le temps de l'étape qui la voit (L60). */
+  app?: AppState;
 }
 
 const TERMINAL = new Set(['ready', 'handed-back', 'failed']);
@@ -196,6 +199,8 @@ function uxText(c: LotCtx): string {
   if (!ux) {
     return 'No way to run the app is declared (cadence.yaml: orchestrate.ux): review the interface from the code, and list under "nonVerifie" what you could not see.';
   }
+  if (c.app?.kind === 'ready') return [`The running app is at ${ux.url}.`, SHOTS_TEXT].join(' ');
+  if (c.app) return `The app could not be verified (${c.app.kind === 'busy' ? 'the port is already in use' : 'it did not start'}): review the interface from the code, and list under "nonVerifie" what you could not see.`;
   return [
     ux.url ? `The running app is at ${ux.url}.` : '',
     ux.command ? `Start the app with: ${ux.command} (from the repository root), and stop it when you are done.` : '',
@@ -555,7 +560,46 @@ function toFix(c: LotCtx, constats: Constat[], what: string): void {
   save(c);
 }
 
+/** Les deux étapes qui voient l'application : la revue UX, et la passe unique d'un petit lot visible. */
+const seesApp = (l: LotState, kind: StepKind) => kind === 'ux' || (kind === 'review-small' && l.small && l.visible);
+
+const appNote = (state: AppState, ux: { url?: string }): string =>
+  state.kind === 'busy' ? `UX non vérifiée : port occupé (${ux.url} répond déjà, l'application n'a pas été lancée)` : state.kind === 'unverified' ? `UX non vérifiée : ${state.cause}` : '';
+
+/**
+ * Avec `command` ET `url`, le programme lance l'application avant l'étape et la tue après (succès, erreur ou signal) :
+ * port occupé ou application muette, la revue UX n'a pas lieu (note dans le lot, la revue de code suit) ; la passe
+ * unique d'un petit lot, elle, a lieu sur le code seul.
+ */
 async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promise<void> {
+  const l = c.lot;
+  const ux = c.config.ux;
+  if (!ux?.command || !ux.url || !seesApp(l, kind)) return reviewStep(c, kind);
+  c.wave.log(`${lotKey(l.project, l.lot)} · lancement de l'application (${ux.url})`);
+  const app = await startApp({ command: ux.command, url: ux.url, cwd: l.repo, log: join(c.wave.store.lotDir(l.project, l.lot), 'ux-app.log'), timeoutMs: (ux.timeout ?? APP_TIMEOUT_S) * 1000 });
+  try {
+    c.app = app.state;
+    if (app.state.kind !== 'ready') {
+      l.uxNote = appNote(app.state, ux);
+      c.wave.log(`${lotKey(l.project, l.lot)} · ${l.uxNote.split('\n')[0]}`);
+      if (kind === 'ux') {
+        // Aucune session : une revue UX antérieure, périmée par le code qui a changé, ne pèse plus.
+        l.ux = undefined;
+        l.uxVerdict = null;
+        l.constats = l.constats.filter((k) => k.source !== 'ux');
+        l.next = codeReview(l);
+        save(c);
+        return;
+      }
+    } else if (l.uxNote?.startsWith('UX non vérifiée')) l.uxNote = undefined;
+    await reviewStep(c, kind);
+  } finally {
+    c.app = undefined;
+    await app.stop();
+  }
+}
+
+async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promise<void> {
   const l = c.lot;
   const done = await session(c, kind);
   if (!done) return;

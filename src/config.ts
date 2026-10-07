@@ -161,17 +161,27 @@ export interface OrchestrateConfig {
   ux?: { url?: string; command?: string; timeout?: number };
   /** Contrôle préalable « livrable déjà présent ? » avant la première implémentation d'un lot sans commit (défaut : vrai). */
   precheck: boolean;
+  /**
+   * Revue proportionnée à la taille du lot (L108) : un lot dont l'estimate est ≤ `threshold` jours reçoit une seule revue
+   * (modèle `light`), sans passe des mineurs ; les autres, la chaîne complète (modèle `full`). Un bloquant ou un majeur sur
+   * un lot léger déclenche quand même une correction puis une revue `full`.
+   */
+  review: { threshold: number; light: ReviewModel; full: ReviewModel };
   permissionMode: string;
   addDirs: string[];
   /** Millisecondes. */
   timeouts: { work: number; review: number };
 }
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'permissionMode', 'addDirs', 'timeouts'];
+const MODELS = ['haiku', 'sonnet', 'opus'] as const;
+export type ReviewModel = (typeof MODELS)[number];
+const REVIEW_KEYS = ['threshold', 'light', 'full'];
+
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'review', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -199,6 +209,21 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   if (o.precheck != null) {
     if (typeof o.precheck !== 'boolean') throw bad('precheck : true ou false attendu');
     config.precheck = o.precheck;
+  }
+  if (o.review != null) {
+    if (!isObject(o.review)) throw bad('review doit être un objet { threshold, light, full }');
+    for (const k of Object.keys(o.review)) if (!REVIEW_KEYS.includes(k)) throw bad(`review.${k} inconnu (attendu : ${REVIEW_KEYS.join(', ')})`);
+    const t = o.review.threshold;
+    if (t != null) {
+      if (typeof t !== 'number' || !(t >= 0)) throw bad('review.threshold : nombre de jours positif ou nul attendu');
+      config.review.threshold = t;
+    }
+    for (const k of ['light', 'full'] as const) {
+      const m = o.review[k];
+      if (m == null) continue;
+      if (!MODELS.includes(m as ReviewModel)) throw bad(`review.${k} : ${MODELS.join(', ')} attendu`);
+      config.review[k] = m as ReviewModel;
+    }
   }
   if (o.ux != null) {
     if (typeof o.ux === 'string' && o.ux.trim()) {

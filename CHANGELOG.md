@@ -25,6 +25,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ## [Unreleased]
 
 ### Added
+- `cadence orchestrate` sizes the review to the lot (L108): a lot whose `estimate` is at most
+  0.25 day gets one single review (Sonnet, `code-reviewer` agent, same criteria) and no minors
+  pass — the minors come back to the lead as notes; a blocking or major finding still triggers a
+  correction and an Opus review. Bigger lots keep the full chain. Threshold and models are set in
+  `cadence.yaml` (`orchestrate.review: { threshold, light, full }`, defaults 0.25 / sonnet / opus).
 - `cadence orchestrate` checks, before opening an implementation session on a lot with
   no commit, whether the deliverable is already in the repository (a short read-only
   Sonnet session): when it is, the lot is handed back as « livrable déjà présent » with

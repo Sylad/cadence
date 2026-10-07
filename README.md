@@ -652,7 +652,7 @@ cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "
 
 You choose the lots; the order is the order given (one queue per repository, as many repositories at the
 same time as the session cap allows — 2 by default). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
-lot (default Sonnet; reviews are always Opus; Haiku only when you write it, for a mechanical lot). Run it
+lot (default Sonnet; reviews are Opus, except the light review below; Haiku only when you write it, for a mechanical lot). Run it
 in the background and read `--status`: it prints one line per transition and the final table.
 
 **Cycle of a lot**: preconditions (clean tracked files, lot `todo` or `doing`, dependencies met) →
@@ -664,6 +664,19 @@ visible lot is replayed too, the code having changed), **two passes at most**, t
 you with the findings. A small lot (`estimate` ≤ 0.5 or `quickwin`) gets one single Opus pass for code and
 usability (code only when the lot is not `visible`). Failing tests (reported red, or red when
 `orchestrate.test` is run) go straight to a correction.
+
+**Review sized to the lot (L108)**: a lot whose `estimate` is ≤ `orchestrate.review.threshold` (0.25 day by default)
+is *light*: one single review (Sonnet by default, `code-reviewer` agent, same criteria), no minors pass — the minors are
+returned to the lead as notes (proposals). A blocking or major finding on a light lot still triggers a correction, and
+the review that follows is the full one (Opus); the cap of two correction passes is unchanged. A bigger lot keeps the
+chain described above (Opus, two corrections, minors pass). `--dry-run` shows « revue légère » on a light lot.
+
+```yaml
+orchestrate:
+  review: { threshold: 0.25, light: sonnet, full: opus }   # defaults; threshold in days (0 = no light lot), models haiku|sonnet|opus
+```
+
+`full` is also the model of the UX review and of the single pass of a small lot that is not light.
 
 **Pre-check « deliverable already present? »** (L77). Before the first implementation of a lot that has no commit yet, a
 short read-only session (Sonnet, `precheck` step, brief `templates/orchestrate/precheck.md`) looks in the repository for

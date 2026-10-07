@@ -273,6 +273,12 @@ function halted(w: WaveCtx): string | null {
   return null;
 }
 
+/** Modèle d'une revue (L108) : la revue légère d'un lot léger tant qu'aucune correction n'a eu lieu, sinon la revue complète (UX comprise). */
+function reviewModel(c: LotCtx, kind: StepKind): Model {
+  const { light, full } = c.config.review;
+  return c.lot.light && c.lot.pass === 0 && (kind === 'review' || kind === 'review-small') ? light : full;
+}
+
 /** Une session : budget et quota vérifiés avant, état écrit avant et après, journal gardé, contrôles du dépôt après. */
 async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const w = c.wave;
@@ -282,7 +288,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   if (lotOver(l)) return overBudget(c);
 
   const write = kind === 'implement' || kind === 'fix';
-  const model: Model = write ? l.model : kind === 'precheck' ? 'sonnet' : 'opus'; // le contrôle préalable ne fait que lire : pas d'Opus
+  const model: Model = write ? l.model : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const before = await snapshot(l.repo);
   const n = l.steps.length + 1;
   const sessionId = randomUUID();
@@ -712,7 +718,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   const minors = minorConstats(rep);
   // Revue conforme avec mineurs : une seule passe de correction des mineurs, avant de conclure (rien sous le tapis).
   // Budget épuisé : la passe n'aurait aucune session pour la jouer, le lot conclut sur la revue conforme et rend les mineurs.
-  const wanted = summary.conforme && uxOk && !l.minorPass && minors.length > 0;
+  const wanted = summary.conforme && uxOk && !l.minorPass && !l.light && minors.length > 0; // lot léger : les mineurs restent des notes (L108)
   const noBudget = wanted && (w.budget.exhausted || lotOver(l)) && !w.incident && !w.quota.hit;
   const minorPass = wanted && !noBudget;
   if (noBudget) l.warnings.push(`${w.budget.exhausted ? 'budget' : 'budget du lot'} atteint : la passe des mineurs n'a pas eu lieu, mineurs rendus en propositions`);

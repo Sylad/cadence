@@ -309,6 +309,53 @@ describe('lot visible : UX puis code', () => {
   });
 });
 
+describe('revue proportionnée (L108)', () => {
+  const minor: Handler = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', fichier: 'a.txt', ligne: 1, texte: 'nommage' }] }));
+
+  it('lot léger : une seule revue Sonnet (agent code-reviewer), pas de passe des mineurs, mineurs rendus en propositions', async () => {
+    const h = harness({ script: { implement: [impl()], review: [minor] } });
+    const c = h.lot('L1', { light: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(h.calls[1].model).toBe('sonnet');
+    expect(h.calls[1].args).toContain('--agent');
+    expect(h.calls[1].args).toContain('code-reviewer');
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.minorPass).toBeFalsy();
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
+    expect(h.plan().lot('L1').review?.verdict).not.toContain('passe des mineurs');
+  });
+
+  it('lot léger : un majeur déclenche une correction, puis la revue est Opus ; les mineurs de cette revue restent des notes', async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, minor], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { light: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
+    expect(h.calls.filter((x) => x.kind === 'review').map((x) => x.model)).toEqual(['sonnet', 'opus']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toHaveLength(1);
+  });
+
+  it('lot léger : les deux passes de correction restent le plafond', async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, major, major], fix: [fix('b.txt'), fix('c.txt')] } });
+    const c = h.lot('L1', { light: true });
+    await runLot(c);
+    expect(h.calls.filter((x) => x.kind === 'review').map((x) => x.model)).toEqual(['sonnet', 'opus', 'opus']);
+    expect(c.lot.status).toBe('handed-back');
+  });
+
+  it('modèles de revue pris dans orchestrate.review ; lot non léger : chaîne actuelle (revue complète puis passe des mineurs)', async () => {
+    const h = harness({ script: { implement: [impl()], review: [minor], fix: [fix('b.txt')], 'review-small': [ok] } });
+    const c = h.lot('L1', {}, { review: { threshold: 0.25, light: 'sonnet', full: 'sonnet' } });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small']);
+    expect(h.calls.filter((x) => x.kind !== 'implement' && x.kind !== 'fix').map((x) => x.model)).toEqual(['sonnet', 'sonnet']);
+    const hl = harness({ script: { implement: [impl()], review: [ok] } });
+    await runLot(hl.lot('L1', { light: true }, { review: { threshold: 0.25, light: 'haiku', full: 'opus' } }));
+    expect(hl.calls[1].model).toBe('haiku');
+  });
+});
+
 describe('petit lot', () => {
   it('une seule session de revue (Opus), et @haiku ne vaut que pour l\'implémentation', async () => {
     const h = harness({ lots: [{ title: 'petit', estimate: 0.5, visible: true }], script: { implement: [impl()], 'review-small': [ok] } });

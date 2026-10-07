@@ -234,6 +234,7 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
     }
     const small = lot.estimate <= 0.5 || lot.quickwin;
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, model: t.model, readOnlyPlan: plan.readonly });
+    state.light = lot.estimate <= env.config.review.threshold;
     state.budget = lotBudget(lot.estimate);
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
     if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };
@@ -282,14 +283,15 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     }
     const steps: { kind: 'precheck' | 'implement' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: 'implement', model: l.model }];
     if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot)) steps.unshift({ kind: 'precheck', model: 'sonnet' });
-    if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: 'opus' });
+    const { light, full } = env.config.review;
+    if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
     else {
-      if (l.visible && env.config.ux) steps.push({ kind: 'ux', model: 'opus' });
-      steps.push({ kind: 'review', model: 'opus' });
+      if (l.visible && env.config.ux) steps.push({ kind: 'ux', model: full });
+      steps.push({ kind: 'review', model: full });
     }
-    io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
+    io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.light ? ` — revue légère (${light}, pas de passe des mineurs ; un bloquant ou un majeur → correction puis revue ${full})` : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus, en session neuve`);
-    io.out('  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
+    io.out(l.light ? '  revue conforme avec mineurs : pas de passe des mineurs, ils sont rendus en notes' : '  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, `${l.project}--${l.lot}`, 'playwright');
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
     const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '' };

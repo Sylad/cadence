@@ -908,6 +908,27 @@ describe('budget par lot (L78)', () => {
     }
   });
 
+  it('revue proportionnée (L108) : seuil sur l\'estimate, dry-run et état du lot le disent ; le seuil vient de cadence.yaml', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'léger', estimate: 0.25 }], b: [{ title: 'plus gros', estimate: 0.5 }] });
+    const r = io(parent);
+    await orchestrate(['a:L1', 'b:L1', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      expect(text).toMatch(/étapes : implement \(sonnet\) → review \(sonnet\) — petit lot — revue légère/);
+      expect(text).toMatch(/étapes : implement \(sonnet\) → review \(opus\) — petit lot\n/);
+    } finally {
+      removeDryRunBriefs(text);
+    }
+    writeFileSync(join(dirs.b, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  review: { threshold: 0.5, light: haiku }\n');
+    git(dirs.b, 'add', 'cadence.yaml');
+    git(dirs.b, 'commit', '-q', '-m', 'chore: cadence.yaml');
+    const f = fakeDeps();
+    await orchestrate(['a:L1', 'b:L1', '--budget', '1'], io(parent).io, f.deps);
+    const store = RunStore.last(parent)!;
+    expect(store.readLot('a', 'L1')!.light).toBe(true);
+    expect(store.readLot('b', 'L1')!.light).toBe(true);
+  });
+
   it("le budget est écrit dans l'état du lot", async () => {
     const { parent } = parentWith({ a: [{ title: 'un', estimate: 2 }] });
     const f = fakeDeps();

@@ -72,6 +72,8 @@ export interface LotState {
   title: string;
   visible: boolean;
   small: boolean;
+  /** Lot léger (estimate ≤ orchestrate.review.threshold, L108) : une revue légère, pas de passe des mineurs. Absent : lot ordinaire. */
+  light?: boolean;
   model: Model;
   readOnlyPlan: boolean;
   /** Node imposé par le `.nvmrc` du projet : ses sessions l'ont en tête du PATH. Absent sans .nvmrc. */

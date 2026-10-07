@@ -107,7 +107,18 @@ describe('cadence.yaml : orchestrate', () => {
     return () => readOrchestrateConfig(f);
   };
   it('défauts', () => {
-    expect(readOrchestrateConfig('/nope')).toEqual({ precheck: true, permissionMode: 'auto', addDirs: [], timeouts: { work: 2_700_000, review: 1_500_000 } });
+    expect(readOrchestrateConfig('/nope')).toEqual({ precheck: true, permissionMode: 'auto', addDirs: [], timeouts: { work: 2_700_000, review: 1_500_000 }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' } });
+  });
+  it('review : seuil et modèles, défauts 0,25 / sonnet / opus, valeurs invalides refusées (L108)', () => {
+    expect(read('orchestrate:\n  review: { threshold: 0.5, light: haiku, full: sonnet }\n')().review).toEqual({ threshold: 0.5, light: 'haiku', full: 'sonnet' });
+    expect(read('orchestrate:\n  review: { threshold: 0.1 }\n')().review).toEqual({ threshold: 0.1, light: 'sonnet', full: 'opus' });
+    expect(read('orchestrate:\n  review: { threshold: 0 }\n')().review.threshold).toBe(0);
+    expect(read('orchestrate:\n  review: { threshold: -1 }\n')).toThrow(/review\.threshold/);
+    expect(read('orchestrate:\n  review: { threshold: vite }\n')).toThrow(/review\.threshold/);
+    expect(read('orchestrate:\n  review: { light: gpt }\n')).toThrow(/review\.light/);
+    expect(read('orchestrate:\n  review: { full: 3 }\n')).toThrow(/review\.full/);
+    expect(read('orchestrate:\n  review: { seuil: 1 }\n')).toThrow(/review\.seuil inconnu/);
+    expect(read('orchestrate:\n  review: oui\n')).toThrow(/review doit être un objet/);
   });
   it('precheck : faux accepté, autre type refusé', () => {
     expect(read('orchestrate:\n  precheck: false\n')().precheck).toBe(false);

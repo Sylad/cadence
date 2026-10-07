@@ -142,7 +142,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
   // Installer les skills ou le hook ne lit pas le plan : un cadence.yaml fautif ne doit pas l'empêcher.
   const installing = command === 'skills' || (command === 'hook' && rest[0] === 'install');
-  const planConfig = installing ? null : readPlanConfig(configPath);
+  const planConfig = installing ? null : readPlanConfig(configPath, root);
   const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? resolve(root, planConfig?.path ?? 'docs/plan/raf.yaml'));
   const loadPlan = () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
   const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));

@@ -29,9 +29,9 @@ function realish(p: string): string {
 
 /**
  * Clé `qa:` : le fichier d'attendus QA, ramené à la forme que git rapporte (relatif à la racine du dépôt,
- * séparateurs posix, sans `./`). Un chemin absolu est lu depuis la racine git (le dossier du fichier hors dépôt git). Une valeur vide vaut absente ; un type faux ou un chemin hors du dépôt est refusé.
+ * séparateurs posix, sans `./`). Un chemin absolu est lu depuis la racine du dépôt de travail que donne le CLI, à défaut la racine git du dossier du fichier (hors dépôt git, ce dossier). Une valeur vide vaut absente ; un type faux ou un chemin hors du dépôt est refusé.
  */
-function readQa(qa: unknown, file: string): string | undefined {
+function readQa(qa: unknown, file: string, workRoot?: string): string | undefined {
   if (qa == null) return undefined;
   if (!isObject(qa)) throw new RafError(`${file} : qa doit être un objet`);
   const v = qa.expectations;
@@ -39,7 +39,7 @@ function readQa(qa: unknown, file: string): string | undefined {
   if (typeof v !== 'string') throw new RafError(`${file} : qa.expectations doit être un chemin`);
   const raw = v.trim().replace(/\\/g, '/');
   if (raw === '') return undefined;
-  const root = gitRoot(dirname(resolve(file))) ?? dirname(resolve(file));
+  const root = workRoot ?? gitRoot(dirname(resolve(file))) ?? dirname(resolve(file));
   const rel = posix.normalize(isAbsolute(raw) ? relative(realish(root), realish(raw)).replace(/\\/g, '/') : raw);
   if (rel === '.' || rel === '..' || rel.startsWith('../') || isAbsolute(rel)) throw new RafError(`${file} : qa.expectations « ${v.trim()} » est hors du dépôt`);
   return rel;
@@ -47,9 +47,10 @@ function readQa(qa: unknown, file: string): string | undefined {
 
 /**
  * Clé `plan:` de cadence.yaml : où est le plan et, s'il est tenu par un autre outil, comment le lire.
+ * `root` : la racine du dépôt de travail (celle du CLI), d'où se résout un chemin absolu de `qa.expectations`.
  * Null quand le fichier ou la clé manque — le plan est alors docs/plan/raf.yaml au format de raf.
  */
-export function readPlanConfig(file: string): PlanConfig | null {
+export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   if (!existsSync(file)) return null;
   let raw: unknown;
   try {
@@ -58,7 +59,7 @@ export function readPlanConfig(file: string): PlanConfig | null {
     throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
   }
   const doc = raw as { plan?: unknown; qa?: unknown } | null;
-  const qa = readQa(doc?.qa, file);
+  const qa = readQa(doc?.qa, file, root);
   const p = doc?.plan;
   if (p == null) return qa ? { settings: { qaExpectations: qa } } : null;
   const bad = (what: string) => new RafError(`${file} : plan.${what}`);

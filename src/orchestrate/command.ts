@@ -124,7 +124,7 @@ interface Target {
 /** Ce qu'un projet fournit à l'orchestrateur : sa configuration et la lecture de son plan (comme le CLI). */
 export function projectEnv(repo: string): { config: OrchestrateConfig; loadPlan: () => Plan; configPath: string } {
   const configPath = join(repo, 'cadence.yaml');
-  const planConfig = readPlanConfig(configPath);
+  const planConfig = readPlanConfig(configPath, repo);
   const planPath = resolve(repo, planConfig?.path ?? 'docs/plan/raf.yaml');
   return { config: readOrchestrateConfig(configPath), loadPlan: () => Plan.load(planPath, { ...planConfig?.settings, config: configPath }), configPath };
 }

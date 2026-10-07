@@ -166,6 +166,13 @@ describe('readPlanConfig', () => {
     expect(readPlanConfig(file)?.settings.qaExpectations).toBe('docs/qa.md');
   });
 
+  it('(L66) la racine donnée par le CLI prime : un --config hors du dépôt de travail accepte un chemin absolu situé dans ce dépôt', () => {
+    const repo = gitRepo();
+    const file = write(join(tempDir(), 'cadence.yaml'), `qa:\n  expectations: '${join(repo, 'docs', 'qa.md')}'\n`);
+    expect(readPlanConfig(file, repo)?.settings.qaExpectations).toBe('docs/qa.md');
+    expect(() => readPlanConfig(file)).toThrow(/hors du dépôt/);
+  });
+
   it.each([
     ['qa:\n  expectations: 42\n', /qa\.expectations doit être un chemin/],
     ['qa:\n  expectations: [a.md]\n', /qa\.expectations doit être un chemin/],

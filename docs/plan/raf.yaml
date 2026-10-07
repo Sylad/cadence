@@ -814,6 +814,7 @@ lots:
     quickwin: true
     created: 2026-10-05
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme, 1 mineur (passage de root du CLI à readPlanConfig sans test au niveau commande) — orchestré (vague 2026-10-07-1234, 1 passe(s) de correction + passe des mineurs)", commit: bd37bc78df4b4dbab3b41d78b6e5182afabb67b8 }
   - id: L67
     title: Publier 0.10.1 — attendus QA tenus avec le plan dans raf check (L65)
     status: done

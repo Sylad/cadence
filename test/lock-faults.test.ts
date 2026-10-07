@@ -70,11 +70,12 @@ describe('takeUrlLock : verrou remplacé entre la lecture et le renommage', () =
 });
 
 describe('startApp : verrou impossible à poser', () => {
-  it('EPERM : non vérifiée avec la cause (la revue de code suit), rien lancé, pas d\'exception', async () => {
+  it.each(['EPERM', 'EMLINK'])('%s : non vérifiée avec le chemin et l\'errno (la revue de code suit), rien lancé, pas d\'exception', async (code) => {
     const url = 'http://127.0.0.1:59871/';
-    hooks.link = errno('EPERM');
+    // Message de la forme réelle de Node : l'errno est dans `code`, le message porte des chemins et un texte long.
+    hooks.link = Object.assign(new Error(`${code}: operation not permitted, link 'a' -> 'b'`), { code });
     const app = await startApp({ command: 'exit 1', url, cwd: dir, log: join(dir, 'app.log'), timeoutMs: 1000, every: 10 });
-    expect(app.state.kind === 'unverified' && app.state.cause).toContain('EPERM');
+    expect(app.state.kind === 'unverified' && app.state.cause).toBe(`verrou ${uxLockFile(url)} : ${code}`);
     expect(existsSync(uxLockFile(url))).toBe(false);
     expect(existsSync(join(dir, 'app.log'))).toBe(false);
   });

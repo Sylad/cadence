@@ -7,7 +7,7 @@ import { isPlanOnly } from './audit.js';
 import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
 import { citedRefs } from './link.js';
 import { RafError, type Plan } from './plan.js';
-import { appendDelivery, lastDelivery, lockAlive, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
+import { appendDelivery, lastDelivery, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
 
 export interface VerifyCheck {
   url?: string;
@@ -318,9 +318,14 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
   if (lock && removeStaleLock(ctx.state, lock)) {
     err(`deliver : verrou périmé retiré (pid ${lock.pid} mort, ${lock.sha.slice(0, 7)})`);
   }
-  if (!writeLock(ctx.state, { pid: process.pid, sha, started: new Date(deps.now()).toISOString() })) {
-    return refuse('une autre livraison vient de démarrer');
+  let taken: boolean;
+  try {
+    taken = writeLock(ctx.state, { pid: process.pid, sha, started: new Date(deps.now()).toISOString() });
+  } catch (e) {
+    // Pas de liens physiques ici (EPERM, EMLINK…) : refus avec la cause, pas une exception qui sort de la commande.
+    return refuse(lockFault(lockPath(ctx.state), e));
   }
+  if (!taken) return refuse('une autre livraison vient de démarrer');
   try {
     const fail = (msg: string) => {
       err(`deliver : ${msg}`);

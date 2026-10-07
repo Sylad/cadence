@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { closeSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { linkNewFile, pidAlive, removeStaleFile } from '../state.js';
+import { linkNewFile, lockFault, pidAlive, removeStaleFile } from '../state.js';
 import { withoutLaunchVars } from './snapshot.js';
 
 /** Défaut de `orchestrate.ux.timeout` : secondes d'attente de la réponse de l'application. */
@@ -136,7 +136,7 @@ export async function startApp(o: AppOpts): Promise<AppRun> {
     }
   } catch (e) {
     // Verrou impossible à poser (pas de liens physiques…) : comme un journal illisible, la revue UX n'a pas lieu, la cause est dite.
-    return { state: { kind: 'unverified', cause: `verrou ${lock} : ${(e as Error).message}` }, stop: none };
+    return { state: { kind: 'unverified', cause: lockFault(lock, e) }, stop: none };
   }
   const release = () => releaseUrlLock(lock);
   if (Date.now() >= deadline) {

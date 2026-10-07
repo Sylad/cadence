@@ -136,6 +136,19 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it('--dry-run : petit lot visible, review-small charge Playwright (et le dit) ; petit lot sans écran, aucun (L74/t6)', async () => {
+    const { parent } = parentWith({ a: [{ title: 'petit', estimate: 0.5, visible: true }], b: [{ title: 'petit sans écran', estimate: 0.5 }] });
+    const r = await run(parent, ['a:L1', 'b:L1', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      expect(out).toMatch(/  review-small : claude [^\n]*--strict-mcp-config[^\n]*\n    brief : [^\n]*\n    mcp : playwright \(captures dans le dossier de la vague : <vague>\/a--L1\/playwright\)/);
+      expect(out).toMatch(/  review : claude [^\n]*\n    brief : [^\n]*\n    mcp : aucun/);
+      expect(out).not.toMatch(/b--L1\/playwright/);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it('arbre sale, claude absent, claude sans --json-schema, hook pre-push existant, session imbriquée', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
     writeFileSync(join(dirs.a, 'docs/plan/raf.yaml'), `${readFileSync(join(dirs.a, 'docs/plan/raf.yaml'), 'utf8')}# sale\n`);

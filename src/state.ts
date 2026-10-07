@@ -122,7 +122,7 @@ export function removeStaleFile(file: string, same: (aside: string) => boolean):
 
 /** Cause d'une pose de verrou impossible, en une ligne : « verrou <chemin> : <errno> » (le code, sinon le message). */
 export function lockFault(file: string, e: unknown): string {
-  return `verrou ${file} : ${(e as NodeJS.ErrnoException).code ?? (e as Error).message}`;
+  return `verrou ${file} : ${(e as NodeJS.ErrnoException | null | undefined)?.code ?? (e instanceof Error ? e.message : String(e))}`;
 }
 
 /** Pose le verrou de façon atomique (lien vers un fichier complet) ; false s'il existe déjà. */

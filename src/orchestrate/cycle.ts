@@ -10,7 +10,7 @@ import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { newsText, objective, renderBrief, type BriefName, type BriefVars, type Templates } from './briefs.js';
-import { journalTokens, peakContext, mcpServersFor, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
+import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { checkShape, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type ReviewReport, type WorkReport } from './schemas.js';
@@ -220,7 +220,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
-  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), news: l.visible ? newsText(l.lot) : '' };
+  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), news: l.visible ? newsText(l.lot, playwrightDir(c.wave.store.lotDir(l.project, l.lot))) : '' };
   if (kind === 'implement' || kind === 'fix') {
     const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
     if (kind === 'fix') {
@@ -288,7 +288,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       cwd: l.repo,
       wave: w.id,
       permissionMode: c.config.permissionMode,
-      addDirs: c.config.addDirs,
+      addDirs: playwright && write ? [...c.config.addDirs, playwrightDir(dirname(mcpConfig))] : c.config.addDirs,
       nodeBin: l.node?.link,
       mcpConfig,
       playwright,

@@ -23,11 +23,11 @@ export interface BriefVars {
 }
 
 /** Consigne d'implémentation d'un lot `visible` : son entrée Nouveautés (convention de `cadence news`, voir le README). */
-export function newsText(lot: string): string {
+export function newsText(lot: string, captureDir?: string): string {
   return [
     `This lot is visible: write its News entry. Run \`cadence news new ${lot}\` (it creates \`docs/nouveautes/<date>-<slug>.md\`), then write the text in terms of what changes for the user, factual (what the user sees or can now do, no implementation detail, no promise).`,
     `The entry's title is user-side: \`cadence news new\` takes the lot's public title when it has one; otherwise rewrite the title in the user's words with \`--title\` (never the internal title of the lot).`,
-    `Add a screenshot of the result: copy it into \`docs/nouveautes/captures/\` and list it under \`captures:\` (a Playwright capture lands in the wave's directory outside the repository; the file you keep for the entry is the one exception, copied into \`docs/nouveautes/captures/\`); if a screenshot makes no sense (or the app cannot be run), write \`nocapture: <reason>\` instead.`,
+    `Add a screenshot of the result: copy it into \`docs/nouveautes/captures/\` and list it under \`captures:\` (a Playwright capture lands in the wave's output directory, outside the repository${captureDir ? `: \`${captureDir}\`, which this session may read` : ''}; the file you keep for the entry is the one exception, copied into \`docs/nouveautes/captures/\`); if a screenshot makes no sense (or the app cannot be run), write \`nocapture: <reason>\` instead.`,
     'Commit the entry with the lot (`cadence news check` must pass).',
   ].join('\n');
 }

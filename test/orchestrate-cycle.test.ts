@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
@@ -206,6 +206,22 @@ describe('lot visible : UX puis code', () => {
     const hn = harness({ lots: [{ title: 'Sans écran' }], script: { implement: [impl()], review: [ok] } });
     await runLot(hn.lot('L1'));
     expect(hn.calls[0].brief).not.toContain('news new');
+  });
+
+  it("le brief d'implement d'un lot visible donne le dossier Playwright de la vague et la session l'a en --add-dir ; lot sans écran : ni l'un ni l'autre (L48/t4)", async () => {
+    const hv = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
+    await runLot(hv.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' }, addDirs: ['/tmp/x'] }));
+    const dir = join(hv.store.dir, 'demo--L1', 'playwright');
+    const impl0 = hv.calls[0]!;
+    expect(isAbsolute(dir)).toBe(true);
+    expect(impl0.brief).toContain(`\`${dir}\``);
+    const adds = impl0.args.flatMap((a, i) => (impl0.args[i - 1] === '--add-dir' ? [a] : []));
+    expect(adds).toEqual(['/tmp/x', dir]);
+    expect(hv.calls[1]!.args).not.toContain(dir); // ux
+    const hn = harness({ lots: [{ title: 'Sans écran' }], script: { implement: [impl()], review: [ok] } });
+    await runLot(hn.lot('L1'));
+    expect(hn.calls[0]!.args).not.toContain('--add-dir');
+    expect(hn.calls[0]!.brief).not.toContain('playwright');
   });
 
   it('chaque session reçoit --strict-mcp-config et son fichier dans le dossier du lot ; lot visible : Playwright pour implement et ux (pas review), captures dans la vague (L74)', async () => {

@@ -43,10 +43,15 @@ export function mcpServersFor(kind: StepKind, visible: boolean, outputDir: strin
   return { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', outputDir] } };
 }
 
+/** Dossier de sortie du Playwright MCP d'un lot : `<lotDir>/playwright`, chemin absolu. */
+export function playwrightDir(lotDir: string): string {
+  return join(resolve(lotDir), 'playwright');
+}
+
 /** Écrit `<lotDir>/mcp-<étape>.json` (et, si Playwright est chargé, le dossier `playwright/`) ; rend le chemin absolu du fichier. */
 export function writeMcpConfig(lotDir: string, kind: StepKind, visible: boolean, small = false): string {
   const dir = resolve(lotDir);
-  const out = join(dir, 'playwright');
+  const out = playwrightDir(dir);
   const servers = mcpServersFor(kind, visible, out, small);
   if (servers.playwright) mkdirSync(out, { recursive: true });
   const file = join(dir, `mcp-${kind}.json`);

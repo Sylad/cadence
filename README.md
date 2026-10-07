@@ -740,7 +740,7 @@ lists the commits already present; finished steps are never replayed.
 Briefs are the templates of `templates/orchestrate/` (`implement.md` is the `lead` skill's standard
 brief; `--dry-run` writes the rendered ones). The `implement` brief of a `visible` lot also carries the
 News instruction (`cadence news new <lot>`, factual user-side text, a screenshot in `docs/nouveautes/captures/` or
-`nocapture:`, `cadence news check` green); a lot that is not `visible` gets nothing. A project can declare, in `cadence.yaml`:
+`nocapture:`, `cadence news check` green); the brief gives the absolute path of the wave's Playwright output directory and the `implement` session gets `--add-dir` on it, to copy the capture into the repository; a lot that is not `visible` gets nothing. A project can declare, in `cadence.yaml`:
 
 ```yaml
 orchestrate:

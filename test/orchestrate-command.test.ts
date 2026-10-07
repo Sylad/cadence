@@ -156,6 +156,24 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it("--dry-run : le brief d'un lot visible donne le dossier Playwright de la vague, l'étape implement l'a en --add-dir ; lot sans écran : ni l'un ni l'autre (L48/t4)", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un', visible: true }], b: [{ title: 'sans écran' }] });
+    const r = await run(parent, ['a:L1', 'b:L1', '--wave', 'w-t4', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      const dir = join(parent, '.cadence', 'runs', 'w-t4', 'a--L1', 'playwright');
+      const briefOf = (project: string) => readFileSync(out.split('\n').find((l) => l.includes('brief :') && l.includes(`${project}--L1--implement.md`))!.replace(/^\s*brief : /, '').trim(), 'utf8');
+      expect(briefOf('a')).toContain(`\`${dir}\``);
+      expect(briefOf('b')).not.toContain('.cadence');
+      const implement = (project: string) => out.split('\n').find((l) => l.startsWith('  implement : claude') && out.indexOf(l) > out.indexOf(`${project}:L1 —`))!;
+      expect(implement('a')).toContain(`--add-dir ${dir}`);
+      expect(implement('b')).not.toContain('--add-dir');
+      expect(out.split('\n').filter((l) => /^  (ux|review|review-small) : claude/.test(l)).join('\n')).not.toContain(dir);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it('--dry-run : petit lot visible, review-small charge Playwright (et le dit) ; petit lot sans écran, aucun (L74/t6)', async () => {
     const { parent } = parentWith({ a: [{ title: 'petit', estimate: 0.5, visible: true }], b: [{ title: 'petit sans écran', estimate: 0.5 }] });
     const r = await run(parent, ['a:L1', 'b:L1', '--dry-run']);

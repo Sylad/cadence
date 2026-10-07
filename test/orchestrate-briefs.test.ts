@@ -243,6 +243,11 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
     expect(out).toContain('--title');
   });
 
+  it("newsText donne le dossier de sortie Playwright de la vague quand on le lui passe (L48/t4)", () => {
+    expect(newsText('L9', '/w/p--L9/playwright')).toContain('`/w/p--L9/playwright`');
+    expect(newsText('L9')).not.toContain('/playwright');
+  });
+
   it('lot non visible : aucune mention des Nouveautés', () => {
     const out = renderBrief('implement', { ...base, news: '' });
     expect(out).not.toMatch(/\{\{/);

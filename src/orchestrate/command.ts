@@ -273,13 +273,15 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus, en session neuve`);
     io.out('  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
-    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', news: l.visible ? newsText(l.lot) : '' };
+    const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, `${l.project}--${l.lot}`, 'playwright');
+    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', news: l.visible ? newsText(l.lot, pwDir) : '' };
     for (const s of steps) {
       const file = join(tmp, `${l.project}--${l.lot}--${s.kind}.md`);
       const brief = renderBrief(s.kind, vars, deps.templatesDir);
       writeFileSync(file, brief);
+      const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small).playwright;
       const args = buildArgs(
-        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: env.config.addDirs, timeoutMs: 0, mcpConfig: '<mcp>', playwright: !!mcpServersFor(s.kind, l.visible, '', l.small).playwright },
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: playwright && (s.kind === 'implement') ? [...env.config.addDirs, pwDir] : env.config.addDirs, timeoutMs: 0, mcpConfig: '<mcp>', playwright },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : claude ${args.join(' ')}`);

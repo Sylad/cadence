@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -52,4 +52,19 @@ export function resolveNode(repo: string, versionsDir: string, fs: NodeFs = real
   if (found.length === 0) return { kind: 'missing', message: `.nvmrc ${wanted} : aucun Node installé correspondant dans ${versionsDir}` };
   const best = found[found.length - 1];
   return { kind: 'ok', version: `v${best}`, wanted, bin: join(versionsDir, `v${best}`, 'bin') };
+}
+
+/** Les seuls binaires d'une version de Node que les sessions voient : le reste de son bin (raf, cadence, claude… installés en global) ne doit pas masquer ceux du PATH. */
+export const NODE_LINKED = ['node', 'npm', 'npx', 'corepack'];
+
+/**
+ * Dossier de liens `<runDir>/node-bin/<version>/` : un lien vers chacun des `NODE_LINKED` présents dans `bin`. Recréé à
+ * chaque appel (départ et reprise), donc idempotent. C'est lui, et non `bin`, qui passe en tête du PATH des sessions.
+ */
+export function linkNodeBin(runDir: string, version: string, bin: string): string {
+  const dir = join(runDir, 'node-bin', version);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  for (const name of NODE_LINKED) if (existsSync(join(bin, name))) symlinkSync(join(bin, name), join(dir, name));
+  return dir;
 }

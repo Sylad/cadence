@@ -754,7 +754,11 @@ orchestrate:
 
 **Node per project (`.nvmrc`)**: when a project has a `.nvmrc` at its root, every session the
 orchestrator launches for it (implementation, UX and code reviews, corrections) runs with the matching Node
-first in its `PATH`, so `node`, `npm` and `npx` resolve to it (Astro needs 22 while the default may be 20).
+first in its `PATH`, so `node`, `npm` and `npx` resolve to it (Astro needs 22 while the default may be 20). Only
+those four names (`node`, `npm`, `npx`, `corepack`) are exposed, through symlinks in
+`.cadence/runs/<wave>/node-bin/<version>/` (recreated at start and at every `--resume`): the rest of that Node's
+`bin` (globally installed `raf`, `cadence`, `claude`…) never shadows the tools in the usual `PATH`. `--resume` resolves
+the `.nvmrc` again for every live lot and refuses it like at start if it can no longer be resolved.
 The file is read trimmed (`22`, `v22`, `22.22`, `v22.22.3`); the highest matching version installed under
 `$NVM_DIR/versions/node` (default `~/.nvm/versions/node`) is used. Only the sessions' environment changes,
 never the orchestrator's own. No `.nvmrc` → nothing changes. A `.nvmrc` that cannot be resolved (`lts/*`, an

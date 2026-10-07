@@ -609,7 +609,10 @@ describe('Node du projet (.nvmrc)', () => {
   /** Un faux ~/.nvm/versions/node avec les versions données. */
   function fakeNvm(versions: string[]): string {
     const dir = tempDir();
-    for (const v of versions) mkdirSync(join(dir, 'versions/node', v, 'bin'), { recursive: true });
+    for (const v of versions) {
+      mkdirSync(join(dir, 'versions/node', v, 'bin'), { recursive: true });
+      for (const n of ['node', 'npm', 'npx', 'raf', 'cadence']) writeFileSync(join(dir, 'versions/node', v, 'bin', n), '#!/bin/sh\n');
+    }
     return dir;
   }
   const run = async (parent: string, argv: string[], deps: OrchestrateDeps, env: Record<string, string>) => {
@@ -632,10 +635,15 @@ describe('Node du projet (.nvmrc)', () => {
     };
     const r = await run(parent, ['a:L1', 'b:L1'], f.deps, { NVM_DIR: nvm });
     expect(r.code).toBe(0);
-    const want = join(nvm, 'versions/node/v22.22.3/bin');
+    const want = join(parent, '.cadence/runs/2026-10-04-1412/node-bin/v22.22.3');
     const aPaths = Object.entries(seen).filter(([k]) => k.startsWith('a:')).map(([, v]) => v);
     expect(aPaths.length).toBeGreaterThanOrEqual(2); // implement + revue, toutes préfixées
     for (const p of aPaths) expect(p!.split(':')[0]).toBe(want);
+    // L80/t2 : seul node/npm/npx (présents dans le faux bin) sont atteignables ; raf et cadence du bin nvm ne masquent rien
+    expect(readdirSync(want).sort()).toEqual(['node', 'npm', 'npx']);
+    expect(existsSync(join(want, 'raf'))).toBe(false);
+    expect(existsSync(join(nvm, 'versions/node/v22.22.3/bin/raf'))).toBe(true);
+    expect(aPaths.every((p) => !p!.split(':').includes(join(nvm, 'versions/node/v22.22.3/bin')))).toBe(true);
     for (const [k, v] of Object.entries(seen)) if (k.startsWith('b:')) expect(v).toBeUndefined(); // pas de .nvmrc : inchangé
     expect(process.env.PATH).toBe(before);
   });
@@ -679,6 +687,7 @@ describe('Node du projet (.nvmrc)', () => {
     writeFileSync(join(s.dirs.a, '.nvmrc'), '24');
     expect((await run(s.parent, ['--resume', '--budget', '1M'], s.f.deps, { NVM_DIR: nvm })).code).toBe(0);
     expect(s.store().readLot('a', 'L1')!.node).toMatchObject({ version: 'v24.1.0', wanted: '24' });
+    expect(readdirSync(join(s.store().dir, 'node-bin')).sort()).toEqual(['v22.22.3', 'v24.1.0']); // lien recréé à la reprise
   });
 
   it('L80/t1 — --resume d\'un état sans node (vague d\'avant L80) et un .nvmrc → résolu et enregistré', async () => {

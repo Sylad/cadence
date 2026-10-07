@@ -1231,10 +1231,11 @@ lots:
       - { date: 2026-10-07, text: "Lead 07-10 : pas de capture Playwright (la bande vit dans Claude Code, pas dans un navigateur) ; la capture Nouveautés sera une image du terminal fournie par le lead. Source déjà importée dans plugins/cadence-hud (commit 6e1bba4) ; vitest l'exclut déjà ; reste : marketplace.json, files npm (déjà sans plugins/), README d'installation, et tsconfig du plugin (pas de .claude-plugin/types versionné)." }
   - id: L112
     title: "Suite rouge sous npm ≥ 11.5 (12.2 vu le 07-10) : npm active le cache de compilation de Node et laisse node-compile-cache dans la racine temporaire privée ; le contrôle de fin de test/global-setup.ts fait échouer la suite. Décision lead : global-setup pose NODE_DISABLE_COMPILE_CACHE=1 pour les workers et les enfants (ou NODE_COMPILE_CACHE vers un sous-dossier qu'il supprime lui-même) ; test qui lance npm sous un TMPDIR privé et vérifie qu'il ne reste rien"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07
   - id: L113
     title: "orchestrate-app.test.ts:282 aléatoire sous charge : « n'a pas répondu en 1 s » échoue dans la suite complète (64 s, 07-10) et passe seul — le test mesure du temps mur ; le rendre déterministe (horloge injectée ou marge ≥ 3×) sans allonger la suite"
     status: todo

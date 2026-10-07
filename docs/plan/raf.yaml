@@ -932,6 +932,7 @@ lots:
       - { date: 2026-10-07, text: "Référence de mesure avant la vague performance (07-10, vagues 1234 → 1921) : petit lot (≤ 0,25 j) = 4 à 14 min et 60 à 260 k tokens ; suite complète 63 s relancée plusieurs fois par session (implémentation, revue, correction) ; L32 ccc 87 min / 396 k avec 2 corrections. À comparer après L75 + L77 + L78 + L108, mêmes colonnes de cadence orchestrate --status." }
       - { date: 2026-10-07, text: "Correction lead 07-10 (revue non conforme, 1 majeur) : ajouter le test « tests rouges avec build déclaré → build non lancé, un seul constat, passage en correction » (break de cycle.ts:532). Le reste des propositions = notes, pas de lots (règle L109) ; aligner agents/code-reviewer.md (contrôles déjà lancés au HEAD relu = acquis) si une ligne suffit." }
       - { date: 2026-10-07, text: "Mesure après optimisation (vague 2026-10-07-2103) : L75 correction 10 min / 114 k, 0 passe ; L110 déjà fait détecté par precheck en < 1 min / 20 k (contre 33-39 k et une session d'implémentation pour L47/L100). À confirmer sur une vague de petits lots neufs." }
+      - { date: 2026-10-07, text: "Mesure vague 2026-10-07-2131 (petits lots neufs, après L75+L77+L78+L108) : L112 3 min / 99 k (1 revue Sonnet, 0 passe) ; L107 3 min / 69 k ; L73 10 min / 184 k (2 commits, 1 fix) ; L106 implémenté en 3 min / 89 k puis vague coupée par un push externe. Référence d'avant : 4-14 min et 60-260 k. Les lots sans correction tombent au plancher (3 min), la revue légère de L108 tient." }
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme, 1 mineur (branche « RED » de checksText jamais exécutée, cycle.ts:222) — orchestré (vague 2026-10-07-2103, 0 passe(s) de correction + passe des mineurs sans commit)", commit: 4f824b9d6896eb2d48cf17be39a34770b827b70e }
     finished: 2026-10-07
@@ -1192,6 +1193,12 @@ lots:
     notes:
       - { date: 2026-10-07, text: "Décision lead 07-10 : la limite vient de cadence.yaml (clé news.publicTitleMax, défaut 80) ; sans clé, raf check avertit seulement, raf public / raf done / cadence news refusent au-delà de la limite déclarée." }
     started: 2026-10-07
+    tasks:
+      - { id: t1, title: "raf check et raf done : contrôler aussi le titre repris de la Nouveauté la plus récente qui cite un lot visible terminé sans public: (cas ccc L32, publicTitleOf de plan-public.ts l.112), avec un test de ce cas", status: todo }
+      - { id: t2, title: "cadence news new sans --title : tester le refus d'un titre de lot trop long et proposer --title dans le message (cli.ts:523)", status: todo }
+      - { id: t3, title: "refuseLongTitle de news new : mesurer le titre après fusion des espaces, comme newEntry l'écrit (cli.ts:154, news.ts:195)", status: todo }
+      - { id: t4, title: "newEntry : écrire title: sans coupure de ligne par yaml.stringify (lineWidth 0) ; test avec un titre de plus de 80 caractères — bug antérieur, en-tête YAML illisible (news.ts:201)", status: todo }
+    review: { date: 2026-10-07, verdict: "not compliant: 1 blocking (the ccc L32 case, a news-entry title reused by the site, is caught by neither raf check nor raf done), 1 major (news new without --title refused, untested, message without hint), 1 minor (length measured before whitespace merge) — revue lead 07-10 au HEAD d92a551, sous-tâches L106/* à faire en session de correction", commit: d92a551ec9f66304f6710bb8dece143dbc8a98d9 }
   - id: L107
     title: "raf show : les lignes suivantes d'une note sur plusieurs lignes sont décalées sous « notes : » (aujourd'hui en colonne 0, cli.ts:245) ; aide et README sans « en entier / in full », ou affichage des sous-tâches et de l'estimation — revue L102"
     status: done

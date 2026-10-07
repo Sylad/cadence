@@ -1192,10 +1192,11 @@ lots:
       - { date: 2026-10-07, text: "Décision lead 07-10 : la limite vient de cadence.yaml (clé news.publicTitleMax, défaut 80) ; sans clé, raf check avertit seulement, raf public / raf done / cadence news refusent au-delà de la limite déclarée." }
   - id: L107
     title: "raf show : les lignes suivantes d'une note sur plusieurs lignes sont décalées sous « notes : » (aujourd'hui en colonne 0, cli.ts:245) ; aide et README sans « en entier / in full », ou affichage des sous-tâches et de l'estimation — revue L102"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07
   - id: L108
     title: "orchestrate : revue proportionnée à la taille du lot — lot ≤ 0,25 j (estimate) : une seule revue (Sonnet, agent code-reviewer, mêmes critères), pas de passe « mineurs », mineurs rendus au lead en notes ; lot plus gros : chaîne actuelle (Opus, 2 corrections, passe mineurs). Seuil et modèles dans cadence.yaml (orchestrate.review), défaut ci-dessus ; un bloquant ou majeur sur un petit lot déclenche quand même une correction et une revue Opus. Tests ; README. Décision Sylvain 07-10 : qualité oui, overkill non"
     status: done

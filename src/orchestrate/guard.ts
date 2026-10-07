@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFile, execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
@@ -82,26 +82,42 @@ function removePlaywrightExclude(repo: string): void {
   writeFileSync(file, lines.join('\n'));
 }
 
-/** Supprime les fichiers NON SUIVIS de `.playwright-mcp/` (jamais un fichier suivi) ; le dossier part quand il est vide. */
+/**
+ * Supprime les fichiers NON SUIVIS de `.playwright-mcp/` (jamais un fichier suivi) ; le dossier part quand il est vide.
+ * Jamais de lien suivi : racine ou entrée qui est un lien symbolique n'est pas parcourue (l'entrée est retirée elle-même,
+ * la racine reste), et une racine ou un ancêtre suivi par git n'est pas parcouru (`ls-files` renvoie alors le chemin lui-même).
+ */
 export function cleanPlaywrightOutput(repo: string): void {
   const root = gitRoot(repo);
   if (!root) return;
   const dir = join(root, PW_DIR);
-  if (!existsSync(dir)) return;
-  let tracked: Set<string>;
+  let st;
   try {
-    tracked = new Set(execFileSync('git', ['ls-files', '-z', '--', PW_DIR], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
+    st = lstatSync(dir);
   } catch {
     return;
   }
+  if (st.isSymbolicLink() || !st.isDirectory()) return;
+  let tracked: string[];
+  try {
+    tracked = execFileSync('git', ['ls-files', '-z', '--', PW_DIR], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+  } catch {
+    return;
+  }
+  if (tracked.includes(PW_DIR)) return;
+  const keeps = (r: string) => tracked.some((t) => t === r || t.startsWith(`${r}/`) || r.startsWith(`${t}/`));
   const walk = (d: string, rel: string): boolean => {
     let empty = true;
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const r = `${rel}/${e.name}`;
-      if (e.isDirectory()) {
-        if (!walk(join(d, e.name), r)) empty = false;
-      } else if (tracked.has(r)) empty = false;
-      else rmSync(join(d, e.name), { force: true });
+      const full = join(d, e.name);
+      if (keeps(r)) {
+        // suivi, ou ancêtre d'un suivi : un dossier est parcouru pour ses entrées non suivies, un fichier ou un lien reste
+        if (e.isDirectory() && !tracked.includes(r)) walk(full, r);
+        empty = false;
+      } else if (lstatSync(full).isDirectory()) {
+        if (!walk(full, r)) empty = false;
+      } else rmSync(full, { force: true }); // fichier ou lien : retiré lui-même, jamais suivi
     }
     if (empty) rmSync(d, { recursive: true, force: true });
     return empty;

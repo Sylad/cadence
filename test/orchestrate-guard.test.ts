@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync, symlinkSync, lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { canInstallPrePush, cleanPlaywrightOutput, installPrePush, pushed, removePrePush, snapshot } from '../src/orchestrate/guard.js';
 import { readFileSync, rmSync } from 'node:fs';
@@ -271,5 +271,52 @@ describe('sorties de Playwright MCP dans le dépôt (L50)', () => {
     cleanPlaywrightOutput(dir);
     expect(existsSync(join(dir, '.playwright-mcp/kept.yml'))).toBe(true);
     expect(existsSync(join(dir, '.playwright-mcp/new.png'))).toBe(false);
+  });
+
+  const outside = () => {
+    const out = tempDir();
+    writeFileSync(join(out, 'precious.txt'), 'keep');
+    return out;
+  };
+
+  it('L50/t1 : un .playwright-mcp non suivi qui est un lien vers un dossier extérieur : le dossier extérieur reste intact', () => {
+    const dir = gitRepo();
+    const out = outside();
+    symlinkSync(out, join(dir, '.playwright-mcp'));
+    cleanPlaywrightOutput(dir);
+    expect(readFileSync(join(out, 'precious.txt'), 'utf8')).toBe('keep');
+  });
+
+  it('L50/t1 : un .playwright-mcp suivi par git qui est un lien : ni le lien ni le dossier extérieur ne sont touchés', () => {
+    const dir = gitRepo();
+    const out = outside();
+    symlinkSync(out, join(dir, '.playwright-mcp'));
+    git(dir, 'add', '-f', '.playwright-mcp');
+    cleanPlaywrightOutput(dir);
+    expect(lstatSync(join(dir, '.playwright-mcp')).isSymbolicLink()).toBe(true);
+    expect(readFileSync(join(out, 'precious.txt'), 'utf8')).toBe('keep');
+  });
+
+  it('L50/t1 : un lien à l\'intérieur est retiré lui-même, sa cible extérieure reste', () => {
+    const dir = gitRepo();
+    const out = outside();
+    mkdirSync(join(dir, '.playwright-mcp'));
+    symlinkSync(out, join(dir, '.playwright-mcp/lien'));
+    writeFileSync(join(dir, '.playwright-mcp/a.yml'), 'x');
+    cleanPlaywrightOutput(dir);
+    expect(readFileSync(join(out, 'precious.txt'), 'utf8')).toBe('keep');
+    expect(existsSync(join(dir, '.playwright-mcp/a.yml'))).toBe(false);
+    expect(existsSync(join(dir, '.playwright-mcp'))).toBe(false);
+  });
+
+  it('L50/t1 : un fichier suivi à l\'intérieur survit', () => {
+    const dir = gitRepo();
+    mkdirSync(join(dir, '.playwright-mcp/sub'), { recursive: true });
+    writeFileSync(join(dir, '.playwright-mcp/sub/kept.yml'), 'x');
+    git(dir, 'add', '-f', '.playwright-mcp/sub/kept.yml');
+    writeFileSync(join(dir, '.playwright-mcp/sub/new.png'), 'x');
+    cleanPlaywrightOutput(dir);
+    expect(existsSync(join(dir, '.playwright-mcp/sub/kept.yml'))).toBe(true);
+    expect(existsSync(join(dir, '.playwright-mcp/sub/new.png'))).toBe(false);
   });
 });

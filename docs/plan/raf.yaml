@@ -903,30 +903,44 @@ lots:
     created: 2026-10-07
   - id: L85
     title: "⚡ Test instable deliver.test.ts « realDeps.exec : au délai, aucun descendant ne survit » (expected 3013 < 2500) : rouge sous charge en suite complète (2 fois sur 4 le 07-10) — même famille que L81"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "07-10 : la revue L70/L81 a vu tomber aussi deliver.test.ts:926 « (c) Ctrl-C : un descendant qui ignore SIGINT » (3040 ms > 3000) — même famille, à couvrir dans ce lot" }
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme (mutation : descendant survivant détecté 8/9)", commit: 5dd26a6883af95ff6de81baabf26600314225ca9 }
+    finished: 2026-10-07
   - id: L86
     title: "isNonQuestion : ajouter « vide » (nommé par L52/t1) et les pluriels manquants (pas de questions bloquantes, je n'ai pas de questions bloquantes) à NON_QUESTIONS, avec test — mineur de la 2e revue L52"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: conforme, commit: 7e24192c9348d527aae0a4445655f8d403006efb }
+    finished: 2026-10-07
   - id: L87
     title: "restoreExclude (L50/t2) : note .git/info/cadence-exclude-before illisible ignorée et retirée sans lever (sinon release() s'interrompt et laisse hooks/exclusions dans les dépôts suivants) ; ne retirer le saut de ligne final que s'il est celui ajouté par la vague ; tests — mineurs de la 2e revue L50"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: conforme avec 1 mineur (branche note d'ancienne forme sans test) — reporté en L89, commit: 43325d04b68b160fc9d4aebde135ff885bc385f7 }
+    finished: 2026-10-07
   - id: L88
     title: "removeExclude (L3, guard.ts:82-89) : ne pas retirer une ligne /.githooks/pre-push que l'utilisateur avait déjà avant la vague ; test — relevé hors périmètre par la revue L50"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: conforme avec 1 mineur (ligne d'une vague 0.11.0 interrompue prise pour une ligne utilisateur) — reporté en L89, commit: 7a59336f0ed01822e6dc5b3043719fcc4ff248c6 }
+    finished: 2026-10-07
+  - id: L89
+    title: "guard.ts : rememberExclude met hookLine=false quand le hook pre-push présent porte la marque cadence (ligne laissée par une vague 0.11.0 interrompue, sans note) ; test de la note d'ancienne forme (sans content) — mineurs de la revue L87/L88"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-07

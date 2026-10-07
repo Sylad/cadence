@@ -363,6 +363,16 @@ describe('nettoyage en routine de clôture (L4)', () => {
     expect((await cadLate(dir, 'session', 'close')).out).not.toContain('aucun motif');
   });
 
+  it('avec session.clean vide (clean: []) : l’indice est aussi affiché, une seule fois', async () => {
+    const dir = await closedProject();
+    configure(dir, 'session:\n  clean: []\n');
+    const { code, out } = await cadLate(dir, 'session', 'close');
+    expect(out.split('\n').filter((l) => l.includes('aucun motif de nettoyage déclaré'))).toHaveLength(1);
+    expect(out).not.toContain('Nettoyage');
+    expect(code).toBe(0);
+    expect(out).toMatch(READY);
+  });
+
   it('aucune section sans motif, ni quand rien n’est périmé', async () => {
     const dir = await project();
     expect((await cadLate(dir, 'session', 'close')).out).not.toContain('Nettoyage');

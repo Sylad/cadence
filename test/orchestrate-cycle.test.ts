@@ -384,6 +384,21 @@ describe('contrôles autour des sessions', () => {
     expect(h.calls[2].brief).toContain('(build): green');
   });
 
+  it('HEAD a bougé entre les contrôles et la revue (lot repris après un commit extérieur) : la revue ne reçoit pas de résultat périmé (L75)', async () => {
+    const h = harness({ budget: 1000, script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'true', build: 'true' });
+    await runLot(c);
+    expect(c.lot.next).toBe('review');
+    const checked = c.lot.checks!.head;
+    commitFile(h.repo, 'outside.txt', 'chore: commit du lead');
+    expect(git(h.repo, 'rev-parse', 'HEAD')).not.toBe(checked);
+    h.wave.budget.limit = 10_000;
+    await runLot(c);
+    const rv = h.calls.find((x) => x.kind === 'review')!;
+    expect(rv.brief).not.toContain('already ran');
+    expect(rv.brief).not.toContain('Take these results as given');
+  });
+
   it('sans commande de tests ni de build, la revue ne reçoit aucun résultat (L75)', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
     await runLot(h.lot('L1'));

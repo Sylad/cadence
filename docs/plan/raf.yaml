@@ -1041,10 +1041,11 @@ lots:
     finished: 2026-10-07
   - id: L93
     title: "README §publication (l.884-891) périmé depuis L64 : une relance saute npm publish et crée la release absente — retirer « re-running the job fails at npm publish », mentionner la concurrency par ref ; test de l'étape release avec un faux gh (présente → pas de create, absente → create --verify-tag, erreur réseau de gh release view ≠ « existe ») — mineurs revue L64"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07
   - id: L94
     title: "test CLI : raf check --config hors du dépôt avec qa.expectations absolu dans le dépôt → accepté ; couvre le passage de root à readPlanConfig (cli.ts:145, orchestrate/command.ts:127 projectEnv) — mineur revue L66"
     status: todo

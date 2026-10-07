@@ -210,7 +210,7 @@ describe('doublon de run pour un même tag (L64)', () => {
       const dir = tempDir();
       try {
         mkdirSync(join(dir, 'bin'));
-        writeFileSync(join(dir, 'bin', 'npm'), `#!/bin/sh\necho "${npmPublish.out}"\nexit ${npmPublish.code}\n`, { mode: 0o755 });
+        writeFileSync(join(dir, 'bin', 'npm'), `#!/bin/sh\ncat <<'EOF'\n${npmPublish.out}\nEOF\nexit ${npmPublish.code}\n`, { mode: 0o755 });
         return spawnSync('bash', ['-e', '-c', publish!], { cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, GITHUB_REF_NAME: 'v1.2.3' }, encoding: 'utf8' });
       } finally {
         rmSync(dir, { recursive: true, force: true });
@@ -234,6 +234,16 @@ describe('doublon de run pour un même tag (L64)', () => {
         expect(r.stdout).toContain('1.2.3 est déjà publiée sur npm');
       },
     );
+
+    it('suite rouge de prepublishOnly qui cite le motif de conflit (titre de test vitest) : le run reste rouge', () => {
+      const out = [
+        ' FAIL  test/publish-workflow.test.ts > conflit (npm error code EPUBLISHCONFLICT)',
+        '   × conflit (npm error 403 You cannot publish over the previously published versions: 1.2.3.)',
+        '\u001b[31m × conflit (npm error code EPUBLISHCONFLICT)\u001b[39m',
+        'npm error code ELIFECYCLE',
+      ].join('\n');
+      expect(runPublish({ out, code: 1 }).status).toBe(1);
+    });
 
     it('autre échec de npm publish : le run reste rouge', () => {
       const r = runPublish({ out: 'npm error code E401', code: 1 });

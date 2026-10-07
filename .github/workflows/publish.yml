@@ -80,7 +80,8 @@ jobs:
       # Quand la version est déjà publiée, cette étape est sautée : ni typecheck ni tests ne tournent dans ce run
       # (le run qui a publié les a passés), et la release ci-dessous peut être créée sans suite exécutée.
       # Le registre peut encore répondre E404 juste après une publication (cache) : un conflit de publication
-      # (EPUBLISHCONFLICT / « previously published ») veut dire « déjà publiée », pas « échec ».
+      # (EPUBLISHCONFLICT / « previously published », sur une ligne d'erreur de npm : la sortie de la suite de
+      # prepublishOnly peut citer ces mots sans être un conflit) veut dire « déjà publiée », pas « échec ».
       - name: Publier sur npm
         if: steps.registry.outputs.published != 'true'
         run: |
@@ -89,7 +90,7 @@ jobs:
             echo "$out"
           else
             echo "$out"
-            printf '%s' "$out" | grep -qE 'EPUBLISHCONFLICT|previously published' || exit 1
+            printf '%s' "$out" | grep -qE '^npm (error|ERR!) (code EPUBLISHCONFLICT|.*previously published)' || exit 1
             echo "$v est déjà publiée sur npm (le registre ne la montrait pas encore) : rien à faire de plus."
           fi
 

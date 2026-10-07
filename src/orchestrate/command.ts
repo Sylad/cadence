@@ -50,6 +50,13 @@ export interface OrchestrateDeps {
 }
 
 export const DEFAULT_BUDGET = 2_000_000;
+
+/** Tokens comptés par jour d'estimate (L78) ; mesuré le 06-10 : un lot de 0,5 j mange 100 à 400 k, un petit lot 60 à 260 k. */
+const LOT_BUDGET_PER_DAY = 1_000_000;
+const LOT_BUDGET_FLOOR = 400_000;
+
+/** Budget d'un lot, dérivé de son estimate : empêche quelques lots d'avaler le budget de la vague au détriment des autres. */
+export const lotBudget = (estimate: number): number => Math.max(LOT_BUDGET_FLOOR, Math.round(estimate * LOT_BUDGET_PER_DAY));
 /** Sessions simultanées, toutes vagues confondues (`--max-sessions`, ou CADENCE_MAX_SESSIONS). */
 export const DEFAULT_MAX_SESSIONS = 2;
 
@@ -227,6 +234,7 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
     }
     const small = lot.estimate <= 0.5 || lot.quickwin;
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, model: t.model, readOnlyPlan: plan.readonly });
+    state.budget = lotBudget(lot.estimate);
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
     if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };
     lots.push(state);
@@ -265,6 +273,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const lot = env.loadPlan().lot(l.lot);
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
+    io.out(`  budget du lot : ${l.budget} tokens comptés (dérivé de l'estimate)`);
     io.out(`  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
     if (l.node) {
       const sk = l.node.skipped;

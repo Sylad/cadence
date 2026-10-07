@@ -259,6 +259,12 @@ function briefFor(c: LotCtx, kind: StepKind): string {
 
 type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot };
 
+/** Tokens comptés par les sessions d'un lot (un lot repris compte ses étapes d'avant). */
+export const lotSpent = (l: LotState): number => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
+
+/** Le lot a dépensé son propre budget (L78) : il ne compte plus que sur le lead, la vague garde le sien pour les autres. */
+const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) >= l.budget;
+
 /** Pourquoi plus aucune session ne doit partir (incident, quota, budget), sinon null. */
 function halted(w: WaveCtx): string | null {
   if (w.incident) return `vague arrêtée : ${w.incident}`;
@@ -273,6 +279,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const l = c.lot;
   const halt = halted(w);
   if (halt) return suspend(c, halt);
+  if (lotOver(l)) return overBudget(c);
 
   const write = kind === 'implement' || kind === 'fix';
   const model: Model = write ? l.model : kind === 'precheck' ? 'sonnet' : 'opus'; // le contrôle préalable ne fait que lire : pas d'Opus
@@ -399,6 +406,12 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   step.status = 'ok';
   save(c);
   return { step, report: res.structured, before, after };
+}
+
+/** Budget du lot atteint avant une session : le lot est rendu au lead (reprendre ne lui rendrait pas de budget), les autres continuent. */
+function overBudget(c: LotCtx): null {
+  const l = c.lot;
+  return stop(c, 'handed-back', `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, dérivé de l'estimate) : étape « ${l.next ?? '?'} » non jouée, à décider par le lead`);
 }
 
 function suspend(c: LotCtx, why: string): null {
@@ -637,6 +650,10 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
     suspend(c, halt); // la session n'aurait pas lieu : l'application ne se lance pas pour rien
     return;
   }
+  if (lotOver(l)) {
+    overBudget(c);
+    return;
+  }
   c.wave.log(`${lotKey(l.project, l.lot)} · lancement de l'application (${ux.url})`);
   const app = await startApp({ command: ux.command, url: ux.url, cwd: l.repo, nodeBin: l.node?.link, log: join(c.wave.store.lotDir(l.project, l.lot), 'ux-app.log'), timeoutMs: (ux.timeout ?? APP_TIMEOUT_S) * 1000 });
   try {
@@ -694,9 +711,9 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   // Revue conforme avec mineurs : une seule passe de correction des mineurs, avant de conclure (rien sous le tapis).
   // Budget épuisé : la passe n'aurait aucune session pour la jouer, le lot conclut sur la revue conforme et rend les mineurs.
   const wanted = summary.conforme && uxOk && !l.minorPass && minors.length > 0;
-  const noBudget = wanted && w.budget.exhausted && !w.incident && !w.quota.hit;
+  const noBudget = wanted && (w.budget.exhausted || lotOver(l)) && !w.incident && !w.quota.hit;
   const minorPass = wanted && !noBudget;
-  if (noBudget) l.warnings.push('budget atteint : la passe des mineurs n\'a pas eu lieu, mineurs rendus en propositions');
+  if (noBudget) l.warnings.push(`${w.budget.exhausted ? 'budget' : 'budget du lot'} atteint : la passe des mineurs n'a pas eu lieu, mineurs rendus en propositions`);
   // Les mineurs confiés à la passe ont pu être proposés par une revue non conforme antérieure : si la revue qui la suit est
   // conforme, ils sont traités et ne restent pas en propositions (ceux que cette revue signale encore sont ajoutés juste après).
   if (l.minorPass && !minorPass && summary.conforme && uxOk && l.minorLines?.length) {

@@ -779,6 +779,35 @@ describe('budget et quota', () => {
     expect(c.lot.status).toBe('ready');
   });
 
+  it("L78 — le budget du lot atteint rend le lot au lead sans ouvrir de session, la vague garde son budget", async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', { budget: 1000 }); // l'implémentation compte 1500 (100 + 1000 + 400)
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/budget du lot atteint \(1500 \/ 1000/);
+    expect(h.wave.budget.exhausted).toBe(false);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement']);
+  });
+
+  it("L78 — un lot sans budget (état d'avant L78) n'est borné que par la vague", async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it("L78 — le budget d'un lot ne compte que ses propres sessions", async () => {
+    const h = harness({ script: { implement: [impl(), impl('b.txt')], review: [ok, ok] } });
+    const a = h.lot('L1', { budget: 5000 });
+    await runLot(a);
+    expect(a.lot.status).toBe('ready');
+    const b = h.lot('L1', { budget: 5000 });
+    await runLot(b);
+    expect(b.lot.status).toBe('ready');
+  });
+
   it('quota atteint : session interrompue, aucune autre ; pas de nouvel essai', async () => {
     const quota: Handler = () => ({ code: 1, stdout: JSON.stringify({ is_error: true, subtype: 'success', result: 'Claude AI usage limit reached|1759600000', session_id: 's', num_turns: 1, duration_ms: 1, usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 } }), stderr: '', timedOut: false });
     const h = harness({ script: { implement: [quota] } });

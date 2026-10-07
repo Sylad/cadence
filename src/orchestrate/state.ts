@@ -78,6 +78,8 @@ export interface LotState {
   node?: { version: string; wanted: string; bin: string; /** Versions plus hautes écartées (pas de node exécutable), pour le dry-run. */ skipped?: string[]; /** Dossier de liens (node, npm, npx, corepack) en tête du PATH des sessions. */ link?: string };
   /** Lots du même projet, plus tôt dans la vague, dont celui-ci dépend (`after`) : il attend qu'ils soient prêts. */
   dependsOn?: string[];
+  /** Plafond des tokens comptés par les sessions de ce lot, dérivé de l'estimate (L78). Absent : seul le budget de la vague borne. */
+  budget?: number;
   status: LotStatus;
   /** Passes de correction faites. */
   pass: number;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
+import { lotBudget, orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
@@ -868,5 +868,35 @@ describe('Node du projet (.nvmrc)', () => {
     } finally {
       removeDryRunBriefs(r.out.join('\n'));
     }
+  });
+});
+
+describe('budget par lot (L78)', () => {
+  it("dérivé de l'estimate : 1 M par jour, plancher 400 k", () => {
+    expect(lotBudget(0.1)).toBe(400_000);
+    expect(lotBudget(0.5)).toBe(500_000);
+    expect(lotBudget(1)).toBe(1_000_000);
+    expect(lotBudget(2.5)).toBe(2_500_000);
+  });
+
+  it("--dry-run dit le budget de chaque lot", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un', estimate: 1 }], b: [{ title: 'petit', estimate: 0.25 }] });
+    const r = io(parent);
+    await orchestrate(['a:L1', 'b:L1', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      expect(text).toContain('budget du lot : 1000000 tokens comptés');
+      expect(text).toContain('budget du lot : 400000 tokens comptés');
+    } finally {
+      removeDryRunBriefs(text);
+    }
+  });
+
+  it("le budget est écrit dans l'état du lot", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un', estimate: 2 }] });
+    const f = fakeDeps();
+    await orchestrate(['a:L1', '--budget', '1'], io(parent).io, f.deps);
+    const store = RunStore.last(parent)!;
+    expect(store.readLot('a', 'L1')!.budget).toBe(2_000_000);
   });
 });

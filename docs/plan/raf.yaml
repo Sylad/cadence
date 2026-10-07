@@ -1126,12 +1126,13 @@ lots:
     created: 2026-10-07
   - id: L102
     title: "raf show <id> : identifiant, statut, dates, after, titre public, notes datées dans l'ordre, puis commits comptés (comme raf commits) ; --notes pour les notes seules (issue #1)"
-    status: todo
+    status: doing
     estimate: 0.5
     quickwin: true
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #1 » dans son corps (issue GitHub)." }
+    started: 2026-10-07
   - id: L103
     title: "cadence session start --all / session close --all depuis un dossier non dépôt : balayer les sous-dossiers (profondeur 1, --depth n) qui ont docs/plan/raf.yaml ou cadence.yaml avec plan:, une section par projet ; le skill lead et session-start l'utilisent au lieu de la boucle shell (issue #3)"
     status: todo

@@ -50,13 +50,16 @@ export const reviewReport = (over: Record<string, unknown> = {}) => ({
 export interface Call {
   args: string[];
   opts: LaunchOpts;
-  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small';
+  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck';
   model: string;
   brief: string;
 }
 
+export const precheckReport = (over: Record<string, unknown> = {}) => ({ dejaPresent: 'non', preuves: [], resume: 'rien de présent', ...over });
+
 export function kindOf(args: string[]): Call['kind'] {
   const brief = args[1];
+  if (brief.startsWith('Pre-check for lot')) return 'precheck';
   const agent = args.includes('--agent') ? args[args.indexOf('--agent') + 1] : null;
   if (agent === 'ux-reviewer') return 'ux';
   if (agent === 'code-reviewer') return brief.includes('single pass') || brief.includes('short re-review') ? 'review-small' : 'review';
@@ -134,7 +137,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; estim
     lot(id, over = {}, config = {}) {
       const state = newLot({ project: 'demo', repo, lot: id, title: h.plan().lot(id).title, visible: false, small: false, model: 'sonnet', readOnlyPlan: false });
       Object.assign(state, over);
-      return { wave, lot: state, config: { ...readOrchestrateConfig('/nope'), ...config }, loadPlan: () => Plan.load(planFile) };
+      return { wave, lot: state, config: { ...readOrchestrateConfig('/nope'), precheck: false, ...config }, loadPlan: () => Plan.load(planFile) };
     },
   };
   return h;

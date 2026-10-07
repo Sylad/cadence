@@ -35,7 +35,20 @@ export const REVIEW_SCHEMA = {
   required: ['bloquants', 'majeurs', 'mineurs', 'constats', 'sousTaches', 'nonVerifie', 'verdict'],
 } as const;
 
-export const schemaFor = (kind: StepKind): object => (kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
+/** Sortie du contrôle préalable : `dejaPresent` vaut « oui » (rien à faire), « partiel » ou « non ». */
+export const PRECHECK_SCHEMA = {
+  type: 'object',
+  properties: { dejaPresent: { type: 'string', enum: ['oui', 'partiel', 'non'] }, preuves: strings, resume: str },
+  required: ['dejaPresent', 'preuves', 'resume'],
+} as const;
+
+export const schemaFor = (kind: StepKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
+
+export interface PrecheckReport {
+  dejaPresent: 'oui' | 'partiel' | 'non';
+  preuves: string[];
+  resume: string;
+}
 
 export interface WorkReport {
   commits: { sha: string; sujet: string }[];

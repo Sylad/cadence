@@ -16,7 +16,7 @@ const FAKE = fileURLToPath(new URL('./fixtures/fake-claude.mjs', import.meta.url
 const SAMPLE = fileURLToPath(new URL('./fixtures/claude-result.sample.json', import.meta.url));
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
-function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string; remote?: boolean; visible?: boolean } = {}) {
+function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string; remote?: boolean; visible?: boolean; precheck?: boolean } = {}) {
   const parent = tempDir();
   const dir = join(parent, 'proj');
   mkdirSync(dir);
@@ -27,7 +27,9 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
   const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'proj', 'L', '2026-09-01');
   plan.add('Un lot', '2026-10-01', { visible: opts.visible });
   plan.save();
-  if (opts.cadenceYaml) writeFileSync(join(dir, 'cadence.yaml'), opts.cadenceYaml);
+  // Le contrôle préalable (L77) a son propre test ; ailleurs il est coupé pour que les étapes attendues restent les mêmes.
+  const yaml = opts.cadenceYaml ?? 'orchestrate:\n';
+  writeFileSync(join(dir, 'cadence.yaml'), yaml.replace('orchestrate:\n', `orchestrate:\n  precheck: ${opts.precheck ?? false}\n`));
   git(dir, 'add', '.');
   git(dir, 'commit', '-q', '-m', 'chore: plan');
   let bare = '';
@@ -221,6 +223,16 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     }
   });
 
+  it('--dry-run : le contrôle préalable ouvre les étapes, sauf orchestrate.precheck: false (L77)', async () => {
+    const on = setup({}, { precheck: true });
+    const r = await on.cli('proj:L1', '--dry-run');
+    try {
+      expect(r.out).toContain('étapes : precheck (sonnet) → implement (sonnet) → review (opus)');
+    } finally {
+      removeDryRunBriefs(r.out);
+    }
+  });
+
   // L3/t12 : vrai processus, vrai signal.
   it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)('%s : sessions tuées, étapes et vague interrompues, verrous et hook retirés', async (signal) => {
     const s = setup({ implement: [{ ...impl, sleepMs: 60_000 }] });
@@ -322,6 +334,17 @@ async function realWave(pkg: string, s: ReturnType<typeof setup>, afterSnapshot:
   const code = await orchestrate(['proj:L1'], { cwd: s.parent, env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') }, deps);
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
+
+describe('contrôle préalable (L77), de bout en bout', () => {
+  it('livrable déjà présent : le vrai claude factice n\'est lancé qu\'une fois (precheck), lot rendu, code 1', async () => {
+    const s = setup({ precheck: [{ structured: { dejaPresent: 'oui', preuves: ['a.ts:3'], resume: 'fait par L9' } }] }, { precheck: true });
+    const r = await s.cli('proj:L1');
+    expect(r.code).toBe(1);
+    expect(s.calls().map((c) => c.kind)).toEqual(['precheck']);
+    expect(s.calls()[0].model).toBe('sonnet');
+    expect(r.out).toContain('livrable déjà présent : fait par L9 (a.ts:3)');
+  });
+});
 
 describe('(L61/t3) le vrai fils lit ses gabarits dans la copie', () => {
   it('un gabarit modifié dans le paquet courant après la copie n\'est pas vu : le brief de revue vient de la copie', async () => {

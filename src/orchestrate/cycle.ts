@@ -15,7 +15,7 @@ import { capturesText, newsText, objective, renderBrief, type BriefName, type Br
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
-import { checkShape, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type ReviewReport, type WorkReport } from './schemas.js';
+import { checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type PrecheckReport, type ReviewReport, type WorkReport } from './schemas.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { lotKey } from './state.js';
 
@@ -251,6 +251,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
         ? `A previous session was interrupted; resume from these commits of the lot already present:\n${mine}`
         : 'A previous session was interrupted before any commit of the lot; start again from the current state of the repository.';
     }
+    if (kind === 'implement' && l.precheck) vars.commits = [vars.commits, l.precheck].filter(Boolean).join('\n');
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
   return renderBrief(briefName(l, kind), vars, c.wave.templates);
@@ -274,13 +275,13 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   if (halt) return suspend(c, halt);
 
   const write = kind === 'implement' || kind === 'fix';
-  const model: Model = write ? l.model : 'opus';
+  const model: Model = write ? l.model : kind === 'precheck' ? 'sonnet' : 'opus'; // le contrôle préalable ne fait que lire : pas d'Opus
   const before = await snapshot(l.repo);
   const n = l.steps.length + 1;
   const sessionId = randomUUID();
   const step: StepState = { n, kind, model, status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
   l.steps.push(step);
-  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing' } as const;
+  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing' } as const;
   transition(c, label[kind]);
   w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} (${model})`);
 
@@ -438,6 +439,37 @@ function badReport(c: LotCtx, step: StepState, e: unknown): null {
   step.status = 'failed';
   step.cause = (e as Error).message;
   return stop(c, 'failed', `${step.kind} : ${(e as Error).message}`);
+}
+
+/**
+ * Contrôle préalable (L77) : une session de lecture seule cherche si le livrable du lot est déjà dans le dépôt (fait par un
+ * autre lot). « oui » rend le lot sans ouvrir d'implémentation ; « partiel » joint le constat au brief de l'implémentation.
+ * Un rapport illisible ne bloque pas : avertissement, l'implémentation part.
+ */
+async function precheck(c: LotCtx): Promise<void> {
+  const l = c.lot;
+  const done = await session(c, 'precheck');
+  if (!done) return;
+  let rep: PrecheckReport;
+  try {
+    rep = checkShape<PrecheckReport>(done.report, PRECHECK_SCHEMA);
+  } catch (e) {
+    l.warnings.push(`contrôle préalable illisible, implémentation lancée : ${(e as Error).message}`);
+    l.next = 'implement';
+    save(c);
+    return;
+  }
+  const proofs = rep.preuves.length ? ` (${rep.preuves.join(' ; ')})` : '';
+  if (rep.dejaPresent === 'oui') {
+    stop(c, 'handed-back', `livrable déjà présent : ${rep.resume.trim()}${proofs}`);
+    return;
+  }
+  if (rep.dejaPresent === 'partiel') {
+    l.precheck = `A pre-check found part of the deliverable already in the repository (do not redo it): ${rep.resume.trim()}${proofs}`;
+    l.warnings.push(`contrôle préalable : livrable en partie présent — ${rep.resume.trim()}${proofs}`);
+  }
+  l.next = 'implement';
+  save(c);
 }
 
 /** Étape d'écriture (implémentation, correction) : contrôles, puis étape suivante décidée. */
@@ -777,12 +809,14 @@ export async function runLot(c: LotCtx): Promise<void> {
         return;
       }
       l.startedSha = (await snapshot(l.repo, { remote: false })).head ?? undefined;
-      l.next = 'implement';
+      // Le contrôle préalable ne vaut que pour un lot sans commit : avec des commits, l'implémentation reprend légitimement.
+      l.next = c.config.precheck && lotWork(c.loadPlan(), l.repo, l.lot).length === 0 ? 'precheck' : 'implement';
       save(c);
     }
     while (l.next && !TERMINAL.has(l.status)) {
       const kind = l.next;
-      if (kind === 'implement' || kind === 'fix') await work(c, kind);
+      if (kind === 'precheck') await precheck(c);
+      else if (kind === 'implement' || kind === 'fix') await work(c, kind);
       else await review(c, kind);
       if (l.status === 'suspended' || l.status === 'question') return;
     }

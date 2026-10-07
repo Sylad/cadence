@@ -100,6 +100,8 @@ export interface LotState {
   checks?: { head: string; runs: { label: 'tests' | 'build'; command: string; code: number }[] };
   /** Dossier où le Playwright d'une étape (ux, ou implement/fix d'un lot visible) a rangé captures et snapshots (dans le dossier de la vague, hors du dépôt). */
   uxCaptures?: string;
+  /** Constat du contrôle préalable (livrable en partie présent), joint au brief de la première implémentation. */
+  precheck?: string;
   /** Réponse de l'humain à une question, jointe au brief de la prochaine session puis effacée. */
   pendingAnswer?: string | null;
   verdict: string | null;

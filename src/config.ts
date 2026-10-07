@@ -159,17 +159,19 @@ export interface OrchestrateConfig {
    * l'orchestrateur qui lance la commande (depuis la racine du dépôt) et attend l'URL, `timeout` secondes (300 par défaut).
    */
   ux?: { url?: string; command?: string; timeout?: number };
+  /** Contrôle préalable « livrable déjà présent ? » avant la première implémentation d'un lot sans commit (défaut : vrai). */
+  precheck: boolean;
   permissionMode: string;
   addDirs: string[];
   /** Millisecondes. */
   timeouts: { work: number; review: number };
 }
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -193,6 +195,10 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     if (o[k] == null) continue;
     if (typeof o[k] !== 'string' || !(o[k] as string).trim()) throw bad(`${k} : commande non vide attendue`);
     config[k] = (o[k] as string).trim();
+  }
+  if (o.precheck != null) {
+    if (typeof o.precheck !== 'boolean') throw bad('precheck : true ou false attendu');
+    config.precheck = o.precheck;
   }
   if (o.ux != null) {
     if (typeof o.ux === 'string' && o.ux.trim()) {

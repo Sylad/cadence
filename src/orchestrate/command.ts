@@ -271,7 +271,8 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const skipped = sk?.length ? ` ; ${sk.join(', ')} ${sk.length > 1 ? 'écartées' : 'écartée'} : pas de node exécutable` : '';
       io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted}${skipped})`);
     }
-    const steps: { kind: 'implement' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: 'implement', model: l.model }];
+    const steps: { kind: 'precheck' | 'implement' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: 'implement', model: l.model }];
+    if (env.config.precheck) steps.unshift({ kind: 'precheck', model: 'sonnet' });
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: 'opus' });
     else {
       if (l.visible && env.config.ux) steps.push({ kind: 'ux', model: 'opus' });

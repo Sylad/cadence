@@ -23,8 +23,8 @@ const flag = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : und
 const brief = argv[1];
 const agent = flag('--agent');
 const resumeId = flag('--resume');
-const kind = resumeId ? /^fake-(.+)-\d+$/.exec(resumeId)?.[1] : agent === 'ux-reviewer' ? 'ux' : agent === 'code-reviewer' ? (brief.includes('single pass') ? 'review-small' : 'review') : brief.includes('found the defects below') ? 'fix' : 'implement';
-const lot = /on lot `([^`]+)`|[Rr]eview lot `([^`]+)`|of lot `([^`]+)`/.exec(brief)?.slice(1).find(Boolean) ?? '?';
+const kind = resumeId ? /^fake-(.+)-\d+$/.exec(resumeId)?.[1] : brief.startsWith('Pre-check for lot') ? 'precheck' : agent === 'ux-reviewer' ? 'ux' : agent === 'code-reviewer' ? (brief.includes('single pass') ? 'review-small' : 'review') : brief.includes('found the defects below') ? 'fix' : 'implement';
+const lot = /on lot `([^`]+)`|[Rr]eview lot `([^`]+)`|of lot `([^`]+)`|[Pp]re-check for lot `([^`]+)`/.exec(brief)?.slice(1).find(Boolean) ?? '?';
 
 const scenarioFile = process.env.FAKE_CLAUDE_SCENARIO;
 const scenario = JSON.parse(readFileSync(scenarioFile, 'utf8'));
@@ -57,7 +57,9 @@ if (action.garbage) {
 
 const sample = JSON.parse(readFileSync(process.env.FAKE_CLAUDE_SAMPLE, 'utf8'));
 const t = action.tokens ?? {};
-const structured = action.structured ?? (kind === 'implement' || kind === 'fix'
+const structured = action.structured ?? (kind === 'precheck'
+  ? { dejaPresent: 'non', preuves: [], resume: 'rien de présent' }
+  : kind === 'implement' || kind === 'fix'
   ? { commits, tests: { commande: 'npm test', resultat: 'ok', vert: true }, build: { commande: 'npm run build', resultat: 'ok', vert: true }, nonVerifie: [], questions: [], resume: 'fait' }
   : { bloquants: 0, majeurs: 0, mineurs: 0, constats: [], sousTaches: [], nonVerifie: [], verdict: 'conforme' });
 const out = {

@@ -9,7 +9,7 @@ import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { Plan } from '../src/plan.js';
-import { claudeOut, commitFile, git, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
+import { claudeOut, commitFile, git, kindOf, precheckReport, reviewReport, workReport } from './orchestrate-harness.js';
 import { gitRepo, removeDryRunBriefs, tempDir } from './helpers.js';
 
 
@@ -30,14 +30,16 @@ function parentWith(projects: Record<string, { title: string; estimate?: number;
       if (l.status === 'doing') plan.setStatus(id, 'doing', '2026-10-01');
     }
     plan.save();
-    git(dir, 'add', '--', 'docs/plan/raf.yaml');
+    // Le contrôle préalable (L77) a ses propres tests : ici il est coupé pour que les étapes attendues restent les mêmes.
+    writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
+    git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
     git(dir, 'commit', '-q', '-m', 'chore: plan');
     dirs[name] = dir;
   }
   return { parent, dirs };
 }
 
-type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
+type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small' | 'precheck', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
 
 function fakeDeps(over: Over = {}, tweak: Partial<OrchestrateDeps> = {}): { deps: OrchestrateDeps; calls: { cwd: string; kind: string; model: string }[] } {
   const calls: { cwd: string; kind: string; model: string }[] = [];
@@ -46,6 +48,7 @@ function fakeDeps(over: Over = {}, tweak: Partial<OrchestrateDeps> = {}): { deps
     calls.push({ cwd: o.cwd, kind, model: args[args.indexOf('--model') + 1] });
     const custom = over[kind];
     if (custom) return custom(o.cwd, args[1]);
+    if (kind === 'precheck') return claudeOut(precheckReport());
     if (kind === 'implement' || kind === 'fix') {
       const lot = /on lot `([^`]+)`/.exec(args[1])![1];
       return claudeOut(workReport({ commits: [commitFile(o.cwd, `${kind}-${Math.random()}.txt`, `${kind === 'fix' ? 'fix' : 'feat'}(${lot}): travail`)] }));

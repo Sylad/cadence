@@ -665,6 +665,14 @@ you with the findings. A small lot (`estimate` ≤ 0.5 or `quickwin`) gets one s
 usability (code only when the lot is not `visible`). Failing tests (reported red, or red when
 `orchestrate.test` is run) go straight to a correction.
 
+**Pre-check « deliverable already present? »** (L77). Before the first implementation of a lot that has no commit yet, a
+short read-only session (Sonnet, `precheck` step, brief `templates/orchestrate/precheck.md`) looks in the repository for
+what the lot asks for (another lot, or a correction, may have done it already). It answers `oui` (everything is there,
+with proofs), `partiel` or `non`: on `oui` no implementation session is opened and the lot is handed back
+(`livrable déjà présent : <résumé> (<preuves>)`) for the lead to drop or close it; on `partiel` the finding goes into the
+implementation brief and a warning; on `non` — or an unreadable report, which only adds a warning — the wave goes on. A
+lot that already has commits is never pre-checked (resuming it is legitimate). `orchestrate.precheck: false` turns it off.
+
 **A lot that already has commits** (a spec commit, an interrupted wave, a lot committed by hand, a lot sent back after a
 review) still starts with the implementation session: its brief tells it to read the lot, its notes and its open
 sub-tasks, which carry the findings of any earlier review. If that session ends without a new commit on a lot that
@@ -759,6 +767,7 @@ News instruction (`cadence news new <lot>`, factual user-side text, a screenshot
 orchestrate:
   test: npm test                         # run by the orchestrator after a work step (optional)
   build: npm run build                   # run after the tests; both results go to the reviewer, who does not redo them (optional)
+  precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default
   addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use

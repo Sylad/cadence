@@ -47,6 +47,7 @@ export function capturesText(captureDir: string): string {
 export type BriefName = StepKind | 'fix-minors' | 'review-recheck';
 
 const FILES: Record<BriefName, string> = {
+  precheck: 'precheck.md',
   implement: 'implement.md',
   fix: 'fix.md',
   'fix-minors': 'fix-minors.md',

@@ -9,7 +9,7 @@ import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { Plan } from '../src/plan.js';
 import { runLot } from '../src/orchestrate/cycle.js';
-import { claudeOut, commitFile, git, harness, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
+import { claudeOut, commitFile, git, harness, kindOf, precheckReport, reviewReport, workReport } from './orchestrate-harness.js';
 import { removeDryRunBriefs, tempDir } from './helpers.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -68,6 +68,7 @@ function setup() {
   const implement = (cwd: string, args: string[]) => claudeOut(workReport({ commits: [commitFile(cwd, `f-${Math.random()}.txt`, `feat(${/on lot `([^`]+)`/.exec(args[1])![1]}): travail`)] }));
   const claude: OrchestrateDeps['claude'] = async (args, o) => {
     const kind = kindOf(args);
+    if (kind === 'precheck') return claudeOut(precheckReport());
     if (kind === 'implement' || kind === 'fix') return implement(o.cwd, args);
     reviews.push(args[1]);
     return claudeOut(reviewReport());

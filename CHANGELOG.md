@@ -25,6 +25,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ## [Unreleased]
 
 ### Added
+- `cadence orchestrate` checks, before opening an implementation session on a lot with
+  no commit, whether the deliverable is already in the repository (a short read-only
+  Sonnet session): when it is, the lot is handed back as « livrable déjà présent » with
+  its proofs instead of spending an implementation session on it; a partial finding
+  goes into the implementation brief. `orchestrate.precheck: false` in `cadence.yaml`
+  turns it off. (L77)
 - `orchestrate.ux` accepts `{ command, url, timeout? }`: with both `command` and
   `url`, the orchestrator itself starts the app before the UX step (and before the
   single pass of a small visible lot) and stops it afterwards, so the wave does the

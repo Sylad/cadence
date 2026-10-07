@@ -107,7 +107,13 @@ describe('cadence.yaml : orchestrate', () => {
     return () => readOrchestrateConfig(f);
   };
   it('défauts', () => {
-    expect(readOrchestrateConfig('/nope')).toEqual({ permissionMode: 'auto', addDirs: [], timeouts: { work: 2_700_000, review: 1_500_000 } });
+    expect(readOrchestrateConfig('/nope')).toEqual({ precheck: true, permissionMode: 'auto', addDirs: [], timeouts: { work: 2_700_000, review: 1_500_000 } });
+  });
+  it('precheck : faux accepté, autre type refusé', () => {
+    expect(read('orchestrate:\n  precheck: false\n')().precheck).toBe(false);
+    expect(read('orchestrate:\n  precheck: true\n')().precheck).toBe(true);
+    expect(read('orchestrate:\n  start: x\n')().precheck).toBe(true);
+    expect(read('orchestrate:\n  precheck: non\n')).toThrow(/orchestrate\.precheck : true ou false attendu/);
   });
   it('lit start, verdict, test, ux, délais', () => {
     const c = read(`orchestrate:\n  start: python3 scripts/raf.py start {lot}\n  verdict: 'python3 scripts/raf.py note {lot} "revue : {verdict}"'\n  test: npm test\n  ux: http://localhost:4200\n  permissionMode: acceptEdits\n  addDirs: [/tmp/t]\n  timeouts: { implement: 60, review: 10 }\n`)();

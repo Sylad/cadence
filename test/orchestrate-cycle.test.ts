@@ -10,7 +10,7 @@ import { projectLogDir } from '../src/orchestrate/launch.js';
 import { createServer } from 'node:http';
 import { tempDir } from './helpers.js';
 import { fakeApp } from './fake-app.js';
-import { claudeOut, commitFile, git, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
+import { claudeOut, commitFile, git, harness, precheckReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 
 /** Une implémentation qui commite un fichier citant le lot. */
 const impl = (file = 'a.txt', over: Record<string, unknown> = {}): Handler => (call) => {
@@ -1584,5 +1584,72 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     expect(h2.calls[1].brief).toContain('could not be verified');
     expect(c2.lot.uxNote).toMatch(/UX non vérifiée/);
     expect(c2.lot.status).toBe('ready');
+  });
+});
+
+describe('contrôle préalable « livrable déjà présent ? » (L77)', () => {
+  it('livrable présent : aucune session d\'implémentation, lot rendu avec les preuves', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport({ dejaPresent: 'oui', preuves: ['src/state.ts:125', 'abc1234 fix(L9)'], resume: 'fait par L9' }))] } });
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('livrable déjà présent');
+    expect(c.lot.outcome).toContain('fait par L9');
+    expect(c.lot.outcome).toContain('src/state.ts:125');
+    expect(h.calls[0].model).toBe('sonnet');
+    expect(h.calls[0].args).toContain('--agent');
+  });
+
+  it('livrable partiel : l\'implémentation part avec le constat du contrôle dans son brief', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport({ dejaPresent: 'partiel', preuves: ['a.ts'], resume: 'la moitié est faite' }))], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+    expect(h.calls[1].brief).toContain('la moitié est faite');
+    expect(h.calls[1].brief).toContain('a.ts');
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('rien de présent : l\'implémentation part sans note du contrôle', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport())], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+    expect(h.calls[1].brief).not.toContain('pre-check');
+  });
+
+  it('lot qui a déjà ses commits : pas de contrôle (reprise légitime)', async () => {
+    const h = harness({ script: { implement: [() => claudeOut(workReport())], review: [ok] } });
+    commitFile(h.repo, 'pre.txt', 'feat(L1): déjà là');
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(h.calls.some((k) => k.kind === 'precheck')).toBe(false);
+  });
+
+  it('rapport illisible : le contrôle ne bloque pas, avertissement et implémentation', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut({ nimporte: 1 })], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+    expect(c.lot.warnings.some((w) => w.includes('contrôle préalable'))).toBe(true);
+  });
+
+  it('livrable présent : reprise après arrêt, le lot ne rejoue pas le contrôle', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport({ dejaPresent: 'oui', preuves: ['x'], resume: 'déjà' }))] } });
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck']);
+  });
+});
+
+describe('contrôle préalable désactivé (orchestrate.precheck: false)', () => {
+  it('le lot part directement à l\'implémentation', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, { precheck: false });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
   });
 });

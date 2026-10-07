@@ -5,7 +5,7 @@ import { parse } from 'yaml';
 import { RafError } from '../plan.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
-export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small';
+export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck';
 export type Model = 'sonnet' | 'opus' | 'haiku';
 
 export interface StepSpec {

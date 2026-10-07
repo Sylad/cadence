@@ -236,6 +236,13 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
     expect(out).not.toMatch(/\{\{/);
   });
 
+  it("le titre de l'entrée est côté utilisateur : titre public du lot, sinon réécrit avec --title (L48/t2)", () => {
+    const out = renderBrief('implement', { ...base, news: newsText('L9') });
+    expect(out).toContain("entry's title is user-side");
+    expect(out).toContain("the lot's public title");
+    expect(out).toContain('--title');
+  });
+
   it('lot non visible : aucune mention des Nouveautés', () => {
     const out = renderBrief('implement', { ...base, news: '' });
     expect(out).not.toMatch(/\{\{/);

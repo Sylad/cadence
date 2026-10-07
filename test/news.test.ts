@@ -234,6 +234,16 @@ describe('news CLI', () => {
     expect(raf(dir, 'hook', 'post-commit').err).toContain('L1 est visible : cadence news new L1');
   });
 
+  it('news new takes the public title of the lot by default; --title wins; no public title: the lot title (L48/t2)', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    raf(dir, 'add', 'Refonte du store interne', '--visible', '--public', 'Vos montants s\'affichent enfin juste');
+    raf(dir, 'add', 'Sans titre public');
+    expect(readFileSync(news(dir, 'new', 'L1').out, 'utf8')).toContain("title: Vos montants s'affichent enfin juste\n");
+    expect(readFileSync(news(dir, 'new', 'L1', '--title', 'Autre titre').out, 'utf8')).toContain('title: Autre titre\n');
+    expect(readFileSync(news(dir, 'new', 'L2').out, 'utf8')).toContain('title: Sans titre public\n');
+  });
+
   it('news new flattens a multi-line title; a directory named *.md is ignored; a directory capture is missing', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--no-hook');

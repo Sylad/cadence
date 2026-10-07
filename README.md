@@ -201,7 +201,7 @@ What changed *for the user*, one entry per visible lot, each with a screenshot.
 ```sh
 raf add "Amounts like 3.000 read as three thousand" --visible   # → L8
 raf start L8 && git commit -m "fix(L8): thousands separator" && raf done L8
-cadence news new L8          # docs/nouveautes/2026-09-29-amounts-like-3-000-….md
+cadence news new L8          # docs/nouveautes/2026-09-29-amounts-like-3-000-….md (title: the lot's public title if any)
 # add docs/nouveautes/captures/l8.png, list it under `captures:`, write the text
 cadence news check           # exit 1 on drift (also part of raf check)
 cadence news build -o frontend/public/nouveautes
@@ -230,7 +230,7 @@ captures:
 
 | Command | Effect |
 |---|---|
-| `cadence news new <lot…> [--title t]` | entry skeleton, dated and timed now (`date`, `created`), titled after the lot |
+| `cadence news new <lot…> [--title t]` | entry skeleton, dated and timed now (`date`, `created`), titled after the lot's public title (`public`), else its title; `--title` wins |
 | `cadence news list` | entries, newest first (see *Order* below) |
 | `cadence news check` | visible lots done without entry, unknown lots, missing or undeclared screenshots, entries without creation time, bad headers |
 | `cadence news stamp` | migration: writes `created:` into entries without one (or with an empty one), from the author date of the commit that added the file under its current name (now if not committed yet) |

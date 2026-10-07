@@ -328,6 +328,11 @@ describe('contrôles autour des sessions', () => {
     }
   });
 
+  it('isNonQuestion : apostrophe typographique (L52/t3)', () => {
+    for (const q of ['Je n’ai pas de question', 'Je n’ai aucune question.', 'JE N’AI PAS DE QUESTION']) expect(isNonQuestion(q), q).toBe(true);
+    expect(isNonQuestion('Je n’ai pas de question sauf SQLite ?')).toBe(false);
+  });
+
   it('une question filtrée est tracée dans les avertissements et visible dans le tableau de fin de vague (L52/t2)', async () => {
     const none: Handler = () => claudeOut(workReport({ questions: ['', 'Aucune question.', 'No questions'] }));
     const h = harness({ script: { implement: [none], review: [ok] } });

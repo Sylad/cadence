@@ -671,7 +671,7 @@ const NON_QUESTIONS = new Set([
 
 /** Casse, espaces, ponctuation finale (hors « ? ») et apostrophe typographique ramenés à la forme de comparaison. */
 function normalizeQuestion(q: string): string {
-  return q.trim().toLowerCase().replace(/\s+/gu, ' ').replace(/[\s.!:;,\-–—…]+$/u, '');
+  return q.trim().toLowerCase().replace(/[’‘]/gu, "'").replace(/\s+/gu, ' ').replace(/[\s.!:;,\-–—…]+$/u, '');
 }
 
 /** Une « question » vide ou qui dit exactement qu'il n'y en a pas (« aucune question », « no questions », « n/a ») n'arrête pas le lot ; une entrée qui contient « ? » n'est jamais filtrée. */

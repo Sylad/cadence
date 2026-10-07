@@ -791,6 +791,20 @@ describe('budget et quota', () => {
     expect(kinds(h)).toEqual(['implement']);
   });
 
+  it("L78 — une question posée après le budget du lot : la réponse n'est pas jouée et la cause le dit", async () => {
+    const ask: Handler = () => claudeOut(workReport({ questions: ['PostgreSQL ou SQLite ?'] }));
+    const h = harness({ script: { implement: [ask, impl()], review: [ok] } });
+    const c = h.lot('L1', { budget: 1000 }); // la session qui pose la question compte déjà plus de 1000
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    c.lot.pendingAnswer = 'SQLite';
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('SQLite');
+    expect(c.lot.outcome).toMatch(/réponse.*pas été jouée/);
+  });
+
   it("L78 — un lot sans budget (état d'avant L78) n'est borné que par la vague", async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
     const c = h.lot('L1');

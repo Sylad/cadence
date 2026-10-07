@@ -411,7 +411,9 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
 /** Budget du lot atteint avant une session : le lot est rendu au lead (reprendre ne lui rendrait pas de budget), les autres continuent. */
 function overBudget(c: LotCtx): null {
   const l = c.lot;
-  return stop(c, 'handed-back', `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, dérivé de l'estimate) : étape « ${l.next ?? '?'} » non jouée, à décider par le lead`);
+  // Une réponse du lead encore en attente n'a pas été consommée : elle ne doit pas se perdre sans qu'on le dise.
+  const answer = l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '';
+  return stop(c, 'handed-back', `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, dérivé de l'estimate) : étape « ${l.next ?? '?'} » non jouée${answer}, à décider par le lead`);
 }
 
 function suspend(c: LotCtx, why: string): null {

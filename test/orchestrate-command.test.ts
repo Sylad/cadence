@@ -929,6 +929,21 @@ describe('budget par lot (L78)', () => {
     expect(store.readLot('b', 'L1')!.light).toBe(true);
   });
 
+  it('revue proportionnée (L108) : seuil > 0,5, le dry-run d\'un lot léger non petit annonce le modèle léger', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'gros mais léger', estimate: 1 }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  review: { threshold: 2 }\n');
+    git(dirs.a, 'add', 'cadence.yaml');
+    git(dirs.a, 'commit', '-q', '-m', 'chore: cadence.yaml');
+    const r = io(parent);
+    await orchestrate(['a:L1', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      expect(text).toMatch(/étapes : implement \(sonnet\) → review \(sonnet\) — revue légère/);
+    } finally {
+      removeDryRunBriefs(text);
+    }
+  });
+
   it("le budget est écrit dans l'état du lot", async () => {
     const { parent } = parentWith({ a: [{ title: 'un', estimate: 2 }] });
     const f = fakeDeps();

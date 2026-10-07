@@ -946,6 +946,7 @@ lots:
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme : 1 mineur (étiquette de la table de calibrage), les deux mineurs de la revue sont corrigés — orchestré (vague 2026-10-07-1943, 1 passe(s) de correction + passe des mineurs)", commit: 0b92d3c9100ce0d26105fad69a6d369fbce9a339 }
   - id: L79
     title: "orchestrate : retirer un lot d'une vague en cours (--drop <projet:lot>) et --stop-after-current — le 06-10 il a fallu une sentinelle sur journal.log + SIGTERM pour écarter ccc L29"
     status: todo

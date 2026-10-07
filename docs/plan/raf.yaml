@@ -1091,16 +1091,24 @@ lots:
     finished: 2026-10-07
   - id: L98
     title: "orchestrate.ux : l'app est lancée avec le Node du .nvmrc du projet (node-env.ts), comme les sessions — aujourd'hui spawn('sh') hérite du PATH de l'orchestrateur (Node 20) : les 3 sites Astro (Node ≥ 22.12) ne démarrent pas, et un préfixe « . ~/.nvm/nvm.sh && nvm use » sort en code 3 sous sh (vécu L95, 07-10) ; test avec un .nvmrc et un faux node ; README"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "compliant — orchestré (vague 2026-10-07-1530, 0 passe(s) de correction)", commit: 8c2ab57c45e5d2b8b0c0cfd5e37b23280e7ced98 }
+    finished: 2026-10-07
   - id: L99
     title: "Erreurs de pose de verrou (mineurs revue L97) : startApp convertit EPERM/EMLINK du verrou d'URL en « UX non vérifiée » avec l'errno (la revue de code suit) ; deliver (deliver.ts:321) refuse avec la cause « verrou <chemin> : <errno> » au lieu de laisser sortir l'exception ; tests via vi.mock('node:fs')"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "compliant — orchestré (vague 2026-10-07-1530, 0 passe(s) de correction + passe des mineurs)", commit: 907e57f1b2f9739f7cbb53debc7e57cb2cb620a5 }
+    finished: 2026-10-07
+  - id: L100
+    title: "lockFault (mineur revue L99) : repli sûr quand l'erreur n'a pas de code (e instanceof Error ? e.message : String(e)) ; test unitaire"
+    status: todo
+    estimate: 0.1
+    quickwin: true
+    created: 2026-10-07

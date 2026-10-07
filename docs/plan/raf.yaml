@@ -1084,3 +1084,4 @@ lots:
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme (1 mineur : chemin deliver/writeLock sur EPERM non testé, l'exception sort sans être gérée) — orchestré (vague 2026-10-07-1458, 0 passe(s) de correction + passe des mineurs)", commit: 931dbdecc8f625f6c8c8b310e33edee3b47c2e79 }

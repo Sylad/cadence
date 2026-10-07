@@ -170,14 +170,6 @@ describe('L61 — instantané de la vague (<vague>/tool/)', () => {
     expect(s.reexecs).toHaveLength(1);
     expect(r.err.join('\n')).toContain('sans instantané');
   });
-
-  it('l\'instantané disparaît avec le dossier de la vague', async () => {
-    const { parent } = project();
-    const s = setup();
-    await orchestrate(['a:L1'], ioOf(parent, { CWD_FOR_TEST: parent }).io, s.deps);
-    rmSync(join(parent, '.cadence/runs/2026-10-04-1412'), { recursive: true });
-    expect(existsSync(join(parent, '.cadence/runs/2026-10-04-1412/tool'))).toBe(false);
-  });
 });
 
 

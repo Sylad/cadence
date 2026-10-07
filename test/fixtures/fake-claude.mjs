@@ -36,6 +36,7 @@ if (!resumeId) used[kind] = index + 1;
 const action = resumeId ? { structured: used.pending[resumeId]?.structured, noStructured: used.pending[resumeId]?.resumeNoStructured, usageLimit: used.pending[resumeId]?.resumeUsageLimit, tokens: { output: 7 } } : ((scenario[kind] ?? [])[index] ?? scenario[`${kind}*`] ?? {});
 
 const entry = { kind, lot, cwd: process.cwd(), model: flag('--model'), orchestrated: process.env.CADENCE_ORCHESTRATED ?? null, leaked: ['CADENCE_SNAPSHOT', 'CADENCE_WAVE_RESERVED'].filter((k) => k in process.env), path: process.env.PATH ?? null, resume: argv.includes('--resume'), resumeId: resumeId ?? null, sessionId: flag('--session-id'), schema: flag('--json-schema') ?? null, argv };
+entry.which = Object.fromEntries(['raf', 'cadence'].map((n) => [n, spawnSync('sh', ['-c', `command -v ${n}`], { encoding: 'utf8' }).stdout.trim()]));
 const commits = [];
 for (const c of action.commits ?? []) {
   writeFileSync(join(process.cwd(), c.file), `${Math.random()}\n`);

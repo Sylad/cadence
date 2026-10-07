@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { run } from '../src/cli.js';
+import { orchestrate, realOrchestrateDeps } from '../src/orchestrate/command.js';
+import { spawnReexec } from '../src/orchestrate/snapshot.js';
 import { cadenceHome, liveWaves } from '../src/orchestrate/registry.js';
 import { projectLogDir } from '../src/orchestrate/launch.js';
 import { RunStore } from '../src/orchestrate/state.js';
@@ -262,4 +264,40 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(() => process.kill(pid, 0)).toThrow(); // la session est morte
     expect(() => process.kill(worker[0], 0)).toThrow(); // et le processus de la vague aussi
   }, 20_000);
+});
+
+const REPO = fileURLToPath(new URL('..', import.meta.url));
+
+/** Une copie du paquet construit (dist/ du dépôt) qu'on peut modifier sans toucher au vrai : le « paquet courant » d'une vague. */
+function livePackage(): string {
+  const pkg = tempDir();
+  for (const n of ['bin', 'dist', 'templates', 'agents', 'skills', 'package.json']) cpSync(join(REPO, n), join(pkg, n), { recursive: true });
+  symlinkSync(join(REPO, 'node_modules'), join(pkg, 'node_modules'), 'dir');
+  return pkg;
+}
+
+/** Une vraie vague : vrai fils node lancé depuis l'instantané d'un paquet jetable, faux claude. */
+async function realWave(pkg: string, s: ReturnType<typeof setup>, afterSnapshot: () => void = () => {}) {
+  const out: string[] = [];
+  const err: string[] = [];
+  const env = { ...process.env, ...s.env };
+  const deps = { ...realOrchestrateDeps(env), snapshot: { packageRoot: pkg, reexec: (...a: Parameters<typeof spawnReexec>) => (afterSnapshot(), spawnReexec(...a)) } };
+  const code = await orchestrate(['proj:L1'], { cwd: s.parent, env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') }, deps);
+  return { code, out: out.join('\n'), err: err.join('\n') };
+}
+
+describe('(L61/t3) le vrai fils lit ses gabarits dans la copie', () => {
+  it('un gabarit modifié dans le paquet courant après la copie n\'est pas vu : le brief de revue vient de la copie', async () => {
+    const pkg = livePackage();
+    const live = join(pkg, 'templates/orchestrate/review.md');
+    const s = setup({ implement: [impl], review: [{}] });
+    // Entre la copie et le démarrage du fils : le paquet courant change (le fils lit ses gabarits au départ).
+    const r = await realWave(pkg, s, () => writeFileSync(live, 'GABARIT MODIFIE {{lot}}\n'));
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(readFileSync(live, 'utf8')).toContain('GABARIT MODIFIE');
+    const review = s.calls().find((c) => c.kind === 'review')!;
+    expect(review.argv[1]).toContain('Review lot `L1`');
+    expect(review.argv[1]).not.toContain('GABARIT MODIFIE');
+  });
 });

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, realpathSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +11,23 @@ export const PACKAGE_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 export const SNAPSHOT_ENV = 'CADENCE_SNAPSHOT';
 /** Vague déjà réservée (et copiée) par le processus d'origine : le processus relancé la reprend telle quelle. */
 export const RESERVED_ENV = 'CADENCE_WAVE_RESERVED';
+
+/** Environnement sans les variables de relance : le fils les lit, il ne les transmet ni aux sessions ni aux commandes du projet. */
+export function withoutLaunchVars(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const { [SNAPSHOT_ENV]: _s, [RESERVED_ENV]: _r, ...rest } = env;
+  return rest;
+}
+
+const real = (p: string) => {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+};
+
+/** Vrai fils : CADENCE_SNAPSHOT désigne CE paquet (la copie qui s'exécute). Une valeur héritée d'une autre vague ne compte pas. */
+export const isSnapshotChild = (env: NodeJS.ProcessEnv, root = PACKAGE_ROOT): boolean => !!env[SNAPSHOT_ENV] && real(env[SNAPSHOT_ENV]!) === real(root);
 
 /** Ce du paquet qui sert à l'exécution d'une vague ; node_modules est lié, jamais copié. */
 const COPIED = ['bin', 'dist', 'templates', 'agents', 'skills', 'package.json'];

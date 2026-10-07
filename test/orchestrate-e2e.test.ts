@@ -66,9 +66,23 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const base = join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1');
     expect(JSON.parse(readFileSync(join(base, '1-implement.json'), 'utf8')).tokens.counted).toBe(115);
     expect(git(s.dir, 'status', '--porcelain')).toBe('');
+    expect(i.leaked).toEqual([]);
     // L61 : la vague a tourné depuis son instantané (copie du paquet dans le dossier de la vague)
     expect(existsSync(join(base, '../tool/bin/cadence.js'))).toBe(true);
     expect(existsSync(join(base, '../tool/dist/orchestrate/snapshot.js'))).toBe(true);
+  });
+
+  it('(L61/t1) variables de relance héritées d\'une autre vague : ignorées, et aucune session ne les voit', async () => {
+    const s = setup({ implement: [impl], review: [{}] });
+    const out: string[] = [];
+    const err: string[] = [];
+    const env = { ...process.env, ...s.env, CADENCE_SNAPSHOT: '/une/autre/vague/tool', CADENCE_WAVE_RESERVED: '2000-01-01-0000' };
+    const code = await run(['orchestrate', 'proj:L1'], { cwd: s.parent, env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') });
+    expect(err.join('\n')).toBe('');
+    expect(code).toBe(0);
+    expect(existsSync(join(s.parent, '.cadence/runs/2026-10-04-1412/wave.json'))).toBe(true);
+    expect(existsSync(join(s.parent, '.cadence/runs/2000-01-01-0000'))).toBe(false);
+    for (const c of s.calls()) expect(c.leaked, c.kind).toEqual([]);
   });
 
   it('sortie illisible : lot en échec, code 1 ; pas de nouvel essai', async () => {

@@ -20,7 +20,7 @@ import { schemaFor } from './schemas.js';
 import { excludeState, lotKey, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
-import { PACKAGE_ROOT, RESERVED_ENV, SNAPSHOT_ENV, snapshotExists, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
+import { PACKAGE_ROOT, RESERVED_ENV, isSnapshotChild, snapshotExists, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -364,10 +364,10 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     return 0;
   }
   // Processus relancé depuis l'instantané : la vague a déjà été réservée par le processus d'origine.
-  const reserved = io.env[RESERVED_ENV];
+  const reserved = deps.snapshot ? undefined : io.env[RESERVED_ENV];
   const store = reserved ? new RunStore(launch, reserved) : RunStore.reserve(launch, args.wave ?? defaultWaveBase(io), { exact: args.wave !== undefined });
   if (!store) return waveExists(args.wave!, io);
-  if (deps.snapshot && !io.env[SNAPSHOT_ENV]) {
+  if (deps.snapshot) {
     try {
       const tool = takeSnapshot(store.dir, deps.snapshot.packageRoot);
       const code = await deps.snapshot.reexec(tool, argv, { ...io.env, [RESERVED_ENV]: store.id }, io);
@@ -533,7 +533,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
 async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, today: Day): Promise<number> {
   const store = typeof args.resume === 'string' ? RunStore.find(launch, args.resume) : RunStore.last(launch, { unfinished: true });
   if (!store) throw new RafError(typeof args.resume === 'string' ? `vague inconnue : ${args.resume}` : 'aucune vague à reprendre dans ce dossier');
-  if (deps.snapshot && !io.env[SNAPSHOT_ENV]) {
+  if (deps.snapshot) {
     // La reprise tourne sur l'instantané de la vague, jamais sur le dist/ courant ; une vague d'avant L61 n'en a pas.
     if (snapshotExists(store.dir)) return deps.snapshot.reexec(toolDirOf(store.dir), argv, io.env, io);
     io.err(`orchestrate : vague ${store.id} sans instantané (antérieure à L61) : reprise avec le dist/ et les gabarits courants`);
@@ -620,6 +620,9 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
 /** Dépendances réelles : `claude` (ou CADENCE_CLAUDE_BIN), agents et gabarits du paquet, journaux de ~/.claude. */
 export function realOrchestrateDeps(env: NodeJS.ProcessEnv): OrchestrateDeps {
   const bin = env.CADENCE_CLAUDE_BIN || 'claude';
+  const child = isSnapshotChild(env);
+  // Lues ici, une fois : ni les sessions ni les commandes du projet ne reçoivent les variables de relance.
+  env = withoutLaunchVars({ ...env });
   return {
     claude: realClaude(bin, env),
     claudeInfo: () => {
@@ -632,7 +635,7 @@ export function realOrchestrateDeps(env: NodeJS.ProcessEnv): OrchestrateDeps {
       }
     },
     agentsDir: AGENTS_DIR,
-    snapshot: env[SNAPSHOT_ENV] ? undefined : { packageRoot: PACKAGE_ROOT, reexec: spawnReexec },
+    snapshot: child ? undefined : { packageRoot: PACKAGE_ROOT, reexec: spawnReexec },
     claudeHome: env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'),
   };
 }

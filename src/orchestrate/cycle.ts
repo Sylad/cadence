@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
@@ -121,7 +122,7 @@ const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g, '\\$&
 /** Commande du projet, asynchrone : la boucle d'événements reste libre (délai de l'autre créneau, signaux). Son groupe est tué au délai et au signal. */
 function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
-    const child = spawn('sh', ['-c', command], { cwd: c.lot.repo, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawn('sh', ['-c', command], { cwd: c.lot.repo, env: withoutLaunchVars(process.env), stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const pid = child.pid;
     if (pid === undefined) {
       child.once('error', (e) => resolve({ code: 127, output: String(e.message) }));

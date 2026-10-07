@@ -1,13 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { afterEach, describe, expect, it } from 'vitest';
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { orchestrate, type OrchestrateDeps } from '../src/orchestrate/command.js';
+import { orchestrate, realOrchestrateDeps, type OrchestrateDeps } from '../src/orchestrate/command.js';
 import { RESERVED_ENV, SNAPSHOT_ENV } from '../src/orchestrate/snapshot.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { Plan } from '../src/plan.js';
-import { claudeOut, commitFile, git, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
+import { runLot } from '../src/orchestrate/cycle.js';
+import { claudeOut, commitFile, git, harness, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
 import { removeDryRunBriefs, tempDir } from './helpers.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -132,7 +133,7 @@ describe('L61 — instantané de la vague (<vague>/tool/)', () => {
     const { parent } = project();
     const s = setup();
     const r = ioOf(parent, { [SNAPSHOT_ENV]: '/x', [RESERVED_ENV]: 'w1' });
-    expect(await orchestrate(['a:L1'], r.io, s.deps)).toBe(0);
+    expect(await orchestrate(['a:L1'], r.io, { ...s.base, templatesDir: join(s.pkg, 'templates/orchestrate') })).toBe(0);
     expect(s.reexecs).toHaveLength(0);
     expect(new RunStore(parent, 'w1').readWave()!.status).toBe('done');
     expect(existsSync(join(parent, '.cadence/runs/w1/tool'))).toBe(false);
@@ -172,3 +173,51 @@ describe('L61 — instantané de la vague (<vague>/tool/)', () => {
   });
 });
 
+
+describe('(L61/t1) variables de relance : lues par le fils, jamais transmises', () => {
+  const saved = { snap: process.env[SNAPSHOT_ENV], res: process.env[RESERVED_ENV] };
+  afterEach(() => {
+    for (const [k, v] of [[SNAPSHOT_ENV, saved.snap], [RESERVED_ENV, saved.res]] as const) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  });
+
+  it('une session claude ne voit ni CADENCE_SNAPSHOT ni CADENCE_WAVE_RESERVED', async () => {
+    const dir = tempDir();
+    const dump = join(dir, 'env.txt');
+    const bin = join(dir, 'claude.sh');
+    writeFileSync(bin, '#!/bin/sh\nenv > "$DUMP"\n');
+    chmodSync(bin, 0o755);
+    const env = { PATH: process.env.PATH, DUMP: dump, CADENCE_CLAUDE_BIN: bin, [SNAPSHOT_ENV]: ROOT, [RESERVED_ENV]: 'w1' };
+    await realOrchestrateDeps(env).claude([], { cwd: dir, env: { CADENCE_ORCHESTRATED: 'w1' }, timeoutMs: 10_000 });
+    const seen = readFileSync(dump, 'utf8');
+    expect(seen).toContain('CADENCE_ORCHESTRATED=w1');
+    expect(seen).not.toContain(SNAPSHOT_ENV);
+    expect(seen).not.toContain(RESERVED_ENV);
+  });
+
+  it('une commande sh du projet (orchestrate.start) ne les voit pas non plus', async () => {
+    const h = harness({ script: {} });
+    const dump = join(tempDir(), 'env.txt');
+    process.env[SNAPSHOT_ENV] = '/x';
+    process.env[RESERVED_ENV] = 'w1';
+    const c = h.lot('L1', { readOnlyPlan: true }, { start: `env > ${dump}` });
+    const plan = c.loadPlan;
+    c.loadPlan = () => {
+      const p = plan();
+      Object.defineProperty(p, 'readonly', { get: () => true });
+      return p;
+    };
+    await runLot(c);
+    const seen = readFileSync(dump, 'utf8');
+    expect(seen).toContain('PATH=');
+    expect(seen).not.toContain(SNAPSHOT_ENV);
+    expect(seen).not.toContain(RESERVED_ENV);
+  });
+
+  it('une variable héritée d\'une autre vague (CADENCE_SNAPSHOT qui n\'est pas CE paquet) ne fait pas passer pour un fils', () => {
+    expect(realOrchestrateDeps({ [SNAPSHOT_ENV]: '/une/autre/vague/tool' }).snapshot).toBeDefined();
+    expect(realOrchestrateDeps({ [SNAPSHOT_ENV]: ROOT }).snapshot).toBeUndefined();
+  });
+});

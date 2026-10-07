@@ -184,6 +184,15 @@ describe('doublon de run pour un même tag (L64)', () => {
     expect(r.output).toContain('published=false');
   });
 
+  it('erreur du registre autre que E404 (5xx, réseau) : échoue, n\'écrit aucun published', () => {
+    for (const out of ['npm error code E500', 'npm error code ENOTFOUND']) {
+      const r = runRegistry({ out, code: 1 });
+      expect(r.status).toBe(1);
+      expect(r.stdout).toContain(out);
+      expect(r.output).toBe('');
+    }
+  });
+
   it('npm publish est sauté quand la version est déjà publiée, la release n\'est créée que si absente', () => {
     expect(workflow).toMatch(/if: steps\.registry\.outputs\.published != 'true'\n\s+run: npm publish/);
     expect(workflow).toMatch(/gh release view "\$GITHUB_REF_NAME"[\s\S]*gh release create/);

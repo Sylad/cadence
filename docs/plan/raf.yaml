@@ -815,6 +815,9 @@ lots:
       - { id: t2, title: "lot visible : implement et fix chargent aussi Playwright (--output-dir dans le dossier de la vague), pour les lots de revue UX (evatosorus L3, jobmail L2, warhammer L2) ; dry-run et README", status: todo }
       - { id: t3, title: "brief ux : la phrase de uxText (cycle.ts:198, « shared tmp folder ») contredit ux.md (noms relatifs dans le dossier de la vague) — formuler selon l'étape + test du brief ux rendu avec config.ux", status: todo }
       - { id: t4, title: "petit lot visible : review-small charge Playwright (seule revue d'ergonomie de la vague), même dossier de captures ; brief review-small, dry-run, README", status: todo }
+      - { id: t5, title: "review-small d'un petit lot visible : outils Playwright accessibles à l'agent code-reviewer (tools restreints sans mcp__playwright) ; test sur le JSON --agents + essai réel haiku", status: todo }
+      - { id: t6, title: "dry-run : test d'un petit lot visible — review-small affiche mcp : playwright (command.ts:287)", status: todo }
+      - { id: t7, title: "shotsText : retirer la branche CLI jamais rendue (code mort)", status: todo }
   - id: L75
     title: "orchestrate : tests et build lancés par le programme avant la revue, résultats passés au relecteur — la revue Opus de ccc L27 a reconstruit base+head et relancé la suite 2×, puis attendu 10 min en boucle (06-10)"
     status: todo

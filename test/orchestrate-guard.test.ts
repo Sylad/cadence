@@ -125,6 +125,9 @@ describe('cadence.yaml : orchestrate', () => {
   it('ux objet : url en http(s) exigée, timeout seulement avec command ET url (L60)', () => {
     expect(read('orchestrate:\n  ux: { command: npm start, url: localhost:4200 }\n')).toThrow(/ux\.url.*http/);
     expect(read('orchestrate:\n  ux: { url: ftp://x }\n')).toThrow(/ux\.url/);
+    expect(read('orchestrate:\n  ux: { command: npm start, url: "http://localhost:42OO/" }\n')).toThrow(/ux\.url.*invalide/);
+    expect(read('orchestrate:\n  ux: { url: "http://" }\n')).toThrow(/ux\.url.*invalide/);
+    expect(read('orchestrate:\n  ux: "http://localhost:42OO/"\n')).toThrow(/ux\.url.*invalide/);
     expect(read('orchestrate:\n  ux: { command: npm start, timeout: 90 }\n')).toThrow(/ux\.timeout.*command ET url/);
     expect(read('orchestrate:\n  ux: { url: http://localhost:4200, timeout: 90 }\n')).toThrow(/ux\.timeout.*command ET url/);
     expect(read('orchestrate:\n  ux: { url: https://localhost:4200 }\n')().ux).toEqual({ url: 'https://localhost:4200' });

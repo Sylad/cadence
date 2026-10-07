@@ -178,6 +178,13 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   const o = (raw as { orchestrate?: unknown } | null)?.orchestrate;
   if (o == null) return config;
   const bad = (what: string) => new RafError(`${file} : orchestrate.${what}`);
+  const checkUxUrl = (url: string) => {
+    try {
+      new URL(url);
+    } catch {
+      throw bad(`ux.url : URL invalide (reçu « ${url} »)`);
+    }
+  };
   if (!isObject(o)) throw new RafError(`${file} : orchestrate doit être un objet`);
   for (const k of Object.keys(o)) if (!ORCH_KEYS.includes(k)) throw bad(`${k} inconnu (attendu : ${ORCH_KEYS.join(', ')})`);
   for (const k of ['start', 'verdict', 'test'] as const) {
@@ -186,12 +193,17 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     config[k] = (o[k] as string).trim();
   }
   if (o.ux != null) {
-    if (typeof o.ux === 'string' && o.ux.trim()) config.ux = /^https?:\/\//.test(o.ux.trim()) ? { url: o.ux.trim() } : { command: o.ux.trim() };
+    if (typeof o.ux === 'string' && o.ux.trim()) {
+      const u = o.ux.trim();
+      if (/^https?:\/\//.test(u)) checkUxUrl(u);
+      config.ux = /^https?:\/\//.test(u) ? { url: u } : { command: u };
+    }
     else if (isObject(o.ux) && (o.ux.url != null || o.ux.command != null)) {
       for (const k of Object.keys(o.ux)) if (k !== 'url' && k !== 'command' && k !== 'timeout') throw bad(`ux.${k} inconnu (attendu : url, command, timeout)`);
       config.ux = {};
       for (const k of ['url', 'command'] as const) if (o.ux[k] != null) config.ux[k] = String(o.ux[k]);
       if (config.ux.url != null && !/^https?:\/\//.test(config.ux.url)) throw bad(`ux.url : une URL http(s) attendue (reçu « ${config.ux.url} »)`);
+      if (config.ux.url != null) checkUxUrl(config.ux.url);
       if (o.ux.timeout != null) {
         if (config.ux.url == null || config.ux.command == null) throw bad('ux.timeout : réservé à la forme { command ET url } (le programme n\'attend la réponse que quand il lance l\'application)');
         if (typeof o.ux.timeout !== 'number' || !(o.ux.timeout > 0)) throw bad('ux.timeout : nombre de secondes positif attendu');

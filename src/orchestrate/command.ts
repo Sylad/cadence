@@ -38,6 +38,8 @@ export interface OrchestrateDeps {
   agentsDir: string;
   templatesDir?: string;
   claudeHome?: string;
+  /** Création du dossier de liens Node d'une vague ; défaut `linkNodeBin` (injectable pour simuler un échec). */
+  linkNode?: typeof linkNodeBin;
 }
 
 export const DEFAULT_BUDGET = 2_000_000;
@@ -354,16 +356,17 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (!store) return waveExists(args.wave!, io);
   const id = store.id;
   const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)) };
-  for (const l of pre.lots) {
-    if (l.node) l.node.link = linkNodeBin(store.dir, l.node.version, l.node.bin);
-    store.writeLot(l);
-  }
   // Une vague qui n'a pas atteint `wave.json` (refus au verrou, démarrage en échec) ne laisse pas son dossier réservé :
   // le même `--wave` se relance, et `reserve` ne le prend pas pour une vague existante.
   const abandon = () => {
     if (!existsSync(join(store.dir, 'wave.json'))) rmSync(store.dir, { recursive: true, force: true });
   };
   try {
+    // Dans la section gardée : un lien ou une écriture qui échoue ne laisse pas la vague réservée sans wave.json.
+    for (const l of pre.lots) {
+      if (l.node) l.node.link = (deps.linkNode ?? linkNodeBin)(store.dir, l.node.version, l.node.bin);
+      store.writeLot(l);
+    }
     const code = await execute(wave, pre.lots, store, io, deps, today, maxSessions(args, io));
     abandon();
     return code;
@@ -554,7 +557,7 @@ async function resume(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, laun
     return 2;
   }
   for (const [l, node] of nodes) {
-    if (node.kind === 'ok') l.node = { version: node.version, wanted: node.wanted, bin: node.bin, link: linkNodeBin(store.dir, node.version, node.bin) };
+    if (node.kind === 'ok') l.node = { version: node.version, wanted: node.wanted, bin: node.bin, link: (deps.linkNode ?? linkNodeBin)(store.dir, node.version, node.bin) };
     else delete l.node;
   }
   // Une étape interrompue (signal, crash) dont les tokens n'ont pas été comptés : relue dans le journal de sa session.

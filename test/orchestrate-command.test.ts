@@ -755,6 +755,21 @@ describe('Node du projet (.nvmrc)', () => {
     }
   });
 
+  it('L80/t6 — un lien qui échoue au départ libère la vague : le même --wave se relance', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    writeFileSync(join(dirs.a, '.nvmrc'), '22');
+    const nvm = fakeNvm(['v22.22.3']);
+    const f = fakeDeps();
+    f.deps.linkNode = () => {
+      throw new Error('EACCES: symlink');
+    };
+    await expect(run(parent, ['a:L1', '--wave', 'w1'], f.deps, { NVM_DIR: nvm })).rejects.toThrow(/EACCES/);
+    expect(existsSync(join(parent, '.cadence/runs/w1'))).toBe(false);
+    expect(f.calls).toEqual([]);
+    delete f.deps.linkNode;
+    expect((await run(parent, ['a:L1', '--wave', 'w1'], f.deps, { NVM_DIR: nvm })).code).toBe(0);
+  });
+
   it('--dry-run : une ligne node par lot avec .nvmrc, rien sans', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
     writeFileSync(join(dirs.a, '.nvmrc'), '22');

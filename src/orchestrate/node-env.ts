@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -6,11 +6,21 @@ import { join } from 'node:path';
 export interface NodeFs {
   read: (file: string) => string | null;
   list: (dir: string) => string[];
+  /** Le fichier existe et son bit d'exécution est posé (lien suivi : un lien cassé n'est pas exécutable). */
+  executable: (file: string) => boolean;
 }
 
 export const realNodeFs: NodeFs = {
   read: (f) => (existsSync(f) ? readFileSync(f, 'utf8') : null),
   list: (d) => (existsSync(d) ? readdirSync(d) : []),
+  executable: (f) => {
+    try {
+      accessSync(f, constants.X_OK);
+      return statSync(f).isFile();
+    } catch {
+      return false;
+    }
+  },
 };
 
 export type NodeChoice =
@@ -44,12 +54,19 @@ export function resolveNode(repo: string, versionsDir: string, fs: NodeFs = real
   const m = /^v?(\d+(?:\.\d+){0,2})$/.exec(wanted);
   if (!m) return { kind: 'missing', message: `.nvmrc « ${wanted} » : version non résoluble (seuls 22, v22, 22.22, v22.22.3 sont compris)` };
   const want = m[1];
-  const found = fs
+  const matching = fs
     .list(versionsDir)
     .map((n) => /^v(\d+\.\d+\.\d+)$/.exec(n)?.[1])
     .filter((v): v is string => !!v && (v === want || v.startsWith(`${want}.`)))
     .sort(cmp);
-  if (found.length === 0) return { kind: 'missing', message: `.nvmrc ${wanted} : aucun Node installé correspondant dans ${versionsDir}` };
+  if (matching.length === 0) return { kind: 'missing', message: `.nvmrc ${wanted} : aucun Node installé correspondant dans ${versionsDir}` };
+  // Une version dont le bin n'a pas de node exécutable (install vide ou cassée) donnerait un dossier de liens vide,
+  // donc un repli silencieux sur le node par défaut : on l'écarte, et une plus basse valide peut être retenue.
+  const found = matching.filter((v) => fs.executable(join(versionsDir, `v${v}`, 'bin', 'node')));
+  if (found.length === 0) {
+    const names = matching.map((v) => `v${v}`).join(', ');
+    return { kind: 'missing', message: `.nvmrc ${wanted} : ${names} trouvée(s) dans ${versionsDir} mais sans node exécutable dans bin (installation vide ou cassée)` };
+  }
   const best = found[found.length - 1];
   return { kind: 'ok', version: `v${best}`, wanted, bin: join(versionsDir, `v${best}`, 'bin') };
 }

@@ -611,7 +611,7 @@ describe('Node du projet (.nvmrc)', () => {
     const dir = tempDir();
     for (const v of versions) {
       mkdirSync(join(dir, 'versions/node', v, 'bin'), { recursive: true });
-      for (const n of ['node', 'npm', 'npx', 'raf', 'cadence']) writeFileSync(join(dir, 'versions/node', v, 'bin', n), '#!/bin/sh\n');
+      for (const n of ['node', 'npm', 'npx', 'raf', 'cadence']) writeFileSync(join(dir, 'versions/node', v, 'bin', n), '#!/bin/sh\n', { mode: 0o755 });
     }
     return dir;
   }

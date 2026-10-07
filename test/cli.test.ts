@@ -405,4 +405,59 @@ describe('titre public trop long (L106)', () => {
     raf(dir, 'public', 'L1', long);
     expect(raf(dir, 'check').out).not.toContain('titre public');
   });
+
+  const entreeLongue = (dir: string, title = long) => {
+    mkdirSync(join(dir, 'docs/nouveautes'), { recursive: true });
+    writeFileSync(join(dir, 'docs/nouveautes/2026-10-07-x.md'), `---\ntitle: ${title}\ndate: 2026-10-07\ncreated: 2026-10-07T10:00:00+02:00\nlots: [L1]\ncaptures: []\nnocapture: test\n---\ncorps\n`);
+  };
+
+  it('raf check signale le titre repris de la Nouveauté d\'un lot visible terminé sans public (cas ccc L32)', () => {
+    const dir = setup();
+    raf(dir, 'done', 'L1', '--force');
+    entreeLongue(dir);
+    const r = raf(dir, 'check');
+    expect(r.out).toContain('L1');
+    expect(r.out).toContain('88');
+    expect(r.out).toContain('Nouveauté');
+    raf(dir, 'public', 'L1', 'court'); // un public: l'emporte sur le titre de la Nouveauté
+    expect(raf(dir, 'check').out).not.toContain('88 caractères');
+  });
+
+  it('raf done refuse un lot visible dont la Nouveauté, reprise par le site, dépasse la limite déclarée', () => {
+    const dir = setup('news:\n  publicTitleMax: 80\n');
+    entreeLongue(dir);
+    const r = raf(dir, 'done', 'L1', '--force');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('88');
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('status: done');
+    raf(dir, 'public', 'L1', 'court');
+    expect(raf(dir, 'done', 'L1', '--force').code).toBe(0);
+  });
+
+  it('news new sans --title refuse un titre de lot trop long et propose --title', () => {
+    const dir = setup('news:\n  publicTitleMax: 80\n');
+    writeFileSync(join(dir, 'docs/plan/raf.yaml'), readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8').replace('title: A', `title: ${long}`));
+    const r = raf(dir, 'news', 'new', 'L1');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('--title');
+    expect(raf(dir, 'news', 'new', 'L1', '--title', 'court').code).toBe(0);
+  });
+
+  it('news new mesure le titre après fusion des espaces', () => {
+    const dir = setup('news:\n  publicTitleMax: 80\n');
+    const t = `${'a'.repeat(40)}${' '.repeat(30)}${'b'.repeat(40)}`; // 110 brut, 81 fusionné
+    expect(raf(dir, 'news', 'new', 'L1', '--title', t).code).not.toBe(0);
+    const ok = `${'a'.repeat(40)}${' '.repeat(30)}${'b'.repeat(39)}`; // 80 fusionné
+    expect(raf(dir, 'news', 'new', 'L1', '--title', ok).code).toBe(0);
+  });
+
+  it('news new écrit un titre de plus de 80 caractères sur une seule ligne', () => {
+    const dir = setup();
+    const titre = Array.from({ length: 16 }, (_, i) => `mot${i}`).join(' '); // > 80, avec espaces
+    const r = raf(dir, 'news', 'new', 'L1', '--title', titre);
+    expect(r.code, r.err).toBe(0);
+    const f = readFileSync(r.out.trim(), 'utf8');
+    expect(f.split('\n').find((l) => l.startsWith('title:'))).toBe(`title: ${titre}`);
+    expect(f.split('\n')[2]).toMatch(/^date:/);
+  });
 });

@@ -5,7 +5,7 @@ import { parse } from 'yaml';
 import { changedFiles, fileAt, readCommits, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import { readNewsConfig } from './config.js';
-import { loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong } from './news.js';
+import { loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong, reusedNewsTitle } from './news.js';
 import { isRecurring } from './recurring.js';
 import { isOpen, type Lot, type Plan, type Verdict } from './plan.js';
 
@@ -98,11 +98,14 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
   const gates = plan.readonly ? [] : [...uxIssues(plan), ...reviewIssues(plan, root, all.byLot)];
   // Un titre public trop long fait échouer le build du site : signalé dès ici, avec 80 caractères sans clé déclarée.
   const max = readNewsConfig(plan.configFile ?? join(root, 'cadence.yaml')).publicTitleMax ?? PUBLIC_TITLE_DEFAULT;
+  // Sans public:, le site reprend le titre de la Nouveauté la plus récente du lot terminé (cas ccc L32).
+  const entries = loadEntries(newsDir);
   const titles = lots.flatMap((l) => {
-    const m = l.public ? publicTitleTooLong(l.public, max) : null;
-    return m ? [{ message: `${l.id} : ${m}` }] : [];
+    const reused = reusedNewsTitle(l, entries);
+    const m = l.public ? publicTitleTooLong(l.public, max) : reused ? publicTitleTooLong(reused, max) : null;
+    return m ? [{ message: `${l.id} : ${reused && !l.public ? m.replace('titre public', 'titre public repris de la Nouveauté') : m}` }] : [];
   });
-  const issues = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, loadEntries(newsDir), newsDir), ...titles, ...gates,
+  const issues = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, entries, newsDir), ...titles, ...gates,
     ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
   // Un plan en lecture seule se corrige avec l'outil du projet : ne pas conseiller une commande raf qui refuserait.
   return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf start .*$/, '') })) : issues;

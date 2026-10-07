@@ -37,6 +37,15 @@ export function publicTitleTooLong(text: string, max: number): string | null {
   return n > max ? `titre public de ${n} caractères, au-delà de la limite de ${max} (news.publicTitleMax) que la page Plan applique au build : « ${text.trim()} »` : null;
 }
 
+/**
+ * Titre que le site reprend de la Nouveauté la plus récente (`entries`, plus récentes d'abord) pour un lot visible
+ * terminé sans `public:` ; null si le lot n'est pas dans ce cas ou qu'aucune entrée ne le cite.
+ */
+export function reusedNewsTitle(lot: Lot, entries: Entry[]): string | null {
+  if (!lot.visible || lot.status !== 'done' || lot.public) return null;
+  return entries.find((e) => e.lots.includes(lot.id))?.title ?? null;
+}
+
 const CREATED_EMPTY = 'created vide — cadence news stamp';
 const CREATED = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?$/;
 const OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/;
@@ -198,7 +207,7 @@ export function newEntry(dir: string, lots: string[], rawTitle: string, today: D
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     path,
-    `---\ntitle: ${stringify(title).trimEnd()}\ndate: ${today}\ncreated: ${toStamp(now)}\nlots: [${lots.join(', ')}]\ncaptures: []\n# une capture peut dire ce qu'elle montre : captures: [${CAPTURE_SHAPE.replace('chemin', 'captures/x.png')}]\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
+    `---\ntitle: ${stringify(title, { lineWidth: 0 }).trimEnd()}\ndate: ${today}\ncreated: ${toStamp(now)}\nlots: [${lots.join(', ')}]\ncaptures: []\n# une capture peut dire ce qu'elle montre : captures: [${CAPTURE_SHAPE.replace('chemin', 'captures/x.png')}]\n# nocapture: raison, quand une capture n'a pas de sens\n---\nCe qui change pour l'utilisateur.\n`,
   );
   return path;
 }

@@ -151,10 +151,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const loadPlan = () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
   const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));
   // Limite DÉCLARÉE (news.publicTitleMax) : sans clé, seul « raf check » avertit ; avec, la pose d'un titre public est refusée.
-  const refuseLongTitle = (text: string) => {
+  const refuseLongTitle = (text: string, hint = '') => {
     const max = readNewsConfig(configPath).publicTitleMax;
     const m = max === undefined ? null : publicTitleTooLong(text, max);
-    if (m) throw new RafError(m);
+    if (m) throw new RafError(m + hint);
   };
   // Une session d'orchestration ne ferme pas un lot, n'enregistre pas de verdict à la place du lead et ne livre pas.
   if (io.env.CADENCE_ORCHESTRATED && (command === 'done' || command === 'ux' || command === 'review' || command === 'deliver')) {
@@ -202,8 +202,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const status: Status = command === 'start' ? 'doing' : command === 'done' ? 'done' : 'dropped';
       // Le titre public part au site : un titre au-delà de la limite déclarée y ferait échouer le build.
       if (status === 'done' && !rest[0].includes('/')) {
-        const pub = plan.lots().find((l) => l.id === rest[0])?.public;
-        if (pub) refuseLongTitle(pub);
+        const lot = plan.lots().find((l) => l.id === rest[0]);
+        // Sans public: d'un lot visible, le site reprend le titre de sa Nouveauté la plus récente.
+        const pub = lot?.public ?? (lot?.visible ? loadEntries(newsDir).find((e) => e.lots.includes(lot.id))?.title : undefined);
+        if (pub) refuseLongTitle(pub, lot?.public ? '' : ' — titre de la Nouveauté reprise par le site : corriger l\'entrée ou poser raf public');
       }
       // Le plan ne lit pas git : lui dire combien de commits du lot sa revue ne couvre pas quand elle est exigée.
       const unreviewed = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? unreviewedWork(plan, root, rest[0]) : 0;
@@ -513,15 +515,16 @@ function news(
   today: Day,
   values: { title?: string; output?: string },
   io: Io,
-  refuseLongTitle: (text: string) => void,
+  refuseLongTitle: (text: string, hint?: string) => void,
 ): number {
   const lots = plan.lots();
   switch (sub) {
     case 'new': {
       if (args.length === 0) throw new RafError('usage : cadence news new <lot…> [--title t]');
       for (const id of args) plan.lot(id);
-      const title = values.title ?? plan.lot(args[0]).public ?? plan.lot(args[0]).title;
-      refuseLongTitle(title);
+      // Mesuré comme newEntry l'écrit : espaces fusionnés.
+      const title = (values.title ?? plan.lot(args[0]).public ?? plan.lot(args[0]).title).replace(/\s+/g, ' ').trim();
+      refuseLongTitle(title, values.title === undefined ? ' — donner un titre court : cadence news new <lot> --title "…"' : '');
       io.out(newEntry(dir, args, title, today, io.now()));
       return 0;
     }

@@ -1184,6 +1184,8 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "Décision lead 07-10 : la limite vient de cadence.yaml (clé news.publicTitleMax, défaut 80) ; sans clé, raf check avertit seulement, raf public / raf done / cadence news refusent au-delà de la limite déclarée." }
   - id: L107
     title: "raf show : les lignes suivantes d'une note sur plusieurs lignes sont décalées sous « notes : » (aujourd'hui en colonne 0, cli.ts:245) ; aide et README sans « en entier / in full », ou affichage des sous-tâches et de l'estimation — revue L102"
     status: todo
@@ -1217,3 +1219,10 @@ lots:
     finished: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "abandonné : déjà fait par la correction de L77 (8e7974f, 5725a0f, 0e9aa6c) — détecté par le precheck de L77 lui-même (vague 2026-10-07-2103, 20 k tokens, < 1 min)" }
+  - id: L111
+    title: "Plugin cadence-hud dans la marketplace du dépôt (plugins/cadence-hud) : bande au-dessus du prompt Claude Code — contexte, fenêtres 5 h/7 j, coût, agents, vagues orchestrate lues dans ~/.cadence/orchestrate et .cadence/runs ; source = ~/.claude/mods/cadence-hud (07-10, 6 tests claude plugin test verts) ; entrée marketplace.json, exclu du paquet npm, README d'installation (/plugin install cadence-hud --marketplace Sylad/cadence) ; réalise le point (3) de L49"
+    public: "Une bande d'état Claude Code : contexte, quota, coût, agents et vagues orchestrate"
+    status: todo
+    estimate: 0.5
+    visible: true
+    created: 2026-10-07

@@ -23,4 +23,4 @@ Give your final report as the structured output, not as free text. If the plan i
 (read-only for `raf`), use that tool's commands named in the project's CLAUDE.md, never `raf start|done|note`.
 {{commits}}
 {{reponse}}
-Playwright (browser MCP or CLI): write every output (screenshots, snapshots, traces, downloads) outside the repository, never in `.playwright-mcp/` or anywhere in the tree — pass `--output-dir /tmp/<name>` (or the project's own tmp folder outside the repository) and give an absolute `/tmp/...` path to screenshots; the repository must stay clean.
+Playwright (browser MCP or CLI): give screenshots, snapshots and traces a relative file name only (e.g. `page-home.png`); they land under `.playwright-mcp/`, which is ignored by git. Never an absolute path such as one under `/tmp`, never the `--output-dir` option (the server's launch argument, which a session cannot set), and never write browser outputs anywhere else in the tree; the repository must stay clean.

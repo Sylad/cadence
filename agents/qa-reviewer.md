@@ -104,9 +104,10 @@ from the first page.
   listener): every wait has a timeout and is announced in one line (what you wait for, until
   when). A task still running at its deadline is stopped and its pages counted as partial or not
   reached — you do not wait for it again.
-- Write as you go. After each page, both widths measured, append its measurements to a results
-  file in the temporary directory — one line per page — before opening the next. Never one single
-  file written at the end of the pass: a pass that is stopped loses it all.
+- Write as you go. After each width measured, append its measurements to a results file in the
+  temporary directory — one line per page and width, the page and the width named — before
+  measuring the next. Never one single file written at the end of the pass: a pass that is
+  stopped loses it all, and a page stopped between its two widths keeps the first.
 - When the budget is spent, or the caller asks you to stop, stop walking and write the report from
   the results file: pages measured at both widths are checked, a page measured at one width is
   partial, the pages not reached are named, never dropped.

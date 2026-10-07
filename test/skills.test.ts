@@ -298,7 +298,7 @@ describe('skills install', () => {
     expect(bounded).toContain('Never wait in silence on your own background work');
     expect(bounded).toContain('every wait has a timeout and is announced');
     // Page par page, au fil de l'eau, pas un JSON unique en fin de passage.
-    expect(bounded).toContain('After each page, both widths measured, append its measurements to a results file in the temporary directory — one line per page — before opening the next. Never one single file written at the end of the pass');
+    expect(bounded).toContain('After each width measured, append its measurements to a results file in the temporary directory — one line per page and width, the page and the width named — before measuring the next. Never one single file written at the end of the pass');
     // Le budget épuisé ou l'arrêt demandé : rapport depuis le fichier, partiel nommé.
     expect(bounded).toContain('When the budget is spent, or the caller asks you to stop, stop walking and write the report from the results file');
     expect(bounded).toContain('the pages not reached are named, never dropped');

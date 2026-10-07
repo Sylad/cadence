@@ -760,11 +760,14 @@ those four names (`node`, `npm`, `npx`, `corepack`) are exposed, through symlink
 `bin` (globally installed `raf`, `cadence`, `claude`…) never shadows the tools in the usual `PATH`. `--resume` resolves
 the `.nvmrc` again for every live lot and refuses it like at start if it can no longer be resolved.
 The file is read trimmed (`22`, `v22`, `22.22`, `v22.22.3`); the highest matching version installed under
-`$NVM_DIR/versions/node` (default `~/.nvm/versions/node`) is used. Only the sessions' environment changes,
+`$NVM_DIR/versions/node` (default `~/.nvm/versions/node`) **that has an executable `bin/node`** is used: a higher
+version with an empty or broken `bin` is skipped for a lower valid one (and `--dry-run` says so); if none is valid
+the lot is refused. Only the sessions' environment changes,
 never the orchestrator's own. No `.nvmrc` → nothing changes. A `.nvmrc` that cannot be resolved (`lts/*`, an
 alias, a version not installed) refuses the lot before anything is started (exit 2), naming the requested
 version and the folder searched — there is no silent fallback to the default Node. `--dry-run` prints
-`node : v22.22.3 (.nvmrc 22)` under each lot that has one.
+`node : v22.22.3 (.nvmrc 22)` under each lot that has one, with the skipped versions when it happens
+(`node : v22.9.0 (.nvmrc 22 ; v22.22.3 écartée : pas de node exécutable)`).
 
 Without `start`, a read-only plan's `todo` lot is refused (start it with the project's tool); without
 `verdict`, the review verdict stays in the wave's state and you report it. Only the plan's files

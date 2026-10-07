@@ -741,6 +741,20 @@ describe('Node du projet (.nvmrc)', () => {
     });
   }
 
+  it('L80/t5 — --dry-run : une version plus haute sans node exécutable est écartée et le dit', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    writeFileSync(join(dirs.a, '.nvmrc'), '22');
+    const nvm = fakeNvm(['v22.9.0', 'v22.22.3']);
+    emptyBin(nvm, 'v22.22.3');
+    const r = await run(parent, ['a:L1', '--dry-run'], fakeDeps().deps, { NVM_DIR: nvm });
+    try {
+      expect(r.code).toBe(0);
+      expect(r.out.filter((l) => l.includes('node :'))).toEqual(['  node : v22.9.0 (.nvmrc 22 ; v22.22.3 écartée : pas de node exécutable)']);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it('--dry-run : une ligne node par lot avec .nvmrc, rien sans', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
     writeFileSync(join(dirs.a, '.nvmrc'), '22');

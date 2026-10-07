@@ -33,6 +33,10 @@ describe('resolveNode (.nvmrc)', () => {
   it('version la plus haute sans node exécutable : écartée, la valide plus basse est retenue', () => {
     expect(resolveNode('/repo', V, fsOf('22', inst, ['v22.22.3']))).toMatchObject({ kind: 'ok', version: 'v22.22.2', bin: `${V}/v22.22.2/bin` });
   });
+  it('L80/t5 — les versions écartées (plus hautes que la retenue) sont rendues', () => {
+    expect(resolveNode('/repo', V, fsOf('22', ['v22.22.3', 'v22.22.2', 'v22.9.0'], ['v22.22.3', 'v22.22.2']))).toMatchObject({ kind: 'ok', version: 'v22.9.0', skipped: ['v22.22.3', 'v22.22.2'] });
+    expect(resolveNode('/repo', V, fsOf('22', inst))).not.toHaveProperty('skipped');
+  });
   it('toutes les versions correspondantes sans node : refus explicite, pas de repli', () => {
     const r = resolveNode('/repo', V, fsOf('22', inst, ['v22.22.2', 'v22.22.3', 'v22.9.0']));
     expect(r.kind).toBe('missing');

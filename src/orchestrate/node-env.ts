@@ -25,7 +25,7 @@ export const realNodeFs: NodeFs = {
 
 export type NodeChoice =
   | { kind: 'none' }
-  | { kind: 'ok'; /** Version retenue, `v22.22.3`. */ version: string; /** Demandé dans .nvmrc, tel que lu. */ wanted: string; bin: string }
+  | { kind: 'ok'; /** Version retenue, `v22.22.3`. */ version: string; /** Demandé dans .nvmrc, tel que lu. */ wanted: string; bin: string; /** Versions plus hautes qui correspondaient mais sans node exécutable, de la plus haute à la plus basse (absent si aucune). */ skipped?: string[] }
   | { kind: 'missing'; message: string };
 
 /** Dossier des versions de nvm : `$NVM_DIR/versions/node`, par défaut `~/.nvm/versions/node`. */
@@ -43,7 +43,7 @@ const cmp = (a: string, b: string) => {
 
 /**
  * Node demandé par le `.nvmrc` à la racine d'un projet, résolu dans les versions installées de nvm : la plus haute
- * dont le numéro commence par celui du fichier (`22`, `v22`, `22.22`, `v22.22.3`). Pas de .nvmrc : rien à changer.
+ * dont le numéro commence par celui du fichier (`22`, `v22`, `22.22`, `v22.22.3`) et qui a un node exécutable. Pas de .nvmrc : rien à changer.
  * .nvmrc illisible pour nous (`lts/*`, alias) ou version absente : refus nommant ce qui est demandé et où on a cherché
  * — jamais de repli silencieux sur le node par défaut.
  */
@@ -68,7 +68,8 @@ export function resolveNode(repo: string, versionsDir: string, fs: NodeFs = real
     return { kind: 'missing', message: `.nvmrc ${wanted} : ${names} trouvée(s) dans ${versionsDir} mais sans node exécutable dans bin (installation vide ou cassée)` };
   }
   const best = found[found.length - 1];
-  return { kind: 'ok', version: `v${best}`, wanted, bin: join(versionsDir, `v${best}`, 'bin') };
+  const skipped = matching.filter((v) => cmp(v, best) > 0).reverse().map((v) => `v${v}`);
+  return { kind: 'ok', version: `v${best}`, wanted, bin: join(versionsDir, `v${best}`, 'bin'), ...(skipped.length ? { skipped } : {}) };
 }
 
 /** Les seuls binaires d'une version de Node que les sessions voient : le reste de son bin (raf, cadence, claude… installés en global) ne doit pas masquer ceux du PATH. */

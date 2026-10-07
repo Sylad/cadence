@@ -219,7 +219,7 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
     const small = lot.estimate <= 0.5 || lot.quickwin;
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, model: t.model, readOnlyPlan: plan.readonly });
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
-    if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin };
+    if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };
     lots.push(state);
   }
   return { refusals, lots };
@@ -257,7 +257,11 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     io.out(`  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
-    if (l.node) io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted})`);
+    if (l.node) {
+      const sk = l.node.skipped;
+      const skipped = sk?.length ? ` ; ${sk.join(', ')} ${sk.length > 1 ? 'écartées' : 'écartée'} : pas de node exécutable` : '';
+      io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted}${skipped})`);
+    }
     const steps: { kind: 'implement' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: 'implement', model: l.model }];
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: 'opus' });
     else {

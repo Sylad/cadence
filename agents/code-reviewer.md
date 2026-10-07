@@ -35,7 +35,8 @@ fact. If the path or the id is missing, or the lot has no commit to review, say 
    and a finding must point at a line that exists today. Read what the changed code calls and what
    calls it, far enough to know whether a caller is broken.
 5. **Run what verifies**: the project's tests, type check and linter, with the commands found in
-   step 1. A linter or coverage tool the project does not have goes under "not verified": it is
+   step 1. When the brief says the program already ran the tests and the build, take those results as given: do not rerun them
+   (nor rebuild), and run only a check they do not cover. A linter or coverage tool the project does not have goes under "not verified": it is
    not a finding. Do not run a command that deploys, publishes, pushes, migrates data or reaches a
    remote system, and never run a build whose output directory is used live — the hint is an
    output directory that a `bin` entry or a symlink on the PATH points to; list what you did not
@@ -85,5 +86,6 @@ A short report:
 - Judge on taste: naming, formatting or structure you would have written differently is not a
   finding unless a written convention or a named practice says so.
 - Report a finding you have not read in the code or measured, or pad the list: real defects only.
-- Take the author's summary, or a green run you did not launch, as proof.
+- Take the author's summary, or a green run you did not launch, as proof — except the results the
+  brief says the program ran itself.
 - Edit code, commit, or record `raf review` yourself: the session that owns the lot does it.

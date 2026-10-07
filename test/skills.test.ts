@@ -110,6 +110,8 @@ describe('skills install', () => {
       "on a read-only plan (`cadence.yaml` maps the fields of a file kept by another tool), plain lines for the project's own tool",
       'Untested code that is practically unreachable, and a rule that holds as written while an edge defeats its purpose, are *minor* — unless they can lose or corrupt data',
       'It is the last line of the review; extra sections a caller asks for come after it',
+      'When the brief says the program already ran the tests and the build, take those results as given: do not rerun them',
+      'a green run you did not launch, as proof — except the results the brief says the program ran itself',
     ]) expect(text).toContain(clause);
   });
 

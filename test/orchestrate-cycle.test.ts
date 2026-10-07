@@ -341,7 +341,7 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.warnings).toContain('question ignorée (non-question) : « Aucune question. »');
     expect(c.lot.warnings).toContain('question ignorée (non-question) : « No questions »');
     expect(c.lot.warnings.filter((w) => w.startsWith('question ignorée'))).toHaveLength(2);
-    expect(renderTable(c.wave, [c.lot]).join('\n')).toContain('⚠ question ignorée (non-question) : « Aucune question. »');
+    expect(renderTable({ id: 'w1', created: '2026-10-07T10:00:00Z', cwd: '/x', budget: 2_000_000, consumed: 0, cacheRead: 0, status: 'done', pid: 1, lots: ['demo:L1'] }, [c.lot]).join('\n')).toContain('⚠ question ignorée (non-question) : « Aucune question. »');
   });
 
   it('une vraie question n\'est pas tracée comme ignorée (L52/t2)', async () => {

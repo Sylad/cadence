@@ -9,13 +9,14 @@ import { cadenceHome, liveWaves } from '../src/orchestrate/registry.js';
 import { projectLogDir } from '../src/orchestrate/launch.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
+import { fakeApp } from './fake-app.js';
 import { gitRepo, removeDryRunBriefs, tempDir, testPackage } from './helpers.js';
 
 const FAKE = fileURLToPath(new URL('./fixtures/fake-claude.mjs', import.meta.url));
 const SAMPLE = fileURLToPath(new URL('./fixtures/claude-result.sample.json', import.meta.url));
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
-function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string; remote?: boolean } = {}) {
+function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string; remote?: boolean; visible?: boolean } = {}) {
   const parent = tempDir();
   const dir = join(parent, 'proj');
   mkdirSync(dir);
@@ -24,7 +25,7 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
   const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'proj', 'L', '2026-09-01');
-  plan.add('Un lot', '2026-10-01');
+  plan.add('Un lot', '2026-10-01', { visible: opts.visible });
   plan.save();
   if (opts.cadenceYaml) writeFileSync(join(dir, 'cadence.yaml'), opts.cadenceYaml);
   git(dir, 'add', '.');
@@ -270,6 +271,37 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(existsSync(join(s.dir, '.git/hooks/pre-push'))).toBe(false);
     expect(() => process.kill(pid, 0)).toThrow(); // la session est morte
     expect(() => process.kill(worker[0], 0)).toThrow(); // et le processus de la vague aussi
+  }, 20_000);
+
+  // L60 : le signal reçu pendant la revue UX tue aussi l'application, détachée dans son propre groupe de processus.
+  it('SIGTERM pendant la revue UX : l\'application lancée par le programme est tuée', async () => {
+    const app = await fakeApp(0);
+    const yaml = `orchestrate:\n  ux: { command: ${JSON.stringify(app.command)}, url: ${JSON.stringify(app.url)}, timeout: 20 }\n`;
+    const s = setup({ implement: [impl], ux: [{ sleepMs: 60_000 }] }, { cadenceYaml: yaml, visible: true });
+    const bin = join(testPackage(), 'bin/cadence.js');
+    const child = spawn(process.execPath, [bin, 'orchestrate', 'proj:L1'], { cwd: s.parent, env: { ...process.env, ...s.env, CLAUDE_CONFIG_DIR: tempDir() }, stdio: 'ignore' });
+    const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+    const waitFor = async (what: string, ok: () => boolean) => {
+      for (let i = 0; i < 300 && !ok(); i++) await new Promise((r) => setTimeout(r, 50));
+      if (!ok()) {
+        child.kill('SIGKILL');
+        throw new Error(`délai : ${what}`);
+      }
+    };
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    await waitFor('session UX lancée', () => s.calls().some((c) => c.kind === 'ux') && existsSync(join(app.dir, 'pid')));
+    const pid = Number(readFileSync(join(app.dir, 'pid'), 'utf8'));
+    expect(alive(pid)).toBe(true);
+    child.kill('SIGTERM');
+    await exited;
+    expect(alive(pid)).toBe(false);
   }, 20_000);
 });
 

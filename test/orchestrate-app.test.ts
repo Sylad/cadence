@@ -112,7 +112,10 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   it('le nom du verrou suit hôte et port ; le verrou est rendu après l\'arrêt, après « port occupé » et après un échec', async () => {
-    expect(uxLockFile('http://127.0.0.1:4200/x')).toMatch(/cadence-ux-127\.0\.0\.1-4200\.lock$/);
+    expect(uxLockFile('http://127.0.0.1:4200/x')).toMatch(/cadence-ux-4200\.lock$/);
+    for (const h of ['localhost', '127.0.0.1', '[::1]']) expect(basename(uxLockFile(`http://${h}:4200/`))).toBe('cadence-ux-4200.lock');
+    expect(basename(uxLockFile('http://localhost/'))).toBe('cadence-ux-80.lock');
+    expect(uxLockFile('http://example.org:4200/')).toMatch(/cadence-ux-example\.org-4200\.lock$/);
     expect(uxLockFile('https://example.org/')).toMatch(/cadence-ux-example\.org-443\.lock$/);
     const t = await fakeApp(0);
     const lock = uxLockFile(t.url);

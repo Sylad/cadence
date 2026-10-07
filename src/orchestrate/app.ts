@@ -67,11 +67,13 @@ function tail(file: string): string {
   }
 }
 
-/** Verrou inter-processus de l'URL : deux vagues (deux processus) qui déclarent la même URL ne lancent pas deux applications sur le même port. */
+/** Verrou inter-processus de l'URL (nom : le port seul pour la machine locale, sinon hôte:port) : deux vagues (deux processus) qui déclarent la même URL ne lancent pas deux applications sur le même port. */
 export function uxLockFile(url: string): string {
   const u = new URL(url);
   const port = u.port || (u.protocol === 'https:' ? '443' : '80');
-  return join(tmpdir(), `cadence-ux-${u.hostname.replace(/[^\w.-]/g, '_')}-${port}.lock`);
+  // localhost, 127.0.0.1 et ::1 désignent la même machine : même port, même verrou
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
+  return join(tmpdir(), `cadence-ux-${local ? '' : `${u.hostname.replace(/[^\w.-]/g, '_')}-`}${port}.lock`);
 }
 
 /** Contenu du verrou : un pid, ou null quand le fichier est vide, illisible, ou rendu entre-temps. */

@@ -714,10 +714,11 @@ lots:
     created: 2026-10-05
   - id: L59
     title: "skill lead : les sessions d'une vague orchestrate comptent dans la limite de deux sous-agents (vécu 05-10 : 3 à 4 sessions en parallèle, 25 % de l'usage)"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-05
+    started: 2026-10-07
   - id: L60
     title: "orchestrate.ux : déclarer dans cadence.yaml des projets à app (ccc, evatosorus, avatar-pandora, warhammer, finance, ol, maritime) comment voir l'app, pour que la vague fasse la revue UX elle-même (05-10 : toutes faites à la main par le lead)"
     status: todo

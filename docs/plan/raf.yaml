@@ -806,9 +806,10 @@ lots:
     created: 2026-10-06
   - id: L74
     title: "orchestrate : MCP minimaux par étape (--strict-mcp-config ; Playwright seulement pour UX et sondes) — chaque claude -p chargeait context7 @latest, Serena via uvx git+, Playwright @latest (mesuré 06-10)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-07
+    started: 2026-10-07
   - id: L75
     title: "orchestrate : tests et build lancés par le programme avant la revue, résultats passés au relecteur — la revue Opus de ccc L27 a reconstruit base+head et relancé la suite 2×, puis attendu 10 min en boucle (06-10)"
     status: todo

@@ -602,11 +602,13 @@ lots:
     created: 2026-10-04
     started: 2026-10-07
     tasks:
-      - { id: t1, title: "skills/lead : la délégation à la main remplit aussi {{news}} (lot visible : texte de newsText, sinon vide) — le plus simple : partir du brief écrit par --dry-run ; test qu'aucun {{…}} ne reste dans un brief rendu (visible et non visible)", status: todo }
-      - { id: t2, title: "titre de l'entrée côté utilisateur : cadence news new <lot> prend lot.public par défaut quand il existe (--title l'emporte) ; newsText dit que le titre est côté utilisateur (public du lot, sinon réécrit avec --title) ; tests", status: todo }
-      - { id: t3, title: "test : le --dry-run d'un lot visible écrit un brief implement contenant « cadence news new <lot> », celui d'un lot non visible non (command.ts:276)", status: todo }
-      - { id: t4, title: "capture de l'entrée : le brief donne le chemin absolu du dossier de sortie Playwright de la vague et l'étape implement a --add-dir sur ce dossier pour pouvoir copier la capture dans docs/nouveautes/captures/ ; test du dry-run", status: todo }
-    review: { date: 2026-10-07, verdict: "non conforme : 2 majeurs (skill lead sans {{news}}, titre interne publié au lieu du titre public), 1 mineur (dry-run non testé)", commit: d153ea03d903259c13ecc302bf0485e5c0a4d659 }
+      - { id: t1, title: "skills/lead : la délégation à la main remplit aussi {{news}} (lot visible : texte de newsText, sinon vide) — le plus simple : partir du brief écrit par --dry-run ; test qu'aucun {{…}} ne reste dans un brief rendu (visible et non visible)", status: done }
+      - { id: t2, title: "titre de l'entrée côté utilisateur : cadence news new <lot> prend lot.public par défaut quand il existe (--title l'emporte) ; newsText dit que le titre est côté utilisateur (public du lot, sinon réécrit avec --title) ; tests", status: done }
+      - { id: t3, title: "test : le --dry-run d'un lot visible écrit un brief implement contenant « cadence news new <lot> », celui d'un lot non visible non (command.ts:276)", status: done }
+      - { id: t4, title: "capture de l'entrée : le brief donne le chemin absolu du dossier de sortie Playwright de la vague et l'étape implement a --add-dir sur ce dossier pour pouvoir copier la capture dans docs/nouveautes/captures/ ; test du dry-run", status: done }
+      - { id: t5, title: "dry-run : le brief rendu (base de la délégation à la main) ne cite aucun dossier Playwright de vague — newsText sans chemin y dit d'enregistrer la capture sous le dossier temporaire et de la copier dans docs/nouveautes/captures/ ; skill lead aligné ; test qu'aucun chemin .cadence/runs n'apparaît dans le brief du dry-run", status: todo }
+      - { id: t6, title: "fix et fix-minors d'un lot visible : le brief donne le chemin absolu du dossier Playwright de la vague (même source playwrightDir que implement), cohérent avec le --add-dir déjà posé ; test", status: todo }
+    review: { date: 2026-10-07, verdict: "non conforme : 1 majeur (brief du dry-run cite un dossier Playwright de vague fictif), 1 mineur (fix a --add-dir sans le chemin)", commit: e239715126d9603cc6a41ec5b8dc60251f78de72 }
   - id: L49
     title: "Suivi visible d'une vague pour l'humain : (1) le skill lead nomme la tâche de fond « vague <id> : projet:lot, … » et arme un suivi (Monitor) qui pousse chaque transition (lot → état, question, prêt, rendu) dans la conversation ; (2) cadence orchestrate --status --watch (tableau rafraîchi dans un terminal) ; (3) à étudier : une ligne de statut Claude Code (barre d'état) « vague : 2/4 prêts, 1 question, 1,1 M / 2 M » — retour de Sylvain 04-10 : « je vois une tâche en cours, pas quels projets ni où on en est »"
     status: todo

@@ -590,11 +590,14 @@ lots:
     finished: 2026-10-04
   - id: L47
     title: "⚡ Suite de la revue L45/t8 : le test FIFO d'isStaleRoot s'exécute dans un processus enfant avec délai, pour qu'une mutation de tmp-hygiene.ts:108 (refus des seuls liens) fasse échouer le test au lieu de bloquer la suite"
-    status: doing
+    status: dropped
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-07
+    finished: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "abandonné : déjà fait par 458d86f (L45) : cas FIFO d'isStaleRoot en processus enfant à délai ; vérifié par la vague 2026-10-07-1234" }
   - id: L48
     title: "⚡ orchestrate : le brief d'implémentation d'un lot visible inclut l'entrée Nouveautés (cadence news new <lot>, texte factuel côté utilisateur, capture selon la convention du projet) — question évitable posée par ol-companion:L29 (vague 2026-10-04-2201)"
     status: done
@@ -709,15 +712,16 @@ lots:
     finished: 2026-10-05
   - id: L58
     title: "Mineurs revue L56 : test orchestrate-cycle.test.ts:990-996 « deux passes sans coupure » — faire réellement partir la revue (test vert après la 1re correction, attendre kinds et statut) ou corriger le titre ; retirer le garde toujours vrai (kind === 'implement' || kind === 'fix') de cycle.ts:482"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-05
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme : aucun constat. Commit relu : bf5f25d. vitest : 781/781 verts (37 fichiers), tsc --noEmit sans erreur. Mutation faite dans une copie temporaire : avec l'ancien garde `kind === 'implement'`, le test « deux passes sans coupure » échoue, il peut donc échouer. Les trois choix de l'auteur tiennent : la revue part bien (kinds attendus [implement, review, fix, fix, review], statut final ready) ; la commande de test du lot reste verte, comme le demande le titre, et seul le rapport de la 1re correction annonce ses tests rouges ; le garde retiré était toujours vrai, puisque `kind` est typé `'implement' | 'fix'` dans `work()`. — orchestré (vague 2026-10-07-1234, 0 passe(s) de correction)", commit: bf5f25d67353bf975b674d9206666e8b7b592058 }
+    finished: 2026-10-07
   - id: L59
     title: "skill lead : les sessions d'une vague orchestrate comptent dans la limite de deux sous-agents (vécu 05-10 : 3 à 4 sessions en parallèle, 25 % de l'usage)"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-05
@@ -755,6 +759,7 @@ lots:
           compliant — orchestré (vague 2026-10-07-1234, 0 passe(s) de correction + passe des mineurs)",
         commit: 57b4de5ef94275820435390ba5fcf4753bc9cbe0
       }
+    finished: 2026-10-07
   - id: L60
     title: "orchestrate.ux : déclarer dans cadence.yaml des projets à app (ccc, evatosorus, avatar-pandora, warhammer, finance, ol, maritime) comment voir l'app, pour que la vague fasse la revue UX elle-même (05-10 : toutes faites à la main par le lead)"
     status: todo
@@ -792,12 +797,13 @@ lots:
     finished: 2026-10-05
   - id: L64
     title: "publish.yml : deux runs pour un même push du tag v0.10.0 (2 s d'écart, cause inconnue) → le 2e en 409 rouge alors que la version est publiée ; ajouter concurrency par ref et sauter npm publish si la version est déjà au registre (run vert, message explicite)"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-05
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme — orchestré (vague 2026-10-07-1234, 2 passe(s) de correction + passe des mineurs)", commit: 5001759ae4e3b4992d98bb1b12c9be644463686f }
+    finished: 2026-10-07
   - id: L65
     title: "raf check : le fichier d'attendus QA (docs/qa/expectations.md, brouillon du qa-reviewer committé par le lead, skill lead §4) est tenu avec le plan — un commit qui ne touche que lui n'a pas à citer de lot ; vécu 05-10 warhammer40k c3c6a29 « commit sans lot » ; test + README + aide CLI"
     status: done
@@ -812,12 +818,13 @@ lots:
     finished: 2026-10-05
   - id: L66
     title: "qa.expectations : résoudre un chemin absolu depuis la racine git, pas depuis le dossier du --config (absolu sous <repo>/config/ → x.md au lieu de config/x.md, <repo>/docs/qa.md refusé) — mineur de la revue L65"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-05
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme, 1 mineur (passage de root du CLI à readPlanConfig sans test au niveau commande) — orchestré (vague 2026-10-07-1234, 1 passe(s) de correction + passe des mineurs)", commit: bd37bc78df4b4dbab3b41d78b6e5182afabb67b8 }
+    finished: 2026-10-07
   - id: L67
     title: Publier 0.10.1 — attendus QA tenus avec le plan dans raf check (L65)
     status: done
@@ -1025,9 +1032,22 @@ lots:
     created: 2026-10-07
   - id: L92
     title: "test/global-setup.ts : en cas d'échec de tsc, inclure sa sortie stdout (diagnostics fichier:ligne) dans l'erreur levée — sinon une erreur de type n'affiche que « Command failed » et bloque toute la suite — mineur de la 3e revue L61"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme — orchestré (vague 2026-10-07-1234, 1 passe(s) de correction + passe des mineurs)", commit: f5d8bd1caa1ed8dcba57a39dbaa3be2dc3f8fbc5 }
+    finished: 2026-10-07
+  - id: L93
+    title: "README §publication (l.884-891) périmé depuis L64 : une relance saute npm publish et crée la release absente — retirer « re-running the job fails at npm publish », mentionner la concurrency par ref ; test de l'étape release avec un faux gh (présente → pas de create, absente → create --verify-tag, erreur réseau de gh release view ≠ « existe ») — mineurs revue L64"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-07
+  - id: L94
+    title: "test CLI : raf check --config hors du dépôt avec qa.expectations absolu dans le dépôt → accepté ; couvre le passage de root à readPlanConfig (cli.ts:145, orchestrate/command.ts:127 projectEnv) — mineur revue L66"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-07

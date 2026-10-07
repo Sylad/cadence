@@ -79,15 +79,17 @@ export function lockAlive(lock: { pid: number; unreadable?: boolean; ageMs: numb
   return lock.unreadable ? lock.ageMs < 5_000 : pidAlive(lock.pid);
 }
 
-/** Pose un fichier de façon atomique (lien vers un fichier complet : il n'existe jamais à moitié écrit) ; false s'il existe déjà. `tag` distingue les fichiers temporaires d'un même processus. */
+/** Pose un fichier de façon atomique (lien vers un fichier complet : il n'existe jamais à moitié écrit) ; false s'il existe déjà (EEXIST) ; toute autre erreur est relancée. `tag` distingue les fichiers temporaires d'un même processus. */
 export function linkNewFile(file: string, content: string, tag: string | number): boolean {
   const tmp = `${file}.${tag}.${Date.now()}.tmp`;
   writeFileSync(tmp, content);
   try {
     linkSync(tmp, file);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    // Seul EEXIST veut dire « déjà là » ; EPERM, EMLINK… (pas de liens physiques ici) remontent au lieu de passer pour un verrou tenu.
+    if ((e as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    throw e;
   } finally {
     rmSync(tmp, { force: true });
   }

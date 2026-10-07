@@ -1193,7 +1193,8 @@ lots:
     review: { date: 2026-10-07, verdict: "conforme : les deux mineurs sont corrigés. Le dry-run annonce le modèle léger pour un lot léger non petit (test ajouté), et le skill lead mentionne la revue Sonnet sans passe des mineurs. Aucune régression : typecheck OK, 881/881 tests. Aucun nouveau constat. — orchestré (vague 2026-10-07-1943, 0 passe(s) de correction + passe des mineurs)", commit: 7b2a806aa5bce2af8cbd4c06eb1ec4751986ef46 }
   - id: L109
     title: "skill lead + brief de revue : couper la cascade de mineurs — un mineur ne devient un lot que s'il décrit un bug observable (sortie fausse, crash, régression mesurée) ; sinon il reste une note du lot d'origine. Vécu 07-10 : L60 → L96 → L97 → L99 → L100 (L100 déjà fait, abandonné). Test sur le texte du skill"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07

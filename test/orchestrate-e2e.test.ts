@@ -69,6 +69,10 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(JSON.parse(readFileSync(join(base, '1-implement.json'), 'utf8')).tokens.counted).toBe(115);
     expect(git(s.dir, 'status', '--porcelain')).toBe('');
     expect(i.leaked).toEqual([]);
+    // L61/t4 : raf et cadence des sessions sont ceux de la copie (<vague>/tool/bin en tête du PATH)
+    const bin = join(s.parent, '.cadence/runs/2026-10-04-1412/tool/bin');
+    expect(i.which).toEqual({ raf: join(bin, 'raf'), cadence: join(bin, 'cadence') });
+    expect(v.which).toEqual(i.which);
     // L61 : la vague a tourné depuis son instantané (copie du paquet dans le dossier de la vague)
     expect(existsSync(join(base, '../tool/bin/cadence.js'))).toBe(true);
     expect(existsSync(join(base, '../tool/dist/orchestrate/snapshot.js'))).toBe(true);

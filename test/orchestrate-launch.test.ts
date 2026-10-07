@@ -166,6 +166,18 @@ describe('agents du paquet', () => {
 });
 
 describe('runSession (lanceur injecté)', () => {
+  it('(L61/t4) toolBin passe en tête du PATH de la session, devant le Node du projet', async () => {
+    const calls: { env: Record<string, string> }[] = [];
+    const claude = async (_a: string[], opts: { env: Record<string, string> }) => {
+      calls.push(opts);
+      return { code: 0, stdout: sample, stderr: '', timedOut: false };
+    };
+    await runSession({ ...spec, kind: 'implement', agent: undefined, toolBin: '/vague/tool/bin', nodeBin: '/node/bin' }, { claude, agents: {} });
+    await runSession({ ...spec, kind: 'implement', agent: undefined, toolBin: '/vague/tool/bin' }, { claude, agents: {} });
+    expect(calls[0].env.PATH.split(':').slice(0, 2)).toEqual(['/vague/tool/bin', '/node/bin']);
+    expect(calls[1].env.PATH.split(':')[0]).toBe('/vague/tool/bin');
+  });
+
   it('passe cwd, environnement de garde, délai ; lit le résultat', async () => {
     const calls: { args: string[]; cwd: string; env: Record<string, string>; timeoutMs: number }[] = [];
     const out = await runSession(

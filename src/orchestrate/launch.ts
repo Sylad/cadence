@@ -25,6 +25,8 @@ export interface StepSpec {
   timeoutMs: number;
   /** Dossier `bin` d'un Node (`.nvmrc` du projet) : mis en tête du PATH de la session, jamais de l'orchestrateur. */
   nodeBin?: string;
+  /** `<vague>/tool/bin` : `raf` et `cadence` de l'instantané, en tête du PATH de la session (avant le Node du projet). */
+  toolBin?: string;
   /** Fichier de configuration MCP de l'étape (écrit par l'orchestrateur) : passé avec `--strict-mcp-config`, seuls ses serveurs sont chargés. */
   mcpConfig?: string;
   /** Le serveur Playwright est chargé pour cette étape : un agent aux outils restreints reçoit alors ses outils MCP. */
@@ -163,7 +165,7 @@ export async function runSession(
   deps: { claude: ClaudeFn; agents: Record<string, AgentDef>; onSpawn?: (pid: number) => void },
 ): Promise<SessionOutcome> {
   const launch = (args: string[]) =>
-    deps.claude(args, { cwd: spec.cwd, env: { CADENCE_ORCHESTRATED: spec.wave, ...(spec.nodeBin ? { PATH: `${spec.nodeBin}${delimiter}${process.env.PATH ?? ''}` } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
+    deps.claude(args, { cwd: spec.cwd, env: { CADENCE_ORCHESTRATED: spec.wave, ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
   const out = await launch(buildArgs(spec, deps.agents));
   const first = classify(out);
   const missing = first.kind === 'failed' && !out.timedOut && out.code === 0 ? lacksStructuredOutput(out.stdout) : null;

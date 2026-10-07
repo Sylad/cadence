@@ -3,6 +3,7 @@ import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, realpathSync, read
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { orchestrate, realOrchestrateDeps, type OrchestrateDeps } from '../src/orchestrate/command.js';
+import { spawnSync } from 'node:child_process';
 import { RESERVED_ENV, SNAPSHOT_ENV, takeSnapshot } from '../src/orchestrate/snapshot.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -17,7 +18,10 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 function fakePackage(): string {
   const pkg = tempDir();
   mkdirSync(join(pkg, 'bin'));
-  writeFileSync(join(pkg, 'bin/cadence.js'), '// bin\n');
+  for (const n of ['cadence', 'raf']) {
+    writeFileSync(join(pkg, `bin/${n}.js`), `#!/usr/bin/env node\nconsole.log('${n}-copie', process.argv.slice(2).join(' '));\n`);
+    chmodSync(join(pkg, `bin/${n}.js`), 0o755);
+  }
   mkdirSync(join(pkg, 'dist'));
   writeFileSync(join(pkg, 'dist/cli.js'), '// v1\n');
   cpSync(join(ROOT, 'templates'), join(pkg, 'templates'), { recursive: true });
@@ -244,5 +248,45 @@ describe('(L61/t2) node_modules de l\'instantané : là où les dépendances se 
     expect(r.err.join('\n')).toMatch(/dépendances.*introuvables|yaml/);
     expect(s.reexecs).toHaveLength(0);
     expect(existsSync(join(parent, '.cadence'))).toBe(false);
+  });
+});
+
+describe('(L61/t4) raf et cadence de l\'instantané', () => {
+  it('<vague>/tool/bin a des entrées exécutables raf et cadence qui lancent bin/*.js de la copie', () => {
+    const wave = join(tempDir(), 'wave');
+    const tool = takeSnapshot(wave, fakePackage());
+    for (const n of ['raf', 'cadence']) {
+      const r = spawnSync(join(tool, 'bin', n), ['commits', 'L1'], { encoding: 'utf8' });
+      expect(r.stdout.trim(), n).toBe(`${n}-copie commits L1`);
+    }
+    // l'entrée appelle la copie, pas le paquet d'origine
+    writeFileSync(join(tool, 'bin/raf.js'), "#!/usr/bin/env node\nconsole.log('modifiee');\n");
+    expect(spawnSync(join(tool, 'bin/raf'), [], { encoding: 'utf8' }).stdout.trim()).toBe('modifiee');
+  });
+
+  it('les sessions ont <vague>/tool/bin en tête du PATH, avant le Node du projet', async () => {
+    const { parent } = project();
+    const s = setup();
+    const envs: Record<string, string>[] = [];
+    const wave = join(parent, '.cadence/runs/2026-10-04-1412');
+    const tracked: OrchestrateDeps['claude'] = async (args, o) => {
+      envs.push(o.env);
+      return s.base.claude(args, o);
+    };
+    const base = { ...s.base, claude: tracked };
+    const deps: OrchestrateDeps = {
+      ...base,
+      snapshot: {
+        packageRoot: s.pkg,
+        reexec: async (toolDir, argv, env, sink) => {
+          const child = ioOf(env.CWD_FOR_TEST!, { ...(env as Record<string, string>) });
+          Object.assign(child.io, { out: sink.out, err: sink.err });
+          return orchestrate(argv, child.io, { ...base, templatesDir: join(toolDir, 'templates/orchestrate') });
+        },
+      },
+    };
+    expect(await orchestrate(['a:L1'], ioOf(parent, { CWD_FOR_TEST: parent }).io, deps)).toBe(0);
+    expect(envs.length).toBeGreaterThan(0);
+    for (const e of envs) expect(e.PATH.split(':')[0]).toBe(join(wave, 'tool/bin'));
   });
 });

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, realpathSync, symlinkSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, realpathSync, symlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, sep } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -30,6 +30,9 @@ const real = (p: string) => {
 /** Vrai fils : CADENCE_SNAPSHOT désigne CE paquet (la copie qui s'exécute). Une valeur héritée d'une autre vague ne compte pas. */
 export const isSnapshotChild = (env: NodeJS.ProcessEnv, root = PACKAGE_ROOT): boolean => !!env[SNAPSHOT_ENV] && real(env[SNAPSHOT_ENV]!) === real(root);
 
+/** Entrées de `package.json#bin` : nom de commande → fichier de `bin/`. */
+const BIN_ENTRIES = { raf: 'raf.js', cadence: 'cadence.js' };
+
 /** Ce du paquet qui sert à l'exécution d'une vague ; node_modules est lié, jamais copié. */
 const COPIED = ['bin', 'dist', 'templates', 'agents', 'skills', 'package.json'];
 
@@ -47,6 +50,9 @@ export interface SnapshotDeps {
 }
 
 export const toolDirOf = (waveDir: string) => join(waveDir, 'tool');
+
+/** `<vague>/tool/bin` si la vague a un instantané (entrées `raf` et `cadence`), sinon rien : le PATH de la session ne change pas. */
+export const toolBinOf = (waveDir: string): string | undefined => (existsSync(join(toolDirOf(waveDir), 'bin', 'raf')) ? join(toolDirOf(waveDir), 'bin') : undefined);
 
 /** Refus de prendre l'instantané (avant toute copie) : le message dit quoi faire. */
 export class SnapshotRefusal extends Error {}
@@ -78,6 +84,13 @@ export function takeSnapshot(waveDir: string, packageRoot: string): string {
     if (existsSync(from)) cpSync(from, join(tool, name), { recursive: true });
   }
   symlinkSync(modules, join(tool, 'node_modules'), 'dir');
+  // Comme npm à l'installation : `raf` et `cadence` sont les bin/*.js de la copie (shebang `env node` conservé).
+  for (const [name, target] of Object.entries(BIN_ENTRIES)) {
+    const js = join(tool, 'bin', target);
+    if (!existsSync(js)) continue;
+    chmodSync(js, 0o755);
+    symlinkSync(target, join(tool, 'bin', name));
+  }
   return tool;
 }
 

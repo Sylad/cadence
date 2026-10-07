@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { withoutLaunchVars } from './snapshot.js';
+import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
@@ -296,6 +296,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       permissionMode: c.config.permissionMode,
       addDirs: playwright && write ? [...c.config.addDirs, playwrightDir(dirname(mcpConfig))] : c.config.addDirs,
       nodeBin: l.node?.link,
+      toolBin: toolBinOf(w.store.dir),
       mcpConfig,
       playwright,
       timeoutMs: write ? c.config.timeouts.work : c.config.timeouts.review,

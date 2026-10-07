@@ -1071,8 +1071,15 @@ lots:
     created: 2026-10-07
   - id: L96
     title: "Verrou UX d'orchestrate.ux (mineurs revue L60) : (1) reprise atomique du verrou périmé (réutiliser writeLock/linkSync de state.ts) ; (2) nom du verrou = port seul pour localhost/127.0.0.1/::1 ; (3) url validée par new URL dans config (port non numérique, hôte vide → erreur nommée) ; (4) verrou obtenu après le délai → rendu sans lancer l'app, note « url tenue par une autre vague » ; la note de délai donne le temps réellement laissé ; (5) test du verrou vide (récent → attente, > 5 s → repris). Un commit par point, tests à chaque fois"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme : les mineurs de la revue sont traités (verrou unifié via linkNewFile/removeStaleFile, branche de course testée), 1 nouveau mineur (erreurs de lien autres que EEXIST avalées) — orchestré (vague 2026-10-07-1445, 0 passe(s) de correction + passe des mineurs)", commit: dbb921b00e7fd37f387569db4aa7ee90c520b457 }
+    finished: 2026-10-07
+  - id: L97
+    title: "linkNewFile (state.ts:89) : ne renvoyer false que sur EEXIST, relancer EPERM/EMLINK & co (régression dbb921b : un tmpdir sans liens physiques fait attendre le verrou UX jusqu'au délai sans dire pourquoi) ; test ; + test takeUrlLock verrou remplacé entre lecture et renommage (app.ts:118-125) — mineurs revue L96"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-07

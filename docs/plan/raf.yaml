@@ -836,9 +836,10 @@ lots:
     created: 2026-10-07
   - id: L81
     title: "⚡ Test instable orchestrate-registry.test.ts:149 (L71/t3, attente 0 ms exacte) : rouge sous charge en suite complète, passe seul → npm test / prepublishOnly rouge"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-07
+    started: 2026-10-07
   - id: L82
     title: "orchestrate : clore (ou proposer de clore) les sous-tâches couvertes par des commits qui les citent quand la revue est conforme (warhammer40k:L64 06-10, raf done refusé)"
     status: todo

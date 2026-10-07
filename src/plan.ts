@@ -234,6 +234,8 @@ export class Plan {
   /** Acquitte un commit : une ligne datée dans la section `acknowledged:` du plan. */
   acknowledge(entry: Acknowledged): void {
     this.writable();
+    // Déjà acquitté (même sha, ou même sujet pour une entrée par sujet) : on garde la première ligne et son motif.
+    if (this.acknowledged.some((a) => (entry.sha ? a.sha === entry.sha : a.sha === undefined && a.subject === entry.subject))) return;
     let list = this.doc.get('acknowledged');
     if (!isSeq(list)) {
       list = this.doc.createNode([]);

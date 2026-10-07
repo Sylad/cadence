@@ -68,6 +68,28 @@ describe('raf ignore : acquitter un commit sans réécrire l\'historique', () =>
     expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(avant);
   });
 
+  it('acquitter deux fois le même commit n\'ajoute pas de seconde ligne', () => {
+    const dir = repo();
+    commit(dir, 'chore: nettoyage', '2026-09-28T10:00:00');
+    raf(dir, 'ignore', 'chore: nettoyage', '--reason', 'outillage');
+    const r = raf(dir, 'ignore', 'chore: nettoyage');
+    expect(r.code).toBe(0);
+    const text = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    expect(text.match(/chore: nettoyage/g)).toHaveLength(1);
+    expect(text).toContain('reason: outillage');
+  });
+
+  it('un sujet d\'un seul mot qui porte aussi le nom d\'une branche s\'acquitte par le sujet', () => {
+    const dir = repo();
+    commit(dir, 'chore: avant', '2026-09-28T09:00:00');
+    execFileSync('git', ['branch', 'other'], { cwd: dir });
+    commit(dir, 'other', '2026-09-28T10:00:00');
+    const r = raf(dir, 'ignore', 'other');
+    expect(r.code).toBe(0);
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('subject: other');
+    expect(raf(dir, 'check').out).toContain('chore: avant');
+  });
+
   it('raf check --ignored liste les exemptions avec date et motif', () => {
     const dir = repo();
     commit(dir, 'chore: .gitignore', '2026-09-28T10:00:00');

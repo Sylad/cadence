@@ -927,6 +927,7 @@ lots:
       - { date: 2026-10-07, text: "Référence de mesure avant la vague performance (07-10, vagues 1234 → 1921) : petit lot (≤ 0,25 j) = 4 à 14 min et 60 à 260 k tokens ; suite complète 63 s relancée plusieurs fois par session (implémentation, revue, correction) ; L32 ccc 87 min / 396 k avec 2 corrections. À comparer après L75 + L77 + L78 + L108, mêmes colonnes de cadence orchestrate --status." }
       - { date: 2026-10-07, text: "Correction lead 07-10 (revue non conforme, 1 majeur) : ajouter le test « tests rouges avec build déclaré → build non lancé, un seul constat, passage en correction » (break de cycle.ts:532). Le reste des propositions = notes, pas de lots (règle L109) ; aligner agents/code-reviewer.md (contrôles déjà lancés au HEAD relu = acquis) si une ligne suffit." }
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme, 1 mineur (branche « RED » de checksText jamais exécutée, cycle.ts:222) — orchestré (vague 2026-10-07-2103, 0 passe(s) de correction + passe des mineurs sans commit)", commit: 4f824b9d6896eb2d48cf17be39a34770b827b70e }
   - id: L76
     title: "orchestrate : lots empilés sur main — le tableau final indique « livrable jusqu'à <sha> » (dernier commit d'un lot prêt sous un lot rendu), comme fait à la main pour ol L36 et ccc L26 avec deliver --sha (06-10)"
     status: todo

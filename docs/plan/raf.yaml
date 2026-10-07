@@ -590,10 +590,11 @@ lots:
     finished: 2026-10-04
   - id: L47
     title: "⚡ Suite de la revue L45/t8 : le test FIFO d'isStaleRoot s'exécute dans un processus enfant avec délai, pour qu'une mutation de tmp-hygiene.ts:108 (refus des seuls liens) fasse échouer le test au lieu de bloquer la suite"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-07
   - id: L48
     title: "⚡ orchestrate : le brief d'implémentation d'un lot visible inclut l'entrée Nouveautés (cadence news new <lot>, texte factuel côté utilisateur, capture selon la convention du projet) — question évitable posée par ol-companion:L29 (vague 2026-10-04-2201)"
     status: done

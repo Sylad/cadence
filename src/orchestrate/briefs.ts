@@ -18,6 +18,8 @@ export interface BriefVars {
   ux: string;
   /** Choix d'interprétation faits par l'auteur, à relire par la revue (vide : aucune ligne). */
   choix: string;
+  /** Résultat des tests et du build lancés par le programme au HEAD relu (vide : le relecteur les lance lui-même). */
+  checks: string;
   /** Consigne de l'entrée Nouveautés : `newsText(lot)` pour un lot `visible` (avec le dossier Playwright de la vague quand une session orchestrée l'a), vide sinon. */
   news: string;
   /** Dossier de sortie Playwright de la vague (fix et fix-minors d'un lot `visible`, pour retrouver une capture) ; vide sinon. */

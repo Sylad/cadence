@@ -13,7 +13,7 @@ const lot = (extra: Partial<Lot> = {}): Lot => ({
 });
 
 describe('gabarits', () => {
-  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', news: '', captures: '' };
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: '', captures: '' };
 
   it('implement, fix et fix-minors interdisent de s\'arrêter sur une question d\'organisation (L52)', () => {
     for (const kind of ['implement', 'fix', 'fix-minors'] as const) {
@@ -181,7 +181,7 @@ describe('schémas', () => {
 });
 
 describe('variantes de la passe des mineurs (L38)', () => {
-  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: 'abc1234 feat(L9): x', reponse: '', constats: '- [mineur] a.txt:1 — nommage', ux: '', choix: '', news: '', captures: '' };
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: 'abc1234 feat(L9): x', reponse: '', constats: '- [mineur] a.txt:1 — nommage', ux: '', choix: '', checks: '', news: '', captures: '' };
 
   it('la correction des mineurs ne dit jamais de s\'arrêter pour poser la question, et demande de lister les mineurs refusés en choix', () => {
     const out = renderBrief('fix-minors', vars);
@@ -209,7 +209,7 @@ describe('variantes de la passe des mineurs (L38)', () => {
 });
 
 describe('instantané des gabarits (L39)', () => {
-  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', news: '', captures: '' };
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: '', captures: '' };
 
   it('loadTemplates lit tous les gabarits une fois ; renderBrief rend depuis l\'instantané sans relire le disque', () => {
     const dir = tempDir();
@@ -230,7 +230,7 @@ describe('instantané des gabarits (L39)', () => {
 });
 
 describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
-  const base = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', captures: '' };
+  const base = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', captures: '' };
 
   it('lot visible : commande cadence news new <lot>, texte factuel côté utilisateur, capture ou nocapture, jamais une question', () => {
     const out = renderBrief('implement', { ...base, news: newsText('L9') });

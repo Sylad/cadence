@@ -758,6 +758,7 @@ News instruction (`cadence news new <lot>`, factual user-side text, a screenshot
 ```yaml
 orchestrate:
   test: npm test                         # run by the orchestrator after a work step (optional)
+  build: npm run build                   # run after the tests; both results go to the reviewer, who does not redo them (optional)
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default
   addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use

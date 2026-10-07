@@ -115,6 +115,10 @@ describe('cadence.yaml : orchestrate', () => {
     expect(c.verdict).toContain('{verdict}');
     expect(read('orchestrate:\n  ux: npm run dev\n')().ux).toEqual({ command: 'npm run dev' });
   });
+  it('lit build comme test : commande non vide (L75)', () => {
+    expect(read('orchestrate:\n  test: npm test\n  build: npm run build\n')()).toMatchObject({ test: 'npm test', build: 'npm run build' });
+    expect(read("orchestrate:\n  build: '  '\n")).toThrow(/build/);
+  });
   it('ux objet { command, url, timeout } : timeout en secondes, positif, sinon erreur nommée (L60)', () => {
     expect(read('orchestrate:\n  ux: { command: npm start, url: http://localhost:4200, timeout: 90 }\n')().ux).toEqual({ command: 'npm start', url: 'http://localhost:4200', timeout: 90 });
     expect(read('orchestrate:\n  ux: { command: npm start, url: http://localhost:4200 }\n')().ux).toEqual({ command: 'npm start', url: 'http://localhost:4200' });

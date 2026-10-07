@@ -282,7 +282,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     io.out('  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, `${l.project}--${l.lot}`, 'playwright');
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
-    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', news: l.visible ? newsText(l.lot) : '', captures: '' };
+    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '' };
     for (const s of steps) {
       const file = join(tmp, `${l.project}--${l.lot}--${s.kind}.md`);
       const brief = renderBrief(s.kind, vars, deps.templatesDir);

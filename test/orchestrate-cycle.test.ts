@@ -363,6 +363,33 @@ describe('contrôles autour des sessions', () => {
     expect(h.calls[1].brief).toContain('boom');
   });
 
+  it('tests et build lancés par le programme : résultat passé au relecteur, qui ne les refait pas (L75)', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'true', build: 'true' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    const brief = h.calls[1].brief;
+    expect(brief).toContain('already ran these checks');
+    expect(brief).toContain('`true` (tests): green');
+    expect(brief).toContain('`true` (build): green');
+    expect(brief).toContain('do not rebuild');
+  });
+
+  it('build rouge → correction directe, jamais de revue avant (L75)', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'true', build: 'test -f b.txt || { echo cassé >&2; exit 4; }' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    expect(h.calls[1].brief).toContain('en échec (code 4)');
+    expect(h.calls[2].brief).toContain('(build): green');
+  });
+
+  it('sans commande de tests ni de build, la revue ne reçoit aucun résultat (L75)', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    await runLot(h.lot('L1'));
+    expect(h.calls[1].brief).not.toContain('already ran');
+  });
+
   it('des « questions » vides ou de non-questions (« aucune question ») n\'arrêtent pas le lot (L52)', async () => {
     const none: Handler = () => claudeOut(workReport({ questions: ['', '  ', 'Aucune question.', 'Je n\'ai pas de question', 'No questions', 'N/A', 'none'] }));
     const h = harness({ script: { implement: [none], review: [ok] } });

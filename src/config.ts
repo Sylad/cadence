@@ -152,6 +152,8 @@ export interface OrchestrateConfig {
   verdict?: string;
   /** Commande de tests du projet, lancée par l'orchestrateur après une implémentation ou une correction. */
   test?: string;
+  /** Commande de build du projet, lancée par l'orchestrateur après les tests, et dont le résultat est passé au relecteur. */
+  build?: string;
   /**
    * Comment voir l'application pour une revue UX : une URL, une commande de lancement, ou les deux. Avec les deux, c'est
    * l'orchestrateur qui lance la commande (depuis la racine du dépôt) et attend l'URL, `timeout` secondes (300 par défaut).
@@ -163,7 +165,7 @@ export interface OrchestrateConfig {
   timeouts: { work: number; review: number };
 }
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'ux', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
@@ -187,7 +189,7 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   };
   if (!isObject(o)) throw new RafError(`${file} : orchestrate doit être un objet`);
   for (const k of Object.keys(o)) if (!ORCH_KEYS.includes(k)) throw bad(`${k} inconnu (attendu : ${ORCH_KEYS.join(', ')})`);
-  for (const k of ['start', 'verdict', 'test'] as const) {
+  for (const k of ['start', 'verdict', 'test', 'build'] as const) {
     if (o[k] == null) continue;
     if (typeof o[k] !== 'string' || !(o[k] as string).trim()) throw bad(`${k} : commande non vide attendue`);
     config[k] = (o[k] as string).trim();

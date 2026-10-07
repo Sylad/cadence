@@ -215,6 +215,14 @@ function choixText(choix: string[]): string {
   return ['The author decided these interpretation questions on its own; re-read each choice against the lot, its notes and the code, and report a finding if one is wrong or changes the scope:', ...choix.map((x) => `- ${x}`)].join('\n');
 }
 
+/** Tests et build déjà lancés par le programme au HEAD relu : le relecteur ne les refait pas (L75). Vide si HEAD a bougé depuis ou si rien n'a tourné. */
+function checksText(c: LotCtx): string {
+  const k = c.lot.checks;
+  if (!k?.runs.length || k.head !== git(c.lot.repo, 'rev-parse', 'HEAD')) return '';
+  const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? 'green' : `RED, exit code ${r.code}`}`);
+  return [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
+}
+
 /** Gabarit d'une étape : la passe des mineurs et la revue courte qui la suit ont chacune le leur. */
 function briefName(l: LotState, kind: StepKind): BriefName {
   if (kind === 'fix' && l.minorFix) return 'fix-minors';
@@ -226,7 +234,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
-  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), news: '', captures: '' };
+  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', news: '', captures: '' };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = newsText(l.lot, pwDir);
@@ -514,15 +522,24 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const red: Constat[] = [];
   if (!rep.tests.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` });
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
-  if (red.length === 0 && c.config.test) {
-    const r = await sh(c, c.config.test);
-    if (r.code !== 0) red.push({ source: 'tests', gravite: 'bloquant', texte: `${c.config.test} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
+  const runs: NonNullable<LotState['checks']>['runs'] = [];
+  if (red.length === 0) {
+    for (const [label, command] of [['tests', c.config.test], ['build', c.config.build]] as const) {
+      if (!command) continue;
+      const r = await sh(c, command);
+      runs.push({ label, command, code: r.code });
+      if (r.code !== 0) {
+        red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
+        break;
+      }
+    }
   }
   if (red.length) {
     toFix(c, red, 'tests rouges');
     return;
   }
   l.constats = [];
+  l.checks = runs.length ? { head: git(l.repo, 'rev-parse', 'HEAD'), runs } : undefined;
   l.next = firstReview(c);
   save(c);
 }

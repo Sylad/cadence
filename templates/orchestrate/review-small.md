@@ -3,6 +3,7 @@ This lot is small: one single pass covers the code review AND the usability revi
 You are given the repository path and the lot id only: read the diff yourself from the commits that
 cite the lot (`raf commits {{lot}}`, or `git log`), run the checks, report real defects only.
 {{ux}}
+{{checks}}
 {{choix}}
 You are read-only: do not modify, commit, push or run `raf review|ux|done`. Do not launch subagents.
 Give your report as the structured output: counts of blocking / major / minor findings (usability

@@ -1145,9 +1145,10 @@ lots:
       - { date: 2026-10-07, text: "abandonné : déjà fait par la correction de L99 (state.ts:125, repli e instanceof Error ? e.message : String(e))" }
   - id: L101
     title: "agent qa-reviewer : ne jamais attendre en silence son propre travail de fond — passage borné (budget temps), résultats écrits page par page au fil de l'eau (pas un JSON unique en fin de passage, perdu si on l'arrête) ; vécu 07-10 sur ccc : 6 min bloqué « waiting on background work », arrêt demandé → 30/38 pages à 1440 seulement, détail perdu"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-07
+    started: 2026-10-07
   - id: L102
     title: "raf show <id> : identifiant, statut, dates, after, titre public, notes datées dans l'ordre, puis commits comptés (comme raf commits) ; --notes pour les notes seules (issue #1)"
     status: done

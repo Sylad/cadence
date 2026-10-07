@@ -762,7 +762,7 @@ lots:
     finished: 2026-10-07
   - id: L60
     title: "orchestrate.ux : déclarer dans cadence.yaml des projets à app (ccc, evatosorus, avatar-pandora, warhammer, finance, ol, maritime) comment voir l'app, pour que la vague fasse la revue UX elle-même (05-10 : toutes faites à la main par le lead)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-05
     notes:
@@ -770,6 +770,7 @@ lots:
       - { date: 2026-10-07, text: "Correction lead 07-10 après revue non conforme (vague 2026-10-07-1402), décisions : (1) MAJEUR même URL : verrou inter-processus par hôte:port de l'url (fichier dans os.tmpdir(), cadence-ux-<hôte>-<port>.lock, création exclusive, contenu = pid ; périmé si le pid est mort → repris), pris AVANT la 1re sonde « port occupé » et rendu après l'arrêt de l'app ; un verrou tenu par un pid vivant = on attend, attente comptée dans timeout, au-delà « UX non vérifiée : url tenue par une autre vague » ; ready seulement si le groupe lancé est encore vivant au moment de la réponse ; test avec deux lots sur la même url (deux processus) ; README : ports distincts par projet recommandés. (2) halted(c.wave) testé avant startApp → suspend, sans lancer. (3) config : forme objet exige url ^https?:// (erreur nommée) ; ux.timeout refusé sans command ET url. (4) un seul faux serveur : étendre test/fake-app.ts (stubborn, status), retirer freePort et FAKE dupliqués d'orchestrate-app.test.ts. (5) test cycle : UX non conforme → fix → app muette à l'étape ux efface l.ux, l.uxVerdict et constats UX (cycle.ts:586-588). Un commit par point, tests verts à chaque commit." }
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme avec 1 mineur (verrou pris après le délai : application lancée pour rien, app.ts:120). Les 3 corrections tiennent : 12 commits relus, vitest 816/816, tsc 0 — orchestré (vague 2026-10-07-1424, 1 passe(s) de correction + passe des mineurs)", commit: 79016f9b0c569a20029fe7107f336cad39c38513 }
+    finished: 2026-10-07
   - id: L61
     title: "orchestrate : lancer une vague depuis une copie figée de dist/ et des gabarits (instantané au démarrage) pour pouvoir orchestrer cadence lui-même et modifier les gabarits sans toucher une vague en cours (05-10 : L53-L57 tous délégués à la main)"
     status: done
@@ -1067,4 +1068,9 @@ lots:
     status: todo
     estimate: 0.5
     after: [ L60 ]
+    created: 2026-10-07
+  - id: L96
+    title: "Verrou UX d'orchestrate.ux (mineurs revue L60) : (1) reprise atomique du verrou périmé (réutiliser writeLock/linkSync de state.ts) ; (2) nom du verrou = port seul pour localhost/127.0.0.1/::1 ; (3) url validée par new URL dans config (port non numérique, hôte vide → erreur nommée) ; (4) verrou obtenu après le délai → rendu sans lancer l'app, note « url tenue par une autre vague » ; la note de délai donne le temps réellement laissé ; (5) test du verrou vide (récent → attente, > 5 s → repris). Un commit par point, tests à chaque fois"
+    status: todo
+    estimate: 0.5
     created: 2026-10-07

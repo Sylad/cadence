@@ -316,7 +316,7 @@ describe('raf show', () => {
     const d = raf(dir, 'done', 'L1');
     expect(d.code, d.err).toBe(0);
     const r = raf(dir, 'show', 'L1');
-    expect(r.out).toMatch(/créé : \d{4}-\d{2}-\d{2}  démarré : \d{4}-\d{2}-\d{2}  terminé : \d{4}-\d{2}-\d{2}/);
+    expect(r.out).toContain('créé : 2026-09-28  démarré : 2026-09-28  terminé : 2026-09-28');
     expect(r.out.split('\n')[0]).toContain('done');
   });
 

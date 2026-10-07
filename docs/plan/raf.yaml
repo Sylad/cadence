@@ -1149,6 +1149,7 @@ lots:
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme (1 mineur noté : libellé du CHANGELOG non mis à jour après le correctif par largeur) — orchestré (vague 2026-10-07-2205, 0 passe(s) de correction + passe des mineurs)", commit: 386cd090fc9533b27d061374dbcea66aa603059f }
   - id: L102
     title: "raf show <id> : identifiant, statut, dates, after, titre public, notes datées dans l'ordre, puis commits comptés (comme raf commits) ; --notes pour les notes seules (issue #1)"
     status: done

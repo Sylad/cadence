@@ -18,7 +18,7 @@ import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { runPool } from './pool.js';
 import { schemaFor } from './schemas.js';
 import { excludeState, lotKey, newLot, RunStore, type LotState, type WaveState } from './state.js';
-import { nvmVersionsDir, resolveNode } from './node-env.js';
+import { nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
 
 export interface OrchestrateIo {
@@ -534,9 +534,21 @@ async function resume(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, laun
     const busy = activeLock(join(sharedStateDir(repo), REPO_LOCK));
     if (busy && busy.pid !== process.pid) refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
   }
+  // Comme au départ : le .nvmrc est relu à chaque reprise (version désinstallée, .nvmrc changé, vague d'avant L80),
+  // et un Node introuvable refuse le lot — jamais de repli silencieux sur le Node par défaut.
+  const nodes = new Map<LotState, NodeChoice>();
+  for (const l of live) {
+    const node = resolveNode(l.repo, nvmVersionsDir(io.env));
+    if (node.kind === 'missing') refusals.push(`${lotKey(l.project, l.lot)} : ${node.message}`);
+    else nodes.set(l, node);
+  }
   if (refusals.length) {
     for (const r of refusals) io.err(`orchestrate : ${r}`);
     return 2;
+  }
+  for (const [l, node] of nodes) {
+    if (node.kind === 'ok') l.node = { version: node.version, wanted: node.wanted, bin: node.bin };
+    else delete l.node;
   }
   // Une étape interrompue (signal, crash) dont les tokens n'ont pas été comptés : relue dans le journal de sa session.
   const recovered = new Budget(0);

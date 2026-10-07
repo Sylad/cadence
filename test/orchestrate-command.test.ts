@@ -652,6 +652,51 @@ describe('Node du projet (.nvmrc)', () => {
     expect(existsSync(join(parent, '.cadence'))).toBe(false);
   });
 
+  /** Une vague suspendue au budget (code 3), prête à reprendre ; rend la fabrique de store pour relire/modifier l'état. */
+  async function suspended(nvmrc: string | null, nvm: string) {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    if (nvmrc !== null) writeFileSync(join(dirs.a, '.nvmrc'), nvmrc);
+    const f = fakeDeps();
+    expect((await run(parent, ['a:L1', '--budget', '1'], f.deps, { NVM_DIR: nvm })).code).toBe(3);
+    return { parent, dirs, f, store: () => RunStore.last(parent)! };
+  }
+
+  it('L80/t1 — --resume : version désinstallée depuis le départ → refus code 2, rien ne repart', async () => {
+    const nvm = fakeNvm(['v22.22.3']);
+    const s = await suspended('22', nvm);
+    rmSync(join(nvm, 'versions/node/v22.22.3'), { recursive: true });
+    const calls = s.f.calls.length;
+    const r = await run(s.parent, ['--resume', '--budget', '1M'], s.f.deps, { NVM_DIR: nvm });
+    expect(r.code).toBe(2);
+    expect(r.err.join('\n')).toContain(`a:L1 : .nvmrc 22 : aucun Node installé correspondant dans ${join(nvm, 'versions/node')}`);
+    expect(s.f.calls.length).toBe(calls);
+  });
+
+  it('L80/t1 — --resume : .nvmrc modifié pendant la vague → nouvelle version résolue et enregistrée', async () => {
+    const nvm = fakeNvm(['v22.22.3', 'v24.1.0']);
+    const s = await suspended('22', nvm);
+    expect(s.store().readLot('a', 'L1')!.node?.version).toBe('v22.22.3');
+    writeFileSync(join(s.dirs.a, '.nvmrc'), '24');
+    expect((await run(s.parent, ['--resume', '--budget', '1M'], s.f.deps, { NVM_DIR: nvm })).code).toBe(0);
+    expect(s.store().readLot('a', 'L1')!.node).toMatchObject({ version: 'v24.1.0', wanted: '24' });
+  });
+
+  it('L80/t1 — --resume d\'un état sans node (vague d\'avant L80) et un .nvmrc → résolu et enregistré', async () => {
+    const nvm = fakeNvm(['v22.22.3']);
+    const s = await suspended(null, nvm);
+    expect(s.store().readLot('a', 'L1')!.node).toBeUndefined();
+    writeFileSync(join(s.dirs.a, '.nvmrc'), '22');
+    expect((await run(s.parent, ['--resume', '--budget', '1M'], s.f.deps, { NVM_DIR: nvm })).code).toBe(0);
+    expect(s.store().readLot('a', 'L1')!.node).toMatchObject({ version: 'v22.22.3' });
+  });
+
+  it('L80/t1 — --resume sans .nvmrc : inchangé', async () => {
+    const nvm = fakeNvm(['v22.22.3']);
+    const s = await suspended(null, nvm);
+    expect((await run(s.parent, ['--resume', '--budget', '1M'], s.f.deps, { NVM_DIR: nvm })).code).toBe(0);
+    expect(s.store().readLot('a', 'L1')!.node).toBeUndefined();
+  });
+
   it('--dry-run : une ligne node par lot avec .nvmrc, rien sans', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
     writeFileSync(join(dirs.a, '.nvmrc'), '22');

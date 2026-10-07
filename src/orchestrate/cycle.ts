@@ -575,6 +575,11 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   const l = c.lot;
   const ux = c.config.ux;
   if (!ux?.command || !ux.url || !seesApp(l, kind)) return reviewStep(c, kind);
+  const halt = halted(c.wave);
+  if (halt) {
+    suspend(c, halt); // la session n'aurait pas lieu : l'application ne se lance pas pour rien
+    return;
+  }
   c.wave.log(`${lotKey(l.project, l.lot)} · lancement de l'application (${ux.url})`);
   const app = await startApp({ command: ux.command, url: ux.url, cwd: l.repo, log: join(c.wave.store.lotDir(l.project, l.lot), 'ux-app.log'), timeoutMs: (ux.timeout ?? APP_TIMEOUT_S) * 1000 });
   try {

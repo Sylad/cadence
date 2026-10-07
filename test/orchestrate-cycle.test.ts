@@ -1465,6 +1465,30 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     }
   });
 
+  it('vague arrêtée avant l\'étape UX (incident, quota, budget) : suspendu, l\'application n\'est pas lancée', async () => {
+    const arms: [string, (h: ReturnType<typeof harness>) => void, string][] = [
+      ['incident', (h) => { h.wave.incident = 'push détecté'; }, 'vague arrêtée : push détecté'],
+      ['quota', (h) => { h.wave.quota = { hit: true }; }, 'quota atteint'],
+      ['budget', (h) => { h.wave.budget.consumed = h.wave.budget.limit; }, 'budget atteint'],
+    ];
+    for (const [, arm, why] of arms) {
+      const app = await fakeApp(0);
+      const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
+      const c = h.lot('L1', { visible: true }, { ux: { command: app.command, url: app.url, timeout: 5 } });
+      const before = h.wave.claude;
+      h.wave.claude = (async (args: string[], o: Parameters<typeof before>[1]) => {
+        const r = await before(args, o);
+        arm(h);
+        return r;
+      }) as typeof before;
+      await runLot(c);
+      expect(kinds(h)).toEqual(['implement']);
+      expect(c.lot.status).toBe('suspended');
+      expect(c.lot.outcome).toBe(why);
+      expect(existsSync(join(app.dir, 'pid'))).toBe(false);
+    }
+  });
+
   it('étape en erreur : l\'application est tuée quand même', async () => {
     const app = await fakeApp(0);
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [() => ({ code: 1, stdout: '', stderr: 'boum', timedOut: false })] } });

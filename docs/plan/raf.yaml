@@ -1075,3 +1075,4 @@ lots:
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme : les mineurs de la revue sont traités (verrou unifié via linkNewFile/removeStaleFile, branche de course testée), 1 nouveau mineur (erreurs de lien autres que EEXIST avalées) — orchestré (vague 2026-10-07-1445, 0 passe(s) de correction + passe des mineurs)", commit: dbb921b00e7fd37f387569db4aa7ee90c520b457 }

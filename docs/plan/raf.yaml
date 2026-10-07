@@ -1197,6 +1197,7 @@ lots:
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "compliant — orchestré (vague 2026-10-07-2131, 0 passe(s) de correction)", commit: 410aaba8db0acb2f09298fbb7e8584a1c26a2d7e }
   - id: L108
     title: "orchestrate : revue proportionnée à la taille du lot — lot ≤ 0,25 j (estimate) : une seule revue (Sonnet, agent code-reviewer, mêmes critères), pas de passe « mineurs », mineurs rendus au lead en notes ; lot plus gros : chaîne actuelle (Opus, 2 corrections, passe mineurs). Seuil et modèles dans cadence.yaml (orchestrate.review), défaut ci-dessus ; un bloquant ou majeur sur un petit lot déclenche quand même une correction et une revue Opus. Tests ; README. Décision Sylvain 07-10 : qualité oui, overkill non"
     status: done

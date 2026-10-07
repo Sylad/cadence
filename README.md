@@ -737,7 +737,7 @@ tree is an incident that stops the wave. `raf done|ux|review` and `cadence deliv
 `CADENCE_ORCHESTRATED` is set.
 
 **Budget**: the wave counts input + cache writes + output tokens (default 2 M); cache reads are kept and
-shown apart. Each lot also has its own budget derived from its estimate (1 M tokens per day, floor 400 k, shown by
+shown apart. Each lot also has its own budget derived from its estimate (400 k tokens per day, floor 200 k, shown by
 `--dry-run`): a lot that spent it gets no further session and is handed back to the lead, the wave budget stays for
 the others. When the budget (or the usage limit) is reached no new session starts, the running ones
 finish, the wave is *suspended* (exit code 3) and `--resume --budget …` continues. A session that returns

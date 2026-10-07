@@ -51,9 +51,9 @@ export interface OrchestrateDeps {
 
 export const DEFAULT_BUDGET = 2_000_000;
 
-/** Tokens comptés par jour d'estimate (L78) ; mesuré le 06-10 : un lot de 0,5 j mange 100 à 400 k, un petit lot 60 à 260 k. */
-const LOT_BUDGET_PER_DAY = 1_000_000;
-const LOT_BUDGET_FLOOR = 400_000;
+/** Tokens comptés par jour d'estimate (L78) ; mesuré le 06-10 : des lots de 0,5 j ont mangé 192 à 531 k, des lots de 1 j 455 à 468 k (2 M pour 6 lots) ; le plafond est posé sous ces mesures pour arrêter vraiment. */
+const LOT_BUDGET_PER_DAY = 400_000;
+const LOT_BUDGET_FLOOR = 200_000;
 
 /** Budget d'un lot, dérivé de son estimate : empêche quelques lots d'avaler le budget de la vague au détriment des autres. */
 export const lotBudget = (estimate: number): number => Math.max(LOT_BUDGET_FLOOR, Math.round(estimate * LOT_BUDGET_PER_DAY));

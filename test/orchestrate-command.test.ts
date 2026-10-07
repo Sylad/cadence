@@ -872,11 +872,17 @@ describe('Node du projet (.nvmrc)', () => {
 });
 
 describe('budget par lot (L78)', () => {
-  it("dérivé de l'estimate : 1 M par jour, plancher 400 k", () => {
-    expect(lotBudget(0.1)).toBe(400_000);
-    expect(lotBudget(0.5)).toBe(500_000);
-    expect(lotBudget(1)).toBe(1_000_000);
-    expect(lotBudget(2.5)).toBe(2_500_000);
+  it("dérivé de l'estimate : 400 k par jour, plancher 200 k", () => {
+    expect(lotBudget(0.1)).toBe(200_000);
+    expect(lotBudget(0.5)).toBe(200_000);
+    expect(lotBudget(1)).toBe(400_000);
+    expect(lotBudget(2.5)).toBe(1_000_000);
+  });
+
+  it("mesures du 06-10 : les lots de 0,5 j à 0,5 M et de 1 j à 0,45 M auraient été arrêtés", () => {
+    // finance L4 459 507, L5 337 304 et 531 234 ; ol L36 205 155 (0,5 j) · finance L6 455 197, ol L37 468 399 (1 j)
+    for (const spent of [459_507, 337_304, 531_234, 205_155]) expect(spent).toBeGreaterThanOrEqual(lotBudget(0.5));
+    for (const spent of [455_197, 468_399]) expect(spent).toBeGreaterThanOrEqual(lotBudget(1));
   });
 
   it("--dry-run dit le budget de chaque lot", async () => {
@@ -885,8 +891,8 @@ describe('budget par lot (L78)', () => {
     await orchestrate(['a:L1', 'b:L1', '--dry-run'], r.io, fakeDeps().deps);
     const text = r.out.join('\n');
     try {
-      expect(text).toContain('budget du lot : 1000000 tokens comptés');
       expect(text).toContain('budget du lot : 400000 tokens comptés');
+      expect(text).toContain('budget du lot : 200000 tokens comptés');
     } finally {
       removeDryRunBriefs(text);
     }
@@ -897,6 +903,6 @@ describe('budget par lot (L78)', () => {
     const f = fakeDeps();
     await orchestrate(['a:L1', '--budget', '1'], io(parent).io, f.deps);
     const store = RunStore.last(parent)!;
-    expect(store.readLot('a', 'L1')!.budget).toBe(2_000_000);
+    expect(store.readLot('a', 'L1')!.budget).toBe(800_000);
   });
 });

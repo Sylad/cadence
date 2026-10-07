@@ -607,25 +607,27 @@ lots:
     created: 2026-10-04
   - id: L50
     title: "⚡ orchestrate : les fichiers que Playwright MCP écrit dans le dépôt (.playwright-mcp/*.yml, captures) rendent le lot « dépôt sale » et le renvoient au lead (ol-companion:L29, vague 2026-10-04-2201) — exclus le temps de la vague (.git/info/exclude, comme le hook) et nettoyés à la fin, ou dossier de sortie Playwright hors dépôt ; test"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-07
     tasks:
-      - { id: t1, title: "cleanPlaywrightOutput : lstat, ne jamais suivre un lien symbolique (racine ou entrée) ni parcourir une racine suivie par git (ls-files sur le chemin lui-même) ; tests lien non suivi et lien suivi — bloquant de la 1re revue", status: todo }
-      - { id: t2, title: "info/exclude restauré à l'octet : retirer le saut de ligne ajouté, supprimer le fichier si la vague l'a créé ; test", status: todo }
-    review: { date: 2026-10-07, verdict: "non conforme : 1 bloquant (suppression hors .playwright-mcp/ et d'un fichier suivi via lien symbolique), 1 mineur", commit: 007bc197a1be44a431818f1356d215e1201402a4 }
+      - { id: t1, title: "cleanPlaywrightOutput : lstat, ne jamais suivre un lien symbolique (racine ou entrée) ni parcourir une racine suivie par git (ls-files sur le chemin lui-même) ; tests lien non suivi et lien suivi — bloquant de la 1re revue", status: done }
+      - { id: t2, title: "info/exclude restauré à l'octet : retirer le saut de ligne ajouté, supprimer le fichier si la vague l'a créé ; test", status: done }
+    review: { date: 2026-10-07, verdict: "conforme avec 2 mineurs (note illisible, saut de ligne final d'une ligne utilisateur) — reportés en lot séparé", commit: 9ec780df45b3ffd46fcc8a3613dbd360a9056c4e }
+    finished: 2026-10-07
   - id: L51
     title: "⚡ orchestrate : le tableau affiche « non conforme (0 bloquant, 0 majeur) » pour un lot rendu au lead pour une autre cause (dépôt sale) — la colonne revue dit la vraie cause ou le dernier verdict réel ; test"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-07
     tasks:
-      - { id: t1, title: "table : byReview exige une dernière revue au statut ok (revue failed/interrupted = autre cause) ; tests statuts failed/suspended", status: todo }
-    review: { date: 2026-10-07, verdict: "non conforme : 1 majeur (revue en échec ou suspendue non signalée comme autre cause)", commit: 64377ab56b01c1c5bcdfed215d685c6fe9e5741f }
+      - { id: t1, title: "table : byReview exige une dernière revue au statut ok (revue failed/interrupted = autre cause) ; tests statuts failed/suspended", status: done }
+    review: { date: 2026-10-07, verdict: conforme, commit: 7cd27d2219a1114e16ac14c5ca661c9bc3cb54e8 }
+    finished: 2026-10-07
   - id: L52
     title: "⚡ orchestrate : les sessions s'arrêtent encore sur des non-questions (« je n'ai pas de question », « faut-il scinder ce commit ? », « la revue portait sur un état antérieur ») — le brief interdit de s'arrêter pour une question d'organisation ou de constat contesté : trancher, lister en choix, continuer ; un constat contesté est relu par la revue suivante, pas par le lead (vague 2026-10-04-2201 : 4 questions évitables, ~1,2 M tokens pour 0 lot prêt)"
     status: done
@@ -908,6 +910,18 @@ lots:
       - { date: 2026-10-07, text: "07-10 : la revue L70/L81 a vu tomber aussi deliver.test.ts:926 « (c) Ctrl-C : un descendant qui ignore SIGINT » (3040 ms > 3000) — même famille, à couvrir dans ce lot" }
   - id: L86
     title: "isNonQuestion : ajouter « vide » (nommé par L52/t1) et les pluriels manquants (pas de questions bloquantes, je n'ai pas de questions bloquantes) à NON_QUESTIONS, avec test — mineur de la 2e revue L52"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-07
+  - id: L87
+    title: "restoreExclude (L50/t2) : note .git/info/cadence-exclude-before illisible ignorée et retirée sans lever (sinon release() s'interrompt et laisse hooks/exclusions dans les dépôts suivants) ; ne retirer le saut de ligne final que s'il est celui ajouté par la vague ; tests — mineurs de la 2e revue L50"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-07
+  - id: L88
+    title: "removeExclude (L3, guard.ts:82-89) : ne pas retirer une ligne /.githooks/pre-push que l'utilisateur avait déjà avant la vague ; test — relevé hors périmètre par la revue L50"
     status: todo
     estimate: 1
     quickwin: true

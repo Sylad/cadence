@@ -619,16 +619,17 @@ lots:
     created: 2026-10-04
   - id: L52
     title: "⚡ orchestrate : les sessions s'arrêtent encore sur des non-questions (« je n'ai pas de question », « faut-il scinder ce commit ? », « la revue portait sur un état antérieur ») — le brief interdit de s'arrêter pour une question d'organisation ou de constat contesté : trancher, lister en choix, continuer ; un constat contesté est relu par la revue suivante, pas par le lead (vague 2026-10-04-2201 : 4 questions évitables, ~1,2 M tokens pour 0 lot prêt)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-04
     started: 2026-10-07
     tasks:
-      - { id: t1, title: "isNonQuestion en liste FERMÉE : l'entrée entière (normalisée : casse, espaces, ponctuation finale hors « ? », apostrophe ’→') doit égaler une forme connue (aucune question, pas de question, je n'ai pas de question, no question(s), none, n/a, rien, vide…) ; jamais filtrée si elle contient « ? » ; tests négatifs : « No question except SQLite? », « No blocking question except: SQLite? », « No question but PostgreSQL? », « Aucune question hors schéma ? », « No, the question is SQLite? », « No further question about X? »", status: todo }
-      - { id: t2, title: "work() : chaque question filtrée tracée dans l.warnings (« question ignorée (non-question) : … ») et visible dans le tableau de fin de vague ; test", status: todo }
-      - { id: t3, title: "isNonQuestion : apostrophe typographique (je n’ai pas de question) ; test", status: todo }
-    review: { date: 2026-10-07, verdict: "non conforme : 1 majeur (le filtre des non-questions avale de vraies questions), 2 mineurs", commit: 571dd1f14ce34ec1cc4ca198c822df60ad3e68b2 }
+      - { id: t1, title: "isNonQuestion en liste FERMÉE : l'entrée entière (normalisée : casse, espaces, ponctuation finale hors « ? », apostrophe ’→') doit égaler une forme connue (aucune question, pas de question, je n'ai pas de question, no question(s), none, n/a, rien, vide…) ; jamais filtrée si elle contient « ? » ; tests négatifs : « No question except SQLite? », « No blocking question except: SQLite? », « No question but PostgreSQL? », « Aucune question hors schéma ? », « No, the question is SQLite? », « No further question about X? »", status: done }
+      - { id: t2, title: "work() : chaque question filtrée tracée dans l.warnings (« question ignorée (non-question) : … ») et visible dans le tableau de fin de vague ; test", status: done }
+      - { id: t3, title: "isNonQuestion : apostrophe typographique (je n’ai pas de question) ; test", status: done }
+    review: { date: 2026-10-07, verdict: "conforme avec 1 mineur (forme « vide » et pluriels manquants dans NON_QUESTIONS, sens prudent) — reporté en lot séparé", commit: bbca2d1d7641e59b893de19baa1a12203029a71e }
+    finished: 2026-10-07
   - id: L53
     title: "orchestrate : un lot déjà implémenté qui n'attend qu'une revue neuve (commits présents, revue précédente non conforme ou absente) est rendu au lead « implement sans commit » au lieu de passer à la revue — vécu 05-10 sur 3 lots (finance L3, ol L29, warhammer L54), puis en question sur L3 quand les sous-tâches ouvertes étaient déjà couvertes par des commits"
     status: done
@@ -896,3 +897,9 @@ lots:
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "07-10 : la revue L70/L81 a vu tomber aussi deliver.test.ts:926 « (c) Ctrl-C : un descendant qui ignore SIGINT » (3040 ms > 3000) — même famille, à couvrir dans ce lot" }
+  - id: L86
+    title: "isNonQuestion : ajouter « vide » (nommé par L52/t1) et les pluriels manquants (pas de questions bloquantes, je n'ai pas de questions bloquantes) à NON_QUESTIONS, avec test — mineur de la 2e revue L52"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-07

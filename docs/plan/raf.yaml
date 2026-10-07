@@ -1186,9 +1186,10 @@ lots:
     created: 2026-10-07
   - id: L108
     title: "orchestrate : revue proportionnée à la taille du lot — lot ≤ 0,25 j (estimate) : une seule revue (Sonnet, agent code-reviewer, mêmes critères), pas de passe « mineurs », mineurs rendus au lead en notes ; lot plus gros : chaîne actuelle (Opus, 2 corrections, passe mineurs). Seuil et modèles dans cadence.yaml (orchestrate.review), défaut ci-dessus ; un bloquant ou majeur sur un petit lot déclenche quand même une correction et une revue Opus. Tests ; README. Décision Sylvain 07-10 : qualité oui, overkill non"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-07
+    started: 2026-10-07
   - id: L109
     title: "skill lead + brief de revue : couper la cascade de mineurs — un mineur ne devient un lot que s'il décrit un bug observable (sortie fausse, crash, régression mesurée) ; sinon il reste une note du lot d'origine. Vécu 07-10 : L60 → L96 → L97 → L99 → L100 (L100 déjà fait, abandonné). Test sur le texte du skill"
     status: todo

@@ -328,6 +328,15 @@ describe('contrôles autour des sessions', () => {
     }
   });
 
+  it('isNonQuestion : « vide » et les pluriels manquants (L86)', () => {
+    for (const q of ['vide', 'Vide.', '(vide)', '(Vide)', 'pas de questions bloquantes', 'Pas de questions bloquantes.', "je n'ai pas de questions bloquantes", 'Je n’ai pas de questions bloquantes', "je n'ai aucune question bloquante", 'i have no blocking question', 'i have no blocking questions']) {
+      expect(isNonQuestion(q), JSON.stringify(q)).toBe(true);
+    }
+    for (const q of ['vide ?', '(vide) ?', 'pas de questions bloquantes sauf SQLite ?', 'vide de sens', 'Le schéma est vide, que faire ?']) {
+      expect(isNonQuestion(q), JSON.stringify(q)).toBe(false);
+    }
+  });
+
   it('isNonQuestion : apostrophe typographique (L52/t3)', () => {
     for (const q of ['Je n’ai pas de question', 'Je n’ai aucune question.', 'JE N’AI PAS DE QUESTION']) expect(isNonQuestion(q), q).toBe(true);
     expect(isNonQuestion('Je n’ai pas de question sauf SQLite ?')).toBe(false);

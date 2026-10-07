@@ -660,13 +660,13 @@ async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise
 
 /** Formes connues de « pas de question » : l'entrée entière, normalisée, doit en égaler une (liste fermée, L52). */
 const NON_QUESTIONS = new Set([
-  '', 'n/a', 'na', 'none', 'nothing', 'nil', 'rien', 'néant', 'neant', 'aucune', 'aucun',
+  '', 'vide', '(vide)', 'n/a', 'na', 'none', 'nothing', 'nil', 'rien', 'néant', 'neant', 'aucune', 'aucun',
   'aucune question', 'aucune autre question', 'aucune question bloquante', 'aucune question supplémentaire', 'aucune question supplementaire',
-  'pas de question', 'pas de questions', 'pas de question bloquante', 'plus de question', 'plus de questions',
-  "je n'ai pas de question", "je n'ai pas de questions", "je n'ai aucune question", "je n'ai pas de question bloquante",
+  'pas de question', 'pas de questions', 'pas de question bloquante', 'pas de questions bloquantes', 'plus de question', 'plus de questions',
+  "je n'ai pas de question", "je n'ai pas de questions", "je n'ai aucune question", "je n'ai pas de question bloquante", "je n'ai pas de questions bloquantes", "je n'ai aucune question bloquante",
   'no question', 'no questions', 'no open question', 'no open questions', 'no blocking question', 'no blocking questions',
   'no other question', 'no other questions', 'no further question', 'no further questions',
-  'i have no question', 'i have no questions', 'there are no questions', 'there is no question',
+  'i have no question', 'i have no questions', 'i have no blocking question', 'i have no blocking questions', 'there are no questions', 'there is no question',
 ]);
 
 /** Casse, espaces, ponctuation finale (hors « ? ») et apostrophe typographique ramenés à la forme de comparaison. */

@@ -20,7 +20,14 @@ function review(l: LotState): string {
   if (!l.code) return '—';
   const fixes = l.pass === 0 ? '' : ` après ${l.pass} correction${l.pass > 1 ? 's' : ''}`;
   if (l.status === 'ready') return `conforme${fixes}`;
-  return `non conforme (${l.code.bloquants} bloquant, ${l.code.majeurs} majeur)`;
+  const verdict = l.code.conforme ? 'conforme' : `non conforme (${l.code.bloquants} bloquant, ${l.code.majeurs} majeur)`;
+  // Rendu, échoué ou suspendu pour une autre cause que la revue (dépôt sale, session coupée…) : la colonne ne présente pas
+  // un verdict de revue comme la cause ; elle donne le dernier verdict réel, la cause est dans les lignes sous le tableau.
+  const stopped = l.status === 'handed-back' || l.status === 'failed' || l.status === 'suspended' || l.status === 'question';
+  const last = l.steps[l.steps.length - 1];
+  const byReview = !l.code.conforme && !!last && (last.kind === 'review' || last.kind === 'review-small');
+  if (stopped && !byReview) return `${verdict} (dernier verdict ; rendu pour une autre cause)`;
+  return verdict;
 }
 
 function ux(l: LotState): string {

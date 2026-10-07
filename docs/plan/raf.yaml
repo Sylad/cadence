@@ -772,6 +772,9 @@ lots:
       - { id: t1, title: "briefs : consigne Playwright applicable (noms relatifs, sorties sous .playwright-mcp/, jamais /tmp ni --output-dir : refusés par le MCP 0.0.76 checkFile)", status: todo }
       - { id: t2, title: "orchestrate : .playwright-mcp/ ignoré dans le contrôle « dépôt sale » (implement et commitPlan), pour les dépôts déjà initialisés sans entrée .gitignore", status: todo }
       - { id: t3, title: "README raf init : mentionner l'ajout de .playwright-mcp/ au .gitignore", status: todo }
+      - { id: t4, title: "snapshot : filtrer aussi les chemins entre guillemets de git status (.playwright-mcp/ avec accent ou espace), test avec un nom accentué", status: todo }
+      - { id: t5, title: "test raf init .gitignore : la ré-exécution doit atteindre ensureGitignore (fonction testée directement ou plan supprimé, code de sortie vérifié)", status: todo }
+      - { id: t6, title: "README orchestrate : .playwright-mcp/, comme .cadence/, ne compte jamais comme dépôt sale", status: todo }
   - id: L71
     title: "orchestrate : verrou par DÉPÔT au lieu du dossier parent — deux vagues dans des dépôts différents coexistent sous un plafond global de sessions simultanées (2 par défaut, réglable) ; même dépôt = toujours refusé (index git, plan et dérivés, tests/build partagés). Plus tard si besoin : worktree par lot à fichiers disjoints + fusion des plans (06-10, refus vécu cadence:L69 × warhammer40k:L64)"
     status: done
@@ -836,10 +839,12 @@ lots:
     created: 2026-10-07
   - id: L81
     title: "⚡ Test instable orchestrate-registry.test.ts:149 (L71/t3, attente 0 ms exacte) : rouge sous charge en suite complète, passe seul → npm test / prepublishOnly rouge"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme — horloge injectée dans acquireSlot, assertions [0,50]/[100] indépendantes de la charge (6 exécutions parallèles + 3 suites complètes vertes)", commit: b873519ad3024f96b9f1356cf83f664d13ef3a6b }
+    finished: 2026-10-07
   - id: L82
     title: "orchestrate : clore (ou proposer de clore) les sous-tâches couvertes par des commits qui les citent quand la revue est conforme (warhammer40k:L64 06-10, raf done refusé)"
     status: todo
@@ -860,3 +865,5 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "07-10 : la revue L70/L81 a vu tomber aussi deliver.test.ts:926 « (c) Ctrl-C : un descendant qui ignore SIGINT » (3040 ms > 3000) — même famille, à couvrir dans ce lot" }

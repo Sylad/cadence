@@ -939,6 +939,7 @@ lots:
     notes:
       - { date: 2026-10-07, text: "07-10 : encore deux cas — cadence L47 (fait par L45) et L100 (fait par la correction de L99) : sessions d'implémentation ouvertes pour rien (33 k et 39 k tokens)." }
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme : les mineurs 1 et 3 sont corrigés (« oui » sans preuve → partiel, condition partagée par needsPrecheck dans runLot et --dry-run, tests ajoutés), le rejet du 2 est justifié ; 1 nouveau mineur : la consigne jointe au brief pour un « oui » non prouvé dit « do not redo it » — orchestré (vague 2026-10-07-1943, 1 passe(s) de correction + passe des mineurs)", commit: 0e9aa6cfd8431616aa9a57295bc61c29c93239e8 }
   - id: L78
     title: "orchestrate : budget par lot dérivé de l'estimate, en plus du budget de vague — 2 M mangés par 6 lots, 7 lots à 0 (06-10)"
     status: todo

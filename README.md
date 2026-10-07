@@ -82,7 +82,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
-| `raf show <id> [--notes]` | one lot in full: status, dates, `after`, public title, dated notes in order, then the counted commits (as `raf commits`); `--notes` prints the notes alone |
+| `raf show <id> [--notes]` | one lot: status, dates, `after`, public title, dated notes in order, then the counted commits (as `raf commits`); `--notes` prints the notes alone |
 | `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |

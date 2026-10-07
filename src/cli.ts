@@ -41,7 +41,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf ux <id> "verdict" enregistre la revue d'ergonomie du lot (agent ux-reviewer)
   raf review enable     revue de code obligatoire avant « done » pour les lots qui ont des commits
   raf review <id> "verdict" enregistre la revue de code du lot (agent code-reviewer)
-  raf show <id> [--notes]   le lot en entier : statut, dates, after, titre public, notes datées, commits comptés ; --notes : les notes seules
+  raf show <id> [--notes]   le lot : statut, dates, after, titre public, notes datées, commits comptés ; --notes : les notes seules
   raf commits <id>      les commits du lot que compte la porte de revue de code, du plus ancien au plus récent
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf list [--status todo|doing|done|dropped]
@@ -258,7 +258,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (lot.public) io.out(`public : ${lot.public}`);
       if (notes.length) {
         io.out('notes :');
-        for (const n of notes) io.out(`  ${n}`);
+        // Les lignes suivantes d'une note multiligne s'alignent sous son texte, pas en colonne 0.
+        for (const n of lot.notes) io.out(`  ${n.date}  ${n.text.replace(/\n/g, `\n${' '.repeat(n.date.length + 4)}`)}`);
       }
       const commits = lotWork(plan, root, lot.id).reverse();
       io.out(`commits (${commits.length}) :`);

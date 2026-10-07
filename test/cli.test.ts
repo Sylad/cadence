@@ -287,6 +287,20 @@ describe('raf show', () => {
     expect(r.out.indexOf('seconde note')).toBeLessThan(r.out.indexOf('commits (2)'));
   });
 
+  it('les lignes suivantes d\'une note sur plusieurs lignes restent sous « notes : », sous le texte', () => {
+    const dir = planAvecLot();
+    raf(dir, 'note', 'L2', 'ligne un\nligne deux');
+    const r = raf(dir, 'show', 'L2');
+    expect(r.out).toContain('  2026-09-28  ligne un\n              ligne deux\n');
+    expect(r.out.split('\n').filter((l) => l && !l.startsWith(' ') && !/^(L2 |créé|after|public|notes|commits)/.test(l))).toEqual([]);
+  });
+
+  it('l\'aide et le README ne promettent pas « en entier » : ils listent ce que show affiche', () => {
+    const aide = raf(gitRepo(), '--help').out;
+    expect(aide).not.toContain('en entier');
+    expect(readFileSync(join(__dirname, '..', 'README.md'), 'utf8')).not.toMatch(/raf show[^\n]*in full/);
+  });
+
   it('--notes n\'affiche que les notes, une par ligne', () => {
     const dir = planAvecLot();
     const r = raf(dir, 'show', 'L2', '--notes');

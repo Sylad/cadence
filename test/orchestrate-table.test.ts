@@ -41,12 +41,12 @@ describe('renderTable : captures UX (L74)', () => {
     const l = lot();
     l.status = 'ready';
     l.uxCaptures = '/launch/.cadence/runs/w1/demo--L1/playwright';
-    expect(renderTable(wave, [l])).toContain('demo:L1 — captures UX : /launch/.cadence/runs/w1/demo--L1/playwright');
+    expect(renderTable(wave, [l])).toContain('demo:L1 — captures Playwright : /launch/.cadence/runs/w1/demo--L1/playwright');
   });
 
   it('sans étape ux, aucune ligne', () => {
     const l = lot();
     l.status = 'ready';
-    expect(renderTable(wave, [l]).join('\n')).not.toContain('captures UX');
+    expect(renderTable(wave, [l]).join('\n')).not.toContain('captures Playwright');
   });
 });

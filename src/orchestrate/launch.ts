@@ -31,18 +31,21 @@ export interface StepSpec {
 
 export type McpServers = Record<string, { command: string; args: string[] }>;
 
-/** Serveurs MCP d'une étape : aucun, sauf Playwright pour l'étape `ux` (sorties dans `outputDir`, hors du dépôt). */
-export function mcpServersFor(kind: StepKind, outputDir: string): McpServers {
-  if (kind !== 'ux') return {};
+/**
+ * Serveurs MCP d'une étape : Playwright pour `ux` et, sur un lot `visible`, pour `implement` et `fix` (fix-minors compris) ;
+ * rien pour `review` et `review-small`, ni pour un lot sans écran. Sorties dans `outputDir`, hors du dépôt.
+ */
+export function mcpServersFor(kind: StepKind, visible: boolean, outputDir: string): McpServers {
+  if (!(kind === 'ux' || (visible && (kind === 'implement' || kind === 'fix')))) return {};
   return { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', outputDir] } };
 }
 
-/** Écrit `<lotDir>/mcp-<étape>.json` (et, pour ux, le dossier `playwright/`) ; rend le chemin absolu du fichier. */
-export function writeMcpConfig(lotDir: string, kind: StepKind): string {
+/** Écrit `<lotDir>/mcp-<étape>.json` (et, si Playwright est chargé, le dossier `playwright/`) ; rend le chemin absolu du fichier. */
+export function writeMcpConfig(lotDir: string, kind: StepKind, visible: boolean): string {
   const dir = resolve(lotDir);
   const out = join(dir, 'playwright');
-  const servers = mcpServersFor(kind, out);
-  if (kind === 'ux') mkdirSync(out, { recursive: true });
+  const servers = mcpServersFor(kind, visible, out);
+  if (servers.playwright) mkdirSync(out, { recursive: true });
   const file = join(dir, `mcp-${kind}.json`);
   writeFileSync(file, `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`);
   return file;

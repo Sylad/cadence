@@ -52,7 +52,7 @@ export function renderTable(wave: WaveState, lots: LotState[]): string[] {
   }
   for (const l of lots) {
     if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);
-    if (l.uxCaptures) out.push(`${l.project}:${l.lot} — captures UX : ${l.uxCaptures}`);
+    if (l.uxCaptures) out.push(`${l.project}:${l.lot} — captures Playwright : ${l.uxCaptures}`);
     for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);
     for (const x of l.choix ?? []) out.push(`${l.project}:${l.lot} — choix fait : ${x}`);
     for (const p of l.proposals) out.push(`${l.project}:${l.lot} — proposé : ${p}`);

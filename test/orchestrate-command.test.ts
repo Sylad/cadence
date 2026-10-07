@@ -129,7 +129,7 @@ describe('refus avant d\'agir (code 2)', () => {
       expect(out).toMatch(/  ux : claude [^\n]*--strict-mcp-config[^\n]*\n    brief : [^\n]*\n    mcp : playwright \(captures dans le dossier de la vague : <vague>\/a--L1\/playwright\)/);
       const implement = out.slice(out.indexOf('  implement :'), out.indexOf('  review :'));
       expect(implement).toContain('--strict-mcp-config --mcp-config <mcp>');
-      expect(implement).toContain('    mcp : aucun');
+      expect(implement).toMatch(/    mcp : playwright \(captures dans le dossier de la vague : <vague>\/a--L1\/playwright\)/); // lot visible (L74)
       expect(out).toMatch(/  review : claude [^\n]*--strict-mcp-config[^\n]*\n    brief : [^\n]*\n    mcp : aucun/);
     } finally {
       removeDryRunBriefs(r.out.join('\n'));

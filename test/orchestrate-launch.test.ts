@@ -102,20 +102,23 @@ describe('buildArgs', () => {
 });
 
 describe('MCP minimaux par étape', () => {
-  it('aucun serveur, sauf Playwright pour l\'étape ux', () => {
-    for (const k of ['implement', 'fix', 'review', 'review-small'] as const) expect(mcpServersFor(k, '/run/p--L1/playwright')).toEqual({});
-    expect(mcpServersFor('ux', '/run/p--L1/playwright')).toEqual({
-      playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', '/run/p--L1/playwright'] },
-    });
+  it('Playwright pour ux, et pour implement/fix d\'un lot visible (même dossier de captures) ; rien pour review, review-small, ni pour un lot sans écran (L74)', () => {
+    const pw = { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', '/run/p--L1/playwright'] } };
+    for (const k of ['implement', 'fix', 'ux'] as const) expect(mcpServersFor(k, true, '/run/p--L1/playwright'), k).toEqual(pw);
+    for (const k of ['implement', 'fix', 'review', 'review-small'] as const) expect(mcpServersFor(k, false, '/run/p--L1/playwright'), `${k} sans écran`).toEqual({});
+    for (const k of ['review', 'review-small'] as const) expect(mcpServersFor(k, true, '/run/p--L1/playwright'), `${k} visible`).toEqual({});
   });
 
-  it('writeMcpConfig écrit {"mcpServers":…} dans le dossier du lot et rend son chemin absolu', () => {
+  it('writeMcpConfig écrit {"mcpServers":…} dans le dossier du lot et rend son chemin absolu ; le dossier playwright/ n\'existe que si le serveur est chargé', () => {
     const dir = tempDir();
-    const none = writeMcpConfig(dir, 'review');
+    const none = writeMcpConfig(dir, 'review', true);
     expect(none).toBe(join(dir, 'mcp-review.json'));
     expect(JSON.parse(readFileSync(none, 'utf8'))).toEqual({ mcpServers: {} });
-    const ux = writeMcpConfig(dir, 'ux');
-    expect(JSON.parse(readFileSync(ux, 'utf8')).mcpServers.playwright.args.at(-1)).toBe(join(dir, 'playwright'));
+    expect(existsSync(join(dir, 'playwright'))).toBe(false);
+    expect(JSON.parse(readFileSync(writeMcpConfig(dir, 'implement', false), 'utf8'))).toEqual({ mcpServers: {} });
+    expect(existsSync(join(dir, 'playwright'))).toBe(false);
+    const impl = writeMcpConfig(dir, 'implement', true);
+    expect(JSON.parse(readFileSync(impl, 'utf8')).mcpServers.playwright.args.at(-1)).toBe(join(dir, 'playwright'));
     expect(existsSync(join(dir, 'playwright'))).toBe(true);
   });
 

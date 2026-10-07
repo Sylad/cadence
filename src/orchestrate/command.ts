@@ -284,7 +284,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : claude ${args.join(' ')}`);
       io.out(`    brief : ${file}`);
-      const servers = Object.keys(mcpServersFor(s.kind, ''));
+      const servers = Object.keys(mcpServersFor(s.kind, l.visible, ''));
       io.out(`    mcp : ${servers.length ? `${servers.join(', ')} (captures dans le dossier de la vague : <vague>/${l.project}--${l.lot}/playwright)` : 'aucun'}`);
     }
   }

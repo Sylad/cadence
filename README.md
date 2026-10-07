@@ -59,7 +59,7 @@ Every version, with what it brings and since when: [CHANGELOG.md](CHANGELOG.md).
 ```sh
 npm install -g @sylad/cadence    # or: npx -p @sylad/cadence raf …
 
-raf init                          # docs/plan/raf.yaml + post-commit hook
+raf init                          # docs/plan/raf.yaml + post-commit hook + .playwright-mcp/ in .gitignore
 raf add "Monthly dedup on merge" --estimate 2
 raf add "Typo in footer" --quickwin
 raf add "Loan cache" --after L1
@@ -76,7 +76,7 @@ raf gantt                         # docs/plan/gantt.html
 
 | Command | Effect |
 |---|---|
-| `raf init [--project name] [--prefix L] [--no-hook]` | create the plan and install the hook |
+| `raf init [--project name] [--prefix L] [--no-hook]` | create the plan, install the hook, add `.playwright-mcp/` to `.gitignore` |
 | `raf add "title" [--estimate d] [--quickwin] [--visible] [--public "title"] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id (`--public`: the lot's title in the public's words, written as `public:` right after `title:`) |
 | `raf add "title" --every <days>` · `raf did <id> ["text"]` | recurring lot: `every` (days) and `last` (last time done) fields; the lot stays `todo`, `raf now` and `session start` list it under « Récurrent » with « dû depuis N j » / « prochain dans N j »; `raf did` resets the count (spec: `docs/superpowers/specs/2026-10-04-L11-tache-recurrente.md`) |
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |

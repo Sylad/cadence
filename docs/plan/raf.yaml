@@ -898,6 +898,8 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-06
+    notes:
+      - { date: 2026-10-07, text: "07-10 : 2 nouveaux cas poussés — warhammer40k d59d988 et ol-companion 07222c4 citent « cadence L95 » dans un commit plan → « L95 inconnu » (erreur du lead) ; un acquittement doit couvrir aussi un id cité inconnu, pas seulement un commit sans lot" }
   - id: L74
     title: "orchestrate : MCP minimaux par étape (--strict-mcp-config ; Playwright seulement pour UX et sondes) — chaque claude -p chargeait context7 @latest, Serena via uvx git+, Playwright @latest (mesuré 06-10)"
     status: done
@@ -1030,6 +1032,7 @@ lots:
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "07-10 (L61/t1) : un test de deliver.test.ts a échoué 1 fois sur 2 sous charge — piste pour nommer le test instable" }
+      - { date: 2026-10-07, text: "07-10 : instable nommé — test/verify.test.ts « pour de vrai : trois sleep 2 en session start prennent ~2 s, pas 6 » rouge 1 fois sur 3 passages de la suite (vague L97 venant de finir), vert seul et en suite complète ensuite ; seuil de durée sensible à la charge" }
   - id: L91
     title: "Doc des briefs Nouveautés hors vague : README l.743 (dry-run sans dossier de vague ; fix/fix-minors d'un lot visible ont le dossier Playwright et --add-dir) et paragraphe Browser d'implement.md qui promet un serveur lancé par l'orchestrateur même en délégation à la main (contredit « capture sous le dossier temporaire ») — mineurs de la 3e revue L48"
     status: todo
@@ -1079,9 +1082,21 @@ lots:
     finished: 2026-10-07
   - id: L97
     title: "linkNewFile (state.ts:89) : ne renvoyer false que sur EEXIST, relancer EPERM/EMLINK & co (régression dbb921b : un tmpdir sans liens physiques fait attendre le verrou UX jusqu'au délai sans dire pourquoi) ; test ; + test takeUrlLock verrou remplacé entre lecture et renommage (app.ts:118-125) — mineurs revue L96"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme (1 mineur : chemin deliver/writeLock sur EPERM non testé, l'exception sort sans être gérée) — orchestré (vague 2026-10-07-1458, 0 passe(s) de correction + passe des mineurs)", commit: 931dbdecc8f625f6c8c8b310e33edee3b47c2e79 }
+    finished: 2026-10-07
+  - id: L98
+    title: "orchestrate.ux : l'app est lancée avec le Node du .nvmrc du projet (node-env.ts), comme les sessions — aujourd'hui spawn('sh') hérite du PATH de l'orchestrateur (Node 20) : les 3 sites Astro (Node ≥ 22.12) ne démarrent pas, et un préfixe « . ~/.nvm/nvm.sh && nvm use » sort en code 3 sous sh (vécu L95, 07-10) ; test avec un .nvmrc et un faux node ; README"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-07
+  - id: L99
+    title: "Erreurs de pose de verrou (mineurs revue L97) : startApp convertit EPERM/EMLINK du verrou d'URL en « UX non vérifiée » avec l'errno (la revue de code suit) ; deliver (deliver.ts:321) refuse avec la cause « verrou <chemin> : <errno> » au lieu de laisser sortir l'exception ; tests via vi.mock('node:fs')"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-07

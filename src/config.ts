@@ -152,8 +152,11 @@ export interface OrchestrateConfig {
   verdict?: string;
   /** Commande de tests du projet, lancée par l'orchestrateur après une implémentation ou une correction. */
   test?: string;
-  /** Comment voir l'application pour une revue UX : une URL, une commande de lancement, ou les deux. */
-  ux?: { url?: string; command?: string };
+  /**
+   * Comment voir l'application pour une revue UX : une URL, une commande de lancement, ou les deux. Avec les deux, c'est
+   * l'orchestrateur qui lance la commande (depuis la racine du dépôt) et attend l'URL, `timeout` secondes (300 par défaut).
+   */
+  ux?: { url?: string; command?: string; timeout?: number };
   permissionMode: string;
   addDirs: string[];
   /** Millisecondes. */
@@ -185,9 +188,13 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   if (o.ux != null) {
     if (typeof o.ux === 'string' && o.ux.trim()) config.ux = /^https?:\/\//.test(o.ux.trim()) ? { url: o.ux.trim() } : { command: o.ux.trim() };
     else if (isObject(o.ux) && (o.ux.url != null || o.ux.command != null)) {
-      for (const k of Object.keys(o.ux)) if (k !== 'url' && k !== 'command') throw bad(`ux.${k} inconnu (attendu : url, command)`);
+      for (const k of Object.keys(o.ux)) if (k !== 'url' && k !== 'command' && k !== 'timeout') throw bad(`ux.${k} inconnu (attendu : url, command, timeout)`);
       config.ux = {};
       for (const k of ['url', 'command'] as const) if (o.ux[k] != null) config.ux[k] = String(o.ux[k]);
+      if (o.ux.timeout != null) {
+        if (typeof o.ux.timeout !== 'number' || !(o.ux.timeout > 0)) throw bad('ux.timeout : nombre de secondes positif attendu');
+        config.ux.timeout = o.ux.timeout;
+      }
     } else throw bad('ux : une URL, une commande, ou { url, command }');
   }
   if (o.permissionMode != null) {

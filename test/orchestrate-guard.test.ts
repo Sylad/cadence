@@ -115,6 +115,13 @@ describe('cadence.yaml : orchestrate', () => {
     expect(c.verdict).toContain('{verdict}');
     expect(read('orchestrate:\n  ux: npm run dev\n')().ux).toEqual({ command: 'npm run dev' });
   });
+  it('ux objet { command, url, timeout } : timeout en secondes, positif, sinon erreur nommée (L60)', () => {
+    expect(read('orchestrate:\n  ux: { command: npm start, url: http://localhost:4200, timeout: 90 }\n')().ux).toEqual({ command: 'npm start', url: 'http://localhost:4200', timeout: 90 });
+    expect(read('orchestrate:\n  ux: { command: npm start, url: http://localhost:4200 }\n')().ux).toEqual({ command: 'npm start', url: 'http://localhost:4200' });
+    expect(read('orchestrate:\n  ux: { command: npm start, timeout: 0 }\n')).toThrow(/ux\.timeout/);
+    expect(read('orchestrate:\n  ux: { command: npm start, timeout: vite }\n')).toThrow(/ux\.timeout/);
+    expect(read('orchestrate:\n  ux: { command: npm start, env: x }\n')).toThrow(/ux\.env inconnu/);
+  });
   it('clé inconnue ou valeur invalide : erreur nommée', () => {
     expect(read('orchestrate:\n  parallel: 3\n')).toThrow(/orchestrate\.parallel inconnu/);
     expect(read('orchestrate:\n  timeouts: { implement: 0 }\n')).toThrow(/timeouts\.implement/);

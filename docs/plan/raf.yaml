@@ -933,11 +933,12 @@ lots:
     created: 2026-10-07
   - id: L77
     title: "orchestrate : contrôle préalable « livrable déjà présent ? » avant d'ouvrir une session d'implémentation — warhammer L59 et L65 étaient déjà faits par d'autres lots (06-10)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "07-10 : encore deux cas — cadence L47 (fait par L45) et L100 (fait par la correction de L99) : sessions d'implémentation ouvertes pour rien (33 k et 39 k tokens)." }
+    started: 2026-10-07
   - id: L78
     title: "orchestrate : budget par lot dérivé de l'estimate, en plus du budget de vague — 2 M mangés par 6 lots, 7 lots à 0 (06-10)"
     status: todo

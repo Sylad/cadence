@@ -728,13 +728,15 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
 
   it('realDeps.exec : au délai, aucun descendant de la commande ne survit (le fork de sh compris)', async () => {
     const dir = tempDir();
-    writeFileSync(join(dir, 'livrer.sh'), `#!/bin/sh\nsleep 3\necho bumped > '${dir}/bumped'\n`, { mode: 0o755 });
+    // Le script dort 6 s pour un délai de 1 s : revenir avant la fin du sommeil prouve que exec n'attend pas l'enfant (5 s de marge
+    // pour la charge de la machine, au lieu de 1,5 s) ; le fichier `bumped` prouve que le descendant, lui, est bien mort.
+    writeFileSync(join(dir, 'livrer.sh'), `#!/bin/sh\nsleep 6\necho bumped > '${dir}/bumped'\n`, { mode: 0o755 });
     const t = Date.now();
     expect(await realDeps(dir).exec('./livrer.sh', {}, 1_000)).toBe(TIMED_OUT);
-    expect(Date.now() - t).toBeLessThan(2_500);
-    await pause(3_000);
+    expect(Date.now() - t).toBeLessThan(6_000);
+    await pause(Math.max(0, t + 6_000 - Date.now()) + 1_500); // jusqu'après la fin qu'aurait eue le sommeil
     expect(existsSync(join(dir, 'bumped'))).toBe(false);
-  }, 15_000);
+  }, 20_000);
 
   it.each([false, true])('(a) script tué au deployTimeout (bump par un petit-enfant : %s) : ses descendants meurent avec lui, une seconde livraison ne court jamais en même temps', async (grandchild) => {
     const logs = tempDir();
@@ -913,8 +915,8 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
 
   it('(c) Ctrl-C : un descendant qui ignore SIGINT sous un parent vivant est tué à l’échéance de la grâce (~2 s) — un seul bump', async () => {
     const logs = tempDir();
-    // le script attend son enfant (trap posé : il ne meurt pas du signal) ; l'enfant ignore SIGINT et bumperait à 4 s
-    const dir = scriptRepo(logs, `  trap 'echo int' INT\n  sh -c "trap '' INT; sleep 4; echo bumped >> '${logs}/bumps'"`);
+    // le script attend son enfant (trap posé : il ne meurt pas du signal) ; l'enfant ignore SIGINT et bumperait à 8 s
+    const dir = scriptRepo(logs, `  trap 'echo int' INT\n  sh -c "trap '' INT; sleep 8; echo bumped >> '${logs}/bumps'"`);
     const first = startFirst(logs, dir);
     try {
       expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
@@ -923,9 +925,9 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
       process.kill(-first.child.pid!, 'SIGINT');
       const end = await first.exited;
       expect(end - t).toBeGreaterThanOrEqual(1_800); // la grâce entière
-      expect(end - t).toBeLessThan(3_000); // mais pas la fin de l'enfant (4 s)
+      expect(end - t).toBeLessThan(6_000); // mais pas la fin de l'enfant (8 s) : 4 s de marge pour la charge, la grâce seule en prend ~2
       expect(await cad(dir)).toBe(0);
-      await pause(3_000);
+      await pause(Math.max(0, t + 8_000 - Date.now()) + 1_500); // jusqu'après le bump qu'aurait fait l'enfant
       expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
     } finally {
       first.cleanup();

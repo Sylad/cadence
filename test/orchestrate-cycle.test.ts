@@ -395,6 +395,22 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.outcome).toMatch(/délai dépassé/);
   });
 
+  it('sorties de Playwright MCP écrites dans le dépôt (L50) : pas un dépôt sale, nettoyées à la fin du lot', async () => {
+    const pw: Handler = (call) => {
+      const c = commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a');
+      mkdirSync(join(call.opts.cwd, '.playwright-mcp'), { recursive: true });
+      writeFileSync(join(call.opts.cwd, '.playwright-mcp/page-1.yml'), 'x');
+      writeFileSync(join(call.opts.cwd, '.playwright-mcp/shot.png'), 'x');
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const h = harness({ script: { implement: [pw], review: [ok] } });
+    installPrePush(h.repo, 'w1');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(existsSync(join(h.repo, '.playwright-mcp'))).toBe(false);
+  });
+
   it('dépôt sale après une session : rendu au lead, fichiers listés, rien n\'est commité ni jeté', async () => {
     const dirty: Handler = (call) => {
       const c = commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a');

@@ -1,5 +1,5 @@
-import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { execFile } from 'node:child_process';
+import { chmodSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFile, execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 import { gitCommonDir, gitRoot, hooksDir } from '../git.js';
@@ -57,6 +57,58 @@ function removeExclude(repo: string): void {
   writeFileSync(file, lines.filter((l) => l !== line).join('\n'));
 }
 
+/** Sorties du MCP Playwright écrites dans le dépôt par une session qui ne respecte pas son dossier de sortie (L50). */
+const PW_DIR = '.playwright-mcp';
+const PW_PATTERN = `/${PW_DIR}/`;
+const PW_MARK = '# cadence orchestrate — sorties Playwright MCP exclues le temps de la vague';
+
+/** Exclut `.playwright-mcp/` le temps de la vague ; une exclusion déjà présente n'est ni dupliquée ni retirée ensuite. */
+function addPlaywrightExclude(repo: string): void {
+  const file = excludeFile(repo);
+  mkdirSync(join(gitCommonDir(repo), 'info'), { recursive: true });
+  const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const lines = text.split('\n');
+  if (lines.some((l) => l === PW_PATTERN || l === `${PW_DIR}/` || l === PW_DIR)) return;
+  appendFileSync(file, `${text === '' || text.endsWith('\n') ? '' : '\n'}${PW_MARK}\n${PW_PATTERN}\n`);
+}
+
+function removePlaywrightExclude(repo: string): void {
+  const file = excludeFile(repo);
+  if (!existsSync(file)) return;
+  const lines = readFileSync(file, 'utf8').split('\n');
+  const i = lines.indexOf(PW_MARK);
+  if (i < 0 || lines[i + 1] !== PW_PATTERN) return;
+  lines.splice(i, 2);
+  writeFileSync(file, lines.join('\n'));
+}
+
+/** Supprime les fichiers NON SUIVIS de `.playwright-mcp/` (jamais un fichier suivi) ; le dossier part quand il est vide. */
+export function cleanPlaywrightOutput(repo: string): void {
+  const root = gitRoot(repo);
+  if (!root) return;
+  const dir = join(root, PW_DIR);
+  if (!existsSync(dir)) return;
+  let tracked: Set<string>;
+  try {
+    tracked = new Set(execFileSync('git', ['ls-files', '-z', '--', PW_DIR], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean));
+  } catch {
+    return;
+  }
+  const walk = (d: string, rel: string): boolean => {
+    let empty = true;
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const r = `${rel}/${e.name}`;
+      if (e.isDirectory()) {
+        if (!walk(join(d, e.name), r)) empty = false;
+      } else if (tracked.has(r)) empty = false;
+      else rmSync(join(d, e.name), { force: true });
+    }
+    if (empty) rmSync(d, { recursive: true, force: true });
+    return empty;
+  };
+  walk(dir, PW_DIR);
+}
+
 /**
  * Pose le hook pre-push temporaire. Refus (raison) quand un autre hook pre-push existe : le remplacer
  * modifierait un fichier suivi (husky) ou sauterait une règle du projet. Un hook laissé par une vague
@@ -69,6 +121,7 @@ export function installPrePush(repo: string, wave = '?'): { ok: true } | { ok: f
   }
   mkdirSync(dirname(file), { recursive: true });
   addExclude(repo);
+  addPlaywrightExclude(repo);
   writeFileSync(file, hook(wave));
   chmodSync(file, 0o755);
   return { ok: true };
@@ -89,6 +142,7 @@ export function removePrePush(repo: string, wave?: string): void {
     }
   }
   removeExclude(repo);
+  removePlaywrightExclude(repo);
 }
 
 /** Pourrait-on poser le hook ? (préconditions, sans écrire) */

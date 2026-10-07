@@ -11,7 +11,7 @@ import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { objective, renderBrief, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
-import { pushed, snapshot, type Snapshot } from './guard.js';
+import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { checkShape, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type ReviewReport, type WorkReport } from './schemas.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
@@ -716,5 +716,12 @@ export async function runLot(c: LotCtx): Promise<void> {
   } catch (e) {
     l.next = null;
     transition(c, 'failed', `erreur : ${(e as Error).message}`);
+  } finally {
+    // Sorties du MCP Playwright qu'une session a écrites dans le dépôt (L50) : jetables, retirées à la fin de chaque passage du lot.
+    try {
+      cleanPlaywrightOutput(l.repo);
+    } catch {
+      // nettoyage de confort : jamais une cause d'échec du lot
+    }
   }
 }

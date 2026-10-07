@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { canInstallPrePush, installPrePush, pushed, removePrePush, snapshot } from '../src/orchestrate/guard.js';
+import { canInstallPrePush, cleanPlaywrightOutput, installPrePush, pushed, removePrePush, snapshot } from '../src/orchestrate/guard.js';
 import { readFileSync, rmSync } from 'node:fs';
 import { readOrchestrateConfig } from '../src/config.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -195,12 +195,13 @@ describe('core.hooksPath dans l\'arbre suivi (L3/t19)', () => {
     expect(installPrePush(dir, 'w1')).toMatchObject({ ok: false });
   });
 
-  it('hooksPath hors de l\'arbre ou .git/hooks : aucune ligne d\'exclusion', () => {
+  it('hooksPath hors de l\'arbre ou .git/hooks : aucune ligne d\'exclusion pour le hook (seule celle de .playwright-mcp/ est posée)', () => {
     const dir = gitRepo();
     const before = exclude(dir);
     installPrePush(dir, 'w1');
-    expect(exclude(dir)).toBe(before);
+    expect(exclude(dir).replace(/# cadence orchestrate — sorties Playwright[^\n]*\n\/\.playwright-mcp\/\n/, '')).toBe(before);
     removePrePush(dir, 'w1');
+    expect(exclude(dir)).toBe(before);
   });
 
   it('la suppression du hook est vue par le snapshot (le statut, lui, ne la voit plus)', async () => {
@@ -232,5 +233,43 @@ describe('snapshot asynchrone (L3/t21)', () => {
     } finally {
       process.env.PATH = path;
     }
+  });
+});
+
+describe('sorties de Playwright MCP dans le dépôt (L50)', () => {
+  const raw = (dir: string) => execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: dir, encoding: 'utf8' }).trim();
+
+  it('le temps de la vague, .playwright-mcp/ est exclu par .git/info/exclude (git ne le voit plus) ; la ligne part avec le hook', () => {
+    const dir = gitRepo();
+    installPrePush(dir, 'w1');
+    mkdirSync(join(dir, '.playwright-mcp'));
+    writeFileSync(join(dir, '.playwright-mcp/page.yml'), 'x');
+    expect(raw(dir)).toBe('');
+    removePrePush(dir, 'w1');
+    expect(readFileSync(join(dir, '.git/info/exclude'), 'utf8')).not.toContain('playwright-mcp');
+    expect(raw(dir)).toContain('.playwright-mcp/');
+  });
+
+  it('une exclusion déjà présente avant la vague est laissée en place', () => {
+    const dir = gitRepo();
+    writeFileSync(join(dir, '.git/info/exclude'), '.playwright-mcp/\n');
+    installPrePush(dir, 'w1');
+    removePrePush(dir, 'w1');
+    expect(readFileSync(join(dir, '.git/info/exclude'), 'utf8')).toContain('.playwright-mcp/');
+  });
+
+  it('cleanPlaywrightOutput supprime les fichiers non suivis de .playwright-mcp/, jamais un fichier suivi', () => {
+    const dir = gitRepo();
+    mkdirSync(join(dir, '.playwright-mcp'));
+    writeFileSync(join(dir, '.playwright-mcp/page.yml'), 'x');
+    cleanPlaywrightOutput(dir);
+    expect(existsSync(join(dir, '.playwright-mcp'))).toBe(false);
+    mkdirSync(join(dir, '.playwright-mcp'));
+    writeFileSync(join(dir, '.playwright-mcp/kept.yml'), 'x');
+    git(dir, 'add', '-f', '.playwright-mcp/kept.yml');
+    writeFileSync(join(dir, '.playwright-mcp/new.png'), 'x');
+    cleanPlaywrightOutput(dir);
+    expect(existsSync(join(dir, '.playwright-mcp/kept.yml'))).toBe(true);
+    expect(existsSync(join(dir, '.playwright-mcp/new.png'))).toBe(false);
   });
 });

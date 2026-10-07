@@ -44,26 +44,55 @@ const excludeFile = (repo: string) => join(gitCommonDir(repo), 'info', 'exclude'
  */
 const excludeMemo = (repo: string) => join(gitCommonDir(repo), 'info', 'cadence-exclude-before');
 
+interface ExcludeMemo {
+  absent: boolean;
+  noFinalNewline: boolean;
+  /** Contenu d'origine (absent d'une note écrite par une version antérieure). */
+  content?: string;
+}
+
 function rememberExclude(repo: string): void {
   const memo = excludeMemo(repo);
   if (existsSync(memo)) return;
   const file = excludeFile(repo);
   const text = existsSync(file) ? readFileSync(file, 'utf8') : null;
+  const note: ExcludeMemo = {
+    absent: text === null,
+    noFinalNewline: text !== null && text !== '' && !text.endsWith('\n'),
+    content: text ?? '',
+  };
   mkdirSync(join(gitCommonDir(repo), 'info'), { recursive: true });
-  writeFileSync(memo, JSON.stringify({ absent: text === null, noFinalNewline: text !== null && text !== '' && !text.endsWith('\n') }));
+  writeFileSync(memo, JSON.stringify(note));
+}
+
+/** La note d'état d'origine, ou null quand elle est absente ou illisible (vide, JSON invalide ou de mauvaise forme) : elle est alors ignorée, jamais une erreur. */
+function readExcludeMemo(repo: string): ExcludeMemo | null {
+  try {
+    const m = JSON.parse(readFileSync(excludeMemo(repo), 'utf8')) as Partial<ExcludeMemo> | null;
+    if (m === null || typeof m !== 'object' || typeof m.absent !== 'boolean' || typeof m.noFinalNewline !== 'boolean') return null;
+    return { absent: m.absent, noFinalNewline: m.noFinalNewline, content: typeof m.content === 'string' ? m.content : undefined };
+  } catch {
+    return null;
+  }
 }
 
 function restoreExclude(repo: string): void {
   const memo = excludeMemo(repo);
   if (!existsSync(memo)) return;
-  const file = excludeFile(repo);
   try {
-    const before = JSON.parse(readFileSync(memo, 'utf8')) as { absent: boolean; noFinalNewline: boolean };
-    if (existsSync(file)) {
+    const before = readExcludeMemo(repo);
+    const file = excludeFile(repo);
+    if (before && existsSync(file)) {
       const text = readFileSync(file, 'utf8');
       if (before.absent && text === '') rmSync(file, { force: true });
-      else if (before.noFinalNewline && text.endsWith('\n') && !text.includes(PW_MARK)) writeFileSync(file, text.slice(0, -1));
+      else if (before.noFinalNewline && text.endsWith('\n') && !text.includes(PW_MARK)) {
+        // Le saut de ligne n'est retiré que s'il est celui de la vague : une ligne ajoutée par l'utilisateur depuis reste intacte.
+        const ours = before.content === undefined ? true : text === `${before.content}\n`;
+        if (ours) writeFileSync(file, text.slice(0, -1));
+      }
     }
+  } catch {
+    // État illisible : on ne casse pas la fin de vague (release() des dépôts suivants).
   } finally {
     rmSync(memo, { force: true });
   }

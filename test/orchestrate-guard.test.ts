@@ -265,6 +265,53 @@ describe('.git/info/exclude restauré à l\'octet près (L50/t2)', () => {
   });
 });
 
+describe('fin de vague : note d\'exclusion illisible, saut de ligne, ligne préexistante (L87)', () => {
+  const file = (dir: string) => join(dir, '.git/info/exclude');
+  const memo = (dir: string) => join(dir, '.git/info/cadence-exclude-before');
+  function trackedHooksRepo() {
+    const dir = gitRepo();
+    mkdirSync(join(dir, '.githooks'));
+    writeFileSync(join(dir, '.githooks/post-commit'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    git(dir, 'add', '--', '.githooks/post-commit');
+    git(dir, 'config', 'core.hooksPath', '.githooks');
+    commit(dir, 'chore: init');
+    return dir;
+  }
+
+  it('note illisible (vide, JSON invalide, mauvaise forme) : ignorée et retirée sans lever, nos lignes partent', () => {
+    for (const garbage of ['', 'pas du json {', 'null', '42', '{"absent":"oui"}']) {
+      const dir = trackedHooksRepo();
+      writeFileSync(file(dir), 'foo');
+      expect(installPrePush(dir, 'w1')).toEqual({ ok: true });
+      expect(readFileSync(file(dir), 'utf8')).toContain('/.githooks/pre-push');
+      writeFileSync(memo(dir), garbage);
+      expect(() => removePrePush(dir, 'w1'), JSON.stringify(garbage)).not.toThrow();
+      expect(existsSync(join(dir, '.githooks/pre-push'))).toBe(false);
+      const text = readFileSync(file(dir), 'utf8');
+      expect(text).not.toContain('.githooks/pre-push');
+      expect(text).not.toContain('playwright-mcp');
+      expect(existsSync(memo(dir))).toBe(false);
+    }
+  });
+
+  it('le saut de ligne final n\'est retiré que s\'il est celui de la vague : une ligne ajoutée par l\'utilisateur pendant la vague reste', () => {
+    const dir = gitRepo();
+    writeFileSync(file(dir), 'foo');
+    installPrePush(dir, 'w1');
+    writeFileSync(file(dir), `${readFileSync(file(dir), 'utf8')}user\n`);
+    removePrePush(dir, 'w1');
+    expect(readFileSync(file(dir), 'utf8')).toBe('foo\nuser\n');
+  });
+
+  it('une ligne /.githooks/pre-push posée par la vague part toujours', () => {
+    const dir = trackedHooksRepo();
+    writeFileSync(file(dir), '# perso\n');
+    installPrePush(dir, 'w1');
+    removePrePush(dir, 'w1');
+    expect(readFileSync(file(dir), 'utf8')).toBe('# perso\n');
+  });
+});
+
 describe('sorties de Playwright MCP dans le dépôt (L50)', () => {
   const raw = (dir: string) => execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: dir, encoding: 'utf8' }).trim();
 

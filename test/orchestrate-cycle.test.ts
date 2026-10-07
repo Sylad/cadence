@@ -1429,6 +1429,25 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     expect(c.lot.status).toBe('ready');
   });
 
+  it('application muette à la 1re étape UX puis prête à la 2e : la note « UX non vérifiée » de la tentative précédente est effacée, seul le verdict UX reste', async () => {
+    const app = await fakeApp(0);
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [major, ok], fix: [fix('b.txt')] } });
+    const ux = { command: 'exit 1', url: app.url, timeout: 20 };
+    const c = h.lot('L1', { visible: true }, { ux });
+    // après la passe de correction, l'application démarre
+    const fixing = h.wave.claude;
+    h.wave.claude = (async (args: string[], o: Parameters<typeof fixing>[1]) => {
+      const r = await fixing(args, o);
+      if (h.calls.some((x) => x.kind === 'fix')) ux.command = app.command;
+      return r;
+    }) as typeof fixing;
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'ux', 'review']);
+    expect(c.lot.uxNote).toBeUndefined();
+    expect(c.lot.uxVerdict).not.toBeNull();
+    expect(c.lot.status).toBe('ready');
+  });
+
   it('port déjà pris : rien n\'est lancé, « port occupé », le lot continue', async () => {
     const app = await fakeApp(0);
     const srv = createServer((_q, r) => r.end('autre')).listen(Number(new URL(app.url).port));

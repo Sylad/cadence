@@ -920,11 +920,12 @@ lots:
     finished: 2026-10-07
   - id: L75
     title: "orchestrate : tests et build lancés par le programme avant la revue, résultats passés au relecteur — la revue Opus de ccc L27 a reconstruit base+head et relancé la suite 2×, puis attendu 10 min en boucle (06-10)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Référence de mesure avant la vague performance (07-10, vagues 1234 → 1921) : petit lot (≤ 0,25 j) = 4 à 14 min et 60 à 260 k tokens ; suite complète 63 s relancée plusieurs fois par session (implémentation, revue, correction) ; L32 ccc 87 min / 396 k avec 2 corrections. À comparer après L75 + L77 + L78 + L108, mêmes colonnes de cadence orchestrate --status." }
+    started: 2026-10-07
   - id: L76
     title: "orchestrate : lots empilés sur main — le tableau final indique « livrable jusqu'à <sha> » (dernier commit d'un lot prêt sous un lot rendu), comme fait à la main pour ol L36 et ccc L26 avec deliver --sha (06-10)"
     status: todo

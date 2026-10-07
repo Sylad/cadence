@@ -279,7 +279,8 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
     return stop(c, 'failed', `brief de ${kind} : ${(e as Error).message}`);
   }
   const mcpConfig = writeMcpConfig(w.store.lotDir(l.project, l.lot), kind, l.visible, l.small);
-  if (mcpServersFor(kind, l.visible, '', l.small).playwright) l.uxCaptures = join(dirname(mcpConfig), 'playwright');
+  const playwright = !!mcpServersFor(kind, l.visible, '', l.small).playwright;
+  if (playwright) l.uxCaptures = join(dirname(mcpConfig), 'playwright');
   l.pendingAnswer = null; // la réponse est dans le brief : elle ne repart pas avec la session suivante
   const outcome = await runSession(
     {
@@ -295,6 +296,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       addDirs: c.config.addDirs,
       nodeBin: l.node?.link,
       mcpConfig,
+      playwright,
       timeoutMs: write ? c.config.timeouts.work : c.config.timeouts.review,
     },
     {

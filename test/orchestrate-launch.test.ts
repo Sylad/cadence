@@ -135,6 +135,25 @@ describe('MCP minimaux par étape', () => {
   });
 });
 
+describe('outils Playwright de l\'agent (L74/t5)', () => {
+  const restricted = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput'] } };
+  const agentsOf = (args: string[]) => JSON.parse(args[args.indexOf('--agents') + 1]);
+
+  it('Playwright chargé + agent aux outils restreints : mcp__playwright (préfixe du serveur, vérifié en réel) ajouté à ses outils, au lancement et à la relance', () => {
+    for (const args of [buildArgs({ ...spec, playwright: true }, restricted), buildRetryArgs({ ...spec, playwright: true }, 'sid', restricted)]) {
+      expect(agentsOf(args)['code-reviewer'].tools).toEqual(['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput', 'mcp__playwright']);
+    }
+    expect(restricted['code-reviewer'].tools).not.toContain('mcp__playwright'); // l'entrée partagée n'est pas modifiée
+  });
+
+  it('sans Playwright (review, lot sans écran) : agents inchangés ; agent sans liste d\'outils : inchangé', () => {
+    expect(agentsOf(buildArgs(spec, restricted))).toEqual(restricted);
+    expect(agentsOf(buildArgs({ ...spec, playwright: false }, restricted))).toEqual(restricted);
+    const open = { 'code-reviewer': { description: 'd', prompt: 'p' } };
+    expect(agentsOf(buildArgs({ ...spec, playwright: true }, open))).toEqual(open);
+  });
+});
+
 describe('agents du paquet', () => {
   it('les définitions de agents/*.md deviennent le JSON de --agents', () => {
     const agents = readAgents(AGENTS_DIR);

@@ -27,6 +27,8 @@ export interface StepSpec {
   nodeBin?: string;
   /** Fichier de configuration MCP de l'étape (écrit par l'orchestrateur) : passé avec `--strict-mcp-config`, seuls ses serveurs sont chargés. */
   mcpConfig?: string;
+  /** Le serveur Playwright est chargé pour cette étape : un agent aux outils restreints reçoit alors ses outils MCP. */
+  playwright?: boolean;
 }
 
 export type McpServers = Record<string, { command: string; args: string[] }>;
@@ -80,11 +82,21 @@ export type ClaudeFn = (args: string[], opts: LaunchOpts) => Promise<LaunchOutco
 /** Outils interdits à toute session : pas de sous-agent, pas de push, de livraison ni de verdict. */
 export const DISALLOWED = ['Agent', 'Bash(git push:*)', 'Bash(cadence deliver:*)', 'Bash(raf done:*)', 'Bash(raf review:*)', 'Bash(raf ux:*)'];
 
+/** Outils MCP du serveur Playwright, par le préfixe du serveur (sonde réelle du 07-10 : `mcp__playwright` expose tous les `browser_*`). */
+export const PLAYWRIGHT_TOOLS = 'mcp__playwright';
+
+/** Agents passés à `--agents` : l'agent d'une étape qui charge Playwright, s'il a une liste d'outils, y gagne les outils du serveur (sinon il ne peut pas l'appeler). */
+function agentsFor(spec: StepSpec, agents: Record<string, AgentDef>): Record<string, AgentDef> {
+  const a = spec.agent ? agents[spec.agent] : undefined;
+  if (!spec.playwright || !spec.agent || !a?.tools) return agents;
+  return { ...agents, [spec.agent]: { ...a, tools: [...a.tools, PLAYWRIGHT_TOOLS] } };
+}
+
 export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): string[] {
   const args = ['-p', spec.brief, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model];
   if (spec.agent) {
     if (!agents[spec.agent]) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
-    args.push('--agents', JSON.stringify(agents), '--agent', spec.agent);
+    args.push('--agents', JSON.stringify(agentsFor(spec, agents)), '--agent', spec.agent);
   }
   args.push('--session-id', spec.sessionId, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);
@@ -126,7 +138,7 @@ export function buildRetryArgs(spec: StepSpec, sessionId: string, agents: Record
   const args = ['-p', FORMAT_RETRY_PROMPT, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model];
   if (spec.agent) {
     if (!agents[spec.agent]) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
-    args.push('--agents', JSON.stringify(agents), '--agent', spec.agent);
+    args.push('--agents', JSON.stringify(agentsFor(spec, agents)), '--agent', spec.agent);
   }
   args.push('--resume', sessionId, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);

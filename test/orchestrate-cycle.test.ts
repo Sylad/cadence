@@ -273,6 +273,8 @@ describe('petit lot', () => {
     const lotDir = join(h.store.dir, 'demo--L1');
     expect(Object.keys(JSON.parse(readFileSync(join(lotDir, 'mcp-review-small.json'), 'utf8')).mcpServers)).toEqual(['playwright']);
     expect(c.lot.uxCaptures).toBe(join(lotDir, 'playwright'));
+    const rs = h.calls.find((x) => x.kind === 'review-small')!;
+    expect(JSON.parse(rs.args[rs.args.indexOf('--agents') + 1])['code-reviewer'].tools).toContain('mcp__playwright');
     const brief = h.calls.find((x) => x.kind === 'review-small')!.brief;
     expect(brief).toContain('relative file name');
     expect(brief).not.toContain('no browser MCP server is loaded');
@@ -281,6 +283,8 @@ describe('petit lot', () => {
     const c2 = h2.lot('L1', { small: true, visible: false });
     await runLot(c2);
     expect(kinds(h2)).toEqual(['implement', 'review']);
+    const rv = h2.calls.find((x) => x.kind === 'review')!;
+    expect(JSON.parse(rv.args[rv.args.indexOf('--agents') + 1])['code-reviewer'].tools).not.toContain('mcp__playwright');
     expect(JSON.parse(readFileSync(join(h2.store.dir, 'demo--L1', 'mcp-review.json'), 'utf8')).mcpServers).toEqual({});
     expect(c2.lot.uxCaptures).toBeUndefined();
   });

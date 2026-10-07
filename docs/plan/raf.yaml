@@ -628,6 +628,7 @@ lots:
       - { id: t1, title: "isNonQuestion en liste FERMÉE : l'entrée entière (normalisée : casse, espaces, ponctuation finale hors « ? », apostrophe ’→') doit égaler une forme connue (aucune question, pas de question, je n'ai pas de question, no question(s), none, n/a, rien, vide…) ; jamais filtrée si elle contient « ? » ; tests négatifs : « No question except SQLite? », « No blocking question except: SQLite? », « No question but PostgreSQL? », « Aucune question hors schéma ? », « No, the question is SQLite? », « No further question about X? »", status: todo }
       - { id: t2, title: "work() : chaque question filtrée tracée dans l.warnings (« question ignorée (non-question) : … ») et visible dans le tableau de fin de vague ; test", status: todo }
       - { id: t3, title: "isNonQuestion : apostrophe typographique (je n’ai pas de question) ; test", status: todo }
+    review: { date: 2026-10-07, verdict: "non conforme : 1 majeur (le filtre des non-questions avale de vraies questions), 2 mineurs", commit: 571dd1f14ce34ec1cc4ca198c822df60ad3e68b2 }
   - id: L53
     title: "orchestrate : un lot déjà implémenté qui n'attend qu'une revue neuve (commits présents, revue précédente non conforme ou absente) est rendu au lead « implement sans commit » au lieu de passer à la revue — vécu 05-10 sur 3 lots (finance L3, ol L29, warhammer L54), puis en question sur L3 quand les sous-tâches ouvertes étaient déjà couvertes par des commits"
     status: done

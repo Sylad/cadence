@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
@@ -705,6 +705,41 @@ describe('Node du projet (.nvmrc)', () => {
     expect((await run(s.parent, ['--resume', '--budget', '1M'], s.f.deps, { NVM_DIR: nvm })).code).toBe(0);
     expect(s.store().readLot('a', 'L1')!.node).toBeUndefined();
   });
+
+  // L80/t4 — vrai disque (aucun NodeFs injecté) : couvre realNodeFs.executable.
+  const emptyBin = (nvm: string, v: string) => {
+    rmSync(join(nvm, 'versions/node', v, 'bin'), { recursive: true });
+    mkdirSync(join(nvm, 'versions/node', v, 'bin'));
+  };
+  const notExec = (nvm: string, v: string) => chmodSync(join(nvm, 'versions/node', v, 'bin/node'), 0o644);
+  const broken: [string, (nvm: string, v: string) => void][] = [['bin vide', emptyBin], ['bin/node en 0o644', notExec]];
+
+  for (const [label, breakIt] of broken) {
+    it(`L80/t4 — ${label} : version refusée au départ (code 2, aucune session)`, async () => {
+      const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+      writeFileSync(join(dirs.a, '.nvmrc'), '22');
+      const nvm = fakeNvm(['v20.20.2', 'v22.22.3']);
+      breakIt(nvm, 'v22.22.3');
+      const f = fakeDeps();
+      const r = await run(parent, ['a:L1'], f.deps, { NVM_DIR: nvm });
+      expect(r.code).toBe(2);
+      expect(r.err.join('\n')).toContain('a:L1 : .nvmrc 22 : v22.22.3 trouvée(s)');
+      expect(r.err.join('\n')).toContain('sans node exécutable');
+      expect(f.calls).toEqual([]);
+      expect(existsSync(join(parent, '.cadence'))).toBe(false);
+    });
+
+    it(`L80/t4 — ${label} : version refusée à --resume (code 2, aucune session)`, async () => {
+      const nvm = fakeNvm(['v22.22.3']);
+      const s = await suspended('22', nvm);
+      breakIt(nvm, 'v22.22.3');
+      const calls = s.f.calls.length;
+      const r = await run(s.parent, ['--resume', '--budget', '1M'], s.f.deps, { NVM_DIR: nvm });
+      expect(r.code).toBe(2);
+      expect(r.err.join('\n')).toContain('sans node exécutable');
+      expect(s.f.calls.length).toBe(calls);
+    });
+  }
 
   it('--dry-run : une ligne node par lot avec .nvmrc, rien sans', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });

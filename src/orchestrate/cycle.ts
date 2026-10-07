@@ -458,6 +458,8 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
 
   // La passe des mineurs ne bloque jamais le lot (revue conforme déjà acquise) : une question est rendue en proposition.
   const questions = rep.questions.filter((q) => !isNonQuestion(q));
+  // Une entrée filtrée reste visible (avertissement du lot, donc tableau de fin de vague) ; l'entrée vide n'a rien à montrer.
+  for (const q of rep.questions) if (q.trim() && isNonQuestion(q)) l.warnings.push(`question ignorée (non-question) : « ${q.trim()} »`);
   if (minorsPass) for (const q of questions) propose(c, `[question passe des mineurs] ${q}`);
   if (!minorsPass && questions.length) {
     l.questions = questions;

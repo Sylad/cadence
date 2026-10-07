@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { isNonQuestion, runLot } from '../src/orchestrate/cycle.js';
@@ -325,6 +326,26 @@ describe('contrôles autour des sessions', () => {
     for (const q of ['No question except SQLite?', 'No blocking question except: SQLite?', 'No question but PostgreSQL?', 'Aucune question hors schéma ?', 'No, the question is SQLite?', 'No further question about X?', 'Aucune question ?', 'No question except SQLite', 'PostgreSQL ou SQLite ?']) {
       expect(isNonQuestion(q), JSON.stringify(q)).toBe(false);
     }
+  });
+
+  it('une question filtrée est tracée dans les avertissements et visible dans le tableau de fin de vague (L52/t2)', async () => {
+    const none: Handler = () => claudeOut(workReport({ questions: ['', 'Aucune question.', 'No questions'] }));
+    const h = harness({ script: { implement: [none], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.warnings).toContain('question ignorée (non-question) : « Aucune question. »');
+    expect(c.lot.warnings).toContain('question ignorée (non-question) : « No questions »');
+    expect(c.lot.warnings.filter((w) => w.startsWith('question ignorée'))).toHaveLength(2);
+    expect(renderTable(c.wave, [c.lot]).join('\n')).toContain('⚠ question ignorée (non-question) : « Aucune question. »');
+  });
+
+  it('une vraie question n\'est pas tracée comme ignorée (L52/t2)', async () => {
+    const ask: Handler = () => claudeOut(workReport({ questions: ['Aucune autre question', 'No question except SQLite?'] }));
+    const h = harness({ script: { implement: [ask] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.questions).toEqual(['No question except SQLite?']);
+    expect(c.lot.warnings.filter((w) => w.startsWith('question ignorée'))).toEqual(['question ignorée (non-question) : « Aucune autre question »']);
   });
 
   it('une vraie question mêlée à des non-questions arrête le lot, seule la vraie est gardée (L52)', async () => {

@@ -441,6 +441,11 @@ function badReport(c: LotCtx, step: StepState, e: unknown): null {
   return stop(c, 'failed', `${step.kind} : ${(e as Error).message}`);
 }
 
+/** Le contrôle préalable ne vaut que pour un lot sans commit : avec des commits, l'implémentation reprend légitimement. */
+export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: string, lot: string): boolean {
+  return config.precheck && lotWork(plan, repo, lot).length === 0;
+}
+
 /**
  * Contrôle préalable (L77) : une session de lecture seule cherche si le livrable du lot est déjà dans le dépôt (fait par un
  * autre lot). « oui » rend le lot sans ouvrir d'implémentation ; « partiel » joint le constat au brief de l'implémentation.
@@ -460,11 +465,14 @@ async function precheck(c: LotCtx): Promise<void> {
     return;
   }
   const proofs = rep.preuves.length ? ` (${rep.preuves.join(' ; ')})` : '';
-  if (rep.dejaPresent === 'oui') {
+  // « oui » sans preuve ne se vérifie pas : il vaut « partiel », l'implémentation part avec le constat.
+  const unproven = rep.dejaPresent === 'oui' && rep.preuves.length === 0;
+  if (unproven) l.warnings.push('contrôle préalable : « oui » sans preuve, traité comme partiel');
+  if (rep.dejaPresent === 'oui' && !unproven) {
     stop(c, 'handed-back', `livrable déjà présent : ${rep.resume.trim()}${proofs}`);
     return;
   }
-  if (rep.dejaPresent === 'partiel') {
+  if (rep.dejaPresent === 'partiel' || unproven) {
     l.precheck = `A pre-check found part of the deliverable already in the repository (do not redo it): ${rep.resume.trim()}${proofs}`;
     l.warnings.push(`contrôle préalable : livrable en partie présent — ${rep.resume.trim()}${proofs}`);
   }
@@ -809,8 +817,7 @@ export async function runLot(c: LotCtx): Promise<void> {
         return;
       }
       l.startedSha = (await snapshot(l.repo, { remote: false })).head ?? undefined;
-      // Le contrôle préalable ne vaut que pour un lot sans commit : avec des commits, l'implémentation reprend légitimement.
-      l.next = c.config.precheck && lotWork(c.loadPlan(), l.repo, l.lot).length === 0 ? 'precheck' : 'implement';
+      l.next = needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot) ? 'precheck' : 'implement';
       save(c);
     }
     while (l.next && !TERMINAL.has(l.status)) {

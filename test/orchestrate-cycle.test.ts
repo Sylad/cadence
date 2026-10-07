@@ -1623,6 +1623,15 @@ describe('contrôle préalable « livrable déjà présent ? » (L77)', () => {
     expect(c.lot.status).toBe('ready');
   });
 
+  it('« oui » sans aucune preuve : traité comme partiel, l\'implémentation part', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport({ dejaPresent: 'oui', preuves: [], resume: 'déjà fait' }))], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+    expect(h.calls[1].brief).toContain('pre-check');
+    expect(c.lot.warnings.join('\n')).toContain('sans preuve');
+  });
+
   it('rien de présent : l\'implémentation part sans note du contrôle', async () => {
     const h = harness({ script: { precheck: [() => claudeOut(precheckReport())], implement: [impl()], review: [ok] } });
     const c = h.lot('L1', {}, { precheck: true });

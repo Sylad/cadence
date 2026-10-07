@@ -248,6 +248,14 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
     expect(newsText('L9')).not.toContain('/playwright');
   });
 
+  it("newsText sans dossier de vague : capture sous le dossier temporaire de l'OS, jamais dans le dépôt, puis copie dans docs/nouveautes/captures/ (L48/t5)", () => {
+    const t = newsText('L9');
+    expect(t).toContain('OS temp directory');
+    expect(t).toContain('never inside the repository');
+    expect(t).toContain('docs/nouveautes/captures/');
+    expect(t).not.toContain("wave's output directory");
+  });
+
   it('lot non visible : aucune mention des Nouveautés', () => {
     const out = renderBrief('implement', { ...base, news: '' });
     expect(out).not.toMatch(/\{\{/);

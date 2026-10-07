@@ -39,7 +39,7 @@ one fresh short session per step. When the lead delegates by hand, the brief is 
 `templates/orchestrate/implement.md` of the cadence package — the single source, tested. The lead runs
 `cd <project> && raf start <lot>`, then starts from the brief written by `cadence orchestrate --dry-run
 <project>:<lot>`: it is already rendered (`{{chemin}}`, `{{lot}}`, `{{titre}}`, `{{objectif}}` and `{{news}}`,
-the News instruction of a `visible` lot, are filled in). The lead only adjusts the goal to what done looks
+the News instruction of a `visible` lot, are filled in; it names no wave Playwright directory — a hand delegation has none — so the screenshot goes under the OS temp directory, then into `docs/nouveautes/captures/`). The lead only adjusts the goal to what done looks
 like (the human's words) and keeps the rest verbatim.
 
 A lot that adds or changes a screen is `visible`: after the implementation, have the

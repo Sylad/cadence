@@ -139,3 +139,57 @@ describe('notes de version', () => {
     expect(workflow.indexOf('Le CHANGELOG a une section')).toBeLessThan(workflow.indexOf('npm publish'));
   });
 });
+
+describe('doublon de run pour un même tag (L64)', () => {
+  const step = workflow.match(/- name: La version est-elle déjà au registre\n\s+id: registry\n\s+run: \|\n((?:\s{10}.*\n|\n)+)/)?.[1];
+
+  // Exécute le script de l'étape avec un faux `npm view` : sortie et code donnés.
+  const runRegistry = (npmView: { out: string; code: number }) => {
+    const dir = tempDir();
+    try {
+      mkdirSync(join(dir, 'bin'));
+      writeFileSync(join(dir, 'bin', 'npm'), `#!/bin/sh\necho "$@" > "${dir}/npm-args"\necho "${npmView.out}"\nexit ${npmView.code}\n`, { mode: 0o755 });
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'cadence-x', version: '1.2.3' }));
+      writeFileSync(join(dir, 'output'), '');
+      const r = spawnSync('bash', ['-e', '-c', step!], {
+        cwd: dir,
+        env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, GITHUB_REF_NAME: 'v1.2.3', GITHUB_OUTPUT: join(dir, 'output') },
+        encoding: 'utf8',
+      });
+      return { ...r, output: readFileSync(join(dir, 'output'), 'utf8'), args: readFileSync(join(dir, 'npm-args'), 'utf8') };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('sérialise les runs d\'un même ref sans annuler celui qui publie', () => {
+    expect(workflow).toMatch(/concurrency:\n\s+group: publish-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress: false/);
+  });
+
+  it('trouve le script de l\'étape', () => {
+    expect(step).toBeTruthy();
+  });
+
+  it('déjà au registre : sort en succès, dit pourquoi, published=true', () => {
+    const r = runRegistry({ out: '1.2.3', code: 0 });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('1.2.3 est déjà publiée sur npm');
+    expect(r.output).toContain('published=true');
+    expect(r.args).toContain('cadence-x@1.2.3');
+  });
+
+  it('absente du registre (E404) : published=false', () => {
+    const r = runRegistry({ out: 'npm error code E404', code: 1 });
+    expect(r.status).toBe(0);
+    expect(r.output).toContain('published=false');
+  });
+
+  it('npm publish est sauté quand la version est déjà publiée, la release n\'est créée que si absente', () => {
+    expect(workflow).toMatch(/if: steps\.registry\.outputs\.published != 'true'\n\s+run: npm publish/);
+    expect(workflow).toMatch(/gh release view "\$GITHUB_REF_NAME"[\s\S]*gh release create/);
+  });
+
+  it('le contrôle du registre précède npm publish', () => {
+    expect(workflow.indexOf('id: registry')).toBeLessThan(workflow.indexOf('npm publish --access'));
+  });
+});

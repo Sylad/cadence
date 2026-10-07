@@ -13,6 +13,12 @@ permissions:
   contents: write   # crée la release GitHub avec la section du CHANGELOG
   id-token: write   # jeton d'identité GitHub, échangé contre un droit de publication par npm
 
+# Un seul run à la fois par ref : un doublon (vécu sur v0.10.0, deux runs à 2 s d'écart) attend le premier
+# au lieu de publier en parallèle, sans jamais annuler celui qui publie.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -55,10 +61,32 @@ jobs:
 
       - run: npm ci
       # prepublishOnly relance typecheck + tests, prepare construit dist/ : une suite rouge arrête tout.
-      - run: npm publish --access public --provenance
+      # Version déjà au registre (run en double, ou relance après une publication réussie) : on saute npm publish
+      # au lieu de finir en 409. Seul E404 veut dire « absente » ; toute autre erreur de npm view est fatale.
+      - name: La version est-elle déjà au registre
+        id: registry
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          name="$(node -p "require('./package.json').name")"
+          if out="$(npm view "$name@$v" version 2>&1)"; then
+            echo "$v est déjà publiée sur npm : npm publish est sauté, ce run n'a rien à faire de plus."
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          elif printf '%s' "$out" | grep -q E404; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$out"; exit 1
+          fi
+
+      - if: steps.registry.outputs.published != 'true'
+        run: npm publish --access public --provenance
 
       # Après la publication seulement : pas de release pour une version qui n'est pas sur npm.
       - name: Release GitHub avec la section du CHANGELOG
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "La release $GITHUB_REF_NAME existe déjà : rien à créer."
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag
+          fi

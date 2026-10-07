@@ -1114,11 +1114,14 @@ lots:
     finished: 2026-10-07
   - id: L100
     title: "lockFault (mineur revue L99) : repli sûr quand l'erreur n'a pas de code (e instanceof Error ? e.message : String(e)) ; test unitaire"
-    status: doing
+    status: dropped
     estimate: 0.1
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
+    finished: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "abandonné : déjà fait par la correction de L99 (state.ts:125, repli e instanceof Error ? e.message : String(e))" }
   - id: L101
     title: "agent qa-reviewer : ne jamais attendre en silence son propre travail de fond — passage borné (budget temps), résultats écrits page par page au fil de l'eau (pas un JSON unique en fin de passage, perdu si on l'arrête) ; vécu 07-10 sur ccc : 6 min bloqué « waiting on background work », arrêt demandé → 30/38 pages à 1440 seulement, détail perdu"
     status: todo
@@ -1126,14 +1129,16 @@ lots:
     created: 2026-10-07
   - id: L102
     title: "raf show <id> : identifiant, statut, dates, after, titre public, notes datées dans l'ordre, puis commits comptés (comme raf commits) ; --notes pour les notes seules (issue #1)"
-    status: doing
+    status: done
     estimate: 0.5
     quickwin: true
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #1 » dans son corps (issue GitHub)." }
+      - { date: 2026-10-07, text: "Mineurs de revue non convertis en lots (règle 07-10 : seul un bug observable devient un lot) : test du message de refus d'une sous-tâche (cli.test.ts:300), assertions de dates. Le bug visible (note multiligne mal décalée) et l'aide « en entier » inexacte sont en L107." }
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme : les 3 constats mineurs sont traités, 843 tests et le typecheck passent, aucun nouveau défaut — orchestré (vague 2026-10-07-1921, 1 passe(s) de correction + passe des mineurs)", commit: 4b7d76ea27d2ba81c5abdd9d862619b920599fae }
+    finished: 2026-10-07
   - id: L103
     title: "cadence session start --all / session close --all depuis un dossier non dépôt : balayer les sous-dossiers (profondeur 1, --depth n) qui ont docs/plan/raf.yaml ou cadence.yaml avec plan:, une section par projet ; le skill lead et session-start l'utilisent au lieu de la boucle shell (issue #3)"
     status: todo
@@ -1150,7 +1155,7 @@ lots:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #4 » dans son corps (issue GitHub)." }
   - id: L105
     title: "session close sans session.clean : une ligne « aucun motif de nettoyage déclaré » avec un exemple de session.clean (chemins relatifs ou absolus, âge minimal), une fois par clôture (issue #5)"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
@@ -1158,8 +1163,15 @@ lots:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #5 » dans son corps (issue GitHub)." }
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme — orchestré (vague 2026-10-07-1921, 0 passe(s) de correction + passe des mineurs)", commit: 8a9b731e16c534290cf25bddbd9d9f4592a39837 }
+    finished: 2026-10-07
   - id: L106
     title: "Titre public trop long attrapé avant le push : raf public / raf done / cadence news refusent (ou raf check signale) un titre public au-delà de la limite que la page Plan du site applique au build (80 car. sur ccc, parsePublicPlan) — vécu 07-10 : ccc L32, titre de la Nouveauté repris (88 car.), build Cloudflare Pages rouge, livraison rouge après 600 s ; le build local lancé avant raf done ne l'avait pas vu"
     status: todo
     estimate: 0.5
+    created: 2026-10-07
+  - id: L107
+    title: "raf show : les lignes suivantes d'une note sur plusieurs lignes sont décalées sous « notes : » (aujourd'hui en colonne 0, cli.ts:245) ; aide et README sans « en entier / in full », ou affichage des sous-tâches et de l'estimation — revue L102"
+    status: todo
+    estimate: 0.25
+    quickwin: true
     created: 2026-10-07

@@ -147,6 +147,17 @@ describe('readPlanConfig', () => {
     expect(of(join(dir, 'docs/quality/pages.md'))).toBe('docs/quality/pages.md');
   });
 
+  it('(L66) un chemin absolu est résolu depuis la racine git, pas depuis le dossier du --config', () => {
+    const repo = gitRepo();
+    mkdirSync(join(repo, 'config'));
+    const file = write(join(repo, 'config', 'cadence.yaml'), `qa:\n  expectations: '${join(repo, 'config', 'x.md')}'\n`);
+    expect(readPlanConfig(file)?.settings.qaExpectations).toBe('config/x.md');
+    const docs = write(join(repo, 'config', 'cadence.yaml'), `qa:\n  expectations: '${join(repo, 'docs', 'qa.md')}'\n`);
+    expect(readPlanConfig(docs)?.settings.qaExpectations).toBe('docs/qa.md');
+    const out = write(join(repo, 'config', 'cadence.yaml'), `qa:\n  expectations: '${join(tempDir(), 'x.md')}'\n`);
+    expect(() => readPlanConfig(out)).toThrow(/hors du dépôt/);
+  });
+
   it.each([
     ['qa:\n  expectations: 42\n', /qa\.expectations doit être un chemin/],
     ['qa:\n  expectations: [a.md]\n', /qa\.expectations doit être un chemin/],

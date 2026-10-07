@@ -60,7 +60,6 @@ jobs:
           git config --global user.email "cadence-ci@users.noreply.github.com"
 
       - run: npm ci
-      # prepublishOnly relance typecheck + tests, prepare construit dist/ : une suite rouge arrête tout.
       # Version déjà au registre (run en double, ou relance après une publication réussie) : on saute npm publish
       # au lieu de finir en 409. Seul E404 veut dire « absente » ; toute autre erreur de npm view est fatale.
       - name: La version est-elle déjà au registre
@@ -77,8 +76,22 @@ jobs:
             echo "$out"; exit 1
           fi
 
-      - if: steps.registry.outputs.published != 'true'
-        run: npm publish --access public --provenance
+      # prepublishOnly relance typecheck + tests, prepare construit dist/ : une suite rouge arrête tout.
+      # Quand la version est déjà publiée, cette étape est sautée : ni typecheck ni tests ne tournent dans ce run
+      # (le run qui a publié les a passés), et la release ci-dessous peut être créée sans suite exécutée.
+      # Le registre peut encore répondre E404 juste après une publication (cache) : un conflit de publication
+      # (EPUBLISHCONFLICT / « previously published ») veut dire « déjà publiée », pas « échec ».
+      - name: Publier sur npm
+        if: steps.registry.outputs.published != 'true'
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          if out="$(npm publish --access public --provenance 2>&1)"; then
+            echo "$out"
+          else
+            echo "$out"
+            printf '%s' "$out" | grep -qE 'EPUBLISHCONFLICT|previously published' || exit 1
+            echo "$v est déjà publiée sur npm (le registre ne la montrait pas encore) : rien à faire de plus."
+          fi
 
       # Après la publication seulement : pas de release pour une version qui n'est pas sur npm.
       - name: Release GitHub avec la section du CHANGELOG

@@ -194,11 +194,58 @@ describe('doublon de run pour un même tag (L64)', () => {
   });
 
   it('npm publish est sauté quand la version est déjà publiée, la release n\'est créée que si absente', () => {
-    expect(workflow).toMatch(/if: steps\.registry\.outputs\.published != 'true'\n\s+run: npm publish/);
+    expect(workflow).toMatch(/- name: Publier sur npm\n\s+if: steps\.registry\.outputs\.published != 'true'\n/);
     expect(workflow).toMatch(/gh release view "\$GITHUB_REF_NAME"[\s\S]*gh release create/);
   });
 
   it('le contrôle du registre précède npm publish', () => {
     expect(workflow.indexOf('id: registry')).toBeLessThan(workflow.indexOf('npm publish --access'));
+  });
+
+  describe('npm publish perd la course contre la propagation du registre', () => {
+    const publish = workflow.match(/- name: Publier sur npm\n\s+if:[^\n]*\n\s+run: \|\n((?:\s{10}.*\n|\n)+)/)?.[1];
+
+    // Exécute le script de l'étape avec un faux `npm publish` : sortie et code donnés.
+    const runPublish = (npmPublish: { out: string; code: number }) => {
+      const dir = tempDir();
+      try {
+        mkdirSync(join(dir, 'bin'));
+        writeFileSync(join(dir, 'bin', 'npm'), `#!/bin/sh\necho "${npmPublish.out}"\nexit ${npmPublish.code}\n`, { mode: 0o755 });
+        return spawnSync('bash', ['-e', '-c', publish!], { cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, GITHUB_REF_NAME: 'v1.2.3' }, encoding: 'utf8' });
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    };
+
+    it('trouve le script de l\'étape, qui publie en public avec provenance', () => {
+      expect(publish).toBeTruthy();
+      expect(publish).toContain('npm publish --access public --provenance');
+    });
+
+    it('publication réussie : succès', () => {
+      expect(runPublish({ out: '+ cadence-x@1.2.3', code: 0 }).status).toBe(0);
+    });
+
+    it.each(['npm error code EPUBLISHCONFLICT', 'npm error 403 You cannot publish over the previously published versions: 1.2.3.'])(
+      'conflit « déjà publiée » (%s) : succès, avec un message explicite',
+      (out) => {
+        const r = runPublish({ out, code: 1 });
+        expect(r.status).toBe(0);
+        expect(r.stdout).toContain('1.2.3 est déjà publiée sur npm');
+      },
+    );
+
+    it('autre échec de npm publish : le run reste rouge', () => {
+      const r = runPublish({ out: 'npm error code E401', code: 1 });
+      expect(r.status).toBe(1);
+      expect(r.stdout).toContain('E401');
+    });
+  });
+
+  it('le commentaire sur prepublishOnly accompagne npm publish, et dit qu\'il est sauté si la version est déjà publiée', () => {
+    const comment = workflow.indexOf('prepublishOnly');
+    expect(comment).toBeGreaterThan(workflow.indexOf('id: registry'));
+    expect(comment).toBeLessThan(workflow.indexOf('- name: Publier sur npm'));
+    expect(workflow.slice(comment, workflow.indexOf('- name: Publier sur npm'))).toMatch(/sauté[^\n]*(typecheck|tests)|(typecheck|tests)[^\n]*sauté/i);
   });
 });

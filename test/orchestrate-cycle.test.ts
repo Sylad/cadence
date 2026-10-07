@@ -375,6 +375,21 @@ describe('contrôles autour des sessions', () => {
     expect(brief).toContain('do not rebuild');
   });
 
+  it('la revue courte (petit lot) et la revue après la passe des mineurs reçoivent aussi les résultats (L75)', async () => {
+    const hs = harness({ lots: [{ title: 'petit', estimate: 0.5, visible: true }], script: { implement: [impl()], 'review-small': [ok] } });
+    await runLot(hs.lot('L1', { small: true, visible: true }, { test: 'true', build: 'true' }));
+    const small = hs.calls.find((x) => x.kind === 'review-small')!;
+    expect(small.brief).toContain('already ran these checks');
+    expect(small.brief).toContain('do not rebuild');
+
+    const minor: Handler = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', fichier: 'a.txt', ligne: 1, texte: 'nommage' }], sousTaches: [] }));
+    const hr = harness({ script: { implement: [impl()], review: [minor], fix: [fix('b.txt')], 'review-small': [ok] } });
+    await runLot(hr.lot('L1', {}, { test: 'true', build: 'true' }));
+    const recheck = hr.calls.filter((x) => x.kind === 'review-small').pop()!;
+    expect(recheck.brief).toContain('already ran these checks');
+    expect(recheck.brief).toContain('`true` (tests): green');
+  });
+
   it('build rouge → correction directe, jamais de revue avant (L75)', async () => {
     const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
     const c = h.lot('L1', {}, { test: 'true', build: 'test -f b.txt || { echo cassé >&2; exit 4; }' });

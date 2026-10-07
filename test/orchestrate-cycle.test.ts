@@ -233,6 +233,17 @@ describe('lot visible : UX puis code', () => {
     expect(c2.lot.uxCaptures).toBeUndefined();
   });
 
+  it('brief ux rendu avec orchestrate.ux : la consigne de captures est celle de l\'étape (noms relatifs, dossier de la vague), jamais un dossier tmp ni un chemin absolu (L74/t3)', async () => {
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
+    const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200', command: 'npm start' } });
+    await runLot(c);
+    const brief = h.calls.find((x) => x.kind === 'ux')!.brief;
+    expect(brief).toContain('http://localhost:4200');
+    expect(brief).toContain('1440');
+    expect(brief).toContain('relative file name');
+    expect(brief).not.toMatch(/tmp folder|shared tmp|OS temp/i);
+  });
+
   it('sans application déclarée : pas de session UX, « à faire par le lead »', async () => {
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], review: [ok] } });
     const c = h.lot('L1', { visible: true });

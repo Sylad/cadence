@@ -187,7 +187,15 @@ function constatLines(constats: Constat[]): string {
     .join('\n');
 }
 
-function uxText(c: LotCtx): string {
+/** Consigne de captures : celle de l'étape qui la reçoit (serveur Playwright de la vague chargé ou non), jamais l'autre. */
+function shotsText(c: LotCtx, kind: StepKind): string {
+  if (mcpServersFor(kind, c.lot.visible, '').playwright) {
+    return 'Take screenshots at 1440 and 390 px width, each with a relative file name only (e.g. `home-1440px.png`): they land in the wave\'s capture directory, outside the repository.';
+  }
+  return 'Take screenshots at 1440 and 390 px width with the Playwright CLI, writing them outside the repository (the OS temp directory, or the temporary folder the project\'s CLAUDE.md names).';
+}
+
+function uxText(c: LotCtx, kind: StepKind): string {
   const ux = c.config.ux;
   if (!ux) {
     return 'No way to run the app is declared (cadence.yaml: orchestrate.ux): review the interface from the code, and list under "nonVerifie" what you could not see.';
@@ -195,7 +203,7 @@ function uxText(c: LotCtx): string {
   return [
     ux.url ? `The running app is at ${ux.url}.` : '',
     ux.command ? `Start the app with: ${ux.command} (from the repository root), and stop it when you are done.` : '',
-    'Take screenshots at 1440 and 390 px width (into the shared tmp folder, never in the repository).',
+    shotsText(c, kind),
   ]
     .filter(Boolean)
     .join(' ');
@@ -217,7 +225,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
-  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []) };
+  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c, kind), choix: choixText(c.lot.choix ?? []) };
   if (kind === 'implement' || kind === 'fix') {
     const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
     if (kind === 'fix') {

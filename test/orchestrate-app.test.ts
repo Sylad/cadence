@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { startApp, uxLockFile } from '../src/orchestrate/app.js';
@@ -236,4 +236,19 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
     await app.stop();
   });
 
+  it('délai dépassé après une attente du verrou : le message annonce le délai restant, pas le délai complet', async () => {
+    const t = await fakeApp(-1);
+    const lock = uxLockFile(t.url);
+    writeFileSync(lock, String(process.pid));
+    const timer = setTimeout(() => rmSync(lock, { force: true }), 2_000);
+    try {
+      const app = await startApp({ ...opts(t), timeoutMs: 3_000 });
+      expect(app.state.kind).toBe('unverified');
+      if (app.state.kind !== 'unverified') return;
+      expect(app.state.cause).toContain('n\'a pas répondu en 1 s');
+      expect(app.state.cause).not.toContain('en 3 s');
+    } finally {
+      clearTimeout(timer);
+    }
+  });
 });

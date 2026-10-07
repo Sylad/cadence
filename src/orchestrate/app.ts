@@ -133,6 +133,7 @@ export async function startApp(o: AppOpts): Promise<AppRun> {
 /** `release` rend le verrou : dès que rien ne tourne (busy, échec), sinon à la fin de `stop`, une fois le groupe disparu. */
 async function launch(o: AppOpts, deadline: number, release: () => void): Promise<AppRun> {
   const none = async () => {};
+  const available = Math.max(0, deadline - Date.now()); // le délai de l'étape moins l'attente du verrou : c'est lui que le message annonce
   if (await responds(o.url)) {
     release();
     return { state: { kind: 'busy' }, stop: none };
@@ -177,7 +178,7 @@ async function launch(o: AppOpts, deadline: number, release: () => void): Promis
     if (gone.why || Date.now() >= deadline) break;
     await sleep(o.every ?? 500);
   }
-  const why = gone.why ?? `l'URL n'a pas répondu en ${Math.round(o.timeoutMs / 1000)} s`;
+  const why = gone.why ?? `l'URL n'a pas répondu en ${Math.round(available / 1000)} s`;
   await stop();
   return { state: { kind: 'unverified', cause: `${why}. Fin du journal :\n${tail(o.log)}` }, stop: none };
 }

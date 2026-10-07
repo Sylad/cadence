@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
-import { basename, dirname, join } from 'node:path';
+import { basename, delimiter, dirname, join } from 'node:path';
+import { chmodSync, mkdirSync as mk } from 'node:fs';
+import { tempDir } from './helpers.js';
 import { startApp, takeUrlLock, uxLockFile } from '../src/orchestrate/app.js';
 import { fakeApp } from './fake-app.js';
 
@@ -282,5 +284,35 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
     } finally {
       clearTimeout(timer);
     }
+  });
+});
+
+describe('Node du .nvmrc pour l\'application UX (L98)', () => {
+  it('nodeBin passe en tête du PATH de l\'application : le « node » lancé est celui du dossier, pas celui de l\'orchestrateur', async () => {
+    const t = await setup(0);
+    const bin = join(tempDir(), 'node-bin');
+    mk(bin, { recursive: true });
+    writeFileSync(join(bin, 'node'), `#!/bin/sh\necho "faux node $0" > ${t.dir}/fake-node-used\nexec ${process.execPath} "$@"\n`);
+    chmodSync(join(bin, 'node'), 0o755);
+    const app = await startApp({ command: t.command, url: t.url, cwd: t.dir, log: t.log, timeoutMs: 15_000, every: 50, nodeBin: bin });
+    expect(app.state).toEqual({ kind: 'ready' });
+    expect(readFileSync(join(t.dir, 'fake-node-used'), 'utf8')).toContain(join(bin, 'node'));
+    await app.stop();
+  });
+
+  it('sans nodeBin, le PATH hérité est inchangé', async () => {
+    const t = await setup(0);
+    const app = await startApp({ command: `echo "$PATH" > ${t.dir}/path; ${t.command}`, url: t.url, cwd: t.dir, log: t.log, timeoutMs: 15_000, every: 50 });
+    expect(app.state).toEqual({ kind: 'ready' });
+    expect(readFileSync(join(t.dir, 'path'), 'utf8').trim()).toBe(process.env.PATH);
+    await app.stop();
+  });
+
+  it('nodeBin devant le PATH existant, séparé par le délimiteur', async () => {
+    const t = await setup(0);
+    const app = await startApp({ command: `echo "$PATH" > ${t.dir}/path; ${t.command}`, url: t.url, cwd: t.dir, log: t.log, timeoutMs: 15_000, every: 50, nodeBin: '/x/node-bin/v22.1.0' });
+    expect(app.state).toEqual({ kind: 'ready' });
+    expect(readFileSync(join(t.dir, 'path'), 'utf8').trim()).toBe(['/x/node-bin/v22.1.0', process.env.PATH].join(delimiter));
+    await app.stop();
   });
 });

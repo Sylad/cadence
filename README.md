@@ -802,7 +802,9 @@ the step suspends the lot without starting the app.
 
 **Node per project (`.nvmrc`)**: when a project has a `.nvmrc` at its root, every session the
 orchestrator launches for it (implementation, UX and code reviews, corrections) runs with the matching Node
-first in its `PATH`, so `node`, `npm` and `npx` resolve to it (Astro needs 22 while the default may be 20). Only
+first in its `PATH`, so `node`, `npm` and `npx` resolve to it (Astro needs 22 while the default may be 20) — and so does
+the app the program starts for the UX review (`ux.command`): same links directory first in its `PATH`, no
+`. ~/.nvm/nvm.sh && nvm use` prefix needed (it exits with code 3 under `sh`). Only
 those four names (`node`, `npm`, `npx`, `corepack`) are exposed, through symlinks in
 `.cadence/runs/<wave>/node-bin/<version>/` (recreated at start and at every `--resume`): the rest of that Node's
 `bin` (globally installed `raf`, `cadence`, `claude`…) is never exposed, so it does not shadow the tools in the usual `PATH`;

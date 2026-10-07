@@ -581,7 +581,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
     return;
   }
   c.wave.log(`${lotKey(l.project, l.lot)} · lancement de l'application (${ux.url})`);
-  const app = await startApp({ command: ux.command, url: ux.url, cwd: l.repo, log: join(c.wave.store.lotDir(l.project, l.lot), 'ux-app.log'), timeoutMs: (ux.timeout ?? APP_TIMEOUT_S) * 1000 });
+  const app = await startApp({ command: ux.command, url: ux.url, cwd: l.repo, nodeBin: l.node?.link, log: join(c.wave.store.lotDir(l.project, l.lot), 'ux-app.log'), timeoutMs: (ux.timeout ?? APP_TIMEOUT_S) * 1000 });
   try {
     c.app = app.state;
     if (app.state.kind !== 'ready') {

@@ -1396,6 +1396,19 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     expect(c.lot.uxNote).toBeUndefined();
   });
 
+  it('L98 : le lot a un .nvmrc résolu : l\'application est lancée avec le Node du dossier de liens (faux node), comme les sessions', async () => {
+    const app = await fakeApp(0);
+    const link = join(app.dir, 'node-bin');
+    mkdirSync(link, { recursive: true });
+    writeFileSync(join(link, 'node'), `#!/bin/sh\necho "$0" > ${app.dir}/fake-node-used\nexec ${process.execPath} "$@"\n`, { mode: 0o755 });
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
+    const c = h.lot('L1', { visible: true }, { ux: { command: app.command, url: app.url, timeout: 20 } });
+    c.lot.node = { version: 'v22.1.0', wanted: '22', bin: '/inutile', link };
+    await runLot(c);
+    expect(readFileSync(join(app.dir, 'fake-node-used'), 'utf8').trim()).toBe(join(link, 'node'));
+    expect(c.lot.uxNote).toBeUndefined();
+  });
+
   it('jamais prête : pas de session UX, note avec la fin du journal, le lot continue vers la revue de code, jamais d\'échec', async () => {
     const app = await fakeApp(-1);
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], review: [ok] } });

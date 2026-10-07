@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { closeSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { linkNewFile, pidAlive, removeStaleFile } from '../state.js';
 import { withoutLaunchVars } from './snapshot.js';
 
@@ -27,6 +27,14 @@ export interface AppOpts {
   killAfterMs?: number;
   /** Intervalle entre deux sondes (ms). */
   every?: number;
+  /** Dossier de liens Node du `.nvmrc` du projet (`linkNodeBin`) : en tête du PATH de l'application, comme celui des sessions. */
+  nodeBin?: string;
+}
+
+/** L'environnement de l'application : celui de l'orchestrateur, avec le Node du projet en tête du PATH quand il y en a un (sans préfixe nvm, qui sort en code 3 sous sh). */
+function appEnv(nodeBin?: string): NodeJS.ProcessEnv {
+  const env = withoutLaunchVars(process.env);
+  return nodeBin ? { ...env, PATH: [nodeBin, env.PATH ?? ''].filter(Boolean).join(delimiter) } : env;
 }
 
 const live = new Set<() => Promise<void>>();
@@ -158,7 +166,7 @@ async function launch(o: AppOpts, deadline: number, release: () => void): Promis
     release();
     return { state: { kind: 'unverified', cause: `journal ${o.log} : ${(e as Error).message}` }, stop: none };
   }
-  const child = spawn('sh', ['-c', o.command], { cwd: o.cwd, env: withoutLaunchVars(process.env), stdio: ['ignore', fd, fd], detached: true });
+  const child = spawn('sh', ['-c', o.command], { cwd: o.cwd, env: appEnv(o.nodeBin), stdio: ['ignore', fd, fd], detached: true });
   closeSync(fd);
   const pid = child.pid;
   if (pid === undefined) {

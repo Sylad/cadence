@@ -157,6 +157,12 @@ describe('skill lead : source unique', () => {
     expect(skill).not.toContain('Rules: test first');
     expect(skill).toContain('cadence orchestrate');
   });
+  it('les sessions d\'une vague orchestrate comptent dans la limite de deux sous-agents (L59)', () => {
+    const skill = read('../skills/lead/SKILL.md');
+    expect(skill).toMatch(/sessions of an orchestrated wave[^\n]*\n?[^\n]*count toward this limit/i);
+    expect(skill).toContain('--max-sessions');
+    expect(skill).toContain('cadence orchestrate --status');
+  });
   it('le dossier de gabarits est celui du paquet', () => {
     expect(TEMPLATES_DIR.endsWith('/templates/orchestrate')).toBe(true);
     expect(JSON.parse(read('../package.json')).files).toContain('templates');

@@ -1229,11 +1229,12 @@ lots:
   - id: L111
     title: "Plugin cadence-hud dans la marketplace du dépôt (plugins/cadence-hud) : bande au-dessus du prompt Claude Code — contexte, fenêtres 5 h/7 j, coût, agents, vagues orchestrate lues dans ~/.cadence/orchestrate et .cadence/runs ; source = ~/.claude/mods/cadence-hud (07-10, 6 tests claude plugin test verts) ; entrée marketplace.json, exclu du paquet npm, README d'installation (/plugin install cadence-hud --marketplace Sylad/cadence) ; réalise le point (3) de L49"
     public: "Une bande d'état Claude Code : contexte, quota, coût, agents et vagues orchestrate"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Lead 07-10 : pas de capture Playwright (la bande vit dans Claude Code, pas dans un navigateur) ; la capture Nouveautés sera une image du terminal fournie par le lead. Source déjà importée dans plugins/cadence-hud (commit 6e1bba4) ; vitest l'exclut déjà ; reste : marketplace.json, files npm (déjà sans plugins/), README d'installation, et tsconfig du plugin (pas de .claude-plugin/types versionné)." }
+    started: 2026-10-07
   - id: L112
     title: "Suite rouge sous npm ≥ 11.5 (12.2 vu le 07-10) : npm active le cache de compilation de Node et laisse node-compile-cache dans la racine temporaire privée ; le contrôle de fin de test/global-setup.ts fait échouer la suite. Décision lead : global-setup pose NODE_DISABLE_COMPILE_CACHE=1 pour les workers et les enfants (ou NODE_COMPILE_CACHE vers un sous-dossier qu'il supprime lui-même) ; test qui lance npm sous un TMPDIR privé et vérifie qu'il ne reste rien"
     status: doing

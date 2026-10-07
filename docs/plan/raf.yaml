@@ -762,11 +762,16 @@ lots:
     finished: 2026-10-06
   - id: L70
     title: "orchestrate : un dossier .playwright-mcp/ laissé par le MCP Playwright rend le lot au lead (« dépôt sale après implement », 2 fois le 06-10 sur warhammer) — le brief impose les sorties Playwright hors du dépôt (--output-dir / tmp) et/ou cadence init ajoute .playwright-mcp/ au .gitignore"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-06
     notes:
       - { date: 2026-10-06, text: "06-10 aussi : la vague warhammer40k:L64 (t1–t5 implémentées, revue conforme) a laissé les 5 sous-tâches en todo → raf done L64 refusé, le lead les a closes à la main. L'orchestrateur devrait clore (ou proposer de clore) les sous-tâches couvertes par des commits qui les citent quand la revue est conforme. Et : un backend dev (nest) lancé par une session d'implémentation est resté vivant après la vague (2 fois) — tuer les process enfants en fin de session." }
+    started: 2026-10-07
+    tasks:
+      - { id: t1, title: "briefs : consigne Playwright applicable (noms relatifs, sorties sous .playwright-mcp/, jamais /tmp ni --output-dir : refusés par le MCP 0.0.76 checkFile)", status: todo }
+      - { id: t2, title: "orchestrate : .playwright-mcp/ ignoré dans le contrôle « dépôt sale » (implement et commitPlan), pour les dépôts déjà initialisés sans entrée .gitignore", status: todo }
+      - { id: t3, title: "README raf init : mentionner l'ajout de .playwright-mcp/ au .gitignore", status: todo }
   - id: L71
     title: "orchestrate : verrou par DÉPÔT au lieu du dossier parent — deux vagues dans des dépôts différents coexistent sous un plafond global de sessions simultanées (2 par défaut, réglable) ; même dépôt = toujours refusé (index git, plan et dérivés, tests/build partagés). Plus tard si besoin : worktree par lot à fichiers disjoints + fusion des plans (06-10, refus vécu cadence:L69 × warhammer40k:L64)"
     status: done
@@ -828,4 +833,24 @@ lots:
     title: "orchestrate : environnement par projet (Node via .nvmrc ou orchestrate.env dans cadence.yaml) — Astro exige Node 22, le node par défaut est 20 (evatosorus, ccc, 06-10)"
     status: todo
     estimate: 0.5
+    created: 2026-10-07
+  - id: L81
+    title: "⚡ Test instable orchestrate-registry.test.ts:149 (L71/t3, attente 0 ms exacte) : rouge sous charge en suite complète, passe seul → npm test / prepublishOnly rouge"
+    status: todo
+    estimate: 1
+    created: 2026-10-07
+  - id: L82
+    title: "orchestrate : clore (ou proposer de clore) les sous-tâches couvertes par des commits qui les citent quand la revue est conforme (warhammer40k:L64 06-10, raf done refusé)"
+    status: todo
+    estimate: 1
+    created: 2026-10-07
+  - id: L83
+    title: "orchestrate : tuer les processus enfants (serveurs de dev) laissés vivants en fin de session d'implémentation (2 fois le 06-10)"
+    status: todo
+    estimate: 1
+    created: 2026-10-07
+  - id: L84
+    title: "agents ux-reviewer et qa-reviewer : même consigne Playwright que les briefs (sorties sous .playwright-mcp/) pour l'usage hors orchestrate"
+    status: todo
+    estimate: 1
     created: 2026-10-07

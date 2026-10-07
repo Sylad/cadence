@@ -844,6 +844,9 @@ lots:
       - { id: t1, title: "orchestrate --resume : re-résoudre le .nvmrc de chaque lot vivant et refuser comme au départ (version désinstallée, .nvmrc modifié, vague d'avant L80) — plus de repli silencieux ; test de reprise", status: todo }
       - { id: t2, title: "session .nvmrc : ne mettre en tête du PATH que node/npm/npx/corepack (dossier de liens dédié dans le dossier de la vague), pour ne pas masquer raf/cadence/claude en service ; README", status: todo }
       - { id: t3, title: "resolveNode : refuser une version dont le bin ne contient pas node (dossier vide ou cassé) — sinon dossier de liens vide = repli silencieux sur le Node par défaut", status: todo }
+      - { id: t4, title: "test de commande : une version nvm au bin vide ou au node non exécutable (0o644) est refusée au départ et à --resume — couvre realNodeFs.executable", status: todo }
+      - { id: t5, title: "README + dry-run : une version installée sans node exécutable est écartée au profit d'une plus basse valide (le dry-run le signale)", status: todo }
+      - { id: t6, title: "orchestrate : linkNodeBin et writeLot du départ dans le try qui appelle abandon(), pour ne pas laisser de vague réservée si un lien échoue", status: todo }
   - id: L81
     title: "⚡ Test instable orchestrate-registry.test.ts:149 (L71/t3, attente 0 ms exacte) : rouge sous charge en suite complète, passe seul → npm test / prepublishOnly rouge"
     status: done

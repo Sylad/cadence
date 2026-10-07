@@ -294,6 +294,32 @@ describe('raf show', () => {
     expect(r.out).toBe('2026-09-28  première note\n2026-09-28  seconde note');
   });
 
+  it('un lot sans after ni titre public ni note ni commit masque ces lignes et affiche « commits (0) : »', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'Base');
+    const r = raf(dir, 'show', 'L1');
+    expect(r.code).toBe(0);
+    expect(r.out).not.toContain('after :');
+    expect(r.out).not.toContain('public :');
+    expect(r.out).not.toContain('notes :');
+    expect(r.out).not.toContain('terminé');
+    expect(r.out).toContain('commits (0) :');
+  });
+
+  it('un lot terminé affiche la date « terminé : … »', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'Base');
+    raf(dir, 'start', 'L1');
+    commit(dir, 'feat(L1): fait', '2026-09-28T10:00:00');
+    const d = raf(dir, 'done', 'L1');
+    expect(d.code, d.err).toBe(0);
+    const r = raf(dir, 'show', 'L1');
+    expect(r.out).toMatch(/créé : \d{4}-\d{2}-\d{2}  démarré : \d{4}-\d{2}-\d{2}  terminé : \d{4}-\d{2}-\d{2}/);
+    expect(r.out.split('\n')[0]).toContain('done');
+  });
+
   it('refuse un lot inconnu et une sous-tâche', () => {
     const dir = planAvecLot();
     expect(raf(dir, 'show', 'L9').err).toContain('lot inconnu');

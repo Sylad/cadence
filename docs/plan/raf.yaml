@@ -925,6 +925,7 @@ lots:
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Référence de mesure avant la vague performance (07-10, vagues 1234 → 1921) : petit lot (≤ 0,25 j) = 4 à 14 min et 60 à 260 k tokens ; suite complète 63 s relancée plusieurs fois par session (implémentation, revue, correction) ; L32 ccc 87 min / 396 k avec 2 corrections. À comparer après L75 + L77 + L78 + L108, mêmes colonnes de cadence orchestrate --status." }
+      - { date: 2026-10-07, text: "Correction lead 07-10 (revue non conforme, 1 majeur) : ajouter le test « tests rouges avec build déclaré → build non lancé, un seul constat, passage en correction » (break de cycle.ts:532). Le reste des propositions = notes, pas de lots (règle L109) ; aligner agents/code-reviewer.md (contrôles déjà lancés au HEAD relu = acquis) si une ligne suffit." }
     started: 2026-10-07
   - id: L76
     title: "orchestrate : lots empilés sur main — le tableau final indique « livrable jusqu'à <sha> » (dernier commit d'un lot prêt sous un lot rendu), comme fait à la main pour ol L36 et ccc L26 avec deliver --sha (06-10)"
@@ -933,20 +934,22 @@ lots:
     created: 2026-10-07
   - id: L77
     title: "orchestrate : contrôle préalable « livrable déjà présent ? » avant d'ouvrir une session d'implémentation — warhammer L59 et L65 étaient déjà faits par d'autres lots (06-10)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "07-10 : encore deux cas — cadence L47 (fait par L45) et L100 (fait par la correction de L99) : sessions d'implémentation ouvertes pour rien (33 k et 39 k tokens)." }
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme : les mineurs 1 et 3 sont corrigés (« oui » sans preuve → partiel, condition partagée par needsPrecheck dans runLot et --dry-run, tests ajoutés), le rejet du 2 est justifié ; 1 nouveau mineur : la consigne jointe au brief pour un « oui » non prouvé dit « do not redo it » — orchestré (vague 2026-10-07-1943, 1 passe(s) de correction + passe des mineurs)", commit: 0e9aa6cfd8431616aa9a57295bc61c29c93239e8 }
+    finished: 2026-10-07
   - id: L78
     title: "orchestrate : budget par lot dérivé de l'estimate, en plus du budget de vague — 2 M mangés par 6 lots, 7 lots à 0 (06-10)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme : 1 mineur (étiquette de la table de calibrage), les deux mineurs de la revue sont corrigés — orchestré (vague 2026-10-07-1943, 1 passe(s) de correction + passe des mineurs)", commit: 0b92d3c9100ce0d26105fad69a6d369fbce9a339 }
+    finished: 2026-10-07
   - id: L79
     title: "orchestrate : retirer un lot d'une vague en cours (--drop <projet:lot>) et --stop-after-current — le 06-10 il a fallu une sentinelle sur journal.log + SIGTERM pour écarter ccc L29"
     status: todo
@@ -1186,16 +1189,24 @@ lots:
     created: 2026-10-07
   - id: L108
     title: "orchestrate : revue proportionnée à la taille du lot — lot ≤ 0,25 j (estimate) : une seule revue (Sonnet, agent code-reviewer, mêmes critères), pas de passe « mineurs », mineurs rendus au lead en notes ; lot plus gros : chaîne actuelle (Opus, 2 corrections, passe mineurs). Seuil et modèles dans cadence.yaml (orchestrate.review), défaut ci-dessus ; un bloquant ou majeur sur un petit lot déclenche quand même une correction et une revue Opus. Tests ; README. Décision Sylvain 07-10 : qualité oui, overkill non"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-07
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme : les deux mineurs sont corrigés. Le dry-run annonce le modèle léger pour un lot léger non petit (test ajouté), et le skill lead mentionne la revue Sonnet sans passe des mineurs. Aucune régression : typecheck OK, 881/881 tests. Aucun nouveau constat. — orchestré (vague 2026-10-07-1943, 0 passe(s) de correction + passe des mineurs)", commit: 7b2a806aa5bce2af8cbd4c06eb1ec4751986ef46 }
+    finished: 2026-10-07
   - id: L109
     title: "skill lead + brief de revue : couper la cascade de mineurs — un mineur ne devient un lot que s'il décrit un bug observable (sortie fausse, crash, régression mesurée) ; sinon il reste une note du lot d'origine. Vécu 07-10 : L60 → L96 → L97 → L99 → L100 (L100 déjà fait, abandonné). Test sur le texte du skill"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "conforme — orchestré (vague 2026-10-07-1943, 0 passe(s) de correction + passe des mineurs)", commit: 155aa55470368054c77a58296551249ef1b05e71 }
+    finished: 2026-10-07
+  - id: L110
+    title: "precheck (suite L77, défauts observables) : (1) session en lecture seule SANS l'agent code-reviewer (il relance toute la suite et s'arrête faute de commit) — brief dédié, test sur l'agent passé ; (2) un « oui » sans preuve ne rend pas le lot : traité comme partiel, test ; (3) --dry-run ne liste precheck que pour un lot sans commit (même garde lotWork que runLot)"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-07

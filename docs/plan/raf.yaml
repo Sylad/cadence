@@ -1116,3 +1116,8 @@ lots:
     estimate: 0.1
     quickwin: true
     created: 2026-10-07
+  - id: L101
+    title: "agent qa-reviewer : ne jamais attendre en silence son propre travail de fond — passage borné (budget temps), résultats écrits page par page au fil de l'eau (pas un JSON unique en fin de passage, perdu si on l'arrête) ; vécu 07-10 sur ccc : 6 min bloqué « waiting on background work », arrêt demandé → 30/38 pages à 1440 seulement, détail perdu"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-07

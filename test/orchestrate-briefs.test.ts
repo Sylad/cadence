@@ -238,6 +238,7 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
 
   it('lot non visible : aucune mention des Nouveautés', () => {
     const out = renderBrief('implement', { ...base, news: '' });
+    expect(out).not.toMatch(/\{\{/);
     expect(out).not.toContain('news new');
     expect(out).not.toContain('nouveautes');
   });

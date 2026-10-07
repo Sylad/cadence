@@ -293,6 +293,14 @@ describe('skills install', () => {
     expect(skill('session-close')).toContain('`raf review <id> "…"`');
   });
 
+  it('le skill lead délègue à la main à partir du brief rendu par --dry-run ({{news}} compris), sans liste de variables à remplir (L48/t1)', () => {
+    const lead = skillText('lead');
+    expect(lead).toContain('cadence orchestrate --dry-run <project>:<lot>');
+    expect(lead).toContain('already rendered');
+    expect(lead).toContain('{{news}}');
+    expect(lead).not.toContain('fills `{{chemin}}`');
+  });
+
   it('les skills lead et deliver font suivre par l’agent qa-reviewer toute livraison qui change ce qu’une page montre ou reçoit ; session-start n’en parle pas', () => {
     const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8').replace(/\s+/g, ' ');
     const lead = skill('lead');

@@ -36,10 +36,11 @@ progress, then drift that blocks a delivery, then ready quick wins. **Stop and w
 
 The default way to delegate is **`cadence orchestrate`** (section 2b): a program, not a conversation, that runs
 one fresh short session per step. When the lead delegates by hand, the brief is the template
-`templates/orchestrate/implement.md` of the cadence package — the single source, tested; `cadence
-orchestrate --dry-run <project>:<lot>` writes it rendered for the lot. The lead runs
-`cd <project> && raf start <lot>`, fills `{{chemin}}`, `{{lot}}`, `{{titre}}` and `{{objectif}}` (what done
-looks like, from the human's words), and keeps the rest verbatim.
+`templates/orchestrate/implement.md` of the cadence package — the single source, tested. The lead runs
+`cd <project> && raf start <lot>`, then starts from the brief written by `cadence orchestrate --dry-run
+<project>:<lot>`: it is already rendered (`{{chemin}}`, `{{lot}}`, `{{titre}}`, `{{objectif}}` and `{{news}}`,
+the News instruction of a `visible` lot, are filled in). The lead only adjusts the goal to what done looks
+like (the human's words) and keeps the rest verbatim.
 
 A lot that adds or changes a screen is `visible`: after the implementation, have the
 `ux-reviewer` agent review it (give it the URL or the way to run the app) and bring its verdict and

@@ -118,9 +118,16 @@ describe('cadence.yaml : orchestrate', () => {
   it('ux objet { command, url, timeout } : timeout en secondes, positif, sinon erreur nommée (L60)', () => {
     expect(read('orchestrate:\n  ux: { command: npm start, url: http://localhost:4200, timeout: 90 }\n')().ux).toEqual({ command: 'npm start', url: 'http://localhost:4200', timeout: 90 });
     expect(read('orchestrate:\n  ux: { command: npm start, url: http://localhost:4200 }\n')().ux).toEqual({ command: 'npm start', url: 'http://localhost:4200' });
-    expect(read('orchestrate:\n  ux: { command: npm start, timeout: 0 }\n')).toThrow(/ux\.timeout/);
-    expect(read('orchestrate:\n  ux: { command: npm start, timeout: vite }\n')).toThrow(/ux\.timeout/);
+    expect(read('orchestrate:\n  ux: { command: npm start, url: http://localhost:4200, timeout: 0 }\n')).toThrow(/ux\.timeout/);
+    expect(read('orchestrate:\n  ux: { command: npm start, url: http://localhost:4200, timeout: vite }\n')).toThrow(/ux\.timeout/);
     expect(read('orchestrate:\n  ux: { command: npm start, env: x }\n')).toThrow(/ux\.env inconnu/);
+  });
+  it('ux objet : url en http(s) exigée, timeout seulement avec command ET url (L60)', () => {
+    expect(read('orchestrate:\n  ux: { command: npm start, url: localhost:4200 }\n')).toThrow(/ux\.url.*http/);
+    expect(read('orchestrate:\n  ux: { url: ftp://x }\n')).toThrow(/ux\.url/);
+    expect(read('orchestrate:\n  ux: { command: npm start, timeout: 90 }\n')).toThrow(/ux\.timeout.*command ET url/);
+    expect(read('orchestrate:\n  ux: { url: http://localhost:4200, timeout: 90 }\n')).toThrow(/ux\.timeout.*command ET url/);
+    expect(read('orchestrate:\n  ux: { url: https://localhost:4200 }\n')().ux).toEqual({ url: 'https://localhost:4200' });
   });
   it('clé inconnue ou valeur invalide : erreur nommée', () => {
     expect(read('orchestrate:\n  parallel: 3\n')).toThrow(/orchestrate\.parallel inconnu/);

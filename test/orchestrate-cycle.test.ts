@@ -3,7 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { join } from 'node:path';
 import { Plan } from '../src/plan.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
-import { runLot } from '../src/orchestrate/cycle.js';
+import { isNonQuestion, runLot } from '../src/orchestrate/cycle.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir } from '../src/orchestrate/launch.js';
 import { tempDir } from './helpers.js';
@@ -316,6 +316,15 @@ describe('contrôles autour des sessions', () => {
     await runLot(c);
     expect(c.lot.status).not.toBe('question');
     expect(c.lot.questions).toEqual([]);
+  });
+
+  it('isNonQuestion : liste fermée, jamais une entrée avec « ? » (L52/t1)', () => {
+    for (const q of ['', '  ', '-', 'Aucune question.', 'AUCUNE  QUESTION !', 'Pas de question', "Je n'ai pas de question", 'Aucune question bloquante', 'No question', 'No questions.', 'No open questions', 'No open question', 'None', 'N/A', 'rien', 'Néant', 'Aucune autre question']) {
+      expect(isNonQuestion(q), JSON.stringify(q)).toBe(true);
+    }
+    for (const q of ['No question except SQLite?', 'No blocking question except: SQLite?', 'No question but PostgreSQL?', 'Aucune question hors schéma ?', 'No, the question is SQLite?', 'No further question about X?', 'Aucune question ?', 'No question except SQLite', 'PostgreSQL ou SQLite ?']) {
+      expect(isNonQuestion(q), JSON.stringify(q)).toBe(false);
+    }
   });
 
   it('une vraie question mêlée à des non-questions arrête le lot, seule la vraie est gardée (L52)', async () => {

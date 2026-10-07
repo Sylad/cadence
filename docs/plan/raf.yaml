@@ -596,10 +596,11 @@ lots:
     created: 2026-10-04
   - id: L48
     title: "⚡ orchestrate : le brief d'implémentation d'un lot visible inclut l'entrée Nouveautés (cadence news new <lot>, texte factuel côté utilisateur, capture selon la convention du projet) — question évitable posée par ol-companion:L29 (vague 2026-10-04-2201)"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-07
   - id: L49
     title: "Suivi visible d'une vague pour l'humain : (1) le skill lead nomme la tâche de fond « vague <id> : projet:lot, … » et arme un suivi (Monitor) qui pousse chaque transition (lot → état, question, prêt, rendu) dans la conversation ; (2) cadence orchestrate --status --watch (tableau rafraîchi dans un terminal) ; (3) à étudier : une ligne de statut Claude Code (barre d'état) « vague : 2/4 prêts, 1 question, 1,1 M / 2 M » — retour de Sylvain 04-10 : « je vois une tâche en cours, pas quels projets ni où on en est »"
     status: todo
@@ -940,7 +941,8 @@ lots:
     finished: 2026-10-07
   - id: L89
     title: "guard.ts : rememberExclude met hookLine=false quand le hook pre-push présent porte la marque cadence (ligne laissée par une vague 0.11.0 interrompue, sans note) ; test de la note d'ancienne forme (sans content) — mineurs de la revue L87/L88"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07

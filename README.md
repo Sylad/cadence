@@ -694,6 +694,9 @@ therefore come from the snapshot: a wave can orchestrate cadence itself, and a s
 `templates/` or rebuild `dist/` without touching the wave running. `--resume` relaunches from the snapshot of the
 resumed wave, never from the current `dist/`; a wave without a snapshot (started before L61) resumes with the current
 package and a warning. The copy is removed with the wave folder. The wave's pid in `--status` is the relaunched process.
+The sessions of the wave also get `.cadence/runs/<wave>/tool/bin` (the `raf` and `cadence` entries of the snapshot) **first in their
+`PATH`**, ahead of the per-project Node below and of the usual `PATH`: the `raf` a reviewer runs (`raf commits`…) is the
+snapshot's, not the installed one. A wave without a snapshot leaves the `PATH` as it is.
 
 **What stays with you**: choosing the lots, the questions raised (`--resume --answer`), re-verifying
 after the wave (`git log`, tests, `raf check`), `raf done`, **`raf ux`** (the orchestrator reports the UX
@@ -768,7 +771,8 @@ orchestrator launches for it (implementation, UX and code reviews, corrections) 
 first in its `PATH`, so `node`, `npm` and `npx` resolve to it (Astro needs 22 while the default may be 20). Only
 those four names (`node`, `npm`, `npx`, `corepack`) are exposed, through symlinks in
 `.cadence/runs/<wave>/node-bin/<version>/` (recreated at start and at every `--resume`): the rest of that Node's
-`bin` (globally installed `raf`, `cadence`, `claude`…) never shadows the tools in the usual `PATH`. `--resume` resolves
+`bin` (globally installed `raf`, `cadence`, `claude`…) is never exposed, so it does not shadow the tools in the usual `PATH`;
+only the snapshot's `tool/bin` (above) comes first, ahead of this Node directory. `--resume` resolves
 the `.nvmrc` again for every live lot and refuses it like at start if it can no longer be resolved.
 The file is read trimmed (`22`, `v22`, `22.22`, `v22.22.3`); the highest matching version installed under
 `$NVM_DIR/versions/node` (default `~/.nvm/versions/node`) **that has an executable `bin/node`** is used: a higher

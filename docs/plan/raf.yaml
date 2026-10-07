@@ -619,6 +619,8 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-04
+    notes:
+      - { date: 2026-10-07, text: "07-10 : le point (3) « barre d'état Claude Code » est réalisé par le mod cadence-hud (L111) ; restent (1) suivi Monitor dans le skill lead et (2) --status --watch." }
   - id: L50
     title: "⚡ orchestrate : les fichiers que Playwright MCP écrit dans le dépôt (.playwright-mcp/*.yml, captures) rendent le lot « dépôt sale » et le renvoient au lead (ol-companion:L29, vague 2026-10-04-2201) — exclus le temps de la vague (.git/info/exclude, comme le hook) et nettoyés à la fin, ou dossier de sortie Playwright hors dépôt ; test"
     status: done
@@ -1224,8 +1226,9 @@ lots:
     public: "Une bande d'état Claude Code : contexte, quota, coût, agents et vagues orchestrate"
     status: todo
     estimate: 0.5
-    visible: true
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "Lead 07-10 : pas de capture Playwright (la bande vit dans Claude Code, pas dans un navigateur) ; la capture Nouveautés sera une image du terminal fournie par le lead. Source déjà importée dans plugins/cadence-hud (commit 6e1bba4) ; vitest l'exclut déjà ; reste : marketplace.json, files npm (déjà sans plugins/), README d'installation, et tsconfig du plugin (pas de .claude-plugin/types versionné)." }
   - id: L112
     title: "Suite rouge sous npm ≥ 11.5 (12.2 vu le 07-10) : npm active le cache de compilation de Node et laisse node-compile-cache dans la racine temporaire privée ; le contrôle de fin de test/global-setup.ts fait échouer la suite. Décision lead : global-setup pose NODE_DISABLE_COMPILE_CACHE=1 pour les workers et les enfants (ou NODE_COMPILE_CACHE vers un sous-dossier qu'il supprime lui-même) ; test qui lance npm sous un TMPDIR privé et vérifie qu'il ne reste rien"
     status: todo

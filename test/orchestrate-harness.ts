@@ -113,7 +113,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; estim
     if (!next) throw new Error(`pas de réponse scénarisée pour ${kind}`);
     return next(call);
   };
-  const agents: Record<string, AgentDef> = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'StructuredOutput'] }, 'ux-reviewer': { description: 'd', prompt: 'p' } };
+  const agents: Record<string, AgentDef> = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'StructuredOutput'] }, 'ux-reviewer': { description: 'd', prompt: 'p' }, 'precheck-reader': { description: 'd', prompt: 'p', tools: ['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput'] } };
   const wave: WaveCtx = {
     id: 'w1',
     store,

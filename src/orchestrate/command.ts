@@ -290,7 +290,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       writeFileSync(file, brief);
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small).playwright;
       const args = buildArgs(
-        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: playwright && (s.kind === 'implement') ? [...env.config.addDirs, pwDir] : env.config.addDirs, timeoutMs: 0, mcpConfig: '<mcp>', playwright },
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: playwright && (s.kind === 'implement') ? [...env.config.addDirs, pwDir] : env.config.addDirs, timeoutMs: 0, mcpConfig: '<mcp>', playwright },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : claude ${args.join(' ')}`);

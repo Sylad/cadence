@@ -6,7 +6,8 @@ import { Plan } from '../src/plan.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { isNonQuestion, runLot } from '../src/orchestrate/cycle.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
-import { projectLogDir } from '../src/orchestrate/launch.js';
+import { projectLogDir, readAgents } from '../src/orchestrate/launch.js';
+import { AGENTS_DIR } from '../src/skills.js';
 import { createServer } from 'node:http';
 import { tempDir } from './helpers.js';
 import { fakeApp } from './fake-app.js';
@@ -1599,6 +1600,17 @@ describe('contrôle préalable « livrable déjà présent ? » (L77)', () => {
     expect(c.lot.outcome).toContain('src/state.ts:125');
     expect(h.calls[0].model).toBe('sonnet');
     expect(h.calls[0].args).toContain('--agent');
+  });
+
+  it('le contrôle part avec un agent dédié en lecture seule, pas avec code-reviewer (qui s\'arrête sur un lot sans commit)', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport({ dejaPresent: 'oui', preuves: ['a.ts:1'], resume: 'fait' }))] } });
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    const args = h.calls[0].args;
+    expect(args[args.indexOf('--agent') + 1]).toBe('precheck-reader');
+    const def = readAgents(AGENTS_DIR)['precheck-reader']; // l'agent réel du paquet, pas le double du harnais
+    expect(def.prompt).not.toMatch(/no commit to review/);
+    expect(def.tools).toEqual(['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput']);
   });
 
   it('livrable partiel : l\'implémentation part avec le constat du contrôle dans son brief', async () => {

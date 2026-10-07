@@ -304,7 +304,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       brief,
       model,
       schema: schemaFor(kind),
-      agent: kind === 'ux' ? 'ux-reviewer' : write ? undefined : 'code-reviewer',
+      agent: kind === 'ux' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
       cwd: l.repo,
       wave: w.id,
       permissionMode: c.config.permissionMode,

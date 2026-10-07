@@ -1,4 +1,4 @@
-Pre-check for lot `{{lot}}` — "{{titre}}" — of the repository `{{chemin}}`, following your agent instructions.
+Pre-check for lot `{{lot}}` — "{{titre}}" — of the repository `{{chemin}}`, as the read-only pre-check reader.
 Question: is the deliverable of this lot ALREADY in the repository (done by another lot, or by a correction)?
 Goal of the lot: {{objectif}}
 Read the lot, its notes and sub-tasks in the plan (`docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`),

@@ -1095,6 +1095,7 @@ lots:
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "compliant — orchestré (vague 2026-10-07-1530, 0 passe(s) de correction)", commit: 8c2ab57c45e5d2b8b0c0cfd5e37b23280e7ced98 }
   - id: L99
     title: "Erreurs de pose de verrou (mineurs revue L97) : startApp convertit EPERM/EMLINK du verrou d'URL en « UX non vérifiée » avec l'errno (la revue de code suit) ; deliver (deliver.ts:321) refuse avec la cause « verrou <chemin> : <errno> » au lieu de laisser sortir l'exception ; tests via vi.mock('node:fs')"
     status: todo

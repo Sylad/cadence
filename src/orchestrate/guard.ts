@@ -38,6 +38,37 @@ function excludeLine(repo: string): string | null {
 
 const excludeFile = (repo: string) => join(gitCommonDir(repo), 'info', 'exclude');
 
+/**
+ * État de `.git/info/exclude` avant la première vague (fichier absent ? sans retour à la ligne final ?), gardé à côté
+ * pour que la fin de vague le restitue à l'octet près. Une reprise garde l'état d'origine déjà noté.
+ */
+const excludeMemo = (repo: string) => join(gitCommonDir(repo), 'info', 'cadence-exclude-before');
+
+function rememberExclude(repo: string): void {
+  const memo = excludeMemo(repo);
+  if (existsSync(memo)) return;
+  const file = excludeFile(repo);
+  const text = existsSync(file) ? readFileSync(file, 'utf8') : null;
+  mkdirSync(join(gitCommonDir(repo), 'info'), { recursive: true });
+  writeFileSync(memo, JSON.stringify({ absent: text === null, noFinalNewline: text !== null && text !== '' && !text.endsWith('\n') }));
+}
+
+function restoreExclude(repo: string): void {
+  const memo = excludeMemo(repo);
+  if (!existsSync(memo)) return;
+  const file = excludeFile(repo);
+  try {
+    const before = JSON.parse(readFileSync(memo, 'utf8')) as { absent: boolean; noFinalNewline: boolean };
+    if (existsSync(file)) {
+      const text = readFileSync(file, 'utf8');
+      if (before.absent && text === '') rmSync(file, { force: true });
+      else if (before.noFinalNewline && text.endsWith('\n') && !text.includes(PW_MARK)) writeFileSync(file, text.slice(0, -1));
+    }
+  } finally {
+    rmSync(memo, { force: true });
+  }
+}
+
 function addExclude(repo: string): void {
   const line = excludeLine(repo);
   if (!line) return;
@@ -136,6 +167,7 @@ export function installPrePush(repo: string, wave = '?'): { ok: true } | { ok: f
     return { ok: false, reason: `un hook pre-push existe déjà (${file}) : l'orchestrateur ne le remplace pas` };
   }
   mkdirSync(dirname(file), { recursive: true });
+  rememberExclude(repo);
   addExclude(repo);
   addPlaywrightExclude(repo);
   writeFileSync(file, hook(wave));
@@ -159,6 +191,7 @@ export function removePrePush(repo: string, wave?: string): void {
   }
   removeExclude(repo);
   removePlaywrightExclude(repo);
+  restoreExclude(repo);
 }
 
 /** Pourrait-on poser le hook ? (préconditions, sans écrire) */

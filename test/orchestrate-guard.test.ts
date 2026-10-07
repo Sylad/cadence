@@ -236,6 +236,35 @@ describe('snapshot asynchrone (L3/t21)', () => {
   });
 });
 
+describe('.git/info/exclude restauré à l\'octet près (L50/t2)', () => {
+  const file = (dir: string) => join(dir, '.git/info/exclude');
+
+  it('un fichier sans retour à la ligne final revient identique', () => {
+    const dir = gitRepo();
+    writeFileSync(file(dir), 'foo');
+    installPrePush(dir, 'w1');
+    removePrePush(dir, 'w1');
+    expect(readFileSync(file(dir), 'utf8')).toBe('foo');
+  });
+
+  it('un fichier absent avant la vague est absent après', () => {
+    const dir = gitRepo();
+    rmSync(file(dir), { force: true });
+    installPrePush(dir, 'w1');
+    removePrePush(dir, 'w1');
+    expect(existsSync(file(dir))).toBe(false);
+  });
+
+  it('reprise : une vague interrompue puis reposée restaure toujours l\'état d\'avant la première vague', () => {
+    const dir = gitRepo();
+    writeFileSync(file(dir), 'foo');
+    installPrePush(dir, 'w1');
+    installPrePush(dir, 'w1');
+    removePrePush(dir, 'w1');
+    expect(readFileSync(file(dir), 'utf8')).toBe('foo');
+  });
+});
+
 describe('sorties de Playwright MCP dans le dépôt (L50)', () => {
   const raw = (dir: string) => execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: dir, encoding: 'utf8' }).trim();
 

@@ -1185,11 +1185,12 @@ lots:
     finished: 2026-10-07
   - id: L106
     title: "Titre public trop long attrapé avant le push : raf public / raf done / cadence news refusent (ou raf check signale) un titre public au-delà de la limite que la page Plan du site applique au build (80 car. sur ccc, parsePublicPlan) — vécu 07-10 : ccc L32, titre de la Nouveauté repris (88 car.), build Cloudflare Pages rouge, livraison rouge après 600 s ; le build local lancé avant raf done ne l'avait pas vu"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Décision lead 07-10 : la limite vient de cadence.yaml (clé news.publicTitleMax, défaut 80) ; sans clé, raf check avertit seulement, raf public / raf done / cadence news refusent au-delà de la limite déclarée." }
+    started: 2026-10-07
   - id: L107
     title: "raf show : les lignes suivantes d'une note sur plusieurs lignes sont décalées sous « notes : » (aujourd'hui en colonne 0, cli.ts:245) ; aide et README sans « en entier / in full », ou affichage des sous-tâches et de l'estimation — revue L102"
     status: doing

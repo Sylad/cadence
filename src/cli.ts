@@ -64,7 +64,7 @@ autre outil se lit sans migration (correspondance des champs, voir le README) et
 Options communes : --file chemin (ou RAF_FILE), RAF_TODAY=AAAA-MM-JJ pour figer la date.`;
 
 /** Ajoute `line` au .gitignore de `root` s'il n'y est pas déjà (avec ou sans `/` initial ou final). Rend vrai si écrit. */
-function ensureGitignore(root: string, line: string): boolean {
+export function ensureGitignore(root: string, line: string): boolean {
   const file = join(root, '.gitignore');
   const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
   const norm = (l: string) => l.trim().replace(/^\//, '').replace(/\/$/, '');

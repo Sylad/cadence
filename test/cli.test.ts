@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { run } from '../src/cli.js';
+import { ensureGitignore, run } from '../src/cli.js';
 import { commit, gitRepo } from './helpers.js';
 
 function raf(dir: string, ...argv: string[]) {
@@ -54,23 +54,30 @@ describe('raf public --clear', () => {
 });
 
 describe('raf init : .gitignore', () => {
-  it('ajoute .playwright-mcp/ au .gitignore, sans doublon ni perte du contenu existant', () => {
+  it('init crée le .gitignore avec .playwright-mcp/ et sort en 0', () => {
     const dir = gitRepo();
-    writeFileSync(join(dir, '.gitignore'), 'node_modules');
-    raf(dir, 'init', '--no-hook');
-    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('node_modules\n.playwright-mcp/\n');
-    raf(dir, 'init', '--no-hook');
-    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('node_modules\n.playwright-mcp/\n');
+    expect(raf(dir, 'init', '--no-hook').code).toBe(0);
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('.playwright-mcp/\n');
   });
 
-  it('crée le .gitignore absent et respecte une entrée déjà posée', () => {
-    const dir = gitRepo();
-    raf(dir, 'init', '--no-hook');
-    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('.playwright-mcp/\n');
-    const dir2 = gitRepo();
-    writeFileSync(join(dir2, '.gitignore'), '/.playwright-mcp\n');
-    raf(dir2, 'init', '--no-hook');
-    expect(readFileSync(join(dir2, '.gitignore'), 'utf8')).toBe('/.playwright-mcp\n');
+  it('ensureGitignore : ajoute sans perdre le contenu, sans doublon, quelle que soit la variante déjà posée', () => {
+    const cas: Array<[string, string | null, string, boolean]> = [
+      ['fichier absent', null, '.playwright-mcp/\n', true],
+      ['sans retour final', 'node_modules', 'node_modules\n.playwright-mcp/\n', true],
+      ['avec retour final', 'node_modules\n', 'node_modules\n.playwright-mcp/\n', true],
+      ['.playwright-mcp', '.playwright-mcp', '.playwright-mcp', false],
+      ['/.playwright-mcp', '/.playwright-mcp\n', '/.playwright-mcp\n', false],
+      ['.playwright-mcp/', '.playwright-mcp/\n', '.playwright-mcp/\n', false],
+      ['variante sans retour final', 'a\n/.playwright-mcp', 'a\n/.playwright-mcp', false],
+    ];
+    for (const [nom, avant, apres, ecrit] of cas) {
+      const dir = gitRepo();
+      if (avant !== null) writeFileSync(join(dir, '.gitignore'), avant);
+      expect(ensureGitignore(dir, '.playwright-mcp/'), nom).toBe(ecrit);
+      expect(readFileSync(join(dir, '.gitignore'), 'utf8'), nom).toBe(apres);
+      expect(ensureGitignore(dir, '.playwright-mcp/'), `${nom} (2e appel)`).toBe(false);
+      expect(readFileSync(join(dir, '.gitignore'), 'utf8'), `${nom} (2e appel)`).toBe(apres);
+    }
   });
 });
 

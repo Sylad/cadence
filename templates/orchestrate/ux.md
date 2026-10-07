@@ -2,6 +2,7 @@ Review the usability and accessibility of lot `{{lot}}` — "{{titre}}" — of t
 following your agent instructions. Read the diff yourself from the commits that cite the lot
 (`raf commits {{lot}}`, or `git log`).
 {{ux}}
+A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.
 You are read-only: do not modify, commit, push or run `raf review|ux|done`. Do not launch subagents.
 Ground every finding in a named rule (Nielsen heuristic, WCAG 2.2 AA criterion) or a measurement;
 describe a mockup before proposing any redesign, never code it.

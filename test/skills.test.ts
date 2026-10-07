@@ -405,10 +405,12 @@ describe('skills install', () => {
   it('un mineur ne devient un lot que s’il décrit un bug observable ; sinon il reste une note du lot d’origine (L109)', () => {
     const lead = skillText('lead');
     expect(lead).toContain(MINOR_RULE);
-    for (const t of ['review', 'review-small', 'review-recheck']) {
+    for (const t of ['review', 'review-small', 'review-recheck', 'ux']) {
       expect(flat(readFileSync(join(SKILLS_DIR, '../templates/orchestrate', `${t}.md`), 'utf8'))).toContain(MINOR_RULE_BRIEF);
     }
-    expect(flat(readFileSync(join(AGENTS_DIR, 'code-reviewer.md'), 'utf8'))).toContain(MINOR_RULE_BRIEF);
+    for (const a of ['code-reviewer', 'ux-reviewer']) {
+      expect(flat(readFileSync(join(AGENTS_DIR, `${a}.md`), 'utf8'))).toContain(MINOR_RULE_BRIEF);
+    }
   });
 
   it('manifestes : trois agents relecteurs annoncés, et la même version aux quatre endroits', () => {

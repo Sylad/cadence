@@ -38,7 +38,7 @@ A short report:
   "not compliant: 1 blocking".
 - **Findings**, most severe first, each with: what (with the capture), the rule or the measure, the
   proposed change, the effort (S ≤ a session, M ≈ a day).
-- **Proposed sub-tasks**: one `raf add --parent <lot> "…"` line per finding worth doing.
+- **Proposed sub-tasks**: one `raf add --parent <lot> "…"` line per finding worth doing. A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.
 - For any redesign, a **described mockup** (layout, hierarchy, what moves where) to be approved before
   anyone codes it.
 

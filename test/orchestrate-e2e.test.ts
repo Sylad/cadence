@@ -66,6 +66,9 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const base = join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1');
     expect(JSON.parse(readFileSync(join(base, '1-implement.json'), 'utf8')).tokens.counted).toBe(115);
     expect(git(s.dir, 'status', '--porcelain')).toBe('');
+    // L61 : la vague a tourné depuis son instantané (copie du paquet dans le dossier de la vague)
+    expect(existsSync(join(base, '../tool/bin/cadence.js'))).toBe(true);
+    expect(existsSync(join(base, '../tool/dist/orchestrate/snapshot.js'))).toBe(true);
   });
 
   it('sortie illisible : lot en échec, code 1 ; pas de nouvel essai', async () => {
@@ -221,7 +224,10 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     mkdirSync(logs, { recursive: true });
     writeFileSync(join(logs, `${sid}.jsonl`), JSON.stringify({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 10, cache_creation_input_tokens: 100, cache_read_input_tokens: 7, output_tokens: 5 } } }));
     writeFileSync(join(logs, 'autre-conversation.jsonl'), JSON.stringify({ type: 'assistant', message: { id: 'z', usage: { input_tokens: 9_999_999, output_tokens: 1 } } }));
-    expect(liveWaves(cadenceHome()).map((w) => w.pid)).toEqual([child.pid]);
+    // L61 : le processus de la vague est le fils relancé depuis l'instantané ; le processus lancé le surveille.
+    const worker = liveWaves(cadenceHome()).map((w) => w.pid);
+    expect(worker).toHaveLength(1);
+    expect(worker[0]).not.toBe(child.pid);
     expect(existsSync(join(s.dir, '.git/cadence/orchestrate.lock'))).toBe(true);
 
     child.kill(signal);
@@ -240,5 +246,6 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(existsSync(join(s.dir, '.git/cadence/orchestrate.lock'))).toBe(false);
     expect(existsSync(join(s.dir, '.git/hooks/pre-push'))).toBe(false);
     expect(() => process.kill(pid, 0)).toThrow(); // la session est morte
+    expect(() => process.kill(worker[0], 0)).toThrow(); // et le processus de la vague aussi
   }, 20_000);
 });

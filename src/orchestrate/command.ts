@@ -20,6 +20,7 @@ import { schemaFor } from './schemas.js';
 import { excludeState, lotKey, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
+import { PACKAGE_ROOT, RESERVED_ENV, SNAPSHOT_ENV, snapshotExists, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -40,6 +41,11 @@ export interface OrchestrateDeps {
   claudeHome?: string;
   /** Création du dossier de liens Node d'une vague ; défaut `linkNodeBin` (injectable pour simuler un échec). */
   linkNode?: typeof linkNodeBin;
+  /**
+   * Instantané d'une vague (L61) : au vrai lancement, le paquet est copié dans `<vague>/tool/` et le processus se relance
+   * depuis cette copie. Absent (tests, processus déjà relancé) : la vague tourne sur le paquet courant, sans copie.
+   */
+  snapshot?: SnapshotDeps;
 }
 
 export const DEFAULT_BUDGET = 2_000_000;
@@ -338,7 +344,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     for (const line of renderTable(store.readWave()!, store.lots())) io.out(line);
     return 0;
   }
-  if (args.resume !== undefined) return resume(args, io, deps, launch, today);
+  if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
 
   if (args.lots.length === 0) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] | --status [vague] | --resume [vague] [--answer projet:lot "réponse"]');
   const refusals: string[] = [];
@@ -357,8 +363,21 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     dryRun(pre.lots, io, deps, budget, id);
     return 0;
   }
-  const store = RunStore.reserve(launch, args.wave ?? defaultWaveBase(io), { exact: args.wave !== undefined });
+  // Processus relancé depuis l'instantané : la vague a déjà été réservée par le processus d'origine.
+  const reserved = io.env[RESERVED_ENV];
+  const store = reserved ? new RunStore(launch, reserved) : RunStore.reserve(launch, args.wave ?? defaultWaveBase(io), { exact: args.wave !== undefined });
   if (!store) return waveExists(args.wave!, io);
+  if (deps.snapshot && !io.env[SNAPSHOT_ENV]) {
+    try {
+      const tool = takeSnapshot(store.dir, deps.snapshot.packageRoot);
+      const code = await deps.snapshot.reexec(tool, argv, { ...io.env, [RESERVED_ENV]: store.id }, io);
+      if (!existsSync(join(store.dir, 'wave.json'))) rmSync(store.dir, { recursive: true, force: true });
+      return code;
+    } catch (e) {
+      rmSync(store.dir, { recursive: true, force: true });
+      throw e;
+    }
+  }
   const id = store.id;
   const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)) };
   // Une vague qui n'a pas atteint `wave.json` (refus au verrou, démarrage en échec) ne laisse pas son dossier réservé :
@@ -511,9 +530,14 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   return all.every((l) => l.status === 'ready') ? 0 : 1;
 }
 
-async function resume(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string, today: Day): Promise<number> {
+async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, today: Day): Promise<number> {
   const store = typeof args.resume === 'string' ? RunStore.find(launch, args.resume) : RunStore.last(launch, { unfinished: true });
   if (!store) throw new RafError(typeof args.resume === 'string' ? `vague inconnue : ${args.resume}` : 'aucune vague à reprendre dans ce dossier');
+  if (deps.snapshot && !io.env[SNAPSHOT_ENV]) {
+    // La reprise tourne sur l'instantané de la vague, jamais sur le dist/ courant ; une vague d'avant L61 n'en a pas.
+    if (snapshotExists(store.dir)) return deps.snapshot.reexec(toolDirOf(store.dir), argv, io.env, io);
+    io.err(`orchestrate : vague ${store.id} sans instantané (antérieure à L61) : reprise avec le dist/ et les gabarits courants`);
+  }
   const wave = store.readWave()!;
   const refusals: string[] = [];
   const info = deps.claudeInfo();
@@ -608,6 +632,7 @@ export function realOrchestrateDeps(env: NodeJS.ProcessEnv): OrchestrateDeps {
       }
     },
     agentsDir: AGENTS_DIR,
+    snapshot: env[SNAPSHOT_ENV] ? undefined : { packageRoot: PACKAGE_ROOT, reexec: spawnReexec },
     claudeHome: env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'),
   };
 }

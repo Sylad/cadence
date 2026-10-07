@@ -12,7 +12,7 @@ import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
-import { Budget, MAX_PASSES, countInterrupted, type LotCtx, type WaveCtx } from './cycle.js';
+import { Budget, MAX_PASSES, countInterrupted, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -272,7 +272,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted}${skipped})`);
     }
     const steps: { kind: 'precheck' | 'implement' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: 'implement', model: l.model }];
-    if (env.config.precheck) steps.unshift({ kind: 'precheck', model: 'sonnet' });
+    if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot)) steps.unshift({ kind: 'precheck', model: 'sonnet' });
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: 'opus' });
     else {
       if (l.visible && env.config.ux) steps.push({ kind: 'ux', model: 'opus' });

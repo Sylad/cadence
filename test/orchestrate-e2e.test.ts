@@ -233,6 +233,20 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     }
   });
 
+  it('--dry-run : un lot qui a déjà des commits n\'a pas d\'étape precheck (comme la vraie vague)', async () => {
+    const on = setup({}, { precheck: true });
+    writeFileSync(join(on.dir, 'a.txt'), 'x');
+    git(on.dir, 'add', 'a.txt');
+    git(on.dir, 'commit', '-q', '-m', 'feat(L1): déjà commencé');
+    const r = await on.cli('proj:L1', '--dry-run');
+    try {
+      expect(r.out).toContain('étapes : implement (sonnet) → review (opus)');
+      expect(r.out).not.toContain('precheck');
+    } finally {
+      removeDryRunBriefs(r.out);
+    }
+  });
+
   // L3/t12 : vrai processus, vrai signal.
   it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)('%s : sessions tuées, étapes et vague interrompues, verrous et hook retirés', async (signal) => {
     const s = setup({ implement: [{ ...impl, sleepMs: 60_000 }] });

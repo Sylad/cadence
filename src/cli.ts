@@ -41,6 +41,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf ux <id> "verdict" enregistre la revue d'ergonomie du lot (agent ux-reviewer)
   raf review enable     revue de code obligatoire avant « done » pour les lots qui ont des commits
   raf review <id> "verdict" enregistre la revue de code du lot (agent code-reviewer)
+  raf show <id> [--notes]   le lot en entier : statut, dates, after, titre public, notes datées, commits comptés ; --notes : les notes seules
   raf commits <id>      les commits du lot que compte la porte de revue de code, du plus ancien au plus récent
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf list [--status todo|doing|done|dropped]
@@ -127,6 +128,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       sha: { type: 'string' },
       retry: { type: 'string' },
       clear: { type: 'boolean' },
+      notes: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -233,11 +235,32 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       need(1, 'commits <lot>');
       const plan = loadPlan();
       const id = rest[0];
-      if (!plan.lots().some((l) => l.id === id)) {
-        throw new RafError(id.includes('/') ? `les commits se listent par lot, pas par sous-tâche : ${id}` : `lot inconnu : ${id}`);
-      }
+      knownLot(plan, id, 'les commits se listent par lot, pas par sous-tâche');
       // Une lecture : le même ensemble que « raf done » et « raf check », plan en lecture seule compris.
       for (const c of lotWork(plan, root, id).reverse()) io.out(short(c));
+      return 0;
+    }
+    case 'show': {
+      need(1, 'show <lot> [--notes]');
+      const plan = loadPlan();
+      const lot = knownLot(plan, rest[0], 'show se lit par lot, pas par sous-tâche');
+      const notes = lot.notes.map((n) => `${n.date}  ${n.text}`);
+      if (values.notes) {
+        for (const n of notes) io.out(n);
+        return 0;
+      }
+      io.out(`${lot.id}  ${lot.status}  ${lot.title}`);
+      const dates = [['créé', lot.created], ['démarré', lot.started], ['terminé', lot.finished]].filter(([, d]) => d);
+      if (dates.length) io.out(dates.map(([k, d]) => `${k} : ${d}`).join('  '));
+      if (lot.after.length) io.out(`after : ${lot.after.join(', ')}`);
+      if (lot.public) io.out(`public : ${lot.public}`);
+      if (notes.length) {
+        io.out('notes :');
+        for (const n of notes) io.out(`  ${n}`);
+      }
+      const commits = lotWork(plan, root, lot.id).reverse();
+      io.out(`commits (${commits.length}) :`);
+      for (const c of commits) io.out(`  ${short(c)}`);
       return 0;
     }
     case 'list': {
@@ -360,6 +383,12 @@ function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, ro
   else plan.recordReview(rest[0], verdict, today, plan.readonly ? null : (lotWork(plan, root, rest[0])[0]?.sha ?? null));
   plan.save();
   return 0;
+}
+
+function knownLot(plan: Plan, id: string, subtask: string): Lot {
+  const lot = plan.lots().find((l) => l.id === id);
+  if (!lot) throw new RafError(id.includes('/') ? `${subtask} : ${id}` : `lot inconnu : ${id}`);
+  return lot;
 }
 
 function describe(l: Lot, commits: number): string {

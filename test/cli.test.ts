@@ -254,3 +254,50 @@ describe('(L94) --config hors du dépôt, qa.expectations absolu dans le dépôt
     expect(env.loadPlan().qaExpectations).toBe('docs/quality/pages.md');
   });
 });
+
+describe('raf show', () => {
+  function planAvecLot() {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'Base');
+    raf(dir, 'add', 'Titre technique', '--public', 'Une nouveauté', '--after', 'L1');
+    raf(dir, 'start', 'L2');
+    raf(dir, 'note', 'L2', 'première', 'note');
+    raf(dir, 'note', 'L2', 'seconde note');
+    commit(dir, 'feat(L2): premier', '2026-09-28T10:00:00');
+    commit(dir, 'feat(L2): second', '2026-09-28T11:00:00');
+    return dir;
+  }
+
+  it('affiche identifiant, statut, dates, after, titre public, notes dans l\'ordre, puis les commits comptés', () => {
+    const dir = planAvecLot();
+    const r = raf(dir, 'show', 'L2');
+    expect(r.code).toBe(0);
+    const lignes = r.out.split('\n');
+    expect(lignes[0]).toBe('L2  doing  Titre technique');
+    expect(r.out).toContain('after : L1');
+    expect(r.out).toContain('public : Une nouveauté');
+    expect(r.out).toContain('créé : 2026-09-28');
+    expect(r.out).toContain('démarré : 2026-09-28');
+    expect(r.out.indexOf('première note')).toBeGreaterThan(-1);
+    expect(r.out.indexOf('première note')).toBeLessThan(r.out.indexOf('seconde note'));
+    expect(r.out).toContain('2026-09-28  première note');
+    expect(r.out).toContain('commits (2)');
+    expect(r.out.indexOf('feat(L2): premier')).toBeLessThan(r.out.indexOf('feat(L2): second'));
+    expect(r.out.indexOf('seconde note')).toBeLessThan(r.out.indexOf('commits (2)'));
+  });
+
+  it('--notes n\'affiche que les notes, une par ligne', () => {
+    const dir = planAvecLot();
+    const r = raf(dir, 'show', 'L2', '--notes');
+    expect(r.code).toBe(0);
+    expect(r.out).toBe('2026-09-28  première note\n2026-09-28  seconde note');
+  });
+
+  it('refuse un lot inconnu et une sous-tâche', () => {
+    const dir = planAvecLot();
+    expect(raf(dir, 'show', 'L9').err).toContain('lot inconnu');
+    expect(raf(dir, 'show', 'L2/t1').code).not.toBe(0);
+    expect(raf(dir, 'show').code).not.toBe(0);
+  });
+});

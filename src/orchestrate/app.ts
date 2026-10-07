@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { closeSync, openSync, readFileSync, rmSync, statSync, writeSync } from 'node:fs';
+import { closeSync, linkSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pidAlive } from '../state.js';
@@ -74,28 +74,53 @@ export function uxLockFile(url: string): string {
   return join(tmpdir(), `cadence-ux-${u.hostname.replace(/[^\w.-]/g, '_')}-${port}.lock`);
 }
 
-/** Création exclusive du verrou (contenu : notre pid). Un verrou d'un pid mort est repris. Faux quand un processus vivant le tient. */
-function takeUrlLock(file: string): boolean {
+/** Contenu du verrou : un pid, ou null quand le fichier est vide, illisible, ou rendu entre-temps. */
+function readUrlLock(file: string): { text: string; age: number } | null {
+  try {
+    return { text: readFileSync(file, 'utf8').trim(), age: Date.now() - statSync(file).mtimeMs };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pose du verrou : lien vers un fichier complet (le verrou n'existe jamais à moitié écrit, comme `writeLock` de state.ts).
+ * Un verrou d'un pid mort est écarté par renommage, puis retiré seulement s'il est encore celui qu'on a lu — sinon
+ * il est rendu à son nouveau porteur (comme `removeStaleLock`) : deux vagues ne se volent pas le verrou.
+ * Faux quand un processus vivant le tient. `pid` : celui du porteur (le nôtre, sauf test).
+ */
+export function takeUrlLock(file: string, pid = process.pid): boolean {
   for (let attempt = 0; attempt < 3; attempt++) {
+    const tmp = `${file}.${pid}.${Date.now()}.${attempt}.tmp`;
+    writeFileSync(tmp, String(pid));
     try {
-      const fd = openSync(file, 'wx');
-      writeSync(fd, String(process.pid));
-      closeSync(fd);
+      linkSync(tmp, file);
       return true;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+    } finally {
+      rmSync(tmp, { force: true });
     }
-    let text: string;
-    let age: number;
+    const seen = readUrlLock(file);
+    if (!seen) continue; // rendu entre-temps
+    // Un fichier vide est un verrou posé par une version qui l'écrivait en deux temps : on ne le vole qu'au bout de 5 s.
+    if (seen.text === '' ? seen.age < 5_000 : pidAlive(Number(seen.text))) return false;
+    const aside = `${file}.stale.${process.pid}`;
     try {
-      text = readFileSync(file, 'utf8').trim();
-      age = Date.now() - statSync(file).mtimeMs;
+      renameSync(file, aside);
     } catch {
-      continue; // rendu entre-temps
+      continue;
     }
-    // Un fichier vide est un verrou en cours de pose : on ne le vole qu'au bout de 5 s (pose interrompue).
-    if (text === '' ? age < 5_000 : pidAlive(Number(text))) return false;
-    rmSync(file, { force: true });
+    if (readUrlLock(aside)?.text === seen.text) {
+      rmSync(aside, { force: true });
+    } else {
+      try {
+        linkSync(aside, file); // un autre l'a pris entre la lecture et le renommage : le lui rendre
+      } catch {
+        // repris par un tiers : le sien fait foi
+      }
+      rmSync(aside, { force: true });
+    }
   }
   return false;
 }

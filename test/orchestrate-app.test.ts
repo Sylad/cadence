@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
-import { join } from 'node:path';
-import { startApp, uxLockFile } from '../src/orchestrate/app.js';
+import { basename, dirname, join } from 'node:path';
+import { startApp, takeUrlLock, uxLockFile } from '../src/orchestrate/app.js';
 import { fakeApp } from './fake-app.js';
 
 const setup = fakeApp;
@@ -148,6 +148,20 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
     expect(app.state).toEqual({ kind: 'ready' });
     expect(readFileSync(uxLockFile(t.url), 'utf8').trim()).toBe(String(process.pid));
     await app.stop();
+  });
+
+  it('reprise d\'un verrou périmé : atomique, un seul porteur, rien ne traîne', async () => {
+    const t = await fakeApp(0);
+    const lock = uxLockFile(t.url);
+    const gone = spawnSync('true').pid as number;
+    writeFileSync(lock, String(gone));
+    expect(takeUrlLock(lock, process.ppid)).toBe(true);
+    expect(readFileSync(lock, 'utf8')).toBe(String(process.ppid));
+    expect(takeUrlLock(lock, process.pid)).toBe(false); // le porteur vit : le verrou reste à lui
+    expect(readFileSync(lock, 'utf8')).toBe(String(process.ppid));
+    const leftovers = readdirSync(dirname(lock)).filter((f) => f.startsWith(basename(lock) + '.'));
+    expect(leftovers).toEqual([]);
+    rmSync(lock, { force: true });
   });
 
   it('même URL, deux lots : le second attend l\'arrêt du premier, sans rien lancer, puis démarre', async () => {

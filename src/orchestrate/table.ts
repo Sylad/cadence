@@ -25,7 +25,7 @@ function review(l: LotState): string {
   // un verdict de revue comme la cause ; elle donne le dernier verdict réel, la cause est dans les lignes sous le tableau.
   const stopped = l.status === 'handed-back' || l.status === 'failed' || l.status === 'suspended' || l.status === 'question';
   const last = l.steps[l.steps.length - 1];
-  const byReview = !l.code.conforme && !!last && (last.kind === 'review' || last.kind === 'review-small');
+  const byReview = !l.code.conforme && !!last && last.status === 'ok' && (last.kind === 'review' || last.kind === 'review-small');
   if (stopped && !byReview) return `${verdict} (dernier verdict ; rendu pour une autre cause)`;
   return verdict;
 }

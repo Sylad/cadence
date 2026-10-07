@@ -53,7 +53,7 @@ describe('renderTable : captures UX (L74)', () => {
 });
 
 describe('renderTable : colonne revue (L51)', () => {
-  const step = (kind: StepKind): StepState => ({ n: 1, kind, model: 'sonnet', status: 'ok', started: '2026-10-04T10:00:00Z' });
+  const step = (kind: StepKind, status: StepState['status'] = 'ok'): StepState => ({ n: 1, kind, model: 'sonnet', status, started: '2026-10-04T10:00:00Z' });
   const summary = (over: Partial<ReviewSummary>): ReviewSummary => ({ conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: 'v', sousTaches: [], nonVerifie: [], head: 'abc', ...over });
   const cell = (l: LotState) => renderTable(wave, [l])[1];
 
@@ -82,5 +82,16 @@ describe('renderTable : colonne revue (L51)', () => {
     l.steps = [step('implement'), step('review'), step('fix'), step('review')];
     expect(cell(l)).toContain('non conforme (0 bloquant, 2 majeur)');
     expect(cell(l)).not.toContain('autre cause');
+  });
+
+  it.each([
+    ['failed', 'failed'],
+    ['interrupted', 'suspended'],
+  ] as const)('dernière étape de revue %s (lot %s) : autre cause, pas un verdict de revue', (stepStatus, lotStatus) => {
+    const l = lot();
+    l.status = lotStatus;
+    l.code = summary({ conforme: false, bloquants: 1 });
+    l.steps = [step('implement'), step('review'), step('fix'), step('review', stepStatus)];
+    expect(cell(l)).toContain('(dernier verdict ; rendu pour une autre cause)');
   });
 });

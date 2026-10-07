@@ -265,6 +265,25 @@ describe('petit lot', () => {
     expect(h.calls[1].brief).toContain('single pass');
     expect(c.lot.status).toBe('ready');
   });
+
+  it('petit lot visible : review-small charge Playwright (captures dans la vague), son brief donne les noms relatifs ; petit lot sans écran : revue de code sans MCP (L74/t4)', async () => {
+    const h = harness({ lots: [{ title: 'petit', estimate: 0.5, visible: true }], script: { implement: [impl()], 'review-small': [ok] } });
+    const c = h.lot('L1', { small: true, visible: true }, { ux: { url: 'http://localhost:4200' } });
+    await runLot(c);
+    const lotDir = join(h.store.dir, 'demo--L1');
+    expect(Object.keys(JSON.parse(readFileSync(join(lotDir, 'mcp-review-small.json'), 'utf8')).mcpServers)).toEqual(['playwright']);
+    expect(c.lot.uxCaptures).toBe(join(lotDir, 'playwright'));
+    const brief = h.calls.find((x) => x.kind === 'review-small')!.brief;
+    expect(brief).toContain('relative file name');
+    expect(brief).not.toContain('no browser MCP server is loaded');
+    expect(brief).not.toMatch(/tmp folder|shared tmp/i);
+    const h2 = harness({ lots: [{ title: 'petit', estimate: 0.5 }], script: { implement: [impl()], review: [ok] } });
+    const c2 = h2.lot('L1', { small: true, visible: false });
+    await runLot(c2);
+    expect(kinds(h2)).toEqual(['implement', 'review']);
+    expect(JSON.parse(readFileSync(join(h2.store.dir, 'demo--L1', 'mcp-review.json'), 'utf8')).mcpServers).toEqual({});
+    expect(c2.lot.uxCaptures).toBeUndefined();
+  });
 });
 
 describe('contrôles autour des sessions', () => {

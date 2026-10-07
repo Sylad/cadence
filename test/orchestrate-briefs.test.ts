@@ -66,11 +66,9 @@ describe('gabarits', () => {
       expect(out, kind).not.toContain('.playwright-mcp'); // les sorties ne tombent plus dans le dépôt
       expect(out, kind).toContain('do not install or start one');
       expect(out, kind).toContain('never inside the repository');
-      if (kind === 'review-small') expect(out, kind).toContain('no browser MCP server is loaded');
-      else {
-        expect(out, kind).toContain('relative file name');
-        expect(out, kind).toContain("run directory outside the repository");
-      }
+      expect(out, kind).toContain('relative file name');
+      expect(out, kind).toContain("run directory outside the repository");
+      expect(out, kind).not.toContain('no browser MCP server is loaded');
       // --output-dir est un argument de lancement du serveur MCP et /tmp est refusé hors racines autorisées : ni l'un ni l'autre ne se prescrit.
       expect(out, kind).not.toContain('--output-dir /tmp');
       expect(out, kind).not.toMatch(/pass `?--output-dir/);

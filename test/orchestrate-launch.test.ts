@@ -106,7 +106,11 @@ describe('MCP minimaux par étape', () => {
     const pw = { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', '/run/p--L1/playwright'] } };
     for (const k of ['implement', 'fix', 'ux'] as const) expect(mcpServersFor(k, true, '/run/p--L1/playwright'), k).toEqual(pw);
     for (const k of ['implement', 'fix', 'review', 'review-small'] as const) expect(mcpServersFor(k, false, '/run/p--L1/playwright'), `${k} sans écran`).toEqual({});
-    for (const k of ['review', 'review-small'] as const) expect(mcpServersFor(k, true, '/run/p--L1/playwright'), `${k} visible`).toEqual({});
+    expect(mcpServersFor('review', true, '/run/p--L1/playwright'), 'review visible').toEqual({});
+    expect(mcpServersFor('review', true, '/run/p--L1/playwright', true), 'review visible petit').toEqual({});
+    expect(mcpServersFor('review-small', true, '/run/p--L1/playwright'), 'review-small visible hors petit lot (passe des mineurs)').toEqual({});
+    expect(mcpServersFor('review-small', false, '/run/p--L1/playwright', true), 'review-small petit sans écran').toEqual({});
+    expect(mcpServersFor('review-small', true, '/run/p--L1/playwright', true), 'review-small petit visible : seule revue d\'ergonomie du lot (L74/t4)').toEqual(pw);
   });
 
   it('writeMcpConfig écrit {"mcpServers":…} dans le dossier du lot et rend son chemin absolu ; le dossier playwright/ n\'existe que si le serveur est chargé', () => {

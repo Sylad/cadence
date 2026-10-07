@@ -773,14 +773,15 @@ version and the folder searched — there is no silent fallback to the default N
 <file>`, with the file written by the orchestrator in the lot's folder of the wave
 (`.cadence/runs/<wave>/<project>--<lot>/mcp-<step>.json`). `--strict-mcp-config` makes `claude` ignore every other
 source (user, project, plugin servers: Serena, context7, Cloudflare…), so a session no longer starts a handful of
-`npx`/`uvx` servers it does not use. `review`, `review-small` and `review-recheck` always get an empty set
+`npx`/`uvx` servers it does not use. `review` and `review-recheck` always get an empty set
 (`{"mcpServers":{}}`); so do `implement`, `fix` and `fix-minors` on a lot without a screen. Playwright, launched as
 `npx -y @playwright/mcp@latest --output-dir <wave>/<project>--<lot>/playwright`, is loaded for the `ux` step and, on a
-`visible` lot, for `implement` and `fix` (`fix-minors` included), so the screenshots and snapshots of the work and of
+`visible` lot, for `implement` and `fix` (`fix-minors` included) and, on a small `visible` lot, for `review-small` (its only
+usability review; `review-small` of a small lot without a screen loads nothing), so the screenshots and snapshots of the work and of
 the review stay with the wave, outside the repository, where the lead can look at them; the final table prints that
 folder whenever Playwright was loaded for the lot, even if no `ux` step ran
 (`<project>:<lot> — captures Playwright : <dir>`; `uxCaptures` in the wave state). The `implement`, `fix`,
-`fix-minors` and `ux` briefs tell the session to give relative file names if a Playwright server is available, and
+`fix-minors`, `review-small` and `ux` briefs tell the session to give relative file names if a Playwright server is available, and
 otherwise to keep any Playwright CLI output outside the repository.
 `--dry-run` prints, under each step, `mcp : aucun` or `mcp : playwright (…)`. There is no per-project override in
 `cadence.yaml` yet.

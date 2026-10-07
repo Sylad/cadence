@@ -189,7 +189,7 @@ function constatLines(constats: Constat[]): string {
 
 /** Consigne de captures : celle de l'étape qui la reçoit (serveur Playwright de la vague chargé ou non), jamais l'autre. */
 function shotsText(c: LotCtx, kind: StepKind): string {
-  if (mcpServersFor(kind, c.lot.visible, '').playwright) {
+  if (mcpServersFor(kind, c.lot.visible, '', c.lot.small).playwright) {
     return 'Take screenshots at 1440 and 390 px width, each with a relative file name only (e.g. `home-1440px.png`): they land in the wave\'s capture directory, outside the repository.';
   }
   return 'Take screenshots at 1440 and 390 px width with the Playwright CLI, writing them outside the repository (the OS temp directory, or the temporary folder the project\'s CLAUDE.md names).';
@@ -278,8 +278,8 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
     step.cause = (e as Error).message;
     return stop(c, 'failed', `brief de ${kind} : ${(e as Error).message}`);
   }
-  const mcpConfig = writeMcpConfig(w.store.lotDir(l.project, l.lot), kind, l.visible);
-  if (mcpServersFor(kind, l.visible, '').playwright) l.uxCaptures = join(dirname(mcpConfig), 'playwright');
+  const mcpConfig = writeMcpConfig(w.store.lotDir(l.project, l.lot), kind, l.visible, l.small);
+  if (mcpServersFor(kind, l.visible, '', l.small).playwright) l.uxCaptures = join(dirname(mcpConfig), 'playwright');
   l.pendingAnswer = null; // la réponse est dans le brief : elle ne repart pas avec la session suivante
   const outcome = await runSession(
     {

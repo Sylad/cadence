@@ -1150,12 +1150,13 @@ lots:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #4 » dans son corps (issue GitHub)." }
   - id: L105
     title: "session close sans session.clean : une ligne « aucun motif de nettoyage déclaré » avec un exemple de session.clean (chemins relatifs ou absolus, âge minimal), une fois par clôture (issue #5)"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #5 » dans son corps (issue GitHub)." }
+    started: 2026-10-07
   - id: L106
     title: "Titre public trop long attrapé avant le push : raf public / raf done / cadence news refusent (ou raf check signale) un titre public au-delà de la limite que la page Plan du site applique au build (80 car. sur ccc, parsePublicPlan) — vécu 07-10 : ccc L32, titre de la Nouveauté repris (88 car.), build Cloudflare Pages rouge, livraison rouge après 600 s ; le build local lancé avant raf done ne l'avait pas vu"
     status: todo

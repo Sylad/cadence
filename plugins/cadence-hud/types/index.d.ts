@@ -22,6 +22,7 @@ export type WaveStep = {
 export type WaveLot = {
   project: string
   lot: string
+  title: string
   status: string
   pass: number
   model: string

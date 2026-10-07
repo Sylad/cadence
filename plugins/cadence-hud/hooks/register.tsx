@@ -170,7 +170,8 @@ export const register: Register = on => {
       })
       const lotWidth = Math.max(0, ...cells.map(c => c.label.length))
       const statusWidth = Math.max(0, ...cells.map(c => c.status.length), queued.length > 0 ? 'en attente'.length : 0)
-      const detailWidth = width - 2 - lotWidth - 2 - statusWidth - 2
+      const detailWidth = Math.max(0, ...cells.map(c => c.detail.length))
+      const titleWidth = width - 2 - lotWidth - 2 - statusWidth - 2 - (detailWidth > 0 ? detailWidth + 2 : 0)
 
       return (
         <Box key={`wave-${wave.id}`} flexDirection="column">
@@ -205,9 +206,13 @@ export const register: Register = on => {
                 {pad(c.status, statusWidth)}
               </Text>
               <Text>{'  '}</Text>
-              <Text dimColor={c.lot.status !== 'question'} color={c.lot.status === 'question' ? 'warning' : undefined}>
-                {fit(c.detail, detailWidth)}
-              </Text>
+              {detailWidth > 0 && (
+                <Text dimColor={c.lot.status !== 'question'} color={c.lot.status === 'question' ? 'warning' : undefined}>
+                  {pad(c.detail, detailWidth)}
+                </Text>
+              )}
+              {detailWidth > 0 && <Text>{'  '}</Text>}
+              <Text color="subtle">{fit(c.lot.title, titleWidth)}</Text>
             </Box>
           ))}
           {queued.length > 0 && (

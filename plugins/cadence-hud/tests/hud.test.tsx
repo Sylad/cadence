@@ -24,6 +24,7 @@ const WAVE: Wave = {
     {
       project: 'cadence',
       lot: 'L75',
+      title: 'raf show aligne les lignes suivantes d’une note',
       status: 'fixing',
       pass: 0,
       model: 'sonnet',
@@ -31,7 +32,7 @@ const WAVE: Wave = {
       steps: 3,
       step: { kind: 'fix', model: 'sonnet', started: '2026-10-07T19:11:11.066Z', pid: 2, alive: true, sub: 0 },
     },
-    { project: 'cadence', lot: 'L110', status: 'queued', pass: 0, model: 'sonnet', next: null, steps: 0, step: null },
+    { project: 'cadence', lot: 'L110', title: 'un lot en attente', status: 'queued', pass: 0, model: 'sonnet', next: null, steps: 0, step: null },
   ],
 }
 
@@ -111,6 +112,8 @@ test('la bande dessine le contexte et la vague sur chaque surface', async ($, on
     expect(await ui.find({ type: 'Text', text: /^L75$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^corrige\s*$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /fix@sonnet 3 min/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /raf show aligne les lignes/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /un lot en attente/ })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: /^en attente$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^L110$/ })).toBeDefined()
     await ui.unmount()

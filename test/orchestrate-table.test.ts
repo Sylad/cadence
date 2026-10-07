@@ -53,7 +53,7 @@ describe('renderTable : captures UX (L74)', () => {
 });
 
 describe('renderTable : colonne revue (L51)', () => {
-  const step = (kind: StepKind): StepState => ({ n: 1, kind, model: 'sonnet', status: 'done', started: '2026-10-04T10:00:00Z' });
+  const step = (kind: StepKind): StepState => ({ n: 1, kind, model: 'sonnet', status: 'ok', started: '2026-10-04T10:00:00Z' });
   const summary = (over: Partial<ReviewSummary>): ReviewSummary => ({ conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: 'v', sousTaches: [], nonVerifie: [], head: 'abc', ...over });
   const cell = (l: LotState) => renderTable(wave, [l])[1];
 

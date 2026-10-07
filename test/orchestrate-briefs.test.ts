@@ -59,12 +59,18 @@ describe('gabarits', () => {
     expect(out).toContain('http://localhost:4200');
   });
 
-  it('les briefs qui peuvent ouvrir un navigateur donnent une consigne Playwright applicable (noms relatifs, .playwright-mcp/)', () => {
+  it('les briefs qui peuvent ouvrir un navigateur donnent une consigne Playwright vraie dans les deux cas (MCP de la vague, ou CLI hors du dépôt) (L74)', () => {
     for (const kind of ['implement', 'fix', 'fix-minors', 'review-small'] as const) {
       const out = renderBrief(kind, vars);
       expect(out, kind).toContain('Playwright');
-      expect(out, kind).toContain('relative file name');
-      expect(out, kind).toContain('.playwright-mcp/');
+      expect(out, kind).not.toContain('.playwright-mcp'); // les sorties ne tombent plus dans le dépôt
+      expect(out, kind).toContain('do not install or start one');
+      expect(out, kind).toContain('never inside the repository');
+      if (kind === 'review-small') expect(out, kind).toContain('no browser MCP server is loaded');
+      else {
+        expect(out, kind).toContain('relative file name');
+        expect(out, kind).toContain("run directory outside the repository");
+      }
       // --output-dir est un argument de lancement du serveur MCP et /tmp est refusé hors racines autorisées : ni l'un ni l'autre ne se prescrit.
       expect(out, kind).not.toContain('--output-dir /tmp');
       expect(out, kind).not.toMatch(/pass `?--output-dir/);

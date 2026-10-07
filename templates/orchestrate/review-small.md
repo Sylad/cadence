@@ -9,4 +9,4 @@ Give your report as the structured output: counts of blocking / major / minor fi
 findings included, each tied to a named rule — Nielsen heuristic or WCAG 2.2 AA criterion — or a
 measurement), each finding (severity, file, line, text), proposed sub-tasks, what you could not
 verify, and the one-line verdict for `raf review {{lot}}`.
-Playwright (browser MCP or CLI): give screenshots, snapshots and traces a relative file name only (e.g. `page-home.png`); they land under `.playwright-mcp/`, which is ignored by git. Never an absolute path such as one under `/tmp`, never the `--output-dir` option (the server's launch argument, which a session cannot set), and never write browser outputs anywhere else in the tree; the repository must stay clean.
+Browser (Playwright): no browser MCP server is loaded in this session; do not install or start one. If you use the Playwright CLI, write its outputs under the OS temp directory (or the temporary folder the project's CLAUDE.md names), never inside the repository, which must stay clean.

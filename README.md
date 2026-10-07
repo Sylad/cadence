@@ -769,6 +769,18 @@ version and the folder searched — there is no silent fallback to the default N
 `node : v22.22.3 (.nvmrc 22)` under each lot that has one, with the skipped versions when it happens
 (`node : v22.9.0 (.nvmrc 22 ; v22.22.3 écartée : pas de node exécutable)`).
 
+**Minimal MCP servers per step**: every session the orchestrator launches gets `--strict-mcp-config --mcp-config
+<file>`, with the file written by the orchestrator in the lot's folder of the wave
+(`.cadence/runs/<wave>/<project>--<lot>/mcp-<step>.json`). `--strict-mcp-config` makes `claude` ignore every other
+source (user, project, plugin servers: Serena, context7, Cloudflare…), so a session no longer starts a handful of
+`npx`/`uvx` servers it does not use. `implement`, `fix`, `fix-minors`, `review` and `review-small` get an empty set
+(`{"mcpServers":{}}`); only the `ux` step gets Playwright, launched as
+`npx -y @playwright/mcp@latest --output-dir <wave>/<project>--<lot>/playwright`, so the screenshots and snapshots of
+the review stay with the wave, outside the repository, where the lead can look at them; the final table prints that
+folder (`<project>:<lot> — captures UX : <dir>`). The `ux` brief tells the session to give relative file names.
+`--dry-run` prints, under each step, `mcp : aucun` or `mcp : playwright (…)`. There is no per-project override in
+`cadence.yaml` yet.
+
 Without `start`, a read-only plan's `todo` lot is refused (start it with the project's tool); without
 `verdict`, the review verdict stays in the wave's state and you report it. Only the plan's files
 (`plan.path`, `plan.files`, the QA expectations file) are committed from those commands; anything else dirty stops the lot (`.cadence/` and `.playwright-mcp/` excepted, as above).

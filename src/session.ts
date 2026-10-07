@@ -183,6 +183,10 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
     }
   }
 
+  else {
+    out(`\n(aucun motif de nettoyage déclaré — exemple de session.clean, dans cadence.yaml : session: { clean: [ "tmp/*", "~/partage/capture-*.png" ], cleanDays: 7 } ; chemins relatifs à la racine ou absolus, cleanDays = âge minimal en jours)`);
+  }
+
   const open = issues.length + repo.open + (lock?.live ? 1 : 0);
   out(open === 0 ? '\n✓ prêt à fermer' : `\n✗ pas fermé : ${open} point(s)`);
   return open === 0 ? 0 : 1;

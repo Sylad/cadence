@@ -174,7 +174,7 @@ describe('faits propres au projet (L2)', () => {
     expect(start.code).toBe(0);
     expect(start.out).toMatch(/Faits propres au projet\n  équipe du lot — depuis 2026-09-27\n[\s\S]*Propositions/);
     const close = await cad(dir, 'session', 'close');
-    expect(close.out).toMatch(/Faits propres au projet\n  fiche du jour absente\n  ✗ commande en échec \(code 3\)\n\n✓ prêt à fermer/);
+    expect(close.out).toMatch(/Faits propres au projet\n  fiche du jour absente\n  ✗ commande en échec \(code 3\)\n\n\(aucun motif[^\n]*\n\n✓ prêt à fermer/);
     // Des faits en plus, pas une condition : l'échec de la commande du projet ne change pas le verdict.
     expect(close.code).toBe(0);
   });
@@ -345,6 +345,22 @@ describe('nettoyage en routine de clôture (L4)', () => {
     } finally {
       chmodSync(join(shared, 'ferme'), 0o755);
     }
+  });
+
+  it('sans session.clean : une seule ligne d’indice avec un exemple, sans bloquer la clôture', async () => {
+    const dir = await closedProject();
+    const { code, out } = await cadLate(dir, 'session', 'close');
+    const lines = out.split('\n').filter((l) => l.includes('aucun motif de nettoyage déclaré'));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('session.clean');
+    expect(lines[0]).toContain('cleanDays');
+    expect(lines[0]).toMatch(/tmp\/\*/);
+    expect(lines[0]).toMatch(/~\//);
+    expect(code).toBe(0);
+    expect(out).toMatch(READY);
+    // Un motif déclaré (même vide de périmés) supprime l'indice.
+    configure(dir, 'session:\n  clean: [ "tmp/*" ]\n');
+    expect((await cadLate(dir, 'session', 'close')).out).not.toContain('aucun motif');
   });
 
   it('aucune section sans motif, ni quand rien n’est périmé', async () => {

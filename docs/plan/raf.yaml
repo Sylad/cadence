@@ -601,6 +601,12 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-07
+    tasks:
+      - { id: t1, title: "skills/lead : la délégation à la main remplit aussi {{news}} (lot visible : texte de newsText, sinon vide) — le plus simple : partir du brief écrit par --dry-run ; test qu'aucun {{…}} ne reste dans un brief rendu (visible et non visible)", status: todo }
+      - { id: t2, title: "titre de l'entrée côté utilisateur : cadence news new <lot> prend lot.public par défaut quand il existe (--title l'emporte) ; newsText dit que le titre est côté utilisateur (public du lot, sinon réécrit avec --title) ; tests", status: todo }
+      - { id: t3, title: "test : le --dry-run d'un lot visible écrit un brief implement contenant « cadence news new <lot> », celui d'un lot non visible non (command.ts:276)", status: todo }
+      - { id: t4, title: "capture de l'entrée : le brief donne le chemin absolu du dossier de sortie Playwright de la vague et l'étape implement a --add-dir sur ce dossier pour pouvoir copier la capture dans docs/nouveautes/captures/ ; test du dry-run", status: todo }
+    review: { date: 2026-10-07, verdict: "non conforme : 2 majeurs (skill lead sans {{news}}, titre interne publié au lieu du titre public), 1 mineur (dry-run non testé)", commit: d153ea03d903259c13ecc302bf0485e5c0a4d659 }
   - id: L49
     title: "Suivi visible d'une vague pour l'humain : (1) le skill lead nomme la tâche de fond « vague <id> : projet:lot, … » et arme un suivi (Monitor) qui pousse chaque transition (lot → état, question, prêt, rendu) dans la conversation ; (2) cadence orchestrate --status --watch (tableau rafraîchi dans un terminal) ; (3) à étudier : une ligne de statut Claude Code (barre d'état) « vague : 2/4 prêts, 1 question, 1,1 M / 2 M » — retour de Sylvain 04-10 : « je vois une tâche en cours, pas quels projets ni où on en est »"
     status: todo
@@ -941,8 +947,15 @@ lots:
     finished: 2026-10-07
   - id: L89
     title: "guard.ts : rememberExclude met hookLine=false quand le hook pre-push présent porte la marque cadence (ligne laissée par une vague 0.11.0 interrompue, sans note) ; test de la note d'ancienne forme (sans content) — mineurs de la revue L87/L88"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: conforme, commit: 0c2ef4f9653737537b59885150f2c554576eea6c }
+    finished: 2026-10-07
+  - id: L90
+    title: "Test instable non identifié : 1 échec sur 7 passages de la suite complète le 07-10 (sous charge, une revue lançait la suite en parallèle), 6 passages suivants verts dont 3 en JSON — relancer sous charge (2 suites en parallèle) avec --reporter=json pour le nommer, puis le traiter comme L81/L85"
+    status: todo
+    estimate: 1
+    created: 2026-10-07

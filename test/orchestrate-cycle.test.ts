@@ -1213,9 +1213,13 @@ describe('correction ordinaire interrompue puis reprise (L40)', () => {
 
   it('deux passes sans coupure : la seconde sans commit relance une revue (lot commité), jamais prise pour une reprise (L56)', async () => {
     const nothing: Handler = () => claudeOut(workReport());
-    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [fix('b.txt'), nothing] } });
-    const c = h.lot('L1', {}, { test: 'test -f c.txt' });
+    // La 1re correction commite mais annonce ses tests rouges : le lot repart en correction, la 2e passe n'a rien à ajouter.
+    const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.txt', 'fix(L1): b')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }));
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [redFix, nothing] } });
+    const c = h.lot('L1', {}, { test: 'test -f a.txt' });
     await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'fix', 'review']);
+    expect(c.lot.status).toBe('ready');
     expect(c.lot.warnings.join('\n')).not.toContain('reprise sans nouveau commit');
     expect(c.lot.warnings).toContain('fix sans nouveau commit : revue lancée sur les commits du lot');
   });

@@ -498,7 +498,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   // La session peut n'avoir plus rien à commiter (réponse du lead, lot commité avant la vague) : le travail du lot est déjà dans git.
   // Même règle côté fix (L56) : la passe n'avait rien à ajouter, le lot a déjà ses commits de travail → revue neuve ; la passe reste consommée, MAX_PASSES borne la boucle.
-  const alreadyDone = (kind === 'implement' || kind === 'fix') && lotWork(plan, l.repo, l.lot).length > 0;
+  const alreadyDone = lotWork(plan, l.repo, l.lot).length > 0;
   if (commits.length === 0 && !alreadyDone && !headMoved) {
     stop(c, 'handed-back', `${kind} sans commit`);
     return;

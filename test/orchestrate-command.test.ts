@@ -879,10 +879,20 @@ describe('budget par lot (L78)', () => {
     expect(lotBudget(2.5)).toBe(1_000_000);
   });
 
-  it("mesures du 06-10 : les lots de 0,5 j à 0,5 M et de 1 j à 0,45 M auraient été arrêtés", () => {
-    // finance L4 459 507, L5 337 304 et 531 234 ; ol L36 205 155 (0,5 j) · finance L6 455 197, ol L37 468 399 (1 j)
-    for (const spent of [459_507, 337_304, 531_234, 205_155]) expect(spent).toBeGreaterThanOrEqual(lotBudget(0.5));
-    for (const spent of [455_197, 468_399]) expect(spent).toBeGreaterThanOrEqual(lotBudget(1));
+  it("mesures du 06-10 rejouées avec la règle : le contrôle se fait avant chaque session, 4 lots sur 5 sont arrêtés", () => {
+    // Un lot n'est arrêté que si une session devait partir alors que le cumul avait déjà atteint le plafond :
+    // il suffit que le cumul avant sa dernière session soit au plafond (le cumul ne fait que croître).
+    // [lot, estimate, cumul avant la dernière session, total final] d'après .cadence/runs/2026-10-06-1801
+    const mesures: Array<[string, number, number, number, boolean]> = [
+      ['finance L4', 0.5, 252_770, 459_507, true],
+      ['finance L5', 0.5, 220_513, 337_304, true],
+      ['finance L6', 1, 403_391, 455_197, true],
+      ['ol L37', 1, 405_513, 468_399, true],
+      ['ol L36', 0.5, 169_079, 205_155, false], // sa dernière review-small part à 169 k : le lot finit à 205 k et reste « ready »
+    ];
+    for (const [lot, estimate, avantDerniere, final, arrete] of mesures) {
+      expect(avantDerniere >= lotBudget(estimate), `${lot} (final ${final})`).toBe(arrete);
+    }
   });
 
   it("--dry-run dit le budget de chaque lot", async () => {

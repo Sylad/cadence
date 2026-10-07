@@ -762,11 +762,12 @@ lots:
     finished: 2026-10-07
   - id: L60
     title: "orchestrate.ux : déclarer dans cadence.yaml des projets à app (ccc, evatosorus, avatar-pandora, warhammer, finance, ol, maritime) comment voir l'app, pour que la vague fasse la revue UX elle-même (05-10 : toutes faites à la main par le lead)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-05
     notes:
       - { date: 2026-10-07, text: "Cadrage lead 07-10 (décisions, à appliquer telles quelles) : le PROGRAMME lance l'app, pas la session UX. orchestrate.ux objet = { command, url, timeout? } (formes chaîne actuelles inchangées). Si command ET url : avant l'étape UX, l'orchestrateur (1) sonde url — si elle répond déjà, il NE lance PAS et note « port occupé » (étape UX non vérifiée, lot continue) ; (2) lance command depuis la racine du dépôt, groupe de processus détaché, sortie dans le dossier de vague (ux-app.log) ; (3) sonde url jusqu'à réponse HTTP < 500 ou timeout (défaut 300 s) — timeout = UX non vérifiée avec la fin du log, lot continue vers la revue de code, jamais d'échec de vague ; (4) brief UX = « The running app is at <url> », sans consigne de lancement ; (5) à la fin de l'étape (succès, erreur, SIGTERM de la vague) tue le groupe : SIGTERM puis SIGKILL après 10 s. command seul ou url seul : comportement actuel. Le petit lot (review-small) suit la même règle. Hors périmètre : env, cwd, comptes/PIN (la commande porte ses préfixes, ex. cd x && PORT=… …). Tests : faux serveur node (prêt, jamais prêt, port déjà pris, enfant qui survit au SIGTERM) ; README §orchestrate.ux à jour ; CHANGELOG. Les déclarations dans les 7 projets = lot séparé." }
+    started: 2026-10-07
   - id: L61
     title: "orchestrate : lancer une vague depuis une copie figée de dist/ et des gabarits (instantané au démarrage) pour pouvoir orchestrer cadence lui-même et modifier les gabarits sans toucher une vague en cours (05-10 : L53-L57 tous délégués à la main)"
     status: done

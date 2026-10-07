@@ -320,6 +320,18 @@ describe('raf show', () => {
     expect(r.out.split('\n')[0]).toContain('done');
   });
 
+  it('un lot abandonné ne se dit pas « terminé »', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'Base');
+    const d = raf(dir, 'drop', 'L1', '--reason', 'plus utile');
+    expect(d.code, d.err).toBe(0);
+    const r = raf(dir, 'show', 'L1');
+    expect(r.out).toContain('dropped');
+    expect(r.out).toContain('créé : 2026-09-28  abandonné : 2026-09-28');
+    expect(r.out).not.toContain('terminé');
+  });
+
   it('refuse un lot inconnu et une sous-tâche', () => {
     const dir = planAvecLot();
     expect(raf(dir, 'show', 'L9').err).toContain('lot inconnu');

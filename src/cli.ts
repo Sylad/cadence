@@ -250,7 +250,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         return 0;
       }
       io.out(`${lot.id}  ${lot.status}  ${lot.title}`);
-      const dates = [['créé', lot.created], ['démarré', lot.started], ['terminé', lot.finished]].filter(([, d]) => d);
+      const dates = [['créé', lot.created], ['démarré', lot.started], [lot.status === 'dropped' ? 'abandonné' : 'terminé', lot.finished]].filter(([, d]) => d);
       if (dates.length) io.out(dates.map(([k, d]) => `${k} : ${d}`).join('  '));
       if (lot.after.length) io.out(`after : ${lot.after.join(', ')}`);
       if (lot.public) io.out(`public : ${lot.public}`);

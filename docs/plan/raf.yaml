@@ -1049,7 +1049,8 @@ lots:
     review: { date: 2026-10-07, verdict: "conforme — 0 bloquant, 0 majeur, 0 mineur ; commit 296d33d, 785 tests verts, tsc 0 — orchestré (vague 2026-10-07-1347, 0 passe(s) de correction)", commit: 296d33d08b161a878d97ca3ed3abf321cefef872 }
   - id: L94
     title: "test CLI : raf check --config hors du dépôt avec qa.expectations absolu dans le dépôt → accepté ; couvre le passage de root à readPlanConfig (cli.ts:145, orchestrate/command.ts:127 projectEnv) — mineur revue L66"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07

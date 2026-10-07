@@ -413,6 +413,16 @@ describe('titre public trop long (L106)', () => {
     expect(raf(dir, 'check').out).not.toContain('titre public');
   });
 
+  it('la clé déclarée l\'emporte sur l\'absence du dossier de Nouveautés : raf check signale même sans docs/nouveautes', () => {
+    const dir = setup('news:\n  publicTitleMax: 60\n');
+    // raf public refuse lui-même au-delà de la clé : le public: s'écrit à la main, comme un titre venu d'ailleurs
+    writeFileSync(join(dir, 'docs/plan/raf.yaml'), readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8').replace('title: A', `title: A\n    public: ${'z'.repeat(70)}`));
+    const r = raf(dir, 'check');
+    expect(r.out).toContain('L1');
+    expect(r.out).toContain('70');
+    expect(r.out).toContain('titre public');
+  });
+
   const entreeLongue = (dir: string, title = long) => {
     mkdirSync(join(dir, 'docs/nouveautes'), { recursive: true });
     writeFileSync(join(dir, 'docs/nouveautes/2026-10-07-x.md'), `---\ntitle: ${title}\ndate: 2026-10-07\ncreated: 2026-10-07T10:00:00+02:00\nlots: [L1]\ncaptures: []\nnocapture: test\n---\ncorps\n`);
@@ -435,7 +445,7 @@ describe('titre public trop long (L106)', () => {
     raf(dir, 'add', 'B'); // L2, non visible
     entreeLongue(dir);
     writeFileSync(join(dir, 'docs/nouveautes/2026-10-07-y.md'), readFileSync(join(dir, 'docs/nouveautes/2026-10-07-x.md'), 'utf8').replace('[L1]', '[L2]'));
-    raf(dir, 'done', 'L2', '--force');
+    expect(raf(dir, 'done', 'L2', '--force').code).toBe(0);
     expect(raf(dir, 'check').out).not.toContain('88 caractères'); // L1 visible mais pas terminé, L2 terminé mais non visible
   });
 

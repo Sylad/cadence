@@ -64,7 +64,9 @@ cadence orchestrate <project>:<lot> <project>:<lot>@haiku … [--budget 2M]
 `cadence orchestrate --dry-run …` first when a precondition is in doubt. The program, not the lead, runs
 for each lot a fresh short session per step — implementation (Sonnet), UX review if the lot is `visible`
 and the project declares how to see its app (`orchestrate.ux` in `cadence.yaml`), code review last
-(Opus, the `code-reviewer` agent), a correction in a new session if the review is not compliant (two
+(Opus, the `code-reviewer` agent; Sonnet, with no pass on the minor findings, for a lot whose estimate is
+≤ 0.25 d — `orchestrate.review` in `cadence.yaml`; a blocker or major finding still brings a correction and an
+Opus review), a correction in a new session if the review is not compliant (two
 passes at most) — and records `raf review` itself when the code review is compliant. The state is in
 `.cadence/runs/<wave>/`, not in this conversation. `@haiku` only when the human writes it, for a
 mechanical lot. Exit code: 0 all ready · 1 some lots handed back · 2 refused before acting · 3 wave

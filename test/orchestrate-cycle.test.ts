@@ -224,6 +224,25 @@ describe('lot visible : UX puis code', () => {
     expect(hn.calls[0]!.brief).not.toContain('playwright');
   });
 
+  it("fix et fix-minors d'un lot visible donnent le dossier Playwright de la vague (celui du --add-dir) ; lot sans écran : rien (L48/t6)", async () => {
+    const hv = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], review: [major, minorReview(), ok], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    await runLot(hv.lot('L1', { visible: true }, { addDirs: ['/tmp/x'] }));
+    const dir = join(hv.store.dir, 'demo--L1', 'playwright');
+    const fixes = hv.calls.filter((c) => c.kind === 'fix');
+    expect(fixes.length).toBeGreaterThanOrEqual(2);
+    expect(fixes[0]!.brief).toContain('A fresh review of the commits'); // fix
+    expect(fixes.some((f) => f.brief.includes('only minor findings'))).toBe(true); // fix-minors
+    for (const f of fixes) {
+      expect(f.brief).toContain(`\`${dir}\``);
+      expect(f.brief).not.toMatch(/\{\{/);
+      const adds = f.args.flatMap((a, i) => (f.args[i - 1] === '--add-dir' ? [a] : []));
+      expect(adds).toEqual(['/tmp/x', dir]);
+    }
+    const hn = harness({ lots: [{ title: 'Sans écran' }], script: { implement: [impl()], review: [major, minorReview(), ok], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    await runLot(hn.lot('L1'));
+    for (const f of hn.calls.filter((c) => c.kind === 'fix')) expect(f.brief).not.toContain('.cadence');
+  });
+
   it('chaque session reçoit --strict-mcp-config et son fichier dans le dossier du lot ; lot visible : Playwright pour implement et ux (pas review), captures dans la vague (L74)', async () => {
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
     const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' } });

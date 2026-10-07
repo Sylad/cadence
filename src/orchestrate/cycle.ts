@@ -9,7 +9,7 @@ import { readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
-import { newsText, objective, renderBrief, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { capturesText, newsText, objective, renderBrief, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
@@ -220,7 +220,12 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
-  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), news: l.visible ? newsText(l.lot, playwrightDir(c.wave.store.lotDir(l.project, l.lot))) : '' };
+  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), news: '', captures: '' };
+  if (l.visible) {
+    const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
+    vars.news = newsText(l.lot, pwDir);
+    vars.captures = capturesText(pwDir);
+  }
   if (kind === 'implement' || kind === 'fix') {
     const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
     if (kind === 'fix') {

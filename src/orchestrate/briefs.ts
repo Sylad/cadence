@@ -20,6 +20,8 @@ export interface BriefVars {
   choix: string;
   /** Consigne de l'entrée Nouveautés : `newsText(lot)` pour un lot `visible` (avec le dossier Playwright de la vague quand une session orchestrée l'a), vide sinon. */
   news: string;
+  /** Dossier de sortie Playwright de la vague (fix et fix-minors d'un lot `visible`, pour retrouver une capture) ; vide sinon. */
+  captures: string;
 }
 
 /** Consigne d'implémentation d'un lot `visible` : son entrée Nouveautés (convention de `cadence news`, voir le README). */
@@ -32,6 +34,11 @@ export function newsText(lot: string, captureDir?: string): string {
       : `Add a screenshot of the result: save it under the OS temp directory (never inside the repository), then copy it into \`docs/nouveautes/captures/\` and list it under \`captures:\` (the file you keep for the entry is the one exception to "nothing inside the repository"); if a screenshot makes no sense (or the app cannot be run), write \`nocapture: <reason>\` instead.`,
     'Commit the entry with the lot (`cadence news check` must pass).',
   ].join('\n');
+}
+
+/** Consigne des briefs de correction d'un lot `visible` : où la vague range les captures Playwright (même dossier que l'étape implement). */
+export function capturesText(captureDir: string): string {
+  return `Playwright captures of this wave land in \`${captureDir}\` (outside the repository; this session may read it): a screenshot a finding asks for is copied from there into \`docs/nouveautes/captures/\`.`;
 }
 
 /** Un gabarit : un par étape, plus deux variantes (passe des mineurs, revue courte qui la suit). */

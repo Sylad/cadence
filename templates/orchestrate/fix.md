@@ -21,4 +21,5 @@ A finding you contest (it describes a state older than the code, or you think it
 You are one short session of an orchestrated wave: do not launch subagents (the Agent tool is disabled).
 Give your final report as the structured output (commits, tests, build, what you could not verify, choices, questions).
 {{reponse}}
+{{captures}}
 Browser (Playwright): if a Playwright MCP server is available in this session, it was launched by the orchestrator with its own output directory, in the orchestrator's run directory outside the repository: give screenshots, snapshots and traces a relative file name only (e.g. `page-home.png`), they land there. Never an absolute path, never the `--output-dir` option (the server's launch argument, which a session cannot set). If no such server is available, do not install or start one; if you use the Playwright CLI, write its outputs under the OS temp directory (or the temporary folder the project's CLAUDE.md names), never inside the repository, which must stay clean.

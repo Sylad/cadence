@@ -732,11 +732,13 @@ lots:
       - { date: 2026-10-07, text: "Décisions du lead (07-10) avant délégation : (1) au lancement d'une vague (pas en --dry-run ni --status), copier dans .cadence/runs/<vague>/tool/ les dossiers du paquet qui servent à l'exécution (bin/, dist/, templates/, agents/, skills/ si lus, package.json) ; node_modules = lien symbolique vers celui du paquet ; (2) le processus orchestrate se relance aussitôt depuis cette copie (node <copie>/bin/cadence.js … avec une variable d'environnement qui empêche une 2e copie), pour que code, gabarits et agents viennent tous de l'instantané ; (3) --resume relance depuis l'instantané de la vague reprise, jamais depuis le dist/ courant ; vague sans instantané (antérieure) = comportement actuel avec un avertissement ; (4) la copie est supprimée avec le dossier de la vague (pas de nettoyage séparé) ; (5) tests : un gabarit modifié après le lancement n'est pas vu par la vague ; --resume reprend l'instantané ; le dry-run ne copie rien ; README (section orchestrate) mis à jour et la phrase « cadence ne peut pas s'orchestrer lui-même » retirée du skill lead si elle y est." }
     started: 2026-10-07
     tasks:
-      - { id: t1, title: "B1 : retirer CADENCE_SNAPSHOT et CADENCE_WAVE_RESERVED de l'environnement transmis aux sessions claude (launch.ts) et aux commandes sh du projet (cycle.ts) ; tests : une session ne voit aucune des deux, et la suite e2e passe avec ces variables posées dans l'environnement du test", status: todo }
-      - { id: t2, title: "B2 : installation npx ou locale (yaml résolu hors du paquet) — l'instantané lie le node_modules où les dépendances sont réellement résolues (import.meta.resolve('yaml') remonté jusqu'à son node_modules) ; si introuvable, refus avant copie avec un message clair et code 2 ; test", status: todo }
-      - { id: t3, title: "m1/m2 : test du vrai fils (TEMPLATES_DIR résolu dans la copie, pas un templatesDir injecté) ; retirer ou réécrire le test « disparaît avec le dossier » qui ne peut pas échouer", status: todo }
-      - { id: t4, title: "m3 : les sessions de la vague ont <vague>/tool/bin (raf et cadence de l'instantané) en tête du PATH, pour que raf commits des relecteurs vienne de la copie ; test", status: todo }
-    review: { date: 2026-10-07, verdict: "non conforme : 2 bloquants (variables de relance transmises aux sessions ; npx/installation locale sans yaml), 3 mineurs", commit: 3e9512e6a224b03632052196e7be4c83c49c3fb6 }
+      - { id: t1, title: "B1 : retirer CADENCE_SNAPSHOT et CADENCE_WAVE_RESERVED de l'environnement transmis aux sessions claude (launch.ts) et aux commandes sh du projet (cycle.ts) ; tests : une session ne voit aucune des deux, et la suite e2e passe avec ces variables posées dans l'environnement du test", status: done }
+      - { id: t2, title: "B2 : installation npx ou locale (yaml résolu hors du paquet) — l'instantané lie le node_modules où les dépendances sont réellement résolues (import.meta.resolve('yaml') remonté jusqu'à son node_modules) ; si introuvable, refus avant copie avec un message clair et code 2 ; test", status: done }
+      - { id: t3, title: "m1/m2 : test du vrai fils (TEMPLATES_DIR résolu dans la copie, pas un templatesDir injecté) ; retirer ou réécrire le test « disparaît avec le dossier » qui ne peut pas échouer", status: done }
+      - { id: t4, title: "m3 : les sessions de la vague ont <vague>/tool/bin (raf et cadence de l'instantané) en tête du PATH, pour que raf commits des relecteurs vienne de la copie ; test", status: done }
+      - { id: t5, title: "e2e sur le code source : un global-setup vitest construit un dist/ jetable (tsc -p tsconfig.build.json vers un dossier temporaire, avec bin/, templates/, agents/, skills/, package.json et lien node_modules) et les tests e2e/snapshot relancent le fils depuis ce paquet jetable, jamais depuis le dist/ en service ; test de garde : une modification de src non reconstruite fait rougir orchestrate-e2e (mutation vérifiée à la main, notée dans le rapport)", status: todo }
+      - { id: t6, title: "README : <vague>/tool/bin (raf, cadence de l'instantané) en tête du PATH des sessions ; corriger « never shadows » du paragraphe Node par projet", status: todo }
+    review: { date: 2026-10-07, verdict: "non conforme : 0 bloquant, 1 majeur (tests e2e exécutent le dist/ en service, plus src/), 1 mineur (README PATH des sessions)", commit: e0574b6c05eb9955ea1c5c666f202740cdf6fcd5 }
   - id: L62
     title: "orchestrate : un lot dont le travail est dans un dépôt voisin non cadence (ex. B64 dans aetherwx-gitops) — clé de lot ou de projet listant les dépôts de travail ; commits et revue lus dans ces dépôts"
     status: todo
@@ -971,6 +973,8 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-07, text: "07-10 (L61/t1) : un test de deliver.test.ts a échoué 1 fois sur 2 sous charge — piste pour nommer le test instable" }
   - id: L91
     title: "Doc des briefs Nouveautés hors vague : README l.743 (dry-run sans dossier de vague ; fix/fix-minors d'un lot visible ont le dossier Playwright et --add-dir) et paragraphe Browser d'implement.md qui promet un serveur lancé par l'orchestrateur même en délégation à la main (contredit « capture sous le dossier temporaire ») — mineurs de la 3e revue L48"
     status: todo

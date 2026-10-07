@@ -1,43 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { startApp } from '../src/orchestrate/app.js';
-import { tempDir } from './helpers.js';
+import { fakeApp } from './fake-app.js';
 
-/** Faux serveur node : écrit son pid, écoute le port après `delay` ms (jamais si delay < 0), ignore SIGTERM si demandé. */
-const FAKE = `
-const http = require('http');
-const fs = require('fs');
-const [port, delay, stubborn, status] = process.argv.slice(2);
-fs.writeFileSync('pid', String(process.pid));
-fs.writeFileSync('cwd', process.cwd());
-if (stubborn === '1') process.on('SIGTERM', () => {});
-console.log('démarrage du faux serveur');
-if (Number(delay) >= 0) setTimeout(() => http.createServer((q, r) => { r.statusCode = Number(status); r.end('ok'); }).listen(Number(port)), Number(delay));
-else setInterval(() => {}, 1000);
-`;
-
-async function freePort(): Promise<number> {
-  const s = createServer();
-  await new Promise<void>((r) => s.listen(0, r));
-  const port = (s.address() as AddressInfo).port;
-  await new Promise((r) => s.close(r));
-  return port;
-}
-
-function setup(delay: number, opts: { stubborn?: boolean; status?: number; prefix?: string } = {}) {
-  const dir = tempDir();
-  writeFileSync(join(dir, 'fake.js'), FAKE);
-  return freePort().then((port) => ({
-    dir,
-    port,
-    url: `http://127.0.0.1:${port}/`,
-    command: `${opts.prefix ?? ''}node fake.js ${port} ${delay} ${opts.stubborn ? 1 : 0} ${opts.status ?? 200}`,
-    log: join(dir, 'ux-app.log'),
-  }));
-}
+const setup = fakeApp;
 
 const alive = (pid: number) => {
   try {
@@ -117,11 +85,10 @@ describe('application de la revue UX lancée par le programme (L60)', () => {
 
   it('la commande porte ses préfixes (cd x && PORT=… …)', async () => {
     const t = await setup(0, { prefix: 'cd sub && PORT=1 ' });
-    const { mkdirSync, copyFileSync } = await import('node:fs');
     mkdirSync(join(t.dir, 'sub'));
-    copyFileSync(join(t.dir, 'fake.js'), join(t.dir, 'sub', 'fake.js'));
     const app = await startApp({ command: t.command, url: t.url, cwd: t.dir, log: t.log, timeoutMs: 15_000, every: 50 });
     expect(app.state).toEqual({ kind: 'ready' });
+    expect(realpathSync(readFileSync(join(t.dir, 'cwd'), 'utf8'))).toBe(realpathSync(join(t.dir, 'sub')));
     await app.stop();
   });
 });

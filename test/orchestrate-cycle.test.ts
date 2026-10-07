@@ -1390,7 +1390,7 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     expect(brief).toContain(`The running app is at ${app.url}`);
     expect(brief).not.toContain('Start the app');
     expect(during).toBe(true);
-    expect(readFileSync(join(h.store.dir, 'demo--L1', 'ux-app.log'), 'utf8')).toContain('faux serveur lancé');
+    expect(readFileSync(join(h.store.dir, 'demo--L1', 'ux-app.log'), 'utf8')).toContain('démarrage du faux serveur');
     expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false);
     expect(c.lot.status).toBe('ready');
     expect(c.lot.uxNote).toBeUndefined();
@@ -1402,7 +1402,7 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     const c = h.lot('L1', { visible: true }, { ux: { command: app.command, url: app.url, timeout: 0.8 } });
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
-    expect(c.lot.uxNote).toMatch(/UX non vérifiée.*n'a pas répondu[\s\S]*faux serveur lancé/);
+    expect(c.lot.uxNote).toMatch(/UX non vérifiée.*n'a pas répondu[\s\S]*démarrage du faux serveur/);
     expect(c.lot.status).toBe('ready');
     expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false);
   });

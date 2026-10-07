@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotText, wavePercent } from '../hooks/format'
+import { ago, bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotCounts, lotText, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -18,6 +18,7 @@ const WAVE: Wave = {
   cap: 2,
   started: '2026-10-07T19:03:10.939Z',
   status: 'running',
+  live: true,
   budget: 1_000_000,
   consumed: 81_926,
   lots: [
@@ -78,6 +79,8 @@ test('un lot se lit en trois cellules ou en une ligne', () => {
 
 test('le collecteur se lit, et une sortie étrange vaut aucune vague', () => {
   expect(parseWaves(JSON.stringify([WAVE]))[0]?.id).toBe(WAVE.id)
+  expect(parseWaves(JSON.stringify([{ ...WAVE, live: undefined }]))[0]?.live).toBe(true)
+  expect(parseWaves(JSON.stringify([{ ...WAVE, live: false }]))[0]?.live).toBe(false)
   expect(parseWaves('{}')).toEqual([])
   expect(() => parseWaves('pas du json')).toThrow()
 })
@@ -129,5 +132,44 @@ test('masquée, la bande laisse la main', async ($, on) => {
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
   expect(await ui.find({ type: 'Text', text: /ctx/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /moteur/ })).toBeDefined()
+  await ui.unmount()
+})
+
+const ENDED: Wave = {
+  ...WAVE,
+  id: '2026-10-07-2131',
+  status: 'interrupted',
+  live: false,
+  ended: '2026-10-07T19:51:25.831Z',
+  budget: 2_000_000,
+  consumed: 440_181,
+  lots: [
+    { ...WAVE.lots[0]!, lot: 'L107', status: 'ready', step: null },
+    { ...WAVE.lots[0]!, lot: 'L112', status: 'ready', step: null },
+    { ...WAVE.lots[0]!, lot: 'L106', status: 'failed', step: null },
+    { ...WAVE.lots[1]!, lot: 'L113', status: 'suspended' },
+  ],
+}
+
+test('le bilan des lots et l’ancienneté se lisent', () => {
+  expect(lotCounts(ENDED)).toBe('2 prêts · 1 échec · 1 suspendu')
+  expect(lotCounts({ ...ENDED, lots: [] })).toBe('')
+  expect(ago(ENDED.ended, Date.parse('2026-10-07T20:03:25.831Z'))).toBe('il y a 12 min')
+  expect(ago(undefined, 0)).toBe('')
+})
+
+test('la dernière vague terminée reste en gris, sur une ligne, sans ses lots', async ($, on) => {
+  seed(on, {
+    ...EMPTY,
+    usage: { percent: 9, tokens: 90_000, window: 1_000_000, limits: [] },
+    waves: [ENDED],
+    now: Date.parse('2026-10-07T20:03:25.831Z'),
+  })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /cadence · 2026-10-07-2131 interrompue il y a 12 min/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /budget\s+22 % 440k\/2M/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /2 prêts · 1 échec · 1 suspendu/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^L107$/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /session/ })).toBeUndefined()
   await ui.unmount()
 })

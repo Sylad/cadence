@@ -40,6 +40,10 @@ export type Wave = {
   status?: string
   budget?: number
   consumed?: number
+  /** Vraie pour une vague dont le processus orchestrate vit ; fausse pour la dernière vague terminée, gardée en gris. */
+  live: boolean
+  /** Fin de la vague (date de son wave.json), seulement quand `live` est fausse. */
+  ended?: string
   lots: WaveLot[]
 }
 

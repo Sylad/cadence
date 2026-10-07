@@ -4,6 +4,7 @@ import type { Register, Timer } from 'claude-code'
 import type { AgentsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
 import {
+  ago,
   bar,
   colorOfLot,
   colorOfPercent,
@@ -12,6 +13,7 @@ import {
   k,
   limitLabel,
   lotCells,
+  lotCounts,
   pad,
   untilReset,
   wavePercent,
@@ -159,6 +161,27 @@ export const register: Register = on => {
 
     const waveRows = w.map(wave => {
       const percent = wavePercent(wave)
+      if (!wave.live) {
+        const project = commonProject(wave)
+        return (
+          <Box key={`wave-${wave.id}`} flexDirection="row">
+            <Text color="subtle">
+              ⟳ {project ? `${project} · ` : ''}
+              {wave.id} {waveStatusFr(wave.status)} {ago(wave.ended, at)}
+            </Text>
+            {sep}
+            <Text color="subtle">
+              budget {pct(percent)} {k(wave.consumed)}/{k(wave.budget)}
+            </Text>
+            {wave.lots.length > 0 && (
+              <Text color="subtle">
+                {sep}
+                {fit(lotCounts(wave), Math.max(10, width - 60))}
+              </Text>
+            )}
+          </Box>
+        )
+      }
       const sessions = waveSessions(wave)
       const project = commonProject(wave)
       const label = (lot: WaveLot) => (project ? lot.lot : `${lot.project}:${lot.lot}`)

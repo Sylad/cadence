@@ -131,3 +131,38 @@ export const waveStatusFr = (status: string | undefined): string => {
 /** Tronque à `width` cellules, avec une ellipse. */
 export const fit = (text: string, width: number): string =>
   width <= 1 ? '' : text.length <= width ? text : `${text.slice(0, Math.max(0, width - 1))}…`
+
+const STATUS_PLURAL_FR: Record<string, string> = {
+  queued: 'en attente',
+  question: 'questions',
+  ready: 'prêts',
+  'handed-back': 'rendus',
+  failed: 'échecs',
+  suspended: 'suspendus',
+}
+
+/** Le bilan des lots d'une vague : "3 prêts · 1 échec · 3 suspendus", dans l'ordre prêt, échec, rendu, question, suspendu, reste. */
+export const lotCounts = (wave: Wave): string => {
+  const order = ['ready', 'failed', 'handed-back', 'question', 'suspended']
+  const counts = new Map<string, number>()
+  for (const lot of wave.lots) counts.set(lot.status, (counts.get(lot.status) ?? 0) + 1)
+  const statuses = [...counts.keys()].sort((a, b) => {
+    const ia = order.indexOf(a)
+    const ib = order.indexOf(b)
+    return (ia === -1 ? order.length : ia) - (ib === -1 ? order.length : ib) || a.localeCompare(b)
+  })
+  return statuses
+    .map(s => {
+      const n = counts.get(s)!
+      return `${n} ${n > 1 ? (STATUS_PLURAL_FR[s] ?? lotStatusFr(s)) : lotStatusFr(s)}`
+    })
+    .join(' · ')
+}
+
+/** "il y a 12 min" depuis une date ISO, ou vide si inconnue. */
+export const ago = (iso: string | undefined, now: number): string => {
+  if (!iso) return ''
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return ''
+  return `il y a ${duration(Math.max(0, now - t))}`
+}

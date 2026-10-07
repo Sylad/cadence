@@ -21,7 +21,10 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
   (`+N` = sessions claude filles, `✝` = étape marquée en cours mais processus mort, `pN` = passe), puis le
   début du titre du lot sur la largeur restante — et une seule
   ligne grise `en attente` listant les lots qui n'ont pas démarré. Les lots de projets différents gardent le
-  préfixe `projet:`.
+  préfixe `projet:` ;
+- sans vague vivante, la **dernière vague terminée** du dossier courant reste sur une ligne grise avec son statut
+  (`terminée` / `interrompue il y a 12 min`), son budget consommé et le bilan de ses lots (`3 prêts · 1 échec · 3 suspendus`),
+  jusqu'à ce qu'une nouvelle vague démarre.
 
 `/hud` masque ou réaffiche la bande.
 

@@ -1407,6 +1407,28 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false);
   });
 
+  it('revue UX non conforme puis application muette : la revue périmée est effacée, ses constats ne repartent pas en correction, le lot conclut sur la revue de code', async () => {
+    const app = await fakeApp(0);
+    const uxBad: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'ui.css', texte: 'contraste 2:1 (WCAG 1.4.3)' }], verdict: 'UX non conforme' }));
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [uxBad], review: [ok, ok], fix: [fix('b.txt')] } });
+    const ux = { command: app.command, url: app.url, timeout: 20 };
+    const c = h.lot('L1', { visible: true }, { ux });
+    // après la passe de correction, l'application ne démarre plus
+    const fixing = h.wave.claude;
+    h.wave.claude = (async (args: string[], o: Parameters<typeof fixing>[1]) => {
+      const r = await fixing(args, o);
+      if (h.calls.some((x) => x.kind === 'fix')) ux.command = 'exit 1';
+      return r;
+    }) as typeof fixing;
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'ux', 'review', 'fix', 'review']);
+    expect(c.lot.uxNote).toMatch(/UX non vérifiée/);
+    expect(c.lot.ux).toBeUndefined();
+    expect(c.lot.uxVerdict).toBeNull();
+    expect(c.lot.constats.filter((k) => k.source === 'ux')).toEqual([]);
+    expect(c.lot.status).toBe('ready');
+  });
+
   it('port déjà pris : rien n\'est lancé, « port occupé », le lot continue', async () => {
     const app = await fakeApp(0);
     const srv = createServer((_q, r) => r.end('autre')).listen(Number(new URL(app.url).port));

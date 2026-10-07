@@ -1242,12 +1242,15 @@ lots:
   - id: L111
     title: "Plugin cadence-hud dans la marketplace du dépôt (plugins/cadence-hud) : bande au-dessus du prompt Claude Code — contexte, fenêtres 5 h/7 j, coût, agents, vagues orchestrate lues dans ~/.cadence/orchestrate et .cadence/runs ; source = ~/.claude/mods/cadence-hud (07-10, 6 tests claude plugin test verts) ; entrée marketplace.json, exclu du paquet npm, README d'installation (/plugin install cadence-hud --marketplace Sylad/cadence) ; réalise le point (3) de L49"
     public: "Une bande d'état Claude Code : contexte, quota, coût, agents, vagues orchestrate"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Lead 07-10 : pas de capture Playwright (la bande vit dans Claude Code, pas dans un navigateur) ; la capture Nouveautés sera une image du terminal fournie par le lead. Source déjà importée dans plugins/cadence-hud (commit 6e1bba4) ; vitest l'exclut déjà ; reste : marketplace.json, files npm (déjà sans plugins/), README d'installation, et tsconfig du plugin (pas de .claude-plugin/types versionné)." }
+      - { date: 2026-10-07, text: "Revue 07-10, mineur noté : une vague dont l'orchestrateur meurt sans écrire (SIGKILL, plantage) garde status running dans wave.json ; la ligne grise affiche alors « en cours il y a 2 h ». Cas rare ; à traiter côté collect.ts (statut dérivé de la vivacité du pid) si vécu." }
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme — agent code-reviewer neuf sur les 6 commits : 1 majeur (attribution turn.complete sans test) et 1 mineur observable (.gitignore des types générés) corrigés par le lead ; 11 tests claude plugin test verts, validate plugin + marketplace OK, tsc strict OK sur la copie chargée, hors paquet npm vérifié ; 1 mineur noté (statut running d'une vague tuée sans écrire)", commit: fc0f34a6944ad6b0cd21dd676901232616316996 }
+    finished: 2026-10-07
   - id: L112
     title: "Suite rouge sous npm ≥ 11.5 (12.2 vu le 07-10) : npm active le cache de compilation de Node et laisse node-compile-cache dans la racine temporaire privée ; le contrôle de fin de test/global-setup.ts fait échouer la suite. Décision lead : global-setup pose NODE_DISABLE_COMPILE_CACHE=1 pour les workers et les enfants (ou NODE_COMPILE_CACHE vers un sous-dossier qu'il supprime lui-même) ; test qui lance npm sous un TMPDIR privé et vérifie qu'il ne reste rien"
     status: done

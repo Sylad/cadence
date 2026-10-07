@@ -197,6 +197,26 @@ describe('lot visible : UX puis code', () => {
     expect(h.plan().lot('L1').review).toBeDefined();
   });
 
+  it('chaque session reçoit --strict-mcp-config et son fichier dans le dossier du lot ; Playwright pour ux seulement, captures dans la vague (L74)', async () => {
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
+    const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' } });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'ux', 'review']);
+    const lotDir = join(h.store.dir, 'demo--L1');
+    for (const call of h.calls) {
+      expect(call.args).toContain('--strict-mcp-config');
+      const file = call.args[call.args.indexOf('--mcp-config') + 1];
+      expect(file).toBe(join(lotDir, `mcp-${call.kind}.json`));
+      const servers = JSON.parse(readFileSync(file, 'utf8')).mcpServers;
+      if (call.kind === 'ux') expect(Object.keys(servers)).toEqual(['playwright']);
+      else expect(servers).toEqual({});
+    }
+    const ux = JSON.parse(readFileSync(join(lotDir, 'mcp-ux.json'), 'utf8')).mcpServers.playwright.args;
+    expect(ux.at(-1)).toBe(join(lotDir, 'playwright'));
+    expect(ux.at(-2)).toBe('--output-dir');
+    expect(c.lot.uxCaptures).toBe(join(lotDir, 'playwright'));
+  });
+
   it('sans application déclarée : pas de session UX, « à faire par le lead »', async () => {
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], review: [ok] } });
     const c = h.lot('L1', { visible: true });

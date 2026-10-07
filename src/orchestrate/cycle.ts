@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { lotCommits, lotWork } from '../audit.js';
 import type { OrchestrateConfig } from '../config.js';
@@ -10,7 +10,7 @@ import { citedRefs } from '../link.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { objective, renderBrief, type BriefName, type BriefVars, type Templates } from './briefs.js';
-import { journalTokens, peakContext, runSession, trackGroup, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
+import { journalTokens, peakContext, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { checkShape, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type ReviewReport, type WorkReport } from './schemas.js';
@@ -270,6 +270,8 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
     step.cause = (e as Error).message;
     return stop(c, 'failed', `brief de ${kind} : ${(e as Error).message}`);
   }
+  const mcpConfig = writeMcpConfig(w.store.lotDir(l.project, l.lot), kind);
+  if (kind === 'ux') l.uxCaptures = join(dirname(mcpConfig), 'playwright');
   l.pendingAnswer = null; // la réponse est dans le brief : elle ne repart pas avec la session suivante
   const outcome = await runSession(
     {
@@ -284,6 +286,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       permissionMode: c.config.permissionMode,
       addDirs: c.config.addDirs,
       nodeBin: l.node?.link,
+      mcpConfig,
       timeoutMs: write ? c.config.timeouts.work : c.config.timeouts.review,
     },
     {

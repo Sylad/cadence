@@ -96,6 +96,8 @@ export interface LotState {
   code?: ReviewSummary;
   ux?: ReviewSummary;
   uxNote?: string;
+  /** Dossier où le Playwright de l'étape ux a rangé captures et snapshots (dans le dossier de la vague, hors du dépôt). */
+  uxCaptures?: string;
   /** Réponse de l'humain à une question, jointe au brief de la prochaine session puis effacée. */
   pendingAnswer?: string | null;
   verdict: string | null;

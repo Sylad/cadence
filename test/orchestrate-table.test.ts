@@ -35,3 +35,18 @@ describe('renderTable : choix et propositions', () => {
     expect(renderTable(wave, [l])).toContain('demo:L1 — proposé : [mineur code] a.txt:1 — nommage');
   });
 });
+
+describe('renderTable : captures UX (L74)', () => {
+  it('une ligne donne le dossier des captures quand l\'étape ux a tourné', () => {
+    const l = lot();
+    l.status = 'ready';
+    l.uxCaptures = '/launch/.cadence/runs/w1/demo--L1/playwright';
+    expect(renderTable(wave, [l])).toContain('demo:L1 — captures UX : /launch/.cadence/runs/w1/demo--L1/playwright');
+  });
+
+  it('sans étape ux, aucune ligne', () => {
+    const l = lot();
+    l.status = 'ready';
+    expect(renderTable(wave, [l]).join('\n')).not.toContain('captures UX');
+  });
+});

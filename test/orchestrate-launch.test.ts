@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSession, isQuotaMessage } from '../src/orchestrate/result.js';
-import { buildArgs, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
+import { buildArgs, buildRetryArgs, mcpServersFor, writeMcpConfig, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { tempDir } from './helpers.js';
 
@@ -98,6 +98,33 @@ describe('buildArgs', () => {
     expect(args).not.toContain('--agent');
     expect(args).not.toContain('--agents');
     expect(args).not.toContain('--add-dir');
+  });
+});
+
+describe('MCP minimaux par étape', () => {
+  it('aucun serveur, sauf Playwright pour l\'étape ux', () => {
+    for (const k of ['implement', 'fix', 'review', 'review-small'] as const) expect(mcpServersFor(k, '/run/p--L1/playwright')).toEqual({});
+    expect(mcpServersFor('ux', '/run/p--L1/playwright')).toEqual({
+      playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', '/run/p--L1/playwright'] },
+    });
+  });
+
+  it('writeMcpConfig écrit {"mcpServers":…} dans le dossier du lot et rend son chemin absolu', () => {
+    const dir = tempDir();
+    const none = writeMcpConfig(dir, 'review');
+    expect(none).toBe(join(dir, 'mcp-review.json'));
+    expect(JSON.parse(readFileSync(none, 'utf8'))).toEqual({ mcpServers: {} });
+    const ux = writeMcpConfig(dir, 'ux');
+    expect(JSON.parse(readFileSync(ux, 'utf8')).mcpServers.playwright.args.at(-1)).toBe(join(dir, 'playwright'));
+    expect(existsSync(join(dir, 'playwright'))).toBe(true);
+  });
+
+  it('buildArgs et buildRetryArgs passent --strict-mcp-config --mcp-config <fichier>', () => {
+    const agents = { 'code-reviewer': { description: 'd', prompt: 'p' } };
+    for (const args of [buildArgs({ ...spec, mcpConfig: '/run/mcp-review.json' }, agents), buildRetryArgs({ ...spec, mcpConfig: '/run/mcp-review.json' }, 'sid', agents)]) {
+      expect(args).toContain('--strict-mcp-config');
+      expect(args[args.indexOf('--mcp-config') + 1]).toBe('/run/mcp-review.json');
+    }
   });
 });
 

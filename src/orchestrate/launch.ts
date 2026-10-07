@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { delimiter, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { RafError } from '../plan.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
@@ -25,6 +25,27 @@ export interface StepSpec {
   timeoutMs: number;
   /** Dossier `bin` d'un Node (`.nvmrc` du projet) : mis en tête du PATH de la session, jamais de l'orchestrateur. */
   nodeBin?: string;
+  /** Fichier de configuration MCP de l'étape (écrit par l'orchestrateur) : passé avec `--strict-mcp-config`, seuls ses serveurs sont chargés. */
+  mcpConfig?: string;
+}
+
+export type McpServers = Record<string, { command: string; args: string[] }>;
+
+/** Serveurs MCP d'une étape : aucun, sauf Playwright pour l'étape `ux` (sorties dans `outputDir`, hors du dépôt). */
+export function mcpServersFor(kind: StepKind, outputDir: string): McpServers {
+  if (kind !== 'ux') return {};
+  return { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', outputDir] } };
+}
+
+/** Écrit `<lotDir>/mcp-<étape>.json` (et, pour ux, le dossier `playwright/`) ; rend le chemin absolu du fichier. */
+export function writeMcpConfig(lotDir: string, kind: StepKind): string {
+  const dir = resolve(lotDir);
+  const out = join(dir, 'playwright');
+  const servers = mcpServersFor(kind, out);
+  if (kind === 'ux') mkdirSync(out, { recursive: true });
+  const file = join(dir, `mcp-${kind}.json`);
+  writeFileSync(file, `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`);
+  return file;
 }
 
 export interface AgentDef {
@@ -64,6 +85,7 @@ export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): str
   args.push('--session-id', spec.sessionId, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);
   args.push('--disallowedTools', ...DISALLOWED);
+  if (spec.mcpConfig) args.push('--strict-mcp-config', '--mcp-config', spec.mcpConfig);
   return args;
 }
 
@@ -105,6 +127,7 @@ export function buildRetryArgs(spec: StepSpec, sessionId: string, agents: Record
   args.push('--resume', sessionId, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);
   args.push('--disallowedTools', ...DISALLOWED);
+  if (spec.mcpConfig) args.push('--strict-mcp-config', '--mcp-config', spec.mcpConfig);
   return args;
 }
 

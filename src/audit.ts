@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { check } from './check.js';
 import type { Day } from './dates.js';
@@ -96,8 +97,9 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
   // Un plan en lecture seule ne reçoit aucun verdict de raf : les deux portes n'y valent pas, même si
   // uxSince ou reviewSince y sont écrits à la main — l'écart ne pourrait jamais être levé.
   const gates = plan.readonly ? [] : [...uxIssues(plan), ...reviewIssues(plan, root, all.byLot)];
-  // Un titre public trop long fait échouer le build du site : signalé dès ici, avec 80 caractères sans clé déclarée.
-  const max = readNewsConfig(plan.configFile ?? join(root, 'cadence.yaml')).publicTitleMax ?? PUBLIC_TITLE_DEFAULT;
+  // Un titre public trop long fait échouer le build du site : signalé dès ici, avec 80 caractères sans clé déclarée
+  // — mais seulement si le projet publie des Nouveautés ; sans site, aucune limite ne s'applique.
+  const max = readNewsConfig(plan.configFile ?? join(root, 'cadence.yaml')).publicTitleMax ?? (existsSync(newsDir) ? PUBLIC_TITLE_DEFAULT : Infinity);
   // Sans public:, le site reprend le titre de la Nouveauté la plus récente du lot terminé (cas ccc L32).
   const entries = loadEntries(newsDir);
   const titles = lots.flatMap((l) => {

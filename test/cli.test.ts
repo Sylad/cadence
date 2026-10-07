@@ -389,8 +389,15 @@ describe('titre public trop long (L106)', () => {
     expect(readFileSync(join(dir2, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('status: done');
   });
 
-  it('raf check signale, avec 80 par défaut sans clé', () => {
+  it('raf check ne signale rien sans clé déclarée ni dossier de Nouveautés : aucun site ne publie ce titre', () => {
     const dir = setup();
+    raf(dir, 'public', 'L1', long);
+    expect(raf(dir, 'check').out).not.toContain('titre public');
+  });
+
+  it('raf check signale, avec 80 par défaut sans clé, dans un projet qui publie des Nouveautés', () => {
+    const dir = setup();
+    mkdirSync(join(dir, 'docs/nouveautes'), { recursive: true });
     raf(dir, 'public', 'L1', long);
     const r = raf(dir, 'check');
     expect(r.out).toContain('L1');
@@ -421,6 +428,23 @@ describe('titre public trop long (L106)', () => {
     expect(r.out).toContain('Nouveauté');
     raf(dir, 'public', 'L1', 'court'); // un public: l'emporte sur le titre de la Nouveauté
     expect(raf(dir, 'check').out).not.toContain('88 caractères');
+  });
+
+  it('raf check ne signale pas la Nouveauté longue d\'un lot non visible, ni d\'un lot visible pas terminé', () => {
+    const dir = setup('news:\n  publicTitleMax: 80\n');
+    raf(dir, 'add', 'B'); // L2, non visible
+    entreeLongue(dir);
+    writeFileSync(join(dir, 'docs/nouveautes/2026-10-07-y.md'), readFileSync(join(dir, 'docs/nouveautes/2026-10-07-x.md'), 'utf8').replace('[L1]', '[L2]'));
+    raf(dir, 'done', 'L2', '--force');
+    expect(raf(dir, 'check').out).not.toContain('88 caractères'); // L1 visible mais pas terminé, L2 terminé mais non visible
+  });
+
+  it('raf done accepte un lot non visible dont une Nouveauté citée est longue', () => {
+    const dir = setup('news:\n  publicTitleMax: 80\n');
+    raf(dir, 'add', 'B'); // L2, non visible
+    entreeLongue(dir);
+    writeFileSync(join(dir, 'docs/nouveautes/2026-10-07-y.md'), readFileSync(join(dir, 'docs/nouveautes/2026-10-07-x.md'), 'utf8').replace('[L1]', '[L2]'));
+    expect(raf(dir, 'done', 'L2', '--force').code).toBe(0);
   });
 
   it('raf done refuse un lot visible dont la Nouveauté, reprise par le site, dépasse la limite déclarée', () => {

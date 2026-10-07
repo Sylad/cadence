@@ -472,7 +472,7 @@ in `cadence.yaml` and it is caught before the push:
 
 ```yaml
 news:
-  publicTitleMax: 80      # characters; `raf check` warns at 80 even without the key
+  publicTitleMax: 80      # characters; without the key, `raf check` warns at 80 in a project that has a news directory
 ```
 
 With the key, `raf public`, `raf add --public`, `raf done` (on a lot whose public title is too long) and

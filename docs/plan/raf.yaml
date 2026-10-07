@@ -719,6 +719,39 @@ lots:
     quickwin: true
     created: 2026-10-05
     started: 2026-10-07
+    review:
+      {
+        date: 2026-10-07,
+        verdict: "Commits revus : 7dd2677 feat(L59) (règle dans skills/lead/SKILL.md et test) et 57b4de5 fix(L59) (formule des créneaux libres, test calé sur la phrase de la règle).
+
+
+          Constats : aucun.
+
+
+          Les deux corrections sont bien faites :
+
+          - **Finding 1.** Le skill calcule maintenant les créneaux libres vague par vague (2 − Σ min(cap, dépôts qui ont encore des lots)) et non plus d'après les sessions en cours. C'est cohérent avec liveLines() (command.ts:313-322), qui affiche le plafond et `w.repos` pour chaque vague. J'ai aussi vérifié acquireSlot (registry.ts:105) : les créneaux sont communs à toutes les vagues, donc la somme peut compter trop large. Cette erreur va dans le sens prudent : le lead démarre moins de sous-agents, jamais plus de deux au total. Ce n'est pas un défaut.
+
+          - **Finding 2.** Le test vérifie maintenant la phrase « before starting a\\s+subagent, check `cadence orchestrate --status` » et la formule `min(cap, number of repositories`. Il échouerait si l'une ou l'autre disparaissait du skill.
+
+
+          Les choix d'interprétation de l'auteur sont conformes au lot :
+
+          - modifier seulement le texte du skill, puisque c'est le lead qui lance les sous-agents et qu'aucun code ne peut l'en empêcher ;
+
+          - écrire la règle en anglais, comme le reste du skill ;
+
+          - ne toucher ni au README ni au CHANGELOG ;
+
+          - faire un seul commit pour les deux findings.
+
+
+          Vérifications lancées : `tsc --noEmit` sans erreur ; orchestrate-briefs.test.ts 26/26 ; suite complète 763/764. Le seul échec (deliver.test.ts) est hors du lot et passe quand on lance ce fichier seul (61/61).
+
+
+          compliant — orchestré (vague 2026-10-07-1234, 0 passe(s) de correction + passe des mineurs)",
+        commit: 57b4de5ef94275820435390ba5fcf4753bc9cbe0
+      }
   - id: L60
     title: "orchestrate.ux : déclarer dans cadence.yaml des projets à app (ccc, evatosorus, avatar-pandora, warhammer, finance, ol, maritime) comment voir l'app, pour que la vague fasse la revue UX elle-même (05-10 : toutes faites à la main par le lead)"
     status: todo

@@ -37,6 +37,13 @@ describe('dossiers temporaires de la suite (L45)', () => {
     expect(tempDir().startsWith(`${root}${sep}`)).toBe(true);
   });
 
+  it('npm lancé sous la racine privée n\'y laisse rien (cache de compilation de Node désactivé, L112)', () => {
+    const dir = tempDir();
+    const out = execFileSync('npm', ['--version'], { env: { ...process.env, TMPDIR: dir, TEMP: dir, TMP: dir }, encoding: 'utf8', timeout: 30_000 });
+    expect(out.trim()).toMatch(/^\d+\.\d+\.\d+/);
+    expect(leftovers(dir)).toEqual([]);
+  });
+
   it('cleanupTempDirs supprime les dossiers de tempDir(), même sans droits', () => {
     const a = tempDir();
     const b = tempDir();

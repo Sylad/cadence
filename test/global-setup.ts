@@ -38,9 +38,10 @@ export default function setup(): () => void {
   const root = mkdtempSync(join(realTmp, ROOT_PREFIX));
   writeFileSync(join(root, PID_FILE), pidFileText());
   // os.tmpdir() lit TMPDIR sous POSIX mais TEMP puis TMP sous win32 : on pose les trois.
-  const names = ['TMPDIR', 'TEMP', 'TMP'] as const;
+  // npm ≥ 11.5 active le cache de compilation de Node et y laisse node-compile-cache : on le coupe pour les workers et les enfants.
+  const names = ['TMPDIR', 'TEMP', 'TMP', 'NODE_DISABLE_COMPILE_CACHE'] as const;
   const previous = Object.fromEntries(names.map((n) => [n, process.env[n]]));
-  for (const n of names) process.env[n] = root;
+  for (const n of names) process.env[n] = n === 'NODE_DISABLE_COMPILE_CACHE' ? '1' : root;
   process.env.CADENCE_TEST_TMP_ROOT = root;
   process.env.CADENCE_TEST_PACKAGE = buildThrowawayPackage(root);
   process.env.CADENCE_TEST_REAL_TMP = realTmp;

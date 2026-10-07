@@ -457,11 +457,12 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   save(c);
 
   // La passe des mineurs ne bloque jamais le lot (revue conforme déjà acquise) : une question est rendue en proposition.
-  if (minorsPass) for (const q of rep.questions) propose(c, `[question passe des mineurs] ${q}`);
-  if (!minorsPass && rep.questions.length) {
-    l.questions = rep.questions;
+  const questions = rep.questions.filter((q) => !isNonQuestion(q));
+  if (minorsPass) for (const q of questions) propose(c, `[question passe des mineurs] ${q}`);
+  if (!minorsPass && questions.length) {
+    l.questions = questions;
     l.next = kind;
-    transition(c, 'question', rep.questions[0]);
+    transition(c, 'question', questions[0]);
     return;
   }
   const dirt = [...trackedPaths(done.after), ...done.after.untracked.filter((f) => !done.before.untracked.includes(f))];
@@ -653,6 +654,14 @@ async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise
   }
   l.next = null;
   transition(c, 'ready', 'prêt à livrer');
+}
+
+/** Une « question » vide ou qui dit qu'il n'y en a pas (« aucune question », « no questions », « n/a ») n'arrête pas le lot. */
+export function isNonQuestion(q: string): boolean {
+  const t = q.trim().toLowerCase().replace(/[\s.!:;,-]+$/u, '');
+  if (!t) return true;
+  if (/^(n\/?a|none|nothing|rien|aucune?|néant|neant|nil|-)$/u.test(t)) return true;
+  return /^(aucune?|pas de|plus de|no|none|nothing|je n'ai (aucune|pas de)|i have no|there (are|is) no)\b.{0,20}\bquestions?(\s+\S+){0,3}$/u.test(t);
 }
 
 /** Joue le cycle d'un lot jusqu'à son terme, ou jusqu'à l'arrêt (question, budget, quota). Ne lève jamais. */

@@ -309,6 +309,24 @@ describe('contrôles autour des sessions', () => {
     expect(h.calls[1].brief).toContain('boom');
   });
 
+  it('des « questions » vides ou de non-questions (« aucune question ») n\'arrêtent pas le lot (L52)', async () => {
+    const none: Handler = () => claudeOut(workReport({ questions: ['', '  ', 'Aucune question.', 'Je n\'ai pas de question', 'No questions', 'N/A', 'none'] }));
+    const h = harness({ script: { implement: [none], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).not.toBe('question');
+    expect(c.lot.questions).toEqual([]);
+  });
+
+  it('une vraie question mêlée à des non-questions arrête le lot, seule la vraie est gardée (L52)', async () => {
+    const ask: Handler = () => claudeOut(workReport({ questions: ['Aucune autre question', 'PostgreSQL ou SQLite ?'] }));
+    const h = harness({ script: { implement: [ask] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    expect(c.lot.questions).toEqual(['PostgreSQL ou SQLite ?']);
+  });
+
   it('une question arrête le lot ; la réponse relance l\'étape dans une session neuve', async () => {
     const ask: Handler = () => claudeOut(workReport({ questions: ['PostgreSQL ou SQLite ?'] }));
     const h = harness({ script: { implement: [ask, impl()], review: [ok] } });

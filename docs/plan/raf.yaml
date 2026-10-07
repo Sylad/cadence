@@ -836,17 +836,19 @@ lots:
     created: 2026-10-07
   - id: L80
     title: "orchestrate : environnement par projet (Node via .nvmrc ou orchestrate.env dans cadence.yaml) — Astro exige Node 22, le node par défaut est 20 (evatosorus, ccc, 06-10)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
     tasks:
-      - { id: t1, title: "orchestrate --resume : re-résoudre le .nvmrc de chaque lot vivant et refuser comme au départ (version désinstallée, .nvmrc modifié, vague d'avant L80) — plus de repli silencieux ; test de reprise", status: todo }
-      - { id: t2, title: "session .nvmrc : ne mettre en tête du PATH que node/npm/npx/corepack (dossier de liens dédié dans le dossier de la vague), pour ne pas masquer raf/cadence/claude en service ; README", status: todo }
-      - { id: t3, title: "resolveNode : refuser une version dont le bin ne contient pas node (dossier vide ou cassé) — sinon dossier de liens vide = repli silencieux sur le Node par défaut", status: todo }
-      - { id: t4, title: "test de commande : une version nvm au bin vide ou au node non exécutable (0o644) est refusée au départ et à --resume — couvre realNodeFs.executable", status: todo }
-      - { id: t5, title: "README + dry-run : une version installée sans node exécutable est écartée au profit d'une plus basse valide (le dry-run le signale)", status: todo }
-      - { id: t6, title: "orchestrate : linkNodeBin et writeLot du départ dans le try qui appelle abandon(), pour ne pas laisser de vague réservée si un lien échoue", status: todo }
+      - { id: t1, title: "orchestrate --resume : re-résoudre le .nvmrc de chaque lot vivant et refuser comme au départ (version désinstallée, .nvmrc modifié, vague d'avant L80) — plus de repli silencieux ; test de reprise", status: done }
+      - { id: t2, title: "session .nvmrc : ne mettre en tête du PATH que node/npm/npx/corepack (dossier de liens dédié dans le dossier de la vague), pour ne pas masquer raf/cadence/claude en service ; README", status: done }
+      - { id: t3, title: "resolveNode : refuser une version dont le bin ne contient pas node (dossier vide ou cassé) — sinon dossier de liens vide = repli silencieux sur le Node par défaut", status: done }
+      - { id: t4, title: "test de commande : une version nvm au bin vide ou au node non exécutable (0o644) est refusée au départ et à --resume — couvre realNodeFs.executable", status: done }
+      - { id: t5, title: "README + dry-run : une version installée sans node exécutable est écartée au profit d'une plus basse valide (le dry-run le signale)", status: done }
+      - { id: t6, title: "orchestrate : linkNodeBin et writeLot du départ dans le try qui appelle abandon(), pour ne pas laisser de vague réservée si un lien échoue", status: done }
+    review: { date: 2026-10-07, verdict: "conforme (3e passe) — Node du .nvmrc (plus haute version nvm valide) via un dossier de liens node/npm/npx/corepack en tête du PATH des sessions ; re-résolu à --resume ; refus sans repli silencieux ; dry-run et README ; 686/686. Non vérifié : vraie session claude avec ce PATH", commit: ce303420d3e95f0f36f90f740ff6f6b6d4476f3a }
+    finished: 2026-10-07
   - id: L81
     title: "⚡ Test instable orchestrate-registry.test.ts:149 (L71/t3, attente 0 ms exacte) : rouge sous charge en suite complète, passe seul → npm test / prepublishOnly rouge"
     status: done

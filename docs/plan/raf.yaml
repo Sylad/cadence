@@ -1207,7 +1207,8 @@ lots:
     finished: 2026-10-07
   - id: L110
     title: "precheck (suite L77, défauts observables) : (1) session en lecture seule SANS l'agent code-reviewer (il relance toute la suite et s'arrête faute de commit) — brief dédié, test sur l'agent passé ; (2) un « oui » sans preuve ne rend pas le lot : traité comme partiel, test ; (3) --dry-run ne liste precheck que pour un lot sans commit (même garde lotWork que runLot)"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07

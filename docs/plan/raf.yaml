@@ -1255,7 +1255,8 @@ lots:
     finished: 2026-10-07
   - id: L113
     title: "orchestrate-app.test.ts:282 aléatoire sous charge : « n'a pas répondu en 1 s » échoue dans la suite complète (64 s, 07-10) et passe seul — le test mesure du temps mur ; le rendre déterministe (horloge injectée ou marge ≥ 3×) sans allonger la suite"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-07

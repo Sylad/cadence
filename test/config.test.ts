@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
@@ -156,6 +156,14 @@ describe('readPlanConfig', () => {
     expect(readPlanConfig(docs)?.settings.qaExpectations).toBe('docs/qa.md');
     const out = write(join(repo, 'config', 'cadence.yaml'), `qa:\n  expectations: '${join(tempDir(), 'x.md')}'\n`);
     expect(() => readPlanConfig(out)).toThrow(/hors du dépôt/);
+  });
+
+  it('(L66) un chemin absolu passant par un lien symbolique vers le dépôt est résolu comme le chemin réel', () => {
+    const repo = gitRepo();
+    const link = join(tempDir(), 'link');
+    symlinkSync(repo, link);
+    const file = write(join(link, 'cadence.yaml'), `qa:\n  expectations: '${join(link, 'docs', 'qa.md')}'\n`);
+    expect(readPlanConfig(file)?.settings.qaExpectations).toBe('docs/qa.md');
   });
 
   it.each([

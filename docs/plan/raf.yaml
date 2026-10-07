@@ -1145,11 +1145,12 @@ lots:
       - { date: 2026-10-07, text: "abandonné : déjà fait par la correction de L99 (state.ts:125, repli e instanceof Error ? e.message : String(e))" }
   - id: L101
     title: "agent qa-reviewer : ne jamais attendre en silence son propre travail de fond — passage borné (budget temps), résultats écrits page par page au fil de l'eau (pas un JSON unique en fin de passage, perdu si on l'arrête) ; vécu 07-10 sur ccc : 6 min bloqué « waiting on background work », arrêt demandé → 30/38 pages à 1440 seulement, détail perdu"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-07
-    review: { date: 2026-10-07, verdict: "conforme (1 mineur noté : libellé du CHANGELOG non mis à jour après le correctif par largeur) — orchestré (vague 2026-10-07-2205, 0 passe(s) de correction + passe des mineurs)", commit: 386cd090fc9533b27d061374dbcea66aa603059f }
+    review: { date: 2026-10-07, verdict: "conforme — revue orchestrée sur 386cd09 (1 mineur : libellé CHANGELOG), réglé par le lead en docs ; suite 911/911, build OK (vague 2026-10-07-2205)", commit: 220b89465808adc57e39998d457ccd1838fda8e6 }
+    finished: 2026-10-07
   - id: L102
     title: "raf show <id> : identifiant, statut, dates, after, titre public, notes datées dans l'ordre, puis commits comptés (comme raf commits) ; --notes pour les notes seules (issue #1)"
     status: done
@@ -1189,18 +1190,19 @@ lots:
     finished: 2026-10-07
   - id: L106
     title: "Titre public trop long attrapé avant le push : raf public / raf done / cadence news refusent (ou raf check signale) un titre public au-delà de la limite que la page Plan du site applique au build (80 car. sur ccc, parsePublicPlan) — vécu 07-10 : ccc L32, titre de la Nouveauté repris (88 car.), build Cloudflare Pages rouge, livraison rouge après 600 s ; le build local lancé avant raf done ne l'avait pas vu"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Décision lead 07-10 : la limite vient de cadence.yaml (clé news.publicTitleMax, défaut 80) ; sans clé, raf check avertit seulement, raf public / raf done / cadence news refusent au-delà de la limite déclarée." }
     started: 2026-10-07
     tasks:
-      - { id: t1, title: "raf check et raf done : contrôler aussi le titre repris de la Nouveauté la plus récente qui cite un lot visible terminé sans public: (cas ccc L32, publicTitleOf de plan-public.ts l.112), avec un test de ce cas", status: todo }
-      - { id: t2, title: "cadence news new sans --title : tester le refus d'un titre de lot trop long et proposer --title dans le message (cli.ts:523)", status: todo }
-      - { id: t3, title: "refuseLongTitle de news new : mesurer le titre après fusion des espaces, comme newEntry l'écrit (cli.ts:154, news.ts:195)", status: todo }
-      - { id: t4, title: "newEntry : écrire title: sans coupure de ligne par yaml.stringify (lineWidth 0) ; test avec un titre de plus de 80 caractères — bug antérieur, en-tête YAML illisible (news.ts:201)", status: todo }
-    review: { date: 2026-10-07, verdict: "not compliant: 1 blocking (the ccc L32 case, a news-entry title reused by the site, is caught by neither raf check nor raf done), 1 major (news new without --title refused, untested, message without hint), 1 minor (length measured before whitespace merge) — revue lead 07-10 au HEAD d92a551, sous-tâches L106/* à faire en session de correction", commit: d92a551ec9f66304f6710bb8dece143dbc8a98d9 }
+      - { id: t1, title: "raf check et raf done : contrôler aussi le titre repris de la Nouveauté la plus récente qui cite un lot visible terminé sans public: (cas ccc L32, publicTitleOf de plan-public.ts l.112), avec un test de ce cas", status: done }
+      - { id: t2, title: "cadence news new sans --title : tester le refus d'un titre de lot trop long et proposer --title dans le message (cli.ts:523)", status: done }
+      - { id: t3, title: "refuseLongTitle de news new : mesurer le titre après fusion des espaces, comme newEntry l'écrit (cli.ts:154, news.ts:195)", status: done }
+      - { id: t4, title: "newEntry : écrire title: sans coupure de ligne par yaml.stringify (lineWidth 0) ; test avec un titre de plus de 80 caractères — bug antérieur, en-tête YAML illisible (news.ts:201)", status: done }
+    review: { date: 2026-10-07, verdict: "conforme — revue Opus sur 2b44c11 (2 mineurs), corrigés dans 6244400 ; revue courte lead (agent code-reviewer neuf) sur 6244400 : aucun effet de bord, typecheck OK, 150 tests connexes verts ; dernier mineur (précédence clé/dossier non testée) réglé par le lead, test tué par mutant ; suite complète 911/911, build OK (vague 2026-10-07-2205, rendu au lead pour budget)", commit: f9f61dd9baac08c1093f421a9a194be052553faa }
+    finished: 2026-10-07
   - id: L107
     title: "raf show : les lignes suivantes d'une note sur plusieurs lignes sont décalées sous « notes : » (aujourd'hui en colonne 0, cli.ts:245) ; aide et README sans « en entier / in full », ou affichage des sous-tâches et de l'estimation — revue L102"
     status: done
@@ -1257,9 +1259,10 @@ lots:
     finished: 2026-10-07
   - id: L113
     title: "orchestrate-app.test.ts:282 aléatoire sous charge : « n'a pas répondu en 1 s » échoue dans la suite complète (64 s, 07-10) et passe seul — le test mesure du temps mur ; le rendre déterministe (horloge injectée ou marge ≥ 3×) sans allonger la suite"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "compliant — orchestré (vague 2026-10-07-2205, 0 passe(s) de correction)", commit: 37341b0717764b5a6b45e5d474fdac514754a14d }
+    finished: 2026-10-07

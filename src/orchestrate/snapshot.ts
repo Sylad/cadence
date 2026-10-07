@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, realpathSync, symlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { join, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
@@ -47,16 +48,36 @@ export interface SnapshotDeps {
 
 export const toolDirOf = (waveDir: string) => join(waveDir, 'tool');
 
+/** Refus de prendre l'instantané (avant toute copie) : le message dit quoi faire. */
+export class SnapshotRefusal extends Error {}
+
+/**
+ * Le `node_modules` où les dépendances du paquet se résolvent réellement : celui du paquet, ou — installation npx ou
+ * locale — un dossier parent. On résout `yaml` depuis le paquet et on remonte jusqu'à son `node_modules`.
+ */
+export function resolveModulesDir(packageRoot: string): string {
+  let file: string;
+  try {
+    file = createRequire(join(packageRoot, 'package.json')).resolve('yaml');
+  } catch {
+    throw new SnapshotRefusal(`dépendances introuvables : « yaml » ne se résout pas depuis ${packageRoot} (installation incomplète ?) — instantané impossible, aucune vague lancée`);
+  }
+  const marker = `${sep}node_modules${sep}`;
+  const at = file.lastIndexOf(marker);
+  if (at < 0) throw new SnapshotRefusal(`dépendances introuvables : « yaml » résolu hors de tout node_modules (${file}) — instantané impossible, aucune vague lancée`);
+  return file.slice(0, at + marker.length - 1);
+}
+
 /** Instantané du paquet dans `<vague>/tool/` : le code, les gabarits et les agents d'une vague ne bougent plus. */
 export function takeSnapshot(waveDir: string, packageRoot: string): string {
+  const modules = resolveModulesDir(packageRoot); // avant toute copie
   const tool = toolDirOf(waveDir);
   mkdirSync(tool, { recursive: true });
   for (const name of COPIED) {
     const from = join(packageRoot, name);
     if (existsSync(from)) cpSync(from, join(tool, name), { recursive: true });
   }
-  const modules = join(packageRoot, 'node_modules');
-  if (existsSync(modules)) symlinkSync(modules, join(tool, 'node_modules'), 'dir');
+  symlinkSync(modules, join(tool, 'node_modules'), 'dir');
   return tool;
 }
 

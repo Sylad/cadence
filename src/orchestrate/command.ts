@@ -20,7 +20,7 @@ import { schemaFor } from './schemas.js';
 import { excludeState, lotKey, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
-import { PACKAGE_ROOT, RESERVED_ENV, isSnapshotChild, snapshotExists, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
+import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -363,6 +363,16 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     dryRun(pre.lots, io, deps, budget, id);
     return 0;
   }
+  if (deps.snapshot) {
+    // Refus avant de réserver la vague : rien n'est créé si les dépendances ne se résolvent pas.
+    try {
+      resolveModulesDir(deps.snapshot.packageRoot);
+    } catch (e) {
+      if (!(e instanceof SnapshotRefusal)) throw e;
+      io.err(`orchestrate : ${e.message}`);
+      return 2;
+    }
+  }
   // Processus relancé depuis l'instantané : la vague a déjà été réservée par le processus d'origine.
   const reserved = deps.snapshot ? undefined : io.env[RESERVED_ENV];
   const store = reserved ? new RunStore(launch, reserved) : RunStore.reserve(launch, args.wave ?? defaultWaveBase(io), { exact: args.wave !== undefined });
@@ -375,6 +385,10 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
       return code;
     } catch (e) {
       rmSync(store.dir, { recursive: true, force: true });
+      if (e instanceof SnapshotRefusal) {
+        io.err(`orchestrate : ${e.message}`);
+        return 2;
+      }
       throw e;
     }
   }

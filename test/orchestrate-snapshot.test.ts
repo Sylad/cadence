@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, realpathSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { orchestrate, realOrchestrateDeps, type OrchestrateDeps } from '../src/orchestrate/command.js';
-import { RESERVED_ENV, SNAPSHOT_ENV } from '../src/orchestrate/snapshot.js';
+import { RESERVED_ENV, SNAPSHOT_ENV, takeSnapshot } from '../src/orchestrate/snapshot.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { Plan } from '../src/plan.js';
@@ -24,8 +24,15 @@ function fakePackage(): string {
   cpSync(AGENTS_DIR, join(pkg, 'agents'), { recursive: true });
   mkdirSync(join(pkg, 'skills'));
   writeFileSync(join(pkg, 'package.json'), '{"name":"x"}\n');
-  mkdirSync(join(pkg, 'node_modules'));
+  fakeYaml(join(pkg, 'node_modules'));
   return pkg;
+}
+
+/** De quoi faire résoudre `yaml` : un faux module dans `modules`. */
+function fakeYaml(modules: string) {
+  mkdirSync(join(modules, 'yaml'), { recursive: true });
+  writeFileSync(join(modules, 'yaml/package.json'), '{"name":"yaml","main":"index.js"}\n');
+  writeFileSync(join(modules, 'yaml/index.js'), 'module.exports = {};\n');
 }
 
 function project() {
@@ -219,5 +226,31 @@ describe('(L61/t1) variables de relance : lues par le fils, jamais transmises', 
   it('une variable héritée d\'une autre vague (CADENCE_SNAPSHOT qui n\'est pas CE paquet) ne fait pas passer pour un fils', () => {
     expect(realOrchestrateDeps({ [SNAPSHOT_ENV]: '/une/autre/vague/tool' }).snapshot).toBeDefined();
     expect(realOrchestrateDeps({ [SNAPSHOT_ENV]: ROOT }).snapshot).toBeUndefined();
+  });
+});
+
+describe('(L61/t2) node_modules de l\'instantané : là où les dépendances se résolvent', () => {
+  it('installation npx ou locale : yaml vit hors du paquet, dans un node_modules parent → c\'est celui-là qui est lié', () => {
+    const outer = tempDir();
+    fakeYaml(join(outer, 'node_modules'));
+    const pkg = join(outer, 'node_modules/@sylad/cadence');
+    mkdirSync(join(pkg, 'bin'), { recursive: true });
+    writeFileSync(join(pkg, 'bin/cadence.js'), '// bin\n');
+    writeFileSync(join(pkg, 'package.json'), '{"name":"@sylad/cadence"}\n');
+    const tool = takeSnapshot(join(tempDir(), 'wave'), pkg);
+    expect(lstatSync(join(tool, 'node_modules')).isSymbolicLink()).toBe(true);
+    expect(realpathSync(join(tool, 'node_modules'))).toBe(realpathSync(join(outer, 'node_modules')));
+    expect(existsSync(join(tool, 'node_modules/yaml/package.json'))).toBe(true);
+  });
+
+  it('yaml introuvable : refus AVANT toute copie, code 2, message clair', async () => {
+    const { parent } = project();
+    const s = setup();
+    rmSync(join(s.pkg, 'node_modules'), { recursive: true });
+    const r = ioOf(parent, { CWD_FOR_TEST: parent });
+    expect(await orchestrate(['a:L1'], r.io, s.deps)).toBe(2);
+    expect(r.err.join('\n')).toMatch(/dépendances.*introuvables|yaml/);
+    expect(s.reexecs).toHaveLength(0);
+    expect(existsSync(join(parent, '.cadence'))).toBe(false);
   });
 });

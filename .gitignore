@@ -1,2 +1,4 @@
 node_modules/
 dist/
+# générés par Claude Code au chargement d'un plugin (tsconfig du plugin les étend)
+plugins/*/.claude-plugin/types/

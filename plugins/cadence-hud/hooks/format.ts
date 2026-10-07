@@ -179,3 +179,13 @@ export const modelsText = (models: ModelsSummary): string =>
     .sort(([, a], [, b]) => b.usd - a.usd || b.tokens - a.tokens)
     .map(([name, m]) => `${name} ${k(m.tokens)} $${m.usd.toFixed(2)}`)
     .join(' · ')
+
+/** Un tour fini attribue ses tokens au modèle `name` et la part du coût de session apparue depuis le dernier tour :
+ *  `total` est le coût courant de /cost (undefined quand il n'a pu être lu) ; un total absent, inchangé ou plus bas
+ *  ne répartit rien, jamais de part négative, et la somme des parts reste égale au dernier total vu. */
+export const attributeTurn = (m: ModelsSummary, name: string, tokens: number, total: number | undefined): ModelsSummary => {
+  const seen = total !== undefined && total > m.usdSeen ? total : m.usdSeen
+  const usd = seen - m.usdSeen
+  const before = m.byModel[name] ?? { tokens: 0, usd: 0 }
+  return { byModel: { ...m.byModel, [name]: { tokens: before.tokens + tokens, usd: before.usd + usd } }, usdSeen: seen }
+}

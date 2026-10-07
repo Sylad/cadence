@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotCounts, lotText, modelsText, shortModel, wavePercent } from '../hooks/format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotCounts, lotText, modelsText, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -196,4 +196,26 @@ test('la bande montre la part de chaque modèle à côté du coût', async ($, o
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
   expect(await ui.find({ type: 'Text', text: /fable 410k \$0\.95 · sonnet 85k \$0\.12/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('l’attribution par tour : premier tour, total inconnu, inchangé ou plus bas, et la somme des parts vaut le total', () => {
+  let m = attributeTurn({ byModel: {}, usdSeen: 0 }, 'fable', 1000, 0.5)
+  const of = (name: string) => m.byModel[name] ?? { tokens: NaN, usd: NaN }
+  expect(of('fable').tokens).toBe(1000)
+  expect(of('fable').usd).toBe(0.5)
+  expect(m.usdSeen).toBe(0.5)
+  m = attributeTurn(m, 'sonnet', 200, undefined) // usage() en échec : les tokens comptent, rien n'est réparti
+  expect(of('sonnet').tokens).toBe(200)
+  expect(of('sonnet').usd).toBe(0)
+  expect(m.usdSeen).toBe(0.5)
+  m = attributeTurn(m, 'sonnet', 300, 0.5) // total inchangé
+  expect(of('sonnet').tokens).toBe(500)
+  expect(of('sonnet').usd).toBe(0)
+  m = attributeTurn(m, 'fable', 100, 0.4) // total plus bas : jamais de part négative
+  expect(of('fable').usd).toBe(0.5)
+  expect(m.usdSeen).toBe(0.5)
+  m = attributeTurn(m, 'sonnet', 100, 0.8)
+  const sum = Object.values(m.byModel).reduce((a, s) => a + s.usd, 0)
+  expect(Math.abs(sum - 0.8) < 1e-9).toBe(true)
+  expect(m.usdSeen).toBe(0.8)
 })

@@ -37,5 +37,8 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
 Les vagues sont lues sur disque (`~/.cadence/orchestrate/waves/<pid>.json`, puis `<cwd>/.cadence/runs/<vague>/`),
 par le script python de `hooks/collect.ts` ; aucune commande cadence n'est lancée.
 
+Installer depuis la marketplace du dépôt cadence : `/plugin marketplace add Sylad/cadence` puis
+`/plugin install cadence-hud@cadence`.
+
 Vérifier : `claude plugin validate <dossier>` · `claude plugin test <dossier>` · `tsc -p <dossier>` une fois chargé.
 Charger ailleurs qu'ici : `claude --plugin-dir <dossier>` ou la variable `CLAUDE_CODE_PLUGIN_DIRS=<dossier>`.

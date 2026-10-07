@@ -3,25 +3,7 @@ import type { Register, Timer } from 'claude-code'
 
 import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import {
-  ago,
-  bar,
-  colorOfLot,
-  colorOfPercent,
-  commonProject,
-  fit,
-  k,
-  limitLabel,
-  lotCells,
-  lotCounts,
-  modelsText,
-  pad,
-  shortModel,
-  untilReset,
-  wavePercent,
-  waveSessions,
-  waveStatusFr,
-} from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, k, limitLabel, lotCells, lotCounts, modelsText, pad, shortModel, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -116,12 +98,7 @@ export const register: Register = on => {
       .catch(() => undefined)
     const name = shortModel(used.model)
     const tokens = used.input_tokens + used.output_tokens + used.cache_read_input_tokens + used.cache_creation_input_tokens
-    await update($, models, (m: ModelsSummary) => {
-      const seen = total !== undefined && total > m.usdSeen ? total : m.usdSeen
-      const usd = seen - m.usdSeen
-      const before = m.byModel[name] ?? { tokens: 0, usd: 0 }
-      return { byModel: { ...m.byModel, [name]: { tokens: before.tokens + tokens, usd: before.usd + usd } }, usdSeen: seen }
-    })
+    await update($, models, (m: ModelsSummary) => attributeTurn(m, name, tokens, total))
     return result
   })
 

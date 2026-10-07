@@ -28,7 +28,7 @@ vi.mock('node:fs', async (orig) => {
 });
 
 const { linkNewFile } = await import('../src/state.js');
-const { takeUrlLock } = await import('../src/orchestrate/app.js');
+const { startApp, takeUrlLock, uxLockFile } = await import('../src/orchestrate/app.js');
 
 const dir = tempDir();
 afterEach(() => {
@@ -66,5 +66,16 @@ describe('takeUrlLock : verrou remplacé entre la lecture et le renommage', () =
     expect(readFileSync(lock, 'utf8')).toBe(String(process.ppid));
     expect(readdirSync(dir).filter((n) => n.startsWith('race.lock.'))).toEqual([]);
     rmSync(lock, { force: true });
+  });
+});
+
+describe('startApp : verrou impossible à poser', () => {
+  it('EPERM : non vérifiée avec la cause (la revue de code suit), rien lancé, pas d\'exception', async () => {
+    const url = 'http://127.0.0.1:59871/';
+    hooks.link = errno('EPERM');
+    const app = await startApp({ command: 'exit 1', url, cwd: dir, log: join(dir, 'app.log'), timeoutMs: 1000, every: 10 });
+    expect(app.state.kind === 'unverified' && app.state.cause).toContain('EPERM');
+    expect(existsSync(uxLockFile(url))).toBe(false);
+    expect(existsSync(join(dir, 'app.log'))).toBe(false);
   });
 });

@@ -121,9 +121,14 @@ export async function startApp(o: AppOpts): Promise<AppRun> {
   const deadline = Date.now() + o.timeoutMs;
   const lock = uxLockFile(o.url);
   const held = { state: { kind: 'unverified', cause: `url tenue par une autre vague (${o.url})` }, stop: none } as const;
-  while (!takeUrlLock(lock)) {
-    if (Date.now() >= deadline) return held;
-    await sleep(o.every ?? 500);
+  try {
+    while (!takeUrlLock(lock)) {
+      if (Date.now() >= deadline) return held;
+      await sleep(o.every ?? 500);
+    }
+  } catch (e) {
+    // Verrou impossible à poser (pas de liens physiques…) : comme un journal illisible, la revue UX n'a pas lieu, la cause est dite.
+    return { state: { kind: 'unverified', cause: `verrou ${lock} : ${(e as Error).message}` }, stop: none };
   }
   const release = () => releaseUrlLock(lock);
   if (Date.now() >= deadline) {

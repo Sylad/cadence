@@ -604,3 +604,63 @@ describe('point d\'entrée', () => {
     expect(bin).toContain('cadence orchestrate <projet>:<lot>');
   });
 });
+
+describe('Node du projet (.nvmrc)', () => {
+  /** Un faux ~/.nvm/versions/node avec les versions données. */
+  function fakeNvm(versions: string[]): string {
+    const dir = tempDir();
+    for (const v of versions) mkdirSync(join(dir, 'versions/node', v, 'bin'), { recursive: true });
+    return dir;
+  }
+  const run = async (parent: string, argv: string[], deps: OrchestrateDeps, env: Record<string, string>) => {
+    const r = io(parent, env);
+    const code = await orchestrate(argv, r.io, deps);
+    return { code, ...r };
+  };
+
+  it('.nvmrc : chaque session part avec le Node en tête du PATH, process.env intact', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
+    writeFileSync(join(dirs.a, '.nvmrc'), 'v22\n');
+    const nvm = fakeNvm(['v20.20.2', 'v22.22.2', 'v22.22.3']);
+    const seen: Record<string, string | undefined> = {};
+    const before = process.env.PATH;
+    const f = fakeDeps();
+    const inner = f.deps.claude;
+    f.deps.claude = async (args, o) => {
+      seen[`${o.cwd.endsWith('/a') ? 'a' : 'b'}:${kindOf(args)}`] = o.env.PATH;
+      return inner(args, o);
+    };
+    const r = await run(parent, ['a:L1', 'b:L1'], f.deps, { NVM_DIR: nvm });
+    expect(r.code).toBe(0);
+    const want = join(nvm, 'versions/node/v22.22.3/bin');
+    const aPaths = Object.entries(seen).filter(([k]) => k.startsWith('a:')).map(([, v]) => v);
+    expect(aPaths.length).toBeGreaterThanOrEqual(2); // implement + revue, toutes préfixées
+    for (const p of aPaths) expect(p!.split(':')[0]).toBe(want);
+    for (const [k, v] of Object.entries(seen)) if (k.startsWith('b:')) expect(v).toBeUndefined(); // pas de .nvmrc : inchangé
+    expect(process.env.PATH).toBe(before);
+  });
+
+  it('version absente : refus code 2 avant d\'agir, avec la version et le dossier', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    writeFileSync(join(dirs.a, '.nvmrc'), '24\n');
+    const nvm = fakeNvm(['v22.22.3']);
+    const f = fakeDeps();
+    const r = await run(parent, ['a:L1'], f.deps, { NVM_DIR: nvm });
+    expect(r.code).toBe(2);
+    expect(r.err.join('\n')).toContain(`a:L1 : .nvmrc 24 : aucun Node installé correspondant dans ${join(nvm, 'versions/node')}`);
+    expect(f.calls).toEqual([]);
+    expect(existsSync(join(parent, '.cadence'))).toBe(false);
+  });
+
+  it('--dry-run : une ligne node par lot avec .nvmrc, rien sans', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
+    writeFileSync(join(dirs.a, '.nvmrc'), '22');
+    const r = await run(parent, ['a:L1', 'b:L1', '--dry-run'], fakeDeps().deps, { NVM_DIR: fakeNvm(['v22.22.2', 'v22.22.3']) });
+    try {
+      expect(r.code).toBe(0);
+      expect(r.out.filter((l) => l.includes('node :'))).toEqual(['  node : v22.22.3 (.nvmrc 22)']);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+});

@@ -18,6 +18,7 @@ import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { runPool } from './pool.js';
 import { schemaFor } from './schemas.js';
 import { excludeState, lotKey, newLot, RunStore, type LotState, type WaveState } from './state.js';
+import { nvmVersionsDir, resolveNode } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
 
 export interface OrchestrateIo {
@@ -210,9 +211,15 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       const busy = activeLock(join(sharedStateDir(t.repo), REPO_LOCK));
       if (busy && !opts.resume) refusals.push(`${basename(t.repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
     }
+    const node = resolveNode(t.repo, nvmVersionsDir(io.env));
+    if (node.kind === 'missing') {
+      refusals.push(`${key} : ${node.message}`);
+      continue;
+    }
     const small = lot.estimate <= 0.5 || lot.quickwin;
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, model: t.model, readOnlyPlan: plan.readonly });
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
+    if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin };
     lots.push(state);
   }
   return { refusals, lots };
@@ -250,6 +257,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     io.out(`  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
+    if (l.node) io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted})`);
     const steps: { kind: 'implement' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: 'implement', model: l.model }];
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: 'opus' });
     else {

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { parse } from 'yaml';
 import { RafError } from '../plan.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
@@ -23,6 +23,8 @@ export interface StepSpec {
   permissionMode: string;
   addDirs: string[];
   timeoutMs: number;
+  /** Dossier `bin` d'un Node (`.nvmrc` du projet) : mis en tête du PATH de la session, jamais de l'orchestrateur. */
+  nodeBin?: string;
 }
 
 export interface AgentDef {
@@ -117,7 +119,7 @@ export async function runSession(
   deps: { claude: ClaudeFn; agents: Record<string, AgentDef>; onSpawn?: (pid: number) => void },
 ): Promise<SessionOutcome> {
   const launch = (args: string[]) =>
-    deps.claude(args, { cwd: spec.cwd, env: { CADENCE_ORCHESTRATED: spec.wave }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
+    deps.claude(args, { cwd: spec.cwd, env: { CADENCE_ORCHESTRATED: spec.wave, ...(spec.nodeBin ? { PATH: `${spec.nodeBin}${delimiter}${process.env.PATH ?? ''}` } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
   const out = await launch(buildArgs(spec, deps.agents));
   const first = classify(out);
   const missing = first.kind === 'failed' && !out.timedOut && out.code === 0 ? lacksStructuredOutput(out.stdout) : null;

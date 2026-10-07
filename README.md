@@ -752,6 +752,16 @@ orchestrate:
   verdict: python3 scripts/raf.py note {lot} "revue de code : {verdict}"
 ```
 
+**Node per project (`.nvmrc`)**: when a project has a `.nvmrc` at its root, every session the
+orchestrator launches for it (implementation, UX and code reviews, corrections) runs with the matching Node
+first in its `PATH`, so `node`, `npm` and `npx` resolve to it (Astro needs 22 while the default may be 20).
+The file is read trimmed (`22`, `v22`, `22.22`, `v22.22.3`); the highest matching version installed under
+`$NVM_DIR/versions/node` (default `~/.nvm/versions/node`) is used. Only the sessions' environment changes,
+never the orchestrator's own. No `.nvmrc` → nothing changes. A `.nvmrc` that cannot be resolved (`lts/*`, an
+alias, a version not installed) refuses the lot before anything is started (exit 2), naming the requested
+version and the folder searched — there is no silent fallback to the default Node. `--dry-run` prints
+`node : v22.22.3 (.nvmrc 22)` under each lot that has one.
+
 Without `start`, a read-only plan's `todo` lot is refused (start it with the project's tool); without
 `verdict`, the review verdict stays in the wave's state and you report it. Only the plan's files
 (`plan.path`, `plan.files`, the QA expectations file) are committed from those commands; anything else dirty stops the lot (`.cadence/` and `.playwright-mcp/` excepted, as above).

@@ -74,6 +74,8 @@ export interface LotState {
   small: boolean;
   model: Model;
   readOnlyPlan: boolean;
+  /** Node imposé par le `.nvmrc` du projet : ses sessions l'ont en tête du PATH. Absent sans .nvmrc. */
+  node?: { version: string; wanted: string; bin: string };
   /** Lots du même projet, plus tôt dans la vague, dont celui-ci dépend (`after`) : il attend qu'ils soient prêts. */
   dependsOn?: string[];
   status: LotStatus;

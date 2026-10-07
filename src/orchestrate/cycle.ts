@@ -283,6 +283,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       wave: w.id,
       permissionMode: c.config.permissionMode,
       addDirs: c.config.addDirs,
+      nodeBin: l.node?.bin,
       timeoutMs: write ? c.config.timeouts.work : c.config.timeouts.review,
     },
     {

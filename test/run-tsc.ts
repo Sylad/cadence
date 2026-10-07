@@ -8,8 +8,9 @@ export function runCompiler(file: string, args: string[], cwd: string): void {
   try {
     execFileSync(file, args, { cwd, stdio: 'pipe', encoding: 'utf8' });
   } catch (e) {
-    const err = e as Error & { stdout?: string; stderr?: string };
-    const out = [err.stdout, err.stderr].map((s) => String(s ?? '').trim()).filter(Boolean).join('\n');
+    // stderr est déjà dans err.message (Node l'y ajoute) : on n'ajoute que stdout.
+    const err = e as Error & { stdout?: string };
+    const out = String(err.stdout ?? '').trim();
     throw new Error(`${err.message}${out ? `\n${out}` : ''}`, { cause: e });
   }
 }

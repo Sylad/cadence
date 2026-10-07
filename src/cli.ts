@@ -46,6 +46,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf list [--status todo|doing|done|dropped]
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
+  raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot (ou citant un id inconnu) sans réécrire l'historique ; raf check --ignored les liste
   raf gantt [-o docs/plan/gantt.html]
   raf hook install
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom]   une session claude neuve par étape ; --status [vague] ; --resume [vague] [--budget 1M] [--answer projet:lot "réponse"]
@@ -128,6 +129,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       sha: { type: 'string' },
       retry: { type: 'string' },
       clear: { type: 'boolean' },
+      ignored: { type: 'boolean' },
       notes: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -273,7 +275,28 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'now':
       return now(loadPlan(), root, newsDir, today, io);
+    case 'ignore': {
+      need(1, 'ignore <sha> | "<sujet exact>" [--reason texte]');
+      const plan = loadPlan();
+      const arg = rest.join(' ');
+      const sha = resolveCommit(root, rest[0]);
+      const commits = planCommits(plan, root);
+      const found = rest.length === 1 && sha ? commits.find((c) => c.sha === sha) : commits.find((c) => c.subject === arg);
+      if (!found) throw new RafError(`aucun commit ne correspond à « ${arg} » (sha ou sujet exact)`);
+      // Un sha est exact ; un sujet vaut pour tous les commits qui le portent.
+      const bySha = rest.length === 1 && sha !== null;
+      plan.acknowledge({ ...(bySha ? { sha: found.sha, subject: found.subject } : { subject: found.subject }), date: today, ...(values.reason ? { reason: values.reason } : {}) });
+      plan.save();
+      io.out(`${bySha ? short(found) : found.subject} acquitté`);
+      return 0;
+    }
     case 'check': {
+      if (values.ignored) {
+        const list = loadPlan().acknowledged;
+        if (list.length === 0) io.out('aucun commit acquitté');
+        for (const a of list) io.out(`${a.sha ? a.sha.slice(0, 7) : 'sujet  '} ${a.subject ?? ''}  (${a.date}${a.reason ? ` — ${a.reason}` : ''})`);
+        return 0;
+      }
       const idle = values.idle === undefined ? 7 : Number(values.idle);
       if (!Number.isInteger(idle) || idle < 0) throw new RafError(`--idle invalide : ${values.idle}`);
       const issues = audit(loadPlan(), root, newsDir, today, { since: values.since, idle });

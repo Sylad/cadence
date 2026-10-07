@@ -55,14 +55,21 @@ export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
   return files.length > 0 && files.every((f) => own.has(f) && (f !== config || onlyPlanKeyChanged(root, sha, f)));
 }
 
+/** Le commit a été acquitté par « raf ignore » : par son sha, ou par son sujet exact. */
+export function isAcknowledged(plan: Plan, c: Commit): boolean {
+  return plan.acknowledged.some((a) => (a.sha !== undefined && a.sha === c.sha) || (a.sha === undefined && a.subject === c.subject));
+}
+
 /**
- * N'ont pas besoin de citer un lot : un commit d'entretien du plan (cf. isPlanOnly) et un commit
- * automatique dont le sujet correspond à un motif `ignore:` du plan.
+ * N'ont pas besoin de citer un lot : un commit d'entretien du plan (cf. isPlanOnly), un commit
+ * automatique dont le sujet correspond à un motif `ignore:` du plan et un commit acquitté (`raf ignore`) ;
+ * un commit acquitté n'est pas non plus signalé pour un identifiant cité inconnu.
  */
 export function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
   const { patterns } = plan.ignore;
-  const orphans = linked.orphans.filter((c) => !patterns.some((re) => re.test(c.subject)) && !isPlanOnly(c.sha, plan, root));
-  return { ...linked, orphans };
+  const acked = (c: Commit) => isAcknowledged(plan, c);
+  const orphans = linked.orphans.filter((c) => !patterns.some((re) => re.test(c.subject)) && !acked(c) && !isPlanOnly(c.sha, plan, root));
+  return { ...linked, orphans, unknown: linked.unknown.filter((u) => !acked(u.commit)) };
 }
 
 /** Fenêtre de l'audit : --since, sinon la date d'adoption du plan, sinon 30 jours. */

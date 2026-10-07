@@ -127,6 +127,14 @@ lots: []
 `;
 }
 
+/** Exemption d'un commit : `sha` complet ou `subject` exact (au moins l'un), datée et motivée. */
+export interface Acknowledged {
+  sha?: string;
+  subject?: string;
+  date: Day;
+  reason?: string;
+}
+
 export class Plan {
   private constructor(
     readonly path: string,
@@ -208,6 +216,32 @@ export class Plan {
       }
     }
     return { patterns, invalid };
+  }
+
+  /** Commits acquittés (`raf ignore`) : exemptés de « sans lot » et d'« inconnu », par sha complet ou par sujet exact. */
+  get acknowledged(): Acknowledged[] {
+    const raw = this.doc.get('acknowledged');
+    if (!isSeq(raw)) return [];
+    return (raw.toJSON() as unknown[]).flatMap((e) => {
+      const o = (e ?? {}) as Record<string, unknown>;
+      const sha = o.sha == null ? undefined : String(o.sha);
+      const subject = o.subject == null ? undefined : String(o.subject);
+      if (!sha && !subject) return [];
+      return [{ sha, subject, date: String(o.date ?? ''), reason: o.reason == null ? undefined : String(o.reason) }];
+    });
+  }
+
+  /** Acquitte un commit : une ligne datée dans la section `acknowledged:` du plan. */
+  acknowledge(entry: Acknowledged): void {
+    this.writable();
+    let list = this.doc.get('acknowledged');
+    if (!isSeq(list)) {
+      list = this.doc.createNode([]);
+      this.doc.set('acknowledged', list);
+    }
+    const node = this.doc.createNode(Object.fromEntries(Object.entries(entry).filter(([, v]) => v !== undefined))) as YAMLMap;
+    node.flow = true;
+    (list as YAMLSeq).add(node);
   }
 
   /** Fichier de configuration lu pour ce plan, null quand on n'en connaît pas (cadence.yaml à la racine alors). */

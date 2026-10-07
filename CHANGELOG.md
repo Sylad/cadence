@@ -25,6 +25,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ## [Unreleased]
 
 ### Added
+- `raf ignore <sha> | "exact subject" [--reason text]` acknowledges a commit without a lot (a tooling chore, a plan commit citing an unknown id) without rewriting history: a dated, reasoned line in the plan's `acknowledged:` section, honoured by `raf check` and `session close`; `raf check --ignored` lists them. (L73)
 - The `code-reviewer` and `ux-reviewer` agents and the orchestrate review briefs now propose a sub-task only for a minor finding that describes an observable bug (a wrong output, a crash, a measured regression); any other minor stays a note of the lot, and the `lead` skill applies the same rule, so a review no longer feeds the next one. (L109)
 - `cadence orchestrate` sizes the review to the lot (L108): a lot whose `estimate` is at most
   0.25 day gets one single review (Sonnet, `code-reviewer` agent, same criteria) and no minors

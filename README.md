@@ -86,6 +86,8 @@ raf gantt                         # docs/plan/gantt.html
 | `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |
+| `raf ignore <sha> \| "exact subject" [--reason text]` | acknowledge a commit without a lot (tooling chore, a plan commit citing an unknown id) without rewriting history: a dated, reasoned line in the plan's `acknowledged:` section; a sha is exact, a subject covers every commit carrying it |
+| `raf check --ignored` | list the acknowledged commits with their date and reason |
 | `raf check [--since date] [--idle 7]` | since the plan's adoption date by default: commits without a lot (commits touching only plan files are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
 | `raf gantt [-o file]` | standalone Gantt page |
 | `raf hook install` | add the (non-blocking, read-only) post-commit hook |

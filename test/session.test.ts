@@ -93,6 +93,14 @@ describe('session close', () => {
     expect(out).toMatch(/✗ pas fermé : \d+ point\(s\)/);
   });
 
+  it('un commit acquitté par raf ignore ne compte plus comme « sans lot » (ni à la clôture)', async () => {
+    const dir = await project();
+    commit(dir, 'chore: .gitignore', '2026-09-28T11:00:00');
+    expect((await cad(dir, 'session', 'close')).out).toContain('sans lot');
+    expect((await cad(dir, 'ignore', 'chore: .gitignore', '--reason', 'outillage')).code).toBe(0);
+    expect((await cad(dir, 'session', 'close')).out).not.toContain('sans lot');
+  });
+
   it('code 0 sur un dépôt propre et poussé', async () => {
     const origin = tempDir();
     git(origin, 'init', '-q', '--bare', '-b', 'main');

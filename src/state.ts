@@ -79,12 +79,12 @@ export function lockAlive(lock: { pid: number; unreadable?: boolean; ageMs: numb
   return lock.unreadable ? lock.ageMs < 5_000 : pidAlive(lock.pid);
 }
 
-/** Pose le verrou de façon atomique (lien vers un fichier complet) ; false s'il existe déjà. */
-export function writeLock(dir: string, lock: Lock): boolean {
-  const tmp = join(dir, `deliver.lock.${lock.pid}.${Date.now()}.tmp`);
-  writeFileSync(tmp, JSON.stringify(lock));
+/** Pose un fichier de façon atomique (lien vers un fichier complet : il n'existe jamais à moitié écrit) ; false s'il existe déjà. `tag` distingue les fichiers temporaires d'un même processus. */
+export function linkNewFile(file: string, content: string, tag: string | number): boolean {
+  const tmp = `${file}.${tag}.${Date.now()}.tmp`;
+  writeFileSync(tmp, content);
   try {
-    linkSync(tmp, lockPath(dir));
+    linkSync(tmp, file);
     return true;
   } catch {
     return false;
@@ -93,27 +93,42 @@ export function writeLock(dir: string, lock: Lock): boolean {
   }
 }
 
-/** Retire un verrou périmé seulement s'il est encore celui qu'on a lu ; sinon le laisse en place. */
-export function removeStaleLock(dir: string, seen: Lock): boolean {
-  const aside = join(dir, `deliver.lock.stale.${process.pid}`);
+/**
+ * Retire un verrou périmé seulement s'il est encore celui qu'on a lu : il est écarté par renommage, `same` relit
+ * l'écart, et s'il a changé il est rendu à son nouveau porteur. Partagé par le verrou de livraison et celui de l'URL UX.
+ */
+export function removeStaleFile(file: string, same: (aside: string) => boolean): boolean {
+  const aside = `${file}.stale.${process.pid}`;
   try {
-    renameSync(lockPath(dir), aside);
+    renameSync(file, aside);
   } catch {
     return false;
   }
-  const now = readLockFile(aside);
-  if (now && now.pid === seen.pid && now.sha === seen.sha && now.started === seen.started) {
+  if (same(aside)) {
     rmSync(aside, { force: true });
     return true;
   }
   // Un autre processus a pris le verrou entre-temps : le lui rendre.
   try {
-    linkSync(aside, lockPath(dir));
+    linkSync(aside, file);
   } catch {
     // Un troisième l'a déjà repris : le sien fait foi.
   }
   rmSync(aside, { force: true });
   return false;
+}
+
+/** Pose le verrou de façon atomique (lien vers un fichier complet) ; false s'il existe déjà. */
+export function writeLock(dir: string, lock: Lock): boolean {
+  return linkNewFile(lockPath(dir), JSON.stringify(lock), lock.pid);
+}
+
+/** Retire un verrou périmé seulement s'il est encore celui qu'on a lu ; sinon le laisse en place. */
+export function removeStaleLock(dir: string, seen: Lock): boolean {
+  return removeStaleFile(lockPath(dir), (aside) => {
+    const now = readLockFile(aside);
+    return !!now && now.pid === seen.pid && now.sha === seen.sha && now.started === seen.started;
+  });
 }
 
 /** Retire le verrou s'il appartient à ce processus. */

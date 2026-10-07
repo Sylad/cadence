@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { headSha, onRemote, repoStatus } from '../src/git.js';
-import { appendDelivery, clearNext, lastDelivery, lockAlive, lockPath, pidAlive, readLock, readNext, releaseLock, removeStaleLock, sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
+import { appendDelivery, clearNext, lastDelivery, lockAlive, lockPath, pidAlive, readLock, readNext, releaseLock, removeStaleFile, removeStaleLock, sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -101,5 +101,33 @@ describe('état local', () => {
   it('détecte un pid mort', () => {
     expect(pidAlive(process.pid)).toBe(true);
     expect(pidAlive(2 ** 22 + 12345)).toBe(false);
+  });
+});
+
+describe('removeStaleFile (protocole partagé des verrous)', () => {
+  it('retire le fichier lu ; s\'il a changé entre la lecture et le renommage, le rend à son porteur', () => {
+    const dir = tempDir();
+    const file = join(dir, 'x.lock');
+    writeFileSync(file, 'ancien');
+    expect(removeStaleFile(file, (aside) => readFileSync(aside, 'utf8') === 'ancien')).toBe(true);
+    expect(existsSync(file)).toBe(false);
+
+    writeFileSync(file, 'nouveau'); // pris par un tiers après notre lecture de « ancien »
+    expect(removeStaleFile(file, (aside) => readFileSync(aside, 'utf8') === 'ancien')).toBe(false);
+    expect(readFileSync(file, 'utf8')).toBe('nouveau');
+    expect(readdirSync(dir)).toEqual(['x.lock']);
+  });
+
+  it('un tiers qui pose le verrou pendant l\'écart garde le sien', () => {
+    const dir = tempDir();
+    const file = join(dir, 'x.lock');
+    writeFileSync(file, 'nouveau');
+    const kept = removeStaleFile(file, (aside) => {
+      writeFileSync(file, 'tiers'); // le lien de retour échoue : le tiers fait foi
+      return readFileSync(aside, 'utf8') === 'ancien';
+    });
+    expect(kept).toBe(false);
+    expect(readFileSync(file, 'utf8')).toBe('tiers');
+    expect(readdirSync(dir)).toEqual(['x.lock']);
   });
 });

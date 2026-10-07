@@ -1,8 +1,8 @@
 import { spawn } from 'node:child_process';
-import { closeSync, linkSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pidAlive } from '../state.js';
+import { linkNewFile, pidAlive, removeStaleFile } from '../state.js';
 import { withoutLaunchVars } from './snapshot.js';
 
 /** Défaut de `orchestrate.ux.timeout` : secondes d'attente de la réponse de l'application. */
@@ -93,36 +93,12 @@ function readUrlLock(file: string): { text: string; age: number } | null {
  */
 export function takeUrlLock(file: string, pid = process.pid): boolean {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const tmp = `${file}.${pid}.${Date.now()}.${attempt}.tmp`;
-    writeFileSync(tmp, String(pid));
-    try {
-      linkSync(tmp, file);
-      return true;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
-    } finally {
-      rmSync(tmp, { force: true });
-    }
+    if (linkNewFile(file, String(pid), `${pid}.${attempt}`)) return true;
     const seen = readUrlLock(file);
     if (!seen) continue; // rendu entre-temps
     // Un fichier vide est un verrou posé par une version qui l'écrivait en deux temps : on ne le vole qu'au bout de 5 s.
     if (seen.text === '' ? seen.age < 5_000 : pidAlive(Number(seen.text))) return false;
-    const aside = `${file}.stale.${process.pid}`;
-    try {
-      renameSync(file, aside);
-    } catch {
-      continue;
-    }
-    if (readUrlLock(aside)?.text === seen.text) {
-      rmSync(aside, { force: true });
-    } else {
-      try {
-        linkSync(aside, file); // un autre l'a pris entre la lecture et le renommage : le lui rendre
-      } catch {
-        // repris par un tiers : le sien fait foi
-      }
-      rmSync(aside, { force: true });
-    }
+    removeStaleFile(file, (aside) => readUrlLock(aside)?.text === seen.text);
   }
   return false;
 }

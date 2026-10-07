@@ -20,15 +20,20 @@ export const bar = (percent: number | undefined, cells = 10): string => {
   return '▰'.repeat(full) + '▱'.repeat(cells - full)
 }
 
-/** Durée courte : 42 s, 3 min, 1 h 05. */
+/** Durée courte : 42 s, 3 min, 1 h 05, puis en jours dès 24 h : 6 j 15 h, 3 j. */
 export const duration = (ms: number): string => {
   const s = Math.max(0, Math.round(ms / 1000))
   if (s < 60) return `${s} s`
   const m = Math.floor(s / 60)
   if (m < 60) return `${m} min`
   const h = Math.floor(m / 60)
-  return `${h} h ${String(m % 60).padStart(2, '0')}`
+  if (h < 24) return `${h} h ${String(m % 60).padStart(2, '0')}`
+  const d = Math.floor(h / 24)
+  return h % 24 === 0 ? `${d} j` : `${d} j ${h % 24} h`
 }
+
+/** Complète à `width` cellules (pour aligner une colonne). */
+export const pad = (text: string, width: number): string => text.padEnd(width)
 
 /** Temps avant une date ISO ("↻ 2 h 10"), ou vide si inconnue ou passée. */
 export const untilReset = (iso: string | undefined, now: number): string => {
@@ -71,20 +76,34 @@ const STATUS_FR: Record<string, string> = {
   suspended: 'suspendu',
 }
 
-/** "L75 corrige · fix@sonnet 3 min ×2" */
-export const lotText = (lot: WaveLot, now: number): string => {
-  const parts = [`${lot.lot} ${STATUS_FR[lot.status] ?? lot.status}`]
+export const lotStatusFr = (status: string): string => STATUS_FR[status] ?? status
+
+/** Les trois colonnes d'un lot : "L75" · "corrige" · "fix@sonnet 3 min +1 ✝ · p2". */
+export const lotCells = (lot: WaveLot, now: number): { lot: string; status: string; detail: string } => {
+  const detail: string[] = []
   if (lot.step) {
     const since = Date.parse(lot.step.started)
     const age = Number.isFinite(since) ? ` ${duration(now - since)}` : ''
     const dead = lot.step.alive ? '' : ' ✝'
     const sub = lot.step.sub > 0 ? ` +${lot.step.sub}` : ''
-    parts.push(`${lot.step.kind}@${lot.step.model}${age}${sub}${dead}`)
+    detail.push(`${lot.step.kind}@${lot.step.model}${age}${sub}${dead}`)
   } else if (lot.next && lot.status !== 'ready') {
-    parts.push(`→ ${lot.next}`)
+    detail.push(`→ ${lot.next}`)
   }
-  if (lot.pass > 0) parts.push(`p${lot.pass}`)
-  return parts.join(' · ')
+  if (lot.pass > 0) detail.push(`p${lot.pass}`)
+  return { lot: lot.lot, status: lotStatusFr(lot.status), detail: detail.join(' · ') }
+}
+
+/** "L75 corrige · fix@sonnet 3 min" — les cellules sur une ligne. */
+export const lotText = (lot: WaveLot, now: number): string => {
+  const c = lotCells(lot, now)
+  return [`${c.lot} ${c.status}`, c.detail].filter(Boolean).join(' · ')
+}
+
+/** Le projet commun à tous les lots d'une vague, ou null s'ils en ont plusieurs. */
+export const commonProject = (wave: Wave): string | null => {
+  const projects = new Set(wave.lots.map(l => l.project))
+  return projects.size === 1 ? [...projects][0]! : null
 }
 
 export const wavePercent = (wave: Wave): number | undefined =>

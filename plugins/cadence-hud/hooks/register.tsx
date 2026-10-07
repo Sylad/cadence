@@ -1,16 +1,18 @@
 import { atom, read, update } from 'claude-code'
 import type { Register, Timer } from 'claude-code'
 
-import type { AgentsSummary, Usage, Wave } from '../types'
+import type { AgentsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
 import {
   bar,
   colorOfLot,
   colorOfPercent,
+  commonProject,
   fit,
   k,
   limitLabel,
-  lotText,
+  lotCells,
+  pad,
   untilReset,
   wavePercent,
   waveSessions,
@@ -117,13 +119,14 @@ export const register: Register = on => {
 
     const { Box, Text } = $.ui.resolve(e)
     const width = Math.max(20, e.props.bodyColumns)
-    const sep = <Text dimColor> · </Text>
+    const sep = <Text dimColor>{'  │  '}</Text>
+    const pct = (p: number | undefined) => (p === undefined ? '  —' : `${String(p).padStart(3)} %`)
 
     const contextRow = u && (
       <Box key="usage" flexDirection="row">
         <Text dimColor>ctx </Text>
         <Text color={colorOfPercent(u.percent, 50, 75)} bold>
-          {bar(u.percent)} {u.percent === undefined ? '—' : `${u.percent} %`}
+          {bar(u.percent)} {pct(u.percent)}
         </Text>
         <Text dimColor> {k(u.tokens)}/{k(u.window)}</Text>
         {u.limits.map(l => (
@@ -131,7 +134,7 @@ export const register: Register = on => {
             {sep}
             <Text dimColor>{limitLabel(l.kind)} </Text>
             <Text color={colorOfPercent(l.percentUsed)} bold>
-              {l.percentUsed} %
+              {pct(l.percentUsed)}
             </Text>
             {untilReset(l.resetsAt, at) ? <Text dimColor> {untilReset(l.resetsAt, at)}</Text> : null}
           </Text>
@@ -157,40 +160,68 @@ export const register: Register = on => {
     const waveRows = w.map(wave => {
       const percent = wavePercent(wave)
       const sessions = waveSessions(wave)
-      const queued = wave.lots.filter(l => l.status === 'queued').length
-      const head = `⟳ ${wave.id} ${waveStatusFr(wave.status)}`
+      const project = commonProject(wave)
+      const label = (lot: WaveLot) => (project ? lot.lot : `${lot.project}:${lot.lot}`)
+      const active = wave.lots.filter(l => l.status !== 'queued')
+      const queued = wave.lots.filter(l => l.status === 'queued')
+      const cells = active.map(lot => {
+        const c = lotCells(lot, at)
+        return { lot, label: label(lot), status: c.status, detail: c.detail }
+      })
+      const lotWidth = Math.max(0, ...cells.map(c => c.label.length))
+      const statusWidth = Math.max(0, ...cells.map(c => c.status.length), queued.length > 0 ? 'en attente'.length : 0)
+      const detailWidth = width - 2 - lotWidth - 2 - statusWidth - 2
 
       return (
         <Box key={`wave-${wave.id}`} flexDirection="column">
           <Box flexDirection="row">
             <Text color="claude" bold>
-              {head}
+              ⟳ {project ? `${project} · ` : ''}
+              {wave.id} {waveStatusFr(wave.status)}
             </Text>
             {sep}
             <Text dimColor>budget </Text>
             <Text color={colorOfPercent(percent)} bold>
+              {bar(percent)} {pct(percent)}
+            </Text>
+            <Text dimColor>
+              {' '}
               {k(wave.consumed)}/{k(wave.budget)}
-              {percent === undefined ? '' : ` ${percent} %`}
             </Text>
             {sep}
             <Text dimColor>
               {sessions} session{sessions > 1 ? 's' : ''}
               {wave.cap ? `/${wave.cap}` : ''}
-              {queued > 0 ? `, ${queued} en attente` : ''}
             </Text>
           </Box>
-          <Box flexDirection="row" flexWrap="wrap">
-            <Text dimColor>{'  '}</Text>
-            {wave.lots.map((lot, i) => (
-              <Text key={`${lot.project}:${lot.lot}`}>
-                {i > 0 ? sep : null}
-                <Text dimColor>{lot.project}:</Text>
-                <Text color={colorOfLot(lot.status)} bold={lot.status === 'question'}>
-                  {fit(lotText(lot, at), width - 4)}
-                </Text>
+          {cells.map(c => (
+            <Box key={`${c.lot.project}:${c.lot.lot}`} flexDirection="row">
+              <Text>{'  '}</Text>
+              <Text bold color={c.lot.status === 'question' || c.lot.status === 'failed' ? colorOfLot(c.lot.status) : 'text'}>
+                {pad(c.label, lotWidth)}
               </Text>
-            ))}
-          </Box>
+              <Text>{'  '}</Text>
+              <Text color={colorOfLot(c.lot.status)} bold={c.lot.status === 'question'}>
+                {pad(c.status, statusWidth)}
+              </Text>
+              <Text>{'  '}</Text>
+              <Text dimColor={c.lot.status !== 'question'} color={c.lot.status === 'question' ? 'warning' : undefined}>
+                {fit(c.detail, detailWidth)}
+              </Text>
+            </Box>
+          ))}
+          {queued.length > 0 && (
+            <Box flexDirection="row">
+              <Text>{'  '}</Text>
+              <Text dimColor>{pad('', lotWidth)}</Text>
+              <Text>{'  '}</Text>
+              <Text color="subtle">{pad('en attente', statusWidth)}</Text>
+              <Text>{'  '}</Text>
+              <Text color="subtle" wrap="wrap">
+                {queued.map(label).join(' · ')}
+              </Text>
+            </Box>
+          )}
         </Box>
       )
     })

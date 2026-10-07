@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { bar, colorOfLot, colorOfPercent, duration, k, lotText, wavePercent } from '../hooks/format'
+import { bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotText, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -59,13 +59,20 @@ test('les nombres, barres et durées sont courts', () => {
   expect(duration(42_000)).toBe('42 s')
   expect(duration(3 * 60_000)).toBe('3 min')
   expect(duration(65 * 60_000)).toBe('1 h 05')
+  expect(duration(23 * 3_600_000 + 59 * 60_000)).toBe('23 h 59')
+  expect(duration(159 * 3_600_000 + 28 * 60_000)).toBe('6 j 15 h')
+  expect(duration(72 * 3_600_000)).toBe('3 j')
 })
 
-test('un lot se lit en une ligne', () => {
+test('un lot se lit en trois cellules ou en une ligne', () => {
   const at = Date.parse('2026-10-07T19:14:11.066Z')
+  expect(lotCells(WAVE.lots[0]!, at)).toEqual({ lot: 'L75', status: 'corrige', detail: 'fix@sonnet 3 min' })
+  expect(lotCells(WAVE.lots[1]!, at)).toEqual({ lot: 'L110', status: 'en attente', detail: '' })
   expect(lotText(WAVE.lots[0]!, at)).toBe('L75 corrige · fix@sonnet 3 min')
   expect(lotText(WAVE.lots[1]!, at)).toBe('L110 en attente')
   expect(wavePercent(WAVE)).toBe(8)
+  expect(commonProject(WAVE)).toBe('cadence')
+  expect(commonProject({ ...WAVE, lots: [WAVE.lots[0]!, { ...WAVE.lots[1]!, project: 'maritime' }] })).toBeNull()
 })
 
 test('le collecteur se lit, et une sortie étrange vaut aucune vague', () => {
@@ -100,9 +107,12 @@ test('la bande dessine le contexte et la vague sur chaque surface', async ($, on
     const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
     expect(await ui.find({ type: 'Text', text: /42 %/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /5h/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /2026-10-07-2103 en cours/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /L75 corrige · fix@sonnet 3 min/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /L110 en attente/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /cadence · 2026-10-07-2103 en cours/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^L75$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^corrige\s*$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /fix@sonnet 3 min/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^en attente$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^L110$/ })).toBeDefined()
     await ui.unmount()
   }
 })

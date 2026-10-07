@@ -2,14 +2,24 @@
 
 Bande au-dessus du prompt de Claude Code (terminal et app de bureau), rafraîchie toutes les 5 s :
 
-- `ctx ▰▰▰▰▱▱▱▱▱▱ 42 % 84k/200k` — contexte de la session, coloré vert / orange / rouge (seuils 50 % et 75 %) ;
-- `5h 23 % ↻ 2 h 10 · 7j 61 % ↻ 3 j` — fenêtres de quota (seuils 60 % et 85 %) et temps avant remise à zéro ;
+```
+ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │  7j  61 % ↻ 6 j 15 h  │  $1.23  │  ⚙ 2 agents nom, nom
+⟳ cadence · 2026-10-07-2131 en cours  │  budget ▱▱▱▱▱▱▱▱▱▱   1 % 14k/2M  │  1 session/2
+  L112  implémente  implement@sonnet 34 s
+  L75   corrige     fix@sonnet 3 min +1 ✝ · p2
+        en attente  L101 · L106 · L107 · L111 · L113 · L73
+```
+
+- `ctx` — contexte de la session, coloré vert / orange / rouge (seuils 50 % et 75 %) ;
+- `5h`, `7j` — fenêtres de quota (seuils 60 % et 85 %) et temps avant remise à zéro, en jours au-delà de 24 h ;
 - `$1.23` — coût de la session ;
 - `⚙ 2 agents nom, nom` — sous-agents de CETTE session en cours ;
-- une ligne par vague `cadence orchestrate` vivante : identifiant, statut, budget consommé / plafond,
-  sessions en cours / plafond, lots en attente, puis chaque lot (`cadence:L75 corrige · fix@sonnet 3 min`),
-  coloré par statut (prêt = vert, question / suspendu = orange, échec / rendu = rouge, en attente = gris) ;
-  `+N` = sessions claude filles de l'étape, `✝` = l'étape est marquée en cours mais son processus est mort.
+- par vague `cadence orchestrate` vivante : un en-tête (projet si tous les lots sont du même, identifiant, statut,
+  budget consommé / plafond, sessions en cours / plafond), puis un **tableau des lots actifs** à colonnes alignées —
+  lot, statut coloré (prêt = vert, question / suspendu = orange, échec / rendu = rouge), détail de l'étape
+  (`+N` = sessions claude filles, `✝` = étape marquée en cours mais processus mort, `pN` = passe) — et une seule
+  ligne grise `en attente` listant les lots qui n'ont pas démarré. Les lots de projets différents gardent le
+  préfixe `projet:`.
 
 `/hud` masque ou réaffiche la bande.
 

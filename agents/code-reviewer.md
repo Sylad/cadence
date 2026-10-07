@@ -65,6 +65,8 @@ fact. If the path or the id is missing, or the lot has no commit to review, say 
 
 ## Output
 
+A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.
+
 A short report:
 
 - **Commits reviewed**: sha and subject, and the commands you ran with their result (counts).

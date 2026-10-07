@@ -6,6 +6,7 @@ rest of the lot is still sound: read the diff yourself from the commits that cit
 is reported, not a reason to ask for another pass. This is a code review only.
 {{checks}}
 {{choix}}
+A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.
 You are read-only: do not modify, commit, push or run `raf review|ux|done`. Do not launch subagents.
 Give your report as the structured output: counts of blocking / major / minor findings, each finding
 (severity, file, line, text), proposed sub-tasks, what you could not verify, and the one-line verdict

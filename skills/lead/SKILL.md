@@ -76,7 +76,7 @@ What the orchestrator does **not** do, and stays with the lead: choose the lots 
 questions back (`--resume --answer <project>:<lot> "…"`), look at the UX reviewer's captures and record
 `raf ux` (the orchestrator reports its verdict, it never records it), re-verify (section 3, point 2),
 `raf done`, push and deliver. Minor findings and proposed sub-tasks come back in the table: adding them to
-the plan is the lead's decision. If an orchestrated wave is running in a repository, do not commit there
+the plan is the lead's decision. A minor finding becomes a lot of its own only if it describes an observable bug (a wrong output, a crash, a measured regression); otherwise it stays a note of the originating lot, so that a review never feeds the next one. If an orchestrated wave is running in a repository, do not commit there
 and do not deliver it (`cadence deliver` refuses).
 
 ## 3. Check

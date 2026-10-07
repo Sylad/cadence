@@ -5,6 +5,7 @@ cite the lot (`raf commits {{lot}}`, or `git log`), run the checks, report real 
 {{ux}}
 {{checks}}
 {{choix}}
+A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.
 You are read-only: do not modify, commit, push or run `raf review|ux|done`. Do not launch subagents.
 Give your report as the structured output: counts of blocking / major / minor findings (usability
 findings included, each tied to a named rule — Nielsen heuristic or WCAG 2.2 AA criterion — or a

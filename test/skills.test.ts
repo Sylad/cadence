@@ -33,6 +33,10 @@ const QA_FORMAT = [
   'ontent hidden on the phone by design is not a defect unless a `shows:` line requires it at 390; content pushed outside the visible area (it needs a sideways scroll) is reported as suspect and handed to `ux-reviewer` in one line',
   'is a failure, unless its line says `may be empty when …`',
 ];
+/** La coupe de la cascade de mineurs : mêmes mots dans le skill lead, les briefs de revue et l'agent. */
+const MINOR_RULE_BRIEF = 'A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.';
+const MINOR_RULE = 'A minor finding becomes a lot of its own only if it describes an observable bug (a wrong output, a crash, a measured regression); otherwise it stays a note of the originating lot, so that a review never feeds the next one.';
+
 const skillText = (name: string): string => flat(readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8'));
 /** La section « QA review » du README, jusqu'au titre suivant. */
 const readmeQa = (): string => {
@@ -396,6 +400,15 @@ describe('skills install', () => {
     expect(text).toContain('The agent reads that key, and so does `raf check`: a commit touching only that file is plan upkeep (no lot to cite, see above).');
     expect(readme).toContain('`ux-reviewer`, `code-reviewer` and `qa-reviewer` agents');
     expect(readme).toContain('- **qa-reviewer** (agent)');
+  });
+
+  it('un mineur ne devient un lot que s’il décrit un bug observable ; sinon il reste une note du lot d’origine (L109)', () => {
+    const lead = skillText('lead');
+    expect(lead).toContain(MINOR_RULE);
+    for (const t of ['review', 'review-small', 'review-recheck']) {
+      expect(flat(readFileSync(join(SKILLS_DIR, '../templates/orchestrate', `${t}.md`), 'utf8'))).toContain(MINOR_RULE_BRIEF);
+    }
+    expect(flat(readFileSync(join(AGENTS_DIR, 'code-reviewer.md'), 'utf8'))).toContain(MINOR_RULE_BRIEF);
   });
 
   it('manifestes : trois agents relecteurs annoncés, et la même version aux quatre endroits', () => {

@@ -1,8 +1,8 @@
-import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCompiler } from './run-tsc.js';
 import { PID_FILE, ROOT_PREFIX, leftovers, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -15,7 +15,7 @@ const REPO = fileURLToPath(new URL('..', import.meta.url));
 function buildThrowawayPackage(into: string): string {
   const pkg = join(into, 'package-jetable');
   mkdirSync(pkg);
-  execFileSync(process.execPath, [join(REPO, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.build.json', '--outDir', join(pkg, 'dist')], { cwd: REPO, stdio: 'pipe' });
+  runCompiler(process.execPath, [join(REPO, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.build.json', '--outDir', join(pkg, 'dist')], REPO);
   for (const n of ['bin', 'templates', 'agents', 'skills', 'package.json']) cpSync(join(REPO, n), join(pkg, n), { recursive: true });
   symlinkSync(join(REPO, 'node_modules'), join(pkg, 'node_modules'), 'dir');
   return pkg;

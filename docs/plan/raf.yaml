@@ -794,6 +794,7 @@ lots:
     quickwin: true
     created: 2026-10-05
     started: 2026-10-07
+    review: { date: 2026-10-07, verdict: "conforme — orchestré (vague 2026-10-07-1234, 2 passe(s) de correction + passe des mineurs)", commit: 5001759ae4e3b4992d98bb1b12c9be644463686f }
   - id: L65
     title: "raf check : le fichier d'attendus QA (docs/qa/expectations.md, brouillon du qa-reviewer committé par le lead, skill lead §4) est tenu avec le plan — un commit qui ne touche que lui n'a pas à citer de lot ; vécu 05-10 warhammer40k c3c6a29 « commit sans lot » ; test + README + aide CLI"
     status: done

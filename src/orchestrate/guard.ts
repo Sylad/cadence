@@ -49,6 +49,8 @@ interface ExcludeMemo {
   noFinalNewline: boolean;
   /** Contenu d'origine (absent d'une note écrite par une version antérieure). */
   content?: string;
+  /** La ligne d'exclusion du hook était déjà là avant la vague : elle n'est pas la nôtre (L88). */
+  hookLine?: boolean;
 }
 
 function rememberExclude(repo: string): void {
@@ -56,10 +58,12 @@ function rememberExclude(repo: string): void {
   if (existsSync(memo)) return;
   const file = excludeFile(repo);
   const text = existsSync(file) ? readFileSync(file, 'utf8') : null;
+  const line = excludeLine(repo);
   const note: ExcludeMemo = {
     absent: text === null,
     noFinalNewline: text !== null && text !== '' && !text.endsWith('\n'),
     content: text ?? '',
+    hookLine: line !== null && text !== null && text.split('\n').includes(line),
   };
   mkdirSync(join(gitCommonDir(repo), 'info'), { recursive: true });
   writeFileSync(memo, JSON.stringify(note));
@@ -70,7 +74,7 @@ function readExcludeMemo(repo: string): ExcludeMemo | null {
   try {
     const m = JSON.parse(readFileSync(excludeMemo(repo), 'utf8')) as Partial<ExcludeMemo> | null;
     if (m === null || typeof m !== 'object' || typeof m.absent !== 'boolean' || typeof m.noFinalNewline !== 'boolean') return null;
-    return { absent: m.absent, noFinalNewline: m.noFinalNewline, content: typeof m.content === 'string' ? m.content : undefined };
+    return { absent: m.absent, noFinalNewline: m.noFinalNewline, content: typeof m.content === 'string' ? m.content : undefined, hookLine: m.hookLine === true };
   } catch {
     return null;
   }
@@ -112,6 +116,7 @@ function removeExclude(repo: string): void {
   const line = excludeLine(repo);
   const file = excludeFile(repo);
   if (!line || !existsSync(file)) return;
+  if (readExcludeMemo(repo)?.hookLine) return; // la ligne était déjà là avant la vague : elle reste
   const lines = readFileSync(file, 'utf8').split('\n');
   if (!lines.includes(line)) return;
   writeFileSync(file, lines.filter((l) => l !== line).join('\n'));

@@ -265,7 +265,7 @@ describe('.git/info/exclude restauré à l\'octet près (L50/t2)', () => {
   });
 });
 
-describe('fin de vague : note d\'exclusion illisible, saut de ligne, ligne préexistante (L87)', () => {
+describe('fin de vague : note d\'exclusion illisible, saut de ligne, ligne préexistante (L87, L88)', () => {
   const file = (dir: string) => join(dir, '.git/info/exclude');
   const memo = (dir: string) => join(dir, '.git/info/cadence-exclude-before');
   function trackedHooksRepo() {
@@ -301,6 +301,14 @@ describe('fin de vague : note d\'exclusion illisible, saut de ligne, ligne prée
     writeFileSync(file(dir), `${readFileSync(file(dir), 'utf8')}user\n`);
     removePrePush(dir, 'w1');
     expect(readFileSync(file(dir), 'utf8')).toBe('foo\nuser\n');
+  });
+
+  it('une ligne /.githooks/pre-push que l\'utilisateur avait déjà avant la vague reste après', () => {
+    const dir = trackedHooksRepo();
+    writeFileSync(file(dir), '# perso\n/.githooks/pre-push\n');
+    expect(installPrePush(dir, 'w1')).toEqual({ ok: true });
+    removePrePush(dir, 'w1');
+    expect(readFileSync(file(dir), 'utf8')).toBe('# perso\n/.githooks/pre-push\n');
   });
 
   it('une ligne /.githooks/pre-push posée par la vague part toujours', () => {

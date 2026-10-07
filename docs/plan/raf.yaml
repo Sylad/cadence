@@ -619,10 +619,15 @@ lots:
     created: 2026-10-04
   - id: L52
     title: "⚡ orchestrate : les sessions s'arrêtent encore sur des non-questions (« je n'ai pas de question », « faut-il scinder ce commit ? », « la revue portait sur un état antérieur ») — le brief interdit de s'arrêter pour une question d'organisation ou de constat contesté : trancher, lister en choix, continuer ; un constat contesté est relu par la revue suivante, pas par le lead (vague 2026-10-04-2201 : 4 questions évitables, ~1,2 M tokens pour 0 lot prêt)"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-04
+    started: 2026-10-07
+    tasks:
+      - { id: t1, title: "isNonQuestion en liste FERMÉE : l'entrée entière (normalisée : casse, espaces, ponctuation finale hors « ? », apostrophe ’→') doit égaler une forme connue (aucune question, pas de question, je n'ai pas de question, no question(s), none, n/a, rien, vide…) ; jamais filtrée si elle contient « ? » ; tests négatifs : « No question except SQLite? », « No blocking question except: SQLite? », « No question but PostgreSQL? », « Aucune question hors schéma ? », « No, the question is SQLite? », « No further question about X? »", status: todo }
+      - { id: t2, title: "work() : chaque question filtrée tracée dans l.warnings (« question ignorée (non-question) : … ») et visible dans le tableau de fin de vague ; test", status: todo }
+      - { id: t3, title: "isNonQuestion : apostrophe typographique (je n’ai pas de question) ; test", status: todo }
   - id: L53
     title: "orchestrate : un lot déjà implémenté qui n'attend qu'une revue neuve (commits présents, revue précédente non conforme ou absente) est rendu au lead « implement sans commit » au lieu de passer à la revue — vécu 05-10 sur 3 lots (finance L3, ol L29, warhammer L54), puis en question sur L3 quand les sous-tâches ouvertes étaient déjà couvertes par des commits"
     status: done

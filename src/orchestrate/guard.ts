@@ -63,7 +63,8 @@ function rememberExclude(repo: string): void {
     absent: text === null,
     noFinalNewline: text !== null && text !== '' && !text.endsWith('\n'),
     content: text ?? '',
-    hookLine: line !== null && text !== null && text.split('\n').includes(line),
+    // Un hook cadence déjà en place = une vague interrompue (0.11.0 sans note) : la ligne est la sienne, pas celle de l'utilisateur (L89).
+    hookLine: line !== null && text !== null && !guardPresent(repo) && text.split('\n').includes(line),
   };
   mkdirSync(join(gitCommonDir(repo), 'info'), { recursive: true });
   writeFileSync(memo, JSON.stringify(note));

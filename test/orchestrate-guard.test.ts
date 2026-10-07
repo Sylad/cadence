@@ -311,6 +311,25 @@ describe('fin de vague : note d\'exclusion illisible, saut de ligne, ligne prée
     expect(readFileSync(file(dir), 'utf8')).toBe('# perso\n/.githooks/pre-push\n');
   });
 
+  it('ligne laissée par une vague 0.11.0 interrompue (hook cadence présent, aucune note) : elle n\'est pas celle de l\'utilisateur, elle part (L89)', () => {
+    const dir = trackedHooksRepo();
+    writeFileSync(file(dir), '# perso\n');
+    installPrePush(dir, 'w0');
+    rmSync(memo(dir)); // 0.11.0 ne laissait pas de note
+    installPrePush(dir, 'w1');
+    removePrePush(dir, 'w1');
+    expect(readFileSync(file(dir), 'utf8')).toBe('# perso\n');
+  });
+
+  it('note d\'ancienne forme (sans content ni hookLine) : le saut de ligne final de la vague est retiré comme avant (L89)', () => {
+    const dir = gitRepo();
+    writeFileSync(file(dir), 'foo');
+    installPrePush(dir, 'w1');
+    writeFileSync(memo(dir), JSON.stringify({ absent: false, noFinalNewline: true }));
+    removePrePush(dir, 'w1');
+    expect(readFileSync(file(dir), 'utf8')).toBe('foo');
+  });
+
   it('une ligne /.githooks/pre-push posée par la vague part toujours', () => {
     const dir = trackedHooksRepo();
     writeFileSync(file(dir), '# perso\n');

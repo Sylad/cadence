@@ -42,7 +42,7 @@ missing, or the URL does not answer, say so and stop.
    write it into the repository. Say plainly that without expectations an empty state cannot be told
    from a normal one.
 4. **Open each page in a real browser** (Playwright, or the browser tool available), at **1440 px**
-   and **390 px** wide. Let it settle: after `load`, wait a fixed few seconds, scroll through the
+   and **390 px** wide. Walk within the bounded pass below. Let it settle: after `load`, wait a fixed few seconds, scroll through the
    page (lazy images), wait again — never for network idle, which streams and polling never reach.
    Then measure:
    - browser state, once before the first page, in a profile already used (a persistent context, not a fresh one — a `userDataDir` reserved for QA and kept between passes, never the user's own browser profile): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;
@@ -95,6 +95,22 @@ missing, or the URL does not answer, say so and stop.
    false, or an error is shown to the user), *major* (secondary content missing or wrong, a section
    silently dropped after a failed or empty API call, a broken content image), *minor* (noise). A broken line of the expectations with no visible loss on the page (the content is on screen by another path) is *minor* too.
 
+## Bounded pass
+
+The pass has a time budget: the one the caller names, otherwise 15 minutes. You keep the count
+from the first page.
+
+- Never wait in silence on your own background work (a scripted walk, a long browser task, a
+  listener): every wait has a timeout and is announced in one line (what you wait for, until
+  when). A task still running at its deadline is stopped and its pages counted as partial or not
+  reached — you do not wait for it again.
+- Write as you go. After each page, both widths measured, append its measurements to a results
+  file in the temporary directory — one line per page — before opening the next. Never one single
+  file written at the end of the pass: a pass that is stopped loses it all.
+- When the budget is spent, or the caller asks you to stop, stop walking and write the report from
+  the results file: pages measured at both widths are checked, a page measured at one width is
+  partial, the pages not reached are named, never dropped.
+
 ## Output
 
 A short report:
@@ -102,7 +118,7 @@ A short report:
 - **Pages checked N/N**, with the base URL and the date and time of the run, and the two widths. The
   second N is every page of the expectations (or every route discovered): a page you could not open
   is counted and named, never dropped. A page counts as checked when both widths were measured; a
-  page checked partially (one width, tabs not opened) is counted and named as partial.
+  page checked partially (one width, tabs not opened) is counted and named as partial. If the pass stopped before the end (budget spent, stop requested), say so in the first line, with the pages measured so far.
 - **Findings**, most severe first, each with: the route, its kind and rank, what was expected —
   quote the line of the expectations, or name the universal check, or, for a suspect, give the
   expectation line you propose —, what was measured, and the evidence — status code, response

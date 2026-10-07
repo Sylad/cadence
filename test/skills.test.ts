@@ -289,6 +289,25 @@ describe('skills install', () => {
     expect(step7).toContain('A broken line of the expectations with no visible loss on the page (the content is on screen by another path) is *minor*');
   });
 
+  it('agent qa-reviewer : passage borné, résultats écrits page par page, jamais d’attente silencieuse (L101)', () => {
+    const qa = qaAgent();
+    const bounded = qa.section('Bounded pass');
+    // Un budget de temps, donné par l'appelant ou par défaut, compté par l'agent.
+    expect(bounded).toContain('The pass has a time budget: the one the caller names, otherwise 15 minutes. You keep the count');
+    // Jamais d'attente silencieuse sur son propre travail de fond.
+    expect(bounded).toContain('Never wait in silence on your own background work');
+    expect(bounded).toContain('every wait has a timeout and is announced');
+    // Page par page, au fil de l'eau, pas un JSON unique en fin de passage.
+    expect(bounded).toContain('After each page, both widths measured, append its measurements to a results file in the temporary directory — one line per page — before opening the next. Never one single file written at the end of the pass');
+    // Le budget épuisé ou l'arrêt demandé : rapport depuis le fichier, partiel nommé.
+    expect(bounded).toContain('When the budget is spent, or the caller asks you to stop, stop walking and write the report from the results file');
+    expect(bounded).toContain('the pages not reached are named, never dropped');
+    // La section Method renvoie vers le passage borné.
+    expect(qa.section('Method')).toContain('Walk within the bounded pass below.');
+    // Le passage partiel se dit dans le rapport.
+    expect(qa.section('Output')).toContain('If the pass stopped before the end (budget spent, stop requested), say so in the first line');
+  });
+
   it('les skills lead et session-close nomment la porte de revue de code', () => {
     const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8');
     expect(skill('lead')).toContain('The `code-reviewer` agent');

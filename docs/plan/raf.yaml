@@ -1241,7 +1241,7 @@ lots:
       - { date: 2026-10-07, text: "abandonné : déjà fait par la correction de L77 (8e7974f, 5725a0f, 0e9aa6c) — détecté par le precheck de L77 lui-même (vague 2026-10-07-2103, 20 k tokens, < 1 min)" }
   - id: L111
     title: "Plugin cadence-hud dans la marketplace du dépôt (plugins/cadence-hud) : bande au-dessus du prompt Claude Code — contexte, fenêtres 5 h/7 j, coût, agents, vagues orchestrate lues dans ~/.cadence/orchestrate et .cadence/runs ; source = ~/.claude/mods/cadence-hud (07-10, 6 tests claude plugin test verts) ; entrée marketplace.json, exclu du paquet npm, README d'installation (/plugin install cadence-hud --marketplace Sylad/cadence) ; réalise le point (3) de L49"
-    public: "Une bande d'état Claude Code : contexte, quota, coût, agents et vagues orchestrate"
+    public: "Une bande d'état Claude Code : contexte, quota, coût, agents, vagues orchestrate"
     status: doing
     estimate: 0.5
     created: 2026-10-07
@@ -1266,3 +1266,9 @@ lots:
     started: 2026-10-07
     review: { date: 2026-10-07, verdict: "compliant — orchestré (vague 2026-10-07-2205, 0 passe(s) de correction)", commit: 37341b0717764b5a6b45e5d474fdac514754a14d }
     finished: 2026-10-07
+  - id: L114
+    title: "README à jour à chaque lot : le brief implement d'orchestrate et l'agent code-reviewer exigent que le README (et la doc d'usage du projet) décrive le comportement livré, comme le CHANGELOG — un README qui ne suit pas la modification est un constat majeur ; test sur le texte du brief et de l'agent. Demande Sylvain 07-10 : « mettre à jour les README en général quand on modifie un projet »"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-07

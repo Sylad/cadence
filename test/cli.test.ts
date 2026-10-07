@@ -242,7 +242,11 @@ describe('(L94) --config hors du dépôt, qa.expectations absolu dans le dépôt
     expect(r.err).toContain('hors du dépôt');
   });
 
-  it('projectEnv (orchestrate) passe la racine du projet : qa.expectations absolu dans le dépôt est accepté', () => {
+  // Ne prouve PAS que `repo` est transmis à readPlanConfig (command.ts:127) : configPath y vaut toujours
+  // join(repo, 'cadence.yaml'), le repli gitRoot(dirname(file)) donne la même racine. Verrouille seulement
+  // le résultat : un chemin absolu dans le dépôt est ramené en relatif. À compléter si projectEnv lit un jour
+  // un cadence.yaml hors du dépôt.
+  it("projectEnv (orchestrate) ramène un qa.expectations absolu dans le dépôt en relatif (la transmission de la racine n'est pas discriminée)", () => {
     const dir = gitRepo();
     raf(dir, 'init', '--no-hook');
     writeFileSync(join(dir, 'cadence.yaml'), `qa:\n  expectations: ${join(dir, 'docs/quality/pages.md')}\n`);

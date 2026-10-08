@@ -21,8 +21,13 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence orchestrate`, recurring lots, public titles, safe clean-up at close | [0.9.0](#090---2026-10-04) |
 | Changelog and GitHub releases | [0.11.0](#0110---2026-10-06) |
 | Parallel waves on different repositories, shared session cap (`--max-sessions`) | [0.11.0](#0110---2026-10-06) |
+| `cadence-hud` plugin: a status band above the Claude Code prompt | [0.12.0](#0120---2026-10-08) |
+| `raf ignore`, `raf check` warning on a visible lot without public title | [0.12.0](#0120---2026-10-08) |
+| Waves: review sized to the lot, precheck of an already-present deliverable, `orchestrate.ux` starts the app | [0.12.0](#0120---2026-10-08) |
 
 ## [Unreleased]
+
+## [0.12.0] - 2026-10-08
 
 ### Added
 - `raf check` warns (`⚠`, exit code unchanged) about a visible lot that has no public title — set with `raf public <id> "…"` or `raf add --public`; dropped lots and non-visible lots are not concerned, nor is a done lot that a News entry cites (the site reuses its title). The summary counts errors and warnings apart, and `session start/close` shows the warning without blocking the close. (L32)

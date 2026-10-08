@@ -24,7 +24,10 @@ Code prompt that shows the session's context, quota, cost and the orchestrate wa
 
 ## What's new
 
-**0.11.0**: waves on different repositories run side by side under a shared cap of
+**0.12.0**: the `cadence-hud` plugin (a status band above the Claude Code prompt),
+`raf ignore` to acknowledge a commit without a lot, waves that size the review to the lot,
+hand back a lot whose deliverable is already there and start the app themselves for the UX
+review (`orchestrate.ux`), and briefs that require the README to follow the change. **0.11.0**: waves on different repositories run side by side under a shared cap of
 simultaneous sessions (`--max-sessions`, 2 by default), and every release now has its
 changelog section and GitHub release. **0.10.1**: the QA expectations file (`docs/qa/expectations.md`) is kept with the plan —
 a commit that only touches it no longer has to cite a lot. **0.10.0**: `cadence orchestrate`

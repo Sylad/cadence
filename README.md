@@ -664,12 +664,18 @@ exception is a **formatting retry** (below).
 ```sh
 cadence orchestrate finance-tracker:L41 ol-companion:L22 cadence:L18@haiku
 cadence orchestrate L18                      # from inside a project
+cadence orchestrate maritime-atlas:Q4/accueil-4-ux12@haiku   # a lot id may contain "/" (sub-tasks of read-only plans)
 cadence orchestrate … --budget 1.5M          # 1500000, 1.5M, 800k; default 2M
 cadence orchestrate … --max-sessions 3       # sessions running at the same moment, all waves together; default 2
 cadence orchestrate … --dry-run              # preconditions + the plan of the wave; nothing is started
 cadence orchestrate --status [<wave>]        # the live waves and the repositories they hold, then the table (default: the last wave of this folder)
 cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"]
 ```
+
+**Lot ids containing `/` (L120)**: the first `:` separates the project from the lot, a final `@` the model, and the lot
+keeps its `/` (`maritime-atlas:Q4/accueil-4-ux12@haiku`); this holds for `--dry-run`, `--status`, `--resume` and
+`--answer` too. In `.cadence/runs/<wave>/` the `/` of the lot becomes `__` (`maritime-atlas--Q4__accueil-4-ux12.json`,
+same for the lot folder and the dry-run briefs); ids without `/` are unchanged.
 
 You choose the lots; the order is the order given (one queue per repository, as many repositories at the
 same time as the session cap allows — 2 by default). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that

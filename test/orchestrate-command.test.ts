@@ -79,6 +79,16 @@ describe('arguments', () => {
     expect(() => parseOrchestrateArgs(['a:L1@gpt'])).toThrow(/modèle inconnu/);
     expect(() => parseOrchestrateArgs(['--parallel'])).toThrow(/option inconnue/);
   });
+  it('L120 — un id de lot peut contenir « / » : le premier « : » sépare le projet, « @ » final le modèle', () => {
+    expect(parseOrchestrateArgs(['maritime-atlas:Q4/accueil-4-ux12', 'a:Q4/x-1@haiku', 'Q4/y-2']).lots).toEqual([
+      { project: 'maritime-atlas', lot: 'Q4/accueil-4-ux12', model: undefined },
+      { project: 'a', lot: 'Q4/x-1', model: 'haiku' },
+      { project: undefined, lot: 'Q4/y-2', model: undefined },
+    ]);
+    expect(parseOrchestrateArgs(['--resume', '--answer', 'ma:Q4/a-1', 'oui']).answers).toEqual([{ project: 'ma', lot: 'Q4/a-1', text: 'oui' }]);
+    expect(parseOrchestrateArgs(['--status', 'ma:Q4/a-1']).lots).toEqual([{ project: 'ma', lot: 'Q4/a-1', model: undefined }]);
+    expect(() => parseOrchestrateArgs(['a:Q4/x@gpt'])).toThrow(/modèle inconnu/);
+  });
   it('budget', () => {
     expect([parseBudget('1500000'), parseBudget('1.5M'), parseBudget('800k'), parseBudget('2M')]).toEqual([1_500_000, 1_500_000, 800_000, 2_000_000]);
     expect(() => parseBudget('beaucoup')).toThrow(/--budget invalide/);
@@ -600,6 +610,45 @@ describe('une vague', () => {
     const second = io(parent);
     expect(await orchestrate(['--resume', '--answer', 'a:L1', 'SQLite'], second.io, f.deps)).toBe(0);
     expect(new RunStore(parent, '2026-10-04-1412').readLot('a', 'L1')!.answers).toEqual(['SQLite']);
+  });
+
+  it('L120 — plan en lecture seule, lot « Q4/accueil-4-ux12 » : --dry-run, vague, question, --answer, --status', async () => {
+    const parent = tempDir();
+    const dir = join(parent, 'ma');
+    mkdirSync(join(dir, 'docs/plan'), { recursive: true });
+    git(dir, 'init', '-q', '-b', 'main');
+    git(dir, 'config', 'user.email', 't@example.com');
+    git(dir, 'config', 'user.name', 'T');
+    git(dir, 'config', 'commit.gpgsign', 'false');
+    writeFileSync(join(dir, 'docs/plan/taches.yaml'), 'taches:\n- id: Q4/accueil-4-ux12\n  titre: sous-tâche\n  etat: en_cours\n  parent: SQ4\n- id: SQ4\n  titre: parent\n  etat: en_cours\n');
+    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: docs/plan/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, parent: parent }\n  statuses: { todo: prevu, doing: en_cours, done: deploye }\norchestrate:\n  precheck: false\n');
+    git(dir, 'add', '--', 'docs/plan/taches.yaml', 'cadence.yaml');
+    git(dir, 'commit', '-q', '-m', 'chore: plan');
+    const id = 'ma:Q4/accueil-4-ux12';
+    const dry = io(parent);
+    try {
+      expect(await orchestrate([id + '@haiku', '--dry-run'], dry.io, fakeDeps().deps)).toBe(0);
+      expect(dry.out.join('\n')).toContain('ma:Q4/accueil-4-ux12 —');
+      expect(dry.out.join('\n')).toContain('ma--Q4__accueil-4-ux12--implement.md');
+      expect(dry.out.join('\n')).toContain('haiku');
+    } finally {
+      removeDryRunBriefs(dry.out.join('\n'));
+    }
+    let n = 0;
+    const f = fakeDeps({
+      implement: (cwd) => (n++ === 0 ? claudeOut(workReport({ questions: ['Quelle option ?'] })) : claudeOut(workReport({ commits: [commitFile(cwd, 'x.txt', 'feat(Q4/accueil-4-ux12): x')] }))),
+    });
+    const first = io(parent);
+    expect(await orchestrate([id], first.io, f.deps)).toBe(1);
+    expect(first.out.join('\n')).toContain(`--resume --answer ${id} "…"`);
+    const runs = join(parent, '.cadence/runs/2026-10-04-1412');
+    expect(readdirSync(runs)).toContain('ma--Q4__accueil-4-ux12.json');
+    expect(readdirSync(runs).filter((x) => x.includes('/'))).toEqual([]);
+    expect(await orchestrate(['--resume', '--answer', id, 'A'], io(parent).io, f.deps)).toBe(0);
+    expect(new RunStore(parent, '2026-10-04-1412').readLot('ma', 'Q4/accueil-4-ux12')!.answers).toEqual(['A']);
+    const st = io(parent);
+    expect(await orchestrate(['--status'], st.io, fakeDeps().deps)).toBe(0);
+    expect(st.out.join('\n')).toContain(id);
   });
 
   it('L3/t9 — lot dépendant d\'un lot suspendu : reste reprenable, tourne après lui à la reprise', async () => {

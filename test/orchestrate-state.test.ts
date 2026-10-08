@@ -24,6 +24,17 @@ describe('RunStore', () => {
     expect(lot.steps).toEqual([]);
   });
 
+  it('L120 — un id de lot avec « / » donne un nom de fichier et de dossier sans « / » (« __ »)', () => {
+    const dir = tempDir();
+    const store = new RunStore(dir, 'w');
+    const lot = newLot({ project: 'maritime-atlas', repo: '/r', lot: 'Q4/accueil-4-ux12', title: 't', visible: false, small: false, model: 'sonnet', readOnlyPlan: true });
+    store.writeLot(lot);
+    store.lotDir('maritime-atlas', 'Q4/accueil-4-ux12');
+    expect(readdirSync(join(dir, '.cadence/runs/w')).sort()).toEqual(['maritime-atlas--Q4__accueil-4-ux12', 'maritime-atlas--Q4__accueil-4-ux12.json']);
+    expect(store.readLot('maritime-atlas', 'Q4/accueil-4-ux12')?.lot).toBe('Q4/accueil-4-ux12');
+    expect(store.lots().map((l) => l.lot)).toEqual(['Q4/accueil-4-ux12']);
+  });
+
   it('deux projets peuvent avoir chacun un L3', () => {
     const store = new RunStore(tempDir(), 'w');
     for (const project of ['a', 'b']) store.writeLot(newLot({ project, repo: `/${project}`, lot: 'L3', title: '', visible: false, small: false, model: 'sonnet', readOnlyPlan: false }));

@@ -18,7 +18,7 @@ import { buildArgs, killSessions, mcpServersFor, readAgents, realClaude, type Ag
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { runPool } from './pool.js';
 import { schemaFor } from './schemas.js';
-import { excludeState, lotKey, newLot, RunStore, type LotState, type WaveState } from './state.js';
+import { excludeState, lotKey, lotSlug, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
 import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
@@ -85,11 +85,12 @@ export function parseMaxSessions(text: string, what = '--max-sessions'): number 
   return Number(text);
 }
 
-const LOT_LIKE = /^(?:[\w.-]+:)?[A-Za-z]+\d+(?:@\w+)?$/;
+const LOT_LIKE = /^(?:[\w.-]+:)?[A-Za-z]+\d+(?:\/[\w./-]*)?(?:@\w+)?$/;
 const MODELS = ['sonnet', 'opus', 'haiku'];
 
 function lotArg(text: string): { project?: string; lot: string; model?: Model } {
-  const m = /^(?:([\w.-]+):)?([\w.-]+?)(?:@(\w+))?$/.exec(text);
+  // le premier « : » sépare le projet du lot, un « @ » final le modèle ; le lot garde ses « / » (L120)
+  const m = /^(?:([\w.-]+):)?([\w.-][\w./-]*?)(?:@(\w+))?$/.exec(text);
   if (!m) throw new RafError(`lot invalide : ${text} (projet:lot, lot, projet:lot@haiku)`);
   if (m[3] && !MODELS.includes(m[3])) throw new RafError(`modèle inconnu : @${m[3]} (attendu : ${MODELS.join(', ')})`);
   return { project: m[1], lot: m[2], model: m[3] as Model | undefined };
@@ -292,11 +293,11 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.light ? ` — revue légère (${light}, pas de passe des mineurs ; un bloquant ou un majeur → correction puis revue ${full})` : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus, en session neuve`);
     io.out(l.light ? '  revue conforme avec mineurs : pas de passe des mineurs, ils sont rendus en notes' : '  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
-    const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, `${l.project}--${l.lot}`, 'playwright');
+    const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, lotSlug(l.project, l.lot), 'playwright');
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
     const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '' };
     for (const s of steps) {
-      const file = join(tmp, `${l.project}--${l.lot}--${s.kind}.md`);
+      const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);
       const brief = renderBrief(s.kind, vars, deps.templatesDir);
       writeFileSync(file, brief);
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small).playwright;

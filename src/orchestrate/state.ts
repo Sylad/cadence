@@ -137,7 +137,9 @@ export function newLot(o: NewLot): LotState {
 }
 
 export const lotKey = (project: string, lot: string) => `${project}:${lot}`;
-const lotFile = (project: string, lot: string) => `${project}--${lot}.json`;
+/** Nom de dossier d'un lot dans la vague : le « / » d'un id de sous-tâche (`Q4/accueil-4-ux12`) devient « __ » ; un id sans « / » est inchangé. */
+export const lotSlug = (project: string, lot: string) => `${project}--${lot.split('/').join('__')}`;
+const lotFile = (project: string, lot: string) => `${lotSlug(project, lot)}.json`;
 
 function atomicWrite(file: string, data: unknown): void {
   const tmp = `${file}.${process.pid}.tmp`;
@@ -198,7 +200,7 @@ export class RunStore {
   }
 
   lotDir(project: string, lot: string): string {
-    const d = join(this.dir, `${project}--${lot}`);
+    const d = join(this.dir, lotSlug(project, lot));
     mkdirSync(d, { recursive: true });
     return d;
   }

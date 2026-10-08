@@ -69,6 +69,7 @@ export function matchesHead(cwd: string, file: string): boolean {
   try {
     git(cwd, ['cat-file', '-e', `HEAD:${file}`]);
     git(cwd, ['diff', '--quiet', 'HEAD', '--', file]);
+    git(cwd, ['diff', '--quiet', '--cached', 'HEAD', '--', file]);
     return true;
   } catch {
     return false;

@@ -8,7 +8,7 @@ import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
-import { gitRoot, readCommits, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
+import { gitRoot, readCommits, hasUnstagedChanges, resolveCommit, stage, stageChange, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
@@ -522,12 +522,17 @@ function preCommit(load: (() => Plan) | null, mode: 'warn' | 'refuse' | 'start' 
       return REFUSED;
     }
     if (plan.readonly) return 0;
+    const file = relative(root, plan.path);
+    const dirty = hasUnstagedChanges(root, file);
+    const before = readFileSync(plan.path, 'utf8');
     for (const id of todo) {
       plan.setStatus(id, 'doing', today, {});
       io.err(`raf: ${id} était todo — raf start ${id} fait par le hook, plan inclus dans ce commit`);
     }
     plan.save();
-    stage(root, relative(root, plan.path));
+    // Un plan déjà modifié sans rapport : seul le passage à doing part dans ce commit, le reste reste non stagé.
+    if (!dirty) stage(root, file);
+    else if (!stageChange(root, file, before, readFileSync(plan.path, 'utf8'))) io.err('raf: plan déjà modifié, passage à doing non stagé — à commiter à part');
   } catch {
     // Un hook ne doit jamais gêner un commit, hors refus.
   }

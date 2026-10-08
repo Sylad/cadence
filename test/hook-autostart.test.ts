@@ -183,6 +183,19 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     expect(raf(dir, 'show', 'L1').out).toContain('doing');
   });
 
+  it('start : un plan déjà modifié et non stagé ne part pas dans le commit de code', () => {
+    const { dir, env } = project('start');
+    raf(dir, 'add', 'C');
+    const r = work(dir, env, 'feat(L1): a');
+    expect(r.status).toBe(0);
+    const inHead = git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout;
+    expect(inHead).not.toContain('title: C');
+    expect(inHead).toMatch(/id: L1[\s\S]*?status: doing/);
+    // Le lot C reste dans le fichier de travail, non stagé.
+    expect(planText(dir)).toContain('title: C');
+    expect(git(dir, 'diff', '--cached', '--name-only').stdout).toBe('');
+  });
+
   it('plan en lecture seule : refuse ne propose pas raf start, start ne démarre rien', () => {
     for (const mode of ['refuse', 'start']) {
       const { dir, env } = project(mode);

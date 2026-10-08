@@ -29,6 +29,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `hook.autostart` (`warn` \| `refuse` \| `start`): what the pre-commit hook does with a lot still todo | [0.15.0](#0150---2026-10-08) |
 | `cadence session start\|close --all [--depth n]`: every project under a folder, one section each | [0.15.0](#0150---2026-10-08) |
 
+## [Unreleased]
+
+### Added
+- A lot can declare **neighbouring repositories** with the lot key `repos:` (paths relative to the project's repository; a read-only plan maps it with `plan.fields.repos`), for work that lives in a repository that is not a cadence project (B64 in `aetherwx-gitops`). `cadence orchestrate` then refuses before acting a listed path that is missing, not a git repository, with a modified tracked file, with its own `pre-push` hook or held by another live orchestration; locks it (so `cadence deliver` refuses it too), guards it with the temporary `pre-push` hook and the after-session checks, queues lots that share a repository one after the other, and gives every session each neighbour as `--add-dir`. The implementation brief names them and requires that commits there cite the lot; the reviewers read the commits that cite the lot in the project and in each neighbour. `raf commits` and `raf show` list those commits (one `dépôt <path> :` section per neighbour), and the code review verdict (`raf review`, and the orchestrator's) stores the sha read in each repository under `review.repos`. `raf check` does not audit the neighbours; their delivery stays with the lead. (L62)
+
 ## [0.15.0] - 2026-10-08
 
 ### Added

@@ -91,8 +91,8 @@ raf gantt                         # docs/plan/gantt.html
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
-| `raf show <id> [--notes]` | one lot: status, dates, `after`, public title, dated notes in order, then the counted commits (as `raf commits`); `--notes` prints the notes alone |
-| `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first |
+| `raf show <id> [--notes]` | one lot: status, dates, `after`, public title, dated notes in order, then the counted commits (as `raf commits`, neighbouring repositories included); `--notes` prints the notes alone |
+| `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first; a lot that declares `repos:` ([neighbouring repositories](#a-lot-whose-work-is-in-a-neighbouring-repository)) gets, after them, one `dépôt <path> :` section per neighbour with the commits there that cite the lot (`aucun commit du lot`, or `introuvable` for a path that is not there) |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |
 | `raf ignore <sha> \| "exact subject" [--reason text]` | acknowledge a commit without a lot (tooling chore, a plan commit citing an unknown id) without rewriting history: a dated, reasoned line in the plan's `acknowledged:` section; a sha is exact, a subject covers every commit carrying it |
@@ -195,6 +195,7 @@ plan:
     started: demarre_le
     finished: [livre_le, ferme_le]
     notes: note
+    repos: depots               # the lot's neighbouring repositories (a list of paths, or one path)
     parent: parent
   statuses:                     # raf status: their states
     todo: [prevu, specifie]
@@ -205,7 +206,7 @@ plan:
 ```
 
 - Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `public`, `every`, `last`, `after`, `created`, `started`,
-  `finished`, `notes`, `parent`; one left out is read under its own name. A timestamp counts for
+  `finished`, `notes`, `repos`, `parent`; one left out is read under its own name. A timestamp counts for
   its day; a note written as plain text is one note.
 - `parent`: an entry `B33/t1-fusion` whose parent is `B33` becomes the sub-task `t1-fusion` of `B33`.
 - Ids need no prefix: a commit belongs to a lot when its message cites one of the plan's ids as a
@@ -333,6 +334,12 @@ makes the review stale: `raf done` refuses (`--force` to override), and
 written by hand without a `commit` field is not checked for staleness. An empty
 verdict is refused, and one left empty or blank by hand in the YAML counts as no
 review. Plans without `reviewSince` are not affected.
+
+A lot that works in neighbouring repositories (`repos:`, see [orchestrate](#a-lot-whose-work-is-in-a-neighbouring-repository))
+has its verdict tied to each of them: `raf review` also stores, under `repos`, the sha of the latest commit citing the
+lot in each neighbour (`review: { date, verdict, commit, repos: { ../aetherwx-gitops: <sha> } }`, `null` when a
+neighbour has none), and refuses to record when a listed repository cannot be read. `raf check` does not audit the
+neighbours: their staleness is not checked, only the project's own commits are.
 
 ### QA review
 
@@ -817,6 +824,40 @@ package and a warning. The copy is removed with the wave folder. The wave's pid 
 The sessions of the wave also get `.cadence/runs/<wave>/tool/bin` (the `raf` and `cadence` entries of the snapshot) **first in their
 `PATH`**, ahead of the per-project Node below and of the usual `PATH`: the `raf` a reviewer runs (`raf commits`…) is the
 snapshot's, not the installed one. A wave without a snapshot leaves the `PATH` as it is.
+
+### A lot whose work is in a neighbouring repository
+
+Some lots are done in another repository that is not a cadence project (B64 of `maritime-atlas` lives in
+`aetherwx-gitops`, a Helm chart repository). The lot declares it with the **lot key `repos:`** — a list of paths relative to
+the project's repository, one path being enough as a string. There is no project-wide key: a neighbour belongs to a lot.
+
+```yaml
+lots:
+  - id: B64
+    title: …
+    repos: [../aetherwx-gitops]
+```
+
+A read-only plan declares it in `cadence.yaml` with `plan.fields.repos: <the file's key>` (a left-out field is read under
+the name `repos`). The effect, for `cadence orchestrate`:
+
+- **Preconditions** (refused before acting, exit code 2, like the project's own repository): every listed path exists and
+  is inside a git repository, has no tracked file modified, has no `pre-push` hook of its own, and is not held by another
+  live orchestration. `--dry-run` applies the same refusals and prints `dépôts voisins : <paths>`. The project's own
+  repository and a duplicate listed twice are counted once.
+- **Lock and guard**: the neighbour gets the repository lock (`orchestrate.lock`, so `cadence deliver` refuses it too, and no
+  other wave can hold it), the temporary `pre-push` hook, and the same after-session checks (push, tampered hook, a review
+  that changed it). Two lots that share a repository, as project or as neighbour, run one after the other, never two
+  sessions in one repository; `--status` lists the neighbours among the repositories a wave holds.
+- **Sessions**: every session gets each neighbour as `--add-dir`, and the briefs name them: the implementation and the
+  corrections must commit there too, with a message that cites the lot (`feat(B64): …`), and never push; the reviewers read
+  the commits that cite the lot in the project **and** in each neighbour (`raf commits <lot>` lists them all). A lot whose
+  whole work is in the neighbour is not « without commit »; a commit there that does not cite the lot is a warning; a
+  neighbour left with a tracked file modified hands the lot back.
+- **Verdict**: `raf review` as recorded by the orchestrator stores the sha read in the project and in each neighbour
+  (`review.repos`), and the verdict text ends with `dépôts relus : <path>@<sha>`. A commit made in a neighbour after the
+  review hands the lot back, like one in the project.
+- **Out of scope**: `raf check` does not audit the neighbours, and their delivery (push, CI, deploy) stays with the lead.
 
 **What stays with you**: choosing the lots, the questions raised (`--resume --answer`), re-verifying
 after the wave (`git log`, tests, `raf check`), `raf done`, **`raf ux`** (the orchestrator reports the UX

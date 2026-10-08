@@ -23,10 +23,12 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
 - `⚙ 2 agents nom, nom` — sous-agents de CETTE session en cours ;
 - `2 cmd` — **commandes d'arrière-plan** de la session en cours, celles de la carte « commandes en arrière-plan »
   de la fenêtre : Bash lancé en arrière-plan (`run_in_background`, Ctrl+B, délai dépassé) et Monitor, y compris
-  ceux des sous-agents. Le mod les suit à leur lancement (résultat de l'appel d'outil), les retire à la notification
+  ceux des sous-agents (sauf le cas ci-dessous). Le mod les suit à leur lancement (résultat de l'appel d'outil), les retire à la notification
   de fin de la tâche (terminée, échouée, arrêtée) ou à un `TaskStop`, et n'affiche rien à zéro ; elle tombe avec le
   compteur d'agents quand la fenêtre est étroite. Une commande lancée avant le chargement du mod, ou dont la
-  notification n'arrive pas, n'est pas vue : le compteur ne remonte qu'aux lancements qu'il a vus ;
+  notification n'arrive pas, n'est pas vue : le compteur ne remonte qu'aux lancements qu'il a vus. Une commande
+  lancée par un sous-agent synchrone (`backgroundEndsWithFinalResponse: true` dans le résultat) n'est pas comptée
+  non plus : elle prend fin avec la réponse finale du sous-agent, pas à une notification ;
 - par vague `cadence orchestrate` vivante : un en-tête (projet si tous les lots sont du même, identifiant, statut,
   budget consommé / plafond, sessions en cours / plafond), puis un **tableau des lots actifs** à colonnes alignées —
   lot, statut coloré (prêt = vert, question / suspendu = orange, échec / rendu = rouge), détail de l'étape

@@ -526,3 +526,67 @@ test('seule une notification de tâche (origin.kind) peut terminer une commande'
   expect(notifiedEnd({ kind: 'user' }, text)).toBeNull()
   expect(notifiedEnd(undefined, text)).toBeNull()
 })
+
+/**
+ * Branche l'état du mod en mémoire (`state.get` relit, `state.set` écrit en versionnant) et répond à `tool.call` par
+ * le résultat que le test pose dans `answer` : les événements passent par les hooks du mod, le test lit ce qu'il a écrit.
+ */
+const wired = (on: On) => {
+  const store = new Map<string, { value: unknown; version: number }>()
+  const answer: { current: Record<string, unknown> } = { current: {} }
+  on('state.get', (_$, e) => ({ value: store.get(e.key) ?? { value: undefined, version: 0 } }) as never)
+  on('state.set', (_$, e) => {
+    const version = (store.get(e.key)?.version ?? 0) + 1
+    store.set(e.key, { value: e.value, version })
+    return { value: { isSet: true, version } } as never
+  })
+  on('tool.call', () => answer.current as never)
+  on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
+  return { answer, commands: () => store.get('commands')?.value ?? [] }
+}
+
+const NOTIFICATION = (id: string) =>
+  `<task-notification>\n<task-id>${id}</task-id>\n<status>completed</status>\n<summary>Background command "x" completed</summary>\n</task-notification>`
+
+test('un Bash lancé en arrière-plan entre dans les commandes, par le hook tool.call', async ($, on) => {
+  const hud = wired(on)
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', input: { command: 'sleep 60', run_in_background: true } } as never)
+  expect(hud.commands()).toEqual(['b1'])
+  hud.answer.current = { result: { taskId: 'm1' } }
+  await $.tool.call({ tool: 'Monitor', input: { command: 'tail -f x' } } as never)
+  expect(hud.commands()).toEqual(['b1', 'm1'])
+})
+
+test('un résultat en erreur ou un Bash au premier plan n\'ajoute rien', async ($, on) => {
+  const hud = wired(on)
+  hud.answer.current = { isError: true, result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', input: { command: 'sleep 60', run_in_background: true } } as never)
+  expect(hud.commands()).toEqual([])
+  hud.answer.current = { result: { stdout: 'ok', interrupted: false } }
+  await $.tool.call({ tool: 'Bash', input: { command: 'ls' } } as never)
+  expect(hud.commands()).toEqual([])
+})
+
+test('TaskStop retire la tâche arrêtée, par le hook tool.call', async ($, on) => {
+  const hud = wired(on)
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  hud.answer.current = { result: { backgroundTaskId: 'b2' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  expect(hud.commands()).toEqual(['b1', 'b2'])
+  hud.answer.current = { result: { message: 'Successfully stopped task: b1', task_id: 'b1', task_type: 'local_bash' } }
+  await $.tool.call({ tool: 'TaskStop', input: { task_id: 'b1' } } as never)
+  expect(hud.commands()).toEqual(['b2'])
+})
+
+test('la notification de fin retire la commande, un prompt tapé n\'en retire aucune', async ($, on) => {
+  const hud = wired(on)
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  // même texte, mais écrit par l'utilisateur : ne termine rien
+  await $.prompt.submit({ origin: { kind: 'composer' }, text: NOTIFICATION('b1') } as never)
+  expect(hud.commands()).toEqual(['b1'])
+  await $.prompt.submit({ origin: { kind: 'task-notification' }, text: NOTIFICATION('b1') } as never)
+  expect(hud.commands()).toEqual([])
+})

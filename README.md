@@ -414,7 +414,7 @@ URL. The agent then returns a draft for you to correct — it never writes the f
 cadence session start              # notes from the last close, lots in progress (silent ones flagged),
                                    # work done since yesterday by lot, drift, repo state, 3 proposals
 cadence session start --since "3 days ago" --idle 2
-cadence session close              # commits by lot since the last `session start` (or last successful close),
+cadence session close              # commits by lot since the last `session start`,
                                    # commits without a lot, lots in progress with no commit in that window,
                                    # drift, uncommitted / unpushed work; exit 1 while something is still open
 cadence session close --since "2 days ago"   # --since overrides the window
@@ -505,7 +505,7 @@ An entry is proposed only if it could be measured entirely. Never proposed:
 The command deletes nothing, never fails on the cleanup and does not change the exit code: the
 `session-close` skill shows the list and removes the entries only after the human agrees.
 
-The commands get `CADENCE_SINCE` and `CADENCE_TODAY`. `CADENCE_SINCE` is the `--since` as given; on `session close` without `--since` it is the instant of the last open or successful close as an ISO 8601 UTC string (`2026-09-28T07:12:00.000Z`), or `<today> 00:00` when no mark exists.
+The commands get `CADENCE_SINCE` and `CADENCE_TODAY`. `CADENCE_SINCE` is the `--since` as given; on `session close` without `--since` it is the instant of the last `session start` as an ISO 8601 UTC string (`2026-09-28T07:12:00.000Z`), or `<today> 00:00` when no mark exists.
 The commands add facts and decide nothing: a failing command is reported and changes neither
 the exit code nor the verdict.
 

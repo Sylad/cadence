@@ -5,6 +5,7 @@ import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { isNonQuestion, runLot } from '../src/orchestrate/cycle.js';
+import { runPool } from '../src/orchestrate/pool.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir, readAgents } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -797,6 +798,24 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.warnings.join('\n')).toMatch(/verdict.*conforme/);
     expect(h.plan().lot('L1').review).toBeUndefined();
     expect(c.lot.steps.at(-1)?.status).toBe('failed');
+  });
+
+  it('le lot suivant du même dépôt sali est suspendu (reprenable), sans session ni capture committée (L133)', async () => {
+    const shots: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'capture.png'), 'png');
+      return claudeOut(reviewReport());
+    };
+    const h = harness({ lots: [{ title: 'Un' }, { title: 'Deux' }], script: { implement: [impl()], review: [shots] } });
+    const c1 = h.lot('L1');
+    const c2 = h.lot('L2');
+    await runPool([c1, c2], 1);
+    expect(c1.lot.status).toBe('handed-back');
+    expect(c2.lot.status).toBe('suspended');
+    expect(c2.lot.outcome).toMatch(/sali par la revue de demo:L1/);
+    expect(c2.lot.steps).toHaveLength(0);
+    expect(h.calls.filter((k) => k.kind === 'implement')).toHaveLength(1);
+    expect(git(h.repo, 'ls-files', 'capture.png')).toBe('');
+    expect(h.wave.incident).toBeNull();
   });
 
   it('un push (même contourné) arrête la vague', async () => {

@@ -921,7 +921,7 @@ temporary `pre-push` hook, installed for the duration of the wave and removed at
 from a session (`CADENCE_ORCHESTRATED` is in their environment; a repository that already has another
 `pre-push` hook is refused before anything starts — `pushurl` is never touched); after every session the
 upstream ref and `git ls-remote` are compared with the "before", and a review that changed `HEAD` or the
-tree (screenshots left at the root, a commit) is an incident of that lot only: the lot is handed back to the lead, the lots of the other repositories carry on, and a verdict the review had already produced is reported in the outcome and the lot's warnings (never recorded in the plan). A push or a removed guard hook still stops the wave. `raf done|ux|review` and `cadence deliver` refuse when
+tree (screenshots left at the root, a commit) is an incident of that lot only: the lot is handed back to the lead, the lots of the other repositories carry on while the lots still queued behind it in the same repository are suspended (resumable, nothing started on a dirty tree), and a verdict the review had already produced is reported in the outcome and the lot's warnings (never recorded in the plan). A push or a removed guard hook still stops the wave. `raf done|ux|review` and `cadence deliver` refuse when
 `CADENCE_ORCHESTRATED` is set.
 
 **Budget**: the wave counts input + cache writes + output tokens (default 2 M); cache reads are kept and

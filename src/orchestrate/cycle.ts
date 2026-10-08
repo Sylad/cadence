@@ -18,7 +18,7 @@ import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.
 import type { Tokens } from './result.js';
 import { checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type PrecheckReport, type ReviewReport, type WorkReport } from './schemas.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
-import { lotKey, neighbourDirs } from './state.js';
+import { lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
 export const MAX_PASSES = 2;
@@ -64,6 +64,8 @@ export interface WaveCtx {
   quota: { hit: boolean; message?: string };
   /** Push ou revue qui a modifié le dépôt : la vague s'arrête. */
   incident: string | null;
+  /** Dépôts salis par une revue (L133) → lot en cause : les lots qui restent dans leur file sont suspendus, ceux des autres dépôts continuent. */
+  dirtyRepos?: Map<string, string>;
   log: (line: string) => void;
   saveWave: () => void;
 }
@@ -277,8 +279,14 @@ export const lotSpent = (l: LotState): number => l.steps.reduce((n, s) => n + (s
 const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) >= l.budget;
 
 /** Pourquoi plus aucune session ne doit partir (incident, quota, budget), sinon null. */
-function halted(w: WaveCtx): string | null {
+function halted(w: WaveCtx, lot?: LotState): string | null {
   if (w.incident) return `vague arrêtée : ${w.incident}`;
+  if (lot && w.dirtyRepos) {
+    for (const r of lotRepoPaths(lot)) {
+      const by = w.dirtyRepos.get(r);
+      if (by) return `dépôt ${r} sali par la revue de ${by} : à nettoyer par le lead avant de reprendre`;
+    }
+  }
   if (w.quota.hit) return 'quota atteint';
   if (w.budget.exhausted) return 'budget atteint';
   return null;
@@ -294,7 +302,7 @@ function reviewModel(c: LotCtx, kind: StepKind): Model {
 async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const w = c.wave;
   const l = c.lot;
-  const halt = halted(w);
+  const halt = halted(w, l);
   if (halt) return suspend(c, halt);
   if (lotOver(l)) return overBudget(c);
 
@@ -404,8 +412,8 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const others: Others = neighbours.map((repo, i) => ({ repo, before: beforeOthers[i], after: afterOthers[i] }));
   step.headAfter = after.head ?? undefined;
   // Le dépôt du projet d'abord, puis chaque voisin : mêmes contrôles, l'incident nomme le dépôt voisin.
-  const watched = [{ where: '', before, after }, ...others.map((o) => ({ where: ` dans ${o.repo.rel}`, before: o.before, after: o.after }))];
-  for (const { where, before: b, after: a } of watched) {
+  const watched = [{ where: '', path: l.repo, before, after }, ...others.map((o) => ({ where: ` dans ${o.repo.rel}`, path: o.repo.path, before: o.before, after: o.after }))];
+  for (const { where, path, before: b, after: a } of watched) {
     if (pushed(b, a)) {
       step.status = 'failed';
       step.cause = `push détecté${where}`;
@@ -425,6 +433,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       step.status = 'failed';
       step.cause = `le dépôt${where} a changé pendant une revue`;
       const traces = [...trackedPaths(a).filter((f) => !trackedPaths(b).includes(f)), ...a.untracked.filter((f) => !b.untracked.includes(f))];
+      (w.dirtyRepos ??= new Map()).set(path, lotKey(l.project, l.lot));
       const what = traces.length ? ` (${traces.join(', ')})` : b.head !== a.head ? ' (commit)' : '';
       return stop(c, 'handed-back', `incident : ${kind} de ${lotKey(l.project, l.lot)} a modifié le dépôt${where}${what}${lostVerdict(c, kind, res.structured)}`);
     }
@@ -698,7 +707,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   const l = c.lot;
   const ux = c.config.ux;
   if (!ux?.command || !ux.url || !seesApp(l, kind)) return reviewStep(c, kind);
-  const halt = halted(c.wave);
+  const halt = halted(c.wave, l);
   if (halt) {
     suspend(c, halt); // la session n'aurait pas lieu : l'application ne se lance pas pour rien
     return;
@@ -878,7 +887,7 @@ export async function runLot(c: LotCtx): Promise<void> {
     if (l.status === 'question' && !l.pendingAnswer) return;
     if (l.next === null && l.steps.length === 0) {
       // Pas de raf start ni de commit du plan pour un lot qu'aucune session ne suivrait.
-      const halt = halted(c.wave);
+      const halt = halted(c.wave, l);
       if (halt) {
         suspend(c, halt);
         return;

@@ -11,7 +11,7 @@ export const REFUSED = 3;
 const BLOCKS = {
   'post-commit': `${BEGIN}\ncommand -v raf >/dev/null 2>&1 && raf hook post-commit || true\n${END}\n`,
   // Seul un refus (hook.autostart: refuse, code 3) arrête le commit : un raf plus ancien ou en panne le laisse passer.
-  'pre-commit': `${BEGIN}\ncommand -v raf >/dev/null 2>&1 && { raf hook pre-commit || { [ $? -ne ${REFUSED} ] || exit 1; }; }\n${END}\n`,
+  'pre-commit': `${BEGIN}\nif command -v raf >/dev/null 2>&1; then raf hook pre-commit; [ $? -ne ${REFUSED} ] || exit 1; fi\n${END}\n`,
 };
 
 /** Adds the raf blocks to post-commit and pre-commit without touching anything else already there. */

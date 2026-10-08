@@ -152,4 +152,59 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     expect(r.code).toBe(0);
     expect(raf(dir, 'show', 'L1').out).toContain('todo');
   });
+
+  it('raf absent du PATH : le commit passe, dans les trois modes (le hook ne bloque jamais sans raf)', () => {
+    for (const mode of [undefined, 'refuse', 'start']) {
+      const { dir, env } = project(mode);
+      const bare = { ...env, PATH: '/usr/bin:/bin' };
+      expect(spawnSync('sh', ['-c', 'command -v raf'], { env: bare }).status).not.toBe(0);
+      writeFileSync(join(dir, 'src.txt'), 'x');
+      git(dir, 'add', 'src.txt');
+      const before = count(dir);
+      const r = spawnSync('git', ['commit', '-qm', 'feat(L1): a'], { cwd: dir, env: bare, encoding: 'utf8' });
+      expect(r.status).toBe(0);
+      expect(count(dir)).toBe(before + 1);
+    }
+  });
+
+  it('plan en lecture seule : refuse ne propose pas raf start, start ne démarre rien', () => {
+    for (const mode of ['refuse', 'start']) {
+      const { dir, env } = project(mode);
+      writeFileSync(join(dir, 'cadence.yaml'), `hook:\n  autostart: ${mode}\nplan:\n  lots: lots\n`);
+      const plan = planText(dir);
+      const r = work(dir, env, 'feat(L1): a');
+      if (mode === 'refuse') {
+        expect(r.status).not.toBe(0);
+        expect(r.stderr).toContain('L1 est encore todo');
+        expect(r.stderr).not.toContain('raf start');
+      } else {
+        expect(r.status).toBe(0);
+        expect(r.stderr).not.toContain('était todo');
+      }
+      expect(planText(dir)).toBe(plan);
+    }
+  });
+
+  it('un lot récurrent n\'est ni refusé ni démarré', () => {
+    for (const mode of ['refuse', 'start']) {
+      const { dir, env } = project(mode);
+      raf(dir, 'add', 'Veille', '--every', '7');
+      git(dir, 'add', 'docs/plan/raf.yaml');
+      expect(spawnSync('git', ['commit', '-qm', 'chore(L3): plan'], { cwd: dir, env, encoding: 'utf8' }).status).toBe(0);
+      const plan = planText(dir);
+      expect(work(dir, env, 'feat(L3): veille').status).toBe(0);
+      expect(planText(dir)).toBe(plan);
+    }
+  });
+
+  it('CADENCE_COMMIT_MESSAGE donne le message au hook (refuse, puis start)', () => {
+    const refuse = project('refuse');
+    const r = spawnSync('git', ['commit', '-q', '--allow-empty', '-m', 'wip'], { cwd: refuse.dir, env: { ...refuse.env, CADENCE_COMMIT_MESSAGE: 'feat(L1): a' }, encoding: 'utf8' });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain('raf start L1');
+    const start = project('start');
+    const s = spawnSync('git', ['commit', '-q', '--allow-empty', '-m', 'wip'], { cwd: start.dir, env: { ...start.env, CADENCE_COMMIT_MESSAGE: 'feat(L1): a' }, encoding: 'utf8' });
+    expect(s.status).toBe(0);
+    expect(raf(start.dir, 'show', 'L1').out).toContain('doing');
+  });
 });

@@ -5,6 +5,9 @@ import { parseWaves } from '../hooks/collect'
 import { ago, attributeTurn, endedCommands, endedTask, notifiedEnd, pruneOwners, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
+/** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
+declare function setTimeout(fn: () => void, ms?: number): unknown
+
 const PLUGIN = 'cadence-hud'
 const BAND = {
   component: 'AbovePrompt',
@@ -640,4 +643,20 @@ test('les commandes d’un sous-agent sortent du compte quand il finit, par les 
   // expiration du Monitor m1
   await $.prompt.submit({ text: '<task-notification>\n<task-id>m1</task-id>\n<event>[Monitor expired after 30m with 2 events delivered. Re-arm it if you still need the watch.]</event>\n</task-notification>', origin: { kind: 'task-notification' } } as never)
   expect(hud.commands()).toEqual(['b1'])
+})
+
+test('session.start repart sans commande ni propriétaire (session neuve ou rechargement du mod)', async ($, on) => {
+  const hud = wired(on)
+  mock.clock(on)
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a1' } as never)
+  expect(hud.commands()).toEqual(['b1'])
+  expect(hud.owners()).toEqual({ b1: 'a1' })
+  await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
+  expect(hud.commands()).toEqual([])
+  expect(hud.owners()).toEqual({})
+  // le premier rafraîchissement du hook est lancé sans être attendu (`void refresh()`) : le laisser se poser avant la fin du test
+  await new Promise<void>(resolve => setTimeout(() => resolve(), 50))
 })

@@ -21,9 +21,8 @@ const now = atom({ plugin: 'cadence-hud', key: 'now' } as const, 0)
 /** Une tâche finie sort des commandes, avec celles que son sous-agent avait lancées ; la table des propriétaires suit. */
 const endCommand = async ($: Parameters<typeof read>[0], ended: string): Promise<void> => {
   const o = await read($, owners)
-  const left = endedCommands(await read($, commands), o, ended)
-  await update($, commands, () => left)
-  await update($, owners, () => pruneOwners(o, left))
+  const left = await update($, commands, (ids: string[]) => endedCommands(ids, o, ended))
+  await update($, owners, (cur: Record<string, string>) => pruneOwners(cur, left))
 }
 
 export const register: Register = on => {
@@ -124,9 +123,10 @@ export const register: Register = on => {
     if (!('result' in result) || result.isError) return result
     const started = startedCommand(e.tool, result.result)
     if (started) {
-      await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
+      // le propriétaire d'abord : une fin de sous-agent tombant entre les deux écritures retire déjà la commande
       const agent = e.agentId
       if (agent) await update($, owners, (o: Record<string, string>) => ({ ...o, [started]: agent }))
+      await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
     } else {
       const stopped = stoppedTask(e.tool, result.result)
       if (stopped) await endCommand($, stopped)

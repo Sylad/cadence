@@ -274,6 +274,23 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
     expect(t).not.toContain("wave's output directory");
   });
 
+  it("le paragraphe Browser ne promet pas un serveur lancé par l'orchestrateur : brief délégué à la main sans serveur, capture sous le dossier temporaire (L91)", () => {
+    const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: '', captures: '' };
+    for (const kind of ['implement', 'fix', 'fix-minors', 'review-small'] as const) {
+      const out = renderBrief(kind, vars);
+      expect(out, kind).not.toContain('it was launched by the orchestrator');
+      expect(out, kind).toContain('only in an orchestrated wave');
+      expect(out, kind).toContain('delegated by hand');
+    }
+  });
+
+  it("README : les briefs Nouveautés hors vague (dry-run, délégation à la main) n'ont pas de dossier de vague ; fix et fix-minors d'un lot visible l'ont aussi, avec --add-dir (L91)", () => {
+    const readme = read('../README.md');
+    expect(readme).toContain('A `--dry-run` brief of a `visible` lot has no wave folder');
+    expect(readme).toContain('OS temp directory');
+    expect(readme).toContain('the `fix` and `fix-minors` briefs of a `visible` lot');
+  });
+
   it('lot non visible : aucune mention des Nouveautés', () => {
     const out = renderBrief('implement', { ...base, news: '' });
     expect(out).not.toMatch(/\{\{/);

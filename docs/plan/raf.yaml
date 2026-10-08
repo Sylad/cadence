@@ -1375,12 +1375,14 @@ lots:
     finished: 2026-10-08
   - id: L120
     title: "cadence orchestrate accepte un id de lot contenant « / » (projet:Q4/accueil-4-ux12, sous-tâches des plans en lecture seule comme maritime-atlas) : seul le premier « : » sépare le projet du lot, « @modèle » reste un suffixe ; --dry-run, --status, --resume --answer et les dossiers .cadence/runs/<vague>/ (nom de fichier sans « / », encoder) suivent ; test sur un plan en lecture seule"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-08
     notes:
       - { date: 2026-10-08, text: "Décision lead 08-10 : règle de découpe = le premier « : » sépare projet et lot, un « @ » final sépare le modèle ; le lot garde ses « / ». Le nom du dossier de run remplace « / » par « __ » (pas d'URL-encodage, lisible dans un terminal). Aucun changement pour les ids sans « / »." }
+      - { date: 2026-10-08, text: "Mineur non repris (revue 08-10) : lotSlug n'est pas injectif, Q4/a et Q4__a donnent le même dossier ; aucun id de plan connu ne contient « __ ». Essai réel du lead : dry-run maritime-atlas:Q4/accueil-4-ux21 accepté, brief rendu." }
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "conforme : mineur 1 (affichage du dossier Playwright en dry-run) corrigé et testé, mineur 2 (lotSlug non injectif) conservé en note, tests 929/929 et typecheck OK — orchestré (vague 2026-10-08-0913, 1 passe(s) de correction + passe des mineurs)", commit: 791de77d5464cb505a7e94caa525231018822807 }
+    finished: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

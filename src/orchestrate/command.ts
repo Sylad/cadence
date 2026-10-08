@@ -18,7 +18,8 @@ import { buildArgs, killSessions, mcpServersFor, readAgents, realClaude, type Ag
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { runPool } from './pool.js';
 import { schemaFor } from './schemas.js';
-import { excludeState, lotKey, lotSlug, newLot, RunStore, type LotState, type WaveState } from './state.js';
+import { resolveLotRepos } from '../repos.js';
+import { excludeState, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
 import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
@@ -226,15 +227,22 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       refusals.push(`${key} : dépendance(s) ni terminée(s) ni plus tôt dans la vague : ${open.join(', ')}`);
       continue;
     }
+    // Dépôts voisins du lot (L62) : chacun doit exister et être un dépôt git, sinon refus avant d'agir comme pour le dépôt du projet.
+    const neighbours = resolveLotRepos(t.repo, lot);
+    if (neighbours.problems.length) {
+      refusals.push(...neighbours.problems.map((p) => `${key} : ${p}`));
+      continue;
+    }
     byProject.set(t.project, [...earlier, t.lot]);
-    if (!repoChecked.has(t.repo)) {
-      repoChecked.add(t.repo);
-      const dirty = await trackedDirty(t.repo);
-      if (dirty.length) refusals.push(`${basename(t.repo)} : arbre sale, ${dirty.length} fichier(s) suivi(s) modifié(s) : ${dirty.join(', ')}`);
-      const hook = canInstallPrePush(t.repo);
-      if (hook) refusals.push(`${basename(t.repo)} : ${hook}`);
-      const busy = activeLock(join(sharedStateDir(t.repo), REPO_LOCK));
-      if (busy && !opts.resume) refusals.push(`${basename(t.repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
+    for (const repo of [t.repo, ...neighbours.repos.map((r) => r.path)]) {
+      if (repoChecked.has(repo)) continue;
+      repoChecked.add(repo);
+      const dirty = await trackedDirty(repo);
+      if (dirty.length) refusals.push(`${basename(repo)} : arbre sale, ${dirty.length} fichier(s) suivi(s) modifié(s) : ${dirty.join(', ')}`);
+      const hook = canInstallPrePush(repo);
+      if (hook) refusals.push(`${basename(repo)} : ${hook}`);
+      const busy = activeLock(join(sharedStateDir(repo), REPO_LOCK));
+      if (busy && !opts.resume) refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
     }
     const node = resolveNode(t.repo, nvmVersionsDir(io.env));
     if (node.kind === 'missing') {
@@ -243,6 +251,7 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
     }
     const small = lot.estimate <= 0.5 || lot.quickwin;
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, model: t.model, readOnlyPlan: plan.readonly });
+    if (neighbours.repos.length) state.repos = neighbours.repos;
     state.light = lot.estimate <= env.config.review.threshold;
     state.budget = lotBudget(lot.estimate);
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
@@ -285,6 +294,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     io.out(`  budget du lot : ${l.budget} tokens comptés (dérivé de l'estimate)`);
     io.out(`  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
+    if (l.repos?.length) io.out(`  dépôts voisins : ${l.repos.map((r) => r.rel).join(', ')} (verrou, garde de push et --add-dir ; leurs commits citent ${l.lot})`);
     if (l.node) {
       const sk = l.node.skipped;
       const skipped = sk?.length ? ` ; ${sk.join(', ')} ${sk.length > 1 ? 'écartées' : 'écartée'} : pas de node exécutable` : '';
@@ -310,7 +320,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       writeFileSync(file, brief);
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small).playwright;
       const args = buildArgs(
-        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: playwright && (s.kind === 'implement') ? [...env.config.addDirs, pwDir] : env.config.addDirs, timeoutMs: 0, mcpConfig: '<mcp>', playwright },
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && s.kind === 'implement' ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : claude ${args.join(' ')}`);
@@ -483,7 +493,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   excludeState(launch);
   const home = cadenceHome();
   const held: string[] = [];
-  const repos = [...new Set(lots.map((l) => l.repo))];
+  const repos = [...new Set(lots.flatMap(lotRepoPaths))];
   const release = () => {
     for (const f of held) releaseLock(f, process.pid);
     held.length = 0;
@@ -638,7 +648,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     live.push(l);
   }
   // Comme au départ : un dépôt tenu par une autre orchestration vivante est refusé avant toute écriture.
-  for (const repo of new Set(live.map((l) => l.repo))) {
+  for (const repo of new Set(live.flatMap(lotRepoPaths))) {
     const busy = activeLock(join(sharedStateDir(repo), REPO_LOCK));
     if (busy && busy.pid !== process.pid) refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
   }
@@ -670,10 +680,10 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   }
   if (args.budget !== undefined) wave.budget = wave.consumed + args.budget;
   const dirty = new Set<string>();
-  for (const l of live) if (!dirty.has(l.repo)) {
-    dirty.add(l.repo);
-    const d = await trackedDirty(l.repo);
-    if (d.length) refusals.push(`${basename(l.repo)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
+  for (const repo of live.flatMap(lotRepoPaths)) if (!dirty.has(repo)) {
+    dirty.add(repo);
+    const d = await trackedDirty(repo);
+    if (d.length) refusals.push(`${basename(repo)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
   }
   if (refusals.length) {
     for (const r of refusals) io.err(`orchestrate : ${r}`);

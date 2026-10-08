@@ -76,6 +76,8 @@ export interface LotState {
   light?: boolean;
   model: Model;
   readOnlyPlan: boolean;
+  /** Dépôts voisins du lot (clé de lot `repos:`, L62), résolus au lancement : chemin déclaré et racine git. Absent : le dépôt du projet seul. */
+  repos?: { rel: string; path: string }[];
   /** Node imposé par le `.nvmrc` du projet : ses sessions l'ont en tête du PATH. Absent sans .nvmrc. */
   node?: { version: string; wanted: string; bin: string; /** Versions plus hautes écartées (pas de node exécutable), pour le dry-run. */ skipped?: string[]; /** Dossier de liens (node, npm, npx, corepack) en tête du PATH des sessions. */ link?: string };
   /** Lots du même projet, plus tôt dans la vague, dont celui-ci dépend (`after`) : il attend qu'ils soient prêts. */
@@ -135,6 +137,12 @@ export interface NewLot {
 export function newLot(o: NewLot): LotState {
   return { ...o, status: 'queued', pass: 0, next: null, steps: [], constats: [], verdict: null, uxVerdict: null, questions: [], choix: [], answers: [], proposals: [], warnings: [], outcome: null };
 }
+
+/** Tous les dépôts où les sessions du lot travaillent : celui du projet, puis ses voisins. */
+export const lotRepoPaths = (l: Pick<LotState, 'repo' | 'repos'>): string[] => [l.repo, ...(l.repos ?? []).map((r) => r.path)];
+
+/** Les dépôts voisins du lot, donnés en `--add-dir` à ses sessions. */
+export const neighbourDirs = (l: Pick<LotState, 'repos'>): string[] => (l.repos ?? []).map((r) => r.path);
 
 export const lotKey = (project: string, lot: string) => `${project}:${lot}`;
 /** Nom de dossier d'un lot dans la vague : le « / » d'un id de sous-tâche (`Q4/accueil-4-ux12`) devient « __ » ; un id sans « / » est inchangé. */

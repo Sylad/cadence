@@ -1400,6 +1400,18 @@ lots:
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "conforme (1 note mineure : commentaire « 74 » au lieu de 75 dans hud.test.tsx:280) — orchestré (vague 2026-10-08-1013, 2 passe(s) de correction + passe des mineurs)", commit: a31cbc6279c21b7fa230c0e00ba11273ace26b76 }
     finished: 2026-10-08
+  - id: L122
+    title: "cadence lead tour : le tour des projets sans modèle — une commande qui lance « cadence session start » sur chaque sous-dossier (plan raf ou cadence.yaml avec plan:) et imprime le tableau du lead (en cours + silencieux, dérive, notes de clôture, prochain lot prêt, dépôt) ; le skill lead l'appelle à la place des deux sous-agents (~150 k tokens par tour le 08-10 pour 10 projets)"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-08
+  - id: L123
+    title: "qa-reviewer : périmètre réduit aux pages touchées par le lot (pages qui appellent les endpoints changés, pages du lot visible, plus la page d'accueil) et lecture du DOM en texte d'abord, capture seulement sur un écart ; garder le cas « lot backend qui vide une page » (13 % du coût sur 24 h le 08-10) ; mesurer avant/après sur une livraison ol ou warhammer"
+    status: todo
+    estimate: 1
+    created: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }
+  - { sha: 78371e06080d70e75e0f026a6b6f1434d5d2db53, subject: "chore: 0.13.1 — cadence-hud reprend les segments qui tiennent, consommation par modèle courte, CADENCE_HUD_AMBIGUOUS ; CHANGELOG et What's new", date: 2026-10-08, reason: "release 0.13.1 : bump de version, CHANGELOG et What's new, sans lot" }

@@ -1519,10 +1519,12 @@ lots:
     finished: 2026-10-08
   - id: L134
     title: "cadence-hud : lignes de lots d'une vague désalignées sur la surface desktop (colonnes remplies d'espaces dans des Text rétrécissables, compressées dès que la ligne dépasse ; vu 08-10 soir) — chaque colonne dans un Box à largeur fixe non rétrécissable (paddingLeft), titre dans un Box extensible tronqué ; copie canonique ~/.claude/mods corrigée et rechargée à chaud, tests 36/36"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-08
     started: 2026-10-08
+    review: { date: 2026-10-08, verdict: "conforme (2e revue après 0c7cc5e : test d'alignement qui tombe sans le correctif, ligne en attente renvoyée à la ligne, export pad retiré ; 37/37)", commit: 0c7cc5e7b70e9252c39a7bfb553fefba51bb0273 }
+    finished: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

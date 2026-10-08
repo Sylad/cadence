@@ -166,6 +166,12 @@ describe('session close : fenêtre depuis la dernière ouverture (issue #7)', ()
     expect((await cad(dir, 'session', 'close')).out).toContain('Commits de la période (depuis la clôture de 18:30)');
   });
 
+  it("une marque d'un autre jour est datée : du AAAA-MM-JJ à HH:MM, mois et jour sur deux chiffres", async () => {
+    const dir = await project();
+    writeFileSync(join(stateDir(dir), 'session.json'), JSON.stringify({ kind: 'start', at: new Date('2026-09-05T09:07:00').toISOString() }));
+    expect((await cad(dir, 'session', 'close')).out).toContain("Commits de la période (depuis l'ouverture du 2026-09-05 à 09:07)");
+  });
+
   it("un fichier d'état illisible retombe sur le jour même", async () => {
     const dir = await project();
     writeFileSync(join(stateDir(dir), 'session.json'), '{pas du json');

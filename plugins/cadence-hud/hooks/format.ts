@@ -254,3 +254,27 @@ export const fitSegments = <S extends { key?: string; text: string; drop: number
   }
   return segments.filter(s => kept.has(s))
 }
+
+/**
+ * L'identifiant de la tâche d'arrière-plan qu'un appel d'outil vient de lancer, ou null : `backgroundTaskId` d'un
+ * Bash (`run_in_background`, Ctrl+B ou délai dépassé), `taskId` d'un Monitor. Une commande qui meurt avec la réponse
+ * finale de son appelant (`backgroundEndsWithFinalResponse`) ne notifiera jamais sa fin : on ne la compte pas.
+ */
+export const startedCommand = (tool: string, result: unknown): string | null => {
+  if (typeof result !== 'object' || result === null) return null
+  const r = result as Record<string, unknown>
+  if (tool === 'Bash') return typeof r.backgroundTaskId === 'string' && !r.backgroundEndsWithFinalResponse ? r.backgroundTaskId : null
+  if (tool === 'Monitor') return typeof r.taskId === 'string' ? r.taskId : null
+  return null
+}
+
+/** L'identifiant de la tâche dont une notification annonce la fin (`completed`, `failed`, `killed`), sinon null. */
+export const endedTask = (text: string): string | null => {
+  const id = /<task-id>([^<\s]+)<\/task-id>/.exec(text)?.[1]
+  const status = /<status>\s*([a-z_]+)\s*<\/status>/.exec(text)?.[1]
+  return id && (status === 'completed' || status === 'failed' || status === 'killed') ? id : null
+}
+
+/** Ajoute ou retire une tâche de la liste des commandes en cours, sans doublon. */
+export const trackCommand = (ids: readonly string[], id: string, isRunning: boolean): string[] =>
+  isRunning ? (ids.includes(id) ? [...ids] : [...ids, id]) : ids.filter(i => i !== id)

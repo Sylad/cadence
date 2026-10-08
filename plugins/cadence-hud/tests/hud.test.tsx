@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { ago, attributeTurn, endedTask, startedCommand, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -93,7 +93,7 @@ const seed = (on: On, values: Record<string, unknown>, env: Record<string, strin
   )
 }
 
-const EMPTY = { agents: { running: 0, names: [] }, models: { byModel: {}, usdSeen: 0 }, error: null, isHidden: false }
+const EMPTY = { commands: [], agents: { running: 0, names: [] }, models: { byModel: {}, usdSeen: 0 }, error: null, isHidden: false }
 
 test('la bande dessine le contexte et la vague sur chaque surface', async ($, on) => {
   seed(on, {
@@ -444,5 +444,70 @@ test('la première ligne n\'emploie que de l\'ASCII et les symboles que cells() 
   expect(await ui.find({ type: 'Text', text: /\.\.\./ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /EUR/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /[^\x00-\x7f▰▱⚙│↻]/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('une commande d\'arrière-plan démarre par Bash (run_in_background ou mise en arrière-plan) ou Monitor, sous-agents compris', () => {
+  expect(startedCommand('Bash', { backgroundTaskId: 'b1' })).toBe('b1')
+  expect(startedCommand('Bash', { stdout: '', interrupted: false })).toBeNull()
+  expect(startedCommand('Bash', { backgroundTaskId: 'b2', backgroundEndsWithFinalResponse: true })).toBeNull()
+  expect(startedCommand('Monitor', { taskId: 'm1', timeoutMs: 300_000 })).toBe('m1')
+  expect(startedCommand('Read', { taskId: 'x' })).toBeNull()
+  expect(startedCommand('Bash', null)).toBeNull()
+})
+
+test('une commande d\'arrière-plan finit par sa notification ou par TaskStop', () => {
+  const note = (id: string, status: string) =>
+    `<task-notification>\n<task-id>${id}</task-id>\n<tool-use-id>t</tool-use-id>\n<status>${status}</status>\n<summary>Background command "x" ${status}</summary>\n</task-notification>`
+  expect(endedTask(note('b1', 'completed'))).toBe('b1')
+  expect(endedTask(note('b1', 'failed'))).toBe('b1')
+  expect(endedTask(note('b1', 'killed'))).toBe('b1')
+  // l'événement d'un Monitor qui tourne encore n'est pas une fin
+  expect(endedTask('<task-notification>\n<task-id>m1</task-id>\n<event>ligne</event>\n</task-notification>')).toBeNull()
+  expect(endedTask(note('b1', 'running'))).toBeNull()
+  expect(endedTask('bonjour')).toBeNull()
+})
+
+test('les commandes en cours ne comptent chaque tâche qu\'une fois et la perdent à sa fin', () => {
+  let ids: string[] = []
+  ids = trackCommand(ids, 'b1', true)
+  ids = trackCommand(ids, 'b1', true)
+  ids = trackCommand(ids, 'm1', true)
+  expect(ids).toEqual(['b1', 'm1'])
+  ids = trackCommand(ids, 'b1', false)
+  expect(ids).toEqual(['m1'])
+  expect(trackCommand(ids, 'inconnue', false)).toEqual(['m1'])
+})
+
+test('la bande compte les commandes d\'arrière-plan à côté des agents', async ($, on) => {
+  seed(on, {
+    ...EMPTY,
+    agents: { running: 1, names: ['tour'] },
+    commands: ['b1', 'm1'],
+    usage: { percent: 42, tokens: 84_000, window: 200_000, limits: [] },
+    waves: [],
+    now: 0,
+  })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
+    expect(await ui.find({ type: 'Text', text: /⚙ 1 agent/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /2 cmd/ })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
+test('sans commande en cours, la bande n\'affiche pas « cmd »', async ($, on) => {
+  seed(on, { ...EMPTY, commands: [], usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0 })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /42 %/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /cmd/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('une commande seule, sans agent, s\'affiche quand même', async ($, on) => {
+  seed(on, { ...EMPTY, commands: ['b1'], usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0 })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /1 cmd/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /agent/ })).toBeUndefined()
   await ui.unmount()
 })

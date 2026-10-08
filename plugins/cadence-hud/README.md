@@ -3,7 +3,7 @@
 Bande au-dessus du prompt de Claude Code (terminal et app de bureau), rafraîchie toutes les 5 s :
 
 ```
-ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │  7j  61 % ↻ 6 j 15 h  │  $1.23  │  fable 410k sonnet 85k  │  ⚙ 2 agents nom, nom
+ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │  7j  61 % ↻ 6 j 15 h  │  $1.23  │  fable 410k sonnet 85k  │  ⚙ 2 agents nom, nom  │  2 cmd
 ⟳ cadence · 2026-10-07-2131 en cours  │  budget ▱▱▱▱▱▱▱▱▱▱   1 % 14k/2M  │  1 session/2
   L112  implémente  implement@sonnet 34 s         global-setup coupe le cache de compilation de Node...
   L75   corrige     fix@sonnet 3 min +1 ✝ · p2    raf show aligne les lignes suivantes d'une note...
@@ -21,6 +21,12 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
   tour précédente, approximative quand deux tours finissent ensemble), qui n'est pas affichée. Les fenêtres de
   quota (`5h`, `7j`) restent celles que l'API renvoie : elle n'en publie pas de propre à un modèle ;
 - `⚙ 2 agents nom, nom` — sous-agents de CETTE session en cours ;
+- `2 cmd` — **commandes d'arrière-plan** de la session en cours, celles de la carte « commandes en arrière-plan »
+  de la fenêtre : Bash lancé en arrière-plan (`run_in_background`, Ctrl+B, délai dépassé) et Monitor, y compris
+  ceux des sous-agents. Le mod les suit à leur lancement (résultat de l'appel d'outil), les retire à la notification
+  de fin de la tâche (terminée, échouée, arrêtée) ou à un `TaskStop`, et n'affiche rien à zéro ; elle tombe avec le
+  compteur d'agents quand la fenêtre est étroite. Une commande lancée avant le chargement du mod, ou dont la
+  notification n'arrive pas, n'est pas vue : le compteur ne remonte qu'aux lancements qu'il a vus ;
 - par vague `cadence orchestrate` vivante : un en-tête (projet si tous les lots sont du même, identifiant, statut,
   budget consommé / plafond, sessions en cours / plafond), puis un **tableau des lots actifs** à colonnes alignées —
   lot, statut coloré (prêt = vert, question / suspendu = orange, échec / rendu = rouge), détail de l'étape
@@ -34,7 +40,7 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
 
 Quand la fenêtre est étroite, la première ligne ne se replie pas : ses segments tombent par priorité jusqu'à tenir sur
 la largeur — d'abord les noms des agents, puis les heures de remise à zéro, puis la consommation par modèle, le coût,
-le compteur d'agents, et en dernier les fenêtres de quota ; le contexte reste toujours. Une fois la ligne tenue, les segments tombés qui
+les compteurs d'agents et de commandes, et en dernier les fenêtres de quota ; le contexte reste toujours. Une fois la ligne tenue, les segments tombés qui
 entrent dans la place restante reviennent, du plus utile au moins utile : un gros segment (les modèles) qui ne tient
 pas ne prive donc pas la ligne des petits qui tiennent (les heures de remise à zéro). La largeur se mesure en
 cellules de terminal, et par défaut au pire cas : `▰ ▱ ⚙ │ ↻` (largeur ambiguë) comptent pour 2, de sorte que la ligne

@@ -29,6 +29,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `hook.autostart` (`warn` \| `refuse` \| `start`): what the pre-commit hook does with a lot still todo | [0.15.0](#0150---2026-10-08) |
 | `cadence session start\|close --all [--depth n]`: every project under a folder, one section each | [0.15.0](#0150---2026-10-08) |
 
+## [Unreleased]
+
+### Added
+- `cadence-hud` shows an `N cmd` segment next to the agents: the background commands of the session in progress (Bash run in the background, by `run_in_background`, Ctrl+B or timeout, and Monitor, subagents' included), as the window's "background commands" card counts them, where the band only counted agents (seen on 2026-10-08: app "2 running, 3 tasks", band "1 agent"). Tracked from the tool results, ended by the task's notification or `TaskStop`; hidden at zero, dropped with the agent counter on a narrow window. (L126)
+
 ## [0.16.0] - 2026-10-08
 
 ### Added

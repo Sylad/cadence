@@ -3,13 +3,14 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, pad, parseAmbiguous, RESET_BACK, shortModel, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, endedTask, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, pad, parseAmbiguous, RESET_BACK, shortModel, startedCommand, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
 
 const usage = atom({ plugin: 'cadence-hud', key: 'usage' } as const, null)
 const agents = atom({ plugin: 'cadence-hud', key: 'agents' } as const, { running: 0, names: [] })
+const commands = atom({ plugin: 'cadence-hud', key: 'commands' } as const, [])
 const models = atom({ plugin: 'cadence-hud', key: 'models' } as const, { byModel: {}, usdSeen: 0 })
 const waves = atom({ plugin: 'cadence-hud', key: 'waves' } as const, [])
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
@@ -102,6 +103,27 @@ export const register: Register = on => {
     return result
   })
 
+  // Les commandes d'arrière-plan sont celles que l'app range dans « commandes en arrière-plan » : Bash lancé en
+  // arrière-plan et Monitor, ceux des sous-agents aussi (leurs appels passent par ici avec leur `agentId`). Elles
+  // naissent au résultat de l'appel, finissent par la notification de la tâche ou par TaskStop.
+  on('tool.call', async ($, e, next) => {
+    const result = await next(e)
+    if (!('result' in result) || result.isError) return result
+    const started = startedCommand(e.tool, result.result)
+    if (started) await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
+    else if (e.tool === 'TaskStop') {
+      const stopped = (result.result as { task_id?: unknown } | null)?.task_id
+      if (typeof stopped === 'string') await update($, commands, (ids: string[]) => trackCommand(ids, stopped, false))
+    }
+    return result
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    const ended = e.origin?.kind === 'task-notification' ? endedTask(e.text) : null
+    if (ended) await update($, commands, (ids: string[]) => trackCommand(ids, ended, false))
+    return next(e)
+  })
+
   on('command.run', { command: 'hud' }, async $ => {
     const hidden = !(await read($, isHidden))
     await update($, isHidden, () => hidden)
@@ -112,9 +134,10 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, m, w, problem, at] = await Promise.all([
+    const [u, a, cmds, m, w, problem, at] = await Promise.all([
       read($, usage),
       read($, agents),
+      read($, commands),
       read($, models),
       read($, waves),
       read($, error),
@@ -217,6 +240,22 @@ export const register: Register = on => {
         })
         const names = fit(a.names.join(', '), 40)
         if (names) segments.push({ key: 'agent-names', text: ` ${names}`, drop: 6, requires: 'agents', node: <Text key="agent-names" dimColor> {names}</Text> })
+      }
+      if (cmds.length > 0) {
+        const label = `${cmds.length} cmd`
+        segments.push({
+          key: 'commands',
+          text: `${SEP}${label}`,
+          drop: 2,
+          node: (
+            <Text key="commands">
+              {sep}
+              <Text color="claude" bold>
+                {label}
+              </Text>
+            </Text>
+          ),
+        })
       }
     }
     const contextRow = u && (

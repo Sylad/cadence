@@ -58,6 +58,8 @@ declare module 'claude-code' {
     'cadence-hud': {
       usage: Usage | null
       agents: AgentsSummary
+      /** Identifiants des commandes d'arrière-plan (Bash, Monitor) en cours, sous-agents compris. */
+      commands: string[]
       models: ModelsSummary
       waves: Wave[]
       error: string | null

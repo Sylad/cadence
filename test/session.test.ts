@@ -116,6 +116,15 @@ describe('session close', () => {
 });
 
 describe('session next', () => {
+  it('dit ce qui est enregistré, lignes telles qu’écrites (issue #6)', async () => {
+    const dir = await project();
+    const r = await cad(dir, 'session', 'next', 'finir L1', ' ', 'relire L2');
+    expect(r.code).toBe(0);
+    expect(r.out).toBe('2 lignes enregistrées pour la prochaine ouverture\n  - finir L1\n  - relire L2');
+    const one = await cad(dir, 'session', 'next', 'finir L1');
+    expect(one.out).toBe('1 ligne enregistrée pour la prochaine ouverture\n  - finir L1');
+  });
+
   it('écrit les notes ; --clear les efface exprès', async () => {
     const dir = await project();
     expect((await cad(dir, 'session', 'next', 'finir L1', 'relire L2')).code).toBe(0);

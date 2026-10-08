@@ -424,6 +424,10 @@ cadence session next "finish L3" "review L4"    # shown by the next session star
 cadence session next --clear       # erase those notes, on purpose
 ```
 
+On success `cadence session next` prints what it recorded (`2 lignes enregistrées pour la prochaine
+ouverture`, then the lines as written, blank ones dropped), so `session-close` can report
+them without running `session start` again.
+
 `--all` runs the same command inside each project found under the current folder —
 `docs/plan/raf.yaml`, or a `cadence.yaml` with `plan:` — and never enters a project
 to look for another. `--since` and `--idle` go to every project; an error in one

@@ -67,7 +67,7 @@ With no project named, run `cadence session close --all` from the parent folder,
    these steps say `raf`.
 6. **Clean state**: everything committed and pushed, no delivery running. If the command still exits 1,
    say what remains and do NOT say the session is closed.
-7. **Three lines for next time**: `cadence session next "…" "…" "…"` — the next `session-start` shows them.
+7. **Three lines for next time**: `cadence session next "…" "…" "…"` — the next `session-start` shows them. The command prints the lines as recorded: report them from that output, do not run `session start` again.
    The lines replace the previous notes. Without a line the command refuses and keeps them; erase
    them on purpose with `cadence session next --clear`, only when nothing is left to say.
 

@@ -723,6 +723,10 @@ function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: st
         );
       }
       writeNext(ctx.state, ctx.today, lines);
+      // Rien sur stdout laissait croire à un échec : on redit les lignes telles qu'enregistrées, pour que
+      // session-close les rapporte sans relancer session start.
+      const n = lines.length;
+      ctx.out(`${n} ligne${n > 1 ? 's' : ''} enregistrée${n > 1 ? 's' : ''} pour la prochaine ouverture\n${lines.map((l) => `  - ${l}`).join('\n')}`);
       return 0;
     }
     default:

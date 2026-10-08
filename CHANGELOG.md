@@ -52,6 +52,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
   before the step starts nothing, and `url` must be `http(s)://` with `timeout` only
   allowed beside `command` and `url`. (L60)
 
+### Changed
+- The `implement` brief of `cadence orchestrate` requires the README and the usage documentation to describe the behaviour delivered, like the CHANGELOG, and the `code-reviewer` agent reports a README that does not follow the change as a major finding. (L114)
+
 ## [0.11.0] - 2026-10-06
 
 ### Added

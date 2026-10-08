@@ -57,9 +57,10 @@ fact. If the path or the id is missing, or the lot has no commit to review, say 
    - errors swallowed, inputs trusted, resources not released, secrets or personal data written
      to a log or to the repository;
    - a written convention of the project not followed: quote the line of CLAUDE.md.
+   - documentation that does not follow the change: the lot changes a behaviour, a command, an option or a default and the README (or the project's usage documentation) still describes the old one or says nothing: name the file and the stale or missing passage.
 7. **Rank** each finding: *blocking* (wrong result, lost data, security hole, crash, a command that
    fails), *major* (breaks in a plausible scenario, behaviour changed without a test, a written
-   convention broken), *minor* (costs maintenance: duplication, dead code). Untested code that is
+   convention broken, a README or usage documentation that does not follow the change), *minor* (costs maintenance: duplication, dead code). Untested code that is
    practically unreachable, and a rule that holds as written while an edge defeats its purpose, are
    *minor* — unless they can lose or corrupt data.
 

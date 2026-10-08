@@ -40,6 +40,17 @@ describe('gabarits', () => {
     expect(out).not.toMatch(/pass `?--output-dir/); // le serveur est lancé avec son --output-dir : la session ne le prescrit pas
   });
 
+  it('README à jour à chaque lot : le brief implement et l\'agent code-reviewer l\'exigent, un README en retard est un constat majeur (L114)', () => {
+    const out = renderBrief('implement', vars);
+    expect(out).toContain('README');
+    expect(out).toContain('describes the behaviour you deliver');
+    expect(out).toContain('like the CHANGELOG');
+    const agent = read('../agents/code-reviewer.md');
+    expect(agent).toContain('README');
+    expect(agent).toMatch(/\*major\* \([^)]*a README or usage documentation that does not follow the change/); // le classement, pas seulement la méthode
+    expect(agent).toContain('usage documentation');
+  });
+
   it('implement.md est le brief du lead (§2) plus deux lignes, rendu sans accolades restantes', () => {
     const out = renderBrief('implement', vars);
     expect(out).toContain('Work in `/r/p` on lot `L9` — "Un titre" — of its plan');

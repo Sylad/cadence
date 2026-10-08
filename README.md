@@ -918,7 +918,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 - **lead**: from a folder holding several projects, one subagent per project
   gathers the facts, you choose the priorities, the lots are delegated with
   `cadence orchestrate` (fresh short sessions with a standard brief — test first,
-  commits citing the lot, no push — reviewed by the `code-reviewer` agent, see
+  README and usage documentation updated with the change, commits citing the lot, no push — reviewed by the `code-reviewer` agent, see
   [orchestrate](#orchestrate)), re-verified by the lead, then delivered
   one project at a time; a delivery that changes what a page shows or what it is
   served is then checked in the running app by the `qa-reviewer` agent, whose
@@ -935,7 +935,8 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   block, dead code) or a named rule, each with `file:line` and a concrete
   scenario; real defects only, ranked, what it could not verify, and a one-line
   verdict for `raf review`. It takes the lot's commits from `raf commits`, never
-  runs a build whose output is used live, and never edits code.
+  runs a build whose output is used live, and never edits code. A README or usage
+  documentation that does not follow the lot's change is a *major* finding.
 - **qa-reviewer** (agent): any web app; given a repository and a base URL (and
   optionally a lot id, to start with the pages it touched — for a backend-only
   lot, those that call the changed endpoints), it opens each page of

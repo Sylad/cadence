@@ -146,7 +146,7 @@ describe('session close : fenêtre depuis la dernière ouverture (issue #7)', ()
     expect(out).toContain('Commits de la période (depuis 2026-09-28 00:00)');
   });
 
-  it("une clôture réussie devient la nouvelle borne ; une clôture refusée ne bouge rien", async () => {
+  it("une clôture, réussie ou refusée, ne bouge pas la borne : relancée sans ouverture entre-temps, elle rapporte encore depuis l'ouverture", async () => {
     const dir = await project();
     writeFileSync(join(stateDir(dir), 'session.json'), JSON.stringify({ kind: 'start', at: new Date('2026-09-28T09:12:00').toISOString() }));
     writeFileSync(join(dir, 'x.txt'), 'x');
@@ -162,8 +162,8 @@ describe('session close : fenêtre depuis la dernière ouverture (issue #7)', ()
     git(dir, 'remote', 'add', 'origin', origin);
     git(dir, 'push', '-q', '-u', 'origin', 'main');
     expect((await cad(dir, 'session', 'close')).code).toBe(0);
-    expect(JSON.parse(readFileSync(join(stateDir(dir), 'session.json'), 'utf8'))).toMatchObject({ kind: 'close' });
-    expect((await cad(dir, 'session', 'close')).out).toContain('Commits de la période (depuis la clôture de 18:30)');
+    expect(JSON.parse(readFileSync(join(stateDir(dir), 'session.json'), 'utf8')).kind).toBe('start');
+    expect((await cad(dir, 'session', 'close')).out).toContain("Commits de la période (depuis l'ouverture de 09:12)");
   });
 
   it('CADENCE_SINCE vaut l\'instant ISO (UTC) de la marque sans --since, et la valeur donnée avec --since', async () => {

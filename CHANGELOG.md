@@ -29,6 +29,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `hook.autostart` (`warn` \| `refuse` \| `start`): what the pre-commit hook does with a lot still todo | [0.15.0](#0150---2026-10-08) |
 | `cadence session start\|close --all [--depth n]`: every project under a folder, one section each | [0.15.0](#0150---2026-10-08) |
 
+## [Unreleased]
+
+### Fixed
+- `cadence session close` re-run without a `session start` in between (as the `session-close` skill does after fixing a point) no longer reports `depuis la clôture de HH:MM` with an empty period and every lot in progress as "aucun commit" : a close no longer records its own time, so the window stays the last opening. (L131)
+
 ## [0.18.0] - 2026-10-08
 
 ### Changed

@@ -103,7 +103,7 @@ export function lastActivity(lot: Lot, commits: Commit[]): Day | undefined {
 const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
 /**
- * Fenêtre de la clôture : --since s'il est donné ; sinon depuis la dernière ouverture (ou clôture réussie) du
+ * Fenêtre de la clôture : --since s'il est donné ; sinon depuis la dernière ouverture du
  * projet, dite avec son heure ; sinon le jour même.
  */
 function closeWindow(ctx: SessionCtx, since: string | undefined): { since: string; label: string } {
@@ -211,7 +211,7 @@ export function sessionClose(ctx: SessionCtx, opts: { since?: string }): number 
 
   const open = issues.filter((i) => !i.warning).length + repo.open + (lock?.live ? 1 : 0);
   out(open === 0 ? '\n✓ prêt à fermer' : `\n✗ pas fermé : ${open} point(s)`);
-  // Seule une clôture réussie devient la borne : relancer la clôture après avoir réglé un point ne vide pas le rapport.
-  if (open === 0) writeSessionMark(ctx.state, { kind: 'close', at: (ctx.now ?? new Date()).toISOString() });
+  // La clôture ne déplace jamais la borne : relancée sans ouverture entre-temps (le skill la relance exprès),
+  // elle rapporte encore depuis l'ouverture. Seule une ouverture pose la marque.
   return open === 0 ? 0 : 1;
 }

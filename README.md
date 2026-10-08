@@ -425,12 +425,13 @@ cadence session next "finish L3" "review L4"    # shown by the next session star
 cadence session next --clear       # erase those notes, on purpose
 ```
 
-`session start` records its time in the worktree's state (`session.json`, under the git dir), and a
-`session close` that ends with `✓ prêt à fermer` records its own. The next close takes the later one
-as its window and names it in the section title: `Commits de la période (depuis l'ouverture de 09:12)`
-(`depuis la clôture de …`; with the date when it is not today). With no recorded time, or an unreadable
-file, the window is the current day, said as such (`depuis 2026-09-28 00:00`); `--since` is quoted as given.
-A refused close (exit 1) leaves the boundary alone.
+`session start` records its time in the worktree's state (`session.json`, under the git dir); the next
+`session close` takes it as its window and names it in the section title: `Commits de la période (depuis
+l'ouverture de 09:12)` (with the date when it is not today). A close never moves the boundary, refused
+or not: run again without a `session start` in between (the `session-close` skill does, after fixing a
+point), it still reports since that opening instead of an empty period. With no recorded opening, or an
+unreadable file, the window is the current day, said as such (`depuis 2026-09-28 00:00`); `--since` is
+quoted as given. (A `session.json` written by 0.18.0 after a close, `depuis la clôture de …`, is still read.)
 
 On success `cadence session next` prints what it recorded (`2 lignes enregistrées pour la prochaine
 ouverture`, then the lines as written, blank ones dropped), so `session-close` can report

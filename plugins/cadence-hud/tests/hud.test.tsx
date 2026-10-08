@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotCounts, lotText, modelsText, shortModel, wavePercent } from '../hooks/format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotCounts, lotText, fitSegments, modelsText, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -218,4 +218,58 @@ test('l’attribution par tour : premier tour, total inconnu, inchangé ou plus 
   const sum = Object.values(m.byModel).reduce((a, s) => a + s.usd, 0)
   expect(Math.abs(sum - 0.8) < 1e-9).toBe(true)
   expect(m.usdSeen).toBe(0.8)
+})
+
+test('les segments tombent par priorité jusqu’à tenir dans la largeur', () => {
+  const segs = [
+    { key: 'ctx', text: 'ctx 1234567890', drop: 0 },
+    { key: '5h', text: ' | 5h 12 %', drop: 1 },
+    { key: 'usd', text: ' | $1.31', drop: 3 },
+    { key: 'models', text: ' | fable 416k $1.47', drop: 5 },
+  ]
+  expect(fitSegments(segs, 200).map(s => s.key)).toEqual(['ctx', '5h', 'usd', 'models'])
+  expect(fitSegments(segs, 40).map(s => s.key)).toEqual(['ctx', '5h', 'usd'])
+  expect(fitSegments(segs, 20).map(s => s.key)).toEqual(['ctx'])
+  expect(fitSegments(segs, 5).map(s => s.key)).toEqual(['ctx'])
+})
+
+test('dans une fenêtre étroite, la première ligne lâche les modèles et les agents avant les fenêtres de quota', async ($, on) => {
+  seed(on, {
+    ...EMPTY,
+    agents: { running: 1, names: ['tour-maritime'] },
+    usage: {
+      percent: 9,
+      tokens: 87_000,
+      window: 1_000_000,
+      usd: 1.31,
+      limits: [
+        { kind: 'five_hour', percentUsed: 0, resetsAt: '2026-10-08T05:00:00Z' },
+        { kind: 'seven_day', percentUsed: 6, resetsAt: '2026-10-14T05:00:00Z' },
+      ],
+    },
+    models: { byModel: { fable: { tokens: 416_000, usd: 1.47 }, haiku: { tokens: 190_000, usd: 0.03 } }, usdSeen: 1.5 },
+    waves: [],
+    now: Date.parse('2026-10-08T00:11:00Z'),
+  })
+  const narrow = { ...BAND, props: { ...BAND.props, bodyColumns: 60 } }
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...narrow })
+  expect(await ui.find({ type: 'Text', text: /87k\/1M/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^5h $/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^7j $/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /fable/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /tour-maritime/ })).toBeUndefined()
+  await ui.unmount()
+
+  // 120 colonnes : les modèles passent avant les heures de remise à zéro, les noms d'agents tombent encore
+  const wide = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND })
+  expect(await wide.find({ type: 'Text', text: /fable 416k \$1\.47 · haiku 190k \$0\.03/ })).toBeDefined()
+  expect(await wide.find({ type: 'Text', text: /↻/ })).toBeUndefined()
+  expect(await wide.find({ type: 'Text', text: /⚙ 1 agent/ })).toBeDefined()
+  expect(await wide.find({ type: 'Text', text: /tour-maritime/ })).toBeUndefined()
+  await wide.unmount()
+
+  const huge = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 200 } })
+  expect(await huge.find({ type: 'Text', text: /↻ 4 h 49/ })).toBeDefined()
+  expect(await huge.find({ type: 'Text', text: /tour-maritime/ })).toBeDefined()
+  await huge.unmount()
 })

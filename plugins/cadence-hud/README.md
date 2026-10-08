@@ -32,6 +32,11 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
   (`terminée` / `interrompue il y a 12 min`), son budget consommé et le bilan de ses lots (`3 prêts · 1 échec · 3 suspendus`),
   jusqu'à ce qu'une nouvelle vague démarre.
 
+Quand la fenêtre est étroite, la première ligne ne se replie pas : ses segments tombent par priorité jusqu'à tenir sur
+la largeur — d'abord les noms des agents, puis les heures de remise à zéro, puis la consommation par modèle, le coût,
+le compteur d'agents, et en dernier les fenêtres de quota ; le contexte reste toujours. Les en-têtes de vague sont
+tronqués en fin de ligne.
+
 `/hud` masque ou réaffiche la bande.
 
 Les vagues sont lues sur disque (`~/.cadence/orchestrate/waves/<pid>.json`, puis `<cwd>/.cadence/runs/<vague>/`),

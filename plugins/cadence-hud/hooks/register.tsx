@@ -1,9 +1,9 @@
 import { atom, read, update } from 'claude-code'
-import type { Register, Timer } from 'claude-code'
+import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, k, limitLabel, lotCells, lotCounts, modelsText, pad, shortModel, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, pad, shortModel, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -127,45 +127,101 @@ export const register: Register = on => {
     const sep = <Text dimColor>{'  │  '}</Text>
     const pct = (p: number | undefined) => (p === undefined ? '  —' : `${String(p).padStart(3)} %`)
 
+    const SEP = '  │  '
+    // La première ligne est UN seul Text (une Box en ligne replierait chaque segment séparément quand la fenêtre
+    // est étroite) : ses segments optionnels tombent par priorité jusqu'à tenir dans la largeur, du moins utile
+    // (noms des agents, puis heures de remise à zéro, puis modèles, coût, agents) au plus utile (fenêtres de quota) ; le contexte reste toujours.
+    const segments: { key: string; text: string; drop: number; node: RenderChildren }[] = []
+    if (u) {
+      const ctx = `${bar(u.percent)} ${pct(u.percent)}`
+      segments.push({
+        key: 'ctx',
+        text: `ctx ${ctx} ${k(u.tokens)}/${k(u.window)}`,
+        drop: 0,
+        node: (
+          <Text key="ctx">
+            <Text dimColor>ctx </Text>
+            <Text color={colorOfPercent(u.percent, 50, 75)} bold>
+              {ctx}
+            </Text>
+            <Text dimColor>
+              {' '}
+              {k(u.tokens)}/{k(u.window)}
+            </Text>
+          </Text>
+        ),
+      })
+      for (const l of u.limits) {
+        segments.push({
+          key: l.kind,
+          text: `${SEP}${limitLabel(l.kind)} ${pct(l.percentUsed)}`,
+          drop: 1,
+          node: (
+            <Text key={l.kind}>
+              {sep}
+              <Text dimColor>{limitLabel(l.kind)} </Text>
+              <Text color={colorOfPercent(l.percentUsed)} bold>
+                {pct(l.percentUsed)}
+              </Text>
+            </Text>
+          ),
+        })
+        const reset = untilReset(l.resetsAt, at)
+        if (reset) {
+          segments.push({ key: `${l.kind}-reset`, text: ` ${reset}`, drop: 5, node: <Text key={`${l.kind}-reset`} dimColor> {reset}</Text> })
+        }
+      }
+      if (u.usd !== undefined) {
+        const usd = `$${u.usd.toFixed(2)}`
+        segments.push({
+          key: 'usd',
+          text: `${SEP}${usd}`,
+          drop: 3,
+          node: (
+            <Text key="usd">
+              {sep}
+              <Text dimColor>{usd}</Text>
+            </Text>
+          ),
+        })
+      }
+      if (Object.keys(m.byModel).length > 0) {
+        const text = fit(modelsText(m), 60)
+        segments.push({
+          key: 'models',
+          text: `${SEP}${text}`,
+          drop: 4,
+          node: (
+            <Text key="models">
+              {sep}
+              <Text dimColor>{text}</Text>
+            </Text>
+          ),
+        })
+      }
+      if (a.running > 0) {
+        const label = `⚙ ${a.running} agent${a.running > 1 ? 's' : ''}`
+        segments.push({
+          key: 'agents',
+          text: `${SEP}${label}`,
+          drop: 2,
+          node: (
+            <Text key="agents">
+              {sep}
+              <Text color="claude" bold>
+                {label}
+              </Text>
+            </Text>
+          ),
+        })
+        const names = fit(a.names.join(', '), 40)
+        if (names) segments.push({ key: 'agent-names', text: ` ${names}`, drop: 6, node: <Text key="agent-names" dimColor> {names}</Text> })
+      }
+    }
     const contextRow = u && (
-      <Box key="usage" flexDirection="row">
-        <Text dimColor>ctx </Text>
-        <Text color={colorOfPercent(u.percent, 50, 75)} bold>
-          {bar(u.percent)} {pct(u.percent)}
-        </Text>
-        <Text dimColor> {k(u.tokens)}/{k(u.window)}</Text>
-        {u.limits.map(l => (
-          <Text key={l.kind}>
-            {sep}
-            <Text dimColor>{limitLabel(l.kind)} </Text>
-            <Text color={colorOfPercent(l.percentUsed)} bold>
-              {pct(l.percentUsed)}
-            </Text>
-            {untilReset(l.resetsAt, at) ? <Text dimColor> {untilReset(l.resetsAt, at)}</Text> : null}
-          </Text>
-        ))}
-        {u.usd !== undefined && (
-          <Text>
-            {sep}
-            <Text dimColor>${u.usd.toFixed(2)}</Text>
-          </Text>
-        )}
-        {Object.keys(m.byModel).length > 0 && (
-          <Text>
-            {sep}
-            <Text dimColor>{fit(modelsText(m), 60)}</Text>
-          </Text>
-        )}
-        {a.running > 0 && (
-          <Text>
-            {sep}
-            <Text color="claude" bold>
-              ⚙ {a.running} agent{a.running > 1 ? 's' : ''}
-            </Text>
-            <Text dimColor> {fit(a.names.join(', '), 40)}</Text>
-          </Text>
-        )}
-      </Box>
+      <Text key="usage" wrap="truncate-end">
+        {fitSegments(segments, width).map(s => s.node)}
+      </Text>
     )
 
     const waveRows = w.map(wave => {
@@ -173,22 +229,18 @@ export const register: Register = on => {
       if (!wave.live) {
         const project = commonProject(wave)
         return (
-          <Box key={`wave-${wave.id}`} flexDirection="row">
-            <Text color="subtle">
-              ⟳ {project ? `${project} · ` : ''}
-              {wave.id} {waveStatusFr(wave.status)} {ago(wave.ended, at)}
-            </Text>
+          <Text key={`wave-${wave.id}`} color="subtle" wrap="truncate-end">
+            ⟳ {project ? `${project} · ` : ''}
+            {wave.id} {waveStatusFr(wave.status)} {ago(wave.ended, at)}
             {sep}
-            <Text color="subtle">
-              budget {pct(percent)} {k(wave.consumed)}/{k(wave.budget)}
-            </Text>
+            budget {pct(percent)} {k(wave.consumed)}/{k(wave.budget)}
             {wave.lots.length > 0 && (
               <Text color="subtle">
                 {sep}
-                {fit(lotCounts(wave), Math.max(10, width - 60))}
+                {lotCounts(wave)}
               </Text>
             )}
-          </Box>
+          </Text>
         )
       }
       const sessions = waveSessions(wave)
@@ -207,7 +259,7 @@ export const register: Register = on => {
 
       return (
         <Box key={`wave-${wave.id}`} flexDirection="column">
-          <Box flexDirection="row">
+          <Text wrap="truncate-end">
             <Text color="claude" bold>
               ⟳ {project ? `${project} · ` : ''}
               {wave.id} {waveStatusFr(wave.status)}
@@ -226,7 +278,7 @@ export const register: Register = on => {
               {sessions} session{sessions > 1 ? 's' : ''}
               {wave.cap ? `/${wave.cap}` : ''}
             </Text>
-          </Box>
+          </Text>
           {cells.map(c => (
             <Box key={`${c.lot.project}:${c.lot.lot}`} flexDirection="row">
               <Text>{'  '}</Text>

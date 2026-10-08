@@ -189,3 +189,21 @@ export const attributeTurn = (m: ModelsSummary, name: string, tokens: number, to
   const before = m.byModel[name] ?? { tokens: 0, usd: 0 }
   return { byModel: { ...m.byModel, [name]: { tokens: before.tokens + tokens, usd: before.usd + usd } }, usdSeen: seen }
 }
+
+/**
+ * Garde les segments d'une ligne qui tiennent dans `width` cellules : tant que la somme des textes dépasse, le
+ * segment au `drop` le plus haut tombe (0 = ne tombe jamais). Rend les segments gardés, dans leur ordre.
+ */
+export const fitSegments = <S extends { text: string; drop: number }>(segments: readonly S[], width: number): S[] => {
+  const kept = [...segments]
+  const length = () => kept.reduce((n, s) => n + s.text.length, 0)
+  while (length() > width) {
+    let idx = -1
+    kept.forEach((s, i) => {
+      if (s.drop > 0 && (idx === -1 || s.drop > kept[idx]!.drop)) idx = i
+    })
+    if (idx === -1) break
+    kept.splice(idx, 1)
+  }
+  return kept
+}

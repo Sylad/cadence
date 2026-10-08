@@ -1310,7 +1310,7 @@ lots:
     finished: 2026-10-08
   - id: L117
     title: "publish.yml : passer actions/checkout et actions/setup-node en v5 (annotations du run v0.12.0 : Node 20 déprécié, forcé sur Node 24) et vérifier ubuntu-latest → Ubuntu 26 le 19-10"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-08
@@ -1353,14 +1353,16 @@ lots:
           Verdict : conforme — orchestré (vague 2026-10-08-0836, 0 passe(s) de correction)",
         commit: 84148239db24499b665a26afa8a0881fd8557b1d
       }
+    finished: 2026-10-08
   - id: L118
     title: "raf check (suite L115) : sur un plan en lecture seule dont le fichier porte la clé public sans mapping dans fields, avertir quand même d'un lot visible sans titre public ; et l'entrée Fixed du CHANGELOG de L115 doit décrire l'exception ajoutée par c3d3e11 (avertissement si un lot porte déjà public:)"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-08
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "compliant — orchestré (vague 2026-10-08-0836, 0 passe(s) de correction)", commit: 2b531c38bd9c71d577cf1c8ca6624dd96599ebf3 }
+    finished: 2026-10-08
   - id: L119
     title: "cadence-hud (suite L116) : cells() compte pour 1 les autres caractères de largeur ambiguë de la première ligne (· U+00B7, …, —) ; décider table East Asian Width ou les exclure du texte, et aligner le README « au pire cas »"
     status: doing

@@ -38,7 +38,7 @@ le compteur d'agents, et en dernier les fenêtres de quota ; le contexte reste t
 cellules de terminal, au pire cas : `▰ ▱ ⚙ │ ↻` (largeur ambiguë) comptent pour 2, de sorte que la ligne tient aussi
 dans un terminal réglé en *ambiguous width = 2* — au prix de lâcher un segment un peu plus tôt dans un terminal en
 largeur 1. Ce sont les seuls caractères non ASCII de cette ligne : les séparateurs (` | `), les points de
-suspension (`...`) et les valeurs inconnues (`-`) sont en ASCII, sans table de largeurs à entretenir. Seuls les
+suspension (`...`), les valeurs inconnues (`-`) et le libellé de la limite de dépense (`EUR`, pas `€`) sont en ASCII, sans table de largeurs à entretenir. Seuls les
 noms d'agents et de modèles, repris tels quels, peuvent encore y mettre un caractère ambigu. Les en-têtes de vague sont
 tronqués en fin de ligne.
 

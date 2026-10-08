@@ -24,8 +24,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence-hud` plugin: a status band above the Claude Code prompt | [0.12.0](#0120---2026-10-08) |
 | `raf ignore`, `raf check` warning on a visible lot without public title | [0.12.0](#0120---2026-10-08) |
 | Waves: review sized to the lot, precheck of an already-present deliverable, `orchestrate.ux` starts the app | [0.12.0](#0120---2026-10-08) |
+| `cadence-hud`: dropped segments taken back when they fit, `CADENCE_HUD_AMBIGUOUS` | [0.13.1](#0131---2026-10-08) |
 
-## [Unreleased]
+## [0.13.1] - 2026-10-08
 
 ### Changed
 - `cadence-hud`'s first line takes back the segments that fit once a big one has dropped: after the priority drop, the dropped segments that fit in the cells left come back, most useful first (the reset times before the per-model consumption, through the segment's `back` rank), instead of staying lost with ~25 cells free. The per-model segment is now short, `opus 1.2M sonnet 800k` (tokens only, 40 characters at most instead of 60). (L121)

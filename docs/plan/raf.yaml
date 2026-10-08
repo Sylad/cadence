@@ -1497,7 +1497,7 @@ lots:
     quickwin: true
     created: 2026-10-08
     started: 2026-10-08
-    review: { date: 2026-10-08, verdict: "conforme (2 notes mineures, sans sous-tâche) — orchestré (vague 2026-10-08-2052, 1 passe(s) de correction)", commit: d12cf5606d9d53ee73ef0c49795158c98f63f9ef }
+    review: { date: 2026-10-08, verdict: "conforme (2 notes mineures, sans sous-tâche) — orchestré (vague 2026-10-08-2052, 1 passe(s) de correction) ; release 0.19.0 fbd134d (bump de version, CHANGELOG, What's new, sans code)", commit: fbd134d1afd06ebc243c991febdc6800ab5f15dd }
     notes:
       - { date: 2026-10-08, text: "mineurs de revue gardés en note : (1) commentaire readSessionMark (state.ts:52) encore « ouverture ou clôture » alors que 'close' n'est plus écrit ; (2) branche héritée kind:'close' (session.ts:114) plus couverte par aucun test ; (3) transitoire : un session.json 0.18.0 contenant kind:'close' fait encore afficher « depuis la clôture de » vide une fois, jusqu'au prochain session start" }
     finished: 2026-10-08
@@ -1507,7 +1507,7 @@ lots:
     estimate: 1
     created: 2026-10-08
     started: 2026-10-08
-    review: { date: 2026-10-08, verdict: "conforme : les constats mineurs sont corrigés, sans régression — orchestré (vague 2026-10-08-2135, 2 passe(s) de correction + passe des mineurs)", commit: 9a6a77956b76bd6b902aed42654dbd658bee18e6 }
+    review: { date: 2026-10-08, verdict: "conforme : les constats mineurs sont corrigés, sans régression — orchestré (vague 2026-10-08-2135, 2 passe(s) de correction + passe des mineurs) ; release 0.19.0 fbd134d (bump de version, CHANGELOG, What's new, sans code)", commit: fbd134d1afd06ebc243c991febdc6800ab5f15dd }
     finished: 2026-10-08
   - id: L133
     title: "orchestrate : un incident sur un lot (dépôt sale après une session) rend CE lot au lead, il ne suspend pas les lots des autres dépôts de la vague — et si la revue a produit un verdict conforme avant l'incident, le rapporter au lieu de le perdre (vécu 08-10 : captures PNG du relecteur à la racine d'ol-companion, L131 suspendu en pleine revue, verdict L55 conforme non enregistré)"
@@ -1515,7 +1515,7 @@ lots:
     estimate: 1
     created: 2026-10-08
     started: 2026-10-08
-    review: { date: 2026-10-08, verdict: "conforme — orchestré (vague 2026-10-08-2135, 1 passe(s) de correction + passe des mineurs)", commit: 5354e222de7afbbc58cab03acb1e16707ae98a23 }
+    review: { date: 2026-10-08, verdict: "conforme — orchestré (vague 2026-10-08-2135, 1 passe(s) de correction + passe des mineurs) ; release 0.19.0 fbd134d (bump de version, CHANGELOG, What's new, sans code)", commit: fbd134d1afd06ebc243c991febdc6800ab5f15dd }
     finished: 2026-10-08
   - id: L134
     title: "cadence-hud : lignes de lots d'une vague désalignées sur la surface desktop (colonnes remplies d'espaces dans des Text rétrécissables, compressées dès que la ligne dépasse ; vu 08-10 soir) — chaque colonne dans un Box à largeur fixe non rétrécissable (paddingLeft), titre dans un Box extensible tronqué ; copie canonique ~/.claude/mods corrigée et rechargée à chaud, tests 36/36"
@@ -1523,7 +1523,7 @@ lots:
     estimate: 0.25
     created: 2026-10-08
     started: 2026-10-08
-    review: { date: 2026-10-08, verdict: "conforme (2e revue après 0c7cc5e : test d'alignement qui tombe sans le correctif, ligne en attente renvoyée à la ligne, export pad retiré ; 37/37)", commit: 0c7cc5e7b70e9252c39a7bfb553fefba51bb0273 }
+    review: { date: 2026-10-08, verdict: "conforme (2e revue après 0c7cc5e : test d'alignement qui tombe sans le correctif, ligne en attente renvoyée à la ligne, export pad retiré ; 37/37) ; release 0.19.0 fbd134d (bump de version, CHANGELOG, What's new, sans code)", commit: fbd134d1afd06ebc243c991febdc6800ab5f15dd }
     finished: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

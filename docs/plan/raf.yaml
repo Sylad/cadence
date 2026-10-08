@@ -1271,7 +1271,8 @@ lots:
     finished: 2026-10-07
   - id: L114
     title: "README à jour à chaque lot : le brief implement d'orchestrate et l'agent code-reviewer exigent que le README (et la doc d'usage du projet) décrive le comportement livré, comme le CHANGELOG — un README qui ne suit pas la modification est un constat majeur ; test sur le texte du brief et de l'agent. Demande Sylvain 07-10 : « mettre à jour les README en général quand on modifie un projet »"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-08

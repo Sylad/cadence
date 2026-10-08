@@ -13,7 +13,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -37,6 +37,8 @@ if (tool === 'raf') {
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--max-sessions 2] [--wave id] [--dry-run]
                     une session claude neuve par étape (implémentation, revues, corrections) ; --status, --resume ;
                     --max-sessions : sessions simultanées, toutes vagues confondues (CADENCE_MAX_SESSIONS)
+  cadence lead tour [dossier] [--idle 3] [--json]
+                    le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);
   process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;

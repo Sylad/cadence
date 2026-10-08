@@ -172,3 +172,11 @@ describe('cadence lead tour', () => {
     expect(json[1]!.doing).toEqual([{ id: 'T2', noActivity: true }]);
   });
 });
+
+describe('point d\'entrée', () => {
+  it('bin/cadence.js route « lead » vers le CLI et le liste dans son aide', () => {
+    const bin = readFileSync(new URL('../bin/cadence.js', import.meta.url), 'utf8');
+    expect(bin).toMatch(/\[[^\]]*'lead'[^\]]*\]\.includes\(tool\)/);
+    expect(bin).toContain('cadence lead tour [dossier]');
+  });
+});

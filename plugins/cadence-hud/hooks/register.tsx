@@ -3,7 +3,7 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, pad, parseAmbiguous, shortModel, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, pad, parseAmbiguous, RESET_BACK, shortModel, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -169,7 +169,7 @@ export const register: Register = on => {
         })
         const reset = untilReset(l.resetsAt, at)
         if (reset) {
-          segments.push({ key: `${l.kind}-reset`, text: ` ${reset}`, drop: 5, back: 3, requires: l.kind, node: <Text key={`${l.kind}-reset`} dimColor> {reset}</Text> })
+          segments.push({ key: `${l.kind}-reset`, text: ` ${reset}`, drop: 5, back: RESET_BACK, requires: l.kind, node: <Text key={`${l.kind}-reset`} dimColor> {reset}</Text> })
         }
       }
       if (u.usd !== undefined) {

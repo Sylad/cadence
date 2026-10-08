@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -265,6 +265,20 @@ test('fitSegments reprend la remise à zéro avant les modèles quand une seule 
   ]
   // 94 en tout ; à 68, heures, modèles et compteur tombent et il reste 15 cellules : la remise à zéro (10) passe avant les modèles (15)
   expect(fitSegments(segs, 68).map(s => s.key)).toEqual(['ctx', '5h', '5h-reset'])
+})
+
+test('fitSegments reprend le coût avant l\'heure de remise à zéro, puis l\'heure avant les modèles', () => {
+  const segs = [
+    { key: 'ctx', text: 'c'.repeat(40), drop: 0 },
+    { key: '5h', text: 'f'.repeat(14), drop: 1 },
+    { key: '5h-reset', text: 'r'.repeat(10), drop: 5, back: RESET_BACK, requires: '5h' },
+    { key: 'usd', text: 'u'.repeat(11), drop: 3 },
+    { key: 'models', text: 'm'.repeat(27), drop: 4 },
+  ]
+  // 102 en tout ; à 65, 11 cellules restent après ctx et 5h : le coût (11) passe avant l'heure (10)
+  expect(fitSegments(segs, 65).map(s => s.key)).toEqual(['ctx', '5h', 'usd'])
+  // 74 : le coût et l'heure tiennent, pas les modèles
+  expect(fitSegments(segs, 75).map(s => s.key)).toEqual(['ctx', '5h', '5h-reset', 'usd'])
 })
 
 test('fitSegments ne reprend pas une heure dont la fenêtre de quota est tombée', () => {

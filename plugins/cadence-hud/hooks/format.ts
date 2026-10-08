@@ -219,6 +219,9 @@ export const cells = (text: string, ambiguous: 1 | 2 = 2): number => {
   return n
 }
 
+/** Rang de reprise des heures de remise à zéro : après le coût (`drop` 3), avant les modèles (`drop` 4). */
+export const RESET_BACK = 3.5
+
 /**
  * Garde les segments d'une ligne qui tiennent dans `width` cellules : tant que la somme des textes dépasse, le
  * segment au `drop` le plus haut tombe (0 = ne tombe jamais). Puis, une fois le compte bon, les segments tombés

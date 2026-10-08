@@ -1470,10 +1470,11 @@ lots:
     created: 2026-10-08
   - id: L129
     title: "issue #6 — cadence session next : aucune sortie en cas de succès (code 0, rien sur stdout) ; attendu : les lignes telles qu'enregistrées ou « N lignes enregistrées pour la prochaine ouverture », pour que session-close les rapporte sans relancer session start ; commenter puis fermer l'issue GitHub #6 à la livraison"
-    status: todo
+    status: doing
     estimate: 0.1
     quickwin: true
     created: 2026-10-08
+    started: 2026-10-08
   - id: L130
     title: "issue #7 — cadence session close : par défaut, la section « Commits de la période » couvre les 24 h (même fenêtre qu'à l'ouverture) et relit les lots déjà rapportés le matin ; attendu : fenêtre depuis la dernière ouverture (ou clôture) du projet, dite dans la sortie (« depuis l'ouverture de 09:12 »), --since garde la main ; commenter puis fermer l'issue GitHub #7 à la livraison"
     status: todo

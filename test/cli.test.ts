@@ -392,6 +392,25 @@ describe('lot visible sans titre public (L32)', () => {
     expect(r.out).toContain('⚠ L1');
     expect(r.out).toMatch(/1 écart\(s\), 1 avertissement\(s\)/);
   });
+
+  it('se tait pour un lot terminé dont une Nouveauté fournit le titre que le site affiche', () => {
+    const dir = setup();
+    raf(dir, 'add', 'A', '--visible');
+    raf(dir, 'done', 'L1', '--force');
+    mkdirSync(join(dir, 'docs/nouveautes'), { recursive: true });
+    writeFileSync(join(dir, 'docs/nouveautes/2026-10-07-x.md'), '---\ntitle: Titre lisible\ndate: 2026-10-07\ncreated: 2026-10-07T10:00:00+02:00\nlots: [L1]\ncaptures: []\nnocapture: test\n---\ncorps\n');
+    const r = raf(dir, 'check');
+    expect(r.out).not.toContain('sans titre public');
+    expect(r.out).not.toContain('avertissement');
+  });
+
+  it('avertit encore pour un lot visible en cours cité par une Nouveauté (le site ne reprend le titre qu\'une fois terminé)', () => {
+    const dir = setup();
+    raf(dir, 'add', 'A', '--visible');
+    mkdirSync(join(dir, 'docs/nouveautes'), { recursive: true });
+    writeFileSync(join(dir, 'docs/nouveautes/2026-10-07-x.md'), '---\ntitle: Titre lisible\ndate: 2026-10-07\ncreated: 2026-10-07T10:00:00+02:00\nlots: [L1]\ncaptures: []\nnocapture: test\n---\ncorps\n');
+    expect(raf(dir, 'check').out).toContain('⚠ L1 : lot visible sans titre public');
+  });
 });
 
 describe('titre public trop long (L106)', () => {

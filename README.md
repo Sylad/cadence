@@ -478,7 +478,7 @@ news:
   publicTitleMax: 80      # characters; without the key, `raf check` warns at 80 in a project that has a news directory
 ```
 
-`raf check` also warns (`⚠`, not an error: exit code 0 if nothing else is wrong) about every visible lot, dropped ones excepted, that has no public title: the site would show its technical title. Fix it with `raf public <id> "…"`.
+`raf check` also warns (`⚠`, not an error: exit code 0 if nothing else is wrong) about every visible lot, dropped ones excepted, that has no public title: the site would show its technical title (a done lot cited by a News entry is spared: the site reuses that entry's title). Fix it with `raf public <id> "…"`.
 
 With the key, `raf public`, `raf add --public`, `raf done` (on a lot whose public title is too long) and
 `cadence news new` (its title) refuse above it; without it, only `raf check` warns.

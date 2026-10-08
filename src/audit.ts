@@ -6,7 +6,7 @@ import { parse } from 'yaml';
 import { changedFiles, fileAt, readCommits, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import { readNewsConfig } from './config.js';
-import { loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong, reusedNewsTitle } from './news.js';
+import { type Entry, loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong, reusedNewsTitle } from './news.js';
 import { isRecurring } from './recurring.js';
 import { isOpen, type Lot, type Plan, type Verdict } from './plan.js';
 
@@ -87,10 +87,13 @@ export interface AuditIssue {
   warning?: true;
 }
 
-/** Avertissements : un lot visible (hors abandonné) sans titre public — le site retombe sur le titre technique du plan. */
-export function missingPublicTitles(lots: Lot[]): AuditIssue[] {
+/**
+ * Avertissements : un lot visible (hors abandonné) sans titre public — le site retombe sur le titre technique du plan,
+ * sauf pour un lot terminé qu'une Nouveauté cite : le site en reprend le titre (cf. reusedNewsTitle).
+ */
+export function missingPublicTitles(lots: Lot[], entries: Entry[]): AuditIssue[] {
   return lots
-    .filter((l) => l.visible && l.status !== 'dropped' && !l.public)
+    .filter((l) => l.visible && l.status !== 'dropped' && !l.public && reusedNewsTitle(l, entries) === null)
     .map((l) => ({ message: `${l.id} : lot visible sans titre public — raf public ${l.id} "…"`, warning: true as const }));
 }
 
@@ -120,7 +123,7 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
     const m = l.public ? publicTitleTooLong(l.public, max) : reused ? publicTitleTooLong(reused, max) : null;
     return m ? [{ message: `${l.id} : ${reused && !l.public ? m.replace('titre public', 'titre public repris de la Nouveauté') : m}` }] : [];
   });
-  const issues: AuditIssue[] = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, entries, newsDir), ...titles, ...gates, ...missingPublicTitles(lots),
+  const issues: AuditIssue[] = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, entries, newsDir), ...titles, ...gates, ...missingPublicTitles(lots, entries),
     ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
   // Un plan en lecture seule se corrige avec l'outil du projet : ne pas conseiller une commande raf qui refuserait.
   return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf (start|public) .*$/, '') })) : issues;

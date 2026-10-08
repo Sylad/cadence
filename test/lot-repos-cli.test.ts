@@ -192,6 +192,19 @@ describe('repoWork : rattachement au projet et à la période du lot (L62)', () 
     expect(Object.values(repoShas(plan, repos, 'L1'))[0]).toBe(git(neighbour, 'rev-parse', 'HEAD'));
   });
 
+  it('dans le dépôt cible dont le nom du projet est partout (images, couches), un seul commit qui le nomme n\'écarte pas les autres', async () => {
+    const { dir, neighbour } = await setup();
+    commitAt(neighbour, 'feat(L1): image aetherwx-nowcast-engine', '2026-10-08T10:00:00');
+    commitAt(neighbour, 'fix(L1): couche aetherwx:graticule_10', '2026-10-08T11:00:00');
+    commitAt(neighbour, 'fix(L1): réglage sans nom', '2026-10-08T12:00:00');
+    commitAt(neighbour, 'chore: lot L1 sans portée', '2026-10-08T12:30:00');
+    edit(dir, /^project: .*$/m, 'project: "aetherwx"');
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const { repos } = resolveLotRepos(dir, plan.lot('L1'));
+    expect(repoWork(plan, repos[0], 'L1')).toHaveLength(4);
+    expect(Object.values(repoShas(plan, repos, 'L1'))[0]).toBe(git(neighbour, 'rev-parse', 'HEAD'));
+  });
+
   it('sans commit qui nomme le projet, tous les commits du lot comptent', async () => {
     const { dir, neighbour } = await setup();
     commitAt(neighbour, 'feat(L1): a', '2026-10-08T10:00:00');

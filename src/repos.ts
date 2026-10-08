@@ -37,17 +37,36 @@ export function resolveLotRepos(base: string, lot: Pick<Lot, 'repos'>): { repos:
   return { repos, failures, problems: failures.map((f) => `dépôt voisin ${f.rel} : ${f.why}`) };
 }
 
+const TYPES = new Set(['feat', 'fix', 'chore', 'docs', 'test', 'tests', 'refactor', 'perf', 'build', 'ci', 'style', 'revert']);
+
+/** Nom que le sujet d'un commit donne à son projet : préfixe `nom:` ou portée `type(nom):`, hors identifiant de lot. */
+function subjectProject(subject: string, ids: Set<string>): string | null {
+  const m = /^([a-z][\w.-]*)(?:\(([^)]+)\))?!?:/i.exec(subject);
+  if (!m) return null;
+  const name = (m[2] ?? m[1]).toLowerCase();
+  return ids.has(name) || (!m[2] && TYPES.has(name)) ? null : name;
+}
+
 /**
  * Commits à relire du lot dans un dépôt voisin, du plus récent au plus ancien : ceux qui citent le lot, selon les références
  * du plan, rattachés à la période du lot (de son démarrage à sa fin) et, dans un dépôt partagé entre projets, au projet :
- * dès qu'un commit du lot nomme le projet, seuls ceux-là comptent (les autres sont ceux d'un projet voisin au même préfixe).
+ * le filtre ne joue que si des commits du lot y portent le nom d'un autre projet (préfixe `nom:` ou portée `type(nom):`) ;
+ * il garde alors ceux qui nomment le projet comme un mot. Sans cela le nom du projet, présent partout dans son propre dépôt
+ * cible (images, couches), écarterait des commits du lot.
  */
 export function repoWork(plan: Plan, repo: LotRepo, lotId: string): Commit[] {
   const lot = plan.lots().find((l) => l.id === lotId);
   const inPeriod = lotWork(plan, repo.path, lotId).filter((c) => (!lot?.started || c.day >= lot.started) && (!lot?.finished || c.day <= lot.finished));
   const project = plan.project.toLowerCase();
   if (!project) return inPeriod;
-  const named = inPeriod.filter((c) => `${c.subject}\n${c.body}`.toLowerCase().includes(project));
+  const ids = new Set(plan.lots().map((l) => l.id.toLowerCase()));
+  const shared = inPeriod.some((c) => {
+    const name = subjectProject(c.subject, ids);
+    return name !== null && name !== project;
+  });
+  if (!shared) return inPeriod;
+  const word = new RegExp(`(^|[^\\w-])${project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w-])`);
+  const named = inPeriod.filter((c) => word.test(`${c.subject}\n${c.body}`.toLowerCase()));
   return named.length > 0 ? named : inPeriod;
 }
 

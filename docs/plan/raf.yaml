@@ -1300,8 +1300,9 @@ lots:
     review: { date: 2026-10-08, verdict: "conforme (1 mineur : l'entrée L115 du CHANGELOG ne mentionne pas l'exception de la clé `public` littérale) — orchestré (vague 2026-10-08-0709, 0 passe(s) de correction + passe des mineurs)", commit: c3d3e118896ccea96c1bf690d4ffc9b61f91ca5d }
   - id: L116
     title: "cadence-hud : mesurer les segments de la première ligne en cellules terminal (largeur ambiguë de ▰▱⚙) plutôt qu'en String.length, pour que la chute par priorité tienne aussi en terminal ambiguous-width=2 — mineur de la 2e revue L111"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-08
+    started: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

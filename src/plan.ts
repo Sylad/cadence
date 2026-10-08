@@ -19,6 +19,11 @@ export interface Verdict {
    * aucun. Absent d'un verdict écrit à la main : rien ne dit ce qui a été relu, rien n'est contrôlé.
    */
   commit?: string | null;
+  /**
+   * Revue de code d'un lot qui travaille aussi dans des dépôts voisins (`repos:`) : pour chacun, clé = chemin déclaré par
+   * le lot, sha du dernier commit du lot lu dans ce dépôt (null s'il n'y en avait aucun). Absent sans dépôt voisin.
+   */
+  repos?: Record<string, string | null>;
 }
 
 export interface Task {
@@ -47,6 +52,8 @@ export interface Lot {
   finished?: Day;
   notes: Note[];
   tasks: Task[];
+  /** Dépôts voisins où le lot travaille (clé de lot `repos:`), chemins relatifs au dossier du projet ; vide : le dépôt du projet seul. */
+  repos?: string[];
   /** Revue d'ergonomie enregistrée par `raf ux`. */
   ux?: Verdict;
   /** Revue de code enregistrée par `raf review`. */
@@ -59,7 +66,7 @@ export class RafError extends Error {}
 
 export type Ref = { lot: string; task?: string };
 
-export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'parent'] as const;
+export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent'] as const;
 export type Field = (typeof FIELDS)[number];
 
 /**
@@ -334,8 +341,8 @@ export class Plan {
   }
 
   /** `commit` : sha du dernier commit compté du lot (le plan ne lit pas git), null s'il n'en a aucun. */
-  recordReview(lotId: string, verdict: string, today: Day, commit: string | null): void {
-    this.recordVerdict('review', 'la revue de code', lotId, { date: today, verdict, commit });
+  recordReview(lotId: string, verdict: string, today: Day, commit: string | null, repos?: Record<string, string | null>): void {
+    this.recordVerdict('review', 'la revue de code', lotId, { date: today, verdict, commit, ...(repos && Object.keys(repos).length ? { repos } : {}) });
   }
 
   private enableGate(key: 'uxSince' | 'reviewSince', today: Day): boolean {
@@ -559,6 +566,7 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
         started: day('started'),
         finished: day('finished'),
         notes: typeof notes === 'string' ? [{ text: notes }] : notes,
+        repos: pick('repos'),
       },
       problems,
     );
@@ -621,10 +629,17 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
           status: STATUSES.includes(t.status as Status) ? (t.status as Status) : 'todo',
         }))
       : [],
+    ...(repoList(raw.repos).length ? { repos: repoList(raw.repos) } : {}),
     ...(asVerdict(raw.ux) ? { ux: asVerdict(raw.ux) } : {}),
     ...(asVerdict(raw.review) ? { review: asVerdict(raw.review) } : {}),
     problems,
   };
+}
+
+/** Chemins de dépôts voisins : une chaîne seule vaut une liste d'un dépôt ; une entrée vide ou non textuelle est écartée. */
+function repoList(raw: unknown): string[] {
+  const items = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
+  return items.filter((x): x is string => typeof x === 'string').map((x) => x.trim()).filter(Boolean);
 }
 
 function asVerdict(raw: unknown): Verdict | undefined {
@@ -636,5 +651,9 @@ function asVerdict(raw: unknown): Verdict | undefined {
   const verdict: Verdict = { date: String(v.date ?? ''), verdict: String(v.verdict) };
   // Champ présent mais vide : relu « jusqu'à rien », comme un verdict noté sans commit.
   if ('commit' in v) verdict.commit = v.commit == null || String(v.commit).trim() === '' ? null : String(v.commit).trim();
+  if (v.repos && typeof v.repos === 'object' && !Array.isArray(v.repos)) {
+    const repos = Object.entries(v.repos as Record<string, unknown>).map(([k, sha]) => [k, sha == null || String(sha).trim() === '' ? null : String(sha).trim()] as const);
+    if (repos.length) verdict.repos = Object.fromEntries(repos);
+  }
   return verdict;
 }

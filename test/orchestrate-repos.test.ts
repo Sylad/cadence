@@ -314,4 +314,25 @@ describe('verrou de dépôt libéré dès que ses lots sont finis (L132)', () =>
     expect(seen.length).toBeGreaterThan(0);
     for (const repos of seen) expect(repos).toEqual([dirs.b]);
   });
+
+  it("un lot rendu au lead sans avoir joué (dépendance en échec) libère aussi son dépôt", async () => {
+    const { parent, dirs } = world({ a: [], b: [] }, []);
+    const plan = Plan.load(join(dirs.a, 'docs/plan/raf.yaml'));
+    plan.add('second', '2026-10-01', { estimate: 1, after: ['L1'] });
+    plan.setStatus('L2', 'doing', '2026-10-01');
+    plan.save();
+    git(dirs.a, 'add', '--', 'docs/plan/raf.yaml');
+    git(dirs.a, 'commit', '-q', '-m', 'chore: plan L2');
+    const seen: { a: boolean; ahook: boolean; b: boolean }[] = [];
+    const base = deps();
+    const claude: ClaudeFn = async (args, o) => {
+      if (o.cwd.endsWith('/b')) seen.push({ a: held(dirs.a), ahook: hooked(dirs.a), b: held(dirs.b) });
+      if (o.cwd.endsWith('/a') && kindOf(args) === 'implement') return { code: 1, stdout: '', stderr: 'boom', timedOut: false };
+      return base.claude(args, o);
+    };
+    await orchestrate(['a:L1', 'a:L2', 'b:L1', '--max-sessions', '1'], io(parent).io, { ...base, claude });
+    expect(seen.length).toBeGreaterThan(0);
+    // L1 échoue, L2 est rendu sans jouer : a est fini et libre avant que b ne joue
+    for (const s of seen) expect(s).toEqual({ a: false, ahook: false, b: true });
+  });
 });

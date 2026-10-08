@@ -25,8 +25,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `raf ignore`, `raf check` warning on a visible lot without public title | [0.12.0](#0120---2026-10-08) |
 | Waves: review sized to the lot, precheck of an already-present deliverable, `orchestrate.ux` starts the app | [0.12.0](#0120---2026-10-08) |
 | `cadence-hud`: dropped segments taken back when they fit, `CADENCE_HUD_AMBIGUOUS` | [0.13.1](#0131---2026-10-08) |
+| `cadence lead tour`: the lead's table of projects without a model | [0.14.0](#0140---2026-10-08) |
 
-## [Unreleased]
+## [0.14.0] - 2026-10-08
 
 ### Added
 - `cadence lead tour [folder] [--idle 3] [--json]`: the lead's table without a model. For every direct sub-folder with a plan (`docs/plan/raf.yaml`, or a `cadence.yaml` with `plan:`, read-only plans included) it reads the facts of `session start` in-process and prints one line per project: lots in progress (`silencieux Nj` past `--idle` days), `raf check` gaps, notes of the last close (cut at 120 characters), next ready lot, repository (`non commité`, `non poussé`, `livraison en cours`). Read-only, exit 0 even when a project is in error (its line says so); `--json` gives the same content. The `lead` skill calls it in place of one subagent per project (about 150 k tokens for a tour of 10 projects on 2026-10-08). (L122)

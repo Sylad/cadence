@@ -1525,6 +1525,12 @@ lots:
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "conforme (2e revue après 0c7cc5e : test d'alignement qui tombe sans le correctif, ligne en attente renvoyée à la ligne, export pad retiré ; 37/37) ; release 0.19.0 fbd134d (bump de version, CHANGELOG, What's new, sans code)", commit: fbd134d1afd06ebc243c991febdc6800ab5f15dd }
     finished: 2026-10-08
+  - id: L135
+    title: "cadence-hud : le compteur « N cmd » ne redescend pas — l'expiration d'un Monitor (« [Monitor expired…] », sans statut) n'est pas une fin, et les commandes de fond d'un sous-agent ne finissent jamais (leur notification revient au sous-agent) ; vu 08-10 soir « 3 cmd » après la fin de tout — reconnaître l'expiration, retirer les commandes d'un sous-agent quand il finit (table commandOwners), repartir de zéro au session.start"
+    status: doing
+    estimate: 0.25
+    created: 2026-10-08
+    started: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

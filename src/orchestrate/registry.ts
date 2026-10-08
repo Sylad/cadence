@@ -70,6 +70,15 @@ export function registerWave(home: string, given: LiveWave): void {
   renameSync(`${file}.tmp`, file);
 }
 
+/** Met à jour la liste des dépôts tenus par la vague (un dépôt libéré en cours de vague n'y figure plus). */
+export function updateWaveRepos(home: string, pid: number, repos: string[]): void {
+  const file = join(wavesDir(home), `${pid}.json`);
+  const w = readWave(file);
+  if (!w) return;
+  writeFileSync(`${file}.tmp`, JSON.stringify({ ...w, repos }));
+  renameSync(`${file}.tmp`, file);
+}
+
 export function unregisterWave(home: string, pid: number): void {
   rmSync(join(wavesDir(home), `${pid}.json`), { force: true });
 }

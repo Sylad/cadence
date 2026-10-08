@@ -10,7 +10,7 @@ import { stopApps } from './app.js';
 import { Plan, RafError, isOpen } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
-import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from './registry.js';
+import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { Budget, MAX_PASSES, countInterrupted, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
@@ -502,6 +502,11 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     releaseLock(file, process.pid);
     held.splice(0, held.length, ...held.filter((f) => f !== file));
     removePrePush(r, wave.id);
+    try {
+      updateWaveRepos(home, process.pid, repos.filter((x) => !freed.has(x)));
+    } catch {
+      // registre illisible : `--status` garde la liste de départ, le verrou est bien tombé
+    }
   };
   const release = () => {
     for (const f of held) releaseLock(f, process.pid);

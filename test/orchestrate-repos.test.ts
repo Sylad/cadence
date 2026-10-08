@@ -294,12 +294,24 @@ describe('verrou de dépôt libéré dès que ses lots sont finis (L132)', () =>
   });
 
   it("un dépôt voisin n'est libéré qu'avec tous les lots qui le touchent", async () => {
-    const { parent, dirs } = world({ a: ['../voisin'], b: [] }, ['voisin']);
-    const seen: { voisin: boolean; a: boolean }[] = [];
+    const { parent, dirs } = world({ a: ['../voisin'], b: ['../voisin'] }, ['voisin']);
+    const seen: { voisin: boolean; hook: boolean; a: boolean }[] = [];
     await orchestrate(['a:L1', 'b:L1', '--max-sessions', '1'], io(parent).io, deps(({ cwd }) => {
-      if (cwd.endsWith('/b')) seen.push({ voisin: held(dirs.voisin), a: held(dirs.a) });
+      if (cwd.endsWith('/b')) seen.push({ voisin: held(dirs.voisin), hook: hooked(dirs.voisin), a: held(dirs.a) });
     }));
     expect(seen.length).toBeGreaterThan(0);
-    for (const s of seen) expect(s).toEqual({ voisin: false, a: false });
+    // a est fini et libre ; voisin reste tenu (verrou et garde) tant que b y écrit encore
+    for (const s of seen) expect(s).toEqual({ voisin: true, hook: true, a: false });
+    expect(held(dirs.voisin)).toBe(false);
+  });
+
+  it('le registre des vagues ne liste plus un dépôt libéré en cours de vague (--status)', async () => {
+    const { parent, dirs } = world({ a: [], b: [] }, []);
+    const seen: string[][] = [];
+    await orchestrate(['a:L1', 'b:L1', '--max-sessions', '1'], io(parent).io, deps(({ cwd }) => {
+      if (cwd.endsWith('/b')) seen.push(liveWaves(cadenceHome()).find((w) => w.pid === process.pid)!.repos);
+    }));
+    expect(seen.length).toBeGreaterThan(0);
+    for (const repos of seen) expect(repos).toEqual([dirs.b]);
   });
 });

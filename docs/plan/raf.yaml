@@ -1065,12 +1065,13 @@ lots:
       - { date: 2026-10-07, text: "07-10 : instable nommé — test/verify.test.ts « pour de vrai : trois sleep 2 en session start prennent ~2 s, pas 6 » rouge 1 fois sur 3 passages de la suite (vague L97 venant de finir), vert seul et en suite complète ensuite ; seuil de durée sensible à la charge" }
   - id: L91
     title: "Doc des briefs Nouveautés hors vague : README l.743 (dry-run sans dossier de vague ; fix/fix-minors d'un lot visible ont le dossier Playwright et --add-dir) et paragraphe Browser d'implement.md qui promet un serveur lancé par l'orchestrateur même en délégation à la main (contredit « capture sous le dossier temporaire ») — mineurs de la 3e revue L48"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-07
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "conforme — orchestré (vague 2026-10-08-0709, 0 passe(s) de correction)", commit: 5857c7b5aa83569fa0aa25e3107082d2fe3442ee }
+    finished: 2026-10-08
   - id: L92
     title: "test/global-setup.ts : en cas d'échec de tsc, inclure sa sortie stdout (diagnostics fichier:ligne) dans l'erreur levée — sinon une erreur de type n'affiche que « Command failed » et bloque toute la suite — mineur de la 3e revue L61"
     status: done
@@ -1292,18 +1293,37 @@ lots:
     finished: 2026-10-08
   - id: L115
     title: "raf check : sur un plan en lecture seule sans champ public dans fields, ne pas avertir d'un lot visible sans titre public (l'avertissement ne peut pas être levé et revient à chaque session) — mineur de la revue L32"
-    status: doing
+    status: done
     estimate: 1
     quickwin: true
     created: 2026-10-08
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "conforme (1 mineur : l'entrée L115 du CHANGELOG ne mentionne pas l'exception de la clé `public` littérale) — orchestré (vague 2026-10-08-0709, 0 passe(s) de correction + passe des mineurs)", commit: c3d3e118896ccea96c1bf690d4ffc9b61f91ca5d }
+    finished: 2026-10-08
   - id: L116
     title: "cadence-hud : mesurer les segments de la première ligne en cellules terminal (largeur ambiguë de ▰▱⚙) plutôt qu'en String.length, pour que la chute par priorité tienne aussi en terminal ambiguous-width=2 — mineur de la 2e revue L111"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-08
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "compliant (1 minor noté, sans sous-tâche) — orchestré (vague 2026-10-08-0709, 0 passe(s) de correction)", commit: 2c44495cfdcd39f472e9e0719c33ea89a32745f9 }
+    finished: 2026-10-08
+  - id: L117
+    title: "publish.yml : passer actions/checkout et actions/setup-node en v5 (annotations du run v0.12.0 : Node 20 déprécié, forcé sur Node 24) et vérifier ubuntu-latest → Ubuntu 26 le 19-10"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-08
+  - id: L118
+    title: "raf check (suite L115) : sur un plan en lecture seule dont le fichier porte la clé public sans mapping dans fields, avertir quand même d'un lot visible sans titre public ; et l'entrée Fixed du CHANGELOG de L115 doit décrire l'exception ajoutée par c3d3e11 (avertissement si un lot porte déjà public:)"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-08
+  - id: L119
+    title: "cadence-hud (suite L116) : cells() compte pour 1 les autres caractères de largeur ambiguë de la première ligne (· U+00B7, …, —) ; décider table East Asian Width ou les exclure du texte, et aligner le README « au pire cas »"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

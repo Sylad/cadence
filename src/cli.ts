@@ -144,6 +144,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     io.out(HELP);
     return 0;
   }
+  if (command !== 'session' && (values.all || values.depth !== undefined)) throw new RafError(`${values.all ? '--all' : '--depth'} ne va qu'avec session start ou session close`);
   const today: Day = io.env.RAF_TODAY ?? toDay(io.now());
   if (!isDay(today)) throw new RafError(`RAF_TODAY invalide : ${today} (attendu AAAA-MM-JJ)`);
   const root = gitRoot(io.cwd) ?? io.cwd;
@@ -661,7 +662,7 @@ async function sessionAll(rest: string[], values: { all?: boolean; depth?: strin
     io.out(`aucun projet sous ${io.cwd} (docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
     return 0;
   }
-  const argv = ['session', sub, ...(values.since === undefined ? [] : ['--since', values.since]), ...(values.idle === undefined ? [] : ['--idle', values.idle])];
+  const argv = ['session', sub, ...(values.since === undefined ? [] : [`--since=${values.since}`]), ...(values.idle === undefined ? [] : ['--idle', values.idle])];
   let worst = 0;
   for (const dir of projects) {
     io.out(`${dir === projects[0] ? '' : '\n'}## ${relative(io.cwd, dir)}`);

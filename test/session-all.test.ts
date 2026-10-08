@@ -140,7 +140,25 @@ describe('cadence session start|close --all', () => {
     expect(code).toBe(2);
   });
 
-  it('un sous-dossier illisible est signalé sans faire planter les autres (--depth 2)', async () => {
+  it('--all et --depth sont refusés hors de session, au lieu d\'être ignorés en silence', async () => {
+    const root = tempDir();
+    await project(join(root, 'alpha'), 'alpha');
+    for (const argv of [['lead', 'tour', '--depth', '2'], ['list', '--all'], ['lead', 'tour', '--all']]) {
+      const { code, err } = await cad(root, ...argv);
+      expect(code).toBe(2);
+      expect(err).toMatch(/ne va qu'avec session/);
+    }
+  });
+
+  it('--since=-1d traverse --all : la valeur commence par un tiret', async () => {
+    const root = tempDir();
+    await project(join(root, 'alpha'), 'alpha');
+    const { code, out } = await cad(root, 'session', 'start', '--all', '--since=-1d');
+    expect(out).not.toMatch(/ambiguous/);
+    expect(code).not.toBe(2);
+  });
+
+  it('un sous-dossier illisible est sauté sans faire planter les autres (--depth 2)', async () => {
     const root = tempDir();
     await project(join(root, 'alpha'), 'alpha');
     const ferme = join(root, 'ferme');

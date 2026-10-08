@@ -28,6 +28,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ## [Unreleased]
 
 ### Fixed
+- `cadence-hud` measures the segments of its first line in terminal cells (the ambiguous-width `▰ ▱ ⚙ │ ↻` count for 2) instead of string length, so the priority drop also holds in a terminal set to ambiguous width = 2. (L116)
 - `raf check` no longer warns about a visible lot without public title on a read-only plan whose `plan.fields` maps no `public` field: the warning could not be cleared and came back at every session. (L115)
 - The `README` and the brief templates now describe the Playwright output of briefs written outside a wave (`--dry-run`, delegation by hand: no wave folder, capture under the OS temp directory; no Playwright server promised) and that `fix` / `fix-minors` of a visible lot get the wave folder and `--add-dir`. (L91)
 

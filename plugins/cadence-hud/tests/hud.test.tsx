@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, duration, k, lotCells, lotCounts, lotText, fitSegments, modelsText, shortModel, wavePercent } from '../hooks/format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, k, lotCells, lotCounts, lotText, fitSegments, modelsText, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -233,6 +233,26 @@ test('les segments tombent par priorité jusqu’à tenir dans la largeur', () =
   expect(fitSegments(segs, 5).map(s => s.key)).toEqual(['ctx'])
 })
 
+test('cells compte en pire cas les caractères de largeur ambiguë (▰▱⚙│↻) et les larges pour 2 cellules', () => {
+  expect(cells('abc')).toBe(3)
+  expect(cells('▰▰▱')).toBe(6)
+  expect(cells('⚙ 2')).toBe(4)
+  expect(cells('  │  ')).toBe(6)
+  expect(cells('↻ 2 h')).toBe(6)
+  expect(cells('日本')).toBe(4)
+  expect(cells('éa')).toBe(2)
+})
+
+test('fitSegments mesure en cellules : une barre ▰▱ de 10 cases pèse 20 cellules', () => {
+  const segs = [
+    { key: 'ctx', text: `ctx ${bar(50)}`, drop: 0 },
+    { key: 'agents', text: '  │  ⚙ 2 agents', drop: 2 },
+  ]
+  // 14 caractères de ctx + 14 d'agents = 28 en String.length, mais 24 + 20 = 44 cellules.
+  expect(fitSegments(segs, 30).map(s => s.key)).toEqual(['ctx'])
+  expect(fitSegments(segs, 44).map(s => s.key)).toEqual(['ctx', 'agents'])
+})
+
 test('dans une fenêtre étroite, la première ligne lâche les modèles et les agents avant les fenêtres de quota', async ($, on) => {
   seed(on, {
     ...EMPTY,
@@ -251,7 +271,7 @@ test('dans une fenêtre étroite, la première ligne lâche les modèles et les 
     waves: [],
     now: Date.parse('2026-10-08T00:11:00Z'),
   })
-  const narrow = { ...BAND, props: { ...BAND.props, bodyColumns: 60 } }
+  const narrow = { ...BAND, props: { ...BAND.props, bodyColumns: 70 } }
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...narrow })
   expect(await ui.find({ type: 'Text', text: /87k\/1M/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^5h $/ })).toBeDefined()
@@ -260,8 +280,9 @@ test('dans une fenêtre étroite, la première ligne lâche les modèles et les 
   expect(await ui.find({ type: 'Text', text: /tour-maritime/ })).toBeUndefined()
   await ui.unmount()
 
-  // 120 colonnes : les modèles passent avant les heures de remise à zéro, les noms d'agents tombent encore
-  const wide = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND })
+  // 140 colonnes (mesurées en cellules, ▰▱⚙│ comptés double) : les modèles passent avant les heures de remise à
+  // zéro, les noms d'agents tombent encore
+  const wide = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 140 } })
   expect(await wide.find({ type: 'Text', text: /fable 416k \$1\.47 · haiku 190k \$0\.03/ })).toBeDefined()
   expect(await wide.find({ type: 'Text', text: /↻/ })).toBeUndefined()
   expect(await wide.find({ type: 'Text', text: /⚙ 1 agent/ })).toBeDefined()

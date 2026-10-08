@@ -191,12 +191,37 @@ export const attributeTurn = (m: ModelsSummary, name: string, tokens: number, to
 }
 
 /**
+ * Largeur en cellules terminal, au pire cas : les caractères de largeur ambiguë (formes géométriques ▰▱, symboles ⚙,
+ * traits │, flèches ↻) comptent pour 2, comme dans un terminal réglé en ambiguous-width=2, et les caractères larges
+ * (CJK, emoji) aussi. Un terminal en largeur 1 n'affiche alors jamais plus que ce que la mesure a prévu.
+ */
+export const cells = (text: string): number => {
+  let n = 0
+  for (const ch of text) {
+    const c = ch.codePointAt(0)!
+    const isWide =
+      (c >= 0x2190 && c <= 0x21ff) || // flèches
+      (c >= 0x2500 && c <= 0x27bf) || // traits, blocs, formes géométriques, symboles, dingbats
+      (c >= 0x1100 && c <= 0x115f) ||
+      (c >= 0x2e80 && c <= 0xa4cf) ||
+      (c >= 0xac00 && c <= 0xd7a3) ||
+      (c >= 0xf900 && c <= 0xfaff) ||
+      (c >= 0xfe30 && c <= 0xfe6f) ||
+      (c >= 0xff00 && c <= 0xff60) ||
+      (c >= 0xffe0 && c <= 0xffe6) ||
+      c >= 0x1f300
+    n += isWide ? 2 : 1
+  }
+  return n
+}
+
+/**
  * Garde les segments d'une ligne qui tiennent dans `width` cellules : tant que la somme des textes dépasse, le
- * segment au `drop` le plus haut tombe (0 = ne tombe jamais). Rend les segments gardés, dans leur ordre.
+ * segment au `drop` le plus haut tombe (0 = ne tombe jamais). Les textes sont mesurés par `cells`. Rend les segments gardés, dans leur ordre.
  */
 export const fitSegments = <S extends { text: string; drop: number }>(segments: readonly S[], width: number): S[] => {
   const kept = [...segments]
-  const length = () => kept.reduce((n, s) => n + s.text.length, 0)
+  const length = () => kept.reduce((n, s) => n + cells(s.text), 0)
   while (length() > width) {
     let idx = -1
     kept.forEach((s, i) => {

@@ -60,6 +60,8 @@ declare module 'claude-code' {
       agents: AgentsSummary
       /** Identifiants des commandes d'arrière-plan (Bash, Monitor) en cours, sous-agents compris. */
       commands: string[]
+      /** Commande → identifiant du sous-agent qui l'a lancée ; une commande de la session principale n'y figure pas. */
+      commandOwners: Record<string, string>
       models: ModelsSummary
       waves: Wave[]
       error: string | null

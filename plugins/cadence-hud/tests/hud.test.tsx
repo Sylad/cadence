@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, attributeTurn, endedTask, notifiedEnd, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { ago, attributeTurn, endedCommands, endedTask, notifiedEnd, pruneOwners, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -93,7 +93,7 @@ const seed = (on: On, values: Record<string, unknown>, env: Record<string, strin
   )
 }
 
-const EMPTY = { commands: [], agents: { running: 0, names: [] }, models: { byModel: {}, usdSeen: 0 }, error: null, isHidden: false }
+const EMPTY = { commands: [], commandOwners: {}, agents: { running: 0, names: [] }, models: { byModel: {}, usdSeen: 0 }, error: null, isHidden: false }
 
 test('la bande dessine le contexte et la vague sur chaque surface', async ($, on) => {
   seed(on, {
@@ -560,7 +560,7 @@ const wired = (on: On) => {
   })
   on('tool.call', () => answer.current as never)
   on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
-  return { answer, commands: () => store.get('commands')?.value ?? [] }
+  return { answer, commands: () => store.get('commands')?.value ?? [], owners: () => store.get('commandOwners')?.value ?? {} }
 }
 
 const NOTIFICATION = (id: string) =>
@@ -607,4 +607,37 @@ test('la notification de fin retire la commande, un prompt tapé n\'en retire au
   expect(hud.commands()).toEqual(['b1'])
   await $.prompt.submit({ origin: { kind: 'task-notification' }, text: NOTIFICATION('b1') } as never)
   expect(hud.commands()).toEqual([])
+})
+
+test('l’expiration d’un Monitor finit sa tâche, un événement ordinaire non', () => {
+  const expired = '<task-notification>\n<task-id>m1</task-id>\n<summary>Monitor event: "x"</summary>\n<event>[Monitor expired after 30m with 16 events delivered. Re-arm it if you still need the watch.]</event>\n</task-notification>'
+  expect(endedTask(expired)).toBe('m1')
+  expect(endedTask('<task-notification>\n<task-id>m1</task-id>\n<event>Monitor expired ? non : une ligne du journal</event>\n</task-notification>')).toBeNull()
+})
+
+test('une tâche finie emporte les commandes de son sous-agent', () => {
+  const owners = { b2: 'a1', m2: 'a1', b3: 'a2' }
+  expect(endedCommands(['b1', 'b2', 'm2', 'b3'], owners, 'a1')).toEqual(['b1', 'b3'])
+  expect(endedCommands(['b1', 'b2', 'm2', 'b3'], owners, 'b2')).toEqual(['b1', 'm2', 'b3'])
+  expect(endedCommands(['b1'], {}, 'inconnue')).toEqual(['b1'])
+  expect(pruneOwners(owners, ['b3'])).toEqual({ b3: 'a2' })
+})
+
+test('les commandes d’un sous-agent sortent du compte quand il finit, par les hooks', async ($, on) => {
+  const hud = wired(on)
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  hud.answer.current = { result: { backgroundTaskId: 'b2' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a1' } as never)
+  hud.answer.current = { result: { taskId: 'm1' } }
+  await $.tool.call({ tool: 'Monitor', input: { command: 'tail -f x' } } as never)
+  expect(hud.commands()).toEqual(['b1', 'b2', 'm1'])
+  expect(hud.owners()).toEqual({ b2: 'a1' })
+  // fin du sous-agent a1 : b2 part avec lui, b1 et m1 restent
+  await $.prompt.submit({ text: NOTIFICATION('a1'), origin: { kind: 'task-notification' } } as never)
+  expect(hud.commands()).toEqual(['b1', 'm1'])
+  expect(hud.owners()).toEqual({})
+  // expiration du Monitor m1
+  await $.prompt.submit({ text: '<task-notification>\n<task-id>m1</task-id>\n<event>[Monitor expired after 30m with 2 events delivered. Re-arm it if you still need the watch.]</event>\n</task-notification>', origin: { kind: 'task-notification' } } as never)
+  expect(hud.commands()).toEqual(['b1'])
 })

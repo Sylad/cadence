@@ -266,12 +266,24 @@ export const startedCommand = (tool: string, result: unknown): string | null => 
   return null
 }
 
-/** L'identifiant de la tâche dont une notification annonce la fin (`completed`, `failed`, `killed`), sinon null. */
+/** L'identifiant de la tâche dont une notification annonce la fin (`completed`, `failed`, `killed`), ou l'expiration
+ *  d'un Monitor (« [Monitor expired after … ] » : un événement sans statut, la tâche est finie quand même), sinon null. */
 export const endedTask = (text: string): string | null => {
   const id = /<task-id>([^<\s]+)<\/task-id>/.exec(text)?.[1]
+  if (!id) return null
   const status = /<status>\s*([a-z_]+)\s*<\/status>/.exec(text)?.[1]
-  return id && (status === 'completed' || status === 'failed' || status === 'killed') ? id : null
+  if (status === 'completed' || status === 'failed' || status === 'killed') return id
+  return !status && /\[Monitor expired\b/.test(text) ? id : null
 }
+
+/** Retire une tâche finie et celles qu'elle possédait : une commande lancée par un sous-agent finit avec lui, sa
+ *  propre notification de fin revient au sous-agent, jamais à la session (vu 08-10 : « 3 cmd » après la fin de tout). */
+export const endedCommands = (ids: readonly string[], owners: Readonly<Record<string, string>>, ended: string): string[] =>
+  ids.filter(i => i !== ended && owners[i] !== ended)
+
+/** La table des propriétaires réduite aux commandes encore en cours. */
+export const pruneOwners = (owners: Readonly<Record<string, string>>, ids: readonly string[]): Record<string, string> =>
+  Object.fromEntries(Object.entries(owners).filter(([id]) => ids.includes(id)))
 
 /** L'identifiant de la tâche qu'un TaskStop réussi vient d'arrêter (`task_id` du résultat), sinon null. */
 export const stoppedTask = (tool: string, result: unknown): string | null => {

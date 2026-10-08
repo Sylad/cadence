@@ -30,6 +30,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence session start\|close --all [--depth n]`: every project under a folder, one section each | [0.15.0](#0150---2026-10-08) |
 | Wave lock per repository: `cadence deliver` on a repository whose lots are finished while the wave continues | [0.19.0](#0190---2026-10-08) |
 
+## [Unreleased]
+
+### Fixed
+- `cadence-hud`: the `N cmd` counter goes back down: a Monitor that expires (`[Monitor expired …]`, no status) ends its task, the background commands a subagent started end with it (their own notification never reaches the session), and a session (or a hot reload of the plugin) starts with no command. (L135)
+
 ## [0.19.0] - 2026-10-08
 
 ### Fixed

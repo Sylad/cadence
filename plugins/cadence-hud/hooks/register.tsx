@@ -3,7 +3,7 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, RESET_BACK, shortModel, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, endedCommands, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, pruneOwners, RESET_BACK, shortModel, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -11,17 +11,30 @@ const REFRESH_MS = 5_000
 const usage = atom({ plugin: 'cadence-hud', key: 'usage' } as const, null)
 const agents = atom({ plugin: 'cadence-hud', key: 'agents' } as const, { running: 0, names: [] })
 const commands = atom({ plugin: 'cadence-hud', key: 'commands' } as const, [])
+const owners = atom({ plugin: 'cadence-hud', key: 'commandOwners' } as const, {})
 const models = atom({ plugin: 'cadence-hud', key: 'models' } as const, { byModel: {}, usdSeen: 0 })
 const waves = atom({ plugin: 'cadence-hud', key: 'waves' } as const, [])
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
 const now = atom({ plugin: 'cadence-hud', key: 'now' } as const, 0)
 
+/** Une tâche finie sort des commandes, avec celles que son sous-agent avait lancées ; la table des propriétaires suit. */
+const endCommand = async ($: Parameters<typeof read>[0], ended: string): Promise<void> => {
+  const o = await read($, owners)
+  const left = endedCommands(await read($, commands), o, ended)
+  await update($, commands, () => left)
+  await update($, owners, () => pruneOwners(o, left))
+}
+
 export const register: Register = on => {
   let timer: Timer | undefined
   let isRefreshing = false
 
   on('session.start', async ($, e, next) => {
+    // Une session démarre sans commande d'arrière-plan ; un rechargement à chaud du mod aussi (il refait session.start) :
+    // le compte repart de zéro plutôt que de garder des identifiants dont la fin ne reviendra jamais (vu 08-10 : « 3 cmd »).
+    await update($, commands, () => [])
+    await update($, owners, () => ({}))
     await $.command.register({
       name: 'hud',
       description: 'Affiche ou masque la bande cadence-hud (contexte, fenêtres, agents, vagues orchestrate)',
@@ -110,17 +123,20 @@ export const register: Register = on => {
     const result = await next(e)
     if (!('result' in result) || result.isError) return result
     const started = startedCommand(e.tool, result.result)
-    if (started) await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
-    else {
+    if (started) {
+      await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
+      const agent = e.agentId
+      if (agent) await update($, owners, (o: Record<string, string>) => ({ ...o, [started]: agent }))
+    } else {
       const stopped = stoppedTask(e.tool, result.result)
-      if (stopped) await update($, commands, (ids: string[]) => trackCommand(ids, stopped, false))
+      if (stopped) await endCommand($, stopped)
     }
     return result
   })
 
   on('prompt.submit', async ($, e, next) => {
     const ended = notifiedEnd(e.origin, e.text)
-    if (ended) await update($, commands, (ids: string[]) => trackCommand(ids, ended, false))
+    if (ended) await endCommand($, ended)
     return next(e)
   })
 

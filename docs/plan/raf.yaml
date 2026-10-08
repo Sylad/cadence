@@ -408,7 +408,9 @@ lots:
     review: { date: 2026-10-08, verdict: "conforme (3 commits relus, typecheck OK, 919/919 tests verts, les 8 choix d'interprétation tiennent) — orchestré (vague 2026-10-08-0639, 1 passe(s) de correction)", commit: d12d0a9155966360aa3179342fe28fe6217cc97a }
     finished: 2026-10-08
     tasks:
-      - { id: t1, title: "raf check : sur un plan en lecture seule sans champ public dans fields, ne pas avertir d'un lot visible sans titre public (l'avertissement ne peut pas être levé et revient à chaque session) — mineur de la revue L32", status: todo }
+      - { id: t1, title: "raf check : sur un plan en lecture seule sans champ public dans fields, ne pas avertir d'un lot visible sans titre public (l'avertissement ne peut pas être levé et revient à chaque session) — mineur de la revue L32", status: dropped }
+    notes:
+      - { date: 2026-10-08, text: "[L32/t1] abandonné : re-créé en lot autonome : parent terminé" }
   - id: L33
     title: "⚡ orchestrate : le brief d'implémentation demande de TRANCHER les questions d'interprétation mineures (et de les lister en « choix faits » dans le rapport, relus par la revue), de ne s'arrêter que sur un vrai blocage — mesure : vague 2026-10-04-1700, 4 lots / 4 questions, ~45 k par aller-retour"
     status: done
@@ -1253,11 +1255,12 @@ lots:
     notes:
       - { date: 2026-10-07, text: "Lead 07-10 : pas de capture Playwright (la bande vit dans Claude Code, pas dans un navigateur) ; la capture Nouveautés sera une image du terminal fournie par le lead. Source déjà importée dans plugins/cadence-hud (commit 6e1bba4) ; vitest l'exclut déjà ; reste : marketplace.json, files npm (déjà sans plugins/), README d'installation, et tsconfig du plugin (pas de .claude-plugin/types versionné)." }
       - { date: 2026-10-07, text: "Revue 07-10, mineur noté : une vague dont l'orchestrateur meurt sans écrire (SIGKILL, plantage) garde status running dans wave.json ; la ligne grise affiche alors « en cours il y a 2 h ». Cas rare ; à traiter côté collect.ts (statut dérivé de la vivacité du pid) si vécu." }
+      - { date: 2026-10-08, text: "[L111/t1] abandonné : re-créé en lot autonome : parent terminé" }
     started: 2026-10-07
     review: { date: 2026-10-08, verdict: "conforme (703c57a relu : un seul Text truncate-end, priorités de chute = README, 13 tests plugin + tsc + 919 vitest verts, copie ~/.claude/mods identique ; 1 mineur : largeur mesurée en String.length, glyphes ambigus rattrapés par truncate-end)", commit: 703c57a891b652206db0eade98be75440b2c1b49 }
     finished: 2026-10-07
     tasks:
-      - { id: t1, title: "cadence-hud : mesurer les segments de la première ligne en cellules terminal (largeur ambiguë de ▰▱⚙) plutôt qu'en String.length, pour que la chute par priorité tienne aussi en terminal ambiguous-width=2 — mineur de la 2e revue L111", status: todo }
+      - { id: t1, title: "cadence-hud : mesurer les segments de la première ligne en cellules terminal (largeur ambiguë de ▰▱⚙) plutôt qu'en String.length, pour que la chute par priorité tienne aussi en terminal ambiguous-width=2 — mineur de la 2e revue L111", status: dropped }
   - id: L112
     title: "Suite rouge sous npm ≥ 11.5 (12.2 vu le 07-10) : npm active le cache de compilation de Node et laisse node-compile-cache dans la racine temporaire privée ; le contrôle de fin de test/global-setup.ts fait échouer la suite. Décision lead : global-setup pose NODE_DISABLE_COMPILE_CACHE=1 pour les workers et les enfants (ou NODE_COMPILE_CACHE vers un sous-dossier qu'il supprime lui-même) ; test qui lance npm sous un TMPDIR privé et vérifie qu'il ne reste rien"
     status: done
@@ -1285,3 +1288,14 @@ lots:
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "compliant — orchestré (vague 2026-10-08-0639, 0 passe(s) de correction)", commit: fff0a8ed468413a90f87cee9a0c141b1c8fa91fd }
     finished: 2026-10-08
+  - id: L115
+    title: "raf check : sur un plan en lecture seule sans champ public dans fields, ne pas avertir d'un lot visible sans titre public (l'avertissement ne peut pas être levé et revient à chaque session) — mineur de la revue L32"
+    status: todo
+    estimate: 1
+    quickwin: true
+    created: 2026-10-08
+  - id: L116
+    title: "cadence-hud : mesurer les segments de la première ligne en cellules terminal (largeur ambiguë de ▰▱⚙) plutôt qu'en String.length, pour que la chute par priorité tienne aussi en terminal ambiguous-width=2 — mineur de la 2e revue L111"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-08

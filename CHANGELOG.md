@@ -28,8 +28,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence lead tour`: the lead's table of projects without a model | [0.14.0](#0140---2026-10-08) |
 | `hook.autostart` (`warn` \| `refuse` \| `start`): what the pre-commit hook does with a lot still todo | [0.15.0](#0150---2026-10-08) |
 | `cadence session start\|close --all [--depth n]`: every project under a folder, one section each | [0.15.0](#0150---2026-10-08) |
+| Wave lock per repository: `cadence deliver` on a repository whose lots are finished while the wave continues | [0.19.0](#0190---2026-10-08) |
 
-## [Unreleased]
+## [0.19.0] - 2026-10-08
 
 ### Fixed
 - `cadence-hud`: the lot rows of a wave are aligned on every surface (desktop included): each column is a fixed-width box instead of space padding, the title is truncated in the remaining width. (L134)

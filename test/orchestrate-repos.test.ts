@@ -245,3 +245,50 @@ describe('lot à dépôt voisin : verrou, garde et file de la vague', () => {
     expect(r.err.join('\n')).toMatch(/voisin : arbre sale, 1 fichier\(s\) suivi\(s\) modifié\(s\) : README\.md/);
   });
 });
+
+describe('verrou de dépôt libéré dès que ses lots sont finis (L132)', () => {
+  const held = (d: string) => existsSync(join(d, '.git/cadence/orchestrate.lock'));
+  const hooked = (d: string) => existsSync(join(d, '.git/hooks/pre-push'));
+
+  it("un dépôt dont tous les lots sont finis est libre (verrou et garde de push) pendant que la vague continue ailleurs", async () => {
+    const { parent, dirs } = world({ a: [], b: [] }, []);
+    const seen: { a: boolean; b: boolean; ahook: boolean; bhook: boolean }[] = [];
+    const r = io(parent);
+    const code = await orchestrate(['a:L1', 'b:L1', '--max-sessions', '1'], r.io, deps(({ cwd }) => {
+      if (cwd.endsWith('/b')) seen.push({ a: held(dirs.a), b: held(dirs.b), ahook: hooked(dirs.a), bhook: hooked(dirs.b) });
+    }));
+    expect(code).toBe(0);
+    // a est entièrement fini quand la première session de b démarre : seul b reste tenu.
+    expect(seen.length).toBeGreaterThan(0);
+    for (const s of seen) expect(s).toEqual({ a: false, b: true, ahook: false, bhook: true });
+    expect(held(dirs.b)).toBe(false);
+  });
+
+  it("un dépôt dont un lot reste à jouer garde son verrou (deux lots du même dépôt)", async () => {
+    const { parent, dirs } = world({ a: [] }, []);
+    const file = join(dirs.a, 'docs/plan/raf.yaml');
+    const plan = Plan.load(file);
+    plan.add('second', '2026-10-01', { estimate: 1 });
+    plan.setStatus('L2', 'doing', '2026-10-01');
+    plan.save();
+    git(dirs.a, 'add', '--', 'docs/plan/raf.yaml');
+    git(dirs.a, 'commit', '-q', '-m', 'chore: plan L2');
+    const seen: boolean[] = [];
+    const code = await orchestrate(['a:L1', 'a:L2'], io(parent).io, deps(({ args }) => {
+      if (/on lot `L2`/.test(args[1] ?? '')) seen.push(held(dirs.a) && hooked(dirs.a));
+    }));
+    expect(code).toBe(0);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(Boolean)).toBe(true);
+  });
+
+  it("un dépôt voisin n'est libéré qu'avec tous les lots qui le touchent", async () => {
+    const { parent, dirs } = world({ a: ['../voisin'], b: [] }, ['voisin']);
+    const seen: { voisin: boolean; a: boolean }[] = [];
+    await orchestrate(['a:L1', 'b:L1', '--max-sessions', '1'], io(parent).io, deps(({ cwd }) => {
+      if (cwd.endsWith('/b')) seen.push({ voisin: held(dirs.voisin), a: held(dirs.a) });
+    }));
+    expect(seen.length).toBeGreaterThan(0);
+    for (const s of seen) expect(s).toEqual({ voisin: false, a: false });
+  });
+});

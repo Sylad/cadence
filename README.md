@@ -900,7 +900,10 @@ verdict and screenshots, it does not record it), the push and the deliveries, on
 `orchestrate.lock`, which also makes `cadence deliver` refuse that repository), not per folder. A wave is
 refused only when one of its repositories is held by a live wave (`<repo> : une orchestration y est déjà en
 cours`; the lock of a dead process is detected and cleared); two waves on different repositories run side by
-side, even when started from the same parent folder. They share a **cap on simultaneous sessions**, counted
+side, even when started from the same parent folder. A repository is released **as soon as every lot of the wave that
+touches it is finished** (ready, handed back or failed): its lock and its `pre-push` guard are lifted while the wave goes
+on elsewhere, so `cadence deliver` accepts it (a repository with a lot still to play, a question or a suspended lot stays
+held until the wave ends). They share a **cap on simultaneous sessions**, counted
 across all live waves: 2 by default, `--max-sessions N` (or `CADENCE_MAX_SESSIONS=N`) to change it — give
 every wave the same value: each wave counts ALL live sessions, whatever their slot, and waits while that
 count has reached ITS OWN cap, so with different caps the highest one can push the total past the lowest

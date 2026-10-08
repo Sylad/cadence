@@ -8,9 +8,9 @@ export const SLOTS = 2;
  * Ordonnanceur : une file par dépôt, les lots d'un dépôt l'un après l'autre dans l'ordre donné, `slots` dépôts
  * au plus en parallèle. Deux lots qui partagent un dépôt (le leur, ou un dépôt voisin déclaré par `repos:`, L62) sont dans la
  * même file : jamais deux sessions dans un même dépôt (le plafond global des sessions de toutes
- * les vagues est tenu par command.ts). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
+ * les vagues est tenu par command.ts). `onSettled` est appelé quand un lot a fini de jouer (L132 : command.ts libère alors les dépôts que plus aucun lot ne tient). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
  */
-export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] = []): Promise<void> {
+export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] = [], onSettled: (c: LotCtx) => void = () => {}): Promise<void> {
   const groups: { repos: Set<string>; lots: LotCtx[] }[] = [];
   for (const c of ctxs) {
     const mine = lotRepoPaths(c.lot);
@@ -53,11 +53,13 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
           c.wave.store.writeLot(c.lot);
           c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} → handed-back — ${c.lot.outcome}`);
           progress = true;
+          onSettled(c);
           continue;
         }
         if (c.lot.outcome?.startsWith('en attente de : ')) c.lot.outcome = null;
         progress = true;
         await runLot(c);
+        onSettled(c);
         }
         todo = waiting;
       }

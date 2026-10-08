@@ -494,6 +494,13 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const home = cadenceHome();
   const held: string[] = [];
   const repos = [...new Set(lots.flatMap(lotRepoPaths))];
+  /** Libère un dépôt : son verrou et sa garde de push (L132 : dès que ses lots sont finis, pas à la fin de la vague). */
+  const freeRepo = (r: string) => {
+    const file = join(sharedStateDir(r), REPO_LOCK);
+    releaseLock(file, process.pid);
+    held.splice(0, held.length, ...held.filter((f) => f !== file));
+    removePrePush(r, wave.id);
+  };
   const release = () => {
     for (const f of held) releaseLock(f, process.pid);
     held.length = 0;
@@ -592,11 +599,17 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     saveWave();
     release();
   });
+  const finished = (l: LotState) => l.status === 'ready' || l.status === 'handed-back' || l.status === 'failed';
   try {
-    await runPool(ctxs, cap, all);
+    await runPool(ctxs, cap, all, (c) => {
+      // Un dépôt dont tous les lots de la vague (reprise comprise) sont prêts ou rendus peut être livré pendant que la vague continue ailleurs.
+      if (wctx.incident) return;
+      for (const r of lotRepoPaths(c.lot)) {
+        if (held.includes(join(sharedStateDir(r), REPO_LOCK)) && all.filter((l) => lotRepoPaths(l).includes(r)).every(finished)) freeRepo(r);
+      }
+    });
   } finally {
     forget();
-    const finished = (l: LotState) => l.status === 'ready' || l.status === 'handed-back' || l.status === 'failed';
     // « done » = plus rien à reprendre : une question en attente ou un lot suspendu garde la vague reprenable.
     wave.status = wctx.incident ? 'interrupted' : wctx.quota.hit ? 'suspended-quota' : lots.some((l) => l.status === 'suspended') ? 'suspended-budget' : all.every(finished) ? 'done' : 'interrupted';
     saveWave();

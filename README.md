@@ -881,7 +881,7 @@ the name `repos`). The effect, for `cadence orchestrate`:
 - **Lock and guard**: the neighbour gets the repository lock (`orchestrate.lock`, so `cadence deliver` refuses it too, and no
   other wave can hold it), the temporary `pre-push` hook, and the same after-session checks (push, tampered hook, a review
   that changed it). Two lots that share a repository, as project or as neighbour, run one after the other, never two
-  sessions in one repository; `--status` lists the neighbours among the repositories a wave holds.
+  sessions in one repository; `--status` lists the neighbours among the repositories a wave still holds (a repository released once all its lots are finished no longer appears).
 - **Sessions**: every session gets each neighbour as `--add-dir`, and the briefs name them: the implementation and the
   corrections must commit there too, with a message that cites the lot (`feat(B64): …`), and never push; the reviewers read
   the commits that cite the lot in the project **and** in each neighbour (`raf commits <lot>` lists them all; in a neighbour only the commits that cite the lot and are dated within the lot's period count, and also contain the `cite:` string when the lot declares one for it — a `fix(B64): …` outside the period, or one without the `cite:` string, is not listed.) A lot whose
@@ -913,11 +913,11 @@ A slot or a registry entry is owned by a pid **and** its start time: a reused pi
 identifiers are reserved atomically (`-2`, `-3` suffix when two waves start in the same minute; an existing
 `--wave` is refused). The registry of live waves and the slots live under `~/.cadence/orchestrate/` (`CADENCE_HOME`
 to move it): `cadence orchestrate --status` lists, from any folder, the live waves, the repositories each
-holds, the cap of each wave and the slots in use.
+still holds (those not yet released), the cap of each wave and the slots in use.
 
 **Guards, imposed by the code**: a global cap of simultaneous sessions, one wave per repository at
 a time (above); `Agent`, `git push`, `cadence deliver`, `raf done|review|ux` are denied to the sessions; a
-temporary `pre-push` hook, installed for the duration of the wave and removed at its end, refuses any push
+temporary `pre-push` hook, installed for the duration of the wave and removed at its end (or, for a repository, as soon as all the lots that touch it are finished), refuses any push
 from a session (`CADENCE_ORCHESTRATED` is in their environment; a repository that already has another
 `pre-push` hook is refused before anything starts — `pushurl` is never touched); after every session the
 upstream ref and `git ls-remote` are compared with the "before", and a review that changed `HEAD` or the

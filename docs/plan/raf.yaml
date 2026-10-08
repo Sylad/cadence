@@ -1507,6 +1507,7 @@ lots:
     estimate: 1
     created: 2026-10-08
     started: 2026-10-08
+    review: { date: 2026-10-08, verdict: "conforme : les constats mineurs sont corrigés, sans régression — orchestré (vague 2026-10-08-2135, 2 passe(s) de correction + passe des mineurs)", commit: 9a6a77956b76bd6b902aed42654dbd658bee18e6 }
   - id: L133
     title: "orchestrate : un incident sur un lot (dépôt sale après une session) rend CE lot au lead, il ne suspend pas les lots des autres dépôts de la vague — et si la revue a produit un verdict conforme avant l'incident, le rapporter au lieu de le perdre (vécu 08-10 : captures PNG du relecteur à la racine d'ol-companion, L131 suspendu en pleine revue, verdict L55 conforme non enregistré)"
     status: todo

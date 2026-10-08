@@ -300,14 +300,22 @@ test('dans une fenêtre étroite, la première ligne lâche les modèles et les 
   expect(await ui.find({ type: 'Text', text: /tour-maritime/ })).toBeUndefined()
   await ui.unmount()
 
-  // 140 colonnes (mesurées en cellules, ▰▱⚙│ comptés double) : les modèles passent avant les heures de remise à
-  // zéro, les noms d'agents tombent encore
+  // 140 colonnes (mesurées en cellules, ▰▱⚙│↻ comptés double) : tout tient sauf les noms d'agents
   const wide = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 140 } })
   expect(await wide.find({ type: 'Text', text: /fable 416k haiku 190k/ })).toBeDefined()
-  expect(await wide.find({ type: 'Text', text: /↻/ })).toBeUndefined()
+  expect(await wide.find({ type: 'Text', text: /↻ 4 h 49/ })).toBeDefined()
   expect(await wide.find({ type: 'Text', text: /⚙ 1 agent/ })).toBeDefined()
   expect(await wide.find({ type: 'Text', text: /tour-maritime/ })).toBeUndefined()
   await wide.unmount()
+
+  // 115 colonnes (cas de la capture du 08-10) : les modèles (27 cellules) ne tiennent pas, mais les heures de
+  // remise à zéro et le compteur d'agents, plus petits, restent
+  const mid = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 115 } })
+  expect(await mid.find({ type: 'Text', text: /fable/ })).toBeUndefined()
+  expect(await mid.find({ type: 'Text', text: /↻ 4 h 49/ })).toBeDefined()
+  expect(await mid.find({ type: 'Text', text: /↻ 6 j 4 h/ })).toBeDefined()
+  expect(await mid.find({ type: 'Text', text: /⚙ 1 agent/ })).toBeDefined()
+  await mid.unmount()
 
   const huge = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 200 } })
   expect(await huge.find({ type: 'Text', text: /↻ 4 h 49/ })).toBeDefined()

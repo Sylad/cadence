@@ -125,6 +125,24 @@ test('la bande dessine le contexte et la vague sur chaque surface', async ($, on
   }
 })
 
+test('les lots d’une vague sont alignés par des Box à largeur fixe, sans espaces de remplissage', async ($, on) => {
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [WAVE], now: Date.parse('2026-10-07T19:14:11.066Z') })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
+    const boxes = await ui.findAll({ type: 'Box' })
+    const fixed = boxes.filter(b => b.props.flexShrink === 0 && typeof b.props.width === 'number' && b.props.paddingLeft === 2)
+    // colonne des lots : « L75 » (3) + 2 ; colonne des états : « en attente » (10) + 2, sur la ligne du lot et sur celle des lots en attente
+    expect(fixed.some(b => b.props.width === 5)).toBe(true)
+    expect(fixed.filter(b => b.props.width === 12)).toHaveLength(2)
+    // le titre prend la largeur restante et se tronque
+    expect(boxes.filter(b => b.props.flexGrow === 1 && b.props.flexShrink === 1)).toHaveLength(2)
+    // aucun texte n'est rembourré d'espaces : l'alignement ne dépend pas de leur rendu
+    const texts = await ui.findAll({ type: 'Text' })
+    expect(texts.filter(t => !t.text?.includes('│') && /^\s*$|\s{2,}$/.test(t.text ?? ''))).toEqual([])
+    await ui.unmount()
+  }
+})
+
 test('masquée, la bande laisse la main', async ($, on) => {
   seed(on, { ...EMPTY, isHidden: true, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0 })
   on('ui.render', { component: 'AbovePrompt' }, ($, e) => {

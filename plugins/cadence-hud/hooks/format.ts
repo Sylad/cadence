@@ -32,8 +32,6 @@ export const duration = (ms: number): string => {
   return h % 24 === 0 ? `${d} j` : `${d} j ${h % 24} h`
 }
 
-/** Complète à `width` cellules (pour aligner une colonne). */
-export const pad = (text: string, width: number): string => text.padEnd(width)
 
 /** Temps avant une date ISO ("↻ 2 h 10"), ou vide si inconnue ou passée. */
 export const untilReset = (iso: string | undefined, now: number): string => {

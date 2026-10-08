@@ -355,7 +355,7 @@ export const register: Register = on => {
               </Box>
               {detailWidth > 0 && <Box width={2 + detailWidth} flexShrink={0} />}
               <Box flexGrow={1} flexShrink={1} width={titleWidth + 2} paddingLeft={2}>
-                <Text wrap="truncate-end" color="subtle">
+                <Text wrap="wrap" color="subtle">
                   {queued.map(label).join(' · ')}
                 </Text>
               </Box>

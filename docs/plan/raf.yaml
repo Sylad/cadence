@@ -1449,11 +1449,15 @@ lots:
     finished: 2026-10-08
   - id: L126
     title: "cadence-hud : segment « N cmd » à côté des agents — compter les commandes d'arrière-plan en cours de la session (Bash run_in_background et Monitor, y compris celles des sous-agents) depuis les mêmes tâches que l'app, pour que la bande suive la carte « commandes en arrière-plan » de la fenêtre (vu le 08-10 : app « 2 en cours, 3 tâches », bande « 1 agent »)"
-    status: doing
+    status: done
     estimate: 0.5
     quickwin: true
     created: 2026-10-08
     started: 2026-10-08
+    review: { date: 2026-10-08, verdict: "conforme — 2e revue Opus (1f423ea) : majeur levé (4 tests de niveau handler, chacun rouge sur cassure du câblage mesurée par mutation), doc nomme le sous-agent synchrone ; 36 tests plugin, 1032 tests, typecheck verts ; verdict rejoué après le commit de release 0.17.0 (versions, CHANGELOG, README seuls)", commit: 5cd4e0ead66df1419d01bee0eb4ef54ae9242f46 }
+    notes:
+      - { date: 2026-10-08, text: "mineur de revue (non corrigé, pas de bug observable) : 14 casts `as never` dans tests/hud.test.tsx:537-590 fixent une forme d'événement différente du kit (`input.command` au lieu de `command` étalé, `wait` manquant) — à réécrire sans cast avec les formes du kit au fil de l'eau ; endedTask() ne lit que la première balise <task-id>/<status>" }
+    finished: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -3,7 +3,7 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, notifiedEnd, pad, parseAmbiguous, RESET_BACK, shortModel, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, RESET_BACK, shortModel, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -295,7 +295,7 @@ export const register: Register = on => {
       const lotWidth = Math.max(0, ...cells.map(c => c.label.length))
       const statusWidth = Math.max(0, ...cells.map(c => c.status.length), queued.length > 0 ? 'en attente'.length : 0)
       const detailWidth = Math.max(0, ...cells.map(c => c.detail.length))
-      const titleWidth = width - 2 - lotWidth - 2 - statusWidth - 2 - (detailWidth > 0 ? detailWidth + 2 : 0)
+      const titleWidth = Math.max(0, width - 2 - lotWidth - 2 - statusWidth - (detailWidth > 0 ? detailWidth + 2 : 0) - 2)
 
       return (
         <Box key={`wave-${wave.id}`} flexDirection="column">
@@ -321,34 +321,44 @@ export const register: Register = on => {
           </Text>
           {cells.map(c => (
             <Box key={`${c.lot.project}:${c.lot.lot}`} flexDirection="row">
-              <Text>{'  '}</Text>
-              <Text bold color={c.lot.status === 'question' || c.lot.status === 'failed' ? colorOfLot(c.lot.status) : 'text'}>
-                {pad(c.label, lotWidth)}
-              </Text>
-              <Text>{'  '}</Text>
-              <Text color={colorOfLot(c.lot.status)} bold={c.lot.status === 'question'}>
-                {pad(c.status, statusWidth)}
-              </Text>
-              <Text>{'  '}</Text>
-              {detailWidth > 0 && (
-                <Text dimColor={c.lot.status !== 'question'} color={c.lot.status === 'question' ? 'warning' : undefined}>
-                  {pad(c.detail, detailWidth)}
+              <Box width={2 + lotWidth} paddingLeft={2} flexShrink={0}>
+                <Text wrap="truncate-end" bold color={c.lot.status === 'question' || c.lot.status === 'failed' ? colorOfLot(c.lot.status) : 'text'}>
+                  {c.label}
                 </Text>
+              </Box>
+              <Box width={2 + statusWidth} paddingLeft={2} flexShrink={0}>
+                <Text wrap="truncate-end" color={colorOfLot(c.lot.status)} bold={c.lot.status === 'question'}>
+                  {c.status}
+                </Text>
+              </Box>
+              {detailWidth > 0 && (
+                <Box width={2 + detailWidth} paddingLeft={2} flexShrink={0}>
+                  <Text wrap="truncate-end" dimColor={c.lot.status !== 'question'} color={c.lot.status === 'question' ? 'warning' : undefined}>
+                    {c.detail}
+                  </Text>
+                </Box>
               )}
-              {detailWidth > 0 && <Text>{'  '}</Text>}
-              <Text color="subtle">{fit(c.lot.title, titleWidth)}</Text>
+              <Box flexGrow={1} flexShrink={1} width={titleWidth + 2} paddingLeft={2}>
+                <Text wrap="truncate-end" color="subtle">
+                  {c.lot.title}
+                </Text>
+              </Box>
             </Box>
           ))}
           {queued.length > 0 && (
             <Box flexDirection="row">
-              <Text>{'  '}</Text>
-              <Text dimColor>{pad('', lotWidth)}</Text>
-              <Text>{'  '}</Text>
-              <Text color="subtle">{pad('en attente', statusWidth)}</Text>
-              <Text>{'  '}</Text>
-              <Text color="subtle" wrap="wrap">
-                {queued.map(label).join(' · ')}
-              </Text>
+              <Box width={2 + lotWidth} flexShrink={0} />
+              <Box width={2 + statusWidth} paddingLeft={2} flexShrink={0}>
+                <Text wrap="truncate-end" color="subtle">
+                  en attente
+                </Text>
+              </Box>
+              {detailWidth > 0 && <Box width={2 + detailWidth} flexShrink={0} />}
+              <Box flexGrow={1} flexShrink={1} width={titleWidth + 2} paddingLeft={2}>
+                <Text wrap="truncate-end" color="subtle">
+                  {queued.map(label).join(' · ')}
+                </Text>
+              </Box>
             </Box>
           )}
         </Box>

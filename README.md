@@ -92,7 +92,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
 | `raf show <id> [--notes]` | one lot: status, dates, `after`, public title, dated notes in order, then the counted commits (as `raf commits`, neighbouring repositories included); `--notes` prints the notes alone |
-| `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first; a lot that declares `repos:` ([neighbouring repositories](#a-lot-whose-work-is-in-a-neighbouring-repository)) gets, after them, one `dépôt <path> :` section per neighbour with the commits there that cite the lot, within the lot's period and, in a repository shared between projects, naming this project (`aucun commit du lot`, or `introuvable` for a path that is not there) |
+| `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first; a lot that declares `repos:` ([neighbouring repositories](#a-lot-whose-work-is-in-a-neighbouring-repository)) gets, after them, one `dépôt <path> :` section per neighbour with the commits there that cite the lot and fall within the lot's period (`started` to `finished`) and, when the lot declares a `cite:` for that neighbour, contain that string (`aucun commit du lot`, or `introuvable` for a path that is not there) |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |
 | `raf ignore <sha> \| "exact subject" [--reason text]` | acknowledge a commit without a lot (tooling chore, a plan commit citing an unknown id) without rewriting history: a dated, reasoned line in the plan's `acknowledged:` section; a sha is exact, a subject covers every commit carrying it |
@@ -195,7 +195,7 @@ plan:
     started: demarre_le
     finished: [livre_le, ferme_le]
     notes: note
-    repos: depots               # the lot's neighbouring repositories (a list of paths, or one path)
+    repos: depots               # the lot's neighbouring repositories (a list of paths and/or { path, cite }, or one of them)
     parent: parent
   statuses:                     # raf status: their states
     todo: [prevu, specifie]
@@ -336,8 +336,8 @@ verdict is refused, and one left empty or blank by hand in the YAML counts as no
 review. Plans without `reviewSince` are not affected.
 
 A lot that works in neighbouring repositories (`repos:`, see [orchestrate](#a-lot-whose-work-is-in-a-neighbouring-repository))
-has its verdict tied to each of them: `raf review` also stores, under `repos`, the sha of the latest commit citing the
-lot in each neighbour (`review: { date, verdict, commit, repos: { ../aetherwx-gitops: <sha> } }`, `null` when a
+has its verdict tied to each of them: `raf review` also stores, under `repos`, the sha of the latest counted commit of the
+lot in each neighbour (the one `raf commits` lists last: it cites the lot, falls within the lot's period and contains the `cite:` string if any) (`review: { date, verdict, commit, repos: { ../aetherwx-gitops: <sha> } }`, `null` when a
 neighbour has none), and refuses to record when a listed repository cannot be read. `raf check` does not audit the
 neighbours: their staleness is not checked, only the project's own commits are.
 
@@ -838,6 +838,26 @@ lots:
     repos: [../aetherwx-gitops]
 ```
 
+**Which commits count in a neighbour.** Nothing is inferred from the neighbour or from the project's name. A commit counts
+when it cites the lot's id (as in the project: `feat(B64): …`, `maritime: … (B64)`) **and** is dated within the lot's period,
+`started` to `finished` (an open end is open). That is all, whatever the prefix or scope of the subject says and whatever
+the commit mentions. When a neighbour is shared between projects whose lots share an id prefix (`developpeur-gitops` holds
+the charts of `finance-tracker`, `warhammer40k` and `ol-companion`, all `L…`), the lot says so with an **explicit key**: an
+entry of `repos:` can be an object, and the list can mix both forms.
+
+```yaml
+    repos:
+      - ../aetherwx-gitops                                  # id + period
+      - { path: ../developpeur-gitops, cite: ol-companion } # id + period + this string
+```
+
+With `cite`, a commit must also contain that string (a substring, case-insensitive, searched in the subject and the body);
+a commit of another app that cites the same id is dropped from `raf commits`, from the briefs, from the sha a review
+records and from the orchestrator's « already has work » test. Without `cite`, in a shared neighbour, the commits of the
+other apps that cite the same id **do** count: that is the default, so declare `cite` for such a neighbour. `cite` applies
+to the neighbour it is written on, not to the project's own repository. The commits of the lot in the neighbour must carry the
+string too (the briefs say so); one that does not is not counted.
+
 A read-only plan declares it in `cadence.yaml` with `plan.fields.repos: <the file's key>` (a left-out field is read under
 the name `repos`). The effect, for `cadence orchestrate`:
 
@@ -851,7 +871,7 @@ the name `repos`). The effect, for `cadence orchestrate`:
   sessions in one repository; `--status` lists the neighbours among the repositories a wave holds.
 - **Sessions**: every session gets each neighbour as `--add-dir`, and the briefs name them: the implementation and the
   corrections must commit there too, with a message that cites the lot (`feat(B64): …`), and never push; the reviewers read
-  the commits that cite the lot in the project **and** in each neighbour (`raf commits <lot>` lists them all; only the commits dated within the lot's period (from `started` to `finished`) count; and when the neighbour also holds commits of the lot id for another project (a subject prefixed `name:` or scoped `type(name):`), only those that name this project as a word count — a `fix(B64): …` outside the period, or one that does not name the project in such a shared repository, is not listed.) A lot whose
+  the commits that cite the lot in the project **and** in each neighbour (`raf commits <lot>` lists them all; in a neighbour only the commits that cite the lot and are dated within the lot's period count, and also contain the `cite:` string when the lot declares one for it — a `fix(B64): …` outside the period, or one without the `cite:` string, is not listed.) A lot whose
   whole work is in the neighbour is not « without commit »; a commit there that does not cite the lot is a warning; a
   neighbour left with a tracked file modified hands the lot back.
 - **Verdict**: `raf review` as recorded by the orchestrator stores the sha read in the project and in each neighbour

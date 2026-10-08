@@ -1406,6 +1406,8 @@ lots:
     estimate: 1
     quickwin: true
     created: 2026-10-08
+    notes:
+      - { date: 2026-10-08, text: "Décisions lead 08-10 : (1) commande `cadence lead tour [dossier]` (dossier parent, défaut = cwd) : repère les sous-dossiers directs qui ont docs/plan/raf.yaml ou un cadence.yaml avec plan:, et pour chacun réutilise le code de session start (même module, pas de sous-processus ni d'appel à claude) ; (2) sortie = une ligne par projet, colonnes : projet · en cours (ids, « silencieux Nj » si pas de commit depuis plus de 3 j) · dérive (écarts raf check) · notes de la dernière clôture (tronquées à 120 car.) · prochain lot prêt (id + titre tronqué) · dépôt (non commité / non poussé / livraison en cours) ; --json pour le même contenu en JSON ; (3) lecture seule, ne modifie aucun plan, exit 0 même si un projet est en erreur (la ligne le dit) ; (4) le skill lead (skills/lead/SKILL.md, section 1) appelle cette commande à la place des sous-agents, et garde le reste ; (5) tests vitest sur deux projets jetables (un raf, un plan en lecture seule), CHANGELOG sous Unreleased, README (section lead)." }
   - id: L123
     title: "qa-reviewer : périmètre réduit aux pages touchées par le lot (pages qui appellent les endpoints changés, pages du lot visible, plus la page d'accueil) et lecture du DOM en texte d'abord, capture seulement sur un écart ; garder le cas « lot backend qui vide une page » (13 % du coût sur 24 h le 08-10) ; mesurer avant/après sur une livraison ol ou warhammer"
     status: todo

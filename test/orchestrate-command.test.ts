@@ -654,6 +654,18 @@ describe('une vague', () => {
     expect(f.calls.map((c) => c.kind)).toEqual(['implement', 'review', 'implement', 'review']);
   });
 
+  it('L133 — dépôt sali par une revue : le lot suivant est suspendu mais la vague n\'est pas « suspended-budget » (code 1, reprenable)', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    const f = fakeDeps({ review: (cwd) => { writeFileSync(join(cwd, 'capture.png'), 'png'); return claudeOut(reviewReport()); } });
+    const r = io(parent);
+    const code = await orchestrate(['a:L1', 'a:L2', '--max-sessions', '1'], r.io, f.deps);
+    expect(code).toBe(1);
+    const wave = new RunStore(parent, '2026-10-04-1412').readWave()!;
+    expect(wave.status).toBe('interrupted');
+    expect(wave.consumed).toBeLessThan(wave.budget);
+    expect(r.out.join('\n')).not.toMatch(/suspended-budget/);
+  });
+
   it('L39 — les gabarits sont lus une fois par exécution : un fichier modifié entre deux exécutions n\'est pris qu\'à la reprise', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
     const dir = tempDir();

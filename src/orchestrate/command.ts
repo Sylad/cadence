@@ -617,8 +617,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     });
   } finally {
     forget();
-    // « done » = plus rien à reprendre : une question en attente ou un lot suspendu garde la vague reprenable.
-    wave.status = wctx.incident ? 'interrupted' : wctx.quota.hit ? 'suspended-quota' : lots.some((l) => l.status === 'suspended') ? 'suspended-budget' : all.every(finished) ? 'done' : 'interrupted';
+    // « done » = plus rien à reprendre : une question en attente ou un lot suspendu garde la vague reprenable. Des lots suspendus parce qu'une revue a sali leur dépôt (L133), budget intact, ne sont pas un manque de budget : « interrupted », le lead nettoie puis reprend.
+    wave.status = wctx.incident ? 'interrupted' : wctx.quota.hit ? 'suspended-quota' : lots.some((l) => l.status === 'suspended') && (budget.exhausted || !wctx.dirtyRepos?.size) ? 'suspended-budget' : all.every(finished) ? 'done' : 'interrupted';
     saveWave();
     release();
   }

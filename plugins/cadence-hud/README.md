@@ -24,8 +24,11 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
 - `2 cmd` — **commandes d'arrière-plan** de la session en cours, celles de la carte « commandes en arrière-plan »
   de la fenêtre : Bash lancé en arrière-plan (`run_in_background`, Ctrl+B, délai dépassé) et Monitor, y compris
   ceux des sous-agents (sauf le cas ci-dessous). Le mod les suit à leur lancement (résultat de l'appel d'outil), les retire à la notification
-  de fin de la tâche (terminée, échouée, arrêtée) ou à un `TaskStop`, et n'affiche rien à zéro ; elle tombe avec le
-  compteur d'agents quand la fenêtre est étroite. Une commande lancée avant le chargement du mod, ou dont la
+  de fin de la tâche (terminée, échouée, arrêtée, ou l'expiration d'un Monitor « [Monitor expired …] ») ou à un
+  `TaskStop`, et n'affiche rien à zéro ; elle tombe avec le compteur d'agents quand la fenêtre est étroite. Une
+  commande lancée par un sous-agent est retirée quand ce sous-agent finit (sa propre notification de fin revient au
+  sous-agent, jamais à la session) ; la session, et un rechargement à chaud du mod, partent de zéro commande. Une
+  commande lancée avant le chargement du mod, ou dont la
   notification n'arrive pas, n'est pas vue : le compteur ne remonte qu'aux lancements qu'il a vus. Une commande
   lancée par un sous-agent synchrone (`backgroundEndsWithFinalResponse: true` dans le résultat) n'est pas comptée
   non plus : elle prend fin avec la réponse finale du sous-agent, pas à une notification ;

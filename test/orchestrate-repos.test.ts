@@ -234,4 +234,14 @@ describe('lot à dépôt voisin : verrou, garde et file de la vague', () => {
     expect(r.err.join('\n')).toContain('voisin : une orchestration y est déjà en cours (autre');
     expect(existsSync(join(dirs.a, '.git/hooks/pre-push'))).toBe(false);
   });
+
+  it('--resume refuse un voisin à fichier suivi modifié : arbre sale', async () => {
+    const { parent, dirs } = world({ a: ['../voisin'] });
+    const asking: OrchestrateDeps = { ...deps(), claude: async () => claudeOut(workReport({ questions: ['Quelle clé ?'] })) };
+    expect(await orchestrate(['a:L1'], io(parent).io, asking)).toBe(1);
+    writeFileSync(join(dirs.voisin, 'README.md'), 'modifié\n');
+    const r = io(parent);
+    expect(await orchestrate(['--resume'], r.io, deps())).toBe(2);
+    expect(r.err.join('\n')).toMatch(/voisin : arbre sale, 1 fichier\(s\) suivi\(s\) modifié\(s\) : README\.md/);
+  });
 });

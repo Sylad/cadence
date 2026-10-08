@@ -623,12 +623,13 @@ lots:
     finished: 2026-10-07
   - id: L49
     title: "Suivi visible d'une vague pour l'humain : (1) le skill lead nomme la tâche de fond « vague <id> : projet:lot, … » et arme un suivi (Monitor) qui pousse chaque transition (lot → état, question, prêt, rendu) dans la conversation ; (2) cadence orchestrate --status --watch (tableau rafraîchi dans un terminal) ; (3) à étudier : une ligne de statut Claude Code (barre d'état) « vague : 2/4 prêts, 1 question, 1,1 M / 2 M » — retour de Sylvain 04-10 : « je vois une tâche en cours, pas quels projets ni où on en est »"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-04
     notes:
       - { date: 2026-10-07, text: "07-10 : le point (3) « barre d'état Claude Code » est réalisé par le mod cadence-hud (L111) ; restent (1) suivi Monitor dans le skill lead et (2) --status --watch." }
       - { date: 2026-10-08, text: "Décision lead 08-10 : (3) est fait (cadence-hud, L111). Reste : (2) cadence orchestrate --status --watch = tableau rafraîchi toutes les 10 s (option --interval), efface l'écran entre deux rendus, se termine seul quand plus aucune vague ne tourne, code de sortie comme --status ; (1) le skill lead (skills/lead/SKILL.md du paquet) dit de lancer la vague en arrière-plan sous le nom « vague <id> : projet:lot, … » et d'armer un suivi sur le fichier d'état .cadence/runs/<vague>/ qui remonte chaque transition (lot → état, question, prêt, rendu) dans la conversation ; pas de boucle d'attente. Lots L117–L120 faits aujourd'hui : rien d'autre à coordonner." }
+    started: 2026-10-08
   - id: L50
     title: "⚡ orchestrate : les fichiers que Playwright MCP écrit dans le dépôt (.playwright-mcp/*.yml, captures) rendent le lot « dépôt sale » et le renvoient au lead (ol-companion:L29, vague 2026-10-04-2201) — exclus le temps de la vague (.git/info/exclude, comme le hook) et nettoyés à la fin, ou dossier de sortie Playwright hors dépôt ; test"
     status: done

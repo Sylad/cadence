@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
+import { findProjects, tourLine, type TourRow } from '../src/lead.js';
 import { sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
@@ -123,5 +124,42 @@ describe('cadence lead tour', () => {
     const { root, alpha } = await parent();
     await cad(root, 'lead', 'tour');
     expect(execFileSync('git', ['status', '--porcelain'], { cwd: alpha, encoding: 'utf8' })).toBe('');
+  });
+
+  it('findProjects écarte dossiers cachés, node_modules et cadence.yaml avec seulement qa:, garde le cadence.yaml illisible', async () => {
+    const { root } = await parent();
+    const planned = (name: string) => {
+      mkdirSync(join(root, name, 'docs/plan'), { recursive: true });
+      writeFileSync(join(root, name, 'docs/plan/raf.yaml'), 'lots: []\n');
+    };
+    planned('.hidden');
+    planned('node_modules');
+    mkdirSync(join(root, 'qa-seul'));
+    writeFileSync(join(root, 'qa-seul/cadence.yaml'), 'qa:\n  expectations: docs/qa.md\n');
+    mkdirSync(join(root, 'casse'));
+    writeFileSync(join(root, 'casse/cadence.yaml'), 'plan: [\n');
+    expect(findProjects(root).map((d) => d.slice(root.length + 1))).toEqual(['alpha', 'beta', 'casse']);
+  });
+
+  it('--idle règle le seuil de silence et refuse une valeur invalide', async () => {
+    const { root } = await parent();
+    const strict = await cad(root, 'lead', 'tour', '--idle', '10');
+    expect(strict.code).toBe(0);
+    expect(strict.out.split('\n')[0]).toMatch(/^alpha · en cours L1 · /);
+    const zero = await cad(root, 'lead', 'tour', '--idle', '0');
+    expect(zero.out.split('\n')[0]).toMatch(/en cours L1 \(silencieux 4 ?j\)/);
+    for (const bad of ['x', '-1', '1.5']) {
+      const r = await cad(root, 'lead', 'tour', `--idle=${bad}`);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain('--idle invalide');
+    }
+  });
+
+  it('la dérive : le nombre, les deux premiers messages, puis « ; … »', () => {
+    const row = (drift: string[]): TourRow => ({ project: 'p', doing: [], drift, notes: [], next: null, repo: [] });
+    expect(tourLine(row([]))).toContain('dérive aucune');
+    expect(tourLine(row(['⚠ a']))).toContain('dérive 1 (⚠ a) ·');
+    expect(tourLine(row(['⚠ a', '✗ b']))).toContain('dérive 2 (⚠ a ; ✗ b) ·');
+    expect(tourLine(row(['⚠ a', '✗ b', '✗ c', '✗ d']))).toContain('dérive 4 (⚠ a ; ✗ b ; …) ·');
   });
 });

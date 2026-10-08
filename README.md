@@ -419,7 +419,9 @@ cadence session next --clear       # erase those notes, on purpose
 `docs/plan/raf.yaml`, or a `cadence.yaml` with `plan:` — and never enters a project
 to look for another. `--since` and `--idle` go to every project; an error in one
 project is printed in its section and the others still run. It replaces the shell
-loop over the sub-folders. For a one-line-per-project overview, `cadence lead tour`.
+loop over the sub-folders. A project that is not the root of its own git repository gets a `✗` line
+(and exit 2) instead of the parent repository's plan. `--all` and `--depth` are refused outside `session`,
+and `--all` refuses `--file`, `--config` and `RAF_FILE`: each project reads its own plan. For a one-line-per-project overview, `cadence lead tour`.
 
 `cadence session next` without a line refuses (exit 2) and leaves the notes of the
 last close as they are — it used to erase them silently; erasing is `--clear`.

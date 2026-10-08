@@ -91,7 +91,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf list [--status s]` | flat list |
 | `raf ignore <sha> \| "exact subject" [--reason text]` | acknowledge a commit without a lot (tooling chore, a plan commit citing an unknown id) without rewriting history: a dated, reasoned line in the plan's `acknowledged:` section; a sha is exact, a subject covers every commit carrying it |
 | `raf check --ignored` | list the acknowledged commits with their date and reason |
-| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default: commits without a lot (commits touching only plan files are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
+| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default (a visible lot without a public title is only a `⚠` warning: it never changes the exit code): commits without a lot (commits touching only plan files are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
 | `raf gantt [-o file]` | standalone Gantt page |
 | `raf hook install` | add the (non-blocking, read-only) post-commit hook |
 
@@ -477,6 +477,8 @@ in `cadence.yaml` and it is caught before the push:
 news:
   publicTitleMax: 80      # characters; without the key, `raf check` warns at 80 in a project that has a news directory
 ```
+
+`raf check` also warns (`⚠`, not an error: exit code 0 if nothing else is wrong) about every visible lot, dropped ones excepted, that has no public title: the site would show its technical title. Fix it with `raf public <id> "…"`.
 
 With the key, `raf public`, `raf add --public`, `raf done` (on a lot whose public title is too long) and
 `cadence news new` (its title) refuse above it; without it, only `raf check` warns.

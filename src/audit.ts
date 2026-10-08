@@ -81,8 +81,21 @@ export function auditSince(plan: Plan, explicit?: string): string {
   return plan.since ? `${plan.since} 00:00` : '30 days ago';
 }
 
+/** Un écart de `raf check` ; `warning` : signalé sans faire échouer la commande. */
+export interface AuditIssue {
+  message: string;
+  warning?: true;
+}
+
+/** Avertissements : un lot visible (hors abandonné) sans titre public — le site retombe sur le titre technique du plan. */
+export function missingPublicTitles(lots: Lot[]): AuditIssue[] {
+  return lots
+    .filter((l) => l.visible && l.status !== 'dropped' && !l.public)
+    .map((l) => ({ message: `${l.id} : lot visible sans titre public — raf public ${l.id} "…"`, warning: true as const }));
+}
+
 /** Écarts entre le plan, l'historique et les Nouveautés — ce que `raf check` affiche. */
-export function audit(plan: Plan, root: string, newsDir: string, today: Day, opts: { since?: string; idle?: number } = {}): { message: string }[] {
+export function audit(plan: Plan, root: string, newsDir: string, today: Day, opts: { since?: string; idle?: number } = {}): AuditIssue[] {
   const lots = plan.lots();
   const linked = exemptPlanOnly(linkCommits(lots, planCommits(plan, root, { since: auditSince(plan, opts.since) }), plan.refs), plan, root);
   // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
@@ -107,10 +120,10 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
     const m = l.public ? publicTitleTooLong(l.public, max) : reused ? publicTitleTooLong(reused, max) : null;
     return m ? [{ message: `${l.id} : ${reused && !l.public ? m.replace('titre public', 'titre public repris de la Nouveauté') : m}` }] : [];
   });
-  const issues = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, entries, newsDir), ...titles, ...gates,
+  const issues: AuditIssue[] = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, entries, newsDir), ...titles, ...gates, ...missingPublicTitles(lots),
     ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
   // Un plan en lecture seule se corrige avec l'outil du projet : ne pas conseiller une commande raf qui refuserait.
-  return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf start .*$/, '') })) : issues;
+  return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf (start|public) .*$/, '') })) : issues;
 }
 
 /** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni réduits au plan. */

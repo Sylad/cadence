@@ -351,7 +351,7 @@ describe('raf CLI with cadence.yaml', () => {
 
     // Le reste de l'audit tourne toujours : seules les deux portes sont ignorées.
     expect(raf(dir, 'check').out).toBe(
-      '✗ B33 en cours sans commit depuis 18 j (Une seule base)\n✗ R12a est visible et terminé sans entrée Nouveautés — cadence news new R12a\n2 écart(s)',
+      '✗ B33 en cours sans commit depuis 18 j (Une seule base)\n✗ R12a est visible et terminé sans entrée Nouveautés — cadence news new R12a\n⚠ R12a : lot visible sans titre public\n2 écart(s), 1 avertissement(s)',
     );
   });
 });

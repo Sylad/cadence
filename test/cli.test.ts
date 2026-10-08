@@ -354,6 +354,46 @@ describe('raf show', () => {
   });
 });
 
+describe('lot visible sans titre public (L32)', () => {
+  const setup = () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    return dir;
+  };
+
+  it('raf check avertit sans échouer : code 0, ligne ⚠, compte d\'avertissements', () => {
+    const dir = setup();
+    raf(dir, 'add', 'A', '--visible');
+    const r = raf(dir, 'check');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('⚠ L1 : lot visible sans titre public');
+    expect(r.out).not.toContain('✗');
+    expect(r.out).toContain('1 avertissement(s)');
+  });
+
+  it('se tait avec un titre public, pour un lot non visible et pour un lot abandonné', () => {
+    const dir = setup();
+    raf(dir, 'add', 'A', '--visible', '--public', 'Une nouveauté');
+    raf(dir, 'add', 'B');
+    raf(dir, 'add', 'C', '--visible');
+    raf(dir, 'drop', 'L3');
+    const r = raf(dir, 'check');
+    expect(r.code).toBe(0);
+    expect(r.out).not.toContain('sans titre public');
+    expect(r.out).toContain('✓ plan et historique cohérents');
+  });
+
+  it('un vrai écart fait toujours échouer et les deux se comptent séparément', () => {
+    const dir = setup();
+    raf(dir, 'add', 'A', '--visible');
+    raf(dir, 'done', 'L1', '--force');
+    const r = raf(dir, 'check');
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('⚠ L1');
+    expect(r.out).toMatch(/1 écart\(s\), 1 avertissement\(s\)/);
+  });
+});
+
 describe('titre public trop long (L106)', () => {
   const long = 'x'.repeat(88);
   const setup = (yaml?: string) => {

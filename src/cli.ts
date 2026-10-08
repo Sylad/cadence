@@ -317,9 +317,12 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const idle = values.idle === undefined ? 7 : Number(values.idle);
       if (!Number.isInteger(idle) || idle < 0) throw new RafError(`--idle invalide : ${values.idle}`);
       const issues = audit(loadPlan(), root, newsDir, today, { since: values.since, idle });
-      for (const i of issues) io.out(`✗ ${i.message}`);
-      io.out(issues.length === 0 ? '✓ plan et historique cohérents' : `${issues.length} écart(s)`);
-      return issues.length === 0 ? 0 : 1;
+      for (const i of issues) io.out(`${i.warning ? '⚠' : '✗'} ${i.message}`);
+      // Un avertissement s'affiche mais ne fait pas échouer : seuls les écarts comptent pour le code de sortie.
+      const errors = issues.filter((i) => !i.warning).length;
+      const warnings = issues.length - errors;
+      io.out(errors === 0 ? `✓ plan et historique cohérents${warnings ? ` (${warnings} avertissement(s))` : ''}` : `${errors} écart(s)${warnings ? `, ${warnings} avertissement(s)` : ''}`);
+      return errors === 0 ? 0 : 1;
     }
     case 'gantt': {
       const plan = loadPlan();
@@ -470,7 +473,7 @@ function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): num
     for (const l of done) io.out(`  ${l.id}  ${l.title}  (${l.finished})`);
   }
 
-  const issues = audit(plan, root, newsDir, today);
+  const issues = audit(plan, root, newsDir, today).filter((i) => !i.warning);
   if (issues.length) io.out(`\n${issues.length} écart(s) entre le plan et l'historique — raf check`);
   return 0;
 }

@@ -130,7 +130,7 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
     'Récurrent',
     recurringByDue(lots, today).map((l) => `${l.id}  ${l.title} — ${dueLine(l, today)}`),
   );
-  section(out, 'Écarts (raf check)', audit(plan, ctx.root, ctx.newsDir, today).map((i) => `✗ ${i.message}`));
+  section(out, 'Écarts (raf check)', audit(plan, ctx.root, ctx.newsDir, today).map((i) => `${i.warning ? '⚠' : '✗'} ${i.message}`));
   section(out, 'Dépôt', [repoLine(ctx.root).line]);
   section(out, 'Effets en production (cadence verify)', ctx.effects ?? []);
   section(out, 'Faits propres au projet', projectFacts(ctx, opts.since));
@@ -162,7 +162,7 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
   section(out, 'Lots en cours', quiet.map((l) => `${l.id}  ${l.title} — aucun commit sur la période : ${plan.readonly ? "le fermer ou l'annoter avec l'outil du projet" : 'raf done ou raf note'}`));
 
   const issues = audit(plan, ctx.root, ctx.newsDir, today);
-  section(out, 'Écarts (raf check)', issues.map((i) => `✗ ${i.message}`));
+  section(out, 'Écarts (raf check)', issues.map((i) => `${i.warning ? '⚠' : '✗'} ${i.message}`));
 
   const repo = repoLine(ctx.root);
   const lock = lockStatus(ctx.shared);
@@ -187,7 +187,7 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
     out(`\n(aucun motif de nettoyage déclaré — exemple de session.clean, dans cadence.yaml : session: { clean: [ "tmp/*", "~/partage/capture-*.png" ], cleanDays: 7 } ; chemins relatifs à la racine ou absolus, cleanDays = âge minimal en jours)`);
   }
 
-  const open = issues.length + repo.open + (lock?.live ? 1 : 0);
+  const open = issues.filter((i) => !i.warning).length + repo.open + (lock?.live ? 1 : 0);
   out(open === 0 ? '\n✓ prêt à fermer' : `\n✗ pas fermé : ${open} point(s)`);
   return open === 0 ? 0 : 1;
 }

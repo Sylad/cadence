@@ -405,6 +405,7 @@ lots:
     quickwin: true
     created: 2026-10-04
     started: 2026-10-08
+    review: { date: 2026-10-08, verdict: "conforme (3 commits relus, typecheck OK, 919/919 tests verts, les 8 choix d'interprétation tiennent) — orchestré (vague 2026-10-08-0639, 1 passe(s) de correction)", commit: d12d0a9155966360aa3179342fe28fe6217cc97a }
   - id: L33
     title: "⚡ orchestrate : le brief d'implémentation demande de TRANCHER les questions d'interprétation mineures (et de les lister en « choix faits » dans le rapport, relus par la revue), de ne s'arrêter que sur un vrai blocage — mesure : vague 2026-10-04-1700, 4 lots / 4 questions, ~45 k par aller-retour"
     status: done

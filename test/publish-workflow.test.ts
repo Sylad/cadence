@@ -13,6 +13,12 @@ describe('publish.yml', () => {
     expect(workflow).not.toContain('npm@latest');
   });
 
+  it('utilise actions/checkout et actions/setup-node en v5 (Node 20 déprécié sur les actions v4)', () => {
+    expect(workflow).toContain('uses: actions/checkout@v5');
+    expect(workflow).toContain('uses: actions/setup-node@v5');
+    expect(workflow).not.toMatch(/actions\/(checkout|setup-node)@v4/);
+  });
+
   it('contrôle le tag contre package.json et les deux fichiers du plugin', () => {
     for (const file of ['package.json', '.claude-plugin/plugin.json', '.claude-plugin/marketplace.json']) {
       expect(workflow).toContain(file);
@@ -132,7 +138,7 @@ describe('notes de version', () => {
   });
 
   it('ne laisse pas le jeton en écriture dans .git/config', () => {
-    expect(workflow).toMatch(/actions\/checkout@v4\n\s+with:\n\s+persist-credentials: false/);
+    expect(workflow).toMatch(/actions\/checkout@v5\n\s+with:\n\s+persist-credentials: false/);
   });
 
   it('contrôle le CHANGELOG avant toute publication', () => {

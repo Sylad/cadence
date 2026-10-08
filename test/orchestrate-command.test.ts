@@ -427,6 +427,25 @@ describe('--status --watch (L49)', () => {
   });
 });
 
+describe('--status <id> --watch pendant qu\'une autre vague tourne (L49)', () => {
+  it('s\'arrête quand la vague observée ne tourne plus, même si une autre vague est vivante', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    expect(await orchestrate(['a:L1', '--wave', '2026-10-08-1000'], io(parent).io, f.deps)).toBe(0);
+    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-08-1100', started: '2026-10-08T11:00:00Z', cwd: '/ailleurs', repos: ['/x/b'], cap: 2 });
+    f.deps.watchSleep = async () => {
+      throw new Error('ne doit pas attendre');
+    };
+    try {
+      const r = io(parent);
+      expect(await orchestrate(['--status', '2026-10-08-1000', '--watch'], r.io, f.deps)).toBe(0);
+      expect(r.out.filter((l) => l === '\x1b[H\x1b[2J')).toHaveLength(1);
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+  });
+});
+
 describe('--status <id> inconnu malgré une vague vivante ailleurs (L71)', () => {
   it('refuse « vague inconnue » au lieu de lister les vagues vivantes avec le code 0', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }] });

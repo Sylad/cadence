@@ -348,12 +348,14 @@ const CLEAR_SCREEN = '\x1b[H\x1b[2J';
 const DEFAULT_WATCH_INTERVAL = 10;
 
 /** Ce que `--status` montre à un instant : les vagues vivantes, puis le tableau (absent si seules les vagues vivantes comptent). */
-function statusView(args: Args, launch: string): { live: string[]; table?: string[] } {
+function statusView(args: Args, launch: string): { live: string[]; table?: string[]; running: boolean } {
   const store = typeof args.status === 'string' ? RunStore.find(launch, args.status) : RunStore.last(launch);
   const live = liveLines();
-  if (!store && live.length && args.status === true) return { live };
+  if (!store && live.length && args.status === true) return { live, running: true };
   if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');
-  return { live, table: renderTable(store.readWave()!, store.lots()) };
+  // `running` : la vague suivie tourne — pour un <id> explicite, elle seule compte, pas les autres vagues de la machine
+  const running = typeof args.status === 'string' ? liveWaves(cadenceHome()).some((w) => w.wave === store.readWave()!.id) : live.length > 0;
+  return { live, table: renderTable(store.readWave()!, store.lots()), running };
 }
 
 /** Refus d'une `--wave` déjà existante, identique en simulation et au vrai lancement. */
@@ -383,14 +385,14 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     // --watch : le même tableau, rafraîchi ; il s'arrête seul quand plus aucune vague ne tourne (le dernier rendu reste affiché)
     const sleep = deps.watchSleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
     for (;;) {
-      const { live, table } = statusView(args, launch);
+      const { live, table, running } = statusView(args, launch);
       io.out(CLEAR_SCREEN);
       for (const line of live) io.out(line);
       if (table) {
         if (live.length) io.out('');
         for (const line of table) io.out(line);
       }
-      if (live.length === 0) return 0;
+      if (!running) return 0;
       io.out('');
       io.out(`rafraîchi toutes les ${args.interval ?? DEFAULT_WATCH_INTERVAL} s — Ctrl-C pour quitter`);
       await sleep((args.interval ?? DEFAULT_WATCH_INTERVAL) * 1000);

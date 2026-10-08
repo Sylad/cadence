@@ -31,6 +31,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 - `hook.autostart` in `cadence.yaml` (`warn` by default, `refuse`, `start`): what the new pre-commit hook does with a commit that cites a lot still `todo`. `refuse` fails the commit with `raf start <id>` in the message; `start` runs `raf start` in the hook and stages the plan, so it goes in the same commit (no amend). `warn` keeps today's post-commit warning. `raf hook install` now installs both hooks; run it again in an existing repository. (L104, #4)
+- `cadence session start|close --all [--depth n]`: from a folder that is not a repository, runs the command in each sub-folder holding a plan (`docs/plan/raf.yaml`, or a `cadence.yaml` with `plan:`), `--depth n` levels down (1 by default), one `## project` section each; `--since` and `--idle` go to every project, an error stays in its section and the others still run, exit code is the worst of the projects. The `session-start` and `session-close` skills use it in place of the shell loop. (L103, #3)
 
 ## [0.14.0] - 2026-10-08
 

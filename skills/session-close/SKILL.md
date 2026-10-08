@@ -8,12 +8,13 @@ description: Close a work session on a repository that uses cadence — plan hyg
 ## Where to run
 
 Every `cadence` / `raf` command works on the git repository of the current directory. When the
-session runs from a parent folder that holds several projects (not itself a repository), run each
-command inside the project concerned: `cd <project> && cadence …`. The projects are the sub-folders
-that contain `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key.
+session runs from a parent folder that holds several projects (not itself a repository), run
+`cadence session close --all` there (`--depth 2` for projects one folder deeper): one "## project"
+section per sub-folder that contains `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key.
+Other commands (`raf …`, `cadence deliver`) still run inside the project concerned: `cd <project> && cadence …`.
 
-With no project named, run `cadence session close` in each project touched during the session
-(`git log --since` or `git status` tell which) and close each one.
+With no project named, run `cadence session close --all` from the parent folder, or `cadence session close` in each project touched during the session
+(`git log --since` or `git status` tell which), and close each one.
 
 ## Steps
 

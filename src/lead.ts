@@ -32,24 +32,30 @@ export function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
-/** Sous-dossiers directs qui portent un plan : docs/plan/raf.yaml, ou un cadence.yaml avec `plan:`. */
-export function findProjects(parent: string): string[] {
-  return readdirSync(parent, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules')
-    .map((e) => join(parent, e.name))
-    .filter((dir) => {
-      if (existsSync(join(dir, 'docs/plan/raf.yaml'))) return true;
-      const conf = join(dir, 'cadence.yaml');
-      if (!existsSync(conf) || !statSync(conf).isFile()) return false;
-      try {
-        const c = readPlanConfig(conf);
-        // Une clé qa: seule ne désigne aucun plan.
-        return !!c && (!!c.path || Object.keys(c.settings).some((k) => k !== 'qaExpectations'));
-      } catch {
-        return true; // un cadence.yaml illisible reste un projet : sa ligne dit l'erreur
-      }
-    })
-    .sort();
+/** Un dossier est un projet s'il porte docs/plan/raf.yaml, ou un cadence.yaml avec `plan:`. */
+function isProject(dir: string): boolean {
+  if (existsSync(join(dir, 'docs/plan/raf.yaml'))) return true;
+  const conf = join(dir, 'cadence.yaml');
+  if (!existsSync(conf) || !statSync(conf).isFile()) return false;
+  try {
+    const c = readPlanConfig(conf);
+    // Une clé qa: seule ne désigne aucun plan.
+    return !!c && (!!c.path || Object.keys(c.settings).some((k) => k !== 'qaExpectations'));
+  } catch {
+    return true; // un cadence.yaml illisible reste un projet : sa ligne dit l'erreur
+  }
+}
+
+/** Les projets sous `parent`, jusqu'à `depth` niveaux (1 : sous-dossiers directs) ; on ne descend pas dans un projet. */
+export function findProjects(parent: string, depth = 1): string[] {
+  const found: string[] = [];
+  for (const e of readdirSync(parent, { withFileTypes: true })) {
+    if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules') continue;
+    const dir = join(parent, e.name);
+    if (isProject(dir)) found.push(dir);
+    else if (depth > 1) found.push(...findProjects(dir, depth - 1));
+  }
+  return found.sort();
 }
 
 /** Les faits de `cadence session start` pour un projet, sous forme de données ; lecture seule. */

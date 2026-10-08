@@ -16,7 +16,7 @@ import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
-import { leadTour, tourLine } from './lead.js';
+import { findProjects, leadTour, tourLine } from './lead.js';
 import { orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
@@ -125,6 +125,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       status: { type: 'string' },
       since: { type: 'string' },
       idle: { type: 'string' },
+      all: { type: 'boolean' },
+      depth: { type: 'string' },
       output: { type: 'string', short: 'o' },
       config: { type: 'string' },
       'dry-run': { type: 'boolean' },
@@ -158,6 +160,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     else for (const r of rows) io.out(tourLine(r));
     return 0;
   }
+  // --all balaie les sous-dossiers : il ne lit ni le plan ni le cadence.yaml du dossier courant.
+  if (command === 'session' && (values.all || values.depth !== undefined)) return sessionAll(rest, values, io);
   // cadence.yaml peut dire où est le plan et, s'il est tenu par un autre outil, comment le lire.
   const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
   // Installer les skills ou le hook ne lit pas le plan : un cadence.yaml fautif ne doit pas l'empêcher.
@@ -641,6 +645,35 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
   }
 }
 
+/** `session start|close --all [--depth n]` : la commande jouée dans chaque projet sous le dossier courant, une section par projet. */
+async function sessionAll(rest: string[], values: { all?: boolean; depth?: string; since?: string; idle?: string }, io: Io): Promise<number> {
+  const sub = rest[0];
+  if (!values.all) throw new RafError('--depth demande --all');
+  if (sub !== 'start' && sub !== 'close') throw new RafError('--all ne va qu\'avec session start ou session close');
+  const depth = values.depth === undefined ? 1 : Number(values.depth);
+  if (!Number.isInteger(depth) || depth < 1) throw new RafError(`--depth invalide : ${values.depth} (un entier ≥ 1)`);
+  if (values.idle !== undefined && !(Number.isInteger(Number(values.idle)) && Number(values.idle) >= 0)) throw new RafError(`--idle invalide : ${values.idle}`);
+  const projects = findProjects(io.cwd, depth);
+  if (projects.length === 0) {
+    io.out(`aucun projet sous ${io.cwd} (docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
+    return 0;
+  }
+  const argv = ['session', sub, ...(values.since === undefined ? [] : ['--since', values.since]), ...(values.idle === undefined ? [] : ['--idle', values.idle])];
+  let worst = 0;
+  for (const dir of projects) {
+    io.out(`${dir === projects[0] ? '' : '\n'}## ${relative(io.cwd, dir)}`);
+    let code: number;
+    try {
+      code = await run(argv, { ...io, cwd: dir, err: (l) => io.out(`✗ ${l}`) });
+    } catch (e) {
+      io.out(`✗ ${e instanceof Error ? e.message : String(e)}`);
+      code = 2;
+    }
+    worst = Math.max(worst, code);
+  }
+  return worst;
+}
+
 function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: string; idle?: string; clear?: boolean }): number {
   switch (sub) {
     case 'start': {
@@ -671,6 +704,6 @@ function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: st
       return 0;
     }
     default:
-      throw new RafError('usage : cadence session start [--since …] [--idle 2] | close [--since …] | next "ligne" … | next --clear');
+      throw new RafError('usage : cadence session start [--since …] [--idle 2] | close [--since …] | start|close --all [--depth n] | next "ligne" … | next --clear');
   }
 }

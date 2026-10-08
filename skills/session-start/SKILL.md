@@ -12,11 +12,12 @@ proposes, and stops.
 ## Where to run
 
 Every `cadence` / `raf` command works on the git repository of the current directory. When the
-session runs from a parent folder that holds several projects (not itself a repository), run each
-command inside the project concerned: `cd <project> && cadence …`. The projects are the sub-folders
-that contain `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key.
+session runs from a parent folder that holds several projects (not itself a repository), run
+`cadence session start --all` there (`--depth 2` for projects one folder deeper): one "## project"
+section per sub-folder that contains `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key.
+Other commands (`raf …`, `cadence deliver`) still run inside the project concerned: `cd <project> && cadence …`.
 
-With no project named, run `cadence session start` in **each** project that has a plan and report
+With no project named, run `cadence session start --all` from the parent folder (or `cadence session start` in **each** project that has a plan) and report
 one or two lines per project (in progress, drift, notes left at the last close), then propose the
 three most useful items across projects and wait. With a project named, work in that one only.
 

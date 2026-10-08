@@ -85,7 +85,8 @@ export function parseMaxSessions(text: string, what = '--max-sessions'): number 
   return Number(text);
 }
 
-const LOT_LIKE = /^(?:[\w.-]+:)?[A-Za-z]+\d+(?:\/[\w./-]*)?(?:@\w+)?$/;
+// une vague (2026-10-04-1412) n'a ni « : » ni « / » : leur présence désigne un lot, quel que soit son motif (R-M7/ux-1)
+const LOT_LIKE = /^(?:[\w.-]+:[\w.-][\w./-]*|[\w.-]+\/[\w./-]*|[A-Za-z]+\d+)(?:@\w+)?$/;
 const MODELS = ['sonnet', 'opus', 'haiku'];
 
 function lotArg(text: string): { project?: string; lot: string; model?: Model } {

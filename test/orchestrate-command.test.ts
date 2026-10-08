@@ -87,6 +87,11 @@ describe('arguments', () => {
     ]);
     expect(parseOrchestrateArgs(['--resume', '--answer', 'ma:Q4/a-1', 'oui']).answers).toEqual([{ project: 'ma', lot: 'Q4/a-1', text: 'oui' }]);
     expect(parseOrchestrateArgs(['--status', 'ma:Q4/a-1']).lots).toEqual([{ project: 'ma', lot: 'Q4/a-1', model: undefined }]);
+    for (const id of ['maritime-atlas:R-M7/ux-1', 'maritime-atlas:NC2.4/scores-versionnes', 'maritime-atlas:E-DI0/tranches-spec-22-09']) {
+      expect(parseOrchestrateArgs(['--status', id])).toMatchObject({ lots: [{ project: 'maritime-atlas', lot: id.split(':')[1] }], status: true });
+      expect(parseOrchestrateArgs(['--resume', id])).toMatchObject({ lots: [{ lot: id.split(':')[1] }], resume: true });
+    }
+    expect(parseOrchestrateArgs(['--status', '2026-10-04-1412']).status).toBe('2026-10-04-1412');
     expect(() => parseOrchestrateArgs(['a:Q4/x@gpt'])).toThrow(/modèle inconnu/);
   });
   it('budget', () => {

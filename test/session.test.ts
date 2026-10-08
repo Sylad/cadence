@@ -244,6 +244,22 @@ describe('nettoyage en routine de clôture (L4)', () => {
     utimesSync(file, when, when);
   };
 
+  it('un avertissement (lot visible sans titre public) s\'affiche en ⚠ et n\'empêche pas « prêt à fermer »', async () => {
+    const dir = await closedProject();
+    await cad(dir, 'add', 'Vitrine', '--visible');
+    git(dir, 'add', '.');
+    commit(dir, 'chore: plan', '2026-09-21T09:00:00');
+    const close = await cadLate(dir, 'session', 'close');
+    expect(close.out).toContain('⚠ L2 : lot visible sans titre public');
+    expect(close.out).not.toContain('✗ L2');
+    expect(close.out).toMatch(READY);
+    const start = await cad(dir, 'session', 'start', '--since', '2026-09-27');
+    expect(start.out).toContain('⚠ L2 : lot visible sans titre public');
+    expect(start.out).not.toContain('✗ L2');
+    const now = await cad(dir, 'now');
+    expect(now.out).not.toContain("entre le plan et l'historique");
+  });
+
   it('liste les fichiers périmés des motifs session.clean, sans rien supprimer ni bloquer la clôture', async () => {
     const dir = await closedProject();
     const shared = tempDir();

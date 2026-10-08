@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, attributeTurn, endedTask, startedCommand, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { ago, attributeTurn, endedTask, notifiedEnd, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -456,7 +456,7 @@ test('une commande d\'arrière-plan démarre par Bash (run_in_background ou mise
   expect(startedCommand('Bash', null)).toBeNull()
 })
 
-test('une commande d\'arrière-plan finit par sa notification ou par TaskStop', () => {
+test('une commande d\'arrière-plan finit par sa notification', () => {
   const note = (id: string, status: string) =>
     `<task-notification>\n<task-id>${id}</task-id>\n<tool-use-id>t</tool-use-id>\n<status>${status}</status>\n<summary>Background command "x" ${status}</summary>\n</task-notification>`
   expect(endedTask(note('b1', 'completed'))).toBe('b1')
@@ -510,4 +510,19 @@ test('une commande seule, sans agent, s\'affiche quand même', async ($, on) => 
   expect(await ui.find({ type: 'Text', text: /1 cmd/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /agent/ })).toBeUndefined()
   await ui.unmount()
+})
+
+test('TaskStop retire la tâche arrêtée, lue dans task_id du résultat', () => {
+  expect(stoppedTask('TaskStop', { message: 'Successfully stopped task: b1', task_id: 'b1', task_type: 'local_bash' })).toBe('b1')
+  expect(stoppedTask('TaskStop', { taskId: 'b1' })).toBeNull()
+  expect(stoppedTask('TaskStop', { task_id: 7 })).toBeNull()
+  expect(stoppedTask('TaskStop', null)).toBeNull()
+  expect(stoppedTask('Bash', { task_id: 'b1' })).toBeNull()
+})
+
+test('seule une notification de tâche (origin.kind) peut terminer une commande', () => {
+  const text = '<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n</task-notification>'
+  expect(notifiedEnd({ kind: 'task-notification' }, text)).toBe('b1')
+  expect(notifiedEnd({ kind: 'user' }, text)).toBeNull()
+  expect(notifiedEnd(undefined, text)).toBeNull()
 })

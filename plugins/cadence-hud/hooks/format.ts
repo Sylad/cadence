@@ -275,6 +275,17 @@ export const endedTask = (text: string): string | null => {
   return id && (status === 'completed' || status === 'failed' || status === 'killed') ? id : null
 }
 
+/** L'identifiant de la tâche qu'un TaskStop réussi vient d'arrêter (`task_id` du résultat), sinon null. */
+export const stoppedTask = (tool: string, result: unknown): string | null => {
+  if (tool !== 'TaskStop' || typeof result !== 'object' || result === null) return null
+  const id = (result as Record<string, unknown>).task_id
+  return typeof id === 'string' ? id : null
+}
+
+/** Comme `endedTask`, mais seulement pour un message d'origine `task-notification` : un prompt tapé ne termine rien. */
+export const notifiedEnd = (origin: { kind?: string } | undefined, text: string): string | null =>
+  origin?.kind === 'task-notification' ? endedTask(text) : null
+
 /** Ajoute ou retire une tâche de la liste des commandes en cours, sans doublon. */
 export const trackCommand = (ids: readonly string[], id: string, isRunning: boolean): string[] =>
   isRunning ? (ids.includes(id) ? [...ids] : [...ids, id]) : ids.filter(i => i !== id)

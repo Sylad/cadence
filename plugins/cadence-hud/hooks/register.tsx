@@ -3,7 +3,7 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, endedTask, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, pad, parseAmbiguous, RESET_BACK, shortModel, startedCommand, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, notifiedEnd, pad, parseAmbiguous, RESET_BACK, shortModel, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -111,15 +111,15 @@ export const register: Register = on => {
     if (!('result' in result) || result.isError) return result
     const started = startedCommand(e.tool, result.result)
     if (started) await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
-    else if (e.tool === 'TaskStop') {
-      const stopped = (result.result as { task_id?: unknown } | null)?.task_id
-      if (typeof stopped === 'string') await update($, commands, (ids: string[]) => trackCommand(ids, stopped, false))
+    else {
+      const stopped = stoppedTask(e.tool, result.result)
+      if (stopped) await update($, commands, (ids: string[]) => trackCommand(ids, stopped, false))
     }
     return result
   })
 
   on('prompt.submit', async ($, e, next) => {
-    const ended = e.origin?.kind === 'task-notification' ? endedTask(e.text) : null
+    const ended = notifiedEnd(e.origin, e.text)
     if (ended) await update($, commands, (ids: string[]) => trackCommand(ids, ended, false))
     return next(e)
   })

@@ -1,8 +1,8 @@
 import type { On } from 'claude-code'
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, modelsText, shortModel, wavePercent } from '../hooks/format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -86,10 +86,12 @@ test('le collecteur se lit, et une sortie étrange vaut aucune vague', () => {
 })
 
 /** Répond aux lectures d'état du mod depuis la mémoire du test (le kit n'a pas d'écriture d'état). */
-const seed = (on: On, values: Record<string, unknown>) =>
+const seed = (on: On, values: Record<string, unknown>, env: Record<string, string> = {}) => {
+  mock.env(on, env)
   on('state.get', (_$, e, next) =>
     e.plugin === PLUGIN && e.key in values ? { value: { value: values[e.key], version: 1 } } : next(e),
   )
+}
 
 const EMPTY = { agents: { running: 0, names: [] }, models: { byModel: {}, usdSeen: 0 }, error: null, isHidden: false }
 
@@ -261,6 +263,52 @@ test('cells compte en pire cas les caractères de largeur ambiguë (▰▱⚙│
   expect(cells('↻ 2 h')).toBe(6)
   expect(cells('日本')).toBe(4)
   expect(cells('éa')).toBe(2)
+})
+
+test('la largeur des caractères ambigus vaut 1 ou 2 (défaut 2, pire cas), les larges restent à 2', () => {
+  expect(parseAmbiguous(undefined)).toBe(2)
+  expect(parseAmbiguous('2')).toBe(2)
+  expect(parseAmbiguous('n importe quoi')).toBe(2)
+  expect(parseAmbiguous('1')).toBe(1)
+  expect(cells('▰▰│↻⚙')).toBe(10)
+  expect(cells('▰▰│↻⚙ 日', 1)).toBe(8)
+  expect(cells('  │  ', 1)).toBe(5)
+  const segs = [
+    { key: 'ctx', text: `ctx ${bar(50)}`, drop: 0 },
+    { key: 'agents', text: '  │  ⚙ 2 agents', drop: 2 },
+  ]
+  // largeur 1 : 14 + 14 = 28 cellules ; largeur 2 : 44
+  expect(fitSegments(segs, 30, 1).map(s => s.key)).toEqual(['ctx', 'agents'])
+  expect(fitSegments(segs, 30, 2).map(s => s.key)).toEqual(['ctx'])
+  expect(fitSegments(segs, 30).map(s => s.key)).toEqual(['ctx'])
+})
+
+test('CADENCE_HUD_AMBIGUOUS=1 libère les 14 cellules du pire cas sur la première ligne', async ($, on) => {
+  seed(on, {
+    ...EMPTY,
+    agents: { running: 1, names: ['tour-maritime'] },
+    usage: { percent: 9, tokens: 87_000, window: 1_000_000, usd: 1.31, limits: [] },
+    waves: [],
+    now: 0,
+  }, { CADENCE_HUD_AMBIGUOUS: '1' })
+  const props = { ...BAND.props, bodyColumns: 50 }
+  const one = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props })
+  expect(await one.find({ type: 'Text', text: /⚙ 1 agent/ })).toBeDefined()
+  await one.unmount()
+})
+
+test('sans CADENCE_HUD_AMBIGUOUS, la même fenêtre de 50 colonnes lâche le compteur d\'agents (pire cas)', async ($, on) => {
+  seed(on, {
+    ...EMPTY,
+    agents: { running: 1, names: ['tour-maritime'] },
+    usage: { percent: 9, tokens: 87_000, window: 1_000_000, usd: 1.31, limits: [] },
+    waves: [],
+    now: 0,
+  })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 50 } })
+  expect(await ui.find({ type: 'Text', text: /87k\/1M/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /⚙ 1 agent/ })).toBeUndefined()
+  await ui.unmount()
 })
 
 test('fitSegments mesure en cellules : une barre ▰▱ de 10 cases pèse 20 cellules', () => {

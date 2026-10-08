@@ -37,9 +37,11 @@ la largeur — d'abord les noms des agents, puis les heures de remise à zéro, 
 le compteur d'agents, et en dernier les fenêtres de quota ; le contexte reste toujours. Une fois la ligne tenue, les segments tombés qui
 entrent dans la place restante reviennent, du plus utile au moins utile : un gros segment (les modèles) qui ne tient
 pas ne prive donc pas la ligne des petits qui tiennent (les heures de remise à zéro). La largeur se mesure en
-cellules de terminal, au pire cas : `▰ ▱ ⚙ │ ↻` (largeur ambiguë) comptent pour 2, de sorte que la ligne tient aussi
-dans un terminal réglé en *ambiguous width = 2* — au prix de lâcher un segment un peu plus tôt dans un terminal en
-largeur 1. Ce sont les seuls caractères non ASCII de cette ligne : les séparateurs (` | `), les points de
+cellules de terminal, et par défaut au pire cas : `▰ ▱ ⚙ │ ↻` (largeur ambiguë) comptent pour 2, de sorte que la ligne
+tient aussi dans un terminal réglé en *ambiguous width = 2* — au prix de lâcher un segment un peu plus tôt dans un
+terminal en largeur 1, comme l'app de bureau (jauge et séparateurs y comptent 14 cellules de moins). Pour mesurer à
+la largeur de votre terminal, définir `CADENCE_HUD_AMBIGUOUS=1` (ou `2`, le défaut ; toute autre valeur vaut 2) dans
+l'environnement de Claude Code, par exemple dans le bloc `env` de `~/.claude/settings.json` ; le mod ne détecte pas le terminal. Ce sont les seuls caractères non ASCII de cette ligne : les séparateurs (` | `), les points de
 suspension (`...`), les valeurs inconnues (`-`) et le libellé de la limite de dépense (`EUR`, pas `€`) sont en ASCII, sans table de largeurs à entretenir. Seuls les
 noms d'agents et de modèles, repris tels quels, peuvent encore y mettre un caractère ambigu. Les en-têtes de vague sont
 tronqués en fin de ligne.

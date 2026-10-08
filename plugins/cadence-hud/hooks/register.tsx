@@ -3,7 +3,7 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, pad, shortModel, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, pad, parseAmbiguous, shortModel, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -122,6 +122,7 @@ export const register: Register = on => {
     ])
     if (u === null && w.length === 0 && problem === null) return next(e)
 
+    const ambiguous = parseAmbiguous(await $.env.get('CADENCE_HUD_AMBIGUOUS'))
     const { Box, Text } = $.ui.resolve(e)
     const width = Math.max(20, e.props.bodyColumns)
     const sep = <Text dimColor>{'  │  '}</Text>
@@ -220,7 +221,7 @@ export const register: Register = on => {
     }
     const contextRow = u && (
       <Text key="usage" wrap="truncate-end">
-        {fitSegments(segments, width).map(s => s.node)}
+        {fitSegments(segments, width, ambiguous).map(s => s.node)}
       </Text>
     )
 

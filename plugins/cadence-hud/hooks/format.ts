@@ -190,18 +190,22 @@ export const attributeTurn = (m: ModelsSummary, name: string, tokens: number, to
   return { byModel: { ...m.byModel, [name]: { tokens: before.tokens + tokens, usd: before.usd + usd } }, usdSeen: seen }
 }
 
+/** Largeur des caractères de largeur ambiguë d'après `CADENCE_HUD_AMBIGUOUS` (le module n'a pas de `process` : la valeur vient de `$.env`) : 1 ou 2, et 2 (le pire cas) sans variable ni valeur valide. */
+export const parseAmbiguous = (value: string | undefined): 1 | 2 => (value?.trim() === '1' ? 1 : 2)
+
 /**
- * Largeur en cellules terminal, au pire cas (la première ligne de la bande n'emploie que de l'ASCII et ces symboles) : les caractères de largeur ambiguë (formes géométriques ▰▱, symboles ⚙,
- * traits │, flèches ↻) comptent pour 2, comme dans un terminal réglé en ambiguous-width=2, et les caractères larges
- * (CJK, emoji) aussi. Un terminal en largeur 1 n'affiche alors jamais plus que ce que la mesure a prévu.
+ * Largeur en cellules terminal (la première ligne de la bande n'emploie que de l'ASCII et ces symboles) : les caractères de largeur ambiguë (formes géométriques ▰▱, symboles ⚙,
+ * traits │, flèches ↻) comptent pour `ambiguous` (2 par défaut : le pire cas, comme dans un terminal réglé en
+ * ambiguous-width=2), et les caractères larges (CJK, emoji) toujours pour 2. Au défaut, un terminal en largeur 1 n'affiche jamais plus que ce que la mesure a prévu.
  */
-export const cells = (text: string): number => {
+export const cells = (text: string, ambiguous: 1 | 2 = 2): number => {
   let n = 0
   for (const ch of text) {
     const c = ch.codePointAt(0)!
-    const isWide =
+    const isAmbiguous =
       (c >= 0x2190 && c <= 0x21ff) || // flèches
-      (c >= 0x2500 && c <= 0x27bf) || // traits, blocs, formes géométriques, symboles, dingbats
+      (c >= 0x2500 && c <= 0x27bf) // traits, blocs, formes géométriques, symboles, dingbats
+    const isWide =
       (c >= 0x1100 && c <= 0x115f) ||
       (c >= 0x2e80 && c <= 0xa4cf) ||
       (c >= 0xac00 && c <= 0xd7a3) ||
@@ -210,7 +214,7 @@ export const cells = (text: string): number => {
       (c >= 0xff00 && c <= 0xff60) ||
       (c >= 0xffe0 && c <= 0xffe6) ||
       c >= 0x1f300
-    n += isWide ? 2 : 1
+    n += isWide ? 2 : isAmbiguous ? ambiguous : 1
   }
   return n
 }
@@ -220,14 +224,15 @@ export const cells = (text: string): number => {
  * segment au `drop` le plus haut tombe (0 = ne tombe jamais). Puis, une fois le compte bon, les segments tombés
  * qui tiendraient dans la place restante reviennent, du plus utile (`drop` le plus bas) au moins utile : un gros
  * segment tombé ne prive pas la ligne des petits qui entrent. Un segment qui `requires` la clé d'un autre ne
- * revient que si celui-là est gardé. Les textes sont mesurés par `cells`. Rend les segments gardés, dans leur ordre.
+ * revient que si celui-là est gardé. Les textes sont mesurés par `cells` avec la même largeur ambiguë. Rend les segments gardés, dans leur ordre.
  */
 export const fitSegments = <S extends { key?: string; text: string; drop: number; requires?: string }>(
   segments: readonly S[],
   width: number,
+  ambiguous: 1 | 2 = 2,
 ): S[] => {
   const kept = new Set(segments)
-  const length = () => [...kept].reduce((n, s) => n + cells(s.text), 0)
+  const length = () => [...kept].reduce((n, s) => n + cells(s.text, ambiguous), 0)
   while (length() > width) {
     let idx: S | undefined
     for (const s of segments) if (kept.has(s) && s.drop > 0 && (!idx || s.drop > idx.drop)) idx = s
@@ -237,7 +242,7 @@ export const fitSegments = <S extends { key?: string; text: string; drop: number
   let free = width - length()
   const dropped = segments.filter(s => !kept.has(s)).sort((a, b) => a.drop - b.drop)
   for (const s of dropped) {
-    const needed = cells(s.text)
+    const needed = cells(s.text, ambiguous)
     const parent = s.requires === undefined || segments.some(o => kept.has(o) && o.key === s.requires)
     if (parent && needed <= free) {
       kept.add(s)

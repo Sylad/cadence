@@ -309,7 +309,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       io.out(`  ${s.kind} : claude ${args.join(' ')}`);
       io.out(`    brief : ${file}`);
       const servers = Object.keys(mcpServersFor(s.kind, l.visible, '', l.small));
-      io.out(`    mcp : ${servers.length ? `${servers.join(', ')} (captures dans le dossier de la vague : <vague>/${l.project}--${l.lot}/playwright)` : 'aucun'}`);
+      io.out(`    mcp : ${servers.length ? `${servers.join(', ')} (captures dans le dossier de la vague : <vague>/${lotSlug(l.project, l.lot)}/playwright)` : 'aucun'}`);
     }
   }
 }

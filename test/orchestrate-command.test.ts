@@ -625,8 +625,8 @@ describe('une vague', () => {
     git(dir, 'config', 'user.email', 't@example.com');
     git(dir, 'config', 'user.name', 'T');
     git(dir, 'config', 'commit.gpgsign', 'false');
-    writeFileSync(join(dir, 'docs/plan/taches.yaml'), 'taches:\n- id: Q4/accueil-4-ux12\n  titre: sous-tâche\n  etat: en_cours\n  parent: SQ4\n- id: SQ4\n  titre: parent\n  etat: en_cours\n');
-    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: docs/plan/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, parent: parent }\n  statuses: { todo: prevu, doing: en_cours, done: deploye }\norchestrate:\n  precheck: false\n');
+    writeFileSync(join(dir, 'docs/plan/taches.yaml'), 'taches:\n- id: Q4/accueil-4-ux12\n  titre: sous-tâche\n  etat: en_cours\n  parent: SQ4\n  visible: true\n- id: SQ4\n  titre: parent\n  etat: en_cours\n');
+    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: docs/plan/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, parent: parent, visible: visible }\n  statuses: { todo: prevu, doing: en_cours, done: deploye }\norchestrate:\n  precheck: false\n');
     git(dir, 'add', '--', 'docs/plan/taches.yaml', 'cadence.yaml');
     git(dir, 'commit', '-q', '-m', 'chore: plan');
     const id = 'ma:Q4/accueil-4-ux12';
@@ -636,6 +636,8 @@ describe('une vague', () => {
       expect(dry.out.join('\n')).toContain('ma:Q4/accueil-4-ux12 —');
       expect(dry.out.join('\n')).toContain('ma--Q4__accueil-4-ux12--implement.md');
       expect(dry.out.join('\n')).toContain('haiku');
+      expect(dry.out.join('\n')).toContain('<vague>/ma--Q4__accueil-4-ux12/playwright');
+      expect(dry.out.join('\n')).not.toContain('<vague>/ma--Q4/accueil');
     } finally {
       removeDryRunBriefs(dry.out.join('\n'));
     }

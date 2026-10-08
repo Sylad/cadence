@@ -1180,7 +1180,7 @@ lots:
     finished: 2026-10-07
   - id: L103
     title: "cadence session start --all / session close --all depuis un dossier non dépôt : balayer les sous-dossiers (profondeur 1, --depth n) qui ont docs/plan/raf.yaml ou cadence.yaml avec plan:, une section par projet ; le skill lead et session-start l'utilisent au lieu de la boucle shell (issue #3)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-07
     notes:
@@ -1188,14 +1188,19 @@ lots:
       - { date: 2026-10-08, text: "08-10 : la moitié « start » est couverte par L122 (cadence lead tour, 0.14.0) : le lead n'a plus besoin de session start --all. Reste le balayage de session close (--all / --depth) et, si on garde session start --all, le réutiliser sur lead tour plutôt que l'inverse. Périmètre à réduire avant la vague." }
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "compliant — orchestré (vague cadence-issues, 2 passe(s) de correction + passe des mineurs)", commit: 5ed0e9c62db2aa22962565bba2b508659cc2a7e7 }
+    finished: 2026-10-08
   - id: L104
     title: "Hook de commit sur un lot encore todo : par défaut l'avertissement actuel ; option hook.autostart dans cadence.yaml — refuse (échouer bruyamment, message raf start <id>) ou start (raf start fait par le hook, plan inclus dans le même commit, en pre-commit, pas d'amend après coup) ; tests des trois modes (issue #4)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #4 » dans son corps (issue GitHub)." }
     started: 2026-10-08
+    tasks:
+      - { id: t1, title: "tests du hook autostart : (1) plan stagé puis arbre restauré depuis HEAD → démarrage sauté, index intact ; (2) premier commit citant un lot avec plan stagé jamais commité → démarrage sauté, message, avertissement post-commit (revue 08-10, mineurs de L104)", status: todo }
+    review: { date: 2026-10-08, verdict: "conforme avec mineurs — revue orchestrée (2 passes) puis correctif 4e88a0b (démarrage seulement si le plan = HEAD) relu en session neuve : conforme avec 2 mineurs ; le premier (index ignoré) corrigé par le lead en une ligne (diff --cached), 976 tests verts ; le second (2 tests manquants) en sous-tâche", commit: 93825f68b451e74dd9858243a018b7e9d95654ae }
+    finished: 2026-10-08
   - id: L105
     title: "session close sans session.clean : une ligne « aucun motif de nettoyage déclaré » avec un exemple de session.clean (chemins relatifs ou absolus, âge minimal), une fois par clôture (issue #5)"
     status: done

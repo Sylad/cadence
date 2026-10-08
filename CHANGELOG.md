@@ -28,7 +28,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ## [Unreleased]
 
 ### Changed
-- `cadence-hud`'s first line takes back the segments that fit once a big one has dropped: after the priority drop, the dropped segments that fit in the cells left come back, most useful first (the reset times before the per-model consumption), instead of staying lost with ~25 cells free. The per-model segment is now short, `opus 1.2M sonnet 0.8M` (tokens only, 40 characters at most instead of 60). (L121)
+- `cadence-hud`'s first line takes back the segments that fit once a big one has dropped: after the priority drop, the dropped segments that fit in the cells left come back, most useful first (the reset times before the per-model consumption, through the segment's `back` rank), instead of staying lost with ~25 cells free. The per-model segment is now short, `opus 1.2M sonnet 0.8M` (tokens only, 40 characters at most instead of 60). (L121)
 
 ### Added
 - `CADENCE_HUD_AMBIGUOUS=1|2` sets the width of the ambiguous-width characters `▰ ▱ ⚙ │ ↻` that `cadence-hud` measures with; default 2 (worst case, unchanged), 1 for a terminal or the desktop app that draws them in one cell (14 cells more on the first line). Documented in the plugin's README; no terminal detection. (L121)

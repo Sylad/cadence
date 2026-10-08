@@ -222,11 +222,11 @@ export const cells = (text: string, ambiguous: 1 | 2 = 2): number => {
 /**
  * Garde les segments d'une ligne qui tiennent dans `width` cellules : tant que la somme des textes dépasse, le
  * segment au `drop` le plus haut tombe (0 = ne tombe jamais). Puis, une fois le compte bon, les segments tombés
- * qui tiendraient dans la place restante reviennent, du plus utile (`drop` le plus bas) au moins utile : un gros
+ * qui tiendraient dans la place restante reviennent, du plus utile au moins utile (`back` le plus bas, `drop` à défaut) : un gros
  * segment tombé ne prive pas la ligne des petits qui entrent. Un segment qui `requires` la clé d'un autre ne
  * revient que si celui-là est gardé. Les textes sont mesurés par `cells` avec la même largeur ambiguë. Rend les segments gardés, dans leur ordre.
  */
-export const fitSegments = <S extends { key?: string; text: string; drop: number; requires?: string }>(
+export const fitSegments = <S extends { key?: string; text: string; drop: number; back?: number; requires?: string }>(
   segments: readonly S[],
   width: number,
   ambiguous: 1 | 2 = 2,
@@ -240,7 +240,7 @@ export const fitSegments = <S extends { key?: string; text: string; drop: number
     kept.delete(idx)
   }
   let free = width - length()
-  const dropped = segments.filter(s => !kept.has(s)).sort((a, b) => a.drop - b.drop)
+  const dropped = segments.filter(s => !kept.has(s)).sort((a, b) => (a.back ?? a.drop) - (b.back ?? b.drop))
   for (const s of dropped) {
     const needed = cells(s.text, ambiguous)
     const parent = s.requires === undefined || segments.some(o => kept.has(o) && o.key === s.requires)

@@ -132,7 +132,7 @@ export const register: Register = on => {
     // La première ligne est UN seul Text (une Box en ligne replierait chaque segment séparément quand la fenêtre
     // est étroite) : ses segments optionnels tombent par priorité jusqu'à tenir dans la largeur, du moins utile
     // (noms des agents, puis heures de remise à zéro, puis modèles, coût, agents) au plus utile (fenêtres de quota) ; le contexte reste toujours.
-    const segments: { key: string; text: string; drop: number; requires?: string; node: RenderChildren }[] = []
+    const segments: { key: string; text: string; drop: number; back?: number; requires?: string; node: RenderChildren }[] = []
     if (u) {
       const ctx = `${bar(u.percent)} ${pct(u.percent)}`
       segments.push({
@@ -169,7 +169,7 @@ export const register: Register = on => {
         })
         const reset = untilReset(l.resetsAt, at)
         if (reset) {
-          segments.push({ key: `${l.kind}-reset`, text: ` ${reset}`, drop: 5, requires: l.kind, node: <Text key={`${l.kind}-reset`} dimColor> {reset}</Text> })
+          segments.push({ key: `${l.kind}-reset`, text: ` ${reset}`, drop: 5, back: 3, requires: l.kind, node: <Text key={`${l.kind}-reset`} dimColor> {reset}</Text> })
         }
       }
       if (u.usd !== undefined) {

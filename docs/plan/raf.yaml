@@ -1180,12 +1180,13 @@ lots:
     finished: 2026-10-07
   - id: L103
     title: "cadence session start --all / session close --all depuis un dossier non dépôt : balayer les sous-dossiers (profondeur 1, --depth n) qui ont docs/plan/raf.yaml ou cadence.yaml avec plan:, une section par projet ; le skill lead et session-start l'utilisent au lieu de la boucle shell (issue #3)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #3 » dans son corps (issue GitHub)." }
       - { date: 2026-10-08, text: "08-10 : la moitié « start » est couverte par L122 (cadence lead tour, 0.14.0) : le lead n'a plus besoin de session start --all. Reste le balayage de session close (--all / --depth) et, si on garde session start --all, le réutiliser sur lead tour plutôt que l'inverse. Périmètre à réduire avant la vague." }
+    started: 2026-10-08
   - id: L104
     title: "Hook de commit sur un lot encore todo : par défaut l'avertissement actuel ; option hook.autostart dans cadence.yaml — refuse (échouer bruyamment, message raf start <id>) ou start (raf start fait par le hook, plan inclus dans le même commit, en pre-commit, pas d'amend après coup) ; tests des trois modes (issue #4)"
     status: doing

@@ -87,6 +87,25 @@ describe('sessions d\'un lot à dépôt voisin (L62)', () => {
     expect(review.repos).toEqual({ [NB]: git(nb, 'rev-parse', 'HEAD') });
   });
 
+  it('reprise : un commit du voisin postérieur à la revue rend le lot au lead, le verdict n\'est pas enregistré', async () => {
+    const { h, c, nb } = scenario(() => ({ fix: [() => claudeOut(workReport({}))] }));
+    // état laissé par une vague coupée après une revue conforme avec un mineur : la passe des mineurs reprend
+    commitFile(h.repo, 'a.txt', 'feat(L1): côté projet');
+    commitFile(nb, 'chart.yaml', 'feat(L1): côté voisin');
+    const minor = { gravite: 'mineur', fichier: 'a.txt', ligne: 1, texte: 'nommage' };
+    c.lot.code = { conforme: true, bloquants: 0, majeurs: 0, mineurs: 1, verdict: 'conforme', sousTaches: [], nonVerifie: [], head: git(h.repo, 'rev-parse', 'HEAD'), repoHeads: { [NB]: git(nb, 'rev-parse', 'HEAD') } };
+    c.lot.minorPass = true;
+    c.lot.minorFix = true;
+    c.lot.constats = [{ source: 'code', ...minor }];
+    c.lot.next = 'fix';
+    commitFile(nb, 'late.yaml', 'feat(L1): postérieur à la revue');
+    await runLot(c);
+    expect(h.calls.map((k) => k.kind)).toEqual(['fix']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain(`un commit est postérieur à la revue dans ${NB} : verdict non enregistré`);
+    expect(h.plan().lot('L1').review).toBeUndefined();
+  });
+
   it('un commit du voisin qui ne cite pas le lot est signalé en avertissement', async () => {
     const { c } = scenario((nb) => ({
       implement: [

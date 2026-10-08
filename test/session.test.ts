@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { SKILLS_DIR } from '../src/skills.js';
 import { run } from '../src/cli.js';
@@ -87,7 +87,7 @@ describe('session close', () => {
     git(dir, 'add', 'x.txt');
     const { code, out } = await cad(dir, 'session', 'close');
     expect(code).toBe(1);
-    expect(out).toMatch(/Commits de la période\n {2}1 commit\(s\) sans lot :\n {4}[0-9a-f]{7} wip sans lot/);
+    expect(out).toMatch(/Commits de la période \(depuis 2026-09-28 00:00\)\n {2}1 commit\(s\) sans lot :\n {4}[0-9a-f]{7} wip sans lot/);
     expect(out).toContain('L1  Cache — aucun commit sur la période : raf done ou raf note');
     expect(out).toContain('1 fichier(s) modifié(s)');
     expect(out).toMatch(/✗ pas fermé : \d+ point\(s\)/);
@@ -112,6 +112,64 @@ describe('session close', () => {
     const { code, out } = await cad(dir, 'session', 'close', '--since', '2026-09-01');
     expect(out).toContain('✓ prêt à fermer');
     expect(code).toBe(0);
+  });
+});
+
+describe('session close : fenêtre depuis la dernière ouverture (issue #7)', () => {
+  it("couvre la période depuis l'ouverture, la dit, et ne relit pas ce que l'ouverture avait déjà rapporté", async () => {
+    const dir = await project();
+    commit(dir, 'feat(L1): du matin', '2026-09-28T08:00:00');
+    await cad(dir, 'session', 'start', '--since', '2026-09-27');
+    const stamp = new Date('2026-09-28T18:30:00');
+    expect(JSON.parse(readFileSync(join(stateDir(dir), 'session.json'), 'utf8'))).toMatchObject({ kind: 'start', at: stamp.toISOString() });
+    // L'ouverture a eu lieu à 18:30 dans ce test ; on la recule à 09:12 pour simuler la matinée.
+    writeFileSync(join(stateDir(dir), 'session.json'), JSON.stringify({ kind: 'start', at: new Date('2026-09-28T09:12:00').toISOString() }));
+    commit(dir, 'feat(L2): de l\'après-midi', '2026-09-28T14:00:00');
+    const { out } = await cad(dir, 'session', 'close');
+    expect(out).toContain("Commits de la période (depuis l'ouverture de 09:12)");
+    expect(out).toContain("feat(L2): de l'après-midi");
+    expect(out).not.toContain('du matin');
+  });
+
+  it('--since garde la main et le dit', async () => {
+    const dir = await project();
+    commit(dir, 'feat(L1): du matin', '2026-09-28T08:00:00');
+    writeFileSync(join(stateDir(dir), 'session.json'), JSON.stringify({ kind: 'start', at: new Date('2026-09-28T09:12:00').toISOString() }));
+    const { out } = await cad(dir, 'session', 'close', '--since', '2026-09-01');
+    expect(out).toContain('Commits de la période (depuis 2026-09-01)');
+    expect(out).toContain('du matin');
+  });
+
+  it("sans ouverture connue : le jour même, dit comme tel", async () => {
+    const dir = await project();
+    const { out } = await cad(dir, 'session', 'close');
+    expect(out).toContain('Commits de la période (depuis 2026-09-28 00:00)');
+  });
+
+  it("une clôture réussie devient la nouvelle borne ; une clôture refusée ne bouge rien", async () => {
+    const dir = await project();
+    writeFileSync(join(stateDir(dir), 'session.json'), JSON.stringify({ kind: 'start', at: new Date('2026-09-28T09:12:00').toISOString() }));
+    writeFileSync(join(dir, 'x.txt'), 'x');
+    git(dir, 'add', 'x.txt');
+    expect((await cad(dir, 'session', 'close')).code).toBe(1);
+    expect(JSON.parse(readFileSync(join(stateDir(dir), 'session.json'), 'utf8')).kind).toBe('start');
+    git(dir, 'reset', '-q');
+    rmSync(join(dir, 'x.txt'));
+    await cad(dir, 'done', 'L1');
+    git(dir, 'commit', '-qam', 'chore: plan');
+    const origin = tempDir();
+    git(origin, 'init', '-q', '--bare', '-b', 'main');
+    git(dir, 'remote', 'add', 'origin', origin);
+    git(dir, 'push', '-q', '-u', 'origin', 'main');
+    expect((await cad(dir, 'session', 'close')).code).toBe(0);
+    expect(JSON.parse(readFileSync(join(stateDir(dir), 'session.json'), 'utf8'))).toMatchObject({ kind: 'close' });
+    expect((await cad(dir, 'session', 'close')).out).toContain('Commits de la période (depuis la clôture de 18:30)');
+  });
+
+  it("un fichier d'état illisible retombe sur le jour même", async () => {
+    const dir = await project();
+    writeFileSync(join(stateDir(dir), 'session.json'), '{pas du json');
+    expect((await cad(dir, 'session', 'close')).out).toContain('depuis 2026-09-28 00:00');
   });
 });
 

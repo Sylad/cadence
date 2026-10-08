@@ -414,15 +414,23 @@ URL. The agent then returns a draft for you to correct — it never writes the f
 cadence session start              # notes from the last close, lots in progress (silent ones flagged),
                                    # work done since yesterday by lot, drift, repo state, 3 proposals
 cadence session start --since "3 days ago" --idle 2
-cadence session close              # today's commits by lot, commits without a lot, lots in progress
-                                   # with no commit today, drift, uncommitted / unpushed work
-                                   # exit 1 while something is still open
+cadence session close              # commits by lot since the last `session start` (or last successful close),
+                                   # commits without a lot, lots in progress with no commit in that window,
+                                   # drift, uncommitted / unpushed work; exit 1 while something is still open
+cadence session close --since "2 days ago"   # --since overrides the window
 cadence session start --all        # from a folder that is not a repository: one "## project" section per
 cadence session close --all --depth 2   # sub-folder holding a plan (--depth n: n levels down, 1 by default);
                                    # exit = the worst code of the projects (2 error, 1 open, 0 closed)
 cadence session next "finish L3" "review L4"    # shown by the next session start; replaces the previous notes
 cadence session next --clear       # erase those notes, on purpose
 ```
+
+`session start` records its time in the worktree's state (`session.json`, under the git dir), and a
+`session close` that ends with `✓ prêt à fermer` records its own. The next close takes the later one
+as its window and names it in the section title: `Commits de la période (depuis l'ouverture de 09:12)`
+(`depuis la clôture de …`; with the date when it is not today). With no recorded time, or an unreadable
+file, the window is the current day, said as such (`depuis 2026-09-28 00:00`); `--since` is quoted as given.
+A refused close (exit 1) leaves the boundary alone.
 
 On success `cadence session next` prints what it recorded (`2 lignes enregistrées pour la prochaine
 ouverture`, then the lines as written, blank ones dropped), so `session-close` can report

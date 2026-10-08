@@ -43,6 +43,27 @@ export function clearNext(dir: string): Next | null {
   return previous;
 }
 
+export interface SessionMark {
+  kind: 'start' | 'close';
+  /** Instant ISO (UTC) de l'ouverture ou de la clôture. */
+  at: string;
+}
+
+/** Dernière ouverture ou clôture réussie du projet ; null si inconnue ou illisible (la clôture retombe alors sur le jour même). */
+export function readSessionMark(dir: string): SessionMark | null {
+  try {
+    const raw = JSON.parse(readFileSync(join(dir, 'session.json'), 'utf8'));
+    if ((raw.kind === 'start' || raw.kind === 'close') && typeof raw.at === 'string' && !Number.isNaN(Date.parse(raw.at))) return { kind: raw.kind, at: raw.at };
+  } catch {
+    // absent ou illisible : pas de borne connue
+  }
+  return null;
+}
+
+export function writeSessionMark(dir: string, mark: SessionMark): void {
+  writeFileSync(join(dir, 'session.json'), `${JSON.stringify(mark)}\n`);
+}
+
 export interface Lock {
   pid: number;
   sha: string;

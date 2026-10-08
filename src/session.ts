@@ -6,7 +6,7 @@ import { diffDays, maxDay, type Day } from './dates.js';
 import { repoStatus, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import type { Lot, Plan } from './plan.js';
-import { lockAlive, readLock, readNext } from './state.js';
+import { lockAlive, readLock, readNext, readSessionMark, writeSessionMark } from './state.js';
 
 export interface SessionCtx {
   plan: Plan;
@@ -17,6 +17,8 @@ export interface SessionCtx {
   /** État commun aux worktrees (verrou de livraison). */
   shared: string;
   today: Day;
+  /** Instant de la session (borne de la prochaine clôture) ; absent : rien n'est enregistré. */
+  now?: Date;
   out: (line: string) => void;
   /** Commande du projet (cadence.yaml : session.start / session.close) dont la sortie complète le rapport. */
   facts?: string;
@@ -98,6 +100,23 @@ export function lastActivity(lot: Lot, commits: Commit[]): Day | undefined {
   return days.length ? days.reduce(maxDay) : undefined;
 }
 
+const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+/**
+ * Fenêtre de la clôture : --since s'il est donné ; sinon depuis la dernière ouverture (ou clôture réussie) du
+ * projet, dite avec son heure ; sinon le jour même.
+ */
+function closeWindow(ctx: SessionCtx, since: string | undefined): { since: string; label: string } {
+  if (since !== undefined) return { since, label: `depuis ${since}` };
+  const mark = readSessionMark(ctx.state);
+  if (!mark) return { since: `${ctx.today} 00:00`, label: `depuis ${ctx.today} 00:00` };
+  const at = new Date(mark.at);
+  const what = mark.kind === 'start' ? "l'ouverture" : 'la clôture';
+  const sameDay = at.toDateString() === (ctx.now ?? new Date()).toDateString();
+  const when = sameDay ? `de ${hhmm(at)}` : `du ${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')} à ${hhmm(at)}`;
+  return { since: mark.at, label: `depuis ${what} ${when}` };
+}
+
 export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: number }): number {
   const { plan, out, today } = ctx;
   const lots = plan.lots();
@@ -144,19 +163,22 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
     'Propositions',
     proposals.map(({ l, why }, i) => `${i + 1}. ${l.quickwin ? '⚡ ' : ''}${l.id}  ${l.title} — ${why}`),
   );
+  // La clôture du soir part de cette heure : elle ne relit pas ce que l'ouverture vient de rapporter.
+  writeSessionMark(ctx.state, { kind: 'start', at: (ctx.now ?? new Date()).toISOString() });
   return 0;
 }
 
-export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
+export function sessionClose(ctx: SessionCtx, opts: { since?: string }): number {
   const { plan, out, today } = ctx;
   out(`${plan.project} — clôture du ${today}`);
 
-  const recent = period(ctx, opts.since);
+  const window = closeWindow(ctx, opts.since);
+  const recent = period(ctx, window.since);
   const commits = byLotLines(recent);
   if (recent.orphans.length) {
     commits.push(`${recent.orphans.length} commit(s) sans lot :`, ...recent.orphans.map((c) => `  ${short(c)}`));
   }
-  section(out, 'Commits de la période', commits.length ? commits : ['(aucun)']);
+  section(out, `Commits de la période (${window.label})`, commits.length ? commits : ['(aucun)']);
 
   const quiet = plan.lots().filter((l) => l.status === 'doing' && !isRecurring(l) && !recent.byLot.has(l.id));
   section(out, 'Lots en cours', quiet.map((l) => `${l.id}  ${l.title} — aucun commit sur la période : ${plan.readonly ? "le fermer ou l'annoter avec l'outil du projet" : 'raf done ou raf note'}`));
@@ -168,7 +190,7 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
   const lock = lockStatus(ctx.shared);
   section(out, 'Dépôt', [repo.line, ...(lock ? [lock.line] : [])]);
 
-  section(out, 'Faits propres au projet', projectFacts(ctx, opts.since));
+  section(out, 'Faits propres au projet', projectFacts(ctx, window.since));
 
   // Une proposition, pas une condition : rien n'est supprimé ici, le skill demande l'accord. Le
   // nettoyage ne change jamais le verdict et ne fait jamais tomber la clôture.
@@ -189,5 +211,7 @@ export function sessionClose(ctx: SessionCtx, opts: { since: string }): number {
 
   const open = issues.filter((i) => !i.warning).length + repo.open + (lock?.live ? 1 : 0);
   out(open === 0 ? '\n✓ prêt à fermer' : `\n✗ pas fermé : ${open} point(s)`);
+  // Seule une clôture réussie devient la borne : relancer la clôture après avoir réglé un point ne vide pas le rapport.
+  if (open === 0) writeSessionMark(ctx.state, { kind: 'close', at: (ctx.now ?? new Date()).toISOString() });
   return open === 0 ? 0 : 1;
 }

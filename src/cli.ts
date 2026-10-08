@@ -378,7 +378,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const sconf = rest[0] === 'start' || rest[0] === 'close' ? readSessionConfig(configPath) : {};
       const facts = rest[0] === 'start' || rest[0] === 'close' ? sconf[rest[0]] : undefined;
       const clean = rest[0] === 'close' && sconf.clean ? { patterns: sconf.clean, days: sconf.cleanDays } : undefined;
-      const sctx: SessionCtx = { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, out: io.out, facts, clean };
+      const sctx: SessionCtx = { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, now: io.now(), out: io.out, facts, clean };
       if (rest[0] !== 'start') return session(rest, sctx, values);
       // La reprise rejoue les vérifications d'effet (un essai, borné) : un effet rouge d'hier se lit avec les faits du matin.
       const effects = morningEffects(configPath, root);
@@ -704,7 +704,7 @@ function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: st
       return sessionStart(ctx, { since: values.since ?? '24 hours ago', idle });
     }
     case 'close':
-      return sessionClose(ctx, { since: values.since ?? `${ctx.today} 00:00` });
+      return sessionClose(ctx, { since: values.since });
     case 'next': {
       const lines = args.filter((l) => l.trim() !== '');
       if (values.clear) {

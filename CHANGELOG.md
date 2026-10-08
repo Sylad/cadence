@@ -33,6 +33,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 - `cadence session next "…"` no longer succeeds in silence: it prints `N lignes enregistrées pour la prochaine ouverture` and the lines as recorded, so `session-close` reports them without running `session start` again. (L129, #6)
+- `cadence session close` now covers the period since the project's last opening (`session start`) or last successful close, not the whole day or 24 h, and says so: `Commits de la période (depuis l'ouverture de 09:12)`. Lots already reported in the morning are no longer listed again. `--since` still takes precedence; with no known opening, the window stays the current day (`depuis 2026-09-28 00:00`). A close that leaves points open does not move the boundary, so rerunning it after a fix keeps the same report. (L130, #7)
 
 ## [0.17.0] - 2026-10-08
 

@@ -18,7 +18,7 @@ With no project named, run `cadence session close --all` from the parent folder,
 
 ## Steps
 
-1. Run `cadence session close` (over several days: `--since "2 days ago"`). Exit code 1 means
+1. Run `cadence session close` (the window runs from the last `session start` or successful close and is named in the "Commits de la période" title; over several days: `--since "2 days ago"`). Exit code 1 means
    *not closed*: something below is still open.
 2. **Plan hygiene**, lot by lot:
    - a `doing` lot with no commit in the period → `raf done <id>` if its tests are green,

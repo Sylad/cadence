@@ -34,7 +34,9 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
 
 Quand la fenêtre est étroite, la première ligne ne se replie pas : ses segments tombent par priorité jusqu'à tenir sur
 la largeur — d'abord les noms des agents, puis les heures de remise à zéro, puis la consommation par modèle, le coût,
-le compteur d'agents, et en dernier les fenêtres de quota ; le contexte reste toujours. La largeur se mesure en
+le compteur d'agents, et en dernier les fenêtres de quota ; le contexte reste toujours. Une fois la ligne tenue, les segments tombés qui
+entrent dans la place restante reviennent, du plus utile au moins utile : un gros segment (les modèles) qui ne tient
+pas ne prive donc pas la ligne des petits qui tiennent (les heures de remise à zéro). La largeur se mesure en
 cellules de terminal, au pire cas : `▰ ▱ ⚙ │ ↻` (largeur ambiguë) comptent pour 2, de sorte que la ligne tient aussi
 dans un terminal réglé en *ambiguous width = 2* — au prix de lâcher un segment un peu plus tôt dans un terminal en
 largeur 1. Ce sont les seuls caractères non ASCII de cette ligne : les séparateurs (` | `), les points de

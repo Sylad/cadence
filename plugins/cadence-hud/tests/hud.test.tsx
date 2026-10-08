@@ -233,6 +233,25 @@ test('les segments tombent par priorité jusqu’à tenir dans la largeur', () =
   expect(fitSegments(segs, 5).map(s => s.key)).toEqual(['ctx'])
 })
 
+test('fitSegments reprend les petits segments qui tiennent une fois le gros tombé (cas de la capture du 08-10)', () => {
+  const segs = [
+    { key: 'ctx', text: 'c'.repeat(30), drop: 0 },
+    { key: '5h', text: ' | 5h 12 %', drop: 1 },
+    { key: '5h-reset', text: ' r 1 h 10', drop: 5, requires: '5h' },
+    { key: 'usd', text: ' | $1.31', drop: 3 },
+    { key: 'models', text: ` | ${'m'.repeat(40)}`, drop: 4 },
+  ]
+  // tout = 30 + 10 + 9 + 8 + 43 = 100 ; sans modèles = 57 : à 70 cellules, les modèles ne tiennent pas mais le reste oui
+  expect(fitSegments(segs, 70).map(s => s.key)).toEqual(['ctx', '5h', '5h-reset', 'usd'])
+  // 50 : ni les modèles (43) ni la remise à zéro (9) ne rentrent dans les 2 cellules qui restent avec le coût
+  expect(fitSegments(segs, 50).map(s => s.key)).toEqual(['ctx', '5h', 'usd'])
+  // 57 : juste de quoi reprendre la remise à zéro (48 + 9), pas les modèles
+  expect(fitSegments(segs, 57).map(s => s.key)).toEqual(['ctx', '5h', '5h-reset', 'usd'])
+  // un segment qui `requires` un segment tombé ne revient pas seul
+  expect(fitSegments(segs, 35).map(s => s.key)).toEqual(['ctx'])
+  expect(fitSegments(segs, 41).map(s => s.key)).toEqual(['ctx', '5h'])
+})
+
 test('cells compte en pire cas les caractères de largeur ambiguë (▰▱⚙│↻) et les larges pour 2 cellules', () => {
   expect(cells('abc')).toBe(3)
   expect(cells('▰▰▱')).toBe(6)

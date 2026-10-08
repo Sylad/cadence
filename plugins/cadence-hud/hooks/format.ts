@@ -217,18 +217,32 @@ export const cells = (text: string): number => {
 
 /**
  * Garde les segments d'une ligne qui tiennent dans `width` cellules : tant que la somme des textes dépasse, le
- * segment au `drop` le plus haut tombe (0 = ne tombe jamais). Les textes sont mesurés par `cells`. Rend les segments gardés, dans leur ordre.
+ * segment au `drop` le plus haut tombe (0 = ne tombe jamais). Puis, une fois le compte bon, les segments tombés
+ * qui tiendraient dans la place restante reviennent, du plus utile (`drop` le plus bas) au moins utile : un gros
+ * segment tombé ne prive pas la ligne des petits qui entrent. Un segment qui `requires` la clé d'un autre ne
+ * revient que si celui-là est gardé. Les textes sont mesurés par `cells`. Rend les segments gardés, dans leur ordre.
  */
-export const fitSegments = <S extends { text: string; drop: number }>(segments: readonly S[], width: number): S[] => {
-  const kept = [...segments]
-  const length = () => kept.reduce((n, s) => n + cells(s.text), 0)
+export const fitSegments = <S extends { key?: string; text: string; drop: number; requires?: string }>(
+  segments: readonly S[],
+  width: number,
+): S[] => {
+  const kept = new Set(segments)
+  const length = () => [...kept].reduce((n, s) => n + cells(s.text), 0)
   while (length() > width) {
-    let idx = -1
-    kept.forEach((s, i) => {
-      if (s.drop > 0 && (idx === -1 || s.drop > kept[idx]!.drop)) idx = i
-    })
-    if (idx === -1) break
-    kept.splice(idx, 1)
+    let idx: S | undefined
+    for (const s of segments) if (kept.has(s) && s.drop > 0 && (!idx || s.drop > idx.drop)) idx = s
+    if (!idx) break
+    kept.delete(idx)
   }
-  return kept
+  let free = width - length()
+  const dropped = segments.filter(s => !kept.has(s)).sort((a, b) => a.drop - b.drop)
+  for (const s of dropped) {
+    const needed = cells(s.text)
+    const parent = s.requires === undefined || segments.some(o => kept.has(o) && o.key === s.requires)
+    if (parent && needed <= free) {
+      kept.add(s)
+      free -= needed
+    }
+  }
+  return segments.filter(s => kept.has(s))
 }

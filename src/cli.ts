@@ -8,7 +8,7 @@ import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
-import { gitRoot, readCommits, resolveCommit, stage, stagedFiles } from './git.js';
+import { gitRoot, readCommits, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
@@ -360,7 +360,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         io.out(changed ? `hook installé : ${path}` : `hook déjà présent : ${path}`);
         return 0;
       }
-      if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io);
+      if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io, readHookConfig(configPath).autostart);
       if (rest[0] === 'pre-commit') return preCommit(existsSync(planPath) ? loadPlan : null, readHookConfig(configPath).autostart, root, today, io);
       throw new RafError('usage : raf hook install|pre-commit|post-commit');
     }
@@ -534,10 +534,11 @@ function preCommit(load: (() => Plan) | null, mode: 'warn' | 'refuse' | 'start' 
   return 0;
 }
 
-function postCommit(load: (() => Plan) | null, newsDir: string, root: string, today: Day, io: Io): number {
+function postCommit(load: (() => Plan) | null, newsDir: string, root: string, today: Day, io: Io, mode?: 'warn' | 'refuse' | 'start'): number {
   if (!load) return 0;
   try {
     const plan = load();
+    if (mode === 'start' && !plan.readonly) syncIndexWithHead(root, relative(root, plan.path));
     const head = readCommits(root, { range: '-1' })[0];
     if (!head) return 0;
     const refs = citedRefs(head, plan.refs);

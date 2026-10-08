@@ -167,6 +167,22 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     }
   });
 
+  it('start : un commit partiel (chemins en argument) laisse l\'index réel et le plan propres', () => {
+    const { dir, env } = project('start');
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    git(dir, 'add', 'a.txt');
+    const r = spawnSync('git', ['commit', '-qm', 'feat(L1): a', 'a.txt'], { cwd: dir, env, encoding: 'utf8' });
+    expect(r.status).toBe(0);
+    expect(git(dir, 'status', '--porcelain').stdout).toBe('');
+    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toBe(planText(dir));
+    // Le commit suivant ne remet pas le lot à todo.
+    writeFileSync(join(dir, 'b.txt'), 'b');
+    git(dir, 'add', 'b.txt');
+    expect(spawnSync('git', ['commit', '-qm', 'feat(L2): b'], { cwd: dir, env, encoding: 'utf8' }).status).toBe(0);
+    expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.trim()).toBe('b.txt');
+    expect(raf(dir, 'show', 'L1').out).toContain('doing');
+  });
+
   it('plan en lecture seule : refuse ne propose pas raf start, start ne démarre rien', () => {
     for (const mode of ['refuse', 'start']) {
       const { dir, env } = project(mode);

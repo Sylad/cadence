@@ -64,6 +64,23 @@ export function stage(cwd: string, file: string): void {
   git(cwd, ['add', '--', file]);
 }
 
+/**
+ * Aligne l'index sur HEAD pour `file` quand le fichier de travail est déjà celui de HEAD : un commit partiel
+ * (`git commit <chemins>`) ne recopie dans l'index réel que ces chemins, et y laisse l'ancienne version du fichier
+ * stagé par un pre-commit. Sans effet si le fichier a d'autres modifications.
+ */
+export function syncIndexWithHead(cwd: string, file: string): void {
+  const same = (args: string[]) => {
+    try {
+      git(cwd, ['diff', '--quiet', ...args, '--', file]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (same(['HEAD']) && !same(['--cached'])) stage(cwd, file);
+}
+
 /** Fichiers modifiés par un commit, relatifs à la racine du dépôt (noms accentués ou à espaces compris). */
 export function changedFiles(cwd: string, sha: string): string[] {
   // -z : noms séparés par NUL, jamais échappés ; quotepath=off en plus pour les sorties qui citeraient quand même.

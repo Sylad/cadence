@@ -962,9 +962,9 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 A band above the Claude Code prompt (terminal and desktop app), refreshed every 5 s:
 
 ```
-ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │  7j  61 % ↻ 6 j 15 h  │  $1.23  │  fable 410k $0.95 · sonnet 85k $0.12  │  ⚙ 2 agents
+ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │  7j  61 % ↻ 6 j 15 h  │  $1.23  │  fable 410k $0.95 | sonnet 85k $0.12  │  ⚙ 2 agents
 ⟳ cadence · 2026-10-07-2131 en cours  │  budget ▱▱▱▱▱▱▱▱▱▱   1 % 14k/2M  │  1 session/2
-  L112  implémente  implement@sonnet 34 s         global-setup coupe le cache de compilation de Node…
+  L112  implémente  implement@sonnet 34 s         global-setup coupe le cache de compilation de Node...
 ```
 
 Context of the session (green / orange / red at 50 and 75 %), the 5-hour and 7-day quota

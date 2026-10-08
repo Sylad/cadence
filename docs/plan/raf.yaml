@@ -804,13 +804,16 @@ lots:
     finished: 2026-10-07
   - id: L62
     title: "orchestrate : un lot dont le travail est dans un dépôt voisin non cadence (ex. B64 dans aetherwx-gitops) — clé de lot ou de projet listant les dépôts de travail ; commits et revue lus dans ces dépôts"
-    status: doing
+    status: done
     estimate: 1.5
     created: 2026-10-05
     notes:
       - { date: 2026-10-08, text: "décisions du lead (08-10), à suivre telles quelles : 1) clé de LOT `repos:` (liste de chemins relatifs au dossier du projet, ex. [../aetherwx-gitops]), pas de clé de projet — un dépôt voisin est propre à un lot ; un plan en lecture seule la déclare par fields.repos dans cadence.yaml. 2) Préconditions : chaque dépôt listé existe, est un dépôt git, a ses fichiers suivis propres — sinon refus avant d'agir, comme pour le dépôt du projet. 3) Verrou de la vague étendu à ces dépôts (jamais deux sessions dans un même dépôt, cadence deliver y refuse aussi). 4) Les sessions du lot reçoivent chaque dépôt en --add-dir ; le brief d'implémentation les nomme et exige que les commits y citent l'id du lot. 5) Revue : raf commits <lot> et le relecteur lisent les commits citant le lot dans le dépôt du projet ET dans les dépôts listés ; le verdict raf review enregistre le sha lu de chaque dépôt (projet + voisins). 6) Hors périmètre : raf check n'audite pas les dépôts voisins, leur livraison reste au lead. 7) README et CHANGELOG dans le même lot, tests pour chaque point." }
       - { date: 2026-10-08, text: "décision du lead (08-10, après 3e revue) : plus AUCUNE inférence du caractère partagé d'un voisin (ni préfixe, ni portée, ni mot du projet). Règle par défaut dans un voisin : un commit compte s'il cite l'id du lot et tombe dans la période started..finished du lot, point. Pour un voisin partagé entre projets (developpeur-gitops), la clé devient explicite : repos: [../x] ou repos: [{ path: ../developpeur-gitops, cite: ol-companion }] — avec cite, le commit doit en plus contenir cette chaîne (sous-chaîne, insensible à la casse) ; fields.repos d'un plan en lecture seule accepte les deux formes. subjectProject disparaît. Tests : les 3 commits du cas aetherwx-gitops (fix(B1) sans aetherwx, couche aetherwx:graticule_10, bump « maritime: frontend sha (B1) ») tous listés ; le cas developpeur-gitops avec cite n'écarte que les commits des autres apps. README + CHANGELOG alignés." }
+      - { date: 2026-10-08, text: "mineur (4e revue) : un voisin déclaré deux fois garde le premier cite sans rien dire et raf commits affiche deux fois la section (repos.ts:35 et :69) — note du lot, pas de sous-tâche" }
     started: 2026-10-08
+    review: { date: 2026-10-08, verdict: "conforme (4e revue, code-reviewer Opus 08-10, sha b591f75) — bloquant de la 3e revue réglé et mesuré : les 3 commits du cas aetherwx-gitops listés, cite: n'écarte que les commits d'autres apps ; plus de subjectProject ; README/CHANGELOG conformes au code ; typecheck, build tsc, 1032 tests verts (relancés par le lead). 1 mineur en note. Non vérifié : vague orchestrate réelle avec un voisin cite:.", commit: b591f750ff3e599462c8796a9604da3b9e7a11b2 }
+    finished: 2026-10-08
   - id: L63
     title: Publier 0.10.0 (L53 revue directe, L54 sha attendu par verify, L55, L56 fix sans commit → revue, L57 questions mineures)
     status: done

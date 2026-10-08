@@ -255,6 +255,28 @@ test('fitSegments reprend les petits segments qui tiennent une fois le gros tomb
   expect(fitSegments(segs, 41).map(s => s.key)).toEqual(['ctx', '5h'])
 })
 
+test('fitSegments reprend la remise à zéro avant les modèles quand une seule place reste', () => {
+  const segs = [
+    { key: 'ctx', text: 'c'.repeat(39), drop: 0 },
+    { key: '5h', text: 'f'.repeat(14), drop: 1 },
+    { key: '5h-reset', text: 'r'.repeat(10), drop: 5, back: 3, requires: '5h' },
+    { key: 'models', text: 'm'.repeat(15), drop: 4 },
+    { key: 'agents', text: 'a'.repeat(16), drop: 2 },
+  ]
+  // 94 en tout ; à 68, heures, modèles et compteur tombent et il reste 15 cellules : la remise à zéro (10) passe avant les modèles (15)
+  expect(fitSegments(segs, 68).map(s => s.key)).toEqual(['ctx', '5h', '5h-reset'])
+})
+
+test('fitSegments ne reprend pas une heure dont la fenêtre de quota est tombée', () => {
+  const segs = [
+    { key: 'ctx', text: 'c'.repeat(39), drop: 0 },
+    { key: '7d', text: 'f'.repeat(14), drop: 1 },
+    { key: '7d-reset', text: 'r'.repeat(10), drop: 5, requires: '7d' },
+  ]
+  // 63 en tout ; à 52, la remise à zéro puis 7j tombent (39), il reste 13 : l'heure (10) tiendrait mais sans sa fenêtre elle ne revient pas
+  expect(fitSegments(segs, 52).map(s => s.key)).toEqual(['ctx'])
+})
+
 test('cells compte en pire cas les caractères de largeur ambiguë (▰▱⚙│↻) et les larges pour 2 cellules', () => {
   expect(cells('abc')).toBe(3)
   expect(cells('▰▰▱')).toBe(6)

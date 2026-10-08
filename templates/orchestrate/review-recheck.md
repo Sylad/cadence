@@ -4,6 +4,7 @@ treated them. Check that the minor findings fixed are fixed, that the fixes brok
 rest of the lot is still sound: read the diff yourself from the commits that cite the lot
 (`raf commits {{lot}}`, or `git log`), run the checks, report real defects only. A new minor finding
 is reported, not a reason to ask for another pass. This is a code review only.
+{{repos}}
 {{checks}}
 {{choix}}
 A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.

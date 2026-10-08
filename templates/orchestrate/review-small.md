@@ -2,6 +2,7 @@ Review lot `{{lot}}` — "{{titre}}" — of the repository `{{chemin}}`, followi
 This lot is small: one single pass covers the code review AND the usability review.
 You are given the repository path and the lot id only: read the diff yourself from the commits that
 cite the lot (`raf commits {{lot}}`, or `git log`), run the checks, report real defects only.
+{{repos}}
 {{ux}}
 {{checks}}
 {{choix}}

@@ -1,6 +1,7 @@
 Review lot `{{lot}}` — "{{titre}}" — of the repository `{{chemin}}`, following your agent instructions.
 You are given the repository path and the lot id only: read the diff yourself from the commits that
 cite the lot (`raf commits {{lot}}`, or `git log`), run the checks, report real defects only.
+{{repos}}
 {{checks}}
 {{choix}}
 A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.

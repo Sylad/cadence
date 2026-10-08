@@ -1,5 +1,6 @@
 Work in `{{chemin}}` on lot `{{lot}}` — "{{titre}}" — of its plan. A fresh review of the commits
 of this lot found the defects below; fix them, and nothing else.
+{{repos}}
 Commits of the lot so far:
 {{commits}}
 

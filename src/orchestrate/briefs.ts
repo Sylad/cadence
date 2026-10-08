@@ -24,6 +24,26 @@ export interface BriefVars {
   news: string;
   /** Dossier de sortie Playwright de la vague (fix et fix-minors d'un lot `visible`, pour retrouver une capture) ; vide sinon. */
   captures: string;
+  /** Dépôts voisins du lot (clé de lot `repos:`, L62) : `reposText(kind, …)` ; absent ou vide pour un lot du dépôt du projet seul. */
+  repos?: string;
+}
+
+/** Consigne sur les dépôts voisins d'un lot (L62) : les sessions d'écriture y travaillent, les relectures y lisent les commits qui citent le lot. */
+export function reposText(role: 'write' | 'read', lot: string, repos: { rel: string; path: string }[]): string {
+  if (!repos.length) return '';
+  const list = repos.map((r) => `- \`${r.rel}\` (${r.path})`);
+  if (role === 'write') {
+    return [
+      "The work of this lot is not only in the project's repository: it also lives in these neighbouring repositories, which are not cadence projects and are added to your directories:",
+      ...list,
+      `Work there as you do in the project's repository: test first, explicit paths, and every commit there cites the lot too (\`feat(${lot}): …\`) — the program and the review find the lot's work by those commits. Never push from any of them. Where the lot touches one, run that repository's own checks; leave it with no tracked file modified.`,
+    ].join('\n');
+  }
+  return [
+    'The work of this lot is also in these neighbouring repositories (not cadence projects); the commits that cite the lot live there as well as in the project:',
+    ...list,
+    `\`raf commits ${lot}\` lists them all; read the diff of the neighbouring ones with \`git -C <path> log\` / \`git -C <path> show\` (${repos.map((r) => `git -C ${r.path} log`).join(' ; ')}), and review them like the rest. You are read-only there too.`,
+  ].join('\n');
 }
 
 /** Consigne d'implémentation d'un lot `visible` : son entrée Nouveautés (convention de `cadence news`, voir le README). */
@@ -80,7 +100,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = (vars as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '' } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

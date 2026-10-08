@@ -8,16 +8,17 @@ import type { OrchestrateConfig } from '../config.js';
 import type { Day } from '../dates.js';
 import { readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
+import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
-import { capturesText, newsText, objective, renderBrief, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { capturesText, newsText, objective, renderBrief, reposText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type PrecheckReport, type ReviewReport, type WorkReport } from './schemas.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
-import { lotKey } from './state.js';
+import { lotKey, neighbourDirs } from './state.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
 export const MAX_PASSES = 2;
@@ -182,7 +183,14 @@ async function startLot(c: LotCtx): Promise<string | null> {
 
 function lotCommitLines(c: LotCtx): string {
   const plan = c.loadPlan();
-  return lotWork(plan, c.lot.repo, c.lot.lot).reverse().map((k) => `- ${short(k)}`).join('\n');
+  const mine = lotWork(plan, c.lot.repo, c.lot.lot).reverse().map((k) => `- ${short(k)}`);
+  const theirs = (c.lot.repos ?? []).flatMap((r) => repoWork(plan, r, c.lot.lot).reverse().map((k) => `- [${r.rel}] ${short(k)}`));
+  return [...mine, ...theirs].join('\n');
+}
+
+/** Le lot a déjà du travail (commits citant le lot) dans son dépôt ou dans un dépôt voisin. */
+function hasWork(plan: Plan, l: Pick<LotState, 'repo' | 'repos' | 'lot'>): boolean {
+  return lotWork(plan, l.repo, l.lot).length > 0 || (l.repos ?? []).some((r) => repoWork(plan, r, l.lot).length > 0);
 }
 
 function constatLines(constats: Constat[]): string {
@@ -234,7 +242,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
-  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', news: '', captures: '' };
+  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', news: '', captures: '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []) };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = newsText(l.lot, pwDir);
@@ -257,7 +265,10 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   return renderBrief(briefName(l, kind), vars, c.wave.templates);
 }
 
-type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot };
+/** Les dépôts voisins du lot, vus avant et après une session. */
+type Others = { repo: LotRepo; before: Snapshot; after: Snapshot }[];
+
+type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot; others: Others };
 
 /** Tokens comptés par les sessions d'un lot (un lot repris compte ses étapes d'avant). */
 export const lotSpent = (l: LotState): number => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
@@ -290,6 +301,8 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const write = kind === 'implement' || kind === 'fix';
   const model: Model = write ? l.model : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const before = await snapshot(l.repo);
+  const neighbours = l.repos ?? [];
+  const beforeOthers = await Promise.all(neighbours.map((r) => snapshot(r.path)));
   const n = l.steps.length + 1;
   const sessionId = randomUUID();
   const step: StepState = { n, kind, model, status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
@@ -321,7 +334,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       cwd: l.repo,
       wave: w.id,
       permissionMode: c.config.permissionMode,
-      addDirs: playwright && write ? [...c.config.addDirs, playwrightDir(dirname(mcpConfig))] : c.config.addDirs,
+      addDirs: [...c.config.addDirs, ...(playwright && write ? [playwrightDir(dirname(mcpConfig))] : []), ...neighbourDirs(l)],
       nodeBin: l.node?.link,
       toolBin: toolBinOf(w.store.dir),
       mcpConfig,
@@ -387,31 +400,37 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   if (w.claudeHome) step.peakContext = peakContext(w.claudeHome, l.repo, res.sessionId);
 
   const after = await snapshot(l.repo);
+  const afterOthers = await Promise.all(neighbours.map((r) => snapshot(r.path)));
+  const others: Others = neighbours.map((repo, i) => ({ repo, before: beforeOthers[i], after: afterOthers[i] }));
   step.headAfter = after.head ?? undefined;
-  if (pushed(before, after)) {
-    step.status = 'failed';
-    step.cause = 'push détecté';
-    w.incident = `push détecté pendant ${lotKey(l.project, l.lot)} (${kind})`;
-    w.saveWave();
-    return stop(c, 'failed', `incident : ${w.incident}`);
-  }
-  if (before.guard && !after.guard) {
-    step.status = 'failed';
-    step.cause = 'le hook pre-push de garde a disparu';
-    w.incident = `le hook pre-push de garde a été supprimé pendant ${lotKey(l.project, l.lot)} (${kind})`;
-    w.saveWave();
-    return stop(c, 'failed', `incident : ${w.incident}`);
-  }
-  if (!write && (before.head !== after.head || before.tracked.join() !== after.tracked.join() || before.untracked.join() !== after.untracked.join())) {
-    step.status = 'failed';
-    step.cause = 'le dépôt a changé pendant une revue';
-    w.incident = `${kind} de ${lotKey(l.project, l.lot)} a modifié le dépôt`;
-    w.saveWave();
-    return stop(c, 'failed', `incident : ${w.incident}`);
+  // Le dépôt du projet d'abord, puis chaque voisin : mêmes contrôles, l'incident nomme le dépôt voisin.
+  const watched = [{ where: '', before, after }, ...others.map((o) => ({ where: ` dans ${o.repo.rel}`, before: o.before, after: o.after }))];
+  for (const { where, before: b, after: a } of watched) {
+    if (pushed(b, a)) {
+      step.status = 'failed';
+      step.cause = `push détecté${where}`;
+      w.incident = `push détecté${where} pendant ${lotKey(l.project, l.lot)} (${kind})`;
+      w.saveWave();
+      return stop(c, 'failed', `incident : ${w.incident}`);
+    }
+    if (b.guard && !a.guard) {
+      step.status = 'failed';
+      step.cause = `le hook pre-push de garde a disparu${where}`;
+      w.incident = `le hook pre-push de garde a été supprimé${where} pendant ${lotKey(l.project, l.lot)} (${kind})`;
+      w.saveWave();
+      return stop(c, 'failed', `incident : ${w.incident}`);
+    }
+    if (!write && (b.head !== a.head || b.tracked.join() !== a.tracked.join() || b.untracked.join() !== a.untracked.join())) {
+      step.status = 'failed';
+      step.cause = `le dépôt${where} a changé pendant une revue`;
+      w.incident = `${kind} de ${lotKey(l.project, l.lot)} a modifié le dépôt${where}`;
+      w.saveWave();
+      return stop(c, 'failed', `incident : ${w.incident}`);
+    }
   }
   step.status = 'ok';
   save(c);
-  return { step, report: res.structured, before, after };
+  return { step, report: res.structured, before, after, others };
 }
 
 /** Budget du lot atteint avant une session : le lot est rendu au lead (reprendre ne lui rendrait pas de budget), les autres continuent. */
@@ -427,12 +446,12 @@ function suspend(c: LotCtx, why: string): null {
   return null;
 }
 
-function summarize(rep: ReviewReport, head: string): ReviewSummary {
+function summarize(rep: ReviewReport, head: string, repoHeads?: Record<string, string>): ReviewSummary {
   // Rien d'un rapport n'est cru sur parole : un constat de gravité majeure compte même si les totaux annoncés disent 0.
   const count = (g: string) => rep.constats.filter((k) => k.gravite === g).length;
   const bloquants = Math.max(rep.bloquants, count('bloquant'));
   const majeurs = Math.max(rep.majeurs, count('majeur'));
-  return { conforme: bloquants === 0 && majeurs === 0, bloquants, majeurs, mineurs: Math.max(rep.mineurs, count('mineur')), verdict: rep.verdict.trim(), sousTaches: rep.sousTaches, nonVerifie: rep.nonVerifie, head };
+  return { conforme: bloquants === 0 && majeurs === 0, bloquants, majeurs, mineurs: Math.max(rep.mineurs, count('mineur')), verdict: rep.verdict.trim(), sousTaches: rep.sousTaches, nonVerifie: rep.nonVerifie, head, ...(repoHeads ? { repoHeads } : {}) };
 }
 
 function propose(c: LotCtx, text: string): void {
@@ -463,8 +482,8 @@ function badReport(c: LotCtx, step: StepState, e: unknown): null {
 }
 
 /** Le contrôle préalable ne vaut que pour un lot sans commit : avec des commits, l'implémentation reprend légitimement. */
-export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: string, lot: string): boolean {
-  return config.precheck && lotWork(plan, repo, lot).length === 0;
+export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: string, lot: string, repos: LotRepo[] = []): boolean {
+  return config.precheck && !hasWork(plan, { repo, repos, lot });
 }
 
 /**
@@ -518,9 +537,12 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const plan = c.loadPlan();
   const range = done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined;
   const commits: Commit[] = readCommits(l.repo, { range });
-  done.step.commits = commits.map(short).reverse();
+  // Commits de la session dans chaque dépôt voisin (L62) : de la tête d'avant la session à la tête d'après.
+  const theirs = done.others.map((o) => ({ repo: o.repo, commits: o.before.head ? readCommits(o.repo.path, { range: `${o.before.head}..HEAD` }) : [] }));
+  const made = commits.length + theirs.reduce((n, t) => n + t.commits.length, 0);
+  done.step.commits = [...commits.map(short).reverse(), ...theirs.flatMap((t) => t.commits.map((k) => `[${t.repo.rel}] ${short(k)}`).reverse())];
   // La liste de git fait foi ; l'écart avec celle du rapport est signalé.
-  const real = new Set(commits.map((k) => k.sha));
+  const real = new Set([...commits, ...theirs.flatMap((t) => t.commits)].map((k) => k.sha));
   for (const a of rep.commits) {
     if ([...real].some((s) => s.startsWith(a.sha) || a.sha.startsWith(s.slice(0, 7)))) continue;
     // Reprise : le rapport cite aussi les commits d'une session précédente du lot, hors de la plage de celle-ci.
@@ -531,6 +553,9 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   for (const k of commits) {
     if (isPlanOnly(k.sha, plan, l.repo)) continue;
     if (!citedRefs(k, plan.refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} : ${short(k)}`);
+  }
+  for (const t of theirs) {
+    for (const k of t.commits) if (!citedRefs(k, plan.refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} dans ${t.repo.rel} : ${short(k)}`);
   }
   save(c);
 
@@ -548,7 +573,11 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     transition(c, 'question', questions[0]);
     return;
   }
-  const dirt = [...trackedPaths(done.after), ...done.after.untracked.filter((f) => !done.before.untracked.includes(f))];
+  const dirt = [
+    ...trackedPaths(done.after),
+    ...done.after.untracked.filter((f) => !done.before.untracked.includes(f)),
+    ...done.others.flatMap((o) => [...trackedPaths(o.after), ...o.after.untracked.filter((f) => !o.before.untracked.includes(f))].map((f) => `${o.repo.rel}: ${f}`)),
+  ];
   if (dirt.length) {
     stop(c, 'handed-back', `dépôt sale après ${kind} : ${dirt.join(', ')}`);
     return;
@@ -560,8 +589,8 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     if (s.kind !== 'fix' || s.status !== 'interrupted') break;
     resumedFrom = s.headBefore;
   }
-  const headMoved = kind === 'fix' && commits.length === 0 && !!resumedFrom && git(l.repo, 'rev-parse', 'HEAD') !== resumedFrom;
-  if (minorsPass && commits.length === 0 && !headMoved) {
+  const headMoved = kind === 'fix' && made === 0 && !!resumedFrom && git(l.repo, 'rev-parse', 'HEAD') !== resumedFrom;
+  if (minorsPass && made === 0 && !headMoved) {
     // Rien à corriger (mineurs jugés faux, listés en « choix ») : la revue conforme d'origine vaut, HEAD n'a pas bougé.
     for (const k of l.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine('code', k));
     l.constats = [];
@@ -572,13 +601,13 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   // La session peut n'avoir plus rien à commiter (réponse du lead, lot commité avant la vague) : le travail du lot est déjà dans git.
   // Même règle côté fix (L56) : la passe n'avait rien à ajouter, le lot a déjà ses commits de travail → revue neuve ; la passe reste consommée, MAX_PASSES borne la boucle.
-  const alreadyDone = lotWork(plan, l.repo, l.lot).length > 0;
-  if (commits.length === 0 && !alreadyDone && !headMoved) {
+  const alreadyDone = hasWork(plan, l);
+  if (made === 0 && !alreadyDone && !headMoved) {
     stop(c, 'handed-back', `${kind} sans commit`);
     return;
   }
   if (headMoved) l.warnings.push(`${minorsPass ? 'passe des mineurs' : 'correction'} reprise sans nouveau commit : un commit d'une session précédente est relu par la revue`);
-  else if (commits.length === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
+  else if (made === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
   const red: Constat[] = [];
   if (!rep.tests.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` });
@@ -697,7 +726,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     badReport(c, done.step, e);
     return;
   }
-  const summary = summarize(rep, done.after.head ?? '');
+  const summary = summarize(rep, done.after.head ?? '', done.others.length ? Object.fromEntries(done.others.map((o) => [o.repo.rel, o.after.head ?? ''])) : undefined);
   if (kind === 'ux') {
     l.ux = summary;
     addProposals(c, rep, 'ux');
@@ -765,16 +794,23 @@ function uxConstatsKept(c: LotCtx): Constat[] {
 async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise<void> {
   const l = c.lot;
   const plan = c.loadPlan();
-  const verdict = `${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction${l.minorPass ? ` + passe des mineurs${minorNote}` : ''})`;
+  // Dépôts voisins du lot (L62) : le sha lu de chacun est enregistré avec le verdict, et dit dans son texte (un plan en lecture seule n'a que le texte).
+  const neighbours = l.repos ?? [];
+  const shas = repoShas(plan, neighbours, l.lot);
+  const read = neighbours.length ? ` ; dépôts relus : ${neighbours.map((r) => `${r.rel}@${shas[r.rel]?.slice(0, 7) ?? 'aucun commit du lot'}`).join(', ')}` : '';
+  const verdict = `${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction${l.minorPass ? ` + passe des mineurs${minorNote}` : ''}${read})`;
   l.verdict = verdict;
   const newer = lotWork(plan, l.repo, l.lot)[0]?.sha ?? null;
-  if (code.head && newer !== null && git(l.repo, 'rev-parse', 'HEAD') !== code.head) {
-    stop(c, 'handed-back', 'un commit est postérieur à la revue : verdict non enregistré');
+  const moved = (code.head && newer !== null && git(l.repo, 'rev-parse', 'HEAD') !== code.head ? [''] : []).concat(
+    neighbours.filter((r) => shas[r.rel] !== null && code.repoHeads?.[r.rel] && git(r.path, 'rev-parse', 'HEAD') !== code.repoHeads[r.rel]).map((r) => ` dans ${r.rel}`),
+  );
+  if (moved.length) {
+    stop(c, 'handed-back', `un commit est postérieur à la revue${moved.join(',')} : verdict non enregistré`);
     return;
   }
   l.constats = [];
   if (!plan.readonly) {
-    plan.recordReview(l.lot, verdict, c.wave.today, newer);
+    plan.recordReview(l.lot, verdict, c.wave.today, newer, neighbours.length ? shas : undefined);
     plan.save();
     const dirty = await commitPlan(c, `plan: ${l.lot} revue de code enregistrée (orchestrate ${c.wave.id})`);
     if (dirty) {
@@ -842,7 +878,7 @@ export async function runLot(c: LotCtx): Promise<void> {
         return;
       }
       l.startedSha = (await snapshot(l.repo, { remote: false })).head ?? undefined;
-      l.next = needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot) ? 'precheck' : 'implement';
+      l.next = needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos) ? 'precheck' : 'implement';
       save(c);
     }
     while (l.next && !TERMINAL.has(l.status)) {

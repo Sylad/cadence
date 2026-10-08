@@ -63,6 +63,8 @@ export interface ReviewSummary {
   nonVerifie: string[];
   /** HEAD que la revue a lu. */
   head: string;
+  /** HEAD lu de chaque dépôt voisin du lot (L62), sous le chemin déclaré ; absent sans dépôt voisin. */
+  repoHeads?: Record<string, string>;
 }
 
 export interface LotState {

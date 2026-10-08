@@ -301,7 +301,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted}${skipped})`);
     }
     const steps: { kind: 'precheck' | 'implement' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: 'implement', model: l.model }];
-    if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot)) steps.unshift({ kind: 'precheck', model: 'sonnet' });
+    if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos)) steps.unshift({ kind: 'precheck', model: 'sonnet' });
     const { light, full } = env.config.review;
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
     else {

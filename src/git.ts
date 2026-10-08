@@ -1,6 +1,4 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 
 export interface Commit {
@@ -66,42 +64,14 @@ export function stage(cwd: string, file: string): void {
   git(cwd, ['add', '--', file]);
 }
 
-/** Le fichier de travail diffère-t-il de l'index (modifications non stagées) ? */
-export function hasUnstagedChanges(cwd: string, file: string): boolean {
+/** Le fichier de travail est-il identique à sa version de HEAD (ni modification stagée, ni non stagée) ? Faux s'il n'est pas dans HEAD. */
+export function matchesHead(cwd: string, file: string): boolean {
   try {
-    git(cwd, ['diff', '--quiet', '--', file]);
-    return false;
-  } catch {
-    return true;
-  }
-}
-
-/**
- * Met dans l'index le seul passage de `before` à `after` pour `file`, sans les autres modifications non stagées du
- * fichier de travail. Faux (index inchangé) si le correctif ne s'applique pas à l'index.
- */
-export function stageChange(cwd: string, file: string, before: string, after: string): boolean {
-  const tmp = mkdtempSync(join(tmpdir(), 'raf-stage-'));
-  try {
-    writeFileSync(join(tmp, 'a'), before);
-    writeFileSync(join(tmp, 'b'), after);
-    let patch = '';
-    try {
-      git(tmp, ['diff', '--no-index', '--no-color', '--', 'a', 'b']);
-    } catch (e) {
-      patch = String((e as { stdout?: string }).stdout ?? '');
-    }
-    patch = patch.replace(/^(diff --git |--- |\+\+\+ )(.*)$/gm, (_m, head: string) =>
-      head === 'diff --git ' ? `${head}a/${file} b/${file}` : `${head}${head === '--- ' ? 'a' : 'b'}/${file}`,
-    );
-    if (!patch) return false;
-    writeFileSync(join(tmp, 'p.diff'), patch);
-    git(cwd, ['apply', '--cached', join(tmp, 'p.diff')]);
+    git(cwd, ['cat-file', '-e', `HEAD:${file}`]);
+    git(cwd, ['diff', '--quiet', 'HEAD', '--', file]);
     return true;
   } catch {
     return false;
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
   }
 }
 

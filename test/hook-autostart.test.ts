@@ -183,17 +183,51 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     expect(raf(dir, 'show', 'L1').out).toContain('doing');
   });
 
-  it('start : un plan déjà modifié et non stagé ne part pas dans le commit de code', () => {
+  it('start : un plan déjà modifié (non stagé) n\'est pas démarré : message, avertissement, plan intact', () => {
     const { dir, env } = project('start');
     raf(dir, 'add', 'C');
+    const modified = planText(dir);
     const r = work(dir, env, 'feat(L1): a');
     expect(r.status).toBe(0);
-    const inHead = git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout;
-    expect(inHead).not.toContain('title: C');
-    expect(inHead).toMatch(/id: L1[\s\S]*?status: doing/);
-    // Le lot C reste dans le fichier de travail, non stagé.
-    expect(planText(dir)).toContain('title: C');
+    expect(r.stderr).toContain('plan modifié non commité : démarrage automatique sauté');
+    expect(r.stderr).toContain('raf start L1');
+    expect(r.stderr).toContain('L1 est encore todo');
+    expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.trim()).toBe('src.txt');
+    // Le plan modifié reste tel quel, non stagé, et L1 n'est pas passé à doing.
+    expect(planText(dir)).toBe(modified);
+    expect(raf(dir, 'show', 'L1').out).toContain('todo');
     expect(git(dir, 'diff', '--cached', '--name-only').stdout).toBe('');
+  });
+
+  it('start : un plan modifié et stagé n\'est pas démarré non plus', () => {
+    const { dir, env } = project('start');
+    raf(dir, 'add', 'C');
+    git(dir, 'add', 'docs/plan/raf.yaml');
+    const r = work(dir, env, 'feat(L1): a');
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('démarrage automatique sauté');
+    expect(raf(dir, 'show', 'L1').out).toContain('todo');
+  });
+
+  it('start : plan modifié non stagé + commit partiel — rien n\'est démarré, le commit suivant ne remet rien à todo', () => {
+    const { dir, env } = project('start');
+    raf(dir, 'add', 'C');
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    git(dir, 'add', 'a.txt');
+    const r = spawnSync('git', ['commit', '-qm', 'feat(L1): a', 'a.txt'], { cwd: dir, env, encoding: 'utf8' });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('plan modifié non commité : démarrage automatique sauté');
+    expect(r.stderr).toContain('L1 est encore todo');
+    expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.trim()).toBe('a.txt');
+    // Pas de « MM » : l'index ne porte pas de plan différent de celui de l'arbre de travail.
+    expect(git(dir, 'status', '--porcelain').stdout.trim()).toBe('M docs/plan/raf.yaml');
+    writeFileSync(join(dir, 'b.txt'), 'b');
+    git(dir, 'add', 'b.txt');
+    expect(spawnSync('git', ['commit', '-qm', 'feat(L2): b'], { cwd: dir, env, encoding: 'utf8' }).status).toBe(0);
+    expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.trim()).toBe('b.txt');
+    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toMatch(/id: L1\n\s+title: A\n\s+status: todo/);
+    expect(raf(dir, 'show', 'L1').out).toContain('todo');
+    expect(raf(dir, 'show', 'L2').out).toContain('doing');
   });
 
   it('plan en lecture seule : refuse ne propose pas raf start, start ne démarre rien', () => {

@@ -8,7 +8,7 @@ import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
-import { gitRoot, readCommits, hasUnstagedChanges, resolveCommit, stage, stageChange, stagedFiles, syncIndexWithHead } from './git.js';
+import { gitRoot, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
@@ -502,7 +502,8 @@ function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): num
 
 /**
  * Pre-commit : un commit qui cite un lot encore todo. `warn` (défaut) : rien ici, le post-commit avertit ; `refuse` :
- * échoue (REFUSED) avec « raf start <id> » ; `start` : démarre le lot et met le plan dans l'index, donc dans CE commit.
+ * échoue (REFUSED) avec « raf start <id> » ; `start` : démarre le lot et met le plan dans l'index, donc dans CE commit,
+ * mais seulement si le plan est identique à HEAD : sinon rien n'est démarré (message, puis avertissement du post-commit).
  * Ne rend REFUSED que pour un refus : toute autre panne laisse le commit passer. Sans message lisible (éditeur), rien.
  */
 function preCommit(load: (() => Plan) | null, mode: 'warn' | 'refuse' | 'start' | undefined, root: string, today: Day, io: Io): number {
@@ -528,16 +529,18 @@ function preCommit(load: (() => Plan) | null, mode: 'warn' | 'refuse' | 'start' 
     }
     if (plan.readonly) return 0;
     const file = relative(root, plan.path);
-    const dirty = hasUnstagedChanges(root, file);
-    const before = readFileSync(plan.path, 'utf8');
+    // Un plan déjà modifié (stagé ou non) : le restager emporterait ces modifications dans ce commit, ou, sur un
+    // commit partiel, les perdrait. On ne démarre rien ; le post-commit avertit comme en mode warn.
+    if (!matchesHead(root, file)) {
+      io.err(`raf: plan modifié non commité : démarrage automatique sauté (hook.autostart: start), raf start ${todo.join(' ')} à la main`);
+      return 0;
+    }
     for (const id of todo) {
       plan.setStatus(id, 'doing', today, {});
       io.err(`raf: ${id} était todo — raf start ${id} fait par le hook, plan inclus dans ce commit`);
     }
     plan.save();
-    // Un plan déjà modifié sans rapport : seul le passage à doing part dans ce commit, le reste reste non stagé.
-    if (!dirty) stage(root, file);
-    else if (!stageChange(root, file, before, readFileSync(plan.path, 'utf8'))) io.err('raf: plan déjà modifié, passage à doing non stagé — à commiter à part');
+    stage(root, file);
   } catch {
     // Un hook ne doit jamais gêner un commit, hors refus.
   }

@@ -115,7 +115,9 @@ hook:
 - `warn`: today's behaviour, the commit goes through, the post-commit hook warns.
 - `refuse`: the commit fails, loudly, with `raf start <id>` in the message (`--no-verify` still bypasses it).
 - `start`: the hook runs `raf start <id>` and stages the plan, so the plan change is **in the same commit** —
-  no amend afterwards, no dirty plan left behind.
+  no amend afterwards, no dirty plan left behind. Only when `docs/plan/raf.yaml` is identical to `HEAD` (no
+  uncommitted change to the plan, staged or not): otherwise nothing is started, the hook says why
+  (`plan modifié non commité : démarrage automatique sauté, raf start <id> à la main`) and behaves like `warn`.
 
 The pre-commit hook reads the message from the command line of the `git commit` that runs it (`-m`, `-am`,
 `--message`, `-F`; Linux, through `/proc`) or from `CADENCE_COMMIT_MESSAGE`. When the message is not known yet

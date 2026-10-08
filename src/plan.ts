@@ -147,9 +147,12 @@ export class Plan {
   /** Un plan lu dans un autre format ne change pas : sa lecture et le motif de ses références sont gardés. */
   private foreign?: { lots: Lot[]; refs: RegExp | null; tasks: Set<string>; ids: Set<string> };
 
-  /** Un plan en lecture seule dont `fields` ne déclare pas de champ `public` n'a pas de titre public à poser ni à lire. */
+  /**
+   * Un plan en lecture seule dont `fields` ne déclare pas de champ `public` n'a pas de titre public à poser ni à lire,
+   * sauf si l'outil écrit déjà la clé `public` sous son propre nom sur un lot.
+   */
   get hasPublicField(): boolean {
-    return !this.settings.format || !!this.settings.format.fields.public;
+    return !this.settings.format || !!this.settings.format.fields.public || this.read().lots.some((l) => l.public !== undefined);
   }
 
   get readonly(): boolean {

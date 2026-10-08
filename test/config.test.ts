@@ -362,6 +362,14 @@ describe('raf CLI with cadence.yaml', () => {
     commit(dir, 'feat(R12a): export', '2026-09-14T10:00:00');
     expect(raf(dir, 'check').out).toContain('⚠ R12a : lot visible sans titre public\n');
   });
+
+  it('still warns without a mapped public field when another lot already carries a literal public key', () => {
+    const dir = gitRepo();
+    write(join(dir, 'cadence.yaml'), CONFIG);
+    write(join(dir, 'docs/suivi/taches.yaml'), `${TACHES}  visible: true\n- id: R99\n  titre: Autre\n  etat: prevu\n  public: Un titre\n`);
+    commit(dir, 'feat(R12a): export', '2026-09-14T10:00:00');
+    expect(raf(dir, 'check').out).toContain('⚠ R12a : lot visible sans titre public\n');
+  });
 });
 
 describe('readNewsConfig', () => {

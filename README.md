@@ -504,8 +504,8 @@ An entry is proposed only if it could be measured entirely. Never proposed:
 The command deletes nothing, never fails on the cleanup and does not change the exit code: the
 `session-close` skill shows the list and removes the entries only after the human agrees.
 
-The commands get `CADENCE_SINCE` (the `--since` in effect) and `CADENCE_TODAY`. They
-add facts and decide nothing: a failing command is reported and changes neither
+The commands get `CADENCE_SINCE` and `CADENCE_TODAY`. `CADENCE_SINCE` is the `--since` as given; on `session close` without `--since` it is the instant of the last open or successful close as an ISO 8601 UTC string (`2026-09-28T07:12:00.000Z`), or `<today> 00:00` when no mark exists.
+The commands add facts and decide nothing: a failing command is reported and changes neither
 the exit code nor the verdict.
 
 ## lead tour

@@ -166,6 +166,15 @@ describe('session close : fenêtre depuis la dernière ouverture (issue #7)', ()
     expect((await cad(dir, 'session', 'close')).out).toContain('Commits de la période (depuis la clôture de 18:30)');
   });
 
+  it('CADENCE_SINCE vaut l\'instant ISO (UTC) de la marque sans --since, et la valeur donnée avec --since', async () => {
+    const dir = await project();
+    writeFileSync(join(dir, 'cadence.yaml'), 'session:\n  close: echo "since=$CADENCE_SINCE"\n');
+    const at = new Date('2026-09-28T09:12:00');
+    writeFileSync(join(stateDir(dir), 'session.json'), JSON.stringify({ kind: 'start', at: at.toISOString() }));
+    expect((await cad(dir, 'session', 'close')).out).toContain(`  since=${at.toISOString()}\n`);
+    expect((await cad(dir, 'session', 'close', '--since', '2026-09-01')).out).toContain('  since=2026-09-01\n');
+  });
+
   it("une marque d'un autre jour est datée : du AAAA-MM-JJ à HH:MM, mois et jour sur deux chiffres", async () => {
     const dir = await project();
     writeFileSync(join(stateDir(dir), 'session.json'), JSON.stringify({ kind: 'start', at: new Date('2026-09-05T09:07:00').toISOString() }));

@@ -24,7 +24,10 @@ Code prompt that shows the session's context, quota, cost and the orchestrate wa
 
 ## What's new
 
-**0.12.0**: the `cadence-hud` plugin (a status band above the Claude Code prompt),
+**0.13.0**: `cadence orchestrate --status --watch` (a wave's table redrawn in the terminal, which
+stops with the wave) and the lead skill that names the wave and follows its journal; lot ids with `/`
+(sub-tasks of a read-only plan) accepted by `orchestrate`; `cadence-hud`'s first line measured in
+terminal cells and kept to ASCII; `publish.yml` on the v5 actions. **0.12.0**: the `cadence-hud` plugin (a status band above the Claude Code prompt),
 `raf ignore` to acknowledge a commit without a lot, waves that size the review to the lot,
 hand back a lot whose deliverable is already there and start the app themselves for the UX
 review (`orchestrate.ux`), and briefs that require the README to follow the change. **0.11.0**: waves on different repositories run side by side under a shared cap of

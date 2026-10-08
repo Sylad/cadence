@@ -79,7 +79,7 @@ export interface LotState {
   model: Model;
   readOnlyPlan: boolean;
   /** Dépôts voisins du lot (clé de lot `repos:`, L62), résolus au lancement : chemin déclaré et racine git. Absent : le dépôt du projet seul. */
-  repos?: { rel: string; path: string }[];
+  repos?: { rel: string; path: string; cite?: string }[];
   /** Node imposé par le `.nvmrc` du projet : ses sessions l'ont en tête du PATH. Absent sans .nvmrc. */
   node?: { version: string; wanted: string; bin: string; /** Versions plus hautes écartées (pas de node exécutable), pour le dry-run. */ skipped?: string[]; /** Dossier de liens (node, npm, npx, corepack) en tête du PATH des sessions. */ link?: string };
   /** Lots du même projet, plus tôt dans la vague, dont celui-ci dépend (`after`) : il attend qu'ils soient prêts. */

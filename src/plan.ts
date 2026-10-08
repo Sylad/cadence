@@ -53,13 +53,22 @@ export interface Lot {
   notes: Note[];
   tasks: Task[];
   /** Dépôts voisins où le lot travaille (clé de lot `repos:`), chemins relatifs au dossier du projet ; vide : le dépôt du projet seul. */
-  repos?: string[];
+  repos?: LotRepoDecl[];
   /** Revue d'ergonomie enregistrée par `raf ux`. */
   ux?: Verdict;
   /** Revue de code enregistrée par `raf review`. */
   review?: Verdict;
   /** Champs écrits à la main illisibles (dates mal formées…), remontés par check. */
   problems: string[];
+}
+
+/**
+ * Un dépôt voisin déclaré par un lot : son chemin, et pour un voisin partagé entre projets une chaîne `cite` que les commits
+ * du lot doivent contenir en plus de l'id du lot (sous-chaîne, sans tenir compte de la casse, sujet et corps).
+ */
+export interface LotRepoDecl {
+  path: string;
+  cite?: string;
 }
 
 export class RafError extends Error {}
@@ -636,10 +645,20 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
   };
 }
 
-/** Chemins de dépôts voisins : une chaîne seule vaut une liste d'un dépôt ; une entrée vide ou non textuelle est écartée. */
-function repoList(raw: unknown): string[] {
+/**
+ * Dépôts voisins déclarés : une chaîne (le chemin) ou un objet `{ path, cite }`, seuls ou en liste (une valeur seule vaut une
+ * liste d'un dépôt). Une entrée sans chemin textuel est écartée ; un `cite` vide ou non textuel vaut pas de `cite`.
+ */
+function repoList(raw: unknown): LotRepoDecl[] {
   const items = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
-  return items.filter((x): x is string => typeof x === 'string').map((x) => x.trim()).filter(Boolean);
+  const out: LotRepoDecl[] = [];
+  for (const item of items) {
+    const path = typeof item === 'string' ? item : item && typeof item === 'object' && typeof (item as Record<string, unknown>).path === 'string' ? ((item as Record<string, unknown>).path as string) : '';
+    if (path.trim() === '') continue;
+    const cite = item && typeof item === 'object' ? (item as Record<string, unknown>).cite : undefined;
+    out.push({ path: path.trim(), ...(typeof cite === 'string' && cite.trim() !== '' ? { cite: cite.trim() } : {}) });
+  }
+  return out;
 }
 
 function asVerdict(raw: unknown): Verdict | undefined {

@@ -29,7 +29,7 @@ export interface BriefVars {
 }
 
 /** Consigne sur les dépôts voisins d'un lot (L62) : les sessions d'écriture y travaillent, les relectures y lisent les commits qui citent le lot. */
-export function reposText(role: 'write' | 'read', lot: string, repos: { rel: string; path: string }[]): string {
+export function reposText(role: 'write' | 'read', lot: string, repos: { rel: string; path: string; cite?: string }[]): string {
   if (!repos.length) return '';
   const list = repos.map((r) => `- \`${r.rel}\` (${r.path})`);
   if (role === 'write') {

@@ -16,7 +16,7 @@ describe('clé de lot `repos:` (L62)', () => {
     const dir = tempDir();
     const file = write(join(dir, 'raf.yaml'), 'version: 1\nproject: demo\nprefix: B\nlots:\n- { id: B1, title: un, status: todo, repos: [../gitops, ../autre] }\n- { id: B2, title: deux, status: todo }\n');
     const plan = Plan.load(file);
-    expect(plan.lot('B1').repos).toEqual(['../gitops', '../autre']);
+    expect(plan.lot('B1').repos).toEqual([{ path: '../gitops' }, { path: '../autre' }]);
     expect(plan.lot('B2').repos ?? []).toEqual([]);
   });
 
@@ -24,15 +24,23 @@ describe('clé de lot `repos:` (L62)', () => {
     const dir = tempDir();
     const file = write(join(dir, 'raf.yaml'), 'version: 1\nproject: demo\nprefix: B\nlots:\n- { id: B1, title: un, status: todo, repos: ../gitops }\n- { id: B2, title: deux, status: todo, repos: [../a, "", 7, "  ../b  "] }\n');
     const plan = Plan.load(file);
-    expect(plan.lot('B1').repos).toEqual(['../gitops']);
-    expect(plan.lot('B2').repos).toEqual(['../a', '../b']);
+    expect(plan.lot('B1').repos).toEqual([{ path: '../gitops' }]);
+    expect(plan.lot('B2').repos).toEqual([{ path: '../a' }, { path: '../b' }]);
   });
 
-  it('un plan en lecture seule la déclare par fields.repos (cadence.yaml)', () => {
+  it('une entrée peut être un objet { path, cite } ; un cite vide ou non textuel est ignoré, un objet sans chemin écarté', () => {
+    const dir = tempDir();
+    const file = write(join(dir, 'raf.yaml'), 'version: 1\nproject: demo\nprefix: B\nlots:\n- { id: B1, title: un, status: todo, repos: [../a, { path: ../developpeur-gitops, cite: " ol-companion " }, { path: ../b, cite: "" }, { path: ../c, cite: 3 }, { cite: x }] }\n- { id: B2, title: deux, status: todo, repos: { path: ../seul, cite: App } }\n');
+    const plan = Plan.load(file);
+    expect(plan.lot('B1').repos).toEqual([{ path: '../a' }, { path: '../developpeur-gitops', cite: 'ol-companion' }, { path: '../b' }, { path: '../c' }]);
+    expect(plan.lot('B2').repos).toEqual([{ path: '../seul', cite: 'App' }]);
+  });
+
+  it('un plan en lecture seule la déclare par fields.repos (cadence.yaml), chaînes et objets mêlés', () => {
     const dir = tempDir();
     const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), 'plan:\n  lots: taches\n  fields: { title: titre, status: etat, repos: depots }\n  statuses: { todo: prevu }\n'))!;
-    const plan = Plan.load(write(join(dir, 'p.yaml'), 'taches:\n- { id: B64, titre: x, etat: prevu, depots: [../aetherwx-gitops] }\n- { id: B65, titre: y, etat: prevu }\n'), cfg.settings);
-    expect(plan.lot('B64').repos).toEqual(['../aetherwx-gitops']);
+    const plan = Plan.load(write(join(dir, 'p.yaml'), 'taches:\n- { id: B64, titre: x, etat: prevu, depots: [../aetherwx-gitops, { path: ../developpeur-gitops, cite: ol-companion }] }\n- { id: B65, titre: y, etat: prevu }\n'), cfg.settings);
+    expect(plan.lot('B64').repos).toEqual([{ path: '../aetherwx-gitops' }, { path: '../developpeur-gitops', cite: 'ol-companion' }]);
     expect(plan.lot('B65').repos ?? []).toEqual([]);
   });
 
@@ -40,7 +48,7 @@ describe('clé de lot `repos:` (L62)', () => {
     const dir = tempDir();
     const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), 'plan:\n  lots: taches\n  fields: { title: titre, status: etat }\n  statuses: { todo: prevu }\n'))!;
     const plan = Plan.load(write(join(dir, 'p.yaml'), 'taches:\n- { id: B64, titre: x, etat: prevu, repos: [../g] }\n'), cfg.settings);
-    expect(plan.lot('B64').repos).toEqual(['../g']);
+    expect(plan.lot('B64').repos).toEqual([{ path: '../g' }]);
   });
 });
 

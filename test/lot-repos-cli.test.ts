@@ -20,7 +20,7 @@ async function raf(dir: string, ...argv: string[]) {
 }
 
 /** Un projet cadence (lot L1 en cours, qui déclare `repos`) et un dépôt voisin non cadence, frères dans le même dossier. */
-async function setup(repos: (neighbour: string) => string[] = (n) => [n]) {
+async function setup(repos: (neighbour: string) => (string | { path: string; cite?: string })[] = (n) => [n]) {
   const parent = tempDir();
   const dir = join(parent, 'projet');
   const neighbour = join(parent, 'voisin');
@@ -46,7 +46,7 @@ async function setup(repos: (neighbour: string) => string[] = (n) => [n]) {
 describe('resolveLotRepos', () => {
   it('rend la racine git de chaque dépôt voisin existant, sous le chemin déclaré', async () => {
     const { dir, neighbour, rel } = await setup();
-    const r = resolveLotRepos(dir, { repos: [rel] });
+    const r = resolveLotRepos(dir, { repos: [{ path: rel }] });
     expect(r.problems).toEqual([]);
     expect(r.repos.map((x) => x.rel)).toEqual([rel]);
     expect(r.repos[0].path).toBe(execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: neighbour, encoding: 'utf8' }).trim());
@@ -55,7 +55,7 @@ describe('resolveLotRepos', () => {
   it('refuse un dossier introuvable et un dossier qui n\'est pas un dépôt git, chacun nommé', async () => {
     const { dir } = await setup();
     const plain = tempDir();
-    const r = resolveLotRepos(dir, { repos: ['../nulle-part', relative(dir, plain)] });
+    const r = resolveLotRepos(dir, { repos: [{ path: '../nulle-part' }, { path: relative(dir, plain) }] });
     expect(r.repos).toEqual([]);
     expect(r.problems).toHaveLength(2);
     expect(r.problems[0]).toContain('../nulle-part');
@@ -65,7 +65,7 @@ describe('resolveLotRepos', () => {
 
   it('un doublon, ou le dépôt du projet lui-même, n\'est compté qu\'une fois', async () => {
     const { dir, rel } = await setup();
-    const r = resolveLotRepos(dir, { repos: [rel, `${rel}/`, '.', '../projet'] });
+    const r = resolveLotRepos(dir, { repos: [rel, `${rel}/`, '.', '../projet'].map((path) => ({ path })) });
     expect(r.problems).toEqual([]);
     expect(r.repos.map((x) => x.rel)).toEqual([rel]);
   });
@@ -181,36 +181,87 @@ describe('repoWork : rattachement au projet et à la période du lot (L62)', () 
     expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject)).toEqual(['feat(L1): dans la période']);
   });
 
-  it('dans un dépôt partagé, ne garde que les commits qui nomment le projet quand certains le font', async () => {
-    const { dir, neighbour } = await setup();
-    commitAt(neighbour, 'fix(warhammer40k): retirer un montage (L1)', '2026-10-08T10:00:00');
-    commitAt(neighbour, 'ol-companion: frontend→sha-1 — chore(L1): lot terminé', '2026-10-08T11:00:00');
-    edit(dir, /^project: .*$/m, 'project: "ol-companion"');
+  it('dans un voisin au nom de chart (aetherwx-gitops), tous les commits du lot comptent, quel que soit le préfixe ou la couche citée', async () => {
+    const { dir, neighbour, rel } = await setup();
+    commitAt(neighbour, 'fix(L1): retrait de la CronJob glofas-trigger du chart maritime', '2026-10-08T10:00:00');
+    commitAt(neighbour, 'fix(L1): couche aetherwx:graticule_10 publiée par le bootstrap', '2026-10-08T11:00:00');
+    commitAt(neighbour, 'maritime: frontend sha-1234567 (L1)', '2026-10-08T12:00:00');
+    edit(dir, /^project: .*$/m, 'project: "AetherWX"');
+    const r = await raf(dir, 'commits', 'L1');
+    expect(r.code).toBe(0);
+    const lines = r.out.split('\n');
+    expect(lines[0]).toBe(`dépôt ${rel} :`);
+    expect(lines.slice(1).map((l) => l.replace(/^ {2}[0-9a-f]{7} /, ''))).toEqual([
+      'fix(L1): retrait de la CronJob glofas-trigger du chart maritime',
+      'fix(L1): couche aetherwx:graticule_10 publiée par le bootstrap',
+      'maritime: frontend sha-1234567 (L1)',
+    ]);
     const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
     const { repos } = resolveLotRepos(dir, plan.lot('L1'));
-    expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject)).toEqual(['ol-companion: frontend→sha-1 — chore(L1): lot terminé']);
+    expect(repoWork(plan, repos[0], 'L1')).toHaveLength(3);
     expect(Object.values(repoShas(plan, repos, 'L1'))[0]).toBe(git(neighbour, 'rev-parse', 'HEAD'));
   });
 
-  it('dans le dépôt cible dont le nom du projet est partout (images, couches), un seul commit qui le nomme n\'écarte pas les autres', async () => {
-    const { dir, neighbour } = await setup();
-    commitAt(neighbour, 'feat(L1): image aetherwx-nowcast-engine', '2026-10-08T10:00:00');
-    commitAt(neighbour, 'fix(L1): couche aetherwx:graticule_10', '2026-10-08T11:00:00');
-    commitAt(neighbour, 'fix(L1): réglage sans nom', '2026-10-08T12:00:00');
-    commitAt(neighbour, 'chore: lot L1 sans portée', '2026-10-08T12:30:00');
-    edit(dir, /^project: .*$/m, 'project: "aetherwx"');
+  it('voisin partagé avec cite : seuls les commits du lot qui contiennent la chaîne (sujet ou corps, sans tenir compte de la casse) comptent', async () => {
+    const { dir, neighbour, rel } = await setup((n) => [{ path: n, cite: 'ol-companion' }]);
+    commitAt(neighbour, 'ol-companion: frontend→sha-1 — chore(L1): lot terminé', '2026-10-08T10:00:00');
+    commitAt(neighbour, 'fix(warhammer40k): retirer un montage (L1)', '2026-10-08T11:00:00');
+    commitAt(neighbour, 'fix(L1): chart\n\nConcerne OL-Companion.', '2026-10-08T12:00:00');
+    commitAt(neighbour, 'fix(L1): chart sans rapport', '2026-10-08T13:00:00');
+    commitAt(neighbour, 'feat(L2): ol-companion mais un autre lot', '2026-10-08T14:00:00');
+    commitAt(neighbour, 'fix(warhammer40k): dernier commit, autre app (L1)', '2026-10-08T15:00:00');
     const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
-    const { repos } = resolveLotRepos(dir, plan.lot('L1'));
-    expect(repoWork(plan, repos[0], 'L1')).toHaveLength(4);
-    expect(Object.values(repoShas(plan, repos, 'L1'))[0]).toBe(git(neighbour, 'rev-parse', 'HEAD'));
+    const { repos, problems } = resolveLotRepos(dir, plan.lot('L1'));
+    expect(problems).toEqual([]);
+    expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject).reverse()).toEqual(['ol-companion: frontend→sha-1 — chore(L1): lot terminé', 'fix(L1): chart']);
+    expect(Object.values(repoShas(plan, repos, 'L1'))[0]).toBe(git(neighbour, 'rev-parse', 'HEAD~3'));
+    const r = await raf(dir, 'commits', 'L1');
+    expect(r.out.split('\n')).toHaveLength(3);
+    expect(r.out).toContain(`dépôt ${rel} :`);
+    expect(r.out).not.toContain('warhammer40k');
   });
 
-  it('sans commit qui nomme le projet, tous les commits du lot comptent', async () => {
+  it('voisin partagé avec cite sans commit qui le contienne : « aucun commit du lot », sha enregistré null', async () => {
+    const { dir, neighbour, rel } = await setup((n) => [{ path: n, cite: 'ol-companion' }]);
+    commitAt(neighbour, 'fix(warhammer40k): autre app (L1)', '2026-10-08T10:00:00');
+    expect((await raf(dir, 'commits', 'L1')).out).toContain(`dépôt ${rel} : aucun commit du lot`);
+    await raf(dir, 'review', 'L1', 'conforme');
+    expect(Plan.load(join(dir, 'docs/plan/raf.yaml')).lot('L1').review!.repos).toEqual({ [rel]: null });
+  });
+
+  it('voisin partagé sans cite : les commits des autres apps qui citent le même id comptent aussi (comportement par défaut)', async () => {
     const { dir, neighbour } = await setup();
-    commitAt(neighbour, 'feat(L1): a', '2026-10-08T10:00:00');
+    commitAt(neighbour, 'ol-companion: frontend→sha-1 — chore(L1): lot terminé', '2026-10-08T10:00:00');
+    commitAt(neighbour, 'fix(warhammer40k): retirer un montage (L1)', '2026-10-08T11:00:00');
     edit(dir, /^project: .*$/m, 'project: "ol-companion"');
     const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
     const { repos } = resolveLotRepos(dir, plan.lot('L1'));
-    expect(repoWork(plan, repos[0], 'L1')).toHaveLength(1);
+    expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject)).toEqual(['fix(warhammer40k): retirer un montage (L1)', 'ol-companion: frontend→sha-1 — chore(L1): lot terminé']);
+    expect(Object.values(repoShas(plan, repos, 'L1'))[0]).toBe(git(neighbour, 'rev-parse', 'HEAD'));
+  });
+});
+
+describe('plan en lecture seule : fields.repos accepte les deux formes', () => {
+  it('une liste mêlant chaîne et { path, cite } est lue par raf commits', async () => {
+    const parent = tempDir();
+    const dir = join(parent, 'projet');
+    const voisin = join(parent, 'voisin');
+    for (const d of [dir, voisin]) {
+      mkdirSync(d);
+      git(d, 'init', '-q', '-b', 'main');
+      git(d, 'config', 'user.email', 't@example.com');
+      git(d, 'config', 'user.name', 'T');
+      git(d, 'config', 'commit.gpgsign', 'false');
+    }
+    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: suivi/taches.yaml\n  since: 2026-09-01\n  lots: taches\n  fields: { title: titre, status: etat, repos: depots }\n  statuses: { todo: prevu, doing: en_cours, done: livre }\n');
+    mkdirSync(join(dir, 'suivi'));
+    writeFileSync(join(dir, 'suivi/taches.yaml'), 'taches:\n- { id: NC2, titre: Socle, etat: en_cours, depots: [{ path: ../voisin, cite: ol-companion }] }\n');
+    git(dir, 'add', '.');
+    commitAt(dir, 'plan: NC2 en cours', '2026-10-08T09:00:00');
+    commitAt(voisin, 'ol-companion: frontend sha-1 (NC2)', '2026-10-08T10:00:00');
+    commitAt(voisin, 'warhammer40k: frontend sha-2 (NC2)', '2026-10-08T11:00:00');
+    const r = await raf(dir, 'commits', 'NC2');
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/^dépôt \.\.\/voisin :\n {2}[0-9a-f]{7} ol-companion: frontend sha-1 \(NC2\)$/);
   });
 });

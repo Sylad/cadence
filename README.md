@@ -92,7 +92,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
 | `raf show <id> [--notes]` | one lot: status, dates, `after`, public title, dated notes in order, then the counted commits (as `raf commits`, neighbouring repositories included); `--notes` prints the notes alone |
-| `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first; a lot that declares `repos:` ([neighbouring repositories](#a-lot-whose-work-is-in-a-neighbouring-repository)) gets, after them, one `dépôt <path> :` section per neighbour with the commits there that cite the lot (`aucun commit du lot`, or `introuvable` for a path that is not there) |
+| `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first; a lot that declares `repos:` ([neighbouring repositories](#a-lot-whose-work-is-in-a-neighbouring-repository)) gets, after them, one `dépôt <path> :` section per neighbour with the commits there that cite the lot, within the lot's period and, in a repository shared between projects, naming this project (`aucun commit du lot`, or `introuvable` for a path that is not there) |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |
 | `raf ignore <sha> \| "exact subject" [--reason text]` | acknowledge a commit without a lot (tooling chore, a plan commit citing an unknown id) without rewriting history: a dated, reasoned line in the plan's `acknowledged:` section; a sha is exact, a subject covers every commit carrying it |
@@ -851,7 +851,7 @@ the name `repos`). The effect, for `cadence orchestrate`:
   sessions in one repository; `--status` lists the neighbours among the repositories a wave holds.
 - **Sessions**: every session gets each neighbour as `--add-dir`, and the briefs name them: the implementation and the
   corrections must commit there too, with a message that cites the lot (`feat(B64): …`), and never push; the reviewers read
-  the commits that cite the lot in the project **and** in each neighbour (`raf commits <lot>` lists them all). A lot whose
+  the commits that cite the lot in the project **and** in each neighbour (`raf commits <lot>` lists them all; only the commits dated within the lot's period (from `started` to `finished`) count; and when the neighbour also holds commits of the lot id for another project (a subject prefixed `name:` or scoped `type(name):`), only those that name this project as a word count — a `fix(B64): …` outside the period, or one that does not name the project in such a shared repository, is not listed.) A lot whose
   whole work is in the neighbour is not « without commit »; a commit there that does not cite the lot is a warning; a
   neighbour left with a tracked file modified hands the lot back.
 - **Verdict**: `raf review` as recorded by the orchestrator stores the sha read in the project and in each neighbour

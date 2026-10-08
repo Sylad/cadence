@@ -44,7 +44,7 @@ export const untilReset = (iso: string | undefined, now: number): string => {
 }
 
 export const limitLabel = (kind: string): string =>
-  kind === 'five_hour' ? '5h' : kind === 'seven_day' ? '7j' : kind === 'spend_limit' ? '€' : kind
+  kind === 'five_hour' ? '5h' : kind === 'seven_day' ? '7j' : kind === 'spend_limit' ? 'EUR' : kind
 
 /** Couleur d'un lot orchestré selon son statut. */
 export const colorOfLot = (status: string): ThemeKey => {

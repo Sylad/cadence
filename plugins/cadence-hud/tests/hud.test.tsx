@@ -314,6 +314,7 @@ test('la première ligne n\'emploie que de l\'ASCII et les symboles que cells() 
       limits: [
         { kind: 'five_hour', percentUsed: undefined, resetsAt: '2026-10-08T05:00:00Z' },
         { kind: 'seven_day', percentUsed: 6, resetsAt: '2026-10-14T05:00:00Z' },
+        { kind: 'spend_limit', percentUsed: 12, resetsAt: '2026-10-14T05:00:00Z' },
       ],
     },
     models: {
@@ -329,6 +330,7 @@ test('la première ligne n\'emploie que de l\'ASCII et les symboles que cells() 
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 400 } })
   expect(await ui.find({ type: 'Text', text: /↻ \d/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /\.\.\./ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /EUR/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /[^\x00-\x7f▰▱⚙│↻]/ })).toBeUndefined()
   await ui.unmount()
 })

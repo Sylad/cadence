@@ -1355,10 +1355,11 @@ lots:
       }
   - id: L118
     title: "raf check (suite L115) : sur un plan en lecture seule dont le fichier porte la clé public sans mapping dans fields, avertir quand même d'un lot visible sans titre public ; et l'entrée Fixed du CHANGELOG de L115 doit décrire l'exception ajoutée par c3d3e11 (avertissement si un lot porte déjà public:)"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-08
+    started: 2026-10-08
   - id: L119
     title: "cadence-hud (suite L116) : cells() compte pour 1 les autres caractères de largeur ambiguë de la première ligne (· U+00B7, …, —) ; décider table East Asian Width ou les exclure du texte, et aligner le README « au pire cas »"
     status: todo

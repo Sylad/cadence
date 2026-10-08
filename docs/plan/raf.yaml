@@ -1070,6 +1070,7 @@ lots:
     quickwin: true
     created: 2026-10-07
     started: 2026-10-08
+    review: { date: 2026-10-08, verdict: "conforme — orchestré (vague 2026-10-08-0709, 0 passe(s) de correction)", commit: 5857c7b5aa83569fa0aa25e3107082d2fe3442ee }
   - id: L92
     title: "test/global-setup.ts : en cas d'échec de tsc, inclure sa sortie stdout (diagnostics fichier:ligne) dans l'erreur levée — sinon une erreur de type n'affiche que « Command failed » et bloque toute la suite — mineur de la 3e revue L61"
     status: done

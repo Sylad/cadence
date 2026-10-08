@@ -27,6 +27,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+- `raf check` no longer warns about a visible lot without public title on a read-only plan whose `plan.fields` maps no `public` field: the warning could not be cleared and came back at every session. (L115)
+
 ## [0.12.0] - 2026-10-08
 
 ### Added

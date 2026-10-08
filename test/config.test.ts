@@ -351,8 +351,16 @@ describe('raf CLI with cadence.yaml', () => {
 
     // Le reste de l'audit tourne toujours : seules les deux portes sont ignorées.
     expect(raf(dir, 'check').out).toBe(
-      '✗ B33 en cours sans commit depuis 18 j (Une seule base)\n✗ R12a est visible et terminé sans entrée Nouveautés — cadence news new R12a\n⚠ R12a : lot visible sans titre public\n2 écart(s), 1 avertissement(s)',
+      '✗ B33 en cours sans commit depuis 18 j (Une seule base)\n✗ R12a est visible et terminé sans entrée Nouveautés — cadence news new R12a\n2 écart(s)',
     );
+  });
+
+  it('warns about a visible lot without public title only if fields maps a public field', () => {
+    const dir = gitRepo();
+    write(join(dir, 'cadence.yaml'), CONFIG.replace('    notes: note\n', '    notes: note\n    public: titre_public\n'));
+    write(join(dir, 'docs/suivi/taches.yaml'), `${TACHES}  visible: true\n`);
+    commit(dir, 'feat(R12a): export', '2026-09-14T10:00:00');
+    expect(raf(dir, 'check').out).toContain('⚠ R12a : lot visible sans titre public\n');
   });
 });
 

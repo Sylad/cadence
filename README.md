@@ -669,6 +669,7 @@ cadence orchestrate … --budget 1.5M          # 1500000, 1.5M, 800k; default 2M
 cadence orchestrate … --max-sessions 3       # sessions running at the same moment, all waves together; default 2
 cadence orchestrate … --dry-run              # preconditions + the plan of the wave; nothing is started
 cadence orchestrate --status [<wave>]        # the live waves and the repositories they hold, then the table (default: the last wave of this folder)
+cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running
 cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"]
 ```
 
@@ -681,6 +682,13 @@ You choose the lots; the order is the order given (one queue per repository, as 
 same time as the session cap allows — 2 by default). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
 lot (default Sonnet; reviews are Opus, except the light review below; Haiku only when you write it, for a mechanical lot). Run it
 in the background and read `--status`: it prints one line per transition and the final table.
+
+**Following a wave (L49)**: `--status --watch` clears the screen and redraws the live waves and the table every
+`--interval` seconds (default 10), then stops by itself, leaving the last render, as soon as no wave is running
+(exit code 0, like `--status`; a wave already finished gives a single render). The `cadence-lead` skill names the background
+task « vague `<id>` : `<project>:<lot>`, … », starts the wave with `--wave <id>` and arms a follow-up on
+`.cadence/runs/<id>/journal.log` that pushes each transition (lot → state, question, ready, handed back) into the conversation.
+The Claude Code status band is the `cadence-hud` plugin.
 
 **Cycle of a lot**: preconditions (clean tracked files, lot `todo` or `doing`, dependencies met) →
 `raf start` (committed alone) → implementation → **UX review** if the lot is `visible` and the app is

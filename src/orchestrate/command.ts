@@ -33,6 +33,8 @@ export interface OrchestrateIo {
 
 export interface OrchestrateDeps {
   claude: ClaudeFn;
+  /** Attente (ms) entre deux rendus de `--status --watch` ; défaut : une vraie attente. */
+  watchSleep?: (ms: number) => Promise<void>;
   /** Intervalle (ms) d'attente d'un créneau de session libre ; défaut 2 s. */
   slotPollMs?: number;
   /** Version de claude et présence de --json-schema ; null si claude est absent. */
@@ -64,6 +66,9 @@ export interface Args {
   lots: { project?: string; lot: string; model?: Model }[];
   dryRun: boolean;
   status?: string | true;
+  watch: boolean;
+  /** Secondes entre deux rendus de `--status --watch`. */
+  interval?: number;
   resume?: string | true;
   budget?: number;
   maxSessions?: number;
@@ -98,7 +103,7 @@ function lotArg(text: string): { project?: string; lot: string; model?: Model } 
 }
 
 export function parseOrchestrateArgs(argv: string[]): Args {
-  const a: Args = { lots: [], dryRun: false, answers: [] };
+  const a: Args = { lots: [], dryRun: false, watch: false, answers: [] };
   const optional = (i: number) => (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) ? argv[i + 1] : undefined);
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
@@ -111,7 +116,9 @@ export function parseOrchestrateArgs(argv: string[]): Args {
       const v = optional(i);
       if (v !== undefined) i++;
       a[t === '--status' ? 'status' : 'resume'] = v ?? true;
-    } else if (t === '--budget') a.budget = parseBudget(value(t));
+    } else if (t === '--watch') a.watch = true;
+    else if (t === '--interval') a.interval = parseMaxSessions(value(t), '--interval');
+    else if (t === '--budget') a.budget = parseBudget(value(t));
     else if (t === '--max-sessions') a.maxSessions = parseMaxSessions(value(t));
     else if (t === '--wave') a.wave = value(t);
     else if (t === '--answer') {
@@ -336,6 +343,19 @@ function liveLines(): string[] {
   return lines;
 }
 
+/** Efface l'écran et replace le curseur en haut : l'entrée d'un rendu de `--status --watch`. */
+const CLEAR_SCREEN = '\x1b[H\x1b[2J';
+const DEFAULT_WATCH_INTERVAL = 10;
+
+/** Ce que `--status` montre à un instant : les vagues vivantes, puis le tableau (absent si seules les vagues vivantes comptent). */
+function statusView(args: Args, launch: string): { live: string[]; table?: string[] } {
+  const store = typeof args.status === 'string' ? RunStore.find(launch, args.status) : RunStore.last(launch);
+  const live = liveLines();
+  if (!store && live.length && args.status === true) return { live };
+  if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');
+  return { live, table: renderTable(store.readWave()!, store.lots()) };
+}
+
 /** Refus d'une `--wave` déjà existante, identique en simulation et au vrai lancement. */
 function waveExists(wave: string, io: OrchestrateIo): number {
   io.err(`orchestrate : --wave ${wave} : cette vague existe déjà`);
@@ -348,20 +368,37 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   const launch = io.cwd;
   const today: Day = io.env.RAF_TODAY && isDay(io.env.RAF_TODAY) ? io.env.RAF_TODAY : toDay(io.now());
 
+  if (args.watch && args.status === undefined) throw new RafError('--watch s\'utilise avec --status');
+  if (args.interval !== undefined && !args.watch) throw new RafError('--interval s\'utilise avec --status --watch');
   if (args.status !== undefined) {
-    const store = typeof args.status === 'string' ? RunStore.find(launch, args.status) : RunStore.last(launch);
     maxSessions(args, io); // une valeur invalide est refusée ici aussi
-    const live = liveLines();
-    for (const line of live) io.out(line);
-    if (!store && live.length && args.status === true) return 0; // sans identifiant : les vagues vivantes suffisent
-    if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');
-    if (live.length) io.out('');
-    for (const line of renderTable(store.readWave()!, store.lots())) io.out(line);
-    return 0;
+    if (!args.watch) {
+      const { live, table } = statusView(args, launch);
+      for (const line of live) io.out(line);
+      if (!table) return 0; // sans identifiant : les vagues vivantes suffisent
+      if (live.length) io.out('');
+      for (const line of table) io.out(line);
+      return 0;
+    }
+    // --watch : le même tableau, rafraîchi ; il s'arrête seul quand plus aucune vague ne tourne (le dernier rendu reste affiché)
+    const sleep = deps.watchSleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
+    for (;;) {
+      const { live, table } = statusView(args, launch);
+      io.out(CLEAR_SCREEN);
+      for (const line of live) io.out(line);
+      if (table) {
+        if (live.length) io.out('');
+        for (const line of table) io.out(line);
+      }
+      if (live.length === 0) return 0;
+      io.out('');
+      io.out(`rafraîchi toutes les ${args.interval ?? DEFAULT_WATCH_INTERVAL} s — Ctrl-C pour quitter`);
+      await sleep((args.interval ?? DEFAULT_WATCH_INTERVAL) * 1000);
+    }
   }
   if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
 
-  if (args.lots.length === 0) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] | --status [vague] | --resume [vague] [--answer projet:lot "réponse"]');
+  if (args.lots.length === 0) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);

@@ -380,6 +380,53 @@ describe('plafond de sessions simultanées et --status (L71)', () => {
   });
 });
 
+describe('--status --watch (L49)', () => {
+  const CLEAR = '\x1b[H\x1b[2J';
+  it('--watch et --interval : analyse, refus hors --status', async () => {
+    expect(parseOrchestrateArgs(['--status', '--watch', '--interval', '5'])).toMatchObject({ status: true, watch: true, interval: 5 });
+    expect(parseOrchestrateArgs(['--status', '2026-10-04-1412', '--watch']).status).toBe('2026-10-04-1412');
+    expect(parseOrchestrateArgs(['--status']).watch).toBe(false);
+    expect(() => parseOrchestrateArgs(['--interval', '0'])).toThrow(/--interval invalide/);
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const r = io(parent);
+    await expect(orchestrate(['--watch'], r.io, fakeDeps().deps)).rejects.toThrow(/--watch s'utilise avec --status/);
+    await expect(orchestrate(['--status', '--interval', '3'], r.io, fakeDeps().deps)).rejects.toThrow(/--interval s'utilise avec --status --watch/);
+  });
+
+  it('rafraîchit le tableau en effaçant l\'écran, puis s\'arrête seul quand plus aucune vague ne tourne', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    expect(await orchestrate(['a:L1', '--wave', '2026-10-08-1000'], io(parent).io, f.deps)).toBe(0);
+    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-08-1000', started: '2026-10-08T10:00:00Z', cwd: parent, repos: ['/x/a'], cap: 2 });
+    const sleeps: number[] = [];
+    f.deps.watchSleep = async (ms) => {
+      sleeps.push(ms);
+      if (sleeps.length === 2) unregisterWave(cadenceHome(), process.ppid);
+    };
+    const r = io(parent);
+    expect(await orchestrate(['--status', '--watch', '--interval', '3'], r.io, f.deps)).toBe(0);
+    expect(sleeps).toEqual([3000, 3000]);
+    expect(r.out.filter((l) => l === CLEAR)).toHaveLength(3); // deux rendus d'une vague vivante, un dernier sans
+    const text = r.out.join('\n');
+    expect(text.match(/vagues en cours : 1/g)).toHaveLength(2);
+    expect(text).toContain('rafraîchi toutes les 3 s');
+    expect(r.out[r.out.length - 1]).toMatch(/^vague 2026-10-08-1000 :/); // le dernier rendu reste affiché, sans invite
+  });
+
+  it('sans vague vivante : un seul rendu, sans attendre ; mêmes refus que --status', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    f.deps.watchSleep = async () => {
+      throw new Error('ne doit pas attendre');
+    };
+    await expect(orchestrate(['--status', '--watch'], io(parent).io, f.deps)).rejects.toThrow(/aucune vague dans ce dossier/);
+    expect(await orchestrate(['a:L1'], io(parent).io, f.deps)).toBe(0);
+    const r = io(parent);
+    expect(await orchestrate(['--status', '--watch'], r.io, f.deps)).toBe(0);
+    expect(r.out.filter((l) => l === CLEAR)).toHaveLength(1);
+  });
+});
+
 describe('--status <id> inconnu malgré une vague vivante ailleurs (L71)', () => {
   it('refuse « vague inconnue » au lieu de lister les vagues vivantes avec le code 0', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }] });

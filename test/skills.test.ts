@@ -326,6 +326,18 @@ describe('skills install', () => {
     expect(lead).not.toContain('fills `{{chemin}}`');
   });
 
+  it('le skill lead nomme la tâche de fond, lance la vague avec --wave et arme un suivi sur le journal, sans boucle d’attente (L49)', () => {
+    const lead = skillText('lead');
+    expect(lead).toContain('« vague `<id>` : `<project>:<lot>`, … »');
+    expect(lead).toContain('--wave <id>');
+    expect(lead).toContain('tail -n +1 -F .cadence/runs/<id>/journal.log');
+    expect(lead).toContain('Monitor');
+    expect(lead).toContain('cadence orchestrate --status --watch');
+    const readme = flat(readFileSync(join(AGENTS_DIR, '..', 'README.md'), 'utf8'));
+    expect(readme).toContain('--status [<wave>] --watch [--interval 10]');
+    expect(readme).toContain('.cadence/runs/<id>/journal.log');
+  });
+
   it('les skills lead et deliver font suivre par l’agent qa-reviewer toute livraison qui change ce qu’une page montre ou reçoit ; session-start n’en parle pas', () => {
     const skill = (name: string) => readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8').replace(/\s+/g, ' ');
     const lead = skill('lead');

@@ -27,6 +27,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+- `cadence orchestrate --status --watch [--interval s]`: the table of a wave, redrawn every 10 s (screen cleared between two renders), which stops by itself when no wave is running; exit code as `--status`. The `cadence-lead` skill names the background task « vague <id> : project:lot, … », starts the wave with `--wave <id>` and arms a follow-up on `.cadence/runs/<id>/journal.log` that pushes each transition into the conversation. (L49)
+
 ### Changed
 - `publish.yml` uses `actions/checkout@v5` and `actions/setup-node@v5`: the v4 actions ran on Node 20, deprecated, and the v0.12.0 run was forced onto Node 24. To check on 2026-10-19: `ubuntu-latest` moves to Ubuntu 26 (not verified in this lot). (L117)
 

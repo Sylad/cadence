@@ -55,11 +55,26 @@ proposed sub-tasks back to the human.
 ### 2b. A wave through `cadence orchestrate`
 
 Once the human has chosen the lots, the lead runs, **in the background** (it is notified at the end; no
-silent wait, no polling loop — `cadence orchestrate --status` shows where the wave is):
+silent wait, no polling loop — `cadence orchestrate --status` shows where the wave is, and the follow-up below pushes each transition):
 
 ```sh
-cadence orchestrate <project>:<lot> <project>:<lot>@haiku … [--budget 2M]
+cadence orchestrate <project>:<lot> <project>:<lot>@haiku … --wave <id> [--budget 2M]
 ```
+
+**Make the wave visible to the human.** Name the background task after what it runs — « vague `<id>` :
+`<project>:<lot>`, … » (its `description`), so the task list says which projects and lots, not just « a task
+is running » — and pass `--wave <id>` (e.g. `2026-10-08-1030`) so its state folder is known in advance. Right after
+starting it, arm **one follow-up** (the Monitor tool) on the wave's journal, which holds one line per transition (lot → new
+state, question, ready, handed back, final table):
+
+```sh
+tail -n +1 -F .cadence/runs/<id>/journal.log     # from the folder the wave was launched in
+```
+
+Each line it prints reaches this conversation as it happens: relay it to the human in one short sentence, and
+bring a question back at once (`--resume --answer`). That follow-up replaces any waiting loop: still no polling,
+no `sleep`. The human can also watch from a terminal with `cadence orchestrate --status --watch` (table refreshed
+every 10 s, `--interval <s>` to change it; it stops by itself when no wave is running).
 
 `cadence orchestrate --dry-run …` first when a precondition is in doubt. The program, not the lead, runs
 for each lot a fresh short session per step — implementation (Sonnet), UX review if the lot is `visible`

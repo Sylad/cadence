@@ -209,6 +209,48 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     expect(raf(dir, 'show', 'L1').out).toContain('todo');
   });
 
+  it('start : plan stagé puis arbre restauré depuis HEAD — démarrage sauté, l\'index garde le plan stagé', () => {
+    const { dir, env } = project('start');
+    raf(dir, 'add', 'C');
+    git(dir, 'add', 'docs/plan/raf.yaml');
+    const staged = git(dir, 'show', ':docs/plan/raf.yaml').stdout;
+    // L'arbre de travail revient à HEAD, l'index garde la version stagée.
+    git(dir, 'restore', '--source=HEAD', '--worktree', 'docs/plan/raf.yaml');
+    expect(git(dir, 'status', '--porcelain').stdout.trim()).toBe('MM docs/plan/raf.yaml');
+    const r = work(dir, env, 'feat(L1): a');
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('plan modifié non commité : démarrage automatique sauté');
+    expect(r.stderr).toContain('L1 est encore todo');
+    // Le plan stagé est parti tel quel dans le commit, sans passage de L1 à doing.
+    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toBe(staged);
+    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toMatch(/id: L1\n\s+title: A\n\s+status: todo/);
+    expect(planText(dir)).not.toBe(staged);
+  });
+
+  it('start : premier commit du dépôt citant un lot, plan stagé jamais commité — démarrage sauté, message, avertissement', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--no-hook');
+    raf(dir, 'add', 'A');
+    writeFileSync(join(dir, 'cadence.yaml'), 'hook:\n  autostart: start\n');
+    raf(dir, 'hook', 'install');
+    const bin = tempDir();
+    const shim = join(bin, 'raf');
+    writeFileSync(shim, `#!/bin/sh\nexec node "${join(process.env.CADENCE_TEST_PACKAGE!, 'bin/raf.js')}" "$@"\n`);
+    chmodSync(shim, 0o755);
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, RAF_TODAY: '2026-09-28' };
+    writeFileSync(join(dir, 'src.txt'), 'x');
+    git(dir, 'add', '-A');
+    expect(git(dir, 'rev-parse', '--verify', '-q', 'HEAD').status).not.toBe(0);
+    const staged = git(dir, 'show', ':docs/plan/raf.yaml').stdout;
+    const r = spawnSync('git', ['commit', '-qm', 'feat(L1): a'], { cwd: dir, env, encoding: 'utf8' });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('plan modifié non commité : démarrage automatique sauté');
+    expect(r.stderr).toContain('L1 est encore todo');
+    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toBe(staged);
+    expect(raf(dir, 'show', 'L1').out).toContain('todo');
+    expect(git(dir, 'status', '--porcelain').stdout).toBe('');
+  });
+
   it('start : plan modifié non stagé + commit partiel — rien n\'est démarré, le commit suivant ne remet rien à todo', () => {
     const { dir, env } = project('start');
     raf(dir, 'add', 'C');

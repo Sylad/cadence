@@ -18,7 +18,7 @@ export interface TourRow {
   project: string;
   /** Renseigné quand le projet n'a pas pu être lu : les autres champs sont alors vides. */
   error?: string;
-  doing: { id: string; silentDays?: number }[];
+  doing: { id: string; silentDays?: number; /** ni `started`, ni commit, ni note : le lot le plus silencieux */ noActivity?: true }[];
   drift: string[];
   notes: string[];
   next: { id: string; title: string } | null;
@@ -67,7 +67,8 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE): TourRow {
 
     row.doing = doing.map((l) => {
       const last = lastActivity(l, all.byLot.get(l.id) ?? []);
-      const days = last ? diffDays(last, today) : 0;
+      if (!last) return { id: l.id, noActivity: true as const };
+      const days = diffDays(last, today);
       return days > idle ? { id: l.id, silentDays: days } : { id: l.id };
     });
     row.drift = audit(plan, root, join(root, 'docs/nouveautes'), today).map((i) => `${i.warning ? '⚠' : '✗'} ${i.message}`);
@@ -93,7 +94,7 @@ const DRIFT_SHOWN = 2;
 /** Une ligne par projet : projet · en cours · dérive · notes · prochain lot prêt · dépôt. */
 export function tourLine(r: TourRow): string {
   if (r.error) return `${r.project} · ✗ erreur : ${r.error}`;
-  const doing = r.doing.length ? r.doing.map((d) => (d.silentDays === undefined ? d.id : `${d.id} (silencieux ${d.silentDays}j)`)).join(', ') : 'rien';
+  const doing = r.doing.length ? r.doing.map((d) => (d.noActivity ? `${d.id} (aucune activité)` : d.silentDays === undefined ? d.id : `${d.id} (silencieux ${d.silentDays}j)`)).join(', ') : 'rien';
   const drift = r.drift.length
     ? `${r.drift.length} (${r.drift.slice(0, DRIFT_SHOWN).join(' ; ')}${r.drift.length > DRIFT_SHOWN ? ' ; …' : ''})`
     : 'aucune';

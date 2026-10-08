@@ -162,4 +162,13 @@ describe('cadence lead tour', () => {
     expect(tourLine(row(['⚠ a', '✗ b']))).toContain('dérive 2 (⚠ a ; ✗ b) ·');
     expect(tourLine(row(['⚠ a', '✗ b', '✗ c', '✗ d']))).toContain('dérive 4 (⚠ a ; ✗ b ; …) ·');
   });
+
+  it('un lot en cours sans aucune activité datée est dit « aucune activité », comme session start', async () => {
+    const { root, beta } = await parent();
+    writeFileSync(join(beta, 'suivi/taches.yaml'), 'taches:\n  - { id: T1, titre: Premier, etat: livre }\n  - { id: T2, titre: Second, etat: en_cours }\n');
+    const { out } = await cad(root, 'lead', 'tour');
+    expect(out.split('\n')[1]).toMatch(/^beta · en cours T2 \(aucune activité\) · /);
+    const json = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as TourRow[];
+    expect(json[1]!.doing).toEqual([{ id: 'T2', noActivity: true }]);
+  });
 });

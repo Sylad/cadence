@@ -470,7 +470,7 @@ beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second 
 
 | Column | Content |
 |---|---|
-| `en cours` | ids of the lots in progress; `(silencieux Nj)` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |
+| `en cours` | ids of the lots in progress; `(aucune activité)` when it has none at all, `(silencieux Nj)` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |
 | `dérive` | the gaps `raf check` reports, counted and the first two shown |
 | `notes` | the notes left by the last `session close`, joined with ` / ` and cut at 120 characters |
 | `prochain` | the first ready lot (quick wins first) — id and title cut at 60 characters |

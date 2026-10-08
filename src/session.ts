@@ -68,7 +68,7 @@ function byLotLines(linked: Linked): string[] {
 }
 
 /** Ligne de livraison en cours ; `live` faux quand le verrou appartient à un processus mort. */
-function lockStatus(state: string): { line: string; live: boolean } | null {
+export function lockStatus(state: string): { line: string; live: boolean } | null {
   const lock = readLock(state);
   if (!lock) return null;
   if (lockAlive(lock)) return { line: `Livraison en cours : ${lock.sha.slice(0, 7)} (pid ${lock.pid}, depuis ${lock.started})`, live: true };
@@ -93,7 +93,7 @@ function section(out: (l: string) => void, title: string, lines: string[]): void
 }
 
 /** Dernière activité d'un lot : dernier commit, dernière note ou démarrage. */
-function lastActivity(lot: Lot, commits: Commit[]): Day | undefined {
+export function lastActivity(lot: Lot, commits: Commit[]): Day | undefined {
   const days = [commits[0]?.day, lot.started, ...lot.notes.map((n) => n.date)].filter((d): d is Day => !!d);
   return days.length ? days.reduce(maxDay) : undefined;
 }

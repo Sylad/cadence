@@ -16,6 +16,7 @@ import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
+import { leadTour, tourLine } from './lead.js';
 import { orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
@@ -50,6 +51,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf gantt [-o docs/plan/gantt.html]
   raf hook install
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--answer projet:lot "réponse"]
+  cadence lead tour [dossier] [--idle 3] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan (en cours, dérive, notes de clôture, prochain lot prêt, dépôt)
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -131,6 +133,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       clear: { type: 'boolean' },
       ignored: { type: 'boolean' },
       notes: { type: 'boolean' },
+      json: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -142,6 +145,19 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const today: Day = io.env.RAF_TODAY ?? toDay(io.now());
   if (!isDay(today)) throw new RafError(`RAF_TODAY invalide : ${today} (attendu AAAA-MM-JJ)`);
   const root = gitRoot(io.cwd) ?? io.cwd;
+  // Le tour parcourt les sous-dossiers : il ne lit ni le plan ni le cadence.yaml du dossier courant.
+  if (command === 'lead') {
+    if (rest[0] !== 'tour' || rest.length > 2) throw new RafError('usage : cadence lead tour [dossier] [--idle 3] [--json]');
+    const idle = values.idle === undefined ? undefined : Number(values.idle);
+    if (idle !== undefined && !(Number.isInteger(idle) && idle >= 0)) throw new RafError(`--idle invalide : ${values.idle}`);
+    const parent = resolve(io.cwd, rest[1] ?? '.');
+    if (!existsSync(parent)) throw new RafError(`lead tour : dossier introuvable : ${parent}`);
+    const rows = leadTour(parent, today, idle);
+    if (values.json) io.out(JSON.stringify(rows, null, 2));
+    else if (rows.length === 0) io.out(`aucun projet sous ${parent} (docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
+    else for (const r of rows) io.out(tourLine(r));
+    return 0;
+  }
   // cadence.yaml peut dire où est le plan et, s'il est tenu par un autre outil, comment le lire.
   const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
   // Installer les skills ou le hook ne lit pas le plan : un cadence.yaml fautif ne doit pas l'empêcher.

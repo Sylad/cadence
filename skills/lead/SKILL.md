@@ -1,12 +1,12 @@
 ---
 name: lead
-description: Lead several cadence projects from a parent folder without loading them into the main context — fan out one subagent per project to gather the facts, agree the priorities with the human, delegate each chosen lot to a subagent with a standard brief, have the work reviewed, re-verify it yourself, then deliver one project at a time. Triggers — "/lead", "pilot all projects", "on pilote tout", "délègue aux sous-agents", start of a multi-project day.
+description: Lead several cadence projects from a parent folder without loading them into the main context — take the facts of every project with `cadence lead tour`, agree the priorities with the human, delegate each chosen lot to a subagent with a standard brief, have the work reviewed, re-verify it yourself, then deliver one project at a time. Triggers — "/lead", "pilot all projects", "on pilote tout", "délègue aux sous-agents", start of a multi-project day.
 ---
 
 # Lead — decide at the top, work in subagents
 
 The lead session stays small: it reads summaries, decides with the human, delegates, checks and
-delivers. Project files are read and changed by subagents, each with its own context. The projects
+delivers. Project files are changed by subagents, each with its own context; the facts of the tour come from `cadence lead tour`, a program. The projects
 are the sub-folders of the current directory that contain `docs/plan/raf.yaml`, or a `cadence.yaml`
 with a `plan:` key. A project whose `cadence.yaml` maps the fields of a plan kept by its own tool is
 **read-only** for `raf`: it takes part in the tour, and its plan is changed with the project's own
@@ -30,9 +30,12 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
 
 ## 1. Tour of the projects
 
-For each project, a subagent (read-only) runs `cd <project> && cadence session start` and returns at
-most five lines: lots in progress (silent ones flagged), drift, notes from the last close, the next
-ready lot. Two at a time, in the background.
+Run `cadence lead tour` from the parent folder (one command, no subagent, no model: it reads the same
+facts as `cadence session start` for every project). It prints one line per project — lots in progress
+(`silencieux Nj` when idle for more than three days), drift, notes from the last close, the next ready lot,
+repository state — and exits 0 even when a project is in error (its line says so). `--json` gives the same
+content. Read the lines yourself; open a project's own `cadence session start` only for the one you need to
+look at closer.
 
 Then report to the human in a compact table — one row per project — and propose **three** items
 across projects, each with project, lot id and one sentence of justification: finish what is in

@@ -455,6 +455,32 @@ The commands get `CADENCE_SINCE` (the `--since` in effect) and `CADENCE_TODAY`. 
 add facts and decide nothing: a failing command is reported and changes neither
 the exit code nor the verdict.
 
+## lead tour
+
+`cadence lead tour [folder] [--idle 3] [--json]` is the lead's morning table, with no model in
+the loop. From a parent folder (default: the current one) it takes every direct sub-folder that
+holds `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key (a plan kept by another tool
+included), and for each one reads the same facts as `cadence session start` — in-process, no
+sub-process, no call to `claude` — then prints **one line per project**:
+
+```
+alpha · en cours L1 (silencieux 4j) · dérive 1 (✗ L2 a 1 commit(s) mais est encore todo) · notes : finir L1 puis livrer · prochain L3 Typo · dépôt non commité, non poussé
+beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second · dépôt propre
+```
+
+| Column | Content |
+|---|---|
+| `en cours` | ids of the lots in progress; `(silencieux Nj)` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |
+| `dérive` | the gaps `raf check` reports, counted and the first two shown |
+| `notes` | the notes left by the last `session close`, joined with ` / ` and cut at 120 characters |
+| `prochain` | the first ready lot (quick wins first) — id and title cut at 60 characters |
+| `dépôt` | `non commité` (modified or untracked files), `non poussé` (commits ahead of the upstream), `livraison en cours` (live delivery lock); `propre` otherwise |
+
+`--json` prints the same content as an array of objects (`project`, `doing`, `drift`, `notes`,
+`next`, `repo`, and `error` when the project could not be read). The tour is read-only: it changes
+no plan. It exits 0 even when a project is in error — that project's line reads
+`beta · ✗ erreur : <cause>`. The `lead` skill runs it instead of one subagent per project.
+
 ## deliver
 
 A delivery is done when its checks pass, not when a tool says "success".
@@ -937,8 +963,8 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 - **deliver**: dry run, delivery, and on failure the cause fixed rather than a
   blind retry; after a green delivery that changes what a page shows or what it
   is served, the `qa-reviewer` agent walks the delivered app.
-- **lead**: from a folder holding several projects, one subagent per project
-  gathers the facts, you choose the priorities, the lots are delegated with
+- **lead**: from a folder holding several projects, `cadence lead tour` (a program,
+  no model: see [lead tour](#lead-tour)) prints one line of facts per project, you choose the priorities, the lots are delegated with
   `cadence orchestrate` (fresh short sessions with a standard brief — test first,
   README and usage documentation updated with the change, commits citing the lot, no push — reviewed by the `code-reviewer` agent, see
   [orchestrate](#orchestrate)), re-verified by the lead, then delivered

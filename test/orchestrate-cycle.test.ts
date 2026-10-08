@@ -766,17 +766,37 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.outcome).toBe('fix sans commit');
   });
 
-  it('une revue qui modifie le dépôt : incident, vague arrêtée, rien enregistré', async () => {
+  it('une revue qui modifie le dépôt : le lot est rendu au lead, la vague continue, rien enregistré (L133)', async () => {
     const touchy: Handler = (call) => {
       commitFile(call.opts.cwd, 'intrus.txt', 'fix(L1): la revue a corrigé');
-      return claudeOut(reviewReport());
+      return claudeOut(reviewReport({ verdict: 'non conforme', majeurs: 1, constats: [{ gravite: 'majeur', texte: 'bug' }] }));
     };
     const h = harness({ script: { implement: [impl()], review: [touchy] } });
     const c = h.lot('L1');
     await runLot(c);
-    expect(c.lot.status).toBe('failed');
-    expect(h.wave.incident).toMatch(/a modifié le dépôt/);
+    expect(c.lot.status).toBe('handed-back');
+    expect(h.wave.incident).toBeNull();
+    expect(c.lot.outcome).toMatch(/a modifié le dépôt/);
+    expect(c.lot.outcome).toMatch(/verdict.*non conforme/);
     expect(h.plan().lot('L1').review).toBeUndefined();
+  });
+
+  it('captures à la racine après une revue conforme : le lot est rendu, le verdict conforme est rapporté et non enregistré (L133)', async () => {
+    const shots: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'capture.png'), 'png');
+      return claudeOut(reviewReport({ verdict: 'conforme : rien à signaler' }));
+    };
+    const h = harness({ script: { implement: [impl()], review: [shots] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(h.wave.incident).toBeNull();
+    expect(c.lot.outcome).toMatch(/capture\.png/);
+    expect(c.lot.outcome).toMatch(/verdict de la revue avant l'incident : conforme/);
+    expect(c.lot.outcome).toMatch(/non enregistré/);
+    expect(c.lot.warnings.join('\n')).toMatch(/verdict.*conforme/);
+    expect(h.plan().lot('L1').review).toBeUndefined();
+    expect(c.lot.steps.at(-1)?.status).toBe('failed');
   });
 
   it('un push (même contourné) arrête la vague', async () => {

@@ -157,7 +157,7 @@ describe('sessions d\'un lot à dépôt voisin (L62)', () => {
     expect(h.wave.incident).toMatch(/push détecté .*\.\.\/gitops/);
   });
 
-  it('la revue qui modifie le voisin est un incident, aucun verdict', async () => {
+  it('la revue qui modifie le voisin rend le lot au lead (pas la vague), aucun verdict enregistré (L133)', async () => {
     const { h, c } = scenario((nb) => ({
       implement: [both(nb)],
       review: [
@@ -168,8 +168,9 @@ describe('sessions d\'un lot à dépôt voisin (L62)', () => {
       ],
     }));
     await runLot(c);
-    expect(c.lot.status).toBe('failed');
-    expect(h.wave.incident).toMatch(/a modifié le dépôt/);
+    expect(c.lot.status).toBe('handed-back');
+    expect(h.wave.incident).toBeNull();
+    expect(c.lot.outcome).toMatch(/a modifié le dépôt dans/);
     expect(h.plan().lot('L1').review).toBeUndefined();
   });
 

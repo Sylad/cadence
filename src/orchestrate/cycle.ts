@@ -421,16 +421,32 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       return stop(c, 'failed', `incident : ${w.incident}`);
     }
     if (!write && (b.head !== a.head || b.tracked.join() !== a.tracked.join() || b.untracked.join() !== a.untracked.join())) {
+      // Incident du LOT (L133) : la revue a laissé des traces (captures, commit), ni push ni garde supprimée — les lots des autres dépôts continuent.
       step.status = 'failed';
       step.cause = `le dépôt${where} a changé pendant une revue`;
-      w.incident = `${kind} de ${lotKey(l.project, l.lot)} a modifié le dépôt${where}`;
-      w.saveWave();
-      return stop(c, 'failed', `incident : ${w.incident}`);
+      const traces = [...trackedPaths(a).filter((f) => !trackedPaths(b).includes(f)), ...a.untracked.filter((f) => !b.untracked.includes(f))];
+      const what = traces.length ? ` (${traces.join(', ')})` : b.head !== a.head ? ' (commit)' : '';
+      return stop(c, 'handed-back', `incident : ${kind} de ${lotKey(l.project, l.lot)} a modifié le dépôt${where}${what}${lostVerdict(c, kind, res.structured)}`);
     }
   }
   step.status = 'ok';
   save(c);
   return { step, report: res.structured, before, after, others };
+}
+
+/** Verdict d'une revue interrompue par un incident du lot : rapporté au lead plutôt que perdu (L133). Rien n'est enregistré dans le plan. */
+function lostVerdict(c: LotCtx, kind: StepKind, report: unknown): string {
+  if (kind === 'precheck') return '';
+  let rep: ReviewReport;
+  try {
+    rep = checkShape<ReviewReport>(report, REVIEW_SCHEMA);
+  } catch {
+    return ' ; la revue n\'a pas rendu de verdict exploitable';
+  }
+  const s = summarize(rep, '');
+  const text = `verdict de la revue avant l'incident : ${s.conforme ? 'conforme' : 'non conforme'} (${s.bloquants} bloquant(s), ${s.majeurs} majeur(s), ${s.mineurs} mineur(s)) — « ${s.verdict} » — non enregistré dans le plan, à confirmer par le lead`;
+  c.lot.warnings.push(text);
+  return ` ; ${text}`;
 }
 
 /** Budget du lot atteint avant une session : le lot est rendu au lead (reprendre ne lui rendrait pas de budget), les autres continuent. */

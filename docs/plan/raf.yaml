@@ -1360,6 +1360,7 @@ lots:
     quickwin: true
     created: 2026-10-08
     started: 2026-10-08
+    review: { date: 2026-10-08, verdict: "compliant — orchestré (vague 2026-10-08-0836, 0 passe(s) de correction)", commit: 2b531c38bd9c71d577cf1c8ca6624dd96599ebf3 }
   - id: L119
     title: "cadence-hud (suite L116) : cells() compte pour 1 les autres caractères de largeur ambiguë de la première ligne (· U+00B7, …, —) ; décider table East Asian Width ou les exclure du texte, et aligner le README « au pire cas »"
     status: todo

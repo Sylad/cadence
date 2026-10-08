@@ -1196,9 +1196,10 @@ lots:
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "Le dernier commit du lot porte « Closes #4 » dans son corps (issue GitHub)." }
+      - { date: 2026-10-08, text: "[L104/t1] abandonné : repris en lot autonome" }
     started: 2026-10-08
     tasks:
-      - { id: t1, title: "tests du hook autostart : (1) plan stagé puis arbre restauré depuis HEAD → démarrage sauté, index intact ; (2) premier commit citant un lot avec plan stagé jamais commité → démarrage sauté, message, avertissement post-commit (revue 08-10, mineurs de L104)", status: todo }
+      - { id: t1, title: "tests du hook autostart : (1) plan stagé puis arbre restauré depuis HEAD → démarrage sauté, index intact ; (2) premier commit citant un lot avec plan stagé jamais commité → démarrage sauté, message, avertissement post-commit (revue 08-10, mineurs de L104)", status: dropped }
     review: { date: 2026-10-08, verdict: "conforme avec mineurs — revue orchestrée (2 passes) puis correctif 4e88a0b (démarrage seulement si le plan = HEAD) relu en session neuve : conforme avec 2 mineurs ; le premier (index ignoré) corrigé par le lead en une ligne (diff --cached), 976 tests verts ; le second (2 tests manquants) en sous-tâche", commit: 93825f68b451e74dd9858243a018b7e9d95654ae }
     finished: 2026-10-08
   - id: L105
@@ -1429,6 +1430,12 @@ lots:
     title: "orchestrate : un lot rendu au lead pour « budget du lot atteint » juste avant sa revue finale n'est pas reprenable (--resume répond « vague terminée », exit 2, vécu 08-10 sur 3 lots de maritime-sq4-1, 209–224 k pour un plancher de 200 k) — soit --resume --budget relève le budget des lots rendus et rejoue l'étape manquante, soit le plancher couvre precheck + implement + review + fix + review courte (~250 k mesurés)"
     status: todo
     estimate: 1
+    created: 2026-10-08
+  - id: L125
+    title: "tests du hook autostart (mineurs de revue L104) : plan stagé puis arbre restauré depuis HEAD → démarrage sauté, index intact ; premier commit citant un lot avec plan stagé jamais commité → démarrage sauté, message, avertissement post-commit"
+    status: todo
+    estimate: 0.5
+    quickwin: true
     created: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

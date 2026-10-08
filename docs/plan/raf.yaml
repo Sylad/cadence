@@ -1317,6 +1317,42 @@ lots:
     notes:
       - { date: 2026-10-08, text: "Décision lead 08-10 : faire le passage v5 maintenant ; la vérification ubuntu-latest → Ubuntu 26 du 19-10 ne se fait pas dans ce lot, l'écrire en une ligne dans le CHANGELOG (Unreleased) et laisser le lot se fermer." }
     started: 2026-10-08
+    review:
+      {
+        date: 2026-10-08,
+        verdict: "conforme. Commit relu : 8414823 « ci(L117): publish.yml passe actions/checkout et actions/setup-node en v5 (Node 20 déprécié) ».
+
+
+          Vérifications lancées :
+
+          - test/publish-workflow.test.ts : 36 tests sur 36 passent.
+
+          - npm run typecheck : aucune erreur.
+
+          - Suite complète : 923/924 au premier passage (échec non identifié, voir « non vérifié »), puis 924/924 sur trois relances.
+
+
+          Ce que j'ai vérifié :
+
+          - .github/workflows/publish.yml est le seul workflow du dépôt. Ses deux lignes `uses:` sont en v5, et `persist-credentials: false` est conservé.
+
+          - Le nouveau test ne peut échouer que si le workflow change : il exige les deux v5 et refuse tout reste de v4.
+
+          - Le test existant mis à jour (lignes 140-141) vérifie toujours `persist-credentials` après `checkout@v5`.
+
+          - CHANGELOG : la section « Changed » placée avant « Fixed » suit l'ordre déjà utilisé dans le fichier (lignes 130 et 135, par exemple). Le script awk qui extrait les notes de version ne dépend pas des sous-titres.
+
+          - La ligne du 19-10, placée dans l'entrée du passage en v5, est conforme à la note du lead du 08-10.
+
+          - Aucune autre documentation ne cite les versions de ces actions.
+
+
+          Les trois choix de l'auteur sont donc conformes au lot.
+
+
+          Verdict : conforme — orchestré (vague 2026-10-08-0836, 0 passe(s) de correction)",
+        commit: 84148239db24499b665a26afa8a0881fd8557b1d
+      }
   - id: L118
     title: "raf check (suite L115) : sur un plan en lecture seule dont le fichier porte la clé public sans mapping dans fields, avertir quand même d'un lot visible sans titre public ; et l'entrée Fixed du CHANGELOG de L115 doit décrire l'exception ajoutée par c3d3e11 (avertissement si un lot porte déjà public:)"
     status: todo

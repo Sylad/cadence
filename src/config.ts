@@ -127,6 +127,32 @@ export function readNewsConfig(file: string): NewsConfig {
   return { publicTitleMax: max };
 }
 
+export interface HookConfig {
+  /** Que faire d'un commit qui cite un lot encore todo : l'avertir (défaut), le refuser, ou démarrer le lot dans le commit. */
+  autostart?: 'warn' | 'refuse' | 'start';
+}
+
+const AUTOSTART = ['warn', 'refuse', 'start'];
+
+/** Clé `hook:` de cadence.yaml. */
+export function readHookConfig(file: string): HookConfig {
+  if (!existsSync(file)) return {};
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const h = (raw as { hook?: unknown } | null)?.hook;
+  if (h == null) return {};
+  if (!isObject(h)) throw new RafError(`${file} : hook doit être un objet { autostart }`);
+  for (const k of Object.keys(h)) if (k !== 'autostart') throw new RafError(`${file} : hook.${k} inconnu (attendu : autostart)`);
+  const a = h.autostart;
+  if (a == null) return {};
+  if (typeof a !== 'string' || !AUTOSTART.includes(a)) throw new RafError(`${file} : hook.autostart : ${AUTOSTART.join(', ')} attendu`);
+  return { autostart: a as HookConfig['autostart'] };
+}
+
 export interface SessionConfig {
   /** Commande sh, à la racine du dépôt, dont la sortie complète « cadence session start ». */
   start?: string;

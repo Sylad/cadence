@@ -16,7 +16,7 @@ function configRel(plan: Plan, root: string): string {
 }
 
 /** Le plan, sa page Gantt, la configuration lue (cadence.yaml) et les fichiers tenus avec lui (plan.files). */
-function ownFiles(plan: Plan, root: string): Set<string> {
+export function ownFiles(plan: Plan, root: string): Set<string> {
   return new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), configRel(plan, root), ...plan.maintained]);
 }
 

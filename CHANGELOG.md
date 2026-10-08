@@ -27,6 +27,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence-hud`: dropped segments taken back when they fit, `CADENCE_HUD_AMBIGUOUS` | [0.13.1](#0131---2026-10-08) |
 | `cadence lead tour`: the lead's table of projects without a model | [0.14.0](#0140---2026-10-08) |
 
+## [Unreleased]
+
+### Added
+- `hook.autostart` in `cadence.yaml` (`warn` by default, `refuse`, `start`): what the new pre-commit hook does with a commit that cites a lot still `todo`. `refuse` fails the commit with `raf start <id>` in the message; `start` runs `raf start` in the hook and stages the plan, so it goes in the same commit (no amend). `warn` keeps today's post-commit warning. `raf hook install` now installs both hooks; run it again in an existing repository. (L104, #4)
+
 ## [0.14.0] - 2026-10-08
 
 ### Added

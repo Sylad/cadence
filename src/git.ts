@@ -54,6 +54,16 @@ export function hooksDir(cwd: string): string {
   return basename(dir) === '_' && basename(dirname(dir)) === '.husky' ? dirname(dir) : dir;
 }
 
+/** Fichiers de l'index (ce que le commit en préparation contient), relatifs à la racine du dépôt. */
+export function stagedFiles(cwd: string): string[] {
+  return git(cwd, ['-c', 'core.quotepath=off', 'diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean);
+}
+
+/** Ajoute un fichier à l'index. */
+export function stage(cwd: string, file: string): void {
+  git(cwd, ['add', '--', file]);
+}
+
 /** Fichiers modifiés par un commit, relatifs à la racine du dépôt (noms accentués ou à espaces compris). */
 export function changedFiles(cwd: string, sha: string): string[] {
   // -z : noms séparés par NUL, jamais échappés ; quotepath=off en plus pour les sorties qui citeraient quand même.

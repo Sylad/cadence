@@ -99,7 +99,28 @@ raf gantt                         # docs/plan/gantt.html
 | `raf check --ignored` | list the acknowledged commits with their date and reason |
 | `raf check [--since date] [--idle 7]` | since the plan's adoption date by default (a visible lot without a public title is only a `⚠` warning: it never changes the exit code): commits without a lot (commits touching only plan files are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
 | `raf gantt [-o file]` | standalone Gantt page |
-| `raf hook install` | add the (non-blocking, read-only) post-commit hook |
+| `raf hook install` | add the post-commit hook (read-only, never blocks) and the pre-commit hook (does nothing unless `hook.autostart` says so, see below) |
+
+#### A commit on a lot that is still `todo`
+
+By default the post-commit hook only warns (`L1 est encore todo — raf start L1`). The `hook.autostart`
+key of `cadence.yaml` changes what the **pre-commit** hook does when the message cites a `todo` lot
+(a recurring lot, a lot already `doing`, a commit without a lot and a plan-upkeep commit are never concerned):
+
+```yaml
+hook:
+  autostart: refuse   # warn (default) | refuse | start
+```
+
+- `warn`: today's behaviour, the commit goes through, the post-commit hook warns.
+- `refuse`: the commit fails, loudly, with `raf start <id>` in the message (`--no-verify` still bypasses it).
+- `start`: the hook runs `raf start <id>` and stages the plan, so the plan change is **in the same commit** —
+  no amend afterwards, no dirty plan left behind.
+
+The pre-commit hook reads the message from the command line of the `git commit` that runs it (`-m`, `-am`,
+`--message`, `-F`; Linux, through `/proc`) or from `CADENCE_COMMIT_MESSAGE`. When the message is not known yet
+(editor, `--amend`) it does nothing and the post-commit warning stays. Run `raf hook install` again to add the
+pre-commit block to an existing repository. A read-only plan is never started by the hook. Only a refusal (exit code 3 of `raf hook pre-commit`) stops a commit: an older or broken `raf` lets it through.
 
 Global options: `--file path` or `RAF_FILE`; `RAF_TODAY=YYYY-MM-DD` to freeze
 the date. `cadence raf …` is the same as `raf …`.

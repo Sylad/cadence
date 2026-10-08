@@ -1,15 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { readNewsConfig, readPlanConfig, readSessionConfig } from './config.js';
-import { audit, exemptPlanOnly, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
+import { readHookConfig, readNewsConfig, readPlanConfig, readSessionConfig } from './config.js';
+import { audit, exemptPlanOnly, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
-import { gitRoot, readCommits, resolveCommit } from './git.js';
-import { installHook } from './hook.js';
+import { gitRoot, readCommits, resolveCommit, stage, stagedFiles } from './git.js';
+import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
 import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
@@ -49,7 +49,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot (ou citant un id inconnu) sans réécrire l'historique ; raf check --ignored les liste
   raf gantt [-o docs/plan/gantt.html]
-  raf hook install
+  raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--answer projet:lot "réponse"]
   cadence lead tour [dossier] [--idle 3] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan (en cours, dérive, notes de clôture, prochain lot prêt, dépôt)
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
@@ -361,7 +361,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         return 0;
       }
       if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io);
-      throw new RafError('usage : raf hook install|post-commit');
+      if (rest[0] === 'pre-commit') return preCommit(existsSync(planPath) ? loadPlan : null, readHookConfig(configPath).autostart, root, today, io);
+      throw new RafError('usage : raf hook install|pre-commit|post-commit');
     }
     case 'session': {
       if (!gitRoot(io.cwd)) throw new RafError('session : à lancer dans un dépôt git');
@@ -491,6 +492,45 @@ function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): num
 
   const issues = audit(plan, root, newsDir, today).filter((i) => !i.warning);
   if (issues.length) io.out(`\n${issues.length} écart(s) entre le plan et l'historique — raf check`);
+  return 0;
+}
+
+/**
+ * Pre-commit : un commit qui cite un lot encore todo. `warn` (défaut) : rien ici, le post-commit avertit ; `refuse` :
+ * échoue (REFUSED) avec « raf start <id> » ; `start` : démarre le lot et met le plan dans l'index, donc dans CE commit.
+ * Ne rend REFUSED que pour un refus : toute autre panne laisse le commit passer. Sans message lisible (éditeur), rien.
+ */
+function preCommit(load: (() => Plan) | null, mode: 'warn' | 'refuse' | 'start' | undefined, root: string, today: Day, io: Io): number {
+  if (!load || !mode || mode === 'warn') return 0;
+  try {
+    const message = pendingCommitMessage(io.env);
+    if (message === null) return 0;
+    const plan = load();
+    const [subject = '', ...body] = message.split('\n');
+    const refs = citedRefs({ sha: '', day: today, subject, body: body.join('\n').trim() }, plan.refs);
+    const staged = stagedFiles(root);
+    const own = ownFiles(plan, root);
+    // Entretien du plan : tous les fichiers du commit sont ceux du plan (la configuration seule ne compte pas).
+    if (staged.length > 0 && staged.every((f) => own.has(f) && f !== relative(root, plan.configFile ?? join(root, 'cadence.yaml')))) return 0;
+    const todo = [...new Set(refs.map((r) => r.lot))].filter((id) => {
+      const lot = plan.lots().find((l) => l.id === id);
+      return lot?.status === 'todo' && !isRecurring(lot);
+    });
+    if (todo.length === 0) return 0;
+    if (mode === 'refuse') {
+      for (const id of todo) io.err(`raf: ${id} est encore todo — commit refusé (hook.autostart: refuse)${plan.readonly ? '' : ` : raf start ${id}`} (--no-verify pour passer outre)`);
+      return REFUSED;
+    }
+    if (plan.readonly) return 0;
+    for (const id of todo) {
+      plan.setStatus(id, 'doing', today, {});
+      io.err(`raf: ${id} était todo — raf start ${id} fait par le hook, plan inclus dans ce commit`);
+    }
+    plan.save();
+    stage(root, relative(root, plan.path));
+  } catch {
+    // Un hook ne doit jamais gêner un commit, hors refus.
+  }
   return 0;
 }
 

@@ -181,11 +181,12 @@ test('la consommation par modèle se lit, du plus cher au moins cher', () => {
   expect(shortModel('gpt-x')).toBe('gpt-x')
   expect(
     modelsText({ byModel: { sonnet: { tokens: 85_300, usd: 0.12 }, fable: { tokens: 410_000, usd: 0.95 } }, usdSeen: 1.07 }),
-  ).toBe('fable 410k $0.95 | sonnet 85k $0.12')
+  ).toBe('fable 410k sonnet 85k')
+  expect(modelsText({ byModel: { opus: { tokens: 1_200_000, usd: 2 }, sonnet: { tokens: 800_000, usd: 1 } }, usdSeen: 3 })).toBe('opus 1.2M sonnet 800k')
   expect(modelsText({ byModel: {}, usdSeen: 0 })).toBe('')
 })
 
-test('la bande montre la part de chaque modèle à côté du coût', async ($, on) => {
+test('la bande montre les tokens de chaque modèle, du plus cher au moins cher', async ($, on) => {
   seed(on, {
     ...EMPTY,
     usage: { percent: 9, tokens: 90_000, window: 1_000_000, usd: 1.07, limits: [] },
@@ -194,7 +195,7 @@ test('la bande montre la part de chaque modèle à côté du coût', async ($, o
     now: 0,
   })
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Text', text: /fable 410k \$0\.95 \| sonnet 85k \$0\.12/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /fable 410k sonnet 85k/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -302,7 +303,7 @@ test('dans une fenêtre étroite, la première ligne lâche les modèles et les 
   // 140 colonnes (mesurées en cellules, ▰▱⚙│ comptés double) : les modèles passent avant les heures de remise à
   // zéro, les noms d'agents tombent encore
   const wide = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 140 } })
-  expect(await wide.find({ type: 'Text', text: /fable 416k \$1\.47 \| haiku 190k \$0\.03/ })).toBeDefined()
+  expect(await wide.find({ type: 'Text', text: /fable 416k haiku 190k/ })).toBeDefined()
   expect(await wide.find({ type: 'Text', text: /↻/ })).toBeUndefined()
   expect(await wide.find({ type: 'Text', text: /⚙ 1 agent/ })).toBeDefined()
   expect(await wide.find({ type: 'Text', text: /tour-maritime/ })).toBeUndefined()

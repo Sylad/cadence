@@ -173,12 +173,12 @@ export const shortModel = (id: string): string => {
   return m ? m[1]!.toLowerCase() : id
 }
 
-/** "fable 410k $0.95 | sonnet 85k $0.12", du plus cher au moins cher ; vide sans modèle. */
+/** "fable 410k sonnet 85k", du plus cher au moins cher (le coût ordonne, il ne s'affiche pas) ; vide sans modèle. */
 export const modelsText = (models: ModelsSummary): string =>
   Object.entries(models.byModel)
     .sort(([, a], [, b]) => b.usd - a.usd || b.tokens - a.tokens)
-    .map(([name, m]) => `${name} ${k(m.tokens)} $${m.usd.toFixed(2)}`)
-    .join(' | ')
+    .map(([name, m]) => `${name} ${k(m.tokens)}`)
+    .join(' ')
 
 /** Un tour fini attribue ses tokens au modèle `name` et la part du coût de session apparue depuis le dernier tour :
  *  `total` est le coût courant de /cost (undefined quand il n'a pu être lu) ; un total absent, inchangé ou plus bas

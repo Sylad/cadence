@@ -186,7 +186,7 @@ export const register: Register = on => {
         })
       }
       if (Object.keys(m.byModel).length > 0) {
-        const text = fit(modelsText(m), 60)
+        const text = fit(modelsText(m), 40)
         segments.push({
           key: 'models',
           text: `${SEP}${text}`,

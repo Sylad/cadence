@@ -32,16 +32,18 @@ export interface BriefVars {
 export function reposText(role: 'write' | 'read', lot: string, repos: { rel: string; path: string; cite?: string }[]): string {
   if (!repos.length) return '';
   const list = repos.map((r) => `- \`${r.rel}\` (${r.path})`);
+  const cited = repos.filter((r) => r.cite);
   if (role === 'write') {
     return [
       "The work of this lot is not only in the project's repository: it also lives in these neighbouring repositories, which are not cadence projects and are added to your directories:",
       ...list,
-      `Work there as you do in the project's repository: test first, explicit paths, and every commit there cites the lot too (\`feat(${lot}): …\`) — the program and the review find the lot's work by those commits. Never push from any of them. Where the lot touches one, run that repository's own checks; leave it with no tracked file modified.`,
+      `Work there as you do in the project's repository: test first, explicit paths, and every commit there cites the lot too (\`feat(${lot}): …\`) — the program and the review find the lot's work by those commits.${cited.map((r) => ` In \`${r.rel}\` every commit also contains \`${r.cite}\` (subject or body): the repository is shared with other projects, and a commit without it is not counted.`).join('')} Never push from any of them. Where the lot touches one, run that repository's own checks; leave it with no tracked file modified.`,
     ].join('\n');
   }
   return [
     'The work of this lot is also in these neighbouring repositories (not cadence projects); the commits that cite the lot live there as well as in the project:',
     ...list,
+    ...cited.map((r) => `In \`${r.rel}\` only the commits that also contain \`${r.cite}\` count: the repository is shared with other projects.`),
     `\`raf commits ${lot}\` lists them all; read the diff of the neighbouring ones with \`git -C <path> log\` / \`git -C <path> show\` (${repos.map((r) => `git -C ${r.path} log`).join(' ; ')}), and review them like the rest. You are read-only there too.`,
   ].join('\n');
 }

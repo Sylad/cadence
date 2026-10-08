@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { OrchestrateConfig } from '../src/config.js';
-import { renderBrief, type BriefVars } from '../src/orchestrate/briefs.js';
+import { renderBrief, reposText, type BriefVars } from '../src/orchestrate/briefs.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { claudeOut, commitFile, git, harness, precheckReport, reviewReport, workReport, type Call, type Handler } from './orchestrate-harness.js';
 import { gitRepo, tempDir } from './helpers.js';
@@ -202,5 +202,14 @@ describe('brief : variable {{repos}}', () => {
     for (const kind of ['implement', 'fix', 'fix-minors', 'review', 'review-small', 'review-recheck', 'precheck'] as const) {
       expect(renderBrief(kind, vars({ repos: 'REPOS-MARK' })), kind).toContain('REPOS-MARK');
     }
+  });
+
+  it('un voisin déclaré avec cite : la consigne d\'écriture exige que ses commits contiennent aussi la chaîne, celle de revue la dit', () => {
+    const repos = [{ rel: NB, path: '/x/gitops', cite: 'ol-companion' }, { rel: '../autre', path: '/x/autre' }];
+    const write = reposText('write', 'L1', repos);
+    expect(write).toContain(`In \`${NB}\` every commit also contains \`ol-companion\``);
+    expect(write).not.toContain("In `../autre` every commit also");
+    expect(reposText('read', 'L1', repos)).toContain(`In \`${NB}\` only the commits that also contain \`ol-companion\` count`);
+    expect(reposText('write', 'L1', [{ rel: NB, path: '/x/gitops' }])).not.toContain('also contains');
   });
 });

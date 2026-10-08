@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, k, lotCells, lotCounts, lotText, fitSegments, modelsText, shortModel, wavePercent } from '../hooks/format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, modelsText, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 const PLUGIN = 'cadence-hud'
@@ -54,7 +54,7 @@ test('les nombres, barres et durées sont courts', () => {
   expect(k(85_300)).toBe('85k')
   expect(k(1_000_000)).toBe('1M')
   expect(k(1_500_000)).toBe('1.5M')
-  expect(k(undefined)).toBe('—')
+  expect(k(undefined)).toBe('-')
   expect(bar(0)).toBe('▱▱▱▱▱▱▱▱▱▱')
   expect(bar(50)).toBe('▰▰▰▰▰▱▱▱▱▱')
   expect(bar(100)).toBe('▰▰▰▰▰▰▰▰▰▰')
@@ -181,7 +181,7 @@ test('la consommation par modèle se lit, du plus cher au moins cher', () => {
   expect(shortModel('gpt-x')).toBe('gpt-x')
   expect(
     modelsText({ byModel: { sonnet: { tokens: 85_300, usd: 0.12 }, fable: { tokens: 410_000, usd: 0.95 } }, usdSeen: 1.07 }),
-  ).toBe('fable 410k $0.95 · sonnet 85k $0.12')
+  ).toBe('fable 410k $0.95 | sonnet 85k $0.12')
   expect(modelsText({ byModel: {}, usdSeen: 0 })).toBe('')
 })
 
@@ -194,7 +194,7 @@ test('la bande montre la part de chaque modèle à côté du coût', async ($, o
     now: 0,
   })
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Text', text: /fable 410k \$0\.95 · sonnet 85k \$0\.12/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /fable 410k \$0\.95 \| sonnet 85k \$0\.12/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -283,7 +283,7 @@ test('dans une fenêtre étroite, la première ligne lâche les modèles et les 
   // 140 colonnes (mesurées en cellules, ▰▱⚙│ comptés double) : les modèles passent avant les heures de remise à
   // zéro, les noms d'agents tombent encore
   const wide = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 140 } })
-  expect(await wide.find({ type: 'Text', text: /fable 416k \$1\.47 · haiku 190k \$0\.03/ })).toBeDefined()
+  expect(await wide.find({ type: 'Text', text: /fable 416k \$1\.47 \| haiku 190k \$0\.03/ })).toBeDefined()
   expect(await wide.find({ type: 'Text', text: /↻/ })).toBeUndefined()
   expect(await wide.find({ type: 'Text', text: /⚙ 1 agent/ })).toBeDefined()
   expect(await wide.find({ type: 'Text', text: /tour-maritime/ })).toBeUndefined()
@@ -293,4 +293,42 @@ test('dans une fenêtre étroite, la première ligne lâche les modèles et les 
   expect(await huge.find({ type: 'Text', text: /↻ 4 h 49/ })).toBeDefined()
   expect(await huge.find({ type: 'Text', text: /tour-maritime/ })).toBeDefined()
   await huge.unmount()
+})
+
+test('fit coupe avec trois points ASCII, sans dépasser la largeur', () => {
+  expect(fit('abcdefghij', 10)).toBe('abcdefghij')
+  expect(fit('abcdefghij', 8)).toBe('abcde...')
+  expect(fit('abcdefghij', 3)).toBe('...')
+  expect(fit('abcdefghij', 2)).toBe('')
+})
+
+test('la première ligne n\'emploie que de l\'ASCII et les symboles que cells() sait compter (▰▱⚙│↻)', async ($, on) => {
+  seed(on, {
+    ...EMPTY,
+    agents: { running: 2, names: ['un-nom-d-agent-tres-long', 'un-autre-nom-d-agent-tres-long', 'et-encore-un-troisieme'] },
+    usage: {
+      percent: undefined,
+      tokens: undefined,
+      window: undefined,
+      usd: 1.31,
+      limits: [
+        { kind: 'five_hour', percentUsed: undefined, resetsAt: '2026-10-08T05:00:00Z' },
+        { kind: 'seven_day', percentUsed: 6, resetsAt: '2026-10-14T05:00:00Z' },
+      ],
+    },
+    models: {
+      byModel: {
+        'un-modele-au-nom-tres-long-1': { tokens: 416_000, usd: 1.47 },
+        'un-modele-au-nom-tres-long-2': { tokens: 190_000, usd: 0.03 },
+      },
+      usdSeen: 1.5,
+    },
+    waves: [],
+    now: Date.parse('2026-10-08T00:11:00Z'),
+  })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 400 } })
+  expect(await ui.find({ type: 'Text', text: /↻ \d/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\.\.\./ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /[^\x00-\x7f▰▱⚙│↻]/ })).toBeUndefined()
+  await ui.unmount()
 })

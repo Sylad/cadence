@@ -8,7 +8,7 @@ export const colorOfPercent = (percent: number | undefined, warn = 60, bad = 85)
 
 /** 1234 → "1k", 85 300 → "85k", 1 000 000 → "1M". */
 export const k = (n: number | undefined): string => {
-  if (n === undefined || !Number.isFinite(n)) return '—'
+  if (n === undefined || !Number.isFinite(n)) return '-'
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`
   if (n >= 1_000) return `${Math.round(n / 1_000)}k`
   return String(n)
@@ -128,9 +128,9 @@ export const waveStatusFr = (status: string | undefined): string => {
   }
 }
 
-/** Tronque à `width` cellules, avec une ellipse. */
+/** Tronque à `width` caractères, avec trois points ASCII (« … » est de largeur ambiguë, que cells() ne couvre pas). */
 export const fit = (text: string, width: number): string =>
-  width <= 1 ? '' : text.length <= width ? text : `${text.slice(0, Math.max(0, width - 1))}…`
+  width <= 2 ? '' : text.length <= width ? text : `${text.slice(0, Math.max(0, width - 3))}...`
 
 const STATUS_PLURAL_FR: Record<string, string> = {
   queued: 'en attente',
@@ -173,12 +173,12 @@ export const shortModel = (id: string): string => {
   return m ? m[1]!.toLowerCase() : id
 }
 
-/** "fable 410k $0.95 · sonnet 85k $0.12", du plus cher au moins cher ; vide sans modèle. */
+/** "fable 410k $0.95 | sonnet 85k $0.12", du plus cher au moins cher ; vide sans modèle. */
 export const modelsText = (models: ModelsSummary): string =>
   Object.entries(models.byModel)
     .sort(([, a], [, b]) => b.usd - a.usd || b.tokens - a.tokens)
     .map(([name, m]) => `${name} ${k(m.tokens)} $${m.usd.toFixed(2)}`)
-    .join(' · ')
+    .join(' | ')
 
 /** Un tour fini attribue ses tokens au modèle `name` et la part du coût de session apparue depuis le dernier tour :
  *  `total` est le coût courant de /cost (undefined quand il n'a pu être lu) ; un total absent, inchangé ou plus bas
@@ -191,7 +191,7 @@ export const attributeTurn = (m: ModelsSummary, name: string, tokens: number, to
 }
 
 /**
- * Largeur en cellules terminal, au pire cas : les caractères de largeur ambiguë (formes géométriques ▰▱, symboles ⚙,
+ * Largeur en cellules terminal, au pire cas (la première ligne de la bande n'emploie que de l'ASCII et ces symboles) : les caractères de largeur ambiguë (formes géométriques ▰▱, symboles ⚙,
  * traits │, flèches ↻) comptent pour 2, comme dans un terminal réglé en ambiguous-width=2, et les caractères larges
  * (CJK, emoji) aussi. Un terminal en largeur 1 n'affiche alors jamais plus que ce que la mesure a prévu.
  */

@@ -125,7 +125,7 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const width = Math.max(20, e.props.bodyColumns)
     const sep = <Text dimColor>{'  │  '}</Text>
-    const pct = (p: number | undefined) => (p === undefined ? '  —' : `${String(p).padStart(3)} %`)
+    const pct = (p: number | undefined) => (p === undefined ? '  -' : `${String(p).padStart(3)} %`)
 
     const SEP = '  │  '
     // La première ligne est UN seul Text (une Box en ligne replierait chaque segment séparément quand la fenêtre

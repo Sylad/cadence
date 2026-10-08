@@ -1065,10 +1065,11 @@ lots:
       - { date: 2026-10-07, text: "07-10 : instable nommé — test/verify.test.ts « pour de vrai : trois sleep 2 en session start prennent ~2 s, pas 6 » rouge 1 fois sur 3 passages de la suite (vague L97 venant de finir), vert seul et en suite complète ensuite ; seuil de durée sensible à la charge" }
   - id: L91
     title: "Doc des briefs Nouveautés hors vague : README l.743 (dry-run sans dossier de vague ; fix/fix-minors d'un lot visible ont le dossier Playwright et --add-dir) et paragraphe Browser d'implement.md qui promet un serveur lancé par l'orchestrateur même en délégation à la main (contredit « capture sous le dossier temporaire ») — mineurs de la 3e revue L48"
-    status: todo
+    status: doing
     estimate: 1
     quickwin: true
     created: 2026-10-07
+    started: 2026-10-08
   - id: L92
     title: "test/global-setup.ts : en cas d'échec de tsc, inclure sa sortie stdout (diagnostics fichier:ligne) dans l'erreur levée — sinon une erreur de type n'affiche que « Command failed » et bloque toute la suite — mineur de la 3e revue L61"
     status: done

@@ -163,3 +163,41 @@ describe('repoWork / repoShas', () => {
     expect(repoShas(plan, repos, 'L1')).toEqual({ [rel]: git(neighbour, 'rev-parse', 'HEAD~1') });
   });
 });
+
+describe('repoWork : rattachement au projet et à la période du lot (L62)', () => {
+  const edit = (dir: string, from: RegExp, to: string) => {
+    const file = join(dir, 'docs/plan/raf.yaml');
+    writeFileSync(file, readFileSync(file, 'utf8').replace(from, to));
+  };
+
+  it('ignore les commits antérieurs au démarrage du lot ou postérieurs à sa fin', async () => {
+    const { dir, neighbour } = await setup();
+    commitAt(neighbour, 'feat(L1): trop tôt', '2026-09-01T10:00:00');
+    commitAt(neighbour, 'feat(L1): dans la période', '2026-10-08T10:00:00');
+    commitAt(neighbour, 'feat(L1): trop tard', '2026-10-20T10:00:00');
+    edit(dir, /started: 2026-10-08/, 'started: 2026-10-01\n    finished: 2026-10-10');
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const { repos } = resolveLotRepos(dir, plan.lot('L1'));
+    expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject)).toEqual(['feat(L1): dans la période']);
+  });
+
+  it('dans un dépôt partagé, ne garde que les commits qui nomment le projet quand certains le font', async () => {
+    const { dir, neighbour } = await setup();
+    commitAt(neighbour, 'fix(warhammer40k): retirer un montage (L1)', '2026-10-08T10:00:00');
+    commitAt(neighbour, 'ol-companion: frontend→sha-1 — chore(L1): lot terminé', '2026-10-08T11:00:00');
+    edit(dir, /^project: .*$/m, 'project: "ol-companion"');
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const { repos } = resolveLotRepos(dir, plan.lot('L1'));
+    expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject)).toEqual(['ol-companion: frontend→sha-1 — chore(L1): lot terminé']);
+    expect(Object.values(repoShas(plan, repos, 'L1'))[0]).toBe(git(neighbour, 'rev-parse', 'HEAD'));
+  });
+
+  it('sans commit qui nomme le projet, tous les commits du lot comptent', async () => {
+    const { dir, neighbour } = await setup();
+    commitAt(neighbour, 'feat(L1): a', '2026-10-08T10:00:00');
+    edit(dir, /^project: .*$/m, 'project: "ol-companion"');
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const { repos } = resolveLotRepos(dir, plan.lot('L1'));
+    expect(repoWork(plan, repos[0], 'L1')).toHaveLength(1);
+  });
+});

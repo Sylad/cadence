@@ -37,9 +37,18 @@ export function resolveLotRepos(base: string, lot: Pick<Lot, 'repos'>): { repos:
   return { repos, failures, problems: failures.map((f) => `dépôt voisin ${f.rel} : ${f.why}`) };
 }
 
-/** Commits à relire du lot dans un dépôt voisin, du plus récent au plus ancien : ceux qui citent le lot, selon les références du plan. */
+/**
+ * Commits à relire du lot dans un dépôt voisin, du plus récent au plus ancien : ceux qui citent le lot, selon les références
+ * du plan, rattachés à la période du lot (de son démarrage à sa fin) et, dans un dépôt partagé entre projets, au projet :
+ * dès qu'un commit du lot nomme le projet, seuls ceux-là comptent (les autres sont ceux d'un projet voisin au même préfixe).
+ */
 export function repoWork(plan: Plan, repo: LotRepo, lotId: string): Commit[] {
-  return lotWork(plan, repo.path, lotId);
+  const lot = plan.lots().find((l) => l.id === lotId);
+  const inPeriod = lotWork(plan, repo.path, lotId).filter((c) => (!lot?.started || c.day >= lot.started) && (!lot?.finished || c.day <= lot.finished));
+  const project = plan.project.toLowerCase();
+  if (!project) return inPeriod;
+  const named = inPeriod.filter((c) => `${c.subject}\n${c.body}`.toLowerCase().includes(project));
+  return named.length > 0 ? named : inPeriod;
 }
 
 /** Sha du dernier commit du lot de chaque dépôt voisin (null : aucun), sous le chemin déclaré — ce qu'un verdict de revue enregistre. */

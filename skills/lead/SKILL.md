@@ -65,7 +65,7 @@ cadence orchestrate <project>:<lot> <project>:<lot>@haiku … --wave <id> [--bud
 `<project>:<lot>`, … » (its `description`), so the task list says which projects and lots, not just « a task
 is running » — and pass `--wave <id>` (e.g. `2026-10-08-1030`) so its state folder is known in advance. Right after
 starting it, arm **one follow-up** (the Monitor tool) on the wave's journal, which holds one line per transition (lot → new
-state, question, ready, handed back, final table):
+state, question, ready, handed back). The final table is not in the journal: it arrives with the background task's end notification, at which point stop the follow-up (it never ends by itself; a later `--resume` writes to the same journal):
 
 ```sh
 tail -n +1 -F .cadence/runs/<id>/journal.log     # from the folder the wave was launched in

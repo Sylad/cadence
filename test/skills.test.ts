@@ -333,6 +333,9 @@ describe('skills install', () => {
     expect(lead).toContain('tail -n +1 -F .cadence/runs/<id>/journal.log');
     expect(lead).toContain('Monitor');
     expect(lead).toContain('cadence orchestrate --status --watch');
+    expect(lead).not.toContain('handed back, final table');
+    expect(lead).toContain('The final table is not in the journal');
+    expect(lead).toContain('stop the follow-up');
     const readme = flat(readFileSync(join(AGENTS_DIR, '..', 'README.md'), 'utf8'));
     expect(readme).toContain('--status [<wave>] --watch [--interval 10]');
     expect(readme).toContain('.cadence/runs/<id>/journal.log');

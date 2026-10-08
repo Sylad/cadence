@@ -1510,9 +1510,10 @@ lots:
     review: { date: 2026-10-08, verdict: "conforme : les constats mineurs sont corrigés, sans régression — orchestré (vague 2026-10-08-2135, 2 passe(s) de correction + passe des mineurs)", commit: 9a6a77956b76bd6b902aed42654dbd658bee18e6 }
   - id: L133
     title: "orchestrate : un incident sur un lot (dépôt sale après une session) rend CE lot au lead, il ne suspend pas les lots des autres dépôts de la vague — et si la revue a produit un verdict conforme avant l'incident, le rapporter au lieu de le perdre (vécu 08-10 : captures PNG du relecteur à la racine d'ol-companion, L131 suspendu en pleine revue, verdict L55 conforme non enregistré)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-08
+    started: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -22,6 +22,15 @@ function raf(dir: string, ...argv: string[]) {
 
 const git = (dir: string, ...args: string[]) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
 
+/** L'environnement d'un commit : un `raf` réel (paquet jetable) en tête du PATH. */
+function rafEnv(): NodeJS.ProcessEnv {
+  const bin = tempDir();
+  const shim = join(bin, 'raf');
+  writeFileSync(shim, `#!/bin/sh\nexec node "${join(process.env.CADENCE_TEST_PACKAGE!, 'bin/raf.js')}" "$@"\n`);
+  chmodSync(shim, 0o755);
+  return { ...process.env, PATH: `${bin}:${process.env.PATH}`, RAF_TODAY: '2026-09-28' };
+}
+
 /** Un dépôt avec le plan commité, le hook installé et un `raf` réel (paquet jetable) en tête du PATH. */
 function project(autostart?: string): { dir: string; env: NodeJS.ProcessEnv } {
   const dir = gitRepo();
@@ -31,11 +40,7 @@ function project(autostart?: string): { dir: string; env: NodeJS.ProcessEnv } {
   raf(dir, 'start', 'L2');
   if (autostart) writeFileSync(join(dir, 'cadence.yaml'), `hook:\n  autostart: ${autostart}\n`);
   raf(dir, 'hook', 'install');
-  const bin = tempDir();
-  const shim = join(bin, 'raf');
-  writeFileSync(shim, `#!/bin/sh\nexec node "${join(process.env.CADENCE_TEST_PACKAGE!, 'bin/raf.js')}" "$@"\n`);
-  chmodSync(shim, 0o755);
-  const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, RAF_TODAY: '2026-09-28' };
+  const env = rafEnv();
   spawnSync('git', ['add', '-A'], { cwd: dir, env });
   // Le hook est déjà là : le premier commit ne cite pas de lot et ne porte que le plan.
   expect(spawnSync('git', ['commit', '-qm', 'chore: plan'], { cwd: dir, env, encoding: 'utf8' }).status).toBe(0);
@@ -233,11 +238,7 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     raf(dir, 'add', 'A');
     writeFileSync(join(dir, 'cadence.yaml'), 'hook:\n  autostart: start\n');
     raf(dir, 'hook', 'install');
-    const bin = tempDir();
-    const shim = join(bin, 'raf');
-    writeFileSync(shim, `#!/bin/sh\nexec node "${join(process.env.CADENCE_TEST_PACKAGE!, 'bin/raf.js')}" "$@"\n`);
-    chmodSync(shim, 0o755);
-    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, RAF_TODAY: '2026-09-28' };
+    const env = rafEnv();
     writeFileSync(join(dir, 'src.txt'), 'x');
     git(dir, 'add', '-A');
     expect(git(dir, 'rev-parse', '--verify', '-q', 'HEAD').status).not.toBe(0);

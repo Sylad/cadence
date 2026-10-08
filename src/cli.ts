@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readHookConfig, readNewsConfig, readPlanConfig, readSessionConfig } from './config.js';
+import { repoSections, repoShas, resolveLotRepos } from './repos.js';
 import { audit, exemptPlanOnly, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
@@ -276,6 +277,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       knownLot(plan, id, 'les commits se listent par lot, pas par sous-tâche');
       // Une lecture : le même ensemble que « raf done » et « raf check », plan en lecture seule compris.
       for (const c of lotWork(plan, root, id).reverse()) io.out(short(c));
+      for (const line of repoSections(plan, root, plan.lot(id))) io.out(line);
       return 0;
     }
     case 'show': {
@@ -300,6 +302,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const commits = lotWork(plan, root, lot.id).reverse();
       io.out(`commits (${commits.length}) :`);
       for (const c of commits) io.out(`  ${short(c)}`);
+      for (const line of repoSections(plan, root, lot, '  ')) io.out(line);
       return 0;
     }
     case 'list': {
@@ -445,7 +448,12 @@ function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, ro
   const verdict = rest.slice(1).join(' ');
   if (kind === 'ux') plan.recordUx(rest[0], verdict, today);
   // Le verdict vaut jusqu'au dernier commit compté du lot ; un plan en lecture seule refuse sans lire git.
-  else plan.recordReview(rest[0], verdict, today, plan.readonly ? null : (lotWork(plan, root, rest[0])[0]?.sha ?? null));
+  else {
+    // Les dépôts voisins du lot : un dépôt qu'on ne peut pas lire ferait enregistrer un verdict sur un sha non lu.
+    const neighbours = plan.readonly || rest[0].includes('/') ? undefined : resolveLotRepos(root, plan.lots().find((l) => l.id === rest[0]) ?? {});
+    if (neighbours?.problems.length) throw new RafError(`${neighbours.problems.join(' ; ')} — la revue de code relit aussi les dépôts du lot`);
+    plan.recordReview(rest[0], verdict, today, plan.readonly ? null : (lotWork(plan, root, rest[0])[0]?.sha ?? null), neighbours?.repos.length ? repoShas(plan, neighbours.repos, rest[0]) : undefined);
+  }
   plan.save();
   return 0;
 }

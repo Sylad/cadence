@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { findProjects } from '../src/lead.js';
 import { commit, tempDir } from './helpers.js';
 
 async function cad(dir: string, ...argv: string[]) {
+  return cadOn('2026-09-28', dir, ...argv);
+}
+
+async function cadOn(today: string, dir: string, ...argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-09-28' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-09-28T18:30:00') });
+  const code = await run(argv, { cwd: dir, env: { RAF_TODAY: today }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date(`${today}T18:30:00`) });
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
@@ -96,6 +100,40 @@ describe('cadence session start|close --all', () => {
     const root = tempDir();
     await project(join(root, 'alpha'), 'alpha');
     expect((await cad(root, 'session', 'start', '--all', '--idle', 'x')).err).toMatch(/--idle invalide/);
-    expect((await cad(root, 'session', 'start', '--all', '--since', '3 days ago')).code).toBe(0);
+    const dflt = await cadOn('2026-09-30', root, 'session', 'start', '--all');
+    expect(dflt.out).not.toMatch(/silencieux depuis/);
+    expect(dflt.out).not.toContain('Fait depuis');
+    const tuned = await cadOn('2026-09-30', root, 'session', 'start', '--all', '--idle', '0', '--since', '2026-09-27');
+    expect(tuned.out).toMatch(/silencieux depuis 2 j/);
+    expect(tuned.out).toContain('Fait depuis 2026-09-27');
+  });
+
+  it('un sous-dossier sans .git dans un dépôt est signalé, jamais lu avec le plan du dépôt parent', async () => {
+    const root = tempDir();
+    const mono = join(root, 'mono');
+    await project(mono, 'mono');
+    await project(join(mono, 'pkg-a'), 'pkg-a');
+    rmSync(join(mono, 'pkg-a', '.git'), { recursive: true, force: true });
+    const { code, out } = await cad(mono, 'session', 'start', '--all');
+    const lines = out.split('\n');
+    expect(lines).toContain('## pkg-a');
+    expect(lines[lines.indexOf('## pkg-a') + 1]).toMatch(/^✗ .*dépôt/);
+    expect(out).not.toContain('Travail mono');
+    expect(code).toBe(2);
+  });
+
+  it('un sous-dossier illisible est signalé sans faire planter les autres (--depth 2)', async () => {
+    const root = tempDir();
+    await project(join(root, 'alpha'), 'alpha');
+    const ferme = join(root, 'ferme');
+    mkdirSync(ferme);
+    chmodSync(ferme, 0o000);
+    try {
+      expect(() => findProjects(root, 2)).not.toThrow();
+      const { out } = await cad(root, 'session', 'start', '--all', '--depth', '2');
+      expect(out.split('\n')).toContain('## alpha');
+    } finally {
+      chmodSync(ferme, 0o755);
+    }
   });
 });

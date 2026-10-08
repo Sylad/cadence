@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readHookConfig, readNewsConfig, readPlanConfig, readSessionConfig } from './config.js';
@@ -663,6 +663,13 @@ async function sessionAll(rest: string[], values: { all?: boolean; depth?: strin
   for (const dir of projects) {
     io.out(`${dir === projects[0] ? '' : '\n'}## ${relative(io.cwd, dir)}`);
     let code: number;
+    const top = gitRoot(dir);
+    if (top && realpathSync(top) !== realpathSync(dir)) {
+      // run() lirait le plan du dépôt parent : mieux vaut le dire que montrer le plan d'un autre projet.
+      io.out(`✗ ${relative(io.cwd, dir)} n'a pas son propre dépôt git (dépôt parent : ${top}) — lancer cadence dans ce dossier`);
+      worst = 2;
+      continue;
+    }
     try {
       code = await run(argv, { ...io, cwd: dir, err: (l) => io.out(`✗ ${l}`) });
     } catch (e) {

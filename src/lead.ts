@@ -49,7 +49,13 @@ function isProject(dir: string): boolean {
 /** Les projets sous `parent`, jusqu'à `depth` niveaux (1 : sous-dossiers directs) ; on ne descend pas dans un projet. */
 export function findProjects(parent: string, depth = 1): string[] {
   const found: string[] = [];
-  for (const e of readdirSync(parent, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = readdirSync(parent, { withFileTypes: true });
+  } catch {
+    return found; // dossier illisible : on le saute, les autres projets tournent
+  }
+  for (const e of entries) {
     if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules') continue;
     const dir = join(parent, e.name);
     if (isProject(dir)) found.push(dir);

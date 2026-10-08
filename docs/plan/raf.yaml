@@ -1389,6 +1389,13 @@ lots:
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "conforme : mineur 1 (affichage du dossier Playwright en dry-run) corrigé et testé, mineur 2 (lotSlug non injectif) conservé en note, tests 929/929 et typecheck OK — orchestré (vague 2026-10-08-0913, 1 passe(s) de correction + passe des mineurs)", commit: 791de77d5464cb505a7e94caa525231018822807 }
     finished: 2026-10-08
+  - id: L121
+    title: "cadence-hud : la première ligne perd des segments alors qu'il reste de la place (vu 08-10 dans l'app de bureau : heures de remise à zéro, consommation par modèle et noms d'agents absents avec ~25 cellules libres) — fitSegments retire par priorité sans reprendre les petits segments qui tiendraient une fois le gros (modèles, 60 car.) tombé ; et le pire cas « largeur ambiguë = 2 » compte 14 cellules de trop (jauge + 4 séparateurs) là où l'app de bureau affiche 1"
+    status: todo
+    estimate: 1
+    created: 2026-10-08
+    notes:
+      - { date: 2026-10-08, text: "Décision lead 08-10 : (1) fitSegments garde l'ordre de priorité mais, après avoir retiré un segment, réessaie les segments plus prioritaires restants : on retire d'abord le moins utile qui ne tient pas, puis on remet ceux qui tiennent, du plus utile au moins utile (remise à zéro avant modèles) ; test sur le cas de la capture (largeur où modèles ne tient pas mais les deux heures de remise à zéro tiennent). (2) Le segment modèles passe de 60 à 40 caractères maxi, forme courte « opus 1.2M sonnet 0.8M ». (3) Largeur ambiguë : variable d'environnement CADENCE_HUD_AMBIGUOUS=1|2, défaut 2 (pire cas), documentée dans le README du plugin ; pas de détection de terminal. Les deux copies (plugins/cadence-hud et ~/.claude/mods/cadence-hud) sont synchronisées par le lead après revue." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

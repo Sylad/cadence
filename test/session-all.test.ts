@@ -90,6 +90,24 @@ describe('cadence session start|close --all', () => {
     expect((await cad(root, 'session', 'next', '--all', 'x')).err).toMatch(/--all/);
   });
 
+  it('refuse --all avec RAF_FILE, --file ou --config : un seul plan ne vaut pas pour tous les projets', async () => {
+    const root = tempDir();
+    await project(join(root, 'alpha'), 'alpha');
+    await project(join(root, 'beta'), 'beta');
+    const plan = join(root, 'alpha', 'docs/plan/raf.yaml');
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await run(['session', 'start', '--all'], { cwd: root, env: { RAF_TODAY: '2026-09-28', RAF_FILE: plan }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-09-28T18:30:00') });
+    expect(code).toBe(2);
+    expect(err.join('\n')).toMatch(/RAF_FILE.*--all|--all.*RAF_FILE/);
+    expect(out.join('\n')).not.toMatch(/## /);
+    for (const opt of ['--file', '--config']) {
+      const r = await cad(root, 'session', 'start', '--all', opt, plan);
+      expect(r.code).toBe(2);
+      expect(r.err).toMatch(new RegExp(opt));
+    }
+  });
+
   it('sans projet : une ligne le dit', async () => {
     const { code, out } = await cad(tempDir(), 'session', 'close', '--all');
     expect(code).toBe(0);

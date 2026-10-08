@@ -646,9 +646,12 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
 }
 
 /** `session start|close --all [--depth n]` : la commande jouée dans chaque projet sous le dossier courant, une section par projet. */
-async function sessionAll(rest: string[], values: { all?: boolean; depth?: string; since?: string; idle?: string }, io: Io): Promise<number> {
+async function sessionAll(rest: string[], values: { all?: boolean; depth?: string; since?: string; idle?: string; file?: string; config?: string }, io: Io): Promise<number> {
   const sub = rest[0];
   if (!values.all) throw new RafError('--depth demande --all');
+  // Chaque projet lit son propre plan : un plan ou une config imposés se retrouveraient dans toutes les sections.
+  const imposed = values.file !== undefined ? '--file' : values.config !== undefined ? '--config' : io.env.RAF_FILE !== undefined ? 'RAF_FILE' : null;
+  if (imposed) throw new RafError(`${imposed} ne va pas avec --all : chaque projet lit son propre plan (lancer la commande dans le projet visé)`);
   if (sub !== 'start' && sub !== 'close') throw new RafError('--all ne va qu\'avec session start ou session close');
   const depth = values.depth === undefined ? 1 : Number(values.depth);
   if (!Number.isInteger(depth) || depth < 1) throw new RafError(`--depth invalide : ${values.depth} (un entier ≥ 1)`);

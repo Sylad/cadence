@@ -29,7 +29,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `hook.autostart` (`warn` \| `refuse` \| `start`): what the pre-commit hook does with a lot still todo | [0.15.0](#0150---2026-10-08) |
 | `cadence session start\|close --all [--depth n]`: every project under a folder, one section each | [0.15.0](#0150---2026-10-08) |
 
-## [Unreleased]
+## [0.18.0] - 2026-10-08
 
 ### Changed
 - `cadence session next "…"` no longer succeeds in silence: it prints `N lignes enregistrées pour la prochaine ouverture` and the lines as recorded, so `session-close` reports them without running `session start` again. (L129, #6)

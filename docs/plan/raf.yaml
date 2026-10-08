@@ -1503,9 +1503,10 @@ lots:
     finished: 2026-10-08
   - id: L132
     title: "orchestrate : le verrou de cadence deliver est par vague, pas par dépôt — un dépôt dont tous les lots de la vague sont finis (prêt/rendu) doit pouvoir être livré pendant que la vague continue ailleurs (vécu 08-10 : maritime prêt, livraison refusée pendant la revue de cadence L131)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-08
+    started: 2026-10-08
   - id: L133
     title: "orchestrate : un incident sur un lot (dépôt sale après une session) rend CE lot au lead, il ne suspend pas les lots des autres dépôts de la vague — et si la revue a produit un verdict conforme avant l'incident, le rapporter au lieu de le perdre (vécu 08-10 : captures PNG du relecteur à la racine d'ol-companion, L131 suspendu en pleine revue, verdict L55 conforme non enregistré)"
     status: todo

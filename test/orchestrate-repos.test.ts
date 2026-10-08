@@ -264,6 +264,17 @@ describe('verrou de dépôt libéré dès que ses lots sont finis (L132)', () =>
     expect(held(dirs.b)).toBe(false);
   });
 
+  it("la ligne d'exclusion écrite par l'utilisateur avant la vague survit à la libération anticipée puis à la fin de vague", async () => {
+    const { parent, dirs } = world({ a: [], b: [] }, []);
+    git(dirs.a, 'config', 'core.hooksPath', '.githooks');
+    const exclude = join(dirs.a, '.git/info/exclude');
+    mkdirSync(join(dirs.a, '.git/info'), { recursive: true });
+    writeFileSync(exclude, '/.githooks/pre-push\n');
+    const code = await orchestrate(['a:L1', 'b:L1', '--max-sessions', '1'], io(parent).io, deps());
+    expect(code).toBe(0);
+    expect(readFileSync(exclude, 'utf8')).toBe('/.githooks/pre-push\n');
+  });
+
   it("un dépôt dont un lot reste à jouer garde son verrou (deux lots du même dépôt)", async () => {
     const { parent, dirs } = world({ a: [] }, []);
     const file = join(dirs.a, 'docs/plan/raf.yaml');

@@ -495,7 +495,9 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const held: string[] = [];
   const repos = [...new Set(lots.flatMap(lotRepoPaths))];
   /** Libère un dépôt : son verrou et sa garde de push (L132 : dès que ses lots sont finis, pas à la fin de la vague). */
+  const freed = new Set<string>();
   const freeRepo = (r: string) => {
+    freed.add(r);
     const file = join(sharedStateDir(r), REPO_LOCK);
     releaseLock(file, process.pid);
     held.splice(0, held.length, ...held.filter((f) => f !== file));
@@ -504,7 +506,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const release = () => {
     for (const f of held) releaseLock(f, process.pid);
     held.length = 0;
-    for (const r of repos) removePrePush(r, wave.id);
+    for (const r of repos) if (!freed.has(r)) removePrePush(r, wave.id);
     try {
       unregisterWave(home, process.pid);
     } catch {

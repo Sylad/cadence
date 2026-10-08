@@ -1527,10 +1527,12 @@ lots:
     finished: 2026-10-08
   - id: L135
     title: "cadence-hud : le compteur « N cmd » ne redescend pas — l'expiration d'un Monitor (« [Monitor expired…] », sans statut) n'est pas une fin, et les commandes de fond d'un sous-agent ne finissent jamais (leur notification revient au sous-agent) ; vu 08-10 soir « 3 cmd » après la fin de tout — reconnaître l'expiration, retirer les commandes d'un sous-agent quand il finit (table commandOwners), repartir de zéro au session.start"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-08
     started: 2026-10-08
+    review: { date: 2026-10-08, verdict: "conforme (2e revue après 07b08f5 : reset session.start testé par le hook, fins calculées dans l'update, propriétaire avant la commande ; 41/41 ; note mineure : lecture de owners avant l'update, fenêtre de quelques ms sans effet durable)", commit: 07b08f5b4f7f3ea22baed7d71003140a398ed7a3 }
+    finished: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

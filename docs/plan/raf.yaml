@@ -1470,18 +1470,32 @@ lots:
     created: 2026-10-08
   - id: L129
     title: "issue #6 — cadence session next : aucune sortie en cas de succès (code 0, rien sur stdout) ; attendu : les lignes telles qu'enregistrées ou « N lignes enregistrées pour la prochaine ouverture », pour que session-close les rapporte sans relancer session start ; commenter puis fermer l'issue GitHub #6 à la livraison"
-    status: doing
+    status: done
     estimate: 0.1
     quickwin: true
     created: 2026-10-08
     started: 2026-10-08
-    review: { date: 2026-10-08, verdict: "compliant — orchestré (vague 2026-10-08-issues-6-7, 0 passe(s) de correction)", commit: 156326f884b976c5c55993c833f047ab88e25577 }
+    review: { date: 2026-10-08, verdict: "conforme — revue Sonnet orchestrée (vague 2026-10-08-issues-6-7), essai réel : « 2 lignes enregistrées pour la prochaine ouverture » + lignes ; verdict rejoué après le commit de release 0.18.0", commit: 653f349c78c9015803d4087d83b56c77025ed5d5 }
+    finished: 2026-10-08
   - id: L130
     title: "issue #7 — cadence session close : par défaut, la section « Commits de la période » couvre les 24 h (même fenêtre qu'à l'ouverture) et relit les lots déjà rapportés le matin ; attendu : fenêtre depuis la dernière ouverture (ou clôture) du projet, dite dans la sortie (« depuis l'ouverture de 09:12 »), --since garde la main ; commenter puis fermer l'issue GitHub #7 à la livraison"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-08
     started: 2026-10-08
+    tasks:
+      - { id: t1, title: "session close relancée sans ouverture entre-temps : la clôture réussie a déplacé la borne, la seconde affiche « depuis la clôture de HH:MM » vide et signale chaque lot en cours « aucun commit : raf done ou raf note » (session-close SKILL.md étape 3 relance close exprès) — ne poser la marque de clôture que si elle suit une ouverture, ou rapporter depuis la dernière OUVERTURE tant qu'aucune n'a suivi (essai réel 08-10 20:13 sur ol-companion)", status: dropped }
+    notes:
+      - { date: 2026-10-08, text: "mineurs de revue (notes) : sameDay compare la marque à now alors que l'en-tête suit today (RAF_TODAY figé seulement) ; fenêtre = date du commit (git log --since), pas l'arrivée sur HEAD (commit d'un worktree fusionné après la borne absent) — antérieur au lot" }
+      - { date: 2026-10-08, text: "[L130/t1] abandonné : repris en lot autonome (bug observable, pas une suite de L130)" }
+    review: { date: 2026-10-08, verdict: "conforme — revue finale Opus après 2 passes : majeurs levés (libellé autre jour, CADENCE_SINCE ISO UTC documenté et testé), 5 mutations rouges, 1040 tests, typecheck ; essai réel 08-10 : « depuis l'ouverture de 20:13 » ; 2 notes mineures ; verdict rejoué après le commit de release 0.18.0", commit: 653f349c78c9015803d4087d83b56c77025ed5d5 }
+    finished: 2026-10-08
+  - id: L131
+    title: "session close relancée sans ouverture entre-temps : la clôture réussie a déplacé la borne, la seconde affiche « depuis la clôture de HH:MM » vide et signale chaque lot en cours « aucun commit : raf done ou raf note » (session-close SKILL.md étape 3 relance close exprès) — ne poser la marque de clôture que si elle suit une ouverture, ou rapporter depuis la dernière OUVERTURE tant qu'aucune n'a suivi (essai réel 08-10 20:13 sur ol-companion, revue L130)"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-08
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

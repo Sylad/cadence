@@ -1314,6 +1314,8 @@ lots:
     estimate: 1
     quickwin: true
     created: 2026-10-08
+    notes:
+      - { date: 2026-10-08, text: "Décision lead 08-10 : faire le passage v5 maintenant ; la vérification ubuntu-latest → Ubuntu 26 du 19-10 ne se fait pas dans ce lot, l'écrire en une ligne dans le CHANGELOG (Unreleased) et laisser le lot se fermer." }
   - id: L118
     title: "raf check (suite L115) : sur un plan en lecture seule dont le fichier porte la clé public sans mapping dans fields, avertir quand même d'un lot visible sans titre public ; et l'entrée Fixed du CHANGELOG de L115 doit décrire l'exception ajoutée par c3d3e11 (avertissement si un lot porte déjà public:)"
     status: todo
@@ -1325,5 +1327,7 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-08
+    notes:
+      - { date: 2026-10-08, text: "Décision lead 08-10 : pas de table East Asian Width (pas de dépendance ni de table maison à entretenir). Retirer de la première ligne les caractères ambigus restants (· … —) au profit d'ASCII (espace-barre-espace, trois points, tiret), de sorte que cells() n'ait à traiter que les symboles déjà couverts par L116 ; README aligné sur ce pire cas ; test qui refuse tout caractère ambigu non couvert dans la première ligne." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

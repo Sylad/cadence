@@ -4,7 +4,7 @@ import type { TestBody } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
 import { register } from '../hooks/register'
-import { activeProjects, parseTour, progressBar, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { activeProjects, colorOfDone, parseTour, progressBar, projectFigures, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Project, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
@@ -1063,6 +1063,17 @@ test('les chiffres d’un projet : barre, faits/total, en cours, ajoutés cette 
   expect(projectStats(cadence)).toBe('▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours')
 })
 
+test('la couleur de la barre d’un projet suit le taux de faits : rouge < 33 %, orange < 66 %, vert au-delà, gris sans lot', () => {
+  expect(colorOfDone(0, 0)).toBe('subtle')
+  expect(colorOfDone(0, 10)).toBe('error')
+  expect(colorOfDone(32, 100)).toBe('error')
+  expect(colorOfDone(33, 100)).toBe('warning')
+  expect(colorOfDone(65, 100)).toBe('warning')
+  expect(colorOfDone(66, 100)).toBe('success')
+  expect(colorOfDone(10, 10)).toBe('success')
+  expect(projectFigures(parseTour(JSON.stringify(TOUR))[1] as Project)).toBe('10/20 · 2 en cours')
+})
+
 test('le tableau est relu à chaque transition de vague, sinon toutes les minutes', () => {
   const sig = waveSignature([WAVE])
   expect(sig).not.toBe(waveSignature([{ ...WAVE, lots: WAVE.lots.map(l => ({ ...l, status: 'ready' })) }]))
@@ -1089,9 +1100,22 @@ test('la bande écrit une ligne par projet actif, repliable par /hud projets', a
     const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
     expect(await ui.find({ type: 'Text', text: /^ol$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^cadence$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^▮▮▮▮▮▯▯▯▯▯ 39\/78 · 0 en cours · \+3 cette semaine$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^▮▮▮▮▮▯▯▯▯▯ 10\/20 · 2 en cours$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^39\/78 · 0 en cours · \+3 cette semaine$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^10\/20 · 2 en cours$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /fini/ })).toBeUndefined()
+    await ui.unmount()
+  }
+})
+
+test('la barre de chaque projet colore ses cases pleines selon le taux de faits, ses cases vides restent grises, sur chaque surface', async ($, on) => {
+  const at = (done: number, todo: number): Project => ({ project: `p${done}`, progress: { done, doing: 0, todo, added7: 0 } })
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, projects: [at(1, 9), at(5, 5), at(9, 1)], projectsFolded: false })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
+    const full = await ui.findAll({ type: 'Text', text: /^▮+$/ })
+    expect(full.map(t => [t.text, t.props.color])).toEqual([['▮', 'error'], ['▮▮▮▮▮', 'warning'], ['▮▮▮▮▮▮▮▮▮', 'success']])
+    const empty = await ui.findAll({ type: 'Text', text: /^▯+$/ })
+    expect(empty.map(t => [t.text, t.props.color])).toEqual([['▯▯▯▯▯▯▯▯▯', 'subtle'], ['▯▯▯▯▯', 'subtle'], ['▯', 'subtle']])
     await ui.unmount()
   }
 })
@@ -1105,7 +1129,7 @@ test('les projets sont alignés par une Box à largeur fixe pour le nom, sans es
     expect(boxes.filter(b => b.props.width === 7 && b.props.flexShrink === 0)).toHaveLength(2)
     // les chiffres prennent la largeur restante, séparés du nom par un paddingLeft, et se tronquent
     expect(boxes.filter(b => b.props.flexGrow === 1 && b.props.flexShrink === 1 && b.props.paddingLeft === 1)).toHaveLength(2)
-    const texts = (await ui.findAll({ type: 'Text' })).filter(t => /^(ol|cadence)$|▮.*en cours/.test(t.text ?? ''))
+    const texts = (await ui.findAll({ type: 'Text' })).filter(t => /^(ol|cadence)$|^\d+\/\d+ · \d+ en cours/.test(t.text ?? ''))
     expect(texts).toHaveLength(4)
     expect(texts.filter(t => /^\s|\s{2,}|\s$/.test(t.text ?? ''))).toEqual([])
     await ui.unmount()

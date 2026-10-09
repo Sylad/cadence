@@ -402,12 +402,22 @@ export const progressBar = (done: number, total: number, cellCount = 10): string
   return '▮'.repeat(full) + '▯'.repeat(cellCount - full)
 }
 
-/** `▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine` : faits sur total des lots, en cours, ajoutés sur 7 jours (rien à zéro). Le nom du projet est dans sa propre colonne (Box), jamais rembourré d'espaces. */
-export const projectStats = (p: Project): string => {
+/** Couleur de la barre d'un projet selon sa part de lots faits : rouge sous 33 %, orange sous 66 %, vert au-delà (les seuils de `colorOfPercent` pris à l'envers : ici plus c'est plein, mieux c'est) ; gris sans lot. */
+export const colorOfDone = (done: number, total: number): ThemeKey =>
+  total <= 0 ? 'subtle' : (done / total) * 100 < 33 ? 'error' : (done / total) * 100 < 66 ? 'warning' : 'success'
+
+/** `39/78 · 0 en cours · +3 cette semaine` : faits sur total des lots, en cours, ajoutés sur 7 jours (rien à zéro). Sans la barre ni le nom du projet, qui ont leurs propres Text. */
+export const projectFigures = (p: Project): string => {
   const { done, doing, todo, added7 } = p.progress
-  const parts = [`${progressBar(done, done + doing + todo)} ${done}/${done + doing + todo}`, `${doing} en cours`]
+  const parts = [`${done}/${done + doing + todo}`, `${doing} en cours`]
   if (added7 > 0) parts.push(`+${added7} cette semaine`)
   return parts.join(' · ')
+}
+
+/** `▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine` : la barre puis les chiffres, en texte brut (la bande les écrit dans des Text séparés pour colorer les cases pleines). */
+export const projectStats = (p: Project): string => {
+  const { done, doing, todo } = p.progress
+  return `${progressBar(done, done + doing + todo)} ${projectFigures(p)}`
 }
 
 /** Ce qui change à une transition de vague : l'état de chaque lot de chaque vague (pas le budget consommé, qui bouge sans cesse). */

@@ -36,6 +36,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence session context`: the context of the session, published by the `cadence-hud` band, for the lead to chain under a threshold | [0.22.0](#0220---2026-10-09) |
 | `cadence-hud`: the progress of each project's plan under the waves, `/hud projets`; `cadence lead tour --json` gains `progress` | [0.22.0](#0220---2026-10-09) |
 
+## [Unreleased]
+
+### Changed
+
+- `cadence-hud`: the progress bar of each project is coloured by the share of lots done — filled cells red below 33 %, orange below 66 %, green beyond (the thresholds of the usage colours, inverted); empty cells stay grey (L152).
+
 ## [0.22.0] - 2026-10-09
 
 ### Added

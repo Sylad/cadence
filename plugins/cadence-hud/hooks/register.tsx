@@ -3,7 +3,7 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, CommandInfo, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
 import { CONTEXT_WRITER, COLLECTOR, parseWaves } from './collect'
-import { activeProjects, ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, k, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, projectStats, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
+import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, k, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -499,9 +499,22 @@ export const register: Register = on => {
                 </Text>
               </Box>
               <Box flexGrow={1} flexShrink={1} paddingLeft={1}>
-                <Text wrap="truncate-end" color="subtle">
-                  {projectStats(p)}
-                </Text>
+                {(() => {
+                  const { done, doing, todo } = p.progress
+                  const barText = progressBar(done, done + doing + todo)
+                  const filled = barText.replace(/▯/g, '')
+                  return (
+                    <Box flexDirection="row">
+                      {filled && <Text color={colorOfDone(done, done + doing + todo)}>{filled}</Text>}
+                      <Text color="subtle">{barText.slice(filled.length)}</Text>
+                      <Box paddingLeft={1} flexShrink={1}>
+                        <Text wrap="truncate-end" color="subtle">
+                          {projectFigures(p)}
+                        </Text>
+                      </Box>
+                    </Box>
+                  )
+                })()}
               </Box>
             </Box>
           ))}

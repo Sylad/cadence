@@ -4,8 +4,8 @@ import type { TestBody } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
 import { register } from '../hooks/register'
-import { commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
-import type { Wave } from '../types'
+import { activeProjects, parseTour, progressBar, projectLine, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import type { Project, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
 declare function setTimeout(fn: () => void, ms?: number): unknown
@@ -573,7 +573,7 @@ const wired = (on: On) => {
   })
   on('tool.call', () => answer.current as never)
   on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
-  return { answer, holdNextCommandsWrite, commands: () => store.get('commands')?.value ?? [], owners: () => store.get('commandOwners')?.value ?? {}, info: () => store.get('commandInfo')?.value ?? {} }
+  return { answer, holdNextCommandsWrite, state: (key: string) => store.get(key)?.value, commands: () => store.get('commands')?.value ?? [], owners: () => store.get('commandOwners')?.value ?? {}, info: () => store.get('commandInfo')?.value ?? {} }
 }
 
 const NOTIFICATION = (id: string) =>
@@ -981,7 +981,7 @@ test('/hud avec un argument inconnu répond « argument inconnu » sans basculer
   mock.clock(on)
   for (const args of ['cmds', 'list', 'CMD']) {
     const unknown = await $.command.run({ command: 'hud', args } as never)
-    expect(unknown.text).toBe(`argument inconnu : ${args} (attendu : cmd)`)
+    expect(unknown.text).toBe(`argument inconnu : ${args} (attendu : cmd, projets)`)
   }
   // rien n'a basculé : le premier « /hud » nu masque la bande, le second la réaffiche
   expect((await $.command.run({ command: 'hud', args: '' } as never)).text).toMatch(/masquée/)
@@ -1027,4 +1027,142 @@ test('la bande publie le contexte de la session pour `cadence session context` (
   const body = JSON.parse(published![published!.length - 1]!)
   expect(body).toMatchObject({ percent: 61, tokens: 122_000, window: 200_000 })
   expect(typeof body.at).toBe('number')
+})
+
+// ── L149 : avancement des plans par projet ────────────────────────────────────────────────────────────────────
+
+const TOUR = [
+  { project: 'ol', doing: [], drift: [], notes: [], next: null, repo: [], progress: { done: 39, doing: 0, todo: 39, added7: 3 } },
+  { project: 'cadence', doing: [{ id: 'L149' }], drift: [], notes: [], next: null, repo: [], progress: { done: 10, doing: 2, todo: 8, added7: 0 } },
+  { project: 'fini', doing: [], drift: [], notes: [], next: null, repo: [], progress: { done: 5, doing: 0, todo: 0, added7: 0 } },
+  { project: 'cassé', error: 'plan illisible', doing: [], drift: [], notes: [], next: null, repo: [] },
+]
+
+test('la barre de projet compte les lots faits sur dix cases, au moins une case pleine dès le premier lot fait', () => {
+  expect(progressBar(39, 78)).toBe('▮▮▮▮▮▯▯▯▯▯')
+  expect(progressBar(0, 78)).toBe('▯▯▯▯▯▯▯▯▯▯')
+  expect(progressBar(78, 78)).toBe('▮▮▮▮▮▮▮▮▮▮')
+  expect(progressBar(1, 200)).toBe('▮▯▯▯▯▯▯▯▯▯')
+  expect(progressBar(199, 200)).toBe('▮▮▮▮▮▮▮▮▮▯')
+  expect(progressBar(0, 0)).toBe('▯▯▯▯▯▯▯▯▯▯')
+})
+
+test('la sortie de lead tour est lue ; une sortie étrange vaut aucun projet, un projet en erreur est écarté, un projet sans reste à faire aussi', () => {
+  expect(parseTour(JSON.stringify(TOUR)).map(p => p.project)).toEqual(['ol', 'cadence', 'fini'])
+  expect(parseTour('{}')).toEqual([])
+  expect(() => parseTour('pas du json')).toThrow()
+  expect(activeProjects(parseTour(JSON.stringify(TOUR))).map(p => p.project)).toEqual(['ol', 'cadence'])
+  // un tableau sans `progress` (cadence trop ancien) n'affiche rien
+  expect(activeProjects(parseTour(JSON.stringify([{ project: 'x', doing: [] }])))).toEqual([])
+})
+
+test('une ligne de projet : nom aligné, barre, faits/total, en cours, ajoutés cette semaine (rien à zéro)', () => {
+  const [ol, cadence] = activeProjects(parseTour(JSON.stringify(TOUR))) as [Project, Project]
+  expect(projectLine(ol, 7)).toBe('ol      ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine')
+  expect(projectLine(cadence, 7)).toBe('cadence ▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours')
+})
+
+test('le tableau est relu à chaque transition de vague, sinon toutes les minutes', () => {
+  const sig = waveSignature([WAVE])
+  expect(sig).not.toBe(waveSignature([{ ...WAVE, lots: WAVE.lots.map(l => ({ ...l, status: 'ready' })) }]))
+  expect(waveSignature([])).toBe('')
+  expect(waveSignature([{ ...WAVE, consumed: 5 }])).toBe(sig)
+  expect(tourDue(undefined, 0, sig, 1000)).toBe(true)
+  expect(tourDue(sig, 1000, sig, 1000 + TOUR_REFRESH_MS - 1)).toBe(false)
+  expect(tourDue(sig, 1000, sig, 1000 + TOUR_REFRESH_MS)).toBe(true)
+  expect(tourDue(sig, 1000, 'autre', 1001)).toBe(true)
+  expect(TOUR_REFRESH_MS).toBe(60_000)
+})
+
+test('le dossier du tableau est celui de lancement de la vague, sinon le dossier de la session', () => {
+  expect(tourFolder([{ ...WAVE, cwd: '/p' }], '/s')).toBe('/p')
+  expect(tourFolder([], '/s')).toBe('/s')
+  expect(tourFolder([], undefined)).toBeNull()
+})
+
+const PROJECTS = activeProjects(parseTour(JSON.stringify(TOUR)))
+
+test('la bande écrit une ligne par projet actif, repliable par /hud projets', async ($, on) => {
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, projects: PROJECTS, projectsFolded: false })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /ol\s+▮▮▮▮▮▯▯▯▯▯ 39\/78 · 0 en cours · \+3 cette semaine/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /cadence\s+▮▮▮▮▮▯▯▯▯▯ 10\/20 · 2 en cours/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /fini/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('repliée, la liste tient sur une ligne qui dit comment la rouvrir', async ($, on) => {
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, projects: PROJECTS, projectsFolded: true })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /39\/78/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /projets \(2\).*\/hud projets/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('/hud projets replie puis rouvre la liste sans masquer la bande', async ($, on) => {
+  const hud = wired(on)
+  mock.clock(on)
+  const first = await $.command.run({ command: 'hud', args: 'projets' } as never)
+  expect(first.text).toMatch(/repliée/)
+  expect(hud.state('projectsFolded')).toBe(true)
+  const second = await $.command.run({ command: 'hud', args: 'projets' } as never)
+  expect(second.text).toMatch(/affichée/)
+  expect(hud.state('projectsFolded')).toBe(false)
+  expect(hud.state('isHidden')).toBeUndefined()
+})
+
+test('le tableau est demandé à cadence lead tour --json dans le dossier de la vague, relu à la transition, sinon à la minute', async ($, on) => {
+  const hud = wired(on)
+  const clock = mock.clock(on)
+  const runs: string[][] = []
+  const wave = { current: [{ ...WAVE, cwd: '/p' }] }
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => ({ value: [] }) as never)
+  on('process.run', async (_$, e) => {
+    const argv = (e as unknown as { argv: string[] }).argv
+    runs.push(argv)
+    if (argv[0] === 'cadence') return { value: { exitCode: 0, stdout: JSON.stringify(TOUR), stderr: '' } } as never
+    return { value: { exitCode: 0, stdout: JSON.stringify(wave.current), stderr: '' } } as never
+  })
+  await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  const tours = () => runs.filter(a => a[0] === 'cadence')
+  expect(tours()).toEqual([['cadence', 'lead', 'tour', '/p', '--json']])
+  expect((hud.state('projects') as Project[]).map(p => p.project)).toEqual(['ol', 'cadence'])
+  // 5 s plus tard, rien n'a changé : pas de nouvelle lecture
+  await clock.advance(5_000)
+  await settle()
+  expect(tours()).toHaveLength(1)
+  // une transition de vague relit le tableau sans attendre la minute
+  wave.current = [{ ...WAVE, cwd: '/p', lots: WAVE.lots.map(l => ({ ...l, status: 'ready', step: null })) }]
+  await clock.advance(5_000)
+  await settle()
+  expect(tours()).toHaveLength(2)
+  // sinon à la minute
+  await clock.advance(60_000)
+  await settle()
+  expect(tours()).toHaveLength(3)
+})
+
+test('un cadence absent ou en échec garde le dernier tableau lu et ne met pas la bande en erreur', async ($, on) => {
+  const hud = wired(on)
+  const clock = mock.clock(on)
+  const ok = { current: true }
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => ({ value: [] }) as never)
+  on('process.run', async (_$, e) => {
+    const argv = (e as unknown as { argv: string[] }).argv
+    if (argv[0] !== 'cadence') return { value: { exitCode: 0, stdout: '[]', stderr: '' } } as never
+    return ok.current ? ({ value: { exitCode: 0, stdout: JSON.stringify(TOUR), stderr: '' } } as never) : ({ value: { exitCode: 127, stdout: '', stderr: 'cadence: not found' } } as never)
+  })
+  await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  expect((hud.state('projects') as Project[]).map(p => p.project)).toEqual(['ol', 'cadence'])
+  ok.current = false
+  await clock.advance(60_000)
+  await settle()
+  expect((hud.state('projects') as Project[]).map(p => p.project)).toEqual(['ol', 'cadence'])
+  expect(hud.state('error')).toBeNull()
 })

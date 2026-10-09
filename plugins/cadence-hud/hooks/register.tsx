@@ -1,9 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { Register, RenderChildren, Timer } from 'claude-code'
 
-import type { AgentsSummary, CommandInfo, ModelsSummary, Usage, Wave, WaveLot } from '../types'
+import type { AgentsSummary, CommandInfo, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
 import { CONTEXT_WRITER, COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, k, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
+import { activeProjects, ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, k, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, projectLine, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -15,6 +15,8 @@ const owners = atom({ plugin: 'cadence-hud', key: 'commandOwners' } as const, {}
 const info = atom({ plugin: 'cadence-hud', key: 'commandInfo' } as const, {})
 const models = atom({ plugin: 'cadence-hud', key: 'models' } as const, { byModel: {}, usdSeen: 0 })
 const waves = atom({ plugin: 'cadence-hud', key: 'waves' } as const, [])
+const projects = atom({ plugin: 'cadence-hud', key: 'projects' } as const, [])
+const projectsFolded = atom({ plugin: 'cadence-hud', key: 'projectsFolded' } as const, false)
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
 const now = atom({ plugin: 'cadence-hud', key: 'now' } as const, 0)
@@ -37,8 +39,14 @@ const endCommand = async ($: Parameters<typeof read>[0], ended: string): Promise
 export const register: Register = on => {
   let timer: Timer | undefined
   let isRefreshing = false
+  let isTouring = false
+  let tourSignature: string | undefined
+  let tourAt = 0
+  let sessionCwd: string | undefined
 
   on('session.start', async ($, e, next) => {
+    sessionCwd = e.cwd
+    tourSignature = undefined
     // Une session démarre sans commande d'arrière-plan ; un rechargement à chaud du mod aussi (il refait session.start) :
     // le compte repart de zéro plutôt que de garder des identifiants dont la fin ne reviendra jamais (vu 08-10 : « 3 cmd »).
     await update($, commands, () => [])
@@ -46,7 +54,7 @@ export const register: Register = on => {
     await update($, info, () => ({}))
     await $.command.register({
       name: 'hud',
-      description: 'Affiche ou masque la bande cadence-hud ; « /hud cmd » liste les commandes d\'arrière-plan comptées',
+      description: 'Affiche ou masque la bande cadence-hud ; « /hud cmd » liste les commandes d\'arrière-plan comptées, « /hud projets » replie la liste des projets',
     })
 
     const refresh = async () => {
@@ -112,8 +120,28 @@ export const register: Register = on => {
         await update($, waves, () => found)
         await update($, error, () => problem)
         await update($, now, () => at)
+        void refreshProjects(found, at)
       } finally {
         isRefreshing = false
+      }
+    }
+
+    // L'avancement des plans vient de `cadence lead tour --json` : relu à chaque transition de vague, sinon toutes les minutes.
+    // Hors de refresh() (un `cadence` lent ne retarde pas la bande) et sans effet sur `error` : cadence absent = pas de lignes de projets.
+    const refreshProjects = async (found: Wave[], at: number) => {
+      const signature = waveSignature(found)
+      const folder = tourFolder(found, sessionCwd)
+      if (isTouring || !folder || !tourDue(tourSignature, tourAt, signature, at)) return
+      isTouring = true
+      tourSignature = signature
+      tourAt = at
+      try {
+        const r = await $.process.run(['cadence', 'lead', 'tour', folder, '--json'], { timeoutMs: 20_000 })
+        if (r.exitCode === 0) await update($, projects, () => activeProjects(parseTour(r.stdout)))
+      } catch {
+        // cadence absent, sortie illisible, délai dépassé : on garde le dernier tableau lu
+      } finally {
+        isTouring = false
       }
     }
 
@@ -185,8 +213,13 @@ export const register: Register = on => {
       const [ids, i, o, at] = await Promise.all([read($, commands), read($, info), read($, owners), $.clock.now()])
       return { text: commandsText(ids, i, o, at) }
     }
+    if (arg === 'projets') {
+      const folded = !(await read($, projectsFolded))
+      await update($, projectsFolded, () => folded)
+      return { text: folded ? 'liste des projets repliée (/hud projets pour la rouvrir).' : 'liste des projets affichée.' }
+    }
     // un argument inconnu ne bascule pas la bande : se tromper d'argument ne doit pas la faire disparaître sans un mot
-    if (arg !== '') return { text: `argument inconnu : ${fit(arg, 40)} (attendu : cmd)` }
+    if (arg !== '') return { text: `argument inconnu : ${fit(arg, 40)} (attendu : cmd, projets)` }
     const hidden = !(await read($, isHidden))
     await update($, isHidden, () => hidden)
 
@@ -196,7 +229,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, cmdInfo, m, allWaves, problem, at] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
@@ -205,9 +238,12 @@ export const register: Register = on => {
       read($, waves),
       read($, error),
       read($, now),
+      read($, projects),
+      read($, projectsFolded),
     ])
     const w = allWaves.filter(wave => isWaveShown(wave, at))
-    if (u === null && w.length === 0 && problem === null) return next(e)
+    const shownProjects = activeProjects(allProjects)
+    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0) return next(e)
 
     const ambiguous = parseAmbiguous(await $.env.get('CADENCE_HUD_AMBIGUOUS'))
     const { Box, Text } = $.ui.resolve(e)
@@ -442,10 +478,27 @@ export const register: Register = on => {
       )
     })
 
+    const nameWidth = Math.max(0, ...shownProjects.map(p => p.project.length))
+    const projectRows =
+      shownProjects.length === 0 ? null : folded ? (
+        <Text key="projects" color="subtle" wrap="truncate-end">
+          ▸ projets ({shownProjects.length}) : /hud projets pour les afficher
+        </Text>
+      ) : (
+        <Box key="projects" flexDirection="column">
+          {shownProjects.map(p => (
+            <Text key={`project-${p.project}`} wrap="truncate-end" color="subtle">
+              {projectLine(p, nameWidth)}
+            </Text>
+          ))}
+        </Box>
+      )
+
     return (
       <Box flexDirection="column">
         {contextRow}
         {waveRows}
+        {projectRows}
         {problem && (
           <Text color="warning" dimColor>
             cadence-hud : {fit(problem, width - 14)}

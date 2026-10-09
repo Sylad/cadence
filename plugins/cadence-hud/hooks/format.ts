@@ -1,6 +1,6 @@
 import type { ThemeKey } from 'claude-code'
 
-import type { CommandInfo, ModelsSummary, Wave, WaveLot } from '../types'
+import type { CommandInfo, ModelsSummary, Project, Wave, WaveLot } from '../types'
 
 /** Couleur d'un taux d'occupation (contexte, fenêtre, budget) : vert, puis orange, puis rouge. */
 export const colorOfPercent = (percent: number | undefined, warn = 60, bad = 85): ThemeKey =>
@@ -374,3 +374,49 @@ export const isWaveShown = (wave: Wave, now: number): boolean => {
   const t = Date.parse(wave.ended)
   return !Number.isFinite(t) || now - t < WAVE_LINGER_MS
 }
+
+// ── L149 : avancement des plans par projet ──────────────────────────────────────────────────────────────────
+
+/** Le tableau des projets est relu au plus toutes les minutes (et à chaque transition de vague). */
+export const TOUR_REFRESH_MS = 60_000
+
+/** Lit la sortie de `cadence lead tour --json` ; une ligne sans `progress` (cadence trop ancien) ou en erreur est écartée. */
+export const parseTour = (stdout: string): Project[] => {
+  const raw: unknown = JSON.parse(stdout)
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((r): r is Project & { error?: string } => typeof r === 'object' && r !== null && typeof (r as Project).project === 'string')
+    .filter(r => !r.error)
+    .map(r => ({ project: r.project, progress: r.progress }))
+}
+
+const open = (p: Project): number => (p.progress ? p.progress.doing + p.progress.todo : 0)
+
+/** Les projets qui ont encore des lots ouverts, dans l'ordre reçu (celui de la priorité). */
+export const activeProjects = (projects: readonly Project[]): Project[] => projects.filter(p => p.progress && open(p) > 0)
+
+/** Dix cases : pleines pour la part de lots faits ; dès le premier lot fait une case est pleine, tant qu'un reste est à faire la dernière reste vide. */
+export const progressBar = (done: number, total: number, cellCount = 10): string => {
+  if (total <= 0 || done <= 0) return '▯'.repeat(cellCount)
+  const full = Math.max(1, Math.min(done >= total ? cellCount : cellCount - 1, Math.round((done / total) * cellCount)))
+  return '▮'.repeat(full) + '▯'.repeat(cellCount - full)
+}
+
+/** `ol      ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine` : faits sur total des lots, en cours, ajoutés sur 7 jours (rien à zéro). */
+export const projectLine = (p: Project, nameWidth: number): string => {
+  const { done, doing, todo, added7 } = p.progress
+  const parts = [`${progressBar(done, done + doing + todo)} ${done}/${done + doing + todo}`, `${doing} en cours`]
+  if (added7 > 0) parts.push(`+${added7} cette semaine`)
+  return `${p.project.padEnd(nameWidth)} ${parts.join(' · ')}`
+}
+
+/** Ce qui change à une transition de vague : l'état de chaque lot de chaque vague (pas le budget consommé, qui bouge sans cesse). */
+export const waveSignature = (waves: readonly Wave[]): string =>
+  waves.map(w => `${w.id}:${w.status ?? ''}:${w.lots.map(l => `${l.project}:${l.lot}=${l.status}/${l.step?.kind ?? ''}/${l.pass}`).join(',')}`).join('|')
+
+/** Vrai quand le tableau doit être relu : jamais lu, vague passée à une autre étape, ou une minute écoulée. */
+export const tourDue = (lastSignature: string | undefined, lastAt: number, signature: string, now: number): boolean =>
+  lastSignature === undefined || signature !== lastSignature || now - lastAt >= TOUR_REFRESH_MS
+
+/** Le dossier parent des projets : celui d'où la vague a été lancée, sinon celui de la session ; null s'il n'y en a aucun. */
+export const tourFolder = (waves: readonly Wave[], sessionCwd: string | undefined): string | null => waves[0]?.cwd ?? sessionCwd ?? null

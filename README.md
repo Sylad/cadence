@@ -1250,7 +1250,19 @@ after it ended, then disappears. A background command counted for more than an h
 record of when it started, is no longer shown as running: it moves to a grey `N cmd sans fin
 vue` ("end never seen") right after `N cmd`, because its end notification may never have reached
 the session. Waves are read from disk (`~/.cadence/orchestrate/waves/`, then `.cadence/runs/`); no
-cadence command is run, and the CLI is not required.
+cadence command is run, and the CLI is not required for those. One more block needs it: the **progress of the plans**,
+one line per active project (a project with open lots), in the order of `priority:`:
+
+```
+ol      ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine
+cadence ▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours
+```
+
+The bar is lots done over lots done + in progress + to do (dropped and recurring lots left out);
+`+N cette semaine` counts the lots created in the last 7 days and is left out at zero. The source is
+`cadence lead tour <folder> --json` (the folder a wave was launched from, otherwise the session's),
+read again at every wave transition and otherwise every minute; without `cadence` on the PATH, the
+lines are simply not drawn.
 
 Install it as a plugin from the same marketplace:
 
@@ -1261,7 +1273,8 @@ Install it as a plugin from the same marketplace:
 
 `/hud` hides or shows the band. `/hud cmd` lists the background commands being counted (id, tool,
 origin `session` or `agent <id>`, age, name; `(sans fin vue)` on the ones above). Any other argument
-answers `argument inconnu : … (attendu : cmd)` and leaves the band as it is. The source lives in [`plugins/cadence-hud`](plugins/cadence-hud/README.md)
+`/hud projets` folds the project list to one line, and opens it again. Any other argument
+answers `argument inconnu : … (attendu : cmd, projets)` and leaves the band as it is. The source lives in [`plugins/cadence-hud`](plugins/cadence-hud/README.md)
 (its own README has the details of every cell); it is not part of the npm package. To work on it:
 `claude plugin validate plugins/cadence-hud`, `claude plugin test plugins/cadence-hud`, and
 `tsc -p plugins/cadence-hud` once Claude Code has loaded the plugin at least once (it generates

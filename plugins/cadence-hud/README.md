@@ -66,10 +66,26 @@ suspension (`...`), les valeurs inconnues (`-`) et le libellé de la limite de d
 noms d'agents et de modèles, repris tels quels, peuvent encore y mettre un caractère ambigu. Les en-têtes de vague sont
 tronqués en fin de ligne.
 
-`/hud` masque ou réaffiche la bande ; `/hud cmd` liste les commandes d'arrière-plan comptées (voir `N cmd`) ; tout autre argument répond `argument inconnu : … (attendu : cmd)` sans masquer la bande.
+- **avancement des plans** (L149) — sous les vagues, une ligne par projet actif (au moins un lot ouvert), dans l'ordre de
+  la clé `priority:` du `cadence.yaml` du dossier de lancement, les autres ensuite par ordre alphabétique :
+
+  ```
+  ol      ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine
+  cadence ▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours
+  ```
+
+  La barre (dix cases) et la fraction comptent les lots faits sur faits + en cours + à faire ; les lots abandonnés et
+  les lots récurrents n'y entrent pas. `+N cette semaine` = lots créés sur les 7 derniers jours (absent à zéro). Les
+  chiffres viennent de `cadence lead tour <dossier> --json` (champ `progress`), lancé dans le dossier de lancement de la
+  vague, sinon dans le dossier de la session : relu à **chaque transition de vague** (un lot change d'étape ou de
+  statut), sinon **toutes les minutes** ; un `cadence` absent ou en échec garde le dernier tableau lu, sans message
+  d'erreur dans la bande. **`/hud projets`** replie la liste sur une ligne grise (`▸ projets (2)`) et la rouvre.
+
+`/hud` masque ou réaffiche la bande ; `/hud cmd` liste les commandes d'arrière-plan comptées (voir `N cmd`) ; `/hud projets` replie ou rouvre la liste des projets ; tout autre argument répond `argument inconnu : … (attendu : cmd, projets)` sans masquer la bande.
 
 Les vagues sont lues sur disque (`~/.cadence/orchestrate/waves/<pid>.json`, puis `<cwd>/.cadence/runs/<vague>/`),
-par le script python de `hooks/collect.ts` ; aucune commande cadence n'est lancée.
+par le script python de `hooks/collect.ts` ; aucune commande cadence n'est lancée pour elles. Seul l'avancement des plans
+appelle `cadence lead tour --json` (CLI `@sylad/cadence` sur le PATH, facultative).
 
 Installer depuis la marketplace du dépôt cadence : `/plugin marketplace add Sylad/cadence` puis
 `/plugin install cadence-hud@cadence`.

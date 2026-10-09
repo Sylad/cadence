@@ -59,6 +59,12 @@ export type Wave = {
   lots: WaveLot[]
 }
 
+/** Une ligne de `cadence lead tour --json` (L149) : ce que la bande en garde pour dessiner l'avancement d'un plan. */
+export type Project = {
+  project: string
+  progress: { done: number; doing: number; todo: number; added7: number }
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'cadence-hud': {
@@ -72,6 +78,10 @@ declare module 'claude-code' {
       commandInfo: Record<string, BackgroundCommandInfo>
       models: ModelsSummary
       waves: Wave[]
+      /** Projets actifs (au moins un lot ouvert), dans l'ordre de priorité de `cadence lead tour`. */
+      projects: Project[]
+      /** La liste des projets est repliée sur une ligne (`/hud projets`). */
+      projectsFolded: boolean
       error: string | null
       isHidden: boolean
       now: number

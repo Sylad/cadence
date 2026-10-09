@@ -1546,13 +1546,15 @@ lots:
     finished: 2026-10-09
   - id: L137
     title: "orchestrate : niveau d'effort par passe (claude -p --effort, 2.1.284) — precheck et tour bas, implémentation moyen, revue haut ; réglable dans cadence.yaml ; mesurer tokens et durée sur une vague avant/après"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-09
     notes:
       - { date: 2026-10-09, text: "mesure AVANT L137 (niveau de la session, wave.json de 2026-10-09-0842, 0900, 0945, 1058 et 1253 ; jetons « counted » moyens par passe, durée moyenne, n) : precheck 21173 jetons 17 s (16) ; implement 85505 jetons 194 s (16) ; fix 51104 jetons 99 s (11) ; review 43277 jetons 119 s (17) ; review-small 50925 jetons 122 s (7). Le champ effort est absent de ces étapes. MESURE APRÈS À FAIRE : aucune vague n'a encore tourné avec orchestrate.effort (la vague 2026-10-09-1303 qui porte L137 a tourné avant le commit 50e9486) ; relever les mêmes moyennes par kind sur la première vague dont les étapes portent effort, et les noter ici avant de fermer le lot." }
+      - { date: 2026-10-09, text: "mineurs (revue 09-10) : règle effort[kind] écrite deux fois (cycle.ts:320 et command.ts:335, dry-run) → une fonction effortFor ; la note « mesure avant » cite durationMs des rapports de session, le README dit ended−started : nommer la source. Mesure « après » à relever sur une vague." }
     started: 2026-10-09
     review: { date: 2026-10-09, verdict: "conforme pour le code (aucun constat) ; la mesure « après » reste à relever sur la prochaine vague avant de fermer le lot — orchestré (vague 2026-10-09-1303, 2 passe(s) de correction)", commit: d28f98097c9f17dc1ebcac1504598b350879cb9b }
+    finished: 2026-10-09
   - id: L138
     title: "precheck-reader : omitClaudeMd (frontmatter 2.1.271) — la pré-vérification n'a pas besoin du CLAUDE.md du projet (400 lignes sur maritime) ; mesurer le contexte de la session precheck avant/après ; décider pour qa-reviewer"
     status: done
@@ -1578,12 +1580,13 @@ lots:
     finished: 2026-10-09
   - id: L141
     title: "lead : le skill calcule à la main les créneaux libres (2 − Σ min(cap, …), SKILL.md:22-23) alors que le registre vit dans src/orchestrate/registry.ts — orchestrate --status (et lead tour) affichent le nombre de créneaux libres, le skill le lit au lieu de le calculer (prompt-audit 09-10)"
-    status: doing
+    status: done
     estimate: 0.5
     quickwin: true
     created: 2026-10-09
     notes:
       - { date: 2026-10-09, text: "09-10 13:02 : cadence orchestrate --status sans argument, avec la vague 2026-10-09-1253 en cours, affiche l'en-tête « vagues en cours : 1 » puis le TABLEAU de la vieille vague ol-gains-1 (terminée le 08-10), pas celui de la vague en cours — choisir la vague par date de lancement, pas par ordre alphabétique du nom ; à corriger dans ce lot" }
+      - { date: 2026-10-09, text: "mineur (revue 09-10) : RunStore.last lit le wave.json de toutes les vagues sans try autour du JSON.parse (state.ts:226) — un wave.json tronqué ferait planter --status et --resume sans id ; quasi inatteignable (atomicWrite)" }
     started: 2026-10-09
     review:
       {
@@ -1593,6 +1596,7 @@ lots:
           compliant — orchestré (vague 2026-10-09-1303, 0 passe(s) de correction + passe des mineurs)",
         commit: 32909307fa8d57fbbc60c47019817ac79d54b149
       }
+    finished: 2026-10-09
   - id: L142
     title: "cadence-hud : la bande reste trompeuse après la fin — « 1 cmd » en orange sans aucune commande en cours, et la ligne de vague « terminée il y a 1 h 04 · budget 12 % · 1 prêt » toujours affichée ; dire clairement l'état : nommer ce qui est compté (/hud cmd liste les commandes comptées avec leur origine), retomber à zéro quand toutes les fins sont passées, et une vague terminée disparaît après un délai ou s'affiche en gris « terminée » sans budget"
     public: La bande d'état retombe à zéro et grise les vagues terminées
@@ -1608,16 +1612,22 @@ lots:
     finished: 2026-10-09
   - id: L143
     title: "Documentation qui suit le code, vérifiée par le programme : clé docs.sync dans cadence.yaml (liste de paires chemins modifiés → documents à toucher : README, doc d'usage, CLAUDE.md), raf check signale un lot dont les commits touchent les chemins sans toucher le document, le brief review le passe en constat majeur avec la liste calculée (plus une phrase) ; cadence lead tour l'affiche en dérive ; essai réel sur ol-companion et cadence. Demande Sylvain 09-10 : « une doc obsolète peut être trompeuse »"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-09
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme après 1 correction — 5 commits : docs.sync (raf check, lead tour, brief de revue), motifs !, since inclusif figé au 2026-10-09 dans le test (vert sous TZ=Pacific/Kiritimati), commentaire since corrigé ; 1098 tests et typecheck verts", commit: 89e73aa8369e32a8bb667e71774d14e8f1e79d9f }
+    finished: 2026-10-09
   - id: L144
     title: "Articles externes rafraîchis à la livraison, comme les Nouveautés : clé docs.articles dans cadence.yaml (dépôt voisin + fichier, ex. l'étude de cas du projet dans claude-code-codex) ; après une livraison verte, cadence deliver ouvre dans ce dépôt un lot « Article <projet> à rafraîchir » qui cite les titres publics livrés et les sections à relire ; le lot se joue ensuite dans une vague ordinaire (Sonnet réécrit, revue vérifie) ; le skill sync-site-docs est retiré au profit de ce mécanisme. Demande Sylvain 09-10"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-09
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme après 2 corrections — 5 commits + f826a82 dans claude-code-codex (skill sync-site-docs retiré) : docs.articles, deliver relit le plan avant d'ouvrir le lot d'article, CLI testée, regroupement par nom (un lot, tous les dépôts) ; typecheck et 1098 tests verts ; 1 mineur en note", commit: 82910eb7e7501f04d1b89a9c53cfc3f843f4e998 }
+    notes:
+      - { date: 2026-10-09, text: "mineur (revue 09-10) : un lot d'article déjà ouvert ne reçoit qu'une note, ses repos ne sont pas complétés par une entrée de même nom ajoutée ensuite (src/articles.ts:119-123) — cas rare, sans perte" }
+    finished: 2026-10-09
   - id: L145
     title: "orchestrate : la revue finale est toujours jouée — le budget du lot (dérivé de l'estimate) ne doit jamais rendre un lot au lead juste avant sa revue (3e cas en 2 jours : L142 le 09-10 matin, Q4/particules-legende-hs-globe le 09-10 après-midi à 229 k / 200 k) ; réserver le coût d'une revue avant chaque passe fix, ou plafonner les passes fix et non la revue ; mesurer sur les journaux des vagues du 08 et 09-10"
     status: todo
@@ -1645,6 +1655,11 @@ lots:
     status: todo
     estimate: 0.5
     after: [ L145 ]
+    created: 2026-10-09
+  - id: L150
+    title: "test orchestrate-command.test.ts instable sous charge : 1 puis 37 échecs (délais 5 s dépassés, « vagues en cours : 2 » au lieu de 1) pendant qu'une suite tournait à côté, 71/71 seul et 1098/1098 sur copie propre — isoler le registre des vagues par test (dossier temporaire dédié) et desserrer les délais (revue L143/L144 09-10)"
+    status: todo
+    estimate: 0.25
     created: 2026-10-09
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

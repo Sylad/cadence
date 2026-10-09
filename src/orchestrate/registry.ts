@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { processStart } from '../proc.js';
+import { lotKey, lotRepoPaths, RunStore, type LotState } from './state.js';
 import { activeLock, holderAlive, releaseLock, takeLock, type OLock } from './lock.js';
 
 /**
@@ -152,5 +153,18 @@ export async function acquireSlot(
       opts.onWait?.(live(home), reportedAt - t0);
     }
     await new Promise((r) => setTimeout(r, pollMs + Math.random() * pollMs * 0.25));
+  }
+}
+
+/** Lots de la vague `pid` qui travaillent encore dans `repo` (en cours, en file ou suspendus) ; null si l'état de la vague est illisible. */
+export function openLotsIn(home: string, pid: number, repo: string): string[] | null {
+  try {
+    const w = liveWaves(home).find((x) => x.pid === pid);
+    const store = w && RunStore.find(w.cwd, w.wave);
+    if (!store) return null;
+    const finished = (l: LotState) => l.status === 'ready' || l.status === 'handed-back' || l.status === 'failed';
+    return store.lots().filter((l) => !finished(l) && lotRepoPaths(l).includes(repo)).map((l) => lotKey(l.project, l.lot));
+  } catch {
+    return null;
   }
 }

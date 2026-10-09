@@ -20,6 +20,7 @@ import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.j
 import { findProjects, leadTour, tourLine } from './lead.js';
 import { liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
+import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
@@ -397,7 +398,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     case 'deliver': {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
       const orchestrating = activeLock(join(sharedStateDir(root), REPO_LOCK));
-      if (orchestrating) throw new RafError(`deliver : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — livrer une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
+      // La vague tient le verrou jusqu'à la fin de ses lots ; ne refuse que si l'un d'eux travaille encore dans CE dépôt (état illisible : on refuse).
+      const stillOpen = orchestrating ? openLotsIn(cadenceHome(), orchestrating.pid, root) : null;
+      if (orchestrating && (stillOpen === null || stillOpen.length > 0)) throw new RafError(`deliver : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — livrer une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans le README)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const plan = existsSync(planPath) ? loadPlan() : null;

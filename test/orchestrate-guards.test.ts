@@ -4,8 +4,10 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { run } from '../src/cli.js';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
+import { registerWave } from '../src/orchestrate/registry.js';
+import { newLot, RunStore, type LotState } from '../src/orchestrate/state.js';
 import { sharedStateDir } from '../src/state.js';
-import { commit, gitRepo } from './helpers.js';
+import { commit, gitRepo, tempDir } from './helpers.js';
 
 async function cli(dir: string, env: Record<string, string>, ...argv: string[]) {
   const out: string[] = [];
@@ -59,5 +61,45 @@ describe('garde-fous sous CADENCE_ORCHESTRATED', () => {
     writeFileSync(lock, JSON.stringify({ pid: 99_999_999, wave: 'morte', started: 'x' }));
     const after = await cli(dir, {}, 'deliver', '--dry-run');
     expect(after.err).not.toContain('orchestration en cours');
+  });
+
+  describe('verrou vivant : seule la file de CE dépôt refuse (L127)', () => {
+    const wave = async (statuses: Record<string, LotState['status']>) => {
+      const dir = await project();
+      const launch = tempDir();
+      const home = tempDir();
+      const store = RunStore.reserve(launch, 'w7')!;
+      store.writeWave({ id: 'w7', status: 'running', created: 'x', lots: Object.keys(statuses) } as never);
+      for (const [key, status] of Object.entries(statuses)) {
+        const [project, lot] = key.split(':');
+        store.writeLot({ ...newLot({ project, repo: project === 'ici' ? dir : join(launch, project), lot, title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false }), status });
+      }
+      mkdirSync(sharedStateDir(dir), { recursive: true });
+      writeFileSync(join(sharedStateDir(dir), REPO_LOCK), JSON.stringify({ pid: process.pid, wave: 'w7', started: 'x' }));
+      registerWave(home, { pid: process.pid, wave: 'w7', started: 'x', cwd: launch, repos: [dir] });
+      process.env.CADENCE_HOME = home;
+      return dir;
+    };
+
+    it('accepte la livraison quand la vague n\'a plus aucun lot en cours ni en file dans ce dépôt', async () => {
+      const dir = await wave({ 'ici:L1': 'ready', 'ailleurs:L2': 'implementing', 'autre:L3': 'queued' });
+      try {
+        const r = await cli(dir, {}, 'deliver', '--dry-run');
+        expect(r.err).not.toContain('orchestration en cours');
+      } finally {
+        delete process.env.CADENCE_HOME;
+      }
+    });
+
+    it('refuse tant qu\'un lot de ce dépôt est en cours ou en file', async () => {
+      const dir = await wave({ 'ici:L1': 'ready', 'ici:L4': 'queued' });
+      try {
+        const r = await cli(dir, {}, 'deliver', '--dry-run');
+        expect(r.code).toBe(2);
+        expect(r.err).toContain('orchestration en cours (vague w7');
+      } finally {
+        delete process.env.CADENCE_HOME;
+      }
+    });
   });
 });

@@ -40,6 +40,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
+- `cadence deliver` no longer refuses a repository on the sole ground that a live wave holds its lock: it reads the wave's state and refuses only when a lot of that wave is still running, queued or suspended in this repository (L127).
 - `cadence-hud`: the progress bar of each project is coloured by the share of lots done — filled cells red below 33 %, orange below 66 %, green beyond (the thresholds of the usage colours, inverted); empty cells stay grey (L152).
 
 ## [0.22.0] - 2026-10-09

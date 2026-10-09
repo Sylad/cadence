@@ -1027,7 +1027,7 @@ cours`; the lock of a dead process is detected and cleared); two waves on differ
 side, even when started from the same parent folder. A repository is released **as soon as every lot of the wave that
 touches it is finished** (ready, handed back or failed): its lock and its `pre-push` guard are lifted while the wave goes
 on elsewhere, so `cadence deliver` accepts it (a repository with a lot still to play, a question or a suspended lot stays
-held until the wave ends). They share a **cap on simultaneous sessions**, counted
+held until the wave ends). `cadence deliver` also reads the wave's own state when a lock is still held: it refuses only if the wave still has a lot running, queued or suspended **in this repository**, and goes ahead when the lots left are elsewhere (an unreadable wave state still refuses). They share a **cap on simultaneous sessions**, counted
 across all live waves: 2 by default, `--max-sessions N` (or `CADENCE_MAX_SESSIONS=N`) to change it — give
 every wave the same value: each wave counts ALL live sessions, whatever their slot, and waits while that
 count has reached ITS OWN cap, so with different caps the highest one can push the total past the lowest

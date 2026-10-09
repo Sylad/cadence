@@ -1546,9 +1546,10 @@ lots:
     finished: 2026-10-09
   - id: L137
     title: "orchestrate : niveau d'effort par passe (claude -p --effort, 2.1.284) — precheck et tour bas, implémentation moyen, revue haut ; réglable dans cadence.yaml ; mesurer tokens et durée sur une vague avant/après"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-09
+    started: 2026-10-09
   - id: L138
     title: "precheck-reader : omitClaudeMd (frontmatter 2.1.271) — la pré-vérification n'a pas besoin du CLAUDE.md du projet (400 lignes sur maritime) ; mesurer le contexte de la session precheck avant/après ; décider pour qa-reviewer"
     status: done

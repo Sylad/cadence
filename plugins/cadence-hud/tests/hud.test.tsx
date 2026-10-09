@@ -935,3 +935,15 @@ test('un sous-agent lancé pendant l\'attente du collecteur garde sa première c
   expect(hud.owners()).toEqual({ b9: 'a2' })
   expect(Object.keys(hud.info())).toEqual(['b9'])
 })
+
+test('/hud avec un argument inconnu répond « argument inconnu » sans basculer la bande', async ($, on) => {
+  wired(on)
+  mock.clock(on)
+  for (const args of ['cmds', 'list', 'CMD']) {
+    const unknown = await $.command.run({ command: 'hud', args } as never)
+    expect(unknown.text).toBe(`argument inconnu : ${args} (attendu : cmd)`)
+  }
+  // rien n'a basculé : le premier « /hud » nu masque la bande, le second la réaffiche
+  expect((await $.command.run({ command: 'hud', args: '' } as never)).text).toMatch(/masquée/)
+  expect((await $.command.run({ command: 'hud', args: '  ' } as never)).text).toMatch(/affichée/)
+})

@@ -166,10 +166,13 @@ export const register: Register = on => {
   )
 
   on('command.run', { command: 'hud' }, async ($, e) => {
-    if (e.args.trim() === 'cmd') {
+    const arg = e.args.trim()
+    if (arg === 'cmd') {
       const [ids, i, o, at] = await Promise.all([read($, commands), read($, info), read($, owners), $.clock.now()])
       return { text: commandsText(ids, i, o, at) }
     }
+    // un argument inconnu ne bascule pas la bande : se tromper d'argument ne doit pas la faire disparaître sans un mot
+    if (arg !== '') return { text: `argument inconnu : ${fit(arg, 40)} (attendu : cmd)` }
     const hidden = !(await read($, isHidden))
     await update($, isHidden, () => hidden)
 

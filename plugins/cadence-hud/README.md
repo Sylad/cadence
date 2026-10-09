@@ -66,7 +66,7 @@ suspension (`...`), les valeurs inconnues (`-`) et le libellé de la limite de d
 noms d'agents et de modèles, repris tels quels, peuvent encore y mettre un caractère ambigu. Les en-têtes de vague sont
 tronqués en fin de ligne.
 
-`/hud` masque ou réaffiche la bande ; `/hud cmd` liste les commandes d'arrière-plan comptées (voir `N cmd`).
+`/hud` masque ou réaffiche la bande ; `/hud cmd` liste les commandes d'arrière-plan comptées (voir `N cmd`) ; tout autre argument répond `argument inconnu : … (attendu : cmd)` sans masquer la bande.
 
 Les vagues sont lues sur disque (`~/.cadence/orchestrate/waves/<pid>.json`, puis `<cwd>/.cadence/runs/<vague>/`),
 par le script python de `hooks/collect.ts` ; aucune commande cadence n'est lancée.

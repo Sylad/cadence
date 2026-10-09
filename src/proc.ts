@@ -282,13 +282,36 @@ export class TreeTracker {
 /** Variable d'environnement qui marque une session de l'orchestrateur : héritée par tous ses descendants, même orphelins. */
 export const SESSION_MARK_VAR = 'CADENCE_SESSION';
 
-/** Pids des processus (hors cadence) dont l'environnement porte `<SESSION_MARK_VAR>=<mark>` : /proc, sinon `ps eww`. */
-export function findMarked(mark: string): number[] {
+/** Entrées de `findMarked` injectables, comme le `read` du TreeTracker : tests sans /proc, ou avec un faux `ps`. */
+export interface FindMarkedIo {
+  /** Dossier des processus (défaut `/proc`) : un dossier absent simule une machine sans /proc. */
+  procRoot?: string;
+  /** Exécuteur de `ps` (défaut `execFileSync`). */
+  run?: typeof execFileSync;
+  /** Plateforme dont `ps` est interrogé (défaut `process.platform`). */
+  platform?: NodeJS.Platform;
+}
+
+/**
+ * Arguments de `ps` qui listent pid et commande suivie de l'ENVIRONNEMENT, sans limite de largeur, selon la plateforme.
+ * macOS (ps BSD), page de manuel officielle : « -E  Display the environment as well.  This does not reflect changes
+ * in the environment after process launch. » — alors que « -e  Display information about other users' processes,
+ * including those without controlling terminals. Identical to -A. » : sur macOS, `-e` n'affiche PAS l'environnement.
+ * Linux (procps), man ps : « e  Show the environment after the command. » (lettre sans tiret, style BSD ; avec un
+ * tiret, `-e` y signifie « tous les processus »).
+ */
+export function psEnvArgs(platform: NodeJS.Platform = process.platform): string[] {
+  return [platform === 'darwin' ? '-axEww' : 'axeww', '-o', 'pid=,command='];
+}
+
+/** Pids des processus (hors cadence) dont l'environnement porte `<SESSION_MARK_VAR>=<mark>` : /proc, sinon `ps` (`-E` sur macOS, `e` sur Linux). */
+export function findMarked(mark: string, io: FindMarkedIo = {}): number[] {
+  const { procRoot = '/proc', run = execFileSync, platform = process.platform } = io;
   const entry = `${SESSION_MARK_VAR}=${mark}`;
   const found: number[] = [];
   let names: string[] | null = null;
   try {
-    names = readdirSync('/proc');
+    names = readdirSync(procRoot);
   } catch {
     // pas de /proc (macOS) : ps
   }
@@ -297,7 +320,7 @@ export function findMarked(mark: string): number[] {
       const pid = Number(name);
       if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) continue;
       try {
-        if (readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').includes(entry)) found.push(pid);
+        if (readFileSync(`${procRoot}/${pid}/environ`, 'utf8').split('\0').includes(entry)) found.push(pid);
       } catch {
         // sorti, zombie ou illisible (autre utilisateur)
       }
@@ -305,12 +328,13 @@ export function findMarked(mark: string): number[] {
     return found;
   }
   try {
-    const out = execFileSync('ps', ['-axeww', '-o', 'pid=,command='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
+    const out = run('ps', psEnvArgs(platform), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
     for (const line of out.split('\n')) {
       const m = /^\s*(\d+)\s(.*)$/.exec(line);
       if (!m) continue;
       const pid = Number(m[1]);
-      if (pid !== process.pid && (m[2] === entry || m[2].includes(` ${entry}`))) found.push(pid);
+      // la marque est un mot entier : `s1` ne reconnaît pas `s10` (comme la comparaison exacte des entrées de /proc)
+      if (pid !== process.pid && ` ${m[2]} `.includes(` ${entry} `)) found.push(pid);
     }
   } catch {
     // ps absent : rien à tuer de plus

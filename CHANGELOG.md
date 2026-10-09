@@ -42,7 +42,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- `cadence orchestrate`: a session no longer leaves its child processes alive — a dev server a session started in its own process group (`setsid`, `nohup`, a tool that detaches) is tracked with the rest of the session's process tree, and every session carries a `CADENCE_SESSION` mark in its environment that its orphaned descendants (a shell that exits right after `nohup srv &`) keep: they are killed with the session when the session ends, hits its time limit, or the wave is interrupted (L83)
+- `cadence orchestrate`: a session no longer leaves its child processes alive — a dev server a session started in its own process group (`setsid`, `nohup`, a tool that detaches) is tracked with the rest of the session's process tree, and every session carries a `CADENCE_SESSION` mark in its environment that its orphaned descendants (a shell that exits right after `nohup srv &`) keep: they are killed with the session when the session ends, hits its time limit, or the wave is interrupted (L83); without `/proc` (macOS) the mark is read from `ps -axEww` (`-E` prints the environment there, `-e` does not), `ps axeww` with procps, and the fallback is covered by tests
 
 ## [0.27.0] - 2026-10-09
 

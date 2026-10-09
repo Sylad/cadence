@@ -1,5 +1,6 @@
+import { execFileSync, spawn } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MAX_SNAPSHOT_AGE_MS, readPsProcs, TreeTracker } from '../src/proc.js';
+import { findMarked, MAX_SNAPSHOT_AGE_MS, psEnvArgs, readPsProcs, SESSION_MARK_VAR, TreeTracker } from '../src/proc.js';
 
 type Procs = NonNullable<ReturnType<typeof readPsProcs>>;
 const table = (...rows: [pid: number, ppid: number, start: string][]): Procs =>
@@ -259,5 +260,55 @@ describe('TreeTracker — racine sortie', () => {
     tracker.stop();
     procs = table([100, 1, 'A']);
     expect(tracker.alive()).toEqual([100]);
+  });
+});
+
+describe('findMarked — repli sans /proc (macOS)', () => {
+  const NO_PROC = '/nonexistent-proc-dir';
+  const fakePs = (out: string) => {
+    const calls: [string, readonly string[]][] = [];
+    const run = ((cmd: string, args: readonly string[]) => (calls.push([cmd, args]), out)) as unknown as typeof execFileSync;
+    return { run, calls };
+  };
+
+  it('trouve le processus marqué dans la sortie de ps, ignore celui qui ne l\'est pas ni la marque d\'une autre session', () => {
+    const { run, calls } = fakePs(
+      [
+        '  101 node server.js PATH=/usr/bin CADENCE_SESSION=s1 HOME=/Users/x',
+        '  102 node other.js PATH=/usr/bin HOME=/Users/x',
+        '  103 sleep 9 CADENCE_SESSION=s10 HOME=/Users/x',
+        '  104 sh CADENCE_SESSION=s1',
+        '  105 grep XCADENCE_SESSION=s1',
+        `  ${process.pid} node cadence CADENCE_SESSION=s1`,
+        '',
+      ].join('\n'),
+    );
+    expect(findMarked('s1', { procRoot: NO_PROC, run, platform: 'darwin' })).toEqual([101, 104]);
+    expect(calls).toEqual([['ps', ['-axEww', '-o', 'pid=,command=']]]);
+  });
+
+  it('ps absent ou en échec : rien à tuer, pas d\'exception', () => {
+    const run = (() => {
+      throw new Error('ENOENT');
+    }) as unknown as typeof execFileSync;
+    expect(findMarked('s1', { procRoot: NO_PROC, run, platform: 'darwin' })).toEqual([]);
+  });
+
+  it('l\'option de ps qui affiche l\'environnement dépend de la plateforme : -E sur macOS (BSD), e sur Linux (procps)', () => {
+    expect(psEnvArgs('darwin')).toEqual(['-axEww', '-o', 'pid=,command=']);
+    expect(psEnvArgs('linux')).toEqual(['axeww', '-o', 'pid=,command=']);
+  });
+
+  it('le vrai ps de cet hôte voit l\'environnement d\'un processus marqué, et pas celui d\'une autre session', async () => {
+    const mark = `test-${process.pid}-${Date.now()}`;
+    const child = spawn('sleep', ['30'], { env: { ...process.env, [SESSION_MARK_VAR]: mark }, stdio: 'ignore' });
+    const other = spawn('sleep', ['30'], { env: { ...process.env, [SESSION_MARK_VAR]: `${mark}-autre` }, stdio: 'ignore' });
+    try {
+      const found = findMarked(mark, { procRoot: NO_PROC });
+      expect(found).toEqual([child.pid]);
+    } finally {
+      child.kill('SIGKILL');
+      other.kill('SIGKILL');
+    }
   });
 });

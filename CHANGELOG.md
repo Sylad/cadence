@@ -38,6 +38,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - `cadence orchestrate --continue [--until HH:MM] [--priority a,b]`: the wave draws the next ready lot of the plan itself when the lots in play are finished, in the priority declared by `--priority` or by `priority:` in the `cadence.yaml` of the parent folder, until the budget, the time window, the usage limit, a question, two lots handed back in a row, or no ready lot whose estimate fits the budget left; lots « à décider avec … » and lots whose `after` is not lifted are never drawn (L147).
+- `lead` skill: chains without the human — after a ready lot it re-verifies, `raf done`, pushes, delivers, runs the QA check and starts the next `--continue` wave in the declared priority, while the context of the lead session (the `ctx` segment of the `cadence-hud` band) stays under 60 %; at the threshold it runs `session-close`, writes memory and records three lines for next time; the first choice and order, questions and UX reservations stay with the human (L148).
 
 ### Fixed
 

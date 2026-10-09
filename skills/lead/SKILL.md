@@ -97,6 +97,30 @@ questions back (`--resume --answer <project>:<lot> "…"`), look at the UX revie
 the plan is the lead's decision. A minor finding becomes a lot of its own only if it describes an observable bug (a wrong output, a crash, a measured regression); otherwise it stays a note of the originating lot, so that a review never feeds the next one. If an orchestrated wave is running in a repository, do not commit there
 and do not deliver it (`cadence deliver` refuses).
 
+### 2c. Chaining without the human
+
+Once the human has given the **first choice and the order** (the lots, and the priority: `--priority` or the
+`priority:` list of the parent folder's `cadence.yaml`), the lead does not come back to ask « next? ». For each lot a
+wave hands back **ready**, it chains, in this order, one project at a time: re-verify it yourself (section 3, point 2),
+`raf done` (a read-only plan: the project's own command), push, deliver (section 4), the `qa-reviewer` check that
+section asks for; then it starts the next wave, in the declared priority — `cadence orchestrate --continue --priority …` draws the next ready lot
+of the plan itself (section 2b), and the limits of section « Limits that always apply » still hold. A lot that was not
+handed back ready (refused, review not compliant after the correction passes, red delivery, blocking QA finding) is
+not chained over: it is reported, and the chain goes on with the lots that do not depend on it.
+
+**The threshold.** Before every new wave, read the context of the lead session as the human reads it: the `ctx`
+segment of the `cadence-hud` band (percentage of the window used, the same figure as `/context`). From **60 %** upward,
+start nothing: at the threshold the lead runs `session-close` in each project touched, writes its memory (filtered,
+as `session-close` says), and records three lines for next time with `cadence session next` — the wave that was
+about to start comes first among them. Under it, chain. The lead says in one sentence which side of the threshold it
+is on each time it chains or stops; it never waits for the figure to move (never a polling loop).
+
+**What stays with the human**: the first choice and the order; the questions a session raised (the lead brings them
+back at once and does not answer in the human's place); the UX reservations (`raf ux` is recorded on the human's
+verdict, a UX reviewer's captures are looked at by the human). While a question or a UX reservation is pending on a
+lot, the chain goes on with the other lots and does not wait for it. A delivery that needs the human's confirmation
+(their standing instructions, section 4) is a stop of the chain, not a bypass.
+
 ## 3. Check
 
 0. After an orchestrated wave the review is already done, by a fresh session: read the table, then go to

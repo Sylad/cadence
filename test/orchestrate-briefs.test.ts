@@ -176,6 +176,22 @@ describe('skill lead : source unique', () => {
     expect(skill).toContain('créneaux libres : N sur 2'); // le skill lit le chiffre du registre (L141)
     expect(skill).not.toMatch(/2 − Σ/);
   });
+  it('le lead enchaîne sans le humain sous un seuil de contexte, et ce qui reste au humain est nommé (L148)', () => {
+    const skill = read('../skills/lead/SKILL.md').replace(/\s+/g, ' ');
+    expect(skill).toContain('### 2c. Chaining without the human');
+    // après un lot prêt : revérifier, raf done, pousser, livrer, QA, puis la vague suivante selon la priorité déclarée
+    expect(skill).toMatch(/re-verify[^.]*`raf done`[^.]*push[^.]*deliver[^.]*`qa-reviewer`[^.]*next wave[^.]*declared priority/i);
+    expect(skill).toContain('cadence orchestrate --continue');
+    // le seuil : 60 %, lu comme la bande cadence-hud (segment ctx)
+    expect(skill).toContain('60 %');
+    expect(skill).toMatch(/`ctx` segment of the `cadence-hud` band/);
+    // au seuil : session-close, mémoire, trois lignes pour la suite
+    expect(skill).toMatch(/at the threshold[^.]*`session-close`[^.]*memory[^.]*three lines/i);
+    // ce qui reste au humain
+    expect(skill).toMatch(/stays with the human\*\*: the first choice and the order[^.]*questions[^.]*UX reservations/i);
+    // un arrêt, pas une boucle d'attente
+    expect(skill).toMatch(/never a polling loop/i);
+  });
   it('le dossier de gabarits est celui du paquet', () => {
     expect(TEMPLATES_DIR.endsWith('/templates/orchestrate')).toBe(true);
     expect(JSON.parse(read('../package.json')).files).toContain('templates');

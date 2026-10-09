@@ -34,7 +34,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ## [Unreleased]
 
 ### Added
-- `docs.sync` in `cadence.yaml`: a list of `{ paths, docs }` pairs (code paths → the README, usage doc or CLAUDE.md that must follow them; `*`, `**`, a trailing `/` for a folder). `raf check` reports an open lot whose commits touch the paths without touching any of the documents (`✗ L7 : documentation en retard — src/a.ts, … sans toucher README.md (docs.sync)`), `cadence lead tour` shows it in the project's drift, and the review brief of `cadence orchestrate` carries the list the program computed, to be reported as one major finding per line (not just the sentence "the README must follow"). `docs.since` extends the audit to lots finished after that day. (L143)
+- `docs.sync` in `cadence.yaml`: a list of `{ paths, docs }` pairs (code paths → the README, usage doc or CLAUDE.md that must follow them; `*`, `**`, a trailing `/` for a folder). `raf check` reports an open lot whose commits touch the paths without touching any of the documents (`✗ L7 : documentation en retard — src/a.ts, … sans toucher README.md (docs.sync)`), `cadence lead tour` shows it in the project's drift, and the review brief of `cadence orchestrate` carries the list the program computed, to be reported as one major finding per line (not just the sentence "the README must follow"). a `!pattern` leaves files out (tests); `docs.since` extends the audit to lots finished after that day. (L143)
 - `cadence orchestrate --status` and `cadence lead tour` print the free session slots (`créneaux libres : N sur 2`) from the registry of live waves; the `lead` skill reads the figure instead of computing `2 − Σ min(cap, …)` by hand. (L141)
 
 ### Fixed

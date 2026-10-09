@@ -24,6 +24,13 @@ export function docSyncMatcher(pattern: string): (file: string) => boolean {
   return (file) => re.test(file);
 }
 
+/** Liste de motifs : un fichier en fait partie s'il correspond à un motif et à aucun motif « !… » (exclusion, ex. `!**\/*.test.ts`). */
+export function docSyncSet(patterns: string[]): (file: string) => boolean {
+  const yes = patterns.filter((p) => !p.startsWith('!')).map(docSyncMatcher);
+  const no = patterns.filter((p) => p.startsWith('!')).map((p) => docSyncMatcher(p.slice(1)));
+  return (file) => yes.some((m) => m(file)) && !no.some((m) => m(file));
+}
+
 /** Fichiers modifiés par un ensemble de commits, sans doublon. */
 export function filesOf(root: string, commits: Commit[]): Set<string> {
   return new Set(commits.flatMap((c) => changedFiles(root, c.sha)));
@@ -33,10 +40,9 @@ export function filesOf(root: string, commits: Commit[]): Set<string> {
 export function docSyncGaps(rules: DocSyncRule[], files: Set<string>): DocSyncGap[] {
   const gaps: DocSyncGap[] = [];
   for (const rule of rules) {
-    const isDoc = rule.docs.map(docSyncMatcher);
-    if ([...files].some((f) => isDoc.some((m) => m(f)))) continue;
-    const isPath = rule.paths.map(docSyncMatcher);
-    const touched = [...files].filter((f) => isPath.some((m) => m(f))).sort();
+    if ([...files].some(docSyncSet(rule.docs))) continue;
+    const inPaths = docSyncSet(rule.paths);
+    const touched = [...files].filter(inPaths).sort();
     if (touched.length) gaps.push({ rule, touched });
   }
   return gaps;

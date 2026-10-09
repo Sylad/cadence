@@ -352,6 +352,8 @@ docs:
       docs: [README.md, docs/usage.md]  # …must change one of these, in the same lot
     - paths: [templates/]
       docs: [CLAUDE.md]
+    - paths: [frontend/src/**, '!**/*.test.tsx']   # a pattern starting with ! leaves files out
+      docs: [README.md]
   since: 2026-10-09                    # optional: also audit lots finished after this day
 ```
 

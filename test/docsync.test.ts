@@ -93,6 +93,18 @@ describe('docs.sync : motifs de chemins', () => {
   });
 });
 
+describe('docs.sync : exclusions', () => {
+  it('un motif « !… » écarte les fichiers qu\'il désigne (tests), sans rien déclencher seul', async () => {
+    const dir = await repo(`docs:\n  sync:\n    - paths: [src/**, '!**/*.test.ts']\n      docs: [README.md]\n`);
+    work(dir, 'feat(L1): test seul', ['src/a.test.ts', 'src/deep/b.test.ts']);
+    expect((await cad(dir, 'check')).out).not.toContain('documentation en retard');
+    work(dir, 'feat(L1): code', ['src/a.ts']);
+    const { out } = await cad(dir, 'check');
+    expect(out).toContain('src/a.ts sans toucher README.md');
+    expect(out).not.toContain('a.test.ts');
+  });
+});
+
 describe('raf check : docs.sync', () => {
   it('signale un lot dont les commits touchent les chemins sans toucher le document, avec la liste calculée', async () => {
     const dir = await repo();

@@ -1725,12 +1725,13 @@ lots:
     finished: 2026-10-09
   - id: L153
     title: "cadence-hud : ligne projet — afficher les ids des lots en cours après le compte (« 2 en cours : L72 L79 »), tronqués au-delà de 3 ; demande Sylvain 09-10 (il ne voyait plus quel lot tournait une fois la vague terminée)"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-09
     notes:
       - { date: 2026-10-09, text: "rsync vers ~/.claude/mods/cadence-hud après commit (deux copies, cf L152) ; bumper plugins/cadence-hud/.claude-plugin/plugin.json 0.4.1 → 0.4.2 à la release" }
+    started: 2026-10-09
   - id: L154
     title: "cadence-hud : l'avancement par projet suit le dossier courant du shell de la session (un cd dans un sous-projet par le lead réduit la bande à une seule ligne, vu 09-10) — prendre le dossier de lancement de la session (ou le dossier parent qui porte le cadence.yaml avec priority) et le garder"
     status: todo

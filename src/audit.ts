@@ -4,7 +4,7 @@ import { check } from './check.js';
 import type { Day } from './dates.js';
 import { parse } from 'yaml';
 import { changedFiles, fileAt, readCommits, type Commit } from './git.js';
-import { linkCommits, type Linked } from './link.js';
+import { citedRefs, linkCommits, type Linked } from './link.js';
 import { readDocsConfig, readNewsConfig } from './config.js';
 import { docSyncGaps, filesOf, gapMessage } from './docsync.js';
 import { type Entry, loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong, reusedNewsTitle } from './news.js';
@@ -202,6 +202,21 @@ export function lotCommits(plan: Plan, root: string, lotId: string): Commit[] {
 /** Commits à relire d'un lot, du plus récent au plus ancien — ce que compte la porte de revue de code et que liste `raf commits`. */
 export function lotWork(plan: Plan, root: string, lotId: string): Commit[] {
   return workCommits(plan, root, lotCommits(plan, root, lotId));
+}
+
+/**
+ * Sous-tâches encore ouvertes d'un lot que citent ses commits de travail (`feat(L3/t2)`), avec le plus récent des commits qui
+ * les citent (L82) : le travail est fait, il ne reste que le plan à tenir. Un commit qui ne cite que le lot ne couvre rien.
+ */
+export function coveredTasks(plan: Plan, root: string, lotId: string): { task: string; sha: string }[] {
+  const lot = plan.lots().find((l) => l.id === lotId);
+  if (!lot) return [];
+  const open = new Set(lot.tasks.filter((t) => isOpen(t.status)).map((t) => t.id));
+  const found = new Map<string, string>();
+  for (const c of lotWork(plan, root, lotId)) {
+    for (const r of citedRefs(c, plan.refs)) if (r.lot === lotId && r.task && open.has(r.task) && !found.has(r.task)) found.set(r.task, c.sha);
+  }
+  return lot.tasks.filter((t) => found.has(t.id)).map((t) => ({ task: t.id, sha: found.get(t.id)! }));
 }
 
 /**

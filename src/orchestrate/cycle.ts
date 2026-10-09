@@ -3,7 +3,7 @@ import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
-import { lotCommits, lotWork } from '../audit.js';
+import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
 import { docSyncBrief, docSyncGaps, filesOf } from '../docsync.js';
 import type { Day } from '../dates.js';
@@ -879,15 +879,22 @@ async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise
     return;
   }
   l.constats = [];
+  // Sous-tâches ouvertes que des commits du lot citent (L82) : la revue conforme vaut pour elles, sinon `raf done` refuserait le lot.
+  const covered = coveredTasks(plan, l.repo, l.lot);
   if (!plan.readonly) {
     plan.recordReview(l.lot, verdict, c.wave.today, newer, neighbours.length ? shas : undefined);
+    for (const k of covered) plan.setStatus(`${l.lot}/${k.task}`, 'done', c.wave.today);
+    if (covered.length) l.warnings.push(`sous-tâches closes (couvertes par des commits qui les citent, revue conforme) : ${covered.map((k) => `${l.lot}/${k.task} (${k.sha.slice(0, 7)})`).join(', ')}`);
     plan.save();
     const dirty = await commitPlan(c, `plan: ${l.lot} revue de code enregistrée (orchestrate ${c.wave.id})`);
     if (dirty) {
       stop(c, 'handed-back', dirty);
       return;
     }
-  } else if (c.config.verdict) {
+  } else {
+    for (const k of covered) propose(c, `[sous-tâche clore] ${l.lot}/${k.task} — couverte par ${k.sha.slice(0, 7)}, revue conforme : à clore avant raf done`);
+  }
+  if (plan.readonly && c.config.verdict) {
     const r = await sh(c, c.config.verdict.replaceAll('{lot}', l.lot).replaceAll('{verdict}', shEscape(verdict)));
     if (r.code !== 0) l.warnings.push(`orchestrate.verdict en échec (code ${r.code}) : le lead reporte le verdict`);
     else {

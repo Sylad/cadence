@@ -1082,6 +1082,50 @@ describe('reprise après coupure', () => {
   });
 });
 
+describe('sous-tâches couvertes (L82)', () => {
+  /** Trois sous-tâches au plan du lot L1 ; l'implémentation commite en citant t1 et t2 (pas t3). */
+  function withTasks() {
+    const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1/t1): a'), commitFile(call.opts.cwd, 'b.txt', 'feat(L1/t2): b')] }))], review: [ok] } });
+    const plan = h.plan();
+    for (const t of ['un', 'deux', 'trois']) plan.addTask('L1', t);
+    plan.save();
+    git(h.repo, 'add', '--', 'docs/plan/raf.yaml');
+    git(h.repo, 'commit', '-q', '-m', 'plan: L1 sous-tâches', '--', 'docs/plan/raf.yaml');
+    return h;
+  }
+  const status = (h: ReturnType<typeof harness>, id: string) => h.plan().lot('L1').tasks.find((t) => t.id === id)?.status;
+
+  it('revue conforme : les sous-tâches ouvertes citées par un commit du lot sont closes dans le commit du plan, les autres restent ouvertes', async () => {
+    const h = withTasks();
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(status(h, 't1')).toBe('done');
+    expect(status(h, 't2')).toBe('done');
+    expect(status(h, 't3')).toBe('todo');
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
+    expect(c.lot.warnings.join('\n')).toContain('L1/t1');
+    expect(c.lot.proposals.join('\n')).not.toContain('L1/t1');
+  });
+
+  it('plan en lecture seule : la clôture est proposée au lead, le plan n\'est pas touché', async () => {
+    const h = withTasks();
+    const c = h.lot('L1', { readOnlyPlan: true }, { start: 'true' });
+    const plan = c.loadPlan;
+    c.loadPlan = () => {
+      const p = plan();
+      Object.defineProperty(p, 'readonly', { get: () => true });
+      return p;
+    };
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(status(h, 't1')).toBe('todo');
+    expect(c.lot.proposals.some((p) => p.includes('L1/t1') && p.includes('clore'))).toBe(true);
+    expect(c.lot.proposals.some((p) => p.includes('L1/t2'))).toBe(true);
+    expect(c.lot.proposals.some((p) => p.includes('L1/t3'))).toBe(false);
+  });
+});
+
 describe('plan en lecture seule', () => {
   it('démarre avec orchestrate.start, note le verdict avec orchestrate.verdict, commite seulement les fichiers du plan', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });

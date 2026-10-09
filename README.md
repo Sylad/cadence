@@ -970,6 +970,8 @@ committed, a short re-review of that commit runs instead): `ready`, verdict reco
 the untreated minors returned as proposals. Same when the budget is exhausted right after a compliant
 review with minors: it concludes on that review instead of staying suspended.
 
+**Sub-tasks covered by commits (L82)**: when the review concludes compliant, the open sub-tasks of the lot that a work commit of the lot cites (`feat(L3/t2): …`; a commit that cites only the lot covers none) are closed in the same plan commit as the verdict, with the warning `sous-tâches closes : L3/t2 (sha)`, so `raf done` does not refuse the lot over finished work. A read-only plan is never written: each such sub-task is returned as a proposal `[sous-tâche clore] L3/t2 — couverte par <sha>`, for you to close with the project's tool. A non-compliant review closes nothing.
+
 **Choices, not questions**: the author brief tells the session to decide minor interpretation questions itself and to list them under `choix` in its report; the reviewer receives that list to re-read, and the final table prints each one (`choix fait : …`). A session stops with a question only on a real blocker: a decision that changes the scope or the architecture or is costly to undo, AND that the plan, its notes and CLAUDE.md do not settle; everything else is a choice.
 
 **Frozen copy of the tool (L61)**: at the real start of a wave (not with `--dry-run` or `--status`), cadence copies the

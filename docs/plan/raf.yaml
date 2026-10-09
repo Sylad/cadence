@@ -1537,10 +1537,11 @@ lots:
     finished: 2026-10-08
   - id: L136
     title: "cadence-hud : hooks de garde tool.call et prompt.submit sans .catch (relevé par claude plugin validate 2.1.290) — une écriture d'état qui échoue bloque l'outil ou le prompt au lieu de perdre une ligne du HUD ; envelopper la tenue de registre, test, rsync des deux copies"
-    status: todo
+    status: doing
     estimate: 0.5
     quickwin: true
     created: 2026-10-09
+    started: 2026-10-09
   - id: L137
     title: "orchestrate : niveau d'effort par passe (claude -p --effort, 2.1.284) — precheck et tour bas, implémentation moyen, revue haut ; réglable dans cadence.yaml ; mesurer tokens et durée sur une vague avant/après"
     status: todo

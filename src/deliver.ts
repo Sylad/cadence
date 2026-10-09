@@ -510,19 +510,21 @@ function deliveredLots(ctx: DeliverCtx, ids: string[], prev: string | null, sha:
 function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
   if (!ctx.plan || !ctx.articles?.length || !ids.length) return;
   try {
+    // Relu : le script du projet a pu fermer des lots ou commiter le plan depuis le départ de la livraison, save() ne doit pas l'écraser.
+    const plan = ctx.plan.reloaded();
     const wanted = new Set(ids);
     const r = openArticleLots({
-      plan: ctx.plan,
+      plan,
       root: ctx.root,
       rules: ctx.articles,
-      delivered: ctx.plan.lots().filter((l) => wanted.has(l.id)),
+      delivered: plan.lots().filter((l) => wanted.has(l.id)),
       publicTitle: ctx.publicTitle ?? ((l) => l.public),
       sha,
       today: ctx.today,
     });
     for (const w of r.warnings) ctx.err(`deliver : ${w}`);
-    if (r.opened.length || r.noted.length) ctx.plan.save();
-    for (const id of r.opened) ctx.out(`article à rafraîchir : ${id} « ${ctx.plan.lot(id).title} » ouvert (plan modifié, à commiter) — à jouer dans une vague ordinaire`);
+    if (r.opened.length || r.noted.length) plan.save();
+    for (const id of r.opened) ctx.out(`article à rafraîchir : ${id} « ${plan.lot(id).title} » ouvert (plan modifié, à commiter) — à jouer dans une vague ordinaire`);
     for (const id of r.noted) ctx.out(`article à rafraîchir : ${id} déjà ouvert, titres livrés ajoutés en note (plan modifié, à commiter)`);
     for (const m of r.manual) ctx.out(`article à rafraîchir : ${m}`);
   } catch (e) {

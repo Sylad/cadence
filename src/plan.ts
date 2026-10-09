@@ -206,6 +206,11 @@ export class Plan {
     return new Plan(path, doc, !/^lots:[^\n]*\n(?:#[^\n]*\n)*- /m.test(text), settings);
   }
 
+  /** Le plan tel qu'il est maintenant sur le disque (un script a pu l'écrire depuis la lecture), mêmes réglages. */
+  reloaded(): Plan {
+    return Plan.load(this.path, this.settings);
+  }
+
   save(): void {
     this.writable();
     writeFileSync(this.path, this.doc.toString({ lineWidth: 0, indentSeq: this.indentSeq }));

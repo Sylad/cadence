@@ -372,6 +372,32 @@ to be reported as one **major** finding per line — a stale document is not lef
 memory of a sentence. Touching a document is what the program checks; whether its text is true is
 still the review's reading. The commits of neighbouring repositories (`repos:`) are not audited.
 
+#### An article elsewhere that follows the delivery
+
+A case study that lives in a neighbouring repository (the project's article on a showcase site) goes stale
+the same way. `docs.articles` names it:
+
+```yaml
+docs:
+  articles:
+    - repo: ../claude-code-codex          # neighbouring repository, relative to the project
+      file: src/pages/cas/demo.md         # the article in it
+      name: demo                          # optional: the name in the lot title (default: the plan's project)
+```
+
+After a **green** `cadence deliver`, for the lots it lists as delivered **that have a public title** (`public:`, or
+the title of their Nouveautés entry), cadence opens in this repository's plan the lot
+`Article demo à rafraîchir` (todo, estimate 0.5, `repos: [{ path: ../claude-code-codex, cite: demo }]`), with a note
+that quotes the delivery, the public titles delivered, the article and the **sections to read again**: the headings
+(`#` lines, or `<h1>`…`<h6>` of an Astro page) that share a word of five letters or more with a delivered title,
+else all the `##` headings. The lot is then played like any other, in an ordinary wave (`cadence orchestrate`: an
+implementer rewrites the article in the neighbouring repository, the review checks it against the note). If a lot
+of that title is still open, it receives a note instead of a duplicate. Internal lots (no public title) open nothing;
+a red delivery opens nothing; `cadence deliver --dry-run` announces the articles. The plan is written but **not
+committed** (`deliver` never commits): the line `article à rafraîchir : L9 …` says so. With a plan kept by another
+tool (read-only), the same line carries the instruction to open the lot with that tool. This replaces the manual
+`sync-site-docs` skill.
+
 ### QA review
 
 No gate and no command here: the QA review comes **after** a delivery, and
@@ -667,6 +693,8 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   reservation number that looks like one) is not a delivered lot. Plan upkeep
   commits (see "Plan upkeep needs no lot") are skipped in that list: they cite
   lots without delivering anything.
+- With [`docs.articles`](#an-article-elsewhere-that-follows-the-delivery), a green delivery of lots with a
+  public title also opens the lot `Article <project> à rafraîchir` in the plan.
 
 ### A project with its own delivery script
 

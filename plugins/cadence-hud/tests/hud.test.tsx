@@ -1060,7 +1060,20 @@ test('la sortie de lead tour est lue ; une sortie étrange vaut aucun projet, un
 test('les chiffres d’un projet : barre, faits/total, en cours, ajoutés cette semaine (rien à zéro), sans le nom ni remplissage', () => {
   const [ol, cadence] = activeProjects(parseTour(JSON.stringify(TOUR))) as [Project, Project]
   expect(projectStats(ol)).toBe('▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine')
-  expect(projectStats(cadence)).toBe('▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours')
+  expect(projectStats(cadence)).toBe('▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours : L149')
+})
+
+test('les ids des lots en cours suivent le compte, tronqués au-delà de 3 par « … » ; sans id ou à zéro, le compte seul (L153)', () => {
+  const at = (n: number, ids: string[]): Project => ({ project: 'x', doing: ids.map(id => ({ id })), progress: { done: 1, doing: n, todo: 0, added7: 0 } })
+  expect(projectFigures(at(2, ['L72', 'L79']))).toBe('1/3 · 2 en cours : L72 L79')
+  expect(projectFigures(at(1, ['L153']))).toBe('1/2 · 1 en cours : L153')
+  expect(projectFigures(at(3, ['L1', 'L2', 'L3']))).toBe('1/4 · 3 en cours : L1 L2 L3')
+  expect(projectFigures(at(5, ['L1', 'L2', 'L3', 'L4', 'L5']))).toBe('1/6 · 5 en cours : L1 L2 L3 …')
+  expect(projectFigures(at(0, []))).toBe('1/1 · 0 en cours')
+  expect(projectFigures({ project: 'x', progress: { done: 1, doing: 2, todo: 1, added7: 2 } })).toBe('1/4 · 2 en cours · +2 cette semaine')
+  expect(projectFigures({ ...at(1, ['L9']), progress: { done: 1, doing: 1, todo: 1, added7: 2 } })).toBe('1/3 · 1 en cours : L9 · +2 cette semaine')
+  // la sortie de lead tour porte les ids
+  expect(parseTour(JSON.stringify(TOUR))[1]!.doing).toEqual([{ id: 'L149' }])
 })
 
 test('la couleur de la barre d’un projet suit le taux de faits : rouge < 33 %, orange < 66 %, vert au-delà, gris sans lot', () => {
@@ -1071,7 +1084,7 @@ test('la couleur de la barre d’un projet suit le taux de faits : rouge < 33 %,
   expect(colorOfDone(65, 100)).toBe('warning')
   expect(colorOfDone(66, 100)).toBe('success')
   expect(colorOfDone(10, 10)).toBe('success')
-  expect(projectFigures(parseTour(JSON.stringify(TOUR))[1] as Project)).toBe('10/20 · 2 en cours')
+  expect(projectFigures(parseTour(JSON.stringify(TOUR))[1] as Project)).toBe('10/20 · 2 en cours : L149')
 })
 
 test('le tableau est relu à chaque transition de vague, sinon toutes les minutes', () => {
@@ -1101,7 +1114,7 @@ test('la bande écrit une ligne par projet actif, repliable par /hud projets', a
     expect(await ui.find({ type: 'Text', text: /^ol$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^cadence$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^39\/78 · 0 en cours · \+3 cette semaine$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^10\/20 · 2 en cours$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^10\/20 · 2 en cours : L149$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /fini/ })).toBeUndefined()
     await ui.unmount()
   }

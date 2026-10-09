@@ -62,6 +62,8 @@ export type Wave = {
 /** Une ligne de `cadence lead tour --json` (L149) : ce que la bande en garde pour dessiner l'avancement d'un plan. */
 export type Project = {
   project: string
+  /** ids des lots en cours (absent d'un cadence trop ancien) */
+  doing?: { id: string }[]
   progress: { done: number; doing: number; todo: number; added7: number }
 }
 

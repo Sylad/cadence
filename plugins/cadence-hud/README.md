@@ -71,11 +71,13 @@ tronqués en fin de ligne.
 
   ```
   ol      ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine
-  cadence ▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours
+  cadence ▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours : L149 L153
   ```
 
   La barre se colore selon la part de lots faits (L152) : cases pleines en rouge sous 33 %, en orange sous 66 %, en vert au-delà (seuils propres à la barre,
   distincts de ceux de la consommation, 60 % et 85 %) ; les cases vides restent grises.
+
+  Le compte des lots en cours est suivi de leurs ids (`2 en cours : L149 L153`, L153), trois au plus puis `…` (`5 en cours : L1 L2 L3 …`) ; le compte seul à zéro, ou avec un `cadence` trop ancien pour les donner.
 
   La barre (dix cases) et la fraction comptent les lots faits sur faits + en cours + à faire ; les lots abandonnés et
   les lots récurrents n'y entrent pas. `+N cette semaine` = lots créés sur les 7 derniers jours, aujourd'hui compris (absent à zéro). Les

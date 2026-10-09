@@ -387,7 +387,7 @@ export const parseTour = (stdout: string): Project[] => {
   return raw
     .filter((r): r is Project & { error?: string } => typeof r === 'object' && r !== null && typeof (r as Project).project === 'string')
     .filter(r => !r.error)
-    .map(r => ({ project: r.project, progress: r.progress }))
+    .map(r => ({ project: r.project, doing: Array.isArray(r.doing) ? r.doing.filter(d => typeof d?.id === 'string').map(d => ({ id: d.id })) : undefined, progress: r.progress }))
 }
 
 const open = (p: Project): number => (p.progress ? p.progress.doing + p.progress.todo : 0)
@@ -406,10 +406,15 @@ export const progressBar = (done: number, total: number, cellCount = 10): string
 export const colorOfDone = (done: number, total: number): ThemeKey =>
   total <= 0 ? 'subtle' : (done / total) * 100 < 33 ? 'error' : (done / total) * 100 < 66 ? 'warning' : 'success'
 
-/** `39/78 · 0 en cours · +3 cette semaine` : faits sur total des lots, en cours, ajoutés sur 7 jours (rien à zéro). Sans la barre ni le nom du projet, qui ont leurs propres Text. */
+/** Au-delà de ce nombre, les ids des lots en cours sont tronqués par « … » (L153). */
+export const DOING_IDS_MAX = 3
+
+/** `39/78 · 2 en cours : L72 L79 · +3 cette semaine` : faits sur total des lots, en cours avec leurs ids (trois au plus puis « … » ; le compte seul à zéro ou sans id), ajoutés sur 7 jours (rien à zéro). Sans la barre ni le nom du projet, qui ont leurs propres Text. */
 export const projectFigures = (p: Project): string => {
   const { done, doing, todo, added7 } = p.progress
-  const parts = [`${done}/${done + doing + todo}`, `${doing} en cours`]
+  const ids = p.doing?.map(d => d.id) ?? []
+  const named = doing > 0 && ids.length > 0 ? ` : ${ids.slice(0, DOING_IDS_MAX).join(' ')}${ids.length > DOING_IDS_MAX ? ' …' : ''}` : ''
+  const parts = [`${done}/${done + doing + todo}`, `${doing} en cours${named}`]
   if (added7 > 0) parts.push(`+${added7} cette semaine`)
   return parts.join(' · ')
 }

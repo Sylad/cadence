@@ -37,6 +37,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence-hud`: the progress of each project's plan under the waves, `/hud projets`; `cadence lead tour --json` gains `progress` | [0.22.0](#0220---2026-10-09) |
 | `cadence orchestrate --drop <project:lot>` and `--stop-after-current` on a live wave, `--resume --drop`; the final table's « livrable jusqu'à <sha> » line; a version commit exempt from the review gate | [0.24.0](#0240---2026-10-09) |
 
+## [Unreleased]
+
+### Changed
+
+- `cadence-hud`: the project line of the plans' progress names the lots in progress after their count — `10/20 · 2 en cours : L72 L79` — three at most, then `…`; the count alone at zero (L153, `cadence-hud` 0.4.2).
+
 ## [0.24.0] - 2026-10-09
 
 ### Added

@@ -1654,10 +1654,11 @@ lots:
     started: 2026-10-09
   - id: L148
     title: "lead : enchaîner sans le humain — après un lot prêt, le skill revérifie, raf done, pousse, livre, QA et relance la vague suivante selon la priorité déclarée, tant que le contexte de la session lead reste sous un seuil (60 %, lu comme la bande cadence-hud) ; au seuil, session-close, mémoire, trois lignes pour la suite ; reste au humain : choix initial et ordre, questions remontées, réserves UX ; demande Sylvain 09-10"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L145 ]
     created: 2026-10-09
+    started: 2026-10-09
   - id: L149
     title: "cadence-hud : avancement des plans par projet actif — une ligne par projet triée par priorité, barre faits/ouverts (ex. ol ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine), source cadence lead tour --json enrichi des comptes faits / en cours / à faire / ajoutés 7 j, rafraîchi à chaque transition de vague sinon toutes les minutes, repliable ; demande Sylvain 09-10 (« je ne sais pas où en sont les projets »)"
     status: todo

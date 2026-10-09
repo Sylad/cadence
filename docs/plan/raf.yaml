@@ -1549,6 +1549,8 @@ lots:
     status: doing
     estimate: 1
     created: 2026-10-09
+    notes:
+      - { date: 2026-10-09, text: "mesure AVANT L137 (niveau de la session, wave.json de 2026-10-09-0842, 0900, 0945, 1058 et 1253 ; jetons « counted » moyens par passe, durée moyenne, n) : precheck 21173 jetons 17 s (16) ; implement 85505 jetons 194 s (16) ; fix 51104 jetons 99 s (11) ; review 43277 jetons 119 s (17) ; review-small 50925 jetons 122 s (7). Le champ effort est absent de ces étapes. MESURE APRÈS À FAIRE : aucune vague n'a encore tourné avec orchestrate.effort (la vague 2026-10-09-1303 qui porte L137 a tourné avant le commit 50e9486) ; relever les mêmes moyennes par kind sur la première vague dont les étapes portent effort, et les noter ici avant de fermer le lot." }
     started: 2026-10-09
   - id: L138
     title: "precheck-reader : omitClaudeMd (frontmatter 2.1.271) — la pré-vérification n'a pas besoin du CLAUDE.md du projet (400 lignes sur maritime) ; mesurer le contexte de la session precheck avant/après ; décider pour qa-reviewer"

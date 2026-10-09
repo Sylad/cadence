@@ -804,6 +804,12 @@ with proofs), `partiel` or `non`: on `oui` no implementation session is opened a
 implementation brief and a warning; on `non` — or an unreadable report, which only adds a warning — the wave goes on. A
 lot that already has commits is never pre-checked (resuming it is legitimate). `orchestrate.precheck: false` turns it off.
 
+The `precheck-reader` agent does not set `omitClaudeMd` (Claude Code 2.1.271), on purpose: measured on a project with a
+297-line `CLAUDE.md` (haiku, `--agents` + `--agent`, same prompt, with and without the flag), the session context is
+identical (22 779 tokens, the project `CLAUDE.md` still answered when asked) — the flag only applies to an agent run as a
+*subagent*, and cadence launches the step as the main agent of its own session. The same goes for `qa-reviewer`, which
+is not launched by the wave: leave it as it is.
+
 **A lot that already has commits** (a spec commit, an interrupted wave, a lot committed by hand, a lot sent back after a
 review) still starts with the implementation session: its brief tells it to read the lot, its notes and its open
 sub-tasks, which carry the findings of any earlier review. If that session ends without a new commit on a lot that

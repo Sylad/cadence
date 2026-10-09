@@ -1570,7 +1570,7 @@ lots:
     quickwin: true
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme — orchestré (vague 2026-10-09-1058, 1 passe(s) de correction)", commit: 0eae50ac2e605fe8b50979aabd0e18fb2a50524f }
+    review: { date: 2026-10-09, verdict: "conforme après 1 correction (Opus, orchestré) : trace de l'essai réel en navigateur ; release 0.20.0 efb4bbb (bump de version, CHANGELOG, What's new, sans code)", commit: efb4bbb241dd9df02f5b1e7fa78b59bceaa15b89 }
     finished: 2026-10-09
   - id: L141
     title: "lead : le skill calcule à la main les créneaux libres (2 − Σ min(cap, …), SKILL.md:22-23) alors que le registre vit dans src/orchestrate/registry.ts — orchestrate --status (et lead tour) affichent le nombre de créneaux libres, le skill le lit au lieu de le calculer (prompt-audit 09-10)"
@@ -1588,7 +1588,7 @@ lots:
     notes:
       - { date: 2026-10-09, text: "Vu 09-10 11:50 par Sylvain, session lead (hud 0.3.3 rsyncé pendant la session, L135 chargé au démarrage) : après deux vagues orchestrate (0842, 0945), 5 Bash en arrière-plan (2 orchestrate, 3 deliver dont un en pipe « | tail », tous notifiés), 3 Monitor arrêtés par TaskStop, 5 sous-agents rendus, pgrep ne montre aucun processus — la bande affiche encore « 1 cmd » et la ligne de la vague 0945 terminée 1 h 04 plus tôt. Hypothèses à vérifier : Monitor arrêté par TaskStop non décompté, ou commande de fond dont la notification est arrivée pendant un tour de sous-agent" }
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme (3e passe, Opus) : 2 courses corrigées et testées par les hooks (sous-agent lancé pendant un refresh ; fin de tâche pendant l'inscription d'une commande), filet refresh testé, /hud cmd nomme les commandes (arguments à plat, e.input n'existait pas), argument inconnu sans bascule, README principal et mod à jour, marketplace 0.3.4 ; non vérifié : rendu réel de la bande", commit: e308a394a7951d0136bfdd94c95a7ecfbe30970b }
+    review: { date: 2026-10-09, verdict: "conforme (3e passe, Opus) : 2 courses corrigées et testées, /hud cmd, README et mod à jour ; release 0.20.0 efb4bbb (bump de version, CHANGELOG, What's new, sans code)", commit: efb4bbb241dd9df02f5b1e7fa78b59bceaa15b89 }
     ux: { date: 2026-10-09, verdict: "conforme sur les tests de rendu (segments « N cmd » puis « N cmd sans fin vue » en gris, vague terminée grise sans budget puis masquée après 30 min, /hud cmd lisible) ; rendu réel du terminal à confirmer à l'œil par Sylvain après rechargement du mod" }
     finished: 2026-10-09
 acknowledged:

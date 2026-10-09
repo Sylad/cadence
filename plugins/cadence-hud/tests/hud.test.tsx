@@ -4,7 +4,7 @@ import type { TestBody } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
 import { register } from '../hooks/register'
-import { activeProjects, parseTour, progressBar, projectLine, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { activeProjects, parseTour, progressBar, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Project, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
@@ -1057,10 +1057,10 @@ test('la sortie de lead tour est lue ; une sortie étrange vaut aucun projet, un
   expect(activeProjects(parseTour(JSON.stringify([{ project: 'x', doing: [] }])))).toEqual([])
 })
 
-test('une ligne de projet : nom aligné, barre, faits/total, en cours, ajoutés cette semaine (rien à zéro)', () => {
+test('les chiffres d’un projet : barre, faits/total, en cours, ajoutés cette semaine (rien à zéro), sans le nom ni remplissage', () => {
   const [ol, cadence] = activeProjects(parseTour(JSON.stringify(TOUR))) as [Project, Project]
-  expect(projectLine(ol, 7)).toBe('ol      ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine')
-  expect(projectLine(cadence, 7)).toBe('cadence ▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours')
+  expect(projectStats(ol)).toBe('▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine')
+  expect(projectStats(cadence)).toBe('▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours')
 })
 
 test('le tableau est relu à chaque transition de vague, sinon toutes les minutes', () => {
@@ -1085,11 +1085,31 @@ const PROJECTS = activeProjects(parseTour(JSON.stringify(TOUR)))
 
 test('la bande écrit une ligne par projet actif, repliable par /hud projets', async ($, on) => {
   seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, projects: PROJECTS, projectsFolded: false })
-  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Text', text: /ol\s+▮▮▮▮▮▯▯▯▯▯ 39\/78 · 0 en cours · \+3 cette semaine/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /cadence\s+▮▮▮▮▮▯▯▯▯▯ 10\/20 · 2 en cours/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /fini/ })).toBeUndefined()
-  await ui.unmount()
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
+    expect(await ui.find({ type: 'Text', text: /^ol$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^cadence$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^▮▮▮▮▮▯▯▯▯▯ 39\/78 · 0 en cours · \+3 cette semaine$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^▮▮▮▮▮▯▯▯▯▯ 10\/20 · 2 en cours$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /fini/ })).toBeUndefined()
+    await ui.unmount()
+  }
+})
+
+test('les projets sont alignés par une Box à largeur fixe pour le nom, sans espaces de remplissage dans un Text', async ($, on) => {
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, projects: PROJECTS, projectsFolded: false })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
+    const boxes = await ui.findAll({ type: 'Box' })
+    // colonne des noms : « cadence » (7), identique pour les deux lignes, qui ne rétrécit pas
+    expect(boxes.filter(b => b.props.width === 7 && b.props.flexShrink === 0)).toHaveLength(2)
+    // les chiffres prennent la largeur restante, séparés du nom par un paddingLeft, et se tronquent
+    expect(boxes.filter(b => b.props.flexGrow === 1 && b.props.flexShrink === 1 && b.props.paddingLeft === 1)).toHaveLength(2)
+    const texts = (await ui.findAll({ type: 'Text' })).filter(t => /^(ol|cadence)$|▮.*en cours/.test(t.text ?? ''))
+    expect(texts).toHaveLength(4)
+    expect(texts.filter(t => /^\s|\s{2,}|\s$/.test(t.text ?? ''))).toEqual([])
+    await ui.unmount()
+  }
 })
 
 test('repliée, la liste tient sur une ligne qui dit comment la rouvrir', async ($, on) => {

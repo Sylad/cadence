@@ -402,12 +402,12 @@ export const progressBar = (done: number, total: number, cellCount = 10): string
   return '▮'.repeat(full) + '▯'.repeat(cellCount - full)
 }
 
-/** `ol      ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine` : faits sur total des lots, en cours, ajoutés sur 7 jours (rien à zéro). */
-export const projectLine = (p: Project, nameWidth: number): string => {
+/** `▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine` : faits sur total des lots, en cours, ajoutés sur 7 jours (rien à zéro). Le nom du projet est dans sa propre colonne (Box), jamais rembourré d'espaces. */
+export const projectStats = (p: Project): string => {
   const { done, doing, todo, added7 } = p.progress
   const parts = [`${progressBar(done, done + doing + todo)} ${done}/${done + doing + todo}`, `${doing} en cours`]
   if (added7 > 0) parts.push(`+${added7} cette semaine`)
-  return `${p.project.padEnd(nameWidth)} ${parts.join(' · ')}`
+  return parts.join(' · ')
 }
 
 /** Ce qui change à une transition de vague : l'état de chaque lot de chaque vague (pas le budget consommé, qui bouge sans cesse). */
@@ -418,5 +418,5 @@ export const waveSignature = (waves: readonly Wave[]): string =>
 export const tourDue = (lastSignature: string | undefined, lastAt: number, signature: string, now: number): boolean =>
   lastSignature === undefined || signature !== lastSignature || now - lastAt >= TOUR_REFRESH_MS
 
-/** Le dossier parent des projets : celui d'où la vague a été lancée, sinon celui de la session ; null s'il n'y en a aucun. */
+/** Le dossier interrogé par `cadence lead tour` : celui d'où la vague a été lancée, sinon celui de la session ; null s'il n'y en a aucun. Un dossier parent de projets donne une ligne par projet, un projet sans sous-projet sa propre ligne. */
 export const tourFolder = (waves: readonly Wave[], sessionCwd: string | undefined): string | null => waves[0]?.cwd ?? sessionCwd ?? null

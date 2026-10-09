@@ -1630,9 +1630,10 @@ lots:
     finished: 2026-10-09
   - id: L145
     title: "orchestrate : la revue finale est toujours jouée — le budget du lot (dérivé de l'estimate) ne doit jamais rendre un lot au lead juste avant sa revue (3e cas en 2 jours : L142 le 09-10 matin, Q4/particules-legende-hs-globe le 09-10 après-midi à 229 k / 200 k) ; réserver le coût d'une revue avant chaque passe fix, ou plafonner les passes fix et non la revue ; mesurer sur les journaux des vagues du 08 et 09-10"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-09
+    started: 2026-10-09
   - id: L146
     title: "orchestrate : étape precheck (et tour / lectures mécaniques) sur le modèle local de Big-Blue (claude-local → Ollama RTX 5090, qwen3-coder:30b) quand cadence.yaml le déclare (orchestrate.precheck: local) ; comparer sur 5 lots verdict et durée avec la version Sonnet ; garder Sonnet par défaut si le local se trompe une fois sur un « partiel ». Demande Sylvain 09-10 : exploiter la machine, dédiée aux devs"
     status: todo

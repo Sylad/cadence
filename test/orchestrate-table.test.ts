@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { renderTable } from '../src/orchestrate/table.js';
 import { newLot, type LotState, type ReviewSummary, type StepState, type WaveState } from '../src/orchestrate/state.js';
 import type { StepKind } from '../src/orchestrate/launch.js';
+import { Plan } from '../src/plan.js';
+import { commitFile, git } from './orchestrate-harness.js';
+import { gitRepo } from './helpers.js';
 
 const wave: WaveState = { id: 'w1', created: '2026-10-04T10:00:00Z', cwd: '/x', budget: 2_000_000, consumed: 0, cacheRead: 0, status: 'done', pid: 1, lots: ['demo:L1'] };
 const lot = () => newLot({ project: 'demo', repo: '/r', lot: 'L1', title: 't', visible: false, small: false, model: 'sonnet', readOnlyPlan: false });
@@ -106,7 +111,7 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
   // Historique empilé sur main : a1 a2 (L1) < b1 (L2) < c1 (L3), du plus ancien au plus récent.
   const order = ['a1', 'a2', 'b1', 'c1'];
   const isAncestor = (_repo: string, a: string, b: string) => order.indexOf(a) <= order.indexOf(b);
-  const lines = (ls: LotState[]) => renderTable(wave, ls, { isAncestor }).filter((x) => x.includes('livrable jusqu'));
+  const lines = (ls: LotState[]) => renderTable(wave, ls, { isAncestor, lotCommits: () => [] }).filter((x) => x.includes('livrable jusqu'));
 
   it('un lot prêt sous un lot rendu : la ligne donne son dernier commit et la commande deliver --sha', () => {
     const out = lines([stacked('demo', 'L1', 'ready', ['a1', 'a2']), stacked('demo', 'L2', 'handed-back', ['b1'])]);
@@ -141,5 +146,49 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
 
   it('les commits d\'un dépôt voisin ([rel] sha) ne comptent pas', () => {
     expect(lines([stacked('demo', 'L1', 'ready', ['[../x] a2']), stacked('demo', 'L2', 'handed-back', ['b1'])])).toEqual([]);
+  });
+  it('commits lus dans git : un lot en échec sans rapport a commité sous un lot prêt, aucune ligne (le tableau ne propose pas de code non revu)', () => {
+    // L1 en échec : aucune étape n'a rempli `commits` (timeout, crash, rapport illisible, quota), mais git attribue a1 à L1.
+    const l1 = stacked('demo', 'L1', 'failed', []);
+    const l2 = stacked('demo', 'L2', 'ready', ['b1']);
+    const l3 = stacked('demo', 'L3', 'handed-back', ['c1']);
+    const gitOf: Record<string, string[]> = { L1: ['a1'], L2: ['b1'], L3: ['c1'] };
+    const withGit = (ls: LotState[]) => renderTable(wave, ls, { isAncestor, lotCommits: (l) => gitOf[l.lot] ?? [] }).filter((x) => x.includes('livrable jusqu'));
+    expect(withGit([l1, l2, l3])).toEqual([]);
+    // Sans la lecture de git (état des étapes seul), le tableau proposait b1.
+    expect(lines([l1, l2, l3])).toEqual(["demo:L2 — livrable jusqu'à b1 (dernier commit de L2, sous L3 rendu) : cadence deliver --sha b1"]);
+  });
+
+  it('commits lus dans git : ceux d\'une vague précédente comptent aussi, sans doublon avec le sha abrégé des étapes', () => {
+    const l1 = stacked('demo', 'L1', 'ready', ['a1abcde feat(L1): x']);
+    const l2 = stacked('demo', 'L2', 'handed-back', ['b1']);
+    const order2 = ['a1abcde', 'a2', 'b1'];
+    const anc = (_repo: string, a: string, b: string) => order2.indexOf(a) <= order2.indexOf(b);
+    const out = renderTable(wave, [l1, l2], { isAncestor: anc, lotCommits: (l) => (l.lot === 'L1' ? ['a1abcde', 'a2'] : []) }).filter((x) => x.includes('livrable jusqu'));
+    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2 (dernier commit de L1, sous L2 rendu) : cadence deliver --sha a2"]);
+  });
+
+  it('dépôt réel : L1 en échec a commité sans rapport, L2 prêt au-dessus, L3 rendu tout en haut : aucune ligne', () => {
+    const repo = gitRepo();
+    const plan = Plan.create(join(repo, 'docs/plan/raf.yaml'), 'demo', 'L', '2026-09-01');
+    for (const t of ['un', 'deux', 'trois']) plan.add(t, '2026-10-01', { estimate: 1 });
+    plan.save();
+    writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: docs/plan/raf.yaml\n');
+    git(repo, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    git(repo, 'commit', '-q', '-m', 'chore: plan');
+    commitFile(repo, 'a.txt', 'feat(L1): code sans rapport').sha;
+    const b1 = commitFile(repo, 'b.txt', 'feat(L2): code revu').sha;
+    const c1 = commitFile(repo, 'c.txt', 'feat(L3): code rendu').sha;
+    const mk = (name: string, status: LotState['status'], shas: string[]) => {
+      const l = newLot({ project: 'demo', repo, lot: name, title: 't', visible: false, small: false, model: 'sonnet', readOnlyPlan: false });
+      l.status = status;
+      l.steps = [{ n: 1, kind: 'implement', model: 'sonnet', status: status === 'failed' ? 'failed' : 'ok', started: '2026-10-04T10:00:00Z', commits: shas }];
+      return l;
+    };
+    const lots = [mk('L1', 'failed', []), mk('L2', 'ready', [`${b1.slice(0, 7)} feat(L2): code revu`]), mk('L3', 'handed-back', [`${c1.slice(0, 7)} feat(L3): code rendu`])];
+    expect(renderTable(wave, lots).filter((x) => x.includes('livrable jusqu'))).toEqual([]);
+    // Si L1 est lui aussi prêt, L2 reste sous L3 rendu : la ligne est bornée à b1 et ne dépend plus de git pour L1.
+    lots[0].status = 'ready';
+    expect(renderTable(wave, lots).filter((x) => x.includes('livrable jusqu'))).toEqual([`demo:L2 — livrable jusqu'à ${b1.slice(0, 7)} (dernier commit de L2, sous L3 rendu) : cadence deliver --sha ${b1.slice(0, 7)}`]);
   });
 });

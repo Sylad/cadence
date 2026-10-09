@@ -1079,7 +1079,8 @@ review still not compliant after two passes) · 2 refused before acting · 3 wav
 **Stacked lots** (L76): lots of one repository commit on top of each other on `main`. When a ready lot sits under a lot that
 is not ready (handed back, failed…), the final table adds a line `<project>:<lot> — livrable jusqu'à <sha> … : cadence deliver --sha <sha>`:
 the last commit of the highest ready lot with no unfinished lot's commit beneath it, which `cadence deliver --sha` can ship
-without the lot above. Nothing is printed when every lot is ready or when the ready lots sit above the unfinished one.
+without the lot above. A lot's commits are read from git (the commits that cite it, whatever session or wave made them), not
+only from the sessions' reports, so a failed or timed-out session that committed still bounds the line. Nothing is printed when every lot is ready or when the ready lots sit above the unfinished one.
 
 **Formatting retry** (the only `--resume` of a session): when a session ends successfully but in plain text,
 without the `structured_output` the schema asks for (the verdict is there, not in the required shape), the

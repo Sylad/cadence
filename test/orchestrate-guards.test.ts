@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -64,6 +64,10 @@ describe('garde-fous sous CADENCE_ORCHESTRATED', () => {
   });
 
   describe('verrou vivant : seule la file de CE dépôt refuse (L127)', () => {
+    let saved: string | undefined;
+    afterEach(() => {
+      process.env.CADENCE_HOME = saved;
+    });
     const wave = async (statuses: Record<string, LotState['status']>) => {
       const dir = await project();
       const launch = tempDir();
@@ -77,29 +81,31 @@ describe('garde-fous sous CADENCE_ORCHESTRATED', () => {
       mkdirSync(sharedStateDir(dir), { recursive: true });
       writeFileSync(join(sharedStateDir(dir), REPO_LOCK), JSON.stringify({ pid: process.pid, wave: 'w7', started: 'x' }));
       registerWave(home, { pid: process.pid, wave: 'w7', started: 'x', cwd: launch, repos: [dir] });
+      saved = process.env.CADENCE_HOME;
       process.env.CADENCE_HOME = home;
       return dir;
     };
 
     it('accepte la livraison quand la vague n\'a plus aucun lot en cours ni en file dans ce dépôt', async () => {
       const dir = await wave({ 'ici:L1': 'ready', 'ailleurs:L2': 'implementing', 'autre:L3': 'queued' });
-      try {
-        const r = await cli(dir, {}, 'deliver', '--dry-run');
-        expect(r.err).not.toContain('orchestration en cours');
-      } finally {
-        delete process.env.CADENCE_HOME;
-      }
+      const r = await cli(dir, {}, 'deliver', '--dry-run');
+      expect(r.err).not.toContain('orchestration en cours');
     });
 
     it('refuse tant qu\'un lot de ce dépôt est en cours ou en file', async () => {
       const dir = await wave({ 'ici:L1': 'ready', 'ici:L4': 'queued' });
-      try {
-        const r = await cli(dir, {}, 'deliver', '--dry-run');
-        expect(r.code).toBe(2);
-        expect(r.err).toContain('orchestration en cours (vague w7');
-      } finally {
-        delete process.env.CADENCE_HOME;
-      }
+      const r = await cli(dir, {}, 'deliver', '--dry-run');
+      expect(r.code).toBe(2);
+      expect(r.err).toContain('orchestration en cours (vague w7');
+    });
+
+    it('refuse aussi depuis un worktree lié du dépôt dont un lot travaille encore', async () => {
+      const dir = await wave({ 'ici:L1': 'implementing' });
+      const wt = join(tempDir(), 'wt');
+      execFileSync('git', ['worktree', 'add', '-q', '-b', 'autre', wt], { cwd: dir });
+      const r = await cli(wt, {}, 'deliver', '--dry-run');
+      expect(r.code).toBe(2);
+      expect(r.err).toContain('orchestration en cours (vague w7');
     });
   });
 });

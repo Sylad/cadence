@@ -20,7 +20,7 @@ import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { runPool } from './pool.js';
 import { schemaFor } from './schemas.js';
 import { resolveLotRepos } from '../repos.js';
-import { excludeState, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
+import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
 import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
@@ -782,7 +782,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     saveWave();
     release();
   });
-  const finished = (l: LotState) => l.status === 'ready' || l.status === 'handed-back' || l.status === 'failed';
+  const finished = lotFinished;
   try {
     await runPool(ctxs, cap, all, (c) => {
       // Un dépôt dont tous les lots de la vague (reprise comprise) sont prêts ou rendus peut être livré pendant que la vague continue ailleurs.

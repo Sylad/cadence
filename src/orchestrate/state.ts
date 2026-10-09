@@ -144,6 +144,9 @@ export function newLot(o: NewLot): LotState {
   return { ...o, status: 'queued', pass: 0, next: null, steps: [], constats: [], verdict: null, uxVerdict: null, questions: [], choix: [], answers: [], proposals: [], warnings: [], outcome: null };
 }
 
+/** Un lot fini ne travaille plus dans son dépôt : prêt, rendu ou échoué. */
+export const lotFinished = (l: Pick<LotState, 'status'>): boolean => l.status === 'ready' || l.status === 'handed-back' || l.status === 'failed';
+
 /** Tous les dépôts où les sessions du lot travaillent : celui du projet, puis ses voisins. */
 export const lotRepoPaths = (l: Pick<LotState, 'repo' | 'repos'>): string[] => [l.repo, ...(l.repos ?? []).map((r) => r.path)];
 

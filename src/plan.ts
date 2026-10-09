@@ -428,6 +428,14 @@ export class Plan {
     return id;
   }
 
+  /** Déclare les dépôts voisins d'un lot (clé `repos:`) : un chemin seul, ou `{ path, cite }` quand le voisin est partagé. */
+  setRepos(lotId: string, repos: LotRepoDecl[]): void {
+    this.writable();
+    const node = this.doc.createNode(repos.map((r) => (r.cite === undefined ? r.path : { path: r.path, cite: r.cite }))) as YAMLSeq;
+    node.flow = true;
+    this.lotNode(lotId).set('repos', node);
+  }
+
   addTask(lotId: string, title: string): string {
     this.writable();
     const lot = this.lotNode(lotId);

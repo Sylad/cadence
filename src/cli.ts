@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { readHookConfig, readNewsConfig, readPlanConfig, readSessionConfig } from './config.js';
+import { readDocsConfig, readHookConfig, readNewsConfig, readPlanConfig, readSessionConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
 import { audit, exemptPlanOnly, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
@@ -397,7 +397,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans le README)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const plan = existsSync(planPath) ? loadPlan() : null;
-      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], sha: values.sha, args: rest, out: io.out, err: io.err };
+      const articles = readDocsConfig(configPath).articles;
+      // Sans public: d'un lot visible, le site reprend le titre de sa Nouveauté la plus récente.
+      const publicTitle = (lot: Lot) => lot.public ?? (lot.visible ? loadEntries(newsDir).find((e) => e.lots.includes(lot.id))?.title : undefined);
+      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], sha: values.sha, args: rest, articles, publicTitle, out: io.out, err: io.err };
       return deliver(ctx, realDeps(root));
     }
     case 'verify': {

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { isDay, type Day } from './dates.js';
+import type { ArticleRule } from './articles.js';
 import type { DocSyncRule } from './docsync.js';
 import { gitRoot } from './git.js';
 import { FIELDS, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
@@ -314,11 +315,13 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
 export interface DocsConfig {
   /** Paires « chemins modifiés → documents à toucher » (L143). */
   sync: DocSyncRule[];
+  /** Articles d'un dépôt voisin rafraîchis à la livraison (L144) ; absent : aucun. */
+  articles?: ArticleRule[];
   /** Jour au-delà duquel un lot terminé est audité (les lots en cours le sont toujours). Absent : aucun lot terminé. */
   since?: Day;
 }
 
-const DOCS_KEYS = ['sync', 'since'];
+const DOCS_KEYS = ['sync', 'since', 'articles'];
 
 /** Clé `docs:` de cadence.yaml : `docs.sync`, la documentation qui doit suivre le code. */
 export function readDocsConfig(file: string): DocsConfig {
@@ -333,7 +336,7 @@ export function readDocsConfig(file: string): DocsConfig {
   const d = (raw as { docs?: unknown } | null)?.docs;
   if (d == null) return none;
   const bad = (what: string) => new RafError(`${file} : docs.${what}`);
-  if (!isObject(d)) throw new RafError(`${file} : docs doit être un objet { sync, since }`);
+  if (!isObject(d)) throw new RafError(`${file} : docs doit être un objet { sync, since, articles }`);
   for (const k of Object.keys(d)) if (!DOCS_KEYS.includes(k)) throw bad(`${k} inconnu (attendu : ${DOCS_KEYS.join(', ')})`);
   const config: DocsConfig = { sync: [] };
   if (d.since != null) {
@@ -351,6 +354,19 @@ export function readDocsConfig(file: string): DocsConfig {
         return v.map((x) => x.trim());
       };
       config.sync.push({ paths: entry('paths'), docs: entry('docs') });
+    });
+  }
+  if (d.articles != null) {
+    if (!Array.isArray(d.articles)) throw bad('articles doit être une liste de { repo, file }');
+    config.articles = d.articles.map((r: unknown, i: number) => {
+      if (!isObject(r)) throw bad(`articles[${i}] doit être un objet { repo, file }`);
+      for (const k of Object.keys(r)) if (!['repo', 'file', 'name'].includes(k)) throw bad(`articles[${i}].${k} inconnu (attendu : repo, file, name)`);
+      const text = (key: 'repo' | 'file' | 'name') => {
+        const v = r[key];
+        if (typeof v !== 'string' || !v.trim()) throw bad(`articles[${i}].${key} : texte non vide attendu`);
+        return v.trim();
+      };
+      return { repo: text('repo'), file: text('file'), ...(r.name != null ? { name: text('name') } : {}) };
     });
   }
   return config;

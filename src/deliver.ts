@@ -6,7 +6,8 @@ import type { Day } from './dates.js';
 import { isPlanOnly } from './audit.js';
 import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
 import { citedRefs } from './link.js';
-import { RafError, type Plan } from './plan.js';
+import { describeArticle, openArticleLots, type ArticleRule } from './articles.js';
+import { RafError, type Lot, type Plan } from './plan.js';
 import { appendDelivery, lastDelivery, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
 
 export interface VerifyCheck {
@@ -79,6 +80,10 @@ export interface DeliverCtx {
   sha?: string;
   /** Arguments de la ligne de commande, ajoutés au script du projet. */
   args: string[];
+  /** Articles d'un dépôt voisin à rafraîchir après une livraison verte (clé `docs.articles`, L144). */
+  articles?: ArticleRule[];
+  /** Titre public d'un lot (le sien, sinon celui de sa Nouveauté) ; `lot.public` par défaut. */
+  publicTitle?: (lot: Lot) => string | undefined;
   out: (line: string) => void;
   err: (line: string) => void;
 }
@@ -309,6 +314,7 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
       if (config.deploy.length === 0) out('    (aucune commande)');
       config.deploy.forEach((c, i) => out(`    ${i + 1}. ${c}`));
     }
+    if (ctx.articles?.length) out(`  Articles rafraîchis après une livraison verte (lot « Article <projet> à rafraîchir ») : ${ctx.articles.map(describeArticle).join(', ')}`);
     if (config.verify.length) out(`  Vérifications (réessayées pendant ${config.verifyTimeout} s) :`);
     config.verify.forEach((c, i) => out(`    ${i + 1}. ${describeCheck(c, sha)}`));
     out(`  Variables : ${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(' ')}`);
@@ -356,11 +362,13 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     const head = script === null || !atHead ? sha : (headSha(ctx.root) ?? sha);
     const moved = head !== sha && isAncestor(ctx.root, sha, head);
     const final = moved ? head : sha;
-    const delivered = deliveredLots(ctx, lastDelivery(ctx.state), final);
+    const ids = deliveredIds(ctx, lastDelivery(ctx.state), final);
+    const delivered = deliveredLots(ctx, ids, lastDelivery(ctx.state), final);
     appendDelivery(ctx.state, ctx.today, final);
     if (moved) out(`✓ livré : ${final.slice(0, 7)} (tête déplacée par le script depuis ${env.CADENCE_SHORT})`);
     else out(`✓ livré${config.verify.length ? ' et vérifié' : ''} : ${env.CADENCE_SHORT}`);
     if (delivered) out(delivered);
+    refreshArticles(ctx, ids, final);
     return 0;
   } finally {
     releaseLock(ctx.state, process.pid);
@@ -472,11 +480,9 @@ async function verifyAll(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: R
  * nommé pour le contexte — les annoncer « livrés » ferait fermer à tort. L'état est celui du départ de
  * la livraison : le plan a été lu avant que le script du projet ne ferme lui-même les lots qu'il livre.
  */
-function deliveredLots(ctx: DeliverCtx, prev: string | null, sha: string): string | null {
-  if (!ctx.plan || !prev || prev === sha) return null;
-  if (!isAncestor(ctx.root, prev, sha)) {
-    return `livraison précédente (${prev.slice(0, 7)}) hors de l'historique de ${sha.slice(0, 7)} (réécrit ?) : lots livrés non calculés`;
-  }
+/** Lots cités par les commits livrés depuis la livraison précédente ; vide quand elle est inconnue ou hors de l'historique. */
+function deliveredIds(ctx: DeliverCtx, prev: string | null, sha: string): string[] {
+  if (!ctx.plan || !prev || prev === sha || !isAncestor(ctx.root, prev, sha)) return [];
   const lots = ctx.plan.lots();
   const known = new Set((ctx.plan.readonly ? lots.filter((l) => l.status === 'doing') : lots).map((l) => l.id));
   const ids = new Set<string>();
@@ -484,6 +490,42 @@ function deliveredLots(ctx: DeliverCtx, prev: string | null, sha: string): strin
     if (isPlanOnly(c.sha, ctx.plan, ctx.root)) continue; // entretien du plan : ne livre rien, même s'il cite des lots
     for (const r of citedRefs(c, ctx.plan.refs)) if (known.has(r.lot)) ids.add(r.lot);
   }
-  if (ids.size === 0) return null;
-  return `livré : ${[...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).join(', ')} — ${ctx.plan.readonly ? "à fermer avec l'outil du projet" : 'raf done'} si l'effet est celui attendu`;
+  return [...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function deliveredLots(ctx: DeliverCtx, ids: string[], prev: string | null, sha: string): string | null {
+  if (!ctx.plan || !prev || prev === sha) return null;
+  if (!isAncestor(ctx.root, prev, sha)) {
+    return `livraison précédente (${prev.slice(0, 7)}) hors de l'historique de ${sha.slice(0, 7)} (réécrit ?) : lots livrés non calculés`;
+  }
+  if (ids.length === 0) return null;
+  return `livré : ${ids.join(', ')} — ${ctx.plan.readonly ? "à fermer avec l'outil du projet" : 'raf done'} si l'effet est celui attendu`;
+}
+
+/**
+ * Livraison verte (L144) : les lots livrés dont le titre est public changent ce que les articles externes racontent, on ouvre
+ * donc le lot qui les rafraîchit. Le plan est écrit mais pas commité (deliver ne commite jamais) ; une erreur ici ne défait pas
+ * une livraison déjà faite.
+ */
+function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
+  if (!ctx.plan || !ctx.articles?.length || !ids.length) return;
+  try {
+    const wanted = new Set(ids);
+    const r = openArticleLots({
+      plan: ctx.plan,
+      root: ctx.root,
+      rules: ctx.articles,
+      delivered: ctx.plan.lots().filter((l) => wanted.has(l.id)),
+      publicTitle: ctx.publicTitle ?? ((l) => l.public),
+      sha,
+      today: ctx.today,
+    });
+    for (const w of r.warnings) ctx.err(`deliver : ${w}`);
+    if (r.opened.length || r.noted.length) ctx.plan.save();
+    for (const id of r.opened) ctx.out(`article à rafraîchir : ${id} « ${ctx.plan.lot(id).title} » ouvert (plan modifié, à commiter) — à jouer dans une vague ordinaire`);
+    for (const id of r.noted) ctx.out(`article à rafraîchir : ${id} déjà ouvert, titres livrés ajoutés en note (plan modifié, à commiter)`);
+    for (const m of r.manual) ctx.out(`article à rafraîchir : ${m}`);
+  } catch (e) {
+    ctx.err(`deliver : article à rafraîchir non ouvert — ${(e as Error).message}`);
+  }
 }

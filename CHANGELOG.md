@@ -40,7 +40,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- `raf check`, `raf done` and `raf commits` no longer count a version commit as work to review: a commit whose files are all version files — the `version` field of `package.json`, `package-lock.json`, `.claude-plugin/plugin.json` and `marketplace.json`, and `CHANGELOG.md` — closes a lot after its review without asking for a new one, and needs no lot of its own, like a plan commit. Any other file, or any other field of a manifest, keeps it reviewable (L72).
+- `raf check`, `raf done` and `raf commits` no longer count a version commit as work to review: a commit whose files are all version files — the `version` field of `package.json`, `package-lock.json`, `.claude-plugin/plugin.json` and `marketplace.json`, `CHANGELOG.md` and the « What's new » section of the README — closes a lot after its review without asking for a new one, and needs no lot of its own, like a plan commit. Any other file, or any other field of a manifest, keeps it reviewable (L72).
 
 ## [0.23.0] - 2026-10-09
 

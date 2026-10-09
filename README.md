@@ -97,7 +97,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf list [--status s]` | flat list |
 | `raf ignore <sha> \| "exact subject" [--reason text]` | acknowledge a commit without a lot (tooling chore, a plan commit citing an unknown id) without rewriting history: a dated, reasoned line in the plan's `acknowledged:` section; a sha is exact, a subject covers every commit carrying it |
 | `raf check --ignored` | list the acknowledged commits with their date and reason |
-| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default (a visible lot without a public title is only a `⚠` warning: it never changes the exit code): commits without a lot (commits touching only plan files, or only version fields and `CHANGELOG.md`, are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
+| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default (a visible lot without a public title is only a `⚠` warning: it never changes the exit code): commits without a lot (commits touching only plan files, or only version fields, `CHANGELOG.md` and the README's « What's new » section, are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
 | `raf gantt [-o file]` | standalone Gantt page |
 | `raf hook install` | add the post-commit hook (read-only, never blocks) and the pre-commit hook (does nothing unless `hook.autostart` says so, see below) |
 
@@ -323,7 +323,7 @@ refuses a lot that has at least one commit citing it and no recorded verdict
 (`--force` to override), and `raf check` reports such lots finished after the
 `reviewSince` day. A lot with no commit has nothing to review; neither does a
 lot whose only commits touch plan files alone (the plan, a file listed under
-`plan.files`, or the QA expectations file), predate the plan's `since` or match an `ignore:` pattern — `raf commits <id>` prints exactly the counted set.
+`plan.files`, or the QA expectations file), are version commits (see [Releasing](#releasing)), predate the plan's `since` or match an `ignore:` pattern — `raf commits <id>` prints exactly the counted set.
 
 The verdict is tied to what was reviewed: `raf review` stores it on the lot with
 the sha of the lot's latest counted commit (`review: { date, verdict, commit }`,
@@ -1300,10 +1300,12 @@ A version exists in three places and is published in two; a release does all of 
 1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and write the version's section of
    `CHANGELOG.md` (`## [x.y.z] - date`, what changes for the user, lots cited), in **one commit that holds
-   only those files** (the version fields and the CHANGELOG, nothing else in the manifests). Such a commit is
+   only those files** (the version fields and the CHANGELOG, nothing else in the manifests, and the « What's new »
+   section of this README, the one place of it a release rewrites). Such a commit is
    exempt from the code-review gate like a plan commit: it closes the lot after its review, and `raf check`
-   does not ask for a new one (nor does it count it as a commit without a lot). Refresh the « What's new »
-   summary of this README *before* the review, in the lot's own commits. A commit that touches any other file
+   does not ask for a new one (nor does it count it as a commit without a lot). The « What's new »
+   summary is ordered by version, a number known only at the release and shared by several lots: write it
+   in that commit, not before the review. A commit that touches any other file
    — or another field of a manifest, or a dependency in `package-lock.json` — is work like any other and has
    to be reviewed.
 2. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,

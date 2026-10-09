@@ -102,4 +102,31 @@ describe('(L72) commit de version et porte de revue', () => {
     expect((await rafOn('2026-09-29', dir, 'done', 'L1')).code).toBe(0);
     expect((await raf(dir, 'check')).out).toBe('✓ plan et historique cohérents');
   });
+
+  const README = (news: string, tail = 'fin\n') => `# x\n\n## What's new\n\n${news}\n\n## Usage\n\n${tail}`;
+
+  it('le « What\'s new » du README, rangé par version, se rafraîchit dans le commit de version', async () => {
+    const dir = await reviewedLot();
+    commitFiles(dir, 'docs(L1): readme', { 'README.md': README('**0.1.0**: a') });
+    await raf(dir, 'review', 'L1', 'conforme');
+    commitFiles(dir, 'release: 0.2.0 (L1)', {
+      'package.json': pkg('0.2.0'),
+      'CHANGELOG.md': '## [0.2.0]\n',
+      'README.md': README('**0.2.0**: b (L1). **0.1.0**: a'),
+    });
+    expect((await rafOn('2026-09-29', dir, 'done', 'L1')).code).toBe(0);
+    expect((await raf(dir, 'check')).out).toBe('✓ plan et historique cohérents');
+  });
+
+  it('un autre passage du README dans le commit de version reste du travail', async () => {
+    const dir = await reviewedLot();
+    commitFiles(dir, 'docs(L1): readme', { 'README.md': README('**0.1.0**: a') });
+    await raf(dir, 'review', 'L1', 'conforme');
+    commitFiles(dir, 'release: 0.2.0 (L1)', {
+      'package.json': pkg('0.2.0'),
+      'README.md': README('**0.2.0**: b (L1). **0.1.0**: a', 'autre\n'),
+    });
+    await rafOn('2026-09-29', dir, 'done', 'L1', '--force');
+    expect((await raf(dir, 'check')).out).toContain('1 commit(s) postérieur(s) à sa revue');
+  });
 });

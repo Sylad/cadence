@@ -61,6 +61,12 @@ export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
 /** Fichiers d'une version : manifestes JSON (dont seul le champ `version` bouge) et CHANGELOG. */
 const VERSION_JSON = /(^|\/)(package\.json|package-lock\.json|\.claude-plugin\/(plugin|marketplace)\.json)$/;
 const CHANGELOG = /(^|\/)CHANGELOG\.md$/;
+const README = /^README\.md$/;
+
+/** Le README sans sa section « What's new », rangée par version et donc réécrite à la release. */
+function withoutWhatsNew(text: string | null): string {
+  return (text ?? '').replace(/^## What's new\s*$[\s\S]*?(?=^## |(?![\s\S]))/m, '');
+}
 
 /** Le JSON sans les champs `version` qu'une release réécrit : la racine, `packages[""]` du lock et `plugins[]` du marketplace. */
 function withoutVersion(text: string | null): string | null {
@@ -78,7 +84,7 @@ function withoutVersion(text: string | null): string | null {
 
 /**
  * Commit de version (L72) : TOUS ses fichiers sont des fichiers de version — package.json, package-lock.json,
- * .claude-plugin/plugin.json et marketplace.json, où seule la `version` change, et CHANGELOG.md. Il clôt le lot
+ * .claude-plugin/plugin.json et marketplace.json, où seule la `version` change, et CHANGELOG.md, plus la section « What's new » du README (seule). Il clôt le lot
  * après sa revue : l'exiger relu rouvrirait la porte à chaque release. Les fichiers décident, jamais le sujet.
  */
 export function isReleaseOnly(sha: string, root: string): boolean {
@@ -87,6 +93,7 @@ export function isReleaseOnly(sha: string, root: string): boolean {
     files.length > 0 &&
     files.every((f) => {
       if (CHANGELOG.test(f)) return true;
+      if (README.test(f)) return withoutWhatsNew(fileAt(root, `${sha}^`, f)) === withoutWhatsNew(fileAt(root, sha, f));
       if (!VERSION_JSON.test(f)) return false;
       const before = withoutVersion(fileAt(root, `${sha}^`, f));
       return before !== null && before === withoutVersion(fileAt(root, sha, f));

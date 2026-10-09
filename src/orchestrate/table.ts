@@ -41,8 +41,8 @@ const commits = (l: LotState) => new Set(l.steps.flatMap((s: StepState) => s.com
 const counted = (l: LotState) => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
 const minutes = (l: LotState) => Math.round(l.steps.reduce((n, s) => n + (s.ended ? Date.parse(s.ended) - Date.parse(s.started) : 0), 0) / 60_000);
 
-/** Commits du lot dans son dépôt, du plus ancien au plus récent (ceux d'un dépôt voisin, `[rel] sha`, sont écartés). */
-const own = (l: LotState): string[] => [...new Set(l.steps.flatMap((s) => s.commits ?? []).filter((c) => !c.startsWith('[')))];
+/** Sha des commits du lot dans son dépôt, du plus ancien au plus récent (entrées `<sha> <sujet>` ; ceux d'un dépôt voisin, `[rel] sha`, sont écartés). */
+const own = (l: LotState): string[] => [...new Set(l.steps.flatMap((s) => s.commits ?? []).filter((c) => !c.startsWith('[')).map((c) => c.split(' ')[0]))];
 
 /**
  * Lots empilés sur main (L76) : un lot prêt sous un lot non prêt n'est livrable que jusqu'à son dernier commit.

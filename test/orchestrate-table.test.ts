@@ -100,7 +100,7 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
   const stacked = (project: string, name: string, status: LotState['status'], shas: string[], repo = '/r'): LotState => {
     const l = newLot({ project, repo, lot: name, title: 't', visible: false, small: false, model: 'sonnet', readOnlyPlan: false });
     l.status = status;
-    l.steps = [{ n: 1, kind: 'implement', model: 'sonnet', status: 'ok', started: '2026-10-04T10:00:00Z', commits: shas }];
+    l.steps = [{ n: 1, kind: 'implement', model: 'sonnet', status: 'ok', started: '2026-10-04T10:00:00Z', commits: shas.map((c) => (c.startsWith('[') ? c : `${c} feat(${name}): sujet du commit`)) }];
     return l;
   };
   // Historique empilé sur main : a1 a2 (L1) < b1 (L2) < c1 (L3), du plus ancien au plus récent.
@@ -128,6 +128,15 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
     expect(lines([stacked('demo', 'L1', 'ready', ['a1']), stacked('demo', 'L2', 'ready', ['b1'])])).toEqual([]);
     expect(lines([stacked('demo', 'L1', 'ready', ['a1']), stacked('demo', 'L2', 'handed-back', [])])).toEqual([]);
     expect(lines([stacked('demo', 'L1', 'ready', ['a1'], '/r'), stacked('other', 'L2', 'handed-back', ['b1'], '/s')])).toEqual([]);
+  });
+
+  it('les commits au format du programme (« <sha> <sujet> ») : sha nu dans la ligne et la commande', () => {
+    const seen: string[] = [];
+    const out = renderTable(wave, [stacked('demo', 'L1', 'ready', ['a1', 'a2']), stacked('demo', 'L2', 'handed-back', ['b1'])], {
+      isAncestor: (_r, a, b) => (seen.push(a, b), order.indexOf(a) <= order.indexOf(b)),
+    }).filter((x) => x.includes('livrable jusqu'));
+    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2 (dernier commit de L1, sous L2 rendu) : cadence deliver --sha a2"]);
+    expect(seen.every((x) => !x.includes(' '))).toBe(true);
   });
 
   it('les commits d\'un dépôt voisin ([rel] sha) ne comptent pas', () => {

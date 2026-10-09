@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSession, isQuotaMessage } from '../src/orchestrate/result.js';
-import { buildArgs, buildRetryArgs, realClaude, mcpServersFor, writeMcpConfig, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
+import { buildArgs, buildRetryArgs, killSessions, realClaude, mcpServersFor, writeMcpConfig, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { tempDir } from './helpers.js';
 
@@ -376,4 +376,33 @@ describe('realClaude : fin de session (L83)', () => {
     await new Promise((r) => setTimeout(r, 200));
     expect(alive(pid)).toBe(false);
   });
+
+  it("au délai, tue l'orphelin qui tient le pipe stdout (close ne viendrait qu'après sa mort)", async () => {
+    const dir = tempDir();
+    const pidFile = join(dir, 'server.pid');
+    const bin = join(dir, 'fake-claude.sh');
+    // L'orphelin garde le stdout de la session ouvert : sans kill au délai, `close` attend ses 60 s.
+    writeFileSync(bin, `#!/bin/sh\nsetsid sh -c 'nohup sh -c "echo \\$\\$ > \\"${pidFile}\\"; exec sleep 60" 2>/dev/null &'\nsleep 60\n`, { mode: 0o755 });
+    const out = await realClaude(bin, process.env)([], { cwd: dir, env: {}, timeoutMs: 1_000 });
+    expect(out.timedOut).toBe(true);
+    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(alive(pid)).toBe(false);
+  }, 15_000);
+
+  it("killSessions (interruption de la vague) tue l'orphelin marqué sans attendre le close de la session", async () => {
+    const dir = tempDir();
+    const pidFile = join(dir, 'server.pid');
+    const bin = join(dir, 'fake-claude.sh');
+    writeFileSync(bin, `#!/bin/sh\nsetsid sh -c 'nohup sh -c "echo \\$\\$ > \\"${pidFile}\\"; exec sleep 60" >/dev/null 2>&1 &'\nsleep 60\n`, { mode: 0o755 });
+    const session = realClaude(bin, process.env)([], { cwd: dir, env: {}, timeoutMs: 30_000 });
+    for (let i = 0; i < 100 && !(existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim()); i++) await new Promise((r) => setTimeout(r, 50));
+    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    expect(alive(pid)).toBe(true);
+    killSessions();
+    // Attente bloquante : le `close` de la session ne peut pas passer, seul killSessions a pu tuer l'orphelin.
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+    expect(alive(pid)).toBe(false);
+    await session;
+  }, 15_000);
 });

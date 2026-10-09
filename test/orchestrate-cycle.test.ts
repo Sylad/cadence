@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { isAbsolute, join } from 'node:path';
 import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
+import { coveredTasks } from '../src/audit.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { REVIEW_RESERVE, isNonQuestion, runLot } from '../src/orchestrate/cycle.js';
 import { runPool } from '../src/orchestrate/pool.js';
@@ -10,7 +11,7 @@ import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir, readAgents } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { createServer } from 'node:http';
-import { tempDir } from './helpers.js';
+import { commit, gitRepo, tempDir } from './helpers.js';
 import { fakeApp } from './fake-app.js';
 import { claudeOut, commitFile, git, harness, precheckReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 
@@ -1152,6 +1153,35 @@ describe('sous-tâches couvertes (L82)', () => {
     expect(c.lot.proposals.some((p) => p.includes('L1/t1') && p.includes('clore'))).toBe(true);
     expect(c.lot.proposals.some((p) => p.includes('L1/t2'))).toBe(true);
     expect(c.lot.proposals.some((p) => p.includes('L1/t3'))).toBe(false);
+  });
+
+  describe('plan au format étranger : coveredTasks lit les mêmes identifiants que plan.refs', () => {
+    /** Lot B53 dont les sous-tâches t4, t4-ux1 et t5 sont ouvertes (maritime-atlas : `B53/t4` puis `B53/t4-ux1`, tous `parent: B53`). */
+    function foreignPlan(subjects: string[]) {
+      const dir = gitRepo();
+      const file = join(dir, 'taches.yaml');
+      writeFileSync(
+        file,
+        'taches:\n- { id: B53, titre: Lot, etat: en_cours }\n' +
+          ['t4', 't4-ux1', 't5'].map((t) => `- { id: B53/${t}, titre: ${t}, etat: en_cours, parent: B53 }\n`).join(''),
+      );
+      git(dir, 'add', 'taches.yaml');
+      commit(dir, 'plan: adoption');
+      for (const s of subjects) commit(dir, s);
+      const format = { lots: 'taches', fields: { title: ['titre'], status: ['etat'], parent: ['parent'] }, statuses: { prevu: 'todo' as const, en_cours: 'doing' as const, livre: 'done' as const }, estimates: {} };
+      return { dir, plan: Plan.load(file, { format }) };
+    }
+
+    it('une sous-tâche dont l\'identifiant en préfixe une autre (B53/t4-ux1) ne propose pas t4', () => {
+      const { dir, plan } = foreignPlan(['fix(frontend) (B53/t4-ux1) : retouche']);
+      expect(plan.refs('fix(frontend) (B53/t4-ux1) : retouche')).toEqual([{ lot: 'B53', task: 't4-ux1' }]);
+      expect(coveredTasks(plan, dir, 'B53').map((c) => c.task)).toEqual(['t4-ux1']);
+    });
+
+    it('une liste à virgule (feat(B53/t4-ux1,t5)) propose chacune de ses sous-tâches, sans t4', () => {
+      const { dir, plan } = foreignPlan(['feat(B53/t4-ux1,t5): c']);
+      expect(coveredTasks(plan, dir, 'B53').map((c) => c.task).sort()).toEqual(['t4-ux1', 't5']);
+    });
   });
 });
 

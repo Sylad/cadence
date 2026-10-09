@@ -42,7 +42,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- `cadence orchestrate`: a compliant review now settles the open sub-tasks that commits of the lot cite (`feat(L3/t2): …`) — closed in the same plan commit as the verdict (warning `sous-tâches closes`), or, when the plan is read-only, returned to you as proposals `[sous-tâche clore]`, so `raf done` no longer refuses the lot over sub-tasks whose work is done (L82)
+- `cadence orchestrate`: a compliant review now settles the open sub-tasks that commits of the lot cite (`feat(L3/t2): …`) — closed in the same plan commit as the verdict (warning `sous-tâches closes`), or, when the plan is read-only, returned to you as proposals `[sous-tâche clore]`, so `raf done` no longer refuses the lot over sub-tasks whose work is done; on a foreign-format plan the sub-task ids are read as the plan itself reads them (`B53/t4-ux1` does not cover `t4`), comma lists included (L82)
 
 ## [0.26.0] - 2026-10-09
 

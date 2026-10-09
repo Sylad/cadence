@@ -111,7 +111,7 @@ export function isOpen(status: Status): boolean {
   return status === 'todo' || status === 'doing';
 }
 
-function escapeRe(s: string): string {
+export function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 

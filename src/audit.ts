@@ -9,7 +9,7 @@ import { readDocsConfig, readNewsConfig } from './config.js';
 import { docSyncGaps, filesOf, gapMessage } from './docsync.js';
 import { type Entry, loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong, reusedNewsTitle } from './news.js';
 import { isRecurring } from './recurring.js';
-import { isOpen, type Lot, type Plan, type Verdict } from './plan.js';
+import { escapeRe, isOpen, type Lot, type Plan, type Verdict } from './plan.js';
 
 /** Chemin de la configuration lue, relatif à la racine : celui de --config, sinon cadence.yaml. */
 function configRel(plan: Plan, root: string): string {
@@ -217,9 +217,12 @@ export function coveredTasks(plan: Plan, root: string, lotId: string): { task: s
     const cited = citedRefs(c, plan.refs).filter((r) => r.lot === lotId && r.task);
     // `fix(L3/t1,t2)` : le motif des références ne lit que la première sous-tâche d'une liste à virgule.
     // Même texte que citedRefs : la portée quand elle cite des lots, sinon le message entier (le corps ne compte pas à côté d'une portée).
+    // Chaque élément de la liste est relu par plan.refs, comme `lot/élément` : seul ce que le plan lirait lui-même est retenu
+    // (`t4` n'est pas lu dans `t4-ux1` au format étranger), quel que soit le format du plan.
     const scope = scopeOf(c.subject);
     const text = scope !== null && plan.refs(scope).length > 0 ? scope : `${c.subject}\n${c.body}`;
-    const listed = cited.length > 0 ? [...text.matchAll(new RegExp(`(?<![\\w/])${lotId}/(t\\d+(?:\\s*,\\s*t\\d+)*)(?![\\w/])`, 'g'))].flatMap((m) => m[1].split(/\s*,\s*/)) : [];
+    const element = '[\\w-]+(?:\\.[\\w-]+)*';
+    const listed = cited.length > 0 ? [...text.matchAll(new RegExp(`(?<![\\w/])${escapeRe(lotId)}/(${element}(?:\\s*,\\s*${element})*)`, 'g'))].flatMap((m) => m[1].split(/\s*,\s*/)).flatMap((e) => plan.refs(`${lotId}/${e}`).filter((r) => r.lot === lotId && r.task).map((r) => r.task!)) : [];
     for (const task of [...cited.map((r) => r.task!), ...listed]) if (open.has(task) && !found.has(task)) found.set(task, c.sha);
   }
   return lot.tasks.filter((t) => found.has(t.id)).map((t) => ({ task: t.id, sha: found.get(t.id)! }));

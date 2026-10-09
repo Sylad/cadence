@@ -960,9 +960,10 @@ lots:
     finished: 2026-10-07
   - id: L76
     title: "orchestrate : lots empilés sur main — le tableau final indique « livrable jusqu'à <sha> » (dernier commit d'un lot prêt sous un lot rendu), comme fait à la main pour ol L36 et ccc L26 avec deliver --sha (06-10)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-07
+    started: 2026-10-09
   - id: L77
     title: "orchestrate : contrôle préalable « livrable déjà présent ? » avant d'ouvrir une session d'implémentation — warhammer L59 et L65 étaient déjà faits par d'autres lots (06-10)"
     status: done

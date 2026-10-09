@@ -36,12 +36,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence session context`: the context of the session, published by the `cadence-hud` band, for the lead to chain under a threshold | [0.22.0](#0220---2026-10-09) |
 | `cadence-hud`: the progress of each project's plan under the waves, `/hud projets`; `cadence lead tour --json` gains `progress` | [0.22.0](#0220---2026-10-09) |
 
-## [Unreleased]
+## [0.23.0] - 2026-10-09
 
 ### Changed
 
-- `cadence deliver` no longer refuses a repository on the sole ground that a live wave holds its lock: it reads the wave's state and refuses only when a lot of that wave is still running, queued or suspended in this repository (L127).
-- `cadence-hud`: the progress bar of each project is coloured by the share of lots done — filled cells red below 33 %, orange below 66 %, green beyond (the thresholds of the usage colours, inverted); empty cells stay grey (L152).
+- `cadence deliver` no longer refuses a repository on the sole ground that a live wave holds its lock: it reads the wave's state and refuses only when a lot of that wave is still running, queued or suspended in this repository, a linked worktree of the repository counting as the repository itself (an unreadable wave state still refuses) (L127).
+- `cadence-hud`: the progress bar of each project is coloured by the share of lots done — filled cells red below 33 %, orange below 66 %, green beyond; empty cells stay grey (L152, `cadence-hud` 0.4.1).
 
 ## [0.22.0] - 2026-10-09
 

@@ -402,7 +402,7 @@ export const progressBar = (done: number, total: number, cellCount = 10): string
   return '▮'.repeat(full) + '▯'.repeat(cellCount - full)
 }
 
-/** Couleur de la barre d'un projet selon sa part de lots faits : rouge sous 33 %, orange sous 66 %, vert au-delà (les seuils de `colorOfPercent` pris à l'envers : ici plus c'est plein, mieux c'est) ; gris sans lot. */
+/** Couleur de la barre d'un projet selon sa part de lots faits : rouge sous 33 %, orange sous 66 %, vert au-delà (seuils propres à la barre : ceux de la consommation sont 60/85, aucun ne dérive de l'autre) ; gris sans lot. */
 export const colorOfDone = (done: number, total: number): ThemeKey =>
   total <= 0 ? 'subtle' : (done / total) * 100 < 33 ? 'error' : (done / total) * 100 < 66 ? 'warning' : 'success'
 

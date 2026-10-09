@@ -74,8 +74,8 @@ tronqués en fin de ligne.
   cadence ▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours
   ```
 
-  La barre se colore selon la part de lots faits (L152) : cases pleines en rouge sous 33 %, en orange sous 66 %, en vert au-delà (les seuils de la
-  consommation, pris à l'envers) ; les cases vides restent grises.
+  La barre se colore selon la part de lots faits (L152) : cases pleines en rouge sous 33 %, en orange sous 66 %, en vert au-delà (seuils propres à la barre,
+  distincts de ceux de la consommation, 60 % et 85 %) ; les cases vides restent grises.
 
   La barre (dix cases) et la fraction comptent les lots faits sur faits + en cours + à faire ; les lots abandonnés et
   les lots récurrents n'y entrent pas. `+N cette semaine` = lots créés sur les 7 derniers jours, aujourd'hui compris (absent à zéro). Les

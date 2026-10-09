@@ -927,6 +927,20 @@ export function isNonQuestion(q: string): boolean {
 /** Fin de vague (L79) : un lot qui a posé sa question PENDANT la vague, puis retiré par `--drop`, n'a plus de cycle à jouer pour s'en apercevoir : il est rendu ici, sinon il resterait en question pour toujours. */
 export function handBackDroppedQuestions(ctxs: LotCtx[]): void {
   for (const c of ctxs) if (c.lot.status === 'question' && dropped(c)) stop(c, 'handed-back', DROPPED);
+  // Les lots restés en file derrière un lot retiré ne seront jamais joués (comme le pool pour une dépendance rendue au lead) : rendus aussi, de proche en proche.
+  for (let moved = true; moved; ) {
+    moved = false;
+    for (const c of ctxs) {
+      if (c.lot.steps.length || (c.lot.status !== 'queued' && c.lot.status !== 'suspended')) continue;
+      const dead = (c.lot.dependsOn ?? []).filter((id) => {
+        const d = ctxs.find((o) => o.lot.project === c.lot.project && o.lot.lot === id);
+        return d?.lot.status === 'handed-back' || d?.lot.status === 'failed';
+      });
+      if (dead.length === 0) continue;
+      stop(c, 'handed-back', `dépendance non prête dans la vague : ${dead.join(', ')}`);
+      moved = true;
+    }
+  }
 }
 
 /** Joue le cycle d'un lot jusqu'à son terme, ou jusqu'à l'arrêt (question, budget, quota). Ne lève jamais. */

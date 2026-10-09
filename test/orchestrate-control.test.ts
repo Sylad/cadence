@@ -287,6 +287,33 @@ describe('--drop d\'un lot en question (L79, revue)', () => {
     expect(store!.readWave()!.status).toBe('done');
   });
 
+  it('un lot qui dépend (after) d\'un lot en question retiré est rendu aussi, la vague finit « done »', async () => {
+    const parent = parentWith(['a', 'b']);
+    const planFile = join(parent, 'a/docs/plan/raf.yaml');
+    const plan = Plan.load(planFile);
+    plan.add('suite', '2026-10-01', { estimate: 1, after: ['L1'] });
+    plan.save();
+    git(join(parent, 'a'), 'add', '--', 'docs/plan/raf.yaml');
+    git(join(parent, 'a'), 'commit', '-q', '-m', 'chore: plan L2');
+    let store: RunStore | undefined;
+    const claude: ClaudeFn = async (args, o) => {
+      const kind = kindOf(args);
+      if (kind !== 'implement' && kind !== 'fix') return claudeOut(reviewReport());
+      if (o.cwd.endsWith('/a')) return claudeOut(workReport({ questions: ['Quelle base ?'] }));
+      store = RunStore.last(parent)!;
+      for (let i = 0; i < 200 && store.readLot('a', 'L1')?.status !== 'question'; i++) await new Promise((r) => setTimeout(r, 10));
+      expect(await orchestrate(['--drop', 'a:L1'], io(parent).io, d)).toBe(0);
+      return claudeOut(workReport({ commits: [commitFile(o.cwd, 'b.txt', 'feat(L1): b')] }));
+    };
+    const d: OrchestrateDeps = { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR };
+    expect(await orchestrate(['a:L1', 'a:L2', 'b:L1', '--max-sessions', '2'], io(parent).io, d)).toBe(1);
+    expect(store!.readLot('a', 'L1')!.status).toBe('handed-back');
+    expect(store!.readLot('a', 'L2')!.status).toBe('handed-back');
+    expect(store!.readLot('a', 'L2')!.outcome).toMatch(/dépendance non prête dans la vague : L1/);
+    expect(store!.readLot('b', 'L1')!.status).toBe('ready');
+    expect(store!.readWave()!.status).toBe('done');
+  });
+
   it('--resume --drop d\'un lot en question le rend au lieu de le laisser en question', async () => {
     const parent = parentWith(['a']);
     const first = deps(() => {});

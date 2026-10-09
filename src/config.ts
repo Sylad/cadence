@@ -332,7 +332,7 @@ export interface DocsConfig {
   sync: DocSyncRule[];
   /** Articles d'un dépôt voisin rafraîchis à la livraison (L144) ; absent : aucun. */
   articles?: ArticleRule[];
-  /** Jour au-delà duquel un lot terminé est audité (les lots en cours le sont toujours). Absent : aucun lot terminé. */
+  /** Jour à partir duquel (inclus) un lot terminé est audité (les lots en cours le sont toujours). Absent : aucun lot terminé. */
   since?: Day;
 }
 

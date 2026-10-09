@@ -1087,8 +1087,8 @@ describe('budget par lot (L78)', () => {
     expect(lotBudget(2.5)).toBe(1_000_000);
   });
 
-  it('le plancher couvre une écriture, une revue, une passe de correction et une revue courte', () => {
-    expect(lotBudget(0.1)).toBeGreaterThanOrEqual(200_000 + 65_000 + 120_000 + 65_000);
+  it('le plancher couvre le pire cas mesuré (L62 : contrôle 14 k, écriture 282 k, revue 80 k) plus la réserve de 65 k pour une correction et sa revue', () => {
+    expect(lotBudget(0.1)).toBeGreaterThanOrEqual(14_000 + 282_000 + 80_000 + 65_000);
   });
 
   it("mesures du 06-10 rejouées avec la règle : le contrôle se fait avant chaque session, plus aucun des 5 lots n'est arrêté par le plancher de 450 k (L128)", () => {

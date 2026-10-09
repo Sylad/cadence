@@ -42,7 +42,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- `cadence orchestrate`: the floor of a lot's budget goes from 200 k to 450 k tokens (still 400 k per estimated day above it): it now pays a write pass, its review, one fix pass and the short review that follows — a lot of 0.5 or 1 day was handed back to the lead at its second or third pass (L128).
+- `cadence orchestrate`: the floor of a lot's budget goes from 200 k to 450 k tokens (still 400 k per estimated day above it): it now pays a write pass, its review, one fix pass and the short review that follows — a lot of 0.5 or 1 day was handed back to the lead at its second or third pass (L128). Trade-off: a `--continue` wave now draws fewer lots (at most 4 lots of up to 1 day out of the default 2 M instead of 10, and a 0.5-day lot needs 450 k left instead of 200 k), so it may stop drawing with up to 450 k unused.
 
 ## [0.25.0] - 2026-10-09
 

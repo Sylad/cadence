@@ -55,11 +55,14 @@ export interface OrchestrateDeps {
 
 export const DEFAULT_BUDGET = 2_000_000;
 
-/** Tokens comptés par jour d'estimate (L78) ; mesuré le 06-10 : des lots de 0,5 j ont mangé 192 à 531 k, des lots de 1 j 455 à 468 k (2 M pour 6 lots) ; le plafond est posé sous ces mesures pour arrêter vraiment. */
+/** Tokens comptés par jour d'estimate (L78) ; mesuré le 06-10 : des lots de 0,5 j ont mangé 192 à 531 k, des lots de 1 j 455 à 468 k (2 M pour 6 lots). Depuis le plancher de L128 (450 k), ce plafond ne borne plus que les lots de plus de 1,125 j : les 5 lots du 06-10 passent tous. */
 const LOT_BUDGET_PER_DAY = 400_000;
 /**
- * Plancher (L128) : une écriture (~200 k, mesure du 06-10), sa revue, une passe de correction (~120 k) et la revue courte
- * qui la suit (65 k chacune, cf. REVIEW_RESERVE). Avec 200 k, L126 était rendu au lead à la 2e passe et L62 (600 k) à la 3e.
+ * Plancher (L128) : de quoi payer, dans le pire cas mesuré, une écriture, sa revue, une passe de correction et la revue
+ * courte qui la suit (65 k, cf. REVIEW_RESERVE). Mesures de tous les `.cadence/runs/*` : passes fix médiane 45 k, p90 63 k,
+ * max 112 k ; passes implement médiane 60 k, p90 93 k, max 282 k (L62). Pire cas : L62, 14 k de contrôle + 282 k d'écriture
+ * + 80 k de revue = 376 k, plus 65 k de réserve = 441 k < 450 k, la passe fix part. Corrige L126 (200 k, rendu à la 2e passe) ;
+ * L62 (estimate 1,5, donc 600 k) n'est pas changé par le plancher, la réserve de L145 couvre déjà sa correction et sa revue.
  */
 const LOT_BUDGET_FLOOR = 450_000;
 

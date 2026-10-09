@@ -53,7 +53,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf gantt [-o docs/plan/gantt.html]
   raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--answer projet:lot "réponse"]
-  cadence lead tour [dossier] [--idle 3] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan (en cours, dérive, notes de clôture, prochain lot prêt, dépôt)
+  cadence lead tour [dossier] [--idle 3] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier seul s'il est lui-même un projet (en cours, dérive, notes de clôture, prochain lot prêt, dépôt)
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -151,7 +151,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const today: Day = io.env.RAF_TODAY ?? toDay(io.now());
   if (!isDay(today)) throw new RafError(`RAF_TODAY invalide : ${today} (attendu AAAA-MM-JJ)`);
   const root = gitRoot(io.cwd) ?? io.cwd;
-  // Le tour parcourt les sous-dossiers : il ne lit ni le plan ni le cadence.yaml du dossier courant.
+  // Le tour parcourt les sous-dossiers (ou, sans sous-projet, prend le dossier lui-même s'il est un projet) : il ne lit pas le plan du dossier courant.
   if (command === 'lead') {
     if (rest[0] !== 'tour' || rest.length > 2) throw new RafError('usage : cadence lead tour [dossier] [--idle 3] [--json]');
     const idle = values.idle === undefined ? undefined : Number(values.idle);

@@ -144,6 +144,56 @@ describe('cadence lead tour', () => {
     expect(rows.map((r) => r.project)).toEqual(['beta', 'alpha']);
   });
 
+  it("les lots « ajoutés cette semaine » sont ceux de moins de 7 jours : 6 jours comptent, 7 non (L149)", async () => {
+    const { root, alpha } = await parent();
+    const plan = join(alpha, 'docs/plan/raf.yaml');
+    const text = readFileSync(plan, 'utf8');
+    const created = (day: string) => text.replace(/(title: Export[^\n]*\n(?:.*\n)*?\s+created: )2026-09-28/, `$1${day}`);
+    const added7 = async () => (JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as Array<{ progress: { added7: number } }>)[0]!.progress.added7;
+    writeFileSync(plan, created('2026-09-22')); // 6 jours avant le 28
+    expect(await added7()).toBe(2);
+    writeFileSync(plan, created('2026-09-21')); // 7 jours avant
+    expect(await added7()).toBe(1);
+  });
+
+  it.each([
+    ['priority: ol\n', /priority doit être une liste/],
+    ['priority: []\n', /priority doit être une liste/],
+    ['priority: [a, 3]\n', /priority doit être une liste/],
+    ['priority: [\n', /illisible/],
+  ])("une priorité invalide (%j) est signalée sur une ligne « cadence.yaml » en erreur, texte et --json, l'ordre alphabétique reste (L149)", async (yaml, cause) => {
+    const { root } = await parent();
+    writeFileSync(join(root, 'cadence.yaml'), yaml);
+    const text = await cad(root, 'lead', 'tour');
+    expect(text.code).toBe(0);
+    const lines = text.out.split('\n');
+    expect(lines[0]).toMatch(/^cadence\.yaml · ✗ erreur : /);
+    expect(lines[0]).toMatch(cause);
+    expect(lines.slice(1).map((l) => l.split(' · ')[0])).toEqual(['alpha', 'beta']);
+    const rows = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as Array<{ project: string; error?: string }>;
+    expect(rows.map((r) => r.project)).toEqual(['cadence.yaml', 'alpha', 'beta']);
+    expect(rows[0]!.error).toMatch(cause);
+    expect(rows[1]!.error).toBeUndefined();
+  });
+
+  it('un cadence.yaml sans priority: ne produit aucune ligne d\'erreur', async () => {
+    const { root } = await parent();
+    writeFileSync(join(root, 'cadence.yaml'), 'qa:\n  expectations: docs/qa.md\n');
+    expect((await cad(root, 'lead', 'tour')).out.split('\n').map((l) => l.split(' · ')[0])).toEqual(['alpha', 'beta']);
+  });
+
+  it("depuis un projet sans sous-projet, la ligne de ce projet seul ; --json la donne avec son avancement (L149)", async () => {
+    const { alpha, beta } = await parent();
+    const { code, out } = await cad(alpha, 'lead', 'tour');
+    expect(code).toBe(0);
+    expect(out.split('\n')).toHaveLength(1);
+    expect(out).toMatch(/^alpha · en cours L1 /);
+    const rows = JSON.parse((await cad(beta, 'lead', 'tour', '--json')).out) as Array<{ project: string; progress: unknown }>;
+    expect(rows.map((r) => r.project)).toEqual(['beta']);
+    expect(rows[0]!.progress).toEqual({ done: 1, doing: 0, todo: 1, added7: 0 });
+    expect((await cad(alpha, 'lead', 'tour', alpha)).out).toBe(out);
+  });
+
   it('sans projet : une ligne le dit', async () => {
     const { code, out } = await cad(tempDir(), 'lead', 'tour');
     expect(code).toBe(0);

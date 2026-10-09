@@ -13,7 +13,7 @@ export const NOTES_MAX = 120;
 export const TITLE_MAX = 60;
 /** Au-delà de ce nombre de jours sans activité, un lot en cours est dit silencieux. */
 export const TOUR_IDLE = 3;
-/** Un lot créé depuis au plus ce nombre de jours compte parmi les « ajoutés cette semaine ». */
+/** Un lot créé depuis moins de ce nombre de jours (aujourd'hui compris : 0 à 6 jours d'écart) compte parmi les « ajoutés cette semaine ». */
 export const ADDED_DAYS = 7;
 
 /** Avancement du plan (L149) : lots faits / en cours / à faire, abandonnés et récurrents exclus ; `added7` = créés sur les 7 derniers jours. */
@@ -98,7 +98,7 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE): TourRow {
       done: counted.filter((l) => l.status === 'done').length,
       doing: counted.filter((l) => l.status === 'doing').length,
       todo: counted.filter((l) => l.status === 'todo').length,
-      added7: counted.filter((l) => l.created !== undefined && diffDays(l.created, today) >= 0 && diffDays(l.created, today) <= ADDED_DAYS).length,
+      added7: counted.filter((l) => l.created !== undefined && diffDays(l.created, today) >= 0 && diffDays(l.created, today) < ADDED_DAYS).length,
     };
     row.next = ready[0] ? { id: ready[0].id, title: ready[0].title } : null;
 
@@ -112,16 +112,24 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE): TourRow {
   return row;
 }
 
-/** Les projets rangés par la clé `priority:` du cadence.yaml du dossier (L149) ; les autres après, par ordre alphabétique. */
+/**
+ * Les projets rangés par la clé `priority:` du cadence.yaml du dossier (L149) ; les autres après, par ordre alphabétique.
+ * Une priorité illisible ou invalide ne vide pas le tableau : l'ordre alphabétique reste, et une première ligne `cadence.yaml` en erreur le dit.
+ * Un dossier qui n'a aucun sous-projet mais est lui-même un projet donne la ligne de ce projet seul (la bande l'interroge depuis le dossier de la session).
+ */
 export function leadTour(parent: string, today: Day, idle = TOUR_IDLE): TourRow[] {
-  const rows = findProjects(parent).map((dir) => tourRow(dir, today, idle));
+  const dirs = findProjects(parent);
+  if (dirs.length === 0 && isProject(parent)) return [tourRow(parent, today, idle)];
+  const rows = dirs.map((dir) => tourRow(dir, today, idle));
   let priority: string[] = [];
+  let problem: TourRow | undefined;
   try {
     priority = readPriority(parent);
-  } catch {
-    // une priorité illisible ne vide pas le tableau : l'ordre alphabétique reste
+  } catch (e) {
+    problem = { ...empty('cadence.yaml'), error: (e instanceof Error ? e.message : String(e)).split('\n')[0]! };
   }
-  return rows.map((r, i) => ({ r, i })).sort((a, b) => priorityRank(a.r.project, priority) - priorityRank(b.r.project, priority) || a.i - b.i).map((x) => x.r);
+  const sorted = rows.map((r, i) => ({ r, i })).sort((a, b) => priorityRank(a.r.project, priority) - priorityRank(b.r.project, priority) || a.i - b.i).map((x) => x.r);
+  return problem ? [problem, ...sorted] : sorted;
 }
 
 const DRIFT_SHOWN = 2;

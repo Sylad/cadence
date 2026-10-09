@@ -597,7 +597,10 @@ When an orchestrated wave is live, one more line closes the tour (not part of `-
 `next`, `repo`, and `error` when the project could not be read), plus `progress` — `{ done, doing, todo, added7 }`,
 the lots done / in progress / to do (dropped and recurring lots left out) and those created in the last 7 days (L149), which
 [`cadence-hud`](plugins/cadence-hud/README.md) draws as one progress bar per project. Projects come in the order of the
-`priority:` key of the folder's `cadence.yaml` (the one `orchestrate --continue` reads), the others after, alphabetically. The tour is read-only: it changes
+`priority:` key of the folder's `cadence.yaml` (the one `orchestrate --continue` reads), the others after, alphabetically; an unreadable `cadence.yaml` or
+a `priority:` that is not a list of names (`priority: ol`, `priority: []`) keeps the alphabetical order and adds a first row `cadence.yaml · ✗ erreur : <cause>` (`project: "cadence.yaml"` with `error` in `--json`).
+"Created in the last 7 days" means today and the six days before. When the folder has no sub-project but is itself a project, the tour is that project's single line
+(this is what `cadence-hud` asks from a session opened inside a project). The tour is read-only: it changes
 no plan. It exits 0 even when a project is in error — that project's line reads
 `beta · ✗ erreur : <cause>`. The `lead` skill runs it instead of one subagent per project.
 

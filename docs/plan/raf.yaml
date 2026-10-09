@@ -1466,6 +1466,7 @@ lots:
     estimate: 0.5
     created: 2026-10-08
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme (1 note mineure : une copie de la règle « lot fini » subsiste dans command.ts:837) — orchestré (vague 2026-10-09-1752, 0 passe(s) de correction + passe des mineurs)", commit: da6ce5badd5bbe045a2a2fdea4498cd1f0a3a9fd }
   - id: L128
     title: "orchestrate : budget de lot dérivé de l'estimate trop court pour une revue + une correction + une revue courte (L62 600 k à la 3e passe, L126 200 k à la 2e : rendu au lead à chaque fois, fini à la main) — plancher ou budget par étape qui couvre au moins une passe de correction et sa revue"
     status: todo

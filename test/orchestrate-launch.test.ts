@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSession, isQuotaMessage } from '../src/orchestrate/result.js';
-import { buildArgs, buildRetryArgs, mcpServersFor, writeMcpConfig, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
+import { buildArgs, buildRetryArgs, realClaude, mcpServersFor, writeMcpConfig, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { tempDir } from './helpers.js';
 
@@ -337,5 +337,29 @@ describe('pic de contexte', () => {
     writeFileSync(join(dir, 'sess.jsonl'), [line(10, 100, 0), 'pas json', line(5, 20, 900), JSON.stringify({ type: 'user' })].join('\n'));
     expect(peakContext(home, '/home/a_b/projects/x', 'sess')).toBe(925);
     expect(peakContext(home, '/home/a_b/projects/x', 'absente')).toBeNull();
+  });
+});
+
+describe('realClaude : fin de session (L83)', () => {
+  const alive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  it('tue le serveur de dev que la session a détaché dans son propre groupe (setsid)', async () => {
+    const dir = tempDir();
+    const pidFile = join(dir, 'server.pid');
+    const bin = join(dir, 'fake-claude.sh');
+    // Le « serveur de dev » : hors du groupe de la session (setsid), il survivait au kill du groupe.
+    writeFileSync(bin, `#!/bin/sh\nsetsid sh -c 'echo $$ > "${pidFile}"; exec sleep 60' >/dev/null 2>&1 &\nwhile [ ! -s "${pidFile}" ]; do sleep 0.05; done\nsleep 0.5\necho '{}'\n`, { mode: 0o755 });
+    const out = await realClaude(bin, process.env)([], { cwd: dir, env: {}, timeoutMs: 30_000 });
+    expect(out.code).toBe(0);
+    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(alive(pid)).toBe(false);
   });
 });

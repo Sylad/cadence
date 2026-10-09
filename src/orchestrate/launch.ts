@@ -4,6 +4,7 @@ import { delimiter, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import type { Effort } from '../config.js';
 import { RafError } from '../plan.js';
+import { TreeTracker } from '../proc.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
 export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck';
@@ -209,6 +210,7 @@ function classify(out: LaunchOutcome): SessionOutcome {
 }
 
 const live = new Set<number>();
+const trees = new Set<TreeTracker>();
 
 /** Suit un groupe de processus lancé par l'orchestrateur (commande du projet) : tué avec les sessions au signal. */
 export function trackGroup(pid: number): () => void {
@@ -226,6 +228,8 @@ export function killSessions(): void {
     }
   }
   live.clear();
+  for (const t of trees) t.kill();
+  trees.clear();
 }
 
 /** Vrai lanceur : `claude` (ou CADENCE_CLAUDE_BIN) dans son propre groupe de processus, tué en bloc au délai. */
@@ -239,6 +243,10 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env): 
         return;
       }
       live.add(pid);
+      // Le groupe ne suffit pas : un serveur de dev lancé par la session (setsid, nohup, npm qui se détache) a son propre
+      // groupe et survivait à la session (L83). L'arbre est suivi pendant toute la session, et tué avec elle.
+      const tree = new TreeTracker(pid);
+      trees.add(tree);
       opts.onSpawn?.(pid);
       const out: Buffer[] = [];
       const err: Buffer[] = [];
@@ -247,6 +255,7 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env): 
       let timedOut = false;
       const timer = setTimeout(() => {
         timedOut = true;
+        tree.kill();
         try {
           process.kill(-pid, 'SIGKILL');
         } catch {
@@ -256,7 +265,10 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env): 
       child.once('close', (code, signal) => {
         clearTimeout(timer);
         live.delete(pid);
-        // Un enfant resté dans le groupe ne survit pas à la session.
+        // Aucun descendant ne survit à la session, dans son groupe ou hors de lui.
+        tree.rootExited();
+        tree.kill();
+        trees.delete(tree);
         try {
           process.kill(-pid, 'SIGKILL');
         } catch {

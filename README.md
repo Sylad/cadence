@@ -1111,6 +1111,10 @@ kept apart, session ids, commits, verdicts), the JSON output of every session an
 cut (Ctrl-C, WSL closed) `--resume` replays an interrupted step entirely in a new session whose brief
 lists the commits already present; finished steps are never replayed.
 
+When a session ends — success, error, time limit (`timeouts`) or interruption of the wave — nothing it started
+survives it: besides its process group, the whole tree of its descendants is tracked while it runs and killed with
+it, so a dev server a session detached into its own group (`setsid`, `nohup`) is not left running.
+
 Briefs are the templates of `templates/orchestrate/` (`implement.md` is the `lead` skill's standard
 brief; `--dry-run` writes the rendered ones). The `implement` brief of a `visible` lot also carries the
 News instruction (`cadence news new <lot>`, factual user-side text, a screenshot in `docs/nouveautes/captures/` or

@@ -38,6 +38,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence orchestrate --drop <project:lot>` and `--stop-after-current` on a live wave, `--resume --drop`; the final table's « livrable jusqu'à <sha> » line; a version commit exempt from the review gate | [0.24.0](#0240---2026-10-09) |
 | `cadence-hud`: the project line of the plans' progress names the lots in progress after their count, three at most | [0.25.0](#0250---2026-10-09) |
 
+## [Unreleased]
+
+### Fixed
+
+- `cadence orchestrate`: a session no longer leaves its child processes alive — a dev server a session started in its own process group (`setsid`, `nohup`, a tool that detaches) is now tracked with the rest of the session's process tree and killed with it when the session ends, hits its time limit, or the wave is interrupted (L83)
+
 ## [0.27.0] - 2026-10-09
 
 ### Changed

@@ -121,29 +121,30 @@ export const register: Register = on => {
   on('tool.call', async ($, e, next) => {
     const result = await next(e)
     if (!('result' in result) || result.isError) return result
-    // la tenue de registre est accessoire : une écriture d'état qui échoue perd une ligne du HUD, elle ne bloque pas l'outil
-    const books = async () => {
-      const started = startedCommand(e.tool, result.result)
-      if (started) {
-        // le propriétaire d'abord : une fin de sous-agent tombant entre les deux écritures retire déjà la commande
-        const agent = e.agentId
-        if (agent) await update($, owners, (o: Record<string, string>) => ({ ...o, [started]: agent }))
-        await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
-      } else {
-        const stopped = stoppedTask(e.tool, result.result)
-        if (stopped) await endCommand($, stopped)
-      }
+    const started = startedCommand(e.tool, result.result)
+    if (started) {
+      // le propriétaire d'abord : une fin de sous-agent tombant entre les deux écritures retire déjà la commande
+      const agent = e.agentId
+      if (agent) await update($, owners, (o: Record<string, string>) => ({ ...o, [started]: agent }))
+      await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
+    } else {
+      const stopped = stoppedTask(e.tool, result.result)
+      if (stopped) await endCommand($, stopped)
     }
-    await books().catch(() => undefined)
     return result
-  })
+  }).catch(
+    // la tenue de registre est accessoire : une écriture d'état qui échoue perd une ligne du HUD, le résultat de l'outil passe
+    ($, e, next) => next(e),
+  )
 
   on('prompt.submit', async ($, e, next) => {
     const ended = notifiedEnd(e.origin, e.text)
-    // idem : un prompt n'attend pas la tenue de registre
-    if (ended) await endCommand($, ended).catch(() => undefined)
+    if (ended) await endCommand($, ended)
     return next(e)
-  })
+  }).catch(
+    // idem : le prompt part même si la tenue de registre échoue
+    ($, e, next) => next(e),
+  )
 
   on('command.run', { command: 'hud' }, async $ => {
     const hidden = !(await read($, isHidden))

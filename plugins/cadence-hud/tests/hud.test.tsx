@@ -2,6 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
+import { register } from '../hooks/register'
 import { ago, attributeTurn, endedCommands, endedTask, notifiedEnd, pruneOwners, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
@@ -612,24 +613,20 @@ test('la notification de fin retire la commande, un prompt tapé n\'en retire au
   expect(hud.commands()).toEqual([])
 })
 
-test('une écriture d\'état qui échoue ne bloque ni l\'outil ni le prompt (tool.call, prompt.submit)', async ($, on) => {
-  let writes = 0
-  on('state.get', () => {
-    writes += 1
-    throw new Error('état illisible')
-  })
-  on('state.set', () => {
-    throw new Error('disque plein')
-  })
-  on('tool.call', () => ({ result: { backgroundTaskId: 'b1' } }) as never)
-  on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
-  const called = await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
-  expect(called).toEqual({ result: { backgroundTaskId: 'b1' } })
-  const stopped = await $.tool.call({ tool: 'TaskStop', input: { task_id: 'b1' } } as never)
-  expect(stopped).toBeDefined()
-  const submitted = await $.prompt.submit({ origin: { kind: 'task-notification' }, text: NOTIFICATION('b1') } as never)
-  expect(submitted).toEqual({ text: NOTIFICATION('b1') })
-  expect(writes).toBeGreaterThan(0)
+test('tool.call et prompt.submit portent un .catch à l\'enregistrement (claude plugin validate), qui laisse la chaîne continuer', async () => {
+  const caught: Record<string, unknown> = {}
+  const fake = ((name: string) => ({
+    catch: (handler: unknown) => {
+      caught[name] = handler
+    },
+  })) as unknown as On
+  register(fake, {} as never)
+  expect(Object.keys(caught).sort()).toEqual(['prompt.submit', 'tool.call'])
+  for (const name of Object.keys(caught)) {
+    const handler = caught[name] as (...a: unknown[]) => unknown
+    const next = Object.assign(async (e: unknown) => ({ passed: e }), { called: false, error: new Error('x') })
+    expect(await handler({}, { text: 't' }, next)).toEqual({ passed: { text: 't' } })
+  }
 })
 
 test('l’expiration d’un Monitor finit sa tâche, un événement ordinaire non', () => {

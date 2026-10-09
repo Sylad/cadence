@@ -35,13 +35,14 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence orchestrate --continue`: the wave draws the next ready lot of the plan itself, in the declared priority | [0.22.0](#0220---2026-10-09) |
 | `cadence session context`: the context of the session, published by the `cadence-hud` band, for the lead to chain under a threshold | [0.22.0](#0220---2026-10-09) |
 | `cadence-hud`: the progress of each project's plan under the waves, `/hud projets`; `cadence lead tour --json` gains `progress` | [0.22.0](#0220---2026-10-09) |
+| `cadence orchestrate --drop <project:lot>` and `--stop-after-current` on a live wave, `--resume --drop`; the final table's « livrable jusqu'à <sha> » line; a version commit exempt from the review gate | [0.24.0](#0240---2026-10-09) |
 
-## [Unreleased]
+## [0.24.0] - 2026-10-09
 
 ### Added
 
-- `cadence orchestrate --drop <project:lot>` and `--stop-after-current` steer a running wave from another terminal, without a sentinel in `journal.log` nor a SIGTERM: a dropped lot is handed back (never started, or after its running session), `--stop-after-current` lets the running sessions finish and leaves the wave interrupted and resumable (L79).
-- `cadence orchestrate`: when lots are stacked on `main` and a ready lot sits under a lot handed back, the final table says « livrable jusqu'à <sha> » (the last commit of that ready lot) with the `cadence deliver --sha` command to ship it (L76).
+- `cadence orchestrate --drop <project:lot>` and `--stop-after-current` steer a running wave from another terminal, without a sentinel in `journal.log` nor a SIGTERM: a dropped lot is handed back (never started, or after its running session; a lot in question is handed back to the lead, and a lot queued behind it with it), `--stop-after-current` lets the running sessions finish and leaves the wave interrupted and resumable, `--continue` drawing no further lot afterwards; `--resume --drop` removes the lot before replaying a stopped wave, leaving it out of the resume checks; both warn when the wave predates L79 and does not read `control.log`; the `lead` skill explains how to steer a live wave (L79).
+- `cadence orchestrate`: when lots are stacked on `main` and a ready lot sits under a lot handed back, the final table says « livrable jusqu'à <sha> » (the last commit of that ready lot) with the commands to ship it, `git push origin <sha>:main && cadence deliver --sha <sha>`, which the `lead` skill follows instead of delivering HEAD (L76).
 
 ### Changed
 

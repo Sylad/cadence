@@ -1647,10 +1647,11 @@ lots:
     created: 2026-10-09
   - id: L147
     title: "orchestrate --continue : la vague tire elle-même le prochain lot prêt du plan quand un lot se termine, dans l'ordre de priorité déclaré dans le dossier parent (cadence > maritime > reste), jusqu'à un budget, une fenêtre horaire (--until 18:00), une limite d'usage, une question posée, deux lots rendus de suite ou plus aucun lot prêt dont l'estimation tient dans le budget restant ; exclus : lots « à décider avec Sylvain » et after non levé ; demande Sylvain 09-10 (temps morts quand il n'est pas devant le PC)"
-    status: todo
+    status: doing
     estimate: 1
     after: [ L145 ]
     created: 2026-10-09
+    started: 2026-10-09
   - id: L148
     title: "lead : enchaîner sans le humain — après un lot prêt, le skill revérifie, raf done, pousse, livre, QA et relance la vague suivante selon la priorité déclarée, tant que le contexte de la session lead reste sous un seuil (60 %, lu comme la bande cadence-hud) ; au seuil, session-close, mémoire, trois lignes pour la suite ; reste au humain : choix initial et ordre, questions remontées, réserves UX ; demande Sylvain 09-10"
     status: todo

@@ -1711,6 +1711,7 @@ lots:
     notes:
       - { date: 2026-10-09, text: "09-10 18:15 : reproduit — suite complète pendant une livraison maritime (livrer.sh) + un QA Playwright : orchestrate-command.test.ts 49 échecs / 86 en 230 s ; rejoué seul : 86/86 en 13 s" }
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme : registre des vagues isolé par test et délais portés à 30 s, 89/89 sur orchestrate-command.test.ts, typecheck vert, rien à signaler — orchestré (vague 2026-10-09-2124, 0 passe(s) de correction)", commit: 2373508134f6bc48c8b0084f63983b0ecc121599 }
   - id: L151
     title: "orchestrate : la cause « tests rouges après … » dit « la passe des mineurs » pour une passe fix jouée après la revue courte (l.minorPass jamais remis à false, cycle.ts:500) — nommer la passe d'après le compteur, test de la séquence passe des mineurs → review-small majeur → fix rouge refusé (revue L145 09-10)"
     status: done

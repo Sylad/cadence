@@ -79,6 +79,13 @@ bring a question back at once (`--resume --answer`). That follow-up replaces any
 no `sleep`. The human can also watch from a terminal with `cadence orchestrate --status --watch` (table refreshed
 every 10 s, `--interval <s>` to change it; it stops by itself when no wave is running).
 
+**Steering a wave that is running.** From the folder the wave was launched in (`--wave <id>` when several run from it), in
+another command: `cadence orchestrate --drop <project>:<lot>` takes a lot out of the wave — a lot not started never starts, a lot
+with a session running lets that session finish, then it is handed back to the lead (its commits stay); a lot that depended on it is
+handed back too. `cadence orchestrate --stop-after-current` lets the sessions running finish and starts nothing else: the wave
+ends `interrupted`, and `--resume` takes it up again. To take a lot out of a wave that is already stopped, use
+`--resume --drop <project>:<lot>` (the lot is handed back instead of being replayed). Neither kills a session.
+
 `cadence orchestrate --dry-run …` first when a precondition is in doubt. The program, not the lead, runs
 for each lot a fresh short session per step — implementation (Sonnet), UX review if the lot is `visible`
 and the project declares how to see its app (`orchestrate.ux` in `cadence.yaml`), code review last

@@ -41,7 +41,8 @@ if (tool === 'raf') {
                     --max-sessions : sessions simultanées, toutes vagues confondues (CADENCE_MAX_SESSIONS)
                     --continue [--until HH:MM] [--priority a,b] : tire seul les lots prêts du plan, jusqu'à une borne
   cadence lead tour [dossier] [--idle 3] [--json]
-                    le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan
+                    le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier courant
+                    s'il est lui-même un projet ; une première ligne « cadence.yaml · ✗ erreur » si priority: est illisible
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);
   process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;

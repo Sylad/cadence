@@ -116,7 +116,7 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
     for (const c of l.status === 'handed-back' ? l.constats : []) out.push(`    · [${c.gravite}] ${c.fichier ? `${c.fichier}${c.ligne ? `:${c.ligne}` : ''} — ` : ''}${c.texte.split('\n')[0]}`);
   }
   for (const d of deliverable(lots, deps.isAncestor ?? isAncestor, deps.lotCommits ?? gitCommitsOf)) {
-    out.push(`${d.ready.project}:${d.ready.lot} — livrable jusqu'à ${d.sha} (dernier commit de ${d.ready.lot}, sous ${d.under.lot} ${d.under.status === 'handed-back' || d.under.status === 'failed' ? 'rendu' : LABEL[d.under.status]}) : cadence deliver --sha ${d.sha}`);
+    out.push(`${d.ready.project}:${d.ready.lot} — livrable jusqu'à ${d.sha} (dernier commit de ${d.ready.lot}, sous ${d.under.lot} ${d.under.status === 'handed-back' || d.under.status === 'failed' ? 'rendu' : LABEL[d.under.status]}) : git push origin ${d.sha}:main && cadence deliver --sha ${d.sha}`);
   }
   for (const l of lots) {
     if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);

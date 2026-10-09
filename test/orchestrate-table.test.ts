@@ -115,14 +115,14 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
 
   it('un lot prêt sous un lot rendu : la ligne donne son dernier commit et la commande deliver --sha', () => {
     const out = lines([stacked('demo', 'L1', 'ready', ['a1', 'a2']), stacked('demo', 'L2', 'handed-back', ['b1'])]);
-    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2 (dernier commit de L1, sous L2 rendu) : cadence deliver --sha a2"]);
+    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2 (dernier commit de L1, sous L2 rendu) : git push origin a2:main && cadence deliver --sha a2"]);
   });
 
   it('plusieurs lots prêts sous le lot rendu : le plus haut empilé', () => {
     const l1 = stacked('demo', 'L1', 'ready', ['a1']);
     const l2 = stacked('demo', 'L2', 'ready', ['a2']);
     const l3 = stacked('demo', 'L3', 'failed', ['b1']);
-    expect(lines([l1, l2, l3])).toEqual(["demo:L2 — livrable jusqu'à a2 (dernier commit de L2, sous L3 rendu) : cadence deliver --sha a2"]);
+    expect(lines([l1, l2, l3])).toEqual(["demo:L2 — livrable jusqu'à a2 (dernier commit de L2, sous L3 rendu) : git push origin a2:main && cadence deliver --sha a2"]);
   });
 
   it('un lot prêt au-dessus du lot rendu n\'est pas livrable : aucune ligne', () => {
@@ -140,7 +140,7 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
     const out = renderTable(wave, [stacked('demo', 'L1', 'ready', ['a1', 'a2']), stacked('demo', 'L2', 'handed-back', ['b1'])], {
       isAncestor: (_r, a, b) => (seen.push(a, b), order.indexOf(a) <= order.indexOf(b)),
     }).filter((x) => x.includes('livrable jusqu'));
-    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2 (dernier commit de L1, sous L2 rendu) : cadence deliver --sha a2"]);
+    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2 (dernier commit de L1, sous L2 rendu) : git push origin a2:main && cadence deliver --sha a2"]);
     expect(seen.every((x) => !x.includes(' '))).toBe(true);
   });
 
@@ -156,7 +156,7 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
     const withGit = (ls: LotState[]) => renderTable(wave, ls, { isAncestor, lotCommits: (l) => gitOf[l.lot] ?? [] }).filter((x) => x.includes('livrable jusqu'));
     expect(withGit([l1, l2, l3])).toEqual([]);
     // Sans la lecture de git (état des étapes seul), le tableau proposait b1.
-    expect(lines([l1, l2, l3])).toEqual(["demo:L2 — livrable jusqu'à b1 (dernier commit de L2, sous L3 rendu) : cadence deliver --sha b1"]);
+    expect(lines([l1, l2, l3])).toEqual(["demo:L2 — livrable jusqu'à b1 (dernier commit de L2, sous L3 rendu) : git push origin b1:main && cadence deliver --sha b1"]);
   });
 
   it('commits lus dans git : ceux d\'une vague précédente comptent aussi, sans doublon avec le sha abrégé des étapes', () => {
@@ -165,7 +165,7 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
     const order2 = ['a1abcde', 'a2', 'b1'];
     const anc = (_repo: string, a: string, b: string) => order2.indexOf(a) <= order2.indexOf(b);
     const out = renderTable(wave, [l1, l2], { isAncestor: anc, lotCommits: (l) => (l.lot === 'L1' ? ['a1abcde', 'a2'] : []) }).filter((x) => x.includes('livrable jusqu'));
-    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2 (dernier commit de L1, sous L2 rendu) : cadence deliver --sha a2"]);
+    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2 (dernier commit de L1, sous L2 rendu) : git push origin a2:main && cadence deliver --sha a2"]);
   });
 
   it('un commit plan-seul au milieu des étapes (git l\'écarte, les étapes le rendent en fin de liste) : la ligne donne le dernier commit par ascendance', () => {
@@ -176,7 +176,7 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
     const l2 = stacked('demo', 'L2', 'handed-back', ['b1cdef']);
     const gitOf: Record<string, string[]> = { L1: ['a1cdef', 'a2cdef'], L2: ['b1cdef'] };
     const out = renderTable(wave, [l1, l2], { isAncestor: anc, lotCommits: (l) => gitOf[l.lot] ?? [] }).filter((x) => x.includes('livrable jusqu'));
-    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2cdef (dernier commit de L1, sous L2 rendu) : cadence deliver --sha a2cdef"]);
+    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2cdef (dernier commit de L1, sous L2 rendu) : git push origin a2cdef:main && cadence deliver --sha a2cdef"]);
   });
 
   it('un commit plan-seul en tête du lot rendu ne le fait pas démarrer plus bas que son premier commit réel', () => {
@@ -210,7 +210,7 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
     };
     const lots = [mk('L1', 'ready', [a1, p1, a2].map((c) => `${c.slice(0, 7)} sujet`)), mk('L2', 'handed-back', [`${b1.slice(0, 7)} feat(L2): code rendu`])];
     const short = a2.slice(0, 7);
-    expect(renderTable(wave, lots).filter((x) => x.includes('livrable jusqu'))).toEqual([`demo:L1 — livrable jusqu'à ${short} (dernier commit de L1, sous L2 rendu) : cadence deliver --sha ${short}`]);
+    expect(renderTable(wave, lots).filter((x) => x.includes('livrable jusqu'))).toEqual([`demo:L1 — livrable jusqu'à ${short} (dernier commit de L1, sous L2 rendu) : git push origin ${short}:main && cadence deliver --sha ${short}`]);
   });
 
   it('dépôt réel : L1 en échec a commité sans rapport, L2 prêt au-dessus, L3 rendu tout en haut : aucune ligne', () => {
@@ -234,6 +234,6 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
     expect(renderTable(wave, lots).filter((x) => x.includes('livrable jusqu'))).toEqual([]);
     // Si L1 est lui aussi prêt, L2 reste sous L3 rendu : la ligne est bornée à b1 et ne dépend plus de git pour L1.
     lots[0].status = 'ready';
-    expect(renderTable(wave, lots).filter((x) => x.includes('livrable jusqu'))).toEqual([`demo:L2 — livrable jusqu'à ${b1.slice(0, 7)} (dernier commit de L2, sous L3 rendu) : cadence deliver --sha ${b1.slice(0, 7)}`]);
+    expect(renderTable(wave, lots).filter((x) => x.includes('livrable jusqu'))).toEqual([`demo:L2 — livrable jusqu'à ${b1.slice(0, 7)} (dernier commit de L2, sous L3 rendu) : git push origin ${b1.slice(0, 7)}:main && cadence deliver --sha ${b1.slice(0, 7)}`]);
   });
 });

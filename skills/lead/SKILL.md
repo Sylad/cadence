@@ -102,7 +102,7 @@ and do not deliver it (`cadence deliver` refuses).
 Once the human has given the **first choice and the order** (the lots, and the priority: `--priority` or the
 `priority:` list of the parent folder's `cadence.yaml`), the lead does not come back to ask « next? ». For each lot a
 wave hands back **ready**, it chains, in this order, one project at a time: re-verify it yourself (section 3, point 2),
-`raf done` (a read-only plan: the project's own command; a `visible` lot first waits for the human's UX verdict, `raf ux`, and is neither closed nor delivered without it — the chain goes on with the other lots), push, deliver (section 4; when the final table gives « livrable jusqu'à <sha> » for a repository — a ready lot under a handed-back one — deliver that sha with `cadence deliver --sha <sha>`, never HEAD, which holds the unreviewed code of the lot above), the `qa-reviewer` check that
+`raf done` (a read-only plan: the project's own command; a `visible` lot first waits for the human's UX verdict, `raf ux`, and is neither closed nor delivered without it — the chain goes on with the other lots), push, deliver (section 4; when the final table gives « livrable jusqu'à <sha> » for a repository — a ready lot under a handed-back one — push that sha alone with `git push origin <sha>:main`, then `cadence deliver --sha <sha>`, never HEAD, which holds the unreviewed code of the lot above), the `qa-reviewer` check that
 section asks for; then it starts the next wave, in the declared priority — `cadence orchestrate --continue --priority …` draws the next ready lot
 of the plan itself (section 2b), and the limits of section « Limits that always apply » still hold. A lot that was not
 handed back ready (refused, review not compliant after the correction passes, red delivery, blocking QA finding) is
@@ -153,8 +153,10 @@ One project at a time, by the lead: push, then the `deliver` skill (`cadence del
 `cadence deliver`). Follow the human's standing instructions about confirmation before production.
 
 When the wave's final table gives a line « livrable jusqu'à <sha> » for the repository (a ready lot stacked under a
-handed-back or failed one), HEAD holds the code of the lot above, which was not reviewed: deliver that sha
-(`cadence deliver --dry-run --sha <sha>`, then `cadence deliver --sha <sha>`), never HEAD.
+handed-back or failed one), HEAD holds the code of the lot above, which was not reviewed: never push or deliver HEAD.
+Push that sha alone first (`git push origin <sha>:main`), then deliver it (`cadence deliver --dry-run --sha <sha>`, then
+`cadence deliver --sha <sha>`). The push comes first because with `ci: github` the CI wait looks for the run of that exact
+sha, and GitHub only builds the tip of a push: without it, the wait ends on « no CI run for this sha ».
 
 After a green delivery that changes what a page shows or what it is served (screen, API, data
 source, configuration of either) — in practice every delivery except docs-, plan- or tests-only ones

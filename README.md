@@ -1077,10 +1077,13 @@ back with the cause. Exit codes: 0 every lot ready · 1 at least one lot handed 
 review still not compliant after two passes) · 2 refused before acting · 3 wave suspended.
 
 **Stacked lots** (L76): lots of one repository commit on top of each other on `main`. When a ready lot sits under a lot that
-is not ready (handed back, failed…), the final table adds a line `<project>:<lot> — livrable jusqu'à <sha> … : cadence deliver --sha <sha>`:
-the last commit of the highest ready lot with no unfinished lot's commit beneath it, which `cadence deliver --sha` can ship
-without the lot above. A lot's commits are read from git (the commits that cite it, whatever session or wave made them), not
-only from the sessions' reports, so a failed or timed-out session that committed still bounds the line. Nothing is printed when every lot is ready or when the ready lots sit above the unfinished one.
+is not ready (handed back, failed…), the final table adds a line `<project>:<lot> — livrable jusqu'à <sha> … : git push origin <sha>:main && cadence deliver --sha <sha>`:
+the last commit of the highest ready lot with no unfinished lot's commit beneath it. Ship it without the lot above by pushing
+that sha alone, then delivering it: `git push origin <sha>:main && cadence deliver --sha <sha>` (with `ci: github` the CI wait
+looks for the run of that exact sha, and GitHub only builds the tip of a push; pushing HEAD would also put the unreviewed lot
+on `main`). A lot's commits are read from git (the commits that cite it, whatever session or wave made them; plan-only and
+version commits do not count), not only from the sessions' reports, so a failed or timed-out session that committed still
+bounds the line. Nothing is printed when every lot is ready or when the ready lots sit above the unfinished one.
 
 **Formatting retry** (the only `--resume` of a session): when a session ends successfully but in plain text,
 without the `structured_output` the schema asks for (the verdict is there, not in the required shape), the

@@ -1466,7 +1466,7 @@ lots:
     estimate: 0.5
     created: 2026-10-08
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme (1 note mineure : une copie de la règle « lot fini » subsiste dans command.ts:837) — orchestré (vague 2026-10-09-1752, 0 passe(s) de correction + passe des mineurs)", commit: da6ce5badd5bbe045a2a2fdea4498cd1f0a3a9fd }
+    review: { date: 2026-10-09, verdict: "conforme (orchestrate 2026-10-09-1752, revue courte après correction, 0 bloquant, 1 mineur noté) ; release 0.23.0 f130e4c (bump de version, CHANGELOG, What's new, sans code)", commit: f130e4cd12e1b519d6b313bececacc46edc4eaab }
     notes:
       - { date: 2026-10-09, text: "Revue 09-10 (mineur, note) : src/orchestrate/command.ts:837 garde une 3e copie littérale de la règle « lot fini » (chemin de reprise, antérieur au lot) au lieu de lotFinished (state.ts:148) — à unifier lors d'un prochain passage" }
     finished: 2026-10-09
@@ -1704,7 +1704,7 @@ lots:
     estimate: 0.25
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "compliant (2 notes mineures : formule « seuils de consommation inversés » inexacte dans README/CHANGELOG/commentaire, retour à la ligne éventuel de la barre non mesuré) — orchestré (vague 2026-10-09-1850, 0 passe(s) de correction)", commit: 96bc238d3383c6f92f92798bb8d1dddc46b7a78c }
+    review: { date: 2026-10-09, verdict: "conforme (orchestrate 2026-10-09-1850, 0 bloquant, 2 mineurs notés) ; release 0.23.0 f130e4c (bump de version, CHANGELOG, What's new, correction de la phrase « pris à l'envers » README/format.ts, sans logique)", commit: f130e4cd12e1b519d6b313bececacc46edc4eaab }
     finished: 2026-10-09
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

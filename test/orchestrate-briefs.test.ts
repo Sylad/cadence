@@ -190,6 +190,12 @@ describe('skill lead : source unique', () => {
     expect(skill).toMatch(/at the threshold[^.]*`session-close`[^.]*memory[^.]*three lines/i);
     // ce qui reste au humain
     expect(skill).toMatch(/stays with the human\*\*: the first choice and the order[^.]*questions[^.]*UX reservations/i);
+    // la porte UX : un lot visible attend le verdict du humain avant raf done et la livraison
+    expect(skill).toMatch(/`visible` lot first waits for the human's UX verdict[^.]*neither closed nor delivered without it/i);
+    // la sortie annoncée est la sortie réelle, et la source du chiffre est nommée
+    expect(skill).toContain('`ctx 42 % (84000/200000)`');
+    expect(skill).toMatch(/run from\s+the parent folder[^.]*`cadence-hud` mod publishes/i);
+    expect(skill).toMatch(/band is not loaded[^.]*treat it as \*\*at the threshold\*\*/i);
     // un arrêt, pas une boucle d'attente
     expect(skill).toMatch(/never a polling loop/i);
   });

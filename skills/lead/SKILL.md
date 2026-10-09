@@ -102,16 +102,19 @@ and do not deliver it (`cadence deliver` refuses).
 Once the human has given the **first choice and the order** (the lots, and the priority: `--priority` or the
 `priority:` list of the parent folder's `cadence.yaml`), the lead does not come back to ask « next? ». For each lot a
 wave hands back **ready**, it chains, in this order, one project at a time: re-verify it yourself (section 3, point 2),
-`raf done` (a read-only plan: the project's own command), push, deliver (section 4), the `qa-reviewer` check that
+`raf done` (a read-only plan: the project's own command; a `visible` lot first waits for the human's UX verdict, `raf ux`, and is neither closed nor delivered without it — the chain goes on with the other lots), push, deliver (section 4), the `qa-reviewer` check that
 section asks for; then it starts the next wave, in the declared priority — `cadence orchestrate --continue --priority …` draws the next ready lot
 of the plan itself (section 2b), and the limits of section « Limits that always apply » still hold. A lot that was not
 handed back ready (refused, review not compliant after the correction passes, red delivery, blocking QA finding) is
 not chained over: it is reported, and the chain goes on with the lots that do not depend on it.
 
-**The threshold.** Before every new wave, read the context of the lead session with `cadence session context` (run it
-from any folder): it prints `ctx 42 % (84k/200k)`, the figure the `ctx` segment of the `cadence-hud` band shows, which the
-band publishes to a file because it is only a rendering the model cannot see. If the command fails (no figure, or one
-older than two minutes — the band is not loaded), treat it as **at the threshold**: you cannot prove you are under it.
+**The threshold.** Before every new wave, read the context of the lead session with `cadence session context`, run from
+the parent folder (the folder the lead was launched from): the `cadence-hud` mod publishes the context of each session,
+one file per session tied to its folder, and the command reads the one of the current folder (`--session <id>` forces
+another). It prints `ctx 42 % (84000/200000)`, the figure the `ctx` segment of the band shows, which the band publishes to
+a file because it is only a rendering the model cannot see. If the command fails (exit code 2: the band is not loaded in
+this folder's session, or the figure is older than two minutes), treat it as **at the threshold**: you cannot prove you are
+under it, and without the band loaded the lead does not chain.
 From **60 %** upward, start nothing: at the threshold the lead runs `session-close` in each project touched, writes its
 memory (filtered, as `session-close` says), and records three lines for next time with `cadence session next` — the wave
 that was about to start comes first among them. Under it, chain. The lead says in one sentence which side of the threshold

@@ -238,6 +238,22 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it('--dry-run affiche --effort <niveau> dans la ligne de chaque passe, selon orchestrate.effort (L137)', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  effort: { precheck: low, implement: medium, fix: medium, review: high, ux: high }\n');
+    git(dirs.a, 'add', 'cadence.yaml');
+    git(dirs.a, 'commit', '-q', '-m', 'cfg');
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      expect(out).toMatch(/  precheck : claude [^\n]*--effort low/);
+      expect(out).toMatch(/  implement : claude [^\n]*--effort medium/);
+      expect(out).toMatch(/  review[^ ]* : claude [^\n]*--effort high/);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it('arbre sale, claude absent, claude sans --json-schema, hook pre-push existant, session imbriquée', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
     writeFileSync(join(dirs.a, 'docs/plan/raf.yaml'), `${readFileSync(join(dirs.a, 'docs/plan/raf.yaml'), 'utf8')}# sale\n`);

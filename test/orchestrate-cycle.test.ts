@@ -1084,10 +1084,11 @@ describe('reprise après coupure', () => {
 
 describe('sous-tâches couvertes (L82)', () => {
   /** Trois sous-tâches au plan du lot L1 ; l'implémentation commite en citant t1 et t2 (pas t3). */
-  function withTasks(subjects = ['feat(L1/t1): a', 'feat(L1/t2): b'], tasks = ['un', 'deux', 'trois']) {
+  function withTasks(subjects = ['feat(L1/t1): a', 'feat(L1/t2): b'], tasks = ['un', 'deux', 'trois'], statuses: Record<string, 'done' | 'dropped'> = {}) {
     const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: subjects.map((s, i) => commitFile(call.opts.cwd, `f${i}.txt`, s)) }))], review: [ok] } });
     const plan = h.plan();
     for (const t of tasks) plan.addTask('L1', t);
+    for (const [t, st] of Object.entries(statuses)) plan.setStatus(`L1/${t}`, st, '2026-10-09');
     plan.save();
     git(h.repo, 'add', '--', 'docs/plan/raf.yaml');
     git(h.repo, 'commit', '-q', '-m', 'plan: L1 sous-tâches', '--', 'docs/plan/raf.yaml');
@@ -1122,6 +1123,18 @@ describe('sous-tâches couvertes (L82)', () => {
     await runLot(c);
     expect(status(h, 't1')).toBe('done');
     expect(status(h, 't3')).toBe('todo');
+  });
+
+  it('une sous-tâche citée déjà done ou dropped n\'est pas retouchée : le lot conclut, leurs statuts ne bougent pas, seule la sous-tâche ouverte est close', async () => {
+    const h = withTasks(['feat(L1/t1,t2): a', 'feat(L1/t3): b'], ['un', 'deux', 'trois', 'quatre'], { t1: 'done', t2: 'dropped' });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(status(h, 't1')).toBe('done');
+    expect(status(h, 't2')).toBe('dropped');
+    expect(status(h, 't3')).toBe('done');
+    expect(status(h, 't4')).toBe('todo');
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
   });
 
   it('plan en lecture seule : la clôture est proposée au lead, le plan n\'est pas touché', async () => {

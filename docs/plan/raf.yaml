@@ -1634,7 +1634,7 @@ lots:
     estimate: 0.5
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme après 2 corrections — 5 commits : la revue finale est toujours jouée, le budget du lot ne borne que l'écriture, réserve REVIEW_RESERVE 65 k mesurée (187 review p90 62,7 k, 114 review-small p90 67,6 k) ; tests des passes fix et des mineurs qui échouent sous mutation ; cause rendue nomme les tests rouges ; 1106 tests et tsc verts ; 1 mineur en sous-tâche (libellé « après la passe des mineurs » erroné pour une passe fix ultérieure)", commit: 19754025cec90d1f6d4f2363ec4db34b6d905f11 }
+    review: { date: 2026-10-09, verdict: "conforme après 2 corrections — 5 commits : la revue finale est toujours jouée, le budget du lot ne borne que l'écriture, réserve REVIEW_RESERVE 65 k mesurée (187 review p90 62,7 k, 114 review-small p90 67,6 k) ; tests des passes fix et des mineurs qui échouent sous mutation ; cause rendue nomme les tests rouges ; 1106 tests et tsc verts ; 1 mineur en sous-tâche (libellé « après la passe des mineurs » erroné pour une passe fix ultérieure) ; release 0.22.0 84b840c (bump de version, CHANGELOG, What's new, sans code)", commit: 84b840c2af3dd293a473f69873f7205a3ff75f43 }
     tasks:
       - { id: t1, title: "orchestrate : la cause « tests rouges après … » dit « la passe des mineurs » pour une passe fix jouée après la revue courte (l.minorPass jamais remis à false, cycle.ts:500) — nommer la passe d'après le compteur, test de la séquence passe des mineurs → review-small majeur → fix rouge refusé (revue L145 09-10)", status: dropped }
     notes:
@@ -1652,7 +1652,7 @@ lots:
     after: [ L145 ]
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme après 3 corrections — orchestrate --continue : tirage par priorité déclarée, un lot par dépôt par tour, budget vérifié avant exclusion, causes des sautés au journal, priorité validée avant d'agir, « à décider » écarté, dry-run qui rejoue le tirage ; 1 mineur en note", commit: 520430cb41a22c64f3dd1dac13bd094e103e551f }
+    review: { date: 2026-10-09, verdict: "conforme après 3 corrections — orchestrate --continue : tirage par priorité déclarée, un lot par dépôt par tour, budget vérifié avant exclusion, causes des sautés au journal, priorité validée avant d'agir, « à décider » écarté, dry-run qui rejoue le tirage ; 1 mineur en note ; release 0.22.0 84b840c (bump de version, CHANGELOG, What's new, sans code)", commit: 84b840c2af3dd293a473f69873f7205a3ff75f43 }
     notes:
       - { date: 2026-10-09, text: "mineurs (revue 09-10) : le dry-run ne lève pas l'after des lots tirés aux tours simulés (aperçu trop court sur un plan chaîné) ; writeWave avant les verrous (course non testable) ; exclusion du 1er tirage non reportée (ligne « lot sauté » en double au tour 2)" }
     finished: 2026-10-09
@@ -1663,7 +1663,7 @@ lots:
     after: [ L145 ]
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme après 3 corrections — session context : --session, puis CLAUDE_CODE_SESSION_ID (essai réel : la variable = le fichier écrit par la bande, 58 % lu pour la session lead à côté d'une session à 10 % dans le même dossier), dossier seulement s'il n'y a qu'une session fraîche ; fichier par session, nettoyage 24 h ; skill lead 2c, README, aide ; 1 cosmétique en note", commit: 6f02149052479fa29a899fcf1bfad2a8cd20cb25 }
+    review: { date: 2026-10-09, verdict: "conforme après 3 corrections — session context : --session, puis CLAUDE_CODE_SESSION_ID (essai réel : la variable = le fichier écrit par la bande, 58 % lu pour la session lead à côté d'une session à 10 % dans le même dossier), dossier seulement s'il n'y a qu'une session fraîche ; fichier par session, nettoyage 24 h ; skill lead 2c, README, aide ; 1 cosmétique en note ; release 0.22.0 84b840c (bump de version, CHANGELOG, What's new, sans code)", commit: 84b840c2af3dd293a473f69873f7205a3ff75f43 }
     notes:
       - { date: 2026-10-09, text: "mineur (revue 09-10) : sans variable et avec seulement des fichiers périmés dans le dossier, le refus dit « plusieurs sessions » au lieu de « toutes périmées » (code 2 juste)" }
     finished: 2026-10-09
@@ -1674,7 +1674,7 @@ lots:
     after: [ L145 ]
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme après 2 corrections — lead tour --json avec comptes faits/en cours/à faire/+7 j (fenêtre stricte), priorité invalide signalée en ligne d'erreur, projet direct accepté ; bande : bloc d'avancement par Box à largeur fixe, 72 tests du plugin verts ; rendu réel à vérifier à l'œil", commit: fd1bb1078a9b641c9d8e92d01ec948dfecd977a4 }
+    review: { date: 2026-10-09, verdict: "conforme après 2 corrections — lead tour --json avec comptes faits/en cours/à faire/+7 j (fenêtre stricte), priorité invalide signalée en ligne d'erreur, projet direct accepté ; bande : bloc d'avancement par Box à largeur fixe, 72 tests du plugin verts ; rendu réel à vérifier à l'œil ; release 0.22.0 84b840c (bump de version, CHANGELOG, What's new, sans code)", commit: 84b840c2af3dd293a473f69873f7205a3ff75f43 }
     finished: 2026-10-09
   - id: L150
     title: "test orchestrate-command.test.ts instable sous charge : 1 puis 37 échecs (délais 5 s dépassés, « vagues en cours : 2 » au lieu de 1) pendant qu'une suite tournait à côté, 71/71 seul et 1098/1098 sur copie propre — isoler le registre des vagues par test (dossier temporaire dédié) et desserrer les délais (revue L143/L144 09-10)"
@@ -1687,7 +1687,7 @@ lots:
     estimate: 0.25
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: conforme — libellé de la cause « tests rouges après … » nommé d'après le compteur de passes ; 1 mineur en note (branche « après la passe des mineurs » sans assertion sur le libellé) ; docs(L151) 131f1f8, commit: 131f1f860915726ea9612558bf3bb58888f204c1 }
+    review: { date: 2026-10-09, verdict: "conforme — libellé de la cause « tests rouges après … » nommé d'après le compteur de passes ; 1 mineur en note (branche « après la passe des mineurs » sans assertion sur le libellé) ; docs(L151) 131f1f8 ; release 0.22.0 84b840c (bump de version, CHANGELOG, What's new, sans code)", commit: 84b840c2af3dd293a473f69873f7205a3ff75f43 }
     notes:
       - { date: 2026-10-09, text: "mineur (revue 09-10) : aucune assertion sur le libellé « la passe des mineurs » (branche l.minorPass && played === minorPassAt) ni sur minorPassAt > 0" }
     finished: 2026-10-09

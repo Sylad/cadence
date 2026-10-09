@@ -924,11 +924,21 @@ export function isNonQuestion(q: string): boolean {
   return NON_QUESTIONS.has(normalizeQuestion(q));
 }
 
+/** Fin de vague (L79) : un lot qui a posé sa question PENDANT la vague, puis retiré par `--drop`, n'a plus de cycle à jouer pour s'en apercevoir : il est rendu ici, sinon il resterait en question pour toujours. */
+export function handBackDroppedQuestions(ctxs: LotCtx[]): void {
+  for (const c of ctxs) if (c.lot.status === 'question' && dropped(c)) stop(c, 'handed-back', DROPPED);
+}
+
 /** Joue le cycle d'un lot jusqu'à son terme, ou jusqu'à l'arrêt (question, budget, quota). Ne lève jamais. */
 export async function runLot(c: LotCtx): Promise<void> {
   const l = c.lot;
   try {
     if (TERMINAL.has(l.status)) return;
+    if (l.status === 'question' && dropped(c)) {
+      // Un lot en question retiré (--drop, éventuellement à la reprise) : il n'attend plus de réponse, il est rendu au lead.
+      stop(c, 'handed-back', DROPPED);
+      return;
+    }
     if (l.status === 'question' && !l.pendingAnswer) return;
     if (l.next === null && l.steps.length === 0) {
       if (dropped(c)) {

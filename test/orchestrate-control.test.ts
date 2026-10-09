@@ -231,3 +231,44 @@ describe('--resume avec --drop / --stop-after-current (L79, revue)', () => {
     expect(store.readWave()!.status).toBe('done');
   });
 });
+
+describe('--drop d\'un lot en question (L79, revue)', () => {
+  it('a:L1 pose une question pendant que b:L1 tourne, --drop a:L1 : a:L1 est rendu au lead et la vague finit « done »', async () => {
+    const parent = parentWith(['a', 'b']);
+    const sessions: string[] = [];
+    let store: RunStore | undefined;
+    const claude: ClaudeFn = async (args, o) => {
+      const kind = kindOf(args);
+      sessions.push(`${o.cwd.split('/').pop()}:${kind}`);
+      if (kind !== 'implement' && kind !== 'fix') return claudeOut(reviewReport());
+      if (o.cwd.endsWith('/a')) return claudeOut(workReport({ questions: ['Quelle base ?'] }));
+      // b tourne : on attend que a:L1 ait posé sa question, puis on demande son retrait depuis un autre terminal
+      store = RunStore.last(parent)!;
+      for (let i = 0; i < 200 && store.readLot('a', 'L1')?.status !== 'question'; i++) await new Promise((r) => setTimeout(r, 10));
+      expect(store.readLot('a', 'L1')!.status).toBe('question');
+      expect(await orchestrate(['--drop', 'a:L1'], io(parent).io, d)).toBe(0);
+      return claudeOut(workReport({ commits: [commitFile(o.cwd, 'b.txt', 'feat(L1): b')] }));
+    };
+    const d: OrchestrateDeps = { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR };
+    const r = io(parent);
+    expect(await orchestrate(['a:L1', 'b:L1', '--max-sessions', '2'], r.io, d)).toBe(1);
+    expect(store!.readLot('a', 'L1')!.status).toBe('handed-back');
+    expect(store!.readLot('a', 'L1')!.outcome).toMatch(/retiré de la vague/);
+    expect(store!.readLot('b', 'L1')!.status).toBe('ready');
+    expect(store!.readWave()!.status).toBe('done');
+  });
+
+  it('--resume --drop d\'un lot en question le rend au lieu de le laisser en question', async () => {
+    const parent = parentWith(['a']);
+    const first = deps(() => {});
+    const asking: OrchestrateDeps = { ...first.d, claude: async (args, o) => (kindOf(args) === 'implement' ? claudeOut(workReport({ questions: ['Quelle base ?'] })) : first.d.claude(args, o)) };
+    expect(await orchestrate(['a:L1'], io(parent).io, asking)).toBe(1);
+    const store = RunStore.last(parent)!;
+    expect(store.readLot('a', 'L1')!.status).toBe('question');
+    const second = deps(() => {});
+    expect(await orchestrate(['--resume', '--drop', 'a:L1'], io(parent).io, second.d)).toBe(1);
+    expect(second.calls).toEqual([]);
+    expect(store.readLot('a', 'L1')!.status).toBe('handed-back');
+    expect(store.readWave()!.status).toBe('done');
+  });
+});

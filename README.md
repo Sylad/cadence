@@ -838,7 +838,8 @@ from (`--wave <id>` when several waves run from it), and write a request in the 
 `journal.log`. `--drop <project:lot>` (repeatable) takes a lot out of the wave: a lot not started yet never starts (no
 `raf start`); a lot with a session running **lets that session finish** (it is not killed), then plays no other: it is
 *handed back* (`retiré de la vague (--drop)`), its commits stay, and a lot that depended on it is handed back too. A lot
-that is unknown or already finished is refused (exit 2). `--stop-after-current` lets the sessions running finish, starts no
+waiting for an answer (`question`) is handed back as well, at the end of the wave or on `--resume --drop`, instead of staying in
+question forever. A lot that is unknown or already finished is refused (exit 2). `--stop-after-current` lets the sessions running finish, starts no
 other session nor lot (`arrêt demandé (--stop-after-current)`), and leaves the wave **interrupted** and resumable
 (`--resume`, which forgets the stop; `--continue` draws nothing more). Neither combines with lots to launch,
 `--continue`, `--dry-run`, `--budget` or `--answer`, nor `--status`; without a live wave from that folder they are refused

@@ -7,12 +7,23 @@ import { gitRoot, repoStatus } from './git.js';
 import { linkCommits } from './link.js';
 import { Plan } from './plan.js';
 import { lastActivity, lockStatus } from './session.js';
+import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { readNext, sharedStateDir, stateDir } from './state.js';
 
 export const NOTES_MAX = 120;
 export const TITLE_MAX = 60;
 /** Au-delà de ce nombre de jours sans activité, un lot en cours est dit silencieux. */
 export const TOUR_IDLE = 3;
+/** Un lot créé depuis au plus ce nombre de jours compte parmi les « ajoutés cette semaine ». */
+export const ADDED_DAYS = 7;
+
+/** Avancement du plan (L149) : lots faits / en cours / à faire, abandonnés et récurrents exclus ; `added7` = créés sur les 7 derniers jours. */
+export interface TourProgress {
+  done: number;
+  doing: number;
+  todo: number;
+  added7: number;
+}
 
 export interface TourRow {
   project: string;
@@ -22,11 +33,12 @@ export interface TourRow {
   drift: string[];
   notes: string[];
   next: { id: string; title: string } | null;
+  progress: TourProgress;
   /** « non commité », « non poussé », « livraison en cours » ; vide quand le dépôt est propre. */
   repo: string[];
 }
 
-const empty = (project: string): TourRow => ({ project, doing: [], drift: [], notes: [], next: null, repo: [] });
+const empty = (project: string): TourRow => ({ project, doing: [], drift: [], notes: [], next: null, progress: { done: 0, doing: 0, todo: 0, added7: 0 }, repo: [] });
 
 export function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
@@ -85,6 +97,13 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE): TourRow {
     });
     row.drift = audit(plan, root, join(root, 'docs/nouveautes'), today).map((i) => `${i.warning ? '⚠' : '✗'} ${i.message}`);
     row.notes = readNext(stateDir(root))?.lines ?? [];
+    const counted = lots.filter((l) => l.status !== 'dropped' && l.every === undefined);
+    row.progress = {
+      done: counted.filter((l) => l.status === 'done').length,
+      doing: counted.filter((l) => l.status === 'doing').length,
+      todo: counted.filter((l) => l.status === 'todo').length,
+      added7: counted.filter((l) => l.created !== undefined && diffDays(l.created, today) >= 0 && diffDays(l.created, today) <= ADDED_DAYS).length,
+    };
     row.next = ready[0] ? { id: ready[0].id, title: ready[0].title } : null;
 
     const s = repoStatus(root);
@@ -97,8 +116,16 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE): TourRow {
   return row;
 }
 
+/** Les projets rangés par la clé `priority:` du cadence.yaml du dossier (L149) ; les autres après, par ordre alphabétique. */
 export function leadTour(parent: string, today: Day, idle = TOUR_IDLE): TourRow[] {
-  return findProjects(parent).map((dir) => tourRow(dir, today, idle));
+  const rows = findProjects(parent).map((dir) => tourRow(dir, today, idle));
+  let priority: string[] = [];
+  try {
+    priority = readPriority(parent);
+  } catch {
+    // une priorité illisible ne vide pas le tableau : l'ordre alphabétique reste
+  }
+  return rows.map((r, i) => ({ r, i })).sort((a, b) => priorityRank(a.r.project, priority) - priorityRank(b.r.project, priority) || a.i - b.i).map((x) => x.r);
 }
 
 const DRIFT_SHOWN = 2;

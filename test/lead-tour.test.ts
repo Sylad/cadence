@@ -126,6 +126,24 @@ describe('cadence lead tour', () => {
     expect(Array.isArray(rows[0]!.drift)).toBe(true);
   });
 
+  it("--json compte les lots faits / en cours / à faire / ajoutés sur 7 jours, sans les abandonnés ni les récurrents (L149)", async () => {
+    const { root, alpha } = await parent();
+    await cad(alpha, 'add', 'Abandonné');
+    await cad(alpha, 'drop', 'L3');
+    const plan = join(alpha, 'docs/plan/raf.yaml');
+    writeFileSync(plan, readFileSync(plan, 'utf8').replace(/(title: Export[^\n]*\n(?:.*\n)*?\s+created: )2026-09-28/, '$12026-09-10'));
+    const rows = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as Array<Record<string, unknown>>;
+    expect(rows[0]!.progress).toEqual({ done: 0, doing: 1, todo: 1, added7: 1 });
+    expect(rows[1]!.progress).toEqual({ done: 1, doing: 0, todo: 1, added7: 0 });
+  });
+
+  it("--json range les projets selon la clé priority: du cadence.yaml du dossier, les autres après, par ordre alphabétique (L149)", async () => {
+    const { root } = await parent();
+    writeFileSync(join(root, 'cadence.yaml'), 'priority: [beta]\n');
+    const rows = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as Array<{ project: string }>;
+    expect(rows.map((r) => r.project)).toEqual(['beta', 'alpha']);
+  });
+
   it('sans projet : une ligne le dit', async () => {
     const { code, out } = await cad(tempDir(), 'lead', 'tour');
     expect(code).toBe(0);
@@ -168,7 +186,7 @@ describe('cadence lead tour', () => {
   });
 
   it('la dérive : le nombre, les deux premiers messages, puis « ; … »', () => {
-    const row = (drift: string[]): TourRow => ({ project: 'p', doing: [], drift, notes: [], next: null, repo: [] });
+    const row = (drift: string[]): TourRow => ({ project: 'p', doing: [], drift, notes: [], next: null, progress: { done: 0, doing: 0, todo: 0, added7: 0 }, repo: [] });
     expect(tourLine(row([]))).toContain('dérive aucune');
     expect(tourLine(row(['⚠ a']))).toContain('dérive 1 (⚠ a) ·');
     expect(tourLine(row(['⚠ a', '✗ b']))).toContain('dérive 2 (⚠ a ; ✗ b) ·');

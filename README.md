@@ -591,7 +591,10 @@ beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second 
 When an orchestrated wave is live, one more line closes the tour (not part of `--json`): `vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2` — the lead reads the free slots there instead of computing them (L141).
 
 `--json` prints the same content as an array of objects (`project`, `doing`, `drift`, `notes`,
-`next`, `repo`, and `error` when the project could not be read). The tour is read-only: it changes
+`next`, `repo`, and `error` when the project could not be read), plus `progress` — `{ done, doing, todo, added7 }`,
+the lots done / in progress / to do (dropped and recurring lots left out) and those created in the last 7 days (L149), which
+[`cadence-hud`](plugins/cadence-hud/README.md) draws as one progress bar per project. Projects come in the order of the
+`priority:` key of the folder's `cadence.yaml` (the one `orchestrate --continue` reads), the others after, alphabetically. The tour is read-only: it changes
 no plan. It exits 0 even when a project is in error — that project's line reads
 `beta · ✗ erreur : <cause>`. The `lead` skill runs it instead of one subagent per project.
 

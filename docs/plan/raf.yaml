@@ -915,11 +915,12 @@ lots:
     finished: 2026-10-06
   - id: L72
     title: "Releasing vs porte de revue : le README fait bumper la version « dans le commit qui clôt le lot », mais ce commit cite le lot après sa revue → raf check exige une nouvelle revue (vécu 0.11.0, 06-10). Trancher : commit de version exempté comme le plan (fichiers de version + CHANGELOG seuls), ou bump avant la revue"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-06
     started: 2026-10-09
     review: { date: 2026-10-09, verdict: "conforme (1 constat mineur noté : code mort laissé dans isReleaseOnly après le court-circuit par nom) — orchestré (vague 2026-10-09-1826, 1 passe(s) de correction + passe des mineurs)", commit: 3f36a1c85deafa0ad903377c424c34eb750c3527 }
+    finished: 2026-10-09
   - id: L73
     title: "raf check : pouvoir acquitter un commit sans lot déjà poussé (chore d'outillage, ex. warhammer 9d5853a .gitignore) sans réécrire l'historique — sinon session close reste « pas fermé » indéfiniment (06-10)"
     status: done
@@ -991,10 +992,14 @@ lots:
     finished: 2026-10-07
   - id: L79
     title: "orchestrate : retirer un lot d'une vague en cours (--drop <projet:lot>) et --stop-after-current — le 06-10 il a fallu une sentinelle sur journal.log + SIGTERM pour écarter ccc L29"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme (Opus, 3 passes : vague 2026-10-09-1826 puis lead ×2) — 4 majeurs de la 1re revue corrigés (b5ef582 f6e9f1a d9828c8 c5b2e2e), majeur --resume --drop et contrôles de reprise corrigé d86764f, dépendants rendus e541d43, skill lead §2b f5bcb87 ; 1214/1214, tsc 0", commit: f5bcb8754394a19eb63695d4f7bce89907aa3382 }
+    notes:
+      - { date: 2026-10-09, text: "Revue 09-10 (mineur, note) : README ~l.848 « only the lots that will be replayed can refuse the resume » trop large — un lot retiré dont une étape running a encore un pid vivant refuse toujours (« session encore en vie »), refus sain" }
+    finished: 2026-10-09
   - id: L80
     title: "orchestrate : environnement par projet (Node via .nvmrc ou orchestrate.env dans cadence.yaml) — Astro exige Node 22, le node par défaut est 20 (evatosorus, ccc, 06-10)"
     status: done
@@ -1718,6 +1723,18 @@ lots:
     started: 2026-10-09
     review: { date: 2026-10-09, verdict: "conforme (orchestrate 2026-10-09-1850, 0 bloquant, 2 mineurs notés) ; release 0.23.0 f130e4c (bump de version, CHANGELOG, What's new, correction de la phrase « pris à l'envers » README/format.ts, sans logique)", commit: f130e4cd12e1b519d6b313bececacc46edc4eaab }
     finished: 2026-10-09
+  - id: L153
+    title: "cadence-hud : ligne projet — afficher les ids des lots en cours après le compte (« 2 en cours : L72 L79 »), tronqués au-delà de 3 ; demande Sylvain 09-10 (il ne voyait plus quel lot tournait une fois la vague terminée)"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-09
+  - id: L154
+    title: "cadence-hud : l'avancement par projet suit le dossier courant du shell de la session (un cd dans un sous-projet par le lead réduit la bande à une seule ligne, vu 09-10) — prendre le dossier de lancement de la session (ou le dossier parent qui porte le cadence.yaml avec priority) et le garder"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-09
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

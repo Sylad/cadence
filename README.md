@@ -1269,8 +1269,8 @@ cadence ▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours
 ```
 
 The bar is lots done over lots done + in progress + to do (dropped and recurring lots left out);
-`+N cette semaine` counts the lots created in the last 7 days and is left out at zero. The source is
-`cadence lead tour <folder> --json` (the folder a wave was launched from, otherwise the session's),
+`+N cette semaine` counts the lots created in the last 7 days (today and the six before) and is left out at zero. The source is
+`cadence lead tour <folder> --json` (the folder a wave was launched from, otherwise the session's: a folder of projects gives one line per project, a project with no sub-project gives its own single line),
 read again at every wave transition and otherwise every minute; without `cadence` on the PATH, the
 lines are simply not drawn.
 

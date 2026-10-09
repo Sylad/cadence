@@ -16,7 +16,7 @@
     },
     {
       "name": "cadence-hud",
-      "description": "A status band above the Claude Code prompt: context, 5 h / 7 d quota windows, cost per model, agents of the session and the running cadence orchestrate waves. No CLI needed.",
+      "description": "A status band above the Claude Code prompt: context, 5 h / 7 d quota windows, cost per model, agents of the session and the running cadence orchestrate waves. Works without the cadence CLI, except the per-project plan progress, which needs `cadence` on the PATH.",
       "version": "0.3.4",
       "source": "./plugins/cadence-hud",
       "author": {

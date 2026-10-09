@@ -952,11 +952,24 @@ describe('budget et quota', () => {
     expect(c.lot.outcome).toMatch(/pas de quoi payer la revue.*65000 réservés/);
   });
 
-  it("L145 — avec de quoi payer la revue, la passe fix a lieu puis la revue est rejouée même si elle dépasse le budget du lot", async () => {
-    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [fix('b.txt')] } });
-    const c = h.lot('L1', { budget: REVIEW_RESERVE + 6000 }); // la correction fait passer le cumul au-delà du budget
+  // Une passe d'écriture facturée ~70 k (cacheWrite 69 000 + 100 + 400) : avec ce budget, elle part (3 k + 65 k < 71 k) puis fait dépasser le budget du lot.
+  const costly = (file: string): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, file, `fix(L1): ${file}`)] }), { cacheWrite: 69_000 });
+
+  it("L145 — avec de quoi payer la revue, la passe fix a lieu puis la revue est rejouée même si la passe fix a fait dépasser le budget du lot", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [costly('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE + 6000 });
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
+    expect(c.lot.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0)).toBeGreaterThan(REVIEW_RESERVE + 6000); // le budget du lot est bien dépassé avant la seconde revue
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it("L145 — passe des mineurs qui dépasse le budget du lot : la revue courte qui la suit est quand même jouée", async () => {
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [costly('b.txt')], 'review-small': [ok] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE + 6000 });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small']);
+    expect(c.lot.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0)).toBeGreaterThan(REVIEW_RESERVE + 6000);
     expect(c.lot.status).toBe('ready');
   });
 

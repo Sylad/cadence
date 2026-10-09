@@ -165,6 +165,24 @@ describe('agents du paquet', () => {
   });
 });
 
+describe('agents de revue en lecture seule (L140)', () => {
+  const agents = readAgents(AGENTS_DIR);
+  const PW = ['mcp__playwright', 'mcp__plugin_playwright_playwright'];
+
+  it.each(['qa-reviewer', 'ux-reviewer'])('%s : liste d\'outils explicite, sans Edit ni Write, avec Bash et les outils Playwright des deux noms de serveur', (name) => {
+    const tools = agents[name].tools;
+    expect(tools).toBeDefined();
+    expect(tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash', ...PW]));
+    for (const interdit of ['Edit', 'Write', 'NotebookEdit', 'MultiEdit']) expect(tools).not.toContain(interdit);
+  });
+
+  it('Playwright chargé par la vague : mcp__playwright n\'est pas ajouté une seconde fois', () => {
+    const args = buildArgs({ ...spec, agent: 'ux-reviewer', playwright: true }, agents);
+    const tools: string[] = JSON.parse(args[args.indexOf('--agents') + 1])['ux-reviewer'].tools;
+    expect(tools.filter((t) => t === 'mcp__playwright')).toHaveLength(1);
+  });
+});
+
 describe('runSession (lanceur injecté)', () => {
   it('(L61/t4) toolBin passe en tête du PATH de la session, devant le Node du projet', async () => {
     const calls: { env: Record<string, string> }[] = [];

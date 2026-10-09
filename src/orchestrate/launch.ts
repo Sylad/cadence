@@ -96,7 +96,7 @@ export const PLAYWRIGHT_TOOLS = 'mcp__playwright';
 function agentsFor(spec: StepSpec, agents: Record<string, AgentDef>): Record<string, AgentDef> {
   const a = spec.agent ? agents[spec.agent] : undefined;
   if (!spec.playwright || !spec.agent || !a?.tools) return agents;
-  return { ...agents, [spec.agent]: { ...a, tools: [...a.tools, PLAYWRIGHT_TOOLS] } };
+  return { ...agents, [spec.agent]: { ...a, tools: [...a.tools, ...(a.tools.includes(PLAYWRIGHT_TOOLS) ? [] : [PLAYWRIGHT_TOOLS])] } };
 }
 
 export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): string[] {

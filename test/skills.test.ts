@@ -119,14 +119,15 @@ describe('skills install', () => {
     ]) expect(text).toContain(clause);
   });
 
-  it('CLI : installe aussi l’agent qa-reviewer, sans liste d’outils (le navigateur disponible dépend de l’installation)', async () => {
+  it('CLI : installe aussi l’agent qa-reviewer, en lecture seule (liste d’outils sans Edit ni Write, L140)', async () => {
     const dir = gitRepo();
     const out: string[] = [];
     const code = await run(['skills', 'install'], { cwd: dir, env: {}, out: (l) => out.push(l), err: () => {}, now: () => new Date() });
     expect(code).toBe(0);
     expect(out.join('\n')).toContain('cadence-qa-reviewer (agent) : installé');
     const agent = readFileSync(join(dir, '.claude/agents/cadence-qa-reviewer.md'), 'utf8');
-    expect(agent).toMatch(/^---\nname: cadence-qa-reviewer\ndescription: .+\n---\n/);
+    expect(agent).toMatch(/^---\nname: cadence-qa-reviewer\ndescription: .+\ntools: Read, Grep, Glob, Bash, mcp__playwright, mcp__plugin_playwright_playwright\n---\n/);
+    expect(agent).not.toMatch(/^tools:.*\b(Edit|Write)\b/m);
   });
 
   it('agent qa-reviewer : le contrat — lecture seule, attentes du projet, constats mesurés', () => {

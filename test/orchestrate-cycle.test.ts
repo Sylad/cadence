@@ -412,6 +412,19 @@ describe('contrôles autour des sessions', () => {
     expect(h.calls[1].brief).toContain('boom');
   });
 
+  it('docs.sync : le brief de revue porte la liste calculée des fichiers touchés sans leur document, en constat majeur (L143)', async () => {
+    const h = harness({ script: { implement: [impl('src-a.txt')], review: [ok] } });
+    writeFileSync(join(h.repo, 'cadence.yaml'), 'docs:\n  sync:\n    - paths: [src-*.txt]\n      docs: [README.md]\n');
+    git(h.repo, 'add', '--', 'cadence.yaml');
+    git(h.repo, 'commit', '-q', '-m', 'chore(L1): docs.sync', '--', 'cadence.yaml');
+    const c = h.lot('L1');
+    await runLot(c);
+    const brief = h.calls[1].brief;
+    expect(brief).toContain('docs.sync');
+    expect(brief).toContain('ONE MAJOR finding per line');
+    expect(brief).toContain('- src-a.txt changed, but none of README.md was touched');
+  });
+
   it('tests et build lancés par le programme : résultat passé au relecteur, qui ne les refait pas (L75)', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
     const c = h.lot('L1', {}, { test: 'true', build: 'true' });

@@ -5,6 +5,7 @@ cite the lot (`raf commits {{lot}}`, or `git log`), run the checks, report real 
 {{repos}}
 {{ux}}
 {{checks}}
+{{docs}}
 {{choix}}
 A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.
 You are read-only: do not modify, commit, push or run `raf review|ux|done`. Do not launch subagents.

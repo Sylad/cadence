@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { dirname, join, relative } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { lotCommits, lotWork } from '../audit.js';
-import type { OrchestrateConfig } from '../config.js';
+import { readDocsConfig, type OrchestrateConfig } from '../config.js';
+import { docSyncBrief, docSyncGaps, filesOf } from '../docsync.js';
 import type { Day } from '../dates.js';
 import { readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
@@ -233,6 +234,14 @@ function checksText(c: LotCtx): string {
   return [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
 }
 
+/** Consigne docs.sync du brief de revue (L143) : calculée sur les commits du lot au moment de la revue, pas écrite d'avance. */
+function docsText(c: LotCtx): string {
+  const plan = c.loadPlan();
+  const { sync } = readDocsConfig(plan.configFile ?? join(c.lot.repo, 'cadence.yaml'));
+  if (!sync.length) return '';
+  return docSyncBrief(sync, docSyncGaps(sync, filesOf(c.lot.repo, lotWork(plan, c.lot.repo, c.lot.lot))));
+}
+
 /** Gabarit d'une étape : la passe des mineurs et la revue courte qui la suit ont chacune le leur. */
 function briefName(l: LotState, kind: StepKind): BriefName {
   if (kind === 'fix' && l.minorFix) return 'fix-minors';
@@ -244,7 +253,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
-  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', news: '', captures: '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []) };
+  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []) };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = newsText(l.lot, pwDir);

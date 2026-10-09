@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { parse } from 'yaml';
-import { isDay } from './dates.js';
+import { isDay, type Day } from './dates.js';
+import type { DocSyncRule } from './docsync.js';
 import { gitRoot } from './git.js';
 import { FIELDS, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
@@ -306,6 +307,51 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
       if (typeof v !== 'number' || !(v > 0)) throw bad(`timeouts.${k} : nombre de minutes positif attendu`);
       config.timeouts[k === 'implement' ? 'work' : 'review'] = v * 60_000;
     }
+  }
+  return config;
+}
+
+export interface DocsConfig {
+  /** Paires « chemins modifiés → documents à toucher » (L143). */
+  sync: DocSyncRule[];
+  /** Jour au-delà duquel un lot terminé est audité (les lots en cours le sont toujours). Absent : aucun lot terminé. */
+  since?: Day;
+}
+
+const DOCS_KEYS = ['sync', 'since'];
+
+/** Clé `docs:` de cadence.yaml : `docs.sync`, la documentation qui doit suivre le code. */
+export function readDocsConfig(file: string): DocsConfig {
+  const none: DocsConfig = { sync: [] };
+  if (!existsSync(file)) return none;
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const d = (raw as { docs?: unknown } | null)?.docs;
+  if (d == null) return none;
+  const bad = (what: string) => new RafError(`${file} : docs.${what}`);
+  if (!isObject(d)) throw new RafError(`${file} : docs doit être un objet { sync, since }`);
+  for (const k of Object.keys(d)) if (!DOCS_KEYS.includes(k)) throw bad(`${k} inconnu (attendu : ${DOCS_KEYS.join(', ')})`);
+  const config: DocsConfig = { sync: [] };
+  if (d.since != null) {
+    if (!isDay(d.since)) throw bad(`since « ${String(d.since)} » n'est pas une date AAAA-MM-JJ`);
+    config.since = d.since;
+  }
+  if (d.sync != null) {
+    if (!Array.isArray(d.sync)) throw bad('sync doit être une liste de { paths, docs }');
+    d.sync.forEach((r: unknown, i: number) => {
+      if (!isObject(r)) throw bad(`sync[${i}] doit être un objet { paths, docs }`);
+      for (const k of Object.keys(r)) if (k !== 'paths' && k !== 'docs') throw bad(`sync[${i}].${k} inconnu (attendu : paths, docs)`);
+      const entry = (key: 'paths' | 'docs') => {
+        const v = list(r[key]);
+        if (!v.length || v.some((x) => !x.trim())) throw bad(`sync[${i}].${key} : au moins un chemin non vide attendu`);
+        return v.map((x) => x.trim());
+      };
+      config.sync.push({ paths: entry('paths'), docs: entry('docs') });
+    });
   }
   return config;
 }

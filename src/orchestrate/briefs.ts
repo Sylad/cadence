@@ -26,6 +26,8 @@ export interface BriefVars {
   captures: string;
   /** Dépôts voisins du lot (clé de lot `repos:`, L62) : `reposText(kind, …)` ; absent ou vide pour un lot du dépôt du projet seul. */
   repos?: string;
+  /** Consigne docs.sync (L143) de la revue : les écarts calculés par le programme, à passer en constat majeur ; vide sans règle déclarée. */
+  docs?: string;
 }
 
 /** Consigne sur les dépôts voisins d'un lot (L62) : les sessions d'écriture y travaillent, les relectures y lisent les commits qui citent le lot. */
@@ -102,7 +104,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '' } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', docs: vars.docs ?? '' } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

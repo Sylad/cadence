@@ -886,8 +886,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   }
   const live: LotState[] = [];
   for (const l of lots) {
-    const finished = l.status === 'ready' || l.status === 'handed-back' || l.status === 'failed';
-    if (finished) continue;
+    if (lotFinished(l)) continue;
     for (const s of l.steps) {
       if (s.status !== 'running') continue;
       if (s.pid && pidAlive(s.pid)) refusals.push(`${lotKey(l.project, l.lot)} : session encore en vie, pid ${s.pid}`);

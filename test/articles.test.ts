@@ -135,6 +135,22 @@ describe('openArticleLots', () => {
     expect(plan.lot(r.opened[0]).notes[0].text).toContain('introuvable');
   });
 
+  it('deux articles de même nom dans deux dépôts voisins : un seul lot, qui déclare les deux dépôts', () => {
+    const { parent, dir } = project();
+    write(parent, 'site/cas/demo.md', ARTICLE);
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const rules = [{ repo: '../codex', file: 'src/cas/demo.md' }, { repo: '../site', file: 'cas/demo.md' }];
+    const r = openArticleLots({ plan, root: dir, rules, delivered: [plan.lot('L1')], publicTitle: (l) => l.public, sha: 'abcdef0', today: '2026-10-09' });
+    expect(r.opened).toEqual(['L4']);
+    expect(r.noted).toEqual([]);
+    expect(plan.lots().filter((l) => l.title === 'Article demo à rafraîchir')).toHaveLength(1);
+    const lot = plan.lot('L4');
+    expect(lot.repos).toEqual([{ path: '../codex', cite: 'demo' }, { path: '../site', cite: 'demo' }]);
+    expect(lot.notes).toHaveLength(1);
+    expect(lot.notes[0].text).toContain('../codex/src/cas/demo.md');
+    expect(lot.notes[0].text).toContain('../site/cas/demo.md');
+  });
+
   it('plan en lecture seule : aucune écriture, la consigne est rendue', () => {
     const { dir, rules } = project();
     const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'), {

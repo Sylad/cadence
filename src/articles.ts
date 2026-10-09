@@ -83,25 +83,36 @@ export interface ArticleResult {
 /**
  * Après une livraison verte (L144) : pour chaque article déclaré, ouvre dans ce dépôt le lot « Article <projet> à rafraîchir »
  * — ou, s'il en est déjà un d'ouvert, y ajoute une note. La note cite les titres publics livrés et les sections à relire ;
- * le lot déclare le dépôt voisin (`repos`, filtré par le nom du projet : le dépôt de l'article est partagé entre projets).
+ * le lot déclare le ou les dépôts voisins (`repos`, filtrés par le nom du projet : le dépôt de l'article est partagé entre projets).
+ * Les entrées de même nom partagent un seul lot, qui déclare tous leurs dépôts.
  * Ne sauve pas le plan. Aucun titre public livré : rien à rafraîchir.
  */
 export function openArticleLots(o: ArticleOpening): ArticleResult {
   const result: ArticleResult = { opened: [], noted: [], manual: [], warnings: [] };
   const titles = [...new Set(o.delivered.map(o.publicTitle).filter((t): t is string => !!t))];
   if (!titles.length) return result;
+  // Un lot par nom de projet : deux articles de même nom (deux dépôts voisins) se jouent ensemble dans le même lot.
+  const byName = new Map<string, ArticleRule[]>();
   for (const rule of o.rules) {
     const name = rule.name ?? o.plan.project;
+    byName.set(name, [...(byName.get(name) ?? []), rule]);
+  }
+  for (const [name, rules] of byName) {
     const title = articleTitle(name);
-    const path = resolve(o.root, rule.repo, rule.file);
-    const where = `${rule.repo}/${rule.file}`;
-    const sections = existsSync(path) ? articleSections(readFileSync(path, 'utf8'), titles) : null;
-    if (sections === null) result.warnings.push(`article introuvable : ${path}`);
+    const repos = [...new Set(rules.map((r) => r.repo))];
+    const articles = rules.map((rule) => {
+      const path = resolve(o.root, rule.repo, rule.file);
+      const sections = existsSync(path) ? articleSections(readFileSync(path, 'utf8'), titles) : null;
+      if (sections === null) result.warnings.push(`article introuvable : ${path}`);
+      return (
+        `Article : ${rule.repo}/${rule.file}. ` +
+        (sections === null ? 'Fichier introuvable à l\'ouverture du lot : vérifier le chemin (docs.articles). ' : `Sections à relire : ${sections.length ? sections.join(' ; ') : '(aucun titre trouvé : relire tout l\'article)'}. `)
+      );
+    });
     const note =
       `Livraison ${o.sha.slice(0, 7)} : titres publics livrés ${titles.map((t) => `« ${t} »`).join(', ')}. ` +
-      `Article : ${where}. ` +
-      (sections === null ? 'Fichier introuvable à l\'ouverture du lot : vérifier le chemin (docs.articles). ' : `Sections à relire : ${sections.length ? sections.join(' ; ') : '(aucun titre trouvé : relire tout l\'article)'}. `) +
-      `Réécrire ce que ces changements rendent faux ou incomplet, sans rien inventer ; les commits du dépôt ${rule.repo} citent le lot et « ${name} ».`;
+      articles.join('') +
+      `Réécrire ce que ces changements rendent faux ou incomplet, sans rien inventer ; les commits ${repos.length > 1 ? 'des dépôts' : 'du dépôt'} ${repos.join(', ')} citent le lot et « ${name} ».`;
     if (o.plan.readonly) {
       result.manual.push(`${title} — plan tenu par un autre outil, ouvrir le lot avec lui : ${note}`);
       continue;
@@ -113,7 +124,7 @@ export function openArticleLots(o: ArticleOpening): ArticleResult {
       continue;
     }
     const id = o.plan.add(title, o.today, { estimate: 0.5 });
-    o.plan.setRepos(id, [{ path: rule.repo, cite: name }]);
+    o.plan.setRepos(id, repos.map((path) => ({ path, cite: name })));
     o.plan.note(id, note, o.today);
     result.opened.push(id);
   }

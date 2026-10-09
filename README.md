@@ -392,7 +392,8 @@ that quotes the delivery, the public titles delivered, the article and the **sec
 (`#` lines, or `<h1>`…`<h6>` of an Astro page) that share a word of five letters or more with a delivered title,
 else all the `##` headings. The lot is then played like any other, in an ordinary wave (`cadence orchestrate`: an
 implementer rewrites the article in the neighbouring repository, the review checks it against the note). If a lot
-of that title is still open, it receives a note instead of a duplicate. Internal lots (no public title) open nothing;
+of that title is still open, it receives a note instead of a duplicate. Two entries with the same name (the same
+project told in two neighbouring repositories) share one lot, which declares both repositories in `repos:`. Internal lots (no public title) open nothing;
 a red delivery opens nothing; `cadence deliver --dry-run` announces the articles. The plan is written but **not
 committed** (`deliver` never commits): the line `article à rafraîchir : L9 …` says so. With a plan kept by another
 tool (read-only), the same line carries the instruction to open the lot with that tool. This replaces the manual

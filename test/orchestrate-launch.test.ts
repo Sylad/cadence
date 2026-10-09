@@ -93,6 +93,14 @@ describe('buildArgs', () => {
     expect(args).not.toContain('-r');
   });
 
+  it('--effort suit le niveau de la passe, absent sans niveau, repris par la relance de mise en forme (L137)', () => {
+    expect(buildArgs({ ...spec, effort: 'low' }, {
+      'code-reviewer': { description: 'd', prompt: 'p' } })).toEqual(expect.arrayContaining(['--effort', 'low']));
+    expect(buildArgs(spec, { 'code-reviewer': { description: 'd', prompt: 'p' } })).not.toContain('--effort');
+    const r = buildRetryArgs({ ...spec, effort: 'high' }, 'sid', { 'code-reviewer': { description: 'd', prompt: 'p' } });
+    expect(r[r.indexOf('--effort') + 1]).toBe('high');
+  });
+
   it('une implémentation n\'a ni --agent ni --agents', () => {
     const args = buildArgs({ ...spec, kind: 'implement', agent: undefined, model: 'sonnet', addDirs: [] }, {});
     expect(args).not.toContain('--agent');

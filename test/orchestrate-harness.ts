@@ -52,6 +52,7 @@ export interface Call {
   opts: LaunchOpts;
   kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck';
   model: string;
+  effort?: string;
   brief: string;
 }
 
@@ -107,7 +108,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; estim
   const script = opts.script ?? {};
   const claude: ClaudeFn = async (args, o) => {
     const kind = kindOf(args);
-    const call: Call = { args, opts: o, kind, model: args[args.indexOf('--model') + 1], brief: args[1] };
+    const call: Call = { args, opts: o, kind, model: args[args.indexOf('--model') + 1], effort: args.includes('--effort') ? args[args.indexOf('--effort') + 1] : undefined, brief: args[1] };
     calls.push(call);
     const next = script[kind]?.shift();
     if (!next) throw new Error(`pas de réponse scénarisée pour ${kind}`);

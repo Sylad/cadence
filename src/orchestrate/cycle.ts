@@ -317,12 +317,13 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
 
   const write = kind === 'implement' || kind === 'fix';
   const model: Model = write ? l.model : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
+  const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
   const before = await snapshot(l.repo);
   const neighbours = l.repos ?? [];
   const beforeOthers = await Promise.all(neighbours.map((r) => snapshot(r.path)));
   const n = l.steps.length + 1;
   const sessionId = randomUUID();
-  const step: StepState = { n, kind, model, status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
+  const step: StepState = { n, kind, model, ...(effort !== 'default' ? { effort } : {}), status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
   l.steps.push(step);
   const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing' } as const;
   transition(c, label[kind]);
@@ -346,6 +347,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       sessionId,
       brief,
       model,
+      effort,
       schema: schemaFor(kind),
       agent: kind === 'ux' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
       cwd: l.repo,

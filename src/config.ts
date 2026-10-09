@@ -219,21 +219,28 @@ export interface OrchestrateConfig {
    * un lot léger déclenche quand même une correction puis une revue `full`.
    */
   review: { threshold: number; light: ReviewModel; full: ReviewModel };
+  /** Niveau d'effort (`claude -p --effort`) de chaque passe (L137). `default` : pas de `--effort`, le niveau de la session. `review` vaut aussi pour `review-small`. */
+  effort: Record<EffortStep, Effort>;
   permissionMode: string;
   addDirs: string[];
   /** Millisecondes. */
   timeouts: { work: number; review: number };
 }
 
+const EFFORTS = ['default', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type Effort = (typeof EFFORTS)[number];
+export const EFFORT_STEPS = ['precheck', 'implement', 'fix', 'review', 'ux'] as const;
+export type EffortStep = (typeof EFFORT_STEPS)[number];
+
 const MODELS = ['haiku', 'sonnet', 'opus'] as const;
 export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'review', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -275,6 +282,14 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
       if (m == null) continue;
       if (!MODELS.includes(m as ReviewModel)) throw bad(`review.${k} : ${MODELS.join(', ')} attendu`);
       config.review[k] = m as ReviewModel;
+    }
+  }
+  if (o.effort != null) {
+    if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, implement, fix, review, ux }');
+    for (const [k, v] of Object.entries(o.effort)) {
+      if (!(EFFORT_STEPS as readonly string[]).includes(k)) throw bad(`effort.${k} inconnu (attendu : ${EFFORT_STEPS.join(', ')})`);
+      if (!EFFORTS.includes(v as Effort)) throw bad(`effort.${k} : ${EFFORTS.join(', ')} attendu`);
+      config.effort[k as EffortStep] = v as Effort;
     }
   }
   if (o.ux != null) {

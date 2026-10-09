@@ -221,6 +221,23 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it('claude avant 2.1.284 : refus tant qu\'une passe demande un effort (L137), accepté si tout est « default »', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const old = fakeDeps({}, { claudeInfo: () => ({ version: '2.1.283', jsonSchema: true }) }).deps;
+    expect((await run(parent, ['a:L1', '--dry-run'], old)).err.join()).toContain("claude 2.1.283 n'a pas --effort");
+    const all = ['precheck', 'implement', 'fix', 'review', 'ux'].map((k) => `${k}: default`).join(', ');
+    writeFileSync(join(dirs.a, 'cadence.yaml'), `orchestrate:\n  effort: { ${all} }\n`);
+    git(dirs.a, 'add', 'cadence.yaml');
+    git(dirs.a, 'commit', '-q', '-m', 'cfg');
+    const r = await run(parent, ['a:L1', '--dry-run'], old);
+    try {
+      expect(r.err.join()).not.toContain('--effort');
+      expect(r.out.join('\n')).not.toContain('--effort');
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it('arbre sale, claude absent, claude sans --json-schema, hook pre-push existant, session imbriquée', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
     writeFileSync(join(dirs.a, 'docs/plan/raf.yaml'), `${readFileSync(join(dirs.a, 'docs/plan/raf.yaml'), 'utf8')}# sale\n`);

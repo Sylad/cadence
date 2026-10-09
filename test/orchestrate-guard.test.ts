@@ -107,7 +107,13 @@ describe('cadence.yaml : orchestrate', () => {
     return () => readOrchestrateConfig(f);
   };
   it('défauts', () => {
-    expect(readOrchestrateConfig('/nope')).toEqual({ precheck: true, permissionMode: 'auto', addDirs: [], timeouts: { work: 2_700_000, review: 1_500_000 }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' } });
+    expect(readOrchestrateConfig('/nope')).toEqual({ precheck: true, permissionMode: 'auto', addDirs: [], timeouts: { work: 2_700_000, review: 1_500_000 }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' } });
+  });
+  it('effort : un niveau par passe, défauts bas / moyen / haut, \'default\' = pas de --effort, valeurs invalides refusées (L137)', () => {
+    expect(read('orchestrate:\n  effort: { review: xhigh, implement: default }\n')().effort).toEqual({ precheck: 'low', implement: 'default', fix: 'medium', review: 'xhigh', ux: 'high' });
+    expect(read('orchestrate:\n  effort: { review: extreme }\n')).toThrow(/effort\.review/);
+    expect(read('orchestrate:\n  effort: { tour: low }\n')).toThrow(/effort\.tour inconnu/);
+    expect(read('orchestrate:\n  effort: haut\n')).toThrow(/effort doit être un objet/);
   });
   it('review : seuil et modèles, défauts 0,25 / sonnet / opus, valeurs invalides refusées (L108)', () => {
     expect(read('orchestrate:\n  review: { threshold: 0.5, light: haiku, full: sonnet }\n')().review).toEqual({ threshold: 0.5, light: 'haiku', full: 'sonnet' });

@@ -28,6 +28,8 @@ export interface StepState {
   n: number;
   kind: StepKind;
   model: Model;
+  /** Niveau d'effort demandé à la session (`--effort`, L137) ; absent : celui de la session (`default`, ou une vague d'avant L137). */
+  effort?: string;
   status: StepStatus;
   pid?: number;
   sessionId?: string;

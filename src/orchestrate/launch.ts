@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { parse } from 'yaml';
+import type { Effort } from '../config.js';
 import { RafError } from '../plan.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
@@ -14,6 +15,8 @@ export interface StepSpec {
   sessionId: string;
   brief: string;
   model: Model;
+  /** Niveau d'effort de la passe (`--effort`, L137). Absent ou `default` : pas de drapeau. */
+  effort?: Effort;
   /** Schéma JSON de la sortie structurée de l'étape. */
   schema: object;
   /** Agent du paquet (revues seulement). */
@@ -99,8 +102,12 @@ function agentsFor(spec: StepSpec, agents: Record<string, AgentDef>): Record<str
   return { ...agents, [spec.agent]: { ...a, tools: [...a.tools, ...(a.tools.includes(PLAYWRIGHT_TOOLS) ? [] : [PLAYWRIGHT_TOOLS])] } };
 }
 
+function effortArgs(spec: StepSpec): string[] {
+  return spec.effort && spec.effort !== 'default' ? ['--effort', spec.effort] : [];
+}
+
 export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): string[] {
-  const args = ['-p', spec.brief, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model];
+  const args = ['-p', spec.brief, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, ...effortArgs(spec)];
   if (spec.agent) {
     if (!agents[spec.agent]) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
     args.push('--agents', JSON.stringify(agentsFor(spec, agents)), '--agent', spec.agent);
@@ -142,7 +149,7 @@ export const FORMAT_RETRY_PROMPT = 'Return your report now in the required forma
 
 /** Arguments de la relance : même session (--resume), mêmes schéma, modèle, agent (outils restreints), mode de permission, dossiers et interdits. */
 export function buildRetryArgs(spec: StepSpec, sessionId: string, agents: Record<string, AgentDef>): string[] {
-  const args = ['-p', FORMAT_RETRY_PROMPT, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model];
+  const args = ['-p', FORMAT_RETRY_PROMPT, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, ...effortArgs(spec)];
   if (spec.agent) {
     if (!agents[spec.agent]) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
     args.push('--agents', JSON.stringify(agentsFor(spec, agents)), '--agent', spec.agent);

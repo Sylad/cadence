@@ -357,6 +357,31 @@ describe('revue proportionnée (L108)', () => {
   });
 });
 
+describe('niveau d\'effort par passe (L137)', () => {
+  it('precheck bas, implémentation et correction moyennes, revue haute ; l\'étape garde son niveau', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport())], implement: [impl()], review: [major, ok], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck', 'implement', 'review', 'fix', 'review']);
+    expect(h.calls.map((x) => x.effort)).toEqual(['low', 'medium', 'high', 'medium', 'high']);
+    expect(c.lot.steps.map((s) => s.effort)).toEqual(['low', 'medium', 'high', 'medium', 'high']);
+  });
+
+  it('niveau réglé dans la config ; \'default\' n\'envoie pas --effort', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const base = h.lot('L1').config.effort;
+    await runLot(h.lot('L1', {}, { effort: { ...base, implement: 'default', review: 'xhigh' } }));
+    expect(h.calls.map((x) => x.effort)).toEqual([undefined, 'xhigh']);
+  });
+
+  it('petit lot : review-small suit le niveau de la revue, ux celui de l\'UX', async () => {
+    const h = harness({ lots: [{ title: 'petit', estimate: 0.5, visible: true }], script: { implement: [impl()], 'review-small': [ok] } });
+    const base = h.lot('L1').config.effort;
+    await runLot(h.lot('L1', { small: true, visible: true }, { effort: { ...base, review: 'max' } }));
+    expect(h.calls.map((x) => x.effort)).toEqual(['medium', 'max']);
+  });
+});
+
 describe('petit lot', () => {
   it('une seule session de revue (Opus), et @haiku ne vaut que pour l\'implémentation', async () => {
     const h = harness({ lots: [{ title: 'petit', estimate: 0.5, visible: true }], script: { implement: [impl()], 'review-small': [ok] } });

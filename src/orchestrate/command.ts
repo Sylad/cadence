@@ -183,6 +183,14 @@ async function trackedDirty(repo: string): Promise<string[]> {
   return (await snapshot(repo, { remote: false })).tracked.map((l) => l.slice(3));
 }
 
+/** `--effort` date de claude 2.1.284 (L137). Une version illisible n'est pas refusée. */
+function olderThanEffort(version: string): boolean {
+  const m = /(\d+)\.(\d+)\.(\d+)/.exec(version);
+  if (!m) return false;
+  const [a, b, c] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  return a < 2 || (a === 2 && (b < 1 || (b === 1 && c < 284)));
+}
+
 /** Préconditions : tout ce qui peut être refusé l'est ici, avant d'agir, sans verrou ni écriture. */
 async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
   const refusals: string[] = [];
@@ -203,6 +211,10 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       plan = env.loadPlan();
     } catch (e) {
       refusals.push(`${key} : ${(e as Error).message}`);
+      continue;
+    }
+    if (info && olderThanEffort(info.version) && Object.values(env.config.effort).some((e) => e !== 'default')) {
+      refusals.push(`${key} : claude ${info.version} n'a pas --effort (2.1.284 requise) : mettre claude à jour, ou orchestrate.effort à « default » pour chaque passe`);
       continue;
     }
     const lot = plan.lots().find((l) => l.id === t.lot);
@@ -320,7 +332,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       writeFileSync(file, brief);
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small).playwright;
       const args = buildArgs(
-        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && s.kind === 'implement' ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright },
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, effort: env.config.effort[s.kind === 'review-small' ? 'review' : s.kind], schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && s.kind === 'implement' ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : claude ${args.join(' ')}`);

@@ -341,6 +341,35 @@ lot in each neighbour (the one `raf commits` lists last: it cites the lot, falls
 neighbour has none), and refuses to record when a listed repository cannot be read. `raf check` does not audit the
 neighbours: their staleness is not checked, only the project's own commits are.
 
+### Documentation that follows the code
+
+A stale README misleads. `cadence.yaml` can declare which documents must follow which code:
+
+```yaml
+docs:
+  sync:
+    - paths: [src/**, bin/*.js]        # what changes…
+      docs: [README.md, docs/usage.md]  # …must change one of these, in the same lot
+    - paths: [templates/]
+      docs: [CLAUDE.md]
+  since: 2026-10-09                    # optional: also audit lots finished after this day
+```
+
+A pattern is an exact path, with `*` (inside a folder), `**` (across folders), `?`, or a trailing `/` for
+a whole folder. `raf check` takes the **work commits** of every lot in progress (plan-only commits do
+not count; a lot finished after `docs.since` is audited too) and, for each pair, reports the lot when
+those commits touch `paths` without any of them touching a file of `docs`:
+
+```
+✗ L7 : documentation en retard — src/a.ts, src/b.ts sans toucher README.md ou docs/usage.md (docs.sync)
+```
+
+It counts as drift: exit code 1, shown in the `dérive` column of `cadence lead tour`, and the review
+brief of `cadence orchestrate` (`review` and `review-small`) carries the list the program computed,
+to be reported as one **major** finding per line — a stale document is not left to the reviewer's
+memory of a sentence. Touching a document is what the program checks; whether its text is true is
+still the review's reading. The commits of neighbouring repositories (`repos:`) are not audited.
+
 ### QA review
 
 No gate and no command here: the QA review comes **after** a delivery, and
@@ -525,7 +554,7 @@ beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second 
 | Column | Content |
 |---|---|
 | `en cours` | ids of the lots in progress; `(aucune activité)` when it has none at all, `(silencieux Nj)` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |
-| `dérive` | the gaps `raf check` reports, counted and the first two shown |
+| `dérive` | the gaps `raf check` reports (a lot whose commits leave a document behind, [`docs.sync`](#documentation-that-follows-the-code), included), counted and the first two shown |
 | `notes` | the notes left by the last `session close`, joined with ` / ` and cut at 120 characters |
 | `prochain` | the first ready lot (quick wins first) — id and title cut at 60 characters |
 | `dépôt` | `non commité` (modified or untracked files), `non poussé` (commits ahead of the upstream), `livraison en cours` (live delivery lock); `propre` otherwise |

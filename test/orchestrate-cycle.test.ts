@@ -1553,6 +1553,16 @@ describe('budget du lot atteint (L78)', () => {
     expect(c.lot.warnings.join('\n')).toContain("budget du lot trop juste pour payer la revue qui suivrait : la passe des mineurs n'a pas eu lieu");
   });
 
+  it("L145 — budget entamé mais sous la réserve d'une revue : pas de passe des mineurs, avertissement « trop juste »", async () => {
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: 50_000 });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
+    expect(c.lot.warnings.join('\n')).toContain('budget du lot trop juste pour payer la revue qui suivrait');
+  });
+
   it("L145 — revue UX : au-delà de son budget le lot joue quand même ses revues, l'application est lancée", async () => {
     const app = await fakeApp(200);
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });

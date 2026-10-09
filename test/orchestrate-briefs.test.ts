@@ -184,7 +184,8 @@ describe('skill lead : source unique', () => {
     expect(skill).toContain('cadence orchestrate --continue');
     // le seuil : 60 %, lu comme la bande cadence-hud (segment ctx)
     expect(skill).toContain('60 %');
-    expect(skill).toMatch(/`ctx` segment of the `cadence-hud` band/);
+    expect(skill).toContain('`cadence session context`'); // une valeur que la session peut lire, pas seulement le rendu de la bande
+    expect(skill).toMatch(/fails[^.]*treat it as \*\*at the threshold\*\*/i);
     // au seuil : session-close, mémoire, trois lignes pour la suite
     expect(skill).toMatch(/at the threshold[^.]*`session-close`[^.]*memory[^.]*three lines/i);
     // ce qui reste au humain

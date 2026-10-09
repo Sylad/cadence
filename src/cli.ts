@@ -20,6 +20,7 @@ import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.j
 import { findProjects, leadTour, tourLine } from './lead.js';
 import { liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
+import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
 
@@ -378,6 +379,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       throw new RafError('usage : raf hook install|pre-commit|post-commit');
     }
     case 'session': {
+      // Le contexte de la session ne dépend d'aucun dépôt : le lead le lit depuis le dossier parent.
+      if (rest[0] === 'context') return sessionContext(io);
       if (!gitRoot(io.cwd)) throw new RafError('session : à lancer dans un dépôt git');
       // « next » n'écrit que les notes : la commande du projet ne se joue qu'à la reprise et à la clôture.
       const sconf = rest[0] === 'start' || rest[0] === 'close' ? readSessionConfig(configPath) : {};
@@ -704,6 +707,14 @@ async function sessionAll(rest: string[], values: { all?: boolean; depth?: strin
   return worst;
 }
 
+/** Le contexte de la session, tel que la bande cadence-hud le publie ; illisible = code 2, à lire comme « au seuil ». */
+function sessionContext(io: Io): number {
+  const r = readHudContext(io.env, io.now().getTime());
+  if (!r.ok) throw new RafError(`session context : contexte illisible — ${r.reason} ; à traiter comme au seuil`);
+  io.out(`ctx ${Math.round(r.ctx.percent)} % (${r.ctx.tokens}/${r.ctx.window})`);
+  return 0;
+}
+
 function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: string; idle?: string; clear?: boolean }): number {
   switch (sub) {
     case 'start': {
@@ -738,6 +749,6 @@ function session([sub, ...args]: string[], ctx: SessionCtx, values: { since?: st
       return 0;
     }
     default:
-      throw new RafError('usage : cadence session start [--since …] [--idle 2] | close [--since …] | start|close --all [--depth n] | next "ligne" … | next --clear');
+      throw new RafError('usage : cadence session start [--since …] [--idle 2] | close [--since …] | start|close --all [--depth n] | next "ligne" … | next --clear | context');
   }
 }

@@ -837,7 +837,7 @@ the lots that would be drawn next. Drawing happens between rounds: a round of up
 **Chaining without the human (L148)**: the `lead` skill, once the human has chosen the first lots and the order, does not ask « next? »
 after a lot that comes back ready: it re-verifies it, records `raf done`, pushes, delivers, has the `qa-reviewer` check the
 delivered app, then starts the next wave with `--continue`, in the declared priority — one project at a time, within the two-session
-limit. Before each new wave it reads the context of its own session as the `ctx` segment of the `cadence-hud` band shows it; from
+limit. Before each new wave it reads the context of its own session with `cadence session context` (the figure of the `ctx` segment of the `cadence-hud` band, which publishes it to `~/.cadence/orchestrate/hud-context.json`; no fresh figure counts as at the threshold); from
 **60 %** upward it starts nothing: it runs `session-close` in each project touched, writes its memory and records three lines for next
 time (`cadence session next`). Stays with the human: the first choice and the order, the questions a session raised, the UX
 reservations; a lot that is not ready, a red delivery or a blocking QA finding is reported and not chained over.

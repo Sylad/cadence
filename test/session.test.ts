@@ -541,3 +541,33 @@ describe('nettoyage en routine de clôture (L4)', () => {
     expect(skill).toContain('never `rm -r` through it');
   });
 });
+
+describe('session context (L148)', () => {
+  async function ctxRun(dir: string, home: string, now: string) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await run(['session', 'context'], { cwd: dir, env: { CADENCE_HOME: home }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date(now) });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  }
+
+  it('lit le chiffre que la bande publie, hors de tout dépôt', async () => {
+    const home = tempDir();
+    const at = new Date('2026-09-28T18:30:00').getTime();
+    writeFileSync(join(home, 'hud-context.json'), JSON.stringify({ percent: 42.4, tokens: 84000, window: 200000, at: at - 5_000 }));
+    const r = await ctxRun(tempDir(), home, '2026-09-28T18:30:00');
+    expect(r.code).toBe(0);
+    expect(r.out).toBe('ctx 42 % (84000/200000)');
+  });
+
+  it('absent ou périmé : refus (code 2), à lire comme « au seuil »', async () => {
+    const home = tempDir();
+    const none = await ctxRun(tempDir(), home, '2026-09-28T18:30:00');
+    expect(none.code).toBe(2);
+    expect(none.err).toContain('au seuil');
+    const at = new Date('2026-09-28T18:30:00').getTime();
+    writeFileSync(join(home, 'hud-context.json'), JSON.stringify({ percent: 10, tokens: 1, window: 2, at: at - 600_000 }));
+    const old = await ctxRun(tempDir(), home, '2026-09-28T18:30:00');
+    expect(old.code).toBe(2);
+    expect(old.err).toContain('périmé');
+  });
+});

@@ -126,3 +126,17 @@ export const parseWaves = (stdout: string): Wave[] => {
     .filter((w): w is Wave => typeof w === 'object' && w !== null && typeof (w as Wave).id === 'string')
     .map(w => ({ ...w, live: w.live !== false }))
 }
+
+/**
+ * Publie le contexte de la session dans `~/.cadence/orchestrate/hud-context.json` (python3 -I, argv[1] = le JSON) :
+ * la bande n'est qu'un rendu, la session lead lit ce chiffre avec `cadence session context`. Écriture atomique.
+ */
+export const CONTEXT_WRITER = `
+import os, sys
+home = os.environ.get('CADENCE_HOME') or os.path.join(os.path.expanduser('~'), '.cadence', 'orchestrate')
+os.makedirs(home, exist_ok=True)
+tmp = os.path.join(home, 'hud-context.json.%d' % os.getpid())
+with open(tmp, 'w') as f:
+    f.write(sys.argv[1])
+os.replace(tmp, os.path.join(home, 'hud-context.json'))
+`

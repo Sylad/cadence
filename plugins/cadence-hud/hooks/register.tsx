@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, CommandInfo, ModelsSummary, Usage, Wave, WaveLot } from '../types'
-import { COLLECTOR, parseWaves } from './collect'
+import { CONTEXT_WRITER, COLLECTOR, parseWaves } from './collect'
 import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, k, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 const PLUGIN = 'cadence-hud'
@@ -102,6 +102,11 @@ export const register: Register = on => {
           problem = `collecteur : ${(collected.stderr || `code ${collected.exitCode}`).trim().split('\n').pop()?.slice(0, 80)}`
         }
 
+        // le contexte sort de la bande : la session lead le lit avec `cadence session context` (accessoire : un échec ne coûte qu'une lecture)
+        if (nextUsage && nextUsage.percent !== undefined) {
+          const published = JSON.stringify({ percent: nextUsage.percent, tokens: nextUsage.tokens, window: nextUsage.window, at })
+          await $.process.run(['python3', '-I', '-c', CONTEXT_WRITER, published], { timeoutMs: 4_000 }).catch(() => undefined)
+        }
         await update($, usage, () => nextUsage)
         await update($, agents, () => summary)
         await update($, waves, () => found)

@@ -108,12 +108,14 @@ of the plan itself (section 2b), and the limits of section « Limits that always
 handed back ready (refused, review not compliant after the correction passes, red delivery, blocking QA finding) is
 not chained over: it is reported, and the chain goes on with the lots that do not depend on it.
 
-**The threshold.** Before every new wave, read the context of the lead session as the human reads it: the `ctx`
-segment of the `cadence-hud` band (percentage of the window used, the same figure as `/context`). From **60 %** upward,
-start nothing: at the threshold the lead runs `session-close` in each project touched, writes its memory (filtered,
-as `session-close` says), and records three lines for next time with `cadence session next` — the wave that was
-about to start comes first among them. Under it, chain. The lead says in one sentence which side of the threshold it
-is on each time it chains or stops; it never waits for the figure to move (never a polling loop).
+**The threshold.** Before every new wave, read the context of the lead session with `cadence session context` (run it
+from any folder): it prints `ctx 42 % (84k/200k)`, the figure the `ctx` segment of the `cadence-hud` band shows, which the
+band publishes to a file because it is only a rendering the model cannot see. If the command fails (no figure, or one
+older than two minutes — the band is not loaded), treat it as **at the threshold**: you cannot prove you are under it.
+From **60 %** upward, start nothing: at the threshold the lead runs `session-close` in each project touched, writes its
+memory (filtered, as `session-close` says), and records three lines for next time with `cadence session next` — the wave
+that was about to start comes first among them. Under it, chain. The lead says in one sentence which side of the threshold
+it is on each time it chains or stops; it never waits for the figure to move (never a polling loop).
 
 **What stays with the human**: the first choice and the order; the questions a session raised (the lead brings them
 back at once and does not answer in the human's place); the UX reservations (`raf ux` is recorded on the human's

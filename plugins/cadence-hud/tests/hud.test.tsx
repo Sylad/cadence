@@ -1004,3 +1004,27 @@ test('les arguments de l\'outil sont à plat sur l\'événement tool.call : la f
   await $.tool.call({ tool: 'TaskStop', shell_id: 'm1' } as never)
   expect(hud.commands()).toEqual([])
 })
+
+test('la bande publie le contexte de la session pour `cadence session context` (L148)', async ($, on) => {
+  const agentList = { current: (): unknown => ({ value: [] }) }
+  const runs: string[][] = []
+  wired(on)
+  const clock = mock.clock(on)
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => agentList.current() as never)
+  on('session.usage', () => ({ value: { context: { percent: 61, tokens: 122_000, window: 200_000 }, rateLimits: [] } }) as never)
+  on('process.run', async (_$, e) => {
+    runs.push((e as unknown as { argv: string[] }).argv)
+    return { value: { exitCode: 1, stdout: '', stderr: 'absent' } } as never
+  })
+  await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  await clock.advance(5_000)
+  await settle()
+  const published = runs.find(a => a.some(x => x.includes('hud-context.json')))
+  expect(published).toBeDefined()
+  const body = JSON.parse(published![published!.length - 1]!)
+  expect(body).toMatchObject({ percent: 61, tokens: 122_000, window: 200_000 })
+  expect(typeof body.at).toBe('number')
+})

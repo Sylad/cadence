@@ -1035,9 +1035,10 @@ lots:
     finished: 2026-10-09
   - id: L83
     title: "orchestrate : tuer les processus enfants (serveurs de dev) laissés vivants en fin de session d'implémentation (2 fois le 06-10)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-07
+    started: 2026-10-09
   - id: L84
     title: "agents ux-reviewer et qa-reviewer : même consigne Playwright que les briefs (sorties sous .playwright-mcp/) pour l'usage hors orchestrate"
     status: todo

@@ -857,6 +857,22 @@ orchestrate:
 
 `full` is also the model of the UX review and of the single pass of a small lot that is not light.
 
+**Effort level per pass** (L137). Each session is launched with `claude -p --effort <level>` (Claude Code 2.1.284; an
+older `claude` is refused at launch unless every pass is `default`). Defaults: `precheck` low (it only reads),
+`implement` and `fix` medium, `review` high (`review-small` follows `review`), `ux` high. A project overrides any of them
+in `cadence.yaml`; the levels are `low`, `medium`, `high`, `xhigh`, `max`, and `default` sends no `--effort` (the
+level of the session, as before this key). The format-retry session (`--resume`) keeps the level of its pass, and
+`--dry-run` shows the flag in each command line.
+
+```yaml
+orchestrate:
+  effort: { precheck: low, implement: medium, fix: medium, review: high, ux: high }   # defaults
+```
+
+To measure what a level costs, run the same kind of wave before and after changing the key: each step of
+`<wave>/<project>--<lot>.json` records its `effort`, its `tokens` and its `started` / `ended` times (a step from a wave
+older than L137, or with `default`, has no `effort`); compare the totals per `kind` between the two waves.
+
 **Pre-check « deliverable already present? »** (L77). Before the first implementation of a lot that has no commit yet, a
 short read-only session (Sonnet, `precheck` step, brief `templates/orchestrate/precheck.md`) looks in the repository for
 what the lot asks for (another lot, or a correction, may have done it already). It answers `oui` (everything is there,
@@ -1025,6 +1041,7 @@ orchestrate:
   test: npm test                         # run by the orchestrator after a work step (optional)
   build: npm run build                   # run after the tests; both results go to the reviewer, who does not redo them (optional)
   precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it
+  effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default
   addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use

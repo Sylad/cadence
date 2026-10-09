@@ -1577,6 +1577,7 @@ lots:
     created: 2026-10-09
   - id: L142
     title: "cadence-hud : la bande reste trompeuse après la fin — « 1 cmd » en orange sans aucune commande en cours, et la ligne de vague « terminée il y a 1 h 04 · budget 12 % · 1 prêt » toujours affichée ; dire clairement l'état : nommer ce qui est compté (/hud cmd liste les commandes comptées avec leur origine), retomber à zéro quand toutes les fins sont passées, et une vague terminée disparaît après un délai ou s'affiche en gris « terminée » sans budget"
+    public: La bande d'état retombe à zéro et grise les vagues terminées
     status: todo
     estimate: 0.5
     visible: true

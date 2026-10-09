@@ -6,7 +6,7 @@ import type { Wave } from '../types'
  * (`<cwd>/.cadence/runs/<vague>/wave.json`) et de ses lots (`<projet>--<lot>.json`). Pour chaque étape
  * en cours il compte les processus `claude` descendants de la session (sessions filles, équipes).
  * Sans vague vivante, il rend la dernière vague terminée du dossier courant (`live: false`, `ended` = date
- * de son wave.json) pour que la bande garde son statut sous les yeux jusqu'à la vague suivante.
+ * de son wave.json) pour que la bande garde son statut sous les yeux ; elle la masque 30 min après sa fin (WAVE_LINGER_MS).
  */
 export const COLLECTOR = `
 import json, os, glob, datetime

@@ -1661,10 +1661,11 @@ lots:
     started: 2026-10-09
   - id: L149
     title: "cadence-hud : avancement des plans par projet actif — une ligne par projet triée par priorité, barre faits/ouverts (ex. ol ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine), source cadence lead tour --json enrichi des comptes faits / en cours / à faire / ajoutés 7 j, rafraîchi à chaque transition de vague sinon toutes les minutes, repliable ; demande Sylvain 09-10 (« je ne sais pas où en sont les projets »)"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L145 ]
     created: 2026-10-09
+    started: 2026-10-09
   - id: L150
     title: "test orchestrate-command.test.ts instable sous charge : 1 puis 37 échecs (délais 5 s dépassés, « vagues en cours : 2 » au lieu de 1) pendant qu'une suite tournait à côté, 71/71 seul et 1098/1098 sur copie propre — isoler le registre des vagues par test (dossier temporaire dédié) et desserrer les délais (revue L143/L144 09-10)"
     status: todo

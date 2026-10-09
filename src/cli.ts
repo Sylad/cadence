@@ -53,7 +53,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot (ou citant un id inconnu) sans réécrire l'historique ; raf check --ignored les liste
   raf gantt [-o docs/plan/gantt.html]
   raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
-  cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--answer projet:lot "réponse"]
+  cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--answer projet:lot "réponse"] ; --drop projet:lot [--wave vague] ; --stop-after-current [--wave vague]
   cadence lead tour [dossier] [--idle 3] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier seul s'il est lui-même un projet (en cours, dérive, notes de clôture, prochain lot prêt, dépôt)
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)

@@ -84,6 +84,10 @@ export interface Args {
   /** `--priority a,b` : ordre des projets pour le tirage, sinon la clé `priority:` du cadence.yaml du dossier de lancement. */
   priority?: string[];
   answers: { project?: string; lot: string; text: string }[];
+  /** `--drop projet:lot` (L79) : retire un lot d'une vague vivante (`--wave` si plusieurs tournent). */
+  drop: { project?: string; lot: string }[];
+  /** `--stop-after-current` (L79) : la vague vivante finit ses sessions en cours puis s'arrête, reprenable. */
+  stopAfterCurrent: boolean;
 }
 
 /** `1500000`, `1.5M`, `800k`. */
@@ -113,7 +117,7 @@ function lotArg(text: string): { project?: string; lot: string; model?: Model } 
 }
 
 export function parseOrchestrateArgs(argv: string[]): Args {
-  const a: Args = { lots: [], dryRun: false, watch: false, continue: false, answers: [] };
+  const a: Args = { lots: [], dryRun: false, watch: false, continue: false, answers: [], drop: [], stopAfterCurrent: false };
   const optional = (i: number) => (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) ? argv[i + 1] : undefined);
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
@@ -131,6 +135,8 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     else if (t === '--budget') a.budget = parseBudget(value(t));
     else if (t === '--max-sessions') a.maxSessions = parseMaxSessions(value(t));
     else if (t === '--wave') a.wave = value(t);
+    else if (t === '--drop') a.drop.push(lotArg(value(t)));
+    else if (t === '--stop-after-current') a.stopAfterCurrent = true;
     else if (t === '--continue') a.continue = true;
     else if (t === '--until') a.until = value(t);
     else if (t === '--priority') a.priority = parsePriority(value(t));
@@ -435,8 +441,9 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     }
   }
   if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
+  if (args.drop.length || args.stopAfterCurrent) return control(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"]');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] | --drop projet:lot | --stop-after-current');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);
@@ -794,7 +801,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   } finally {
     forget();
     // « done » = plus rien à reprendre : une question en attente ou un lot suspendu garde la vague reprenable. Des lots suspendus parce qu'une revue a sali leur dépôt (L133), budget intact, ne sont pas un manque de budget : « interrupted », le lead nettoie puis reprend.
-    wave.status = wctx.incident ? 'interrupted' : wctx.quota.hit ? 'suspended-quota' : lots.some((l) => l.status === 'suspended') && (budget.exhausted || !wctx.dirtyRepos?.size) ? 'suspended-budget' : all.every(finished) ? 'done' : 'interrupted';
+    wave.status = wctx.incident ? 'interrupted' : wctx.quota.hit ? 'suspended-quota' : lots.some((l) => l.status === 'suspended') && (budget.exhausted || !wctx.dirtyRepos?.size) && (budget.exhausted || !store.control().stopAfterCurrent) ? 'suspended-budget' : all.every(finished) ? 'done' : 'interrupted';
     saveWave();
     release();
   }
@@ -803,6 +810,51 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   for (const line of renderTable(wave, all)) io.out(line);
   if (wave.status === 'suspended-budget' || wave.status === 'suspended-quota') return 3;
   return all.every((l) => l.status === 'ready') ? 0 : 1;
+}
+
+/** `--drop` / `--stop-after-current` (L79) : une demande écrite dans le dossier d'état de la vague vivante ; c'est elle qui la lit avant sa prochaine session. */
+function control(args: Args, io: OrchestrateIo): number {
+  const flags = '--drop / --stop-after-current';
+  if (args.lots.length || args.continue || args.dryRun || args.budget !== undefined || args.answers.length) throw new RafError(`${flags} ne se combinent pas avec des lots à lancer, --continue, --dry-run, --budget ou --answer`);
+  const live = liveWaves(cadenceHome()).filter((w) => w.cwd === io.cwd && (args.wave === undefined || w.wave === args.wave));
+  if (live.length === 0) {
+    io.err(`orchestrate : ${flags} : aucune vague en cours${args.wave ? ` (${args.wave})` : ''} lancée depuis ce dossier`);
+    return 2;
+  }
+  if (live.length > 1) {
+    io.err(`orchestrate : ${flags} : plusieurs vagues tournent depuis ce dossier (${live.map((w) => w.wave).join(', ')}) : précisez --wave`);
+    return 2;
+  }
+  const store = RunStore.find(io.cwd, live[0].wave);
+  if (!store) {
+    io.err(`orchestrate : ${flags} : dossier d'état de la vague ${live[0].wave} introuvable`);
+    return 2;
+  }
+  const lots = store.lots();
+  const refusals: string[] = [];
+  const keys: string[] = [];
+  for (const d of args.drop) {
+    const matches = lots.filter((l) => l.lot === d.lot && (d.project ? l.project === d.project : true));
+    const where = `${d.project ? `${d.project}:` : ''}${d.lot}`;
+    if (matches.length !== 1) refusals.push(matches.length ? `--drop ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--drop ${where} : lot inconnu dans la vague ${store.id}`);
+    else if (lotFinished(matches[0])) refusals.push(`--drop ${lotKey(matches[0].project, matches[0].lot)} : le lot est déjà fini (${matches[0].status})`);
+    else keys.push(lotKey(matches[0].project, matches[0].lot));
+  }
+  if (refusals.length) {
+    for (const r of refusals) io.err(`orchestrate : ${r}`);
+    return 2;
+  }
+  for (const k of keys) {
+    store.requestDrop(k);
+    store.journal(`demande : retirer ${k} de la vague`);
+    io.out(`${k} : retrait demandé — la vague ${store.id} l'écarte avant sa prochaine session (la session en cours finit)`);
+  }
+  if (args.stopAfterCurrent) {
+    store.requestStopAfterCurrent();
+    store.journal('demande : arrêt après les sessions en cours');
+    io.out(`vague ${store.id} : arrêt demandé — les sessions en cours finissent, aucune autre ne part ; reprise par « cadence orchestrate --resume ${store.id} »`);
+  }
+  return 0;
 }
 
 async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, today: Day): Promise<number> {
@@ -875,6 +927,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     store.writeLot(l);
   }
   if (args.budget !== undefined) wave.budget = wave.consumed + args.budget;
+  store.clearStopRequest(); // un arrêt demandé à la vague d'avant ne doit pas arrêter celle-ci
   const dirty = new Set<string>();
   for (const repo of live.flatMap(lotRepoPaths)) if (!dirty.has(repo)) {
     dirty.add(repo);

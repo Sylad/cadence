@@ -303,8 +303,16 @@ export const REVIEW_RESERVE = 65_000;
 /** Une passe de correction laisse-t-elle de quoi rejouer la revue dans le budget du lot ? Sans budget de lot : toujours. */
 const fixAffordable = (l: LotState): boolean => l.budget === undefined || lotSpent(l) + REVIEW_RESERVE < l.budget;
 
+/** Cause d'une suspension demandée par `--stop-after-current` (L79). */
+export const STOP_REQUESTED = 'arrêt demandé (--stop-after-current)';
+
+/** Le lot a-t-il été écarté de la vague par `--drop` (L79) ? */
+const dropped = (c: LotCtx): boolean => c.wave.store.control().drops.includes(lotKey(c.lot.project, c.lot.lot));
+const DROPPED = 'retiré de la vague (--drop)';
+
 /** Pourquoi plus aucune session ne doit partir (incident, quota, budget), sinon null. */
 function halted(w: WaveCtx, lot?: LotState): string | null {
+  if (w.store.control().stopAfterCurrent) return STOP_REQUESTED;
   if (w.incident) return `vague arrêtée : ${w.incident}`;
   if (lot && w.dirtyRepos) {
     for (const r of lotRepoPaths(lot)) {
@@ -327,6 +335,7 @@ function reviewModel(c: LotCtx, kind: StepKind): Model {
 async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const w = c.wave;
   const l = c.lot;
+  if (dropped(c)) return stop(c, 'handed-back', DROPPED);
   const halt = halted(w, l);
   if (halt) return suspend(c, halt);
   const write = kind === 'implement' || kind === 'fix';
@@ -922,6 +931,10 @@ export async function runLot(c: LotCtx): Promise<void> {
     if (TERMINAL.has(l.status)) return;
     if (l.status === 'question' && !l.pendingAnswer) return;
     if (l.next === null && l.steps.length === 0) {
+      if (dropped(c)) {
+        stop(c, 'handed-back', DROPPED);
+        return;
+      }
       // Pas de raf start ni de commit du plan pour un lot qu'aucune session ne suivrait.
       const halt = halted(c.wave, l);
       if (halt) {

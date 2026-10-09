@@ -258,6 +258,29 @@ export class RunStore {
     return all.map((l, i) => ({ l, i })).sort((a, b) => rank(a.l) - rank(b.l) || a.i - b.i).map((x) => x.l);
   }
 
+  /** Demandes faites à une vague vivante (`--drop`, `--stop-after-current`, L79) : un fichier de lignes, en ajout seul, que la vague relit avant chaque session. Pas de `.json` : `lots()` le prendrait pour un lot. */
+  control(): { drops: string[]; stopAfterCurrent: boolean } {
+    const f = join(this.dir, 'control.log');
+    const lines = existsSync(f) ? readFileSync(f, 'utf8').split('\n').map((l) => l.trim()) : [];
+    return { drops: lines.filter((l) => l.startsWith('drop ')).map((l) => l.slice(5)), stopAfterCurrent: lines.includes('stop-after-current') };
+  }
+
+  requestDrop(key: string): void {
+    appendFileSync(join(this.dir, 'control.log'), `drop ${key}\n`);
+  }
+
+  requestStopAfterCurrent(): void {
+    appendFileSync(join(this.dir, 'control.log'), 'stop-after-current\n');
+  }
+
+  /** Efface l'arrêt demandé (`--resume`) ; les retraits restent. */
+  clearStopRequest(): void {
+    const f = join(this.dir, 'control.log');
+    if (!existsSync(f)) return;
+    const kept = readFileSync(f, 'utf8').split('\n').filter((l) => l.trim() !== '' && l.trim() !== 'stop-after-current');
+    writeFileSync(f, kept.map((l) => `${l}\n`).join(''));
+  }
+
   journal(line: string): void {
     appendFileSync(join(this.dir, 'journal.log'), `${new Date().toISOString()} ${line}\n`);
   }

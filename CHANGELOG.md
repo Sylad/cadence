@@ -40,6 +40,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- `cadence orchestrate --drop <project:lot>` and `--stop-after-current` steer a running wave from another terminal, without a sentinel in `journal.log` nor a SIGTERM: a dropped lot is handed back (never started, or after its running session), `--stop-after-current` lets the running sessions finish and leaves the wave interrupted and resumable (L79).
 - `cadence orchestrate`: when lots are stacked on `main` and a ready lot sits under a lot handed back, the final table says « livrable jusqu'à <sha> » (the last commit of that ready lot) with the `cadence deliver --sha` command to ship it (L76).
 
 ### Changed

@@ -862,7 +862,8 @@ alphabetical order. Launched from inside a project, only that project is drawn. 
 starts, lots given or not. A candidate that preflight refuses (dirty tree, Node missing…) is skipped with its cause in the
 journal (`continue : lot sauté — <cause>`; for the first draw also on the error output). Drawing stops — `continue : arrêt — <reason>` — at: the budget, the
 time window (`--until HH:MM`, today's clock: nothing new is drawn from then on, a running lot is not cut), the usage limit,
-a question asked (the wave stays resumable with `--answer`), two lots handed back in a row, an interrupted wave, or no ready
+a question asked (the wave stays resumable with `--answer`), two lots handed back in a row, an interrupted wave, a `--stop-after-current` request (`arrêt demandé`, even when the last running
+lots finished cleanly), or no ready
 lot whose estimate fits the budget left. `--resume … --continue` draws again after the resumed lots. `--dry-run --continue` replays the
 draws round by round with the same function as the wave (one lot per repository per round, pre-check, budget counted on the estimates) and
 names the candidates skipped with their cause: `tour 1 : a:L2, b:L2 · tour 2 : a:L3, a:L4`. Drawing happens between rounds: a round of up to `--max-sessions` lots must finish before the next draw.

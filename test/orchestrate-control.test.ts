@@ -272,3 +272,26 @@ describe('--drop d\'un lot en question (L79, revue)', () => {
     expect(store.readWave()!.status).toBe('done');
   });
 });
+
+describe('--continue et --stop-after-current (L79, revue)', () => {
+  it('l\'arrêt demandé pendant la dernière session : aucune manche tirée, la cause dit « arrêt demandé »', async () => {
+    const parent = parentWith(['a'], 3);
+    let asked = false;
+    const { d, calls } = deps(async (kind) => {
+      if (kind.startsWith('review') && !asked) {
+        asked = true;
+        expect(await orchestrate(['--stop-after-current'], io(parent).io, d)).toBe(0);
+      }
+    });
+    const r = io(parent);
+    await orchestrate(['a:L1', '--continue', '--max-sessions', '1'], r.io, d);
+    const store = RunStore.last(parent)!;
+    expect(store.readLot('a', 'L1')!.status).toBe('ready');
+    expect(calls.filter((c) => c.kind === 'implement')).toHaveLength(1);
+    const text = r.out.join('\n');
+    expect(text).not.toMatch(/continue : tire/);
+    expect(text).toMatch(/continue : arrêt — arrêt demandé \(--stop-after-current\)/);
+    expect(text).not.toMatch(/vague interrompue \(incident ou signal\)/);
+    expect(store.readWave()!.lots).toEqual(['a:L1']);
+  });
+});

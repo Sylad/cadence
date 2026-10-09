@@ -98,6 +98,8 @@ describe('arrêt', () => {
     [{ questions: 1 }, /question/],
     [{ streak: 2 }, /deux lots rendus/],
     [{ interrupted: true }, /interrompue/],
+    [{ stopRequested: true }, /arrêt demandé \(--stop-after-current\)/],
+    [{ stopRequested: true, interrupted: true }, /arrêt demandé/], // la cause est la demande, pas « incident ou signal »
   ])('%j', (over, re) => {
     expect(stopReason({ ...base, ...over })).toMatch(re);
   });

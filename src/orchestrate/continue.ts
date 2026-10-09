@@ -7,6 +7,7 @@ import { gitRoot } from '../git.js';
 import { findProjects, isProject } from '../lead.js';
 import { RafError, type Lot } from '../plan.js';
 import { lotBudget } from './command.js';
+import { STOP_REQUESTED } from './cycle.js';
 
 /** `--until 18:00` : l'heure d'aujourd'hui (date de `now`) à partir de laquelle la vague ne tire plus de lot. */
 export function parseUntil(text: string, now: Date): Date {
@@ -100,11 +101,14 @@ export interface StopFacts {
   streak: number;
   /** Vague interrompue (incident, signal). */
   interrupted: boolean;
+  /** `--stop-after-current` demandé (L79) : même quand tous les lots ont fini, rien ne doit être tiré. */
+  stopRequested?: boolean;
   remaining: number;
 }
 
 /** Pourquoi la vague ne tire plus de lot, ou null quand elle peut continuer. */
 export function stopReason(f: StopFacts): string | null {
+  if (f.stopRequested) return STOP_REQUESTED;
   if (f.interrupted) return 'vague interrompue (incident ou signal)';
   if (f.quotaHit) return "limite d'usage atteinte";
   if (f.questions > 0) return `${f.questions} question(s) posée(s) à la vague`;

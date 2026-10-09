@@ -640,7 +640,7 @@ async function continueRounds(first: number, wave: WaveState, all: LotState[], s
   for (;;) {
     const questions = all.filter((l) => l.status === 'question').length;
     const remaining = wave.status === 'suspended-budget' ? 0 : wave.budget - wave.consumed;
-    const why = stopReason({ now: io.now(), until: args.untilAt, quotaHit: wave.status === 'suspended-quota', questions, streak: handedBackStreak(all), interrupted: wave.status === 'interrupted' && questions === 0, remaining });
+    const why = stopReason({ now: io.now(), until: args.untilAt, quotaHit: wave.status === 'suspended-quota', questions, streak: handedBackStreak(all), interrupted: wave.status === 'interrupted' && questions === 0, stopRequested: store.control().stopAfterCurrent, remaining });
     if (why) {
       say(`continue : arrêt — ${why}`);
       return code;

@@ -1705,11 +1705,12 @@ lots:
     finished: 2026-10-09
   - id: L150
     title: "test orchestrate-command.test.ts instable sous charge : 1 puis 37 échecs (délais 5 s dépassés, « vagues en cours : 2 » au lieu de 1) pendant qu'une suite tournait à côté, 71/71 seul et 1098/1098 sur copie propre — isoler le registre des vagues par test (dossier temporaire dédié) et desserrer les délais (revue L143/L144 09-10)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-09
     notes:
       - { date: 2026-10-09, text: "09-10 18:15 : reproduit — suite complète pendant une livraison maritime (livrer.sh) + un QA Playwright : orchestrate-command.test.ts 49 échecs / 86 en 230 s ; rejoué seul : 86/86 en 13 s" }
+    started: 2026-10-09
   - id: L151
     title: "orchestrate : la cause « tests rouges après … » dit « la passe des mineurs » pour une passe fix jouée après la revue courte (l.minorPass jamais remis à false, cycle.ts:500) — nommer la passe d'après le compteur, test de la séquence passe des mineurs → review-small majeur → fix rouge refusé (revue L145 09-10)"
     status: done

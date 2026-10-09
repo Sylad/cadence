@@ -38,6 +38,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence orchestrate --drop <project:lot>` and `--stop-after-current` on a live wave, `--resume --drop`; the final table's « livrable jusqu'à <sha> » line; a version commit exempt from the review gate | [0.24.0](#0240---2026-10-09) |
 | `cadence-hud`: the project line of the plans' progress names the lots in progress after their count, three at most | [0.25.0](#0250---2026-10-09) |
 
+## [Unreleased]
+
+### Changed
+
+- `cadence orchestrate`: the floor of a lot's budget goes from 200 k to 450 k tokens (still 400 k per estimated day above it): it now pays a write pass, its review, one fix pass and the short review that follows — a lot of 0.5 or 1 day was handed back to the lead at its second or third pass (L128).
+
 ## [0.25.0] - 2026-10-09
 
 ### Changed

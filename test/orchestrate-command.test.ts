@@ -1079,22 +1079,27 @@ describe('Node du projet (.nvmrc)', () => {
 });
 
 describe('budget par lot (L78)', () => {
-  it("dérivé de l'estimate : 400 k par jour, plancher 200 k", () => {
-    expect(lotBudget(0.1)).toBe(200_000);
-    expect(lotBudget(0.5)).toBe(200_000);
-    expect(lotBudget(1)).toBe(400_000);
+  it("dérivé de l'estimate : 400 k par jour, plancher 450 k (écriture + revue + correction + revue courte, L128)", () => {
+    expect(lotBudget(0.1)).toBe(450_000);
+    expect(lotBudget(0.5)).toBe(450_000);
+    expect(lotBudget(1)).toBe(450_000);
+    expect(lotBudget(1.25)).toBe(500_000);
     expect(lotBudget(2.5)).toBe(1_000_000);
   });
 
-  it("mesures du 06-10 rejouées avec la règle : le contrôle se fait avant chaque session, 4 lots sur 5 sont arrêtés", () => {
+  it('le plancher couvre une écriture, une revue, une passe de correction et une revue courte', () => {
+    expect(lotBudget(0.1)).toBeGreaterThanOrEqual(200_000 + 65_000 + 120_000 + 65_000);
+  });
+
+  it("mesures du 06-10 rejouées avec la règle : le contrôle se fait avant chaque session, plus aucun des 5 lots n'est arrêté par le plancher de 450 k (L128)", () => {
     // Un lot n'est arrêté que si une session devait partir alors que le cumul avait déjà atteint le plafond :
     // il suffit que le cumul avant sa dernière session soit au plafond (le cumul ne fait que croître).
     // [lot, estimate, cumul avant la dernière session, total final] d'après .cadence/runs/2026-10-06-1801
     const mesures: Array<[string, number, number, number, boolean]> = [
-      ['finance L4', 0.5, 252_770, 459_507, true],
-      ['finance L5', 0.5, 220_513, 337_304, true],
-      ['finance L6', 1, 403_391, 455_197, true],
-      ['ol L37', 1, 405_513, 468_399, true],
+      ['finance L4', 0.5, 252_770, 459_507, false],
+      ['finance L5', 0.5, 220_513, 337_304, false],
+      ['finance L6', 1, 403_391, 455_197, false],
+      ['ol L37', 1, 405_513, 468_399, false],
       ['ol L36', 0.5, 169_079, 205_155, false], // sa dernière review-small part à 169 k : le lot finit à 205 k et reste « ready »
     ];
     for (const [lot, estimate, avantDerniere, final, arrete] of mesures) {
@@ -1103,13 +1108,13 @@ describe('budget par lot (L78)', () => {
   });
 
   it("--dry-run dit le budget de chaque lot", async () => {
-    const { parent } = parentWith({ a: [{ title: 'un', estimate: 1 }], b: [{ title: 'petit', estimate: 0.25 }] });
+    const { parent } = parentWith({ a: [{ title: 'un', estimate: 1 }], b: [{ title: 'gros', estimate: 2 }] });
     const r = io(parent);
     await orchestrate(['a:L1', 'b:L1', '--dry-run'], r.io, fakeDeps().deps);
     const text = r.out.join('\n');
     try {
-      expect(text).toContain('budget du lot : 400000 tokens comptés');
-      expect(text).toContain('budget du lot : 200000 tokens comptés');
+      expect(text).toContain('budget du lot : 450000 tokens comptés');
+      expect(text).toContain('budget du lot : 800000 tokens comptés');
     } finally {
       removeDryRunBriefs(text);
     }
@@ -1209,7 +1214,7 @@ describe('--continue (L147)', () => {
     const { parent } = parentWith({ a: [{ title: 'gros', estimate: 3 }, { title: 'petit', estimate: 0.5 }] });
     const f = fakeDeps();
     const o = io(parent);
-    await orchestrate(['--continue', '--budget', '300k'], o.io, f.deps);
+    await orchestrate(['--continue', '--budget', '500k'], o.io, f.deps);
     expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L2']);
   });
 

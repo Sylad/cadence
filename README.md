@@ -1071,7 +1071,7 @@ tree (screenshots left at the root, a commit) is an incident of that lot only: t
 `CADENCE_ORCHESTRATED` is set.
 
 **Budget**: the wave counts input + cache writes + output tokens (default 2 M); cache reads are kept and
-shown apart. Each lot also has its own budget derived from its estimate (400 k tokens per day, floor 200 k, shown by
+shown apart. Each lot also has its own budget derived from its estimate (400 k tokens per day, floor 450 k — a write pass, its review, one fix pass and the short review after it —, shown by
 `--dry-run`): it bounds the *writing* passes, never the reviews. A lot that spent it gets no further implementation or
 fix and is handed back to the lead, but its review (and UX review) is played first; a fix pass starts only if
 the remaining budget can also pay the review that follows it (65 k tokens reserved: a fixed amount close to the 90th

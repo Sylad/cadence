@@ -1553,7 +1553,7 @@ lots:
       - { date: 2026-10-09, text: "mesure AVANT L137 (niveau de la session, wave.json de 2026-10-09-0842, 0900, 0945, 1058 et 1253 ; jetons « counted » moyens par passe, durée moyenne, n) : precheck 21173 jetons 17 s (16) ; implement 85505 jetons 194 s (16) ; fix 51104 jetons 99 s (11) ; review 43277 jetons 119 s (17) ; review-small 50925 jetons 122 s (7). Le champ effort est absent de ces étapes. MESURE APRÈS À FAIRE : aucune vague n'a encore tourné avec orchestrate.effort (la vague 2026-10-09-1303 qui porte L137 a tourné avant le commit 50e9486) ; relever les mêmes moyennes par kind sur la première vague dont les étapes portent effort, et les noter ici avant de fermer le lot." }
       - { date: 2026-10-09, text: "mineurs (revue 09-10) : règle effort[kind] écrite deux fois (cycle.ts:320 et command.ts:335, dry-run) → une fonction effortFor ; la note « mesure avant » cite durationMs des rapports de session, le README dit ended−started : nommer la source. Mesure « après » à relever sur une vague." }
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme pour le code (aucun constat) ; la mesure « après » reste à relever sur la prochaine vague avant de fermer le lot — orchestré (vague 2026-10-09-1303, 2 passe(s) de correction)", commit: d28f98097c9f17dc1ebcac1504598b350879cb9b }
+    review: { date: 2026-10-09, verdict: "conforme pour le code (aucun constat) ; la mesure « après » reste à relever sur la prochaine vague avant de fermer le lot — orchestré (vague 2026-10-09-1303, 2 passe(s) de correction) ; release 0.21.0 58b44ae (bump de version, CHANGELOG, What's new, sans code)", commit: 58b44ae5c95d8f5bacd59fef8b10d6a577761ae9 }
     finished: 2026-10-09
   - id: L138
     title: "precheck-reader : omitClaudeMd (frontmatter 2.1.271) — la pré-vérification n'a pas besoin du CLAUDE.md du projet (400 lignes sur maritime) ; mesurer le contexte de la session precheck avant/après ; décider pour qa-reviewer"
@@ -1593,8 +1593,8 @@ lots:
         date: 2026-10-09,
         verdict: "Commits revus : 49c58c3 feat(L141) et 3290930 fix(L141). Résultats : `npx tsc --noEmit` passe (code 0), les tests des 4 fichiers touchés passent (128/128), et la suite complète passe 3 fois sur 4 (1059/1059 ; un échec isolé sur 1059 au premier lancement, voir « non vérifié »). Le correctif ajoute un test de RunStore.last avec `unfinished`. Ce test aurait échoué avec l'ancien tri alphabétique (« ol-gains-1 » passe devant « 2026-10-09-1253 »), donc le constat mineur précédent est corrigé, et rien n'est cassé. Les choix d'interprétation tiennent face au lot et au code : le total vaut DEFAULT_MAX_SESSIONS = 2, comme dans le skill ; lead tour n'affiche la ligne que si une vague est vivante, et sa sortie --json ne change pas ; le tri par `created` vaut aussi pour --resume ; les dépôts encore tenus viennent du registre ; liveLines est réutilisée et non copiée. Le README, le CHANGELOG et SKILL.md suivent le changement. Il reste un nouveau constat mineur, consigné en note : un wave.json illisible fait planter RunStore.last.
 
-          compliant — orchestré (vague 2026-10-09-1303, 0 passe(s) de correction + passe des mineurs)",
-        commit: 32909307fa8d57fbbc60c47019817ac79d54b149
+          compliant — orchestré (vague 2026-10-09-1303, 0 passe(s) de correction + passe des mineurs) ; release 0.21.0 58b44ae (bump de version, CHANGELOG, What's new, sans code)",
+        commit: 58b44ae5c95d8f5bacd59fef8b10d6a577761ae9
       }
     finished: 2026-10-09
   - id: L142
@@ -1616,7 +1616,7 @@ lots:
     estimate: 0.5
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme après 1 correction — 5 commits : docs.sync (raf check, lead tour, brief de revue), motifs !, since inclusif figé au 2026-10-09 dans le test (vert sous TZ=Pacific/Kiritimati), commentaire since corrigé ; 1098 tests et typecheck verts", commit: 89e73aa8369e32a8bb667e71774d14e8f1e79d9f }
+    review: { date: 2026-10-09, verdict: "conforme après 1 correction — 5 commits : docs.sync (raf check, lead tour, brief de revue), motifs !, since inclusif figé au 2026-10-09 dans le test (vert sous TZ=Pacific/Kiritimati), commentaire since corrigé ; 1098 tests et typecheck verts ; release 0.21.0 58b44ae (bump de version, CHANGELOG, What's new, sans code)", commit: 58b44ae5c95d8f5bacd59fef8b10d6a577761ae9 }
     finished: 2026-10-09
   - id: L144
     title: "Articles externes rafraîchis à la livraison, comme les Nouveautés : clé docs.articles dans cadence.yaml (dépôt voisin + fichier, ex. l'étude de cas du projet dans claude-code-codex) ; après une livraison verte, cadence deliver ouvre dans ce dépôt un lot « Article <projet> à rafraîchir » qui cite les titres publics livrés et les sections à relire ; le lot se joue ensuite dans une vague ordinaire (Sonnet réécrit, revue vérifie) ; le skill sync-site-docs est retiré au profit de ce mécanisme. Demande Sylvain 09-10"
@@ -1624,7 +1624,7 @@ lots:
     estimate: 0.5
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme après 2 corrections — 5 commits + f826a82 dans claude-code-codex (skill sync-site-docs retiré) : docs.articles, deliver relit le plan avant d'ouvrir le lot d'article, CLI testée, regroupement par nom (un lot, tous les dépôts) ; typecheck et 1098 tests verts ; 1 mineur en note", commit: 82910eb7e7501f04d1b89a9c53cfc3f843f4e998 }
+    review: { date: 2026-10-09, verdict: "conforme après 2 corrections — 5 commits + f826a82 dans claude-code-codex (skill sync-site-docs retiré) : docs.articles, deliver relit le plan avant d'ouvrir le lot d'article, CLI testée, regroupement par nom (un lot, tous les dépôts) ; typecheck et 1098 tests verts ; 1 mineur en note ; release 0.21.0 58b44ae (bump de version, CHANGELOG, What's new, sans code)", commit: 58b44ae5c95d8f5bacd59fef8b10d6a577761ae9 }
     notes:
       - { date: 2026-10-09, text: "mineur (revue 09-10) : un lot d'article déjà ouvert ne reçoit qu'une note, ses repos ne sont pas complétés par une entrée de même nom ajoutée ensuite (src/articles.ts:119-123) — cas rare, sans perte" }
     finished: 2026-10-09

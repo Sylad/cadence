@@ -1159,3 +1159,82 @@ describe('budget par lot (L78)', () => {
     expect(store.readLot('a', 'L1')!.budget).toBe(800_000);
   });
 });
+
+describe('--continue (L147)', () => {
+  const doneBy = (calls: { cwd: string; kind: string }[]) => calls.filter((c) => c.kind === 'implement').map((c) => c.cwd.split('/').pop());
+
+  it('sans lot donné, tire les lots prêts dans l\'ordre de priorité, projet après projet, puis s\'arrête faute de lot', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }, { title: 'b deux' }] });
+    const f = fakeDeps();
+    const o = io(parent);
+    const code = await orchestrate(['--continue', '--priority', 'b,a', '--max-sessions', '1'], o.io, f.deps);
+    expect(code).toBe(0);
+    expect(doneBy(f.calls)).toEqual(['b', 'b', 'a']);
+    expect(o.out.join('\n')).toMatch(/continue : tire b:L2\n/);
+    expect(o.out.join('\n')).toMatch(/continue : arrêt — plus aucun lot prêt/);
+    const store = RunStore.last(parent)!;
+    expect(store.readWave()!.lots).toEqual(['b:L1', 'b:L2', 'a:L1']);
+    expect(store.readWave()!.status).toBe('done');
+  });
+
+  it('la priorité vient du cadence.yaml du dossier parent ; les lots à décider et ceux dont l\'after n\'est pas levé ne sont pas tirés', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un à décider avec Sylvain' }, { title: 'b deux', after: ['L1'] }, { title: 'b trois' }] });
+    writeFileSync(join(parent, 'cadence.yaml'), 'priority: [b, a]\n');
+    const f = fakeDeps();
+    expect(await orchestrate(['--continue', '--max-sessions', '1'], io(parent).io, f.deps)).toBe(0);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['b:L3', 'a:L1']);
+  });
+
+  it('un lot donné ouvre la vague, la suite est tirée ; une question arrête le tirage et garde la vague reprenable', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    const f = fakeDeps({ implement: (cwd) => claudeOut(workReport({ questions: ['Quelle base ?'] })) });
+    const o = io(parent);
+    const code = await orchestrate(['a:L1', '--continue'], o.io, f.deps);
+    expect(code).toBe(1);
+    expect(doneBy(f.calls)).toEqual(['a']);
+    expect(o.out.join('\n')).toMatch(/continue : arrêt — 1 question/);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1']);
+  });
+
+  it('deux lots rendus de suite arrêtent le tirage', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }, { title: 'trois' }] });
+    const f = fakeDeps({ implement: () => claudeOut(workReport({ commits: [] })) });
+    const o = io(parent);
+    await orchestrate(['--continue', '--max-sessions', '1'], o.io, f.deps);
+    expect(o.out.join('\n')).toMatch(/continue : arrêt — deux lots rendus de suite/);
+    expect(RunStore.last(parent)!.readWave()!.lots).toHaveLength(2);
+  });
+
+  it('le budget restant : un lot dont l\'estimation ne tient pas n\'est pas tiré, le suivant qui tient l\'est', async () => {
+    const { parent } = parentWith({ a: [{ title: 'gros', estimate: 3 }, { title: 'petit', estimate: 0.5 }] });
+    const f = fakeDeps();
+    const o = io(parent);
+    await orchestrate(['--continue', '--budget', '300k'], o.io, f.deps);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L2']);
+  });
+
+  it('--until : la fenêtre close (l\'horloge passe l\'heure) arrête le tirage ; --until sans --continue ou invalide est refusé', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    let hour = 14;
+    const o = io(parent);
+    o.io.now = () => new Date(`2026-10-04T${hour}:12:00`);
+    const f = fakeDeps({ implement: (cwd) => { hour = 18; return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] })); } });
+    await orchestrate(['--continue', '--until', '17:00', '--max-sessions', '1'], o.io, f.deps);
+    expect(o.out.join('\n')).toMatch(/continue : arrêt — fenêtre horaire close/);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1']);
+    await expect(orchestrate(['a:L1', '--until', '17:00'], io(parent).io, f.deps)).rejects.toThrow(/--continue/);
+    await expect(orchestrate(['--continue', '--until', '13:00'], io(parent).io, f.deps)).rejects.toThrow(/déjà passée/);
+  });
+
+  it('aucun lot prêt au départ : refus (2) ; --dry-run dit les lots qui seraient tirés', async () => {
+    const empty = parentWith({ a: [{ title: 'à décider avec Sylvain' }] });
+    const e = io(empty.parent);
+    expect(await orchestrate(['--continue'], e.io, fakeDeps().deps)).toBe(2);
+    expect(e.err.join('\n')).toMatch(/aucun lot prêt/);
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    const o = io(parent);
+    expect(await orchestrate(['a:L1', '--continue', '--until', '17:00', '--dry-run'], o.io, fakeDeps().deps)).toBe(0);
+    removeDryRunBriefs(o.out.join('\n'));
+    expect(o.out.join('\n')).toMatch(/--continue : priorité .*jusqu'à 17:00\n.*tirés ensuite, dans l'ordre : a:L2/);
+  });
+});

@@ -35,6 +35,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence orchestrate --continue [--until HH:MM] [--priority a,b]`: the wave draws the next ready lot of the plan itself when the lots in play are finished, in the priority declared by `--priority` or by `priority:` in the `cadence.yaml` of the parent folder, until the budget, the time window, the usage limit, a question, two lots handed back in a row, or no ready lot whose estimate fits the budget left; lots « à décider avec … » and lots whose `after` is not lifted are never drawn (L147).
+
 ### Fixed
 
 - `cadence orchestrate`: the cause « tests rouges après … » of a lot handed back without review now names the write pass that was really played, from the pass counter: after a minors pass followed by a short review with a major finding and a red fix pass, it says « la passe fix 1 », no longer « la passe des mineurs ». (L151)

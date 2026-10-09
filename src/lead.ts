@@ -33,7 +33,7 @@ export function truncate(text: string, max: number): string {
 }
 
 /** Un dossier est un projet s'il porte docs/plan/raf.yaml, ou un cadence.yaml avec `plan:`. */
-function isProject(dir: string): boolean {
+export function isProject(dir: string): boolean {
   if (existsSync(join(dir, 'docs/plan/raf.yaml'))) return true;
   const conf = join(dir, 'cadence.yaml');
   if (!existsSync(conf) || !statSync(conf).isFile()) return false;

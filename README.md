@@ -813,10 +813,26 @@ cadence orchestrate maritime-atlas:Q4/accueil-4-ux12@haiku   # a lot id may cont
 cadence orchestrate … --budget 1.5M          # 1500000, 1.5M, 800k; default 2M
 cadence orchestrate … --max-sessions 3       # sessions running at the same moment, all waves together; default 2
 cadence orchestrate … --dry-run              # preconditions + the plan of the wave; nothing is started
+cadence orchestrate --continue [--until 18:00] [--priority cadence,maritime]   # the wave draws the next ready lot itself (below)
 cadence orchestrate --status [<wave>]        # the live waves and the repositories they hold, then the table (default: the last wave of this folder)
 cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running (with an explicit `<wave>`: when that wave is no longer running)
 cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"]
 ```
+
+**`--continue` — idle time (L147)**: lots given on the command line open the wave (none: the first ones are drawn from the
+plan too); then, each time the lots in play are finished, the wave **draws the next ready lots of the plan** — up to the
+session cap — and plays them in the same wave (same budget, same state folder, journal line `continue : tire …`). A lot
+is drawn when it is `todo`, its `after` is lifted, it is not recurring, neither its title nor a note says « à décider avec
+… » (a lot waiting for a human decision), it is not already in the wave, and its own budget (derived from its estimate)
+fits in the budget left — otherwise the next one that fits is taken. Projects are visited in the declared **priority**:
+`--priority cadence,maritime`, or a `priority: [cadence, maritime]` list in the `cadence.yaml` of the folder you launch from
+(the parent of the projects); a name also covers `name-…` (`maritime` → `maritime-atlas`), the other projects come after, in
+alphabetical order. Launched from inside a project, only that project is drawn. A candidate that preflight refuses (dirty tree,
+Node missing…) is skipped with its cause in the journal. Drawing stops — `continue : arrêt — <reason>` — at: the budget, the
+time window (`--until HH:MM`, today's clock: nothing new is drawn from then on, a running lot is not cut), the usage limit,
+a question asked (the wave stays resumable with `--answer`), two lots handed back in a row, an interrupted wave, or no ready
+lot whose estimate fits the budget left. `--resume … --continue` draws again after the resumed lots. `--dry-run --continue` lists
+the lots that would be drawn next. Drawing happens between rounds: a round of up to `--max-sessions` lots must finish before the next draw.
 
 **Lot ids containing `/` (L120)**: the first `:` separates the project from the lot, a final `@` the model, and the lot
 keeps its `/` (`maritime-atlas:Q4/accueil-4-ux12@haiku`); this holds for `--dry-run`, `--status`, `--resume` and

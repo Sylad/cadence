@@ -12,6 +12,7 @@ import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
+import { candidates, parsePriority, parseUntil, readPriority, stopReason } from './continue.js';
 import { Budget, MAX_PASSES, countInterrupted, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
@@ -74,6 +75,14 @@ export interface Args {
   budget?: number;
   maxSessions?: number;
   wave?: string;
+  /** `--continue` (L147) : la vague tire elle-même le prochain lot prêt du plan quand ceux en cours sont finis. */
+  continue: boolean;
+  /** `--until HH:MM` : plus aucun lot n'est tiré à partir de cette heure. */
+  until?: string;
+  /** `until` en date, lue une fois au lancement (`orchestrate`). */
+  untilAt?: Date;
+  /** `--priority a,b` : ordre des projets pour le tirage, sinon la clé `priority:` du cadence.yaml du dossier de lancement. */
+  priority?: string[];
   answers: { project?: string; lot: string; text: string }[];
 }
 
@@ -104,7 +113,7 @@ function lotArg(text: string): { project?: string; lot: string; model?: Model } 
 }
 
 export function parseOrchestrateArgs(argv: string[]): Args {
-  const a: Args = { lots: [], dryRun: false, watch: false, answers: [] };
+  const a: Args = { lots: [], dryRun: false, watch: false, continue: false, answers: [] };
   const optional = (i: number) => (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) ? argv[i + 1] : undefined);
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
@@ -122,6 +131,9 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     else if (t === '--budget') a.budget = parseBudget(value(t));
     else if (t === '--max-sessions') a.maxSessions = parseMaxSessions(value(t));
     else if (t === '--wave') a.wave = value(t);
+    else if (t === '--continue') a.continue = true;
+    else if (t === '--until') a.until = value(t);
+    else if (t === '--priority') a.priority = parsePriority(value(t));
     else if (t === '--answer') {
       const target = lotArg(value(t));
       a.answers.push({ project: target.project, lot: target.lot, text: value(t) });
@@ -392,6 +404,8 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   const launch = io.cwd;
   const today: Day = io.env.RAF_TODAY && isDay(io.env.RAF_TODAY) ? io.env.RAF_TODAY : toDay(io.now());
 
+  if ((args.until !== undefined || args.priority !== undefined) && !args.continue) throw new RafError('--until et --priority s\'utilisent avec --continue');
+  if (args.until !== undefined) args.untilAt = parseUntil(args.until, io.now()); // heure invalide ou passée : refus avant d'agir
   if (args.watch && args.status === undefined) throw new RafError('--watch s\'utilise avec --status');
   if (args.interval !== undefined && !args.watch) throw new RafError('--interval s\'utilise avec --status --watch');
   if (args.status !== undefined) {
@@ -422,12 +436,18 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   }
   if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
 
-  if (args.lots.length === 0) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"]');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);
   refusals.push(...pre.refusals);
   const budget = args.budget ?? DEFAULT_BUDGET;
+  // --continue sans lot donné : le premier tour est tiré du plan ; rien de prêt, ou tout refusé, vaut un refus avant d'agir.
+  if (args.continue && args.lots.length === 0 && refusals.length === 0) {
+    const first = await draw(args, io, deps, launch, new Set(), budget, maxSessions(args, io));
+    pre.lots.push(...first.lots);
+    refusals.push(...(first.lots.length ? [] : first.skipped.length ? first.skipped : ['--continue : aucun lot prêt dont l\'estimation tient dans le budget']));
+  }
   if (refusals.length) {
     for (const r of refusals) io.err(`orchestrate : ${r}`);
     return 2;
@@ -437,6 +457,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     const id = waveId(io, args.wave, launch);
     if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
     dryRun(pre.lots, io, deps, budget, id);
+    if (args.continue) continueDryRun(args, io, launch, pre.lots, budget);
     return 0;
   }
   if (deps.snapshot) {
@@ -481,12 +502,99 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
       if (l.node) l.node.link = (deps.linkNode ?? linkNodeBin)(store.dir, l.node.version, l.node.bin);
       store.writeLot(l);
     }
-    const code = await execute(wave, pre.lots, store, io, deps, today, maxSessions(args, io));
+    const code = await continueRounds(await execute(wave, pre.lots, store, io, deps, today, maxSessions(args, io)), wave, pre.lots, store, io, deps, today, args, launch);
     abandon();
     return code;
   } catch (e) {
     abandon();
     throw e;
+  }
+}
+
+
+const priorityOf = (args: Args, launch: string) => args.priority ?? readPriority(launch);
+
+/**
+ * Tire jusqu'à `n` lots prêts du plan (L147), dans l'ordre de priorité, et les passe au contrôle préalable comme un lot donné :
+ * un lot refusé (arbre sale, Node introuvable…) est sauté, sa cause rendue dans `skipped`. `exclude` reçoit chaque lot essayé.
+ */
+async function draw(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string, exclude: Set<string>, remaining: number, n: number): Promise<{ lots: LotState[]; skipped: string[] }> {
+  const lots: LotState[] = [];
+  const skipped: string[] = [];
+  for (const c of candidates(launch, { priority: priorityOf(args, launch), exclude, remaining })) {
+    if (lots.length >= n) break;
+    const repo = gitRoot(c.dir);
+    const key = lotKey(c.project, c.lot.id);
+    if (!repo) continue;
+    const pre = await preflight(args, [{ project: c.project, projectDir: c.dir, repo, lot: c.lot.id, model: 'sonnet' }], io, deps, launch);
+    exclude.add(key);
+    if (pre.refusals.length) {
+      skipped.push(...pre.refusals);
+      continue;
+    }
+    if (pre.lots[0].budget! > remaining) continue;
+    remaining -= pre.lots[0].budget!;
+    lots.push(...pre.lots);
+  }
+  return { lots, skipped };
+}
+
+/** `--dry-run --continue` : ce qui serait tiré ensuite, dans l'ordre, et les bornes. */
+function continueDryRun(args: Args, io: OrchestrateIo, launch: string, given: LotState[], budget: number): void {
+  const exclude = new Set(given.map((l) => lotKey(l.project, l.lot)));
+  const next = candidates(launch, { priority: priorityOf(args, launch), exclude, remaining: budget });
+  io.out(`--continue : priorité ${priorityOf(args, launch).join(' > ') || '(aucune déclarée : ordre alphabétique)'}${args.until ? ` · jusqu'à ${args.until}` : ''}`);
+  io.out(next.length ? `  tirés ensuite, dans l'ordre : ${next.slice(0, 10).map((c) => lotKey(c.project, c.lot.id)).join(', ')}${next.length > 10 ? ', …' : ''}` : '  aucun autre lot prêt à tirer');
+}
+
+/** Lots rendus ou en échec de suite, en comptant depuis le dernier lot de la vague. */
+function handedBackStreak(all: LotState[]): number {
+  let n = 0;
+  for (const l of [...all].reverse()) {
+    if (l.status === 'handed-back' || l.status === 'failed') n++;
+    else break;
+  }
+  return n;
+}
+
+/**
+ * `--continue` (L147) : tant qu'aucune borne ne joue, tire jusqu'à `cap` lots prêts du plan et les joue dans la même vague
+ * (même budget, même dossier d'état). Sans `--continue`, rend le code tel quel. Bornes : budget, `--until`, limite d'usage,
+ * question posée, deux lots rendus de suite, vague interrompue, plus de lot prêt dont l'estimation tient dans le budget restant.
+ */
+async function continueRounds(first: number, wave: WaveState, all: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, args: Args, launch: string): Promise<number> {
+  if (!args.continue || first === 2) return first; // 2 : refus au verrou, rien n'a tourné
+  const say = (line: string) => {
+    io.out(line);
+    store.journal(line);
+  };
+  const exclude = new Set(all.map((l) => lotKey(l.project, l.lot)));
+  const cap = maxSessions(args, io);
+  let code = first;
+  for (;;) {
+    const questions = all.filter((l) => l.status === 'question').length;
+    const remaining = wave.status === 'suspended-budget' ? 0 : wave.budget - wave.consumed;
+    const why = stopReason({ now: io.now(), until: args.untilAt, quotaHit: wave.status === 'suspended-quota', questions, streak: handedBackStreak(all), interrupted: wave.status === 'interrupted' && questions === 0, remaining });
+    if (why) {
+      say(`continue : arrêt — ${why}`);
+      return code;
+    }
+    const drawn = await draw(args, io, deps, launch, exclude, remaining, cap);
+    for (const s of drawn.skipped) say(`continue : lot sauté — ${s}`);
+    if (drawn.lots.length === 0) {
+      say("continue : arrêt — plus aucun lot prêt dont l'estimation tient dans le budget restant");
+      return code;
+    }
+    for (const l of drawn.lots) {
+      if (l.node) l.node.link = (deps.linkNode ?? linkNodeBin)(store.dir, l.node.version, l.node.bin);
+      store.writeLot(l);
+      wave.lots.push(lotKey(l.project, l.lot));
+    }
+    store.writeWave(wave);
+    all.push(...drawn.lots);
+    say(`continue : tire ${drawn.lots.map((l) => lotKey(l.project, l.lot)).join(', ')}`);
+    code = await execute(wave, drawn.lots, store, io, deps, today, cap, all);
+    if (code === 2) return code;
   }
 }
 
@@ -725,7 +833,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     for (const line of renderTable(wave, lots)) io.out(line);
     return 0;
   }
-  return execute(wave, live, store, io, deps, today, maxSessions(args, io), lots);
+  return continueRounds(await execute(wave, live, store, io, deps, today, maxSessions(args, io), lots), wave, lots, store, io, deps, today, args, launch);
 }
 
 /** Dépendances réelles : `claude` (ou CADENCE_CLAUDE_BIN), agents et gabarits du paquet, journaux de ~/.claude. */

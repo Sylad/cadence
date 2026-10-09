@@ -844,7 +844,9 @@ other session nor lot (`arrêt demandé (--stop-after-current)`), and leaves the
 (`--resume`, which forgets the stop; `--continue` draws nothing more). Neither combines with lots to launch,
 `--continue`, `--dry-run`, `--budget` or `--answer`, nor `--status`; without a live wave from that folder they are refused
 (exit 2). A stopped wave is no longer live, so to take a lot out of it use **`--resume --drop <project:lot>`**: the lot is
-handed back instead of being replayed (an unknown or finished lot is refused, exit 2, before anything runs).
+handed back instead of being replayed (an unknown or finished lot is refused, exit 2, before anything runs). A lot taken out
+this way is left out of the resume checks (repository lock, `.nvmrc` Node, dirty tree): only the lots that will be replayed can
+refuse the resume, and a refusal writes nothing to `control.log`.
 `--resume --stop-after-current` is refused (exit 2): resuming contradicts stopping.
 A wave runs on its own snapshot of the tool: one launched before L79 never reads `control.log`, so the request is written but the
 command warns `ne lit pas les demandes de contrôle` on the error output.

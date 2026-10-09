@@ -13,7 +13,7 @@ import { pidAlive, sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { Budget, MAX_PASSES, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
+import { Budget, DROPPED, MAX_PASSES, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -899,7 +899,9 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     else if (lotFinished(matches[0])) refusals.push(`--drop ${lotKey(matches[0].project, matches[0].lot)} : le lot est déjà fini (${matches[0].status})`);
     else drops.push(lotKey(matches[0].project, matches[0].lot));
   }
+  // Un lot retiré ne jouera rien : il ne subit ni le verrou du dépôt, ni le .nvmrc, ni l'arbre sale — un refus pour LUI ne doit pas faire échouer la reprise des autres.
   const live: LotState[] = [];
+  const removed: LotState[] = [];
   for (const l of lots) {
     if (lotFinished(l)) continue;
     for (const s of l.steps) {
@@ -907,7 +909,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
       if (s.pid && pidAlive(s.pid)) refusals.push(`${lotKey(l.project, l.lot)} : session encore en vie, pid ${s.pid}`);
       else s.status = 'interrupted';
     }
-    live.push(l);
+    (drops.includes(lotKey(l.project, l.lot)) ? removed : live).push(l);
   }
   // Comme au départ : un dépôt tenu par une autre orchestration vivante est refusé avant toute écriture.
   for (const repo of new Set(live.flatMap(lotRepoPaths))) {
@@ -922,31 +924,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     if (node.kind === 'missing') refusals.push(`${lotKey(l.project, l.lot)} : ${node.message}`);
     else nodes.set(l, node);
   }
-  if (refusals.length) {
-    for (const r of refusals) io.err(`orchestrate : ${r}`);
-    return 2;
-  }
-  for (const [l, node] of nodes) {
-    if (node.kind === 'ok') l.node = { version: node.version, wanted: node.wanted, bin: node.bin, link: (deps.linkNode ?? linkNodeBin)(store.dir, node.version, node.bin) };
-    else delete l.node;
-  }
-  // Une étape interrompue (signal, crash) dont les tokens n'ont pas été comptés : relue dans le journal de sa session.
-  const recovered = new Budget(0);
-  for (const l of live) for (const s of l.steps) if (s.status === 'interrupted') countInterrupted(deps.claudeHome, l.repo, s, recovered);
-  wave.consumed += recovered.consumed;
-  wave.cacheRead += recovered.cacheRead;
-  if (recovered.consumed || recovered.cacheRead) store.writeWave(wave);
-  for (const l of live) {
-    if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';
-    store.writeLot(l);
-  }
-  if (args.budget !== undefined) wave.budget = wave.consumed + args.budget;
-  store.clearStopRequest(); // un arrêt demandé à la vague d'avant ne doit pas arrêter celle-ci
-  for (const k of drops) {
-    store.requestDrop(k);
-    store.journal(`demande : retirer ${k} de la vague (--resume --drop)`);
-    io.out(`${k} : retrait demandé — le lot est rendu au lead sans être rejoué`);
-  }
+  // Tous les refus avant la moindre écriture (l'arbre sale compris) : une reprise refusée ne change pas l'état de la vague.
   const dirty = new Set<string>();
   for (const repo of live.flatMap(lotRepoPaths)) if (!dirty.has(repo)) {
     dirty.add(repo);
@@ -957,9 +935,40 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     for (const r of refusals) io.err(`orchestrate : ${r}`);
     return 2;
   }
+  for (const [l, node] of nodes) {
+    if (node.kind === 'ok') l.node = { version: node.version, wanted: node.wanted, bin: node.bin, link: (deps.linkNode ?? linkNodeBin)(store.dir, node.version, node.bin) };
+    else delete l.node;
+  }
+  // Une étape interrompue (signal, crash) dont les tokens n'ont pas été comptés : relue dans le journal de sa session.
+  const recovered = new Budget(0);
+  for (const l of [...live, ...removed]) for (const s of l.steps) if (s.status === 'interrupted') countInterrupted(deps.claudeHome, l.repo, s, recovered);
+  wave.consumed += recovered.consumed;
+  wave.cacheRead += recovered.cacheRead;
+  if (recovered.consumed || recovered.cacheRead) store.writeWave(wave);
+  for (const l of live) {
+    if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';
+    store.writeLot(l);
+  }
+  if (args.budget !== undefined) wave.budget = wave.consumed + args.budget;
+  store.clearStopRequest(); // un arrêt demandé à la vague d'avant ne doit pas arrêter celle-ci
+  for (const l of removed) {
+    const k = lotKey(l.project, l.lot);
+    store.requestDrop(k);
+    store.journal(`demande : retirer ${k} de la vague (--resume --drop)`);
+    io.out(`${k} : retrait demandé — le lot est rendu au lead sans être rejoué`);
+    l.next = null;
+    l.status = 'handed-back';
+    l.outcome = DROPPED;
+    store.writeLot(l);
+    store.journal(`${k} → handed-back — ${DROPPED}`);
+  }
   if (live.length === 0) {
+    if (lots.every(lotFinished)) {
+      wave.status = 'done';
+      store.writeWave(wave);
+    }
     for (const line of renderTable(wave, lots)) io.out(line);
-    return 0;
+    return removed.length && !lots.every((l) => l.status === 'ready') ? 1 : 0;
   }
   return continueRounds(await execute(wave, live, store, io, deps, today, maxSessions(args, io), lots), wave, lots, store, io, deps, today, args, launch);
 }

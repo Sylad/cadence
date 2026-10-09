@@ -308,7 +308,7 @@ export const STOP_REQUESTED = 'arrêt demandé (--stop-after-current)';
 
 /** Le lot a-t-il été écarté de la vague par `--drop` (L79) ? */
 const dropped = (c: LotCtx): boolean => c.wave.store.control().drops.includes(lotKey(c.lot.project, c.lot.lot));
-const DROPPED = 'retiré de la vague (--drop)';
+export const DROPPED = 'retiré de la vague (--drop)';
 
 /** Pourquoi plus aucune session ne doit partir (incident, quota, budget), sinon null. */
 function halted(w: WaveCtx, lot?: LotState): string | null {

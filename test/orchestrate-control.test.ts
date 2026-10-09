@@ -204,6 +204,33 @@ describe('--resume avec --drop / --stop-after-current (L79, revue)', () => {
     expect(store.readWave()!.status).toBe('done');
   });
 
+  it('--resume --drop b:L1 avec le dépôt de b sale : le lot retiré ne subit pas les contrôles de reprise, a:L1 est rejoué', async () => {
+    const { parent, store } = await stoppedWave();
+    writeFileSync(join(parent, 'b/cadence.yaml'), 'orchestrate:\n  precheck: false\n# modifié\n');
+    const second = deps(() => {});
+    const r = io(parent);
+    expect(await orchestrate(['--resume', '--drop', 'b:L1'], r.io, second.d)).toBe(1);
+    expect(r.err.join('\n')).not.toMatch(/arbre sale/);
+    expect(second.calls.length).toBeGreaterThan(0);
+    expect(second.calls.every((c) => c.cwd.endsWith('/a'))).toBe(true);
+    expect(store.readLot('a', 'L1')!.status).toBe('ready');
+    expect(store.readLot('b', 'L1')!.status).toBe('handed-back');
+    expect(store.readLot('b', 'L1')!.outcome).toMatch(/retiré de la vague/);
+    expect(store.readWave()!.status).toBe('done');
+  });
+
+  it('--resume --drop b:L1 refusé à cause d\'un AUTRE lot (arbre sale de a) : rien n\'est écrit dans control.log, b:L1 reste suspendu', async () => {
+    const { parent, store } = await stoppedWave();
+    writeFileSync(join(parent, 'a/cadence.yaml'), 'orchestrate:\n  precheck: false\n# modifié\n');
+    const second = deps(() => {});
+    const r = io(parent);
+    expect(await orchestrate(['--resume', '--drop', 'b:L1'], r.io, second.d)).toBe(2);
+    expect(r.err.join('\n')).toMatch(/a : arbre sale/);
+    expect(second.calls).toEqual([]);
+    expect(store.control().drops).toEqual([]);
+    expect(store.readLot('b', 'L1')!.status).toBe('suspended');
+  });
+
   it('--resume --drop d\'un lot inconnu ou déjà fini est refusé (code 2) avant de jouer quoi que ce soit', async () => {
     const { parent, store } = await stoppedWave();
     const second = deps(() => {});

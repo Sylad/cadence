@@ -862,9 +862,10 @@ lots:
     finished: 2026-10-05
   - id: L68
     title: "orchestrate : accepter un id de sous-tâche (projet:Q4/accueil-4-ux18) — aujourd'hui « lot invalide », ce qui oblige à déléguer à la main les sous-tâches d'un plan à ids préfixés (maritime-atlas, 05-10)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-05
+    started: 2026-10-09
   - id: L69
     title: "Notes de version : CHANGELOG.md rétroactif par version (v0.1→v0.10.1, « disponible depuis vX »), section What's new du README qui y renvoie, publish.yml refuse un tag sans section et crée la release GitHub avec la section de la version"
     status: done

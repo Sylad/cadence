@@ -1489,9 +1489,10 @@ lots:
     finished: 2026-10-09
   - id: L128
     title: "orchestrate : budget de lot dérivé de l'estimate trop court pour une revue + une correction + une revue courte (L62 600 k à la 3e passe, L126 200 k à la 2e : rendu au lead à chaque fois, fini à la main) — plancher ou budget par étape qui couvre au moins une passe de correction et sa revue"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-08
+    started: 2026-10-09
   - id: L129
     title: "issue #6 — cadence session next : aucune sortie en cas de succès (code 0, rien sur stdout) ; attendu : les lignes telles qu'enregistrées ou « N lignes enregistrées pour la prochaine ouverture », pour que session-close les rapporte sans relancer session start ; commenter puis fermer l'issue GitHub #6 à la livraison"
     status: done

@@ -97,7 +97,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf list [--status s]` | flat list |
 | `raf ignore <sha> \| "exact subject" [--reason text]` | acknowledge a commit without a lot (tooling chore, a plan commit citing an unknown id) without rewriting history: a dated, reasoned line in the plan's `acknowledged:` section; a sha is exact, a subject covers every commit carrying it |
 | `raf check --ignored` | list the acknowledged commits with their date and reason |
-| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default (a visible lot without a public title is only a `⚠` warning: it never changes the exit code): commits without a lot (commits touching only plan files are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
+| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default (a visible lot without a public title is only a `⚠` warning: it never changes the exit code): commits without a lot (commits touching only plan files, or only version fields and `CHANGELOG.md`, are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
 | `raf gantt [-o file]` | standalone Gantt page |
 | `raf hook install` | add the post-commit hook (read-only, never blocks) and the pre-commit hook (does nothing unless `hook.autostart` says so, see below) |
 
@@ -1298,9 +1298,14 @@ the `.claude-plugin/types` the tsconfig extends).
 A version exists in three places and is published in two; a release does all of it, in this order:
 
 1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
-   `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, in the commit that closes the lot.
-   Write the version's section of `CHANGELOG.md` (`## [x.y.z] - date`, what changes for the user, lots cited)
-   and refresh the « What's new » summary of this README in that same commit.
+   `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and write the version's section of
+   `CHANGELOG.md` (`## [x.y.z] - date`, what changes for the user, lots cited), in **one commit that holds
+   only those files** (the version fields and the CHANGELOG, nothing else in the manifests). Such a commit is
+   exempt from the code-review gate like a plan commit: it closes the lot after its review, and `raf check`
+   does not ask for a new one (nor does it count it as a commit without a lot). Refresh the « What's new »
+   summary of this README *before* the review, in the lot's own commits. A commit that touches any other file
+   — or another field of a manifest, or a dependency in `package-lock.json` — is work like any other and has
+   to be reviewed.
 2. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,
    which publishes to npm through Trusted Publishing (OIDC, no token stored anywhere): it checks the tag
    matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` and that `CHANGELOG.md` has a `## [x.y.z]` section for it (no section, no publication), then `npm publish --provenance`, where `prepublishOnly` runs the type-check and the

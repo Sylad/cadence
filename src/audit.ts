@@ -58,20 +58,56 @@ export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
   return files.length > 0 && files.every((f) => own.has(f) && (f !== config || onlyPlanKeyChanged(root, sha, f)));
 }
 
+/** Fichiers d'une version : manifestes JSON (dont seul le champ `version` bouge) et CHANGELOG. */
+const VERSION_JSON = /(^|\/)(package\.json|package-lock\.json|\.claude-plugin\/(plugin|marketplace)\.json)$/;
+const CHANGELOG = /(^|\/)CHANGELOG\.md$/;
+
+/** Le JSON sans les champs `version` qu'une release réécrit : la racine, `packages[""]` du lock et `plugins[]` du marketplace. */
+function withoutVersion(text: string | null): string | null {
+  if (text === null) return '{}';
+  try {
+    const json = JSON.parse(text) as Record<string, any>;
+    delete json.version;
+    if (json.packages?.['']) delete json.packages[''].version;
+    for (const p of Array.isArray(json.plugins) ? json.plugins : []) if (p && typeof p === 'object') delete p.version;
+    return JSON.stringify(json);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Commit de version (L72) : TOUS ses fichiers sont des fichiers de version — package.json, package-lock.json,
+ * .claude-plugin/plugin.json et marketplace.json, où seule la `version` change, et CHANGELOG.md. Il clôt le lot
+ * après sa revue : l'exiger relu rouvrirait la porte à chaque release. Les fichiers décident, jamais le sujet.
+ */
+export function isReleaseOnly(sha: string, root: string): boolean {
+  const files = changedFiles(root, sha);
+  return (
+    files.length > 0 &&
+    files.every((f) => {
+      if (CHANGELOG.test(f)) return true;
+      if (!VERSION_JSON.test(f)) return false;
+      const before = withoutVersion(fileAt(root, `${sha}^`, f));
+      return before !== null && before === withoutVersion(fileAt(root, sha, f));
+    })
+  );
+}
+
 /** Le commit a été acquitté par « raf ignore » : par son sha, ou par son sujet exact. */
 export function isAcknowledged(plan: Plan, c: Commit): boolean {
   return plan.acknowledged.some((a) => (a.sha !== undefined && a.sha === c.sha) || (a.sha === undefined && a.subject === c.subject));
 }
 
 /**
- * N'ont pas besoin de citer un lot : un commit d'entretien du plan (cf. isPlanOnly), un commit
+ * N'ont pas besoin de citer un lot : un commit d'entretien du plan (cf. isPlanOnly), un commit de version (cf. isReleaseOnly), un commit
  * automatique dont le sujet correspond à un motif `ignore:` du plan et un commit acquitté (`raf ignore`) ;
  * un commit acquitté n'est pas non plus signalé pour un identifiant cité inconnu.
  */
 export function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
   const { patterns } = plan.ignore;
   const acked = (c: Commit) => isAcknowledged(plan, c);
-  const orphans = linked.orphans.filter((c) => !patterns.some((re) => re.test(c.subject)) && !acked(c) && !isPlanOnly(c.sha, plan, root));
+  const orphans = linked.orphans.filter((c) => !patterns.some((re) => re.test(c.subject)) && !acked(c) && !isPlanOnly(c.sha, plan, root) && !isReleaseOnly(c.sha, root));
   return { ...linked, orphans, unknown: linked.unknown.filter((u) => !acked(u.commit)) };
 }
 
@@ -143,10 +179,10 @@ export function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commi
     .flatMap((l) => docSyncGaps(sync, filesOf(root, workCommits(plan, root, byLot.get(l.id) ?? []))).map((g) => ({ message: gapMessage(l.id, g) })));
 }
 
-/** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni réduits au plan. */
+/** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni réduits au plan, ni une simple version. */
 function workCommits(plan: Plan, root: string, commits: Commit[]): Commit[] {
   const adopted = plan.since;
-  return commits.filter((c) => (!adopted || c.day >= adopted) && !isPlanOnly(c.sha, plan, root));
+  return commits.filter((c) => (!adopted || c.day >= adopted) && !isPlanOnly(c.sha, plan, root) && !isReleaseOnly(c.sha, root));
 }
 
 /** Commits liés à un lot, du plus récent au plus ancien, avant tout tri : commits de plan et d'avant l'adoption compris. */

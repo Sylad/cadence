@@ -406,6 +406,18 @@ describe('--status : créneaux libres et vague choisie (L141)', () => {
     expect(r.out.join('\n')).toContain('vague 2026-10-09-1253 :');
     expect(r.out.join('\n')).not.toContain('vague ol-gains-1 :');
   });
+
+  it('RunStore.last avec unfinished (--resume sans identifiant) prend la dernière lancée non terminée, pas la dernière par ordre alphabétique', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    expect(await orchestrate(['a:L1', '--wave', '2026-10-09-1253'], io(parent).io, fakeDeps().deps)).toBe(0);
+    const base = new RunStore(parent, '2026-10-09-1253').readWave()!;
+    const wave = (id: string, created: string, status: 'interrupted' | 'done') => new RunStore(parent, id).writeWave({ ...base, id, created, status });
+    wave('ol-gains-1', '2026-10-07T09:00:00.000Z', 'interrupted');
+    wave('2026-10-09-1253', '2026-10-09T12:53:00.000Z', 'interrupted');
+    expect(RunStore.last(parent, { unfinished: true })!.id).toBe('2026-10-09-1253');
+    wave('2026-10-09-1253', '2026-10-09T12:53:00.000Z', 'done');
+    expect(RunStore.last(parent, { unfinished: true })!.id).toBe('ol-gains-1');
+  });
 });
 
 describe('--status --watch (L49)', () => {

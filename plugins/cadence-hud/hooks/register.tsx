@@ -2,8 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, CommandInfo, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
-import { CONTEXT_WRITER, COLLECTOR, parseWaves } from './collect'
-import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, k, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
+import { CONTEXT_WRITER, COLLECTOR, LAUNCH_FOLDER, parseWaves } from './collect'
+import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, isInside, k, launchFolder, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -45,7 +45,12 @@ export const register: Register = on => {
   let sessionCwd: string | undefined
 
   on('session.start', async ($, e, next) => {
-    sessionCwd = e.cwd
+    // Le dossier du tableau est celui de lancement, pas le dossier courant du shell : un cd du lead dans un sous-projet
+    // (ou un rechargement à chaud qui revient avec ce dossier) ne le déplace pas (L154, vu 10-09 : une seule ligne).
+    if (!sessionCwd || !isInside(e.cwd, sessionCwd)) {
+      const r = await $.process.run(['python3', '-I', '-c', LAUNCH_FOLDER, e.cwd], { timeoutMs: 4_000 }).catch(() => undefined)
+      sessionCwd = r && r.exitCode === 0 ? launchFolder(r.stdout, e.cwd) : e.cwd
+    }
     tourSignature = undefined
     // Une session démarre sans commande d'arrière-plan ; un rechargement à chaud du mod aussi (il refait session.start) :
     // le compte repart de zéro plutôt que de garder des identifiants dont la fin ne reviendra jamais (vu 08-10 : « 3 cmd »).

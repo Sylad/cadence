@@ -435,3 +435,15 @@ export const tourDue = (lastSignature: string | undefined, lastAt: number, signa
 
 /** Le dossier interrogé par `cadence lead tour` : celui d'où la vague a été lancée, sinon celui de la session ; null s'il n'y en a aucun. Un dossier parent de projets donne une ligne par projet, un projet sans sous-projet sa propre ligne. */
 export const tourFolder = (waves: readonly Wave[], sessionCwd: string | undefined): string | null => waves[0]?.cwd ?? sessionCwd ?? null
+
+/**
+ * Lit la sortie du résolveur de dossier de lancement : le cwd lui-même ou l'un de ses ancêtres ; toute autre sortie
+ * (vide, illisible, hors de l'arborescence) vaut le cwd, jamais un dossier étranger à la session.
+ */
+export const launchFolder = (stdout: string, cwd: string): string => {
+  const found = stdout.trim().replace(/(.)\/+$/, '$1')
+  return found === cwd || (found.startsWith('/') && cwd.startsWith(found === '/' ? '/' : `${found}/`)) ? found : cwd
+}
+
+/** Vrai quand `cwd` est le dossier de lancement ou l'un de ses descendants (un cd dans un sous-projet). */
+export const isInside = (cwd: string, folder: string): boolean => cwd === folder || cwd.startsWith(folder === '/' ? '/' : `${folder}/`)

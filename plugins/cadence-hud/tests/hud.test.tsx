@@ -2,9 +2,9 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { parseWaves } from '../hooks/collect'
+import { LAUNCH_FOLDER, parseWaves } from '../hooks/collect'
 import { register } from '../hooks/register'
-import { activeProjects, colorOfDone, parseTour, progressBar, projectFigures, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { activeProjects, launchFolder, colorOfDone, parseTour, progressBar, projectFigures, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Project, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
@@ -1103,6 +1103,41 @@ test('le dossier du tableau est celui de lancement de la vague, sinon le dossier
   expect(tourFolder([{ ...WAVE, cwd: '/p' }], '/s')).toBe('/p')
   expect(tourFolder([], '/s')).toBe('/s')
   expect(tourFolder([], undefined)).toBeNull()
+})
+
+test('le dossier de lancement est le cwd ou son ancêtre qui porte la sortie du résolveur, sinon le cwd', () => {
+  expect(launchFolder('/w/proj\n', '/w/proj/sub')).toBe('/w/proj')
+  expect(launchFolder('/w/proj/sub\n', '/w/proj/sub')).toBe('/w/proj/sub')
+  expect(launchFolder('/w/proj/sub/', '/w/proj/sub')).toBe('/w/proj/sub')
+  expect(launchFolder('/ailleurs', '/w/proj/sub')).toBe('/w/proj/sub')
+  expect(launchFolder('/w/pro', '/w/proj/sub')).toBe('/w/proj/sub')
+  expect(launchFolder('[{"id":"w"}]', '/w/proj/sub')).toBe('/w/proj/sub')
+  expect(launchFolder('', '/w/proj/sub')).toBe('/w/proj/sub')
+})
+
+test('un cd du lead dans un sous-projet ne déplace pas le dossier du tableau : il reste celui de lancement', async ($, on) => {
+  const hud = wired(on)
+  mock.clock(on)
+  const runs: string[][] = []
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => ({ value: [] }) as never)
+  on('process.run', async (_$, e) => {
+    const argv = (e as unknown as { argv: string[] }).argv
+    runs.push(argv)
+    if (argv[0] === 'cadence') return { value: { exitCode: 0, stdout: JSON.stringify(TOUR), stderr: '' } } as never
+    if (argv.includes(LAUNCH_FOLDER)) return { value: { exitCode: 0, stdout: '/w\n', stderr: '' } } as never
+    return { value: { exitCode: 0, stdout: '[]', stderr: '' } } as never
+  })
+  await $.session.start({ cwd: '/w/ol', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  const tours = () => runs.filter(a => a[0] === 'cadence').map(a => a[3])
+  expect(tours()).toEqual(['/w'])
+  // rechargement à chaud après un cd : session.start revient avec le dossier courant du shell, le dossier de lancement reste
+  await $.session.start({ cwd: '/w/ol/sub', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  expect(tours().every(f => f === '/w')).toBe(true)
+  expect(hud.state('projects')).toBeDefined()
 })
 
 const PROJECTS = activeProjects(parseTour(JSON.stringify(TOUR)))

@@ -82,7 +82,7 @@ tronqués en fin de ligne.
   La barre (dix cases) et la fraction comptent les lots faits sur faits + en cours + à faire ; les lots abandonnés et
   les lots récurrents n'y entrent pas. `+N cette semaine` = lots créés sur les 7 derniers jours, aujourd'hui compris (absent à zéro). Les
   chiffres viennent de `cadence lead tour <dossier> --json` (champ `progress`), lancé dans le dossier de lancement de la
-  vague, sinon dans le dossier de la session (un dossier parent de projets donne une ligne par projet ; un dossier qui est
+  vague, sinon dans le **dossier de lancement de la session** : le dossier où elle a démarré, ou son plus proche ancêtre dont le `cadence.yaml` porte une clé `priority:` (le dossier parent des projets), et il y reste même si le lead fait un `cd` dans un sous-projet ou si le mod est rechargé à chaud depuis ce sous-dossier (L154 ; sans cela la bande tombait à une seule ligne) (un dossier parent de projets donne une ligne par projet ; un dossier qui est
   lui-même un projet, sans sous-projet, donne la ligne de ce projet seul) : relu à **chaque transition de vague** (un lot change d'étape ou de
   statut), sinon **toutes les minutes** ; un `cadence` absent ou en échec garde le dernier tableau lu, sans message
   d'erreur dans la bande. **`/hud projets`** replie la liste sur une ligne grise (`▸ projets (2)`) et la rouvre.

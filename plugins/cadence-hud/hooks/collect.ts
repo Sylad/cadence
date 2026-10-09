@@ -146,3 +146,27 @@ with open(tmp, 'w') as f:
     f.write(sys.argv[1])
 os.replace(tmp, os.path.join(folder, name))
 `
+
+/**
+ * Dossier de lancement de la session (python3 -I, argv[1] = le dossier courant) : le plus proche ancêtre, lui-même compris,
+ * dont le `cadence.yaml` porte une clé `priority:` (le dossier parent des projets) ; sans un tel dossier, le dossier courant.
+ * Écrit le chemin seul sur la sortie standard.
+ */
+export const LAUNCH_FOLDER = `
+import os, re, sys
+start = os.path.abspath(sys.argv[1])
+d = start
+while True:
+    try:
+        with open(os.path.join(d, 'cadence.yaml')) as f:
+            if re.search(r'^priority\\s*:', f.read(), re.M):
+                start = d
+                break
+    except OSError:
+        pass
+    up = os.path.dirname(d)
+    if up == d:
+        break
+    d = up
+print(start)
+`

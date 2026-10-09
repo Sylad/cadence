@@ -1284,6 +1284,15 @@ describe('--continue (L147)', () => {
 
   });
 
+  it('un lot qui ne tient pas dans le reste d\'UN tour n\'est pas écarté pour la vague : il est tiré au tour suivant, quand le budget restant le permet', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un', estimate: 0.5 }, { title: 'deux', estimate: 0.5 }, { title: 'trois', estimate: 1 }] });
+    const f = fakeDeps();
+    const o = io(parent);
+    await orchestrate(['a:L1', '--continue', '--budget', '500k', '--max-sessions', '2'], o.io, f.deps);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1', 'a:L2', 'a:L3']);
+    expect(o.out.join('\n')).toMatch(/continue : tire a:L2\n[\s\S]*continue : tire a:L3\n/);
+  });
+
   it('au premier tour sans lot donné, un lot sauté dit sa cause : sur la sortie d\'erreur et dans le journal de la vague', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
     writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n# sale\n');
@@ -1304,5 +1313,16 @@ describe('--continue (L147)', () => {
     await expect(orchestrate(['a:L1', '--continue'], io(parent).io, f.deps)).rejects.toThrow(/priority/);
     expect(f.calls).toHaveLength(0);
     expect(existsSync(join(parent, '.cadence/runs')) ? readdirSync(join(parent, '.cadence/runs')) : []).toEqual([]);
+  });
+
+  it('un tour tire au plus UN lot par dépôt tant que d\'autres dépôts ont des lots prêts, puis complète avec le même dépôt s\'il n\'y a rien d\'autre', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }, { title: 'a trois' }, { title: 'a quatre' }], b: [{ title: 'b un' }, { title: 'b deux' }] });
+    const f = fakeDeps();
+    const o = io(parent);
+    await orchestrate(['--continue', '--priority', 'a,b', '--max-sessions', '2'], o.io, f.deps);
+    const text = o.out.join('\n');
+    expect(text).toMatch(/continue : tire a:L2, b:L2\n/);
+    expect(text).toMatch(/continue : tire a:L3, a:L4\n/);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1', 'b:L1', 'a:L2', 'b:L2', 'a:L3', 'a:L4']);
   });
 });

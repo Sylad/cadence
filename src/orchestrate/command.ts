@@ -12,7 +12,7 @@ import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
-import { candidates, parsePriority, parseUntil, readPriority, stopReason } from './continue.js';
+import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
 import { Budget, MAX_PASSES, countInterrupted, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
@@ -523,18 +523,24 @@ const priorityOf = (args: Args, launch: string) => args.priority ?? readPriority
 
 /**
  * Tire jusqu'à `n` lots prêts du plan (L147), dans l'ordre de priorité, et les passe au contrôle préalable comme un lot donné :
- * un lot refusé est sauté, sa cause rendue dans `skipped`. `exclude` reçoit chaque lot essayé ou refusé pour lui-même, pas ceux d'un dépôt refusé.
+ * un lot refusé est sauté, sa cause rendue dans `skipped`. `exclude` reçoit chaque lot tiré ou refusé pour lui-même, pas ceux d'un
+ * dépôt refusé ni un lot qui ne tient pas dans le reste du budget (il tiendra peut-être au tour suivant).
+ * Un tour tire au plus UN lot par dépôt (le pool joue à la suite les lots d'un même dépôt, `--max-sessions` ne servirait à rien) ;
+ * les lots écartés pour cela complètent le tour, dans l'ordre, quand aucun autre dépôt n'a de lot prêt.
  */
 async function draw(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string, exclude: Set<string>, remaining: number, n: number): Promise<{ lots: LotState[]; skipped: string[] }> {
   const lots: LotState[] = [];
   const skipped: string[] = [];
   const badRepos = new Set<string>();
-  for (const c of candidates(launch, { priority: priorityOf(args, launch), exclude, remaining })) {
-    if (lots.length >= n) break;
-    const repo = gitRoot(c.dir);
+  const used = new Set<string>();
+  type Pre = Awaited<ReturnType<typeof preflight>>;
+  const deferred: { c: Candidate; repo: string; pre?: Pre }[] = [];
+  /** `spread` : premier passage, un dépôt déjà pris ce tour renvoie le lot au second ; sinon (second passage) le lot complète le tour. */
+  const attempt = async (c: Candidate, repo: string, spread: boolean, checked?: Pre): Promise<void> => {
     const key = lotKey(c.project, c.lot.id);
-    if (!repo || badRepos.has(repo)) continue;
-    const pre = await preflight(args, [{ project: c.project, projectDir: c.dir, repo, lot: c.lot.id, model: 'sonnet' }], io, deps, launch);
+    if (badRepos.has(repo)) return;
+    if (spread && used.has(repo)) return void deferred.push({ c, repo });
+    const pre = checked ?? (await preflight(args, [{ project: c.project, projectDir: c.dir, repo, lot: c.lot.id, model: 'sonnet' }], io, deps, launch));
     if (pre.refusals.length) {
       // Un refus propre au lot l'écarte pour la vague ; celui d'un dépôt (arbre sale, orchestration en cours, pre-push) est passager :
       // le dépôt est sauté pour ce tirage seulement, une ligne, et ses lots restent tirables au suivant.
@@ -542,12 +548,24 @@ async function draw(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch
       if (own.length) exclude.add(key);
       if (own.length < pre.refusals.length) badRepos.add(repo);
       skipped.push(...pre.refusals.filter((r) => !skipped.includes(r)));
-      continue;
+      return;
     }
+    const lot = pre.lots[0];
+    if (lot.budget! > remaining) return; // pas exclu : le budget du tour suivant le permettra peut-être
+    if (spread && lotRepoPaths(lot).some((r) => used.has(r))) return void deferred.push({ c, repo, pre }); // un dépôt voisin déjà pris ce tour
     exclude.add(key);
-    if (pre.lots[0].budget! > remaining) continue;
-    remaining -= pre.lots[0].budget!;
-    lots.push(...pre.lots);
+    remaining -= lot.budget!;
+    lots.push(lot);
+    for (const r of lotRepoPaths(lot)) used.add(r);
+  };
+  for (const c of candidates(launch, { priority: priorityOf(args, launch), exclude, remaining })) {
+    if (lots.length >= n) break;
+    const repo = gitRoot(c.dir);
+    if (repo) await attempt(c, repo, true);
+  }
+  for (const d of deferred) {
+    if (lots.length >= n) break;
+    await attempt(d.c, d.repo, false, d.pre);
   }
   return { lots, skipped };
 }

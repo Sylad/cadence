@@ -825,13 +825,17 @@ cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "
 **`--continue` — idle time (L147)**: lots given on the command line open the wave (none: the first ones are drawn from the
 plan too); then, each time the lots in play are finished, the wave **draws the next ready lots of the plan** — up to the
 session cap — and plays them in the same wave (same budget, same state folder, journal line `continue : tire …`). A lot
-is drawn when it is `todo`, its `after` is lifted, it is not recurring, neither its title nor a note says « à décider avec
-… » (a lot waiting for a human decision), it is not already in the wave, and its own budget (derived from its estimate)
-fits in the budget left — otherwise the next one that fits is taken. Projects are visited in the declared **priority**:
+is drawn when it is `todo`, its `after` is lifted, it is not recurring, neither its title nor a note says « à décider »
+(« à décider avec … », « (à décider) »: a lot waiting for a human decision), it is not already in the wave, and its own budget (derived from its estimate)
+fits in the budget left — otherwise the next one that fits is taken (a lot that does not fit in what is left of the current
+round is not dropped: it is tried again at the next round, once the budget allows it). A round takes at most **one lot per
+repository** while other repositories have ready lots — the pool plays the lots of one repository one after the other, so a
+second one would leave a session idle — and is completed with the same repository when nothing else is ready. Projects are visited in the declared **priority**:
 `--priority cadence,maritime`, or a `priority: [cadence, maritime]` list in the `cadence.yaml` of the folder you launch from
 (the parent of the projects); a name also covers `name-…` (`maritime` → `maritime-atlas`), the other projects come after, in
-alphabetical order. Launched from inside a project, only that project is drawn. A candidate that preflight refuses (dirty tree,
-Node missing…) is skipped with its cause in the journal. Drawing stops — `continue : arrêt — <reason>` — at: the budget, the
+alphabetical order. Launched from inside a project, only that project is drawn. A `priority:` key that cannot be read is refused before anything
+starts, lots given or not. A candidate that preflight refuses (dirty tree, Node missing…) is skipped with its cause in the
+journal (`continue : lot sauté — <cause>`; for the first draw also on the error output). Drawing stops — `continue : arrêt — <reason>` — at: the budget, the
 time window (`--until HH:MM`, today's clock: nothing new is drawn from then on, a running lot is not cut), the usage limit,
 a question asked (the wave stays resumable with `--answer`), two lots handed back in a row, an interrupted wave, or no ready
 lot whose estimate fits the budget left. `--resume … --continue` draws again after the resumed lots. `--dry-run --continue` lists

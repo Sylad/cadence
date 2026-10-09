@@ -31,6 +31,14 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | Wave lock per repository: `cadence deliver` on a repository whose lots are finished while the wave continues | [0.19.0](#0190---2026-10-08) |
 | `cadence-hud`: `/hud cmd` lists the counted background commands, `N cmd sans fin vue`, finished waves greyed then hidden | [0.20.0](#0200---2026-10-09) |
 
+## [Unreleased]
+
+### Added
+- `cadence orchestrate --status` and `cadence lead tour` print the free session slots (`créneaux libres : N sur 2`) from the registry of live waves; the `lead` skill reads the figure instead of computing `2 − Σ min(cap, …)` by hand. (L141)
+
+### Fixed
+- `cadence orchestrate --status` without an identifier showed the table of the wave whose name sorts last (an old `ol-gains-1`) instead of the most recently launched one; it now picks by launch time. `--resume` without an identifier follows the same rule. (L141)
+
 ## [0.20.0] - 2026-10-09
 
 ### Fixed

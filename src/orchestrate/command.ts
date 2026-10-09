@@ -10,7 +10,7 @@ import { stopApps } from './app.js';
 import { Plan, RafError, isOpen } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
-import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
+import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { Budget, MAX_PASSES, countInterrupted, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
@@ -342,13 +342,13 @@ function duration(ms: number): string {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
 }
 
-/** Vagues vivantes (toutes, quel que soit leur dossier de départ) et dépôts qu'elles tiennent. */
-function liveLines(): string[] {
+/** Vagues vivantes (toutes, quel que soit leur dossier de départ), créneaux libres et dépôts qu'elles tiennent. */
+export function liveLines(): string[] {
   const home = cadenceHome();
   const waves = liveWaves(home);
   if (waves.length === 0) return [];
   const slots = liveSlots(home).length;
-  const lines = [`vagues en cours : ${waves.length} · sessions en cours : ${slots}`];
+  const lines = [`vagues en cours : ${waves.length} · sessions en cours : ${slots} · créneaux libres : ${freeSlots(waves, DEFAULT_MAX_SESSIONS)} sur ${DEFAULT_MAX_SESSIONS}`];
   for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · plafond ${w.cap ?? '?'} · dépôts : ${w.repos.join(', ')}`);
   return lines;
 }

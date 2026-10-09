@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { findProjects, tourLine, type TourRow } from '../src/lead.js';
 import { sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
+import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 async function cad(dir: string, ...argv: string[]) {
@@ -83,6 +84,17 @@ describe('cadence lead tour', () => {
     writeLock(sharedStateDir(alpha), { pid: process.pid, sha: 'abcdef1234567', started: '2026-09-28 10:00:00' });
     const { out } = await cad(root, 'lead', 'tour');
     expect(out.split('\n')[0]).toMatch(/dépôt non poussé, livraison en cours$/);
+  });
+
+  it('ajoute une ligne « créneaux libres » quand une vague tourne, rien sinon (L141)', async () => {
+    const { root } = await parent();
+    expect((await cad(root, 'lead', 'tour')).out).not.toContain('créneaux libres');
+    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-09-1253', started: '2026-10-09T12:53:00Z', cwd: root, repos: ['/x/a'], cap: 2 });
+    const { out } = await cad(root, 'lead', 'tour');
+    expect(out.split('\n')[2]).toBe('vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2');
+    const json = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out);
+    expect(Array.isArray(json)).toBe(true);
+    unregisterWave(cadenceHome(), process.ppid);
   });
 
   it('tronque les notes de clôture à 120 caractères', async () => {

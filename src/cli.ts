@@ -18,7 +18,7 @@ import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { findProjects, leadTour, tourLine } from './lead.js';
-import { orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
+import { liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
@@ -159,7 +159,12 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     const rows = leadTour(parent, today, idle);
     if (values.json) io.out(JSON.stringify(rows, null, 2));
     else if (rows.length === 0) io.out(`aucun projet sous ${parent} (docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
-    else for (const r of rows) io.out(tourLine(r));
+    else {
+      for (const r of rows) io.out(tourLine(r));
+      // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
+      const [slots] = liveLines();
+      if (slots) io.out(slots);
+    }
     return 0;
   }
   // --all balaie les sous-dossiers : il ne lit ni le plan ni le cadence.yaml du dossier courant.

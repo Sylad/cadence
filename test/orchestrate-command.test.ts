@@ -380,6 +380,34 @@ describe('plafond de sessions simultanées et --status (L71)', () => {
   });
 });
 
+describe('--status : créneaux libres et vague choisie (L141)', () => {
+  const run = async (parent: string, argv: string[]) => {
+    const r = io(parent);
+    return { code: await orchestrate(argv, r.io, fakeDeps().deps), ...r };
+  };
+
+  it('affiche les créneaux libres dans l\'en-tête des vagues vivantes', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-09-1253', started: '2026-10-09T12:53:00Z', cwd: '/ailleurs', repos: ['/x/a'], cap: 2 });
+    const r = await run(parent, ['--status']);
+    expect(r.out.join('\n')).toContain('vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2');
+    unregisterWave(cadenceHome(), process.ppid);
+  });
+
+  it('sans identifiant, montre le tableau de la vague la plus récemment lancée, pas la dernière par ordre alphabétique', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    expect(await orchestrate(['a:L1', '--wave', '2026-10-09-1253'], io(parent).io, f.deps)).toBe(0);
+    const old = new RunStore(parent, 'ol-gains-1');
+    const recent = new RunStore(parent, '2026-10-09-1253');
+    old.writeWave({ ...recent.readWave()!, id: 'ol-gains-1', created: '2026-10-07T09:00:00.000Z' });
+    recent.writeWave({ ...recent.readWave()!, created: '2026-10-09T12:53:00.000Z' });
+    const r = await run(parent, ['--status']);
+    expect(r.out.join('\n')).toContain('vague 2026-10-09-1253 :');
+    expect(r.out.join('\n')).not.toContain('vague ol-gains-1 :');
+  });
+});
+
 describe('--status --watch (L49)', () => {
   const CLEAR = '\x1b[H\x1b[2J';
   it('--watch et --interval : analyse, refus hors --status', async () => {

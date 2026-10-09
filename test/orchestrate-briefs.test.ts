@@ -173,7 +173,8 @@ describe('skill lead : source unique', () => {
     expect(skill).toMatch(/sessions of an orchestrated wave[^\n]*\n?[^\n]*count toward this limit/i);
     expect(skill).toContain('--max-sessions');
     expect(skill).toMatch(/before starting a\s+subagent, check `cadence orchestrate --status`/);
-    expect(skill).toMatch(/min\(cap, number of repositories/);
+    expect(skill).toContain('créneaux libres : N sur 2'); // le skill lit le chiffre du registre (L141)
+    expect(skill).not.toMatch(/2 − Σ/);
   });
   it('le dossier de gabarits est celui du paquet', () => {
     expect(TEMPLATES_DIR.endsWith('/templates/orchestrate')).toBe(true);

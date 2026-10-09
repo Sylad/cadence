@@ -56,6 +56,17 @@ export function liveWaves(home: string): LiveWave[] {
   return out.sort((a, b) => a.started.localeCompare(b.started));
 }
 
+/**
+ * Les créneaux que le lead peut encore donner à des sous-agents : `total` moins, pour chaque vague vivante, le
+ * plus petit de son plafond et du nombre de dépôts qu'elle tient encore (ses pas prennent un créneau et le
+ * rendent entre deux étapes : les sessions vivantes à l'instant ne disent pas ce que la vague va reprendre).
+ * Une vague sans plafond connu compte pour `total`.
+ */
+export function freeSlots(waves: LiveWave[], total: number): number {
+  const held = waves.reduce((n, w) => n + Math.min(w.cap ?? total, w.repos.length), 0);
+  return Math.max(0, total - held);
+}
+
 /** Inscrit la vague ; écarte au passage les entrées de processus morts (les `.tmp` d'une inscription en cours ne sont pas touchés). */
 export function registerWave(home: string, given: LiveWave): void {
   const w: LiveWave = { ...given, start: given.start ?? processStart(given.pid) ?? undefined };

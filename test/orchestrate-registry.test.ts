@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
+import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { tempDir } from './helpers.js';
 
 const wave = (over = {}) => ({ pid: process.pid, wave: 'w1', started: 'x', cwd: '/p', repos: ['/p/a'], ...over });
@@ -170,5 +170,22 @@ describe('registerWave (L71/t4)', () => {
     writeFileSync(join(home, 'waves/4242.json.tmp'), '{"pid":4242');
     registerWave(home, wave());
     expect(existsSync(join(home, 'waves/4242.json.tmp'))).toBe(true);
+  });
+});
+
+describe('créneaux libres (L141)', () => {
+  const w = (cap: number | undefined, repos: string[]) => wave({ cap, repos });
+  it('sans vague : tout le plafond est libre', () => {
+    expect(freeSlots([], 2)).toBe(2);
+  });
+  it('une vague retire min(plafond, dépôts qu\'elle tient)', () => {
+    expect(freeSlots([w(2, ['/a'])], 2)).toBe(1);
+    expect(freeSlots([w(2, ['/a', '/b', '/c'])], 2)).toBe(0);
+    expect(freeSlots([w(1, ['/a', '/b'])], 2)).toBe(1);
+  });
+  it('deux vagues s\'additionnent, jamais sous zéro ; plafond inconnu : le total', () => {
+    expect(freeSlots([w(2, ['/a']), w(2, ['/b'])], 2)).toBe(0);
+    expect(freeSlots([w(2, ['/a', '/b']), w(2, ['/c', '/d'])], 2)).toBe(0);
+    expect(freeSlots([w(undefined, ['/a', '/b'])], 2)).toBe(0);
   });
 });

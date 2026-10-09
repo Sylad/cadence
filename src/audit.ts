@@ -131,7 +131,7 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
 }
 
 /**
- * Documentation en retard (L143, clé `docs.sync`) : un lot en cours — ou terminé après `docs.since` — dont les commits de
+ * Documentation en retard (L143, clé `docs.sync`) : un lot en cours — ou terminé à partir de `docs.since` — dont les commits de
  * travail touchent des chemins sans toucher le document que la règle désigne. Les commits de plan ne comptent pas.
  */
 export function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): AuditIssue[] {
@@ -139,7 +139,7 @@ export function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commi
   if (!sync.length) return [];
   return plan
     .lots()
-    .filter((l) => l.status === 'doing' || (l.status === 'done' && !!since && !!l.finished && l.finished > since))
+    .filter((l) => l.status === 'doing' || (l.status === 'done' && !!since && !!l.finished && l.finished >= since))
     .flatMap((l) => docSyncGaps(sync, filesOf(root, workCommits(plan, root, byLot.get(l.id) ?? []))).map((g) => ({ message: gapMessage(l.id, g) })));
 }
 

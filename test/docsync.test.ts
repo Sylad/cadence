@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readDocsConfig } from '../src/config.js';
+import { toDay } from '../src/dates.js';
 import { docSyncMatcher } from '../src/docsync.js';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -149,6 +150,13 @@ describe('raf check : docs.sync', () => {
     work(avant, 'feat(L1): code', ['src/a.ts']);
     await cad(avant, 'done', 'L1');
     expect((await cad(avant, 'check')).out).toContain('L1 : documentation en retard');
+  });
+
+  it('un lot terminé le jour même de docs.since est audité', async () => {
+    const dir = await repo(`${CONFIG}  since: ${toDay(new Date())}\n`);
+    work(dir, 'feat(L1): code', ['src/a.ts']);
+    await cad(dir, 'done', 'L1');
+    expect((await cad(dir, 'check')).out).toContain('L1 : documentation en retard');
   });
 });
 

@@ -354,12 +354,12 @@ docs:
       docs: [CLAUDE.md]
     - paths: [frontend/src/**, '!**/*.test.tsx']   # a pattern starting with ! leaves files out
       docs: [README.md]
-  since: 2026-10-09                    # optional: also audit lots finished after this day
+  since: 2026-10-09                    # optional: also audit lots finished on or after this day
 ```
 
 A pattern is an exact path, with `*` (inside a folder), `**` (across folders), `?`, or a trailing `/` for
 a whole folder. `raf check` takes the **work commits** of every lot in progress (plan-only commits do
-not count; a lot finished after `docs.since` is audited too) and, for each pair, reports the lot when
+not count; a lot finished on or after `docs.since` is audited too) and, for each pair, reports the lot when
 those commits touch `paths` without any of them touching a file of `docs`:
 
 ```

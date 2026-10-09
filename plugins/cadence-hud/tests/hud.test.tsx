@@ -1,5 +1,6 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
+import type { TestBody } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
 import { register } from '../hooks/register'
@@ -581,39 +582,39 @@ const NOTIFICATION = (id: string) =>
 test('un Bash lancé en arrière-plan entre dans les commandes, par le hook tool.call', async ($, on) => {
   const hud = wired(on)
   hud.answer.current = { result: { backgroundTaskId: 'b1' } }
-  await $.tool.call({ tool: 'Bash', input: { command: 'sleep 60', run_in_background: true } } as never)
+  await $.tool.call({ tool: 'Bash', command: 'sleep 60', run_in_background: true } as never)
   expect(hud.commands()).toEqual(['b1'])
   hud.answer.current = { result: { taskId: 'm1' } }
-  await $.tool.call({ tool: 'Monitor', input: { command: 'tail -f x' } } as never)
+  await $.tool.call({ tool: 'Monitor', command: 'tail -f x' } as never)
   expect(hud.commands()).toEqual(['b1', 'm1'])
 })
 
 test('un résultat en erreur ou un Bash au premier plan n\'ajoute rien', async ($, on) => {
   const hud = wired(on)
   hud.answer.current = { isError: true, result: { backgroundTaskId: 'b1' } }
-  await $.tool.call({ tool: 'Bash', input: { command: 'sleep 60', run_in_background: true } } as never)
+  await $.tool.call({ tool: 'Bash', command: 'sleep 60', run_in_background: true } as never)
   expect(hud.commands()).toEqual([])
   hud.answer.current = { result: { stdout: 'ok', interrupted: false } }
-  await $.tool.call({ tool: 'Bash', input: { command: 'ls' } } as never)
+  await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
   expect(hud.commands()).toEqual([])
 })
 
 test('TaskStop retire la tâche arrêtée, par le hook tool.call', async ($, on) => {
   const hud = wired(on)
   hud.answer.current = { result: { backgroundTaskId: 'b1' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true } as never)
   hud.answer.current = { result: { backgroundTaskId: 'b2' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true } as never)
   expect(hud.commands()).toEqual(['b1', 'b2'])
   hud.answer.current = { result: { message: 'Successfully stopped task: b1', task_id: 'b1', task_type: 'local_bash' } }
-  await $.tool.call({ tool: 'TaskStop', input: { task_id: 'b1' } } as never)
+  await $.tool.call({ tool: 'TaskStop', task_id: 'b1' } as never)
   expect(hud.commands()).toEqual(['b2'])
 })
 
 test('la notification de fin retire la commande, un prompt tapé n\'en retire aucune', async ($, on) => {
   const hud = wired(on)
   hud.answer.current = { result: { backgroundTaskId: 'b1' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true } as never)
   // même texte, mais écrit par l'utilisateur : ne termine rien
   await $.prompt.submit({ origin: { kind: 'composer' }, text: NOTIFICATION('b1') } as never)
   expect(hud.commands()).toEqual(['b1'])
@@ -654,11 +655,11 @@ test('une tâche finie emporte les commandes de son sous-agent', () => {
 test('les commandes d’un sous-agent sortent du compte quand il finit, par les hooks', async ($, on) => {
   const hud = wired(on)
   hud.answer.current = { result: { backgroundTaskId: 'b1' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true } as never)
   hud.answer.current = { result: { backgroundTaskId: 'b2' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a1' } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true, agentId: 'a1' } as never)
   hud.answer.current = { result: { taskId: 'm1' } }
-  await $.tool.call({ tool: 'Monitor', input: { command: 'tail -f x' } } as never)
+  await $.tool.call({ tool: 'Monitor', command: 'tail -f x' } as never)
   expect(hud.commands()).toEqual(['b1', 'b2', 'm1'])
   expect(hud.owners()).toEqual({ b2: 'a1' })
   // fin du sous-agent a1 : b2 part avec lui, b1 et m1 restent
@@ -676,7 +677,7 @@ test('session.start repart sans commande ni propriétaire (session neuve ou rech
   on('command.register', () => ({ value: {} }) as never)
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
   hud.answer.current = { result: { backgroundTaskId: 'b1' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a1' } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true, agentId: 'a1' } as never)
   expect(hud.commands()).toEqual(['b1'])
   expect(hud.owners()).toEqual({ b1: 'a1' })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
@@ -802,9 +803,9 @@ test('Bash et Monitor enregistrent leur étiquette et leur origine, et la fin le
   const hud = wired(on)
   mock.clock(on)
   hud.answer.current = { result: { backgroundTaskId: 'b1' } }
-  await $.tool.call({ tool: 'Bash', input: { command: 'sleep 60', description: 'attendre' } } as never)
+  await $.tool.call({ tool: 'Bash', command: 'sleep 60', description: 'attendre' } as never)
   hud.answer.current = { result: { taskId: 'm1' } }
-  await $.tool.call({ tool: 'Monitor', input: { command: 'tail -f x' }, agentId: 'a1' } as never)
+  await $.tool.call({ tool: 'Monitor', command: 'tail -f x', agentId: 'a1' } as never)
   const info = hud.info() as Record<string, { tool: string; label: string; since: number }>
   expect(Object.keys(info)).toEqual(['b1', 'm1'])
   expect(info.b1).toMatchObject({ tool: 'Bash', label: 'attendre' })
@@ -820,7 +821,7 @@ test('/hud cmd répond la liste des commandes comptées, /hud bascule la bande',
   const hud = wired(on)
   mock.clock(on)
   hud.answer.current = { result: { backgroundTaskId: 'b1' } }
-  await $.tool.call({ tool: 'Bash', input: { command: 'sleep 60', description: 'attendre' } } as never)
+  await $.tool.call({ tool: 'Bash', command: 'sleep 60', description: 'attendre' } as never)
   const listed = await $.command.run({ command: 'hud', args: 'cmd' } as never)
   expect(listed.text).toMatch(/1 commande comptée :\n {2}b1 {2}Bash {5}session .*attendre/)
   const toggled = await $.command.run({ command: 'hud', args: '' } as never)
@@ -838,7 +839,7 @@ const settle = () => new Promise<void>(resolve => setTimeout(() => resolve(), 50
  * = avancer l'horloge d'un pas de minuterie.
  */
 const mounted = async (
-  $: Parameters<Parameters<typeof test>[1]>[0],
+  $: Parameters<TestBody>[0],
   on: On,
   agentList: { current: () => unknown },
   collector: { current: Promise<void> | undefined } = { current: undefined },
@@ -865,11 +866,11 @@ test('un sous-agent terminé emporte ses commandes au rafraîchissement, un sous
   const agentList = { current: (): unknown => ({ value: [] }) }
   const { hud, refresh } = await mounted($, on, agentList)
   hud.answer.current = { result: { backgroundTaskId: 'b1' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true } as never)
   hud.answer.current = { result: { backgroundTaskId: 'b2' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a1' } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true, agentId: 'a1' } as never)
   hud.answer.current = { result: { backgroundTaskId: 'b3' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a2' } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true, agentId: 'a2' } as never)
   expect(hud.commands()).toEqual(['b1', 'b2', 'b3'])
   agentList.current = () => ({
     value: [
@@ -887,7 +888,7 @@ test('si $.agent.list() échoue, le rafraîchissement ne retire aucune commande 
   const agentList = { current: (): unknown => ({ value: [] }) }
   const { hud, refresh } = await mounted($, on, agentList)
   hud.answer.current = { result: { backgroundTaskId: 'b2' } }
-  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a1' } as never)
+  await $.tool.call({ tool: 'Bash', run_in_background: true, agentId: 'a1' } as never)
   agentList.current = () => ({ deny: 'liste indisponible' })
   await refresh()
   expect(hud.commands()).toEqual(['b2'])
@@ -924,7 +925,7 @@ test('un sous-agent lancé pendant l\'attente du collecteur garde sa première c
     releaseWrite = resolve
   })
   hud.answer.current = { result: { backgroundTaskId: 'b9' } }
-  const called = $.tool.call({ tool: 'Bash', input: { run_in_background: true, description: 'z' }, agentId: 'a2' } as never)
+  const called = $.tool.call({ tool: 'Bash', run_in_background: true, description: 'z', agentId: 'a2' } as never)
   await settle()
   expect(hud.owners()).toEqual({ b9: 'a2' })
   releaseCollector()
@@ -946,4 +947,21 @@ test('/hud avec un argument inconnu répond « argument inconnu » sans basculer
   // rien n'a basculé : le premier « /hud » nu masque la bande, le second la réaffiche
   expect((await $.command.run({ command: 'hud', args: '' } as never)).text).toMatch(/masquée/)
   expect((await $.command.run({ command: 'hud', args: '  ' } as never)).text).toMatch(/affichée/)
+})
+
+test('les arguments de l\'outil sont à plat sur l\'événement tool.call : la fiche prend sa description, et TaskStop retire la tâche que son résultat ne nomme pas', async ($, on) => {
+  const hud = wired(on)
+  mock.clock(on)
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', command: 'sleep 60', description: 'attendre la CI', run_in_background: true } as never)
+  hud.answer.current = { result: { taskId: 'm1' } }
+  await $.tool.call({ tool: 'Monitor', command: 'tail -f x' } as never)
+  const info = hud.info() as Record<string, { label: string }>
+  expect(info.b1?.label).toBe('attendre la CI')
+  expect(info.m1?.label).toBe('tail -f x')
+  hud.answer.current = { result: { message: 'stopped' } }
+  await $.tool.call({ tool: 'TaskStop', task_id: 'b1' } as never)
+  expect(hud.commands()).toEqual(['m1'])
+  await $.tool.call({ tool: 'TaskStop', shell_id: 'm1' } as never)
+  expect(hud.commands()).toEqual([])
 })

@@ -143,11 +143,11 @@ export const register: Register = on => {
       // sans horloge, la commande est comptée quand même (sans fiche : la bande l'écrit « sans fin vue », faute d'âge)
       const since = await $.clock.now().catch(() => undefined)
       if (since !== undefined) {
-        await update($, info, (cur: Record<string, CommandInfo>) => ({ ...cur, [started]: { tool: e.tool, label: commandLabel(e.tool, e.input), since } }))
+        await update($, info, (cur: Record<string, CommandInfo>) => ({ ...cur, [started]: { tool: e.tool, label: commandLabel(e.tool, e), since } }))
       }
       await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
     } else {
-      const stopped = stoppedTask(e.tool, result.result, e.input)
+      const stopped = stoppedTask(e.tool, result.result, e)
       if (stopped) await endCommand($, stopped)
     }
     return result

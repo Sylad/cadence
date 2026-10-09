@@ -89,6 +89,8 @@ function withoutVersion(text: string | null): string | null {
  */
 export function isReleaseOnly(sha: string, root: string): boolean {
   const files = changedFiles(root, sha);
+  // Les noms d'abord : un fichier hors version refuse le commit sans qu'aucun contenu ne soit lu.
+  if (!files.length || !files.every((f) => CHANGELOG.test(f) || README.test(f) || VERSION_JSON.test(f))) return false;
   return (
     files.length > 0 &&
     files.every((f) => {

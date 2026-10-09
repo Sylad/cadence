@@ -1021,6 +1021,8 @@ lots:
     status: todo
     estimate: 1
     created: 2026-10-07
+    notes:
+      - { date: 2026-10-09, text: "prompt-audit 09-10 : ux-reviewer.md:19 dit « project's temporary folder », qa-reviewer.md:137 et code-reviewer.md:44 disent « outside the repository » — aligner les trois dans ce lot ; au passage qa-reviewer.md:78 raconte l'incident CDN au passé, garder la règle et sa raison sans le récit" }
   - id: L85
     title: "⚡ Test instable deliver.test.ts « realDeps.exec : au délai, aucun descendant ne survit » (expected 3013 < 2500) : rouge sous charge en suite complète (2 fois sur 4 le 07-10) — même famille que L81"
     status: done
@@ -1554,6 +1556,12 @@ lots:
     title: "Suite d'évaluation du plugin cadence (claude plugin eval, 2.1.263) : cas tirés des pièges relevés à la main (raf done refusé sans revue, deliver --sha, orchestrate avec ids à « / », livrer.sh sans bloc) et baseline sans plugin ; remplace l'essai réel haiku ; chaque run est facturé, à lancer à la release seulement"
     status: todo
     estimate: 2
+    created: 2026-10-09
+  - id: L140
+    title: "agents qa-reviewer et ux-reviewer : frontmatter sans tools: alors que le texte dit lecture seule — ils héritent de Edit et Write (prompt-audit 09-10) ; restreindre à Read, Grep, Glob, Bash et les outils Playwright, vérifier qu'un essai réel passe encore (capture, DOM, réseau), README"
+    status: todo
+    estimate: 0.5
+    quickwin: true
     created: 2026-10-09
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

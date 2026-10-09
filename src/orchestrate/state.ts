@@ -93,6 +93,8 @@ export interface LotState {
   pass: number;
   /** Vrai une fois la passe unique de correction des mineurs lancée (revue conforme avec mineurs) ; elle ne se rejoue pas. */
   minorPass?: boolean;
+  /** Passes de correction faites quand la passe des mineurs a été décidée : sert à nommer la dernière passe d'écriture jouée. */
+  minorPassAt?: number;
   /** Vrai entre la décision de la passe des mineurs et la fin de sa session `fix` : celle-ci reçoit le brief des mineurs, pas celui des défauts. */
   minorFix?: boolean;
   /** Mineurs confiés à la passe des mineurs (lignes de proposition) : retirés des propositions si la revue courte qui la suit est conforme. */

@@ -497,7 +497,9 @@ function overBudget(c: LotCtx, reserve = false): null {
   const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (dérivé de l'estimate), il ne reste pas de quoi payer la revue qui suivrait la correction (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, dérivé de l'estimate)`;
   // Tests rouges après une écriture : la passe fix refusée aurait suivi, le lot revient sans revue (L145) — la cause le dit.
   const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
-  const after = l.minorPass ? 'la passe des mineurs' : l.pass > 1 ? `la passe fix ${l.pass - 1}` : "l'implémentation";
+  // Passe d'écriture qui vient d'être jouée, nommée d'après le compteur : l.pass - 1 passes de correction l'ont précédée (minorPass reste vrai après la passe des mineurs).
+  const played = l.pass - 1;
+  const after = l.minorPass && played === (l.minorPassAt ?? 0) ? 'la passe des mineurs' : played > 0 ? `la passe fix ${played}` : "l'implémentation";
   const prefix = red ? `tests rouges après ${after}, correction suivante non abordable : ` : '';
   const unreviewed = red ? ' ; le lot revient sans revue, avec ses constats' : '';
   return stop(c, 'handed-back', `${prefix}${why} : étape « ${l.next ?? '?'} » non jouée${answer}${unreviewed}, à décider par le lead`);
@@ -828,6 +830,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   addProposals(c, rep, 'code', !minorPass);
   if (minorPass) {
     l.minorPass = true;
+    l.minorPassAt = l.pass;
     l.minorLines = rep.constats.filter((k) => k.gravite === 'mineur').map((k) => minorLine('code', k));
     l.minorFix = true;
     l.constats = minors;

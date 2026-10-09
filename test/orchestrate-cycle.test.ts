@@ -985,6 +985,16 @@ describe('budget et quota', () => {
     expect(c.lot.constats.some((k) => k.source === 'tests')).toBe(true);
   });
 
+  it("L151 — passe des mineurs, review-small majeur, passe fix rouge refusée : la cause dit la passe fix 1, pas la passe des mineurs", async () => {
+    const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'c.txt', 'fix(L1): c.txt')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }), { cacheWrite: 69_000 });
+    const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [fix('b.txt'), redFix, fix('d.txt')], 'review-small': [major] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE + 20000 });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small', 'fix']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/^tests rouges après la passe fix 1, correction suivante non abordable : /);
+  });
+
   it("L145 — tests rouges après l'implémentation, budget sans réserve pour la revue : cause nommée, réserve citée", async () => {
     const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: '2 failed', vert: false } })], fix: [fix('b.txt')] } });
     const c = h.lot('L1', { budget: REVIEW_RESERVE });

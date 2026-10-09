@@ -214,7 +214,11 @@ export function coveredTasks(plan: Plan, root: string, lotId: string): { task: s
   const open = new Set(lot.tasks.filter((t) => isOpen(t.status)).map((t) => t.id));
   const found = new Map<string, string>();
   for (const c of lotWork(plan, root, lotId)) {
-    for (const r of citedRefs(c, plan.refs)) if (r.lot === lotId && r.task && open.has(r.task) && !found.has(r.task)) found.set(r.task, c.sha);
+    const text = `${c.subject}\n${c.body}`;
+    const cited = citedRefs(c, plan.refs).filter((r) => r.lot === lotId && r.task);
+    // `fix(L3/t1,t2)` : le motif des références ne lit que la première sous-tâche d'une liste à virgule.
+    const listed = cited.length > 0 ? [...text.matchAll(new RegExp(`(?<![\\w/])${lotId}/(t\\d+(?:\\s*,\\s*t\\d+)*)(?![\\w/])`, 'g'))].flatMap((m) => m[1].split(/\s*,\s*/)) : [];
+    for (const task of [...cited.map((r) => r.task!), ...listed]) if (open.has(task) && !found.has(task)) found.set(task, c.sha);
   }
   return lot.tasks.filter((t) => found.has(t.id)).map((t) => ({ task: t.id, sha: found.get(t.id)! }));
 }

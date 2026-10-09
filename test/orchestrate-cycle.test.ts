@@ -1084,10 +1084,10 @@ describe('reprise après coupure', () => {
 
 describe('sous-tâches couvertes (L82)', () => {
   /** Trois sous-tâches au plan du lot L1 ; l'implémentation commite en citant t1 et t2 (pas t3). */
-  function withTasks() {
-    const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1/t1): a'), commitFile(call.opts.cwd, 'b.txt', 'feat(L1/t2): b')] }))], review: [ok] } });
+  function withTasks(subjects = ['feat(L1/t1): a', 'feat(L1/t2): b'], tasks = ['un', 'deux', 'trois']) {
+    const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: subjects.map((s, i) => commitFile(call.opts.cwd, `f${i}.txt`, s)) }))], review: [ok] } });
     const plan = h.plan();
-    for (const t of ['un', 'deux', 'trois']) plan.addTask('L1', t);
+    for (const t of tasks) plan.addTask('L1', t);
     plan.save();
     git(h.repo, 'add', '--', 'docs/plan/raf.yaml');
     git(h.repo, 'commit', '-q', '-m', 'plan: L1 sous-tâches', '--', 'docs/plan/raf.yaml');
@@ -1106,6 +1106,14 @@ describe('sous-tâches couvertes (L82)', () => {
     expect(git(h.repo, 'status', '--porcelain')).toBe('');
     expect(c.lot.warnings.join('\n')).toContain('L1/t1');
     expect(c.lot.proposals.join('\n')).not.toContain('L1/t1');
+  });
+
+  it('une liste à virgule dans la portée (fix(L1/t1,t2)) cite chacune de ses sous-tâches', async () => {
+    const h = withTasks(['fix(L1/t1,t2): a', 'fix(L1/t4, t5): b'], ['un', 'deux', 'trois', 'quatre', 'cinq']);
+    const c = h.lot('L1');
+    await runLot(c);
+    for (const t of ['t1', 't2', 't4', 't5']) expect(status(h, t)).toBe('done');
+    expect(status(h, 't3')).toBe('todo');
   });
 
   it('plan en lecture seule : la clôture est proposée au lead, le plan n\'est pas touché', async () => {

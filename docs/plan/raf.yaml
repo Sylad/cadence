@@ -1555,6 +1555,7 @@ lots:
     quickwin: true
     created: 2026-10-09
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "compliant — orchestré (vague 2026-10-09-0842, 0 passe(s) de correction)", commit: 36974bede543b3bddae259e6378e58bb58dfaecb }
   - id: L139
     title: "Suite d'évaluation du plugin cadence (claude plugin eval, 2.1.263) : cas tirés des pièges relevés à la main (raf done refusé sans revue, deliver --sha, orchestrate avec ids à « / », livrer.sh sans bloc) et baseline sans plugin ; remplace l'essai réel haiku ; chaque run est facturé, à lancer à la release seulement"
     status: todo

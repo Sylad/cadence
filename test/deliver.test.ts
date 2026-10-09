@@ -872,7 +872,7 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
   it('(a) Ctrl-C : un enfant en arrière-plan qui ignore SIGINT, son shell mort, est tué au plus tard à l’échéance de la grâce — un seul bump', async () => {
     const logs = tempDir();
     // `&` dans un sh non interactif : l'enfant ignore SIGINT ; le script, lui, meurt du signal dans `wait`
-    const dir = scriptRepo(logs, `  sh -c "sleep 3; echo bumped >> '${logs}/bumps'" &\n  wait`);
+    const dir = scriptRepo(logs, `  sh -c "sleep 8; echo bumped >> '${logs}/bumps'" &\n  wait`);
     const first = startFirst(logs, dir);
     try {
       expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
@@ -880,9 +880,11 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
       const t = Date.now();
       process.kill(-first.child.pid!, 'SIGINT'); // ce que fait le terminal
       const end = await first.exited;
-      expect(end - t).toBeLessThan(2_000 + 1_000); // la grâce, pas la fin de l'enfant
+      // L150 : la grâce (2 s) plus la sortie de vite-node, qui s'allonge sous charge ; l'enfant, lui, vit encore ~7 s :
+      // la borne reste très en dessous de sa fin, donc elle prouve toujours « la grâce, pas la fin de l'enfant ».
+      expect(end - t).toBeLessThan(2_000 + 3_000);
       expect(await cad(dir)).toBe(0); // seconde livraison : bumpe tout de suite
-      await pause(3_500); // au-delà du réveil de l'enfant de la première
+      await pause(6_500); // au-delà du réveil de l'enfant de la première (8 s après son lancement)
       expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
     } finally {
       first.cleanup();

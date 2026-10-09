@@ -32,6 +32,15 @@ describe('registre des vagues isolé par test (L150)', () => {
   });
 });
 
+/** Attend qu'une condition devienne vraie (événement), échoue en la nommant au bout de `ms` : sous charge, jamais une durée fixe. */
+async function until(cond: () => boolean, what: string, ms = 20_000): Promise<void> {
+  const t0 = Date.now();
+  while (!cond()) {
+    if (Date.now() - t0 > ms) throw new Error(`délai dépassé (${ms} ms) : ${what}`);
+    await new Promise((res) => setTimeout(res, 10));
+  }
+}
+
 /** Plusieurs projets sous un même dossier parent, chacun son dépôt git et son plan. */
 function parentWith(projects: Record<string, { title: string; estimate?: number; visible?: boolean; status?: 'doing'; after?: string[] }[]>) {
   const parent = tempDir();
@@ -391,15 +400,25 @@ describe('plafond de sessions simultanées et --status (L71)', () => {
     f.deps.slotPollMs = 10;
     const r = io(parent);
     const done = orchestrate(['a:L1'], r.io, f.deps);
-    await new Promise((res) => setTimeout(res, 150));
-    expect(f.calls).toEqual([]); // plafond atteint : aucune session
-    expect(r.out.join('\n')).toMatch(/en attente d'un créneau de session depuis \d+ s \(2\/2 en cours : x, y\)/);
-    x();
-    expect(await done).toBe(0);
-    expect(f.calls.length).toBeGreaterThan(0);
-    expect(r.out.join('\n')).toMatch(/créneau de session obtenu après \d+ s d'attente/);
-    y();
-    expect(liveSlots(home)).toEqual([]); // tous les créneaux de la vague sont rendus
+    // L150 — jamais un échec qui laisse la vague en vie : elle écrirait encore (wave.json.<pid>.tmp) après la
+    // suppression du dossier du test (ENOENT non géré). On libère les créneaux et on attend la fin quoi qu'il arrive.
+    try {
+      // La vague démarre (dépôts git, verrous, état) AVANT d'atteindre l'attente : sous charge cela dépasse tout délai
+      // fixe. On attend l'événement — son message d'attente — pas une durée.
+      await until(() => /en attente d'un créneau de session/.test(r.out.join('\n')), "le message d'attente de créneau");
+      expect(f.calls).toEqual([]); // plafond atteint : aucune session
+      expect(r.out.join('\n')).toMatch(/en attente d'un créneau de session depuis \d+ s \(2\/2 en cours : x, y\)/);
+      x();
+      expect(await done).toBe(0);
+      expect(f.calls.length).toBeGreaterThan(0);
+      expect(r.out.join('\n')).toMatch(/créneau de session obtenu après \d+ s d'attente/);
+      y();
+      expect(liveSlots(home)).toEqual([]); // tous les créneaux de la vague sont rendus
+    } finally {
+      x(); // idempotents : rendre un créneau déjà rendu ne fait rien
+      y();
+      await done.catch(() => undefined);
+    }
   });
 
   it('le plafond est celui du drapeau : --max-sessions 1 garde un créneau pour une seule session à la fois', async () => {

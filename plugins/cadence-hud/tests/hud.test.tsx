@@ -612,6 +612,26 @@ test('la notification de fin retire la commande, un prompt tapé n\'en retire au
   expect(hud.commands()).toEqual([])
 })
 
+test('une écriture d\'état qui échoue ne bloque ni l\'outil ni le prompt (tool.call, prompt.submit)', async ($, on) => {
+  let writes = 0
+  on('state.get', () => {
+    writes += 1
+    throw new Error('état illisible')
+  })
+  on('state.set', () => {
+    throw new Error('disque plein')
+  })
+  on('tool.call', () => ({ result: { backgroundTaskId: 'b1' } }) as never)
+  on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
+  const called = await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  expect(called).toEqual({ result: { backgroundTaskId: 'b1' } })
+  const stopped = await $.tool.call({ tool: 'TaskStop', input: { task_id: 'b1' } } as never)
+  expect(stopped).toBeDefined()
+  const submitted = await $.prompt.submit({ origin: { kind: 'task-notification' }, text: NOTIFICATION('b1') } as never)
+  expect(submitted).toEqual({ text: NOTIFICATION('b1') })
+  expect(writes).toBeGreaterThan(0)
+})
+
 test('l’expiration d’un Monitor finit sa tâche, un événement ordinaire non', () => {
   const expired = '<task-notification>\n<task-id>m1</task-id>\n<summary>Monitor event: "x"</summary>\n<event>[Monitor expired after 30m with 16 events delivered. Re-arm it if you still need the watch.]</event>\n</task-notification>'
   expect(endedTask(expired)).toBe('m1')

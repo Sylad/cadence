@@ -34,6 +34,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 - `cadence-hud`: the `N cmd` counter goes back down: a Monitor that expires (`[Monitor expired …]`, no status) ends its task, the background commands a subagent started end with it (their own notification never reaches the session), and a session (or a hot reload of the plugin) starts with no command. (L135)
+- `cadence-hud`: a failing state write in the `tool.call` and `prompt.submit` guard hooks no longer blocks the tool or the prompt; the HUD loses a line at worst (`claude plugin validate` 2.1.290 warning). (L136)
 
 ## [0.19.0] - 2026-10-08
 

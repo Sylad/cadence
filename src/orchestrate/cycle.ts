@@ -287,6 +287,16 @@ export const lotSpent = (l: LotState): number => l.steps.reduce((n, s) => n + (s
 /** Le lot a dépensé son propre budget (L78) : il ne compte plus que sur le lead, la vague garde le sien pour les autres. */
 const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) >= l.budget;
 
+/**
+ * Coût réservé à la revue qui suit une passe de correction (L145) : le 90e centile des revues, mesuré sur les journaux
+ * des vagues du 08 et 09-10 (183 revues, médiane 43 k, p90 62 k, max 106 k tokens comptés). Une passe fix ne part que
+ * s'il reste de quoi payer cette revue : un lot ne revient jamais au lead sur un correctif non relu.
+ */
+export const REVIEW_RESERVE = 65_000;
+
+/** Une passe de correction laisse-t-elle de quoi rejouer la revue dans le budget du lot ? Sans budget de lot : toujours. */
+const fixAffordable = (l: LotState): boolean => l.budget === undefined || lotSpent(l) + REVIEW_RESERVE < l.budget;
+
 /** Pourquoi plus aucune session ne doit partir (incident, quota, budget), sinon null. */
 function halted(w: WaveCtx, lot?: LotState): string | null {
   if (w.incident) return `vague arrêtée : ${w.incident}`;
@@ -313,9 +323,10 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const l = c.lot;
   const halt = halted(w, l);
   if (halt) return suspend(c, halt);
-  if (lotOver(l)) return overBudget(c);
-
   const write = kind === 'implement' || kind === 'fix';
+  // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est toujours jouée, la passe fix réserve son coût.
+  if (write && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
+
   const model: Model = write ? l.model : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
   const before = await snapshot(l.repo);
@@ -469,12 +480,16 @@ function lostVerdict(c: LotCtx, kind: StepKind, report: unknown): string {
   return ` ; ${text}`;
 }
 
-/** Budget du lot atteint avant une session : le lot est rendu au lead (reprendre ne lui rendrait pas de budget), les autres continuent. */
-function overBudget(c: LotCtx): null {
+/**
+ * Budget du lot atteint avant une session d'écriture : le lot est rendu au lead (reprendre ne lui rendrait pas de budget), les autres continuent.
+ * `reserve` : le budget n'est pas dépensé, mais la passe fix ne laisserait pas de quoi rejouer la revue (L145).
+ */
+function overBudget(c: LotCtx, reserve = false): null {
   const l = c.lot;
   // Une réponse du lead encore en attente n'a pas été consommée : elle ne doit pas se perdre sans qu'on le dise.
   const answer = l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '';
-  return stop(c, 'handed-back', `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, dérivé de l'estimate) : étape « ${l.next ?? '?'} » non jouée${answer}, à décider par le lead`);
+  const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (dérivé de l'estimate), il ne reste pas de quoi payer la revue qui suivrait la correction (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, dérivé de l'estimate)`;
+  return stop(c, 'handed-back', `${why} : étape « ${l.next ?? '?'} » non jouée${answer}, à décider par le lead`);
 }
 
 function suspend(c: LotCtx, why: string): null {
@@ -723,10 +738,6 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
     suspend(c, halt); // la session n'aurait pas lieu : l'application ne se lance pas pour rien
     return;
   }
-  if (lotOver(l)) {
-    overBudget(c);
-    return;
-  }
   c.wave.log(`${lotKey(l.project, l.lot)} · lancement de l'application (${ux.url})`);
   const app = await startApp({ command: ux.command, url: ux.url, cwd: l.repo, nodeBin: l.node?.link, log: join(c.wave.store.lotDir(l.project, l.lot), 'ux-app.log'), timeoutMs: (ux.timeout ?? APP_TIMEOUT_S) * 1000 });
   try {
@@ -784,9 +795,9 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   // Revue conforme avec mineurs : une seule passe de correction des mineurs, avant de conclure (rien sous le tapis).
   // Budget épuisé : la passe n'aurait aucune session pour la jouer, le lot conclut sur la revue conforme et rend les mineurs.
   const wanted = summary.conforme && uxOk && !l.minorPass && !l.light && minors.length > 0; // lot léger : les mineurs restent des notes (L108)
-  const noBudget = wanted && (w.budget.exhausted || lotOver(l)) && !w.incident && !w.quota.hit;
+  const noBudget = wanted && (w.budget.exhausted || !fixAffordable(l)) && !w.incident && !w.quota.hit;
   const minorPass = wanted && !noBudget;
-  if (noBudget) l.warnings.push(`${w.budget.exhausted ? 'budget' : 'budget du lot'} atteint : la passe des mineurs n'a pas eu lieu, mineurs rendus en propositions`);
+  if (noBudget) l.warnings.push(`${w.budget.exhausted ? 'budget atteint' : 'budget du lot trop juste pour payer la revue qui suivrait'} : la passe des mineurs n'a pas eu lieu, mineurs rendus en propositions`);
   // Les mineurs confiés à la passe ont pu être proposés par une revue non conforme antérieure : si la revue qui la suit est
   // conforme, ils sont traités et ne restent pas en propositions (ceux que cette revue signale encore sont ajoutés juste après).
   if (l.minorPass && !minorPass && summary.conforme && uxOk && l.minorLines?.length) {

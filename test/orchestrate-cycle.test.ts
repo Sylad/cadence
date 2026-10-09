@@ -4,7 +4,7 @@ import { isAbsolute, join } from 'node:path';
 import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
-import { isNonQuestion, runLot } from '../src/orchestrate/cycle.js';
+import { REVIEW_RESERVE, isNonQuestion, runLot } from '../src/orchestrate/cycle.js';
 import { runPool } from '../src/orchestrate/pool.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir, readAgents } from '../src/orchestrate/launch.js';
@@ -21,6 +21,14 @@ const impl = (file = 'a.txt', over: Record<string, unknown> = {}): Handler => (c
 };
 const fix = (file: string): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, file, `fix(L1): ${file}`)] }));
 const ok: Handler = () => claudeOut(reviewReport());
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
 const major: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }], verdict: 'non conforme' }));
 const kinds = (h: ReturnType<typeof harness>) => h.calls.map((c) => c.kind);
 
@@ -916,16 +924,40 @@ describe('budget et quota', () => {
     expect(c.lot.status).toBe('ready');
   });
 
-  it("L78 — le budget du lot atteint rend le lot au lead sans ouvrir de session, la vague garde son budget", async () => {
+  it("L145 — le budget du lot dépensé par l'implémentation n'empêche pas la revue : elle est toujours jouée", async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
     const c = h.lot('L1', { budget: 1000 }); // l'implémentation compte 1500 (100 + 1000 + 400)
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement']);
-    expect(c.lot.status).toBe('handed-back');
-    expect(c.lot.outcome).toMatch(/budget du lot atteint \(1500 \/ 1000/);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('ready');
     expect(h.wave.budget.exhausted).toBe(false);
+  });
+
+  it("L145 — revue non conforme, budget du lot dépassé : pas de passe fix, le lot est rendu après la revue", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: 1000 });
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement']);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/budget du lot atteint \(\d+ \/ 1000/);
+    expect(c.lot.code?.conforme).toBe(false);
+  });
+
+  it("L145 — la passe fix réserve le coût d'une revue : sous le budget mais sans de quoi relire, elle n'a pas lieu", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE }); // dépensé ≈ 3 k, moins que le budget, mais 3 k + réserve > budget
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/pas de quoi payer la revue.*65000 réservés/);
+  });
+
+  it("L145 — avec de quoi payer la revue, la passe fix a lieu puis la revue est rejouée même si elle dépasse le budget du lot", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE + 6000 }); // la correction fait passer le cumul au-delà du budget
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
+    expect(c.lot.status).toBe('ready');
   });
 
   it("L78 — une question posée après le budget du lot : la réponse n'est pas jouée et la cause le dit", async () => {
@@ -1518,17 +1550,17 @@ describe('budget du lot atteint (L78)', () => {
     expect(h.wave.budget.exhausted).toBe(false);
     expect(c.lot.status).toBe('ready');
     expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
-    expect(c.lot.warnings.join('\n')).toContain("budget du lot atteint : la passe des mineurs n'a pas eu lieu");
+    expect(c.lot.warnings.join('\n')).toContain("budget du lot trop juste pour payer la revue qui suivrait : la passe des mineurs n'a pas eu lieu");
   });
 
-  it("revue UX : au-delà de son budget le lot est rendu, l'application n'est pas lancée", async () => {
+  it("L145 — revue UX : au-delà de son budget le lot joue quand même ses revues, l'application est lancée", async () => {
     const app = await fakeApp(200);
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
     const c = h.lot('L1', { visible: true, budget: 1000 }, { ux: { command: app.command, url: app.url, timeout: 20 } });
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement']);
-    expect(c.lot.status).toBe('handed-back');
-    expect(existsSync(join(app.dir, 'pid'))).toBe(false);
+    expect(kinds(h)).toEqual(['implement', 'ux', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false); // application tuée après l'étape
   });
 });
 
@@ -1627,14 +1659,6 @@ describe('lot déjà commité : implement tourne toujours (L53)', () => {
 });
 
 describe('le programme lance l\'application de la revue UX (L60)', () => {
-  const alive = (pid: number) => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
-  };
 
   it('prête : brief « The running app is at <url> » sans consigne de lancement, journal dans le dossier du lot, application tuée après l\'étape', async () => {
     const app = await fakeApp(200);

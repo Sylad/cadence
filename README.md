@@ -1010,8 +1010,10 @@ tree (screenshots left at the root, a commit) is an incident of that lot only: t
 
 **Budget**: the wave counts input + cache writes + output tokens (default 2 M); cache reads are kept and
 shown apart. Each lot also has its own budget derived from its estimate (400 k tokens per day, floor 200 k, shown by
-`--dry-run`): a lot that spent it gets no further session and is handed back to the lead, the wave budget stays for
-the others. When the budget (or the usage limit) is reached no new session starts, the running ones
+`--dry-run`): it bounds the *writing* passes, never the reviews. A lot that spent it gets no further implementation or
+fix and is handed back to the lead, but its review (and UX review) is always played first; a fix pass starts only if
+the remaining budget can also pay the review that follows it (65 k tokens reserved, the 90th percentile of the reviews
+measured in the wave journals), so a lot is never returned right before its review. The wave budget stays for the others. When the budget (or the usage limit) is reached no new session starts, the running ones
 finish, the wave is *suspended* (exit code 3) and `--resume --budget …` continues. A session that returns
 nothing readable, times out (45 min for work, 25 for a review) or fails is not retried; the lot is handed
 back with the cause. Exit codes: 0 every lot ready · 1 at least one lot handed back (question, failure,

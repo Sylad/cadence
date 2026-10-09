@@ -33,6 +33,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `docs.sync` in `cadence.yaml`: `raf check`, `lead tour` and the review brief report a document that does not follow the code | [0.21.0](#0210---2026-10-09) |
 | `docs.articles` in `cadence.yaml`: after a green `cadence deliver`, a lot `Article <project> à rafraîchir` opened in the neighbouring repository | [0.21.0](#0210---2026-10-09) |
 
+## [Unreleased]
+
+### Changed
+- `cadence orchestrate`: the final review is always played. A lot's own budget (derived from its estimate) now bounds the writing passes only, never the reviews: a lot that spent it during the implementation or a fix still gets its review (and UX review), and is handed back after it, not before. A fix pass starts only if the lot's remaining budget can pay a review after it (65 k tokens reserved, the 90th percentile of 183 reviews measured in the wave journals of 10-08 and 10-09: median 43 k, max 106 k); otherwise the lot is handed back after the review that asked for the fix, with the reason, and the minors pass follows the same rule. The wave budget and the usage limit still stop everything. (L145)
+
 ## [0.21.0] - 2026-10-09
 
 ### Added

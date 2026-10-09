@@ -1591,6 +1591,16 @@ lots:
     review: { date: 2026-10-09, verdict: "conforme (3e passe, Opus) : 2 courses corrigées et testées, /hud cmd, README et mod à jour ; release 0.20.0 efb4bbb (bump de version, CHANGELOG, What's new, sans code)", commit: efb4bbb241dd9df02f5b1e7fa78b59bceaa15b89 }
     ux: { date: 2026-10-09, verdict: "conforme sur les tests de rendu (segments « N cmd » puis « N cmd sans fin vue » en gris, vague terminée grise sans budget puis masquée après 30 min, /hud cmd lisible) ; rendu réel du terminal à confirmer à l'œil par Sylvain après rechargement du mod" }
     finished: 2026-10-09
+  - id: L143
+    title: "Documentation qui suit le code, vérifiée par le programme : clé docs.sync dans cadence.yaml (liste de paires chemins modifiés → documents à toucher : README, doc d'usage, CLAUDE.md), raf check signale un lot dont les commits touchent les chemins sans toucher le document, le brief review le passe en constat majeur avec la liste calculée (plus une phrase) ; cadence lead tour l'affiche en dérive ; essai réel sur ol-companion et cadence. Demande Sylvain 09-10 : « une doc obsolète peut être trompeuse »"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-09
+  - id: L144
+    title: "Articles externes rafraîchis à la livraison, comme les Nouveautés : clé docs.articles dans cadence.yaml (dépôt voisin + fichier, ex. l'étude de cas du projet dans claude-code-codex) ; après une livraison verte, cadence deliver ouvre dans ce dépôt un lot « Article <projet> à rafraîchir » qui cite les titres publics livrés et les sections à relire ; le lot se joue ensuite dans une vague ordinaire (Sonnet réécrit, revue vérifie) ; le skill sync-site-docs est retiré au profit de ce mécanisme. Demande Sylvain 09-10"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-09
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

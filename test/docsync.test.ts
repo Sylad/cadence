@@ -140,6 +140,21 @@ describe('raf check : docs.sync', () => {
     expect((await cad(nu, 'check')).out).not.toContain('documentation en retard');
   });
 
+  it('le « What\'s new » écrit dans le commit de version ne compte pas comme documentation', async () => {
+    const dir = await repo();
+    work(dir, 'chore: readme', ['README.md']);
+    write(dir, 'README.md', "# x\n\n## What's new\n\n- 1.0\n\n## Usage\n\nu\n");
+    git(dir, 'add', '--', 'README.md');
+    commit(dir, 'chore: readme neuf', '2026-10-09T09:00:00');
+    work(dir, 'feat(L1): code', ['src/a.ts']);
+    write(dir, 'README.md', "# x\n\n## What's new\n\n- 1.1\n\n## Usage\n\nu\n");
+    write(dir, 'CHANGELOG.md', '## 1.1\n');
+    git(dir, 'add', '--', 'README.md', 'CHANGELOG.md');
+    commit(dir, 'chore(L1): version 1.1', '2026-10-09T11:00:00');
+    const { out } = await cad(dir, 'check');
+    expect(out).toContain('L1 : documentation en retard');
+  });
+
   it('un lot terminé n\'est audité que depuis docs.since', async () => {
     const dir = await repo(`${CONFIG}  since: 2026-10-10\n`);
     work(dir, 'feat(L1): code', ['src/a.ts']);

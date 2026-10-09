@@ -358,8 +358,8 @@ docs:
 ```
 
 A pattern is an exact path, with `*` (inside a folder), `**` (across folders), `?`, or a trailing `/` for
-a whole folder. `raf check` takes the **work commits** of every lot in progress (plan-only commits do
-not count; a lot finished on or after `docs.since` is audited too) and, for each pair, reports the lot when
+a whole folder. `raf check` takes the **work commits** of every lot in progress (plan-only commits and
+version commits do not count — so a "What's new" line written in the version commit is not documentation; a lot finished on or after `docs.since` is audited too) and, for each pair, reports the lot when
 those commits touch `paths` without any of them touching a file of `docs`:
 
 ```

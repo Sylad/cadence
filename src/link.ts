@@ -15,7 +15,7 @@ export function isMerge(c: Commit): boolean {
 }
 
 /** Portée d'un sujet « type(L24,L25)! : … » ; null sans parenthèses. */
-function scopeOf(subject: string): string | null {
+export function scopeOf(subject: string): string | null {
   return /^[\w-]+\(([^)]*)\)!?\s*:/.exec(subject)?.[1] ?? null;
 }
 

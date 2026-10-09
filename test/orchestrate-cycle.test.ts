@@ -1116,6 +1116,14 @@ describe('sous-tâches couvertes (L82)', () => {
     expect(status(h, 't3')).toBe('todo');
   });
 
+  it('une sous-tâche seulement mentionnée dans le corps (« Reste à faire : L1/t3 ») n\'est pas close', async () => {
+    const h = withTasks(['feat(L1/t1): a\n\nReste à faire : L1/t3'], ['un', 'deux', 'trois']);
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(status(h, 't1')).toBe('done');
+    expect(status(h, 't3')).toBe('todo');
+  });
+
   it('plan en lecture seule : la clôture est proposée au lead, le plan n\'est pas touché', async () => {
     const h = withTasks();
     const c = h.lot('L1', { readOnlyPlan: true }, { start: 'true' });

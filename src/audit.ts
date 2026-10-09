@@ -4,7 +4,7 @@ import { check } from './check.js';
 import type { Day } from './dates.js';
 import { parse } from 'yaml';
 import { changedFiles, fileAt, readCommits, type Commit } from './git.js';
-import { citedRefs, linkCommits, type Linked } from './link.js';
+import { citedRefs, linkCommits, scopeOf, type Linked } from './link.js';
 import { readDocsConfig, readNewsConfig } from './config.js';
 import { docSyncGaps, filesOf, gapMessage } from './docsync.js';
 import { type Entry, loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong, reusedNewsTitle } from './news.js';
@@ -214,9 +214,11 @@ export function coveredTasks(plan: Plan, root: string, lotId: string): { task: s
   const open = new Set(lot.tasks.filter((t) => isOpen(t.status)).map((t) => t.id));
   const found = new Map<string, string>();
   for (const c of lotWork(plan, root, lotId)) {
-    const text = `${c.subject}\n${c.body}`;
     const cited = citedRefs(c, plan.refs).filter((r) => r.lot === lotId && r.task);
     // `fix(L3/t1,t2)` : le motif des références ne lit que la première sous-tâche d'une liste à virgule.
+    // Même texte que citedRefs : la portée quand elle cite des lots, sinon le message entier (le corps ne compte pas à côté d'une portée).
+    const scope = scopeOf(c.subject);
+    const text = scope !== null && plan.refs(scope).length > 0 ? scope : `${c.subject}\n${c.body}`;
     const listed = cited.length > 0 ? [...text.matchAll(new RegExp(`(?<![\\w/])${lotId}/(t\\d+(?:\\s*,\\s*t\\d+)*)(?![\\w/])`, 'g'))].flatMap((m) => m[1].split(/\s*,\s*/)) : [];
     for (const task of [...cited.map((r) => r.task!), ...listed]) if (open.has(task) && !found.has(task)) found.set(task, c.sha);
   }

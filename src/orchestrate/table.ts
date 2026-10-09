@@ -55,9 +55,11 @@ function gitCommitsOf(l: LotState): string[] {
 const sameCommit = (a: string, b: string) => a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a));
 
 /**
- * Sha des commits du lot dans son dépôt, du plus ancien au plus récent : ceux que git attribue au lot (une session en échec,
- * au rapport illisible ou coupée par le quota n'a pas rempli `steps[].commits` ; ceux d'une vague précédente n'y sont pas),
+ * Sha des commits du lot dans son dépôt : ceux que git attribue au lot (une session en échec, au rapport illisible ou coupée
+ * par le quota n'a pas rempli `steps[].commits` ; ceux d'une vague précédente n'y sont pas), du plus ancien au plus récent,
  * puis ceux des étapes que git n'a pas retrouvés (entrées `<sha> <sujet>` ; ceux d'un dépôt voisin, `[rel] sha`, sont écartés).
+ * Ce second groupe suit le premier sans respecter l'ordre de l'historique (git écarte les commits plan-seuls et de version, qui
+ * reviennent par les étapes) : le premier et le dernier commit s'obtiennent par ascendance (`oldest`, `newest`), pas par position.
  */
 function own(l: LotState, fromGit: (l: LotState) => string[]): string[] {
   const out = [...new Set(fromGit(l))];
@@ -65,6 +67,16 @@ function own(l: LotState, fromGit: (l: LotState) => string[]): string[] {
     if (!out.some((o) => sameCommit(o, c))) out.push(c);
   }
   return out;
+}
+
+/** Le plus récent des commits par ascendance (jamais la position) : `best` cède la place à `c` quand il en est un ancêtre. */
+function newest(repo: string, shas: string[], ancestor: (repo: string, a: string, b: string) => boolean): string {
+  return shas.reduce((best, c) => (ancestor(repo, best, c) ? c : best));
+}
+
+/** Le plus ancien des commits par ascendance : `best` cède la place à `c` quand il en est un descendant. */
+function oldest(repo: string, shas: string[], ancestor: (repo: string, a: string, b: string) => boolean): string {
+  return shas.reduce((best, c) => (ancestor(repo, c, best) ? c : best));
 }
 
 /**
@@ -76,8 +88,8 @@ function deliverable(lots: LotState[], ancestor: (repo: string, a: string, b: st
   const mine = new Map(lots.map((l) => [l, own(l, fromGit)]));
   for (const repo of new Set(lots.map((l) => l.repo))) {
     const here = lots.filter((l) => l.repo === repo);
-    const blocked = here.filter((l) => l.status !== 'ready' && mine.get(l)!.length > 0).map((l) => ({ lot: l, first: mine.get(l)![0] }));
-    const ready = here.filter((l) => l.status === 'ready' && mine.get(l)!.length > 0).map((l) => ({ lot: l, last: mine.get(l)!.at(-1)! }));
+    const blocked = here.filter((l) => l.status !== 'ready' && mine.get(l)!.length > 0).map((l) => ({ lot: l, first: oldest(repo, mine.get(l)!, ancestor) }));
+    const ready = here.filter((l) => l.status === 'ready' && mine.get(l)!.length > 0).map((l) => ({ lot: l, last: newest(repo, mine.get(l)!, ancestor) }));
     const ok = ready.filter((r) => blocked.every((b) => !ancestor(repo, b.first, r.last)));
     const above = ok.map((r) => ({ ...r, under: blocked.find((b) => ancestor(repo, r.last, b.first))?.lot })).filter((r) => r.under);
     const top = above.find((r) => above.every((o) => ancestor(repo, o.last, r.last)));

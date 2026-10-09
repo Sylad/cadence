@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
-import { readOrchestrateConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
+import { planLoader, readOrchestrateConfig, type OrchestrateConfig } from '../config.js';
 import { isDay, toDay, type Day } from '../dates.js';
 import { gitRoot, hooksDir } from '../git.js';
 import { onTermination } from '../proc.js';
@@ -154,9 +154,8 @@ interface Target {
 /** Ce qu'un projet fournit à l'orchestrateur : sa configuration et la lecture de son plan (comme le CLI). */
 export function projectEnv(repo: string): { config: OrchestrateConfig; loadPlan: () => Plan; configPath: string } {
   const configPath = join(repo, 'cadence.yaml');
-  const planConfig = readPlanConfig(configPath, repo);
-  const planPath = resolve(repo, planConfig?.path ?? 'docs/plan/raf.yaml');
-  return { config: readOrchestrateConfig(configPath), loadPlan: () => Plan.load(planPath, { ...planConfig?.settings, config: configPath }), configPath };
+  const loadPlan = planLoader(repo);
+  return { config: readOrchestrateConfig(configPath), loadPlan, configPath };
 }
 
 const isProject = (dir: string) => existsSync(join(dir, 'docs/plan/raf.yaml')) || (existsSync(join(dir, 'cadence.yaml')) && /^plan\s*:/m.test(readFileSync(join(dir, 'cadence.yaml'), 'utf8')));

@@ -1,11 +1,10 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, join } from 'node:path';
 import { audit, nextUp, planCommits } from './audit.js';
-import { readPlanConfig } from './config.js';
+import { planLoader, readPlanConfig } from './config.js';
 import { diffDays, type Day } from './dates.js';
 import { gitRoot, repoStatus } from './git.js';
 import { linkCommits } from './link.js';
-import { Plan } from './plan.js';
 import { lastActivity, lockStatus } from './session.js';
 import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { readNext, sharedStateDir, stateDir } from './state.js';
@@ -81,10 +80,7 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE): TourRow {
   const row = empty(basename(dir));
   try {
     const root = gitRoot(dir) ?? dir;
-    const configPath = join(root, 'cadence.yaml');
-    const planConfig = readPlanConfig(configPath, root);
-    const planPath = resolve(root, planConfig?.path ?? 'docs/plan/raf.yaml');
-    const plan = Plan.load(planPath, { ...planConfig?.settings, config: configPath });
+    const plan = planLoader(root)();
     const lots = plan.lots();
     const all = linkCommits(lots, planCommits(plan, root), plan.refs);
     const { doing, ready } = nextUp(lots);

@@ -5,7 +5,7 @@ import { isDay, type Day } from './dates.js';
 import type { ArticleRule } from './articles.js';
 import type { DocSyncRule } from './docsync.js';
 import { gitRoot } from './git.js';
-import { FIELDS, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
+import { FIELDS, Plan, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
 export interface PlanConfig {
   /** Chemin du plan, relatif à la racine du dépôt. */
@@ -81,6 +81,17 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
   if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
   return { ...(p.path != null ? { path: String(p.path) } : {}), settings };
+}
+
+/**
+ * Le chargeur du plan du projet dont `root` est la racine : le `cadence.yaml` est lu tout de suite (une erreur sort ici), le plan à
+ * chaque appel. Une seule lecture de « où est le plan et comment le lire » pour l'orchestrateur, `lead tour` et le tirage de `--continue`.
+ */
+export function planLoader(root: string): () => Plan {
+  const configPath = join(root, 'cadence.yaml');
+  const planConfig = readPlanConfig(configPath, root);
+  const planPath = resolve(root, planConfig?.path ?? 'docs/plan/raf.yaml');
+  return () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
 }
 
 function parseFormat(p: Record<string, unknown>, bad: (what: string) => RafError): PlanFormat {

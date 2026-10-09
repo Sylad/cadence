@@ -1,11 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, join } from 'node:path';
 import { parse } from 'yaml';
 import { nextUp } from '../audit.js';
-import { readPlanConfig } from '../config.js';
+import { planLoader } from '../config.js';
 import { gitRoot } from '../git.js';
 import { findProjects, isProject } from '../lead.js';
-import { Plan, RafError, type Lot } from '../plan.js';
+import { RafError, type Lot } from '../plan.js';
 import { lotBudget } from './command.js';
 
 /** `--until 18:00` : l'heure d'aujourd'hui (date de `now`) à partir de laquelle la vague ne tire plus de lot. */
@@ -66,13 +66,6 @@ export interface DrawOpts {
   remaining: number;
 }
 
-function loadPlan(dir: string): Plan {
-  const root = gitRoot(dir) ?? dir;
-  const configPath = join(root, 'cadence.yaml');
-  const planConfig = readPlanConfig(configPath, root);
-  return Plan.load(resolve(root, planConfig?.path ?? 'docs/plan/raf.yaml'), { ...planConfig?.settings, config: configPath });
-}
-
 /**
  * Les lots tirables sous `launch` : prêts (à faire, `after` levé, ni récurrents ni en cours), ni « à décider avec Sylvain » ni déjà
  * dans la vague, dont le budget tient dans `remaining` ; projets dans l'ordre de priorité (puis alphabétique), lots dans l'ordre du plan
@@ -85,7 +78,7 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
   for (const { dir, project } of ranked) {
     let ready: Lot[];
     try {
-      ready = nextUp(loadPlan(dir).lots()).ready;
+      ready = nextUp(planLoader(gitRoot(dir) ?? dir)().lots()).ready;
     } catch {
       continue;
     }

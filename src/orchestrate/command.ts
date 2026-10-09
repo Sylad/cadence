@@ -442,10 +442,12 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   const pre = await preflight(args, targets, io, deps, launch);
   refusals.push(...pre.refusals);
   const budget = args.budget ?? DEFAULT_BUDGET;
+  const firstSkipped: string[] = [];
   // --continue sans lot donné : le premier tour est tiré du plan ; rien de prêt, ou tout refusé, vaut un refus avant d'agir.
   if (args.continue && args.lots.length === 0 && refusals.length === 0) {
     const first = await draw(args, io, deps, launch, new Set(), budget, maxSessions(args, io));
     pre.lots.push(...first.lots);
+    firstSkipped.push(...first.skipped);
     refusals.push(...(first.lots.length ? [] : first.skipped.length ? first.skipped : ['--continue : aucun lot prêt dont l\'estimation tient dans le budget']));
   }
   if (refusals.length) {
@@ -490,6 +492,11 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     }
   }
   const id = store.id;
+  // Les candidats refusés au premier tirage : leur cause dit pourquoi ils ne jouent pas (même ligne que celles des tirages suivants).
+  for (const s of firstSkipped) {
+    io.err(`orchestrate : lot sauté — ${s}`);
+    store.journal(`continue : lot sauté — ${s}`);
+  }
   const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)) };
   // Une vague qui n'a pas atteint `wave.json` (refus au verrou, démarrage en échec) ne laisse pas son dossier réservé :
   // le même `--wave` se relance, et `reserve` ne le prend pas pour une vague existante.

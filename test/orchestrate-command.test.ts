@@ -1284,6 +1284,19 @@ describe('--continue (L147)', () => {
 
   });
 
+  it('au premier tour sans lot donné, un lot sauté dit sa cause : sur la sortie d\'erreur et dans le journal de la vague', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n# sale\n');
+    const f = fakeDeps();
+    const o = io(parent);
+    expect(await orchestrate(['--continue', '--priority', 'a,b', '--max-sessions', '1'], o.io, f.deps)).toBe(0);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['b:L1']);
+    expect(o.err.join('\n')).toMatch(/lot sauté — a : arbre sale/);
+    const journal = readFileSync(join(RunStore.last(parent)!.dir, 'journal.log'), 'utf8');
+    expect(journal).toMatch(/continue : lot sauté — a : arbre sale/);
+    expect(journal.indexOf('lot sauté')).toBeLessThan(journal.indexOf('continue : arrêt'));
+  });
+
   it('une clé priority: invalide du cadence.yaml du dossier de lancement est refusée avant d\'agir, même avec des lots donnés', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
     writeFileSync(join(parent, 'cadence.yaml'), 'priority: 3\n');

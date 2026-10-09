@@ -1578,12 +1578,13 @@ lots:
   - id: L142
     title: "cadence-hud : la bande reste trompeuse après la fin — « 1 cmd » en orange sans aucune commande en cours, et la ligne de vague « terminée il y a 1 h 04 · budget 12 % · 1 prêt » toujours affichée ; dire clairement l'état : nommer ce qui est compté (/hud cmd liste les commandes comptées avec leur origine), retomber à zéro quand toutes les fins sont passées, et une vague terminée disparaît après un délai ou s'affiche en gris « terminée » sans budget"
     public: La bande d'état retombe à zéro et grise les vagues terminées
-    status: todo
+    status: doing
     estimate: 0.5
     visible: true
     created: 2026-10-09
     notes:
       - { date: 2026-10-09, text: "Vu 09-10 11:50 par Sylvain, session lead (hud 0.3.3 rsyncé pendant la session, L135 chargé au démarrage) : après deux vagues orchestrate (0842, 0945), 5 Bash en arrière-plan (2 orchestrate, 3 deliver dont un en pipe « | tail », tous notifiés), 3 Monitor arrêtés par TaskStop, 5 sous-agents rendus, pgrep ne montre aucun processus — la bande affiche encore « 1 cmd » et la ligne de la vague 0945 terminée 1 h 04 plus tôt. Hypothèses à vérifier : Monitor arrêté par TaskStop non décompté, ou commande de fond dont la notification est arrivée pendant un tour de sous-agent" }
+    started: 2026-10-09
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -1030,6 +1030,32 @@ test('la bande publie le contexte de la session pour `cadence session context` (
   expect(typeof body.at).toBe('number')
 })
 
+test('la fiche publiée pour `cadence session context` porte le cwd de session.start, pas le dossier de lancement résolu (L154)', async ($, on) => {
+  const agentList = { current: (): unknown => ({ value: [] }) }
+  const runs: string[][] = []
+  wired(on)
+  const clock = mock.clock(on)
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => agentList.current() as never)
+  on('session.usage', () => ({ value: { context: { percent: 61, tokens: 122_000, window: 200_000 }, rateLimits: [] } }) as never)
+  on('session.id', () => ({ value: 'lead-2' }) as never)
+  on('process.run', async (_$, e) => {
+    const argv = (e as unknown as { argv: string[] }).argv
+    runs.push(argv)
+    // le résolveur répond un ancêtre : le dossier de lancement du tableau est /w, la session a démarré dans /w/ol
+    if (argv.includes(LAUNCH_FOLDER)) return { value: { exitCode: 0, stdout: '/w\n', stderr: '' } } as never
+    return { value: { exitCode: 1, stdout: '', stderr: 'absent' } } as never
+  })
+  await $.session.start({ cwd: '/w/ol', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  await clock.advance(5_000)
+  await settle()
+  const published = runs.find(a => a.some(x => x.includes('hud-context')))
+  expect(published).toBeDefined()
+  expect(JSON.parse(published![published!.length - 1]!)).toMatchObject({ session: 'lead-2', cwd: '/w/ol' })
+})
+
 // ── L149 : avancement des plans par projet ────────────────────────────────────────────────────────────────────
 
 const TOUR = [

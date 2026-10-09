@@ -41,7 +41,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- `cadence-hud`: the projects' progress follows the folder the session was launched from (or its nearest ancestor whose `cadence.yaml` has `priority:`), not the shell's current folder — a `cd` by the lead into a sub-project no longer shrinks the band to a single line (L154).
+- `cadence-hud`: the projects' progress follows the folder the session was launched from (or its nearest ancestor whose `cadence.yaml` has `priority:`), not the shell's current folder — a `cd` by the lead into a sub-project no longer shrinks the band to a single line; the session context published for `cadence session context` keeps the `session.start` folder (L154).
 - `cadence-hud`: the project line of the plans' progress names the lots in progress after their count — `10/20 · 2 en cours : L72 L79` — three at most, then `…`; the count alone at zero (L153, `cadence-hud` 0.4.2).
 
 ## [0.24.0] - 2026-10-09

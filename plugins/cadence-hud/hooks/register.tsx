@@ -43,10 +43,13 @@ export const register: Register = on => {
   let tourSignature: string | undefined
   let tourAt = 0
   let sessionCwd: string | undefined
+  // le cwd de session.start tel quel : c'est lui que `cadence session context` retrouve (le dossier de lancement ne sert qu'à l'avancement)
+  let startCwd: string | undefined
 
   on('session.start', async ($, e, next) => {
     // Le dossier du tableau est celui de lancement, pas le dossier courant du shell : un cd du lead dans un sous-projet
     // (ou un rechargement à chaud qui revient avec ce dossier) ne le déplace pas (L154, vu 10-09 : une seule ligne).
+    startCwd = e.cwd
     if (!sessionCwd || !isInside(e.cwd, sessionCwd)) {
       const r = await $.process.run(['python3', '-I', '-c', LAUNCH_FOLDER, e.cwd], { timeoutMs: 4_000 }).catch(() => undefined)
       sessionCwd = r && r.exitCode === 0 ? launchFolder(r.stdout, e.cwd) : e.cwd
@@ -119,7 +122,7 @@ export const register: Register = on => {
         // accessoire : un échec ne coûte qu'une lecture)
         if (nextUsage && nextUsage.percent !== undefined) {
           const session = await $.session.id().catch(() => undefined)
-          const cwd = sessionCwd ?? (await $.session.cwd().catch(() => undefined))
+          const cwd = startCwd ?? (await $.session.cwd().catch(() => undefined))
           if (session && cwd) {
             const published = JSON.stringify({ session, cwd, percent: nextUsage.percent, tokens: nextUsage.tokens, window: nextUsage.window, at })
             await $.process.run(['python3', '-I', '-c', CONTEXT_WRITER, published], { timeoutMs: 4_000 }).catch(() => undefined)

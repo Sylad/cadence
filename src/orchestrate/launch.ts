@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import type { Effort } from '../config.js';
 import { RafError } from '../plan.js';
-import { TreeTracker } from '../proc.js';
+import { killMarked, SESSION_MARK_VAR, TreeTracker } from '../proc.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
 export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck';
@@ -211,6 +212,7 @@ function classify(out: LaunchOutcome): SessionOutcome {
 
 const live = new Set<number>();
 const trees = new Set<TreeTracker>();
+const marks = new Set<string>();
 
 /** Suit un groupe de processus lancé par l'orchestrateur (commande du projet) : tué avec les sessions au signal. */
 export function trackGroup(pid: number): () => void {
@@ -230,21 +232,29 @@ export function killSessions(): void {
   live.clear();
   for (const t of trees) t.kill();
   trees.clear();
+  for (const m of marks) killMarked(m);
+  marks.clear();
 }
 
 /** Vrai lanceur : `claude` (ou CADENCE_CLAUDE_BIN) dans son propre groupe de processus, tué en bloc au délai. */
 export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env): ClaudeFn {
   return (args, opts) =>
     new Promise((resolve) => {
-      const child = spawn(bin, args, { cwd: opts.cwd, env: { ...base, ...opts.env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+      // Marque héritée par tous les descendants, même orphelins rattachés à init (un shell qui sort aussitôt après
+      // `nohup srv &` échappe à tout relevé de l'arbre) : à la fin de la session, tout ce qui la porte est tué.
+      const mark = randomUUID();
+      marks.add(mark);
+      const child = spawn(bin, args, { cwd: opts.cwd, env: { ...base, ...opts.env, [SESSION_MARK_VAR]: mark }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
       const pid = child.pid;
       if (pid === undefined) {
+        marks.delete(mark);
         child.once('error', (e) => resolve({ code: 127, stdout: '', stderr: String(e.message), timedOut: false }));
         return;
       }
       live.add(pid);
       // Le groupe ne suffit pas : un serveur de dev lancé par la session (setsid, nohup, npm qui se détache) a son propre
-      // groupe et survivait à la session (L83). L'arbre est suivi pendant toute la session, et tué avec elle.
+      // groupe et survivait à la session (L83). L'arbre est suivi pendant toute la session ; la marque rattrape ce
+      // qui a quitté l'arbre entre deux relevés.
       const tree = new TreeTracker(pid);
       trees.add(tree);
       opts.onSpawn?.(pid);
@@ -256,6 +266,7 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env): 
       const timer = setTimeout(() => {
         timedOut = true;
         tree.kill();
+        killMarked(mark);
         try {
           process.kill(-pid, 'SIGKILL');
         } catch {
@@ -269,6 +280,8 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env): 
         tree.rootExited();
         tree.kill();
         trees.delete(tree);
+        killMarked(mark);
+        marks.delete(mark);
         try {
           process.kill(-pid, 'SIGKILL');
         } catch {

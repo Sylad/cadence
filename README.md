@@ -1112,8 +1112,10 @@ cut (Ctrl-C, WSL closed) `--resume` replays an interrupted step entirely in a ne
 lists the commits already present; finished steps are never replayed.
 
 When a session ends — success, error, time limit (`timeouts`) or interruption of the wave — nothing it started
-survives it: besides its process group, the whole tree of its descendants is tracked while it runs and killed with
-it, so a dev server a session detached into its own group (`setsid`, `nohup`) is not left running.
+survives it: besides its process group, the tree of its descendants is tracked while it runs and killed with it, and
+every session carries a `CADENCE_SESSION=<id>` mark in its environment that all its descendants inherit, even those
+re-parented to init (`nohup srv &` or `setsid srv &` from a shell that exits at once): at the end, every process
+bearing the mark is killed (read from `/proc/<pid>/environ`, or `ps eww` on macOS).
 
 Briefs are the templates of `templates/orchestrate/` (`implement.md` is the `lead` skill's standard
 brief; `--dry-run` writes the rendered ones). The `implement` brief of a `visible` lot also carries the

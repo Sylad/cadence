@@ -278,3 +278,57 @@ export class TreeTracker {
     }
   }
 }
+
+/** Variable d'environnement qui marque une session de l'orchestrateur : héritée par tous ses descendants, même orphelins. */
+export const SESSION_MARK_VAR = 'CADENCE_SESSION';
+
+/** Pids des processus (hors cadence) dont l'environnement porte `<SESSION_MARK_VAR>=<mark>` : /proc, sinon `ps eww`. */
+export function findMarked(mark: string): number[] {
+  const entry = `${SESSION_MARK_VAR}=${mark}`;
+  const found: number[] = [];
+  let names: string[] | null = null;
+  try {
+    names = readdirSync('/proc');
+  } catch {
+    // pas de /proc (macOS) : ps
+  }
+  if (names) {
+    for (const name of names) {
+      const pid = Number(name);
+      if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) continue;
+      try {
+        if (readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').includes(entry)) found.push(pid);
+      } catch {
+        // sorti, zombie ou illisible (autre utilisateur)
+      }
+    }
+    return found;
+  }
+  try {
+    const out = execFileSync('ps', ['-axeww', '-o', 'pid=,command='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
+    for (const line of out.split('\n')) {
+      const m = /^\s*(\d+)\s(.*)$/.exec(line);
+      if (!m) continue;
+      const pid = Number(m[1]);
+      if (pid !== process.pid && (m[2] === entry || m[2].includes(` ${entry}`))) found.push(pid);
+    }
+  } catch {
+    // ps absent : rien à tuer de plus
+  }
+  return found;
+}
+
+/** Tue (SIGKILL) tout processus marqué de la session, où qu'il soit rattaché ; repasse tant qu'un descendant en crée. */
+export function killMarked(mark: string): void {
+  for (let pass = 0; pass < 5; pass++) {
+    const pids = findMarked(mark);
+    if (pids.length === 0) return;
+    for (const pid of pids) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // déjà mort
+      }
+    }
+  }
+}

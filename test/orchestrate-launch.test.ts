@@ -362,4 +362,18 @@ describe('realClaude : fin de session (L83)', () => {
     await new Promise((r) => setTimeout(r, 200));
     expect(alive(pid)).toBe(false);
   });
+
+  it("tue le serveur lancé par un shell qui meurt aussitôt (setsid + nohup + &), orphelin hors de l'arbre", async () => {
+    const dir = tempDir();
+    const pidFile = join(dir, 'server.pid');
+    const bin = join(dir, 'fake-claude.sh');
+    // Schéma de l'outil Bash : le shell a sa session, lance le serveur en arrière-plan et sort aussitôt ; le serveur
+    // est rattaché à init avant tout relevé de l'arbre.
+    writeFileSync(bin, `#!/bin/sh\nsetsid sh -c 'nohup sh -c "echo \\$\\$ > \\"${pidFile}\\"; exec sleep 60" >/dev/null 2>&1 &'\nwhile [ ! -s "${pidFile}" ]; do sleep 0.05; done\nsleep 1\necho '{}'\n`, { mode: 0o755 });
+    const out = await realClaude(bin, process.env)([], { cwd: dir, env: {}, timeoutMs: 30_000 });
+    expect(out.code).toBe(0);
+    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(alive(pid)).toBe(false);
+  });
 });

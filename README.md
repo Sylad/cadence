@@ -1057,7 +1057,7 @@ percentile of the full reviews, 62.7 k over 187 reviews; the short review after 
 over 114; measured on 2026-10-09 in the wave journals `.cadence/runs`, `tokens.counted`, 67 waves from 10-04 to 10-09).
 Exception: when the tests are red after a write pass, the lot goes to a fix pass without a review; if that fix pass is
 refused for lack of budget the lot is handed back to the lead without a review, with its findings, and the cause names
-the red tests. The wave budget stays for the others. When the budget (or the usage limit) is reached no new session starts, the running ones
+the red tests: the pass it names is the one whose tests were red, counted by its number (« la passe fix 2 », « l'implémentation »), and « la passe des mineurs » appears only when that pass was the one played. The wave budget stays for the others. When the budget (or the usage limit) is reached no new session starts, the running ones
 finish, the wave is *suspended* (exit code 3) and `--resume --budget …` continues. A session that returns
 nothing readable, times out (45 min for work, 25 for a review) or fails is not retried; the lot is handed
 back with the cause. Exit codes: 0 every lot ready · 1 at least one lot handed back (question, failure,

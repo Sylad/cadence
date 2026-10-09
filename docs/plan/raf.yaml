@@ -1542,6 +1542,7 @@ lots:
     quickwin: true
     created: 2026-10-09
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme — orchestré (vague 2026-10-09-0842, 1 passe(s) de correction)", commit: 7d889d069f40caceb24336fee361997d242c3987 }
   - id: L137
     title: "orchestrate : niveau d'effort par passe (claude -p --effort, 2.1.284) — precheck et tour bas, implémentation moyen, revue haut ; réglable dans cadence.yaml ; mesurer tokens et durée sur une vague avant/après"
     status: todo

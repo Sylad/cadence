@@ -12,7 +12,7 @@ export type Usage = {
 export type CommandInfo = { tool: string; label: string; since: number }
 
 // dans `declare module 'claude-code'`, « CommandInfo » nommerait le type des commandes slash du module : un alias hors du bloc lève l'ambiguïté
-type BackgroundCommandInfo = CommandInfo
+export type BackgroundCommandInfo = CommandInfo
 
 export type AgentsSummary = { running: number; names: string[] }
 

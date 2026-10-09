@@ -38,10 +38,11 @@ function pushed(): string {
   return dir;
 }
 
-const cad = (dir: string) => {
+const cad = async (dir: string) => {
   const out: string[] = [];
   const err: string[] = [];
-  return run(['deliver'], { cwd: dir, env: { RAF_TODAY: '2026-10-09' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-09T12:00:00') }).then((code) => ({ code, out: out.join('\n'), err: err.join('\n') }));
+  const code = await run(['deliver'], { cwd: dir, env: { RAF_TODAY: '2026-10-09' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-09T12:00:00') });
+  return { code, out: out.join('\n'), err: err.join('\n') };
 };
 
 describe('cadence deliver (CLI) : articles à rafraîchir', () => {

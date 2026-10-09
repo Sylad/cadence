@@ -289,20 +289,6 @@ export const register: Register = on => {
         if (names) segments.push({ key: 'agent-names', text: ` ${names}`, drop: 6, requires: 'agents', node: <Text key="agent-names" dimColor> {names}</Text> })
       }
       const { live: liveCmds, stale: staleCmds } = splitCommands(cmds, cmdInfo, at)
-      if (staleCmds.length > 0) {
-        const label = `${staleCmds.length} sans fin vue`
-        segments.push({
-          key: 'stale-commands',
-          text: `${SEP}${label}`,
-          drop: 3,
-          node: (
-            <Text key="stale-commands">
-              {sep}
-              <Text dimColor>{label}</Text>
-            </Text>
-          ),
-        })
-      }
       if (liveCmds.length > 0) {
         const label = `${liveCmds.length} cmd`
         segments.push({
@@ -315,6 +301,20 @@ export const register: Register = on => {
               <Text color="claude" bold>
                 {label}
               </Text>
+            </Text>
+          ),
+        })
+      }
+      if (staleCmds.length > 0) {
+        const label = `${staleCmds.length} cmd sans fin vue`
+        segments.push({
+          key: 'stale-commands',
+          text: `${SEP}${label}`,
+          drop: 3,
+          node: (
+            <Text key="stale-commands">
+              {sep}
+              <Text dimColor>{label}</Text>
             </Text>
           ),
         })

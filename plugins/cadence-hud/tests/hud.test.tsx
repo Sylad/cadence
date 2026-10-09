@@ -777,7 +777,7 @@ test('une vague terminée depuis plus de 30 min n\'est plus dessinée', async ($
   await ui.unmount()
 })
 
-test('la bande compte les commandes fraîches en orange et signale les anciennes à part', async ($, on) => {
+test('la bande compte les commandes fraîches en orange et écrit « N cmd sans fin vue » en gris, après « N cmd »', async ($, on) => {
   const at = 10 * 3_600_000
   seed(on, {
     ...EMPTY,
@@ -788,9 +788,13 @@ test('la bande compte les commandes fraîches en orange et signale les anciennes
     now: at,
   })
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Text', text: /1 cmd/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /1 cmd sans fin/ })).toBeUndefined()
-  expect(await ui.find({ type: 'Text', text: /1 sans fin vue/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^1 cmd$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^1 cmd sans fin vue$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^1 sans fin vue$/ })).toBeUndefined()
+  // l'ordre : « N cmd » d'abord, puis « N cmd sans fin vue »
+  const texts = (await ui.findAll({ type: 'Text' })).map(t => t.text ?? '')
+  expect(texts.indexOf('1 cmd')).toBeGreaterThanOrEqual(0)
+  expect(texts.indexOf('1 cmd sans fin vue')).toBeGreaterThan(texts.indexOf('1 cmd'))
   await ui.unmount()
 })
 
@@ -898,7 +902,7 @@ test('une commande comptée sans fiche est « sans fin vue » dans la bande, jam
   seed(on, { ...EMPTY, commands: ['b9'], commandInfo: {}, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 10 * 3_600_000 })
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
   expect(await ui.find({ type: 'Text', text: /^1 cmd$/ })).toBeUndefined()
-  expect(await ui.find({ type: 'Text', text: /1 sans fin vue/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^1 cmd sans fin vue$/ })).toBeDefined()
   await ui.unmount()
 })
 

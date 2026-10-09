@@ -1729,12 +1729,16 @@ lots:
     estimate: 0.25
     quickwin: true
     created: 2026-10-09
+    notes:
+      - { date: 2026-10-09, text: "rsync vers ~/.claude/mods/cadence-hud après commit (deux copies, cf L152) ; bumper plugins/cadence-hud/.claude-plugin/plugin.json 0.4.1 → 0.4.2 à la release" }
   - id: L154
     title: "cadence-hud : l'avancement par projet suit le dossier courant du shell de la session (un cd dans un sous-projet par le lead réduit la bande à une seule ligne, vu 09-10) — prendre le dossier de lancement de la session (ou le dossier parent qui porte le cadence.yaml avec priority) et le garder"
     status: todo
     estimate: 0.25
     quickwin: true
     created: 2026-10-09
+    notes:
+      - { date: 2026-10-09, text: "rsync vers ~/.claude/mods/cadence-hud après commit (deux copies, cf L152) ; la bande lit aujourd'hui le cwd publié par la session — vérifier d'où il vient (hook SessionStart / fiche de session) avant de choisir le dossier de lancement" }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -846,6 +846,8 @@ other session nor lot (`arrêt demandé (--stop-after-current)`), and leaves the
 (exit 2). A stopped wave is no longer live, so to take a lot out of it use **`--resume --drop <project:lot>`**: the lot is
 handed back instead of being replayed (an unknown or finished lot is refused, exit 2, before anything runs).
 `--resume --stop-after-current` is refused (exit 2): resuming contradicts stopping.
+A wave runs on its own snapshot of the tool: one launched before L79 never reads `control.log`, so the request is written but the
+command warns `ne lit pas les demandes de contrôle` on the error output.
 
 **`--continue` — idle time (L147)**: lots given on the command line open the wave (none: the first ones are drawn from the
 plan too); then, each time the lots in play are finished, the wave **draws the next ready lots of the plan** — up to the

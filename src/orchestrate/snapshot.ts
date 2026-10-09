@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, mkdirSync, realpathSync, symlinkSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, sep } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -95,6 +95,19 @@ export function takeSnapshot(waveDir: string, packageRoot: string): string {
 }
 
 export const snapshotExists = (waveDir: string) => existsSync(join(toolDirOf(waveDir), 'bin', 'cadence.js'));
+
+/**
+ * La vague lit-elle `control.log` (`--drop`, `--stop-after-current`, L79) ? Elle tourne sur son instantané : une vague lancée
+ * avant L79 n'a pas ce code et ignorerait la demande en silence. Sans instantané (vague jouée dans ce processus, ou antérieure à L61) : rien à lire, on suppose que oui.
+ */
+export function waveReadsControl(waveDir: string): boolean {
+  if (!snapshotExists(waveDir)) return true;
+  try {
+    return readFileSync(join(toolDirOf(waveDir), 'dist', 'orchestrate', 'state.js'), 'utf8').includes('control.log');
+  } catch {
+    return false;
+  }
+}
 
 /** Relance réelle : un processus node sur la copie, signaux transmis, code de sortie rendu. */
 export function spawnReexec(toolDir: string, argv: string[], env: NodeJS.ProcessEnv, sink: LineSink): Promise<number> {

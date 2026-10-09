@@ -23,7 +23,7 @@ import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
-import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
+import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, waveReadsControl, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -848,6 +848,8 @@ function control(args: Args, io: OrchestrateIo): number {
     for (const r of refusals) io.err(`orchestrate : ${r}`);
     return 2;
   }
+  // La demande est écrite quoi qu'il arrive (le fichier est inoffensif) ; mais une vague d'avant L79 ne le lira jamais : on le dit.
+  if (!waveReadsControl(store.dir)) io.err(`orchestrate : ${flags} : la vague ${store.id} ne lit pas les demandes de contrôle (lancée avec une version de cadence d'avant L79) : la demande est écrite dans control.log mais cette vague ne la lira pas`);
   for (const k of keys) {
     store.requestDrop(k);
     store.journal(`demande : retirer ${k} de la vague`);

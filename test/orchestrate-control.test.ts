@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { orchestrate, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { runLot } from '../src/orchestrate/cycle.js';
+import { waveReadsControl } from '../src/orchestrate/snapshot.js';
 import { registerWave } from '../src/orchestrate/registry.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -377,5 +378,38 @@ describe('refus de --drop / --stop-after-current (L79, revue)', () => {
     await orchestrate(['a:L1'], io(parent).io, d);
     expect(seen!.code).toBe(0);
     expect(seen!.out).toMatch(/a:L1 : retrait demandé/);
+  });
+});
+
+describe('vague d\'avant L79 (L79, revue)', () => {
+  it('la demande est écrite, mais on avertit que la vague ne lit pas les demandes de contrôle', async () => {
+    const parent = parentWith(['a']);
+    let seen: { code: number; err: string; drops: string[] } | undefined;
+    const { d } = deps(async (kind) => {
+      if (kind !== 'implement') return;
+      const store = RunStore.last(parent)!;
+      // l'instantané de cette vague : un dist/ sans control.log, comme avant L79
+      mkdirSync(join(store.dir, 'tool', 'bin'), { recursive: true });
+      mkdirSync(join(store.dir, 'tool', 'dist', 'orchestrate'), { recursive: true });
+      writeFileSync(join(store.dir, 'tool', 'bin', 'cadence.js'), '');
+      writeFileSync(join(store.dir, 'tool', 'dist', 'orchestrate', 'state.js'), '// avant L79\n');
+      const r = io(parent);
+      const code = await orchestrate(['--drop', 'a:L1'], r.io, d);
+      seen = { code, err: r.err.join('\n'), drops: store.control().drops };
+    });
+    await orchestrate(['a:L1'], io(parent).io, d);
+    expect(seen!.code).toBe(0);
+    expect(seen!.drops).toEqual(['a:L1']);
+    expect(seen!.err).toMatch(/la vague .* ne lit pas les demandes de contrôle/);
+  });
+
+  it('un instantané qui connaît control.log, ou pas d\'instantané : pas d\'avertissement', async () => {
+    const dir = tempDir();
+    expect(waveReadsControl(dir)).toBe(true);
+    mkdirSync(join(dir, 'tool', 'bin'), { recursive: true });
+    mkdirSync(join(dir, 'tool', 'dist', 'orchestrate'), { recursive: true });
+    writeFileSync(join(dir, 'tool', 'bin', 'cadence.js'), '');
+    writeFileSync(join(dir, 'tool', 'dist', 'orchestrate', 'state.js'), "join(this.dir, 'control.log')\n");
+    expect(waveReadsControl(dir)).toBe(true);
   });
 });

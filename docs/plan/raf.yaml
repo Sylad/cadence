@@ -1647,25 +1647,35 @@ lots:
     created: 2026-10-09
   - id: L147
     title: "orchestrate --continue : la vague tire elle-même le prochain lot prêt du plan quand un lot se termine, dans l'ordre de priorité déclaré dans le dossier parent (cadence > maritime > reste), jusqu'à un budget, une fenêtre horaire (--until 18:00), une limite d'usage, une question posée, deux lots rendus de suite ou plus aucun lot prêt dont l'estimation tient dans le budget restant ; exclus : lots « à décider avec Sylvain » et after non levé ; demande Sylvain 09-10 (temps morts quand il n'est pas devant le PC)"
-    status: doing
+    status: done
     estimate: 1
     after: [ L145 ]
     created: 2026-10-09
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme après 3 corrections — orchestrate --continue : tirage par priorité déclarée, un lot par dépôt par tour, budget vérifié avant exclusion, causes des sautés au journal, priorité validée avant d'agir, « à décider » écarté, dry-run qui rejoue le tirage ; 1 mineur en note", commit: 520430cb41a22c64f3dd1dac13bd094e103e551f }
+    notes:
+      - { date: 2026-10-09, text: "mineurs (revue 09-10) : le dry-run ne lève pas l'after des lots tirés aux tours simulés (aperçu trop court sur un plan chaîné) ; writeWave avant les verrous (course non testable) ; exclusion du 1er tirage non reportée (ligne « lot sauté » en double au tour 2)" }
+    finished: 2026-10-09
   - id: L148
     title: "lead : enchaîner sans le humain — après un lot prêt, le skill revérifie, raf done, pousse, livre, QA et relance la vague suivante selon la priorité déclarée, tant que le contexte de la session lead reste sous un seuil (60 %, lu comme la bande cadence-hud) ; au seuil, session-close, mémoire, trois lignes pour la suite ; reste au humain : choix initial et ordre, questions remontées, réserves UX ; demande Sylvain 09-10"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L145 ]
     created: 2026-10-09
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme après 3 corrections — session context : --session, puis CLAUDE_CODE_SESSION_ID (essai réel : la variable = le fichier écrit par la bande, 58 % lu pour la session lead à côté d'une session à 10 % dans le même dossier), dossier seulement s'il n'y a qu'une session fraîche ; fichier par session, nettoyage 24 h ; skill lead 2c, README, aide ; 1 cosmétique en note", commit: 6f02149052479fa29a899fcf1bfad2a8cd20cb25 }
+    notes:
+      - { date: 2026-10-09, text: "mineur (revue 09-10) : sans variable et avec seulement des fichiers périmés dans le dossier, le refus dit « plusieurs sessions » au lieu de « toutes périmées » (code 2 juste)" }
+    finished: 2026-10-09
   - id: L149
     title: "cadence-hud : avancement des plans par projet actif — une ligne par projet triée par priorité, barre faits/ouverts (ex. ol ▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine), source cadence lead tour --json enrichi des comptes faits / en cours / à faire / ajoutés 7 j, rafraîchi à chaque transition de vague sinon toutes les minutes, repliable ; demande Sylvain 09-10 (« je ne sais pas où en sont les projets »)"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L145 ]
     created: 2026-10-09
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme après 2 corrections — lead tour --json avec comptes faits/en cours/à faire/+7 j (fenêtre stricte), priorité invalide signalée en ligne d'erreur, projet direct accepté ; bande : bloc d'avancement par Box à largeur fixe, 72 tests du plugin verts ; rendu réel à vérifier à l'œil", commit: fd1bb1078a9b641c9d8e92d01ec948dfecd977a4 }
+    finished: 2026-10-09
   - id: L150
     title: "test orchestrate-command.test.ts instable sous charge : 1 puis 37 échecs (délais 5 s dépassés, « vagues en cours : 2 » au lieu de 1) pendant qu'une suite tournait à côté, 71/71 seul et 1098/1098 sur copie propre — isoler le registre des vagues par test (dossier temporaire dédié) et desserrer les délais (revue L143/L144 09-10)"
     status: todo
@@ -1673,11 +1683,14 @@ lots:
     created: 2026-10-09
   - id: L151
     title: "orchestrate : la cause « tests rouges après … » dit « la passe des mineurs » pour une passe fix jouée après la revue courte (l.minorPass jamais remis à false, cycle.ts:500) — nommer la passe d'après le compteur, test de la séquence passe des mineurs → review-small majeur → fix rouge refusé (revue L145 09-10)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "compliant (1 minor note, no sub-task) — orchestré (vague 2026-10-09-1540, 0 passe(s) de correction)", commit: d6369d5b4b6ed55b15421cabda29cd40fe8ddddd }
+    review: { date: 2026-10-09, verdict: conforme — libellé de la cause « tests rouges après … » nommé d'après le compteur de passes ; 1 mineur en note (branche « après la passe des mineurs » sans assertion sur le libellé), commit: d6369d5b4b6ed55b15421cabda29cd40fe8ddddd }
+    notes:
+      - { date: 2026-10-09, text: "mineur (revue 09-10) : aucune assertion sur le libellé « la passe des mineurs » (branche l.minorPass && played === minorPassAt) ni sur minorPassAt > 0" }
+    finished: 2026-10-09
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

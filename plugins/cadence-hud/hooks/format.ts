@@ -281,9 +281,10 @@ export const endedTask = (text: string): string | null => {
 export const endedCommands = (ids: readonly string[], owners: Readonly<Record<string, string>>, ended: string): string[] =>
   ids.filter(i => i !== ended && owners[i] !== ended)
 
-/** La table des propriétaires réduite aux commandes encore en cours. */
-export const pruneOwners = (owners: Readonly<Record<string, string>>, ids: readonly string[]): Record<string, string> =>
-  Object.fromEntries(Object.entries(owners).filter(([id]) => ids.includes(id)))
+/** Une table (propriétaires, fiches) privée des identifiants retirés, et d'eux seuls : une entrée inscrite pour une
+ *  commande qui naît (pas encore comptée) n'est pas à retirer parce qu'elle n'est pas encore dans la liste. */
+export const withoutIds = <T>(table: Readonly<Record<string, T>>, removed: readonly string[]): Record<string, T> =>
+  Object.fromEntries(Object.entries(table).filter(([id]) => !removed.includes(id)))
 
 /** L'identifiant de la tâche qu'un TaskStop réussi vient d'arrêter : `task_id` du résultat, à défaut `task_id` ou
  *  `shell_id` de l'appel lui-même (un résultat qui ne nomme pas la tâche ne doit pas la laisser dans le compte), sinon null. */

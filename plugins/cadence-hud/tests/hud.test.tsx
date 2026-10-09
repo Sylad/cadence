@@ -4,7 +4,7 @@ import type { TestBody } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
 import { register } from '../hooks/register'
-import { commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, pruneOwners, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
@@ -649,7 +649,8 @@ test('une tâche finie emporte les commandes de son sous-agent', () => {
   expect(endedCommands(['b1', 'b2', 'm2', 'b3'], owners, 'a1')).toEqual(['b1', 'b3'])
   expect(endedCommands(['b1', 'b2', 'm2', 'b3'], owners, 'b2')).toEqual(['b1', 'm2', 'b3'])
   expect(endedCommands(['b1'], {}, 'inconnue')).toEqual(['b1'])
-  expect(pruneOwners(owners, ['b3'])).toEqual({ b3: 'a2' })
+  expect(withoutIds(owners, ['b2', 'm2'])).toEqual({ b3: 'a2' })
+  expect(withoutIds({ b2: 1, b9: 2 }, ['b2', 'zz'])).toEqual({ b9: 2 })
 })
 
 test('les commandes d’un sous-agent sortent du compte quand il finit, par les hooks', async ($, on) => {
@@ -935,6 +936,44 @@ test('un sous-agent lancé pendant l\'attente du collecteur garde sa première c
   expect(hud.commands()).toEqual(['b9'])
   expect(hud.owners()).toEqual({ b9: 'a2' })
   expect(Object.keys(hud.info())).toEqual(['b9'])
+})
+
+test('une fin qui tombe entre le propriétaire et la fiche d\'une commande qui naît ne l\'efface pas (entrelacement tool.call / fin)', async ($, on) => {
+  const hud = wired(on)
+  // l'horloge est retenue : le tool.call de b9 (sous-agent a2) a écrit le propriétaire et attend la fiche, b9 n'est pas encore compté
+  let releaseClock: () => void = () => undefined
+  const gate = new Promise<void>(resolve => {
+    releaseClock = resolve
+  })
+  let held = false
+  on('clock.now', async () => {
+    if (!held && Object.keys(hud.owners()).length > 0) {
+      held = true
+      await gate
+    }
+    return { value: 1_000 } as never
+  })
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', run_in_background: true } as never)
+  expect(hud.commands()).toEqual(['b1'])
+  hud.answer.current = { result: { backgroundTaskId: 'b9' } }
+  const called = $.tool.call({ tool: 'Bash', run_in_background: true, description: 'z', agentId: 'a2' } as never)
+  await settle()
+  expect(hud.owners()).toEqual({ b9: 'a2' })
+  // fin de b1 dans la fenêtre
+  await $.prompt.submit({ text: NOTIFICATION('b1'), origin: { kind: 'task-notification' } } as never)
+  expect(hud.commands()).toEqual([])
+  expect(hud.owners()).toEqual({ b9: 'a2' })
+  releaseClock()
+  await called
+  expect(hud.commands()).toEqual(['b9'])
+  expect(hud.owners()).toEqual({ b9: 'a2' })
+  expect(Object.keys(hud.info())).toEqual(['b9'])
+  // sa propre fin, ensuite, l'efface bien
+  await $.prompt.submit({ text: NOTIFICATION('a2'), origin: { kind: 'task-notification' } } as never)
+  expect(hud.commands()).toEqual([])
+  expect(hud.owners()).toEqual({})
+  expect(hud.info()).toEqual({})
 })
 
 test('/hud avec un argument inconnu répond « argument inconnu » sans basculer la bande', async ($, on) => {

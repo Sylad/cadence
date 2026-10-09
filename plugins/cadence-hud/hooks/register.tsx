@@ -3,7 +3,7 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, CommandInfo, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, k, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, pruneOwners, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, k, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -19,12 +19,19 @@ const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
 const now = atom({ plugin: 'cadence-hud', key: 'now' } as const, 0)
 
-/** Une tâche finie sort des commandes, avec celles que son sous-agent avait lancées ; la table des propriétaires suit. */
+/** Une tâche finie sort des commandes, avec celles que son sous-agent avait lancées ; propriétaires et fiches ne perdent
+ *  QUE les identifiants retirés par cette fin : une commande en train de naître (propriétaire déjà écrit, pas encore
+ *  comptée) n'est dans aucune liste et doit garder les siens. */
 const endCommand = async ($: Parameters<typeof read>[0], ended: string): Promise<void> => {
   const o = await read($, owners)
-  const left = await update($, commands, (ids: string[]) => endedCommands(ids, o, ended))
-  await update($, owners, (cur: Record<string, string>) => pruneOwners(cur, left))
-  await update($, info, (cur: Record<string, CommandInfo>) => Object.fromEntries(Object.entries(cur).filter(([id]) => left.includes(id))))
+  let removed: string[] = [ended]
+  await update($, commands, (ids: string[]) => {
+    const left = endedCommands(ids, o, ended)
+    removed = [ended, ...ids.filter(i => !left.includes(i))]
+    return left
+  })
+  await update($, owners, (cur: Record<string, string>) => withoutIds(cur, removed))
+  await update($, info, (cur: Record<string, CommandInfo>) => withoutIds(cur, removed))
 }
 
 export const register: Register = on => {
@@ -137,7 +144,9 @@ export const register: Register = on => {
     if (!('result' in result) || result.isError) return result
     const started = startedCommand(e.tool, result.result)
     if (started) {
-      // le propriétaire d'abord : une fin de sous-agent tombant entre les deux écritures retire déjà la commande
+      // le propriétaire d'abord, la commande en dernier : une fin tombant entre les écritures ne trouve pas encore la commande
+      // dans `commands` et ne la retire pas, mais elle laisse propriétaire et fiche (endCommand ne retire que ses propres ids) :
+      // si c'était la fin de son sous-agent, le filet de refresh (endedOwners) la retire au tour suivant
       const agent = e.agentId
       if (agent) await update($, owners, (o: Record<string, string>) => ({ ...o, [started]: agent }))
       // sans horloge, la commande est comptée quand même (sans fiche : la bande l'écrit « sans fin vue », faute d'âge)

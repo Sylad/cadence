@@ -87,6 +87,16 @@ Les vagues sont lues sur disque (`~/.cadence/orchestrate/waves/<pid>.json`, puis
 par le script python de `hooks/collect.ts` ; aucune commande cadence n'est lancée pour elles. Seul l'avancement des plans
 appelle `cadence lead tour --json` (CLI `@sylad/cadence` sur le PATH, facultative).
 
+**La bande écrit aussi un fichier** (elle n'est donc pas en lecture seule) : à chaque rafraîchissement, soit toutes les 5 s,
+un `python3` écrit le contexte de la session dans `~/.cadence/orchestrate/hud-context/<id de session>.json`
+(`session`, `cwd` = le dossier de la session, `percent`, `tokens`, `window`, `at` ; écriture atomique, un fichier PAR
+session). C'est ce que lit `cadence session context` : la session lead ne voit pas la bande, qui n'est qu'un rendu, et le
+skill `lead` en tire son seuil de 60 % pour enchaîner sans le humain. Lancée depuis le dossier de la session (le dossier
+parent, pour le lead), la commande choisit le fichier dont `cwd` est le dossier courant, le plus récent s'il y en a
+plusieurs ; `--session <id>` force une session. Sans bande chargée dans cette session, ou avec un chiffre de plus de 2 min,
+la commande sort en code 2 et le lead n'enchaîne pas : **désactiver ou modifier ce mod coupe donc l'enchaînement du lead**.
+Les fichiers de plus de 24 h sont ignorés et supprimés à la lecture de la commande.
+
 Installer depuis la marketplace du dépôt cadence : `/plugin marketplace add Sylad/cadence` puis
 `/plugin install cadence-hud@cadence`.
 

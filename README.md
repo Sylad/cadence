@@ -481,6 +481,9 @@ cadence session close --all --depth 2   # sub-folder holding a plan (--depth n: 
                                    # exit = the worst code of the projects (2 error, 1 open, 0 closed)
 cadence session next "finish L3" "review L4"    # shown by the next session start; replaces the previous notes
 cadence session next --clear       # erase those notes, on purpose
+cadence session context            # `ctx 42 % (84000/200000)`: the context of the session running in this folder,
+                                   # as the cadence-hud band publishes it; --session <id> picks another one;
+                                   # exit 2 when no fresh figure (band not loaded) = treat as at the threshold
 ```
 
 `session start` records its time in the worktree's state (`session.json`, under the git dir); the next
@@ -844,7 +847,7 @@ the lots that would be drawn next. Drawing happens between rounds: a round of up
 **Chaining without the human (L148)**: the `lead` skill, once the human has chosen the first lots and the order, does not ask « next? »
 after a lot that comes back ready: it re-verifies it, records `raf done`, pushes, delivers, has the `qa-reviewer` check the
 delivered app, then starts the next wave with `--continue`, in the declared priority — one project at a time, within the two-session
-limit. Before each new wave it reads the context of its own session with `cadence session context` (the figure of the `ctx` segment of the `cadence-hud` band, which publishes it to `~/.cadence/orchestrate/hud-context.json`; no fresh figure counts as at the threshold); from
+limit. Before each new wave it reads the context of its own session with `cadence session context` (run from the parent folder: the figure of the `ctx` segment of the `cadence-hud` band, which publishes the context of each session to `~/.cadence/orchestrate/hud-context/<session id>.json` and tags it with the session's folder; without the band loaded in that session the command exits with code 2, and a missing or stale figure counts as at the threshold); from
 **60 %** upward it starts nothing: it runs `session-close` in each project touched, writes its memory and records three lines for next
 time (`cadence session next`). Stays with the human: the first choice and the order, the questions a session raised, the UX
 reservations; a lot that is not ready, a red delivery or a blocking QA finding is reported and not chained over.

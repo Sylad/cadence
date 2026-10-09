@@ -1687,7 +1687,7 @@ lots:
     estimate: 0.25
     created: 2026-10-09
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: conforme — libellé de la cause « tests rouges après … » nommé d'après le compteur de passes ; 1 mineur en note (branche « après la passe des mineurs » sans assertion sur le libellé), commit: d6369d5b4b6ed55b15421cabda29cd40fe8ddddd }
+    review: { date: 2026-10-09, verdict: conforme — libellé de la cause « tests rouges après … » nommé d'après le compteur de passes ; 1 mineur en note (branche « après la passe des mineurs » sans assertion sur le libellé) ; docs(L151) 131f1f8, commit: 131f1f860915726ea9612558bf3bb58888f204c1 }
     notes:
       - { date: 2026-10-09, text: "mineur (revue 09-10) : aucune assertion sur le libellé « la passe des mineurs » (branche l.minorPass && played === minorPassAt) ni sur minorPassAt > 0" }
     finished: 2026-10-09

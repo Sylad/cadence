@@ -1462,11 +1462,14 @@ lots:
     finished: 2026-10-08
   - id: L127
     title: "cadence deliver : le verrou « orchestration en cours » refuse la livraison d'un dépôt dont la vague n'a plus aucun lot (vécu 08-10 : maritime prêt à livrer, vague 2026-10-09-0900 encore sur cadence et ol) — ne refuser que si la vague a encore un lot en cours ou en file dans CE dépôt"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-08
     started: 2026-10-09
     review: { date: 2026-10-09, verdict: "conforme (1 note mineure : une copie de la règle « lot fini » subsiste dans command.ts:837) — orchestré (vague 2026-10-09-1752, 0 passe(s) de correction + passe des mineurs)", commit: da6ce5badd5bbe045a2a2fdea4498cd1f0a3a9fd }
+    notes:
+      - { date: 2026-10-09, text: "Revue 09-10 (mineur, note) : src/orchestrate/command.ts:837 garde une 3e copie littérale de la règle « lot fini » (chemin de reprise, antérieur au lot) au lieu de lotFinished (state.ts:148) — à unifier lors d'un prochain passage" }
+    finished: 2026-10-09
   - id: L128
     title: "orchestrate : budget de lot dérivé de l'estimate trop court pour une revue + une correction + une revue courte (L62 600 k à la 3e passe, L126 200 k à la 2e : rendu au lead à chaque fois, fini à la main) — plancher ou budget par étape qui couvre au moins une passe de correction et sa revue"
     status: todo
@@ -1683,6 +1686,8 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-09
+    notes:
+      - { date: 2026-10-09, text: "09-10 18:15 : reproduit — suite complète pendant une livraison maritime (livrer.sh) + un QA Playwright : orchestrate-command.test.ts 49 échecs / 86 en 230 s ; rejoué seul : 86/86 en 13 s" }
   - id: L151
     title: "orchestrate : la cause « tests rouges après … » dit « la passe des mineurs » pour une passe fix jouée après la revue courte (l.minorPass jamais remis à false, cycle.ts:500) — nommer la passe d'après le compteur, test de la séquence passe des mineurs → review-small majeur → fix rouge refusé (revue L145 09-10)"
     status: done

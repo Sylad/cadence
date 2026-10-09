@@ -546,10 +546,10 @@ describe('session context (L148)', () => {
   const NOW = '2026-09-28T18:30:00';
   const at = new Date(NOW).getTime();
 
-  async function ctxRun(dir: string, home: string, extra: string[] = []) {
+  async function ctxRun(dir: string, home: string, extra: string[] = [], env: Record<string, string> = {}) {
     const out: string[] = [];
     const err: string[] = [];
-    const code = await run(['session', 'context', ...extra], { cwd: dir, env: { CADENCE_HOME: home }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date(NOW) });
+    const code = await run(['session', 'context', ...extra], { cwd: dir, env: { CADENCE_HOME: home, ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date(NOW) });
     return { code, out: out.join('\n'), err: err.join('\n') };
   }
 
@@ -578,12 +578,33 @@ describe('session context (L148)', () => {
     expect((await ctxRun(other, home)).out).toBe('ctx 15 % (30000/200000)');
   });
 
-  it('plusieurs sessions dans le même dossier : la plus récente', async () => {
+  it('CLAUDE_CODE_SESSION_ID posée : sa session, même quand une autre du même dossier est plus récente', async () => {
     const home = tempDir();
     const dir = tempDir();
     publish(home, 'a', { cwd: dir, percent: 10, tokens: 1, window: 2, at: at - 40_000 });
     publish(home, 'b', { cwd: dir, percent: 55, tokens: 3, window: 4, at: at - 3_000 });
-    expect((await ctxRun(dir, home)).out).toBe('ctx 55 % (3/4)');
+    expect((await ctxRun(dir, home, [], { CLAUDE_CODE_SESSION_ID: 'a' })).out).toBe('ctx 10 % (1/2)');
+    expect((await ctxRun(dir, home, [], { CLAUDE_CODE_SESSION_ID: 'b' })).out).toBe('ctx 55 % (3/4)');
+    // --session l'emporte sur la variable
+    expect((await ctxRun(dir, home, ['--session', 'b'], { CLAUDE_CODE_SESSION_ID: 'a' })).out).toBe('ctx 55 % (3/4)');
+    // la variable désigne une session sans fichier : refus, pas de repli sur le dossier
+    const lost = await ctxRun(dir, home, [], { CLAUDE_CODE_SESSION_ID: 'muette' });
+    expect(lost.code).toBe(2);
+    expect(lost.err).toContain('CLAUDE_CODE_SESSION_ID');
+  });
+
+  it('variable absente et deux sessions fraîches dans le même dossier : refus qui demande --session', async () => {
+    const home = tempDir();
+    const dir = tempDir();
+    publish(home, 'a', { cwd: dir, percent: 10, tokens: 1, window: 2, at: at - 40_000 });
+    publish(home, 'b', { cwd: dir, percent: 55, tokens: 3, window: 4, at: at - 3_000 });
+    const r = await ctxRun(dir, home);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('plusieurs sessions dans ce dossier');
+    expect(r.err).toContain('--session');
+    // une session périmée du même dossier (close) n'est pas une rivale
+    publish(home, 'b', { cwd: dir, percent: 55, tokens: 3, window: 4, at: at - 3_000_000 });
+    expect((await ctxRun(dir, home)).out).toBe('ctx 10 % (1/2)');
   });
 
   it('--session force la session, même si son dossier n\'est pas le dossier courant', async () => {

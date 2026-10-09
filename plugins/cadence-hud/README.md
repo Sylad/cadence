@@ -92,9 +92,11 @@ appelle `cadence lead tour --json` (CLI `@sylad/cadence` sur le PATH, facultativ
 un `python3` écrit le contexte de la session dans `~/.cadence/orchestrate/hud-context/<id de session>.json`
 (`session`, `cwd` = le dossier de la session, `percent`, `tokens`, `window`, `at` ; écriture atomique, un fichier PAR
 session). C'est ce que lit `cadence session context` : la session lead ne voit pas la bande, qui n'est qu'un rendu, et le
-skill `lead` en tire son seuil de 60 % pour enchaîner sans le humain. Lancée depuis le dossier de la session (le dossier
-parent, pour le lead), la commande choisit le fichier dont `cwd` est le dossier courant, le plus récent s'il y en a
-plusieurs ; `--session <id>` force une session. Sans bande chargée dans cette session, ou avec un chiffre de plus de 2 min,
+skill `lead` en tire son seuil de 60 % pour enchaîner sans le humain. La commande lit par défaut le fichier de SA session, celui
+que nomme la variable `CLAUDE_CODE_SESSION_ID` (posée par Claude Code dans l'environnement de ses commandes Bash, valeur
+identique au nom du fichier) ; `--session <id>` l'emporte. Le dossier courant ne sert que si la variable est absente ET qu'une
+seule session publie pour ce dossier ; avec deux sessions dans le même dossier (elles alternent, « la plus récente » serait
+parfois celle de l'autre), elle sort en code 2 et demande `--session`. Sans bande chargée dans cette session, ou avec un chiffre de plus de 2 min,
 la commande sort en code 2 et le lead n'enchaîne pas : **désactiver ou modifier ce mod coupe donc l'enchaînement du lead**.
 Les fichiers de plus de 24 h sont ignorés et supprimés à la lecture de la commande.
 

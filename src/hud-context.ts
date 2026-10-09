@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { cadenceHome } from './orchestrate/registry.js';
 
 /** Au-delà, le chiffre écrit par la bande est trop vieux pour guider un arrêt (la bande le rafraîchit toutes les 5 s). */
@@ -65,10 +65,14 @@ function livingFiles(dir: string, nowMs: number): string[] {
   return kept;
 }
 
+/** La variable que Claude Code pose dans l'environnement de ses commandes Bash : l'id de la session, nom du fichier que la bande écrit. */
+export const SESSION_ID_ENV = 'CLAUDE_CODE_SESSION_ID';
+
 /**
- * Le contexte publié par la bande pour la session qui tourne dans `cwd` (le plus récent s'il y en a plusieurs),
- * ou pour la session `session` quand on la désigne ; sinon une raison de ne pas le croire
- * (aucune session, illisible, incomplet, périmé).
+ * Le contexte publié par la bande pour la session de l'appelant, dans l'ordre : `session` quand on la désigne, sinon la session de la
+ * variable `CLAUDE_CODE_SESSION_ID` ; seulement si elle est absente ET qu'un seul fichier publie pour `cwd`, celui-là (deux sessions
+ * d'un même dossier alternent : « la plus récente » donnerait le chiffre de l'autre, d'où le refus). Sinon une raison de ne pas le croire
+ * (aucune session, plusieurs, illisible, incomplet, périmé).
  */
 export function readHudContext(env: NodeJS.ProcessEnv, nowMs: number, target: { cwd: string; session?: string }): { ok: true; ctx: HudContext } | { ok: false; reason: string } {
   const dir = hudContextDir(env);
@@ -76,21 +80,26 @@ export function readHudContext(env: NodeJS.ProcessEnv, nowMs: number, target: { 
   const files = livingFiles(dir, nowMs);
   let file: string | undefined;
   let unreadable = 0;
-  if (target.session !== undefined) {
-    file = join(dir, hudContextFile(target.session));
-    if (!files.includes(file)) return { ok: false, reason: `aucun contexte publié pour la session ${target.session} (${file} absent)` };
+  const fromEnv = target.session === undefined && !!env[SESSION_ID_ENV];
+  const session = target.session ?? (env[SESSION_ID_ENV] || undefined);
+  if (session !== undefined) {
+    file = join(dir, hudContextFile(session));
+    if (!files.includes(file)) return { ok: false, reason: `aucun contexte publié pour la session ${session}${fromEnv ? ` (variable ${SESSION_ID_ENV})` : ''} (${file} absent ; le mod cadence-hud est-il chargé dans cette session ?)` };
   } else {
-    const candidates: { file: string; at: number }[] = [];
+    const found: { file: string; at: number }[] = [];
     for (const f of files) {
       try {
         const raw = JSON.parse(readFileSync(f, 'utf8')) as Partial<HudContext>;
-        if (typeof raw?.cwd === 'string' && sameFolder(raw.cwd, target.cwd)) candidates.push({ file: f, at: isNum(raw.at) ? raw.at : -Infinity });
+        if (typeof raw?.cwd === 'string' && sameFolder(raw.cwd, target.cwd)) found.push({ file: f, at: isNum(raw.at) ? raw.at : -Infinity });
       } catch {
         unreadable++;
       }
     }
-    candidates.sort((a, b) => b.at - a.at);
-    file = candidates[0]?.file;
+    // Un fichier périmé est une session close ou muette, pas une rivale : elle ne compte parmi les candidates que si aucune n'est fraîche.
+    const fresh = found.filter((c) => nowMs - c.at <= HUD_CONTEXT_MAX_AGE_MS);
+    const candidates = (fresh.length ? fresh : found).map((c) => c.file);
+    if (candidates.length > 1) return { ok: false, reason: `plusieurs sessions dans ce dossier (${candidates.map((f) => basename(f, '.json')).join(', ')}) et ${SESSION_ID_ENV} absente : passer --session <id>` };
+    file = candidates[0];
     if (!file) {
       const more = unreadable ? ` ; ${unreadable} fichier(s) illisible(s)` : '';
       return { ok: false, reason: `aucune session de la bande ne publie pour ${target.cwd} dans ${dir} (le mod cadence-hud est-il chargé dans cette session ?)${more}` };

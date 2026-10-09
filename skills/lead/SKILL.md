@@ -108,13 +108,15 @@ of the plan itself (section 2b), and the limits of section « Limits that always
 handed back ready (refused, review not compliant after the correction passes, red delivery, blocking QA finding) is
 not chained over: it is reported, and the chain goes on with the lots that do not depend on it.
 
-**The threshold.** Before every new wave, read the context of the lead session with `cadence session context`, run from
-the parent folder (the folder the lead was launched from): the `cadence-hud` mod publishes the context of each session,
-one file per session tied to its folder, and the command reads the one of the current folder (`--session <id>` forces
-another). It prints `ctx 42 % (84000/200000)`, the figure the `ctx` segment of the band shows, which the band publishes to
+**The threshold.** Before every new wave, read the context of the lead session with `cadence session context`: the
+`cadence-hud` mod publishes the context of each session, one file per session named after its id, and the command reads the
+one named by `$CLAUDE_CODE_SESSION_ID` (Claude Code sets it in the environment of your Bash, so it is your own session,
+whatever the folder; `--session <id>` overrides it). Without the variable it falls back to the folder only if a single
+session publishes for it; two sessions in one folder make it exit 2 ("pass --session"), never guess the latest. It prints
+`ctx 42 % (84000/200000)`, the figure the `ctx` segment of the band shows, which the band publishes to
 a file because it is only a rendering the model cannot see. If the command fails (exit code 2: the band is not loaded in
-this folder's session, or the figure is older than two minutes), treat it as **at the threshold**: you cannot prove you are
-under it, and without the band loaded the lead does not chain.
+this session, several sessions share the folder without the variable, or the figure is older than two minutes), treat it as
+**at the threshold**: you cannot prove you are under it, and without the band loaded the lead does not chain.
 From **60 %** upward, start nothing: at the threshold the lead runs `session-close` in each project touched, writes its
 memory (filtered, as `session-close` says), and records three lines for next time with `cadence session next` — the wave
 that was about to start comes first among them. Under it, chain. The lead says in one sentence which side of the threshold

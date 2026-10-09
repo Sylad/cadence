@@ -29,6 +29,7 @@ if (tool === 'raf') {
   cadence session start|close --all [--depth 1]   depuis un dossier non dépôt : une section par projet des sous-dossiers
   cadence session next "ligne" …       notes pour la prochaine session (remplacent les précédentes)
   cadence session next --clear         efface ces notes ; sans ligne ni --clear, la commande refuse
+  cadence session context [--session <id>]   contexte de la session (variable CLAUDE_CODE_SESSION_ID, sinon la seule du dossier) publié par la bande cadence-hud ; code 2 sans chiffre frais
   cadence deliver [--dry-run] [--sha rév] [--config cadence.yaml] [-- arguments du script du projet]
                     CI du sha poussé → déploiement → vérifications de l'effet ;
                     ou le script de livraison du projet (deliver.script), sous verrou et journal

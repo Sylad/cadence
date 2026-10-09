@@ -708,7 +708,7 @@ async function sessionAll(rest: string[], values: { all?: boolean; depth?: strin
   return worst;
 }
 
-/** Le contexte de la session qui tourne dans le dossier courant (ou de `--session <id>`), tel que la bande cadence-hud le publie ; illisible = code 2, à lire comme « au seuil ». */
+/** Le contexte de la session de `--session <id>`, sinon de `CLAUDE_CODE_SESSION_ID`, sinon (variable absente) de la seule session du dossier courant, tel que la bande cadence-hud le publie ; illisible = code 2, à lire comme « au seuil ». */
 function sessionContext(io: Io, session?: string): number {
   const r = readHudContext(io.env, io.now().getTime(), { cwd: io.cwd, session });
   if (!r.ok) throw new RafError(`session context : contexte illisible — ${r.reason} ; à traiter comme au seuil`);

@@ -194,7 +194,9 @@ describe('skill lead : source unique', () => {
     expect(skill).toMatch(/`visible` lot first waits for the human's UX verdict[^.]*neither closed nor delivered without it/i);
     // la sortie annoncée est la sortie réelle, et la source du chiffre est nommée
     expect(skill).toContain('`ctx 42 % (84000/200000)`');
-    expect(skill).toMatch(/run from\s+the parent folder[^.]*`cadence-hud` mod publishes/i);
+    // la session est désignée par la variable de Claude Code, jamais « la plus récente du dossier » (deux sessions d'un dossier alternent)
+    expect(skill).toMatch(/`cadence-hud` mod publishes[^.]*\$CLAUDE_CODE_SESSION_ID/i);
+    expect(skill).toMatch(/two sessions in one folder make it exit 2[^.]*never guess the latest/i);
     expect(skill).toMatch(/band is not loaded[^.]*treat it as \*\*at the threshold\*\*/i);
     // un arrêt, pas une boucle d'attente
     expect(skill).toMatch(/never a polling loop/i);

@@ -1,9 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { Register, RenderChildren, Timer } from 'claude-code'
 
-import type { AgentsSummary, ModelsSummary, Usage, Wave, WaveLot } from '../types'
+import type { AgentsSummary, CommandInfo, ModelsSummary, Usage, Wave, WaveLot } from '../types'
 import { COLLECTOR, parseWaves } from './collect'
-import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commonProject, endedCommands, fit, fitSegments, k, limitLabel, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, pruneOwners, RESET_BACK, shortModel, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, k, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, pruneOwners, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, trackCommand, untilReset, wavePercent, waveSessions, waveStatusFr } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -12,6 +12,7 @@ const usage = atom({ plugin: 'cadence-hud', key: 'usage' } as const, null)
 const agents = atom({ plugin: 'cadence-hud', key: 'agents' } as const, { running: 0, names: [] })
 const commands = atom({ plugin: 'cadence-hud', key: 'commands' } as const, [])
 const owners = atom({ plugin: 'cadence-hud', key: 'commandOwners' } as const, {})
+const info = atom({ plugin: 'cadence-hud', key: 'commandInfo' } as const, {})
 const models = atom({ plugin: 'cadence-hud', key: 'models' } as const, { byModel: {}, usdSeen: 0 })
 const waves = atom({ plugin: 'cadence-hud', key: 'waves' } as const, [])
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
@@ -23,6 +24,7 @@ const endCommand = async ($: Parameters<typeof read>[0], ended: string): Promise
   const o = await read($, owners)
   const left = await update($, commands, (ids: string[]) => endedCommands(ids, o, ended))
   await update($, owners, (cur: Record<string, string>) => pruneOwners(cur, left))
+  await update($, info, (cur: Record<string, CommandInfo>) => Object.fromEntries(Object.entries(cur).filter(([id]) => left.includes(id))))
 }
 
 export const register: Register = on => {
@@ -34,18 +36,23 @@ export const register: Register = on => {
     // le compte repart de zéro plutôt que de garder des identifiants dont la fin ne reviendra jamais (vu 08-10 : « 3 cmd »).
     await update($, commands, () => [])
     await update($, owners, () => ({}))
+    await update($, info, () => ({}))
     await $.command.register({
       name: 'hud',
-      description: 'Affiche ou masque la bande cadence-hud (contexte, fenêtres, agents, vagues orchestrate)',
+      description: 'Affiche ou masque la bande cadence-hud ; « /hud cmd » liste les commandes d\'arrière-plan comptées',
     })
 
     const refresh = async () => {
       if (isRefreshing) return
       isRefreshing = true
       try {
+        let listed = true
         const [u, list, collected, at] = await Promise.all([
           $.session.usage().catch(() => null),
-          $.agent.list().catch(() => []),
+          $.agent.list().catch(() => {
+            listed = false
+            return []
+          }),
           $.process.run(['python3', '-I', '-c', COLLECTOR], { timeoutMs: 4_000 }).catch(err => ({
             exitCode: -1,
             stdout: '',
@@ -63,6 +70,8 @@ export const register: Register = on => {
               limits: u.rateLimits.map(r => ({ kind: r.kind, percentUsed: r.percentUsed, resetsAt: r.resetsAt })),
             }
           : null
+        // un sous-agent fini (ou disparu) emporte ses commandes même si son avis de fin n'a pas été vu
+        if (listed) for (const gone of endedOwners(await read($, owners), list)) await endCommand($, gone)
         const live = list.filter(a => a.status === 'running' || a.status === 'pending' || a.status === 'waiting')
         const summary: AgentsSummary = {
           running: live.length,
@@ -126,9 +135,14 @@ export const register: Register = on => {
       // le propriétaire d'abord : une fin de sous-agent tombant entre les deux écritures retire déjà la commande
       const agent = e.agentId
       if (agent) await update($, owners, (o: Record<string, string>) => ({ ...o, [started]: agent }))
+      // sans horloge, la commande est comptée quand même (sans fiche : ni âge ni nom)
+      const since = await $.clock.now().catch(() => undefined)
+      if (since !== undefined) {
+        await update($, info, (cur: Record<string, CommandInfo>) => ({ ...cur, [started]: { tool: e.tool, label: commandLabel(e.tool, e.input), since } }))
+      }
       await update($, commands, (ids: string[]) => trackCommand(ids, started, true))
     } else {
-      const stopped = stoppedTask(e.tool, result.result)
+      const stopped = stoppedTask(e.tool, result.result, e.input)
       if (stopped) await endCommand($, stopped)
     }
     return result
@@ -146,7 +160,11 @@ export const register: Register = on => {
     ($, e, next) => next(e),
   )
 
-  on('command.run', { command: 'hud' }, async $ => {
+  on('command.run', { command: 'hud' }, async ($, e) => {
+    if (e.args.trim() === 'cmd') {
+      const [ids, i, o, at] = await Promise.all([read($, commands), read($, info), read($, owners), $.clock.now()])
+      return { text: commandsText(ids, i, o, at) }
+    }
     const hidden = !(await read($, isHidden))
     await update($, isHidden, () => hidden)
 
@@ -156,15 +174,17 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, m, w, problem, at] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
+      read($, info),
       read($, models),
       read($, waves),
       read($, error),
       read($, now),
     ])
+    const w = allWaves.filter(wave => isWaveShown(wave, at))
     if (u === null && w.length === 0 && problem === null) return next(e)
 
     const ambiguous = parseAmbiguous(await $.env.get('CADENCE_HUD_AMBIGUOUS'))
@@ -263,8 +283,23 @@ export const register: Register = on => {
         const names = fit(a.names.join(', '), 40)
         if (names) segments.push({ key: 'agent-names', text: ` ${names}`, drop: 6, requires: 'agents', node: <Text key="agent-names" dimColor> {names}</Text> })
       }
-      if (cmds.length > 0) {
-        const label = `${cmds.length} cmd`
+      const { live: liveCmds, stale: staleCmds } = splitCommands(cmds, cmdInfo, at)
+      if (staleCmds.length > 0) {
+        const label = `${staleCmds.length} sans fin vue`
+        segments.push({
+          key: 'stale-commands',
+          text: `${SEP}${label}`,
+          drop: 3,
+          node: (
+            <Text key="stale-commands">
+              {sep}
+              <Text dimColor>{label}</Text>
+            </Text>
+          ),
+        })
+      }
+      if (liveCmds.length > 0) {
+        const label = `${liveCmds.length} cmd`
         segments.push({
           key: 'commands',
           text: `${SEP}${label}`,
@@ -294,8 +329,6 @@ export const register: Register = on => {
           <Text key={`wave-${wave.id}`} color="subtle" wrap="truncate-end">
             ⟳ {project ? `${project} · ` : ''}
             {wave.id} {waveStatusFr(wave.status)} {ago(wave.ended, at)}
-            {sep}
-            budget {pct(percent)} {k(wave.consumed)}/{k(wave.budget)}
             {wave.lots.length > 0 && (
               <Text color="subtle">
                 {sep}

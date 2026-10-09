@@ -8,6 +8,9 @@ export type Usage = {
   limits: RateLimit[]
 }
 
+/** Ce que `/hud cmd` sait d'une commande d'arrière-plan comptée : l'outil, son nom court et l'heure (ms) où le mod l'a vue naître. */
+export type CommandInfo = { tool: string; label: string; since: number }
+
 export type AgentsSummary = { running: number; names: string[] }
 
 /** Ce qu'un modèle a consommé sur la session : tokens (entrée + sortie + cache) et dollars qui lui sont attribués. */
@@ -62,6 +65,8 @@ declare module 'claude-code' {
       commands: string[]
       /** Commande → identifiant du sous-agent qui l'a lancée ; une commande de la session principale n'y figure pas. */
       commandOwners: Record<string, string>
+      /** Commande → outil, nom et heure de lancement (pour `/hud cmd` et l'âge au-delà duquel elle n'est plus comptée en cours). */
+      commandInfo: Record<string, CommandInfo>
       models: ModelsSummary
       waves: Wave[]
       error: string | null

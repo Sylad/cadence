@@ -1,6 +1,6 @@
 import type { ThemeKey } from 'claude-code'
 
-import type { ModelsSummary, Wave, WaveLot } from '../types'
+import type { CommandInfo, ModelsSummary, Wave, WaveLot } from '../types'
 
 /** Couleur d'un taux d'occupation (contexte, fenêtre, budget) : vert, puis orange, puis rouge. */
 export const colorOfPercent = (percent: number | undefined, warn = 60, bad = 85): ThemeKey =>
@@ -285,11 +285,19 @@ export const endedCommands = (ids: readonly string[], owners: Readonly<Record<st
 export const pruneOwners = (owners: Readonly<Record<string, string>>, ids: readonly string[]): Record<string, string> =>
   Object.fromEntries(Object.entries(owners).filter(([id]) => ids.includes(id)))
 
-/** L'identifiant de la tâche qu'un TaskStop réussi vient d'arrêter (`task_id` du résultat), sinon null. */
-export const stoppedTask = (tool: string, result: unknown): string | null => {
-  if (tool !== 'TaskStop' || typeof result !== 'object' || result === null) return null
-  const id = (result as Record<string, unknown>).task_id
-  return typeof id === 'string' ? id : null
+/** L'identifiant de la tâche qu'un TaskStop réussi vient d'arrêter : `task_id` du résultat, à défaut `task_id` ou
+ *  `shell_id` de l'appel lui-même (un résultat qui ne nomme pas la tâche ne doit pas la laisser dans le compte), sinon null. */
+export const stoppedTask = (tool: string, result: unknown, input?: unknown): string | null => {
+  if (tool !== 'TaskStop') return null
+  const pick = (o: unknown, ...keys: string[]): string | null => {
+    if (typeof o !== 'object' || o === null) return null
+    for (const key of keys) {
+      const v = (o as Record<string, unknown>)[key]
+      if (typeof v === 'string') return v
+    }
+    return null
+  }
+  return pick(result, 'task_id') ?? pick(input, 'task_id', 'shell_id')
 }
 
 /** Comme `endedTask`, mais seulement pour un message d'origine `task-notification` : un prompt tapé ne termine rien. */
@@ -299,3 +307,69 @@ export const notifiedEnd = (origin: { kind?: string } | undefined, text: string)
 /** Ajoute ou retire une tâche de la liste des commandes en cours, sans doublon. */
 export const trackCommand = (ids: readonly string[], id: string, isRunning: boolean): string[] =>
   isRunning ? (ids.includes(id) ? [...ids] : [...ids, id]) : ids.filter(i => i !== id)
+
+/** Une commande sans fin vue depuis cette durée n'est plus comptée « en cours » : son avis de fin s'est sans doute perdu. */
+export const STALE_COMMAND_MS = 60 * 60_000
+
+/** Une vague terminée reste affichée (en gris) ce temps, puis la bande l'oublie. */
+export const WAVE_LINGER_MS = 30 * 60_000
+
+/** Le nom d'une commande d'arrière-plan sur une ligne : sa description, sinon sa commande, 50 caractères au plus. */
+export const commandLabel = (_tool: string, input: unknown): string => {
+  if (typeof input !== 'object' || input === null) return ''
+  const i = input as Record<string, unknown>
+  const text = [i.description, i.command].find((v): v is string => typeof v === 'string' && v.trim() !== '') ?? ''
+  return fit(text.replace(/\s+/g, ' ').trim(), 50)
+}
+
+/** Sépare les commandes comptées en cours de celles sans fin vue depuis `STALE_COMMAND_MS` ; sans fiche, une commande est en cours. */
+export const splitCommands = (
+  ids: readonly string[],
+  info: Readonly<Record<string, CommandInfo>>,
+  now: number,
+): { live: string[]; stale: string[] } => {
+  const stale = ids.filter(i => info[i] !== undefined && now - info[i]!.since >= STALE_COMMAND_MS)
+  return { live: ids.filter(i => !stale.includes(i)), stale }
+}
+
+/** La table de ce que `/hud cmd` répond : chaque commande comptée, son outil, son origine, son âge et son nom. */
+export const commandsText = (
+  ids: readonly string[],
+  info: Readonly<Record<string, CommandInfo>>,
+  owners: Readonly<Record<string, string>>,
+  now: number,
+): string => {
+  if (ids.length === 0) return "Aucune commande d'arrière-plan comptée."
+  const { stale } = splitCommands(ids, info, now)
+  const head =
+    `${ids.length} commande${ids.length > 1 ? 's' : ''} comptée${ids.length > 1 ? 's' : ''}` +
+    (stale.length > 0 ? `, ${stale.length} sans fin vue depuis plus d'une heure (non comptée en cours)` : '') +
+    ' :'
+  const idWidth = Math.max(...ids.map(i => i.length))
+  const rows = ids.map(id => {
+    const c = info[id]
+    const origin = owners[id] ? `agent ${owners[id]}` : 'session'
+    const age = c ? duration(now - c.since) : '-'
+    const flag = stale.includes(id) ? '  (sans fin vue)' : ''
+    const label = c?.label ? `${c.label}${flag}` : ''
+    return `  ${id.padEnd(idWidth)}  ${(c?.tool ?? '?').padEnd(7)}  ${origin.padEnd(10)}  ${age.padEnd(8)} ${label}`.trimEnd()
+  })
+  return [head, ...rows].join('\n')
+}
+
+/** Les sous-agents propriétaires de commandes qui ne tournent plus (statut terminé, ou absents de la liste) : leurs commandes finissent avec eux. */
+export const endedOwners = (owners: Readonly<Record<string, string>>, agents: readonly { id: string; status: string }[]): string[] => {
+  const status = new Map(agents.map(a => [a.id, a.status]))
+  const gone = (id: string) => {
+    const s = status.get(id)
+    return s === undefined || s === 'completed' || s === 'failed' || s === 'killed'
+  }
+  return [...new Set(Object.values(owners))].filter(gone)
+}
+
+/** Une vague vivante s'affiche toujours ; une vague terminée jusqu'à `WAVE_LINGER_MS` après sa fin (date inconnue : affichée). */
+export const isWaveShown = (wave: Wave, now: number): boolean => {
+  if (wave.live || !wave.ended) return true
+  const t = Date.parse(wave.ended)
+  return !Number.isFinite(t) || now - t < WAVE_LINGER_MS
+}

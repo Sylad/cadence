@@ -30,6 +30,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence session start\|close --all [--depth n]`: every project under a folder, one section each | [0.15.0](#0150---2026-10-08) |
 | Wave lock per repository: `cadence deliver` on a repository whose lots are finished while the wave continues | [0.19.0](#0190---2026-10-08) |
 
+## [Unreleased]
+
+### Changed
+- `cadence-hud` 0.3.4: the band no longer misleads after the work is over. `/hud cmd` lists the background commands it counts (id, tool, origin `session` or `agent <id>`, age, name); a subagent that is finished or gone from the agent list takes its commands with it, `TaskStop` removes its task even when the result does not name it, and a command with no end seen for over an hour is no longer counted as running (grey `N sans fin vue`). A finished wave shows grey on one line (`terminée il y a 12 min · 3 prêts`) without its budget and disappears 30 minutes after its end. (L142)
+
 ## [0.19.1] - 2026-10-09
 
 ### Fixed

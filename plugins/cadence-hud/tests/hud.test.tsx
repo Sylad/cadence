@@ -3,7 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { parseWaves } from '../hooks/collect'
 import { register } from '../hooks/register'
-import { ago, attributeTurn, endedCommands, endedTask, notifiedEnd, pruneOwners, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, pruneOwners, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
@@ -191,7 +191,7 @@ test('la dernière vague terminée reste en gris, sur une ligne, sans ses lots',
   })
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'desktop', ...BAND })
   expect(await ui.find({ type: 'Text', text: /cadence · 2026-10-07-2131 interrompue il y a 12 min/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /budget\s+22 % 440k\/2M/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /budget/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /2 prêts · 1 échec · 1 suspendu/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^L107$/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /session/ })).toBeUndefined()
@@ -564,7 +564,7 @@ const wired = (on: On) => {
   })
   on('tool.call', () => answer.current as never)
   on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
-  return { answer, commands: () => store.get('commands')?.value ?? [], owners: () => store.get('commandOwners')?.value ?? {} }
+  return { answer, commands: () => store.get('commands')?.value ?? [], owners: () => store.get('commandOwners')?.value ?? {}, info: () => store.get('commandInfo')?.value ?? {} }
 }
 
 const NOTIFICATION = (id: string) =>
@@ -676,4 +676,141 @@ test('session.start repart sans commande ni propriétaire (session neuve ou rech
   expect(hud.owners()).toEqual({})
   // le premier rafraîchissement du hook est lancé sans être attendu (`void refresh()`) : le laisser se poser avant la fin du test
   await new Promise<void>(resolve => setTimeout(() => resolve(), 50))
+})
+
+// ── L142 : dire clairement l'état ──────────────────────────────────────────────────────────────────────────────
+
+test('une commande se nomme par sa description, sinon sa commande, sur une ligne courte', () => {
+  expect(commandLabel('Bash', { command: 'sleep 60', description: 'Attendre la CI' })).toBe('Attendre la CI')
+  expect(commandLabel('Bash', { command: 'sleep 60\nls' })).toBe('sleep 60 ls')
+  expect(commandLabel('Monitor', { command: 'tail -f x', description: 'suivre x' })).toBe('suivre x')
+  expect(commandLabel('Bash', { command: 'x'.repeat(100) })).toBe(`${'x'.repeat(47)}...`)
+  expect(commandLabel('Bash', undefined)).toBe('')
+})
+
+test('une commande sans fin vue depuis une heure ne compte plus comme en cours', () => {
+  const at = 10 * 3_600_000
+  const info = {
+    fresh: { tool: 'Bash', label: 'a', since: at - 5 * 60_000 },
+    old: { tool: 'Monitor', label: 'b', since: at - 61 * 60_000 },
+  }
+  expect(splitCommands(['fresh', 'old', 'inconnue'], info, at)).toEqual({ live: ['fresh', 'inconnue'], stale: ['old'] })
+  expect(splitCommands([], {}, at)).toEqual({ live: [], stale: [] })
+})
+
+test('/hud cmd liste chaque commande comptée avec son origine et son âge', () => {
+  const at = 10 * 3_600_000
+  const info = {
+    b1: { tool: 'Bash', label: 'deliver', since: at - 3 * 60_000 },
+    m1: { tool: 'Monitor', label: 'suivre la CI', since: at - 70 * 60_000 },
+    b2: { tool: 'Bash', label: 'tests', since: at - 42_000 },
+  }
+  expect(commandsText(['b1', 'm1', 'b2', 'x9'], info, { b2: 'a1' }, at)).toEqual([
+    '4 commandes comptées, 1 sans fin vue depuis plus d\'une heure (non comptée en cours) :',
+    '  b1  Bash     session     3 min    deliver',
+    '  m1  Monitor  session     1 h 10   suivre la CI  (sans fin vue)',
+    '  b2  Bash     agent a1    42 s     tests',
+    '  x9  ?        session     -',
+  ].join('\n'))
+  expect(commandsText([], {}, {}, at)).toBe('Aucune commande d\'arrière-plan comptée.')
+})
+
+test('un sous-agent terminé ou disparu de la liste emporte ses commandes, un sous-agent vivant non', () => {
+  const owners = { b1: 'a1', b2: 'a2', b3: 'a3' }
+  const agents = [
+    { id: 'a1', status: 'completed' },
+    { id: 'a2', status: 'running' },
+  ]
+  expect(endedOwners(owners, agents)).toEqual(['a1', 'a3'])
+  expect(endedOwners({}, agents)).toEqual([])
+})
+
+test('TaskStop retire la tâche même quand son résultat ne la nomme pas : repli sur task_id / shell_id de l\'appel', () => {
+  expect(stoppedTask('TaskStop', { message: 'ok' }, { task_id: 'b7' })).toBe('b7')
+  expect(stoppedTask('TaskStop', { message: 'ok' }, { shell_id: 'b8' })).toBe('b8')
+  expect(stoppedTask('TaskStop', { task_id: 'b1' }, { task_id: 'b7' })).toBe('b1')
+  expect(stoppedTask('TaskStop', { message: 'ok' }, {})).toBeNull()
+})
+
+test('une vague terminée disparaît après 30 min, une vague vivante jamais', () => {
+  const ended = '2026-10-09T10:00:00.000Z'
+  const done: Wave = { ...WAVE, live: false, ended, status: 'done' }
+  const t = Date.parse(ended)
+  expect(isWaveShown(done, t + 29 * 60_000)).toBe(true)
+  expect(isWaveShown(done, t + 31 * 60_000)).toBe(false)
+  expect(isWaveShown({ ...done, ended: undefined }, t)).toBe(true)
+  expect(isWaveShown({ ...WAVE, live: true }, t + 99 * 3_600_000)).toBe(true)
+})
+
+test('la vague terminée est grise, dit « terminée » et n\'affiche aucun budget', async ($, on) => {
+  seed(on, {
+    ...EMPTY,
+    usage: { percent: 42, window: 200_000, limits: [] },
+    waves: [{ ...WAVE, live: false, ended: '2026-10-07T19:00:00.000Z', status: 'done', lots: [{ ...WAVE.lots[0]!, status: 'ready', step: null }] }],
+    now: Date.parse('2026-10-07T19:10:00.000Z'),
+  })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /terminée il y a 10 min/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /budget/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /1 prêt/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('une vague terminée depuis plus de 30 min n\'est plus dessinée', async ($, on) => {
+  seed(on, {
+    ...EMPTY,
+    usage: { percent: 42, window: 200_000, limits: [] },
+    waves: [{ ...WAVE, live: false, ended: '2026-10-07T19:00:00.000Z', status: 'done', lots: [] }],
+    now: Date.parse('2026-10-07T20:04:00.000Z'),
+  })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /42 %/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /terminée/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('la bande compte les commandes fraîches en orange et signale les anciennes à part', async ($, on) => {
+  const at = 10 * 3_600_000
+  seed(on, {
+    ...EMPTY,
+    commands: ['b1', 'm1'],
+    commandInfo: { b1: { tool: 'Bash', label: 'x', since: at - 60_000 }, m1: { tool: 'Monitor', label: 'y', since: at - 2 * 3_600_000 } },
+    usage: { percent: 42, window: 200_000, limits: [] },
+    waves: [],
+    now: at,
+  })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /1 cmd/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /1 cmd sans fin/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /1 sans fin vue/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('Bash et Monitor enregistrent leur étiquette et leur origine, et la fin les efface', async ($, on) => {
+  const hud = wired(on)
+  mock.clock(on)
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', input: { command: 'sleep 60', description: 'attendre' } } as never)
+  hud.answer.current = { result: { taskId: 'm1' } }
+  await $.tool.call({ tool: 'Monitor', input: { command: 'tail -f x' }, agentId: 'a1' } as never)
+  const info = hud.info() as Record<string, { tool: string; label: string; since: number }>
+  expect(Object.keys(info)).toEqual(['b1', 'm1'])
+  expect(info.b1).toMatchObject({ tool: 'Bash', label: 'attendre' })
+  expect(info.m1).toMatchObject({ tool: 'Monitor', label: 'tail -f x' })
+  await $.prompt.submit({ text: NOTIFICATION('b1'), origin: { kind: 'task-notification' } } as never)
+  expect(Object.keys(hud.info())).toEqual(['m1'])
+  await $.prompt.submit({ text: NOTIFICATION('a1'), origin: { kind: 'task-notification' } } as never)
+  expect(hud.commands()).toEqual([])
+  expect(hud.info()).toEqual({})
+})
+
+test('/hud cmd répond la liste des commandes comptées, /hud bascule la bande', async ($, on) => {
+  const hud = wired(on)
+  mock.clock(on)
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', input: { command: 'sleep 60', description: 'attendre' } } as never)
+  const listed = await $.command.run({ command: 'hud', args: 'cmd' } as never)
+  expect(listed.text).toMatch(/1 commande comptée :\n {2}b1 {2}Bash {5}session .*attendre/)
+  const toggled = await $.command.run({ command: 'hud', args: '' } as never)
+  expect(toggled.text).toMatch(/masquée/)
 })

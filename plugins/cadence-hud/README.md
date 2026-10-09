@@ -31,7 +31,14 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
   commande lancée avant le chargement du mod, ou dont la
   notification n'arrive pas, n'est pas vue : le compteur ne remonte qu'aux lancements qu'il a vus. Une commande
   lancée par un sous-agent synchrone (`backgroundEndsWithFinalResponse: true` dans le résultat) n'est pas comptée
-  non plus : elle prend fin avec la réponse finale du sous-agent, pas à une notification ;
+  non plus : elle prend fin avec la réponse finale du sous-agent, pas à une notification. Trois filets
+  complètent les fins vues : un sous-agent propriétaire que `$.agent.list()` donne terminé (ou n'y figure plus)
+  emporte ses commandes même si son avis de fin n'est pas passé par la session ; un `TaskStop` retire la tâche
+  même quand son résultat ne la nomme pas (l'`task_id` / `shell_id` de l'appel sert de repli) ; une commande sans
+  fin vue depuis **plus d'une heure** n'est plus comptée « en cours » (orange) : la bande l'écrit à part, en gris,
+  `1 sans fin vue`. **`/hud cmd`** liste ce qui est compté : identifiant, outil (Bash / Monitor), origine
+  (`session` ou `agent <id>`), âge et nom (description de l'appel, sinon sa commande), avec `(sans fin vue)` sur
+  les anciennes ;
 - par vague `cadence orchestrate` vivante : un en-tête (projet si tous les lots sont du même, identifiant, statut,
   budget consommé / plafond, sessions en cours / plafond), puis un **tableau des lots actifs** à colonnes alignées —
   lot, statut coloré (prêt = vert, question / suspendu = orange, échec / rendu = rouge), détail de l'étape
@@ -40,8 +47,9 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
   ligne grise `en attente` listant les lots qui n'ont pas démarré. Les lots de projets différents gardent le
   préfixe `projet:` ;
 - sans vague vivante, la **dernière vague terminée** du dossier courant reste sur une ligne grise avec son statut
-  (`terminée` / `interrompue il y a 12 min`), son budget consommé et le bilan de ses lots (`3 prêts · 1 échec · 3 suspendus`),
-  jusqu'à ce qu'une nouvelle vague démarre.
+  (`terminée` / `interrompue il y a 12 min`) et le bilan de ses lots (`3 prêts · 1 échec · 3 suspendus`), **sans
+  budget** (il n'a plus d'objet une fois la vague finie) ; elle **disparaît 30 min après sa fin**, ou plus tôt
+  quand une nouvelle vague démarre.
 
 Quand la fenêtre est étroite, la première ligne ne se replie pas : ses segments tombent par priorité jusqu'à tenir sur
 la largeur — d'abord les noms des agents, puis les heures de remise à zéro, puis la consommation par modèle, le coût,
@@ -57,7 +65,7 @@ suspension (`...`), les valeurs inconnues (`-`) et le libellé de la limite de d
 noms d'agents et de modèles, repris tels quels, peuvent encore y mettre un caractère ambigu. Les en-têtes de vague sont
 tronqués en fin de ligne.
 
-`/hud` masque ou réaffiche la bande.
+`/hud` masque ou réaffiche la bande ; `/hud cmd` liste les commandes d'arrière-plan comptées (voir `N cmd`).
 
 Les vagues sont lues sur disque (`~/.cadence/orchestrate/waves/<pid>.json`, puis `<cwd>/.cadence/runs/<vague>/`),
 par le script python de `hooks/collect.ts` ; aucune commande cadence n'est lancée.

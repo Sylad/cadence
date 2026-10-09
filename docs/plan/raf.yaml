@@ -862,10 +862,13 @@ lots:
     finished: 2026-10-05
   - id: L68
     title: "orchestrate : accepter un id de sous-tâche (projet:Q4/accueil-4-ux18) — aujourd'hui « lot invalide », ce qui oblige à déléguer à la main les sous-tâches d'un plan à ids préfixés (maritime-atlas, 05-10)"
-    status: doing
+    status: dropped
     estimate: 0.5
     created: 2026-10-05
     started: 2026-10-09
+    finished: 2026-10-09
+    notes:
+      - { date: 2026-10-09, text: "abandonné : déjà couvert par L120 b9533db (orchestrate accepte les ids avec « / »), constaté par le precheck de la vague 2026-10-09-1826" }
   - id: L69
     title: "Notes de version : CHANGELOG.md rétroactif par version (v0.1→v0.10.1, « disponible depuis vX »), section What's new du README qui y renvoie, publish.yml refuse un tag sans section et crée la release GitHub avec la section de la version"
     status: done
@@ -960,10 +963,14 @@ lots:
     finished: 2026-10-07
   - id: L76
     title: "orchestrate : lots empilés sur main — le tableau final indique « livrable jusqu'à <sha> » (dernier commit d'un lot prêt sous un lot rendu), comme fait à la main pour ol L36 et ccc L26 avec deliver --sha (06-10)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-07
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme (Opus, 4 passes : vague 2026-10-09-1826 ×2 puis lead ×2) — bloquant own() par ascendance corrigé ee277c4 (cas réel ol L77 → 7a1ea11), majeur procédure git push <sha>:main && deliver --sha corrigé 203b1ae (tableau, skill lead §2c/§4, README) ; 1191/1191, tsc 0", commit: 203b1ae062da9784192ff8fbc2d459196e070af9 }
+    notes:
+      - { date: 2026-10-09, text: "Revue 09-10 (mineur, note) : own() ajoute encore les commits plan-seuls enregistrés par les étapes ; si l'un est le plus récent d'un lot prêt, newest le prend et, avec une CI filtrée par paths (maritime), pousser ce sha seul ne lance aucun run — aucun cas dans les vagues de .cadence/runs" }
+    finished: 2026-10-09
   - id: L77
     title: "orchestrate : contrôle préalable « livrable déjà présent ? » avant d'ouvrir une session d'implémentation — warhammer L59 et L65 étaient déjà faits par d'autres lots (06-10)"
     status: done

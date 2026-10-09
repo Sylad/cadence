@@ -827,7 +827,7 @@ cadence orchestrate … --dry-run              # preconditions + the plan of the
 cadence orchestrate --continue [--until 18:00] [--priority cadence,maritime]   # the wave draws the next ready lot itself (below)
 cadence orchestrate --status [<wave>]        # the live waves and the repositories they hold, then the table (default: the last wave of this folder)
 cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running (with an explicit `<wave>`: when that wave is no longer running)
-cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"]
+cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
 cadence orchestrate --drop ccc:L29 [--wave <wave>]   # from another terminal: take a lot out of the running wave
 cadence orchestrate --stop-after-current [--wave <wave>]   # from another terminal: let the running sessions finish, start nothing else
 ```
@@ -841,7 +841,10 @@ from (`--wave <id>` when several waves run from it), and write a request in the 
 that is unknown or already finished is refused (exit 2). `--stop-after-current` lets the sessions running finish, starts no
 other session nor lot (`arrêt demandé (--stop-after-current)`), and leaves the wave **interrupted** and resumable
 (`--resume`, which forgets the stop; `--continue` draws nothing more). Neither combines with lots to launch,
-`--continue`, `--dry-run`, `--budget` or `--answer`; without a live wave from that folder they are refused (exit 2).
+`--continue`, `--dry-run`, `--budget` or `--answer`, nor `--status`; without a live wave from that folder they are refused
+(exit 2). A stopped wave is no longer live, so to take a lot out of it use **`--resume --drop <project:lot>`**: the lot is
+handed back instead of being replayed (an unknown or finished lot is refused, exit 2, before anything runs).
+`--resume --stop-after-current` is refused (exit 2): resuming contradicts stopping.
 
 **`--continue` — idle time (L147)**: lots given on the command line open the wave (none: the first ones are drawn from the
 plan too); then, each time the lots in play are finished, the wave **draws the next ready lots of the plan** — up to the

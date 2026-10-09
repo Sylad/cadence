@@ -66,7 +66,7 @@ describe('cycle', () => {
   });
 });
 
-function parentWith(names: string[]) {
+function parentWith(names: string[], lots = 1) {
   const parent = tempDir();
   for (const name of names) {
     const dir = join(parent, name);
@@ -76,7 +76,7 @@ function parentWith(names: string[]) {
     git(dir, 'config', 'user.name', 'T');
     git(dir, 'config', 'commit.gpgsign', 'false');
     const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
-    plan.add('lot', '2026-10-01', { estimate: 1 });
+    for (let i = 0; i < lots; i++) plan.add('lot', '2026-10-01', { estimate: 1 });
     plan.save();
     writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
     git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
@@ -169,5 +169,65 @@ describe('orchestrate --drop / --stop-after-current sur une vague vivante', () =
     expect(unknown).toMatch(/a:L9 : lot inconnu dans la vague/);
     const finished = io(parent);
     expect(await orchestrate(['--drop', 'a:L1'], finished.io, dd.d)).toBe(2); // la vague est finie : plus rien à retirer
+  });
+});
+
+describe('--resume avec --drop / --stop-after-current (L79, revue)', () => {
+  /** Une vague arrêtée par --stop-after-current : a:L1 et b:L1 suspendus. */
+  async function stoppedWave() {
+    const parent = parentWith(['a', 'b']);
+    let asked = false;
+    const first = deps(async (kind) => {
+      if (kind === 'implement' && !asked) {
+        asked = true;
+        expect(await orchestrate(['--stop-after-current'], io(parent).io, first.d)).toBe(0);
+      }
+    });
+    await orchestrate(['a:L1', 'b:L1', '--max-sessions', '1'], io(parent).io, first.d);
+    const store = RunStore.last(parent)!;
+    expect(store.readLot('a', 'L1')!.status).toBe('suspended');
+    expect(store.readLot('b', 'L1')!.status).toBe('suspended');
+    return { parent, store };
+  }
+
+  it('--resume --drop b:L1 : b:L1 n\'est pas rejoué, il est rendu au lead ; a:L1 va à son terme', async () => {
+    const { parent, store } = await stoppedWave();
+    const second = deps(() => {});
+    const r = io(parent);
+    expect(await orchestrate(['--resume', '--drop', 'b:L1'], r.io, second.d)).toBe(1);
+    expect(second.calls.every((c) => c.cwd.endsWith('/a'))).toBe(true);
+    expect(store.readLot('a', 'L1')!.status).toBe('ready');
+    expect(store.readLot('b', 'L1')!.status).toBe('handed-back');
+    expect(store.readLot('b', 'L1')!.outcome).toMatch(/retiré de la vague/);
+    expect(store.readWave()!.status).toBe('done');
+  });
+
+  it('--resume --drop d\'un lot inconnu ou déjà fini est refusé (code 2) avant de jouer quoi que ce soit', async () => {
+    const { parent, store } = await stoppedWave();
+    const second = deps(() => {});
+    const unknown = io(parent);
+    expect(await orchestrate(['--resume', '--drop', 'b:L9'], unknown.io, second.d)).toBe(2);
+    expect(unknown.err.join('\n')).toMatch(/--drop b:L9 : lot inconnu dans la vague/);
+    expect(second.calls).toEqual([]);
+    expect(store.control().drops).toEqual([]);
+  });
+
+  it('--resume --stop-after-current et --status avec --drop / --stop-after-current sont refusés', async () => {
+    const parent = parentWith(['a']);
+    const { d } = deps(() => {});
+    await expect(orchestrate(['--resume', '--stop-after-current'], io(parent).io, d)).rejects.toThrow(/--resume ne se combine pas avec --stop-after-current/);
+    await expect(orchestrate(['--status', '--drop', 'a:L1'], io(parent).io, d)).rejects.toThrow(/--status ne se combine pas avec --drop \/ --stop-after-current/);
+    await expect(orchestrate(['--status', '--stop-after-current'], io(parent).io, d)).rejects.toThrow(/--status ne se combine pas/);
+  });
+
+  it('--resume après --stop-after-current rejoue les lots suspendus (l\'arrêt demandé est oublié)', async () => {
+    const { parent, store } = await stoppedWave();
+    expect(store.control().stopAfterCurrent).toBe(true);
+    const second = deps(() => {});
+    expect(await orchestrate(['--resume', '--max-sessions', '1'], io(parent).io, second.d)).toBe(0);
+    expect(store.control().stopAfterCurrent).toBe(false);
+    expect(store.readLot('a', 'L1')!.status).toBe('ready');
+    expect(store.readLot('b', 'L1')!.status).toBe('ready');
+    expect(store.readWave()!.status).toBe('done');
   });
 });

@@ -414,6 +414,9 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.continue) priorityOf(args, launch); // une clé priority: illisible du cadence.yaml : refus avant d'agir, lots donnés ou non
   if (args.watch && args.status === undefined) throw new RafError('--watch s\'utilise avec --status');
   if (args.interval !== undefined && !args.watch) throw new RafError('--interval s\'utilise avec --status --watch');
+  // --drop / --stop-after-current (L79) pilotent une vague VIVANTE : ni avec --status (rien à piloter), ni --stop-after-current avec --resume (il le contredit). --resume --drop retire le lot avant de rejouer la vague arrêtée.
+  if (args.status !== undefined && (args.drop.length || args.stopAfterCurrent)) throw new RafError('--status ne se combine pas avec --drop / --stop-after-current');
+  if (args.resume !== undefined && args.stopAfterCurrent) throw new RafError('--resume ne se combine pas avec --stop-after-current (il reprend la vague, il ne l\'arrête pas)');
   if (args.status !== undefined) {
     maxSessions(args, io); // une valeur invalide est refusée ici aussi
     if (!args.watch) {
@@ -884,6 +887,15 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
       l.questions = [];
     }
   }
+  // --resume --drop projet:lot (L79) : le lot est retiré avant d'être rejoué — le seul moyen de retirer un lot d'une vague arrêtée, --drop seul refusant une vague qui ne tourne plus.
+  const drops: string[] = [];
+  for (const d of args.drop) {
+    const matches = lots.filter((x) => x.lot === d.lot && (d.project ? x.project === d.project : true));
+    const where = `${d.project ? `${d.project}:` : ''}${d.lot}`;
+    if (matches.length !== 1) refusals.push(matches.length ? `--drop ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--drop ${where} : lot inconnu dans la vague ${wave.id}`);
+    else if (lotFinished(matches[0])) refusals.push(`--drop ${lotKey(matches[0].project, matches[0].lot)} : le lot est déjà fini (${matches[0].status})`);
+    else drops.push(lotKey(matches[0].project, matches[0].lot));
+  }
   const live: LotState[] = [];
   for (const l of lots) {
     if (lotFinished(l)) continue;
@@ -927,6 +939,11 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   }
   if (args.budget !== undefined) wave.budget = wave.consumed + args.budget;
   store.clearStopRequest(); // un arrêt demandé à la vague d'avant ne doit pas arrêter celle-ci
+  for (const k of drops) {
+    store.requestDrop(k);
+    store.journal(`demande : retirer ${k} de la vague (--resume --drop)`);
+    io.out(`${k} : retrait demandé — le lot est rendu au lead sans être rejoué`);
+  }
   const dirty = new Set<string>();
   for (const repo of live.flatMap(lotRepoPaths)) if (!dirty.has(repo)) {
     dirty.add(repo);

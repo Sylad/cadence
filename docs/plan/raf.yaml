@@ -1710,13 +1710,15 @@ lots:
     finished: 2026-10-09
   - id: L150
     title: "test orchestrate-command.test.ts instable sous charge : 1 puis 37 échecs (délais 5 s dépassés, « vagues en cours : 2 » au lieu de 1) pendant qu'une suite tournait à côté, 71/71 seul et 1098/1098 sur copie propre — isoler le registre des vagues par test (dossier temporaire dédié) et desserrer les délais (revue L143/L144 09-10)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-09
     notes:
       - { date: 2026-10-09, text: "09-10 18:15 : reproduit — suite complète pendant une livraison maritime (livrer.sh) + un QA Playwright : orchestrate-command.test.ts 49 échecs / 86 en 230 s ; rejoué seul : 86/86 en 13 s" }
+      - { date: 2026-10-09, text: "Notes de la revue 09-10 : helper until en 6 copies dans les tests (signatures différentes) ; sous très forte charge le délai global vitest 30 s peut couper avant l'échec nommé d'until (20 s) ; x()/y() idempotents seulement parce que test et vague partagent le pid. À 3 suites en parallèle : deliver (a) et verify SIGHUP tombent encore (logs tmp/L150-*.log), hors objectif du lot" }
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "conforme : registre des vagues isolé par test et délais portés à 30 s, 89/89 sur orchestrate-command.test.ts, typecheck vert, rien à signaler — orchestré (vague 2026-10-09-2124, 0 passe(s) de correction)", commit: 2373508134f6bc48c8b0084f63983b0ecc121599 }
+    review: { date: 2026-10-09, verdict: "conforme (Opus 09-10) : registre isolé par test, attente du créneau par événement avec échec nommé, vague attendue en fin de test, borne de grâce élargie ; 1224/1224 seul et deux suites en parallèle (lead) ; 3 notes mineures", commit: dc60793cf7f38ff252be7dbb29e3fc7fc88a49a3 }
+    finished: 2026-10-09
   - id: L151
     title: "orchestrate : la cause « tests rouges après … » dit « la passe des mineurs » pour une passe fix jouée après la revue courte (l.minorPass jamais remis à false, cycle.ts:500) — nommer la passe d'après le compteur, test de la séquence passe des mineurs → review-small majeur → fix rouge refusé (revue L145 09-10)"
     status: done

@@ -405,6 +405,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
 
   if ((args.until !== undefined || args.priority !== undefined) && !args.continue) throw new RafError('--until et --priority s\'utilisent avec --continue');
   if (args.until !== undefined) args.untilAt = parseUntil(args.until, io.now()); // heure invalide ou passée : refus avant d'agir
+  if (args.continue) priorityOf(args, launch); // une clé priority: illisible du cadence.yaml : refus avant d'agir, lots donnés ou non
   if (args.watch && args.status === undefined) throw new RafError('--watch s\'utilise avec --status');
   if (args.interval !== undefined && !args.watch) throw new RafError('--interval s\'utilise avec --status --watch');
   if (args.status !== undefined) {

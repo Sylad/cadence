@@ -1283,4 +1283,13 @@ describe('--continue (L147)', () => {
     expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1']);
 
   });
+
+  it('une clé priority: invalide du cadence.yaml du dossier de lancement est refusée avant d\'agir, même avec des lots donnés', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    writeFileSync(join(parent, 'cadence.yaml'), 'priority: 3\n');
+    const f = fakeDeps();
+    await expect(orchestrate(['a:L1', '--continue'], io(parent).io, f.deps)).rejects.toThrow(/priority/);
+    expect(f.calls).toHaveLength(0);
+    expect(existsSync(join(parent, '.cadence/runs')) ? readdirSync(join(parent, '.cadence/runs')) : []).toEqual([]);
+  });
 });

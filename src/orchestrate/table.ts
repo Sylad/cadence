@@ -1,3 +1,4 @@
+import { isAncestor } from '../git.js';
 import { quotaReset } from './result.js';
 import type { LotState, StepState, WaveState } from './state.js';
 
@@ -40,8 +41,29 @@ const commits = (l: LotState) => new Set(l.steps.flatMap((s: StepState) => s.com
 const counted = (l: LotState) => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
 const minutes = (l: LotState) => Math.round(l.steps.reduce((n, s) => n + (s.ended ? Date.parse(s.ended) - Date.parse(s.started) : 0), 0) / 60_000);
 
+/** Commits du lot dans son dépôt, du plus ancien au plus récent (ceux d'un dépôt voisin, `[rel] sha`, sont écartés). */
+const own = (l: LotState): string[] => [...new Set(l.steps.flatMap((s) => s.commits ?? []).filter((c) => !c.startsWith('[')))];
+
+/**
+ * Lots empilés sur main (L76) : un lot prêt sous un lot non prêt n'est livrable que jusqu'à son dernier commit.
+ * Par dépôt, le plus haut dernier commit d'un lot prêt qui n'a aucun commit d'un lot non prêt sous lui et en a au moins un au-dessus.
+ */
+function deliverable(lots: LotState[], ancestor: (repo: string, a: string, b: string) => boolean): { ready: LotState; sha: string; under: LotState }[] {
+  const out: { ready: LotState; sha: string; under: LotState }[] = [];
+  for (const repo of new Set(lots.map((l) => l.repo))) {
+    const here = lots.filter((l) => l.repo === repo);
+    const blocked = here.filter((l) => l.status !== 'ready' && own(l).length > 0).map((l) => ({ lot: l, first: own(l)[0] }));
+    const ready = here.filter((l) => l.status === 'ready' && own(l).length > 0).map((l) => ({ lot: l, last: own(l).at(-1)! }));
+    const ok = ready.filter((r) => blocked.every((b) => !ancestor(repo, b.first, r.last)));
+    const above = ok.map((r) => ({ ...r, under: blocked.find((b) => ancestor(repo, r.last, b.first))?.lot })).filter((r) => r.under);
+    const top = above.find((r) => above.every((o) => ancestor(repo, o.last, r.last)));
+    if (top) out.push({ ready: top.lot, sha: top.last, under: top.under! });
+  }
+  return out;
+}
+
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. */
-export function renderTable(wave: WaveState, lots: LotState[]): string[] {
+export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean } = {}): string[] {
   const rows = lots.map((l) => [`${l.project}:${l.lot}`, LABEL[l.status], String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`]);
   const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée'];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
@@ -56,6 +78,9 @@ export function renderTable(wave: WaveState, lots: LotState[]): string[] {
   for (const l of lots.filter((x) => x.status === 'handed-back' || x.status === 'failed' || x.status === 'suspended')) {
     out.push(`${l.project}:${l.lot} — ${l.outcome ?? LABEL[l.status]}`);
     for (const c of l.status === 'handed-back' ? l.constats : []) out.push(`    · [${c.gravite}] ${c.fichier ? `${c.fichier}${c.ligne ? `:${c.ligne}` : ''} — ` : ''}${c.texte.split('\n')[0]}`);
+  }
+  for (const d of deliverable(lots, deps.isAncestor ?? isAncestor)) {
+    out.push(`${d.ready.project}:${d.ready.lot} — livrable jusqu'à ${d.sha} (dernier commit de ${d.ready.lot}, sous ${d.under.lot} ${d.under.status === 'handed-back' || d.under.status === 'failed' ? 'rendu' : LABEL[d.under.status]}) : cadence deliver --sha ${d.sha}`);
   }
   for (const l of lots) {
     if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);

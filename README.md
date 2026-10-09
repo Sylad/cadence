@@ -1063,6 +1063,11 @@ nothing readable, times out (45 min for work, 25 for a review) or fails is not r
 back with the cause. Exit codes: 0 every lot ready · 1 at least one lot handed back (question, failure,
 review still not compliant after two passes) · 2 refused before acting · 3 wave suspended.
 
+**Stacked lots** (L76): lots of one repository commit on top of each other on `main`. When a ready lot sits under a lot that
+is not ready (handed back, failed…), the final table adds a line `<project>:<lot> — livrable jusqu'à <sha> … : cadence deliver --sha <sha>`:
+the last commit of the highest ready lot with no unfinished lot's commit beneath it, which `cadence deliver --sha` can ship
+without the lot above. Nothing is printed when every lot is ready or when the ready lots sit above the unfinished one.
+
 **Formatting retry** (the only `--resume` of a session): when a session ends successfully but in plain text,
 without the `structured_output` the schema asks for (the verdict is there, not in the required shape), the
 orchestrator resumes **that same session once** (`claude -p --resume <session-id> --json-schema <same schema>`,

@@ -95,3 +95,42 @@ describe('renderTable : colonne revue (L51)', () => {
     expect(cell(l)).toContain('(dernier verdict ; rendu pour une autre cause)');
   });
 });
+
+describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
+  const stacked = (project: string, name: string, status: LotState['status'], shas: string[], repo = '/r'): LotState => {
+    const l = newLot({ project, repo, lot: name, title: 't', visible: false, small: false, model: 'sonnet', readOnlyPlan: false });
+    l.status = status;
+    l.steps = [{ n: 1, kind: 'implement', model: 'sonnet', status: 'ok', started: '2026-10-04T10:00:00Z', commits: shas }];
+    return l;
+  };
+  // Historique empilé sur main : a1 a2 (L1) < b1 (L2) < c1 (L3), du plus ancien au plus récent.
+  const order = ['a1', 'a2', 'b1', 'c1'];
+  const isAncestor = (_repo: string, a: string, b: string) => order.indexOf(a) <= order.indexOf(b);
+  const lines = (ls: LotState[]) => renderTable(wave, ls, { isAncestor }).filter((x) => x.includes('livrable jusqu'));
+
+  it('un lot prêt sous un lot rendu : la ligne donne son dernier commit et la commande deliver --sha', () => {
+    const out = lines([stacked('demo', 'L1', 'ready', ['a1', 'a2']), stacked('demo', 'L2', 'handed-back', ['b1'])]);
+    expect(out).toEqual(["demo:L1 — livrable jusqu'à a2 (dernier commit de L1, sous L2 rendu) : cadence deliver --sha a2"]);
+  });
+
+  it('plusieurs lots prêts sous le lot rendu : le plus haut empilé', () => {
+    const l1 = stacked('demo', 'L1', 'ready', ['a1']);
+    const l2 = stacked('demo', 'L2', 'ready', ['a2']);
+    const l3 = stacked('demo', 'L3', 'failed', ['b1']);
+    expect(lines([l1, l2, l3])).toEqual(["demo:L2 — livrable jusqu'à a2 (dernier commit de L2, sous L3 rendu) : cadence deliver --sha a2"]);
+  });
+
+  it('un lot prêt au-dessus du lot rendu n\'est pas livrable : aucune ligne', () => {
+    expect(lines([stacked('demo', 'L2', 'handed-back', ['b1']), stacked('demo', 'L3', 'ready', ['c1'])])).toEqual([]);
+  });
+
+  it('tous prêts, ou aucun commit, ou un autre dépôt : aucune ligne', () => {
+    expect(lines([stacked('demo', 'L1', 'ready', ['a1']), stacked('demo', 'L2', 'ready', ['b1'])])).toEqual([]);
+    expect(lines([stacked('demo', 'L1', 'ready', ['a1']), stacked('demo', 'L2', 'handed-back', [])])).toEqual([]);
+    expect(lines([stacked('demo', 'L1', 'ready', ['a1'], '/r'), stacked('other', 'L2', 'handed-back', ['b1'], '/s')])).toEqual([]);
+  });
+
+  it('les commits d\'un dépôt voisin ([rel] sha) ne comptent pas', () => {
+    expect(lines([stacked('demo', 'L1', 'ready', ['[../x] a2']), stacked('demo', 'L2', 'handed-back', ['b1'])])).toEqual([]);
+  });
+});

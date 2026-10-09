@@ -1570,6 +1570,7 @@ lots:
     quickwin: true
     created: 2026-10-09
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme — orchestré (vague 2026-10-09-1058, 1 passe(s) de correction)", commit: 0eae50ac2e605fe8b50979aabd0e18fb2a50524f }
   - id: L141
     title: "lead : le skill calcule à la main les créneaux libres (2 − Σ min(cap, …), SKILL.md:22-23) alors que le registre vit dans src/orchestrate/registry.ts — orchestrate --status (et lead tour) affichent le nombre de créneaux libres, le skill le lit au lieu de le calculer (prompt-audit 09-10)"
     status: todo

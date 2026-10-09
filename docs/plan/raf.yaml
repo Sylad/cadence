@@ -912,9 +912,10 @@ lots:
     finished: 2026-10-06
   - id: L72
     title: "Releasing vs porte de revue : le README fait bumper la version « dans le commit qui clôt le lot », mais ce commit cite le lot après sa revue → raf check exige une nouvelle revue (vécu 0.11.0, 06-10). Trancher : commit de version exempté comme le plan (fichiers de version + CHANGELOG seuls), ou bump avant la revue"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-06
+    started: 2026-10-09
   - id: L73
     title: "raf check : pouvoir acquitter un commit sans lot déjà poussé (chore d'outillage, ex. warhammer 9d5853a .gitignore) sans réécrire l'historique — sinon session close reste « pas fermé » indéfiniment (06-10)"
     status: done

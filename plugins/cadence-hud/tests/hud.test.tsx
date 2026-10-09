@@ -814,3 +814,70 @@ test('/hud cmd répond la liste des commandes comptées, /hud bascule la bande',
   const toggled = await $.command.run({ command: 'hud', args: '' } as never)
   expect(toggled.text).toMatch(/masquée/)
 })
+
+// ── L142 : le filet « sous-agent fini ou disparu » de `refresh`, par les hooks ─────────────────────────────────
+
+/** Laisse se poser le rafraîchissement : la minuterie le lance sans l'attendre. */
+const settle = () => new Promise<void>(resolve => setTimeout(() => resolve(), 50))
+
+/**
+ * Monte le mod comme une session : `session.start` (qui lance la minuterie du rafraîchissement), un `$.agent.list()` que
+ * le test pilote (`agentList` : la liste, ou une fonction qui échoue) et un collecteur qui échoue tout de suite. Rafraîchir
+ * = avancer l'horloge d'un pas de minuterie.
+ */
+const mounted = async (
+  $: Parameters<Parameters<typeof test>[1]>[0],
+  on: On,
+  agentList: { current: () => unknown },
+) => {
+  const hud = wired(on)
+  const clock = mock.clock(on)
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => agentList.current() as never)
+  on('process.run', () => ({ value: { exitCode: 1, stdout: '', stderr: 'absent' } }) as never)
+  await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  const refresh = async () => {
+    await clock.advance(5_000)
+    await settle()
+  }
+  return { hud, refresh }
+}
+
+test('un sous-agent terminé emporte ses commandes au rafraîchissement, un sous-agent vivant garde les siennes', async ($, on) => {
+  const agentList = { current: (): unknown => ({ value: [] }) }
+  const { hud, refresh } = await mounted($, on, agentList)
+  hud.answer.current = { result: { backgroundTaskId: 'b1' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true } } as never)
+  hud.answer.current = { result: { backgroundTaskId: 'b2' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a1' } as never)
+  hud.answer.current = { result: { backgroundTaskId: 'b3' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a2' } as never)
+  expect(hud.commands()).toEqual(['b1', 'b2', 'b3'])
+  agentList.current = () => ({
+    value: [
+      { id: 'a1', status: 'completed', description: 'x', type: 'general-purpose' },
+      { id: 'a2', status: 'running', description: 'y', type: 'general-purpose' },
+    ],
+  })
+  await refresh()
+  expect(hud.commands()).toEqual(['b1', 'b3'])
+  expect(hud.owners()).toEqual({ b3: 'a2' })
+  expect(Object.keys(hud.info())).toEqual(['b1', 'b3'])
+})
+
+test('si $.agent.list() échoue, le rafraîchissement ne retire aucune commande (une liste vide ne dit pas que tous les sous-agents ont fini)', async ($, on) => {
+  const agentList = { current: (): unknown => ({ value: [] }) }
+  const { hud, refresh } = await mounted($, on, agentList)
+  hud.answer.current = { result: { backgroundTaskId: 'b2' } }
+  await $.tool.call({ tool: 'Bash', input: { run_in_background: true }, agentId: 'a1' } as never)
+  agentList.current = () => ({ deny: 'liste indisponible' })
+  await refresh()
+  expect(hud.commands()).toEqual(['b2'])
+  expect(hud.owners()).toEqual({ b2: 'a1' })
+  // la liste revient, sans a1 : le filet joue alors
+  agentList.current = () => ({ value: [] })
+  await refresh()
+  expect(hud.commands()).toEqual([])
+})

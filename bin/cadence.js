@@ -39,6 +39,7 @@ if (tool === 'raf') {
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--max-sessions 2] [--wave id] [--dry-run]
                     une session claude neuve par étape (implémentation, revues, corrections) ; --status, --resume ;
                     --max-sessions : sessions simultanées, toutes vagues confondues (CADENCE_MAX_SESSIONS)
+                    --continue [--until HH:MM] [--priority a,b] : tire seul les lots prêts du plan, jusqu'à une borne
   cadence lead tour [dossier] [--idle 3] [--json]
                     le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan
   cadence skills install [--dir .claude] [--force]

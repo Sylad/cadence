@@ -1235,7 +1235,20 @@ describe('--continue (L147)', () => {
     const o = io(parent);
     expect(await orchestrate(['a:L1', '--continue', '--until', '17:00', '--dry-run'], o.io, fakeDeps().deps)).toBe(0);
     removeDryRunBriefs(o.out.join('\n'));
-    expect(o.out.join('\n')).toMatch(/--continue : priorité .*jusqu'à 17:00\n.*tirés ensuite, dans l'ordre : a:L2/);
+    expect(o.out.join('\n')).toMatch(/--continue : priorité .*jusqu'à 17:00\n.*tirés ensuite, par tour .*: tour 1 : a:L2/);
+  });
+
+  it('--dry-run --continue simule les tours avec la règle de draw (un lot par dépôt par tour) et dit les lots sautés', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a1' }, { title: 'a2' }, { title: 'a3' }, { title: 'a4' }], b: [{ title: 'b1' }, { title: 'b2' }], c: [{ title: 'c1' }] });
+    writeFileSync(join(dirs.c, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n# sale\n');
+    const o = io(parent);
+    expect(await orchestrate(['--continue', '--dry-run', '--priority', 'a,b,c', '--max-sessions', '2', '--budget', '4M'], o.io, fakeDeps().deps)).toBe(0);
+    removeDryRunBriefs(o.out.join('\n'));
+    const text = o.out.join('\n');
+    // premier tirage : a:L1, b:L1 (lots donnés, affichés par la simulation) ; ensuite un seul lot de a par tour tant que b en a, puis a seul complète
+    expect(text).toMatch(/tirés ensuite, par tour .*: tour 1 : a:L2, b:L2 · tour 2 : a:L3, a:L4/);
+    expect(text.match(/lot sauté — c : arbre sale/g)).toHaveLength(1);
+    expect(text).not.toMatch(/tour 1 : a:L2, a:L3/);
   });
 
   it('un refus qui vaut pour tout le dépôt (arbre sale) saute le dépôt pour ce tirage seulement : une ligne, et ses lots sont tirés dès qu\'il est propre', async () => {

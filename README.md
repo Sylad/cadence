@@ -846,8 +846,9 @@ starts, lots given or not. A candidate that preflight refuses (dirty tree, Node 
 journal (`continue : lot sauté — <cause>`; for the first draw also on the error output). Drawing stops — `continue : arrêt — <reason>` — at: the budget, the
 time window (`--until HH:MM`, today's clock: nothing new is drawn from then on, a running lot is not cut), the usage limit,
 a question asked (the wave stays resumable with `--answer`), two lots handed back in a row, an interrupted wave, or no ready
-lot whose estimate fits the budget left. `--resume … --continue` draws again after the resumed lots. `--dry-run --continue` lists
-the lots that would be drawn next. Drawing happens between rounds: a round of up to `--max-sessions` lots must finish before the next draw.
+lot whose estimate fits the budget left. `--resume … --continue` draws again after the resumed lots. `--dry-run --continue` replays the
+draws round by round with the same function as the wave (one lot per repository per round, pre-check, budget counted on the estimates) and
+names the candidates skipped with their cause: `tour 1 : a:L2, b:L2 · tour 2 : a:L3, a:L4`. Drawing happens between rounds: a round of up to `--max-sessions` lots must finish before the next draw.
 
 **Chaining without the human (L148)**: the `lead` skill, once the human has chosen the first lots and the order, does not ask « next? »
 after a lot that comes back ready: it re-verifies it, records `raf done`, pushes, delivers, has the `qa-reviewer` check the

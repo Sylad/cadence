@@ -459,7 +459,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     const id = waveId(io, args.wave, launch);
     if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
     dryRun(pre.lots, io, deps, budget, id);
-    if (args.continue) continueDryRun(args, io, launch, pre.lots, budget);
+    if (args.continue) await continueDryRun(args, io, deps, launch, pre.lots, budget, firstSkipped);
     return 0;
   }
   if (deps.snapshot) {
@@ -570,12 +570,37 @@ async function draw(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch
   return { lots, skipped };
 }
 
-/** `--dry-run --continue` : ce qui serait tiré ensuite, dans l'ordre, et les bornes. */
-function continueDryRun(args: Args, io: OrchestrateIo, launch: string, given: LotState[], budget: number): void {
-  const exclude = new Set(given.map((l) => lotKey(l.project, l.lot)));
-  const next = candidates(launch, { priority: priorityOf(args, launch), exclude, remaining: budget });
+/** Nombre de tours que la simulation de `--dry-run --continue` déroule au plus. */
+const DRY_RUN_ROUNDS = 10;
+
+/**
+ * `--dry-run --continue` : ce que les tirages suivants joueraient, par tour, avec la même fonction `draw` que la vague (un lot par dépôt
+ * par tour, contrôle préalable, budget) ; les lots sautés disent pourquoi. Le budget est décompté sur l'estimation des lots tirés
+ * (la consommation réelle n'est pas connue). `firstSkipped` : causes écartées au premier tirage, quand il a fourni les lots donnés.
+ */
+async function continueDryRun(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string, given: LotState[], budget: number, firstSkipped: string[]): Promise<void> {
   io.out(`--continue : priorité ${priorityOf(args, launch).join(' > ') || '(aucune déclarée : ordre alphabétique)'}${args.until ? ` · jusqu'à ${args.until}` : ''}`);
-  io.out(next.length ? `  tirés ensuite, dans l'ordre : ${next.slice(0, 10).map((c) => lotKey(c.project, c.lot.id)).join(', ')}${next.length > 10 ? ', …' : ''}` : '  aucun autre lot prêt à tirer');
+  const said = new Set<string>();
+  const skip = (causes: string[]) => {
+    for (const s of causes) {
+      if (said.has(s)) continue;
+      said.add(s);
+      io.out(`  lot sauté — ${s}`);
+    }
+  };
+  skip(firstSkipped);
+  const exclude = new Set(given.map((l) => lotKey(l.project, l.lot)));
+  let remaining = budget - given.reduce((sum, l) => sum + (l.budget ?? 0), 0);
+  const cap = maxSessions(args, io);
+  const rounds: string[] = [];
+  for (let round = 1; round <= DRY_RUN_ROUNDS && remaining > 0; round++) {
+    const drawn = await draw(args, io, deps, launch, exclude, remaining, cap);
+    skip(drawn.skipped);
+    if (drawn.lots.length === 0) break;
+    rounds.push(`tour ${round} : ${drawn.lots.map((l) => lotKey(l.project, l.lot)).join(', ')}`);
+    remaining -= drawn.lots.reduce((sum, l) => sum + (l.budget ?? 0), 0);
+  }
+  io.out(rounds.length ? `  tirés ensuite, par tour (budget décompté sur les estimations) : ${rounds.join(' · ')}${rounds.length === DRY_RUN_ROUNDS ? ' · …' : ''}` : '  aucun autre lot prêt à tirer');
 }
 
 /** Lots rendus ou en échec de suite, en comptant depuis le dernier lot de la vague. */

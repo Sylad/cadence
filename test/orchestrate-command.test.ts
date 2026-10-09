@@ -1237,4 +1237,50 @@ describe('--continue (L147)', () => {
     removeDryRunBriefs(o.out.join('\n'));
     expect(o.out.join('\n')).toMatch(/--continue : priorité .*jusqu'à 17:00\n.*tirés ensuite, dans l'ordre : a:L2/);
   });
+
+  it('un refus qui vaut pour tout le dépôt (arbre sale) saute le dépôt pour ce tirage seulement : une ligne, et ses lots sont tirés dès qu\'il est propre', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }, { title: 'a trois' }], b: [{ title: 'b un' }, { title: 'b deux' }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n# sale\n');
+    let cleaned = false;
+    const f = fakeDeps({
+      implement: (cwd, brief) => {
+        const lot = /on lot `([^`]+)`/.exec(brief)![1];
+        if (cwd.endsWith('/b') && lot === 'L2' && !cleaned) {
+          cleaned = true;
+          git(dirs.a, 'checkout', '--', 'cadence.yaml');
+        }
+        return claudeOut(workReport({ commits: [commitFile(cwd, `x-${Math.random()}.txt`, `feat(${lot}): travail`)] }));
+      },
+    });
+    const o = io(parent);
+    await orchestrate(['--continue', '--priority', 'a,b', '--max-sessions', '1'], o.io, f.deps);
+    const text = o.out.join('\n');
+    expect(text.match(/lot sauté — a : arbre sale/g)).toHaveLength(1);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['b:L1', 'b:L2', 'a:L1', 'a:L2', 'a:L3']);
+  });
+
+  it('--resume --answer … --continue : la vague reprise tire la suite du plan, sans rejouer les lots repris', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    let n = 0;
+    const f = fakeDeps({
+      implement: (cwd, brief) => (n++ === 0 ? claudeOut(workReport({ questions: ['Quelle base ?'] })) : claudeOut(workReport({ commits: [commitFile(cwd, `x-${n}.txt`, `feat(${/on lot \`([^\`]+)\`/.exec(brief)![1]}): x`)] }))),
+    });
+    expect(await orchestrate(['a:L1'], io(parent).io, f.deps)).toBe(1);
+    const o = io(parent);
+    expect(await orchestrate(['--resume', '--answer', 'a:L1', 'SQLite', '--continue', '--max-sessions', '1'], o.io, f.deps)).toBe(0);
+    expect(o.out.join('\n')).toMatch(/continue : tire a:L2\n/);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1', 'a:L2']);
+    expect(f.calls.filter((c) => c.kind === 'implement')).toHaveLength(3); // L1, L1 repris, L2
+    expect(RunStore.last(parent)!.readWave()!.status).toBe('done');
+  });
+
+  it("la limite d'usage arrête le tirage (vague suspendue, code 3)", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    const quota = fakeDeps({ implement: () => claudeOut({}, {}, { is_error: true, subtype: 'success', result: 'Claude AI usage limit reached|1759600000' }) });
+    const o = io(parent);
+    expect(await orchestrate(['--continue', '--max-sessions', '1'], o.io, quota.deps)).toBe(3);
+    expect(o.out.join('\n')).toMatch(/continue : arrêt — limite d'usage atteinte/);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1']);
+
+  });
 });

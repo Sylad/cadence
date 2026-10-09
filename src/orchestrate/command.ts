@@ -516,22 +516,28 @@ const priorityOf = (args: Args, launch: string) => args.priority ?? readPriority
 
 /**
  * Tire jusqu'à `n` lots prêts du plan (L147), dans l'ordre de priorité, et les passe au contrôle préalable comme un lot donné :
- * un lot refusé (arbre sale, Node introuvable…) est sauté, sa cause rendue dans `skipped`. `exclude` reçoit chaque lot essayé.
+ * un lot refusé est sauté, sa cause rendue dans `skipped`. `exclude` reçoit chaque lot essayé ou refusé pour lui-même, pas ceux d'un dépôt refusé.
  */
 async function draw(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string, exclude: Set<string>, remaining: number, n: number): Promise<{ lots: LotState[]; skipped: string[] }> {
   const lots: LotState[] = [];
   const skipped: string[] = [];
+  const badRepos = new Set<string>();
   for (const c of candidates(launch, { priority: priorityOf(args, launch), exclude, remaining })) {
     if (lots.length >= n) break;
     const repo = gitRoot(c.dir);
     const key = lotKey(c.project, c.lot.id);
-    if (!repo) continue;
+    if (!repo || badRepos.has(repo)) continue;
     const pre = await preflight(args, [{ project: c.project, projectDir: c.dir, repo, lot: c.lot.id, model: 'sonnet' }], io, deps, launch);
-    exclude.add(key);
     if (pre.refusals.length) {
-      skipped.push(...pre.refusals);
+      // Un refus propre au lot l'écarte pour la vague ; celui d'un dépôt (arbre sale, orchestration en cours, pre-push) est passager :
+      // le dépôt est sauté pour ce tirage seulement, une ligne, et ses lots restent tirables au suivant.
+      const own = pre.refusals.filter((r) => r.startsWith(`${key} : `));
+      if (own.length) exclude.add(key);
+      if (own.length < pre.refusals.length) badRepos.add(repo);
+      skipped.push(...pre.refusals.filter((r) => !skipped.includes(r)));
       continue;
     }
+    exclude.add(key);
     if (pre.lots[0].budget! > remaining) continue;
     remaining -= pre.lots[0].budget!;
     lots.push(...pre.lots);

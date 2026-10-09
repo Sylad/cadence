@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { lotBudget, orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
@@ -12,6 +12,25 @@ import { Plan } from '../src/plan.js';
 import { claudeOut, commitFile, git, kindOf, precheckReport, reviewReport, workReport } from './orchestrate-harness.js';
 import { gitRepo, removeDryRunBriefs, tempDir } from './helpers.js';
 
+// L150 — le registre des vagues et les créneaux sont propres à CHAQUE test : sous charge, un test qui échoue (ou est
+// interrompu par son délai) avant son unregisterWave() laissait sa vague vivante au suivant (« vagues en cours : 2 »).
+const fileHome = process.env.CADENCE_HOME;
+beforeEach(() => {
+  process.env.CADENCE_HOME = tempDir();
+});
+afterEach(() => {
+  process.env.CADENCE_HOME = fileHome;
+});
+
+describe('registre des vagues isolé par test (L150)', () => {
+  it('un test laisse une vague vivante…', () => {
+    registerWave(cadenceHome(), { pid: process.ppid, wave: 'laissee', started: '2026-10-09T12:00:00Z', cwd: '/x', repos: [], cap: 1 });
+    expect(liveWaves(cadenceHome())).toHaveLength(1);
+  });
+  it('…le suivant ne la voit pas', () => {
+    expect(liveWaves(cadenceHome())).toEqual([]);
+  });
+});
 
 /** Plusieurs projets sous un même dossier parent, chacun son dépôt git et son plan. */
 function parentWith(projects: Record<string, { title: string; estimate?: number; visible?: boolean; status?: 'doing'; after?: string[] }[]>) {

@@ -506,6 +506,7 @@ test('la bande compte les commandes d\'arrière-plan à côté des agents', asyn
     ...EMPTY,
     agents: { running: 1, names: ['tour'] },
     commands: ['b1', 'm1'],
+    commandInfo: { b1: { tool: 'Bash', label: 'x', since: 0 }, m1: { tool: 'Monitor', label: 'y', since: 0 } },
     usage: { percent: 42, tokens: 84_000, window: 200_000, limits: [] },
     waves: [],
     now: 0,
@@ -527,9 +528,9 @@ test('sans commande en cours, la bande n\'affiche pas « cmd »', async ($, on) 
 })
 
 test('une commande seule, sans agent, s\'affiche quand même', async ($, on) => {
-  seed(on, { ...EMPTY, commands: ['b1'], usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0 })
+  seed(on, { ...EMPTY, commands: ['b1'], commandInfo: { b1: { tool: 'Bash', label: 'x', since: 0 } }, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0 })
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Text', text: /1 cmd/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^1 cmd$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /agent/ })).toBeUndefined()
   await ui.unmount()
 })
@@ -556,15 +557,22 @@ test('seule une notification de tâche (origin.kind) peut terminer une commande'
 const wired = (on: On) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const answer: { current: Record<string, unknown> } = { current: {} }
+  /** Retient la PROCHAINE écriture de `commands` jusqu'à ce que la promesse posée là se résolve (rejouer un entrelacement). */
+  const holdNextCommandsWrite: { current: Promise<void> | undefined } = { current: undefined }
   on('state.get', (_$, e) => ({ value: store.get(e.key) ?? { value: undefined, version: 0 } }) as never)
-  on('state.set', (_$, e) => {
+  on('state.set', async (_$, e) => {
+    if (e.key === 'commands' && holdNextCommandsWrite.current) {
+      const gate = holdNextCommandsWrite.current
+      holdNextCommandsWrite.current = undefined
+      await gate
+    }
     const version = (store.get(e.key)?.version ?? 0) + 1
     store.set(e.key, { value: e.value, version })
     return { value: { isSet: true, version } } as never
   })
   on('tool.call', () => answer.current as never)
   on('prompt.submit', (_$, e) => ({ text: e.text }) as never)
-  return { answer, commands: () => store.get('commands')?.value ?? [], owners: () => store.get('commandOwners')?.value ?? {}, info: () => store.get('commandInfo')?.value ?? {} }
+  return { answer, holdNextCommandsWrite, commands: () => store.get('commands')?.value ?? [], owners: () => store.get('commandOwners')?.value ?? {}, info: () => store.get('commandInfo')?.value ?? {} }
 }
 
 const NOTIFICATION = (id: string) =>
@@ -688,13 +696,13 @@ test('une commande se nomme par sa description, sinon sa commande, sur une ligne
   expect(commandLabel('Bash', undefined)).toBe('')
 })
 
-test('une commande sans fin vue depuis une heure ne compte plus comme en cours', () => {
+test('une commande sans fin vue depuis une heure, ou sans fiche, ne compte plus comme en cours', () => {
   const at = 10 * 3_600_000
   const info = {
     fresh: { tool: 'Bash', label: 'a', since: at - 5 * 60_000 },
     old: { tool: 'Monitor', label: 'b', since: at - 61 * 60_000 },
   }
-  expect(splitCommands(['fresh', 'old', 'inconnue'], info, at)).toEqual({ live: ['fresh', 'inconnue'], stale: ['old'] })
+  expect(splitCommands(['fresh', 'old', 'inconnue'], info, at)).toEqual({ live: ['fresh'], stale: ['old', 'inconnue'] })
   expect(splitCommands([], {}, at)).toEqual({ live: [], stale: [] })
 })
 
@@ -706,11 +714,11 @@ test('/hud cmd liste chaque commande comptée avec son origine et son âge', () 
     b2: { tool: 'Bash', label: 'tests', since: at - 42_000 },
   }
   expect(commandsText(['b1', 'm1', 'b2', 'x9'], info, { b2: 'a1' }, at)).toEqual([
-    '4 commandes comptées, 1 sans fin vue depuis plus d\'une heure (non comptée en cours) :',
+    '4 commandes comptées, 2 sans fin vue (plus d\'une heure, ou sans fiche : non comptée en cours) :',
     '  b1  Bash     session     3 min    deliver',
     '  m1  Monitor  session     1 h 10   suivre la CI  (sans fin vue)',
     '  b2  Bash     agent a1    42 s     tests',
-    '  x9  ?        session     -',
+    '  x9  ?        session     -        (sans fin vue)',
   ].join('\n'))
   expect(commandsText([], {}, {}, at)).toBe('Aucune commande d\'arrière-plan comptée.')
 })
@@ -829,20 +837,24 @@ const mounted = async (
   $: Parameters<Parameters<typeof test>[1]>[0],
   on: On,
   agentList: { current: () => unknown },
+  collector: { current: Promise<void> | undefined } = { current: undefined },
 ) => {
   const hud = wired(on)
   const clock = mock.clock(on)
   on('command.register', () => ({ value: {} }) as never)
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
   on('agent.list', () => agentList.current() as never)
-  on('process.run', () => ({ value: { exitCode: 1, stdout: '', stderr: 'absent' } }) as never)
+  on('process.run', async () => {
+    await collector.current
+    return { value: { exitCode: 1, stdout: '', stderr: 'absent' } } as never
+  })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
   await settle()
   const refresh = async () => {
     await clock.advance(5_000)
     await settle()
   }
-  return { hud, refresh }
+  return { hud, refresh, clock }
 }
 
 test('un sous-agent terminé emporte ses commandes au rafraîchissement, un sous-agent vivant garde les siennes', async ($, on) => {
@@ -880,4 +892,42 @@ test('si $.agent.list() échoue, le rafraîchissement ne retire aucune commande 
   agentList.current = () => ({ value: [] })
   await refresh()
   expect(hud.commands()).toEqual([])
+})
+
+test('une commande comptée sans fiche est « sans fin vue » dans la bande, jamais « en cours » pour toujours', async ($, on) => {
+  seed(on, { ...EMPTY, commands: ['b9'], commandInfo: {}, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 10 * 3_600_000 })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /^1 cmd$/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /1 sans fin vue/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('un sous-agent lancé pendant l\'attente du collecteur garde sa première commande (course owners / liste des agents)', async ($, on) => {
+  const agentList = { current: (): unknown => ({ value: [] }) }
+  const collector: { current: Promise<void> | undefined } = { current: undefined }
+  const { hud, clock } = await mounted($, on, agentList, collector)
+  // le collecteur python (jusqu'à 4 s) est retenu : le rafraîchissement attend, comme sur la machine lente
+  let releaseCollector: () => void = () => undefined
+  collector.current = new Promise<void>(resolve => {
+    releaseCollector = resolve
+  })
+  await clock.advance(5_000)
+  await settle()
+  // le rafraîchissement a lu ce qu'il lit avant le collecteur et attend ; pendant l'attente : le sous-agent a2 naît, sa commande b9 est inscrite (propriétaire, fiche) mais pas encore comptée
+  agentList.current = () => ({ value: [{ id: 'a2', status: 'running', description: 'y', type: 'general-purpose' }] })
+  let releaseWrite: () => void = () => undefined
+  hud.holdNextCommandsWrite.current = new Promise<void>(resolve => {
+    releaseWrite = resolve
+  })
+  hud.answer.current = { result: { backgroundTaskId: 'b9' } }
+  const called = $.tool.call({ tool: 'Bash', input: { run_in_background: true, description: 'z' }, agentId: 'a2' } as never)
+  await settle()
+  expect(hud.owners()).toEqual({ b9: 'a2' })
+  releaseCollector()
+  await settle()
+  releaseWrite()
+  await called
+  expect(hud.commands()).toEqual(['b9'])
+  expect(hud.owners()).toEqual({ b9: 'a2' })
+  expect(Object.keys(hud.info())).toEqual(['b9'])
 })

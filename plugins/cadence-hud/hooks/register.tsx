@@ -46,13 +46,8 @@ export const register: Register = on => {
       if (isRefreshing) return
       isRefreshing = true
       try {
-        let listed = true
-        const [u, list, collected, at] = await Promise.all([
+        const [u, collected, at] = await Promise.all([
           $.session.usage().catch(() => null),
-          $.agent.list().catch(() => {
-            listed = false
-            return []
-          }),
           $.process.run(['python3', '-I', '-c', COLLECTOR], { timeoutMs: 4_000 }).catch(err => ({
             exitCode: -1,
             stdout: '',
@@ -60,6 +55,16 @@ export const register: Register = on => {
           })),
           $.clock.now(),
         ])
+        // Les propriétaires puis la liste des agents sont lus APRÈS l'attente du collecteur (jusqu'à 4 s), dans cet ordre :
+        // un propriétaire inscrit s'est lancé avant la lecture de la liste et y figure s'il tourne encore ; un sous-agent
+        // lancé pendant l'attente n'est pas encore inscrit, donc jamais pris pour un disparu (liste lue avant l'attente :
+        // sa première commande était retirée puis ajoutée sans fiche, « 1 cmd » pour toujours).
+        const ownersNow = await read($, owners)
+        let listed = true
+        const list = await $.agent.list().catch(() => {
+          listed = false
+          return []
+        })
 
         const nextUsage: Usage | null = u
           ? {
@@ -71,7 +76,7 @@ export const register: Register = on => {
             }
           : null
         // un sous-agent fini (ou disparu) emporte ses commandes même si son avis de fin n'a pas été vu
-        if (listed) for (const gone of endedOwners(await read($, owners), list)) await endCommand($, gone)
+        if (listed) for (const gone of endedOwners(ownersNow, list)) await endCommand($, gone)
         const live = list.filter(a => a.status === 'running' || a.status === 'pending' || a.status === 'waiting')
         const summary: AgentsSummary = {
           running: live.length,
@@ -135,7 +140,7 @@ export const register: Register = on => {
       // le propriétaire d'abord : une fin de sous-agent tombant entre les deux écritures retire déjà la commande
       const agent = e.agentId
       if (agent) await update($, owners, (o: Record<string, string>) => ({ ...o, [started]: agent }))
-      // sans horloge, la commande est comptée quand même (sans fiche : ni âge ni nom)
+      // sans horloge, la commande est comptée quand même (sans fiche : la bande l'écrit « sans fin vue », faute d'âge)
       const since = await $.clock.now().catch(() => undefined)
       if (since !== undefined) {
         await update($, info, (cur: Record<string, CommandInfo>) => ({ ...cur, [started]: { tool: e.tool, label: commandLabel(e.tool, e.input), since } }))

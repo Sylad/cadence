@@ -322,13 +322,14 @@ export const commandLabel = (_tool: string, input: unknown): string => {
   return fit(text.replace(/\s+/g, ' ').trim(), 50)
 }
 
-/** Sépare les commandes comptées en cours de celles sans fin vue depuis `STALE_COMMAND_MS` ; sans fiche, une commande est en cours. */
+/** Sépare les commandes comptées en cours de celles sans fin vue : depuis `STALE_COMMAND_MS`, ou sans fiche (ni âge ni
+ *  nom : on ne sait pas depuis quand elle tourne, elle ne doit pas rester « en cours » pour toujours). */
 export const splitCommands = (
   ids: readonly string[],
   info: Readonly<Record<string, CommandInfo>>,
   now: number,
 ): { live: string[]; stale: string[] } => {
-  const stale = ids.filter(i => info[i] !== undefined && now - info[i]!.since >= STALE_COMMAND_MS)
+  const stale = ids.filter(i => info[i] === undefined || now - info[i]!.since >= STALE_COMMAND_MS)
   return { live: ids.filter(i => !stale.includes(i)), stale }
 }
 
@@ -343,15 +344,14 @@ export const commandsText = (
   const { stale } = splitCommands(ids, info, now)
   const head =
     `${ids.length} commande${ids.length > 1 ? 's' : ''} comptée${ids.length > 1 ? 's' : ''}` +
-    (stale.length > 0 ? `, ${stale.length} sans fin vue depuis plus d'une heure (non comptée en cours)` : '') +
+    (stale.length > 0 ? `, ${stale.length} sans fin vue (plus d'une heure, ou sans fiche : non comptée en cours)` : '') +
     ' :'
   const idWidth = Math.max(...ids.map(i => i.length))
   const rows = ids.map(id => {
     const c = info[id]
     const origin = owners[id] ? `agent ${owners[id]}` : 'session'
     const age = c ? duration(now - c.since) : '-'
-    const flag = stale.includes(id) ? '  (sans fin vue)' : ''
-    const label = c?.label ? `${c.label}${flag}` : ''
+    const label = [c?.label, stale.includes(id) ? '(sans fin vue)' : ''].filter(Boolean).join('  ')
     return `  ${id.padEnd(idWidth)}  ${(c?.tool ?? '?').padEnd(7)}  ${origin.padEnd(10)}  ${age.padEnd(8)} ${label}`.trimEnd()
   })
   return [head, ...rows].join('\n')

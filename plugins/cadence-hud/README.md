@@ -33,10 +33,11 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
   lancée par un sous-agent synchrone (`backgroundEndsWithFinalResponse: true` dans le résultat) n'est pas comptée
   non plus : elle prend fin avec la réponse finale du sous-agent, pas à une notification. Trois filets
   complètent les fins vues : un sous-agent propriétaire que `$.agent.list()` donne terminé (ou n'y figure plus)
-  emporte ses commandes même si son avis de fin n'est pas passé par la session ; un `TaskStop` retire la tâche
+  emporte ses commandes même si son avis de fin n'est pas passé par la session (la liste est lue après le collecteur,
+  pour qu'un sous-agent lancé pendant l'attente ne soit pas pris pour un disparu) ; un `TaskStop` retire la tâche
   même quand son résultat ne la nomme pas (l'`task_id` / `shell_id` de l'appel sert de repli) ; une commande sans
-  fin vue depuis **plus d'une heure** n'est plus comptée « en cours » (orange) : la bande l'écrit à part, en gris,
-  `1 sans fin vue`. **`/hud cmd`** liste ce qui est compté : identifiant, outil (Bash / Monitor), origine
+  fin vue depuis **plus d'une heure** (ou dont la fiche manque, donc l'âge est inconnu) n'est plus comptée « en cours »
+  (orange) : la bande l'écrit à part, en gris, `1 sans fin vue`. **`/hud cmd`** liste ce qui est compté : identifiant, outil (Bash / Monitor), origine
   (`session` ou `agent <id>`), âge et nom (description de l'appel, sinon sa commande), avec `(sans fin vue)` sur
   les anciennes ;
 - par vague `cadence orchestrate` vivante : un en-tête (projet si tous les lots sont du même, identifiant, statut,

@@ -1462,9 +1462,10 @@ lots:
     finished: 2026-10-08
   - id: L127
     title: "cadence deliver : le verrou « orchestration en cours » refuse la livraison d'un dépôt dont la vague n'a plus aucun lot (vécu 08-10 : maritime prêt à livrer, vague 2026-10-09-0900 encore sur cadence et ol) — ne refuser que si la vague a encore un lot en cours ou en file dans CE dépôt"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-08
+    started: 2026-10-09
   - id: L128
     title: "orchestrate : budget de lot dérivé de l'estimate trop court pour une revue + une correction + une revue courte (L62 600 k à la 3e passe, L126 200 k à la 2e : rendu au lead à chaque fois, fini à la main) — plancher ou budget par étape qui couvre au moins une passe de correction et sa revue"
     status: todo

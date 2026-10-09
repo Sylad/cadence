@@ -1610,9 +1610,10 @@ lots:
     started: 2026-10-09
   - id: L144
     title: "Articles externes rafraîchis à la livraison, comme les Nouveautés : clé docs.articles dans cadence.yaml (dépôt voisin + fichier, ex. l'étude de cas du projet dans claude-code-codex) ; après une livraison verte, cadence deliver ouvre dans ce dépôt un lot « Article <projet> à rafraîchir » qui cite les titres publics livrés et les sections à relire ; le lot se joue ensuite dans une vague ordinaire (Sonnet réécrit, revue vérifie) ; le skill sync-site-docs est retiré au profit de ce mécanisme. Demande Sylvain 09-10"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-09
+    started: 2026-10-09
   - id: L145
     title: "orchestrate : la revue finale est toujours jouée — le budget du lot (dérivé de l'estimate) ne doit jamais rendre un lot au lead juste avant sa revue (3e cas en 2 jours : L142 le 09-10 matin, Q4/particules-legende-hs-globe le 09-10 après-midi à 229 k / 200 k) ; réserver le coût d'une revue avant chaque passe fix, ou plafonner les passes fix et non la revue ; mesurer sur les journaux des vagues du 08 et 09-10"
     status: todo

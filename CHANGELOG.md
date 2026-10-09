@@ -32,8 +32,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence-hud`: `/hud cmd` lists the counted background commands, `N cmd sans fin vue`, finished waves greyed then hidden | [0.20.0](#0200---2026-10-09) |
 | `docs.sync` in `cadence.yaml`: `raf check`, `lead tour` and the review brief report a document that does not follow the code | [0.21.0](#0210---2026-10-09) |
 | `docs.articles` in `cadence.yaml`: after a green `cadence deliver`, a lot `Article <project> à rafraîchir` opened in the neighbouring repository | [0.21.0](#0210---2026-10-09) |
+| `cadence orchestrate --continue`: the wave draws the next ready lot of the plan itself, in the declared priority | [0.22.0](#0220---2026-10-09) |
+| `cadence session context`: the context of the session, published by the `cadence-hud` band, for the lead to chain under a threshold | [0.22.0](#0220---2026-10-09) |
+| `cadence-hud`: the progress of each project's plan under the waves, `/hud projets`; `cadence lead tour --json` gains `progress` | [0.22.0](#0220---2026-10-09) |
 
-## [Unreleased]
+## [0.22.0] - 2026-10-09
 
 ### Added
 

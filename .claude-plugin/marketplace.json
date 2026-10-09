@@ -8,7 +8,7 @@
     {
       "name": "cadence",
       "description": "Session start and close rituals driven by a versioned plan (raf), and deliveries proven by their effect. Needs the cadence CLI (npm i -g @sylad/cadence).",
-      "version": "0.21.0",
+      "version": "0.22.0",
       "source": "./",
       "author": {
         "name": "Sylvain Ladoire"
@@ -17,7 +17,7 @@
     {
       "name": "cadence-hud",
       "description": "A status band above the Claude Code prompt: context, 5 h / 7 d quota windows, cost per model, agents of the session and the running cadence orchestrate waves. Works without the cadence CLI, except the per-project plan progress, which needs `cadence` on the PATH.",
-      "version": "0.3.4",
+      "version": "0.4.0",
       "source": "./plugins/cadence-hud",
       "author": {
         "name": "Sylvain Ladoire"

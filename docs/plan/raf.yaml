@@ -1630,10 +1630,16 @@ lots:
     finished: 2026-10-09
   - id: L145
     title: "orchestrate : la revue finale est toujours jouée — le budget du lot (dérivé de l'estimate) ne doit jamais rendre un lot au lead juste avant sa revue (3e cas en 2 jours : L142 le 09-10 matin, Q4/particules-legende-hs-globe le 09-10 après-midi à 229 k / 200 k) ; réserver le coût d'une revue avant chaque passe fix, ou plafonner les passes fix et non la revue ; mesurer sur les journaux des vagues du 08 et 09-10"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-09
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme après 2 corrections — 5 commits : la revue finale est toujours jouée, le budget du lot ne borne que l'écriture, réserve REVIEW_RESERVE 65 k mesurée (187 review p90 62,7 k, 114 review-small p90 67,6 k) ; tests des passes fix et des mineurs qui échouent sous mutation ; cause rendue nomme les tests rouges ; 1106 tests et tsc verts ; 1 mineur en sous-tâche (libellé « après la passe des mineurs » erroné pour une passe fix ultérieure)", commit: 19754025cec90d1f6d4f2363ec4db34b6d905f11 }
+    tasks:
+      - { id: t1, title: "orchestrate : la cause « tests rouges après … » dit « la passe des mineurs » pour une passe fix jouée après la revue courte (l.minorPass jamais remis à false, cycle.ts:500) — nommer la passe d'après le compteur, test de la séquence passe des mineurs → review-small majeur → fix rouge refusé (revue L145 09-10)", status: dropped }
+    notes:
+      - { date: 2026-10-09, text: "[L145/t1] abandonné : repris en lot autonome (L145 clos, le libellé se corrige à part)" }
+    finished: 2026-10-09
   - id: L146
     title: "orchestrate : étape precheck (et tour / lectures mécaniques) sur le modèle local de Big-Blue (claude-local → Ollama RTX 5090, qwen3-coder:30b) quand cadence.yaml le déclare (orchestrate.precheck: local) ; comparer sur 5 lots verdict et durée avec la version Sonnet ; garder Sonnet par défaut si le local se trompe une fois sur un « partiel ». Demande Sylvain 09-10 : exploiter la machine, dédiée aux devs"
     status: todo
@@ -1659,6 +1665,11 @@ lots:
     created: 2026-10-09
   - id: L150
     title: "test orchestrate-command.test.ts instable sous charge : 1 puis 37 échecs (délais 5 s dépassés, « vagues en cours : 2 » au lieu de 1) pendant qu'une suite tournait à côté, 71/71 seul et 1098/1098 sur copie propre — isoler le registre des vagues par test (dossier temporaire dédié) et desserrer les délais (revue L143/L144 09-10)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-09
+  - id: L151
+    title: "orchestrate : la cause « tests rouges après … » dit « la passe des mineurs » pour une passe fix jouée après la revue courte (l.minorPass jamais remis à false, cycle.ts:500) — nommer la passe d'après le compteur, test de la séquence passe des mineurs → review-small majeur → fix rouge refusé (revue L145 09-10)"
     status: todo
     estimate: 0.25
     created: 2026-10-09

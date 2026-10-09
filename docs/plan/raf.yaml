@@ -1725,23 +1725,27 @@ lots:
     finished: 2026-10-09
   - id: L153
     title: "cadence-hud : ligne projet — afficher les ids des lots en cours après le compte (« 2 en cours : L72 L79 »), tronqués au-delà de 3 ; demande Sylvain 09-10 (il ne voyait plus quel lot tournait une fois la vague terminée)"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-09
     notes:
       - { date: 2026-10-09, text: "rsync vers ~/.claude/mods/cadence-hud après commit (deux copies, cf L152) ; bumper plugins/cadence-hud/.claude-plugin/plugin.json 0.4.1 → 0.4.2 à la release" }
+      - { date: 2026-10-09, text: "Revue 09-10 (mineur, note) : le compte vient de progress.doing (récurrents exclus) et les ids de doing[] (récurrents inclus) → « 1 en cours : L1 L2 » possible avec un lot récurrent en cours ; aligner les deux sources lors d'un prochain passage" }
     started: 2026-10-09
     review: { date: 2026-10-09, verdict: "compliant — orchestré (vague 2026-10-09-2018, 0 passe(s) de correction)", commit: 5399d93c3a3e68b15b0d3212c9ef318091f8524e }
+    finished: 2026-10-09
   - id: L154
     title: "cadence-hud : l'avancement par projet suit le dossier courant du shell de la session (un cd dans un sous-projet par le lead réduit la bande à une seule ligne, vu 09-10) — prendre le dossier de lancement de la session (ou le dossier parent qui porte le cadence.yaml avec priority) et le garder"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-09
     notes:
       - { date: 2026-10-09, text: "rsync vers ~/.claude/mods/cadence-hud après commit (deux copies, cf L152) ; la bande lit aujourd'hui le cwd publié par la session — vérifier d'où il vient (hook SessionStart / fiche de session) avant de choisir le dossier de lancement" }
     started: 2026-10-09
+    review: { date: 2026-10-09, verdict: "conforme (Opus, 2 passes : vague 2026-10-09-2018 puis lead) — majeur corrigé 6c035f6 (hud-context republie le cwd de session.start, dossier de lancement réservé à l'avancement ; test rouge sans la correction) ; claude plugin test 78/78 ; copie ~/.claude/mods synchronisée", commit: 6c035f65cab7c858bc7a8274ae4b06e2fb9628fb }
+    finished: 2026-10-09
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

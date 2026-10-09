@@ -1604,9 +1604,10 @@ lots:
     finished: 2026-10-09
   - id: L143
     title: "Documentation qui suit le code, vérifiée par le programme : clé docs.sync dans cadence.yaml (liste de paires chemins modifiés → documents à toucher : README, doc d'usage, CLAUDE.md), raf check signale un lot dont les commits touchent les chemins sans toucher le document, le brief review le passe en constat majeur avec la liste calculée (plus une phrase) ; cadence lead tour l'affiche en dérive ; essai réel sur ol-companion et cadence. Demande Sylvain 09-10 : « une doc obsolète peut être trompeuse »"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-09
+    started: 2026-10-09
   - id: L144
     title: "Articles externes rafraîchis à la livraison, comme les Nouveautés : clé docs.articles dans cadence.yaml (dépôt voisin + fichier, ex. l'étude de cas du projet dans claude-code-codex) ; après une livraison verte, cadence deliver ouvre dans ce dépôt un lot « Article <projet> à rafraîchir » qui cite les titres publics livrés et les sections à relire ; le lot se joue ensuite dans une vague ordinaire (Sonnet réécrit, revue vérifie) ; le skill sync-site-docs est retiré au profit de ce mécanisme. Demande Sylvain 09-10"
     status: todo

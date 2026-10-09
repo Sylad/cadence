@@ -10,4 +10,4 @@ La bande au-dessus du prompt dit désormais clairement ce qu'elle compte et ce q
 
 - `/hud cmd` liste les commandes d'arrière-plan comptées dans « N cmd » : identifiant, outil, origine (la session ou tel sous-agent), âge et nom.
 - Le compteur retombe à zéro quand les commandes sont finies : un sous-agent terminé emporte ses commandes, et un arrêt par `TaskStop` est toujours pris en compte. Une commande dont on n'a vu aucune fin depuis plus d'une heure (ou dont on ignore le lancement) n'est plus comptée en orange ; la bande l'écrit à part, en gris, « 1 cmd sans fin vue », après « N cmd ».
-- Une vague orchestrate terminée reste sur une ligne grise (« terminée il y a 12 min · 3 prêts ») sans afficher de budget, et disparaît 30 minutes après sa fin.
+- Une vague orchestrate terminée reste sur une ligne grise (« terminée il y a 12 min  │  3 prêts ») sans afficher de budget, et disparaît 30 minutes après sa fin.

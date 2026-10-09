@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { orchestrate, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { runLot } from '../src/orchestrate/cycle.js';
+import { registerWave } from '../src/orchestrate/registry.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import type { ClaudeFn } from '../src/orchestrate/launch.js';
@@ -293,5 +294,88 @@ describe('--continue et --stop-after-current (L79, revue)', () => {
     expect(text).toMatch(/continue : arrêt — arrêt demandé \(--stop-after-current\)/);
     expect(text).not.toMatch(/vague interrompue \(incident ou signal\)/);
     expect(store.readWave()!.lots).toEqual(['a:L1']);
+  });
+});
+
+describe('refus de --drop / --stop-after-current (L79, revue)', () => {
+  const control = ['--drop', 'a:L1'];
+
+  it.each([
+    ['des lots à lancer', ['b:L1']],
+    ['--continue', ['--continue']],
+    ['--dry-run', ['--dry-run']],
+    ['--budget', ['--budget', '1M']],
+    ['--answer', ['--answer', 'a:L1', 'oui']],
+  ])('ne se combine pas avec %s (RafError, donc code 2 au CLI)', async (_name, extra) => {
+    const parent = parentWith(['a', 'b']);
+    const { d, calls } = deps(() => {});
+    for (const flags of [control, ['--stop-after-current']]) {
+      await expect(orchestrate([...flags, ...extra], io(parent).io, d)).rejects.toThrow(/ne se combinent pas avec des lots à lancer, --continue, --dry-run, --budget ou --answer/);
+    }
+    expect(calls).toEqual([]);
+  });
+
+  it('plusieurs vagues tournent depuis ce dossier : précisez --wave (code 2) ; --wave en désigne une', async () => {
+    const parent = parentWith(['a']);
+    const saved = process.env.CADENCE_HOME;
+    process.env.CADENCE_HOME = tempDir();
+    try {
+      // process.ppid : un second processus vivant, pour une seconde vague inscrite au registre
+      registerWave(process.env.CADENCE_HOME, { pid: process.pid, wave: 'w1', started: '2026-10-04T10:00:00Z', cwd: parent, repos: [] });
+      registerWave(process.env.CADENCE_HOME, { pid: process.ppid, wave: 'w2', started: '2026-10-04T10:01:00Z', cwd: parent, repos: [] });
+      const { d } = deps(() => {});
+      const r = io(parent);
+      expect(await orchestrate(['--drop', 'a:L1'], r.io, d)).toBe(2);
+      expect(r.err.join('\n')).toMatch(/plusieurs vagues tournent depuis ce dossier \(w1, w2\) : précisez --wave/);
+      const one = io(parent);
+      expect(await orchestrate(['--stop-after-current', '--wave', 'w9'], one.io, d)).toBe(2);
+      expect(one.err.join('\n')).toMatch(/aucune vague en cours \(w9\)/);
+    } finally {
+      process.env.CADENCE_HOME = saved;
+    }
+  });
+
+  /** Une vague vivante à deux projets : a:L1 est prêt quand `request` tourne (dans la session de b). Les constats se font après la vague : une assertion levée dans une session ferait échouer le lot en silence. */
+  async function withLiveWave(flags: string[]) {
+    const parent = parentWith(['a', 'b']);
+    let seen: { code: number; err: string; drops: string[] } | undefined;
+    const { d } = deps(async (kind, cwd) => {
+      if (kind !== 'implement' || !cwd.endsWith('/b')) return;
+      const store = RunStore.last(parent)!;
+      for (let i = 0; i < 300 && store.readLot('a', 'L1')?.status !== 'ready'; i++) await new Promise((r) => setTimeout(r, 10));
+      const r = io(parent);
+      const code = await orchestrate(flags, r.io, d);
+      seen = { code, err: r.err.join('\n'), drops: store.control().drops };
+    });
+    await orchestrate(['a:L1', 'b:L1', '--max-sessions', '2'], io(parent).io, d);
+    expect(RunStore.last(parent)!.readLot('b', 'L1')!.status).toBe('ready'); // la vague est allée à son terme
+    return seen!;
+  }
+
+  it('--drop L1 sans projet alors que deux projets portent L1 : refusé (code 2), rien d\'écrit', async () => {
+    const seen = await withLiveWave(['--drop', 'L1']);
+    expect(seen.code).toBe(2);
+    expect(seen.err).toMatch(/--drop L1 : plusieurs projets portent ce lot, précisez projet:lot/);
+    expect(seen.drops).toEqual([]);
+  });
+
+  it('--drop d\'un lot déjà fini : refusé (code 2) avec son état', async () => {
+    const seen = await withLiveWave(['--drop', 'a:L1']);
+    expect(seen.code).toBe(2);
+    expect(seen.err).toMatch(/--drop a:L1 : le lot est déjà fini \(ready\)/);
+    expect(seen.drops).toEqual([]);
+  });
+
+  it('--drop L1 sans projet est accepté quand un seul projet porte ce lot', async () => {
+    const parent = parentWith(['a']);
+    let seen: { code: number; out: string } | undefined;
+    const { d } = deps(async (kind) => {
+      if (kind !== 'implement' || seen) return;
+      const r = io(parent);
+      seen = { code: await orchestrate(['--drop', 'L1'], r.io, d), out: r.out.join('\n') };
+    });
+    await orchestrate(['a:L1'], io(parent).io, d);
+    expect(seen!.code).toBe(0);
+    expect(seen!.out).toMatch(/a:L1 : retrait demandé/);
   });
 });

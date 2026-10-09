@@ -47,9 +47,9 @@ export function priorityRank(project: string, priority: string[]): number {
   return i < 0 ? priority.length : i;
 }
 
-/** Un lot « à décider avec Sylvain » (titre ou note) attend une décision humaine : jamais tiré. */
+/** Un lot « à décider » (« à décider avec Sylvain », « (à décider) » ; titre ou note) attend une décision humaine : jamais tiré. */
 export function decisionPending(lot: Pick<Lot, 'title' | 'notes'>): boolean {
-  return /à décider avec/i.test([lot.title, ...lot.notes.map((n) => n.text)].join('\n'));
+  return /à décider/i.test([lot.title, ...lot.notes.map((n) => n.text)].join('\n'));
 }
 
 export interface Candidate {

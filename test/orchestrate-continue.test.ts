@@ -61,6 +61,12 @@ describe('lots à décider', () => {
     expect(decisionPending(lot('X', ['À décider avec Sylvain avant']))).toBe(true);
     expect(decisionPending(lot('X décidé'))).toBe(false);
   });
+  it('« (à décider) » en fin de titre, ou « À décider » sans « avec », exclut aussi le lot (insensible à la casse)', () => {
+    const lot = (title: string, notes: string[] = []) => ({ title, notes: notes.map((text) => ({ date: '2026-10-01', text })) }) as never;
+    expect(decisionPending(lot('Choisir la base (à décider)'))).toBe(true);
+    expect(decisionPending(lot('X', ['À DÉCIDER par Sylvain']))).toBe(true);
+    expect(decisionPending(lot('Décider de la base'))).toBe(false);
+  });
 });
 
 describe('candidats', () => {

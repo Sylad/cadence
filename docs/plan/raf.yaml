@@ -1489,11 +1489,14 @@ lots:
     finished: 2026-10-09
   - id: L128
     title: "orchestrate : budget de lot dérivé de l'estimate trop court pour une revue + une correction + une revue courte (L62 600 k à la 3e passe, L126 200 k à la 2e : rendu au lead à chaque fois, fini à la main) — plancher ou budget par étape qui couvre au moins une passe de correction et sa revue"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-08
     started: 2026-10-09
     review: { date: 2026-10-09, verdict: "conforme — commits 508a80d et 07423d4 relus, typecheck OK, vitest 1215/1215 au vert (57 fichiers). Les 4 mineurs de la revue complète sont traités : (1) commentaire du plafond juste (450/400 = 1,125 j) ; (2) commentaire du plancher conforme aux mesures L62 (14 k + 282 k + 80 k + 65 k = 441 k < 450 k) ; (3) test fondé sur ces mesures (command.test:1090) ; (4) compromis de --continue noté au CHANGELOG. Les choix de l'auteur tiennent : plancher littéral, L62 laissé à la réserve de L145, plan non modifié. Reste 1 mineur : la note --continue du CHANGELOG simplifie trop (« instead of 10 » ne vaut que pour les lots ≤ 0,5 j, « at most 4 » ne vaut que pour un seul tirage). — orchestré (vague 2026-10-09-2048, 0 passe(s) de correction + passe des mineurs)", commit: 07423d43505f1b4ec3aeb0524af244d31579f9ce }
+    notes:
+      - { date: 2026-10-09, text: "Revue 09-10 (mineur, note) : CHANGELOG — la note sur le compromis de --continue (plancher 450 k vs budget de vague) simplifie sur deux points, à préciser au prochain passage" }
+    finished: 2026-10-09
   - id: L129
     title: "issue #6 — cadence session next : aucune sortie en cas de succès (code 0, rien sur stdout) ; attendu : les lignes telles qu'enregistrées ou « N lignes enregistrées pour la prochaine ouverture », pour que session-close les rapporte sans relancer session start ; commenter puis fermer l'issue GitHub #6 à la livraison"
     status: done

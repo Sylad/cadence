@@ -1533,6 +1533,28 @@ lots:
     started: 2026-10-08
     review: { date: 2026-10-08, verdict: "conforme (2e revue après 07b08f5 : reset session.start testé par le hook, fins calculées dans l'update, propriétaire avant la commande ; 41/41 ; note mineure : lecture de owners avant l'update, fenêtre de quelques ms sans effet durable)", commit: 07b08f5b4f7f3ea22baed7d71003140a398ed7a3 }
     finished: 2026-10-08
+  - id: L136
+    title: "cadence-hud : hooks de garde tool.call et prompt.submit sans .catch (relevé par claude plugin validate 2.1.290) — une écriture d'état qui échoue bloque l'outil ou le prompt au lieu de perdre une ligne du HUD ; envelopper la tenue de registre, test, rsync des deux copies"
+    status: todo
+    estimate: 0.5
+    quickwin: true
+    created: 2026-10-09
+  - id: L137
+    title: "orchestrate : niveau d'effort par passe (claude -p --effort, 2.1.284) — precheck et tour bas, implémentation moyen, revue haut ; réglable dans cadence.yaml ; mesurer tokens et durée sur une vague avant/après"
+    status: todo
+    estimate: 1
+    created: 2026-10-09
+  - id: L138
+    title: "precheck-reader : omitClaudeMd (frontmatter 2.1.271) — la pré-vérification n'a pas besoin du CLAUDE.md du projet (400 lignes sur maritime) ; mesurer le contexte de la session precheck avant/après ; décider pour qa-reviewer"
+    status: todo
+    estimate: 0.5
+    quickwin: true
+    created: 2026-10-09
+  - id: L139
+    title: "Suite d'évaluation du plugin cadence (claude plugin eval, 2.1.263) : cas tirés des pièges relevés à la main (raf done refusé sans revue, deliver --sha, orchestrate avec ids à « / », livrer.sh sans bloc) et baseline sans plugin ; remplace l'essai réel haiku ; chaque run est facturé, à lancer à la release seulement"
+    status: todo
+    estimate: 2
+    created: 2026-10-09
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

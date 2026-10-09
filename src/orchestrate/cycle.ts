@@ -288,9 +288,15 @@ export const lotSpent = (l: LotState): number => l.steps.reduce((n, s) => n + (s
 const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) >= l.budget;
 
 /**
- * Coût réservé à la revue qui suit une passe de correction (L145) : le 90e centile des revues, mesuré sur les journaux
- * des vagues du 08 et 09-10 (183 revues, médiane 43 k, p90 62 k, max 106 k tokens comptés). Une passe fix ne part que
- * s'il reste de quoi payer cette revue : un lot ne revient jamais au lead sur un correctif non relu.
+ * Coût réservé à la revue qui suit une passe de correction (L145). Réserve fixe de 65 k tokens comptés, proche du p90 des
+ * revues complètes. Mesure faite le 2026-10-09 sur les journaux `.cadence/runs/*` (67 dossiers de vague du 04 au 09-10,
+ * `tokens.counted` des `N-review.json`, `N-review-small.json`, `N-ux.json` ; aucun journal `ux` conservé, 2 `review-small`
+ * sans `tokens.counted` écartés ; p90 par interpolation linéaire) : 187 revues, médiane 43,4 k, p90 62,7 k, max 105,9 k ;
+ * 114 revues courtes (review-small, après la passe des mineurs), médiane 37,4 k, p90 67,6 k, max 82,7 k ; ensemble des
+ * 301 revues, médiane 42,3 k, p90 67,0 k, max 105,9 k. La revue courte a donc un p90 plus haut que la revue complète : 65 k
+ * couvre 170 revues sur 187 (90,9 %) mais 99 revues courtes sur 114 (86,8 %). Une passe fix ne part que s'il reste de quoi payer cette revue.
+ * Seule exception : des tests rouges après une écriture (work() appelle toFix() sans revue) — la passe fix suivante peut
+ * alors être refusée et le lot revient au lead sans revue, avec ses constats.
  */
 export const REVIEW_RESERVE = 65_000;
 
@@ -324,7 +330,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   const halt = halted(w, l);
   if (halt) return suspend(c, halt);
   const write = kind === 'implement' || kind === 'fix';
-  // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est toujours jouée, la passe fix réserve son coût.
+  // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est jouée dès que le code est à relire (sauf tests rouges après une écriture, cf. REVIEW_RESERVE), la passe fix réserve son coût.
   if (write && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
   const model: Model = write ? l.model : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
@@ -489,7 +495,12 @@ function overBudget(c: LotCtx, reserve = false): null {
   // Une réponse du lead encore en attente n'a pas été consommée : elle ne doit pas se perdre sans qu'on le dise.
   const answer = l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '';
   const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (dérivé de l'estimate), il ne reste pas de quoi payer la revue qui suivrait la correction (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, dérivé de l'estimate)`;
-  return stop(c, 'handed-back', `${why} : étape « ${l.next ?? '?'} » non jouée${answer}, à décider par le lead`);
+  // Tests rouges après une écriture : la passe fix refusée aurait suivi, le lot revient sans revue (L145) — la cause le dit.
+  const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
+  const after = l.minorPass ? 'la passe des mineurs' : l.pass > 1 ? `la passe fix ${l.pass - 1}` : "l'implémentation";
+  const prefix = red ? `tests rouges après ${after}, correction suivante non abordable : ` : '';
+  const unreviewed = red ? ' ; le lot revient sans revue, avec ses constats' : '';
+  return stop(c, 'handed-back', `${prefix}${why} : étape « ${l.next ?? '?'} » non jouée${answer}${unreviewed}, à décider par le lead`);
 }
 
 function suspend(c: LotCtx, why: string): null {

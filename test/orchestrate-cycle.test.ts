@@ -973,6 +973,35 @@ describe('budget et quota', () => {
     expect(c.lot.status).toBe('ready');
   });
 
+  it("L145 — tests rouges après la passe fix 1, correction suivante non abordable : le lot revient sans revue et la cause nomme les tests rouges", async () => {
+    const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.txt', 'fix(L1): b.txt')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }), { cacheWrite: 69_000 });
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [redFix, fix('c.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE + 6000 });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix']); // pas de revue du correctif, pas de seconde passe fix
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/^tests rouges après la passe fix 1, correction suivante non abordable : /);
+    expect(c.lot.outcome).toContain('le lot revient sans revue, avec ses constats');
+    expect(c.lot.constats.some((k) => k.source === 'tests')).toBe(true);
+  });
+
+  it("L145 — tests rouges après l'implémentation, budget sans réserve pour la revue : cause nommée, réserve citée", async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: '2 failed', vert: false } })], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/^tests rouges après l'implémentation, correction suivante non abordable : .*65000 réservés/);
+  });
+
+  it("L145 — passe fix refusée sans tests rouges : la cause ne parle pas de tests rouges", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE });
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).not.toContain('tests rouges');
+  });
+
   it("L78 — une question posée après le budget du lot : la réponse n'est pas jouée et la cause le dit", async () => {
     const ask: Handler = () => claudeOut(workReport({ questions: ['PostgreSQL ou SQLite ?'] }));
     const h = harness({ script: { implement: [ask, impl()], review: [ok] } });

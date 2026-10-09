@@ -1014,6 +1014,7 @@ test('la bande publie le contexte de la session pour `cadence session context` (
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
   on('agent.list', () => agentList.current() as never)
   on('session.usage', () => ({ value: { context: { percent: 61, tokens: 122_000, window: 200_000 }, rateLimits: [] } }) as never)
+  on('session.id', () => ({ value: 'lead-1' }) as never)
   on('process.run', async (_$, e) => {
     runs.push((e as unknown as { argv: string[] }).argv)
     return { value: { exitCode: 1, stdout: '', stderr: 'absent' } } as never
@@ -1022,10 +1023,10 @@ test('la bande publie le contexte de la session pour `cadence session context` (
   await settle()
   await clock.advance(5_000)
   await settle()
-  const published = runs.find(a => a.some(x => x.includes('hud-context.json')))
+  const published = runs.find(a => a.some(x => x.includes('hud-context')))
   expect(published).toBeDefined()
   const body = JSON.parse(published![published!.length - 1]!)
-  expect(body).toMatchObject({ percent: 61, tokens: 122_000, window: 200_000 })
+  expect(body).toMatchObject({ session: 'lead-1', cwd: '/x', percent: 61, tokens: 122_000, window: 200_000 })
   expect(typeof body.at).toBe('number')
 })
 

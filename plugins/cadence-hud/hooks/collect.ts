@@ -128,15 +128,21 @@ export const parseWaves = (stdout: string): Wave[] => {
 }
 
 /**
- * Publie le contexte de la session dans `~/.cadence/orchestrate/hud-context.json` (python3 -I, argv[1] = le JSON) :
- * la bande n'est qu'un rendu, la session lead lit ce chiffre avec `cadence session context`. Écriture atomique.
+ * Publie le contexte de la session dans `~/.cadence/orchestrate/hud-context/<id de session>.json` (python3 -I,
+ * argv[1] = le JSON, qui porte `session`, `cwd`, `percent`, `tokens`, `window`, `at`) : un fichier PAR session, pour
+ * que `cadence session context` lise celle du dossier où il est lancé et non le chiffre d'une autre session ouverte.
+ * La bande n'est qu'un rendu, la session lead lit ce chiffre avec `cadence session context`. Écriture atomique.
+ * Le nom du fichier est celui de l'id nettoyé comme src/hud-context.ts (hudContextFile).
  */
 export const CONTEXT_WRITER = `
-import os, sys
+import os, re, sys, json
 home = os.environ.get('CADENCE_HOME') or os.path.join(os.path.expanduser('~'), '.cadence', 'orchestrate')
-os.makedirs(home, exist_ok=True)
-tmp = os.path.join(home, 'hud-context.json.%d' % os.getpid())
+body = json.loads(sys.argv[1])
+folder = os.path.join(home, 'hud-context')
+os.makedirs(folder, exist_ok=True)
+name = re.sub(r'[^A-Za-z0-9_-]', '_', str(body['session'])) + '.json'
+tmp = os.path.join(folder, name + '.%d' % os.getpid())
 with open(tmp, 'w') as f:
     f.write(sys.argv[1])
-os.replace(tmp, os.path.join(home, 'hud-context.json'))
+os.replace(tmp, os.path.join(folder, name))
 `

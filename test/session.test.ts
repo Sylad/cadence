@@ -543,31 +543,120 @@ describe('nettoyage en routine de clôture (L4)', () => {
 });
 
 describe('session context (L148)', () => {
-  async function ctxRun(dir: string, home: string, now: string) {
+  const NOW = '2026-09-28T18:30:00';
+  const at = new Date(NOW).getTime();
+
+  async function ctxRun(dir: string, home: string, extra: string[] = []) {
     const out: string[] = [];
     const err: string[] = [];
-    const code = await run(['session', 'context'], { cwd: dir, env: { CADENCE_HOME: home }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date(now) });
+    const code = await run(['session', 'context', ...extra], { cwd: dir, env: { CADENCE_HOME: home }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date(NOW) });
     return { code, out: out.join('\n'), err: err.join('\n') };
   }
 
-  it('lit le chiffre que la bande publie, hors de tout dépôt', async () => {
+  /** Ce que la bande d'une session publie : un fichier par session dans <home>/hud-context/. */
+  function publish(home: string, id: string, body: Record<string, unknown>) {
+    mkdirSync(join(home, 'hud-context'), { recursive: true });
+    writeFileSync(join(home, 'hud-context', `${id}.json`), JSON.stringify(body));
+  }
+
+  it('lit le chiffre que la bande publie pour le dossier courant, hors de tout dépôt', async () => {
     const home = tempDir();
-    const at = new Date('2026-09-28T18:30:00').getTime();
-    writeFileSync(join(home, 'hud-context.json'), JSON.stringify({ percent: 42.4, tokens: 84000, window: 200000, at: at - 5_000 }));
-    const r = await ctxRun(tempDir(), home, '2026-09-28T18:30:00');
+    const dir = tempDir();
+    publish(home, 'lead', { cwd: dir, percent: 42.4, tokens: 84000, window: 200000, at: at - 5_000 });
+    const r = await ctxRun(dir, home);
     expect(r.code).toBe(0);
     expect(r.out).toBe('ctx 42 % (84000/200000)');
   });
 
-  it('absent ou périmé : refus (code 2), à lire comme « au seuil »', async () => {
+  it('deux sessions écrivent : celle du dossier courant est choisie, jamais une autre', async () => {
     const home = tempDir();
-    const none = await ctxRun(tempDir(), home, '2026-09-28T18:30:00');
+    const lead = tempDir();
+    const other = tempDir();
+    publish(home, 'lead', { cwd: lead, percent: 70, tokens: 140000, window: 200000, at: at - 20_000 });
+    publish(home, 'autre', { cwd: other, percent: 15, tokens: 30000, window: 200000, at: at - 1_000 });
+    expect((await ctxRun(lead, home)).out).toBe('ctx 70 % (140000/200000)');
+    expect((await ctxRun(other, home)).out).toBe('ctx 15 % (30000/200000)');
+  });
+
+  it('plusieurs sessions dans le même dossier : la plus récente', async () => {
+    const home = tempDir();
+    const dir = tempDir();
+    publish(home, 'a', { cwd: dir, percent: 10, tokens: 1, window: 2, at: at - 40_000 });
+    publish(home, 'b', { cwd: dir, percent: 55, tokens: 3, window: 4, at: at - 3_000 });
+    expect((await ctxRun(dir, home)).out).toBe('ctx 55 % (3/4)');
+  });
+
+  it('--session force la session, même si son dossier n\'est pas le dossier courant', async () => {
+    const home = tempDir();
+    publish(home, 'lead', { cwd: '/ailleurs', percent: 61, tokens: 5, window: 6, at: at - 2_000 });
+    const r = await ctxRun(tempDir(), home, ['--session', 'lead']);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe('ctx 61 % (5/6)');
+    const none = await ctxRun(tempDir(), home, ['--session', 'inconnue']);
+    expect(none.code).toBe(2);
+    expect(none.err).toContain('inconnue');
+  });
+
+  it('aucun fichier ou aucune session de ce dossier : refus (code 2) qui le dit, à lire comme « au seuil »', async () => {
+    const home = tempDir();
+    const none = await ctxRun(tempDir(), home);
     expect(none.code).toBe(2);
     expect(none.err).toContain('au seuil');
-    const at = new Date('2026-09-28T18:30:00').getTime();
-    writeFileSync(join(home, 'hud-context.json'), JSON.stringify({ percent: 10, tokens: 1, window: 2, at: at - 600_000 }));
-    const old = await ctxRun(tempDir(), home, '2026-09-28T18:30:00');
+    expect(none.err).toContain('cadence-hud');
+    publish(home, 'autre', { cwd: tempDir(), percent: 15, tokens: 1, window: 2, at: at - 1_000 });
+    const dir = tempDir();
+    const elsewhere = await ctxRun(dir, home);
+    expect(elsewhere.code).toBe(2);
+    expect(elsewhere.err).toContain(`aucune session de la bande ne publie pour ${dir}`);
+  });
+
+  it('périmé (plus de 2 min) : refus ; plus de 24 h : ignoré et supprimé à la lecture', async () => {
+    const home = tempDir();
+    const dir = tempDir();
+    publish(home, 'lead', { cwd: dir, percent: 10, tokens: 1, window: 2, at: at - 600_000 });
+    const old = await ctxRun(dir, home);
     expect(old.code).toBe(2);
     expect(old.err).toContain('périmé');
+    publish(home, 'vieille', { cwd: dir, percent: 99, tokens: 1, window: 2, at: at - 25 * 3600_000 });
+    publish(home, 'lead', { cwd: dir, percent: 20, tokens: 1, window: 2, at: at - 1_000 });
+    const r = await ctxRun(dir, home);
+    expect(r.out).toBe('ctx 20 % (1/2)');
+    expect(existsSync(join(home, 'hud-context', 'vieille.json'))).toBe(false);
+    expect(existsSync(join(home, 'hud-context', 'lead.json'))).toBe(true);
+  });
+
+  it('incomplet (tokens absent) : refus, le lead ne enchaîne pas', async () => {
+    const home = tempDir();
+    const dir = tempDir();
+    publish(home, 'lead', { cwd: dir, percent: 30, window: 200000, at: at - 1_000 });
+    const r = await ctxRun(dir, home);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('incomplet');
+  });
+
+  it('illisible : refus, par session désignée comme par dossier', async () => {
+    const home = tempDir();
+    const dir = tempDir();
+    mkdirSync(join(home, 'hud-context'), { recursive: true });
+    writeFileSync(join(home, 'hud-context', 'lead.json'), '{pas du json');
+    const forced = await ctxRun(dir, home, ['--session', 'lead']);
+    expect(forced.code).toBe(2);
+    expect(forced.err).toContain('illisible');
+    const byFolder = await ctxRun(dir, home);
+    expect(byFolder.code).toBe(2);
+    expect(byFolder.err).toContain('1 fichier(s) illisible(s)');
+  });
+
+  it("le script d'écriture de la bande et la lecture de la commande tombent sur le même fichier", async () => {
+    const source = readFileSync(new URL('../plugins/cadence-hud/hooks/collect.ts', import.meta.url), 'utf8');
+    const writer = /CONTEXT_WRITER = `([^`]*)`/.exec(source)?.[1];
+    expect(writer).toBeDefined();
+    const home = tempDir();
+    const dir = tempDir();
+    const body = JSON.stringify({ session: 'a/b c', cwd: dir, percent: 33, tokens: 7, window: 9, at: at - 1_000 });
+    execFileSync('python3', ['-I', '-c', writer!, body], { env: { ...process.env, CADENCE_HOME: home } });
+    expect(existsSync(join(home, 'hud-context', 'a_b_c.json'))).toBe(true);
+    expect((await ctxRun(dir, home)).out).toBe('ctx 33 % (7/9)');
+    expect((await ctxRun(tempDir(), home, ['--session', 'a/b c'])).out).toBe('ctx 33 % (7/9)');
   });
 });

@@ -29,8 +29,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `hook.autostart` (`warn` \| `refuse` \| `start`): what the pre-commit hook does with a lot still todo | [0.15.0](#0150---2026-10-08) |
 | `cadence session start\|close --all [--depth n]`: every project under a folder, one section each | [0.15.0](#0150---2026-10-08) |
 | Wave lock per repository: `cadence deliver` on a repository whose lots are finished while the wave continues | [0.19.0](#0190---2026-10-08) |
+| `cadence-hud`: `/hud cmd` lists the counted background commands, `N cmd sans fin vue`, finished waves greyed then hidden | [0.20.0](#0200---2026-10-09) |
 
-## [Unreleased]
+## [0.20.0] - 2026-10-09
 
 ### Fixed
 - The `qa-reviewer` and `ux-reviewer` agents are read-only for real: their frontmatter now lists `tools: Read, Grep, Glob, Bash` and the Playwright tools (`mcp__playwright`, `mcp__plugin_playwright_playwright`), where it had no `tools:` and so inherited `Edit` and `Write` while the text said read-only. A wave that loads Playwright no longer adds `mcp__playwright` twice. Checked with a real session on 2026-10-09: the installed `ux-reviewer.md` file (`.claude/agents/`, interactive Playwright plugin server) opened a page, took a DOM snapshot (`browser_snapshot`), a screenshot (`browser_take_screenshot`) and listed the network requests (`browser_network_requests`), and `Edit`/`Write` were absent from its tool list. (L140)

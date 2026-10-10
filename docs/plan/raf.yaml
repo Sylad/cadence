@@ -1050,11 +1050,12 @@ lots:
     finished: 2026-10-10
   - id: L84
     title: "agents ux-reviewer et qa-reviewer : même consigne Playwright que les briefs (sorties sous .playwright-mcp/) pour l'usage hors orchestrate"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-07
     notes:
       - { date: 2026-10-09, text: "prompt-audit 09-10 : ux-reviewer.md:19 dit « project's temporary folder », qa-reviewer.md:137 et code-reviewer.md:44 disent « outside the repository » — aligner les trois dans ce lot ; au passage qa-reviewer.md:78 raconte l'incident CDN au passé, garder la règle et sa raison sans le récit" }
+    started: 2026-10-10
   - id: L85
     title: "⚡ Test instable deliver.test.ts « realDeps.exec : au délai, aucun descendant ne survit » (expected 3013 < 2500) : rouge sous charge en suite complète (2 fois sur 4 le 07-10) — même famille que L81"
     status: done

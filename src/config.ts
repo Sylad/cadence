@@ -227,6 +227,11 @@ export interface OrchestrateConfig {
   /** `precheck: local` (L146) : le contrôle préalable part sur `claude-local` (Ollama de Big-Blue) ; Sonnet reste le repli. */
   precheckLocal: boolean;
   /**
+   * Les sessions de vague ont accès à la production (L168) ? Défaut : non, elles partent sans kubeconfig
+   * (`KUBECONFIG=/dev/null`) ni jeton de prod. `true` lève la restriction pour ce projet.
+   */
+  prodAccess: boolean;
+  /**
    * Revue proportionnée à la taille du lot (L108) : un lot dont l'estimate est ≤ `threshold` jours reçoit une seule revue
    * (modèle `light`), sans passe des mineurs ; les autres, la chaîne complète (modèle `full`). Un bloquant ou un majeur sur
    * un lot léger déclenche quand même une correction puis une revue `full`.
@@ -249,11 +254,11 @@ const MODELS = ['haiku', 'sonnet', 'opus'] as const;
 export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'prodAccess', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, precheckLocal: false, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, precheckLocal: false, prodAccess: false, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -282,6 +287,10 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     if (typeof o.precheck !== 'boolean' && o.precheck !== 'local') throw bad('precheck : true, false ou local attendu');
     config.precheck = o.precheck !== false;
     config.precheckLocal = o.precheck === 'local';
+  }
+  if (o.prodAccess != null) {
+    if (typeof o.prodAccess !== 'boolean') throw bad('prodAccess : true ou false attendu');
+    config.prodAccess = o.prodAccess;
   }
   if (o.review != null) {
     if (!isObject(o.review)) throw bad('review doit être un objet { threshold, light, full }');

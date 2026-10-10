@@ -5,6 +5,7 @@ import { delimiter, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import type { Effort } from '../config.js';
 import { RafError } from '../plan.js';
+import { sandboxEnv } from './sandbox.js';
 import { killMarked, SESSION_MARK_VAR, TreeTracker } from '../proc.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
@@ -40,6 +41,8 @@ export interface StepSpec {
   playwright?: boolean;
   /** Étape lancée par `claude-local` (modèle Ollama de Big-Blue, hors quota) : arguments de `buildLocalArgs`, jamais de relance `--resume` (L146). */
   local?: boolean;
+  /** La session n'a pas accès à la production (L168) : `prodAccess` du projet lève la restriction (défaut : coupé). */
+  prodAccess?: boolean;
 }
 
 export type McpServers = Record<string, { command: string; args: string[] }>;
@@ -92,6 +95,8 @@ export interface LaunchOpts {
   onSpawn?: (pid: number) => void;
   /** Lancer `claude-local` plutôt que `claude` (L146). */
   local?: boolean;
+  /** Variables retirées de l'environnement hérité (accès à la production, L168). */
+  unset?: string[];
 }
 
 /** Le lanceur : injecté dans les tests, `realClaude` en vrai. Jamais `--resume` d'une session de travail, sauf la relance de mise en forme. */
@@ -195,8 +200,9 @@ export async function runSession(
   spec: StepSpec,
   deps: { claude: ClaudeFn; agents: Record<string, AgentDef>; onSpawn?: (pid: number) => void },
 ): Promise<SessionOutcome> {
+  const sandbox = sandboxEnv(!!spec.prodAccess);
   const launch = (args: string[]) =>
-    deps.claude(args, { local: spec.local, cwd: spec.cwd, env: { CADENCE_ORCHESTRATED: spec.wave, ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
+    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...sandbox.set, ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
   const out = await launch(spec.local ? buildLocalArgs(spec, deps.agents) : buildArgs(spec, deps.agents));
   const first = classify(out);
   if (spec.local) return first; // pas de relance de mise en forme : l'appelant se replie sur Sonnet
@@ -267,7 +273,9 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env, l
       // `nohup srv &` échappe à tout relevé de l'arbre) : à la fin de la session, tout ce qui la porte est tué.
       const mark = randomUUID();
       marks.add(mark);
-      const child = spawn(opts.local ? localBin : bin, args, { cwd: opts.cwd, env: { ...base, ...opts.env, [SESSION_MARK_VAR]: mark }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+      const inherited = { ...base };
+      for (const v of opts.unset ?? []) delete inherited[v];
+      const child = spawn(opts.local ? localBin : bin, args, { cwd: opts.cwd, env: { ...inherited, ...opts.env, [SESSION_MARK_VAR]: mark }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
       const pid = child.pid;
       if (pid === undefined) {
         marks.delete(mark);

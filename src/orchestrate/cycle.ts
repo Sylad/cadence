@@ -385,6 +385,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       cwd: l.repo,
       wave: w.id,
       permissionMode: c.config.permissionMode,
+      prodAccess: c.config.prodAccess,
       addDirs: [...c.config.addDirs, ...(playwright && write ? [playwrightDir(dirname(mcpConfig))] : []), ...neighbourDirs(l)],
       nodeBin: l.node?.link,
       toolBin: toolBinOf(w.store.dir),

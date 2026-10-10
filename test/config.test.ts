@@ -408,3 +408,18 @@ describe('orchestrate.precheck: local (L146)', () => {
     expect(() => read('orchestrate:\n  precheck: gpu\n')).toThrow(/precheck : true, false ou local attendu/);
   });
 });
+
+describe('orchestrate.prodAccess (L168)', () => {
+  const read = (yaml: string) => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'cadence.yaml'), yaml);
+    return readOrchestrateConfig(join(dir, 'cadence.yaml'));
+  };
+  it('défaut : coupé ; true le lève ; autre chose est refusé', () => {
+    expect(read('orchestrate: {}\n').prodAccess).toBe(false);
+    expect(readOrchestrateConfig(join(tempDir(), 'absent.yaml')).prodAccess).toBe(false);
+    expect(read('orchestrate:\n  prodAccess: true\n').prodAccess).toBe(true);
+    expect(read('orchestrate:\n  prodAccess: false\n').prodAccess).toBe(false);
+    expect(() => read('orchestrate:\n  prodAccess: oui\n')).toThrow(/prodAccess : true ou false attendu/);
+  });
+});

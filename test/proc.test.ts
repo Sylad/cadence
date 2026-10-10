@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { findMarked, MAX_SNAPSHOT_AGE_MS, psEnvArgs, readPsProcs, SESSION_MARK_VAR, TreeTracker } from '../src/proc.js';
+import { findMarked, killMarked, MAX_SNAPSHOT_AGE_MS, psEnvArgs, readPsProcs, SESSION_MARK_VAR, TreeTracker } from '../src/proc.js';
 
 type Procs = NonNullable<ReturnType<typeof readPsProcs>>;
 const table = (...rows: [pid: number, ppid: number, start: string][]): Procs =>
@@ -343,6 +343,31 @@ describe('findMarked — repli sans /proc (macOS)', () => {
       throw new Error('ENOENT');
     }) as unknown as typeof execFileSync;
     expect(findMarked('s1', { procRoot: NO_PROC, run, platform: 'darwin' })).toEqual([]);
+  });
+
+  it('ps en échec : le relevé impossible est signalé (les orphelins marqués ont pu survivre)', () => {
+    const run = (() => {
+      throw new Error('ENOENT');
+    }) as unknown as typeof execFileSync;
+    const warn = vi.fn();
+    findMarked('s1', { procRoot: NO_PROC, run, platform: 'linux', onUnavailable: warn });
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('killMarked signale une seule fois un relevé impossible', () => {
+    const warn = vi.fn();
+    const run = (() => {
+      throw new Error('ENOENT');
+    }) as unknown as typeof execFileSync;
+    killMarked('s1', { procRoot: NO_PROC, run, onUnavailable: warn });
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('un relevé réussi ne signale rien', () => {
+    const warn = vi.fn();
+    const run = (() => '') as unknown as typeof execFileSync;
+    findMarked('s1', { procRoot: NO_PROC, run, platform: 'linux', onUnavailable: warn });
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('l\'option de ps qui affiche l\'environnement dépend de la plateforme : -E sur macOS (BSD), e sur Linux (procps)', () => {

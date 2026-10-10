@@ -290,6 +290,8 @@ export interface FindMarkedIo {
   run?: typeof execFileSync;
   /** Plateforme dont `ps` est interrogé (défaut `process.platform`). */
   platform?: NodeJS.Platform;
+  /** Appelé quand le relevé est impossible (ni /proc ni ps) : des orphelins marqués ont pu survivre. */
+  onUnavailable?: () => void;
 }
 
 /**
@@ -354,7 +356,7 @@ function procInfo(procRoot: string, pid: number): { name: string; ppid: number }
  * macOS, `e` sur Linux). Les démons partagés (SHARED_DAEMONS) qui portent la marque, et leurs descendants, n'en font pas partie.
  */
 export function findMarked(mark: string, io: FindMarkedIo = {}): number[] {
-  const { procRoot = '/proc', run = execFileSync, platform = process.platform } = io;
+  const { procRoot = '/proc', run = execFileSync, platform = process.platform, onUnavailable } = io;
   const entry = `${SESSION_MARK_VAR}=${mark}`;
   const found: number[] = [];
   let names: string[] | null = null;
@@ -391,15 +393,26 @@ export function findMarked(mark: string, io: FindMarkedIo = {}): number[] {
     const markedSet = new Set(marked);
     found.push(...marked.filter((pid) => !underSharedDaemon(pid, (p) => table.get(p) ?? null, markedSet)));
   } catch {
-    // ps absent : rien à tuer de plus
+    // ps absent ou en échec : rien à tuer de plus, mais on le dit
+    onUnavailable?.();
   }
   return found;
 }
 
+function defaultMarkedUnavailable(): void {
+  process.stderr.write('cadence : processus de la session illisibles (ni /proc ni ps), des orphelins marqués ont pu survivre\n');
+}
+
 /** Tue (SIGKILL) tout processus marqué de la session, où qu'il soit rattaché ; repasse tant qu'un descendant en crée. */
-export function killMarked(mark: string): void {
+export function killMarked(mark: string, io: FindMarkedIo = {}): void {
+  let said = false;
+  const onUnavailable = (): void => {
+    if (said) return;
+    said = true;
+    (io.onUnavailable ?? defaultMarkedUnavailable)();
+  };
   for (let pass = 0; pass < 5; pass++) {
-    const pids = findMarked(mark);
+    const pids = findMarked(mark, { ...io, onUnavailable });
     if (pids.length === 0) return;
     for (const pid of pids) {
       try {

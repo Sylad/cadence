@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { check } from '../src/check.js';
 import { readCommits } from '../src/git.js';
 import { linkCommits } from '../src/link.js';
 import { Plan } from '../src/plan.js';
+import { run } from '../src/cli.js';
 import { commit, gitRepo } from './helpers.js';
 
 describe('check against a real repository', () => {
@@ -369,5 +370,37 @@ describe('attribution d’un commit à ses lots : la portée prime', () => {
   it('sans portée citant un lot, les formes documentées continuent de compter', () => {
     expect(lotsOf('fix: L2 corrigé', 'L3/t1 : suite', 'feat(api): L4 et L5').ids).toEqual(['L2', 'L3', 'L4', 'L5']);
     expect(lotsOf('feat(api): L7 : x').ids).toEqual(['L7']);
+  });
+});
+
+describe('plan à clé dupliquée', () => {
+  const lots = (extra: string) => `project: demo\nlots:\n  - id: L1\n    title: a\n    status: todo\n    estimate: 1\n${extra}    created: 2026-10-01\n`;
+
+  function check(dir: string): { code: number; out: string; err: string } {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = run(['check'], { cwd: dir, env: { RAF_TODAY: '2026-10-10' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-10T09:00:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  }
+
+  it('raf check refuse deux estimate: sous un lot, en nommant la ligne', () => {
+    const dir = gitRepo();
+    mkdirSync(join(dir, 'docs/plan'), { recursive: true });
+    writeFileSync(join(dir, 'docs/plan/raf.yaml'), lots('    estimate: 2\n'));
+    const r = check(dir);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('Map keys must be unique');
+    expect(r.err).toContain('line 7');
+    expect(r.out).not.toContain('✓');
+  });
+
+  it('un plan tenu par un autre outil (cadence.yaml) est refusé de même', () => {
+    const dir = gitRepo();
+    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: plan.yaml\n  lots: backlog\n');
+    writeFileSync(join(dir, 'plan.yaml'), 'backlog:\n  - id: B1\n    title: a\n    status: todo\n    title: b\n');
+    const r = check(dir);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('Map keys must be unique');
+    expect(r.err).toContain('line 5');
   });
 });

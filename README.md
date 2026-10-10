@@ -968,6 +968,18 @@ with proofs), `partiel` or `non`: on `oui` no implementation session is opened a
 implementation brief and a warning; on `non` — or an unreadable report, which only adds a warning — the wave goes on. A
 lot that already has commits is never pre-checked (resuming it is legitimate). `orchestrate.precheck: false` turns it off.
 
+**Production access of the sessions** (L168): a session of a wave (`implement`, `fix`, `precheck`, `review`, `ux`) has no
+access to the production cluster. What a session inherits was measured on the dev machine: `KUBECONFIG` (pointing at
+`~/.kube/config`, the production cluster), the `kubectl` of the `PATH` (a link to `k3s`, which without `KUBECONFIG`
+falls back on `/etc/rancher/k3s/k3s.yaml`) and the cloud and GitHub tokens of the environment. `cadence orchestrate` now
+starts every session with `KUBECONFIG=/dev/null` (`kubectl get pods` answers « connection refused » on `localhost:8080`)
+and without `KUBERNETES_SERVICE_*`, `KUBE_TOKEN`, `ARGOCD_*`, `CLOUDFLARE_*`/`CF_API_*`, `AWS_*`, `GOOGLE_APPLICATION_CREDENTIALS`,
+`AZURE_CLIENT_SECRET`, `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` (idea taken from the sandbox of docker/docker-agent,
+closed by default). `HOME` is left alone, so the credential files `gh` keeps under `~/.config` stay readable (a session
+can neither push nor deliver anyway). `cadence deliver` and `cadence verify` are the lead's and keep their access; so do
+the project's own `test`, `build` and `ux.command`, which the program launches. A lot that really needs the cluster is run in a
+project with `orchestrate.prodAccess: true`: the restriction is lifted for all its sessions (default `false`).
+
 `orchestrate.precheck: local` (L146) runs the pre-check on the local model of the dev machine instead of Sonnet: the
 orchestrator launches `claude-local` with the same brief, the `precheck-reader` prompt and tools, no quota used and nothing counted in the
 lot's budget (the step shows `local` as its model). `claude-local` is **not shipped with cadence**: it is a personal wrapper (a script on the `PATH`, `qwen3-coder:30b` by default) around
@@ -1175,6 +1187,7 @@ orchestrate:
   test: npm test                         # run by the orchestrator after a work step (optional)
   build: npm run build                   # run after the tests; both results go to the reviewer, who does not redo them (optional)
   precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it, local runs it on claude-local (Ollama) with Sonnet as fallback
+  prodAccess: false                      # default: wave sessions get no access to production (see « Production access of the sessions »); true lifts it for this project
   effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default

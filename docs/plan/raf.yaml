@@ -1475,6 +1475,10 @@ lots:
     estimate: 1
     created: 2026-10-08
     started: 2026-10-10
+    tasks:
+      - { id: t1, title: "mesurer avant/après le coût de qa-reviewer sur une livraison ol ou warhammer : relever la ligne Scope + coût du run avec l'ancien périmètre (toutes pages, captures) et avec le nouveau, comparer sur un lot qui touche des endpoints, et sur le cas « lot backend qui vide une page » (13 % du coût sur 24 h le 08-10)", status: todo }
+    notes:
+      - { date: 2026-10-10, text: "Revue 10-10 : le titre demande une mesure avant/après sur une livraison ol ou warhammer ; elle n'est pas faite par 3e5305c/257df2d (la ligne Scope du rapport la rend possible, rien de plus). Portée par la sous-tâche L123/t1 : L123 ne se clôt pas tant que L123/t1 n'est pas faite, avec les chiffres notés ici." }
   - id: L124
     title: "orchestrate : un lot rendu au lead pour « budget du lot atteint » juste avant sa revue finale n'est pas reprenable (--resume répond « vague terminée », exit 2, vécu 08-10 sur 3 lots de maritime-sq4-1, 209–224 k pour un plancher de 200 k) — soit --resume --budget relève le budget des lots rendus et rejoue l'étape manquante, soit le plancher couvre precheck + implement + review + fix + review courte (~250 k mesurés)"
     status: todo

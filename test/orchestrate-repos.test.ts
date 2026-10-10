@@ -211,9 +211,9 @@ describe('lot à dépôt voisin : verrou, garde et file de la vague', () => {
     const d = deps(async () => {
       inFlight++;
       max = Math.max(max, inFlight);
-      // rendez-vous : chaque session attend que l'autre ait démarré (borne large), plus de fenêtre en temps réel
+      // rendez-vous : chaque session attend que les deux aient été en vol ensemble (max atteint 2 ; borne large, jamais atteinte si elles se chevauchent), plus de fenêtre en temps réel
       const limit = Date.now() + 5000;
-      while (inFlight < 2 && Date.now() < limit) await new Promise((r) => setTimeout(r, 5));
+      while (max < 2 && Date.now() < limit) await new Promise((r) => setTimeout(r, 5));
       inFlight--;
     });
     await orchestrate(['a:L1', 'b:L1', '--max-sessions', '4'], io(parent).io, d);

@@ -1842,10 +1842,14 @@ lots:
     finished: 2026-10-10
   - id: L160
     title: "L146 suite : (1) comparer sur 5 lots réels verdict et durée du precheck local (orchestrate.precheck: local sur un projet, ol ou warhammer) avec la version Sonnet, consigner le tableau dans le plan ; (2) tour / lectures mécaniques (cadence lead tour, precheck-reader hors orchestrate) sur le modèle local ; garder Sonnet par défaut si le local se trompe une fois sur un « partiel »"
-    status: todo
+    status: done
     estimate: 0.5
     after: [ L146 ]
     created: 2026-10-10
+    notes:
+      - { date: 2026-10-10, text: "Mesure 10-10, vague ol 2026-10-10-1510 (orchestrate.precheck: local, claude-local → Ollama 0.24.0, qwen3-coder:30b, RTX 5090) sur L97 L98 L99 L100 L101 L102 + rejeu manuel de L97. Résultat : 1 verdict local sur 6 dans la vague (L100 : « non » juste, 27 tours, 82 s, 180 k jetons locaux) ; 4 échecs au 1er tour en 1 à 12 s (L97 L98 L101 L102 : le modèle émet son appel Read en texte « <function=Read>… », non interprété par le point d'entrée Anthropic d'Ollama → 2 tours, pas de structured_output) ; 1 thrashing d'autocompaction à 32k de contexte (L99, 90 s). Rejeu de L97 à 64k (OLLAMA_CONTEXT_LENGTH=65536 en drop-in systemd + CLAUDE_LOCAL_CTX=65536 par défaut dans claude-local) : « oui » juste et prouvé (fichier:ligne, sha), 12 tours, 107 s. Sonnet en repli : 15 à 18 s, verdict juste 6/6. Conclusion : verdicts locaux justes quand la session aboutit (2/2), mais la session n'aboutit que 2 fois sur 7 à cause du parseur d'appels d'outils d'Ollama (indépendant de cadence), et coûte 5 à 7 fois le temps de Sonnet. Sonnet reste le défaut ; ol-companion remis sur Sonnet après la vague. Lectures mécaniques : lead tour n'appelle aucun modèle ; precheck-reader hors orchestrate = les rejeux ci-dessus. À réessayer après une mise à jour d'Ollama (parseur qwen3-coder) ou avec un autre modèle à outils (qwen3:32b)." }
+    started: 2026-10-10
+    finished: 2026-10-10
   - id: L161
     title: "Release 0.28.0 : L90 (test instable), L123 (qa-reviewer à périmètre réduit), L146 (precheck local), L155, L156 — recette : npm version + plugin.json + marketplace.json (hud inchangé depuis 0.27.1, ne pas le bumper), CHANGELOG [Unreleased] → [0.28.0] - 2026-10-10 + ligne Available since pour precheck local, README What's new préfixé 0.28.0, build + vitest verts, commit « release(L161): 0.28.0 — … », tag v0.28.0 à pousser par le lead"
     status: done

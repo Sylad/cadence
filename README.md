@@ -1032,7 +1032,7 @@ the first implementation: `precheck → spec → implement → ux → review`. A
   judgement); `--resume --answer <lot> "…"` gives the answer to the resumed `spec` session. Every other hypothesis (wording, order of fields, error state, spacing) stays written in the sheet.
   The agent can also ask a question itself in its report.
 - **Under the threshold**: if the session finds that the lot changes no screen, it gives the reason in one line (`sousSeuil`), writes no mockup, and the lot goes on to `implement` as before; the reason is
-  kept as a warning of the lot. A spec already committed for the lot (a sheet whose `ecran.lot` is the lot) is not played again when the wave is resumed.
+  kept as a warning of the lot. On resume the spec step is skipped only when a sheet of the lot (`ecran.lot` is the lot) already passes the program's checks (`cadence spec check`, mockup, captures) and carries no costly hypothesis; otherwise the spec is played again. The sheet path in the report is relative to the repository (an absolute or `./` path is normalised, a path outside the repository is a finding).
 
 **Production access of the sessions** (L168): a session of a wave (`implement`, `fix`, `precheck`, `spec`, `review`, `ux`) is
 started with no *default* access to the production cluster (a guard against the ordinary path, not a barrier). What a session inherits was measured on the dev machine: `KUBECONFIG` (pointing at

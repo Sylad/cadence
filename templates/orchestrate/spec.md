@@ -19,7 +19,7 @@ Commit the spec with explicit paths (never `git add -A` or `commit -a`), a messa
 Decide minor interpretation questions yourself and list each one under "choix" with the alternative you did not take. Leave "questions" empty rather than writing a placeholder such as "no question".
 {{commits}}
 {{reponse}}
-Report: `fiche` (path of the sheet, or empty under the threshold), `sousSeuil` (the reason, or empty), `commits`, `nonVerifie` (what you could not render or check), `choix`, `questions`, `resume`.
+Report: `fiche` (path of the sheet relative to the repository, e.g. `docs/specs/<screen>/fiche.yaml`, or empty under the threshold), `sousSeuil` (the reason, or empty), `commits`, `nonVerifie` (what you could not render or check), `choix`, `questions`, `resume`.
 
 You are one short session of an orchestrated wave: do not launch subagents (the Agent tool is disabled).
 Give your final report as the structured output, not as free text.

@@ -26,7 +26,7 @@ export const WORK_SCHEMA = {
  */
 export const SPEC_SCHEMA = {
   type: 'object',
-  properties: { commits: WORK_SCHEMA.properties.commits, nonVerifie: strings, questions: strings, choix: strings, sousSeuil: str, fiche: str, resume: str },
+  properties: { commits: WORK_SCHEMA.properties.commits, nonVerifie: strings, questions: strings, choix: strings, sousSeuil: str, fiche: { type: 'string', description: 'path of the sheet relative to the repository, or empty' }, resume: str },
   required: ['commits', 'nonVerifie', 'questions', 'sousSeuil', 'fiche', 'resume'],
 } as const;
 

@@ -167,6 +167,31 @@ describe('étape spec : contrôles du programme', () => {
     expect(c.lot.outcome).toMatch(/spec/);
   });
 
+  it('le chemin de fiche du rapport est normalisé : absolu ou préfixé ./, le lot passe', async () => {
+    const absolu: Handler = (call) => claudeOut(specReport({ fiche: join(call.opts.cwd, ecrit(call.opts.cwd)) }));
+    const pointe: Handler = (call) => claudeOut(specReport({ fiche: `./${ecrit(call.opts.cwd)}` }));
+    for (const handler of [absolu, pointe]) {
+      const h = harness({ lots, script: { spec: [handler], implement: [impl], review: [ok] } });
+      const c = h.lot('L1', screen);
+      await runLot(c);
+      expect(kinds(h)).toEqual(['spec', 'implement', 'review']);
+      expect(c.lot.spec).toMatchObject({ fiche: 'docs/specs/prochain-match/fiche.yaml' });
+    }
+  });
+
+  it('un chemin de fiche hors du dépôt est un écart, pas une exception', async () => {
+    const dehors: Handler = (call) => {
+      ecrit(call.opts.cwd);
+      return claudeOut(specReport({ fiche: '../ailleurs/fiche.yaml' }));
+    };
+    const h = harness({ lots, script: { spec: [dehors, dehors] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'spec']);
+    expect(h.calls[1].brief).toContain('hors du dépôt');
+    expect(c.lot.status).toBe('handed-back');
+  });
+
   it('la seconde passe peut corriger : le lot continue', async () => {
     const h = harness({ lots, script: { spec: [spec({ fiche: (d) => { d.regles[1].id = 'R9'; } }), spec()], implement: [impl], review: [ok] } });
     const c = h.lot('L1', screen);

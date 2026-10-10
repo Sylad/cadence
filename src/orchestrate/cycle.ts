@@ -2,7 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { parse } from 'yaml';
 import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
-import { dirname, join, relative } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
@@ -778,8 +778,12 @@ async function specStep(c: LotCtx): Promise<void> {
     return;
   }
 
-  const fiche = rep.fiche.trim() || findFiche(l.repo, c.config.spec.dir, l.lot) || '';
-  const problems = fiche ? checkSpec(l.repo, fiche, l.lot) : [`aucune fiche écrite : ${c.config.spec.dir}/<écran>/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change aucun écran)`];
+  // Le chemin du rapport est ramené relatif au dépôt (absolu, `./…` ou `a/../b` donneraient de faux écarts) ; hors du dépôt, c'est un écart.
+  const reported = rep.fiche.trim();
+  const asked = reported ? relative(l.repo, resolve(l.repo, reported)) : '';
+  const outside = asked === '..' || asked.startsWith('../') || isAbsolute(asked);
+  const fiche = outside ? '' : asked || findFiche(l.repo, c.config.spec.dir, l.lot) || '';
+  const problems = outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/<écran>/fiche.yaml)`] : fiche ? checkSpec(l.repo, fiche, l.lot) : [`aucune fiche écrite : ${c.config.spec.dir}/<écran>/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change aucun écran)`];
   if (problems.length) {
     if (l.specProblems) {
       stop(c, 'handed-back', `spec non conforme après 2 passes : ${problems.join(' ; ')}`);

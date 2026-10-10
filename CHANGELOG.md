@@ -46,7 +46,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- **qa-reviewer** walks only what a lot touched: given a lot id, the pages that call the changed endpoints, those of the screens it changed, and the home page — a backend-only lot that can empty a page stays in scope. Pages left out are named « Not walked », and the report opens with a **Scope** line (pages walked of pages in the expectations, captures taken) so a pass can be compared with the next. The page is read as text first; a capture is taken only for a gap (L123).
+- **qa-reviewer** walks only what a lot touched: given a lot id, the pages that call the changed endpoints, those of the screens it changed, and the home page — a backend-only lot that can empty a page stays in scope, with the pages that consume the services it changed (grep of the callers); when the lot changes no route, or the diff cannot be linked to pages, the fallback is mandatory — every page is walked and the report says so. Pages left out are named « Not walked », and the report opens with a **Scope** line (pages walked of pages in the expectations, captures taken) so a pass can be compared with the next. The page is read as text first; a capture is taken only for a gap (L123).
 
 ## [0.27.1] - 2026-10-10
 

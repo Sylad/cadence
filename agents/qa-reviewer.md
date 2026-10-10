@@ -112,7 +112,12 @@ a delivery rarely changes them all:
 - the home page.
 
 A backend-only lot is kept in scope: it can empty a page without touching a screen, and the pages
-that call its endpoints are exactly the ones to walk. If you cannot tell which pages a changed
+that call its endpoints are exactly the ones to walk. It also touches the pages that consume the
+services the lot changed — grep for their callers, from the changed service up to the endpoint
+that uses it, and walk the pages of those endpoints. If the lot changes no route (a service, a
+data source or a configuration changed under routes that keep their path), the scope cannot come
+from the routes: the fallback is mandatory: walk every page and say so in the report. The same
+holds if you cannot link the diff to any page. If you cannot tell which pages a changed
 endpoint feeds, walk every page and say so — a scope you cannot establish reduces nothing. Pages
 outside the scope are named under « Not walked », never counted as checked. Without a lot id,
 walk every page.

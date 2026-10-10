@@ -1484,9 +1484,10 @@ lots:
     review: { date: 2026-10-10, verdict: "conforme après 1 mineur (README:1286 dit encore « endpoints cannot be mapped » au lieu de « diff cannot be linked ») ; la clôture attend la mesure L123/t1 — orchestré (vague 2026-10-10-1250, 2 passe(s) de correction + passe des mineurs)", commit: 3e523c13464efed16367e4e1b8010e66b9058c8e }
   - id: L124
     title: "orchestrate : un lot rendu au lead pour « budget du lot atteint » juste avant sa revue finale n'est pas reprenable (--resume répond « vague terminée », exit 2, vécu 08-10 sur 3 lots de maritime-sq4-1, 209–224 k pour un plancher de 200 k) — soit --resume --budget relève le budget des lots rendus et rejoue l'étape manquante, soit le plancher couvre precheck + implement + review + fix + review courte (~250 k mesurés)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-08
+    started: 2026-10-10
   - id: L125
     title: "tests du hook autostart (mineurs de revue L104) : plan stagé puis arbre restauré depuis HEAD → démarrage sauté, index intact ; premier commit citant un lot avec plan stagé jamais commité → démarrage sauté, message, avertissement post-commit"
     status: done

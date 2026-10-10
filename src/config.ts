@@ -232,6 +232,11 @@ export interface OrchestrateConfig {
    */
   prodAccess: boolean;
   /**
+   * Étape spec (L169, spec etape-spec) : `dir` = dossier des specs d'écran du projet cible, relatif à la racine du dépôt
+   * (défaut `docs/specs`, un sous-dossier par écran) ; `render` = commande de rendu des maquettes, lue par l'étape (lots suivants).
+   */
+  spec: { dir: string; render?: string };
+  /**
    * Revue proportionnée à la taille du lot (L108) : un lot dont l'estimate est ≤ `threshold` jours reçoit une seule revue
    * (modèle `light`), sans passe des mineurs ; les autres, la chaîne complète (modèle `full`). Un bloquant ou un majeur sur
    * un lot léger déclenche quand même une correction puis une revue `full`.
@@ -254,11 +259,11 @@ const MODELS = ['haiku', 'sonnet', 'opus'] as const;
 export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'prodAccess', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'prodAccess', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, precheckLocal: false, prodAccess: false, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -291,6 +296,19 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   if (o.prodAccess != null) {
     if (typeof o.prodAccess !== 'boolean') throw bad('prodAccess : true ou false attendu');
     config.prodAccess = o.prodAccess;
+  }
+  if (o.spec != null) {
+    if (!isObject(o.spec)) throw bad('spec doit être un objet { dir, render }');
+    for (const k of Object.keys(o.spec)) if (k !== 'dir' && k !== 'render') throw bad(`spec.${k} inconnu (attendu : dir, render)`);
+    if (o.spec.dir != null) {
+      const d = typeof o.spec.dir === 'string' ? o.spec.dir.trim().replace(/\/+$/, '') : '';
+      if (d === '' || isAbsolute(d) || d.split(/[\\/]/).includes('..')) throw bad('spec.dir : chemin relatif non vide au dépôt attendu, sans « .. »');
+      config.spec.dir = d;
+    }
+    if (o.spec.render != null) {
+      if (typeof o.spec.render !== 'string' || !o.spec.render.trim()) throw bad('spec.render : commande non vide attendue');
+      config.spec.render = o.spec.render.trim();
+    }
   }
   if (o.review != null) {
     if (!isObject(o.review)) throw bad('review doit être un objet { threshold, light, full }');

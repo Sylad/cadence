@@ -13,7 +13,7 @@ import { gitRoot, readCommits, matchesHead, resolveCommit, stage, stagedFiles, s
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
-import { Plan, RafError, STATUSES, type Lot, type Status } from './plan.js';
+import { Plan, RafError, STATUSES, type Lot, type Screen, type Status } from './plan.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
@@ -37,7 +37,7 @@ export interface Io {
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
 
   raf init [--project nom] [--prefix L] [--no-hook]
-  raf add "titre" [--estimate j] [--quickwin] [--visible] [--public "titre public"] [--every jours] [--after L2,L4] [--parent L3]
+  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--public "titre public"] [--every jours] [--after L2,L4] [--parent L3]
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf note <id> "texte"
@@ -119,6 +119,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       estimate: { type: 'string' },
       quickwin: { type: 'boolean' },
       visible: { type: 'boolean' },
+      screen: { type: 'string' },
       public: { type: 'string' },
       every: { type: 'string' },
       dir: { type: 'string' },
@@ -216,6 +217,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       let id: string;
       if (values.parent) {
+        if (values.screen !== undefined) throw new RafError('--screen se pose sur un lot, pas sur une sous-tâche');
         if (values.public !== undefined) throw new RafError('--public se pose sur un lot, pas sur une sous-tâche');
         if (values.every !== undefined) throw new RafError('--every se pose sur un lot, pas sur une sous-tâche');
         id = plan.addTask(values.parent, rest.join(' '));
@@ -226,7 +228,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         const every = values.every === undefined ? undefined : Number(values.every);
         if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new RafError(`périodicité invalide : ${values.every} (un nombre entier de jours)`);
         if (values.public !== undefined) refuseLongTitle(values.public);
-        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, public: values.public, every, after });
+        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, public: values.public, every, after });
       }
       plan.save();
       io.out(id);
@@ -310,6 +312,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (dates.length) io.out(dates.map(([k, d]) => `${k} : ${d}`).join('  '));
       if (lot.after.length) io.out(`after : ${lot.after.join(', ')}`);
       if (lot.public) io.out(`public : ${lot.public}`);
+      if (lot.screen) io.out(`screen : ${lot.screen}`);
       if (notes.length) {
         io.out('notes :');
         // Les lignes suivantes d'une note multiligne s'alignent sous son texte, pas en colonne 0.

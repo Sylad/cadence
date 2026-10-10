@@ -40,6 +40,8 @@ export interface Lot {
   quickwin: boolean;
   /** Changement visible par l'utilisateur : une entrée Nouveautés est attendue à la livraison. */
   visible: boolean;
+  /** Écran que le lot crée ou change (L169, étape spec) : exige `visible`. Absent = pas d'étape spec. */
+  screen?: Screen;
   /** Titre public du lot, en langage du public (pages Nouveautés et Plan) ; absent = pas de titre public. */
   public?: string;
   /** Périodicité en jours : le lot est récurrent, il reste `todo` et se refait (`raf did`). */
@@ -75,7 +77,11 @@ export class RafError extends Error {}
 
 export type Ref = { lot: string; task?: string };
 
-export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent'] as const;
+export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'screen', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent'] as const;
+/** Nature de l'écran d'un lot visible : nouvelle page, nouveau composant, parcours modifié. */
+export const SCREENS = ['page', 'component', 'journey'] as const;
+export type Screen = (typeof SCREENS)[number];
+
 export type Field = (typeof FIELDS)[number];
 
 /**
@@ -407,8 +413,12 @@ export class Plan {
     return node as YAMLMap;
   }
 
-  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; public?: string; every?: number; after?: string[] } = {}): string {
+  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; public?: string; every?: number; after?: string[] } = {}): string {
     this.writable();
+    if (opts.screen !== undefined) {
+      if (!SCREENS.includes(opts.screen)) throw new RafError(`screen inconnu : ${String(opts.screen)} (${SCREENS.join(', ')})`);
+      if (!opts.visible) throw new RafError('--screen exige --visible : un écran est un changement visible');
+    }
     const known = new Set(this.lots().map((l) => l.id));
     for (const dep of opts.after ?? []) if (!known.has(dep)) throw new RafError(`dépendance inconnue : ${dep}`);
     const re = new RegExp(`^${escapeRe(this.prefix)}(\\d+)$`);
@@ -423,6 +433,7 @@ export class Plan {
     Object.assign(entry, { status: 'todo', estimate: opts.estimate ?? 1 });
     if (opts.quickwin) entry.quickwin = true;
     if (opts.visible) entry.visible = true;
+    if (opts.screen) entry.screen = opts.screen;
     if (opts.every !== undefined) entry.every = opts.every;
     if (opts.after?.length) entry.after = opts.after;
     entry.created = today;
@@ -580,6 +591,7 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
         estimate: typeof effort === 'string' ? format.estimates[effort] : effort,
         quickwin: pick('quickwin'),
         visible: pick('visible'),
+        screen: pick('screen'),
         public: pick('public'),
         every: pick('every'),
         last: day('last'),
@@ -627,6 +639,12 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
   };
   const after = raw.after == null ? [] : Array.isArray(raw.after) ? raw.after.map(String) : [String(raw.after)];
   const last = asDay('last');
+  let screen: Screen | undefined;
+  if (raw.screen != null) {
+    if (SCREENS.includes(raw.screen as Screen)) screen = raw.screen as Screen;
+    else problems.push(`screen « ${String(raw.screen)} » inconnu (${SCREENS.join(', ')})`);
+    if (screen && raw.visible !== true) problems.push(`screen « ${screen} » sans visible : un écran est un changement visible`);
+  }
   return {
     id: String(raw.id),
     title: String(raw.title ?? ''),
@@ -634,6 +652,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     estimate: typeof raw.estimate === 'number' && raw.estimate > 0 ? raw.estimate : 1,
     quickwin: raw.quickwin === true,
     visible: raw.visible === true,
+    ...(screen ? { screen } : {}),
     ...(typeof raw.public === 'string' && raw.public.trim() !== '' ? { public: raw.public.trim() } : {}),
     ...(Number.isInteger(raw.every) && (raw.every as number) > 0 ? { every: raw.every as number } : {}),
     ...(last ? { last } : {}),

@@ -1870,9 +1870,10 @@ lots:
     finished: 2026-10-10
   - id: L162
     title: "orchestrate : une étape en lecture seule (precheck, review, review-small, review-recheck, ux) qui laisse des fichiers NON SUIVIS dans le dépôt (captures Playwright écrites par un script en chemin relatif : warhammer L79 et L81 le 10-10, consigne L84 du brief ignorée) interrompt toute la vague et suspend les lots suivants du dépôt — les déplacer dans le dossier de la vague (runs/<vague>/<lot>/stray/), journaliser un avertissement nommant les fichiers, garder le verdict et continuer ; un fichier SUIVI modifié reste un incident. Tests sur les deux cas, README"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-10
+    started: 2026-10-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

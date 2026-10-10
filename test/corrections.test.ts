@@ -7,7 +7,7 @@ import { run } from '../src/cli.js';
 import { CAUSES, classifyAll, measure, ollamaClassifier, parseCause, readCache, readRuns, renderReport, sampleKeys, type Classification } from '../src/corrections.js';
 import { tempDir } from './helpers.js';
 
-interface FakeStep { kind: string; status?: string; constats?: string[] }
+interface FakeStep { kind: string; status?: string; constats?: string[]; ended?: string }
 
 /** Un enregistrement de lot dans <runs>/<vague>/<projet>--<lot>.json, avec le rapport de chaque revue. */
 function lot(runs: string, wave: string, project: string, id: string, steps: FakeStep[], visible = false) {
@@ -20,7 +20,7 @@ function lot(runs: string, wave: string, project: string, id: string, steps: Fak
       const structured = { bloquants: 0, majeurs: s.constats.length, mineurs: 0, constats: s.constats.map((texte) => ({ gravite: 'majeur', fichier: 'src/a.ts', ligne: 1, texte })) };
       writeFileSync(join(dir, `${project}--${id}`, report), JSON.stringify({ structured }));
     }
-    return { n, kind: s.kind, status: s.status ?? 'ok', report, commits: s.kind === 'fix' ? [`abc${n} fix(${id}): correctif ${n}`] : [] };
+    return { n, kind: s.kind, status: s.status ?? 'ok', ended: s.ended ?? '2026-10-10T08:00:00.000Z', report, commits: s.kind === 'fix' ? [`abc${n} fix(${id}): correctif ${n}`] : [] };
   });
   writeFileSync(join(dir, `${project}--${id}.json`), JSON.stringify({ project, lot: id, visible, status: 'ready', steps: rec }));
   writeFileSync(join(dir, 'wave.json'), '{}');
@@ -318,6 +318,26 @@ describe('cadence corrections', () => {
     const e = await cad(parent, 'corrections', parent, '--until', 'hier');
     expect(e.code).not.toBe(0);
     expect(e.err).toContain('--until invalide');
+  });
+
+  it('--until ne compte que les étapes terminées avant la date : une vague créée avant mais encore en cours ne gonfle pas le relevé', () => {
+    const runs = tempDir();
+    lot(runs, 'w1', 'alpha', 'L1', [{ kind: 'implement' }, { kind: 'review', constats: ['x'] }, { kind: 'fix' }, { kind: 'fix', ended: '2026-10-10T11:00:00.000Z' }]);
+    lot(runs, 'w1', 'alpha', 'L2', [{ kind: 'implement', ended: '2026-10-10T11:00:00.000Z' }, { kind: 'fix', ended: '2026-10-10T11:30:00.000Z' }]);
+    lot(runs, 'w1', 'alpha', 'L3', [{ kind: 'implement', ended: 'pas une date' }, { kind: 'fix' }]);
+    writeFileSync(join(runs, 'w1', 'wave.json'), JSON.stringify({ created: '2026-10-10T07:00:00.000Z' }));
+    const r = readRuns(runs, '2026-10-10T10:00:00Z');
+    expect(r.lots.map((l) => `${l.lot}:${l.fixes}`)).toEqual(['L1:1']); // L2 écrit après la date, L3 sans date lisible
+    expect(r.passes).toHaveLength(1);
+    expect(readRuns(runs).lots.map((l) => `${l.lot}:${l.fixes}`)).toEqual(['L1:2', 'L2:1', 'L3:1']);
+  });
+
+  it('--until écarte une vague sans date lisible', () => {
+    const runs = tempDir();
+    lot(runs, 'w1', 'alpha', 'L1', [{ kind: 'implement' }, { kind: 'fix' }]);
+    writeFileSync(join(runs, 'w1', 'wave.json'), '{}');
+    expect(readRuns(runs, '2026-10-10T10:00:00Z').lots).toEqual([]);
+    expect(readRuns(runs).lots).toHaveLength(1);
   });
 
   it('refuse un dossier sans journaux', async () => {

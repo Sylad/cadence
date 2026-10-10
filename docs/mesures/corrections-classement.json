@@ -66,15 +66,7 @@
     "cause": "test-manquant",
     "by": "ollama:mistral-small3.2:24b"
   },
-  "2026-10-04-2201/claude-code-codex--L16/4": {
-    "cause": "test-manquant",
-    "by": "ollama:mistral-small3.2:24b"
-  },
   "2026-10-04-2201/finance-tracker--L3/3": {
-    "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
-  },
-  "2026-10-04-2201/finance-tracker--L3/4": {
     "cause": "bug-code",
     "by": "ollama:mistral-small3.2:24b"
   },
@@ -85,11 +77,6 @@
   "2026-10-04-2201/warhammer40k--L54/3": {
     "cause": "test-manquant",
     "by": "ollama:mistral-small3.2:24b"
-  },
-  "2026-10-04-2201/warhammer40k--L54/4": {
-    "cause": "test-manquant",
-    "by": "ollama:mistral-small3.2:24b",
-    "manual": "bug-code"
   },
   "2026-10-04-2201/warhammer40k--L54/6": {
     "cause": "bug-code",
@@ -125,24 +112,7 @@
     "cause": "bug-code",
     "by": "ollama:mistral-small3.2:24b"
   },
-  "2026-10-05-1114/evatosorus--L24/4": {
-    "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
-  },
-  "2026-10-05-1114/evatosorus--L24/5": {
-    "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b",
-    "manual": "bug-code"
-  },
   "2026-10-05-1114/warhammer40k--L60/3": {
-    "cause": "derive-architecture",
-    "by": "ollama:mistral-small3.2:24b"
-  },
-  "2026-10-05-1114/warhammer40k--L60/4": {
-    "cause": "derive-architecture",
-    "by": "ollama:mistral-small3.2:24b"
-  },
-  "2026-10-05-1114/warhammer40k--L60/5": {
     "cause": "derive-architecture",
     "by": "ollama:mistral-small3.2:24b"
   },
@@ -237,10 +207,6 @@
     "cause": "spec-floue",
     "by": "ollama:mistral-small3.2:24b"
   },
-  "2026-10-06-1400/warhammer40k--L74/8": {
-    "cause": "spec-floue",
-    "by": "ollama:mistral-small3.2:24b"
-  },
   "2026-10-06-1400/warhammer40k--L75/3": {
     "cause": "test-manquant",
     "by": "ollama:mistral-small3.2:24b"
@@ -303,10 +269,6 @@
   },
   "2026-10-06-2138/claude-code-codex--L27/3": {
     "cause": "derive-architecture",
-    "by": "ollama:mistral-small3.2:24b"
-  },
-  "2026-10-06-2138/evatosorus--L33/2": {
-    "cause": "faux-constat",
     "by": "ollama:mistral-small3.2:24b"
   },
   "2026-10-06-2138/finance-tracker--L5/3": {
@@ -733,10 +695,6 @@
     "by": "ollama:mistral-small3.2:24b",
     "manual": "test-manquant"
   },
-  "2026-10-09-2018/cadence--L154/3": {
-    "cause": "faux-constat",
-    "by": "ollama:mistral-small3.2:24b"
-  },
   "2026-10-09-2048/cadence--L128/4": {
     "cause": "bug-code",
     "by": "ollama:mistral-small3.2:24b",
@@ -786,10 +744,6 @@
     "manual": "bug-code"
   },
   "2026-10-10-1025/cadence--L84/4": {
-    "cause": "spec-floue",
-    "by": "ollama:mistral-small3.2:24b"
-  },
-  "2026-10-10-1025/cadence--L84/5": {
     "cause": "spec-floue",
     "by": "ollama:mistral-small3.2:24b"
   },
@@ -895,10 +849,6 @@
     "cause": "test-manquant",
     "by": "ollama:mistral-small3.2:24b"
   },
-  "2026-10-10-1345/warhammer40k--L80/3": {
-    "cause": "test-manquant",
-    "by": "ollama:mistral-small3.2:24b"
-  },
   "2026-10-10-1345/warhammer40k--L80/5": {
     "cause": "derive-architecture",
     "by": "ollama:mistral-small3.2:24b",
@@ -995,10 +945,6 @@
   },
   "2026-10-10-1905/warhammer40k--L87/4": {
     "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
-  },
-  "2026-10-10-1905/warhammer40k--L91/3": {
-    "cause": "faux-constat",
     "by": "ollama:mistral-small3.2:24b"
   },
   "2026-10-10-1930/finance-tracker--L60/4": {

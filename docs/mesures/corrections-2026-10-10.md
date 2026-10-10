@@ -1,8 +1,8 @@
 # Mesure de référence des corrections de vague (L165)
 
-Relevé du 2026-10-10, arrêté aux vagues créées avant 18 h 31 UTC (125 vagues, journaux `.cadence/runs` de tous les projets) : 258 passes de correction sur 266 lots, 61 % des lots à au moins une correction, 29 % à au moins deux (le plan citait 61 % et 28 % sur 227 passages, relevés plus tôt dans la journée). Point de départ du lot suivant (L166) : son critère de réussite se mesure contre ces chiffres.
+Relevé du 2026-10-10, arrêté à 18 h 31 UTC (vagues créées avant, étapes terminées avant : 125 vagues, journaux `.cadence/runs` de tous les projets) : 253 passes de correction sur 263 lots, 61 % des lots à au moins une correction, 29 % à au moins deux (le plan citait 61 % et 28 % sur 227 passages, relevés plus tôt dans la journée). Point de départ du lot suivant (L166) : son critère de réussite se mesure contre ces chiffres.
 
-Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/corrections-classement.json --until 2026-10-10T18:31Z` (relecture seule, aucun appel au modèle ; `--classify` reclasse les passes absentes du cache ; `--until` borne le relevé aux vagues créées jusque-là, sans quoi les vagues suivantes changent les chiffres). Le test `test/corrections-mesure.test.ts` rejoue cette commande sur les journaux et vérifie que la section « Résultats » ci-dessous en est la sortie exacte.
+Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/corrections-classement.json --until 2026-10-10T18:31Z` (relecture seule, aucun appel au modèle ; `--classify` reclasse les passes absentes du cache ; `--until` borne le relevé aux vagues créées jusque-là et aux étapes terminées jusque-là (`ended`), sans quoi les vagues suivantes, et la vague encore en cours à cette heure-là, changent les chiffres). Le test `test/corrections-mesure.test.ts` rejoue cette commande sur les journaux et vérifie que la section « Résultats » ci-dessous en est la sortie exacte.
 
 ## Méthode
 
@@ -15,17 +15,17 @@ Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/c
 
 ## Résultats
 
-**266 lots** passés par une session d'écriture, **258 passes de correction** : 61 % des lots ont eu au moins une correction, 29 % au moins deux.
+**263 lots** passés par une session d'écriture, **253 passes de correction** : 61 % des lots ont eu au moins une correction, 29 % au moins deux.
 
 ### Par cause
 
 | Cause | Passes | Part |
 |---|---|---|
-| spec floue ou critère absent | 27 | 10 % |
+| spec floue ou critère absent | 27 | 11 % |
 | règle de gestion inventée | 1 | 0 % |
 | dérive d'architecture | 31 | 12 % |
 | données / SQL | 0 | 0 % |
-| bug de code | 135 | 52 % |
+| bug de code | 130 | 51 % |
 | test manquant | 51 | 20 % |
 | faux constat de revue | 0 | 0 % |
 | sans revue (tests rouges) | 13 | 5 % |
@@ -34,8 +34,8 @@ Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/c
 
 | Projet | spec floue ou critère absent | règle de gestion inventée | dérive d'architecture | données / SQL | bug de code | test manquant | faux constat de revue | sans revue (tests rouges) | Total |
 |---|---|---|---|---|---|---|---|---|---|
-| avatar-pandora | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 3 |
-| cadence | 14 | 0 | 14 | 0 | 62 | 30 | 0 | 2 | 122 |
+| avatar-pandora | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| cadence | 14 | 0 | 14 | 0 | 60 | 30 | 0 | 2 | 120 |
 | claude-code-codex | 0 | 0 | 2 | 0 | 4 | 2 | 0 | 1 | 9 |
 | evatosorus | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 3 | 4 |
 | finance-tracker | 1 | 1 | 4 | 0 | 12 | 2 | 0 | 1 | 21 |
@@ -47,21 +47,22 @@ Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/c
 
 | Projet | Lots | ≥ 1 correction | ≥ 2 corrections | Passes |
 |---|---|---|---|---|
-| avatar-pandora | 2 | 2 (100 %) | 1 (50 %) | 3 |
-| cadence | 125 | 78 (62 %) | 38 (30 %) | 122 |
+| avatar-pandora | 1 | 0 (0 %) | 0 (0 %) | 0 |
+| cadence | 123 | 77 (63 %) | 37 (30 %) | 120 |
 | claude-code-codex | 7 | 6 (86 %) | 2 (29 %) | 9 |
 | evatosorus | 2 | 2 (100 %) | 1 (50 %) | 4 |
 | finance-tracker | 12 | 10 (83 %) | 8 (67 %) | 21 |
 | maritime-atlas | 39 | 30 (77 %) | 8 (21 %) | 38 |
 | ol-companion | 49 | 24 (49 %) | 14 (29 %) | 40 |
 | warhammer40k | 30 | 11 (37 %) | 5 (17 %) | 21 |
-| **Total** | 266 | 163 (61 %) | 77 (29 %) | 258 |
+| **Total** | 263 | 160 (61 %) | 75 (29 %) | 253 |
 
 ### Lots visibles et non visibles
 
 | Lots | Lots | ≥ 1 correction | ≥ 2 corrections | Passes |
 |---|---|---|---|---|
-| visibles | 56 | 27 (48 %) | 15 (27 %) | 48 |
-| non visibles | 210 | 136 (65 %) | 62 (30 %) | 210 |
+| visibles | 55 | 25 (45 %) | 14 (25 %) | 45 |
+| non visibles | 208 | 135 (65 %) | 61 (29 %) | 208 |
 
 Échantillon relu à la main : 62 passes, le modèle local est d'accord avec la relecture sur 47 (76 %) ; la cause relue prime dans les tableaux.
+

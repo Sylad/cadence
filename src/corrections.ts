@@ -57,6 +57,7 @@ interface RawStep {
   status: string;
   report?: string;
   commits?: string[];
+  ended?: string;
 }
 
 const isReview = (kind: string) => kind.startsWith('review') || kind === 'ux';
@@ -85,28 +86,32 @@ function findingsOf(report: any): string[] {
 
 /**
  * Lit les journaux de vague `<runs>/<vague>/<projet>--<lot>.json`. Un lot compte (dénominateur) dès qu'une session
- * d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là, pour une mesure que les vagues suivantes ne changent pas ; une vague sans date lisible est lue) ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
+ * d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là, pour une mesure que ni les vagues suivantes ni une vague encore en cours ne changent ; une vague ou une étape sans date lisible est écartée) ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
  */
 export function readRuns(runsDir: string, until?: string): Runs {
   const lots: LotRecord[] = [];
   const passes: FixPass[] = [];
   if (!existsSync(runsDir)) return { lots, passes };
+  const limit = until === undefined ? Infinity : Date.parse(until);
+  // Sous `until`, une étape compte si elle est terminée avant la date ; sans date de fin lisible, elle est écartée.
+  const inTime = (s: RawStep) => until === undefined || Date.parse(s.ended ?? '') <= limit;
   for (const wave of readdirSync(runsDir).sort()) {
     const waveDir = join(runsDir, wave);
     if (!statSync(waveDir).isDirectory()) continue;
     if (until !== undefined) {
       // Les vagues nommées à la main (ol-gains-1) n'ont pas d'horodatage dans leur nom : on lit `created` dans wave.json.
       const created = Date.parse(readJson(join(waveDir, 'wave.json'))?.created);
-      if (created > Date.parse(until)) continue;
+      if (!(created <= limit)) continue;
     }
     for (const file of readdirSync(waveDir).sort()) {
       if (!file.endsWith('.json') || file === 'wave.json') continue;
       const rec = readJson(join(waveDir, file));
       if (!rec || !Array.isArray(rec.steps)) continue;
-      const steps = rec.steps as RawStep[];
-      if (!steps.some((s) => s.kind === 'implement' && s.status === 'ok')) continue;
+      const steps = (rec.steps as RawStep[]).filter((s) => s && typeof s === 'object');
+      const done = (s: RawStep) => s.status === 'ok' && inTime(s);
+      if (!steps.some((s) => s.kind === 'implement' && done(s))) continue;
       const name = basename(file, '.json');
-      const fixSteps = steps.filter((s) => s.kind === 'fix' && s.status === 'ok');
+      const fixSteps = steps.filter((s) => s.kind === 'fix' && done(s));
       lots.push({ project: rec.project, lot: rec.lot, visible: !!rec.visible, fixes: fixSteps.length });
       for (const fix of fixSteps) {
         const review = [...steps].reverse().find((s) => s.n < fix.n && isReview(s.kind) && s.report);

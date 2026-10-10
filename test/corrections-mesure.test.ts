@@ -14,4 +14,12 @@ describe('relevé de référence des corrections (L165)', () => {
     const m = measure(readRuns(runs, until), readCache(join(root, 'docs', 'mesures', 'corrections-classement.json')));
     expect(doc.split('## Résultats\n\n')[1]!.trim()).toBe(renderReport(m).trim());
   });
+
+  it.skipIf(!existsSync(runs))('le cache versionné ne garde aucune cause modèle pour une passe sans revue', () => {
+    const until = /^Reproduction : .*--until (\S+?)`? /m.exec(doc)?.[1];
+    const cache = readCache(join(root, 'docs', 'mesures', 'corrections-classement.json'));
+    const sansRevue = readRuns(runs, until).passes.filter((p) => p.findings.length === 0).map((p) => p.key);
+    expect(sansRevue.length).toBeGreaterThan(0);
+    expect(sansRevue.filter((k) => cache.has(k))).toEqual([]);
+  });
 });

@@ -44,7 +44,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- `cadence corrections [folder] [--classify] [--sample n]`: the baseline of a wave's corrections, read from the `.cadence/runs` journals of every project: share of lots with at least one and two `fix` passes per project and for visible versus non-visible lots, and the passes by cause (unclear spec, invented rule, architecture drift, data / SQL, code bug, missing test, false review finding), classified by the local model (Ollama, off the Anthropic quota) with a hand-read sample; `--until date` freezes a baseline to the waves created up to then, and `--sample` draws only passes that have findings to read (L165).
+- `cadence corrections [folder] [--classify] [--sample n]`: the baseline of a wave's corrections, read from the `.cadence/runs` journals of every project: share of lots with at least one and two `fix` passes per project and for visible versus non-visible lots, and the passes by cause (unclear spec, invented rule, architecture drift, data / SQL, code bug, missing test, false review finding), classified by the local model (Ollama, off the Anthropic quota) with a hand-read sample; `--until date` freezes a baseline to the waves created up to then and the steps ended by then (a wave or step with no readable date is left out), and `--sample` draws only passes that have findings to read (L165).
 - `docs/lead.md`: the workflow of the `lead` skill drawn in three lanes (human, lead session, `orchestrate` program and agents) as an SVG that follows GitHub's light and dark themes, with the permanent rules and the exit codes; linked from the README (L167).
 
 ## [1.0.0] - 2026-10-10

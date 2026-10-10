@@ -626,7 +626,7 @@ The classification is cached in `<folder>/.cadence/corrections.json` (or `--cach
 new passes, and a pass the model could not answer stays out of the cache. `--sample n` prints `n` passes with findings spread
 evenly over the sorted keys, with their findings and the model's cause, to be read by hand; a `manual` field written
 beside a pass in the cache file (one of the seven causes, else the command refuses the file) overrides the model's cause in every table and gives the **agreement rate** of the model
-on the reviewed sample. `--until date` (ISO, e.g. `2026-10-10T18:31Z`) reads only the waves created up to then (`created` in the wave's `wave.json`), so that later waves do not change a published baseline. `--json` prints the measure as data. The command reads the journals and writes nothing but the cache.
+on the reviewed sample. `--until date` (ISO, e.g. `2026-10-10T18:31Z`) reads only the waves created up to then (`created` in the wave's `wave.json`) and, in them, only the steps ended by then (`ended`), so that neither later waves nor a wave still running at that time change a published baseline; a wave or a step with no readable date is left out. `--json` prints the measure as data. The command reads the journals and writes nothing but the cache.
 The first baseline is in [docs/mesures/corrections-2026-10-10.md](docs/mesures/corrections-2026-10-10.md); `test/corrections-mesure.test.ts` replays its command on the journals and checks the document's results word for word (skipped when the journals are not there).
 
 ## deliver

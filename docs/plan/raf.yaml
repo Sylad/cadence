@@ -1983,12 +1983,13 @@ lots:
     created: 2026-10-10
   - id: L173
     title: "Étape accept : tests rouges, verrou par empreinte sur toutes les sessions du dépôt, fichiers des acceptation.json exclus de config.test et de la CI (config du lanceur) tant que le lot n'est pas vert, commande dédiée, retour à vert: true posé par le cycle quand elle passe (spec etape-spec, S5)"
-    status: todo
+    status: doing
     estimate: 1
     after: [ L171 ]
     created: 2026-10-10
     notes:
       - { date: 2026-10-10, text: "Revue L166 : préciser la différence tolérée sur acceptation.json par le verrou (seule la clé vert, posée par le cycle) et où est rangé le sha rouge (hors d'acceptation.json, sinon une session peut le réécrire) — sinon le lot B voit un diff non vide après le vert: true du lot A" }
+    started: 2026-10-11
   - id: L174
     title: "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses (spec etape-spec, S6)"
     status: todo

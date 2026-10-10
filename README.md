@@ -406,7 +406,7 @@ No gate and no command here: the QA review comes **after** a delivery, and
 page shows or what it is served (screen, API, data source, configuration of
 either) — in practice every delivery except docs-, plan- or tests-only ones: a
 backend-only lot can empty a page without touching a screen, and the agent then
-starts with the pages that call the changed endpoints. The `qa-reviewer` agent
+walks the pages that call the changed endpoints. The `qa-reviewer` agent
 opens each page of the running app in a real browser and judges it from the
 user's side. A page can be empty while everything else is green — no code
 changed, a data source went down upstream, the unit tests replace the network,
@@ -1280,12 +1280,14 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   runs a build whose output is used live, and never edits code. A README or usage
   documentation that does not follow the lot's change is a *major* finding.
 - **qa-reviewer** (agent): any web app (read-only like `ux-reviewer`: same tool list, no `Edit`, no `Write`); given a repository and a base URL (and
-  optionally a lot id, to start with the pages it touched — for a backend-only
-  lot, those that call the changed endpoints), it opens each page of
+  optionally a lot id, to walk only the pages it touched — those that call the
+  changed endpoints, those of the screens it changed, and the home page; a
+  backend-only lot stays in scope, and when the endpoints cannot be mapped to pages
+  every page is walked; the others are named « Not walked »), it opens each page of
   the project's expectations file in a real browser at 1440 and 390 px and
   measures: expected content present and non-empty, no error or missing-data
   message, every API call answered 2xx with a non-empty body, no console error,
-  no broken content image. Findings are defects (a line of the expectations
+  no broken content image. It reads the page as text first and takes a capture only for a gap. Findings are defects (a line of the expectations
   broken, or a universal check failing with a visible effect, with or without an
   expectations file), suspects (it looks like missing or wrong data and no
   expectation settles it) or noise (a console error or a failed request with no

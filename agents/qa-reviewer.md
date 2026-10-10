@@ -15,9 +15,7 @@ that a defect. You do: a players page with no players is a defect, whatever the 
 ## Inputs
 
 The absolute path of the repository and the base URL of the app — deployed, or a local server the
-caller started. Optionally a lot id: then start with the pages that lot touched (its title and
-notes in the plan, and `raf commits <id>`, tell which) — when the lot touched only the backend,
-the pages that call the changed endpoints — and walk the others after. If the path or the URL is
+caller started. Optionally a lot id: then walk only the pages that lot touched, as « Scope of a lot » below says. If the path or the URL is
 missing, or the URL does not answer, say so and stop.
 
 ## Method
@@ -46,6 +44,11 @@ missing, or the URL does not answer, say so and stop.
    and **390 px** wide. Walk within the bounded pass below. Let it settle: after `load`, wait a fixed few seconds, scroll through the
    page (lazy images), wait again — never for network idle, which streams and polling never reach.
    Then measure:
+   - read the page as text first: its rendered text and structure (`innerText`, or the
+     accessibility snapshot), the counts of the selectors named by the expectations, the responses
+     you listened to. Compare that text with the expectations, and take a capture only for a gap —
+     a `shows:` line unmet, a `never:` text found, a failed call — as evidence of that gap: a page
+     that matches its expectations gets none;
    - browser state, once before the first page, in a profile already used (a persistent context, not a fresh one — a `userDataDir` reserved for QA and kept between passes, never the user's own browser profile): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;
    - the expected content is present and non-empty — name the selector or the text found and its
      count (`.player-card` ×14), not "the list looks fine";
@@ -96,6 +99,24 @@ missing, or the URL does not answer, say so and stop.
    false, or an error is shown to the user), *major* (secondary content missing or wrong, a section
    silently dropped after a failed or empty API call, a broken content image), *minor* (noise). A broken line of the expectations with no visible loss on the page (the content is on screen by another path) is *minor* too.
 
+## Scope of a lot
+
+With a lot id, walk only the pages the lot touched — the cost of a pass is the pages walked, and
+a delivery rarely changes them all:
+
+- the pages that call the changed endpoints (`raf commits <id>` and the diff tell which routes
+  changed; the `api:` lines of the expectations, and the calls you see a page make, tell which
+  pages use them);
+- the pages of the screens the lot changed (its title and notes in the plan, and
+  the components in its commits, name them);
+- the home page.
+
+A backend-only lot is kept in scope: it can empty a page without touching a screen, and the pages
+that call its endpoints are exactly the ones to walk. If you cannot tell which pages a changed
+endpoint feeds, walk every page and say so — a scope you cannot establish reduces nothing. Pages
+outside the scope are named under « Not walked », never counted as checked. Without a lot id,
+walk every page.
+
 ## Bounded pass
 
 The pass has a time budget: the one the caller names, otherwise 15 minutes. You keep the count
@@ -117,6 +138,7 @@ from the first page.
 
 A short report:
 
+- **Scope**, one line: the lot id (or "none: every page"), the pages walked of pages in the expectations (or routes discovered), the pages not walked and why, and the captures taken — the figures to compare from one pass to the next.
 - **Pages checked N/N**, with the base URL and the date and time of the run, and the two widths. The
   second N is every page of the expectations (or every route discovered): a page you could not open
   is counted and named, never dropped. A page counts as checked when both widths were measured; a

@@ -141,7 +141,7 @@ describe('skills install', () => {
       'If a PIN or a login wall is met, say so and stop there for those pages',
       // Entrées.
       'The absolute path of the repository and the base URL of the app',
-      'Optionally a lot id: then start with the pages that lot touched',
+      'Optionally a lot id: then walk only the pages that lot touched',
       // Le fichier d'attentes, et son absence.
       '`docs/qa/expectations.md`, or the file named by `qa.expectations` in `cadence.yaml`',
       'No expectations file: do not guess silently',
@@ -249,7 +249,7 @@ describe('skills install', () => {
     // Déclencheur : toute livraison qui change ce qu'une page montre ou reçoit — pas seulement un lot « visible ».
     expect(qa.description).toContain(`Use after any delivery that ${QA_TRIGGER} — or to re-check a deployed app.`);
     expect(qa.description + qa.body).not.toContain('`visible`');
-    expect(qa.section('Inputs')).toContain('then start with the pages that lot touched (its title and notes in the plan, and `raf commits <id>`, tell which) — when the lot touched only the backend, the pages that call the changed endpoints — and walk the others after.');
+    expect(qa.section('Inputs')).toContain('then walk only the pages that lot touched, as « Scope of a lot » below says.');
     expect(qa.description).toContain('Read-only — does not modify code, log in or submit anything.');
   });
 
@@ -307,6 +307,35 @@ describe('skills install', () => {
     expect(qa.section('Method')).toContain('Walk within the bounded pass below.');
     // Le passage partiel se dit dans le rapport.
     expect(qa.section('Output')).toContain('If the pass stopped before the end (budget spent, stop requested), say so in the first line');
+  });
+
+  it('agent qa-reviewer : périmètre d’un lot et lecture du DOM en texte d’abord (L123)', () => {
+    const qa = qaAgent();
+    const scope = qa.section('Scope of a lot');
+    // Trois ensembles de pages, pas plus : endpoints changés, pages du lot visible, accueil.
+    expect(scope).toContain('walk only the pages the lot touched');
+    expect(scope).toContain('the pages that call the changed endpoints');
+    expect(scope).toContain('the pages of the screens the lot changed');
+    expect(scope).toContain('the home page');
+    // Le cas qui coûte : un lot backend qui vide une page, sans écran touché.
+    expect(scope).toContain('A backend-only lot is kept in scope');
+    expect(scope).toContain('can empty a page without touching a screen');
+    // Un périmètre qui ne se déduit pas ne réduit rien : passage complet, dit.
+    expect(scope).toContain('If you cannot tell which pages a changed endpoint feeds, walk every page');
+    // Les pages hors périmètre sont nommées, jamais comptées comme vérifiées.
+    expect(scope).toContain('named under « Not walked », never counted as checked');
+    // Sans lot : tout est parcouru.
+    expect(scope).toContain('Without a lot id, walk every page');
+    // Texte d'abord, capture sur écart seulement.
+    const method = qa.section('Method');
+    expect(method).toContain('read the page as text first');
+    expect(method).toContain('take a capture only for a gap');
+    expect(method).toContain('a page that matches its expectations gets none');
+    // Le rapport permet de mesurer avant/après.
+    const output = qa.section('Output');
+    expect(output).toContain('**Scope**');
+    expect(output).toContain('pages walked of pages in the expectations');
+    expect(output).toContain('captures taken');
   });
 
   it('les skills lead et session-close nomment la porte de revue de code', () => {
@@ -392,11 +421,11 @@ describe('skills install', () => {
     const text = flat(section);
     expect(text).toContain('No gate and no command here: the QA review comes **after** a delivery, and `raf done` does not wait for it.');
     expect(text).toContain(`It follows any delivery that ${QA_TRIGGER}:`);
-    expect(text).toContain('a backend-only lot can empty a page without touching a screen, and the agent then starts with the pages that call the changed endpoints.');
+    expect(text).toContain('a backend-only lot can empty a page without touching a screen, and the agent then walks the pages that call the changed endpoints.');
     const skills = flat(readme.slice(readme.indexOf('## Claude Code skills'), readme.indexOf('## Releasing')));
     expect(skills).toContain('after a green delivery that changes what a page shows or what it is served, the `qa-reviewer` agent walks the delivered app.');
     expect(skills).toContain('a delivery that changes what a page shows or what it is served is then checked in the running app by the `qa-reviewer` agent, whose blocking findings come back to you.');
-    expect(skills).toContain('optionally a lot id, to start with the pages it touched — for a backend-only lot, those that call the changed endpoints');
+    expect(skills).toContain('optionally a lot id, to walk only the pages it touched — those that call the changed endpoints, those of the screens it changed, and the home page; a backend-only lot stays in scope');
     expect(skills).not.toMatch(/visible lot[^.]*qa-reviewer/);
     // Les trois sortes de constat, comme dans le contrat de l'agent.
     expect(skills).toContain('Findings are defects (a line of the expectations broken, or a universal check failing with a visible effect, with or without an expectations file), suspects (it looks like missing or wrong data and no expectation settles it) or noise (a console error or a failed request with no visible effect, ranked minor)');

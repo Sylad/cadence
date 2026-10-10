@@ -205,3 +205,15 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
   }
   return out;
 }
+
+/** Consigne propre à l'étape accept dans le brief : fiche, maquette, commande dédiée, gabarit du lanceur, et les écarts de la passe précédente. */
+export function acceptText(o: { fiche: string; maquette: string; acceptation: string; command: string; test?: string; runner?: string; problems?: string[] }): string {
+  const lines = [
+    `Sheet: \`${o.fiche}\` (rules, fields, actions). Mockup: \`${o.maquette}\` (every field carries \`data-testid="<field id>"\`). You get nothing else about the screen: the implementation does not exist yet.`,
+    `The project declares the dedicated command that runs ONLY the acceptance tests of this lot (\`orchestrate.accept\`): \`${o.command}\` (from the repository root; the program sets \`CADENCE_ACCEPTATION\` to the absolute path of the lot's \`acceptation.json\`, and replaces \`{acceptation}\` with it).${o.test ? ` The project's ordinary test command is \`${o.test}\`: it must stay green with your red tests committed.` : ''}`,
+    `Write \`${o.acceptation}\`: \`{ "lot": "<lot>", "fiche": "${o.fiche}", "fichiers": ["<test file>", …], "vert": false }\` (paths relative to the repository). The ordinary test config of the project (shared with its CI) must exclude those files while \`vert\` is false; the dedicated config includes only them. Both read the file with this runner template (copy it into the project, e.g. \`tests/acceptation-runner.mjs\`):`,
+  ];
+  if (o.runner) lines.push('```js', o.runner.trimEnd(), '```');
+  if (o.problems?.length) lines.push('', 'The program checked your previous pass and it did not pass; fix exactly these points (one more pass only, then the lot goes back to the lead):', ...o.problems.map((p) => `- ${p}`));
+  return lines.join('\n');
+}

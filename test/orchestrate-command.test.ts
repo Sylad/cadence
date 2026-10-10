@@ -67,7 +67,7 @@ function parentWith(projects: Record<string, { title: string; estimate?: number;
   return { parent, dirs };
 }
 
-type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small' | 'precheck' | 'spec', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
+type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
 
 function fakeDeps(over: Over = {}, tweak: Partial<OrchestrateDeps> = {}): { deps: OrchestrateDeps; calls: { cwd: string; kind: string; model: string }[] } {
   const calls: { cwd: string; kind: string; model: string }[] = [];
@@ -201,6 +201,27 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it("--dry-run (L173) : avec orchestrate.accept, l'étape accept (Sonnet, agent acceptance-writer, sans Playwright) s'intercale entre spec et implement ; son brief est rendu sans {{…}}", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un écran', screen: 'page' }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  accept: npx vitest run -c vitest.acceptation.config.ts\n');
+    git(dirs.a, 'add', '--', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: config');
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      expect(out).toMatch(/spec \(sonnet\) → accept \(sonnet\) → implement/);
+      const accept = out.slice(out.indexOf('  accept :'), out.indexOf('  implement :'));
+      expect(accept).toContain('--agent acceptance-writer');
+      expect(accept).toMatch(/mcp : aucun/);
+      const line = out.split('\n').find((l) => l.includes('brief :') && l.includes('a--L1--accept.md'))!;
+      const brief = readFileSync(line.replace(/^\s*brief : /, '').trim(), 'utf8');
+      expect(brief).toContain('npx vitest run -c vitest.acceptation.config.ts');
+      expect(brief).not.toMatch(/\{\{/);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it("--dry-run : le brief implement d'un lot visible porte cadence news new <lot>, celui d'un lot sans écran non ; aucun {{…}} ne reste (L48/t3)", async () => {
     const { parent } = parentWith({ a: [{ title: 'un', visible: true }], b: [{ title: 'sans écran' }] });
     const r = await run(parent, ['a:L1', 'b:L1', '--dry-run']);
@@ -272,7 +293,7 @@ describe('refus avant d\'agir (code 2)', () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
     const old = fakeDeps({}, { claudeInfo: () => ({ version: '2.1.283', jsonSchema: true }) }).deps;
     expect((await run(parent, ['a:L1', '--dry-run'], old)).err.join()).toContain("claude 2.1.283 n'a pas --effort");
-    const all = ['precheck', 'spec', 'implement', 'fix', 'review', 'ux'].map((k) => `${k}: default`).join(', ');
+    const all = ['precheck', 'spec', 'accept', 'implement', 'fix', 'review', 'ux'].map((k) => `${k}: default`).join(', ');
     writeFileSync(join(dirs.a, 'cadence.yaml'), `orchestrate:\n  effort: { ${all} }\n`);
     git(dirs.a, 'add', 'cadence.yaml');
     git(dirs.a, 'commit', '-q', '-m', 'cfg');

@@ -35,8 +35,8 @@ lot's news entry, and a human is asked only about a choice that is costly to und
 lots that deliver it). Delivered so far: the sheet template `templates/fiche.yaml`, `cadence spec check`
 (the sheet's invariants) and `cadence spec qa` (the screen's `docs/qa/expectations.md` section, derived
 from the sheet), see [spec](#spec) below, and the `spec` step of `orchestrate` itself (the `spec-writer` agent, the
-render at 1440 and 390 px, the commit of the spec), see [The spec step](#the-spec-step-of-a-lot-with-screen) in `orchestrate`; the UX review of
-the mockup, the acceptance tests and the downstream briefs are not delivered yet.
+render at 1440 and 390 px, the commit of the spec), see [The spec step](#the-spec-step-of-a-lot-with-screen) in `orchestrate`; the `accept` step (red acceptance tests and the lock that protects them), see [The accept step](#the-accept-step-red-acceptance-tests-and-their-lock); the UX review of
+the mockup and the downstream briefs are not delivered yet.
 
 ## What's new
 
@@ -996,7 +996,7 @@ without `--effort` (see below), so `effort.precheck` has no effect on it and the
 
 ```yaml
 orchestrate:
-  effort: { precheck: low, spec: medium, implement: medium, fix: medium, review: high, ux: high }   # defaults
+  effort: { precheck: low, spec: medium, accept: medium, implement: medium, fix: medium, review: high, ux: high }   # defaults
 ```
 
 To measure what a level costs, run the same kind of wave before and after changing the key: each step of
@@ -1014,7 +1014,7 @@ lot that already has commits is never pre-checked (resuming it is legitimate). `
 ### The spec step of a lot with `screen:`
 
 A lot that declares `screen:` (`raf add … --visible --screen page|component|journey`, see [raf](#raf)) gets one more session, `spec`, **after** the pre-check and **before**
-the first implementation: `precheck → spec → implement → ux → review`. A lot without `screen:` follows the usual path, unchanged. `--dry-run` lists the step
+the first implementation: `precheck → spec → accept → implement → ux → review` (`accept` only when the project declares `orchestrate.accept`, see below). A lot without `screen:` follows the usual path, unchanged. `--dry-run` lists the step
 (`spec (sonnet)`), its command line and its brief `templates/orchestrate/spec.md`.
 
 - **The session** (L171): Sonnet, the `spec-writer` agent (it writes only the spec folder, never application code), Playwright loaded like for `implement`. It reads the lot,
@@ -1033,6 +1033,32 @@ the first implementation: `precheck → spec → implement → ux → review`. A
   The agent can also ask a question itself in its report.
 - **Under the threshold**: if the session finds that the lot changes no screen, it gives the reason in one line (`sousSeuil`), writes no mockup, and the lot goes on to `implement` as before; the reason is
   kept as a warning of the lot. On resume the spec step is skipped only when a sheet of the lot (`ecran.lot` is the lot) already passes the program's checks (`cadence spec check`, mockup, captures) and carries no costly hypothesis; otherwise the spec is played again. The sheet path in the report is relative to the repository (an absolute or `./` path is normalised, a path outside the repository is a finding).
+
+### The accept step: red acceptance tests and their lock
+
+After a valid spec, and only when `cadence.yaml` declares `orchestrate.accept` (the project's **dedicated command**, which runs *only* the acceptance tests of one lot), a lot with a sheet gets one more
+session, `accept` (L173): `precheck → spec → accept → implement → ux → review`. Without `orchestrate.accept` the step is skipped, with a warning on the lot (`étape accept ignorée …`), and the lot goes from `spec` to `implement` as before.
+`--dry-run` lists the step (`accept (sonnet)`) and its brief `templates/orchestrate/accept.md`.
+
+- **The session**: Sonnet, the `acceptance-writer` agent, a session other than the implementer's. Its brief gives it the sheet, the mockup and how to run the project's tests (the dedicated command, and the runner template below) — not the lot's objective, notes or
+  sub-tasks, and no implementation. It writes one or more cases per rule, **named as the sheet plans them** (`regles[].tests`, e.g. `R3 — erreur : message et bouton Réessayer`), selectors = the `data-testid` of the fields, API calls simulated from `actions[]`,
+  and commits them **red** in one commit (`test(L7): acceptation R1–Rn (rouge)`) with `<spec.dir>/<écran>/acceptation.json` — `{ "lot", "fiche", "fichiers": [...], "vert": false }` — and the runner configuration. `effort.accept` (default `medium`) sets its effort.
+- **Out of the ordinary test run and the CI while the lot is not green.** Red tests committed would fail `orchestrate.test` (after every `implement`/`fix`) and the project's CI (which `cadence deliver` waits for), for lots that are not theirs. So the
+  runner configuration shared by `orchestrate.test` and the CI excludes the files listed in every `acceptation.json` whose `vert` is `false`, and only the dedicated command runs them. `templates/acceptation-runner.mjs` is the helper the session copies
+  into the project: `acceptationIgnored()` (Vitest `exclude`; `acceptationIgnored(root, dir, 'regex')` for Jest `testPathIgnorePatterns`) and `acceptationOnly()` (the `include` of the dedicated config, which reads the environment variable `CADENCE_ACCEPTATION`:
+  the program sets it to the absolute path of the lot's `acceptation.json` when it runs `orchestrate.accept`, and also replaces `{acceptation}` in the command with that path — quote it if the path may hold spaces). If the CI or the test command do not use that config
+  (paths hard-coded), the session must not commit red tests and puts the question in its report.
+- **What the program checks** afterwards, with no model: `acceptation.json` is the lot's (`lot`, `fiche`, listed files committed, `vert: false`), every test name planned in the sheet appears in the listed files, the other lots' acceptation tests are untouched, the dedicated command
+  **fails** (a test green before the code proves nothing), `orchestrate.test` stays **green** with the red tests committed (proof that they are excluded), and the tree is clean. Anything missing goes to **one second `accept` session**; still not valid, the lot is handed back
+  (`accept non conforme après 2 passes : …`). A question in the report puts the lot in `question`, like the other steps. The check that each listed test *individually* fails is not made: only the dedicated command's exit code is (it fails if any of them fails).
+- **The seal.** Once the checks pass, **the program** (not the session) adds to `acceptation.json` the git fingerprint of each listed file (`empreintes`) and commits it (`test(L7): acceptation scellée …`): that commit is the **red commit**. Its sha is written nowhere in the file (a session could rewrite it): it is
+  the latest commit in git history that changed the file otherwise than by its `vert` key, and the wave keeps it in the lot's state (`accept.rouge`) too.
+- **The lock, for every session of the repository.** At the end of each `implement` and `fix` the cycle compares, for the `acceptation.json` of **all** lots found under `orchestrate.spec.dir` (a repository has one queue: the next lot runs on the same branch), the listed test files with the red commit
+  (`git diff <red commit> -- <files>`, empty expected, working tree included, and the fingerprints), and each `acceptation.json` with its version before the session. The only difference tolerated on `acceptation.json` is the `vert` key, and only **the cycle** sets it: a session that changes it, rewrites the
+  file, deletes it, creates one outside the accept step, or modifies a locked test hands the lot back (`verrou des tests d'acceptation : …`) — a useful change is a question to the lead or a review finding, never a silent gesture. The lock does not depend on `orchestrate.accept` being declared.
+- **Back to green, set by the cycle.** At the end of each `implement`/`fix`, once the session reports green, the cycle runs the dedicated command. Red: the findings go to a `fix` pass (the tests are made green without editing the locked files). Green: the cycle sets `vert: true` and commits it (`chore(L7): acceptation verte …`;
+  `commitPlan` may commit the `acceptation.json` files, otherwise the dirty tree would stop the lot). The files then join `orchestrate.test` and the CI, which keep the lot green from then on; the following lot, running with `vert: true` in a file whose tests are unchanged, sees no difference but that key.
+- **When the lot is handed back** (question, budget, passes exhausted) its tests stay red but excluded from the project's runner and CI: the next lots and `cadence deliver` do not see them; `--resume` continues with the same lock. On resume, the step is skipped when the lot already has a valid committed `acceptation.json`.
 
 **Production access of the sessions** (L168): a session of a wave (`implement`, `fix`, `precheck`, `spec`, `review`, `ux`) is
 started with no *default* access to the production cluster (a guard against the ordinary path, not a barrier). What a session inherits was measured on the dev machine: `KUBECONFIG` (pointing at
@@ -1256,9 +1282,10 @@ orchestrate:
   test: npm test                         # run by the orchestrator after a work step (optional)
   build: npm run build                   # run after the tests; both results go to the reviewer, who does not redo them (optional)
   precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it, local runs it on claude-local (Ollama) with Sonnet as fallback
+  accept: npx vitest run -c vitest.acceptation.config.ts   # accept step (see « The accept step »): the dedicated command that runs ONLY the acceptance tests of the lot (optional; without it the step is skipped with a warning)
   spec: { dir: docs/specs }              # spec step (see « The spec step of a lot with screen: »): folder of the screen specs, relative to the repository (default docs/specs); render: the command the spec session runs to render the mockups at 1440 and 390 px (optional, Playwright otherwise)
   prodAccess: false                      # default: wave sessions get no access to production (see « Production access of the sessions »); true lifts it for this project
-  effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, implement, fix, review, ux
+  effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, accept, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default
   addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use
@@ -1547,7 +1574,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 - The **text of the outputs**: wording, layout, order of the lines and columns of every report, table and message
   (the `--json` outputs and the exit codes are part of the commands above). In a `--json` output a new field is a
   minor change, so consumers must tolerate unknown fields; removing or renaming a field is a major change.
-- The **`precheck-reader`** and **`spec-writer`** agents: internal to `cadence orchestrate`, not meant to be called by hand.
+- The **`precheck-reader`**, **`spec-writer`** and **`acceptance-writer`** agents: internal to `cadence orchestrate`, not meant to be called by hand.
 - The **`cadence-hud` band**: its segments, colours and layout; it is versioned on its own.
 - The **wave journals** under `.cadence/runs` and the files `cadence orchestrate` keeps there.
 - The wording of the briefs and of the instructions inside the skills and the agents.

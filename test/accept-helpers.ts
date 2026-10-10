@@ -24,7 +24,7 @@ export function ecritAcceptation(repo: string, o: Opts = {}): { json: string; fi
   writeFileSync(join(repo, json), JSON.stringify({ lot, fiche: `${DIR}/${ecran}/fiche.yaml`, fichiers: [test], vert: o.vert ?? false }, null, 2));
   const paths = [test, json, ...(o.sansFiche ? [] : [`${DIR}/${ecran}/fiche.yaml`])];
   git(repo, 'add', '--', ...paths);
-  git(repo, 'commit', '-q', '-m', `test(${lot}): acceptation R1–R4 (rouge)`, '--', ...paths);
+  git(repo, 'commit', '-q', '--allow-empty', '-m', `test(${lot}): acceptation R1–R4 (rouge)`, '--', ...paths);
   return { json, fiche: `${DIR}/${ecran}/fiche.yaml`, sha: git(repo, 'rev-parse', 'HEAD'), test };
 }
 

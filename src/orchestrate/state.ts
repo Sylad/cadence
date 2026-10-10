@@ -81,6 +81,10 @@ export interface LotState {
   screen?: Screen;
   /** Issue de l'étape spec : la fiche écrite (et le nombre de ses hypothèses), ou la raison d'une sortie sous le seuil. */
   spec?: { fiche: string; hypotheses: number } | { sousSeuil: string };
+  /** Issue de l'étape accept (L173) : l'acceptation.json du lot (chemin relatif au dépôt) et le commit rouge scellé par le programme, rangé ici et dans git, jamais dans le fichier. */
+  accept?: { acceptation: string; rouge: string };
+  /** Écarts de l'étape accept relevés par le programme, rendus à la seconde passe `accept` (une seule). */
+  acceptProblems?: string[];
   /** Écarts de la spec relevés par le programme, rendus à la seconde passe `spec` (une seule). */
   specProblems?: string[];
   /** Questions posées par le programme sur des hypothèses coûteuses de la fiche (--answer vide `questions` : elles restent là pour le brief de reprise). */

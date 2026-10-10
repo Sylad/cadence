@@ -50,7 +50,7 @@ export const reviewReport = (over: Record<string, unknown> = {}) => ({
 export interface Call {
   args: string[];
   opts: LaunchOpts;
-  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec';
+  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept';
   model: string;
   effort?: string;
   brief: string;
@@ -59,6 +59,9 @@ export interface Call {
 
 /** Rapport d'une étape spec : `sousSeuil` vide = un écran est spécifié ; `fiche` = chemin de la fiche écrite. */
 export const specReport = (over: Record<string, unknown> = {}) => ({ commits: [], nonVerifie: [], questions: [], choix: [], sousSeuil: '', fiche: '', resume: 'spec écrite', ...over });
+
+/** Rapport d'une étape accept. */
+export const acceptReport = (over: Record<string, unknown> = {}) => ({ commits: [], nonVerifie: [], questions: [], choix: [], resume: 'tests rouges écrits', ...over });
 
 export const precheckReport = (over: Record<string, unknown> = {}) => ({ dejaPresent: 'non', preuves: [], resume: 'rien de présent', ...over });
 
@@ -71,6 +74,7 @@ export function kindOf(args: string[]): Call['kind'] {
   const agent = args.includes('--agent') ? args[args.indexOf('--agent') + 1] : null;
   if (agent === 'ux-reviewer') return 'ux';
   if (agent === 'spec-writer') return 'spec';
+  if (agent === 'acceptance-writer') return 'accept';
   if (agent === 'code-reviewer') return brief.includes('single pass') || brief.includes('short re-review') ? 'review-small' : 'review';
   return brief.includes('found the defects below') || brief.includes('found only minor findings') ? 'fix' : 'implement';
 }
@@ -122,7 +126,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; scree
     if (!next) throw new Error(`pas de réponse scénarisée pour ${kind}`);
     return next(call);
   };
-  const agents: Record<string, AgentDef> = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'StructuredOutput'] }, 'ux-reviewer': { description: 'd', prompt: 'p' }, 'precheck-reader': { description: 'd', prompt: 'p', tools: ['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput'] }, 'spec-writer': { description: 'd', prompt: 'p', tools: ['Read', 'Write', 'Edit', 'Bash', 'StructuredOutput'] } };
+  const agents: Record<string, AgentDef> = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'StructuredOutput'] }, 'ux-reviewer': { description: 'd', prompt: 'p' }, 'precheck-reader': { description: 'd', prompt: 'p', tools: ['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput'] }, 'spec-writer': { description: 'd', prompt: 'p', tools: ['Read', 'Write', 'Edit', 'Bash', 'StructuredOutput'] }, 'acceptance-writer': { description: 'd', prompt: 'p', tools: ['Read', 'Write', 'Edit', 'Bash', 'StructuredOutput'] } };
   const wave: WaveCtx = {
     id: 'w1',
     store,

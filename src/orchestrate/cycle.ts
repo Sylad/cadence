@@ -2,7 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { parse } from 'yaml';
 import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
@@ -18,7 +18,8 @@ import { capturesText, newsText, objective, renderBrief, reposText, TEMPLATES_DI
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
-import { checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
+import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
+import { acceptText, checkAcceptation, findAcceptation, lockViolations, parseAcceptation, redSha, sealAcceptation, setVert } from './accept.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheReady, findFiche, specText } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { lotKey, lotRepoPaths, neighbourDirs } from './state.js';
@@ -117,9 +118,12 @@ async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
   const repo = c.lot.repo;
   const plan = c.loadPlan();
   const own = new Set([relative(repo, plan.path), ...plan.maintained]);
+  // Les acceptation.json (L173) rejoignent les fichiers que le cycle a le droit de commiter : il y pose le scellé et `vert: true`.
+  const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
+  const ownFile = (f: string) => own.has(f) || (f.startsWith(specDir) && f.endsWith('/acceptation.json'));
   const dirty = trackedPaths(await snapshot(repo, { remote: false }));
   if (dirty.length === 0) return null;
-  const foreign = dirty.filter((f) => !own.has(f));
+  const foreign = dirty.filter((f) => !ownFile(f));
   if (foreign.length) return `arbre sale (fichiers hors plan) : ${foreign.join(', ')}`;
   git(repo, 'add', '--', ...dirty);
   git(repo, 'commit', '-q', '-m', message, '--', ...dirty);
@@ -129,9 +133,9 @@ async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
 const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g, '\\$&');
 
 /** Commande du projet, asynchrone : la boucle d'événements reste libre (délai de l'autre créneau, signaux). Son groupe est tué au délai et au signal. */
-function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000): Promise<{ code: number; output: string }> {
+function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000, env: Record<string, string> = {}): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
-    const child = spawn('sh', ['-c', command], { cwd: c.lot.repo, env: withoutLaunchVars(process.env), stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawn('sh', ['-c', command], { cwd: c.lot.repo, env: { ...withoutLaunchVars(process.env), ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const pid = child.pid;
     if (pid === undefined) {
       child.once('error', (e) => resolve({ code: 127, output: String(e.message) }));
@@ -260,6 +264,21 @@ function ficheTemplate(): string | undefined {
   }
 }
 
+/** Gabarit du lanceur de tests livré avec le paquet, joint au brief de l'étape accept. */
+function acceptRunner(): string | undefined {
+  try {
+    return readFileSync(join(TEMPLATES_DIR, '..', 'acceptation-runner.mjs'), 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+/** Fiche du lot : celle de l'étape spec, ou la fiche retrouvée dans le dépôt (reprise). */
+function ficheOf(c: LotCtx): string | null {
+  const l = c.lot;
+  return l.spec && 'fiche' in l.spec ? l.spec.fiche : findFiche(l.repo, c.config.spec.dir, l.lot);
+}
+
 function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
@@ -275,6 +294,14 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     const mine = lotCommitLines(c);
     if (mine) vars.commits = `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}`;
     if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer) : `Answer from the human to your earlier question: ${l.pendingAnswer}`;
+  }
+  if (kind === 'accept') {
+    const fiche = ficheOf(c) ?? '';
+    const folder = posix.dirname(fiche);
+    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, acceptation: `${folder}/acceptation.json`, command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(), problems: l.acceptProblems });
+    vars.objectif = ''; // l'oracle est écrit depuis la fiche et la maquette seules, pas depuis le texte du lot
+    vars.commits = '';
+    if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
   if (kind === 'implement' || kind === 'fix') {
     const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
@@ -360,11 +387,11 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   if (dropped(c)) return stop(c, 'handed-back', DROPPED);
   const halt = halted(w, l);
   if (halt) return suspend(c, halt);
-  const write = kind === 'implement' || kind === 'fix' || kind === 'spec';
+  const write = kind === 'implement' || kind === 'fix' || kind === 'spec' || kind === 'accept';
   // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est jouée dès que le code est à relire (sauf tests rouges après une écriture, cf. REVIEW_RESERVE), la passe fix réserve son coût.
   if (write && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
-  const model: StepModel = kind === 'spec' ? 'sonnet' : write ? l.model : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
+  const model: StepModel = kind === 'spec' || kind === 'accept' ? 'sonnet' : write ? l.model : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
   const before = await snapshot(l.repo);
   const neighbours = l.repos ?? [];
@@ -373,7 +400,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   const sessionId = randomUUID();
   const step: StepState = { n, kind, model, ...(effort !== 'default' ? { effort } : {}), status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
   l.steps.push(step);
-  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing', spec: 'implementing' } as const;
+  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing', spec: 'implementing', accept: 'implementing' } as const;
   transition(c, label[kind]);
   w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} (${model})`);
 
@@ -398,7 +425,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       effort,
       local,
       schema: schemaFor(kind),
-      agent: kind === 'spec' ? 'spec-writer' : kind === 'ux' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
+      agent: kind === 'spec' ? 'spec-writer' : kind === 'accept' ? 'acceptance-writer' : kind === 'ux' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
       cwd: l.repo,
       wave: w.id,
       permissionMode: c.config.permissionMode,
@@ -729,8 +756,27 @@ function firstWrite(c: LotCtx): StepKind {
   const l = c.lot;
   if (!l.screen || l.spec) return 'implement';
   const fiche = findFiche(l.repo, c.config.spec.dir, l.lot);
-  return fiche && ficheReady(l.repo, fiche, l.lot) ? 'implement' : 'spec';
+  return fiche && ficheReady(l.repo, fiche, l.lot) ? afterSpec(c, fiche) : 'spec';
 }
+
+const NO_ACCEPT = 'étape accept ignorée : orchestrate.accept absent (commande dédiée aux tests d\'acceptation), le lot passe de spec à implement sans tests rouges';
+
+/** Étape qui suit une spec écrite : les tests d'acceptation rouges (S5) quand le projet déclare sa commande dédiée et qu'aucune acceptation conforme n'est déjà commitée, sinon l'implémentation. */
+function afterSpec(c: LotCtx, fiche: string): StepKind {
+  const l = c.lot;
+  if (!c.config.accept) {
+    if (!l.warnings.includes(NO_ACCEPT)) l.warnings.push(NO_ACCEPT);
+    return 'implement';
+  }
+  const json = `${posix.dirname(fiche)}/acceptation.json`;
+  if (listed(c, json) && checkAcceptation(l.repo, json, l.lot, fiche).length === 0) {
+    l.accept = { acceptation: json, rouge: redSha(l.repo, json) ?? '' };
+    return 'implement';
+  }
+  return 'accept';
+}
+
+const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo, json));
 
 /**
  * Étape spec (L171, spec etape-spec S3) : la session écrit maquette, captures et fiche dans `<spec.dir>/<écran>/`, le programme
@@ -814,8 +860,119 @@ async function specStep(c: LotCtx): Promise<void> {
   l.specAsked = undefined;
   l.spec = { fiche, hypotheses: (doc.regles ?? []).filter((r) => r.statut === 'hypothese').length };
   l.specProblems = undefined;
+  l.next = afterSpec(c, fiche);
+  save(c);
+}
+
+/** Commande dédiée aux tests d'acceptation du lot : `{acceptation}` y est remplacé, `CADENCE_ACCEPTATION` posé, chemin absolu dans les deux cas. */
+function runAccept(c: LotCtx, json: string): Promise<{ code: number; output: string }> {
+  const abs = join(c.lot.repo, json);
+  return sh(c, (c.config.accept ?? '').replaceAll('{acceptation}', abs), 30 * 60_000, { CADENCE_ACCEPTATION: abs });
+}
+
+const tail = (output: string, n = 40): string => output.trim().split('\n').slice(-n).join('\n');
+
+/** Écarts des tests d'acceptation écrits par la session (vide = acceptés) : autres lots intacts, acceptation.json conforme, tests rouges, config.test toujours verte. */
+async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore: string | undefined): Promise<string[]> {
+  const l = c.lot;
+  const out = headBefore ? lockViolations(l.repo, c.config.spec.dir, headBefore, { created: 'allow', skip: json }) : [];
+  out.push(...checkAcceptation(l.repo, json, l.lot, fiche));
+  if (out.length) return out;
+  const red = await runAccept(c, json);
+  if (red.code === 0) out.push(`la commande dédiée (orchestrate.accept) passe alors que le code n'existe pas : des tests verts avant le code ne prouvent rien — chaque test doit échouer parce que la fonctionnalité manque\n${tail(red.output, 15)}`);
+  if (c.config.test) {
+    const ordinary = await sh(c, c.config.test);
+    if (ordinary.code !== 0) out.push(`orchestrate.test échoue (code ${ordinary.code}) avec les tests rouges commités : les fichiers listés dans ${json} ne sont pas exclus de la config du lanceur (partagée avec la CI) tant que vert est false\n${tail(ordinary.output, 15)}`);
+  }
+  return out;
+}
+
+/**
+ * Étape accept (L173, spec etape-spec S5) : une session distincte de l'implémenteur écrit, depuis la fiche et la maquette seules, les tests
+ * d'acceptation rouges. Le programme vérifie (acceptation.json conforme, autres lots intacts, commande dédiée rouge, config.test verte),
+ * accorde une seconde passe, puis SCELLE le fichier (empreintes) dans un commit du cycle : c'est le commit rouge du verrou.
+ */
+async function acceptStep(c: LotCtx): Promise<void> {
+  const l = c.lot;
+  const fiche = ficheOf(c);
+  if (!fiche || !c.config.accept) {
+    l.next = 'implement';
+    save(c);
+    return;
+  }
+  const json = `${posix.dirname(fiche)}/acceptation.json`;
+  const done = await session(c, 'accept');
+  if (!done) return;
+  let rep: AcceptReport;
+  try {
+    rep = checkShape<AcceptReport>(done.report, ACCEPT_SCHEMA);
+  } catch (e) {
+    badReport(c, done.step, e);
+    return;
+  }
+  const commits: Commit[] = readCommits(l.repo, { range: done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined });
+  done.step.commits = commits.map(short).reverse();
+  for (const k of commits) if (!citedRefs(k, c.loadPlan().refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} : ${short(k)}`);
+  for (const x of rep.choix ?? []) if (!(l.choix ??= []).includes(x)) l.choix.push(x);
+  save(c);
+
+  const questions = rep.questions.filter((q) => !isNonQuestion(q));
+  for (const q of rep.questions) if (q.trim() && isNonQuestion(q)) l.warnings.push(`question ignorée (non-question) : « ${q.trim()} »`);
+  if (questions.length) {
+    l.questions = questions;
+    l.next = 'accept';
+    transition(c, 'question', questions[0]);
+    return;
+  }
+  const dirt = [
+    ...trackedPaths(done.after),
+    ...done.after.untracked.filter((f) => !done.before.untracked.includes(f)),
+    ...done.others.flatMap((o) => [...trackedPaths(o.after), ...o.after.untracked.filter((f) => !o.before.untracked.includes(f))].map((f) => `${o.repo.rel}: ${f}`)),
+  ];
+  if (dirt.length) {
+    stop(c, 'handed-back', `dépôt sale après accept : ${dirt.join(', ')}`);
+    return;
+  }
+  const problems = await acceptProblems(c, fiche, json, done.step.headBefore);
+  if (problems.length) {
+    if (l.acceptProblems) {
+      stop(c, 'handed-back', `accept non conforme après 2 passes : ${problems.join(' ; ')}`);
+      return;
+    }
+    l.acceptProblems = problems;
+    l.next = 'accept';
+    save(c);
+    return;
+  }
+  l.acceptProblems = undefined;
+  sealAcceptation(l.repo, json);
+  const dirty = await commitPlan(c, `test(${l.lot}): acceptation scellée, empreintes des tests rouges (orchestrate ${c.wave.id})`);
+  if (dirty) {
+    stop(c, 'handed-back', `scellé de ${json} : ${dirty}`);
+    return;
+  }
+  l.accept = { acceptation: json, rouge: git(l.repo, 'rev-parse', 'HEAD') };
   l.next = 'implement';
   save(c);
+}
+
+/**
+ * Retour au vert (S5) : à la fin de chaque implement/fix, quand la commande dédiée passe, le CYCLE (jamais une session) pose `vert: true`
+ * dans l'acceptation.json du lot et le commite ; les fichiers rejoignent alors config.test et la CI. Rend un constat quand elle échoue.
+ */
+async function acceptGreen(c: LotCtx): Promise<Constat | null> {
+  const l = c.lot;
+  if (!c.config.accept) return null;
+  const json = l.accept?.acceptation ?? findAcceptation(l.repo, c.config.spec.dir, l.lot);
+  if (!json || !existsSync(join(l.repo, json))) return null;
+  const a = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
+  if (typeof a === 'string' || a.vert) return null;
+  const r = await runAccept(c, json);
+  if (r.code !== 0) return { source: 'tests', gravite: 'bloquant', texte: `tests d'acceptation encore rouges (${c.config.accept}, code ${r.code}) : à rendre verts sans modifier les fichiers listés dans ${json} :\n${tail(r.output)}` };
+  setVert(l.repo, json);
+  const dirty = await commitPlan(c, `chore(${l.lot}): acceptation verte, vert: true posé par le cycle (orchestrate ${c.wave.id})`);
+  if (dirty) return { source: 'tests', gravite: 'bloquant', texte: `vert: true de ${json} : ${dirty}` };
+  return null;
 }
 
 /** Étape d'écriture (implémentation, correction) : contrôles, puis étape suivante décidée. */
@@ -880,6 +1037,12 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     stop(c, 'handed-back', `dépôt sale après ${kind} : ${dirt.join(', ')}`);
     return;
   }
+  // Verrou des tests d'acceptation (L173) : ceux de TOUS les lots du dépôt, pas seulement du lot courant ; une modification est une question au lead.
+  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore) : [];
+  if (locked.length) {
+    stop(c, 'handed-back', `verrou des tests d'acceptation : ${locked.join(' ; ')}`);
+    return;
+  }
   // Reprise : une session précédente de l'étape (correction ordinaire ou passe des mineurs) a pu commiter avant d'être coupée ; la revue d'origine ne vaut alors plus.
   // Référence : le HEAD de départ de la première session coupée de la série qui précède celle-ci (pas la revue, qui peut ne pas exister encore).
   let resumedFrom: string | undefined;
@@ -911,6 +1074,10 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   if (!rep.tests.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` });
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
   const runs: NonNullable<LotState['checks']>['runs'] = [];
+  if (red.length === 0) {
+    const green = await acceptGreen(c);
+    if (green) red.push(green);
+  }
   if (red.length === 0) {
     for (const [label, command] of [['tests', c.config.test], ['build', c.config.build]] as const) {
       if (!command) continue;
@@ -1215,6 +1382,7 @@ export async function runLot(c: LotCtx): Promise<void> {
       const kind = l.next;
       if (kind === 'precheck') await precheck(c);
       else if (kind === 'spec') await specStep(c);
+      else if (kind === 'accept') await acceptStep(c);
       else if (kind === 'implement' || kind === 'fix') await work(c, kind);
       else await review(c, kind);
       if (l.status === 'suspended' || l.status === 'question') return;

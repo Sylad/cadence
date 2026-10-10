@@ -30,6 +30,13 @@ export const SPEC_SCHEMA = {
   required: ['commits', 'nonVerifie', 'questions', 'sousSeuil', 'fiche', 'resume'],
 } as const;
 
+/** Sortie de l'étape accept : les tests d'acceptation rouges, commités avec leur acceptation.json. */
+export const ACCEPT_SCHEMA = {
+  type: 'object',
+  properties: { commits: WORK_SCHEMA.properties.commits, nonVerifie: strings, questions: strings, choix: strings, resume: str },
+  required: ['commits', 'nonVerifie', 'questions', 'resume'],
+} as const;
+
 /** Sortie d'une revue (code, UX ou passe unique) : `verdict` est la ligne pour `raf review` / `raf ux`. */
 export const REVIEW_SCHEMA = {
   type: 'object',
@@ -52,7 +59,7 @@ export const PRECHECK_SCHEMA = {
   required: ['dejaPresent', 'preuves', 'resume'],
 } as const;
 
-export const schemaFor = (kind: StepKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'spec' ? SPEC_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
+export const schemaFor = (kind: StepKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'spec' ? SPEC_SCHEMA : kind === 'accept' ? ACCEPT_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
 
 export interface PrecheckReport {
   dejaPresent: 'oui' | 'partiel' | 'non';
@@ -78,6 +85,14 @@ export interface SpecReport {
   choix?: string[];
   sousSeuil: string;
   fiche: string;
+  resume: string;
+}
+
+export interface AcceptReport {
+  commits: { sha: string; sujet: string }[];
+  nonVerifie: string[];
+  questions: string[];
+  choix?: string[];
   resume: string;
 }
 

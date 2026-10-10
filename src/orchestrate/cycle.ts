@@ -19,7 +19,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
-import { checkSpec, costlyHypotheses, findFiche, specText } from './spec.js';
+import { answeredText, checkSpec, costlyHypotheses, ficheReady, findFiche, specText } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 
@@ -274,7 +274,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     vars.spec = specText({ dir: c.config.spec.dir, render: c.config.spec.render, screen: l.screen, problems: l.specProblems, template: ficheTemplate() });
     const mine = lotCommitLines(c);
     if (mine) vars.commits = `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}`;
-    if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
+    if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer) : `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
   if (kind === 'implement' || kind === 'fix') {
     const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
@@ -727,8 +727,9 @@ async function precheck(c: LotCtx): Promise<void> {
 /** Première session d'écriture d'un lot : la spec de son écran quand il déclare `screen:` et qu'aucune fiche n'est écrite, sinon l'implémentation. */
 function firstWrite(c: LotCtx): StepKind {
   const l = c.lot;
-  if (!l.screen || l.spec || findFiche(l.repo, c.config.spec.dir, l.lot)) return 'implement';
-  return 'spec';
+  if (!l.screen || l.spec) return 'implement';
+  const fiche = findFiche(l.repo, c.config.spec.dir, l.lot);
+  return fiche && ficheReady(l.repo, fiche, l.lot) ? 'implement' : 'spec';
 }
 
 /**
@@ -794,10 +795,12 @@ async function specStep(c: LotCtx): Promise<void> {
   const costly = costlyHypotheses(doc);
   if (costly.length) {
     l.questions = costly.map((x) => `${x.id} est posée comme hypothèse mais touche un choix coûteux à défaire (${x.categorie}) : « ${x.siFaux} » — la confirmer, ou la corriger, avant que la fiche serve de référence.`);
+    l.specAsked = [...l.questions];
     l.next = 'spec';
     transition(c, 'question', l.questions[0]);
     return;
   }
+  l.specAsked = undefined;
   l.spec = { fiche, hypotheses: (doc.regles ?? []).filter((r) => r.statut === 'hypothese').length };
   l.specProblems = undefined;
   l.next = 'implement';

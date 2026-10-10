@@ -23,6 +23,8 @@ interface Écrit {
   sansCapture?: string[];
   sansTestid?: string;
   sansSection?: string;
+  /** Nom du dossier d'écran, s'il diffère de ecran.id. */
+  dossier?: string;
 }
 
 /** Ce que fait un agent spec : fiche, maquette, captures, un commit qui cite le lot. */
@@ -30,7 +32,8 @@ function ecrit(cwd: string, o: Écrit = {}): string {
   const doc = parse(readFileSync(EXEMPLE, 'utf8')) as any;
   doc.ecran.lot = 'L1';
   o.fiche?.(doc);
-  const dir = join(cwd, 'docs/specs', doc.ecran.id);
+  const nom = o.dossier ?? doc.ecran.id;
+  const dir = join(cwd, 'docs/specs', nom);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'fiche.yaml'), stringify(doc));
   const ids = (doc.champs as any[]).map((c) => c.id).filter((i) => i !== o.sansTestid);
@@ -45,10 +48,10 @@ function ecrit(cwd: string, o: Écrit = {}): string {
       files.push(f);
     }
   }
-  const rel = files.map((f) => `docs/specs/${doc.ecran.id}/${f}`);
+  const rel = files.map((f) => `docs/specs/${nom}/${f}`);
   git(cwd, 'add', '--', ...rel);
   git(cwd, 'commit', '-q', '--allow-empty', '-m', 'feat(L1): spec prochain-match', '--', ...rel);
-  return `docs/specs/${doc.ecran.id}/fiche.yaml`;
+  return `docs/specs/${nom}/fiche.yaml`;
 }
 
 const spec = (o: Écrit = {}, over: Record<string, unknown> = {}): Handler => (call) => {
@@ -83,6 +86,23 @@ describe('étape spec : où elle s’insère', () => {
     ecrit(h.repo);
     await runLot(h.lot('L1', screen));
     expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+});
+
+describe('étape spec : une fiche déjà là ne vaut que si elle est conforme', () => {
+  it('une fiche non conforme laissée par un lot rendu : la spec est rejouée, pas l’implémentation', async () => {
+    const h = harness({ lots, script: { spec: [spec()], implement: [impl], review: [ok] } });
+    ecrit(h.repo, { fiche: (d) => { d.regles[1].id = 'R9'; } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'implement', 'review']);
+  });
+
+  it('une fiche avec hypothèse coûteuse non tranchée : la spec est rejouée', async () => {
+    const h = harness({ lots, script: { spec: [spec()], implement: [impl], review: [ok] } });
+    ecrit(h.repo, { fiche: (d) => { d.regles[2].si_faux = 'Si faux, une migration du stockage des rappels serait à écrire.'; } });
+    await runLot(h.lot('L1', screen));
+    expect(kinds(h)).toEqual(['spec', 'implement', 'review']);
   });
 });
 
@@ -193,6 +213,25 @@ describe('étape spec : contrôles du programme', () => {
     expect(h.calls[1].brief).toContain('L9');
   });
 
+  it('un ecran.id qui ne correspond pas au dossier est un écart', async () => {
+    const m = spec({ dossier: 'autre-dossier' });
+    const h = harness({ lots, script: { spec: [m, m] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(h.calls[1].brief).toContain('ne correspond pas au dossier docs/specs/autre-dossier');
+    expect(c.lot.status).toBe('handed-back');
+  });
+
+  it('un ecran.maquette différent de <dossier>/maquette.html est un écart', async () => {
+    const m = spec({ fiche: (d) => { d.ecran.maquette = 'docs/ailleurs/maquette.html'; } });
+    const h = harness({ lots, script: { spec: [m, m] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(h.calls[1].brief).toContain('ecran.maquette');
+    expect(h.calls[1].brief).toContain('docs/ailleurs/maquette.html');
+    expect(c.lot.status).toBe('handed-back');
+  });
+
   it('un fichier de la spec resté hors de git rend le lot (dépôt sale)', async () => {
     const sale: Handler = (call) => {
       const fiche = ecrit(call.opts.cwd);
@@ -227,6 +266,21 @@ describe('étape spec : question ciblée', () => {
     c.lot.pendingAnswer = 'les rappels restent côté client';
     await runLot(c);
     expect(h.calls[1].brief).toContain('les rappels restent côté client');
+    expect(kinds(h)).toEqual(['spec', 'spec', 'implement', 'review']);
+  });
+
+  it('la reprise rappelle la règle posée en question et dit de la passer en sourcee avec la réponse du lead', async () => {
+    const m = spec({ fiche: (d) => { d.regles[2].si_faux = 'Si faux, une migration du stockage des rappels serait à écrire.'; } });
+    const confirme = spec({ fiche: (d) => { d.regles[2].statut = 'sourcee'; d.regles[2].source = 'réponse du lead'; delete d.regles[2].si_faux; } });
+    const h = harness({ lots, script: { spec: [m, confirme], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    c.lot.questions = []; // --answer vide les questions
+    c.lot.pendingAnswer = 'confirmé, garder R3';
+    await runLot(c);
+    expect(h.calls[1].brief).toContain('R3');
+    expect(h.calls[1].brief).toContain('migration du stockage');
+    expect(h.calls[1].brief).toMatch(/sourcee/);
     expect(kinds(h)).toEqual(['spec', 'spec', 'implement', 'review']);
   });
 

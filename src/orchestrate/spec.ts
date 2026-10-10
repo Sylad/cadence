@@ -55,6 +55,26 @@ export function costlyHypotheses(doc: unknown): { id: string; categorie: string;
   return out;
 }
 
+/** Une fiche déjà écrite ne dispense de la spec que si elle passe les contrôles du programme et ne porte aucune hypothèse coûteuse. */
+export function ficheReady(repo: string, fiche: string, lot: string): boolean {
+  if (checkSpec(repo, fiche, lot).length) return false;
+  try {
+    return costlyHypotheses(parse(readFileSync(join(repo, fiche), 'utf8'))).length === 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Consigne de reprise après la réponse du lead à des hypothèses coûteuses : la règle confirmée n'est plus une hypothèse. */
+export function answeredText(asked: string[], answer: string): string {
+  return [
+    'The program asked the lead about expensive-to-undo hypotheses of your sheet:',
+    ...asked.map((q) => `- ${q}`),
+    `Answer from the lead: ${answer}`,
+    'Apply it to the sheet: a rule the lead confirms becomes `statut: sourcee` with `source: réponse du lead` (no `si_faux`); a rule the lead corrects is rewritten as they say (`sourcee`, same source). Do not leave it as `hypothese`, or the program asks the same question again.',
+  ].join('\n');
+}
+
 /** Fichiers suivis par git sous un dossier (chemins relatifs au dépôt). */
 function tracked(repo: string, dir: string): Set<string> {
   try {

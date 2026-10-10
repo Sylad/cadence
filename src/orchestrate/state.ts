@@ -83,6 +83,8 @@ export interface LotState {
   spec?: { fiche: string; hypotheses: number } | { sousSeuil: string };
   /** Écarts de la spec relevés par le programme, rendus à la seconde passe `spec` (une seule). */
   specProblems?: string[];
+  /** Questions posées par le programme sur des hypothèses coûteuses de la fiche (--answer vide `questions` : elles restent là pour le brief de reprise). */
+  specAsked?: string[];
   /** Lot léger (estimate ≤ orchestrate.review.threshold, L108) : une revue légère, pas de passe des mineurs. Absent : lot ordinaire. */
   light?: boolean;
   model: Model;

@@ -22,7 +22,7 @@ reports a page left empty or in error.
 And a second plugin, [`cadence-hud`](#cadence-hud): a status band above the Claude
 Code prompt that shows the session's context, quota, cost and the orchestrate waves running.
 
-### Spec step (design, not delivered yet)
+### Spec step (design, first commands delivered)
 
 For a visible lot that adds a page, a component or changes a journey, `orchestrate` will get a step
 before the code: a static HTML mockup in the project's own style (1440 and 390 px; empty, loading and
@@ -30,9 +30,11 @@ error states) and a machine-readable screen sheet (fields, numbered rules `R1…
 or *hypothesis*, actions → API calls). The `ux-reviewer` agent reads the mockup before any code; the
 acceptance tests are written from the sheet, red, by a session other than the implementer's; the
 implementation gets the sheet, the code review checks rule → test → green, the hypotheses go into the
-lot's news entry, and a human is asked only about a choice that is costly to undo. Only the design
-exists today (`docs/superpowers/specs/2026-10-10-etape-spec-design.md`, with an example sheet and the
-plan of the lots that deliver it); nothing in the commands changes yet.
+lot's news entry, and a human is asked only about a choice that is costly to undo. The design is in
+`docs/superpowers/specs/2026-10-10-etape-spec-design.md` (with an example sheet and the plan of the
+lots that deliver it). Delivered so far: the sheet template `templates/fiche.yaml`, `cadence spec check`
+(the sheet's invariants) and `cadence spec qa` (the screen's `docs/qa/expectations.md` section, derived
+from the sheet), see [spec](#spec) below; the `orchestrate` step itself is not delivered yet.
 
 ## What's new
 

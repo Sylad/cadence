@@ -1962,6 +1962,7 @@ lots:
       - { date: 2026-10-10, text: "Revue L166 : la clé masque des règles manque au tableau du format de la fiche (design l.64) et à la liste des invariants (l.74-77) — l'ajouter, cadence spec check doit refuser un masque qui cite un champ absent" }
       - { date: 2026-10-11, text: "Rendu par la vague 2026-10-10-2330 (revue 7 non conforme), 2 majeurs à corriger dans la reprise : (1) README section Stability — ajouter cadence spec check|qa à Guaranteed (avec leurs codes de sortie) et ranger le format de fiche.yaml / templates/fiche.yaml dans Guaranteed ou Not guaranteed (expérimental tant que S3–S6 le retouchent) ; (2) test de src/spec.ts:151/157 — plusieurs règles sourcées vide masquant un même champ et plusieurs règles portant l'action de chargement : énoncés joints par « ; »" }
     started: 2026-10-10
+    review: { date: 2026-10-11, verdict: "conforme — orchestré (vague 2026-10-11-0005, 0 passe(s) de correction + passe des mineurs)", commit: 037b1109ae250c52d7e344d8bf6aaa5a87ed1482 }
   - id: L171
     title: "Étape spec d'orchestrate : spec-writer, rendu 1440/390 (spec etape-spec, S3)"
     status: todo

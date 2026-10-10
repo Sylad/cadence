@@ -323,7 +323,9 @@ describe('skills install', () => {
     // Un périmètre qui ne se déduit pas ne réduit rien : passage complet, dit.
     expect(scope).toContain('If you cannot tell which pages a changed endpoint feeds, walk every page');
     // Lot backend qui ne change aucune route : repli explicite et obligatoire, dit dans le rapport.
-    expect(scope).toContain('If the lot changes no route');
+    expect(scope).toContain('If a backend lot changes no route (a service');
+    // Un lot limité aux écrans garde le périmètre réduit : le repli ne le concerne pas.
+    expect(scope).toContain('A lot that changes only screens keeps the reduced scope');
     expect(scope).toContain('the fallback is mandatory: walk every page and say so in the report');
     // Un lot backend touche aussi les pages qui consomment les services modifiés (grep des appels).
     expect(scope).toContain('the pages that consume the services the lot changed');

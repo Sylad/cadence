@@ -1967,10 +1967,11 @@ lots:
     finished: 2026-10-11
   - id: L171
     title: "Étape spec d'orchestrate : spec-writer, rendu 1440/390 (spec etape-spec, S3)"
-    status: todo
+    status: doing
     estimate: 1
     after: [ L170 ]
     created: 2026-10-10
+    started: 2026-10-11
   - id: L172
     title: "Revue UX de la maquette : ux-reviewer mode maquette (spec etape-spec, S4)"
     status: todo

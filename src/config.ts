@@ -218,6 +218,12 @@ export interface OrchestrateConfig {
   /** Commande de build du projet, lancée par l'orchestrateur après les tests, et dont le résultat est passé au relecteur. */
   build?: string;
   /**
+   * Commande dédiée de l'étape accept (L173, spec etape-spec S5) : ne lance QUE les tests d'acceptation du lot (config du lanceur
+   * `*.acceptation.config.*` qui lit `CADENCE_ACCEPTATION`, chemin de l'acceptation.json du lot, aussi substitué à `{acceptation}`).
+   * Absente : l'étape accept n'a pas lieu (un lot avec fiche passe de spec à implement).
+   */
+  accept?: string;
+  /**
    * Comment voir l'application pour une revue UX : une URL, une commande de lancement, ou les deux. Avec les deux, c'est
    * l'orchestrateur qui lance la commande (depuis la racine du dépôt) et attend l'URL, `timeout` secondes (300 par défaut).
    */
@@ -252,18 +258,18 @@ export interface OrchestrateConfig {
 
 const EFFORTS = ['default', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = (typeof EFFORTS)[number];
-export const EFFORT_STEPS = ['precheck', 'spec', 'implement', 'fix', 'review', 'ux'] as const;
+export const EFFORT_STEPS = ['precheck', 'spec', 'accept', 'implement', 'fix', 'review', 'ux'] as const;
 export type EffortStep = (typeof EFFORT_STEPS)[number];
 
 const MODELS = ['haiku', 'sonnet', 'opus'] as const;
 export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'prodAccess', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'ux', 'precheck', 'prodAccess', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', accept: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -283,7 +289,7 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   };
   if (!isObject(o)) throw new RafError(`${file} : orchestrate doit être un objet`);
   for (const k of Object.keys(o)) if (!ORCH_KEYS.includes(k)) throw bad(`${k} inconnu (attendu : ${ORCH_KEYS.join(', ')})`);
-  for (const k of ['start', 'verdict', 'test', 'build'] as const) {
+  for (const k of ['start', 'verdict', 'test', 'build', 'accept'] as const) {
     if (o[k] == null) continue;
     if (typeof o[k] !== 'string' || !(o[k] as string).trim()) throw bad(`${k} : commande non vide attendue`);
     config[k] = (o[k] as string).trim();
@@ -327,7 +333,7 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     }
   }
   if (o.effort != null) {
-    if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, spec, implement, fix, review, ux }');
+    if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, spec, accept, implement, fix, review, ux }');
     for (const [k, v] of Object.entries(o.effort)) {
       if (!(EFFORT_STEPS as readonly string[]).includes(k)) throw bad(`effort.${k} inconnu (attendu : ${EFFORT_STEPS.join(', ')})`);
       if (!EFFORTS.includes(v as Effort)) throw bad(`effort.${k} : ${EFFORTS.join(', ')} attendu`);

@@ -133,3 +133,23 @@ describe('README (L169)', () => {
     expect(readme).toMatch(/- Fields: [^\n]*\n?[^\n]*`visible`, `screen`, `public`/);
   });
 });
+
+describe('orchestrate.accept (L173, spec etape-spec S5)', () => {
+  const read = (yaml: string) => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'cadence.yaml'), yaml);
+    return readOrchestrateConfig(join(dir, 'cadence.yaml'));
+  };
+  it('défaut : pas de commande dédiée, effort medium', () => {
+    expect(read('orchestrate: {}\n').accept).toBeUndefined();
+    expect(read('orchestrate: {}\n').effort.accept).toBe('medium');
+  });
+  it('lit la commande dédiée et l’effort de l’étape', () => {
+    const c = read('orchestrate:\n  accept: npx vitest run -c vitest.acceptation.config.ts\n  effort: { accept: high }\n');
+    expect(c.accept).toBe('npx vitest run -c vitest.acceptation.config.ts');
+    expect(c.effort.accept).toBe('high');
+  });
+  it('refuse une commande vide', () => {
+    expect(() => read('orchestrate:\n  accept: " "\n')).toThrow(/accept : commande non vide/);
+  });
+});

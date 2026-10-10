@@ -314,7 +314,9 @@ describe('skills install', () => {
     const i = readme.indexOf('- **qa-reviewer** (agent)');
     const entry = readme.slice(i, readme.indexOf('\n- **', i + 10));
     expect(entry).toContain('the pages that consume the services the lot changed');
-    expect(entry).toContain('changes no route');
+    expect(readme).toContain('when the diff changes no route and no screen, or cannot be linked to pages, it walks every page and says so');
+    const changelog = readFileSync(join(__dirname, '..', 'CHANGELOG.md'), 'utf8');
+    expect(changelog).toContain('when the lot changes no route and no screen, or the diff cannot be linked to pages, the fallback is mandatory');
     for (const f of ['lead', 'deliver']) {
       const skill = readFileSync(join(__dirname, '..', 'skills', f, 'SKILL.md'), 'utf8');
       expect(skill).toContain('the pages that consume the services the lot changed');

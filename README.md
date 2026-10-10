@@ -406,7 +406,7 @@ No gate and no command here: the QA review comes **after** a delivery, and
 page shows or what it is served (screen, API, data source, configuration of
 either) — in practice every delivery except docs-, plan- or tests-only ones: a
 backend-only lot can empty a page without touching a screen, and the agent then
-walks the pages that call the changed endpoints. It also walks the pages that consume the services the lot changed; when the diff changes no route, or cannot be linked to pages, it walks every page and says so. The `qa-reviewer` agent
+walks the pages that call the changed endpoints. It also walks the pages that consume the services the lot changed; when the diff changes no route and no screen, or cannot be linked to pages, it walks every page and says so. The `qa-reviewer` agent
 opens each page of the running app in a real browser and judges it from the
 user's side. A page can be empty while everything else is green — no code
 changed, a data source went down upstream, the unit tests replace the network,

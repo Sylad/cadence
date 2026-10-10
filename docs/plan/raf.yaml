@@ -1951,12 +1951,13 @@ lots:
     review: { date: 2026-10-10, verdict: "conforme — orchestré (vague 2026-10-10-2330, 1 passe(s) de correction)", commit: b4ff9fe264d2058ae348e9de31a00c77518cd396 }
   - id: L170
     title: cadence spec check et spec qa, gabarit de fiche (spec etape-spec, S2)
-    status: todo
+    status: doing
     estimate: 1
     after: [ L169 ]
     created: 2026-10-10
     notes:
       - { date: 2026-10-10, text: "Revue L166 : la clé masque des règles manque au tableau du format de la fiche (design l.64) et à la liste des invariants (l.74-77) — l'ajouter, cadence spec check doit refuser un masque qui cite un champ absent" }
+    started: 2026-10-10
   - id: L171
     title: "Étape spec d'orchestrate : spec-writer, rendu 1440/390 (spec etape-spec, S3)"
     status: todo

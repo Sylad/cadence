@@ -946,9 +946,12 @@ implementation brief and a warning; on `non` — or an unreadable report, which 
 lot that already has commits is never pre-checked (resuming it is legitimate). `orchestrate.precheck: false` turns it off.
 
 `orchestrate.precheck: local` (L146) runs the pre-check on the local model of the dev machine instead of Sonnet: the
-orchestrator launches `claude-local` (Claude Code harness on Ollama, `qwen3-coder:30b` by default; `CADENCE_CLAUDE_LOCAL_BIN`
-names another binary) with the same brief, the `precheck-reader` prompt and tools, no quota used and nothing counted in the
-lot's budget (the step shows `local` as its model). Sonnet stays the safety net: a local session with no result (Ollama
+orchestrator launches `claude-local` with the same brief, the `precheck-reader` prompt and tools, no quota used and nothing counted in the
+lot's budget (the step shows `local` as its model). `claude-local` is **not shipped with cadence**: it is a personal wrapper (a script on the `PATH`, `qwen3-coder:30b` by default) around
+`claude` pointed at Ollama. `CADENCE_CLAUDE_LOCAL_BIN` names another binary, which must take the prompt as its **first argument**
+and add itself `-p`, `--bare`, `--strict-mcp-config` and `--model` (cadence passes none of them), then accept `--output-format`,
+`--json-schema`, `--tools`, `--session-id`, `--permission-mode`, `--add-dir` and `--disallowedTools`. A bare `claude` does not fit.
+Without such a binary every local check fails and is replayed on Sonnet: keep `true`. Sonnet stays the safety net: a local session with no result (Ollama
 down, timeout, no structured report) or an unreadable report is replayed on Sonnet with a warning, and a local `oui` — the
 only answer that hands the lot back without an implementation — is confirmed by Sonnet before it counts. A local `partiel`
 or `non` is taken as is. The default stays `true` (Sonnet): switch to `local` only after comparing verdicts and durations

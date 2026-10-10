@@ -1793,9 +1793,10 @@ lots:
     finished: 2026-10-10
   - id: L158
     title: "raf check accepte un plan YAML à clé dupliquée (deux estimate: sous un lot, 10-10) que orchestrate refuse (« Map keys must be unique ») : raf check doit le refuser avec la ligne, test"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-10
+    started: 2026-10-10
   - id: L159
     title: "Release 0.27.1 : L83 (fin de session tue l'arbre, démons partagés épargnés) + L84 (consigne Playwright des agents) + L157 — recette : bumps ×4 (hud compris, rsync ~/.claude/mods/cadence-hud), CHANGELOG daté, What's new, tag v0.27.1 poussé (OIDC npm)"
     status: todo

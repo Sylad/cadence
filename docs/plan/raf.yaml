@@ -1788,6 +1788,7 @@ lots:
     estimate: 0.25
     created: 2026-10-09
     started: 2026-10-10
+    review: { date: 2026-10-10, verdict: "compliant — orchestré (vague 2026-10-10-1232, 0 passe(s) de correction)", commit: fbf88d57732b5c58a2ef76a1faeaebd202a87dd2 }
   - id: L156
     title: "coveredTasks (L82) : lire aussi les commits du lot dans ses dépôts voisins (L62, repoWork les fournit déjà) — feat(L3/t2) commité dans le voisin laisse t2 ouverte et raf done refuse (revue 09-10)"
     status: todo

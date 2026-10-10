@@ -1909,13 +1909,14 @@ lots:
     finished: 2026-10-10
   - id: L166
     title: "Conception d'une étape spec avant l'implémentation dans orchestrate (lots visibles au-dessus d'un seuil : nouvelle page, nouveau composant, parcours modifié) : maquette HTML statique à la charte du projet rendue 1440/390 avec états vide/chargement/erreur + fiche d'écran lisible par machine (champs id/libellé/type/source API/obligatoire, règles de gestion numérotées R1… avec message, actions → appel API, chaque règle « sourcée » ou « hypothèse ») ; l'agent UX relit la maquette avant le code (boucle sur la maquette, pas sur le code), aucune validation humaine systématique (question ciblée seulement si le choix est coûteux à défaire), le brief d'implémentation reçoit la fiche, les tests citent les règles, la code review vérifie la couverture de la fiche, la passe UX après code devient une conformité légère, les hypothèses remontent dans l'entrée Nouveautés ; livrable : spec versionnée docs/ + plan de lots, essai prévu sur un écran d'une app loisir, critère de réussite mesuré contre le lot de mesure"
-    status: todo
+    status: doing
     estimate: 1
     after: [ L165 ]
     created: 2026-10-10
     notes:
       - { date: 2026-10-10, text: "Ajout Sylvain 10-10 : les tests d'acceptation sont écrits AVANT le dev, depuis la fiche, par une session distincte de l'implémenteur (oracle indépendant) — un ou plusieurs cas par règle R, nommés d'après elle, sélecteurs = ids de la fiche (data-testid) ; commités rouges, l'implémentation les rend verts sans les modifier (toute modification d'un test d'acceptation = question ou constat de revue) ; ce qui n'est pas testable automatiquement (rendu, ergonomie) reste à la passe UX de conformité ; docs/qa/expectations.md dérivé de la fiche ; la code review vérifie règle → test → vert au lieu de reconstruire les cas" }
       - { date: 2026-10-10, text: "Le plan de lots produit par la conception inclut, en dernier, la mise à jour du schéma du workflow lead (docs/lead.md, L167) avec les étapes spec, revue UX de la maquette et tests d'acceptation (demande Sylvain 10-10)" }
+    started: 2026-10-10
   - id: L167
     title: "Doc docs/lead.md : schéma du workflow du skill lead en trois couloirs (humain, session lead, programme orchestrate et agents) en SVG compatible thème clair/sombre de GitHub, version générique (aucun nom de personne, de projet ni de chemin local) — tour, vague et étapes par lot, relais du journal et questions, re-vérification, raf ux/done, livraison et qa-reviewer, seuil de contexte 60 % et enchaînement, clôture ; règles permanentes et codes de sortie ; lien depuis le README"
     status: done

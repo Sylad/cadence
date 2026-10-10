@@ -169,8 +169,7 @@ After a green delivery that changes what a page shows or what it is served (scre
 source, configuration of either) — in practice every delivery except docs-, plan- or tests-only ones
 — have the `qa-reviewer` agent check the delivered app, as a fresh subagent: give it the absolute
 path of the project, the base URL of the delivered app and the lot id. The lot need not be
-`visible`: a backend-only lot can empty a page without changing a screen. When the lot touched only
-the backend, the agent starts with the pages that call the changed endpoints. It walks the pages in
+`visible`: a backend-only lot can empty a page without changing a screen. With a lot id, the agent walks only the pages the lot touched (the pages that call the changed endpoints, the pages of the changed screens, the home page) and names the others under « Not walked »: they are not checked. It walks the pages in
 a real browser against the project's expectations (`docs/qa/expectations.md`: per page, what the
 user must find there) and returns measured findings; it reads only, and never logs in. Bring its
 blocking findings back to the human — a page whose main content is missing, or that shows an error,

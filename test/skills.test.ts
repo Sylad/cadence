@@ -380,7 +380,7 @@ describe('skills install', () => {
     expect(delivery).toContain('give it the absolute path of the project, the base URL of the delivered app and the lot id.');
     // Les deux pannes à l'origine de l'agent venaient de lots sans écran : le lot n'a pas à être « visible ».
     expect(delivery).toContain('The lot need not be `visible`: a backend-only lot can empty a page without changing a screen.');
-    expect(delivery).toContain('When the lot touched only the backend, the agent starts with the pages that call the changed endpoints.');
+    expect(delivery).toContain('With a lot id, the agent walks only the pages the lot touched (the pages that call the changed endpoints, the pages of the changed screens, the home page) and names the others under « Not walked »: they are not checked.');
     expect(delivery).not.toContain('lot marked `visible`');
     expect(delivery).toContain('Bring its blocking findings back to the human');
     expect(delivery).toContain('it reads only, and never logs in');
@@ -392,7 +392,7 @@ describe('skills install', () => {
     const deliver = skill('deliver');
     const step = deliver.slice(deliver.indexOf(' 6. '), deliver.indexOf('## Rules'));
     expect(step).toContain(`After a green delivery that ${QA_TRIGGER} — have the \`qa-reviewer\` agent walk the delivered app in a real browser, whether the lot is \`visible\` or not:`);
-    expect(step).toContain('When the lot touched only the backend, the agent starts with the pages that call the changed endpoints.');
+    expect(step).toContain('With a lot id, the agent walks only the pages the lot touched (the pages that call the changed endpoints, the pages of the changed screens, the home page) and names the others under « Not walked »: they are not checked.');
     expect(step).not.toContain('delivery of a `visible` lot');
     // Ses entrées, la remontée des constats bloquants, et la livraison qui reste faite.
     expect(step).toContain('give it the repository path, the base URL and the lot id.');

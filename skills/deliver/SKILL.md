@@ -57,8 +57,7 @@ Deliver one project at a time: the one the human names, or ask.
 6. After a green delivery that changes what a page shows or what it is served (screen, API, data
    source, configuration of either) — in practice every delivery except docs-, plan- or tests-only
    ones — have the `qa-reviewer` agent walk the delivered app in a real browser, whether the lot
-   is `visible` or not: give it the repository path, the base URL and the lot id. When the lot
-   touched only the backend, the agent starts with the pages that call the changed endpoints. It
+   is `visible` or not: give it the repository path, the base URL and the lot id. With a lot id, the agent walks only the pages the lot touched (the pages that call the changed endpoints, the pages of the changed screens, the home page) and names the others under « Not walked »: they are not checked. It
    checks each page against `docs/qa/expectations.md` — what the user must find there — and
    reports a page left empty, an error shown, an API call that failed or came back empty: what
    the checks of `cadence.yaml` do not see. Bring its blocking findings to the human. It is not a

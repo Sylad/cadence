@@ -1874,6 +1874,7 @@ lots:
     estimate: 0.5
     created: 2026-10-10
     started: 2026-10-10
+    review: { date: 2026-10-10, verdict: "conforme (1 mineur : chemin abrégé dans le CHANGELOG) — orchestré (vague 2026-10-10-1620, 1 passe(s) de correction + passe des mineurs)", commit: 9c7856ff7b665fabea93a2f2fd54e58474b788d8 }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

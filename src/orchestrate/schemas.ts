@@ -20,6 +20,16 @@ export const WORK_SCHEMA = {
   required: ['commits', 'tests', 'build', 'nonVerifie', 'questions', 'resume'],
 } as const;
 
+/**
+ * Sortie de l'étape spec : `sousSeuil` vaut une raison (une ligne) quand le lot ne change aucun écran, « » sinon ;
+ * `fiche` le chemin de la fiche écrite (relatif au dépôt), « » sous le seuil.
+ */
+export const SPEC_SCHEMA = {
+  type: 'object',
+  properties: { commits: WORK_SCHEMA.properties.commits, nonVerifie: strings, questions: strings, choix: strings, sousSeuil: str, fiche: str, resume: str },
+  required: ['commits', 'nonVerifie', 'questions', 'sousSeuil', 'fiche', 'resume'],
+} as const;
+
 /** Sortie d'une revue (code, UX ou passe unique) : `verdict` est la ligne pour `raf review` / `raf ux`. */
 export const REVIEW_SCHEMA = {
   type: 'object',
@@ -42,7 +52,7 @@ export const PRECHECK_SCHEMA = {
   required: ['dejaPresent', 'preuves', 'resume'],
 } as const;
 
-export const schemaFor = (kind: StepKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
+export const schemaFor = (kind: StepKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'spec' ? SPEC_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
 
 export interface PrecheckReport {
   dejaPresent: 'oui' | 'partiel' | 'non';
@@ -58,6 +68,16 @@ export interface WorkReport {
   questions: string[];
   /** Choix d'interprétation faits par l'auteur ; absent d'un ancien rapport. */
   choix?: string[];
+  resume: string;
+}
+
+export interface SpecReport {
+  commits: { sha: string; sujet: string }[];
+  nonVerifie: string[];
+  questions: string[];
+  choix?: string[];
+  sousSeuil: string;
+  fiche: string;
   resume: string;
 }
 

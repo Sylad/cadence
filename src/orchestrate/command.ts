@@ -12,6 +12,7 @@ import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
+import { specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
 import { Budget, DROPPED, MAX_PASSES, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
@@ -286,7 +287,7 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       continue;
     }
     const small = lot.estimate <= 0.5 || lot.quickwin;
-    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, model: t.model, readOnlyPlan: plan.readonly });
+    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, ...(lot.screen ? { screen: lot.screen } : {}), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.light = lot.estimate <= env.config.review.threshold;
     state.budget = lotBudget(lot.estimate);
@@ -336,7 +337,8 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const skipped = sk?.length ? ` ; ${sk.join(', ')} ${sk.length > 1 ? 'écartées' : 'écartée'} : pas de node exécutable` : '';
       io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted}${skipped})`);
     }
-    const steps: { kind: 'precheck' | 'implement' | 'ux' | 'review' | 'review-small'; model: StepModel }[] = [{ kind: 'implement', model: l.model }];
+    const steps: { kind: 'precheck' | 'spec' | 'implement' | 'ux' | 'review' | 'review-small'; model: StepModel }[] = [{ kind: 'implement', model: l.model }];
+    if (l.screen) steps.unshift({ kind: 'spec', model: 'sonnet' });
     if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos)) steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
     const { light, full } = env.config.review;
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
@@ -350,6 +352,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, lotSlug(l.project, l.lot), 'playwright');
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
     const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '' };
+    if (l.screen) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen });
     for (const s of steps) {
       const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);
       const brief = renderBrief(s.kind, vars, deps.templatesDir);
@@ -357,7 +360,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small).playwright;
       const local = s.model === 'local';
       const args = (local ? buildLocalArgs : buildArgs)(
-        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model === 'local' ? 'sonnet' : s.model, local, effort: env.config.effort[s.kind === 'review-small' ? 'review' : s.kind], schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && s.kind === 'implement' ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright },
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model === 'local' ? 'sonnet' : s.model, local, effort: env.config.effort[s.kind === 'review-small' ? 'review' : s.kind], schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'spec' ? 'spec-writer' : s.kind === 'ux' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && (s.kind === 'implement' || s.kind === 'spec') ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : ${local ? 'claude-local' : 'claude'} ${args.join(' ')}`);

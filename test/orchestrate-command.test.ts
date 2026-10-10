@@ -42,7 +42,7 @@ async function until(cond: () => boolean, what: string, ms = 20_000): Promise<vo
 }
 
 /** Plusieurs projets sous un même dossier parent, chacun son dépôt git et son plan. */
-function parentWith(projects: Record<string, { title: string; estimate?: number; visible?: boolean; status?: 'doing'; after?: string[] }[]>) {
+function parentWith(projects: Record<string, { title: string; estimate?: number; visible?: boolean; screen?: 'page' | 'component' | 'journey'; status?: 'doing'; after?: string[] }[]>) {
   const parent = tempDir();
   const dirs: Record<string, string> = {};
   for (const [name, lots] of Object.entries(projects)) {
@@ -54,7 +54,7 @@ function parentWith(projects: Record<string, { title: string; estimate?: number;
     git(dir, 'config', 'commit.gpgsign', 'false');
     const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
     for (const l of lots) {
-      const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible, after: l.after });
+      const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible || !!l.screen, screen: l.screen, after: l.after });
       if (l.status === 'doing') plan.setStatus(id, 'doing', '2026-10-01');
     }
     plan.save();
@@ -67,7 +67,7 @@ function parentWith(projects: Record<string, { title: string; estimate?: number;
   return { parent, dirs };
 }
 
-type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small' | 'precheck', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
+type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small' | 'precheck' | 'spec', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
 
 function fakeDeps(over: Over = {}, tweak: Partial<OrchestrateDeps> = {}): { deps: OrchestrateDeps; calls: { cwd: string; kind: string; model: string }[] } {
   const calls: { cwd: string; kind: string; model: string }[] = [];
@@ -182,6 +182,25 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it("--dry-run (L171) : un lot avec screen: annonce l'étape spec (Sonnet, agent spec-writer, Playwright) avant implement, son brief est rendu sans {{…}}", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un écran', screen: 'page' }], b: [{ title: 'sans écran', visible: true }] });
+    const r = await run(parent, ['a:L1', 'b:L1', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      expect(out).toMatch(/étapes : spec \(sonnet\) → implement/);
+      expect(out.split('étapes :')[2]).not.toContain('spec (');
+      const spec = out.slice(out.indexOf('  spec :'), out.indexOf('  implement :'));
+      expect(spec).toContain('--agent spec-writer');
+      expect(spec).toMatch(/mcp : playwright/);
+      const line = out.split('\n').find((l) => l.includes('brief :') && l.includes('a--L1--spec.md'))!;
+      const brief = readFileSync(line.replace(/^\s*brief : /, '').trim(), 'utf8');
+      expect(brief).toContain('maquette-<état>-<largeur>.png');
+      expect(brief).not.toMatch(/\{\{/);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it("--dry-run : le brief implement d'un lot visible porte cadence news new <lot>, celui d'un lot sans écran non ; aucun {{…}} ne reste (L48/t3)", async () => {
     const { parent } = parentWith({ a: [{ title: 'un', visible: true }], b: [{ title: 'sans écran' }] });
     const r = await run(parent, ['a:L1', 'b:L1', '--dry-run']);
@@ -253,7 +272,7 @@ describe('refus avant d\'agir (code 2)', () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
     const old = fakeDeps({}, { claudeInfo: () => ({ version: '2.1.283', jsonSchema: true }) }).deps;
     expect((await run(parent, ['a:L1', '--dry-run'], old)).err.join()).toContain("claude 2.1.283 n'a pas --effort");
-    const all = ['precheck', 'implement', 'fix', 'review', 'ux'].map((k) => `${k}: default`).join(', ');
+    const all = ['precheck', 'spec', 'implement', 'fix', 'review', 'ux'].map((k) => `${k}: default`).join(', ');
     writeFileSync(join(dirs.a, 'cadence.yaml'), `orchestrate:\n  effort: { ${all} }\n`);
     git(dirs.a, 'add', 'cadence.yaml');
     git(dirs.a, 'commit', '-q', '-m', 'cfg');

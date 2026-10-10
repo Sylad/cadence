@@ -28,6 +28,8 @@ export interface BriefVars {
   repos?: string;
   /** Consigne docs.sync (L143) de la revue : les écarts calculés par le programme, à passer en constat majeur ; vide sans règle déclarée. */
   docs?: string;
+  /** Consigne de l'étape spec (L171) : dossier, largeurs, commande de rendu, écarts de la passe précédente ; vide ailleurs. */
+  spec?: string;
 }
 
 /** Consigne sur les dépôts voisins d'un lot (L62) : les sessions d'écriture y travaillent, les relectures y lisent les commits qui citent le lot. */
@@ -72,6 +74,7 @@ export type BriefName = StepKind | 'fix-minors' | 'review-recheck';
 
 const FILES: Record<BriefName, string> = {
   precheck: 'precheck.md',
+  spec: 'spec.md',
   implement: 'implement.md',
   fix: 'fix.md',
   'fix-minors': 'fix-minors.md',
@@ -104,7 +107,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', docs: vars.docs ?? '' } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', docs: vars.docs ?? '', spec: vars.spec ?? '' } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

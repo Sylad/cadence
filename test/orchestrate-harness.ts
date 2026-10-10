@@ -50,12 +50,15 @@ export const reviewReport = (over: Record<string, unknown> = {}) => ({
 export interface Call {
   args: string[];
   opts: LaunchOpts;
-  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck';
+  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec';
   model: string;
   effort?: string;
   brief: string;
   local: boolean;
 }
+
+/** Rapport d'une étape spec : `sousSeuil` vide = un écran est spécifié ; `fiche` = chemin de la fiche écrite. */
+export const specReport = (over: Record<string, unknown> = {}) => ({ commits: [], nonVerifie: [], questions: [], choix: [], sousSeuil: '', fiche: '', resume: 'spec écrite', ...over });
 
 export const precheckReport = (over: Record<string, unknown> = {}) => ({ dejaPresent: 'non', preuves: [], resume: 'rien de présent', ...over });
 
@@ -67,6 +70,7 @@ export function kindOf(args: string[]): Call['kind'] {
   if (brief.includes('Pre-check for lot')) return 'precheck';
   const agent = args.includes('--agent') ? args[args.indexOf('--agent') + 1] : null;
   if (agent === 'ux-reviewer') return 'ux';
+  if (agent === 'spec-writer') return 'spec';
   if (agent === 'code-reviewer') return brief.includes('single pass') || brief.includes('short re-review') ? 'review-small' : 'review';
   return brief.includes('found the defects below') || brief.includes('found only minor findings') ? 'fix' : 'implement';
 }
@@ -95,12 +99,12 @@ export interface Harness {
  * Dépôt jetable avec un plan, lots donnés ; le lanceur est un scénario : `script[kind]` est la file des
  * réponses de chaque type d'étape. Rien ne lance le vrai claude.
  */
-export function harness(opts: { lots?: { title: string; visible?: boolean; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number; templatesDir?: string } = {}): Harness {
+export function harness(opts: { lots?: { title: string; visible?: boolean; screen?: 'page' | 'component' | 'journey'; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number; templatesDir?: string } = {}): Harness {
   const repo = gitRepo();
   const planFile = join(repo, 'docs/plan/raf.yaml');
   const plan = Plan.create(planFile, 'demo', 'L', '2026-09-01');
   for (const l of opts.lots ?? [{ title: 'Un lot' }]) {
-    const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible, quickwin: l.quickwin });
+    const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible || !!l.screen, screen: l.screen, quickwin: l.quickwin });
     if (l.status === 'doing') plan.setStatus(id, 'doing', '2026-10-01');
   }
   plan.save();
@@ -118,7 +122,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; estim
     if (!next) throw new Error(`pas de réponse scénarisée pour ${kind}`);
     return next(call);
   };
-  const agents: Record<string, AgentDef> = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'StructuredOutput'] }, 'ux-reviewer': { description: 'd', prompt: 'p' }, 'precheck-reader': { description: 'd', prompt: 'p', tools: ['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput'] } };
+  const agents: Record<string, AgentDef> = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'StructuredOutput'] }, 'ux-reviewer': { description: 'd', prompt: 'p' }, 'precheck-reader': { description: 'd', prompt: 'p', tools: ['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput'] }, 'spec-writer': { description: 'd', prompt: 'p', tools: ['Read', 'Write', 'Edit', 'Bash', 'StructuredOutput'] } };
   const wave: WaveCtx = {
     id: 'w1',
     store,

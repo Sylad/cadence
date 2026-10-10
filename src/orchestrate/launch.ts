@@ -9,7 +9,7 @@ import { sandboxEnv } from './sandbox.js';
 import { killMarked, SESSION_MARK_VAR, TreeTracker } from '../proc.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
-export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck';
+export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec';
 export type Model = 'sonnet' | 'opus' | 'haiku';
 /** Modèle d'une étape : celui de Claude, ou `local` (claude-local → Ollama, L146). */
 export type StepModel = Model | 'local';
@@ -48,12 +48,12 @@ export interface StepSpec {
 export type McpServers = Record<string, { command: string; args: string[] }>;
 
 /**
- * Serveurs MCP d'une étape : Playwright pour `ux` et, sur un lot `visible`, pour `implement` et `fix` (fix-minors compris) ;
+ * Serveurs MCP d'une étape : Playwright pour `ux` et, sur un lot `visible`, pour `spec` (rendu 1440/390 de la maquette, L171), `implement` et `fix` (fix-minors compris) ;
  * et `review-small` d'un petit lot visible (sa seule revue d'ergonomie) ; rien pour `review`, ni pour un lot sans écran.
  * Sorties dans `outputDir`, hors du dépôt.
  */
 export function mcpServersFor(kind: StepKind, visible: boolean, outputDir: string, small = false): McpServers {
-  if (!(kind === 'ux' || (visible && (kind === 'implement' || kind === 'fix' || (kind === 'review-small' && small))))) return {};
+  if (!(kind === 'ux' || (visible && (kind === 'spec' || kind === 'implement' || kind === 'fix' || (kind === 'review-small' && small))))) return {};
   return { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', outputDir] } };
 }
 

@@ -1,0 +1,259 @@
+import { describe, expect, it } from 'vitest';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parse, stringify } from 'yaml';
+import { runLot } from '../src/orchestrate/cycle.js';
+import { mcpServersFor, readAgents } from '../src/orchestrate/launch.js';
+import { costlyHypotheses } from '../src/orchestrate/spec.js';
+import { AGENTS_DIR } from '../src/skills.js';
+import { claudeOut, commitFile, git, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
+
+// L171 (spec etape-spec, S3) : l'étape spec d'orchestrate, avant l'implémentation d'un lot qui déclare screen:.
+const EXEMPLE = join(__dirname, '..', 'docs', 'superpowers', 'specs', '2026-10-10-etape-spec-fiche-exemple.yaml');
+const kinds = (h: ReturnType<typeof harness>) => h.calls.map((c) => c.kind);
+const impl: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }));
+const ok: Handler = () => claudeOut(reviewReport());
+const screen = { visible: true, screen: 'page' as const };
+const lots = [{ title: 'Un écran', screen: 'page' as const }];
+
+interface Écrit {
+  /** Modifie la fiche avant qu'elle soit écrite. */
+  fiche?: (doc: any) => void;
+  /** Largeurs/états dont la capture manque. */
+  sansCapture?: string[];
+  sansTestid?: string;
+  sansSection?: string;
+}
+
+/** Ce que fait un agent spec : fiche, maquette, captures, un commit qui cite le lot. */
+function ecrit(cwd: string, o: Écrit = {}): string {
+  const doc = parse(readFileSync(EXEMPLE, 'utf8')) as any;
+  doc.ecran.lot = 'L1';
+  o.fiche?.(doc);
+  const dir = join(cwd, 'docs/specs', doc.ecran.id);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'fiche.yaml'), stringify(doc));
+  const ids = (doc.champs as any[]).map((c) => c.id).filter((i) => i !== o.sansTestid);
+  const html = [...ids.map((i) => `<p data-testid="${i}">${i}</p>`), ...(doc.etats as string[]).filter((e) => e !== o.sansSection).map((e) => `<section id="etat-${e}"></section>`)].join('\n');
+  writeFileSync(join(dir, 'maquette.html'), `<!doctype html>\n${html}\n`);
+  const files = ['fiche.yaml', 'maquette.html'];
+  for (const e of doc.etats as string[]) {
+    for (const w of [1440, 390]) {
+      const f = `maquette-${e}-${w}.png`;
+      if (o.sansCapture?.includes(f)) continue;
+      writeFileSync(join(dir, f), 'png');
+      files.push(f);
+    }
+  }
+  const rel = files.map((f) => `docs/specs/${doc.ecran.id}/${f}`);
+  git(cwd, 'add', '--', ...rel);
+  git(cwd, 'commit', '-q', '--allow-empty', '-m', 'feat(L1): spec prochain-match', '--', ...rel);
+  return `docs/specs/${doc.ecran.id}/fiche.yaml`;
+}
+
+const spec = (o: Écrit = {}, over: Record<string, unknown> = {}): Handler => (call) => {
+  const fiche = ecrit(call.opts.cwd, o);
+  return claudeOut(specReport({ fiche, ...over }));
+};
+
+describe('étape spec : où elle s’insère', () => {
+  it('un lot avec screen: joue spec avant implement, puis la revue', async () => {
+    const h = harness({ lots, script: { spec: [spec()], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.spec).toMatchObject({ fiche: 'docs/specs/prochain-match/fiche.yaml', hypotheses: 2 });
+  });
+
+  it('un lot sans screen: garde le chemin actuel, sans spec', async () => {
+    const h = harness({ lots: [{ title: 'Un écran', visible: true }], script: { implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', { visible: true }));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('le contrôle préalable passe avant la spec', async () => {
+    const h = harness({ lots, script: { precheck: [() => claudeOut({ dejaPresent: 'non', preuves: [], resume: 'rien' })], spec: [spec()], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', screen, { precheck: true }));
+    expect(kinds(h)).toEqual(['precheck', 'spec', 'implement', 'review']);
+  });
+
+  it('une fiche déjà commitée pour le lot (reprise) évite de rejouer la spec', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecrit(h.repo);
+    await runLot(h.lot('L1', screen));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+});
+
+describe('étape spec : la session', () => {
+  it('Sonnet, agent spec-writer, Playwright chargé, captures dans les dossiers de la session, brief complet', async () => {
+    const h = harness({ lots, script: { spec: [spec()], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen, { spec: { dir: 'docs/specs', render: 'npm run maquette:rendu' } });
+    await runLot(c);
+    const call = h.calls[0];
+    expect(call.model).toBe('sonnet');
+    expect(call.args[call.args.indexOf('--agent') + 1]).toBe('spec-writer');
+    expect(call.args).toContain('--mcp-config');
+    expect(call.args.filter((a) => a === '--add-dir').length).toBeGreaterThan(0);
+    for (const attendu of ['L1', '1440', '390', 'docs/specs/<écran>/', 'maquette.html', 'fiche.yaml', 'data-testid', 'etat-vide', 'cadence spec check', 'page', 'npm run maquette:rendu', 'templates/fiche.yaml', 'hypothese', 'sousSeuil']) {
+      expect(call.brief, attendu).toContain(attendu);
+    }
+    expect(call.brief).toMatch(/maquette-<état>-<largeur>\.png/);
+  });
+
+  it('mcpServersFor charge Playwright pour spec sur un lot visible, pas sans écran', () => {
+    expect(Object.keys(mcpServersFor('spec', true, '/run/p--L1/playwright'))).toEqual(['playwright']);
+    expect(mcpServersFor('spec', false, '/run/p--L1/playwright')).toEqual({});
+  });
+
+  it('l’agent spec-writer du paquet existe, écrit, et ne lance ni sous-agent ni push', () => {
+    const a = readAgents(AGENTS_DIR)['spec-writer'];
+    expect(a).toBeDefined();
+    expect(a.tools).toEqual(expect.arrayContaining(['Read', 'Write', 'Edit', 'Bash', 'StructuredOutput']));
+    expect(a.prompt).toMatch(/1440/);
+    expect(a.prompt).toMatch(/hypothese/);
+  });
+
+  it('l’effort de spec suit orchestrate.effort.spec', async () => {
+    const h = harness({ lots, script: { spec: [spec()], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', screen, { effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high', spec: 'high' } }));
+    expect(h.calls[0].effort).toBe('high');
+  });
+});
+
+describe('étape spec : sortie sous le seuil', () => {
+  it('une raison dans sousSeuil : pas de maquette exigée, le lot reprend le chemin actuel, la raison est notée', async () => {
+    const h = harness({ lots, script: { spec: [() => claudeOut(specReport({ sousSeuil: 'le lot ne change aucun écran : un export CSV côté serveur' }))], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'implement', 'review']);
+    expect(c.lot.spec).toEqual({ sousSeuil: 'le lot ne change aucun écran : un export CSV côté serveur' });
+    expect(c.lot.warnings.join('\n')).toContain('sous le seuil');
+    expect(c.lot.status).toBe('ready');
+  });
+});
+
+describe('étape spec : contrôles du programme', () => {
+  it('une fiche invalide : une seconde passe reçoit les écarts, puis le lot est rendu', async () => {
+    const mauvaise = spec({ fiche: (d) => { d.regles[1].id = 'R9'; } });
+    const h = harness({ lots, script: { spec: [mauvaise, mauvaise] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'spec']);
+    expect(h.calls[1].brief).toMatch(/R9|R2/);
+    expect(h.calls[1].brief).toContain('did not pass');
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/spec/);
+  });
+
+  it('la seconde passe peut corriger : le lot continue', async () => {
+    const h = harness({ lots, script: { spec: [spec({ fiche: (d) => { d.regles[1].id = 'R9'; } }), spec()], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'spec', 'implement', 'review']);
+  });
+
+  it('une capture manquante (état × largeur) est un écart', async () => {
+    const m = spec({ sansCapture: ['maquette-erreur-390.png'] });
+    const h = harness({ lots, script: { spec: [m, m] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(h.calls[1].brief).toContain('maquette-erreur-390.png');
+    expect(c.lot.status).toBe('handed-back');
+  });
+
+  it('un champ sans data-testid dans la maquette est un écart', async () => {
+    const m = spec({ sansTestid: 'score' });
+    const h = harness({ lots, script: { spec: [m, m] } });
+    await runLot(h.lot('L1', screen));
+    expect(h.calls[1].brief).toContain('data-testid="score"');
+  });
+
+  it('un état sans section #etat-… dans la maquette est un écart', async () => {
+    const m = spec({ sansSection: 'erreur' });
+    const h = harness({ lots, script: { spec: [m, m] } });
+    await runLot(h.lot('L1', screen));
+    expect(h.calls[1].brief).toContain('etat-erreur');
+  });
+
+  it('aucune fiche écrite est un écart', async () => {
+    const rien: Handler = () => claudeOut(specReport());
+    const h = harness({ lots, script: { spec: [rien, rien] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(h.calls[1].brief).toContain('fiche.yaml');
+  });
+
+  it('la fiche d’un autre lot (ecran.lot différent) est un écart', async () => {
+    const m = spec({ fiche: (d) => { d.ecran.lot = 'L9'; } });
+    const h = harness({ lots, script: { spec: [m, m] } });
+    await runLot(h.lot('L1', screen));
+    expect(h.calls[1].brief).toContain('L9');
+  });
+
+  it('un fichier de la spec resté hors de git rend le lot (dépôt sale)', async () => {
+    const sale: Handler = (call) => {
+      const fiche = ecrit(call.opts.cwd);
+      writeFileSync(join(call.opts.cwd, 'brouillon.txt'), 'x');
+      return claudeOut(specReport({ fiche }));
+    };
+    const h = harness({ lots, script: { spec: [sale] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('brouillon.txt');
+  });
+});
+
+describe('étape spec : question ciblée', () => {
+  it('une hypothèse dont si_faux touche un stockage de données devient une question, pas une hypothèse', async () => {
+    const m = spec({ fiche: (d) => { d.regles[2].si_faux = 'Si faux, une migration du stockage des rappels serait à écrire.'; } });
+    const h = harness({ lots, script: { spec: [m] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    expect(c.lot.next).toBe('spec');
+    expect(c.lot.questions[0]).toContain('R3');
+    expect(kinds(h)).toEqual(['spec']);
+  });
+
+  it('la réponse du lead est donnée à la session spec reprise', async () => {
+    const m = spec({ fiche: (d) => { d.regles[2].si_faux = 'Si faux, une migration du stockage des rappels serait à écrire.'; } });
+    const h = harness({ lots, script: { spec: [m, spec()], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    c.lot.pendingAnswer = 'les rappels restent côté client';
+    await runLot(c);
+    expect(h.calls[1].brief).toContain('les rappels restent côté client');
+    expect(kinds(h)).toEqual(['spec', 'spec', 'implement', 'review']);
+  });
+
+  it('une question du rapport arrête le lot en question, l’étape suivante reste spec', async () => {
+    const h = harness({ lots, script: { spec: [() => claudeOut(specReport({ questions: ['Faut-il garder l’URL /match déjà publiée ?'] }))] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    expect(c.lot.next).toBe('spec');
+    expect(kinds(h)).toEqual(['spec']);
+  });
+
+  it('une hypothèse banale (libellé, ordre) reste une hypothèse écrite', () => {
+    const doc = parse(readFileSync(EXEMPLE, 'utf8')) as any;
+    expect(costlyHypotheses(doc)).toEqual([]);
+  });
+
+  it.each([
+    ['Si faux, le modèle de données change.', true],
+    ['Si le contrat d’API public doit changer.', true],
+    ['La route déjà publiée /match serait renommée.', true],
+    ['Une suppression irréversible des rappels.', true],
+    ['Un paiement serait déclenché.', true],
+    ['Cette règle contredit R4 du lot L12.', true],
+    ['Si le club veut un autre libellé, seul ce bloc change.', false],
+  ])('costlyHypotheses : %s', (siFaux, coûteux) => {
+    const doc = { regles: [{ id: 'R1', statut: 'hypothese', si_faux: siFaux }, { id: 'R2', statut: 'sourcee', si_faux: 'une migration' }] };
+    expect(costlyHypotheses(doc).map((x) => x.id)).toEqual(coûteux ? ['R1'] : []);
+  });
+});

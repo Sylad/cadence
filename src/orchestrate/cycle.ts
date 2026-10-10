@@ -1,8 +1,9 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { parse } from 'yaml';
 import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, relative } from 'node:path';
-import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
 import { docSyncBrief, docSyncGaps, filesOf } from '../docsync.js';
@@ -13,11 +14,12 @@ import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
-import { capturesText, newsText, objective, renderBrief, reposText, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { capturesText, newsText, objective, renderBrief, reposText, TEMPLATES_DIR, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
-import { checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type PrecheckReport, type ReviewReport, type WorkReport } from './schemas.js';
+import { checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
+import { checkSpec, costlyHypotheses, findFiche, specText } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 
@@ -249,15 +251,30 @@ function briefName(l: LotState, kind: StepKind): BriefName {
   return kind;
 }
 
+/** Gabarit de fiche livré avec le paquet, joint au brief de la spec (la session ne lit pas le dossier du paquet). */
+function ficheTemplate(): string | undefined {
+  try {
+    return readFileSync(join(TEMPLATES_DIR, '..', 'fiche.yaml'), 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
 function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
-  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []) };
+  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []) };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = newsText(l.lot, pwDir);
     vars.captures = capturesText(pwDir);
+  }
+  if (kind === 'spec') {
+    vars.spec = specText({ dir: c.config.spec.dir, render: c.config.spec.render, screen: l.screen, problems: l.specProblems, template: ficheTemplate() });
+    const mine = lotCommitLines(c);
+    if (mine) vars.commits = `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}`;
+    if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
   if (kind === 'implement' || kind === 'fix') {
     const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
@@ -343,11 +360,11 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   if (dropped(c)) return stop(c, 'handed-back', DROPPED);
   const halt = halted(w, l);
   if (halt) return suspend(c, halt);
-  const write = kind === 'implement' || kind === 'fix';
+  const write = kind === 'implement' || kind === 'fix' || kind === 'spec';
   // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est jouée dès que le code est à relire (sauf tests rouges après une écriture, cf. REVIEW_RESERVE), la passe fix réserve son coût.
   if (write && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
-  const model: StepModel = write ? l.model : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
+  const model: StepModel = kind === 'spec' ? 'sonnet' : write ? l.model : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
   const before = await snapshot(l.repo);
   const neighbours = l.repos ?? [];
@@ -356,7 +373,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   const sessionId = randomUUID();
   const step: StepState = { n, kind, model, ...(effort !== 'default' ? { effort } : {}), status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
   l.steps.push(step);
-  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing' } as const;
+  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing', spec: 'implementing' } as const;
   transition(c, label[kind]);
   w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} (${model})`);
 
@@ -381,7 +398,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       effort,
       local,
       schema: schemaFor(kind),
-      agent: kind === 'ux' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
+      agent: kind === 'spec' ? 'spec-writer' : kind === 'ux' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
       cwd: l.repo,
       wave: w.id,
       permissionMode: c.config.permissionMode,
@@ -679,7 +696,7 @@ async function precheck(c: LotCtx): Promise<void> {
       rep = checkShape<PrecheckReport>(done.report, PRECHECK_SCHEMA);
     } catch (e) {
       l.warnings.push(`contrôle préalable illisible, implémentation lancée : ${(e as Error).message}`);
-      l.next = 'implement';
+      l.next = firstWrite(c);
       save(c);
       return;
     }
@@ -703,6 +720,86 @@ async function precheck(c: LotCtx): Promise<void> {
     l.precheck = `A pre-check found part of the deliverable already in the repository (do not redo it): ${rep.resume.trim()}${proofs}`;
     l.warnings.push(`contrôle préalable : livrable en partie présent — ${rep.resume.trim()}${proofs}`);
   }
+  l.next = firstWrite(c);
+  save(c);
+}
+
+/** Première session d'écriture d'un lot : la spec de son écran quand il déclare `screen:` et qu'aucune fiche n'est écrite, sinon l'implémentation. */
+function firstWrite(c: LotCtx): StepKind {
+  const l = c.lot;
+  if (!l.screen || l.spec || findFiche(l.repo, c.config.spec.dir, l.lot)) return 'implement';
+  return 'spec';
+}
+
+/**
+ * Étape spec (L171, spec etape-spec S3) : la session écrit maquette, captures et fiche dans `<spec.dir>/<écran>/`, le programme
+ * en relève les écarts (une seconde passe, puis le lot est rendu), une hypothèse coûteuse à défaire devient une question au lead,
+ * et une sortie sous le seuil (le lot ne change aucun écran) rend le lot au chemin actuel.
+ */
+async function specStep(c: LotCtx): Promise<void> {
+  const l = c.lot;
+  const done = await session(c, 'spec');
+  if (!done) return;
+  let rep: SpecReport;
+  try {
+    rep = checkShape<SpecReport>(done.report, SPEC_SCHEMA);
+  } catch (e) {
+    badReport(c, done.step, e);
+    return;
+  }
+  const commits: Commit[] = readCommits(l.repo, { range: done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined });
+  done.step.commits = commits.map(short).reverse();
+  for (const k of commits) if (!citedRefs(k, c.loadPlan().refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} : ${short(k)}`);
+  for (const x of rep.choix ?? []) if (!(l.choix ??= []).includes(x)) l.choix.push(x);
+  save(c);
+
+  const questions = rep.questions.filter((q) => !isNonQuestion(q));
+  for (const q of rep.questions) if (q.trim() && isNonQuestion(q)) l.warnings.push(`question ignorée (non-question) : « ${q.trim()} »`);
+  if (questions.length) {
+    l.questions = questions;
+    l.next = 'spec';
+    transition(c, 'question', questions[0]);
+    return;
+  }
+  const dirt = [...trackedPaths(done.after), ...done.after.untracked.filter((f) => !done.before.untracked.includes(f))];
+  if (dirt.length) {
+    stop(c, 'handed-back', `dépôt sale après spec : ${dirt.join(', ')}`);
+    return;
+  }
+
+  const reason = rep.sousSeuil.trim();
+  if (reason) {
+    l.spec = { sousSeuil: reason };
+    l.specProblems = undefined;
+    l.warnings.push(`étape spec : sous le seuil, aucune maquette — ${reason}`);
+    l.next = 'implement';
+    save(c);
+    return;
+  }
+
+  const fiche = rep.fiche.trim() || findFiche(l.repo, c.config.spec.dir, l.lot) || '';
+  const problems = fiche ? checkSpec(l.repo, fiche, l.lot) : [`aucune fiche écrite : ${c.config.spec.dir}/<écran>/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change aucun écran)`];
+  if (problems.length) {
+    if (l.specProblems) {
+      stop(c, 'handed-back', `spec non conforme après 2 passes : ${problems.join(' ; ')}`);
+      return;
+    }
+    l.specProblems = problems;
+    l.next = 'spec';
+    save(c);
+    return;
+  }
+  const doc = parse(readFileSync(join(l.repo, fiche), 'utf8')) as { regles?: { statut?: unknown }[] };
+  // Un choix coûteux à défaire n'est pas une hypothèse : la question remonte au lead, la session reprend avec sa réponse.
+  const costly = costlyHypotheses(doc);
+  if (costly.length) {
+    l.questions = costly.map((x) => `${x.id} est posée comme hypothèse mais touche un choix coûteux à défaire (${x.categorie}) : « ${x.siFaux} » — la confirmer, ou la corriger, avant que la fiche serve de référence.`);
+    l.next = 'spec';
+    transition(c, 'question', l.questions[0]);
+    return;
+  }
+  l.spec = { fiche, hypotheses: (doc.regles ?? []).filter((r) => r.statut === 'hypothese').length };
+  l.specProblems = undefined;
   l.next = 'implement';
   save(c);
 }
@@ -1097,12 +1194,13 @@ export async function runLot(c: LotCtx): Promise<void> {
         return;
       }
       l.startedSha = (await snapshot(l.repo, { remote: false })).head ?? undefined;
-      l.next = needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos) ? 'precheck' : 'implement';
+      l.next = needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos) ? 'precheck' : firstWrite(c);
       save(c);
     }
     while (l.next && !TERMINAL.has(l.status)) {
       const kind = l.next;
       if (kind === 'precheck') await precheck(c);
+      else if (kind === 'spec') await specStep(c);
       else if (kind === 'implement' || kind === 'fix') await work(c, kind);
       else await review(c, kind);
       if (l.status === 'suspended' || l.status === 'question') return;

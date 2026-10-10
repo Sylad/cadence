@@ -22,9 +22,9 @@ reports a page left empty or in error.
 And a second plugin, [`cadence-hud`](#cadence-hud): a status band above the Claude
 Code prompt that shows the session's context, quota, cost and the orchestrate waves running.
 
-### Spec step (design, first commands delivered)
+### Spec step (design, first steps delivered)
 
-For a visible lot that adds a page, a component or changes a journey, `orchestrate` will get a step
+For a visible lot that adds a page, a component or changes a journey, `orchestrate` gets a step
 before the code: a static HTML mockup in the project's own style (1440 and 390 px; empty, loading and
 error states) and a machine-readable screen sheet (fields, numbered rules `R1…` each marked *sourced*
 or *hypothesis*, actions → API calls). The `ux-reviewer` agent reads the mockup before any code; the
@@ -34,7 +34,9 @@ lot's news entry, and a human is asked only about a choice that is costly to und
 `docs/superpowers/specs/2026-10-10-etape-spec-design.md` (with an example sheet and the plan of the
 lots that deliver it). Delivered so far: the sheet template `templates/fiche.yaml`, `cadence spec check`
 (the sheet's invariants) and `cadence spec qa` (the screen's `docs/qa/expectations.md` section, derived
-from the sheet), see [spec](#spec) below; the `orchestrate` step itself is not delivered yet.
+from the sheet), see [spec](#spec) below, and the `spec` step of `orchestrate` itself (the `spec-writer` agent, the
+render at 1440 and 390 px, the commit of the spec), see [The spec step](#the-spec-step-of-a-lot-with-screen) in `orchestrate`; the UX review of
+the mockup, the acceptance tests and the downstream briefs are not delivered yet.
 
 ## What's new
 
@@ -994,7 +996,7 @@ without `--effort` (see below), so `effort.precheck` has no effect on it and the
 
 ```yaml
 orchestrate:
-  effort: { precheck: low, implement: medium, fix: medium, review: high, ux: high }   # defaults
+  effort: { precheck: low, spec: medium, implement: medium, fix: medium, review: high, ux: high }   # defaults
 ```
 
 To measure what a level costs, run the same kind of wave before and after changing the key: each step of
@@ -1009,7 +1011,30 @@ with proofs), `partiel` or `non`: on `oui` no implementation session is opened a
 implementation brief and a warning; on `non` — or an unreadable report, which only adds a warning — the wave goes on. A
 lot that already has commits is never pre-checked (resuming it is legitimate). `orchestrate.precheck: false` turns it off.
 
-**Production access of the sessions** (L168): a session of a wave (`implement`, `fix`, `precheck`, `review`, `ux`) is
+### The spec step of a lot with `screen:`
+
+A lot that declares `screen:` (`raf add … --visible --screen page|component|journey`, see [raf](#raf)) gets one more session, `spec`, **after** the pre-check and **before**
+the first implementation: `precheck → spec → implement → ux → review`. A lot without `screen:` follows the usual path, unchanged. `--dry-run` lists the step
+(`spec (sonnet)`), its command line and its brief `templates/orchestrate/spec.md`.
+
+- **The session** (L171): Sonnet, the `spec-writer` agent (it writes only the spec folder, never application code), Playwright loaded like for `implement`. It reads the lot,
+  the project's CLAUDE.md and its charter (CSS, neighbouring components, `docs/qa/expectations.md`, existing routes and API contracts), then writes in
+  `<orchestrate.spec.dir>/<écran>/` (`docs/specs` by default): `maquette.html` (static HTML + CSS to the project's own style; one section `#etat-vide`, `#etat-chargement`,
+  `#etat-erreur` and `#etat-charge` per state; every field of the sheet carries `data-testid="<field id>"`), one capture per state and per width
+  `maquette-<état>-<largeur>.png` (1440 and 390), and `fiche.yaml` (the template `templates/fiche.yaml` is part of its brief). The mockup is rendered by
+  `orchestrate.spec.render` when the project declares it (the session runs that command), otherwise with Playwright; the captures land in the wave's output directory and the session copies the
+  kept ones into the folder. `effort.spec` (default `medium`) sets its effort level. It commits the whole spec in one commit that cites the lot (`spec(L7): …`).
+- **What the program checks** afterwards, with no model: the sheet passes `cadence spec check`, is the lot's (`ecran.lot`) and sits in the folder named by `ecran.id`; `maquette.html` exists with a
+  `#etat-<état>` section per state and a `data-testid` per field; every state has its capture at both widths; everything is committed and the tree is clean. Anything missing is listed back to **one second
+  `spec` session** (a fresh session whose brief names the points); if the second spec is still not valid the lot is handed back (`spec non conforme après 2 passes : …`).
+- **A costly choice is a question, not a hypothesis.** A rule marked `hypothese` whose `si_faux` involves a data model or storage, a public or shared API contract or an already published route,
+  a destructive or irreversible action, or a contradiction with a sourced rule, puts the lot in `question` (the program recognises these by keywords as a safety net behind the agent's own
+  judgement); `--resume --answer <lot> "…"` gives the answer to the resumed `spec` session. Every other hypothesis (wording, order of fields, error state, spacing) stays written in the sheet.
+  The agent can also ask a question itself in its report.
+- **Under the threshold**: if the session finds that the lot changes no screen, it gives the reason in one line (`sousSeuil`), writes no mockup, and the lot goes on to `implement` as before; the reason is
+  kept as a warning of the lot. A spec already committed for the lot (a sheet whose `ecran.lot` is the lot) is not played again when the wave is resumed.
+
+**Production access of the sessions** (L168): a session of a wave (`implement`, `fix`, `precheck`, `spec`, `review`, `ux`) is
 started with no *default* access to the production cluster (a guard against the ordinary path, not a barrier). What a session inherits was measured on the dev machine: `KUBECONFIG` (pointing at
 `~/.kube/config`, the production cluster), the `kubectl` of the `PATH` (a link to `k3s`, which without `KUBECONFIG`
 falls back on `/etc/rancher/k3s/k3s.yaml`) and the cloud and GitHub tokens of the environment. `cadence orchestrate` now
@@ -1231,9 +1256,9 @@ orchestrate:
   test: npm test                         # run by the orchestrator after a work step (optional)
   build: npm run build                   # run after the tests; both results go to the reviewer, who does not redo them (optional)
   precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it, local runs it on claude-local (Ollama) with Sonnet as fallback
-  spec: { dir: docs/specs }              # spec step (screens of `--screen` lots): folder of the screen specs, relative to the repository (default docs/specs); render: the command that renders the mockups (optional, no default)
+  spec: { dir: docs/specs }              # spec step (see « The spec step of a lot with screen: »): folder of the screen specs, relative to the repository (default docs/specs); render: the command the spec session runs to render the mockups at 1440 and 390 px (optional, Playwright otherwise)
   prodAccess: false                      # default: wave sessions get no access to production (see « Production access of the sessions »); true lifts it for this project
-  effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, implement, fix, review, ux
+  effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default
   addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use
@@ -1522,7 +1547,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 - The **text of the outputs**: wording, layout, order of the lines and columns of every report, table and message
   (the `--json` outputs and the exit codes are part of the commands above). In a `--json` output a new field is a
   minor change, so consumers must tolerate unknown fields; removing or renaming a field is a major change.
-- The **`precheck-reader`** agent: internal to `cadence orchestrate`, not meant to be called by hand.
+- The **`precheck-reader`** and **`spec-writer`** agents: internal to `cadence orchestrate`, not meant to be called by hand.
 - The **`cadence-hud` band**: its segments, colours and layout; it is versioned on its own.
 - The **wave journals** under `.cadence/runs` and the files `cadence orchestrate` keeps there.
 - The wording of the briefs and of the instructions inside the skills and the agents.

@@ -2,6 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renam
 import { join, relative } from 'node:path';
 import { gitCommonDir, gitRoot } from '../git.js';
 import type { Model, StepKind, StepModel } from './launch.js';
+import type { Screen } from '../plan.js';
 import type { Tokens } from './result.js';
 
 export type WaveStatus = 'running' | 'suspended-budget' | 'suspended-quota' | 'done' | 'interrupted';
@@ -76,6 +77,12 @@ export interface LotState {
   title: string;
   visible: boolean;
   small: boolean;
+  /** Seuil de l'étape spec (clé de lot `screen:`, L169) : le lot passe par `spec` avant `implement`. Absent : chemin actuel. */
+  screen?: Screen;
+  /** Issue de l'étape spec : la fiche écrite (et le nombre de ses hypothèses), ou la raison d'une sortie sous le seuil. */
+  spec?: { fiche: string; hypotheses: number } | { sousSeuil: string };
+  /** Écarts de la spec relevés par le programme, rendus à la seconde passe `spec` (une seule). */
+  specProblems?: string[];
   /** Lot léger (estimate ≤ orchestrate.review.threshold, L108) : une revue légère, pas de passe des mineurs. Absent : lot ordinaire. */
   light?: boolean;
   model: Model;
@@ -136,6 +143,7 @@ export interface NewLot {
   title: string;
   visible: boolean;
   small: boolean;
+  screen?: Screen;
   model: Model;
   readOnlyPlan: boolean;
 }

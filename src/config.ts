@@ -233,7 +233,7 @@ export interface OrchestrateConfig {
   prodAccess: boolean;
   /**
    * Étape spec (L169, spec etape-spec) : `dir` = dossier des specs d'écran du projet cible, relatif à la racine du dépôt
-   * (défaut `docs/specs`, un sous-dossier par écran) ; `render` = commande de rendu des maquettes, lue par l'étape (lots suivants).
+   * (défaut `docs/specs`, un sous-dossier par écran) ; `render` = commande de rendu des maquettes, donnée à la session de l'étape spec (L171).
    */
   spec: { dir: string; render?: string };
   /**
@@ -252,7 +252,7 @@ export interface OrchestrateConfig {
 
 const EFFORTS = ['default', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = (typeof EFFORTS)[number];
-export const EFFORT_STEPS = ['precheck', 'implement', 'fix', 'review', 'ux'] as const;
+export const EFFORT_STEPS = ['precheck', 'spec', 'implement', 'fix', 'review', 'ux'] as const;
 export type EffortStep = (typeof EFFORT_STEPS)[number];
 
 const MODELS = ['haiku', 'sonnet', 'opus'] as const;
@@ -263,7 +263,7 @@ const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'prodA
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -326,7 +326,7 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     }
   }
   if (o.effort != null) {
-    if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, implement, fix, review, ux }');
+    if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, spec, implement, fix, review, ux }');
     for (const [k, v] of Object.entries(o.effort)) {
       if (!(EFFORT_STEPS as readonly string[]).includes(k)) throw bad(`effort.${k} inconnu (attendu : ${EFFORT_STEPS.join(', ')})`);
       if (!EFFORTS.includes(v as Effort)) throw bad(`effort.${k} : ${EFFORTS.join(', ')} attendu`);

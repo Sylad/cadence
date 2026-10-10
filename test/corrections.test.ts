@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { CAUSES, classifyAll, measure, ollamaClassifier, parseCause, readRuns, renderReport, sampleKeys, type Classification } from '../src/corrections.js';
+import { CAUSES, classifyAll, measure, ollamaClassifier, parseCause, readCache, readRuns, renderReport, sampleKeys, type Classification } from '../src/corrections.js';
 import { tempDir } from './helpers.js';
 
 interface FakeStep { kind: string; status?: string; constats?: string[] }
@@ -76,6 +76,18 @@ describe('measure', () => {
     expect(m.byCause['bug-code']).toBe(1);
     expect(m.byCause['spec-floue']).toBe(0);
     expect(m.agreement).toEqual({ reviewed: 2, agree: 1 });
+  });
+});
+
+describe('readCache', () => {
+  it('refuse une cause ou une relecture inconnue, en nommant la passe et le fichier', () => {
+    const file = join(tempDir(), 'c.json');
+    writeFileSync(file, JSON.stringify({ 'w1/a--L1/3': { cause: 'bug-code', by: 'ollama:m', manual: 'bug_code' } }));
+    expect(() => readCache(file)).toThrow(/w1\/a--L1\/3.*bug_code/);
+    writeFileSync(file, JSON.stringify({ 'w1/a--L1/3': { cause: 'nimporte', by: 'ollama:m' } }));
+    expect(() => readCache(file)).toThrow(/nimporte/);
+    writeFileSync(file, JSON.stringify({ 'w1/a--L1/3': { cause: 'bug-code', by: 'ollama:m', manual: 'test-manquant' } }));
+    expect(readCache(file).get('w1/a--L1/3')!.manual).toBe('test-manquant');
   });
 });
 

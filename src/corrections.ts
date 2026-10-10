@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { RafError } from './plan.js';
 
 /** Les causes d'une passe de correction (L165), dans l'ordre où le rapport les liste. */
 export const CAUSES = ['spec-floue', 'regle-inventee', 'derive-architecture', 'donnees-sql', 'bug-code', 'test-manquant', 'faux-constat'] as const;
@@ -224,7 +225,14 @@ export function sampleKeys(keys: string[], n: number): string[] {
 
 export function readCache(file: string): Map<string, Classification> {
   const raw = existsSync(file) ? readJson(file) : null;
-  return new Map(Object.entries((raw ?? {}) as Record<string, Classification>));
+  const known = (c: unknown) => typeof c === 'string' && (CAUSES as readonly string[]).includes(c);
+  const entries = Object.entries((raw ?? {}) as Record<string, Classification>);
+  // Une cause inconnue (faute de frappe dans une relecture) ferait disparaître la passe des tableaux : on refuse le fichier.
+  for (const [key, c] of entries) {
+    if (!known(c?.cause)) throw new RafError(`${file} : cause inconnue pour ${key} : ${String(c?.cause)}`);
+    if (c.manual !== undefined && !known(c.manual)) throw new RafError(`${file} : relecture inconnue pour ${key} : ${String(c.manual)} (causes : ${CAUSES.join(', ')})`);
+  }
+  return new Map(entries);
 }
 
 export function serializeCache(cache: Map<string, Classification>): string {

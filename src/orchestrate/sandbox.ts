@@ -5,6 +5,9 @@
  * Mesuré sur Big-Blue : une session hérite de `KUBECONFIG` (qui désigne `~/.kube/config`, donc la prod) ; `kubectl` du
  * PATH est un lien vers k3s, qui sans `KUBECONFIG` retombe sur `/etc/rancher/k3s/k3s.yaml`. `KUBECONFIG=/dev/null`
  * coupe les deux : `kubectl get pods` répond « connection refused » sur localhost:8080.
+ *
+ * Limite : ce n'est pas une barrière. `~/.kube/config` reste lisible (même utilisateur) ; `kubectl --kubeconfig ~/.kube/config`
+ * ou `KUBECONFIG=~/.kube/config` rouvre le cluster. Le rendre illisible demande un bac à sable fichiers (hors de ce lot).
  */
 
 /** Variables qui donnent un accès à la production ou au cloud : retirées de l'environnement des sessions. */

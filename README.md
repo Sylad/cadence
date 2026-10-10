@@ -968,15 +968,18 @@ with proofs), `partiel` or `non`: on `oui` no implementation session is opened a
 implementation brief and a warning; on `non` — or an unreadable report, which only adds a warning — the wave goes on. A
 lot that already has commits is never pre-checked (resuming it is legitimate). `orchestrate.precheck: false` turns it off.
 
-**Production access of the sessions** (L168): a session of a wave (`implement`, `fix`, `precheck`, `review`, `ux`) has no
-access to the production cluster. What a session inherits was measured on the dev machine: `KUBECONFIG` (pointing at
+**Production access of the sessions** (L168): a session of a wave (`implement`, `fix`, `precheck`, `review`, `ux`) is
+started with no *default* access to the production cluster (a guard against the ordinary path, not a barrier). What a session inherits was measured on the dev machine: `KUBECONFIG` (pointing at
 `~/.kube/config`, the production cluster), the `kubectl` of the `PATH` (a link to `k3s`, which without `KUBECONFIG`
 falls back on `/etc/rancher/k3s/k3s.yaml`) and the cloud and GitHub tokens of the environment. `cadence orchestrate` now
 starts every session with `KUBECONFIG=/dev/null` (`kubectl get pods` answers « connection refused » on `localhost:8080`)
 and without `KUBERNETES_SERVICE_*`, `KUBE_TOKEN`, `ARGOCD_*`, `CLOUDFLARE_*`/`CF_API_*`, `AWS_*`, `GOOGLE_APPLICATION_CREDENTIALS`,
 `AZURE_CLIENT_SECRET`, `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` (idea taken from the sandbox of docker/docker-agent,
 closed by default). `HOME` is left alone, so the credential files `gh` keeps under `~/.config` stay readable (a session
-can neither push nor deliver anyway). `cadence deliver` and `cadence verify` are the lead's and keep their access; so do
+can neither push nor deliver anyway) and so does `~/.kube/config`: a session that deliberately runs
+`kubectl --kubeconfig ~/.kube/config …` or `KUBECONFIG=~/.kube/config kubectl …` still reaches the cluster. The restriction
+stops the accidental access, not a deliberate workaround; making the file unreadable needs a filesystem sandbox
+(a mount namespace, or the file sandbox of Claude Code), which cadence does not set up. `cadence deliver` and `cadence verify` are the lead's and keep their access; so do
 the project's own `test`, `build` and `ux.command`, which the program launches. A lot that really needs the cluster is run in a
 project with `orchestrate.prodAccess: true`: the restriction is lifted for all its sessions (default `false`).
 

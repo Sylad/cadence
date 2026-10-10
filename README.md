@@ -1428,15 +1428,18 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
   `skills`; their options and exit codes as this README documents them. A new command or option is a minor change.
 - **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`
   and the keys each of them takes. A key is not renamed nor removed, nor does its meaning change; a new key is a minor change.
-- **The plan file** (`docs/plan/raf.yaml`): `version`, `project`, `prefix`, `since`, `ignore`, `lots` (with their
+- **The plan file** (`docs/plan/raf.yaml`): `project`, `prefix`, `since`, `ignore`, `lots` (with their
   fields, `tasks`, `notes`, `repos`) and `acknowledged`, and the plan formats `plan:` in `cadence.yaml` can read.
+  The `version` key is kept in the file but ignored (`src/plan.ts` does not read it): it is not a schema version.
 - **The names of the skills** (`session-start`, `session-close`, `deliver`, `lead`) **and of the agents**
   (`ux-reviewer`, `code-reviewer`, `qa-reviewer`).
 
 **Not guaranteed** (may change in any release)
 
 - The **text of the outputs**: wording, layout, order of the lines and columns of every report, table and message
-  (the `--json` outputs and the exit codes are part of the commands above).
+  (the `--json` outputs and the exit codes are part of the commands above). In a `--json` output a new field is a
+  minor change, so consumers must tolerate unknown fields; removing or renaming a field is a major change.
+- The **`precheck-reader`** agent: internal to `cadence orchestrate`, not meant to be called by hand.
 - The **`cadence-hud` band**: its segments, colours and layout; it is versioned on its own.
 - The **wave journals** under `.cadence/runs` and the files `cadence orchestrate` keeps there.
 - The wording of the briefs and of the instructions inside the skills and the agents.

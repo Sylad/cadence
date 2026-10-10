@@ -15,7 +15,9 @@ describe('release 1.0.0 (L164)', () => {
   it('le CHANGELOG a une section 1.0.0 datée qui ouvre sur l’engagement semver', () => {
     const log = read('CHANGELOG.md')
     expect(log).toContain('## [1.0.0] - 2026-10-10')
-    expect(log.slice(log.indexOf('## [1.0.0]'))).toMatch(/semantic versioning|semver/i)
+    const after = log.slice(log.indexOf('## [1.0.0]')).split('\n').slice(1)
+    const first = after.find((l) => l.trim() !== '') ?? ''
+    expect(first).toMatch(/semantic versioning|semver/i)
   })
 
   it('le README ouvre « What’s new » sur 1.0.0', () => {
@@ -28,7 +30,7 @@ describe('release 1.0.0 (L164)', () => {
     expect(start).toBeGreaterThan(-1)
     const section = readme.slice(start, readme.indexOf('\n## ', start + 5))
     for (const word of ['raf', 'cadence orchestrate', 'cadence.yaml', 'raf.yaml', 'session-start', 'qa-reviewer',
-      'cadence-hud', '.cadence/runs', 'schema version']) expect(section).toContain(word)
+      'cadence-hud', '.cadence/runs', 'schema version', 'precheck-reader', 'unknown fields']) expect(section).toContain(word)
     expect(section).toMatch(/not guaranteed/i)
   })
 })

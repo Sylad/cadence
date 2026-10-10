@@ -1948,6 +1948,7 @@ lots:
     estimate: 0.5
     created: 2026-10-10
     started: 2026-10-10
+    review: { date: 2026-10-10, verdict: "conforme — orchestré (vague 2026-10-10-2330, 1 passe(s) de correction)", commit: b4ff9fe264d2058ae348e9de31a00c77518cd396 }
   - id: L170
     title: cadence spec check et spec qa, gabarit de fiche (spec etape-spec, S2)
     status: todo

@@ -1909,7 +1909,7 @@ lots:
     finished: 2026-10-10
   - id: L166
     title: "Conception d'une étape spec avant l'implémentation dans orchestrate (lots visibles au-dessus d'un seuil : nouvelle page, nouveau composant, parcours modifié) : maquette HTML statique à la charte du projet rendue 1440/390 avec états vide/chargement/erreur + fiche d'écran lisible par machine (champs id/libellé/type/source API/obligatoire, règles de gestion numérotées R1… avec message, actions → appel API, chaque règle « sourcée » ou « hypothèse ») ; l'agent UX relit la maquette avant le code (boucle sur la maquette, pas sur le code), aucune validation humaine systématique (question ciblée seulement si le choix est coûteux à défaire), le brief d'implémentation reçoit la fiche, les tests citent les règles, la code review vérifie la couverture de la fiche, la passe UX après code devient une conformité légère, les hypothèses remontent dans l'entrée Nouveautés ; livrable : spec versionnée docs/ + plan de lots, essai prévu sur un écran d'une app loisir, critère de réussite mesuré contre le lot de mesure"
-    status: doing
+    status: done
     estimate: 1
     after: [ L165 ]
     created: 2026-10-10
@@ -1917,8 +1917,10 @@ lots:
       - { date: 2026-10-10, text: "Ajout Sylvain 10-10 : les tests d'acceptation sont écrits AVANT le dev, depuis la fiche, par une session distincte de l'implémenteur (oracle indépendant) — un ou plusieurs cas par règle R, nommés d'après elle, sélecteurs = ids de la fiche (data-testid) ; commités rouges, l'implémentation les rend verts sans les modifier (toute modification d'un test d'acceptation = question ou constat de revue) ; ce qui n'est pas testable automatiquement (rendu, ergonomie) reste à la passe UX de conformité ; docs/qa/expectations.md dérivé de la fiche ; la code review vérifie règle → test → vert au lieu de reconstruire les cas" }
       - { date: 2026-10-10, text: "Le plan de lots produit par la conception inclut, en dernier, la mise à jour du schéma du workflow lead (docs/lead.md, L167) avec les étapes spec, revue UX de la maquette et tests d'acceptation (demande Sylvain 10-10)" }
       - { date: 2026-10-10, text: "Rendu par la vague 2026-10-10-2240 : 3 majeurs restants de la revue 7, à corriger dans la reprise : (1) dérivation expectations.md — les lignes shows: des champs absents d'un état vide sourcé reçoivent aussi une condition « — unless … » (design l.135) ; (2) plan de lots — S5 et sa commande raf add portent l'exclusion des acceptation.json de config.test tant que leur lot n'est pas vert, la commande dédiée et le verrou étendu, et chaque commande raf add du plan cite la spec et l'id S (design l.221-239) ; (3) fiche exemple — message-erreur et bouton-reessayer en champs (obligatoire: false) cités par R3, action liée au bouton (fiche-exemple l.41). Mineur : la regex couteux du test suit les 4 catégories de la spec." }
+      - { date: 2026-10-10, text: "Re-vérifié par le lead 10-10 : build, 1367 tests, raf check propre. Livrable : docs/superpowers/specs/2026-10-10-etape-spec-design.md + fiche exemple ; plan S1–S9 ajouté au plan. Mineur restant : plusieurs tests de test/etape-spec-fiche.test.ts ne vérifient que la présence de phrases (l.66-85, 110-120), à remplacer par des calculs quand S2 code la dérivation" }
     started: 2026-10-10
     review: { date: 2026-10-10, verdict: "conforme — orchestré (vague 2026-10-10-2300, 2 passe(s) de correction + passe des mineurs)", commit: de7eef13332b8fd934e279a97128b5fd6e0491a3 }
+    finished: 2026-10-10
   - id: L167
     title: "Doc docs/lead.md : schéma du workflow du skill lead en trois couloirs (humain, session lead, programme orchestrate et agents) en SVG compatible thème clair/sombre de GitHub, version générique (aucun nom de personne, de projet ni de chemin local) — tour, vague et étapes par lot, relais du journal et questions, re-vérification, raf ux/done, livraison et qa-reviewer, seuil de contexte 60 % et enchaînement, clôture ; règles permanentes et codes de sortie ; lien depuis le README"
     status: done
@@ -1940,6 +1942,65 @@ lots:
     notes:
       - { date: 2026-10-10, text: "Re-vérifié par le lead 10-10 : build, 1349 tests. Effet : KUBECONFIG=/dev/null et jetons GH_TOKEN/GITHUB_TOKEN/GH_ENTERPRISE_TOKEN retirés des sessions de vague ; orchestrate.prodAccess: true par projet pour l'autoriser ; test/build/ux.command gardent l'environnement complet. À surveiller : une prochaine vague maritime dont une session lirait la prod" }
     finished: 2026-10-10
+  - id: L169
+    title: Champ screen des lots + clé orchestrate.spec (spec etape-spec, S1)
+    status: todo
+    estimate: 0.5
+    created: 2026-10-10
+  - id: L170
+    title: cadence spec check et spec qa, gabarit de fiche (spec etape-spec, S2)
+    status: todo
+    estimate: 1
+    after: [ L169 ]
+    created: 2026-10-10
+    notes:
+      - { date: 2026-10-10, text: "Revue L166 : la clé masque des règles manque au tableau du format de la fiche (design l.64) et à la liste des invariants (l.74-77) — l'ajouter, cadence spec check doit refuser un masque qui cite un champ absent" }
+  - id: L171
+    title: "Étape spec d'orchestrate : spec-writer, rendu 1440/390 (spec etape-spec, S3)"
+    status: todo
+    estimate: 1
+    after: [ L170 ]
+    created: 2026-10-10
+  - id: L172
+    title: "Revue UX de la maquette : ux-reviewer mode maquette (spec etape-spec, S4)"
+    status: todo
+    estimate: 0.75
+    after: [ L171 ]
+    created: 2026-10-10
+  - id: L173
+    title: "Étape accept : tests rouges, verrou par empreinte sur toutes les sessions du dépôt, fichiers des acceptation.json exclus de config.test et de la CI (config du lanceur) tant que le lot n'est pas vert, commande dédiée, retour à vert: true posé par le cycle quand elle passe (spec etape-spec, S5)"
+    status: todo
+    estimate: 1
+    after: [ L171 ]
+    created: 2026-10-10
+    notes:
+      - { date: 2026-10-10, text: "Revue L166 : préciser la différence tolérée sur acceptation.json par le verrou (seule la clé vert, posée par le cycle) et où est rangé le sha rouge (hors d'acceptation.json, sinon une session peut le réécrire) — sinon le lot B voit un diff non vide après le vert: true du lot A" }
+  - id: L174
+    title: "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses (spec etape-spec, S6)"
+    status: todo
+    estimate: 1
+    after: [ L172, L173 ]
+    created: 2026-10-10
+  - id: L175
+    title: Essai étape spec sur un écran d'app loisir (spec etape-spec, S7)
+    status: todo
+    estimate: 0.5
+    after: [ L174 ]
+    created: 2026-10-10
+  - id: L176
+    title: Mesure de l'étape spec contre le lot de mesure, 8 lots avec fiche (spec etape-spec, S8)
+    status: todo
+    estimate: 0.5
+    after: [ L175 ]
+    created: 2026-10-10
+    notes:
+      - { date: 2026-10-10, text: "Revue L166 : comparer à la référence des lots VISIBLES, pas « tous lots » (45 % corrigés contre 65 %) — src/corrections.ts doit sortir les causes par visibilité (byVisibility ne compte que lots et passes)" }
+  - id: L177
+    title: "docs/lead.md : schéma du workflow avec les étapes spec, L167 (spec etape-spec, S9)"
+    status: todo
+    estimate: 0.25
+    after: [ L174 ]
+    created: 2026-10-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

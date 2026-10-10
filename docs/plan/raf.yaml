@@ -1702,7 +1702,7 @@ lots:
       - { date: 2026-10-09, text: "[L145/t1] abandonné : repris en lot autonome (L145 clos, le libellé se corrige à part)" }
     finished: 2026-10-09
   - id: L146
-    title: "orchestrate : étape precheck (et tour / lectures mécaniques) sur le modèle local de Big-Blue (claude-local → Ollama RTX 5090, qwen3-coder:30b) quand cadence.yaml le déclare (orchestrate.precheck: local) ; comparer sur 5 lots verdict et durée avec la version Sonnet ; garder Sonnet par défaut si le local se trompe une fois sur un « partiel ». Demande Sylvain 09-10 : exploiter la machine, dédiée aux devs"
+    title: "orchestrate : étape precheck sur le modèle local de Big-Blue (claude-local → Ollama RTX 5090, qwen3-coder:30b) quand cadence.yaml le déclare (orchestrate.precheck: local) ; repli Sonnet sur échec ou rapport illisible, « oui » confirmé par Sonnet, jetons locaux hors budget — TEST exigé sur « une session locale réussie ne débite pas le budget » (majeur revue 10-10). Scindé le 10-10 : comparaison sur 5 lots + lectures mécaniques → L160. Demande Sylvain 09-10 : exploiter la machine"
     status: doing
     estimate: 0.5
     created: 2026-10-09
@@ -1710,6 +1710,7 @@ lots:
     notes:
       - { date: 2026-10-10, text: "reste ouvert (revue 10-10) : (1) comparaison sur 5 lots verdict/durée local vs Sonnet non faite (un seul essai : 8,9 s, oui juste) ; (2) « tour / lectures mécaniques » sur le modèle local non fait. Ne pas clore le lot avant." }
       - { date: 2026-10-10, text: "Rendu par la vague 1335 (10-10) après 2 corrections, 449 k tokens, 4 commits (7587ded 29a90c7 f2e76e1 bbdc2c1) ; 2 majeurs restants : src/orchestrate/cycle.ts:462 — Ce que promettent le README et le CHANGELOG (« nothing counted in the lot's budget ») n'est vérifié par aucun test quand la session locale réussit. Il dépend de deux lignes : `if (!local) w.budget.add(res.tokens)` (l. 46 ‖ null:null — Le lot n'est pas livré en entier. Son titre demande aussi (1) « tour / lectures mécaniques » sur le modèle local et (2) « comparer sur 5 lots verdict et durée avec la version Sonnet ». Les 3 commits ne font passer en loc ; restent aussi ouvertes la comparaison sur 5 lots (verdict + durée vs Sonnet) et les lectures mécaniques" }
+      - { date: 2026-10-10, text: "Scindé 10-10 par le lead : ce lot = precheck local + le test manquant (cycle.ts:462, session locale réussie non comptée) ; L160 = comparaison 5 lots + lectures mécaniques" }
   - id: L147
     title: "orchestrate --continue : la vague tire elle-même le prochain lot prêt du plan quand un lot se termine, dans l'ordre de priorité déclaré dans le dossier parent (cadence > maritime > reste), jusqu'à un budget, une fenêtre horaire (--until 18:00), une limite d'usage, une question posée, deux lots rendus de suite ou plus aucun lot prêt dont l'estimation tient dans le budget restant ; exclus : lots « à décider avec Sylvain » et after non levé ; demande Sylvain 09-10 (temps morts quand il n'est pas devant le PC)"
     status: done
@@ -1836,6 +1837,12 @@ lots:
     started: 2026-10-10
     review: { date: 2026-10-10, verdict: "compliant (release 0.27.1 : bumps ×4 cohérents, CHANGELOG daté, What's new à jour, 1249 tests verts, typecheck vert ; reste le tag v0.27.1 à pousser — 1 note mineure sur la mention du hud 0.4.3) — orchestré (vague 2026-10-10-1120, 0 passe(s) de correction)", commit: null }
     finished: 2026-10-10
+  - id: L160
+    title: "L146 suite : (1) comparer sur 5 lots réels verdict et durée du precheck local (orchestrate.precheck: local sur un projet, ol ou warhammer) avec la version Sonnet, consigner le tableau dans le plan ; (2) tour / lectures mécaniques (cadence lead tour, precheck-reader hors orchestrate) sur le modèle local ; garder Sonnet par défaut si le local se trompe une fois sur un « partiel »"
+    status: todo
+    estimate: 0.5
+    after: [ L146 ]
+    created: 2026-10-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

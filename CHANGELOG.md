@@ -38,8 +38,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence orchestrate --drop <project:lot>` and `--stop-after-current` on a live wave, `--resume --drop`; the final table's « livrable jusqu'à <sha> » line; a version commit exempt from the review gate | [0.24.0](#0240---2026-10-09) |
 | `cadence-hud`: the project line of the plans' progress names the lots in progress after their count, three at most | [0.25.0](#0250---2026-10-09) |
 | `orchestrate.precheck: local`: the « deliverable already present? » pre-check runs on the local model (`claude-local`, Ollama), off the Anthropic quota | [0.28.0](#0280---2026-10-10) |
+| Stable contract under semantic versioning, README *Stability* section | [1.0.0](#100---2026-10-10) |
 
-## [Unreleased]
+## [1.0.0] - 2026-10-10
+
+First major release: from now on cadence follows [semantic versioning](https://semver.org) for the surface the README's *Stability* section lists (L164).
 
 ### Changed
 
@@ -47,6 +50,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- README *Stability* section: the guaranteed surface (commands and options, `cadence.yaml` keys, plan file, skill and agent names) and what is not (text outputs, `cadence-hud` band, `.cadence/runs` journals); no schema version, no migration (L164).
 - `evals/` and `npm run eval:plugin`: an evaluation suite of the plugin for `claude plugin eval`, four cases drawn from traps found by hand (`raf done` refused without a review, `deliver --sha`, `orchestrate` with lot ids containing `/`, a `livrer.sh` without a `deliver:` block) and a baseline arm without the plugin; billed per run, to be run at the release only (L139).
 
 ## [0.28.0] - 2026-10-10

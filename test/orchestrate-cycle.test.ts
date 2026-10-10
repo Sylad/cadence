@@ -2274,3 +2274,25 @@ describe('contrôle préalable sur le modèle local (L146)', () => {
     expect(h.calls[1].brief).toContain('moitié faite');
   });
 });
+
+describe('accès à la production des sessions de vague (L168)', () => {
+  it('par défaut : chaque session du cycle part sans kubeconfig ni variables de prod', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    await runLot(h.lot('L1'));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    for (const call of h.calls) {
+      expect(call.opts.env?.KUBECONFIG).toBe('/dev/null');
+      expect(call.opts.unset).toContain('GH_TOKEN');
+    }
+  });
+
+  it('orchestrate.prodAccess: true du projet lève la restriction jusqu\'à la session', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    await runLot(h.lot('L1', {}, { prodAccess: true }));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    for (const call of h.calls) {
+      expect(call.opts.env).not.toHaveProperty('KUBECONFIG');
+      expect(call.opts.unset ?? []).toEqual([]);
+    }
+  });
+});

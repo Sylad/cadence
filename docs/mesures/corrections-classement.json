@@ -1,0 +1,1046 @@
+{
+  "2026-10-04-1628/cadence--L28/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
+  },
+  "2026-10-04-1700/cadence--L12/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1807/cadence--L11/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1807/cadence--L11/5": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1807/cadence--L35/3": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1807/cadence--L37/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1807/cadence--L38/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1807/cadence--L4/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1807/cadence--L4/5": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1807/cadence--L40/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1807/cadence--L40/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-04-1920/cadence--L4/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1920/cadence--L4/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-1920/cadence--L43/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-2132/cadence--L45/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-2201/claude-code-codex--L16/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-2201/claude-code-codex--L16/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-2201/finance-tracker--L3/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-2201/finance-tracker--L3/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-2201/ol-companion--L29/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-2201/warhammer40k--L54/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-2201/warhammer40k--L54/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-04-2201/warhammer40k--L54/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-04-2201/warhammer40k--L54/8": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-0800/finance-tracker--L3/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-0800/finance-tracker--L3/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-0913/claude-code-codex--L16/3": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-0913/finance-tracker--L59/3": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-1057/maritime-atlas--B65/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-1114/evatosorus--L24/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-1114/evatosorus--L24/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-1114/evatosorus--L24/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-05-1114/warhammer40k--L60/3": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-1114/warhammer40k--L60/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-1114/warhammer40k--L60/5": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-1247/maritime-atlas--B66/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-1247/maritime-atlas--B66/5": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-2003/warhammer40k--L63/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-2058/ol-companion--L30/3": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-05-2058/warhammer40k--L55/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-0917/ol-companion--L31/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-0917/warhammer40k--L64/3": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1016/cadence--L69/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
+  },
+  "2026-10-06-1029/warhammer40k--L64/3": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1029/warhammer40k--L64/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1029/warhammer40k--L64/7": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1154/ol-companion--L67/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1154/ol-companion--L67/5": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1203/ol-companion--L67/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1203/ol-companion--L67/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1203/ol-companion--L67/7": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1222/cadence--L71/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1222/cadence--L71/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-06-1222/cadence--L71/7": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1400/warhammer40k--L74/5": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1400/warhammer40k--L74/7": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1400/warhammer40k--L74/8": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1400/warhammer40k--L75/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/finance-tracker--L4/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/finance-tracker--L4/5": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/finance-tracker--L4/7": {
+    "cause": "regle-inventee",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/finance-tracker--L5/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/finance-tracker--L5/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/finance-tracker--L6/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-06-1801/finance-tracker--L6/5": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/finance-tracker--L6/7": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/ol-companion--L36/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/ol-companion--L37/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/ol-companion--L37/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/ol-companion--L37/7": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-1801/ol-companion--L40/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-2138/claude-code-codex--L27/3": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-2138/evatosorus--L33/2": {
+    "cause": "faux-constat",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-2138/finance-tracker--L5/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-2138/finance-tracker--L5/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-06-2138/finance-tracker--L5/7": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-2138/ol-companion--L37/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-06-2138/ol-companion--L37/5": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1234/cadence--L59/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1234/cadence--L64/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1234/cadence--L64/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1234/cadence--L64/7": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1234/cadence--L66/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1234/cadence--L66/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1234/cadence--L92/3": {
+    "cause": "regle-inventee",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-07-1234/cadence--L92/5": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1347/cadence--L94/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1402/cadence--L60/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1402/cadence--L60/5": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1424/cadence--L60/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1424/cadence--L60/5": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1445/cadence--L96/3": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1458/cadence--L97/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1530/cadence--L99/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1550/claude-code-codex--L29/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1550/claude-code-codex--L31/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-07-1735/claude-code-codex--L32/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1735/claude-code-codex--L32/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1735/claude-code-codex--L32/7": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1921/cadence--L102/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1921/cadence--L102/5": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1921/cadence--L105/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1943/cadence--L108/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1943/cadence--L109/3": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1943/cadence--L75/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1943/cadence--L75/5": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "derive-architecture"
+  },
+  "2026-10-07-1943/cadence--L77/3": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1943/cadence--L77/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1943/cadence--L78/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-1943/cadence--L78/5": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-2103/cadence--L75/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-2131/cadence--L73/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-2205/cadence--L101/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-07-2205/cadence--L106/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-0639/cadence--L32/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-0709/cadence--L115/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-0836/cadence--L119/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-08-0836/cadence--L119/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-0913/cadence--L120/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-0913/cadence--L120/6": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-0928/cadence--L49/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1013/cadence--L121/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1013/cadence--L121/6": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1013/cadence--L121/8": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1510/cadence--L125/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1510/ol-companion--L49/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1510/ol-companion--L49/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1535/maritime-atlas--B64__ewds-400/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "spec-floue"
+  },
+  "2026-10-08-1611/maritime-atlas--B64__ewds-400/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1611/maritime-atlas--B64__grib-4-octets/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1611/maritime-atlas--Q4__accueil-4-ux-temp-compact-cr2/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1720/cadence--L62/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1720/cadence--L62/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1720/ol-companion--L52/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-1720/ol-companion--L52/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-2052/cadence--L131/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-2135/cadence--L132/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-2135/cadence--L132/6": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-08-2135/cadence--L132/8": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-2135/cadence--L133/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-2135/cadence--L133/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-issues-6-7/cadence--L130/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-08-issues-6-7/cadence--L130/6": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-0842/cadence--L136/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-0842/maritime-atlas--Q4__particules-openlayers/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-0900/cadence--L126/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-0900/maritime-atlas--Q4__point-panneau-390-tiroir/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-0945/maritime-atlas--Q4__particules-ol-bascule/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1058/cadence--L140/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
+  },
+  "2026-10-09-1058/maritime-atlas--Q4__particules-vagues-vitesse/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1253/maritime-atlas--Q4__particules-legende-hs-globe/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1253/maritime-atlas--Q4__timebar-validite-suivante-particules/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1253/ol-companion--L77/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1253/ol-companion--L77/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1303/cadence--L137/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1303/cadence--L137/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1303/cadence--L141/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1303/cadence--L143/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1303/cadence--L144/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-09-1448/maritime-atlas--Q4__particules-legende-hs-widget/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1448/maritime-atlas--Q4__particules-ol-bascule-retelechargement/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1448/maritime-atlas--Q4__timebar-retour-temps-reel-particules/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1502/cadence--L145/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1540/cadence--L147/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1540/cadence--L148/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1752/cadence--L127/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1826/cadence--L72/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1826/cadence--L72/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1826/cadence--L76/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1826/ol-companion--L70/5": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "derive-architecture"
+  },
+  "2026-10-09-1826/ol-companion--L70/7": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-1846/maritime-atlas--Q4__a-propos-6b/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-2018/cadence--L154/3": {
+    "cause": "faux-constat",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-2048/cadence--L128/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-2124/cadence--L82/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-2124/cadence--L82/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-2124/maritime-atlas--Q4__timebar-live-qa-validites/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-2238/cadence--L83/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-09-2238/cadence--L83/6": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-0943/cadence--L83/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-10-0943/cadence--L83/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1015/maritime-atlas--Q4__accueil-4-ux24/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1015/maritime-atlas--Q4__accueil-4-ux24/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1015/maritime-atlas--Q4__orchestrate-ux-2-cr1/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1025/cadence--L84/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1025/cadence--L84/5": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1035/ol-companion--L94/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1035/ol-companion--L95/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1035/ol-companion--L95/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1120/cadence--L158/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1140/finance-tracker--L7/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "2026-10-10-1140/finance-tracker--L7/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1150/cadence--L90/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1150/cadence--L90/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1151/maritime-atlas--Q4__accueil-4-ux22/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1151/maritime-atlas--Q4__accueil-4-ux22/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1151/maritime-atlas--Q4__accueil-4-ux23/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1151/maritime-atlas--Q4__accueil-4-ux23/6": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1225/maritime-atlas--Q4__accueil-4-ux22/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1225/maritime-atlas--Q4__accueil-4-ux22/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1232/cadence--L123/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1232/cadence--L123/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "spec-floue"
+  },
+  "2026-10-10-1250/cadence--L123/3": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1250/cadence--L123/5": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1250/cadence--L123/7": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1251/ol-companion--L96/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1300/maritime-atlas--Q4__accueil-4-ux22-direct-etroit/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1300/maritime-atlas--Q4__accueil-4-ux22-direct-etroit/6": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1335/cadence--L146/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1335/cadence--L146/6": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1345/warhammer40k--L80/3": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1345/warhammer40k--L80/5": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "derive-architecture"
+  },
+  "2026-10-10-1355/cadence--L146/3": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1355/cadence--L146/5": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1500/maritime-atlas--Q4__metar-390-legende-chevauche/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1500/maritime-atlas--Q4__metar-390-legende-chevauche/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1510/ol-companion--L101/5": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1510/ol-companion--L101/7": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1510/ol-companion--L102/5": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1510/ol-companion--L102/7": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1530/cadence--L139/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1530/cadence--L139/6": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1600/cadence--L139/3": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
+  },
+  "2026-10-10-1615/maritime-atlas--Q4__dashboard-21-station-vide/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1615/maritime-atlas--Q4__dashboard-21-station-vide/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1620/cadence--L162/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1620/cadence--L162/6": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1630/maritime-atlas--Q4__dashboard-21-mesure-prod/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1645/ol-companion--L107/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1805/ol-companion--L38/5": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1825/finance-tracker--L13/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1835/ol-companion--L38/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1835/ol-companion--L38/7": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "derive-architecture"
+  },
+  "2026-10-10-1905/warhammer40k--L87/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1905/warhammer40k--L91/3": {
+    "cause": "faux-constat",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1930/finance-tracker--L60/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1930/finance-tracker--L60/6": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-1950/ol-companion--L112/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-2010/avatar-pandora--L26/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "2026-10-10-2010/avatar-pandora--L26/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "cadence-issues/cadence--L103/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "cadence-issues/cadence--L103/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "cadence-issues/cadence--L103/8": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "cadence-issues/cadence--L104/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "cadence-issues/cadence--L104/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
+  },
+  "cadence-l122/cadence--L122/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "cadence-l122/cadence--L122/6": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "maritime-sq4-1/maritime-atlas--B64.1/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "maritime-sq4-1/maritime-atlas--Q4__accueil-4-ux-temp-compact-cr3/4": {
+    "cause": "spec-floue",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "maritime-sq4-1/maritime-atlas--Q4__accueil-4-ux-temp-compact-cr4/4": {
+    "cause": "test-manquant",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "maritime-sq4-1/maritime-atlas--Q4__orchestrate-ux-2/4": {
+    "cause": "derive-architecture",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "ol-gains-1/ol-companion--L47/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "ol-gains-1/ol-companion--L47/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "ol-gains-1/ol-companion--L48/4": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  },
+  "ol-gains-1/ol-companion--L48/6": {
+    "cause": "bug-code",
+    "by": "ollama:mistral-small3.2:24b"
+  }
+}

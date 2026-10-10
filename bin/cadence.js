@@ -13,7 +13,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -43,6 +43,9 @@ if (tool === 'raf') {
   cadence lead tour [dossier] [--idle 3] [--json]
                     le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier courant
                     s'il est lui-même un projet ; une première ligne « cadence.yaml · ✗ erreur » si priority: est illisible
+  cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--json]
+                    la mesure des passes de correction des vagues (dossier/.cadence/runs) : lots à ≥1 et ≥2 corrections,
+                    par projet, visibles ou non, passes par cause ; --classify les classe par Ollama (hors quota)
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);
   process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;

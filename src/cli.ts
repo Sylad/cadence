@@ -21,6 +21,7 @@ import { findProjects, leadTour, tourLine } from './lead.js';
 import { liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
+import { classifyAll, measure, ollamaClassifier, readCache, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
@@ -55,6 +56,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--answer projet:lot "réponse"] [--drop projet:lot] ; --drop projet:lot [--wave vague] ; --stop-after-current [--wave vague]
   cadence lead tour [dossier] [--idle 3] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier seul s'il est lui-même un projet (en cours, dérive, notes de clôture, prochain lot prêt, dépôt)
+  cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--json]   mesure des passes de correction des journaux dossier/.cadence/runs : lots à ≥1 et ≥2 corrections, par projet, visibles ou non, passes par cause (classées par Ollama avec --classify, hors quota)
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -140,6 +142,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       ignored: { type: 'boolean' },
       notes: { type: 'boolean' },
       json: { type: 'boolean' },
+      classify: { type: 'boolean' },
+      model: { type: 'string' },
+      cache: { type: 'string' },
+      sample: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -170,6 +176,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     return 0;
   }
+  if (command === 'corrections') return corrections(rest, values, io);
   // --all balaie les sous-dossiers : il ne lit ni le plan ni le cadence.yaml du dossier courant.
   if (command === 'session' && (values.all || values.depth !== undefined)) return sessionAll(rest, values, io);
   // cadence.yaml peut dire où est le plan et, s'il est tenu par un autre outil, comment le lire.
@@ -670,6 +677,41 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
   } catch (e) {
     return [`✗ ${(e as Error).message}`];
   }
+}
+
+/** `cadence corrections` (L165) : la mesure de référence des passes de correction d'une vague, lue dans <dossier>/.cadence/runs. */
+async function corrections(rest: string[], values: { classify?: boolean; model?: string; cache?: string; sample?: string; json?: boolean }, io: Io): Promise<number> {
+  if (rest.length > 1) throw new RafError('usage : cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--json]');
+  const parent = resolve(io.cwd, rest[0] ?? '.');
+  const runsDir = join(parent, '.cadence', 'runs');
+  if (!existsSync(runsDir)) throw new RafError(`corrections : aucun journal de vague dans ${runsDir}`);
+  const sample = values.sample === undefined ? undefined : Number(values.sample);
+  if (sample !== undefined && !(Number.isInteger(sample) && sample > 0)) throw new RafError(`--sample invalide : ${values.sample}`);
+  const model = values.model ?? 'mistral-small3.2:24b';
+  const cacheFile = resolve(io.cwd, values.cache ?? join(parent, '.cadence', 'corrections.json'));
+  const data = readRuns(runsDir);
+  const cache = readCache(cacheFile);
+  if (values.classify) {
+    const classify = ollamaClassifier({ url: io.env.OLLAMA_HOST ?? 'http://localhost:11434', model });
+    await classifyAll(data.passes, cache, classify, model, (done, total) => {
+      if (done % 25 === 0 || done === total) io.err(`classement : ${done}/${total}`);
+    });
+    writeFileSync(cacheFile, serializeCache(cache));
+  }
+  if (sample !== undefined) {
+    const byKey = new Map(data.passes.map((p) => [p.key, p]));
+    for (const key of sampleKeys([...byKey.keys()], sample)) {
+      const p = byKey.get(key)!;
+      io.out(`## ${key} (${p.project} ${p.lot}) · modèle : ${cache.get(key)?.cause ?? 'non classé'}${cache.get(key)?.manual ? ` · relu : ${cache.get(key)!.manual}` : ''}`);
+      for (const f of p.findings) io.out(`- ${f}`);
+      for (const c of p.commits) io.out(`  commit : ${c}`);
+      io.out('');
+    }
+    return 0;
+  }
+  const m = measure(data, cache);
+  io.out(values.json ? JSON.stringify(m, null, 2) : renderReport(m));
+  return 0;
 }
 
 /** `session start|close --all [--depth n]` : la commande jouée dans chaque projet sous le dossier courant, une section par projet. */

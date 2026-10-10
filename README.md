@@ -606,6 +606,29 @@ a `priority:` that is not a list of names (`priority: ol`, `priority: []`) keeps
 no plan. It exits 0 even when a project is in error — that project's line reads
 `beta · ✗ erreur : <cause>`. The `lead` skill runs it instead of one subagent per project.
 
+## corrections
+
+`cadence corrections [folder] [--classify [--model m]] [--cache file] [--sample n] [--json]` measures how often a wave
+has to correct itself. From the folder a wave was launched from (default: the current one) it reads the journals
+`<folder>/.cadence/runs/<wave>/<project>--<lot>.json` of **every project** and prints:
+
+- the **lots with a correction**: of the lots that went through a successful write session, the share with at least one
+  and at least two `fix` passes, per project and for visible versus non-visible lots (`61 %` and `28 %` of 264 lots on 10-10);
+- the **passes by cause**, in total and per project. The cause of a pass is read from the findings of the review that
+  precedes it, among: unclear spec or missing criterion (`spec-floue`), invented business rule (`regle-inventee`),
+  architecture drift (`derive-architecture`), data / SQL (`donnees-sql`), code bug (`bug-code`), missing test
+  (`test-manquant`), false review finding (`faux-constat`). One cause per pass: the root of what forced the fix.
+
+Without `--classify` the command calls no model: the passes not yet classified count as `non classé`. With `--classify`
+each pass is classified by a **local model served by Ollama** (`OLLAMA_HOST`, default `http://localhost:11434`;
+`--model`, default `mistral-small3.2:24b`; temperature 0, output constrained to the seven causes), off the Anthropic quota.
+The classification is cached in `<folder>/.cadence/corrections.json` (or `--cache file`): a re-run classifies only the
+new passes, and a pass the model could not answer stays out of the cache. `--sample n` prints `n` passes spread
+evenly over the sorted keys, with their findings and the model's cause, to be read by hand; a `manual` field written
+beside a pass in the cache file overrides the model's cause in every table and gives the **agreement rate** of the model
+on the reviewed sample. `--json` prints the measure as data. The command reads the journals and writes nothing but the cache.
+The first baseline is in [docs/mesures/corrections-2026-10-10.md](docs/mesures/corrections-2026-10-10.md).
+
 ## deliver
 
 A delivery is done when its checks pass, not when a tool says "success".
@@ -1425,7 +1448,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 
 - **Commands and options** of `raf` and `cadence` (`cadence raf …` is `raf …`): `init`, `add`, `start`, `done`, `drop`,
   `note`, `did`, `public`, `ux`, `review`, `commits`, `show`, `list`, `now`, `ignore`, `check`, `gantt`, `hook`;
-  `cadence news`, `session` (`start`, `close`, `next`, `context`), `lead tour`, `deliver`, `verify`, `orchestrate`,
+  `cadence news`, `session` (`start`, `close`, `next`, `context`), `lead tour`, `corrections`, `deliver`, `verify`, `orchestrate`,
   `skills`; their options and exit codes as this README documents them. A new command or option is a minor change.
 - **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`
   and the keys each of them takes. A key is not renamed nor removed, nor does its meaning change; a new key is a minor change.

@@ -491,7 +491,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       const to = where ? join(stray, relative(l.repo, path).replace(/[\\/]/g, '_')) : stray;
       const moved = moveStray(path, fresh, to);
       if (moved.length) {
-        const text = `${kind} : ${moved.length} fichier(s) non suivi(s) laissé(s)${where} par une étape en lecture seule, déplacé(s) dans ${stray} : ${moved.join(', ')}`;
+        const text = `${kind} : ${moved.length} fichier(s) non suivi(s) laissé(s)${where} par une étape en lecture seule, déplacé(s) dans ${to} : ${moved.join(', ')}`;
         c.lot.warnings.push(text);
         w.log(`${lotKey(l.project, l.lot)} · ${text}`);
       }

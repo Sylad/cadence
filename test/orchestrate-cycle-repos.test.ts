@@ -191,6 +191,8 @@ describe('sessions d\'un lot à dépôt voisin (L62)', () => {
     expect(existsSync(join(h.wave.store.lotDir(c.lot.project, c.lot.lot), 'stray', relative(h.repo, nb).replace(/[\\/]/g, '_'), 'capture.png'))).toBe(true);
     expect(c.lot.warnings.join('\n')).toMatch(/capture\.png/);
     expect(c.lot.warnings.join('\n')).toMatch(/dans \.\.\/gitops/);
+    const dest = join(h.wave.store.lotDir(c.lot.project, c.lot.lot), 'stray', relative(h.repo, nb).replace(/[\\/]/g, '_'));
+    expect(c.lot.warnings.join('\n')).toContain(`déplacé(s) dans ${dest} :`);
   });
 
   it('le contrôle préalable ne part pas quand le voisin porte déjà des commits du lot', async () => {

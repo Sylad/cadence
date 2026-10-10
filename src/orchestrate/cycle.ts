@@ -486,23 +486,21 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
     }
     // Étape en lecture seule qui n'a laissé que des fichiers NON SUIVIS (captures d'un script en chemin relatif, L162) : déplacés dans le dossier du lot, avertissement, le verdict est gardé.
     if (!write && b.head === a.head && b.tracked.join() === a.tracked.join() && b.untracked.join() !== a.untracked.join() && b.untracked.every((f) => a.untracked.includes(f))) {
-      const fresh = a.untracked.filter((f) => !b.untracked.includes(f));
+      const fresh = a.untracked.filter((f) => !b.untracked.includes(f)).map(unquotePath);
       const stray = join(dir, 'stray');
-      if (moveStray(path, fresh, where ? join(stray, relative(l.repo, path).replace(/[\\/]/g, '_')) : stray)) {
-        const text = `${kind} : ${fresh.length} fichier(s) non suivi(s) laissé(s)${where} par une étape en lecture seule, déplacé(s) dans ${stray} : ${fresh.join(', ')}`;
+      const to = where ? join(stray, relative(l.repo, path).replace(/[\\/]/g, '_')) : stray;
+      const moved = moveStray(path, fresh, to);
+      if (moved.length) {
+        const text = `${kind} : ${moved.length} fichier(s) non suivi(s) laissé(s)${where} par une étape en lecture seule, déplacé(s) dans ${stray} : ${moved.join(', ')}`;
         c.lot.warnings.push(text);
         w.log(`${lotKey(l.project, l.lot)} · ${text}`);
-        continue;
       }
+      if (moved.length === fresh.length) continue;
+      // Déplacement partiel : l'incident ne nomme que ce qui reste dans le dépôt.
+      return handBack(c, kind, res.structured, step, where, path, b, a, fresh.filter((f) => !moved.includes(f)));
     }
     if (!write && (b.head !== a.head || b.tracked.join() !== a.tracked.join() || b.untracked.join() !== a.untracked.join())) {
-      // Incident du LOT (L133) : la revue a laissé des traces (captures, commit), ni push ni garde supprimée — les lots des autres dépôts continuent.
-      step.status = 'failed';
-      step.cause = `le dépôt${where} a changé pendant une revue`;
-      const traces = [...trackedPaths(a).filter((f) => !trackedPaths(b).includes(f)), ...a.untracked.filter((f) => !b.untracked.includes(f))];
-      (w.dirtyRepos ??= new Map()).set(path, lotKey(l.project, l.lot));
-      const what = traces.length ? ` (${traces.join(', ')})` : b.head !== a.head ? ' (commit)' : '';
-      return stop(c, 'handed-back', `incident : ${kind} de ${lotKey(l.project, l.lot)} a modifié le dépôt${where}${what}${lostVerdict(c, kind, res.structured)}`);
+      return handBack(c, kind, res.structured, step, where, path, b, a);
     }
   }
   step.status = 'ok';
@@ -510,11 +508,47 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   return { step, report: res.structured, before, after, others };
 }
 
-/** Déplace des fichiers non suivis (chemins relatifs au dépôt) sous `to`, arborescence gardée ; false si l'un n'a pu l'être (l'incident reste alors). */
-function moveStray(repo: string, files: string[], to: string): boolean {
-  try {
-    for (const f of files) {
-      const rel = f.replace(/^"|"$/g, '');
+/** Incident du LOT (L133) : la revue a laissé des traces (captures, commit), ni push ni garde supprimée — les lots des autres dépôts continuent. */
+function handBack(c: LotCtx, kind: StepKind, report: unknown, step: StepState, where: string, path: string, b: Snapshot, a: Snapshot, left?: string[]): null {
+  const l = c.lot;
+  const w = c.wave;
+  step.status = 'failed';
+  step.cause = `le dépôt${where} a changé pendant une revue`;
+  const traces = left ?? [...trackedPaths(a).filter((f) => !trackedPaths(b).includes(f)), ...a.untracked.filter((f) => !b.untracked.includes(f))];
+  (w.dirtyRepos ??= new Map()).set(path, lotKey(l.project, l.lot));
+  const what = traces.length ? ` (${traces.join(', ')})` : b.head !== a.head ? ' (commit)' : '';
+  return stop(c, 'handed-back', `incident : ${kind} de ${lotKey(l.project, l.lot)} a modifié le dépôt${where}${what}${lostVerdict(c, kind, report)}`);
+}
+
+/** Décode un chemin de `git status --porcelain` : entre guillemets, avec les échappements du C-quoting (`\303\251`, `\"`, `\\`, `\t`…). */
+function unquotePath(f: string): string {
+  if (!/^".*"$/s.test(f)) return f;
+  const bytes: number[] = [];
+  const esc: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13 };
+  const body = f.slice(1, -1);
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch !== '\\') {
+      bytes.push(...Buffer.from(ch));
+      continue;
+    }
+    const oct = /^[0-7]{3}/.exec(body.slice(i + 1));
+    if (oct) {
+      bytes.push(parseInt(oct[0], 8));
+      i += 3;
+    } else {
+      const n = body[++i];
+      bytes.push(...(n in esc ? [esc[n]] : Buffer.from(n)));
+    }
+  }
+  return Buffer.from(bytes).toString('utf8');
+}
+
+/** Déplace des fichiers non suivis (chemins relatifs au dépôt, décodés) sous `to`, arborescence gardée ; renvoie ceux qui l'ont été (s'arrête au premier échec). */
+function moveStray(repo: string, files: string[], to: string): string[] {
+  const moved: string[] = [];
+  for (const rel of files) {
+    try {
       const from = join(repo, rel);
       let dest = join(to, rel);
       for (let i = 1; existsSync(dest); i++) dest = join(to, `${rel}.${i}`);
@@ -525,11 +559,12 @@ function moveStray(repo: string, files: string[], to: string): boolean {
         copyFileSync(from, dest); // autre volume
         rmSync(from);
       }
+      moved.push(rel);
+    } catch {
+      break;
     }
-    return true;
-  } catch {
-    return false;
   }
+  return moved;
 }
 
 /** Verdict d'une revue interrompue par un incident du lot : rapporté au lead plutôt que perdu (L133). Rien n'est enregistré dans le plan. */

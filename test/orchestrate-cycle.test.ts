@@ -846,6 +846,61 @@ describe('contrôles autour des sessions', () => {
     expect(git(h.repo, 'status', '--porcelain')).toBe('');
   });
 
+  it('noms non ASCII et guillemets : déplacés tels quels, sans déplacement partiel muet (L162)', async () => {
+    const names = ['capture-accueil.png', 'capture-écran.png', 'x"y.png'];
+    const shots: Handler = (call) => {
+      for (const n of names) writeFileSync(join(call.opts.cwd, n), 'png');
+      return claudeOut(reviewReport());
+    };
+    const h = harness({ script: { implement: [impl()], review: [shots] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    const stray = join(h.wave.store.lotDir(c.lot.project, c.lot.lot), 'stray');
+    for (const n of names) {
+      expect(existsSync(join(h.repo, n))).toBe(false);
+      expect(existsSync(join(stray, n))).toBe(true);
+    }
+    expect(c.lot.warnings.join('\n')).toContain('capture-écran.png');
+  });
+
+  it('le même fichier laissé par deux étapes : suffixe .1, rien d\'écrasé (L162)', async () => {
+    const shot = (body: string): Handler => (call) => {
+      writeFileSync(join(call.opts.cwd, 'capture.png'), body);
+      return claudeOut(reviewReport(body === 'un' ? { majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug' }], verdict: 'non conforme' } : {}));
+    };
+    const h = harness({ script: { implement: [impl()], review: [shot('un'), shot('deux')], fix: [fix('b.txt')] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    const stray = join(h.wave.store.lotDir(c.lot.project, c.lot.lot), 'stray');
+    expect(readFileSync(join(stray, 'capture.png'), 'utf8')).toBe('un');
+    expect(readFileSync(join(stray, 'capture.png.1'), 'utf8')).toBe('deux');
+    expect(c.lot.warnings).toHaveLength(2);
+  });
+
+  it('déplacement impossible : l\'incident du lot reste, les fichiers déjà déplacés sont journalisés (L162)', async () => {
+    const shots: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'a-capture.png'), 'png');
+      mkdirSync(join(call.opts.cwd, 'shots'));
+      writeFileSync(join(call.opts.cwd, 'shots', 'b.png'), 'png');
+      return claudeOut(reviewReport());
+    };
+    const h = harness({ script: { implement: [impl()], review: [shots] } });
+    const c = h.lot('L1');
+    // un FICHIER à la place du dossier « shots » dans stray/ : le second déplacement échoue
+    const stray = join(h.wave.store.lotDir(c.lot.project, c.lot.lot), 'stray');
+    mkdirSync(stray, { recursive: true });
+    writeFileSync(join(stray, 'shots'), 'obstacle');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/a modifié le dépôt/);
+    expect(c.lot.outcome).toMatch(/shots\/b\.png/);
+    expect(c.lot.outcome).not.toMatch(/a-capture\.png/);
+    expect(existsSync(join(stray, 'a-capture.png'))).toBe(true);
+    expect(c.lot.warnings.join('\n')).toMatch(/a-capture\.png/);
+  });
+
   it('le lot suivant du même dépôt n\'est pas suspendu par des captures non suivies (L162)', async () => {
     const shots: Handler = (call) => {
       writeFileSync(join(call.opts.cwd, 'capture.png'), 'png');

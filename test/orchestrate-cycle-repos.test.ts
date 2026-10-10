@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import type { OrchestrateConfig } from '../src/config.js';
 import { renderBrief, reposText, type BriefVars } from '../src/orchestrate/briefs.js';
 import { runLot } from '../src/orchestrate/cycle.js';
@@ -172,6 +172,25 @@ describe('sessions d\'un lot à dépôt voisin (L62)', () => {
     expect(h.wave.incident).toBeNull();
     expect(c.lot.outcome).toMatch(/a modifié le dépôt dans/);
     expect(h.plan().lot('L1').review).toBeUndefined();
+  });
+
+  it('un fichier non suivi laissé par la revue dans le voisin : déplacé dans stray/<voisin avec _>, le lot continue (L162)', async () => {
+    const { h, c, nb } = scenario((n) => ({
+      implement: [both(n)],
+      review: [
+        () => {
+          writeFileSync(join(nb, 'capture.png'), 'png');
+          return claudeOut(reviewReport());
+        },
+      ],
+    }));
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(h.wave.incident).toBeNull();
+    expect(existsSync(join(nb, 'capture.png'))).toBe(false);
+    expect(existsSync(join(h.wave.store.lotDir(c.lot.project, c.lot.lot), 'stray', relative(h.repo, nb).replace(/[\\/]/g, '_'), 'capture.png'))).toBe(true);
+    expect(c.lot.warnings.join('\n')).toMatch(/capture\.png/);
+    expect(c.lot.warnings.join('\n')).toMatch(/dans \.\.\/gitops/);
   });
 
   it('le contrôle préalable ne part pas quand le voisin porte déjà des commits du lot', async () => {

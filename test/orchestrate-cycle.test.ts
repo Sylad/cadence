@@ -2131,6 +2131,21 @@ describe('contrôle préalable sur le modèle local (L146)', () => {
     expect(c.lot.status).toBe('ready');
   });
 
+  it('session locale réussie : ses jetons ne débitent pas le budget de la vague (seules les étapes Sonnet comptent)', async () => {
+    const gros = { input: 9_000_000, cacheWrite: 5_000_000, cacheRead: 3_000_000, output: 2_000_000 };
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport(), gros)], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, localCfg);
+    await runLot(c);
+    expect(h.calls[0].local).toBe(true);
+    const [locale, ...sonnet] = c.lot.steps;
+    expect(locale.tokens).toMatchObject({ counted: 0 });
+    expect(locale.tokens!.output).toBe(2_000_000); // tracé dans l'étape, mais hors budget
+    const attendu = sonnet.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
+    expect(attendu).toBeGreaterThan(0);
+    expect(h.wave.budget.consumed).toBe(attendu);
+    expect(h.wave.budget.cacheRead).toBe(sonnet.reduce((n, s) => n + (s.tokens?.cacheRead ?? 0), 0));
+  });
+
   it('rapport local illisible : repli sur Sonnet', async () => {
     const h = harness({ script: { precheck: [() => claudeOut({ nimporte: 1 }), () => claudeOut(precheckReport())], implement: [impl()], review: [ok] } });
     const c = h.lot('L1', {}, localCfg);

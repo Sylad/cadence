@@ -67,6 +67,21 @@ export function readPsProcs(run: typeof execFileSync = execFileSync): Map<number
   return procs;
 }
 
+/**
+ * Nom (comm), état, parent et heure de démarrage (champ 22) lus dans `<procRoot>/<pid>/stat` ; null s'il est sorti ou
+ * illisible. Seul lecteur de ce fichier : « pid (comm) état ppid … starttime … », comm peut contenir espaces et parenthèses.
+ */
+export function readStat(procRoot: string, pid: number): { name: string; state: string; ppid: number; start: string } | null {
+  try {
+    const stat = readFileSync(`${procRoot}/${pid}/stat`, 'utf8');
+    const close = stat.lastIndexOf(')');
+    const f = stat.slice(close + 2).split(' ');
+    return { name: stat.slice(stat.indexOf('(') + 1, close), state: f[0]!, ppid: Number(f[1]), start: f[19]! };
+  } catch {
+    return null;
+  }
+}
+
 /** Tous les processus visibles : /proc sous Linux (starttime, champ 22 de stat), `ps` ailleurs (lstart) ; null si illisibles. */
 export function readProcs(): Map<number, ProcInfo> | null {
   const procs = new Map<number, ProcInfo>();
@@ -78,14 +93,8 @@ export function readProcs(): Map<number, ProcInfo> | null {
   }
   if (names) {
     for (const n of names) {
-      try {
-        const stat = readFileSync(`/proc/${n}/stat`, 'utf8');
-        // « pid (comm) état ppid … starttime … » — comm peut contenir espaces et parenthèses
-        const f = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
-        procs.set(Number(n), { ppid: Number(f[1]), start: f[19]!, zombie: f[0] === 'Z' });
-      } catch {
-        // sorti entre-temps
-      }
+      const st = readStat('/proc', Number(n));
+      if (st) procs.set(Number(n), { ppid: st.ppid, start: st.start, zombie: st.state === 'Z' });
     }
   } else {
     return readPsProcs();
@@ -96,12 +105,9 @@ export function readProcs(): Map<number, ProcInfo> | null {
 /** Heure de démarrage d'un processus (son identité : un pid se réutilise) ; null s'il est mort ou illisible. */
 export function processStart(pid: number): string | null {
   if (!Number.isInteger(pid) || pid <= 0) return null;
-  try {
-    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
-    return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19] ?? null;
-  } catch {
-    // pas de /proc (macOS) ou processus sorti : ps
-  }
+  const st = readStat('/proc', pid);
+  if (st?.start) return st.start;
+  // pas de /proc (macOS) ou processus sorti : ps
   try {
     const out = execFileSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     return out || null;
@@ -340,17 +346,6 @@ export function psEnvArgs(platform: NodeJS.Platform = process.platform): string[
   return [platform === 'darwin' ? '-axEww' : 'axeww', '-o', 'pid=,ppid=,command='];
 }
 
-/** Nom (comm) et parent d'un processus lus dans `<procRoot>/<pid>/stat` ; null s'il est sorti ou illisible. */
-function procInfo(procRoot: string, pid: number): { name: string; ppid: number } | null {
-  try {
-    const stat = readFileSync(`${procRoot}/${pid}/stat`, 'utf8');
-    const close = stat.lastIndexOf(')');
-    return { name: stat.slice(stat.indexOf('(') + 1, close), ppid: Number(stat.slice(close + 2).split(' ')[1]) };
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Pids des processus (hors cadence) dont l'environnement porte `<SESSION_MARK_VAR>=<mark>` : /proc, sinon `ps` (`-E` sur
  * macOS, `e` sur Linux). Les démons partagés (SHARED_DAEMONS) qui portent la marque, et leurs descendants, n'en font pas partie.
@@ -376,7 +371,7 @@ export function findMarked(mark: string, io: FindMarkedIo = {}): number[] {
       }
     }
     const markedSet = new Set(found);
-    return found.filter((pid) => !underSharedDaemon(pid, (p) => procInfo(procRoot, p), markedSet));
+    return found.filter((pid) => !underSharedDaemon(pid, (p) => readStat(procRoot, p), markedSet));
   }
   try {
     const out = run('ps', psEnvArgs(platform), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });

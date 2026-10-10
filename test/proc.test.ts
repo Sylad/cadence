@@ -1,9 +1,9 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { findMarked, killMarked, MAX_SNAPSHOT_AGE_MS, psEnvArgs, readPsProcs, SESSION_MARK_VAR, TreeTracker } from '../src/proc.js';
+import { findMarked, killMarked, MAX_SNAPSHOT_AGE_MS, psEnvArgs, readPsProcs, readStat, SESSION_MARK_VAR, TreeTracker } from '../src/proc.js';
 
 type Procs = NonNullable<ReturnType<typeof readPsProcs>>;
 const table = (...rows: [pid: number, ppid: number, start: string][]): Procs =>
@@ -385,6 +385,21 @@ describe('findMarked — repli sans /proc (macOS)', () => {
     } finally {
       child.kill('SIGKILL');
       other.kill('SIGKILL');
+    }
+  });
+});
+
+describe('readStat — lecture commune de /proc/<pid>/stat', () => {
+  it('comm avec espaces et parenthèses : nom, parent, état et heure de démarrage restent justes', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'stat-'));
+    try {
+      mkdirSync(join(dir, '42'));
+      const rest = ['S', '7', ...Array(17).fill('0'), '999', '0'];
+      writeFileSync(join(dir, '42', 'stat'), `42 (we) ird) ${rest.join(' ')}\n`);
+      expect(readStat(dir, 42)).toEqual({ name: 'we) ird', ppid: 7, state: 'S', start: '999' });
+      expect(readStat(dir, 43)).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

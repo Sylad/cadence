@@ -1,68 +1,67 @@
 # Mesure de référence des corrections de vague (L165)
 
-Relevé du 2026-10-10 (en fin de journée : 255 passes, 29 % à ≥2 corrections, un lot ayant reçu une seconde correction depuis les 61 % / 28 % du plan) sur les journaux `.cadence/runs` de tous les projets (125 vagues). Point de départ du lot suivant (L166) : son critère de réussite se mesure contre ces chiffres.
+Relevé du 2026-10-10, arrêté aux vagues créées avant 18 h 31 UTC (125 vagues, journaux `.cadence/runs` de tous les projets) : 258 passes de correction sur 266 lots, 61 % des lots à au moins une correction, 29 % à au moins deux (le plan citait 61 % et 28 % sur 227 passages, relevés plus tôt dans la journée). Point de départ du lot suivant (L166) : son critère de réussite se mesure contre ces chiffres.
 
-Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/corrections-classement.json` (relecture seule, aucun appel au modèle ; `--classify` reclasse les passes absentes du cache).
+Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/corrections-classement.json --until 2026-10-10T18:31Z` (relecture seule, aucun appel au modèle ; `--classify` reclasse les passes absentes du cache ; `--until` borne le relevé aux vagues créées jusque-là, sans quoi les vagues suivantes changent les chiffres). Le test `test/corrections-mesure.test.ts` rejoue cette commande sur les journaux et vérifie que la section « Résultats » ci-dessous en est la sortie exacte.
 
 ## Méthode
 
 - **Lot** : un enregistrement de journal dont une session d'écriture (`implement`) a abouti ; un lot rejoué dans plusieurs vagues compte plusieurs fois. **Passe de correction** : un pas `fix` abouti.
-- **Cause** : une seule par passe, celle du constat le plus grave de la revue qui la précède. Classement par `mistral-small3.2:24b` (Ollama local, température 0, hors quota Anthropic), puis relecture à la main de 24 passes réparties sur les clés triées (`--sample 24`).
+- **Cause** : une seule par passe, celle du constat le plus grave de la revue qui la précède. Classement par `mistral-small3.2:24b` (Ollama local, température 0, hors quota Anthropic), puis relecture à la main.
 - **Premier essai écarté** : avec un premier prompt, le modèle mettait 169 passes sur 254 en « spec floue » et n'était d'accord avec la relecture que sur 5 passes sur 24 ; le prompt a été resserré (bug de code par défaut, « spec floue » seulement si le constat dit que l'énoncé est flou). Le classement ci-dessous est le second.
-- **Fiabilité** : sur les 24 passes relues, le second classement est d'accord sur 16 (67 %). Les relectures priment dans les tableaux. Les écarts viennent surtout de la frontière entre bug de code, test manquant et dérive d'architecture (doc non suivie) : lire les parts par cause comme un ordre de grandeur, pas comme une mesure exacte. La relecture est celle d'une seule personne.
-- **Passes sans revue** : 4 passes (cadence L154, evatosorus L33, warhammer40k L80 et L91) ont été déclenchées par des tests rouges juste après l'écriture, sans revue : elles n'ont aucun constat à lire, sont comptées à part et ne passent pas par le modèle. Une première version les envoyait au modèle, qui en classait 3 en « faux constat de revue » : cette ligne mesurait donc des passes sans revue, non des erreurs de revue (elle vaut 0).
-- Limite : une passe peut avoir plusieurs constats de causes différentes ; seule la plus grave est comptée.
+- **Fiabilité** : l'échantillon de `--sample 24` (24 passes réparties sur les clés triées, qui ont toutes des constats) a été relu en entier sur le code final : le modèle est d'accord avec la relecture sur 18 passes sur 24 (75 %). Au total 62 passes ont été relues (cet échantillon et ceux des relevés précédents, dont les clés ont changé quand le nombre de passes a changé) : accord sur 47 (76 %). Les relectures priment dans les tableaux. Les désaccords viennent de la frontière entre bug de code, test manquant (un test qui ne peut pas échouer ou une sonde non mise à jour y sont rangés) et dérive d'architecture (doc non suivie) : lire les parts par cause comme un ordre de grandeur, pas comme une mesure exacte. La relecture est celle d'une seule personne, et elle lit le premier constat de chaque passe.
+- **Passes sans revue** : 13 passes (cadence L84 et L154, claude-code-codex L16, evatosorus L24 ×2 et L33, finance-tracker L3, warhammer40k L54, L60 ×2, L74, L80, L91) n'ont aucun constat à lire : déclenchées par des tests rouges juste après l'écriture, ou deuxième passe `fix` d'une revue déjà traitée par la première. Elles sont comptées à part et ne passent pas par le modèle. Une première version les envoyait au modèle, qui en classait en « faux constat de revue » : cette ligne mesurait donc des passes sans revue, non des erreurs de revue (elle vaut 0).
+- Limite : une passe peut avoir plusieurs constats de causes différentes ; seule la plus grave est comptée. « Faux constat de revue » et « données / SQL » valent 0 : aucun constat relu n'était une erreur de la revue elle-même, et les projets mesurés n'ont guère de SQL.
 
 ## Résultats
 
-**264 lots** passés par une session d'écriture, **255 passes de correction** : 61 % des lots ont eu au moins une correction, 29 % au moins deux.
+**266 lots** passés par une session d'écriture, **258 passes de correction** : 61 % des lots ont eu au moins une correction, 29 % au moins deux.
 
 ### Par cause
 
 | Cause | Passes | Part |
 |---|---|---|
-| spec floue ou critère absent | 30 | 12 % |
+| spec floue ou critère absent | 27 | 10 % |
 | règle de gestion inventée | 1 | 0 % |
-| dérive d'architecture | 36 | 14 % |
+| dérive d'architecture | 31 | 12 % |
 | données / SQL | 0 | 0 % |
-| bug de code | 135 | 53 % |
-| test manquant | 49 | 19 % |
+| bug de code | 135 | 52 % |
+| test manquant | 51 | 20 % |
 | faux constat de revue | 0 | 0 % |
-| sans revue (tests rouges) | 4 | 2 % |
+| sans revue (tests rouges) | 13 | 5 % |
 
 ### Par cause et par projet (passes)
 
 | Projet | spec floue ou critère absent | règle de gestion inventée | dérive d'architecture | données / SQL | bug de code | test manquant | faux constat de revue | sans revue (tests rouges) | Total |
 |---|---|---|---|---|---|---|---|---|---|
-| avatar-pandora | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 2 |
-| cadence | 15 | 0 | 15 | 0 | 59 | 30 | 0 | 1 | 120 |
-| claude-code-codex | 0 | 0 | 2 | 0 | 4 | 3 | 0 | 0 | 9 |
-| evatosorus | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 1 | 4 |
-| finance-tracker | 1 | 1 | 5 | 0 | 12 | 2 | 0 | 0 | 21 |
-| maritime-atlas | 8 | 0 | 3 | 0 | 22 | 5 | 0 | 0 | 38 |
-| ol-companion | 1 | 0 | 6 | 0 | 27 | 6 | 0 | 0 | 40 |
-| warhammer40k | 5 | 0 | 5 | 0 | 6 | 3 | 0 | 2 | 21 |
+| avatar-pandora | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 3 |
+| cadence | 14 | 0 | 14 | 0 | 62 | 30 | 0 | 2 | 122 |
+| claude-code-codex | 0 | 0 | 2 | 0 | 4 | 2 | 0 | 1 | 9 |
+| evatosorus | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 3 | 4 |
+| finance-tracker | 1 | 1 | 4 | 0 | 12 | 2 | 0 | 1 | 21 |
+| maritime-atlas | 8 | 0 | 3 | 0 | 21 | 6 | 0 | 0 | 38 |
+| ol-companion | 1 | 0 | 5 | 0 | 27 | 7 | 0 | 0 | 40 |
+| warhammer40k | 3 | 0 | 3 | 0 | 5 | 4 | 0 | 6 | 21 |
 
 ### Lots avec correction
 
 | Projet | Lots | ≥ 1 correction | ≥ 2 corrections | Passes |
 |---|---|---|---|---|
-| avatar-pandora | 1 | 1 (100 %) | 1 (100 %) | 2 |
-| cadence | 124 | 77 (62 %) | 37 (30 %) | 120 |
+| avatar-pandora | 2 | 2 (100 %) | 1 (50 %) | 3 |
+| cadence | 125 | 78 (62 %) | 38 (30 %) | 122 |
 | claude-code-codex | 7 | 6 (86 %) | 2 (29 %) | 9 |
 | evatosorus | 2 | 2 (100 %) | 1 (50 %) | 4 |
 | finance-tracker | 12 | 10 (83 %) | 8 (67 %) | 21 |
 | maritime-atlas | 39 | 30 (77 %) | 8 (21 %) | 38 |
 | ol-companion | 49 | 24 (49 %) | 14 (29 %) | 40 |
 | warhammer40k | 30 | 11 (37 %) | 5 (17 %) | 21 |
-| **Total** | 264 | 161 (61 %) | 76 (29 %) | 255 |
+| **Total** | 266 | 163 (61 %) | 77 (29 %) | 258 |
 
 ### Lots visibles et non visibles
 
 | Lots | Lots | ≥ 1 correction | ≥ 2 corrections | Passes |
 |---|---|---|---|---|
-| visibles | 55 | 26 (47 %) | 15 (27 %) | 47 |
-| non visibles | 209 | 135 (65 %) | 61 (29 %) | 208 |
+| visibles | 56 | 27 (48 %) | 15 (27 %) | 48 |
+| non visibles | 210 | 136 (65 %) | 62 (30 %) | 210 |
 
-Échantillon relu à la main : 24 passes, le modèle local est d'accord avec la relecture sur 16 (67 %) ; la cause relue prime dans les tableaux.
-
+Échantillon relu à la main : 62 passes, le modèle local est d'accord avec la relecture sur 47 (76 %) ; la cause relue prime dans les tableaux.

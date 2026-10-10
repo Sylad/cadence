@@ -1968,10 +1968,12 @@ lots:
   - id: L171
     title: "Étape spec d'orchestrate : spec-writer, rendu 1440/390 (spec etape-spec, S3)"
     status: doing
-    estimate: 1
+    estimate: 2
     after: [ L170 ]
     created: 2026-10-10
     started: 2026-10-11
+    notes:
+      - { date: 2026-10-11, text: "Rendu par la vague 2026-10-11-0020 (budget du lot atteint avant la 2e correction), estimation passée à 2. Reste à corriger : (1) MAJEUR cycle.ts:782 — le chemin fiche du rapport est utilisé tel quel : un chemin absolu donne /repo/repo/… et un préfixe ./ fait échouer git.has → faux écarts puis lot rendu ; normaliser (relative(repo, resolve(repo, fiche))), refuser un chemin hors du dépôt, test ; SPEC_SCHEMA et spec.md demandent un chemin relatif au dépôt ; (2) MAJEUR README.md:1035 — dire que la spec n'est sautée à la reprise que si la fiche passe checkSpec et ne porte aucune hypothèse coûteuse (firstWrite, cycle.ts:728-732)" }
   - id: L172
     title: "Revue UX de la maquette : ux-reviewer mode maquette (spec etape-spec, S4)"
     status: todo

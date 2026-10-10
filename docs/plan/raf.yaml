@@ -1471,17 +1471,19 @@ lots:
     finished: 2026-10-08
   - id: L123
     title: "qa-reviewer : périmètre réduit aux pages touchées par le lot (pages qui appellent les endpoints changés, pages du lot visible, plus la page d'accueil) et lecture du DOM en texte d'abord, capture seulement sur un écart ; garder le cas « lot backend qui vide une page » (13 % du coût sur 24 h le 08-10) ; mesurer avant/après sur une livraison ol ou warhammer"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-08
     started: 2026-10-10
     tasks:
-      - { id: t1, title: "mesurer avant/après le coût de qa-reviewer sur une livraison ol ou warhammer : relever la ligne Scope + coût du run avec l'ancien périmètre (toutes pages, captures) et avec le nouveau, comparer sur un lot qui touche des endpoints, et sur le cas « lot backend qui vide une page » (13 % du coût sur 24 h le 08-10)", status: todo }
+      - { id: t1, title: "mesurer avant/après le coût de qa-reviewer sur une livraison ol ou warhammer : relever la ligne Scope + coût du run avec l'ancien périmètre (toutes pages, captures) et avec le nouveau, comparer sur un lot qui touche des endpoints, et sur le cas « lot backend qui vide une page » (13 % du coût sur 24 h le 08-10)", status: done }
     notes:
       - { date: 2026-10-10, text: "Revue 10-10 : le titre demande une mesure avant/après sur une livraison ol ou warhammer ; elle n'est pas faite par 3e5305c/257df2d (la ligne Scope du rapport la rend possible, rien de plus). Portée par la sous-tâche L123/t1 : L123 ne se clôt pas tant que L123/t1 n'est pas faite, avec les chiffres notés ici." }
       - { date: 2026-10-10, text: "Rendu par la vague 1232 (10-10) après 2 corrections, 3 commits (3e5305c 257df2d 84bc2c2) ; reste 1 majeur : le périmètre réduit se fonde sur les routes changées, donc un lot backend qui vide une page SANS changer de route n'est pas couvert. Règle attendue : si le diff du lot ne change aucune route (ou si l'agent ne peut pas relier le diff à des pages), le repli est explicite et obligatoire : parcourir toutes les pages et le dire ; un lot backend touche en plus les pages qui consomment les services modifiés (grep des appels)" }
       - { date: 2026-10-10, text: "10-10 : code prêt (revue conforme, 1253 tests, build) ; t1 (mesure avant/après) à faire par le lead sur la prochaine livraison ol : référence avant = QA 13 pages ≈ 123 k et 159 k tokens (L83, L94/L95 le 10-10) ; ⚠ le cache du plugin (~/.claude/plugins/cache/cadence/cadence/0.22.0) est en retard sur 0.27.1 : les agents utilisés par le lead aujourd'hui sont les anciens" }
+      - { date: 2026-10-10, text: "t1 mesuré 10-10 sur la livraison ol e00722d (L96 L104 L105), nouvel agent via claude -p --agents (Sonnet) : 4 pages (périmètre /fixtures, /nouveautes, / + page match atteinte) au lieu de 13, 240 s au lieu de 971–1019 s, 10,8 k tokens de sortie + 63 k en cache + 625 k relus, 0,48 $, 0 défaut ; avant (agent du cache 0.22.0, Agent tool) : 123 k et 159 k tokens d'agent sur 13 pages" }
     review: { date: 2026-10-10, verdict: "conforme après 1 mineur (README:1286 dit encore « endpoints cannot be mapped » au lieu de « diff cannot be linked ») ; la clôture attend la mesure L123/t1 — orchestré (vague 2026-10-10-1250, 2 passe(s) de correction + passe des mineurs)", commit: 3e523c13464efed16367e4e1b8010e66b9058c8e }
+    finished: 2026-10-10
   - id: L124
     title: "orchestrate : un lot rendu au lead pour « budget du lot atteint » juste avant sa revue finale n'est pas reprenable (--resume répond « vague terminée », exit 2, vécu 08-10 sur 3 lots de maritime-sq4-1, 209–224 k pour un plancher de 200 k) — soit --resume --budget relève le budget des lots rendus et rejoue l'étape manquante, soit le plancher couvre precheck + implement + review + fix + review courte (~250 k mesurés)"
     status: dropped
@@ -1707,6 +1709,7 @@ lots:
     started: 2026-10-10
     notes:
       - { date: 2026-10-10, text: "reste ouvert (revue 10-10) : (1) comparaison sur 5 lots verdict/durée local vs Sonnet non faite (un seul essai : 8,9 s, oui juste) ; (2) « tour / lectures mécaniques » sur le modèle local non fait. Ne pas clore le lot avant." }
+      - { date: 2026-10-10, text: "Rendu par la vague 1335 (10-10) après 2 corrections, 449 k tokens, 4 commits (7587ded 29a90c7 f2e76e1 bbdc2c1) ; 2 majeurs restants : src/orchestrate/cycle.ts:462 — Ce que promettent le README et le CHANGELOG (« nothing counted in the lot's budget ») n'est vérifié par aucun test quand la session locale réussit. Il dépend de deux lignes : `if (!local) w.budget.add(res.tokens)` (l. 46 ‖ null:null — Le lot n'est pas livré en entier. Son titre demande aussi (1) « tour / lectures mécaniques » sur le modèle local et (2) « comparer sur 5 lots verdict et durée avec la version Sonnet ». Les 3 commits ne font passer en loc ; restent aussi ouvertes la comparaison sur 5 lots (verdict + durée vs Sonnet) et les lectures mécaniques" }
   - id: L147
     title: "orchestrate --continue : la vague tire elle-même le prochain lot prêt du plan quand un lot se termine, dans l'ordre de priorité déclaré dans le dossier parent (cadence > maritime > reste), jusqu'à un budget, une fenêtre horaire (--until 18:00), une limite d'usage, une question posée, deux lots rendus de suite ou plus aucun lot prêt dont l'estimation tient dans le budget restant ; exclus : lots « à décider avec Sylvain » et after non levé ; demande Sylvain 09-10 (temps morts quand il n'est pas devant le PC)"
     status: done

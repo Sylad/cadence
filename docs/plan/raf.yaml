@@ -1782,6 +1782,7 @@ lots:
     created: 2026-10-09
   - id: L157
     title: "CHANGELOG [Unreleased] : la ligne L83 sur les démons partagés dit l'inverse du défaut (« spared the lead's tmux panes » → tuer par la marque les TUAIT ; l'exclusion les épargne), aligner sur README:1125"
+    estimate: 0.1
     status: todo
     estimate: 1
     created: 2026-10-10

@@ -362,6 +362,9 @@ describe('skills install', () => {
     expect(output).toContain('**Scope**');
     expect(output).toContain('pages walked of pages in the expectations');
     expect(output).toContain('captures taken');
+    // La rubrique « Not walked » que les skills et le README citent existe dans le rapport.
+    expect(output).toContain('« Not walked »');
+    expect(output).toContain('naming each page not walked and why');
   });
 
   it('les skills lead et session-close nomment la porte de revue de code', () => {

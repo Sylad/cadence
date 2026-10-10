@@ -146,7 +146,7 @@ from the first page.
 
 A short report:
 
-- **Scope**, one line: the lot id (or "none: every page"), the pages walked of pages in the expectations (or routes discovered), the pages not walked and why, and the captures taken — the figures to compare from one pass to the next.
+- **Scope**, one line: the lot id (or "none: every page"), the pages walked of pages in the expectations (or routes discovered), a « Not walked » list naming each page not walked and why, and the captures taken — the figures to compare from one pass to the next.
 - **Pages checked N/N**, with the base URL and the date and time of the run, and the two widths. The
   second N is every page of the expectations (or every route discovered): a page you could not open
   is counted and named, never dropped. A page counts as checked when both widths were measured; a

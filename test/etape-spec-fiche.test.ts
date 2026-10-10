@@ -67,6 +67,22 @@ describe('fiche d\'écran de l\'exemple (L166)', () => {
     expect(spec).toMatch(/`api:` = les seules `actions\[\]`\s+de chargement \(`declencheur: null`\) en GET/);
   });
 
+  it('porte l\'état de chaque règle et en déduit shows/never/api sans contredire l\'exemple', () => {
+    for (const r of fiche.regles) expect(fiche.etats).toContain(r.etat);
+    expect(spec).toMatch(/`etat`/);
+    const propres = new Set(fiche.regles.filter((r: any) => r.etat === 'vide' || r.etat === 'erreur').flatMap((r: any) => r.champs ?? []));
+    // un champ affiché page chargée ne peut pas être « propre à un état » : il sortirait de shows:
+    for (const c of fiche.champs.filter((x: any) => x.obligatoire && x.source !== 'statique')) expect(propres.has(c.id)).toBe(false);
+    expect(spec).toMatch(/may be empty when/);
+    expect(spec).toMatch(/`never:`[^\n]*règles d'état `erreur`/);
+  });
+
+  it('isole les tests d\'acceptation rouges des autres lots du dépôt et étend le verrou à toute session', () => {
+    expect(spec).toMatch(/autres lots du dépôt/);
+    expect(spec).toMatch(/exclus de `config\.test`/);
+    expect(spec).toMatch(/toute session du dépôt/);
+  });
+
   it('sépare l\'essai (S7) de la mesure à 8 lots (S8) et fait dépendre la mise à jour de lead.md de S6', () => {
     const ligne = (id: string) => spec.split('\n').find((l) => l.startsWith(`| ${id} |`)) ?? '';
     expect(ligne('S7')).not.toMatch(/mesure/i);

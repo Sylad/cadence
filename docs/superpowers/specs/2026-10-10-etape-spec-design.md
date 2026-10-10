@@ -61,7 +61,7 @@ Voir l'exemple. Clés de premier niveau :
 | `ecran` | `id`, `titre`, `route`, `lot`, `largeurs` (`[1440, 390]`), `maquette` (chemin) |
 | `etats` | au moins `vide`, `chargement`, `erreur` (+ `charge`) |
 | `champs[]` | `id` (kebab-case, unique : c'est aussi le `data-testid`), `libelle`, `type`, `source` (appel API et chemin dans la réponse, ou `statique`, ou `action Ax`), `obligatoire` (booléen) |
-| `regles[]` | `id` (`R1`, `R2`… dans l'ordre), `enonce`, `message` (texte exact à l'écran, ou `null`), `champs` (ids concernés), `statut`, `tests[]` |
+| `regles[]` | `id` (`R1`, `R2`… dans l'ordre), `etat` (un des `etats` : l'état où la règle s'applique et où son message est visible), `enonce`, `message` (texte exact à l'écran, ou `null`), `champs` (ids concernés), `statut`, `tests[]` |
 | `actions[]` | `id` (`A1`…), `declencheur` (id d'un champ, ou `null` pour le chargement), `appel` (`VERBE /chemin`), `regles` (règles qu'elle porte) |
 
 **Statut d'une règle** — c'est ce qui rend l'invention visible :
@@ -74,7 +74,7 @@ Voir l'exemple. Clés de premier niveau :
 Invariants (vérifiés par le test de l'exemple, puis par `cadence spec check`, lot S2) : ids de champs
 uniques ; règles numérotées sans trou ; chaque règle a un statut et sa justification ; les actions et
 les règles ne citent que des ids existants ; chaque règle a au moins un test prévu, nommé `Rn — …` ;
-au moins les états vide, chargement, erreur.
+au moins les états vide, chargement, erreur ; chaque règle a un `etat` qui est l'un des `etats`.
 
 ### 3. Revue UX de la maquette
 
@@ -82,7 +82,7 @@ L'agent `ux-reviewer` gagne un mode « maquette » : il ouvre `maquette.html` (f
 d'application), regarde les captures 1440/390 de chaque état, lit la fiche, et rend des constats classés
 bloquant / majeur / mineur, chacun avec la règle (Nielsen, WCAG 2.2 AA) ou la mesure. Il vérifie en
 plus la **cohérence maquette ↔ fiche** : chaque champ présent des deux côtés, chaque message de règle
-visible dans l'état qui le porte, les `data-testid` posés. Un bloquant ou un majeur renvoie à
+visible dans l'état que porte sa clé `etat`, les `data-testid` posés. Un bloquant ou un majeur renvoie à
 l'agent spec (passe 2, session neuve avec les constats) ; après la passe 2, ce qui reste est rendu au
 lead avec le lot ; les mineurs vont en notes du lot. Le verdict de cette revue **n'est pas** `raf ux` :
 c'est la passe de conformité après code qui garde ce rôle.
@@ -116,15 +116,28 @@ lancer les tests du projet (pas le code d'implémentation à écrire). Contrat :
   `docs/specs/<écran>/acceptation.json`). L'implémentation les rend verts **sans les modifier** ;
   à la fin de chaque `implement` et `fix`, le cycle compare les empreintes (lot S5 : contrôle propre
   à l'étape, la garde actuelle de `guard.ts` ne porte que sur le push) et rend le lot au lead si un de ces
-  fichiers a changé. Une modification utile est une question au lead
+  fichiers a changé. Le verrou vaut pour **toute session du dépôt** (un dépôt n'a qu'une file : le lot
+  suivant tourne sur la même branche) : le contrôle porte sur les `acceptation.json` de tous les lots, pas
+  seulement du lot courant. Une modification utile est une question au lead
   ou un constat de revue — jamais un geste silencieux.
+- **Isolement des autres lots du dépôt** : le cycle relance `config.test` après chaque `implement`/`fix`,
+  et des tests rouges commités feraient échouer les autres lots du dépôt (passes `fix` « tests rouges »
+  sur un travail qui n'est pas le leur). Les fichiers listés dans `acceptation.json` sont donc
+  **exclus de `config.test`** tant que leur lot n'est pas vert (l'étape retire ces fichiers de la commande, S5) ; seul
+  le lot propriétaire les lance, par une commande dédiée, et ils rejoignent `config.test` quand il est
+  vert. Si le lot est rendu au lead (question, budget, passes épuisées), ses tests restent rouges mais
+  exclus : les lots suivants ne les voient pas ; le lot reprend (`--resume`) avec le même verrou.
 - Hors champ : ce qui ne s'automatise pas (rendu, ergonomie, lisibilité) reste à la passe UX de
   conformité.
-- `docs/qa/expectations.md` est **dérivé de la fiche** (`cadence spec qa`) : `shows:` = champs
-  obligatoires, **sauf** les champs propres à un état (un champ cité par une règle de l'état vide ou
-  d'erreur, comme `message-vide`), qui ne sont pas visibles page chargée et vont, par leur message, dans
-  `never:` avec les messages de règles qui signalent un état dégradé ; `api:` = les seules `actions[]`
-  de chargement (`declencheur: null`) en GET, la passe QA n'envoyant jamais de POST ; les actions
+- `docs/qa/expectations.md` est **dérivé de la fiche** (`cadence spec qa`), à partir de la clé `etat` des
+  règles. Un champ est **propre à un état** quand une règle d'état `vide` ou `erreur` le cite
+  (comme message-vide) ; une règle ne cite donc dans `champs` que les champs qu'elle fait apparaître (ceux
+  qu'elle masque restent dans son énoncé). Ensuite : `shows:` = champs obligatoires, **sauf** les champs propres à un état
+  (non visibles page chargée). `never:` = les messages des règles d'état `erreur`
+  (état dégradé) ; le message d'une règle d'état `vide` n'y va jamais, c'est un affichage prévu. `api:` = les seules `actions[]`
+  de chargement (`declencheur: null`) en GET, la passe QA n'envoyant jamais de POST ; si une règle
+  `sourcee` d'état `vide` porte l'action, la ligne `api:` se termine par `may be empty when <énoncé de la
+  règle>` (sans cela, le corps vide d'un état vide prévu serait un faux constat) ; les actions
   déclenchées par un champ restent à l'acceptation. Le lead le commite comme aujourd'hui (fichier de plan).
 
 ### 6. Implémentation

@@ -19,6 +19,7 @@ champs:
 
 regles:
   - id: R1
+    etat: charge
     enonce: Le score n'est affiché qu'une fois le match joué ; avant, le champ score est absent.
     message: ~
     champs: [score]
@@ -26,13 +27,15 @@ regles:
     source: "docs/qa/expectations.md, /fixtures/:id : « le score une fois le match joué »"
     tests: ["R1 — le score est absent avant le coup d'envoi", "R1 — le score s'affiche après le match"]
   - id: R2
+    etat: vide
     enonce: Sans match programmé, l'écran affiche le message d'état vide et aucun autre champ.
     message: "Aucun match programmé pour le moment."
-    champs: [message-vide, equipe-domicile]
+    champs: [message-vide]
     statut: sourcee
     source: "demande du lot : « un état vide qui dit quoi faire »"
     tests: ["R2 — état vide : le message s'affiche, pas d'équipe"]
   - id: R3
+    etat: erreur
     enonce: Si l'appel échoue, l'écran affiche l'erreur et un bouton « Réessayer » qui rappelle l'API.
     message: "Impossible de charger le prochain match."
     champs: []
@@ -40,6 +43,7 @@ regles:
     si_faux: Si le club veut un affichage du dernier résultat connu à la place, seul ce bloc change (aucune donnée en jeu).
     tests: ["R3 — erreur : message et bouton Réessayer", "R3 — Réessayer relance l'appel"]
   - id: R4
+    etat: charge
     enonce: Le rappel ne peut être demandé qu'une fois par match ; le bouton devient inactif après.
     message: "Rappel enregistré."
     champs: [bouton-rappel]

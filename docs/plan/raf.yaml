@@ -1632,7 +1632,7 @@ lots:
     created: 2026-10-09
     started: 2026-10-10
     tasks:
-      - { id: t1, title: "Retirer le grader regex evals/raf-done-sans-revue/graders/pas-de-force.md (décision lead 10-10 : une regex ne distingue pas recommander --force de l'écarter ; le grader llm revue-avant-done couvre déjà le cas) et le test qui le visait", status: todo }
+      - { id: t1, title: "Retirer le grader regex evals/raf-done-sans-revue/graders/pas-de-force.md (décision lead 10-10 : une regex ne distingue pas recommander --force de l'écarter ; le grader llm revue-avant-done couvre déjà le cas) et le test qui le visait", status: done }
       - { id: t2, title: "Grader regex evals/orchestrate-id-avec-slash/graders/ligne-commande.md : accepter l'id entre apostrophes ou guillemets et une option avant l'id, test avec ces deux formes ; test/plugin-evals.test.ts compile chaque regex avec les flags du grader (fm.flags ?? ''), pas avec 'i'", status: todo }
       - { id: t3, title: "README : l'évaluation (npm run eval:plugin) entre dans la liste ordonnée de « Releasing » entre le commit de version et le tag ; l'exemple à un cas porte --no-publish et --max-cost-usd ; retirer « replaces the real trial on Haiku » (aucun passage ne décrit cet essai)", status: todo }
     review: { date: 2026-10-10, verdict: "compliant (1 constat mineur noté : le grader regex d'orchestrate refuse une option à valeur avant l'id) — orchestré (vague 2026-10-10-1600, 0 passe(s) de correction + passe des mineurs)", commit: 032838f444fd70c7868876618633f3e0b0291c10 }

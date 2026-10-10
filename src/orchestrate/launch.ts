@@ -273,20 +273,26 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env): 
           // déjà mort
         }
       }, Math.max(1_000, opts.timeoutMs));
-      child.once('close', (code, signal) => {
-        clearTimeout(timer);
-        live.delete(pid);
-        // Aucun descendant ne survit à la session, dans son groupe ou hors de lui.
+      // Aucun descendant ne survit à la session, dans son groupe ou hors de lui. Dès que la racine sort (`exit`), pas
+      // à `close` : un descendant qui tient stdout/stderr ouverts retarderait `close` jusqu'au délai (« délai dépassé »
+      // pour une session pourtant sortie en code 0).
+      const reap = (): void => {
         tree.rootExited();
         tree.kill();
         trees.delete(tree);
         killMarked(mark);
-        marks.delete(mark);
         try {
           process.kill(-pid, 'SIGKILL');
         } catch {
           // groupe vide
         }
+      };
+      child.once('exit', reap);
+      child.once('close', (code, signal) => {
+        clearTimeout(timer);
+        live.delete(pid);
+        reap();
+        marks.delete(mark);
         resolve({ code: code ?? (signal ? 137 : 1), stdout: Buffer.concat(out).toString('utf8'), stderr: Buffer.concat(err).toString('utf8'), timedOut });
       });
     });

@@ -390,6 +390,37 @@ describe('realClaude : fin de session (L83)', () => {
     expect(alive(pid)).toBe(false);
   }, 15_000);
 
+  it("(t2) tue le descendant détaché qui a perdu la marque (env -u CADENCE_SESSION + setsid) : seul le suivi de l'arbre le voit", async () => {
+    const dir = tempDir();
+    const pidFile = join(dir, 'server.pid');
+    const bin = join(dir, 'fake-claude.sh');
+    // Sans la marque, killMarked ne peut rien ; le serveur est encore sous la session au moins un intervalle de relevé
+    // (sleep 0.5 > TRACK_INTERVAL_MS), puis devient orphelin quand la session sort : le TreeTracker l'a retenu.
+    writeFileSync(bin, `#!/bin/sh\nsetsid env -u CADENCE_SESSION sh -c 'echo $$ > "${pidFile}"; exec sleep 60' >/dev/null 2>&1 &\nwhile [ ! -s "${pidFile}" ]; do sleep 0.05; done\nsleep 0.6\necho '{}'\n`, { mode: 0o755 });
+    const out = await realClaude(bin, process.env)([], { cwd: dir, env: {}, timeoutMs: 30_000 });
+    expect(out.code).toBe(0);
+    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(alive(pid)).toBe(false);
+  });
+
+  it("(t3) session sortie en code 0 dont un descendant tient stdout : tué à l'exit de la racine, pas de « délai dépassé »", async () => {
+    const dir = tempDir();
+    const pidFile = join(dir, 'server.pid');
+    const bin = join(dir, 'fake-claude.sh');
+    // Le descendant hérite du stdout de la session (pas de redirection) : `close` ne viendrait qu'à sa mort.
+    writeFileSync(bin, `#!/bin/sh\nsetsid sh -c 'echo $$ > "${pidFile}"; exec sleep 60' &\nwhile [ ! -s "${pidFile}" ]; do sleep 0.05; done\necho '{"ok":true}'\nexit 0\n`, { mode: 0o755 });
+    const started = Date.now();
+    const out = await realClaude(bin, process.env)([], { cwd: dir, env: {}, timeoutMs: 30_000 });
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(out.timedOut).toBe(false);
+    expect(out.code).toBe(0);
+    expect(out.stdout).toContain('{"ok":true}');
+    const pid = Number(readFileSync(pidFile, 'utf8').trim());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(alive(pid)).toBe(false);
+  }, 20_000);
+
   it("killSessions (interruption de la vague) tue l'orphelin marqué sans attendre le close de la session", async () => {
     const dir = tempDir();
     const pidFile = join(dir, 'server.pid');

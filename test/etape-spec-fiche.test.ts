@@ -93,13 +93,30 @@ describe('fiche d\'écran de l\'exemple (L166)', () => {
     expect(ligne('S9')).toMatch(/\| S6 \|$/);
   });
 
-  it('ajoute « — unless » aux lignes shows: des champs qu\'un état vide sourcé fait disparaître', () => {
-    expect(spec).toMatch(/`shows:`[\s\S]*?`— unless <énoncé>`/);
-    expect(spec).toMatch(/règle `sourcee` d'état `vide`[^\n]*\n?[^\n]*`shows:`|`shows:`[^\n]*\n?[^\n]*règle `sourcee` d'état `vide`/);
-    // l'exemple : R2 (vide, sourcée) masque les champs obligatoires affichés page chargée
+  it('rend « — unless » calculable : la clé masque de la règle vide sourcée liste exactement les champs concernés', () => {
+    expect(spec).toMatch(/clé `masque`/);
+    expect(spec).toMatch(/`shows:`[^\n]*\n?[^\n]*`masque` d'une règle `sourcee` d'état `vide`[\s\S]*?— unless/);
+    const ids = new Set(fiche.champs.map((c: any) => c.id));
     const r2 = fiche.regles.find((r: any) => r.etat === 'vide' && r.statut === 'sourcee');
-    expect(r2).toBeTruthy();
-    expect(fiche.champs.some((c: any) => c.obligatoire && c.source !== 'statique')).toBe(true);
+    expect(r2?.masque).toBeTruthy();
+    for (const m of r2.masque) expect(ids.has(m)).toBe(true);
+    // les champs masqués ne sont pas ceux que la règle fait apparaître
+    for (const m of r2.masque) expect(r2.champs).not.toContain(m);
+    // les champs obligatoires affichés page chargée (non statiques) sont tous masqués par R2 : ce sont les lignes « — unless »
+    const attendus = fiche.champs.filter((c: any) => c.obligatoire && c.source !== 'statique').map((c: any) => c.id).sort();
+    expect([...r2.masque].sort()).toEqual(attendus);
+  });
+
+  it('écarte les tests d\'acceptation rouges de config.test ET de la CI via la config du lanceur, et le porte dans S5', () => {
+    expect(spec).toMatch(/la CI du projet/);
+    expect(spec).toMatch(/exclus de `config\.test` et de la CI/);
+    expect(spec).toMatch(/`vert: false`/);
+    expect(spec).toMatch(/`testPathIgnorePatterns`/);
+    const s5 = spec.split('\n').find((l) => l.startsWith('| S5 |')) ?? '';
+    expect(s5).toMatch(/CI/);
+    expect(s5).toMatch(/config du lanceur/);
+    const cmd = spec.split('\n').filter((l) => l.startsWith('raf add '))[4];
+    expect(cmd).toMatch(/CI/);
   });
 
   it('cite l\'erreur et le bouton Réessayer en champs, liés à R3 et à une action', () => {

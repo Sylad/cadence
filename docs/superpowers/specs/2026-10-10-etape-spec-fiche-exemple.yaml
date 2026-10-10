@@ -33,6 +33,7 @@ regles:
     enonce: Sans match programmé, l'écran affiche le message d'état vide et aucun autre champ.
     message: "Aucun match programmé pour le moment."
     champs: [message-vide]
+    masque: [equipe-domicile, equipe-exterieur, date-match]
     statut: sourcee
     source: "demande du lot : « un état vide qui dit quoi faire »"
     tests: ["R2 — état vide : le message s'affiche, pas d'équipe"]

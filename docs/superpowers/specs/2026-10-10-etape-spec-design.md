@@ -120,22 +120,31 @@ lancer les tests du projet (pas le code d'implémentation à écrire). Contrat :
   suivant tourne sur la même branche) : le contrôle porte sur les `acceptation.json` de tous les lots, pas
   seulement du lot courant. Une modification utile est une question au lead
   ou un constat de revue — jamais un geste silencieux.
-- **Isolement des autres lots du dépôt** : le cycle relance `config.test` après chaque `implement`/`fix`,
-  et des tests rouges commités feraient échouer les autres lots du dépôt (passes `fix` « tests rouges »
-  sur un travail qui n'est pas le leur). Les fichiers listés dans `acceptation.json` sont donc
-  **exclus de `config.test`** tant que leur lot n'est pas vert (l'étape retire ces fichiers de la commande, S5) ; seul
-  le lot propriétaire les lance, par une commande dédiée, et ils rejoignent `config.test` quand il est
-  vert. Si le lot est rendu au lead (question, budget, passes épuisées), ses tests restent rouges mais
-  exclus : les lots suivants ne les voient pas ; le lot reprend (`--resume`) avec le même verrou.
+- **Isolement des autres lots du dépôt** : des tests rouges commités feraient échouer deux choses qui
+  ne sont pas le lot : le `config.test` que le cycle relance après chaque `implement`/`fix` (passes `fix`
+  « tests rouges » sur un travail qui n'est pas le leur) et **la CI du projet**, que `cadence deliver` attend
+  (une CI rouge bloque la livraison de tout lot empilé). Le mécanisme est donc porté par la **configuration
+  du lanceur de tests**, partagée par `config.test` et la CI : `acceptation.json` porte `vert: false` tant que
+  le lot n'est pas vert, et l'étape fait lire à la config du lanceur (`exclude` de vitest,
+  `testPathIgnorePatterns` de jest) les fichiers listés des `acceptation.json` à `vert: false` ; ils sont
+  ainsi **exclus de `config.test` et de la CI**. Seul le lot propriétaire les lance, par une commande
+  dédiée (config `*.acceptation.config.*` qui n'inclut que ces fichiers) ; quand il est vert, l'étape
+  passe `vert: true` et ils rejoignent `config.test` et la CI. Si la CI ou `config.test` n'utilisent pas la config du lanceur (chemins
+  codés en dur), l'étape ne commite pas de test rouge et rend la question au lead. Si le lot est rendu au
+  lead (question, budget, passes épuisées), ses tests restent rouges mais exclus du lanceur du projet et de la CI : les lots
+  suivants et `cadence deliver` ne les voient pas ; le lot reprend (`--resume`) avec le même verrou.
 - Hors champ : ce qui ne s'automatise pas (rendu, ergonomie, lisibilité) reste à la passe UX de
   conformité.
 - `docs/qa/expectations.md` est **dérivé de la fiche** (`cadence spec qa`), à partir de la clé `etat` des
   règles. Un champ est **propre à un état** quand une règle d'état `vide` ou `erreur` le cite
-  (comme message-vide) ; une règle ne cite donc dans `champs` que les champs qu'elle fait apparaître (ceux
-  qu'elle masque restent dans son énoncé). Ensuite : `shows:` = champs obligatoires, **sauf** les champs propres à un état
-  (non visibles page chargée) ; la ligne `shows:` d'un champ qu'une règle `sourcee` d'état `vide` fait
-  disparaître (R2 de l'exemple : « aucun autre champ ») se termine par `— unless <énoncé>` (condition en
-  mots, comme `may be empty when`), sans quoi l'état vide prévu serait un faux constat. `never:` = les messages des règles d'état `erreur`
+  (comme message-vide) ; une règle ne cite donc dans `champs` que les champs qu'elle fait apparaître. Les champs
+  qu'une règle d'état `vide` fait disparaître sont listés dans sa clé `masque` (ids de champs ; R2 de l'exemple
+  masque les trois champs de match), jamais déduits de la prose. Ensuite : `shows:` = champs obligatoires, **sauf** les champs propres à un état
+  (non visibles page chargée) ; la ligne `shows:` d'un champ listé dans le `masque` d'une règle `sourcee` d'état `vide`
+  se termine par `— unless <énoncé>` (condition en mots, comme `may be empty when`) ; les autres champs
+  obligatoires (un titre statique toujours visible) n'en reçoivent jamais, et un `masque` ne cite que des champs de la fiche
+  (`cadence spec check` le contrôle) ; sans cela l'état vide prévu serait un faux constat. 
+  `never:` = les messages des règles d'état `erreur`
   (état dégradé) ; le message d'une règle d'état `vide` n'y va jamais, c'est un affichage prévu. `api:` = les seules `actions[]`
   de chargement (`declencheur: null`) en GET, la passe QA n'envoyant jamais de POST ; si une règle
   `sourcee` d'état `vide` porte l'action, la ligne `api:` se termine par `may be empty when <énoncé de la
@@ -220,7 +229,7 @@ conception ne les ajoute pas lui-même : ils deviennent prêts pour `orchestrate
 | S2 | Format de la fiche : `cadence spec check <fiche>` (invariants ci-dessus, codes de sortie), `cadence spec qa <fiche>` (dérive `expectations.md`), gabarit `templates/fiche.yaml` | 1 | S1 |
 | S3 | Étape `spec` d'orchestrate : agent `spec-writer`, brief, rendu Playwright 1440/390 des états, commit de la spec, règle « hypothèse coûteuse = question », sortie sous le seuil | 1 | S2 |
 | S4 | Revue UX de la maquette : mode « maquette » de `ux-reviewer`, cohérence maquette ↔ fiche, boucle ≤ 2 passes, rendu au lead | 0.75 | S3 |
-| S5 | Étape `accept` : session distincte, tests rouges vérifiés, empreinte `acceptation.json`, garde de `implement`/`fix` sur ces fichiers pour toutes les sessions du dépôt (tous les lots), exclusion des fichiers listés dans les `acceptation.json` de `config.test` tant que leur lot n'est pas vert, commande dédiée du lot propriétaire | 1 | S3 |
+| S5 | Étape `accept` : session distincte, tests rouges vérifiés, empreinte `acceptation.json`, garde de `implement`/`fix` sur ces fichiers pour toutes les sessions du dépôt (tous les lots), exclusion des fichiers listés dans les `acceptation.json` (`vert: false`) de `config.test` et de la CI via la config du lanceur de tests tant que leur lot n'est pas vert, commande dédiée du lot propriétaire | 1 | S3 |
 | S6 | Briefs aval : fiche donnée à `implement`, tests citant les règles, `code-reviewer` règle → test → vert, UX de conformité légère (remplace la passe complète des lots avec fiche), section « Hypothèses » de Nouveautés + contrôle de `news check` | 1 | S4, S5 |
 | S7 | Essai sur un écran d'une app loisir (à la main puis orchestré), note sur le fonctionnement de la fiche | 0.5 | S6 |
 | S8 | Mesure contre le lot de mesure, une fois 8 lots avec fiche livrés (ouvert tant qu'ils ne le sont pas), note de conclusion | 0.5 | S7 |
@@ -233,7 +242,7 @@ raf add "Champ screen des lots + clé orchestrate.spec (spec etape-spec, S1)" --
 raf add "cadence spec check et spec qa, gabarit de fiche (spec etape-spec, S2)" --estimate 1 --after <S1>
 raf add "Étape spec d'orchestrate : spec-writer, rendu 1440/390 (spec etape-spec, S3)" --estimate 1 --after <S2>
 raf add "Revue UX de la maquette : ux-reviewer mode maquette (spec etape-spec, S4)" --estimate 0.75 --after <S3>
-raf add "Étape accept : tests rouges, verrou par empreinte sur toutes les sessions du dépôt, fichiers des acceptation.json exclus de config.test tant que le lot n'est pas vert, commande dédiée (spec etape-spec, S5)" --estimate 1 --after <S3>
+raf add "Étape accept : tests rouges, verrou par empreinte sur toutes les sessions du dépôt, fichiers des acceptation.json exclus de config.test et de la CI (config du lanceur) tant que le lot n'est pas vert, commande dédiée (spec etape-spec, S5)" --estimate 1 --after <S3>
 raf add "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses (spec etape-spec, S6)" --estimate 1 --after <S4>,<S5>
 raf add "Essai étape spec sur un écran d'app loisir (spec etape-spec, S7)" --estimate 0.5 --after <S6>
 raf add "Mesure de l'étape spec contre le lot de mesure, 8 lots avec fiche (spec etape-spec, S8)" --estimate 0.5 --after <S7>

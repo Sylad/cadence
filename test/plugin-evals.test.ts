@@ -81,6 +81,19 @@ describe('cohérence des graders (L139)', () => {
     expect(grader('raf-done-sans-revue', 'revue-avant-done.md').body).toMatch(/--force/);
   });
 
+  it('le grader regex de orchestrate-id-avec-slash accepte apostrophes, guillemets et une option avant l\'id', () => {
+    const g = grader('orchestrate-id-avec-slash', 'ligne-commande.md');
+    const re = new RegExp(String(g.fm.pattern), String(g.fm.flags ?? ''));
+    const id = 'maritime-atlas:Q4/accueil-4-ux12@haiku';
+    expect(re.test(`cadence orchestrate ${id}`)).toBe(true);
+    expect(re.test(`cadence orchestrate '${id}'`)).toBe(true);
+    expect(re.test(`cadence orchestrate "${id}"`)).toBe(true);
+    expect(re.test(`cadence orchestrate --dry-run ${id}`)).toBe(true);
+    expect(re.test(`cadence orchestrate --dry-run '${id}'`)).toBe(true);
+    expect(re.test('cadence orchestrate maritime-atlas:Q4@haiku')).toBe(false);
+    expect(re.test('cadence orchestrate maritime-atlas:accueil-4-ux12@haiku')).toBe(false);
+  });
+
   it('les critères ne réclament que des faits portés par les skills (lecture seule, sans Bash)', () => {
     const all = cases
       .flatMap((name) => readdirSync(join(evalsDir, name, 'graders')).map((f) => grader(name, f).body + readFileSync(join(evalsDir, name, 'prompt.md'), 'utf8')));

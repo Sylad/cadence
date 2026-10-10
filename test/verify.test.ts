@@ -181,13 +181,15 @@ describe('vérifications en parallèle, chacune avec le budget entier', () => {
     expect(out.join('\n')).not.toMatch(/non vérifiée|\?/);
   });
 
-  it('pour de vrai : trois « sleep 2 » en session start prennent ~2 s, pas 6', async () => {
+  it('pour de vrai : trois « sleep 5 » en session start prennent ~5 s, pas 15', async () => {
     const { effectLines } = await import('../src/verify.js');
     const t = Date.now();
-    const lines = await effectLines(config('    - command: sleep 2\n    - command: sleep 2\n    - command: sleep 2\n'), 'abc', realCheckDeps(tempDir(), { quiet: true }));
+    // Sommeils de 5 s : en série ce serait 15 s ; la borne de 12 s laisse 7 s de marge à la charge de la machine (L90 : 4,5 s pour 2 s
+    // de sommeil sautaient en suite complète sous charge), sans cesser de distinguer le parallèle du séquentiel.
+    const lines = await effectLines(config('    - command: sleep 5\n    - command: sleep 5\n    - command: sleep 5\n'), 'abc', realCheckDeps(tempDir(), { quiet: true }));
     expect(lines).toEqual(['✓ verify : 3/3 vérifications vertes']);
-    expect(Date.now() - t).toBeLessThan(4_500);
-  });
+    expect(Date.now() - t).toBeLessThan(12_000);
+  }, 30_000);
 });
 
 describe('verifyCommand', () => {

@@ -324,3 +324,25 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
     expect(out).not.toContain('nouveautes');
   });
 });
+
+describe('agents hors orchestrate : même consigne Playwright que les briefs (L84)', () => {
+  const flatten = (p: string): string => read(p).replace(/\s+/g, ' ');
+  const PLAYWRIGHT_RULE = 'Give screenshots and snapshots a relative file name only (e.g. `page-home.png`), never an absolute path: the Playwright MCP writes them under `.playwright-mcp/` (ignored by git), or in the wave\'s output directory outside the repository when a wave launched it';
+
+  it.each(['ux-reviewer', 'qa-reviewer'])('%s répète la consigne Playwright : nom relatif, sorties sous .playwright-mcp/', (name) => {
+    expect(flatten(`../agents/${name}.md`)).toContain(PLAYWRIGHT_RULE);
+  });
+
+  it.each(['ux-reviewer', 'qa-reviewer', 'code-reviewer'])('%s dit « temporary directory outside the repository », plus « project\'s temporary folder »', (name) => {
+    const agent = flatten(`../agents/${name}.md`);
+    expect(agent).toContain('temporary directory outside the repository');
+    expect(agent).not.toContain("project's temporary folder");
+  });
+
+  it('qa-reviewer garde la règle du GET et sa raison (le cache CDN), sans le récit de l\'incident', () => {
+    const agent = flatten('../agents/qa-reviewer.md');
+    expect(agent).toContain('Request only URLs the app itself uses, or add a cache-busting query parameter.');
+    expect(agent).toContain('cached by a CDN');
+    expect(agent).not.toContain('was cached for 4 hours');
+  });
+});

@@ -17,7 +17,7 @@ identity (colours, density, tone) is a constraint, not something to "fix".
 
 1. **Look before judging.** Capture the screen with the browser tool available (Playwright or
    equivalent) at **1440 px** and **390 px** wide, in its main states: empty, loaded, error, loading,
-   and the key interaction. Look at every capture. Store them in the project's temporary folder.
+   and the key interaction. Look at every capture. Give screenshots and snapshots a relative file name only (e.g. `page-home.png`), never an absolute path: the Playwright MCP writes them under `.playwright-mcp/` (ignored by git), or in the wave's output directory outside the repository when a wave launched it. Anything else you create goes in a temporary directory outside the repository, removed afterwards.
 2. **Walk the main task** a real user comes for (find, read, compare, act, undo) and count the steps.
 3. **Check, and measure where a number exists:**
    - Nielsen's 10 heuristics — especially visibility of system status, match with the user's words,

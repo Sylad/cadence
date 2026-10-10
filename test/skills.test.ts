@@ -243,7 +243,7 @@ describe('skills install', () => {
     expect(qa.section('Output')).toContain('Without an expectations file, the draft comes here.');
     expect(qa.section('Output')).toContain('- **Verdict**, one line, alone — e.g. "6/6 pages as expected", "not as expected: 1 blocking (/players shows no player)",');
     // Le profil QA survit aux passes : il est exclu du nettoyage des fichiers temporaires.
-    expect(qa.section('Output')).toContain('Captures and temporary files go in a temporary directory outside the repository, or in the one the caller names; remove them, or list their paths in the report — except the QA browser profile, which is kept for the next pass. The working tree is left as you found it.');
+    expect(qa.section('Output')).toContain('Other temporary files go in a temporary directory outside the repository, or in the one the caller names; remove them, or list their paths in the report — except the QA browser profile, which is kept for the next pass. The working tree is left as you found it.');
     expect(qa.description).toContain('without an expectations file it still runs its universal checks, reports what it saw and returns a draft one.');
     expect(qa.description).toContain('reports empty states, wrong data, error messages, failed or empty API calls, console errors and broken images.');
     // Déclencheur : toute livraison qui change ce qu'une page montre ou reçoit — pas seulement un lot « visible ».
@@ -264,7 +264,7 @@ describe('skills install', () => {
     // État du navigateur : le bundle chargé contre celui que référence index.html relu sans cache, puis le cache vidé.
     expect(step4).toContain("browser state, once before the first page, in a profile already used (a persistent context, not a fresh one — a `userDataDir` reserved for QA and kept between passes, never the user's own browser profile): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;");
     // « GET only » n'est pas « sans effet » : un CDN met en cache une sonde sur un actif absent.
-    expect(step5).toContain('GET only is not "without effect": a probe on an asset name that does not exist was cached for 4 hours by the CDN and then served to real visitors. Request only URLs the app itself uses, or add a cache-busting query parameter.');
+    expect(step5).toContain('GET only is not "without effect": a probe on an asset name that does not exist is cached by a CDN and then served to real visitors. Request only URLs the app itself uses, or add a cache-busting query parameter.');
     // La minute de calme se passe hors de l'app.
     expect(step4).toContain('the quiet minute is spent on `about:blank`, never on the app, whose polling would keep calling its backend;');
     // Comparaison des textes sans casse.

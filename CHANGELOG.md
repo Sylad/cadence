@@ -40,6 +40,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- The `ux-reviewer` and `qa-reviewer` agents carry the briefs' Playwright rule for use outside `cadence orchestrate`: a capture gets a relative file name only, written by the Playwright MCP under `.playwright-mcp/`; the three reviewer agents say the same « temporary directory outside the repository », and `qa-reviewer` keeps the reason of its GET-only rule (a CDN caches an unknown asset) without the story of the incident (L84)
+
 ### Fixed
 
 - `cadence orchestrate`: a session no longer leaves its child processes alive — a dev server a session started in its own process group (`setsid`, `nohup`, a tool that detaches) is tracked with the rest of the session's process tree, and every session carries a `CADENCE_SESSION` mark in its environment that its orphaned descendants (a shell that exits right after `nohup srv &`) keep: they are killed with the session when the session ends, hits its time limit, or the wave is interrupted (L83); without `/proc` (macOS) the mark is read from `ps -axEww` (`-E` prints the environment there, `-e` does not), `ps axeww` with procps, and the fallback is covered by tests

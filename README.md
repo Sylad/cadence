@@ -1269,7 +1269,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   `raf add --parent` sub-tasks, and a one-line verdict for `raf ux`. It never
   edits code. Read-only for real: its `tools:` list is `Read, Grep, Glob, Bash` and the
   Playwright tools (`mcp__playwright`, and `mcp__plugin_playwright_playwright` when the
-  browser comes from the Playwright plugin) — no `Edit`, no `Write`.
+  browser comes from the Playwright plugin) — no `Edit`, no `Write`. Outside a wave it gives its captures a relative file name only, which the Playwright MCP writes under `.playwright-mcp/` (the same rule as the wave's briefs); `qa-reviewer` follows it too.
 - **code-reviewer** (agent): any stack; given a repository and a lot id, it reads
   the diff itself from the commits that cite the lot — not the author's summary —
   and the project's CLAUDE.md, when there is one, for its conventions; findings grounded in a

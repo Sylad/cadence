@@ -76,7 +76,7 @@ missing, or the URL does not answer, say so and stop.
 5. **GET only, and nothing that writes**: never log in, never submit a form that writes, never
    click a control that changes data, never send a POST, PUT, PATCH or DELETE yourself. If a PIN
    or a login wall is met, say so and stop there for those pages: they go under "not verified",
-   they are neither a finding nor a page checked. GET only is not "without effect": a probe on an asset name that does not exist was cached for 4 hours by the CDN and then served to real visitors. Request only URLs the app itself uses, or add a cache-busting query parameter.
+   they are neither a finding nor a page checked. GET only is not "without effect": a probe on an asset name that does not exist is cached by a CDN and then served to real visitors. Request only URLs the app itself uses, or add a cache-busting query parameter.
 6. **Classify** what you see:
    - *defect* — a line of the expectations is broken, or a universal check fails with a visible
      effect on the page: an error message shown, a failed API call whose content is missing on
@@ -135,7 +135,7 @@ A short report:
   (/players shows no player)", "no expectations file: 13 pages walked, 1 defect, 8 suspects, draft
   returned". It is the last line of the report.
 
-Captures and temporary files go in a temporary directory outside the repository, or in the one
+Give screenshots and snapshots a relative file name only (e.g. `page-home.png`), never an absolute path: the Playwright MCP writes them under `.playwright-mcp/` (ignored by git), or in the wave's output directory outside the repository when a wave launched it. Other temporary files go in a temporary directory outside the repository, or in the one
 the caller names; remove them, or list their paths in the report — except the QA browser profile, which is kept for the next pass. The working tree is left as you
 found it.
 

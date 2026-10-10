@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { measure, readCache, readRuns, renderReport } from '../src/corrections.js';
+import { measure, readCache, readRuns, renderReport, sampleKeys } from '../src/corrections.js';
 
 const root = resolve(import.meta.dirname, '..');
 const runs = join(root, '..', '.cadence', 'runs');
@@ -21,5 +21,22 @@ describe('relevé de référence des corrections (L165)', () => {
     const sansRevue = readRuns(runs, until).passes.filter((p) => p.findings.length === 0).map((p) => p.key);
     expect(sansRevue.length).toBeGreaterThan(0);
     expect(sansRevue.filter((k) => cache.has(k))).toEqual([]);
+  });
+
+  it.skipIf(!existsSync(runs))("l'échantillon de --sample 24 a été relu en entier et son taux d'accord est celui du document", () => {
+    const until = /^Reproduction : .*--until (\S+?)`? /m.exec(doc)?.[1];
+    const cache = readCache(join(root, 'docs', 'mesures', 'corrections-classement.json'));
+    const keys = sampleKeys(readRuns(runs, until).passes.filter((p) => p.findings.length > 0).map((p) => p.key), 24);
+    expect(keys.filter((k) => !cache.get(k)?.manual)).toEqual([]);
+    const accord = keys.filter((k) => cache.get(k)!.manual === cache.get(k)!.cause).length;
+    expect(doc).toContain(`le modèle est d'accord avec la relecture sur ${accord} passes sur 24 (${Math.round((accord / 24) * 100)} %)`);
+  });
+
+  it('le README cite le nombre de lots et le taux à deux corrections du relevé publié', () => {
+    const lots = /\*\*(\d+) lots\*\*/.exec(doc)?.[1];
+    const un = /(\d+) % des lots ont eu/.exec(doc)?.[1];
+    const deux = /(\d+) % au moins deux/.exec(doc)?.[1];
+    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    expect(readme).toContain(`\`${un} %\` and \`${deux} %\` of ${lots} lots in the 10-10 baseline`);
   });
 });

@@ -613,7 +613,7 @@ has to correct itself. From the folder a wave was launched from (default: the cu
 `<folder>/.cadence/runs/<wave>/<project>--<lot>.json` of **every project** and prints:
 
 - the **lots with a correction**: of the lots that went through a successful write session, the share with at least one
-  and at least two `fix` passes, per project and for visible versus non-visible lots (`61 %` and `29 %` of 266 lots in the 10-10 baseline);
+  and at least two `fix` passes, per project and for visible versus non-visible lots (`61 %` and `29 %` of 263 lots in the 10-10 baseline);
 - the **passes by cause**, in total and per project. The cause of a pass is read from the findings of the review that
   precedes it, among: unclear spec or missing criterion (`spec-floue`), invented business rule (`regle-inventee`),
   architecture drift (`derive-architecture`), data / SQL (`donnees-sql`), code bug (`bug-code`), missing test

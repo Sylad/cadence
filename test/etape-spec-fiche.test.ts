@@ -147,4 +147,12 @@ describe('fiche d\'écran de l\'exemple (L166)', () => {
     expect(cmds[4]).toMatch(/commande dédiée/);
     expect(cmds[4]).toMatch(/verrou/);
   });
+
+  it('nomme qui pose vert: true et quand (le cycle, à la fin d\'implement/fix, commande dédiée verte), dans la section 5, S5 et sa commande raf add', () => {
+    expect(spec).toMatch(/commande dédiée passe, \*\*le cycle\*\*[\s\S]{0,120}pose `vert: true`/);
+    const s5 = spec.split('\n').find((l) => l.startsWith('| S5 |')) ?? '';
+    expect(s5).toMatch(/`vert: true`/);
+    const cmd = spec.split('\n').filter((l) => l.startsWith('raf add '))[4];
+    expect(cmd).toMatch(/`?vert: true`?/);
+  });
 });

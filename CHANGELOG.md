@@ -37,8 +37,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence-hud`: the progress of each project's plan under the waves, `/hud projets`; `cadence lead tour --json` gains `progress` | [0.22.0](#0220---2026-10-09) |
 | `cadence orchestrate --drop <project:lot>` and `--stop-after-current` on a live wave, `--resume --drop`; the final table's « livrable jusqu'à <sha> » line; a version commit exempt from the review gate | [0.24.0](#0240---2026-10-09) |
 | `cadence-hud`: the project line of the plans' progress names the lots in progress after their count, three at most | [0.25.0](#0250---2026-10-09) |
+| `orchestrate.precheck: local`: the « deliverable already present? » pre-check runs on the local model (`claude-local`, Ollama), off the Anthropic quota | [0.28.0](#0280---2026-10-10) |
 
-## [Unreleased]
+## [0.28.0] - 2026-10-10
 
 ### Added
 

@@ -80,8 +80,8 @@ describe('cohérence des graders (L139)', () => {
   });
 
   it('les critères ne réclament que des faits portés par les skills (lecture seule, sans Bash)', () => {
-    const all = readdirSync(evalsDir, { withFileTypes: true }).filter((d) => d.isDirectory())
-      .flatMap((d) => readdirSync(join(evalsDir, d.name, 'graders')).map((f) => grader(d.name, f).body + readFileSync(join(evalsDir, d.name, 'prompt.md'), 'utf8')));
+    const all = cases
+      .flatMap((name) => readdirSync(join(evalsDir, name, 'graders')).map((f) => grader(name, f).body + readFileSync(join(evalsDir, name, 'prompt.md'), 'utf8')));
     for (const t of all) {
       expect(t).not.toMatch(/__|\.cadence\/runs|la clé `deliver` est absente/);
     }

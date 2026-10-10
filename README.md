@@ -1398,7 +1398,7 @@ step 4.
 a folder with a `prompt.md` and `graders/*.md`, and replays a trap found by hand: `raf-done-sans-revue` (`raf done` refused on a lot whose
 commits have no code review, with no `--force` to get round it), `deliver-sha` (`git push origin <sha>:main` then
 `cadence deliver --sha <sha>` for a pushed commit that is not `HEAD`), `orchestrate-id-avec-slash` (`maritime-atlas:Q4/accueil-4-ux12@haiku`
-keeps its `/`, the state file says `__`) and `livrer-sh-sans-bloc` (a `./livrer.sh` without a `deliver:` block in `cadence.yaml` is not
+keeps its `/`) and `livrer-sh-sans-bloc` (a `./livrer.sh` without a `deliver:` block in `cadence.yaml` is not
 run by `cadence deliver`). Every case also runs a **baseline without the plugin**, so the report gives the score of each arm and the
 difference: a trap the baseline already avoids proves nothing about the plugin. The cases are read-only questions (tools `Read`, `Glob`, `Grep`,
 `Skill`, no scaffold script), each graded by a regular expression and by a model-judged criterion.

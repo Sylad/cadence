@@ -1039,7 +1039,7 @@ lots:
     estimate: 1
     created: 2026-10-07
     started: 2026-10-09
-    review: { date: 2026-10-09, verdict: "non conforme (4e revue Opus, 09-10) : 2 majeurs — killMarked tue un démon partagé démarré par une session (serveur tmux mesuré : les panneaux du lead ouverts ensuite portent la marque et meurent avec ; même famille gpg-agent, ssh ControlPersist, Gradle, pm2) ; TreeTracker de realClaude sans test qui échoue sans lui (mutation : 31/31 verts) — 3 mineurs ; 1232/1232, build ok", commit: c5ada05efaae7136bacd11f1c20e4e532a86df8c }
+    review: { date: 2026-10-10, verdict: "conforme : 3 remarques mineures en note (garde `said` inutile et son test, commentaire « seul lecteur » faux à cause de hook.ts, limite ni /proc ni ps absente du README) — orchestré (vague 2026-10-10-0943, 1 passe(s) de correction + passe des mineurs)", commit: 8e3ac40905ccb097e88a7a1e349d3a41fb13d5af }
     notes:
       - { date: 2026-10-09, text: "Notes revue 09-10 : README:1114-1116 promet plus que le code (docker compose up -d, client tmux d'un serveur déjà lancé, env -i entre deux relevés, environ illisible) ; killMarked ne signale jamais un relevé impossible (EMFILE → [] en silence, TreeTracker a onUnavailable). Coût mesuré : findMarked 0,8 ms / 84 processus, 7,5 ms / 884 ; TreeTracker 200 ms ≈ 2,4 % de la boucle par session" }
     tasks:

@@ -1,6 +1,6 @@
 {
   "name": "cadence-hud",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "author": { "name": "Sylvain Ladoire" },
   "description": "Bande au-dessus du prompt : contexte, fenêtres 5 h / 7 j, coût, consommation par modèle, agents de la session et vagues cadence orchestrate en cours",
   "types": "./types/index.d.ts"

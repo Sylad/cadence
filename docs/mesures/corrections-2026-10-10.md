@@ -9,7 +9,7 @@ Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/c
 - **Lot** : un enregistrement de journal dont une session d'écriture (`implement`) a abouti ; un lot rejoué dans plusieurs vagues compte plusieurs fois. **Passe de correction** : un pas `fix` abouti.
 - **Cause** : une seule par passe, celle du constat le plus grave de la revue qui la précède. Classement par `mistral-small3.2:24b` (Ollama local, température 0, hors quota Anthropic), puis relecture à la main.
 - **Premier essai écarté** : avec un premier prompt, le modèle mettait 169 passes sur 254 en « spec floue » et n'était d'accord avec la relecture que sur 5 passes sur 24 ; le prompt a été resserré (bug de code par défaut, « spec floue » seulement si le constat dit que l'énoncé est flou). Le classement ci-dessous est le second.
-- **Fiabilité** : l'échantillon de `--sample 24` (24 passes réparties sur les clés triées, qui ont toutes des constats) a été relu en entier sur le code final : le modèle est d'accord avec la relecture sur 18 passes sur 24 (75 %). Au total 62 passes ont été relues (cet échantillon et ceux des relevés précédents, dont les clés ont changé quand le nombre de passes a changé) : accord sur 47 (76 %). Les relectures priment dans les tableaux. Les désaccords viennent de la frontière entre bug de code, test manquant (un test qui ne peut pas échouer ou une sonde non mise à jour y sont rangés) et dérive d'architecture (doc non suivie) : lire les parts par cause comme un ordre de grandeur, pas comme une mesure exacte. La relecture est celle d'une seule personne, et elle lit le premier constat de chaque passe.
+- **Fiabilité** : l'échantillon de `--sample 24` (24 passes réparties sur les clés triées, qui ont toutes des constats) a été relu en entier sur le code final : le modèle est d'accord avec la relecture sur 17 passes sur 24 (71 %). Au total 77 passes ont été relues (cet échantillon et ceux des relevés précédents, dont les clés ont changé quand le nombre de passes a changé) : accord sur 59 (77 %). Les relectures priment dans les tableaux. Les désaccords viennent de la frontière entre bug de code, test manquant (un test qui ne peut pas échouer ou une sonde non mise à jour y sont rangés) et dérive d'architecture (doc non suivie) : lire les parts par cause comme un ordre de grandeur, pas comme une mesure exacte. La relecture est celle d'une seule personne, et elle lit le premier constat de chaque passe.
 - **Passes sans revue** : 13 passes (cadence L84 et L154, claude-code-codex L16, evatosorus L24 ×2 et L33, finance-tracker L3, warhammer40k L54, L60 ×2, L74, L80, L91) n'ont aucun constat à lire : déclenchées par des tests rouges juste après l'écriture, ou deuxième passe `fix` d'une revue déjà traitée par la première. Elles sont comptées à part et ne passent pas par le modèle. Une première version les envoyait au modèle, qui en classait en « faux constat de revue » : cette ligne mesurait donc des passes sans revue, non des erreurs de revue (elle vaut 0).
 - Limite : une passe peut avoir plusieurs constats de causes différentes ; seule la plus grave est comptée. « Faux constat de revue » et « données / SQL » valent 0 : aucun constat relu n'était une erreur de la revue elle-même, et les projets mesurés n'ont guère de SQL.
 
@@ -21,12 +21,12 @@ Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/c
 
 | Cause | Passes | Part |
 |---|---|---|
-| spec floue ou critère absent | 27 | 11 % |
+| spec floue ou critère absent | 25 | 10 % |
 | règle de gestion inventée | 1 | 0 % |
-| dérive d'architecture | 31 | 12 % |
+| dérive d'architecture | 32 | 13 % |
 | données / SQL | 0 | 0 % |
 | bug de code | 130 | 51 % |
-| test manquant | 51 | 20 % |
+| test manquant | 52 | 21 % |
 | faux constat de revue | 0 | 0 % |
 | sans revue (tests rouges) | 13 | 5 % |
 
@@ -35,11 +35,11 @@ Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/c
 | Projet | spec floue ou critère absent | règle de gestion inventée | dérive d'architecture | données / SQL | bug de code | test manquant | faux constat de revue | sans revue (tests rouges) | Total |
 |---|---|---|---|---|---|---|---|---|---|
 | avatar-pandora | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| cadence | 14 | 0 | 14 | 0 | 60 | 30 | 0 | 2 | 120 |
+| cadence | 13 | 0 | 15 | 0 | 60 | 30 | 0 | 2 | 120 |
 | claude-code-codex | 0 | 0 | 2 | 0 | 4 | 2 | 0 | 1 | 9 |
 | evatosorus | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 3 | 4 |
 | finance-tracker | 1 | 1 | 4 | 0 | 12 | 2 | 0 | 1 | 21 |
-| maritime-atlas | 8 | 0 | 3 | 0 | 21 | 6 | 0 | 0 | 38 |
+| maritime-atlas | 7 | 0 | 3 | 0 | 21 | 7 | 0 | 0 | 38 |
 | ol-companion | 1 | 0 | 5 | 0 | 27 | 7 | 0 | 0 | 40 |
 | warhammer40k | 3 | 0 | 3 | 0 | 5 | 4 | 0 | 6 | 21 |
 
@@ -64,5 +64,4 @@ Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/c
 | visibles | 55 | 25 (45 %) | 14 (25 %) | 45 |
 | non visibles | 208 | 135 (65 %) | 61 (29 %) | 208 |
 
-Échantillon relu à la main : 62 passes, le modèle local est d'accord avec la relecture sur 47 (76 %) ; la cause relue prime dans les tableaux.
-
+Échantillon relu à la main : 77 passes, le modèle local est d'accord avec la relecture sur 59 (77 %) ; la cause relue prime dans les tableaux.

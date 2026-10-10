@@ -213,7 +213,8 @@
   },
   "2026-10-06-1801/finance-tracker--L4/3": {
     "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
   },
   "2026-10-06-1801/finance-tracker--L4/5": {
     "cause": "derive-architecture",
@@ -256,7 +257,8 @@
   },
   "2026-10-06-1801/ol-companion--L37/5": {
     "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
   },
   "2026-10-06-1801/ol-companion--L37/7": {
     "cause": "bug-code",
@@ -299,7 +301,8 @@
   },
   "2026-10-07-1234/cadence--L64/3": {
     "cause": "test-manquant",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
   },
   "2026-10-07-1234/cadence--L64/5": {
     "cause": "bug-code",
@@ -342,7 +345,8 @@
   },
   "2026-10-07-1424/cadence--L60/3": {
     "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
   },
   "2026-10-07-1424/cadence--L60/5": {
     "cause": "test-manquant",
@@ -384,7 +388,8 @@
   },
   "2026-10-07-1921/cadence--L102/3": {
     "cause": "test-manquant",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
   },
   "2026-10-07-1921/cadence--L102/5": {
     "cause": "test-manquant",
@@ -427,7 +432,8 @@
   },
   "2026-10-07-1943/cadence--L78/5": {
     "cause": "test-manquant",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
   },
   "2026-10-07-2103/cadence--L75/3": {
     "cause": "test-manquant",
@@ -470,7 +476,8 @@
   },
   "2026-10-08-0913/cadence--L120/6": {
     "cause": "spec-floue",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
   },
   "2026-10-08-0928/cadence--L49/4": {
     "cause": "bug-code",
@@ -513,7 +520,8 @@
   },
   "2026-10-08-1611/maritime-atlas--B64__grib-4-octets/4": {
     "cause": "test-manquant",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
   },
   "2026-10-08-1611/maritime-atlas--Q4__accueil-4-ux-temp-compact-cr2/3": {
     "cause": "bug-code",
@@ -556,7 +564,8 @@
   },
   "2026-10-08-2135/cadence--L133/4": {
     "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
   },
   "2026-10-08-2135/cadence--L133/6": {
     "cause": "bug-code",
@@ -599,7 +608,8 @@
   },
   "2026-10-09-1058/maritime-atlas--Q4__particules-vagues-vitesse/4": {
     "cause": "spec-floue",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
   },
   "2026-10-09-1253/maritime-atlas--Q4__particules-legende-hs-globe/4": {
     "cause": "spec-floue",
@@ -642,7 +652,8 @@
   },
   "2026-10-09-1448/maritime-atlas--Q4__particules-legende-hs-widget/4": {
     "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
   },
   "2026-10-09-1448/maritime-atlas--Q4__particules-ol-bascule-retelechargement/4": {
     "cause": "bug-code",
@@ -727,7 +738,8 @@
   },
   "2026-10-10-0943/cadence--L83/5": {
     "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
   },
   "2026-10-10-1015/maritime-atlas--Q4__accueil-4-ux24/4": {
     "cause": "bug-code",
@@ -770,7 +782,8 @@
   },
   "2026-10-10-1140/finance-tracker--L7/6": {
     "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "bug-code"
   },
   "2026-10-10-1150/cadence--L90/4": {
     "cause": "bug-code",
@@ -856,7 +869,8 @@
   },
   "2026-10-10-1355/cadence--L146/3": {
     "cause": "bug-code",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "derive-architecture"
   },
   "2026-10-10-1355/cadence--L146/5": {
     "cause": "spec-floue",
@@ -1003,7 +1017,8 @@
   },
   "cadence-l122/cadence--L122/4": {
     "cause": "test-manquant",
-    "by": "ollama:mistral-small3.2:24b"
+    "by": "ollama:mistral-small3.2:24b",
+    "manual": "test-manquant"
   },
   "cadence-l122/cadence--L122/6": {
     "cause": "test-manquant",

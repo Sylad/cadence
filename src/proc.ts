@@ -307,12 +307,20 @@ function isSharedDaemon(name: string): boolean {
   return SHARED_DAEMONS.has((base.split('/').pop() ?? '').toLowerCase());
 }
 
-/** Vrai si `pid` ou l'un de ses ancêtres est un démon partagé (`info` : nom et parent d'un pid, null s'il est illisible). */
-function underSharedDaemon(pid: number, info: (pid: number) => { name: string; ppid: number } | null): boolean {
-  for (let cur = pid, depth = 0; cur > 1 && depth < 64; depth++) {
+/**
+ * Vrai si `pid` ou l'un de ses ancêtres est un démon partagé QUI PORTE LA MARQUE (`info` : nom et parent d'un pid, null
+ * s'il est illisible ; `marked` : pids marqués). Un tmux sans la marque est celui du lead, où cadence tourne peut-être :
+ * il n'épargne rien. La remontée s'arrête à cadence.
+ */
+function underSharedDaemon(
+  pid: number,
+  info: (pid: number) => { name: string; ppid: number } | null,
+  marked: ReadonlySet<number>,
+): boolean {
+  for (let cur = pid, depth = 0; cur > 1 && cur !== process.pid && depth < 64; depth++) {
     const i = info(cur);
     if (!i) return false;
-    if (isSharedDaemon(i.name)) return true;
+    if (marked.has(cur) && isSharedDaemon(i.name)) return true;
     cur = i.ppid;
   }
   return false;
@@ -343,7 +351,7 @@ function procInfo(procRoot: string, pid: number): { name: string; ppid: number }
 
 /**
  * Pids des processus (hors cadence) dont l'environnement porte `<SESSION_MARK_VAR>=<mark>` : /proc, sinon `ps` (`-E` sur
- * macOS, `e` sur Linux). Les démons partagés (SHARED_DAEMONS) et leurs descendants n'en font pas partie.
+ * macOS, `e` sur Linux). Les démons partagés (SHARED_DAEMONS) qui portent la marque, et leurs descendants, n'en font pas partie.
  */
 export function findMarked(mark: string, io: FindMarkedIo = {}): number[] {
   const { procRoot = '/proc', run = execFileSync, platform = process.platform } = io;
@@ -365,7 +373,8 @@ export function findMarked(mark: string, io: FindMarkedIo = {}): number[] {
         // sorti, zombie ou illisible (autre utilisateur)
       }
     }
-    return found.filter((pid) => !underSharedDaemon(pid, (p) => procInfo(procRoot, p)));
+    const markedSet = new Set(found);
+    return found.filter((pid) => !underSharedDaemon(pid, (p) => procInfo(procRoot, p), markedSet));
   }
   try {
     const out = run('ps', psEnvArgs(platform), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
@@ -379,7 +388,8 @@ export function findMarked(mark: string, io: FindMarkedIo = {}): number[] {
       // la marque est un mot entier : `s1` ne reconnaît pas `s10` (comme la comparaison exacte des entrées de /proc)
       if (pid !== process.pid && ` ${m[3]} `.includes(` ${entry} `)) marked.push(pid);
     }
-    found.push(...marked.filter((pid) => !underSharedDaemon(pid, (p) => table.get(p) ?? null)));
+    const markedSet = new Set(marked);
+    found.push(...marked.filter((pid) => !underSharedDaemon(pid, (p) => table.get(p) ?? null, markedSet)));
   } catch {
     // ps absent : rien à tuer de plus
   }

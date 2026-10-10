@@ -1123,7 +1123,7 @@ the session between two samples (every 200 ms); a process whose environment is u
 found; a process started through a daemon that already ran before the session (`docker compose up -d` talks to the
 Docker daemon, which owns the containers) is out of reach. **Shared daemons are spared**: a tmux server, `screen`,
 `gpg-agent` or `dirmngr` started on demand by a session carries its mark and would pass it to clients and panes opened
-later from elsewhere, so killing by mark would kill the lead's own tmux panes; those daemons, and everything that
+later from elsewhere, so killing by mark would kill the lead's own tmux panes; those daemons (only when they carry the mark: the lead's own tmux, where cadence itself may run, does not, and spares nothing), and everything that
 descends from them, are left alone (a dev server started inside a tmux pane therefore survives its session). Not in
 that list, because their name does not tell them from an ordinary client: the ssh master (`ControlPersist`), the
 Gradle daemon (java) and pm2 (node) — they are killed if they carry the mark.

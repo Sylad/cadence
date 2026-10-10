@@ -306,6 +306,20 @@ describe('findMarked — repli sans /proc (macOS)', () => {
     expect(findMarked('s1', { procRoot: NO_PROC, run, platform: 'linux' })).toEqual([206, 207]);
   });
 
+  it("(L83/t1) un tmux qui ne porte pas la marque (celui du lead, où tourne cadence) n'épargne rien : ses descendants marqués sont trouvés", () => {
+    const { run } = fakePs(
+      [
+        '  201 1 tmux: server',
+        '  202 201 -bash',
+        '  203 202 node cadence',
+        '  204 203 node dev-server.js CADENCE_SESSION=s1',
+        '  205 1 sleep 30 CADENCE_SESSION=s1',
+        '',
+      ].join('\n'),
+    );
+    expect(findMarked('s1', { procRoot: NO_PROC, run, platform: 'linux' })).toEqual([204, 205]);
+  });
+
   it("(L83/t1) avec /proc : un serveur tmux démarré par la session et son panneau sont épargnés, le serveur de dev voisin est trouvé", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'cadence-shared-'));
     const mark = `test-${process.pid}-${Date.now()}`;

@@ -16,7 +16,7 @@ const FAKE = fileURLToPath(new URL('./fixtures/fake-claude.mjs', import.meta.url
 const SAMPLE = fileURLToPath(new URL('./fixtures/claude-result.sample.json', import.meta.url));
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
-function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string; remote?: boolean; visible?: boolean; precheck?: boolean } = {}) {
+function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string; remote?: boolean; visible?: boolean; precheck?: boolean | 'local' } = {}) {
   const parent = tempDir();
   const dir = join(parent, 'proj');
   mkdirSync(dir);
@@ -228,6 +228,20 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const r = await on.cli('proj:L1', '--dry-run');
     try {
       expect(r.out).toContain('étapes : precheck (sonnet) → implement (sonnet) → review (opus)');
+    } finally {
+      removeDryRunBriefs(r.out);
+    }
+  });
+
+  it('--dry-run : precheck: local montre l\'étape (local) et ses arguments claude-local, pas ceux de Sonnet (L146)', async () => {
+    const on = setup({}, { precheck: 'local' });
+    const r = await on.cli('proj:L1', '--dry-run');
+    try {
+      expect(r.out).toContain('étapes : precheck (local) → implement (sonnet) → review (opus)');
+      const line = r.out.split('\n').find((l) => l.trim().startsWith('precheck :'))!;
+      expect(line).toContain('precheck : claude-local ');
+      expect(line).not.toContain('--model sonnet');
+      expect(r.out).toMatch(/implement : claude (?!-local)/);
     } finally {
       removeDryRunBriefs(r.out);
     }

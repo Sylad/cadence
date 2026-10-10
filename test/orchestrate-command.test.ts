@@ -731,6 +731,25 @@ describe('une vague', () => {
     expect(existsSync(join(parent, '.cadence/orchestrate.lock'))).toBe(false); // plus de verrou par dossier
   });
 
+  it('L146 — --resume ne compte pas au budget une étape locale tuée : ses jetons sont ceux d\'Ollama, pas du quota', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const claudeHome = tempDir();
+    const f = fakeDeps({}, { claudeHome });
+    expect(await orchestrate(['a:L1', '--budget', '1'], io(parent).io, f.deps)).toBe(3);
+    const store = new RunStore(parent, '2026-10-04-1412');
+    const lot = store.readLot('a', 'L1')!;
+    lot.steps.push({ n: lot.steps.length + 1, kind: 'precheck', model: 'local', status: 'running', pid: 2_999_999, sessionId: 'locale-tuee', started: '2026-10-04T14:13:00.000Z' });
+    store.writeLot(lot);
+    const dir = projectLogDir(claudeHome, realpathSync(dirs.a));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'locale-tuee.jsonl'), JSON.stringify({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 10, cache_creation_input_tokens: 100, cache_read_input_tokens: 7, output_tokens: 5 } } }));
+    expect(await orchestrate(['--resume', '--budget', '1M'], io(parent).io, f.deps)).toBe(0);
+    const after = new RunStore(parent, '2026-10-04-1412');
+    const steps = after.readLot('a', 'L1')!.steps;
+    expect(steps.find((x) => x.sessionId === 'locale-tuee')!.tokens).toBeUndefined();
+    expect(after.readWave()!.consumed).toBe(steps.reduce((n, x) => n + (x.tokens?.counted ?? 0), 0));
+  });
+
   it('L3/t20 — --resume compte au budget l\'étape tuée par un signal, relue dans le journal de sa session', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
     const claudeHome = tempDir();

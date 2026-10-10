@@ -343,6 +343,9 @@ describe('skills install', () => {
     // Un lot backend touche aussi les pages qui consomment les services modifiés (grep des appels).
     expect(scope).toContain('the pages that consume the services the lot changed');
     expect(scope).toContain('grep for their callers');
+    // Le repli « diff non rattachable » est une phrase autonome, pas un renvoi à la phrase précédente.
+    expect(scope).not.toContain('The same holds');
+    expect(scope.replace(/\s+/g, ' ')).toContain('If you cannot link the diff to any page (a shared helper, a utility), the fallback is mandatory too: walk every page and say so');
     // Les pages hors périmètre sont nommées, jamais comptées comme vérifiées.
     expect(scope).toContain('named under « Not walked », never counted as checked');
     // Sans lot : tout est parcouru.

@@ -117,8 +117,9 @@ services the lot changed — grep for their callers, from the changed service up
 that uses it, and walk the pages of those endpoints. If a backend lot changes no route (a service, a
 data source or a configuration changed under routes that keep their path) and no screen, the scope
 cannot come from the routes: the fallback is mandatory: walk every page and say so in the report.
-A lot that changes only screens keeps the reduced scope: the pages of those screens, plus the home
-page. The same holds if you cannot link the diff to any page. If you cannot tell which pages a changed
+If you cannot link the diff to any page (a shared helper, a utility), the fallback is mandatory too:
+walk every page and say so in the report. A lot that changes only screens keeps the reduced scope:
+the pages of those screens, plus the home page. If you cannot tell which pages a changed
 endpoint feeds, walk every page and say so — a scope you cannot establish reduces nothing. Pages
 outside the scope are named under « Not walked », never counted as checked. Without a lot id,
 walk every page.

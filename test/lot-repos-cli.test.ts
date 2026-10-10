@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { run } from '../src/cli.js';
 import { Plan } from '../src/plan.js';
+import { coveredTasks } from '../src/audit.js';
 import { resolveLotRepos, repoShas, repoWork } from '../src/repos.js';
 import { commit as commitAt, tempDir } from './helpers.js';
 
@@ -263,5 +264,38 @@ describe('plan en lecture seule : fields.repos accepte les deux formes', () => {
     const r = await raf(dir, 'commits', 'NC2');
     expect(r.code).toBe(0);
     expect(r.out).toMatch(/^dépôt \.\.\/voisin :\n {2}[0-9a-f]{7} ol-companion: frontend sha-1 \(NC2\)$/);
+  });
+});
+
+describe('coveredTasks : commits du lot dans un dépôt voisin (L156)', () => {
+  const withTasks = (dir: string) => {
+    const file = join(dir, 'docs/plan/raf.yaml');
+    writeFileSync(file, readFileSync(file, 'utf8').replace(/- id: L1\n/, '- id: L1\n    tasks:\n    - { id: t1, title: a, status: todo }\n    - { id: t2, title: b, status: todo }\n'.replace(/^/, '')));
+  };
+
+  it('une sous-tâche citée seulement dans le voisin est couverte, avec le sha du voisin', async () => {
+    const { dir, neighbour } = await setup();
+    withTasks(dir);
+    commit(neighbour, 'feat(L1/t2): fait dans le voisin');
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const { repos } = resolveLotRepos(dir, plan.lot('L1'));
+    expect(coveredTasks(plan, dir, 'L1').map((c) => c.task)).toEqual([]);
+    const neighbourWork = repos.flatMap((r) => repoWork(plan, r, 'L1'));
+    const covered = coveredTasks(plan, dir, 'L1', neighbourWork);
+    expect(covered.map((c) => c.task)).toEqual(['t2']);
+    expect(covered[0].sha).toBe(git(neighbour, 'rev-parse', 'HEAD'));
+  });
+
+  it('un commit du voisin qui ne cite que le lot ne couvre rien ; le commit du projet garde la priorité', async () => {
+    const { dir, neighbour } = await setup();
+    withTasks(dir);
+    commit(neighbour, 'feat(L1): sans sous-tâche');
+    commit(neighbour, 'feat(L1/t1): voisin');
+    commit(dir, 'feat(L1/t1): projet');
+    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const { repos } = resolveLotRepos(dir, plan.lot('L1'));
+    const covered = coveredTasks(plan, dir, 'L1', repos.flatMap((r) => repoWork(plan, r, 'L1')));
+    expect(covered.map((c) => c.task)).toEqual(['t1']);
+    expect(covered[0].sha).toBe(git(dir, 'rev-parse', 'HEAD'));
   });
 });

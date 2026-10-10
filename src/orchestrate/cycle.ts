@@ -880,7 +880,7 @@ async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise
   }
   l.constats = [];
   // Sous-tâches ouvertes que des commits du lot citent (L82) : la revue conforme vaut pour elles, sinon `raf done` refuserait le lot.
-  const covered = coveredTasks(plan, l.repo, l.lot);
+  const covered = coveredTasks(plan, l.repo, l.lot, neighbours.flatMap((r) => repoWork(plan, r, l.lot)));
   if (!plan.readonly) {
     plan.recordReview(l.lot, verdict, c.wave.today, newer, neighbours.length ? shas : undefined);
     for (const k of covered) plan.setStatus(`${l.lot}/${k.task}`, 'done', c.wave.today);

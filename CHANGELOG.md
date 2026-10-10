@@ -42,6 +42,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `cadence orchestrate`: the sub-tasks a compliant review closes (L82) are also read in the commits of the lot in its neighbouring repositories (`repos:`, L62): `feat(L3/t2)` committed in a neighbour no longer leaves `t2` open and `raf done` refusing the lot (L156).
 - `cadence orchestrate`: the sub-tasks a commit covers (L82) are read with the same left guard as the plan's references, so `fix(E-A2/t3,t4, A2/t1)` no longer proposes `A2/t3` and `A2/t4` (lot `A2` read inside `E-A2`), and a list that repeats the lot id, `fix(L1/t1, L1/t2,t3)`, is read to its end, `t3` included (L155).
 
 ### Changed

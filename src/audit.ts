@@ -207,13 +207,14 @@ export function lotWork(plan: Plan, root: string, lotId: string): Commit[] {
 /**
  * Sous-tâches encore ouvertes d'un lot que citent ses commits de travail (`feat(L3/t2)`), avec le plus récent des commits qui
  * les citent (L82) : le travail est fait, il ne reste que le plan à tenir. Un commit qui ne cite que le lot ne couvre rien.
+ * `neighbourWork` : les commits du lot dans ses dépôts voisins (`repoWork`, L62), lus après ceux du projet (L156).
  */
-export function coveredTasks(plan: Plan, root: string, lotId: string): { task: string; sha: string }[] {
+export function coveredTasks(plan: Plan, root: string, lotId: string, neighbourWork: Commit[] = []): { task: string; sha: string }[] {
   const lot = plan.lots().find((l) => l.id === lotId);
   if (!lot) return [];
   const open = new Set(lot.tasks.filter((t) => isOpen(t.status)).map((t) => t.id));
   const found = new Map<string, string>();
-  for (const c of lotWork(plan, root, lotId)) {
+  for (const c of [...lotWork(plan, root, lotId), ...neighbourWork]) {
     const cited = citedRefs(c, plan.refs).filter((r) => r.lot === lotId && r.task);
     // `fix(L3/t1,t2)` : le motif des références ne lit que la première sous-tâche d'une liste à virgule.
     // Même texte que citedRefs : la portée quand elle cite des lots, sinon le message entier (le corps ne compte pas à côté d'une portée).

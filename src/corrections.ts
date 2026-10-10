@@ -85,15 +85,20 @@ function findingsOf(report: any): string[] {
 
 /**
  * Lit les journaux de vague `<runs>/<vague>/<projet>--<lot>.json`. Un lot compte (dénominateur) dès qu'une session
- * d'écriture a abouti ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
+ * d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là, pour une mesure que les vagues suivantes ne changent pas ; une vague sans date lisible est lue) ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
  */
-export function readRuns(runsDir: string): Runs {
+export function readRuns(runsDir: string, until?: string): Runs {
   const lots: LotRecord[] = [];
   const passes: FixPass[] = [];
   if (!existsSync(runsDir)) return { lots, passes };
   for (const wave of readdirSync(runsDir).sort()) {
     const waveDir = join(runsDir, wave);
     if (!statSync(waveDir).isDirectory()) continue;
+    if (until !== undefined) {
+      // Les vagues nommées à la main (ol-gains-1) n'ont pas d'horodatage dans leur nom : on lit `created` dans wave.json.
+      const created = Date.parse(readJson(join(waveDir, 'wave.json'))?.created);
+      if (created > Date.parse(until)) continue;
+    }
     for (const file of readdirSync(waveDir).sort()) {
       if (!file.endsWith('.json') || file === 'wave.json') continue;
       const rec = readJson(join(waveDir, file));

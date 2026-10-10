@@ -608,12 +608,12 @@ no plan. It exits 0 even when a project is in error — that project's line read
 
 ## corrections
 
-`cadence corrections [folder] [--classify [--model m]] [--cache file] [--sample n] [--json]` measures how often a wave
+`cadence corrections [folder] [--classify [--model m]] [--cache file] [--sample n] [--until date] [--json]` measures how often a wave
 has to correct itself. From the folder a wave was launched from (default: the current one) it reads the journals
 `<folder>/.cadence/runs/<wave>/<project>--<lot>.json` of **every project** and prints:
 
 - the **lots with a correction**: of the lots that went through a successful write session, the share with at least one
-  and at least two `fix` passes, per project and for visible versus non-visible lots (`61 %` and `28 %` of 264 lots on 10-10);
+  and at least two `fix` passes, per project and for visible versus non-visible lots (`61 %` and `29 %` of 266 lots in the 10-10 baseline);
 - the **passes by cause**, in total and per project. The cause of a pass is read from the findings of the review that
   precedes it, among: unclear spec or missing criterion (`spec-floue`), invented business rule (`regle-inventee`),
   architecture drift (`derive-architecture`), data / SQL (`donnees-sql`), code bug (`bug-code`), missing test
@@ -623,11 +623,11 @@ Without `--classify` the command calls no model: the passes not yet classified c
 each pass is classified by a **local model served by Ollama** (`OLLAMA_HOST`, default `http://localhost:11434`;
 `--model`, default `mistral-small3.2:24b`; temperature 0, output constrained to the seven causes), off the Anthropic quota.
 The classification is cached in `<folder>/.cadence/corrections.json` (or `--cache file`): a re-run classifies only the
-new passes, and a pass the model could not answer stays out of the cache. `--sample n` prints `n` passes spread
+new passes, and a pass the model could not answer stays out of the cache. `--sample n` prints `n` passes with findings spread
 evenly over the sorted keys, with their findings and the model's cause, to be read by hand; a `manual` field written
 beside a pass in the cache file (one of the seven causes, else the command refuses the file) overrides the model's cause in every table and gives the **agreement rate** of the model
-on the reviewed sample. `--json` prints the measure as data. The command reads the journals and writes nothing but the cache.
-The first baseline is in [docs/mesures/corrections-2026-10-10.md](docs/mesures/corrections-2026-10-10.md).
+on the reviewed sample. `--until date` (ISO, e.g. `2026-10-10T18:31Z`) reads only the waves created up to then (`created` in the wave's `wave.json`), so that later waves do not change a published baseline. `--json` prints the measure as data. The command reads the journals and writes nothing but the cache.
+The first baseline is in [docs/mesures/corrections-2026-10-10.md](docs/mesures/corrections-2026-10-10.md); `test/corrections-mesure.test.ts` replays its command on the journals and checks the document's results word for word (skipped when the journals are not there).
 
 ## deliver
 

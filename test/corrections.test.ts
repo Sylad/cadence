@@ -296,6 +296,30 @@ describe('cadence corrections', () => {
     }
   });
 
+  it('--sample ne tire que des passes qui ont des constats à relire (pas les passes sans revue)', async () => {
+    const parent = parentWithRuns();
+    lot(join(parent, '.cadence', 'runs'), 'w3', 'gamma', 'L5', [{ kind: 'implement' }, { kind: 'fix' }, { kind: 'review', constats: [] }]);
+    const s = await cad(parent, 'corrections', parent, '--sample', '10');
+    expect(s.out).toContain('## w1/alpha--L1/3');
+    expect(s.out).not.toContain('gamma--L5');
+  });
+
+  it('--until borne la mesure aux vagues créées jusque-là (wave.json) : les vagues suivantes ne changent plus les chiffres', async () => {
+    const parent = parentWithRuns();
+    const runs = join(parent, '.cadence', 'runs');
+    writeFileSync(join(runs, 'w1', 'wave.json'), JSON.stringify({ id: 'w1', created: '2026-10-10T10:00:00.000Z' }));
+    writeFileSync(join(runs, 'w2', 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-10T12:00:00.000Z' }));
+    const all = JSON.parse((await cad(parent, 'corrections', parent, '--json')).out);
+    const w1 = JSON.parse((await cad(parent, 'corrections', parent, '--until', '2026-10-10T10:00:00Z', '--json')).out);
+    expect(all.total.lots).toBe(3);
+    expect(w1.total.lots).toBe(2);
+    expect(w1.total.passes).toBe(1);
+    expect(readRuns(runs, '2026-10-10T09:00:00Z').lots).toEqual([]);
+    const e = await cad(parent, 'corrections', parent, '--until', 'hier');
+    expect(e.code).not.toBe(0);
+    expect(e.err).toContain('--until invalide');
+  });
+
   it('refuse un dossier sans journaux', async () => {
     const r = await cad(tempDir(), 'corrections');
     expect(r.code).not.toBe(0);

@@ -43,7 +43,7 @@ if (tool === 'raf') {
   cadence lead tour [dossier] [--idle 3] [--json]
                     le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier courant
                     s'il est lui-même un projet ; une première ligne « cadence.yaml · ✗ erreur » si priority: est illisible
-  cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--json]
+  cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--json]
                     la mesure des passes de correction des vagues (dossier/.cadence/runs) : lots à ≥1 et ≥2 corrections,
                     par projet, visibles ou non, passes par cause ; --classify les classe par Ollama (hors quota)
   cadence skills install [--dir .claude] [--force]

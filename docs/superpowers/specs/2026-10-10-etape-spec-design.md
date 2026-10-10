@@ -114,9 +114,11 @@ lancer les tests du projet (pas le code d'implémentation à écrire). Contrat :
   prouve rien : il est renvoyé à la session). Commit `test(Lx): acceptation R1–Rn (rouge)`.
 - **Verrou** : l'étape enregistre l'empreinte des fichiers de tests d'acceptation (liste dans
   `docs/specs/<écran>/acceptation.json`). L'implémentation les rend verts **sans les modifier** ;
-  à la fin de chaque `implement` et `fix`, le cycle compare les empreintes (lot S5 : contrôle propre
+  à la fin de chaque `implement` et `fix`, le cycle compare les fichiers (lot S5 : contrôle propre
   à l'étape, la garde actuelle de `guard.ts` ne porte que sur le push) et rend le lot au lead si un de ces
-  fichiers a changé. Le verrou vaut pour **toute session du dépôt** (un dépôt n'a qu'une file : le lot
+  fichiers a changé. La liste elle-même est protégée : la comparaison se fait **au commit rouge par git**
+  (`git diff <sha rouge> -- <fichiers listés>`, vide attendu), pas seulement par les empreintes que la session
+  pourrait réécrire, et `acceptation.json` lui-même est sous le verrou (seul le cycle y pose `vert: true`). Le verrou vaut pour **toute session du dépôt** (un dépôt n'a qu'une file : le lot
   suivant tourne sur la même branche) : le contrôle porte sur les `acceptation.json` de tous les lots, pas
   seulement du lot courant. Une modification utile est une question au lead
   ou un constat de revue — jamais un geste silencieux.
@@ -130,7 +132,7 @@ lancer les tests du projet (pas le code d'implémentation à écrire). Contrat :
   ainsi **exclus de `config.test` et de la CI**. Seul le lot propriétaire les lance, par une commande
   dédiée (config `*.acceptation.config.*` qui n'inclut que ces fichiers) ; à la fin de chaque `implement`/`fix`,
   quand la commande dédiée passe, **le cycle** (pas l'étape `accept`, terminée depuis) pose `vert: true` dans l'`acceptation.json`
-  du lot, dans le commit du cycle ; les fichiers rejoignent alors `config.test` et la CI, qui gardent le lot vert ensuite. Si la CI ou `config.test` n'utilisent pas la config du lanceur (chemins
+  du lot, dans le commit du cycle ; S5 étend pour cela `commitPlan` (`src/orchestrate/cycle.ts`), qui ne commite que le plan et ses fichiers maintenus : les `acceptation.json` rejoignent les fichiers qu'il a le droit de commiter, sinon l'arbre sale arrête le lot ; les fichiers rejoignent alors `config.test` et la CI, qui gardent le lot vert ensuite. Si la CI ou `config.test` n'utilisent pas la config du lanceur (chemins
   codés en dur), l'étape ne commite pas de test rouge et rend la question au lead. Si le lot est rendu au
   lead (question, budget, passes épuisées), ses tests restent rouges mais exclus du lanceur du projet et de la CI : les lots
   suivants et `cadence deliver` ne les voient pas ; le lot reprend (`--resume`) avec le même verrou.
@@ -230,7 +232,7 @@ conception ne les ajoute pas lui-même : ils deviennent prêts pour `orchestrate
 | S2 | Format de la fiche : `cadence spec check <fiche>` (invariants ci-dessus, codes de sortie), `cadence spec qa <fiche>` (dérive `expectations.md`), gabarit `templates/fiche.yaml` | 1 | S1 |
 | S3 | Étape `spec` d'orchestrate : agent `spec-writer`, brief, rendu Playwright 1440/390 des états, commit de la spec, règle « hypothèse coûteuse = question », sortie sous le seuil | 1 | S2 |
 | S4 | Revue UX de la maquette : mode « maquette » de `ux-reviewer`, cohérence maquette ↔ fiche, boucle ≤ 2 passes, rendu au lead | 0.75 | S3 |
-| S5 | Étape `accept` : session distincte, tests rouges vérifiés, empreinte `acceptation.json`, garde de `implement`/`fix` sur ces fichiers pour toutes les sessions du dépôt (tous les lots), exclusion des fichiers listés dans les `acceptation.json` (`vert: false`) de `config.test` et de la CI via la config du lanceur de tests tant que leur lot n'est pas vert, commande dédiée du lot propriétaire, retour à `vert: true` posé par le cycle à la fin d'`implement`/`fix` quand cette commande passe | 1 | S3 |
+| S5 | Étape `accept` : session distincte, tests rouges vérifiés, empreinte `acceptation.json`, garde de `implement`/`fix` sur ces fichiers pour toutes les sessions du dépôt (tous les lots), exclusion des fichiers listés dans les `acceptation.json` (`vert: false`) de `config.test` et de la CI via la config du lanceur de tests tant que leur lot n'est pas vert, commande dédiée du lot propriétaire, retour à `vert: true` posé par le cycle à la fin d'`implement`/`fix` quand cette commande passe (extension de `commitPlan` aux `acceptation.json`), comparaison au commit rouge par git | 1 | S3 |
 | S6 | Briefs aval : fiche donnée à `implement`, tests citant les règles, `code-reviewer` règle → test → vert, UX de conformité légère (remplace la passe complète des lots avec fiche), section « Hypothèses » de Nouveautés + contrôle de `news check` | 1 | S4, S5 |
 | S7 | Essai sur un écran d'une app loisir (à la main puis orchestré), note sur le fonctionnement de la fiche | 0.5 | S6 |
 | S8 | Mesure contre le lot de mesure, une fois 8 lots avec fiche livrés (ouvert tant qu'ils ne le sont pas), note de conclusion | 0.5 | S7 |

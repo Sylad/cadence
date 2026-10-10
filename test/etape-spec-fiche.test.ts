@@ -54,7 +54,20 @@ describe('fiche d\'écran de l\'exemple (L166)', () => {
 
   it('contient au moins une hypothèse, que la spec fait remonter dans l\'entrée Nouveautés', () => {
     expect(fiche.regles.some((r: any) => r.statut === 'hypothese')).toBe(true);
-    expect(spec).toMatch(/Hypothèses/);
+    expect(spec).toMatch(/^### 8\. Hypothèses → Nouveautés$/m);
+  });
+
+  it('nomme l\'extension de commitPlan qui permet au cycle de commiter les acceptation.json (sinon arbre sale)', () => {
+    const s5 = spec.split('\n').find((l) => l.startsWith('| S5 |')) ?? '';
+    expect(spec).toMatch(/`commitPlan`[\s\S]{0,200}`acceptation\.json`/);
+    expect(s5).toMatch(/`commitPlan`/);
+  });
+
+  it('protège la liste des empreintes elle-même : comparaison au commit rouge par git, acceptation.json sous le verrou', () => {
+    expect(spec).toMatch(/git diff <sha rouge>/);
+    expect(spec).toMatch(/`acceptation\.json` lui-même est sous le verrou/);
+    const s5 = spec.split('\n').find((l) => l.startsWith('| S5 |')) ?? '';
+    expect(s5).toMatch(/commit rouge/);
   });
 
   it('ne laisse en hypothèse aucune règle dont si_faux touche un choix coûteux à défaire', () => {

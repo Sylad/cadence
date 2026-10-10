@@ -1,7 +1,6 @@
 # Gabarit de fiche d'écran (étape spec d'orchestrate, L170). Copier dans docs/specs/<écran>/fiche.yaml,
 # remplacer les valeurs, puis `cadence spec check docs/specs/<écran>/fiche.yaml`.
-# Chaque clé est décrite dans docs/superpowers/specs/2026-10-10-etape-spec-design.md (§ 2) ; l'exemple rempli
-# est 2026-10-10-etape-spec-fiche-exemple.yaml dans le même dossier.
+# Chaque clé et les invariants vérifiés sont décrits dans la section « spec » du README de cadence.
 ecran:
   id: mon-ecran                # kebab-case ; nom du dossier docs/specs/<id>/
   titre: Mon écran

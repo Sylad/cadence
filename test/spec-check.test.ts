@@ -179,6 +179,13 @@ describe('gabarit templates/fiche.yaml', () => {
     expect(t).toMatch(/masque/);
     expect(cadence(tempDir(), 'spec', 'check', join(root, 'templates', 'fiche.yaml')).code).toBe(0);
   });
+
+  it('ne renvoie qu\'à des références livrées avec le paquet (README), pas à docs/', () => {
+    const t = readFileSync(join(root, 'templates', 'fiche.yaml'), 'utf8');
+    expect(t).not.toMatch(/docs\/superpowers/);
+    expect(t).not.toMatch(/dans le même dossier/);
+    expect(t).toMatch(/README/);
+  });
 });
 
 describe('design de l\'étape spec : la clé masque (note de revue L166)', () => {

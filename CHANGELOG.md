@@ -39,6 +39,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence-hud`: the project line of the plans' progress names the lots in progress after their count, three at most | [0.25.0](#0250---2026-10-09) |
 | `orchestrate.precheck: local`: the « deliverable already present? » pre-check runs on the local model (`claude-local`, Ollama), off the Anthropic quota | [0.28.0](#0280---2026-10-10) |
 
+## [Unreleased]
+
+### Added
+
+- `evals/` and `npm run eval:plugin`: an evaluation suite of the plugin for `claude plugin eval`, four cases drawn from traps found by hand (`raf done` refused without a review, `deliver --sha`, `orchestrate` with lot ids containing `/`, a `livrer.sh` without a `deliver:` block) and a baseline arm without the plugin; billed per run, to be run at the release only (L139).
+
 ## [0.28.0] - 2026-10-10
 
 ### Added

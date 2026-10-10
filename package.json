@@ -26,6 +26,7 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "eval:plugin": "claude plugin eval . --max-cost-usd 5 --no-publish",
     "prepare": "npm run build",
     "prepublishOnly": "npm run typecheck && npm test"
   },

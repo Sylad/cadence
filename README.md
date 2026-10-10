@@ -1392,6 +1392,28 @@ The Claude Code plugin is read from the repository, so pushing `main` is what up
 publish run, leaves npm behind without any other error — 0.3.0 and 0.4.0 were never published — hence
 step 4.
 
+### Evaluating the plugin (before a release)
+
+`evals/` holds an evaluation suite for the plugin itself, run by `claude plugin eval` (Claude Code 2.1.263 and later). Each case is
+a folder with a `prompt.md` and `graders/*.md`, and replays a trap found by hand: `raf-done-sans-revue` (`raf done` refused on a lot whose
+commits have no code review, with no `--force` to get round it), `deliver-sha` (`git push origin <sha>:main` then
+`cadence deliver --sha <sha>` for a pushed commit that is not `HEAD`), `orchestrate-id-avec-slash` (`maritime-atlas:Q4/accueil-4-ux12@haiku`
+keeps its `/`, the state file says `__`) and `livrer-sh-sans-bloc` (a `./livrer.sh` without a `deliver:` block in `cadence.yaml` is not
+run by `cadence deliver`). Every case also runs a **baseline without the plugin**, so the report gives the score of each arm and the
+difference: a trap the baseline already avoids proves nothing about the plugin. The cases are read-only questions (tools `Read`, `Glob`, `Grep`,
+`Skill`, no scaffold script), each graded by a regular expression and by a model-judged criterion.
+
+```sh
+npm run eval:plugin              # claude plugin eval . --max-cost-usd 5 --no-publish; 4 cases × 3 runs × 2 arms = 24 runs
+claude plugin eval . --case deliver-sha --runs 1 --trust-plugin    # one case, one run (the first run asks to trust the plugin)
+```
+
+**Every run is billed** (a full `claude` session on your own credential, plus the judge): the suite is run at the release, once the
+version commit is ready, never in `npm test`, in `prepublishOnly` or in CI, and `--max-cost-usd 5` aborts a runaway. A case below
+the threshold (1.0 by default, `--threshold`) makes the command exit 1: read the case in the report before deciding it is the plugin
+and not the wording of the case. It replaces the real trial on Haiku the releases used to rely on. `npm test` only checks that the
+files are well formed (`test/plugin-evals.test.ts`); `evals/` is not part of the npm package.
+
 ## License
 
 MIT

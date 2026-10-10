@@ -2,7 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, relative } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
 import { docSyncBrief, docSyncGaps, filesOf } from '../docsync.js';
@@ -484,6 +484,17 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       w.saveWave();
       return stop(c, 'failed', `incident : ${w.incident}`);
     }
+    // Étape en lecture seule qui n'a laissé que des fichiers NON SUIVIS (captures d'un script en chemin relatif, L162) : déplacés dans le dossier du lot, avertissement, le verdict est gardé.
+    if (!write && b.head === a.head && b.tracked.join() === a.tracked.join() && b.untracked.join() !== a.untracked.join() && b.untracked.every((f) => a.untracked.includes(f))) {
+      const fresh = a.untracked.filter((f) => !b.untracked.includes(f));
+      const stray = join(dir, 'stray');
+      if (moveStray(path, fresh, where ? join(stray, relative(l.repo, path).replace(/[\\/]/g, '_')) : stray)) {
+        const text = `${kind} : ${fresh.length} fichier(s) non suivi(s) laissé(s)${where} par une étape en lecture seule, déplacé(s) dans ${stray} : ${fresh.join(', ')}`;
+        c.lot.warnings.push(text);
+        w.log(`${lotKey(l.project, l.lot)} · ${text}`);
+        continue;
+      }
+    }
     if (!write && (b.head !== a.head || b.tracked.join() !== a.tracked.join() || b.untracked.join() !== a.untracked.join())) {
       // Incident du LOT (L133) : la revue a laissé des traces (captures, commit), ni push ni garde supprimée — les lots des autres dépôts continuent.
       step.status = 'failed';
@@ -497,6 +508,28 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   step.status = 'ok';
   save(c);
   return { step, report: res.structured, before, after, others };
+}
+
+/** Déplace des fichiers non suivis (chemins relatifs au dépôt) sous `to`, arborescence gardée ; false si l'un n'a pu l'être (l'incident reste alors). */
+function moveStray(repo: string, files: string[], to: string): boolean {
+  try {
+    for (const f of files) {
+      const rel = f.replace(/^"|"$/g, '');
+      const from = join(repo, rel);
+      let dest = join(to, rel);
+      for (let i = 1; existsSync(dest); i++) dest = join(to, `${rel}.${i}`);
+      mkdirSync(dirname(dest), { recursive: true });
+      try {
+        renameSync(from, dest);
+      } catch {
+        copyFileSync(from, dest); // autre volume
+        rmSync(from);
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Verdict d'une revue interrompue par un incident du lot : rapporté au lead plutôt que perdu (L133). Rien n'est enregistré dans le plan. */

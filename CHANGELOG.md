@@ -41,6 +41,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- `cadence orchestrate`: a read-only step (precheck, review, review-small, review-recheck, ux) that leaves only UNTRACKED files in the repository (Playwright screenshots written by a script with a relative path) no longer stops the lot nor suspends the next ones of the repository: the files are moved to `runs/<wave>/<lot>/stray/`, a warning names them in the lot's warnings and the wave log, the verdict is kept and the lot goes on. A modified TRACKED file or a commit stays an incident (L162).
+
 ### Added
 
 - `evals/` and `npm run eval:plugin`: an evaluation suite of the plugin for `claude plugin eval`, four cases drawn from traps found by hand (`raf done` refused without a review, `deliver --sha`, `orchestrate` with lot ids containing `/`, a `livrer.sh` without a `deliver:` block) and a baseline arm without the plugin; billed per run, to be run at the release only (L139).

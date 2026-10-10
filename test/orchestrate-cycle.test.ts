@@ -829,7 +829,7 @@ describe('contrôles autour des sessions', () => {
     expect(h.plan().lot('L1').review).toBeUndefined();
   });
 
-  it('captures à la racine après une revue conforme : le lot est rendu, le verdict conforme est rapporté et non enregistré (L133)', async () => {
+  it('captures non suivies laissées par une revue : déplacées dans stray/, avertissement, verdict gardé, le lot continue (L162)', async () => {
     const shots: Handler = (call) => {
       writeFileSync(join(call.opts.cwd, 'capture.png'), 'png');
       return claudeOut(reviewReport({ verdict: 'conforme : rien à signaler' }));
@@ -837,22 +837,58 @@ describe('contrôles autour des sessions', () => {
     const h = harness({ script: { implement: [impl()], review: [shots] } });
     const c = h.lot('L1');
     await runLot(c);
-    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.status).toBe('ready');
     expect(h.wave.incident).toBeNull();
-    expect(c.lot.outcome).toMatch(/capture\.png/);
-    expect(c.lot.outcome).toMatch(/verdict de la revue avant l'incident : conforme/);
-    expect(c.lot.outcome).toMatch(/non enregistré/);
-    expect(c.lot.warnings.join('\n')).toMatch(/verdict.*conforme/);
-    expect(h.plan().lot('L1').review).toBeUndefined();
-    expect(c.lot.steps.at(-1)?.status).toBe('failed');
+    expect(existsSync(join(h.repo, 'capture.png'))).toBe(false);
+    expect(existsSync(join(h.wave.store.lotDir(c.lot.project, c.lot.lot), 'stray', 'capture.png'))).toBe(true);
+    expect(c.lot.warnings.join('\n')).toMatch(/capture\.png/);
+    expect(h.plan().lot('L1').review).toBeDefined();
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
   });
 
-  it('le lot suivant du même dépôt sali est suspendu (reprenable), sans session ni capture committée (L133)', async () => {
+  it('le lot suivant du même dépôt n\'est pas suspendu par des captures non suivies (L162)', async () => {
     const shots: Handler = (call) => {
       writeFileSync(join(call.opts.cwd, 'capture.png'), 'png');
       return claudeOut(reviewReport());
     };
-    const h = harness({ lots: [{ title: 'Un' }, { title: 'Deux' }], script: { implement: [impl()], review: [shots] } });
+    const h = harness({ lots: [{ title: 'Un' }, { title: 'Deux' }], script: { implement: [impl(), impl()], review: [shots, ok] } });
+    const c1 = h.lot('L1');
+    const c2 = h.lot('L2');
+    await runPool([c1, c2], 1);
+    expect(c1.lot.status).toBe('ready');
+    expect(c2.lot.status).not.toBe('suspended');
+    expect(h.calls.filter((k) => k.kind === 'implement')).toHaveLength(2);
+    expect(h.wave.incident).toBeNull();
+  });
+
+  it('un fichier SUIVI modifié par la revue reste un incident du lot, le verdict est rapporté non enregistré (L133, L162)', async () => {
+    const touchy: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'README.md'), 'modifié par la revue');
+      return claudeOut(reviewReport({ verdict: 'conforme : rien à signaler' }));
+    };
+    const h = harness({ script: { implement: [impl()], review: [touchy] } });
+    writeFileSync(join(h.repo, 'README.md'), 'init');
+    git(h.repo, 'add', 'README.md');
+    git(h.repo, 'commit', '-q', '-m', 'docs: readme');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(h.wave.incident).toBeNull();
+    expect(c.lot.outcome).toMatch(/a modifié le dépôt/);
+    expect(c.lot.outcome).toMatch(/README\.md/);
+    expect(c.lot.outcome).toMatch(/verdict de la revue avant l'incident : conforme/);
+    expect(h.plan().lot('L1').review).toBeUndefined();
+  });
+
+  it('le lot suivant du dépôt dont un fichier suivi a été modifié est suspendu (L133)', async () => {
+    const touchy: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'README.md'), 'modifié par la revue');
+      return claudeOut(reviewReport());
+    };
+    const h = harness({ lots: [{ title: 'Un' }, { title: 'Deux' }], script: { implement: [impl()], review: [touchy] } });
+    writeFileSync(join(h.repo, 'README.md'), 'init');
+    git(h.repo, 'add', 'README.md');
+    git(h.repo, 'commit', '-q', '-m', 'docs: readme');
     const c1 = h.lot('L1');
     const c2 = h.lot('L2');
     await runPool([c1, c2], 1);
@@ -860,8 +896,6 @@ describe('contrôles autour des sessions', () => {
     expect(c2.lot.status).toBe('suspended');
     expect(c2.lot.outcome).toMatch(/sali par la revue de demo:L1/);
     expect(c2.lot.steps).toHaveLength(0);
-    expect(h.calls.filter((k) => k.kind === 'implement')).toHaveLength(1);
-    expect(git(h.repo, 'ls-files', 'capture.png')).toBe('');
     expect(h.wave.incident).toBeNull();
   });
 

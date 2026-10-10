@@ -784,9 +784,9 @@ describe('une vague', () => {
     expect(f.calls.map((c) => c.kind)).toEqual(['implement', 'review', 'implement', 'review']);
   });
 
-  it('L133 — dépôt sali par une revue : le lot suivant est suspendu mais la vague n\'est pas « suspended-budget » (code 1, reprenable)', async () => {
+  it('L133 — dépôt sali par une revue (commit) : le lot suivant est suspendu mais la vague n\'est pas « suspended-budget » (code 1, reprenable)', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
-    const f = fakeDeps({ review: (cwd) => { writeFileSync(join(cwd, 'capture.png'), 'png'); return claudeOut(reviewReport()); } });
+    const f = fakeDeps({ review: (cwd) => { commitFile(cwd, 'intrus.txt', 'fix(L1): la revue a corrigé'); return claudeOut(reviewReport()); } });
     const r = io(parent);
     const code = await orchestrate(['a:L1', 'a:L2', '--max-sessions', '1'], r.io, f.deps);
     expect(code).toBe(1);

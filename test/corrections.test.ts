@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { CAUSES, classifyAll, measure, ollamaClassifier, parseCause, readCache, readRuns, renderReport, sampleKeys, type Classification } from '../src/corrections.js';
@@ -188,9 +190,12 @@ describe('renderReport', () => {
 
 describe('cadence corrections', () => {
   async function cad(dir: string, ...argv: string[]) {
+    return cadEnv(dir, {}, ...argv);
+  }
+  async function cadEnv(dir: string, env: Record<string, string>, ...argv: string[]) {
     const out: string[] = [];
     const err: string[] = [];
-    const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-10-10' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-10T10:00:00') });
+    const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-10-10', ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-10T10:00:00') });
     return { code, out: out.join('\n'), err: err.join('\n') };
   }
 
@@ -205,6 +210,66 @@ describe('cadence corrections', () => {
     const j = await cad(parent, 'corrections', parent, '--json');
     expect(JSON.parse(j.out).total).toEqual({ lots: 3, atLeast1: 2, atLeast2: 1, passes: 3 });
     expect(readFileSync(join(runs, 'w1', 'wave.json'), 'utf8')).toBe('{}'); // lecture seule
+  });
+
+  function parentWithRuns() {
+    const parent = tempDir();
+    const runs = join(parent, '.cadence', 'runs');
+    mkdirSync(runs, { recursive: true });
+    cpSync(fixture(), runs, { recursive: true });
+    return parent;
+  }
+
+  it('--classify appelle Ollama, écrit le cache (--cache fichier) puis le rapport le relit ; --sample affiche modèle et relecture', async () => {
+    const models: string[] = [];
+    const server = createServer((req, res) => {
+      let body = '';
+      req.on('data', (d) => (body += d));
+      req.on('end', () => {
+        models.push(JSON.parse(body).model);
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ message: { content: '{"cause":"test-manquant","raison":"r"}' } }));
+      });
+    });
+    await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok));
+    try {
+      const parent = parentWithRuns();
+      const cacheFile = join(parent, 'mon-cache.json');
+      const host = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      const r = await cadEnv(parent, { OLLAMA_HOST: host }, 'corrections', parent, '--classify', '--model', 'm-test', '--cache', 'mon-cache.json');
+      expect(r.code).toBe(0);
+      expect(models).toEqual(['m-test', 'm-test', 'm-test']);
+      expect(existsSync(join(parent, '.cadence', 'corrections.json'))).toBe(false); // --cache résolu depuis le dossier courant
+      const cache = JSON.parse(readFileSync(cacheFile, 'utf8'));
+      expect(Object.keys(cache)).toEqual(['w1/alpha--L1/3', 'w2/beta--L3/3', 'w2/beta--L3/5']);
+      expect(cache['w1/alpha--L1/3']).toEqual({ cause: 'test-manquant', by: 'ollama:m-test' });
+      // relance : rien à reclasser, le cache est relu
+      await cadEnv(parent, { OLLAMA_HOST: host }, 'corrections', parent, '--classify', '--model', 'm-test', '--cache', 'mon-cache.json');
+      expect(models).toHaveLength(3);
+      const rep = await cad(parent, 'corrections', parent, '--cache', 'mon-cache.json', '--json');
+      expect(JSON.parse(rep.out).byCause['test-manquant']).toBe(3);
+      cache['w2/beta--L3/3'].manual = 'bug-code';
+      writeFileSync(cacheFile, JSON.stringify(cache));
+      const s = await cad(parent, 'corrections', parent, '--cache', 'mon-cache.json', '--sample', '3');
+      expect(s.out).toContain('## w1/alpha--L1/3 (alpha L1) · modèle : test-manquant');
+      expect(s.out).toContain('## w2/beta--L3/3 (beta L3) · modèle : test-manquant · relu : bug-code');
+      expect(s.out).toContain("- le comportement attendu n'est pas décrit");
+      expect(s.out).toContain('commit : abc3 fix(L1): correctif 3');
+    } finally {
+      server.close();
+    }
+  });
+
+  it('--classify sans Ollama ne crée pas d\'entrée au cache ; --sample invalide est refusé', async () => {
+    const parent = parentWithRuns();
+    const r = await cadEnv(parent, { OLLAMA_HOST: 'http://127.0.0.1:1' }, 'corrections', parent, '--classify');
+    expect(r.code).toBe(0);
+    expect(JSON.parse(readFileSync(join(parent, '.cadence', 'corrections.json'), 'utf8'))).toEqual({});
+    for (const bad of ['0', 'x', '1.5']) {
+      const e = await cad(parent, 'corrections', parent, '--sample', bad);
+      expect(e.code).not.toBe(0);
+      expect(e.err).toContain('--sample invalide');
+    }
   });
 
   it('refuse un dossier sans journaux', async () => {

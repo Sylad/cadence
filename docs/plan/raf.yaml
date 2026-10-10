@@ -1035,7 +1035,7 @@ lots:
     finished: 2026-10-09
   - id: L83
     title: "orchestrate : tuer les processus enfants (serveurs de dev) laissés vivants en fin de session d'implémentation (2 fois le 06-10)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-07
     started: 2026-10-09
@@ -1044,9 +1044,10 @@ lots:
       - { date: 2026-10-09, text: "Notes revue 09-10 : README:1114-1116 promet plus que le code (docker compose up -d, client tmux d'un serveur déjà lancé, env -i entre deux relevés, environ illisible) ; killMarked ne signale jamais un relevé impossible (EMFILE → [] en silence, TreeTracker a onUnavailable). Coût mesuré : findMarked 0,8 ms / 84 processus, 7,5 ms / 884 ; TreeTracker 200 ms ≈ 2,4 % de la boucle par session" }
       - { date: 2026-10-10, text: "Mineurs revue 10-10 (notes, pas de lot) : garde said de killMarked inutile (proc.ts:403, un appel ne signale jamais deux fois) ; commentaire readStat « seul lecteur » faux, hook.ts:94 parentOf lit aussi /proc/<pid>/stat ; README « Limits of the mark » ne dit pas que sans /proc ni ps rien n'est tué et une ligne part sur stderr" }
     tasks:
-      - { id: t1, title: "orchestrate : un démon partagé démarré à la demande par une session (serveur tmux, gpg-agent, maître ssh, démon Gradle) porte la marque CADENCE_SESSION et la passe aux clients venus d'ailleurs — killMarked tue alors les panneaux tmux du lead ; exclure (tmux, screen au moins) ou documenter", status: todo }
-      - { id: t2, title: "orchestrate : test qui échoue sans le TreeTracker de realClaude (descendant setsid lancé avec env -u CADENCE_SESSION)", status: todo }
-      - { id: t3, title: "orchestrate : une session sortie en code 0 dont un descendant tient stdout/stderr finit en « délai dépassé » après timeouts.work — tuer arbre et marque à l'exit de la racine (défaut antérieur à L83)", status: todo }
+      - { id: t1, title: "orchestrate : un démon partagé démarré à la demande par une session (serveur tmux, gpg-agent, maître ssh, démon Gradle) porte la marque CADENCE_SESSION et la passe aux clients venus d'ailleurs — killMarked tue alors les panneaux tmux du lead ; exclure (tmux, screen au moins) ou documenter", status: done }
+      - { id: t2, title: "orchestrate : test qui échoue sans le TreeTracker de realClaude (descendant setsid lancé avec env -u CADENCE_SESSION)", status: done }
+      - { id: t3, title: "orchestrate : une session sortie en code 0 dont un descendant tient stdout/stderr finit en « délai dépassé » après timeouts.work — tuer arbre et marque à l'exit de la racine (défaut antérieur à L83)", status: done }
+    finished: 2026-10-10
   - id: L84
     title: "agents ux-reviewer et qa-reviewer : même consigne Playwright que les briefs (sorties sous .playwright-mcp/) pour l'usage hors orchestrate"
     status: todo

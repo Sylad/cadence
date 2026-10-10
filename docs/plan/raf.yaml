@@ -1484,10 +1484,11 @@ lots:
     review: { date: 2026-10-10, verdict: "conforme après 1 mineur (README:1286 dit encore « endpoints cannot be mapped » au lieu de « diff cannot be linked ») ; la clôture attend la mesure L123/t1 — orchestré (vague 2026-10-10-1250, 2 passe(s) de correction + passe des mineurs)", commit: 3e523c13464efed16367e4e1b8010e66b9058c8e }
   - id: L124
     title: "orchestrate : un lot rendu au lead pour « budget du lot atteint » juste avant sa revue finale n'est pas reprenable (--resume répond « vague terminée », exit 2, vécu 08-10 sur 3 lots de maritime-sq4-1, 209–224 k pour un plancher de 200 k) — soit --resume --budget relève le budget des lots rendus et rejoue l'étape manquante, soit le plancher couvre precheck + implement + review + fix + review courte (~250 k mesurés)"
-    status: doing
+    status: dropped
     estimate: 1
     created: 2026-10-08
     started: 2026-10-10
+    finished: 2026-10-10
   - id: L125
     title: "tests du hook autostart (mineurs de revue L104) : plan stagé puis arbre restauré depuis HEAD → démarrage sauté, index intact ; premier commit citant un lot avec plan stagé jamais commité → démarrage sauté, message, avertissement post-commit"
     status: done
@@ -1796,11 +1797,14 @@ lots:
     finished: 2026-10-10
   - id: L156
     title: "coveredTasks (L82) : lire aussi les commits du lot dans ses dépôts voisins (L62, repoWork les fournit déjà) — feat(L3/t2) commité dans le voisin laisse t2 ouverte et raf done refuse (revue 09-10)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-09
     started: 2026-10-10
     review: { date: 2026-10-10, verdict: "compliant (0 bloquant, 0 majeur, 2 mineurs en note) — orchestré (vague 2026-10-10-1315, 0 passe(s) de correction)", commit: 1ff5a880381ff6c68e1d74518695419870fbb76d }
+    notes:
+      - { date: 2026-10-10, text: "mineurs revue 10-10 : branchement de conclude() (cycle.ts:883) non couvert par un test, les tests appellent coveredTasks directement ; withTasks dans lot-repos-cli.test.ts:272 porte un .replace(/^/, '') sans effet" }
+    finished: 2026-10-10
   - id: L157
     title: "CHANGELOG [Unreleased] : la ligne L83 sur les démons partagés dit l'inverse du défaut (« spared the lead's tmux panes » → tuer par la marque les TUAIT ; l'exclusion les épargne), aligner sur README:1125"
     estimate: 0.1

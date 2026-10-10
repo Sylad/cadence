@@ -7,56 +7,15 @@ import { mcpServersFor, readAgents } from '../src/orchestrate/launch.js';
 import { costlyHypotheses } from '../src/orchestrate/spec.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { gitRepo } from './helpers.js';
+import { ecrit, EXEMPLE, type Écrit } from './spec-helpers.js';
 import { claudeOut, commitFile, git, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
 
 // L171 (spec etape-spec, S3) : l'étape spec d'orchestrate, avant l'implémentation d'un lot qui déclare screen:.
-const EXEMPLE = join(__dirname, '..', 'docs', 'superpowers', 'specs', '2026-10-10-etape-spec-fiche-exemple.yaml');
 const kinds = (h: ReturnType<typeof harness>) => h.calls.map((c) => c.kind);
 const impl: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }));
 const ok: Handler = () => claudeOut(reviewReport());
 const screen = { visible: true, screen: 'page' as const };
 const lots = [{ title: 'Un écran', screen: 'page' as const }];
-
-interface Écrit {
-  /** Modifie la fiche avant qu'elle soit écrite. */
-  fiche?: (doc: any) => void;
-  /** Largeurs/états dont la capture manque. */
-  sansCapture?: string[];
-  sansTestid?: string;
-  sansSection?: string;
-  /** Nom du dossier d'écran, s'il diffère de ecran.id. */
-  dossier?: string;
-  /** Racine des specs, si elle diffère de docs/specs. */
-  racine?: string;
-}
-
-/** Ce que fait un agent spec : fiche, maquette, captures, un commit qui cite le lot. */
-function ecrit(cwd: string, o: Écrit = {}): string {
-  const doc = parse(readFileSync(EXEMPLE, 'utf8')) as any;
-  doc.ecran.lot = 'L1';
-  o.fiche?.(doc);
-  const nom = o.dossier ?? doc.ecran.id;
-  const racine = o.racine ?? 'docs/specs';
-  const dir = join(cwd, racine, nom);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'fiche.yaml'), stringify(doc));
-  const ids = (doc.champs as any[]).map((c) => c.id).filter((i) => i !== o.sansTestid);
-  const html = [...ids.map((i) => `<p data-testid="${i}">${i}</p>`), ...(doc.etats as string[]).filter((e) => e !== o.sansSection).map((e) => `<section id="etat-${e}"></section>`)].join('\n');
-  writeFileSync(join(dir, 'maquette.html'), `<!doctype html>\n${html}\n`);
-  const files = ['fiche.yaml', 'maquette.html'];
-  for (const e of doc.etats as string[]) {
-    for (const w of [1440, 390]) {
-      const f = `maquette-${e}-${w}.png`;
-      if (o.sansCapture?.includes(f)) continue;
-      writeFileSync(join(dir, f), 'png');
-      files.push(f);
-    }
-  }
-  const rel = files.map((f) => `${racine}/${nom}/${f}`);
-  git(cwd, 'add', '--', ...rel);
-  git(cwd, 'commit', '-q', '--allow-empty', '-m', 'feat(L1): spec prochain-match', '--', ...rel);
-  return `${racine}/${nom}/fiche.yaml`;
-}
 
 const spec = (o: Écrit = {}, over: Record<string, unknown> = {}): Handler => (call) => {
   const fiche = ecrit(call.opts.cwd, o);

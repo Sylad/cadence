@@ -2,34 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
-import { checkAcceptation, findAcceptation, lockViolations, redSha, setVert } from '../src/orchestrate/accept.js';
+import { checkAcceptation, findAcceptation, lockViolations, redSha, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { gitRepo } from './helpers.js';
 import { git } from './orchestrate-harness.js';
+import { DIR, ecritAcceptation } from './accept-helpers.js';
 
 // L173 (spec etape-spec, S5) : ce que le programme sait de l'étape accept — le fichier acceptation.json et le verrou des tests rouges.
-const EXEMPLE = join(__dirname, '..', 'docs', 'superpowers', 'specs', '2026-10-10-etape-spec-fiche-exemple.yaml');
-const DIR = 'docs/specs';
-
-interface Opts { lot?: string; vert?: boolean; tests?: string; ecran?: string }
-
-/** Ce que fait l'agent accept : fiche + fichiers de tests + acceptation.json, dans un seul commit rouge. */
-function ecritAcceptation(repo: string, o: Opts = {}): { json: string; fiche: string; sha: string; test: string } {
-  const lot = o.lot ?? 'L1';
-  const ecran = o.ecran ?? 'prochain-match';
-  const dir = join(repo, DIR, ecran);
-  mkdirSync(join(repo, 'test'), { recursive: true });
-  mkdirSync(dir, { recursive: true });
-  const fiche = parse(readFileSync(EXEMPLE, 'utf8')) as any;
-  const noms = (fiche.regles as any[]).flatMap((r) => r.tests as string[]);
-  const test = `test/${ecran}.acceptation.test.ts`;
-  writeFileSync(join(repo, test), o.tests ?? noms.map((n) => `it('${n}', () => { throw new Error('rouge'); });`).join('\n'));
-  writeFileSync(join(dir, 'fiche.yaml'), readFileSync(EXEMPLE, 'utf8'));
-  const json = `${DIR}/${ecran}/acceptation.json`;
-  writeFileSync(join(repo, json), JSON.stringify({ lot, fiche: `${DIR}/${ecran}/fiche.yaml`, fichiers: [test], vert: o.vert ?? false }, null, 2));
-  git(repo, 'add', '--', test, json, `${DIR}/${ecran}/fiche.yaml`);
-  git(repo, 'commit', '-q', '-m', `test(${lot}): acceptation R1–R4 (rouge)`, '--', test, json, `${DIR}/${ecran}/fiche.yaml`);
-  return { json, fiche: `${DIR}/${ecran}/fiche.yaml`, sha: git(repo, 'rev-parse', 'HEAD'), test };
-}
 
 const commitPaths = (repo: string, message: string, ...paths: string[]) => {
   git(repo, 'add', '--', ...paths);
@@ -160,5 +138,55 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
     ecritAcceptation(repo2);
     expect(lockViolations(repo2, DIR, head2).join('\n')).toContain('créé');
     expect(lockViolations(repo2, DIR, head2, { created: 'allow' })).toEqual([]);
+  });
+});
+
+describe('scellé par le programme : empreintes et commit rouge', () => {
+  const sceller = (repo: string, json: string) => {
+    sealAcceptation(repo, json);
+    commitPaths(repo, 'test(L1): acceptation scellée', json);
+    return git(repo, 'rev-parse', 'HEAD');
+  };
+
+  it('le scellé ajoute l’empreinte de chaque fichier listé ; le commit rouge est alors le commit du scellé', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    const seal = sceller(repo, a.json);
+    const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    expect(doc.empreintes[a.test]).toBe(git(repo, 'hash-object', a.test));
+    expect(redSha(repo, a.json)).toBe(seal);
+    expect(redSha(repo, a.json)).not.toBe(a.sha);
+  });
+
+  it('une passe de correction des tests avant le scellé ne laisse aucun écart : le commit rouge est celui du scellé', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}\n// passe 2\n`);
+    commitPaths(repo, 'test(L1): passe 2', a.test);
+    const head = sceller(repo, a.json);
+    expect(lockViolations(repo, DIR, head)).toEqual([]);
+  });
+
+  it('un test modifié après le scellé est signalé ; la clé vert posée ensuite reste tolérée', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    sceller(repo, a.json);
+    setVert(repo, a.json);
+    commitPaths(repo, 'chore(L1): vert', a.json);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    expect(lockViolations(repo, DIR, head)).toEqual([]);
+    writeFileSync(join(repo, a.test), 'modifié\n');
+    commitPaths(repo, 'feat(L2): touche', a.test);
+    const v = lockViolations(repo, DIR, head).join('\n');
+    expect(v).toContain(a.test);
+    expect(v).toMatch(/empreinte/);
+  });
+
+  it('skip : l’acceptation.json du lot en cours d’écriture n’est pas contrôlée', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    writeFileSync(join(repo, a.test), 'autre\n');
+    expect(lockViolations(repo, DIR, head, { skip: a.json })).toEqual([]);
   });
 });

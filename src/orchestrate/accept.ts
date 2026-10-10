@@ -5,8 +5,11 @@ import { parse } from 'yaml';
 
 // Étape accept d'orchestrate (L173, spec etape-spec S5) : le fichier acceptation.json d'un lot et le verrou de ses tests rouges.
 //
-// acceptation.json (`<spec.dir>/<écran>/acceptation.json`) : { lot, fiche, fichiers[], vert }.
-// Le sha du commit rouge n'y figure PAS (une session pourrait le réécrire) : c'est le commit qui a AJOUTÉ le fichier, relu dans git.
+// acceptation.json (`<spec.dir>/<écran>/acceptation.json`) : { lot, fiche, fichiers[], vert, empreintes? }.
+// La session accept écrit lot, fiche, fichiers et `vert: false` ; une fois ses contrôles passés, le PROGRAMME scelle le fichier (`sealAcceptation` :
+// empreinte git de chaque fichier de tests) et le commite : ce commit est le commit rouge.
+// Le sha du commit rouge n'est écrit nulle part dans le fichier (une session pourrait le réécrire) : c'est le dernier commit de l'historique git
+// qui a changé le fichier autrement que par sa clé `vert` (`redSha`).
 // La seule différence tolérée sur ce fichier, par rapport à ce commit, est la clé `vert`, posée par le cycle (`setVert`).
 
 export interface Acceptation {
@@ -14,6 +17,8 @@ export interface Acceptation {
   fiche: string;
   fichiers: string[];
   vert: boolean;
+  /** Empreinte git (blob) de chaque fichier de tests, posée par le programme au scellé. */
+  empreintes?: Record<string, string>;
 }
 
 type Obj = Record<string, unknown>;
@@ -55,17 +60,37 @@ export function parseAcceptation(text: string): Acceptation | string {
   if (typeof fiche !== 'string' || !fiche) return 'clé « fiche » (chemin de la fiche) attendue';
   if (!Array.isArray(fichiers) || fichiers.length === 0 || fichiers.some((f) => typeof f !== 'string' || !f)) return 'clé « fichiers » : liste non vide de chemins attendue';
   if (typeof vert !== 'boolean') return 'clé « vert » (booléen) attendue';
-  return { lot, fiche, fichiers: fichiers as string[], vert };
+  const empreintes = isObj(doc.empreintes) ? (Object.fromEntries(Object.entries(doc.empreintes).filter(([, v]) => typeof v === 'string')) as Record<string, string>) : undefined;
+  return { lot, fiche, fichiers: fichiers as string[], vert, ...(empreintes ? { empreintes } : {}) };
 }
 
-/** Le commit rouge : celui qui a ajouté le fichier (le plus ancien si le fichier a été supprimé puis ajouté de nouveau). Null s'il n'est pas dans l'historique. */
-export function redSha(repo: string, path: string): string | null {
+/** JSON à clés triées, sans la clé `vert` : la forme que le verrou compare. */
+const canon = (a: Obj): string => JSON.stringify(Object.fromEntries(Object.entries(a).filter(([k]) => k !== 'vert').sort(([x], [y]) => x.localeCompare(y))));
+
+const show = (repo: string, rev: string, path: string): Obj | null => {
   try {
-    const shas = git(repo, 'log', '--diff-filter=A', '--format=%H', '--', path).split('\n').filter(Boolean);
-    return shas.length ? shas[shas.length - 1] : null;
+    const v = JSON.parse(git(repo, 'show', `${rev}:${path}`)) as unknown;
+    return isObj(v) ? v : null;
   } catch {
     return null;
   }
+};
+
+/** Le commit rouge : le plus récent qui a changé le fichier autrement que par sa clé `vert` (l'ajout, ou le scellé du programme). Null hors historique. */
+export function redSha(repo: string, path: string): string | null {
+  let shas: string[];
+  try {
+    shas = git(repo, 'log', '--format=%H', '--', path).split('\n').filter(Boolean);
+  } catch {
+    return null;
+  }
+  for (const sha of shas) {
+    const cur = show(repo, sha, path);
+    if (!cur) continue; // suppression
+    const prev = show(repo, `${sha}^`, path);
+    if (!prev || canon(cur) !== canon(prev)) return sha;
+  }
+  return null;
 }
 
 /** Chemin (relatif au dépôt) de l'`acceptation.json` du lot sous `dir`, ou null. */
@@ -79,6 +104,15 @@ export function findAcceptation(repo: string, dir: string, lot: string): string 
     }
   }
   return null;
+}
+
+/** Scelle le fichier (le programme, jamais une session) : l'empreinte git de chaque fichier de tests listé ; le commit est à faire. */
+export function sealAcceptation(repo: string, path: string): void {
+  const file = join(repo, path);
+  const doc = JSON.parse(readFileSync(file, 'utf8')) as Obj;
+  const fichiers = (doc.fichiers as string[]).map((f) => posix.normalize(f));
+  doc.empreintes = Object.fromEntries(fichiers.map((f) => [f, git(repo, 'hash-object', '--', f).trim()]));
+  writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
 }
 
 /** Pose `vert: true` dans le fichier (le cycle, jamais une session) ; le commit est à faire. */
@@ -124,30 +158,20 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
   return problems;
 }
 
-/** JSON à clés triées, sans la clé `vert` : la forme que le verrou compare. */
-const canon = (a: Obj): string => JSON.stringify(Object.fromEntries(Object.entries(a).filter(([k]) => k !== 'vert').sort(([x], [y]) => x.localeCompare(y))));
-
-const show = (repo: string, rev: string, path: string): Obj | null => {
-  try {
-    const v = JSON.parse(git(repo, 'show', `${rev}:${path}`)) as unknown;
-    return isObj(v) ? v : null;
-  } catch {
-    return null;
-  }
-};
-
 /**
  * Le verrou (spec etape-spec § 5), valable pour toute session du dépôt : les tests d'acceptation de TOUS les lots sont inchangés depuis leur
  * commit rouge, au sens de git (arbre de travail compris), et chaque `acceptation.json` n'a bougé que par sa clé `vert` — posée par le
  * cycle, donc jamais modifiée pendant une session (comparée à `headBefore`). Vide = rien à signaler.
- * `created: 'allow'` : l'étape accept crée le fichier de son lot ; ailleurs, un fichier neuf est un écart.
+ * `created: 'allow'` : l'étape accept crée le fichier de son lot ; ailleurs, un fichier neuf est un écart. `skip` : le fichier du lot que l'étape accept
+ * est en train d'écrire, pas encore scellé (les autres lots restent verrouillés).
  */
-export function lockViolations(repo: string, dir: string, headBefore: string, opts: { created?: 'allow' | 'refuse' } = {}): string[] {
+export function lockViolations(repo: string, dir: string, headBefore: string, opts: { created?: 'allow' | 'refuse'; skip?: string } = {}): string[] {
   const out: string[] = [];
   const before = new Set(listAcceptations(repo, dir, headBefore));
   const now = new Set(listAcceptations(repo, dir));
   for (const p of before) if (!now.has(p)) out.push(`${p} : acceptation.json supprimé (verrou des tests d'acceptation)`);
   for (const p of [...now].sort()) {
+    if (p === opts.skip) continue;
     const isNew = !before.has(p);
     if (isNew && opts.created !== 'allow') out.push(`${p} : acceptation.json créé hors de l'étape accept`);
     const red = redSha(repo, p);
@@ -157,8 +181,9 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
       out.push(`${p} : acceptation.json sans commit rouge lisible`);
       continue;
     }
-    if (canon(cur) !== canon(base)) out.push(`${p} : acceptation.json modifié depuis le commit rouge ${red.slice(0, 7)} (seule la clé vert, posée par le cycle, peut changer)`);
     const was = isNew ? undefined : show(repo, headBefore, p);
+    // Le commit rouge est le dernier changement du fichier : il ne bouge que si une session l'a réécrit, ce que la comparaison à la tête d'avant la session attrape.
+    if (was && canon(cur) !== canon(was)) out.push(`${p} : acceptation.json réécrit pendant la session (seule la clé vert, posée par le cycle, peut changer)`);
     if (was && was.vert !== cur.vert) out.push(`${p} : clé vert changée pendant la session (elle est posée par le cycle)`);
     const fichiers = Array.isArray(base.fichiers) ? base.fichiers.filter((f): f is string => typeof f === 'string') : [];
     if (!fichiers.length) continue;
@@ -169,7 +194,14 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
       changed = fichiers;
     }
     const lot = typeof base.lot === 'string' ? base.lot : '?';
-    for (const f of changed) out.push(`${f} : test d'acceptation de ${lot} modifié depuis le commit rouge ${red.slice(0, 7)} (verrou ${p})`);
+    const emp = isObj(base.empreintes) ? base.empreintes : {};
+    for (const f of fichiers) {
+      const want = emp[f];
+      if (typeof want !== 'string' || changed.includes(f)) continue; // déjà signalé ci-dessus
+      const have = existsSync(join(repo, f)) ? git(repo, 'hash-object', '--', f).trim() : null;
+      if (have !== want) out.push(`${f} : empreinte différente de celle du scellé de ${p} (test d'acceptation de ${lot})`);
+    }
+    for (const f of changed) out.push(`${f} : test d'acceptation de ${lot} : empreinte modifiée depuis le commit rouge ${red.slice(0, 7)} (verrou ${p})`);
   }
   return out;
 }

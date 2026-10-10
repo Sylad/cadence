@@ -219,14 +219,18 @@ export function ollamaClassifier(opts: { url: string; model: string; fetch?: typ
 }
 
 /** Classe les passes absentes du cache, une à une ; un échec n'entre pas au cache (une relance le reprend). */
-export async function classifyAll(passes: FixPass[], cache: Map<string, Classification>, classify: Classifier, model: string, progress?: (done: number, total: number) => void): Promise<void> {
+export async function classifyAll(passes: FixPass[], cache: Map<string, Classification>, classify: Classifier, model: string, progress?: (done: number, total: number) => void, checkpoint?: { every: number; save: () => void }): Promise<void> {
   const todo = passes.filter((p) => p.findings.length > 0 && !cache.has(p.key));
   let done = 0;
   for (const p of todo) {
     const cause = await classify(p);
     if (cause) cache.set(p.key, { cause, by: `ollama:${model}` });
-    progress?.(++done, todo.length);
+    done++;
+    progress?.(done, todo.length);
+    // Sauvegarde périodique : une interruption (Ctrl-C, Ollama tombé) ne perd que les derniers classements.
+    if (checkpoint && done % checkpoint.every === 0) checkpoint.save();
   }
+  if (checkpoint && done % checkpoint.every !== 0) checkpoint.save();
 }
 
 /** n clés réparties à intervalle régulier dans l'ordre trié : le même échantillon à chaque lecture. */

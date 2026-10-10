@@ -187,6 +187,19 @@ describe('classifyAll', () => {
     expect(cache.get('w2/beta--L3/3')).toEqual({ cause: 'donnees-sql', by: 'ollama:m' });
     expect(cache.has('w2/beta--L3/5')).toBe(false);
   });
+
+  it('appelle checkpoint tous les n classements et à la fin, de sorte qu\'une interruption garde le travail fait', async () => {
+    const { passes } = readRuns(fixture());
+    const cache = new Map<string, Classification>();
+    const saved: number[] = [];
+    let calls = 0;
+    const boom = async () => { if (++calls === 3) throw new Error('interrompu'); return 'bug-code' as const; };
+    await expect(classifyAll(passes, cache, boom, 'm', undefined, { every: 2, save: () => saved.push(cache.size) })).rejects.toThrow('interrompu');
+    expect(saved).toEqual([2]);
+    saved.length = 0;
+    await classifyAll(passes, cache, async () => 'bug-code', 'm', undefined, { every: 2, save: () => saved.push(cache.size) });
+    expect(saved.at(-1)).toBe(cache.size);
+  });
 });
 
 describe('sampleKeys', () => {

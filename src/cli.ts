@@ -697,7 +697,7 @@ async function corrections(rest: string[], values: { classify?: boolean; model?:
     const classify = ollamaClassifier({ url: io.env.OLLAMA_HOST ?? 'http://localhost:11434', model });
     await classifyAll(data.passes, cache, classify, model, (done, total) => {
       if (done % 25 === 0 || done === total) io.err(`classement : ${done}/${total}`);
-    });
+    }, { every: 10, save: () => writeFileSync(cacheFile, serializeCache(cache)) });
     writeFileSync(cacheFile, serializeCache(cache));
   }
   if (sample !== undefined) {

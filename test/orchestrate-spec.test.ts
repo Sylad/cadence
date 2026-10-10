@@ -6,6 +6,7 @@ import { runLot } from '../src/orchestrate/cycle.js';
 import { mcpServersFor, readAgents } from '../src/orchestrate/launch.js';
 import { costlyHypotheses } from '../src/orchestrate/spec.js';
 import { AGENTS_DIR } from '../src/skills.js';
+import { gitRepo } from './helpers.js';
 import { claudeOut, commitFile, git, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
 
 // L171 (spec etape-spec, S3) : l'étape spec d'orchestrate, avant l'implémentation d'un lot qui déclare screen:.
@@ -25,6 +26,8 @@ interface Écrit {
   sansSection?: string;
   /** Nom du dossier d'écran, s'il diffère de ecran.id. */
   dossier?: string;
+  /** Racine des specs, si elle diffère de docs/specs. */
+  racine?: string;
 }
 
 /** Ce que fait un agent spec : fiche, maquette, captures, un commit qui cite le lot. */
@@ -33,7 +36,8 @@ function ecrit(cwd: string, o: Écrit = {}): string {
   doc.ecran.lot = 'L1';
   o.fiche?.(doc);
   const nom = o.dossier ?? doc.ecran.id;
-  const dir = join(cwd, 'docs/specs', nom);
+  const racine = o.racine ?? 'docs/specs';
+  const dir = join(cwd, racine, nom);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'fiche.yaml'), stringify(doc));
   const ids = (doc.champs as any[]).map((c) => c.id).filter((i) => i !== o.sansTestid);
@@ -48,10 +52,10 @@ function ecrit(cwd: string, o: Écrit = {}): string {
       files.push(f);
     }
   }
-  const rel = files.map((f) => `docs/specs/${nom}/${f}`);
+  const rel = files.map((f) => `${racine}/${nom}/${f}`);
   git(cwd, 'add', '--', ...rel);
   git(cwd, 'commit', '-q', '--allow-empty', '-m', 'feat(L1): spec prochain-match', '--', ...rel);
-  return `docs/specs/${nom}/fiche.yaml`;
+  return `${racine}/${nom}/fiche.yaml`;
 }
 
 const spec = (o: Écrit = {}, over: Record<string, unknown> = {}): Handler => (call) => {
@@ -192,6 +196,17 @@ describe('étape spec : contrôles du programme', () => {
     expect(c.lot.status).toBe('handed-back');
   });
 
+  it('une fiche rangée hors de orchestrate.spec.dir est un écart', async () => {
+    const ailleurs = spec({ racine: 'docs/spec' });
+    const h = harness({ lots, script: { spec: [ailleurs, spec()], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'spec', 'implement', 'review']);
+    expect(h.calls[1].brief).toContain('docs/spec/prochain-match/fiche.yaml');
+    expect(h.calls[1].brief).toContain('hors de docs/specs');
+    expect(c.lot.spec).toMatchObject({ fiche: 'docs/specs/prochain-match/fiche.yaml' });
+  });
+
   it('la seconde passe peut corriger : le lot continue', async () => {
     const h = harness({ lots, script: { spec: [spec({ fiche: (d) => { d.regles[1].id = 'R9'; } }), spec()], implement: [impl], review: [ok] } });
     const c = h.lot('L1', screen);
@@ -269,6 +284,20 @@ describe('étape spec : contrôles du programme', () => {
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toContain('brouillon.txt');
   });
+  it('un fichier laissé dans un dépôt voisin par la session spec rend le lot (dépôt sale)', async () => {
+    const nb = gitRepo();
+    commitFile(nb, 'README.md', 'init');
+    const sale: Handler = (call) => {
+      const fiche = ecrit(call.opts.cwd);
+      writeFileSync(join(nb, 'brouillon.txt'), 'x');
+      return claudeOut(specReport({ fiche }));
+    };
+    const h = harness({ lots, script: { spec: [sale] } });
+    const c = h.lot('L1', { ...screen, repos: [{ rel: '../gitops', path: nb }] });
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('../gitops: brouillon.txt');
+  });
 });
 
 describe('étape spec : question ciblée', () => {
@@ -305,7 +334,7 @@ describe('étape spec : question ciblée', () => {
     await runLot(c);
     expect(h.calls[1].brief).toContain('R3');
     expect(h.calls[1].brief).toContain('migration du stockage');
-    expect(h.calls[1].brief).toMatch(/sourcee/);
+    expect(h.calls[1].brief).toContain('source: réponse du lead');
     expect(kinds(h)).toEqual(['spec', 'spec', 'implement', 'review']);
   });
 

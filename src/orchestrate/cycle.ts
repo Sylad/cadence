@@ -763,7 +763,11 @@ async function specStep(c: LotCtx): Promise<void> {
     transition(c, 'question', questions[0]);
     return;
   }
-  const dirt = [...trackedPaths(done.after), ...done.after.untracked.filter((f) => !done.before.untracked.includes(f))];
+  const dirt = [
+    ...trackedPaths(done.after),
+    ...done.after.untracked.filter((f) => !done.before.untracked.includes(f)),
+    ...done.others.flatMap((o) => [...trackedPaths(o.after), ...o.after.untracked.filter((f) => !o.before.untracked.includes(f))].map((f) => `${o.repo.rel}: ${f}`)),
+  ];
   if (dirt.length) {
     stop(c, 'handed-back', `dépôt sale après spec : ${dirt.join(', ')}`);
     return;
@@ -784,7 +788,8 @@ async function specStep(c: LotCtx): Promise<void> {
   const asked = reported ? relative(l.repo, resolve(l.repo, reported)) : '';
   const outside = asked === '..' || asked.startsWith('../') || isAbsolute(asked);
   const fiche = outside ? '' : asked || findFiche(l.repo, c.config.spec.dir, l.lot) || '';
-  const problems = outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/<écran>/fiche.yaml)`] : fiche ? checkSpec(l.repo, fiche, l.lot) : [`aucune fiche écrite : ${c.config.spec.dir}/<écran>/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change aucun écran)`];
+  const inDir = fiche === '' || fiche.startsWith(`${c.config.spec.dir.replace(/\/+$/, '')}/`);
+  const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/<écran>/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/<écran>/fiche.yaml)`] : fiche ? checkSpec(l.repo, fiche, l.lot) : [`aucune fiche écrite : ${c.config.spec.dir}/<écran>/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change aucun écran)`];
   if (problems.length) {
     if (l.specProblems) {
       stop(c, 'handed-back', `spec non conforme après 2 passes : ${problems.join(' ; ')}`);

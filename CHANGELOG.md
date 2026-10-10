@@ -40,6 +40,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence orchestrate`: `orchestrate.precheck: local` runs the « deliverable already present? » pre-check on the local model of the dev machine (`claude-local`, Ollama) instead of Sonnet, off the Anthropic quota and outside the lot's budget. Sonnet stays the default and the fallback: a local session with no result or an unreadable report is replayed on Sonnet, and a local `oui` is confirmed by Sonnet before the lot is handed back (L146).
+
 ### Fixed
 
 - `cadence orchestrate`: the sub-tasks a compliant review closes (L82) are also read in the commits of the lot in its neighbouring repositories (`repos:`, L62): `feat(L3/t2)` committed in a neighbour no longer leaves `t2` open and `raf done` refusing the lot (L156).

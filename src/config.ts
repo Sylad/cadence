@@ -224,6 +224,8 @@ export interface OrchestrateConfig {
   ux?: { url?: string; command?: string; timeout?: number };
   /** Contrôle préalable « livrable déjà présent ? » avant la première implémentation d'un lot sans commit (défaut : vrai). */
   precheck: boolean;
+  /** `precheck: local` (L146) : le contrôle préalable part sur `claude-local` (Ollama de Big-Blue) ; Sonnet reste le repli. */
+  precheckLocal: boolean;
   /**
    * Revue proportionnée à la taille du lot (L108) : un lot dont l'estimate est ≤ `threshold` jours reçoit une seule revue
    * (modèle `light`), sans passe des mineurs ; les autres, la chaîne complète (modèle `full`). Un bloquant ou un majeur sur
@@ -251,7 +253,7 @@ const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'ux', 'precheck', 'revie
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, precheckLocal: false, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -277,8 +279,9 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     config[k] = (o[k] as string).trim();
   }
   if (o.precheck != null) {
-    if (typeof o.precheck !== 'boolean') throw bad('precheck : true ou false attendu');
-    config.precheck = o.precheck;
+    if (typeof o.precheck !== 'boolean' && o.precheck !== 'local') throw bad('precheck : true, false ou local attendu');
+    config.precheck = o.precheck !== false;
+    config.precheckLocal = o.precheck === 'local';
   }
   if (o.review != null) {
     if (!isObject(o.review)) throw bad('review doit être un objet { threshold, light, full }');

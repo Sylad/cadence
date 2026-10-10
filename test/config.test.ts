@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
-import { readNewsConfig, readPlanConfig, readSessionConfig } from '../src/config.js';
+import { readNewsConfig, readOrchestrateConfig, readPlanConfig, readSessionConfig } from '../src/config.js';
 import { parseDeliverConfig } from '../src/deliver.js';
 import { Plan } from '../src/plan.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -388,5 +388,23 @@ describe('readNewsConfig', () => {
     expect(() => read('news:\n  publicTitleMax: abc\n')).toThrow(/publicTitleMax/);
     expect(() => read('news:\n  publicTitleMaxx: 80\n')).toThrow(/inconnu/);
     expect(() => read('news: 3\n')).toThrow(/news/);
+  });
+});
+
+describe('orchestrate.precheck: local (L146)', () => {
+  const read = (yaml: string) => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'cadence.yaml'), yaml);
+    return readOrchestrateConfig(join(dir, 'cadence.yaml'));
+  };
+  it('défaut : contrôle sur Sonnet, pas local', () => {
+    expect(read('orchestrate: {}\n')).toMatchObject({ precheck: true, precheckLocal: false });
+  });
+  it('local : le contrôle reste actif et passe sur le modèle local', () => {
+    expect(read('orchestrate:\n  precheck: local\n')).toMatchObject({ precheck: true, precheckLocal: true });
+  });
+  it('false coupe le contrôle ; une autre valeur est refusée', () => {
+    expect(read('orchestrate:\n  precheck: false\n')).toMatchObject({ precheck: false, precheckLocal: false });
+    expect(() => read('orchestrate:\n  precheck: gpu\n')).toThrow(/precheck : true, false ou local attendu/);
   });
 });

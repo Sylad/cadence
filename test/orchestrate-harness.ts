@@ -54,13 +54,17 @@ export interface Call {
   model: string;
   effort?: string;
   brief: string;
+  local: boolean;
 }
 
 export const precheckReport = (over: Record<string, unknown> = {}) => ({ dejaPresent: 'non', preuves: [], resume: 'rien de présent', ...over });
 
+/** Le brief : après `-p` pour `claude`, premier argument pour `claude-local` (L146). */
+export const briefOf = (args: string[]): string => (args[0] === '-p' ? args[1] : args[0]);
+
 export function kindOf(args: string[]): Call['kind'] {
-  const brief = args[1];
-  if (brief.startsWith('Pre-check for lot')) return 'precheck';
+  const brief = briefOf(args);
+  if (brief.includes('Pre-check for lot')) return 'precheck';
   const agent = args.includes('--agent') ? args[args.indexOf('--agent') + 1] : null;
   if (agent === 'ux-reviewer') return 'ux';
   if (agent === 'code-reviewer') return brief.includes('single pass') || brief.includes('short re-review') ? 'review-small' : 'review';
@@ -108,7 +112,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; estim
   const script = opts.script ?? {};
   const claude: ClaudeFn = async (args, o) => {
     const kind = kindOf(args);
-    const call: Call = { args, opts: o, kind, model: args[args.indexOf('--model') + 1], effort: args.includes('--effort') ? args[args.indexOf('--effort') + 1] : undefined, brief: args[1] };
+    const call: Call = { args, opts: o, kind, model: args[args.indexOf('--model') + 1], effort: args.includes('--effort') ? args[args.indexOf('--effort') + 1] : undefined, brief: briefOf(args), local: !!o.local };
     calls.push(call);
     const next = script[kind]?.shift();
     if (!next) throw new Error(`pas de réponse scénarisée pour ${kind}`);

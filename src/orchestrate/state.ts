@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { gitCommonDir, gitRoot } from '../git.js';
-import type { Model, StepKind } from './launch.js';
+import type { Model, StepKind, StepModel } from './launch.js';
 import type { Tokens } from './result.js';
 
 export type WaveStatus = 'running' | 'suspended-budget' | 'suspended-quota' | 'done' | 'interrupted';
@@ -27,7 +27,7 @@ export interface WaveState {
 export interface StepState {
   n: number;
   kind: StepKind;
-  model: Model;
+  model: StepModel;
   /** Niveau d'effort demandé à la session (`--effort`, L137) ; absent : celui de la session (`default`, ou une vague d'avant L137). */
   effort?: string;
   status: StepStatus;

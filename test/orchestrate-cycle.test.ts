@@ -2093,3 +2093,64 @@ describe('contrôle préalable désactivé (orchestrate.precheck: false)', () =>
     expect(kinds(h)).toEqual(['implement', 'review']);
   });
 });
+
+describe('contrôle préalable sur le modèle local (L146)', () => {
+  const localCfg = { precheck: true, precheckLocal: true } as const;
+
+  it('precheck: local : la session de contrôle part sur claude-local, l\'implémentation reste sur Sonnet', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport())], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, localCfg);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+    expect(h.calls[0].local).toBe(true);
+    expect(h.calls[1].local).toBe(false);
+    expect(c.lot.steps[0].model).toBe('local');
+    expect(c.lot.steps[1].model).toBe('sonnet');
+  });
+
+  it('local en échec (code ≠ 0) : repli sur Sonnet, avertissement, le lot continue', async () => {
+    const h = harness({ script: { precheck: [() => ({ code: 2, stdout: '', stderr: 'Ollama ne répond pas', timedOut: false }), () => claudeOut(precheckReport())], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, localCfg);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck', 'precheck', 'implement', 'review']);
+    expect([h.calls[0].local, h.calls[1].local]).toEqual([true, false]);
+    expect(h.calls[1].model).toBe('sonnet');
+    expect(c.lot.warnings.join('\n')).toContain('modèle local');
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('rapport local illisible : repli sur Sonnet', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut({ nimporte: 1 }), () => claudeOut(precheckReport())], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, localCfg);
+    await runLot(c);
+    expect(h.calls.filter((k) => k.kind === 'precheck').map((k) => k.local)).toEqual([true, false]);
+  });
+
+  it('« oui » du modèle local : confirmé par Sonnet avant de rendre le lot ; Sonnet dit partiel, l\'implémentation part', async () => {
+    const oui = () => claudeOut(precheckReport({ dejaPresent: 'oui', preuves: ['a.ts:1'], resume: 'tout est là' }));
+    const h = harness({ script: { precheck: [oui, () => claudeOut(precheckReport({ dejaPresent: 'partiel', preuves: ['a.ts'], resume: 'la moitié' }))], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, localCfg);
+    await runLot(c);
+    expect(h.calls.filter((k) => k.kind === 'precheck').map((k) => k.local)).toEqual([true, false]);
+    expect(kinds(h)).toEqual(['precheck', 'precheck', 'implement', 'review']);
+    expect(h.calls[2].brief).toContain('la moitié');
+    expect(c.lot.warnings.join('\n')).toContain('modèle local');
+  });
+
+  it('« oui » local confirmé par Sonnet : lot rendu', async () => {
+    const oui = () => claudeOut(precheckReport({ dejaPresent: 'oui', preuves: ['a.ts:1'], resume: 'tout est là' }));
+    const h = harness({ script: { precheck: [oui, oui] } });
+    const c = h.lot('L1', {}, localCfg);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('livrable déjà présent');
+  });
+
+  it('« partiel » du modèle local : pas de seconde session, le constat part dans le brief', async () => {
+    const h = harness({ script: { precheck: [() => claudeOut(precheckReport({ dejaPresent: 'partiel', preuves: ['a.ts'], resume: 'moitié faite' }))], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, localCfg);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+    expect(h.calls[1].brief).toContain('moitié faite');
+  });
+});

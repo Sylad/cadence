@@ -14,7 +14,7 @@ import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, newsText, objective, renderBrief, reposText, type BriefName, type BriefVars, type Templates } from './briefs.js';
-import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind } from './launch.js';
+import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, WORK_SCHEMA, type PrecheckReport, type ReviewReport, type WorkReport } from './schemas.js';
@@ -332,7 +332,12 @@ function reviewModel(c: LotCtx, kind: StepKind): Model {
 }
 
 /** Une session : budget et quota vérifiés avant, état écrit avant et après, journal gardé, contrôles du dépôt après. */
-async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
+/** Rendu par `session(…, true)` quand l'étape locale n'a rien donné (Ollama éteint, délai, rapport sans structure) : l'appelant se replie sur Sonnet (L146). */
+const LOCAL_FAILED = Symbol('local-failed');
+
+async function session(c: LotCtx, kind: StepKind, local: true): Promise<Done | null | typeof LOCAL_FAILED>;
+async function session(c: LotCtx, kind: StepKind, local?: false): Promise<Done | null>;
+async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done | null | typeof LOCAL_FAILED> {
   const w = c.wave;
   const l = c.lot;
   if (dropped(c)) return stop(c, 'handed-back', DROPPED);
@@ -342,7 +347,7 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est jouée dès que le code est à relire (sauf tests rouges après une écriture, cf. REVIEW_RESERVE), la passe fix réserve son coût.
   if (write && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
-  const model: Model = write ? l.model : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
+  const model: StepModel = write ? l.model : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
   const before = await snapshot(l.repo);
   const neighbours = l.repos ?? [];
@@ -372,8 +377,9 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       kind,
       sessionId,
       brief,
-      model,
+      model: local ? 'sonnet' : (model as Model),
       effort,
+      local,
       schema: schemaFor(kind),
       agent: kind === 'ux' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
       cwd: l.repo,
@@ -410,6 +416,19 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
       if (w.claudeHome && spent.sessionId) step.peakContext = peakContext(w.claudeHome, l.repo, spent.sessionId);
     }
   }
+  if (local && outcome.kind !== 'ok') {
+    // Hors quota Anthropic : rien au budget, et jamais d'arrêt du lot — Sonnet reprend le contrôle.
+    const cause = outcome.kind === 'failed' ? outcome.cause : outcome.message;
+    writeFileSync(join(dir, `${base}.json`), outcome.kind === 'failed' ? outcome.stdout : '');
+    if (outcome.kind === 'failed') writeFileSync(join(dir, `${base}.err`), outcome.stderr);
+    step.status = 'failed';
+    step.cause = cause;
+    step.report = `${base}.json`;
+    delete step.tokens;
+    l.warnings.push(`contrôle préalable : modèle local sans résultat (${cause.slice(0, 200)}), repli sur Sonnet`);
+    save(c);
+    return LOCAL_FAILED;
+  }
   if (outcome.kind === 'failed') {
     if (outcome.firstStdout !== undefined) writeFileSync(join(dir, `${base}.first.json`), outcome.firstStdout);
     writeFileSync(join(dir, `${base}.json`), outcome.stdout);
@@ -435,12 +454,12 @@ async function session(c: LotCtx, kind: StepKind): Promise<Done | null> {
   writeFileSync(join(dir, `${base}.json`), JSON.stringify({ ...res, structured: res.structured }, null, 2));
   step.report = `${base}.json`;
   step.sessionId = res.sessionId;
-  step.tokens = res.tokens;
+  step.tokens = local ? { ...res.tokens, counted: 0 } : res.tokens; // local : hors quota, hors budget
   if (res.formattingRetry) {
     step.formatRetry = true;
     w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} : rapport sans sortie structurée, relance de mise en forme`);
   }
-  w.budget.add(res.tokens);
+  if (!local) w.budget.add(res.tokens);
   w.saveWave();
   if (w.claudeHome) step.peakContext = peakContext(w.claudeHome, l.repo, res.sessionId);
 
@@ -566,16 +585,34 @@ export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: s
  */
 async function precheck(c: LotCtx): Promise<void> {
   const l = c.lot;
-  const done = await session(c, 'precheck');
-  if (!done) return;
-  let rep: PrecheckReport;
-  try {
-    rep = checkShape<PrecheckReport>(done.report, PRECHECK_SCHEMA);
-  } catch (e) {
-    l.warnings.push(`contrôle préalable illisible, implémentation lancée : ${(e as Error).message}`);
-    l.next = 'implement';
-    save(c);
-    return;
+  let rep: PrecheckReport | null = null;
+  if (c.config.precheckLocal) {
+    // Modèle local (L146) : un échec, un rapport illisible ou un « oui » (qui rendrait le lot sans implémentation) rend la main à Sonnet.
+    const done = await session(c, 'precheck', true);
+    if (!done) return;
+    if (done !== LOCAL_FAILED) {
+      try {
+        rep = checkShape<PrecheckReport>(done.report, PRECHECK_SCHEMA);
+      } catch (e) {
+        l.warnings.push(`contrôle préalable : rapport du modèle local illisible (${(e as Error).message}), repli sur Sonnet`);
+      }
+      if (rep?.dejaPresent === 'oui') {
+        l.warnings.push('contrôle préalable : « oui » du modèle local, confirmé par Sonnet');
+        rep = null;
+      }
+    }
+  }
+  if (!rep) {
+    const done = await session(c, 'precheck');
+    if (!done) return;
+    try {
+      rep = checkShape<PrecheckReport>(done.report, PRECHECK_SCHEMA);
+    } catch (e) {
+      l.warnings.push(`contrôle préalable illisible, implémentation lancée : ${(e as Error).message}`);
+      l.next = 'implement';
+      save(c);
+      return;
+    }
   }
   const proofs = rep.preuves.length ? ` (${rep.preuves.join(' ; ')})` : '';
   // « oui » sans preuve ne se vérifie pas : il vaut « partiel », l'implémentation part avec le constat.

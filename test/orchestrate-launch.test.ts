@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { chmodSync } from 'node:fs';
 import { parseSession, isQuotaMessage } from '../src/orchestrate/result.js';
-import { buildArgs, buildRetryArgs, killSessions, realClaude, mcpServersFor, writeMcpConfig, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
+import { buildArgs, buildLocalArgs, buildRetryArgs, killSessions, realClaude, mcpServersFor, writeMcpConfig, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { tempDir } from './helpers.js';
 
@@ -436,4 +437,50 @@ describe('realClaude : fin de session (L83)', () => {
     expect(alive(pid)).toBe(false);
     await session;
   }, 15_000);
+});
+
+describe('étape sur le modèle local (L146)', () => {
+  const agents = { 'precheck-reader': { description: 'd', prompt: 'PROMPT-AGENT', tools: ['Read', 'Grep', 'StructuredOutput'] } };
+  const local: StepSpec = { ...spec, kind: 'precheck', model: 'sonnet', agent: 'precheck-reader', local: true, effort: 'low' };
+
+  it('buildLocalArgs : brief en premier (prompt de claude-local), prompt de l\'agent joint, ni --model ni --effort ni --agents', () => {
+    const args = buildLocalArgs(local, agents);
+    expect(args[0]).toContain('PROMPT-AGENT');
+    expect(args[0]).toContain('BRIEF');
+    for (const f of ['-p', '--model', '--effort', '--agents', '--agent', '--mcp-config']) expect(args).not.toContain(f);
+    const at = (flag: string) => args[args.indexOf(flag) + 1];
+    expect(at('--tools')).toBe('Read,Grep,StructuredOutput');
+    expect(JSON.parse(at('--json-schema'))).toEqual({ type: 'object' });
+    expect(at('--session-id')).toBe(spec.sessionId);
+    expect(at('--add-dir')).toBe('/tmp/x');
+    expect(args.slice(args.indexOf('--disallowedTools') + 1)).toContain('Bash(git push:*)');
+  });
+
+  it('runSession local : lanceur marqué local, arguments locaux, pas de relance --resume sur un texte sans structure', async () => {
+    const seen: { args: string[]; local?: boolean }[] = [];
+    const claude = async (args: string[], o: { local?: boolean }) => {
+      seen.push({ args, local: o.local });
+      return { code: 0, stdout: JSON.stringify({ ...JSON.parse(sample), structured_output: undefined }), stderr: '', timedOut: false };
+    };
+    const out = await runSession(local, { claude: claude as never, agents });
+    expect(seen).toHaveLength(1);
+    expect(seen[0].local).toBe(true);
+    expect(seen[0].args).not.toContain('--resume');
+    expect(out.kind).toBe('failed');
+  });
+
+  it('realClaude lance claude-local (localBin) quand l\'appel est local, claude sinon', async () => {
+    const dir = tempDir();
+    const mk = (name: string) => {
+      const f = join(dir, name);
+      writeFileSync(f, `#!/bin/sh\necho ${name}\n`);
+      chmodSync(f, 0o755);
+      return f;
+    };
+    const bin = mk('claude');
+    const localBin = mk('claude-local');
+    const run = realClaude(bin, process.env, localBin);
+    expect((await run([], { cwd: dir, env: {}, timeoutMs: 10_000, local: true })).stdout.trim()).toBe('claude-local');
+    expect((await run([], { cwd: dir, env: {}, timeoutMs: 10_000 })).stdout.trim()).toBe('claude');
+  });
 });

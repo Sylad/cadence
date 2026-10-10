@@ -15,7 +15,7 @@ import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from 
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
 import { Budget, DROPPED, MAX_PASSES, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
-import { buildArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model } from './launch.js';
+import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { runPool } from './pool.js';
 import { schemaFor } from './schemas.js';
@@ -336,8 +336,8 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const skipped = sk?.length ? ` ; ${sk.join(', ')} ${sk.length > 1 ? 'écartées' : 'écartée'} : pas de node exécutable` : '';
       io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted}${skipped})`);
     }
-    const steps: { kind: 'precheck' | 'implement' | 'ux' | 'review' | 'review-small'; model: Model }[] = [{ kind: 'implement', model: l.model }];
-    if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos)) steps.unshift({ kind: 'precheck', model: 'sonnet' });
+    const steps: { kind: 'precheck' | 'implement' | 'ux' | 'review' | 'review-small'; model: StepModel }[] = [{ kind: 'implement', model: l.model }];
+    if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos)) steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
     const { light, full } = env.config.review;
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
     else {
@@ -355,11 +355,12 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const brief = renderBrief(s.kind, vars, deps.templatesDir);
       writeFileSync(file, brief);
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small).playwright;
-      const args = buildArgs(
-        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model, effort: env.config.effort[s.kind === 'review-small' ? 'review' : s.kind], schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && s.kind === 'implement' ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright },
+      const local = s.model === 'local';
+      const args = (local ? buildLocalArgs : buildArgs)(
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model === 'local' ? 'sonnet' : s.model, local, effort: env.config.effort[s.kind === 'review-small' ? 'review' : s.kind], schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'ux' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && s.kind === 'implement' ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
-      io.out(`  ${s.kind} : claude ${args.join(' ')}`);
+      io.out(`  ${s.kind} : ${local ? 'claude-local' : 'claude'} ${args.join(' ')}`);
       io.out(`    brief : ${file}`);
       const servers = Object.keys(mcpServersFor(s.kind, l.visible, '', l.small));
       io.out(`    mcp : ${servers.length ? `${servers.join(', ')} (captures dans le dossier de la vague : <vague>/${lotSlug(l.project, l.lot)}/playwright)` : 'aucun'}`);
@@ -987,7 +988,7 @@ export function realOrchestrateDeps(env: NodeJS.ProcessEnv): OrchestrateDeps {
   // Lues ici, une fois : ni les sessions ni les commandes du projet ne reçoivent les variables de relance.
   env = withoutLaunchVars({ ...env });
   return {
-    claude: realClaude(bin, env),
+    claude: realClaude(bin, env, env.CADENCE_CLAUDE_LOCAL_BIN || 'claude-local'),
     claudeInfo: () => {
       try {
         const version = execFileSync(bin, ['--version'], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 20_000 }).trim();

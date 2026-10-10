@@ -944,6 +944,16 @@ with proofs), `partiel` or `non`: on `oui` no implementation session is opened a
 implementation brief and a warning; on `non` — or an unreadable report, which only adds a warning — the wave goes on. A
 lot that already has commits is never pre-checked (resuming it is legitimate). `orchestrate.precheck: false` turns it off.
 
+`orchestrate.precheck: local` (L146) runs the pre-check on the local model of the dev machine instead of Sonnet: the
+orchestrator launches `claude-local` (Claude Code harness on Ollama, `qwen3-coder:30b` by default; `CADENCE_CLAUDE_LOCAL_BIN`
+names another binary) with the same brief, the `precheck-reader` prompt and tools, no quota used and nothing counted in the
+lot's budget (the step shows `local` as its model). Sonnet stays the safety net: a local session with no result (Ollama
+down, timeout, no structured report) or an unreadable report is replayed on Sonnet with a warning, and a local `oui` — the
+only answer that hands the lot back without an implementation — is confirmed by Sonnet before it counts. A local `partiel`
+or `non` is taken as is. The default stays `true` (Sonnet): switch to `local` only after comparing verdicts and durations
+against Sonnet on a few lots, and go back to `true` the first time the local model gets a `partiel` wrong. `--dry-run`
+prints the step as `precheck (local)` with its `claude-local` arguments.
+
 The `precheck-reader` agent does not set `omitClaudeMd` (Claude Code 2.1.271), on purpose: measured on a project with a
 297-line `CLAUDE.md` (haiku, `--agents` + `--agent`, same prompt, with and without the flag), the session context is
 identical (22 779 tokens, the project `CLAUDE.md` still answered when asked) — the flag only applies to an agent run as a
@@ -1137,7 +1147,7 @@ News instruction (`cadence news new <lot>`, factual user-side text, a screenshot
 orchestrate:
   test: npm test                         # run by the orchestrator after a work step (optional)
   build: npm run build                   # run after the tests; both results go to the reviewer, who does not redo them (optional)
-  precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it
+  precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it, local runs it on claude-local (Ollama) with Sonnet as fallback
   effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default

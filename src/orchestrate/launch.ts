@@ -10,6 +10,8 @@ import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumT
 
 export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck';
 export type Model = 'sonnet' | 'opus' | 'haiku';
+/** Modèle d'une étape : celui de Claude, ou `local` (claude-local → Ollama, L146). */
+export type StepModel = Model | 'local';
 
 export interface StepSpec {
   kind: StepKind;
@@ -36,6 +38,8 @@ export interface StepSpec {
   mcpConfig?: string;
   /** Le serveur Playwright est chargé pour cette étape : un agent aux outils restreints reçoit alors ses outils MCP. */
   playwright?: boolean;
+  /** Étape lancée par `claude-local` (modèle Ollama de Big-Blue, hors quota) : arguments de `buildLocalArgs`, jamais de relance `--resume` (L146). */
+  local?: boolean;
 }
 
 export type McpServers = Record<string, { command: string; args: string[] }>;
@@ -86,6 +90,8 @@ export interface LaunchOpts {
   timeoutMs: number;
   /** Appelé avec le pid dès le démarrage (pour l'état). */
   onSpawn?: (pid: number) => void;
+  /** Lancer `claude-local` plutôt que `claude` (L146). */
+  local?: boolean;
 }
 
 /** Le lanceur : injecté dans les tests, `realClaude` en vrai. Jamais `--resume` d'une session de travail, sauf la relance de mise en forme. */
@@ -118,6 +124,22 @@ export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): str
   for (const d of spec.addDirs) args.push('--add-dir', d);
   args.push('--disallowedTools', ...DISALLOWED);
   if (spec.mcpConfig) args.push('--strict-mcp-config', '--mcp-config', spec.mcpConfig);
+  return args;
+}
+
+/**
+ * Arguments de `claude-local` (L146) : le prompt vient en premier, le script ajoute lui-même `--bare`, `--model` et le
+ * serveur Ollama. Le harnais `--bare` ne charge pas `--agents` : le prompt de l'agent est joint au brief et ses outils
+ * passent par `--tools`. Pas de `--effort`, pas de MCP (aucune étape locale n'en charge).
+ */
+export function buildLocalArgs(spec: StepSpec, agents: Record<string, AgentDef>): string[] {
+  const a = spec.agent ? agents[spec.agent] : undefined;
+  if (spec.agent && !a) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
+  const args = [a ? `${a.prompt}\n\n${spec.brief}` : spec.brief, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema)];
+  if (a?.tools) args.push('--tools', a.tools.join(','));
+  args.push('--session-id', spec.sessionId, '--permission-mode', spec.permissionMode);
+  for (const d of spec.addDirs) args.push('--add-dir', d);
+  args.push('--disallowedTools', ...DISALLOWED);
   return args;
 }
 
@@ -174,9 +196,10 @@ export async function runSession(
   deps: { claude: ClaudeFn; agents: Record<string, AgentDef>; onSpawn?: (pid: number) => void },
 ): Promise<SessionOutcome> {
   const launch = (args: string[]) =>
-    deps.claude(args, { cwd: spec.cwd, env: { CADENCE_ORCHESTRATED: spec.wave, ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
-  const out = await launch(buildArgs(spec, deps.agents));
+    deps.claude(args, { local: spec.local, cwd: spec.cwd, env: { CADENCE_ORCHESTRATED: spec.wave, ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
+  const out = await launch(spec.local ? buildLocalArgs(spec, deps.agents) : buildArgs(spec, deps.agents));
   const first = classify(out);
+  if (spec.local) return first; // pas de relance de mise en forme : l'appelant se replie sur Sonnet
   const missing = first.kind === 'failed' && !out.timedOut && out.code === 0 ? lacksStructuredOutput(out.stdout) : null;
   if (!missing) return first;
   const spentFirst = first.kind === 'failed' ? first.tokens : undefined;
@@ -237,14 +260,14 @@ export function killSessions(): void {
 }
 
 /** Vrai lanceur : `claude` (ou CADENCE_CLAUDE_BIN) dans son propre groupe de processus, tué en bloc au délai. */
-export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env): ClaudeFn {
+export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env, localBin = 'claude-local'): ClaudeFn {
   return (args, opts) =>
     new Promise((resolve) => {
       // Marque héritée par tous les descendants, même orphelins rattachés à init (un shell qui sort aussitôt après
       // `nohup srv &` échappe à tout relevé de l'arbre) : à la fin de la session, tout ce qui la porte est tué.
       const mark = randomUUID();
       marks.add(mark);
-      const child = spawn(bin, args, { cwd: opts.cwd, env: { ...base, ...opts.env, [SESSION_MARK_VAR]: mark }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+      const child = spawn(opts.local ? localBin : bin, args, { cwd: opts.cwd, env: { ...base, ...opts.env, [SESSION_MARK_VAR]: mark }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
       const pid = child.pid;
       if (pid === undefined) {
         marks.delete(mark);

@@ -190,3 +190,14 @@ describe('design de l\'étape spec : la clé masque (note de revue L166)', () =>
     expect(invariants).toMatch(/`masque`[^.]*champ/);
   });
 });
+
+describe('citations en scalaire (revue L170)', () => {
+  it('refuse une règle qui cite regles ou champs sans liste', () => {
+    const f = fiche();
+    f.actions[0].regles = 'R9';
+    expect(checkFiche(f).join('\n')).toMatch(/A1 : regles doit être une liste/);
+    const g = fiche();
+    g.regles[0].champs = 'fantome';
+    expect(checkFiche(g).join('\n')).toMatch(/R1 : champs doit être une liste/);
+  });
+});

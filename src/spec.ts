@@ -66,6 +66,7 @@ export function checkFiche(doc: unknown): string[] {
     if (r.statut !== 'sourcee' && r.statut !== 'hypothese') p.push(`${id} : statut « ${String(r.statut ?? '')} » inconnu (sourcee ou hypothese)`);
     else if (r.statut === 'sourcee' && !texte(r.source)) p.push(`${id} : une règle sourcée dit d'où elle vient (source)`);
     else if (r.statut === 'hypothese' && !texte(r.si_faux)) p.push(`${id} : une hypothèse dit ce qui changerait si elle était fausse (si_faux)`);
+    if ('champs' in r && r.champs !== undefined && r.champs !== null && !Array.isArray(r.champs)) p.push(`${id} : champs doit être une liste d'ids de champs`);
     const cites = Array.isArray(r.champs) ? r.champs : [];
     for (const c of cites) if (!ids.has(String(c))) p.push(`${id} : champ « ${String(c)} » absent de la fiche`);
     if ('masque' in r && r.masque !== undefined && r.masque !== null) {
@@ -91,6 +92,7 @@ export function checkFiche(doc: unknown): string[] {
     if (a.id !== attendu) p.push(`action n° ${i + 1} : l'id doit être ${attendu} (A1, A2… dans l'ordre), pas ${texte(a.id) ? a.id : 'absent'}`);
     if (a.declencheur !== null && a.declencheur !== undefined && !(texte(a.declencheur) && ids.has(a.declencheur))) p.push(`${id} : déclencheur « ${String(a.declencheur)} » absent de la fiche (un id de champ, ou null pour le chargement)`);
     if (!texte(a.appel) || !APPEL.test(a.appel)) p.push(`${id} : appel « ${String(a.appel ?? '')} » invalide (VERBE /chemin)`);
+    if ('regles' in a && a.regles !== undefined && a.regles !== null && !Array.isArray(a.regles)) p.push(`${id} : regles doit être une liste d'ids de règles`);
     for (const r of Array.isArray(a.regles) ? a.regles : []) if (!ruleIds.has(String(r))) p.push(`${id} : règle « ${String(r)} » absente de la fiche`);
   }
   return p;

@@ -1784,7 +1784,6 @@ lots:
     title: "CHANGELOG [Unreleased] : la ligne L83 sur les démons partagés dit l'inverse du défaut (« spared the lead's tmux panes » → tuer par la marque les TUAIT ; l'exclusion les épargne), aligner sur README:1125"
     estimate: 0.1
     status: todo
-    estimate: 1
     created: 2026-10-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

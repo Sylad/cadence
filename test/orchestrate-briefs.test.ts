@@ -327,7 +327,7 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
 
 describe('agents hors orchestrate : même consigne Playwright que les briefs (L84)', () => {
   const flatten = (p: string): string => read(p).replace(/\s+/g, ' ');
-  const PLAYWRIGHT_RULE = 'Give screenshots and snapshots a relative file name only (e.g. `page-home.png`), never an absolute path: the Playwright MCP writes them under `.playwright-mcp/` (ignored by git), or in the wave\'s output directory outside the repository when a wave launched it';
+  const PLAYWRIGHT_RULE = 'Give screenshots and snapshots a relative file name only (e.g. `page-home.png`), never an absolute path: the Playwright MCP writes them under `.playwright-mcp/` (list them in the report if git does not ignore that folder), or in the wave\'s output directory outside the repository when a wave launched it';
 
   it.each(['ux-reviewer', 'qa-reviewer'])('%s répète la consigne Playwright : nom relatif, sorties sous .playwright-mcp/', (name) => {
     expect(flatten(`../agents/${name}.md`)).toContain(PLAYWRIGHT_RULE);

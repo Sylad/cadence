@@ -1471,9 +1471,10 @@ lots:
     finished: 2026-10-08
   - id: L123
     title: "qa-reviewer : périmètre réduit aux pages touchées par le lot (pages qui appellent les endpoints changés, pages du lot visible, plus la page d'accueil) et lecture du DOM en texte d'abord, capture seulement sur un écart ; garder le cas « lot backend qui vide une page » (13 % du coût sur 24 h le 08-10) ; mesurer avant/après sur une livraison ol ou warhammer"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-08
+    started: 2026-10-10
   - id: L124
     title: "orchestrate : un lot rendu au lead pour « budget du lot atteint » juste avant sa revue finale n'est pas reprenable (--resume répond « vague terminée », exit 2, vécu 08-10 sur 3 lots de maritime-sq4-1, 209–224 k pour un plancher de 200 k) — soit --resume --budget relève le budget des lots rendus et rejoue l'étape manquante, soit le plancher couvre precheck + implement + review + fix + review courte (~250 k mesurés)"
     status: todo

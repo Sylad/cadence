@@ -56,4 +56,23 @@ describe('fiche d\'écran de l\'exemple (L166)', () => {
     expect(fiche.regles.some((r: any) => r.statut === 'hypothese')).toBe(true);
     expect(spec).toMatch(/Hypothèses/);
   });
+
+  it('ne laisse en hypothèse aucune règle dont si_faux touche un choix coûteux à défaire', () => {
+    const couteux = /stockage|clé|migration|contrat d'API|route|destructi|irréversible|suppression|paiement/i;
+    for (const r of fiche.regles.filter((x: any) => x.statut === 'hypothese')) expect(r.si_faux).not.toMatch(couteux);
+  });
+
+  it('dérive expectations.md sans faux constats : shows exclut les champs propres à un état, api se limite au chargement en GET', () => {
+    expect(spec).toMatch(/`shows:`[^`]*\*\*sauf\*\* les champs propres à un état/);
+    expect(spec).toMatch(/`api:` = les seules `actions\[\]`\s+de chargement \(`declencheur: null`\) en GET/);
+  });
+
+  it('sépare l\'essai (S7) de la mesure à 8 lots (S8) et fait dépendre la mise à jour de lead.md de S6', () => {
+    const ligne = (id: string) => spec.split('\n').find((l) => l.startsWith(`| ${id} |`)) ?? '';
+    expect(ligne('S7')).not.toMatch(/mesure/i);
+    expect(ligne('S8')).toMatch(/mesure[\s\S]*8 lots/i);
+    expect(ligne('S8')).toMatch(/\| S7 \|$/);
+    expect(ligne('S9')).toMatch(/docs\/lead\.md/);
+    expect(ligne('S9')).toMatch(/\| S6 \|$/);
+  });
 });

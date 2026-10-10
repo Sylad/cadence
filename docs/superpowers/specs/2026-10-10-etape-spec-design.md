@@ -121,8 +121,11 @@ lancer les tests du projet (pas le code d'implémentation à écrire). Contrat :
 - Hors champ : ce qui ne s'automatise pas (rendu, ergonomie, lisibilité) reste à la passe UX de
   conformité.
 - `docs/qa/expectations.md` est **dérivé de la fiche** (`cadence spec qa`) : `shows:` = champs
-  obligatoires, `never:` = messages de règles qui signalent un état dégradé, `api:` = `actions[]` ;
-  le lead le commite comme aujourd'hui (fichier de plan).
+  obligatoires, **sauf** les champs propres à un état (un champ cité par une règle de l'état vide ou
+  d'erreur, comme `message-vide`), qui ne sont pas visibles page chargée et vont, par leur message, dans
+  `never:` avec les messages de règles qui signalent un état dégradé ; `api:` = les seules `actions[]`
+  de chargement (`declencheur: null`) en GET, la passe QA n'envoyant jamais de POST ; les actions
+  déclenchées par un champ restent à l'acceptation. Le lead le commite comme aujourd'hui (fichier de plan).
 
 ### 6. Implémentation
 
@@ -204,8 +207,9 @@ conception ne les ajoute pas lui-même : ils deviennent prêts pour `orchestrate
 | S4 | Revue UX de la maquette : mode « maquette » de `ux-reviewer`, cohérence maquette ↔ fiche, boucle ≤ 2 passes, rendu au lead | 0.75 | S3 |
 | S5 | Étape `accept` : session distincte, tests rouges vérifiés, empreinte `acceptation.json`, garde de `implement`/`fix` sur ces fichiers | 1 | S3 |
 | S6 | Briefs aval : fiche donnée à `implement`, tests citant les règles, `code-reviewer` règle → test → vert, UX de conformité légère (remplace la passe complète des lots avec fiche), section « Hypothèses » de Nouveautés + contrôle de `news check` | 1 | S4, S5 |
-| S7 | Essai sur un écran d'une app loisir (à la main puis orchestré), mesure contre le lot de mesure après 8 lots avec fiche, note de conclusion | 1 | S6 |
-| S8 | **Dernier** : mettre à jour `docs/lead.md` et ses deux SVG (L167) avec les étapes spec, revue UX de la maquette et tests d'acceptation, README (sections lead et orchestrate) | 0.25 | S7 |
+| S7 | Essai sur un écran d'une app loisir (à la main puis orchestré), note sur le fonctionnement de la fiche | 0.5 | S6 |
+| S8 | Mesure contre le lot de mesure, une fois 8 lots avec fiche livrés (ouvert tant qu'ils ne le sont pas), note de conclusion | 0.5 | S7 |
+| S9 | Mettre à jour `docs/lead.md` et ses deux SVG (L167) avec les étapes spec, revue UX de la maquette et tests d'acceptation, README (sections lead et orchestrate) : dès les étapes livrées, sans attendre la mesure | 0.25 | S6 |
 
 Commandes prêtes à lancer :
 
@@ -216,8 +220,9 @@ raf add "Étape spec d'orchestrate (spec-writer, rendu 1440/390)" --estimate 1 -
 raf add "Revue UX de la maquette (ux-reviewer mode maquette)" --estimate 0.75 --after <S3>
 raf add "Étape accept : tests d'acceptation rouges, verrou par empreinte" --estimate 1 --after <S3>
 raf add "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses" --estimate 1 --after <S4>,<S5>
-raf add "Essai étape spec sur un écran d'app loisir + mesure" --estimate 1 --after <S6>
-raf add "docs/lead.md : schéma du workflow avec les étapes spec (L167)" --estimate 0.25 --after <S7>
+raf add "Essai étape spec sur un écran d'app loisir" --estimate 0.5 --after <S6>
+raf add "Mesure de l'étape spec contre le lot de mesure (8 lots avec fiche)" --estimate 0.5 --after <S7>
+raf add "docs/lead.md : schéma du workflow avec les étapes spec (L167)" --estimate 0.25 --after <S6>
 ```
 
 ## Risques et ce qu'on ne fait pas

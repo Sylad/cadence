@@ -44,7 +44,7 @@ regles:
     message: "Rappel enregistré."
     champs: [bouton-rappel]
     statut: hypothese
-    si_faux: Si plusieurs rappels sont voulus, la clé (utilisateur, match) du stockage change — coûteux à défaire une fois des rappels créés (question ciblée au lead).
+    si_faux: Si plusieurs rappels sont voulus, seul le bouton change (on retire l'inactivation) ; le serveur accepte déjà les appels répétés.
     tests: ["R4 — un second clic ne crée pas de rappel", "R4 — le bouton est inactif après le rappel"]
 
 actions:

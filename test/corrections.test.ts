@@ -55,6 +55,19 @@ describe('readRuns', () => {
   });
 });
 
+describe('fix enchaînés', () => {
+  it('une passe qui suit directement une autre passe fix n\'est pas rattachée à la revue déjà traitée', () => {
+    const runs = tempDir();
+    lot(runs, 'w1', 'alpha', 'L1', [{ kind: 'implement' }, { kind: 'review', constats: ['constat A'] }, { kind: 'fix' }, { kind: 'fix' }, { kind: 'review', constats: ['constat B'] }, { kind: 'fix' }]);
+    const { passes } = readRuns(runs);
+    expect(passes.map((p) => [p.key, p.findings])).toEqual([
+      ['w1/alpha--L1/3', ['constat A']],
+      ['w1/alpha--L1/4', []],
+      ['w1/alpha--L1/6', ['constat B']],
+    ]);
+  });
+});
+
 describe('measure', () => {
   const cls = (key: string, cause: Classification['cause']): [string, Classification] => [key, { cause, by: 'ollama:m' }];
   it('compte les lots à ≥1 et ≥2 corrections, par projet et visible/non visible, et les passes par cause', () => {
@@ -103,6 +116,17 @@ describe('passe sans constat (tests rouges)', () => {
     expect(m.byCause['sans-constat']).toBe(1);
     expect(m.byProjectCause.gamma!['sans-constat']).toBe(1);
     expect(renderReport(m)).toContain('tests rouges');
+  });
+});
+
+describe('readCache fichier illisible', () => {
+  it('refuse un cache dont le JSON est invalide au lieu de le lire vide', () => {
+    const file = join(tempDir(), 'c.json');
+    writeFileSync(file, '{"w1/a--L1/3": {"cause":"bug-code","by":"ollama:m","manual":"test-manquant"},}');
+    expect(() => readCache(file)).toThrow(/c\.json/);
+  });
+  it('un fichier absent reste un cache vide', () => {
+    expect(readCache(join(tempDir(), 'rien.json')).size).toBe(0);
   });
 });
 

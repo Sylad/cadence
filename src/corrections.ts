@@ -105,7 +105,9 @@ export function readRuns(runsDir: string): Runs {
       lots.push({ project: rec.project, lot: rec.lot, visible: !!rec.visible, fixes: fixSteps.length });
       for (const fix of fixSteps) {
         const review = [...steps].reverse().find((s) => s.n < fix.n && isReview(s.kind) && s.report);
-        const findings = review?.report ? findingsOf(readJson(join(waveDir, name, review.report))) : [];
+        // Une passe fix entre la revue et celle-ci a déjà traité ces constats : cette passe-ci (tests rouges) n'en a pas.
+        const handled = review ? fixSteps.some((f) => f.n > review.n && f.n < fix.n) : false;
+        const findings = review?.report && !handled ? findingsOf(readJson(join(waveDir, name, review.report))) : [];
         passes.push({ key: `${wave}/${name}/${fix.n}`, project: rec.project, lot: rec.lot, visible: !!rec.visible, findings, commits: fix.commits ?? [] });
       }
     }
@@ -226,7 +228,12 @@ export function sampleKeys(keys: string[], n: number): string[] {
 }
 
 export function readCache(file: string): Map<string, Classification> {
-  const raw = existsSync(file) ? readJson(file) : null;
+  let raw: unknown = null;
+  if (existsSync(file)) {
+    // Un fichier illisible lu comme vide serait réécrit par --classify et perdrait les relectures saisies à la main.
+    raw = readJson(file);
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new RafError(`${file} : JSON illisible (un objet clé → classement est attendu), corrigez ou supprimez le fichier`);
+  }
   const known = (c: unknown) => typeof c === 'string' && (CAUSES as readonly string[]).includes(c);
   const entries = Object.entries((raw ?? {}) as Record<string, Classification>);
   // Une cause inconnue (faute de frappe dans une relecture) ferait disparaître la passe des tableaux : on refuse le fichier.

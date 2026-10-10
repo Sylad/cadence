@@ -70,6 +70,35 @@ describe('champ screen des lots (L169, spec etape-spec S1)', () => {
   });
 });
 
+describe('screen dans un plan externe et sur une sous-tâche (L169)', () => {
+  it('plan.fields.screen est lu ; show l\'affiche, check refuse les écrans invalides', () => {
+    const dir = gitRepo();
+    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, visible: vis, screen: ecran }\n  statuses: { todo: prevu }\n');
+    writeFileSync(join(dir, 'taches.yaml'), `taches:
+  - { id: X1, titre: Ok, etat: prevu, vis: true, ecran: page }
+  - { id: X2, titre: Sans, etat: prevu, ecran: component }
+  - { id: X3, titre: Inconnu, etat: prevu, vis: true, ecran: modal }
+`);
+    expect(raf(dir, 'show', 'X1').out).toContain('screen : page');
+    const r = raf(dir, 'check');
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/X2 : screen « component » sans visible/);
+    expect(r.out).toMatch(/X3 : screen « modal » inconnu/);
+    expect(r.out).not.toMatch(/X1 : screen/);
+  });
+
+  it('raf add --screen --parent est refusé et n\'écrit rien', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'Lot', '--visible');
+    const before = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const r = raf(dir, 'add', 'sub', '--parent', 'L1', '--screen', 'page');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/pas sur une sous-tâche/);
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(before);
+  });
+});
+
 describe('orchestrate.spec (L169, spec etape-spec S1)', () => {
   const read = (yaml: string) => {
     const dir = tempDir();
@@ -98,5 +127,8 @@ describe('README (L169)', () => {
   it('documente --screen et orchestrate.spec', () => {
     expect(readme).toMatch(/\[--visible \[--screen page\\\|component\\\|journey\]\]/);
     expect(readme).toMatch(/^\s+spec: \{ dir: docs\/specs/m);
+  });
+  it('liste screen parmi les champs mappables d\'un plan externe', () => {
+    expect(readme).toMatch(/- Fields: [^\n]*\n?[^\n]*`visible`, `screen`, `public`/);
   });
 });

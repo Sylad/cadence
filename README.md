@@ -36,7 +36,7 @@ lots that deliver it). Delivered so far: the sheet template `templates/fiche.yam
 (the sheet's invariants) and `cadence spec qa` (the screen's `docs/qa/expectations.md` section, derived
 from the sheet), see [spec](#spec) below, and the `spec` step of `orchestrate` itself (the `spec-writer` agent, the
 render at 1440 and 390 px, the commit of the spec), see [The spec step](#the-spec-step-of-a-lot-with-screen) in `orchestrate`; the `accept` step (red acceptance tests and the lock that protects them), see [The accept step](#the-accept-step-red-acceptance-tests-and-their-lock); the UX review of
-the mockup and the downstream briefs are not delivered yet.
+the mockup (the `ux-reviewer` agent in mockup mode), see [The mockup review](#the-mockup-review-before-any-code); the downstream briefs are not delivered yet.
 
 ## What's new
 
@@ -996,7 +996,7 @@ without `--effort` (see below), so `effort.precheck` has no effect on it and the
 
 ```yaml
 orchestrate:
-  effort: { precheck: low, spec: medium, accept: medium, implement: medium, fix: medium, review: high, ux: high }   # defaults
+  effort: { precheck: low, spec: medium, maquette: high, accept: medium, implement: medium, fix: medium, review: high, ux: high }   # defaults
 ```
 
 To measure what a level costs, run the same kind of wave before and after changing the key: each step of
@@ -1014,7 +1014,7 @@ lot that already has commits is never pre-checked (resuming it is legitimate). `
 ### The spec step of a lot with `screen:`
 
 A lot that declares `screen:` (`raf add … --visible --screen page|component|journey`, see [raf](#raf)) gets one more session, `spec`, **after** the pre-check and **before**
-the first implementation: `precheck → spec → accept → implement → ux → review` (`accept` only when the project declares `orchestrate.accept`, see below). A lot without `screen:` follows the usual path, unchanged. `--dry-run` lists the step
+the first implementation: `precheck → spec → maquette → accept → implement → ux → review` (`maquette` unless `orchestrate.maquette: false`, see [The mockup review](#the-mockup-review-before-any-code); `accept` only when the project declares `orchestrate.accept`, see below). A lot without `screen:` follows the usual path, unchanged. `--dry-run` lists the step
 (`spec (sonnet)`), its command line and its brief `templates/orchestrate/spec.md`.
 
 - **The session** (L171): Sonnet, the `spec-writer` agent (it writes only the spec folder, never application code), Playwright loaded like for `implement`. It reads the lot,
@@ -1034,10 +1034,24 @@ the first implementation: `precheck → spec → accept → implement → ux →
 - **Under the threshold**: if the session finds that the lot changes no screen, it gives the reason in one line (`sousSeuil`), writes no mockup, and the lot goes on to `implement` as before; the reason is
   kept as a warning of the lot. On resume the spec step is skipped only when a sheet of the lot (`ecran.lot` is the lot) already passes the program's checks (`cadence spec check`, mockup, captures) and carries no costly hypothesis; otherwise the spec is played again. The sheet path in the report is relative to the repository (an absolute or `./` path is normalised, a path outside the repository is a finding).
 
+### The mockup review: before any code
+
+After a valid spec, a lot with a sheet gets a UX review of its mockup, `maquette` (L172), unless `cadence.yaml` sets `orchestrate.maquette: false` (default `true`): `precheck → spec → maquette → accept → implement → ux → review`.
+`--dry-run` lists the step (`maquette (opus)`, the `review.full` model), its `ux-reviewer` command line and its brief `templates/orchestrate/maquette.md`.
+
+- **The session**: the `ux-reviewer` agent in **mockup mode**, read-only, Playwright loaded, a fresh session. It opens `maquette.html` as a local file (no application, no server), looks at the captures
+  `maquette-<état>-<largeur>.png` (1440 and 390 px) of every state, reads `fiche.yaml`, and reports findings ranked blocking / major / minor, each grounded in a rule (Nielsen, WCAG 2.2 AA) or a measurement. On top of
+  that it checks the **consistency mockup ↔ sheet**: every field of the sheet in the mockup with its `data-testid`, every rule message visible, word for word, in the state its `etat` names, every state with its
+  `#etat-<état>` section, the `masque` of an empty-state rule really hiding the fields it names. `effort.maquette` (default `high`) sets its effort level. Its verdict is **not** `raf ux`: the conformity pass after the code keeps that role.
+- **The loop, two reviews at most.** A blocking or major finding sends the mockup back to the spec writer: a **second `spec` session** (fresh, its brief carries the findings), then the mockup is reviewed again. If the second review is
+  still not conforming, the lot is handed back with what remains (`maquette non conforme après 2 revues : …`) and nothing is implemented. A conforming review goes on to `accept` (or `implement`).
+- **Minor findings** are not sent back: they are kept as proposals of the lot (`[mineur maquette] …`), like the minors of the other reviews. A report whose totals announce a major finding is not taken for conforming.
+- **On resume**, a sheet already committed is reviewed before the next step, unless the lot already has a sealed, conforming `acceptation.json` (it can only have been written after the review).
+
 ### The accept step: red acceptance tests and their lock
 
 After a valid spec, and only when `cadence.yaml` declares `orchestrate.accept` (the project's **dedicated command**, which runs *only* the acceptance tests of one lot), a lot with a sheet gets one more
-session, `accept` (L173): `precheck → spec → accept → implement → ux → review`. Without `orchestrate.accept` the step is skipped, with a warning on the lot (`étape accept ignorée …`), and the lot goes from `spec` to `implement` as before.
+session, `accept` (L173): `precheck → spec → maquette → accept → implement → ux → review`. Without `orchestrate.accept` the step is skipped, with a warning on the lot (`étape accept ignorée …`), and the lot goes from `spec` to `implement` as before.
 `--dry-run` lists the step (`accept (sonnet)`) and its brief `templates/orchestrate/accept.md`.
 
 - **The session**: Sonnet, the `acceptance-writer` agent, a session other than the implementer's. Its brief gives it the sheet, the mockup and how to run the project's tests (the dedicated command, and the runner template below) — not the lot's objective, notes or
@@ -1283,9 +1297,10 @@ orchestrate:
   build: npm run build                   # run after the tests; both results go to the reviewer, who does not redo them (optional)
   precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it, local runs it on claude-local (Ollama) with Sonnet as fallback
   accept: npx vitest run -c vitest.acceptation.config.ts   # accept step (see « The accept step »): the dedicated command that runs ONLY the acceptance tests of the lot (optional; without it the step is skipped with a warning)
+  maquette: true                         # default: UX review of the mockup between spec and accept (see « The mockup review »); false skips it
   spec: { dir: docs/specs }              # spec step (see « The spec step of a lot with screen: »): folder of the screen specs, relative to the repository (default docs/specs); render: the command the spec session runs to render the mockups at 1440 and 390 px (optional, Playwright otherwise)
   prodAccess: false                      # default: wave sessions get no access to production (see « Production access of the sessions »); true lifts it for this project
-  effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, accept, implement, fix, review, ux
+  effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, maquette, accept, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default
   addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use
@@ -1574,7 +1589,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 - The **text of the outputs**: wording, layout, order of the lines and columns of every report, table and message
   (the `--json` outputs and the exit codes are part of the commands above). In a `--json` output a new field is a
   minor change, so consumers must tolerate unknown fields; removing or renaming a field is a major change.
-- The **`precheck-reader`**, **`spec-writer`** and **`acceptance-writer`** agents: internal to `cadence orchestrate`, not meant to be called by hand.
+- The **`precheck-reader`**, **`spec-writer`** and **`acceptance-writer`** agents, and the mockup mode of **`ux-reviewer`**: internal to `cadence orchestrate`, not meant to be called by hand.
 - The **`cadence-hud` band**: its segments, colours and layout; it is versioned on its own.
 - The **wave journals** under `.cadence/runs` and the files `cadence orchestrate` keeps there.
 - The wording of the briefs and of the instructions inside the skills and the agents.

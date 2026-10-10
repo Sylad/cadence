@@ -83,6 +83,10 @@ export interface LotState {
   spec?: { fiche: string; hypotheses: number } | { sousSeuil: string };
   /** Issue de l'étape accept (L173) : l'acceptation.json du lot (chemin relatif au dépôt) et le commit rouge scellé par le programme, rangé ici et dans git, jamais dans le fichier. */
   accept?: { acceptation: string; rouge: string };
+  /** Revue UX de la maquette (L172) : nombre de revues jouées (2 au plus), la dernière conforme ou non, son verdict. */
+  maquette?: { passes: number; conforme: boolean; verdict: string };
+  /** Constats bloquants et majeurs de la revue de maquette, rendus à la seconde passe `spec` (une seule). */
+  maquetteConstats?: Constat[];
   /** Écarts de l'étape accept relevés par le programme, rendus à la seconde passe `accept` (une seule). */
   acceptProblems?: string[];
   /** Écarts de la spec relevés par le programme, rendus à la seconde passe `spec` (une seule). */

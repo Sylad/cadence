@@ -100,7 +100,7 @@ describe('étape spec : la session', () => {
 
   it('l’effort de spec suit orchestrate.effort.spec', async () => {
     const h = harness({ lots, script: { spec: [spec()], implement: [impl], review: [ok] } });
-    await runLot(h.lot('L1', screen, { effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high', spec: 'high', accept: 'medium' } }));
+    await runLot(h.lot('L1', screen, { effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high', spec: 'high', maquette: 'high', accept: 'medium' } }));
     expect(h.calls[0].effort).toBe('high');
   });
 });

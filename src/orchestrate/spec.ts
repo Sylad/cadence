@@ -124,7 +124,7 @@ export function checkSpec(repo: string, fiche: string, lot: string): string[] {
 }
 
 /** Consigne propre à l'étape spec dans le brief : dossier, largeurs, commande de rendu, et les écarts de la passe précédente. */
-export function specText(o: { dir: string; render?: string; screen?: string; problems?: string[]; template?: string }): string {
+export function specText(o: { dir: string; render?: string; screen?: string; problems?: string[]; review?: string; template?: string }): string {
   const lines = [
     `The lot declares \`screen: ${o.screen ?? 'page'}\`. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
     `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-vide-1440.png\`).`,
@@ -134,5 +134,6 @@ export function specText(o: { dir: string; render?: string; screen?: string; pro
   ];
   if (o.template) lines.push('', 'Template of the sheet (`templates/fiche.yaml` of cadence; every key and invariant is checked by `cadence spec check`):', '```yaml', o.template.trimEnd(), '```');
   if (o.problems?.length) lines.push('', 'The program checked your previous spec and it did not pass; fix exactly these points (one more pass only, then the lot goes back to the lead):', ...o.problems.map((p) => `- ${p}`));
+  if (o.review) lines.push('', o.review);
   return lines.join('\n');
 }

@@ -59,6 +59,7 @@ export const PRECHECK_SCHEMA = {
   required: ['dejaPresent', 'preuves', 'resume'],
 } as const;
 
+/** Une revue de maquette rend le même rapport qu'une revue d'ergonomie (REVIEW_SCHEMA). */
 export const schemaFor = (kind: StepKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'spec' ? SPEC_SCHEMA : kind === 'accept' ? ACCEPT_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
 
 export interface PrecheckReport {

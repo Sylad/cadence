@@ -50,7 +50,7 @@ export const reviewReport = (over: Record<string, unknown> = {}) => ({
 export interface Call {
   args: string[];
   opts: LaunchOpts;
-  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept';
+  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette';
   model: string;
   effort?: string;
   brief: string;
@@ -72,7 +72,7 @@ export function kindOf(args: string[]): Call['kind'] {
   const brief = briefOf(args);
   if (brief.includes('Pre-check for lot')) return 'precheck';
   const agent = args.includes('--agent') ? args[args.indexOf('--agent') + 1] : null;
-  if (agent === 'ux-reviewer') return 'ux';
+  if (agent === 'ux-reviewer') return brief.includes('UX review of the mockup') ? 'maquette' : 'ux';
   if (agent === 'spec-writer') return 'spec';
   if (agent === 'acceptance-writer') return 'accept';
   if (agent === 'code-reviewer') return brief.includes('single pass') || brief.includes('short re-review') ? 'review-small' : 'review';
@@ -150,7 +150,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; scree
     lot(id, over = {}, config = {}) {
       const state = newLot({ project: 'demo', repo, lot: id, title: h.plan().lot(id).title, visible: false, small: false, model: 'sonnet', readOnlyPlan: false });
       Object.assign(state, over);
-      return { wave, lot: state, config: { ...readOrchestrateConfig('/nope'), precheck: false, ...config }, loadPlan: () => Plan.load(planFile) };
+      return { wave, lot: state, config: { ...readOrchestrateConfig('/nope'), precheck: false, maquette: false, ...config }, loadPlan: () => Plan.load(planFile) };
     },
   };
   return h;

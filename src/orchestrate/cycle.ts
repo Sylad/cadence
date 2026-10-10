@@ -20,6 +20,7 @@ import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
 import { acceptText, checkAcceptation, findAcceptation, lockViolations, parseAcceptation, redSha, sealAcceptation, setVert } from './accept.js';
+import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheReady, findFiche, specText } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { lotKey, lotRepoPaths, neighbourDirs } from './state.js';
@@ -290,10 +291,14 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     vars.captures = capturesText(pwDir);
   }
   if (kind === 'spec') {
-    vars.spec = specText({ dir: c.config.spec.dir, render: c.config.spec.render, screen: l.screen, problems: l.specProblems, template: ficheTemplate() });
+    vars.spec = specText({ dir: c.config.spec.dir, render: c.config.spec.render, screen: l.screen, problems: l.specProblems, review: l.maquetteConstats?.length ? reviewedText(l.maquetteConstats) : undefined, template: ficheTemplate() });
     const mine = lotCommitLines(c);
     if (mine) vars.commits = `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}`;
     if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer) : `Answer from the human to your earlier question: ${l.pendingAnswer}`;
+  }
+  if (kind === 'maquette') {
+    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, previous: l.maquetteConstats });
+    vars.reponse = '';
   }
   if (kind === 'accept') {
     const fiche = ficheOf(c) ?? '';
@@ -400,7 +405,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   const sessionId = randomUUID();
   const step: StepState = { n, kind, model, ...(effort !== 'default' ? { effort } : {}), status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
   l.steps.push(step);
-  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing', spec: 'implementing', accept: 'implementing' } as const;
+  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing', spec: 'implementing', accept: 'implementing', maquette: 'reviewing' } as const;
   transition(c, label[kind]);
   w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} (${model})`);
 
@@ -425,7 +430,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       effort,
       local,
       schema: schemaFor(kind),
-      agent: kind === 'spec' ? 'spec-writer' : kind === 'accept' ? 'acceptance-writer' : kind === 'ux' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
+      agent: kind === 'spec' ? 'spec-writer' : kind === 'accept' ? 'acceptance-writer' : kind === 'ux' || kind === 'maquette' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
       cwd: l.repo,
       wave: w.id,
       permissionMode: c.config.permissionMode,
@@ -761,8 +766,20 @@ function firstWrite(c: LotCtx): StepKind {
 
 const NO_ACCEPT = 'étape accept ignorée : orchestrate.accept absent (commande dédiée aux tests d\'acceptation), le lot passe de spec à implement sans tests rouges';
 
-/** Étape qui suit une spec écrite : les tests d'acceptation rouges (S5) quand le projet déclare sa commande dédiée et qu'aucune acceptation conforme n'est déjà commitée, sinon l'implémentation. */
+/**
+ * Étape qui suit une spec écrite : la revue UX de la maquette (S4) tant qu'elle n'est pas conforme (`orchestrate.maquette`), sauf si une
+ * acceptation conforme est déjà commitée (elle n'a pu être écrite qu'après la revue) ; puis les tests d'acceptation rouges (S5).
+ */
 function afterSpec(c: LotCtx, fiche: string): StepKind {
+  const l = c.lot;
+  const json = `${posix.dirname(fiche)}/acceptation.json`;
+  const sealed = !!c.config.accept && listed(c, json) && checkAcceptation(l.repo, json, l.lot, fiche).length === 0;
+  if (c.config.maquette && !l.maquette?.conforme && !sealed) return 'maquette';
+  return afterMaquette(c, fiche);
+}
+
+/** Étape qui suit une maquette relue : les tests d'acceptation rouges (S5) quand le projet déclare sa commande dédiée et qu'aucune acceptation conforme n'est déjà commitée, sinon l'implémentation. */
+function afterMaquette(c: LotCtx, fiche: string): StepKind {
   const l = c.lot;
   if (!c.config.accept) {
     if (!l.warnings.includes(NO_ACCEPT)) l.warnings.push(NO_ACCEPT);
@@ -861,6 +878,48 @@ async function specStep(c: LotCtx): Promise<void> {
   l.spec = { fiche, hypotheses: (doc.regles ?? []).filter((r) => r.statut === 'hypothese').length };
   l.specProblems = undefined;
   l.next = afterSpec(c, fiche);
+  save(c);
+}
+
+/**
+ * Étape maquette (L172, spec etape-spec S4) : l'agent ux-reviewer, en lecture seule, relit la maquette et sa fiche. Un bloquant ou un majeur renvoie
+ * à la spec (une seule seconde passe, avec les constats), puis la maquette est relue ; ce qui reste après la seconde revue est rendu au lead.
+ * Les mineurs vont en notes du lot. Ce verdict n'est pas `raf ux` : la conformité après code garde ce rôle.
+ */
+async function maquetteStep(c: LotCtx): Promise<void> {
+  const l = c.lot;
+  const fiche = ficheOf(c);
+  if (!fiche) {
+    l.next = 'implement';
+    save(c);
+    return;
+  }
+  const done = await session(c, 'maquette');
+  if (!done) return;
+  let rep: ReviewReport;
+  try {
+    rep = checkShape<ReviewReport>(done.report, REVIEW_SCHEMA);
+  } catch (e) {
+    badReport(c, done.step, e);
+    return;
+  }
+  const summary = summarize(rep, done.after.head ?? '');
+  const passes = (l.maquette?.passes ?? 0) + 1;
+  l.maquette = { passes, conforme: summary.conforme, verdict: summary.verdict };
+  addProposals(c, rep, 'maquette');
+  const constats = blockingConstats(rep, 'ux');
+  if (summary.conforme) {
+    l.maquetteConstats = undefined;
+    l.next = afterMaquette(c, fiche);
+    save(c);
+    return;
+  }
+  if (passes >= 2) {
+    stop(c, 'handed-back', `maquette non conforme après 2 revues : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
+    return;
+  }
+  l.maquetteConstats = constats.length ? constats : [{ source: 'ux', gravite: 'majeur', texte: summary.verdict }];
+  l.next = 'spec';
   save(c);
 }
 
@@ -1382,6 +1441,7 @@ export async function runLot(c: LotCtx): Promise<void> {
       const kind = l.next;
       if (kind === 'precheck') await precheck(c);
       else if (kind === 'spec') await specStep(c);
+      else if (kind === 'maquette') await maquetteStep(c);
       else if (kind === 'accept') await acceptStep(c);
       else if (kind === 'implement' || kind === 'fix') await work(c, kind);
       else await review(c, kind);

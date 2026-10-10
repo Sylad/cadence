@@ -67,7 +67,7 @@ function parentWith(projects: Record<string, { title: string; estimate?: number;
   return { parent, dirs };
 }
 
-type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
+type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
 
 function fakeDeps(over: Over = {}, tweak: Partial<OrchestrateDeps> = {}): { deps: OrchestrateDeps; calls: { cwd: string; kind: string; model: string }[] } {
   const calls: { cwd: string; kind: string; model: string }[] = [];
@@ -187,7 +187,7 @@ describe('refus avant d\'agir (code 2)', () => {
     const r = await run(parent, ['a:L1', 'b:L1', '--dry-run']);
     try {
       const out = r.out.join('\n');
-      expect(out).toMatch(/étapes : spec \(sonnet\) → implement/);
+      expect(out).toMatch(/étapes : spec \(sonnet\) → maquette \(opus\) → implement/);
       expect(out.split('étapes :')[2]).not.toContain('spec (');
       const spec = out.slice(out.indexOf('  spec :'), out.indexOf('  implement :'));
       expect(spec).toContain('--agent spec-writer');
@@ -201,6 +201,32 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it("--dry-run (L172) : la revue de maquette (agent ux-reviewer, Playwright) s'intercale entre spec et implement, et orchestrate.maquette: false la retire", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un écran', screen: 'page' }] });
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      const maquette = out.slice(out.indexOf('  maquette :'), out.indexOf('  implement :'));
+      expect(maquette).toContain('--agent ux-reviewer');
+      expect(maquette).toMatch(/mcp : playwright/);
+      const line = out.split('\n').find((l) => l.includes('brief :') && l.includes('a--L1--maquette.md'))!;
+      const brief = readFileSync(line.replace(/^\s*brief : /, '').trim(), 'utf8');
+      expect(brief).toContain('docs/specs/<écran>/maquette.html');
+      expect(brief).not.toMatch(/\{\{/);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  maquette: false\n');
+    git(dirs.a, 'add', '--', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: config');
+    const off = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      expect(off.out.join('\n')).toMatch(/spec \(sonnet\) → implement/);
+    } finally {
+      removeDryRunBriefs(off.out.join('\n'));
+    }
+  });
+
   it("--dry-run (L173) : avec orchestrate.accept, l'étape accept (Sonnet, agent acceptance-writer, sans Playwright) s'intercale entre spec et implement ; son brief est rendu sans {{…}}", async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un écran', screen: 'page' }] });
     writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  accept: npx vitest run -c vitest.acceptation.config.ts\n');
@@ -209,7 +235,7 @@ describe('refus avant d\'agir (code 2)', () => {
     const r = await run(parent, ['a:L1', '--dry-run']);
     try {
       const out = r.out.join('\n');
-      expect(out).toMatch(/spec \(sonnet\) → accept \(sonnet\) → implement/);
+      expect(out).toMatch(/spec \(sonnet\) → maquette \(opus\) → accept \(sonnet\) → implement/);
       const accept = out.slice(out.indexOf('  accept :'), out.indexOf('  implement :'));
       expect(accept).toContain('--agent acceptance-writer');
       expect(accept).toMatch(/mcp : aucun/);
@@ -293,7 +319,7 @@ describe('refus avant d\'agir (code 2)', () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
     const old = fakeDeps({}, { claudeInfo: () => ({ version: '2.1.283', jsonSchema: true }) }).deps;
     expect((await run(parent, ['a:L1', '--dry-run'], old)).err.join()).toContain("claude 2.1.283 n'a pas --effort");
-    const all = ['precheck', 'spec', 'accept', 'implement', 'fix', 'review', 'ux'].map((k) => `${k}: default`).join(', ');
+    const all = ['precheck', 'spec', 'maquette', 'accept', 'implement', 'fix', 'review', 'ux'].map((k) => `${k}: default`).join(', ');
     writeFileSync(join(dirs.a, 'cadence.yaml'), `orchestrate:\n  effort: { ${all} }\n`);
     git(dirs.a, 'add', 'cadence.yaml');
     git(dirs.a, 'commit', '-q', '-m', 'cfg');

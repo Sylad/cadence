@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, writeFileSync } from 'node:fs';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { sandboxEnv, PROD_VARS } from '../src/orchestrate/sandbox.js';
 import { realClaude, runSession, type StepSpec } from '../src/orchestrate/launch.js';
@@ -65,5 +65,13 @@ describe('une session de vague ne voit pas le cluster (L168)', () => {
   });
   it('avec prodAccess, il réussit', async () => {
     expect(await seen(true)).toMatch(/^kubectl=0 GH=secret/);
+  });
+});
+
+describe('README (L168)', () => {
+  it('nomme chaque variable retirée, sans promettre un préfixe entier', () => {
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    for (const v of PROD_VARS) expect(readme, v).toContain(v);
+    expect(readme).not.toMatch(/`AWS_\*`|`ARGOCD_\*`|`CLOUDFLARE_\*`|`CF_API_\*`/);
   });
 });

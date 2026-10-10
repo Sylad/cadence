@@ -973,7 +973,7 @@ started with no *default* access to the production cluster (a guard against the 
 `~/.kube/config`, the production cluster), the `kubectl` of the `PATH` (a link to `k3s`, which without `KUBECONFIG`
 falls back on `/etc/rancher/k3s/k3s.yaml`) and the cloud and GitHub tokens of the environment. `cadence orchestrate` now
 starts every session with `KUBECONFIG=/dev/null` (`kubectl get pods` answers « connection refused » on `localhost:8080`)
-and without `KUBERNETES_SERVICE_*`, `KUBE_TOKEN`, `ARGOCD_*`, `CLOUDFLARE_*`/`CF_API_*`, `AWS_*`, `GOOGLE_APPLICATION_CREDENTIALS`,
+and without `KUBERNETES_SERVICE_HOST`, `KUBERNETES_SERVICE_PORT`, `KUBE_TOKEN`, `ARGOCD_SERVER`, `ARGOCD_AUTH_TOKEN`, `ARGOCD_OPTS`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_API_KEY`, `CF_API_TOKEN`, `CF_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` (exactly these names: `AWS_PROFILE` or `AWS_WEB_IDENTITY_TOKEN_FILE` are kept), `GOOGLE_APPLICATION_CREDENTIALS`,
 `AZURE_CLIENT_SECRET`, `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` (idea taken from the sandbox of docker/docker-agent,
 closed by default). `HOME` is left alone, so the credential files `gh` keeps under `~/.config` stay readable (a session
 can neither push nor deliver anyway) and so does `~/.kube/config`: a session that deliberately runs

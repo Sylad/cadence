@@ -2117,6 +2117,18 @@ describe('contrôle préalable sur le modèle local (L146)', () => {
     expect(h.calls[1].model).toBe('sonnet');
     expect(c.lot.warnings.join('\n')).toContain('modèle local');
     expect(c.lot.status).toBe('ready');
+    expect(c.lot.steps[0].tokens).toBeUndefined();
+  });
+
+  it('local en échec avec des jetons déclarés : rien au budget de la vague', async () => {
+    const usage = { input_tokens: 7_000_000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 10 };
+    const bad = () => ({ code: 1, stdout: JSON.stringify({ is_error: true, subtype: 'error_during_execution', result: 'boom', session_id: 's-local', num_turns: 1, duration_ms: 1, usage }), stderr: '', timedOut: false });
+    const h = harness({ script: { precheck: [bad, () => claudeOut(precheckReport())], implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, localCfg);
+    await runLot(c);
+    expect(c.lot.steps[0].tokens).toBeUndefined();
+    expect(h.wave.budget.consumed).toBeLessThan(1_000_000);
+    expect(c.lot.status).toBe('ready');
   });
 
   it('rapport local illisible : repli sur Sonnet', async () => {
@@ -2134,7 +2146,10 @@ describe('contrôle préalable sur le modèle local (L146)', () => {
     expect(h.calls.filter((k) => k.kind === 'precheck').map((k) => k.local)).toEqual([true, false]);
     expect(kinds(h)).toEqual(['precheck', 'precheck', 'implement', 'review']);
     expect(h.calls[2].brief).toContain('la moitié');
-    expect(c.lot.warnings.join('\n')).toContain('modèle local');
+    const w = c.lot.warnings.join('\n');
+    expect(w).toContain('Sonnet');
+    expect(w).toContain('partiel');
+    expect(w).not.toContain('confirmé par Sonnet');
   });
 
   it('« oui » local confirmé par Sonnet : lot rendu', async () => {
@@ -2144,6 +2159,7 @@ describe('contrôle préalable sur le modèle local (L146)', () => {
     await runLot(c);
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toContain('livrable déjà présent');
+    expect(c.lot.warnings.join('\n')).toContain('confirmé par Sonnet');
   });
 
   it('« partiel » du modèle local : pas de seconde session, le constat part dans le brief', async () => {

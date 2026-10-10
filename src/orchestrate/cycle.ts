@@ -42,7 +42,7 @@ export class Budget {
  * session (`--session-id`). Une étape déjà comptée (`tokens`) ne l'est jamais deux fois. Vrai quand quelque chose a été compté.
  */
 export function countInterrupted(claudeHome: string | undefined, repo: string, step: StepState, budget: Budget): boolean {
-  if (!claudeHome || !step.sessionId || step.tokens) return false;
+  if (!claudeHome || !step.sessionId || step.tokens || step.model === 'local') return false; // le modèle local n'a rien pris au quota
   const spent = journalTokens(claudeHome, repo, step.sessionId);
   if (!spent) return false;
   step.tokens = spent.tokens;
@@ -405,7 +405,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   const dir = w.store.lotDir(l.project, l.lot);
   const base = `${n}-${kind}`;
 
-  if (outcome.kind !== 'ok') {
+  if (outcome.kind !== 'ok' && !local) {
     // Une session en échec, au quota ou tuée au délai a consommé des tokens : ceux de sa sortie, sinon ceux de son journal.
     const spent = outcome.tokens ? { tokens: outcome.tokens, sessionId: outcome.sessionId } : w.claudeHome ? journalTokens(w.claudeHome, l.repo, outcome.sessionId ?? sessionId) : null;
     if (spent) {
@@ -417,7 +417,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
     }
   }
   if (local && outcome.kind !== 'ok') {
-    // Hors quota Anthropic : rien au budget, et jamais d'arrêt du lot — Sonnet reprend le contrôle.
+    // Hors quota Anthropic : rien au budget (ni sortie, ni journal), et jamais d'arrêt du lot — Sonnet reprend le contrôle.
     const cause = outcome.kind === 'failed' ? outcome.cause : outcome.message;
     writeFileSync(join(dir, `${base}.json`), outcome.kind === 'failed' ? outcome.stdout : '');
     if (outcome.kind === 'failed') writeFileSync(join(dir, `${base}.err`), outcome.stderr);
@@ -586,6 +586,7 @@ export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: s
 async function precheck(c: LotCtx): Promise<void> {
   const l = c.lot;
   let rep: PrecheckReport | null = null;
+  let localYes = false;
   if (c.config.precheckLocal) {
     // Modèle local (L146) : un échec, un rapport illisible ou un « oui » (qui rendrait le lot sans implémentation) rend la main à Sonnet.
     const done = await session(c, 'precheck', true);
@@ -597,7 +598,7 @@ async function precheck(c: LotCtx): Promise<void> {
         l.warnings.push(`contrôle préalable : rapport du modèle local illisible (${(e as Error).message}), repli sur Sonnet`);
       }
       if (rep?.dejaPresent === 'oui') {
-        l.warnings.push('contrôle préalable : « oui » du modèle local, confirmé par Sonnet');
+        localYes = true;
         rep = null;
       }
     }
@@ -613,6 +614,13 @@ async function precheck(c: LotCtx): Promise<void> {
       save(c);
       return;
     }
+  }
+  if (localYes) {
+    l.warnings.push(
+      rep.dejaPresent === 'oui'
+        ? 'contrôle préalable : « oui » du modèle local, confirmé par Sonnet'
+        : `contrôle préalable : le modèle local a dit « oui », Sonnet dit « ${rep.dejaPresent} » — le local s'est trompé, repasser orchestrate.precheck à true`,
+    );
   }
   const proofs = rep.preuves.length ? ` (${rep.preuves.join(' ; ')})` : '';
   // « oui » sans preuve ne se vérifie pas : il vaut « partiel », l'implémentation part avec le constat.

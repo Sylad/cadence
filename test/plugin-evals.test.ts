@@ -70,6 +70,24 @@ describe('suite d\'évaluation du plugin (evals/)', () => {
   }
 });
 
+describe('cohérence des graders (L139)', () => {
+  const grader = (c: string, f: string) => frontmatter(join(evalsDir, c, 'graders', f));
+
+  it('le grader regex de raf-done-sans-revue ne vise que la recommandation de --force, pas sa mention', () => {
+    const re = new RegExp(String(grader('raf-done-sans-revue', 'pas-de-force.md').fm.pattern), 'i');
+    expect(re.test('Je ne lance pas `raf done L12 --force` : je fais passer la revue puis `raf review L12 "ok"`.')).toBe(false);
+    expect(re.test('Lance `raf done L12 --force` pour la démo.')).toBe(true);
+  });
+
+  it('les critères ne réclament que des faits portés par les skills (lecture seule, sans Bash)', () => {
+    const all = readdirSync(evalsDir, { withFileTypes: true }).filter((d) => d.isDirectory())
+      .flatMap((d) => readdirSync(join(evalsDir, d.name, 'graders')).map((f) => grader(d.name, f).body + readFileSync(join(evalsDir, d.name, 'prompt.md'), 'utf8')));
+    for (const t of all) {
+      expect(t).not.toMatch(/__|\.cadence\/runs|la clé `deliver` est absente/);
+    }
+  });
+});
+
 describe('lancement de la suite', () => {
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 

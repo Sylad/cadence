@@ -1,5 +1,5 @@
 ---
 type: regex
-pattern: 'raf done L12 --force|raf done --force'
+pattern: '([Ll]ance|[Ee]xécute|[Uu]tilise|[Tt]ape|[Ff]ais)\s+`?raf done( L12)? --force'
 match: not_contains
 ---

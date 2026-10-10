@@ -656,6 +656,18 @@ The first baseline is in [docs/mesures/corrections-2026-10-10.md](docs/mesures/c
 - `masque` (optional, only on a rule of state `vide`) lists the fields the rule makes disappear: every id must be a field of the sheet and none may be one the rule shows in `champs`;
 - `actions[]` are numbered `A1`… in order, their `declencheur` is a field id (or `null` for the page load), their `appel` reads `VERB /path`, and the `regles` they carry exist.
 
+`cadence spec qa <fiche.yaml>` derives from a valid sheet the section of `docs/qa/expectations.md` for its screen and prints it on the standard output
+(it never writes the file: you paste the section, and the lead commits it like the rest of the plan files). A sheet with violations prints them on the
+error output, nothing on the standard one, and exits 1. The derivation is built so that the planned empty and error states are never reported as defects:
+
+- `## <route>` is the screen's route;
+- `shows:` — one line per mandatory field (its `libelle`), **except** the fields that belong to a state (listed in `champs` of a rule of state `vide` or `erreur`, like the empty-state message);
+  the line of a field listed in the `masque` of a `sourcee` rule of state `vide` ends with `— unless <the rule's statement>`; the other fields (a static title) never get one;
+- `never:` — the messages of the rules of state `erreur`, on one line; the message of a rule of state `vide` is a planned display and never goes there;
+- `api:` — the load actions only (`declencheur: null`) in `GET` (the QA pass never sends a POST); the line ends with `may be empty when <the rule's statement>` when a `sourcee` rule of state `vide` carries the action.
+  Actions triggered by a field stay with the acceptance tests.
+
+
 ## deliver
 
 A delivery is done when its checks pass, not when a tool says "success".

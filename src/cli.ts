@@ -22,7 +22,7 @@ import { liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/comma
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
-import { checkFiche, readFiche, summary } from './spec.js';
+import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
@@ -685,11 +685,19 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
   }
 }
 
-/** `cadence spec check <fiche>` (L170) : les invariants de la fiche d'écran ; code 0 valide, 1 écarts, 2 usage ou fichier illisible. */
+/** `cadence spec check|qa <fiche>` (L170) : code 0 valide, 1 écarts, 2 usage ou fichier illisible. `qa` imprime la section expectations.md de l'écran. */
 function spec(rest: string[], io: Io): number {
-  if (rest[0] !== 'check' || rest.length !== 2) throw new RafError('usage : cadence spec check <fiche.yaml>');
+  const sub = rest[0];
+  if ((sub !== 'check' && sub !== 'qa') || rest.length !== 2) throw new RafError('usage : cadence spec check|qa <fiche.yaml>');
   const doc = readFiche(resolve(io.cwd, rest[1]!));
   const problems = checkFiche(doc);
+  if (sub === 'qa') {
+    // les écarts vont sur la sortie d'erreur : la sortie standard est la section, qu'on redirige vers le fichier
+    for (const m of problems) io.err(`✗ ${m}`);
+    if (problems.length > 0) return 1;
+    io.out(deriveQa(doc).trimEnd());
+    return 0;
+  }
   for (const m of problems) io.out(`✗ ${m}`);
   if (problems.length > 0) {
     io.out(`${problems.length} écart(s)`);

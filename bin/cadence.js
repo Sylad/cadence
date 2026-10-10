@@ -48,6 +48,8 @@ if (tool === 'raf') {
                     par projet, visibles ou non, passes par cause ; --classify les classe par Ollama (hors quota)
   cadence spec check <fiche.yaml>
                     les invariants d'une fiche d'écran (étape spec, gabarit templates/fiche.yaml) ; code 1 si un écart, 2 si illisible
+  cadence spec qa <fiche.yaml>
+                    la section de docs/qa/expectations.md dérivée de la fiche (shows, never, api), sur la sortie standard
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);
   process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;

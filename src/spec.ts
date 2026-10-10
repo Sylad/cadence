@@ -112,3 +112,33 @@ export function readFiche(path: string): unknown {
     throw new RafError(`spec : ${path} n'est pas du YAML lisible : ${(e as Error).message.split('\n')[0]}`);
   }
 }
+
+/** Une phrase sans point final, pour la suite d'un « unless » ou d'un « may be empty when ». */
+const condition = (enonce: string) => enonce.trim().replace(/[.\s]+$/, '');
+
+/**
+ * La section `docs/qa/expectations.md` de l'écran, dérivée de la fiche (spec etape-spec § 5). Une fiche invalide est refusée.
+ * - `shows:` un champ obligatoire par ligne, sauf les champs propres à un état (cités par une règle d'état vide ou erreur) ;
+ *   la ligne d'un champ du `masque` d'une règle sourcée d'état vide se termine par `— unless <énoncé>`.
+ * - `never:` les messages des règles d'état erreur (jamais celui d'une règle vide : c'est un affichage prévu).
+ * - `api:` les actions de chargement (sans déclencheur) en GET ; `— may be empty when <énoncé>` si une règle sourcée d'état vide la porte.
+ */
+export function deriveQa(doc: unknown): string {
+  const problems = checkFiche(doc);
+  if (problems.length > 0) throw new RafError(`fiche invalide :\n${problems.map((m) => `✗ ${m}`).join('\n')}`);
+  const f = doc as { ecran: Obj; champs: Obj[]; regles: Obj[]; actions: Obj[] };
+  const vides = f.regles.filter((r) => r.etat === 'vide' && r.statut === 'sourcee');
+  const propres = new Set(f.regles.filter((r) => r.etat === 'vide' || r.etat === 'erreur').flatMap((r) => (r.champs as string[] | undefined) ?? []));
+  const out = [`## ${f.ecran.route as string}`];
+  for (const c of f.champs.filter((x) => x.obligatoire === true && !propres.has(x.id as string))) {
+    const unless = vides.filter((r) => ((r.masque as string[] | undefined) ?? []).includes(c.id as string)).map((r) => condition(r.enonce as string));
+    out.push(`- shows: ${c.libelle as string}${unless.length ? ` — unless ${unless.join(' ; ')}` : ''}`);
+  }
+  const messages = f.regles.filter((r) => r.etat === 'erreur' && typeof r.message === 'string' && r.message !== '').map((r) => `"${r.message as string}"`);
+  if (messages.length) out.push(`- never: ${messages.join(', ')}`);
+  for (const a of f.actions.filter((x) => (x.declencheur === null || x.declencheur === undefined) && (x.appel as string).startsWith('GET '))) {
+    const peut = vides.filter((r) => ((a.regles as string[] | undefined) ?? []).includes(r.id as string)).map((r) => condition(r.enonce as string));
+    out.push(`- api: ${(a.appel as string).slice(4)}${peut.length ? ` — may be empty when ${peut.join(' ; ')}` : ''}`);
+  }
+  return `${out.join('\n')}\n`;
+}

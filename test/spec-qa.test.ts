@@ -85,6 +85,19 @@ describe('cadence spec qa : expectations.md dérivé de la fiche (L170, spec eta
     expect(lignes(f)).toContain('- api: /api/fixtures/next');
   });
 
+  it('shows : plusieurs règles sourcées vides masquant le même champ, énoncés joints par « ; »', () => {
+    const f = fiche();
+    f.regles.push({ id: 'R5', etat: 'vide', enonce: 'Hors saison, aucun match.', message: 'Hors saison.', champs: ['message-vide'], masque: ['equipe-domicile'], statut: 'sourcee', source: 'demande du lot', tests: ['R5 — hors saison'] });
+    expect(lignes(f)).toContain('- shows: Équipe à domicile — unless Sans match programmé, l\'écran affiche le message d\'état vide et aucun autre champ ; Hors saison, aucun match');
+  });
+
+  it('api : plusieurs règles sourcées vides portant l\'action de chargement, énoncés joints par « ; »', () => {
+    const f = fiche();
+    f.regles.push({ id: 'R5', etat: 'vide', enonce: 'Hors saison, aucun match.', message: 'Hors saison.', champs: ['message-vide'], statut: 'sourcee', source: 'demande du lot', tests: ['R5 — hors saison'] });
+    f.actions[1].regles = ['R1', 'R2', 'R5'];
+    expect(lignes(f)).toContain('- api: /api/fixtures/next — may be empty when Sans match programmé, l\'écran affiche le message d\'état vide et aucun autre champ ; Hors saison, aucun match');
+  });
+
   it('refuse une fiche invalide (les écarts de spec check, rien dérivé)', () => {
     const f = fiche();
     f.regles[1].masque = ['fantome'];

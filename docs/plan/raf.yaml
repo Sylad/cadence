@@ -1977,10 +1977,11 @@ lots:
     review: { date: 2026-10-11, verdict: "conforme (1 mineur noté : spec.dir « . » rejette toute fiche) — orchestré (vague 2026-10-11-0045, 2 passe(s) de correction + passe des mineurs)", commit: b8dc9d780e9c0fa77d11989e98afb929dce24f65 }
   - id: L172
     title: "Revue UX de la maquette : ux-reviewer mode maquette (spec etape-spec, S4)"
-    status: todo
+    status: doing
     estimate: 0.75
     after: [ L171 ]
     created: 2026-10-10
+    started: 2026-10-11
   - id: L173
     title: "Étape accept : tests rouges, verrou par empreinte sur toutes les sessions du dépôt, fichiers des acceptation.json exclus de config.test et de la CI (config du lanceur) tant que le lot n'est pas vert, commande dédiée, retour à vert: true posé par le cycle quand elle passe (spec etape-spec, S5)"
     status: doing

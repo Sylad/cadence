@@ -1907,12 +1907,15 @@ lots:
     created: 2026-10-10
     notes:
       - { date: 2026-10-10, text: "Ajout Sylvain 10-10 : les tests d'acceptation sont écrits AVANT le dev, depuis la fiche, par une session distincte de l'implémenteur (oracle indépendant) — un ou plusieurs cas par règle R, nommés d'après elle, sélecteurs = ids de la fiche (data-testid) ; commités rouges, l'implémentation les rend verts sans les modifier (toute modification d'un test d'acceptation = question ou constat de revue) ; ce qui n'est pas testable automatiquement (rendu, ergonomie) reste à la passe UX de conformité ; docs/qa/expectations.md dérivé de la fiche ; la code review vérifie règle → test → vert au lieu de reconstruire les cas" }
+      - { date: 2026-10-10, text: "Le plan de lots produit par la conception inclut, en dernier, la mise à jour du schéma du workflow lead (docs/lead.md, L167) avec les étapes spec, revue UX de la maquette et tests d'acceptation (demande Sylvain 10-10)" }
   - id: L167
     title: "Doc docs/lead.md : schéma du workflow du skill lead en trois couloirs (humain, session lead, programme orchestrate et agents) en SVG compatible thème clair/sombre de GitHub, version générique (aucun nom de personne, de projet ni de chemin local) — tour, vague et étapes par lot, relais du journal et questions, re-vérification, raf ux/done, livraison et qa-reviewer, seuil de contexte 60 % et enchaînement, clôture ; règles permanentes et codes de sortie ; lien depuis le README"
     status: todo
     estimate: 0.25
     quickwin: true
     created: 2026-10-10
+    notes:
+      - { date: 2026-10-10, text: Peut sortir avant L166 avec le workflow actuel ; sera refait quand les lots d'implémentation de l'étape spec seront livrés (demande Sylvain 10-10) }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

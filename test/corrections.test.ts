@@ -79,6 +79,31 @@ describe('measure', () => {
   });
 });
 
+describe('passe sans constat (tests rouges)', () => {
+  function withRed() {
+    const runs = fixture();
+    lot(runs, 'w3', 'gamma', 'L5', [{ kind: 'implement' }, { kind: 'fix' }, { kind: 'review', constats: [] }]);
+    return runs;
+  }
+
+  it('est comptée à part, sans appeler le modèle ni fausser « faux constat »', async () => {
+    const data = readRuns(withRed());
+    const red = data.passes.find((p) => p.key === 'w3/gamma--L5/2')!;
+    expect(red.findings).toEqual([]);
+    const cache = new Map<string, Classification>();
+    const asked: string[] = [];
+    await classifyAll(data.passes, cache, async (p) => { asked.push(p.key); return 'faux-constat'; }, 'm');
+    expect(asked).not.toContain(red.key);
+    expect(cache.has(red.key)).toBe(false);
+    // même une classification déjà au cache (modèle sans donnée) ne compte pas comme cause de revue
+    const m = measure(data, new Map([[red.key, { cause: 'faux-constat', by: 'ollama:m' }]]));
+    expect(m.byCause['faux-constat']).toBe(0);
+    expect(m.byCause['sans-constat']).toBe(1);
+    expect(m.byProjectCause.gamma!['sans-constat']).toBe(1);
+    expect(renderReport(m)).toContain('tests rouges');
+  });
+});
+
 describe('readCache', () => {
   it('refuse une cause ou une relecture inconnue, en nommant la passe et le fichier', () => {
     const file = join(tempDir(), 'c.json');

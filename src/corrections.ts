@@ -5,7 +5,8 @@ import { RafError } from './plan.js';
 /** Les causes d'une passe de correction (L165), dans l'ordre où le rapport les liste. */
 export const CAUSES = ['spec-floue', 'regle-inventee', 'derive-architecture', 'donnees-sql', 'bug-code', 'test-manquant', 'faux-constat'] as const;
 export type Cause = (typeof CAUSES)[number];
-export type CauseOrNone = Cause | 'non-classe';
+/** `sans-constat` : passe sans constat de revue à lire (tests rouges juste après l'écriture) : comptée à part, jamais envoyée au modèle. */
+export type CauseOrNone = Cause | 'sans-constat' | 'non-classe';
 
 const LABELS: Record<CauseOrNone, string> = {
   'spec-floue': 'spec floue ou critère absent',
@@ -15,6 +16,7 @@ const LABELS: Record<CauseOrNone, string> = {
   'bug-code': 'bug de code',
   'test-manquant': 'test manquant',
   'faux-constat': 'faux constat de revue',
+  'sans-constat': 'sans revue (tests rouges)',
   'non-classe': 'non classé',
 };
 
@@ -128,7 +130,7 @@ export interface Measure {
 }
 
 const tally = (): Tally => ({ lots: 0, atLeast1: 0, atLeast2: 0, passes: 0 });
-const causes = (): Record<CauseOrNone, number> => ({ ...Object.fromEntries([...CAUSES, 'non-classe'].map((c) => [c, 0])) } as Record<CauseOrNone, number>);
+const causes = (): Record<CauseOrNone, number> => ({ ...Object.fromEntries([...CAUSES, 'sans-constat', 'non-classe'].map((c) => [c, 0])) } as Record<CauseOrNone, number>);
 
 export function measure(data: Runs, cache: Map<string, Classification>): Measure {
   const m: Measure = { total: tally(), byProject: {}, byVisibility: { visible: tally(), hidden: tally() }, byCause: causes(), byProjectCause: {}, agreement: { reviewed: 0, agree: 0 } };
@@ -143,10 +145,10 @@ export function measure(data: Runs, cache: Map<string, Classification>): Measure
   }
   for (const p of data.passes) {
     const c = cache.get(p.key);
-    const cause: CauseOrNone = c ? (c.manual ?? c.cause) : 'non-classe';
+    const cause: CauseOrNone = p.findings.length === 0 ? 'sans-constat' : c ? (c.manual ?? c.cause) : 'non-classe';
     m.byCause[cause]++;
     (m.byProjectCause[p.project] ??= causes())[cause]++;
-    if (c?.manual) {
+    if (c?.manual && cause !== 'sans-constat') {
       m.agreement.reviewed++;
       if (c.manual === c.cause) m.agreement.agree++;
     }
@@ -206,7 +208,7 @@ export function ollamaClassifier(opts: { url: string; model: string; fetch?: typ
 
 /** Classe les passes absentes du cache, une à une ; un échec n'entre pas au cache (une relance le reprend). */
 export async function classifyAll(passes: FixPass[], cache: Map<string, Classification>, classify: Classifier, model: string, progress?: (done: number, total: number) => void): Promise<void> {
-  const todo = passes.filter((p) => !cache.has(p.key));
+  const todo = passes.filter((p) => p.findings.length > 0 && !cache.has(p.key));
   let done = 0;
   for (const p of todo) {
     const cause = await classify(p);
@@ -243,8 +245,8 @@ const pct = (a: number, b: number) => (b === 0 ? '—' : `${Math.round((100 * a)
 const row = (name: string, t: Tally) => `| ${name} | ${t.lots} | ${t.atLeast1} (${pct(t.atLeast1, t.lots)}) | ${t.atLeast2} (${pct(t.atLeast2, t.lots)}) | ${t.passes} |`;
 
 export function renderReport(m: Measure): string {
-  const all = [...CAUSES, 'non-classe'] as CauseOrNone[];
-  const used = all.filter((c) => c !== 'non-classe' || m.byCause['non-classe'] > 0);
+  const all = [...CAUSES, 'sans-constat', 'non-classe'] as CauseOrNone[];
+  const used = all.filter((c) => (c !== 'non-classe' && c !== 'sans-constat') || m.byCause[c] > 0);
   const projects = Object.keys(m.byProject).sort();
   const passes = m.total.passes;
   const out: string[] = [];

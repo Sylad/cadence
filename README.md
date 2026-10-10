@@ -617,7 +617,7 @@ has to correct itself. From the folder a wave was launched from (default: the cu
 - the **passes by cause**, in total and per project. The cause of a pass is read from the findings of the review that
   precedes it, among: unclear spec or missing criterion (`spec-floue`), invented business rule (`regle-inventee`),
   architecture drift (`derive-architecture`), data / SQL (`donnees-sql`), code bug (`bug-code`), missing test
-  (`test-manquant`), false review finding (`faux-constat`). One cause per pass: the root of what forced the fix.
+  (`test-manquant`), false review finding (`faux-constat`). One cause per pass: the root of what forced the fix. A pass with no review finding to read (triggered by red tests right after the write session) is counted apart as `sans-constat` and never sent to the model.
 
 Without `--classify` the command calls no model: the passes not yet classified count as `non classé`. With `--classify`
 each pass is classified by a **local model served by Ollama** (`OLLAMA_HOST`, default `http://localhost:11434`;
@@ -625,7 +625,7 @@ each pass is classified by a **local model served by Ollama** (`OLLAMA_HOST`, de
 The classification is cached in `<folder>/.cadence/corrections.json` (or `--cache file`): a re-run classifies only the
 new passes, and a pass the model could not answer stays out of the cache. `--sample n` prints `n` passes spread
 evenly over the sorted keys, with their findings and the model's cause, to be read by hand; a `manual` field written
-beside a pass in the cache file overrides the model's cause in every table and gives the **agreement rate** of the model
+beside a pass in the cache file (one of the seven causes, else the command refuses the file) overrides the model's cause in every table and gives the **agreement rate** of the model
 on the reviewed sample. `--json` prints the measure as data. The command reads the journals and writes nothing but the cache.
 The first baseline is in [docs/mesures/corrections-2026-10-10.md](docs/mesures/corrections-2026-10-10.md).
 

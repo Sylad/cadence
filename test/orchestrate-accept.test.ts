@@ -1,0 +1,164 @@
+import { describe, expect, it } from 'vitest';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parse } from 'yaml';
+import { checkAcceptation, findAcceptation, lockViolations, redSha, setVert } from '../src/orchestrate/accept.js';
+import { gitRepo } from './helpers.js';
+import { git } from './orchestrate-harness.js';
+
+// L173 (spec etape-spec, S5) : ce que le programme sait de l'étape accept — le fichier acceptation.json et le verrou des tests rouges.
+const EXEMPLE = join(__dirname, '..', 'docs', 'superpowers', 'specs', '2026-10-10-etape-spec-fiche-exemple.yaml');
+const DIR = 'docs/specs';
+
+interface Opts { lot?: string; vert?: boolean; tests?: string; ecran?: string }
+
+/** Ce que fait l'agent accept : fiche + fichiers de tests + acceptation.json, dans un seul commit rouge. */
+function ecritAcceptation(repo: string, o: Opts = {}): { json: string; fiche: string; sha: string; test: string } {
+  const lot = o.lot ?? 'L1';
+  const ecran = o.ecran ?? 'prochain-match';
+  const dir = join(repo, DIR, ecran);
+  mkdirSync(join(repo, 'test'), { recursive: true });
+  mkdirSync(dir, { recursive: true });
+  const fiche = parse(readFileSync(EXEMPLE, 'utf8')) as any;
+  const noms = (fiche.regles as any[]).flatMap((r) => r.tests as string[]);
+  const test = `test/${ecran}.acceptation.test.ts`;
+  writeFileSync(join(repo, test), o.tests ?? noms.map((n) => `it('${n}', () => { throw new Error('rouge'); });`).join('\n'));
+  writeFileSync(join(dir, 'fiche.yaml'), readFileSync(EXEMPLE, 'utf8'));
+  const json = `${DIR}/${ecran}/acceptation.json`;
+  writeFileSync(join(repo, json), JSON.stringify({ lot, fiche: `${DIR}/${ecran}/fiche.yaml`, fichiers: [test], vert: o.vert ?? false }, null, 2));
+  git(repo, 'add', '--', test, json, `${DIR}/${ecran}/fiche.yaml`);
+  git(repo, 'commit', '-q', '-m', `test(${lot}): acceptation R1–R4 (rouge)`, '--', test, json, `${DIR}/${ecran}/fiche.yaml`);
+  return { json, fiche: `${DIR}/${ecran}/fiche.yaml`, sha: git(repo, 'rev-parse', 'HEAD'), test };
+}
+
+const commitPaths = (repo: string, message: string, ...paths: string[]) => {
+  git(repo, 'add', '--', ...paths);
+  git(repo, 'commit', '-q', '-m', message, '--', ...paths);
+};
+
+describe('acceptation.json : lecture et contrôles de l’étape', () => {
+  it('un fichier conforme ne relève aucun écart', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    expect(checkAcceptation(repo, a.json, 'L1', a.fiche)).toEqual([]);
+  });
+
+  it('un test cité par la fiche et absent des fichiers listés est un écart', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo, { tests: "it('R1 — le score est absent avant le coup d\\'envoi', () => { throw new Error('x'); });" });
+    const p = checkAcceptation(repo, a.json, 'L1', a.fiche);
+    expect(p.join('\n')).toContain('R2 — état vide : le message s\'affiche, pas d\'équipe');
+  });
+
+  it('vert: true à l’écriture, lot différent, fichier listé non commité : autant d’écarts', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo, { vert: true, lot: 'L9' });
+    const p = checkAcceptation(repo, a.json, 'L1', a.fiche).join('\n');
+    expect(p).toContain('vert');
+    expect(p).toContain('L9');
+    const repo2 = gitRepo();
+    const c = ecritAcceptation(repo2);
+    const doc = JSON.parse(readFileSync(join(repo2, c.json), 'utf8'));
+    doc.fichiers.push('test/absent.test.ts');
+    writeFileSync(join(repo2, c.json), JSON.stringify(doc));
+    expect(checkAcceptation(repo2, c.json, 'L1', c.fiche).join('\n')).toContain('test/absent.test.ts');
+  });
+
+  it('acceptation.json absent : écart nommé', () => {
+    const repo = gitRepo();
+    expect(checkAcceptation(repo, 'docs/specs/x/acceptation.json', 'L1', 'docs/specs/x/fiche.yaml')[0]).toMatch(/absent/);
+  });
+
+  it('findAcceptation retrouve celui du lot, redSha le commit qui l’a ajouté', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    expect(findAcceptation(repo, DIR, 'L1')).toBe(a.json);
+    expect(findAcceptation(repo, DIR, 'L2')).toBeNull();
+    expect(redSha(repo, a.json)).toBe(a.sha);
+  });
+});
+
+describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', () => {
+  it('aucun écart quand rien n’a bougé', () => {
+    const repo = gitRepo();
+    ecritAcceptation(repo);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    expect(lockViolations(repo, DIR, head)).toEqual([]);
+  });
+
+  it('un fichier de test modifié depuis le commit rouge est signalé, même d’un autre lot', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo, { lot: 'L1' });
+    const head = git(repo, 'rev-parse', 'HEAD');
+    writeFileSync(join(repo, a.test), "it('R1', () => {});\n");
+    commitPaths(repo, 'feat(L2): triche', a.test);
+    const v = lockViolations(repo, DIR, head).join('\n');
+    expect(v).toContain(a.test);
+    expect(v).toContain('L1');
+  });
+
+  it('une modification restée dans l’arbre (non commitée) est signalée aussi', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    writeFileSync(join(repo, a.test), 'autre\n');
+    expect(lockViolations(repo, DIR, head).join('\n')).toContain(a.test);
+  });
+
+  it('un fichier de test supprimé est signalé', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    git(repo, 'rm', '-q', a.test);
+    git(repo, 'commit', '-q', '-m', 'feat(L1): supprime', '--', a.test);
+    expect(lockViolations(repo, DIR, head).join('\n')).toContain(a.test);
+  });
+
+  it('seule la clé vert, posée par le cycle, est tolérée : setVert ne déclenche aucun écart au contrôle suivant', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    setVert(repo, a.json);
+    commitPaths(repo, 'chore(L1): vert', a.json);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    expect(JSON.parse(readFileSync(join(repo, a.json), 'utf8')).vert).toBe(true);
+    // le lot suivant (B) voit un diff non vide par rapport au sha rouge mais aucun écart
+    expect(lockViolations(repo, DIR, head)).toEqual([]);
+  });
+
+  it('une session qui pose vert: true elle-même est signalée', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    doc.vert = true;
+    writeFileSync(join(repo, a.json), JSON.stringify(doc));
+    commitPaths(repo, 'feat(L1): vert', a.json);
+    expect(lockViolations(repo, DIR, head).join('\n')).toMatch(/vert/);
+  });
+
+  it('une autre clé d’acceptation.json réécrite (liste de fichiers réduite) est signalée', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    doc.fichiers = [];
+    writeFileSync(join(repo, a.json), JSON.stringify(doc));
+    commitPaths(repo, 'feat(L1): vide la liste', a.json);
+    expect(lockViolations(repo, DIR, head).join('\n')).toContain(a.json);
+  });
+
+  it('un acceptation.json supprimé ou créé par une session d’implémentation est signalé', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    git(repo, 'rm', '-q', a.json);
+    git(repo, 'commit', '-q', '-m', 'feat(L1): supprime', '--', a.json);
+    expect(lockViolations(repo, DIR, head).join('\n')).toContain('supprimé');
+    const repo2 = gitRepo();
+    git(repo2, 'commit', '-q', '--allow-empty', '-m', 'chore: vide');
+    const head2 = git(repo2, 'rev-parse', 'HEAD');
+    ecritAcceptation(repo2);
+    expect(lockViolations(repo2, DIR, head2).join('\n')).toContain('créé');
+    expect(lockViolations(repo2, DIR, head2, { created: 'allow' })).toEqual([]);
+  });
+});

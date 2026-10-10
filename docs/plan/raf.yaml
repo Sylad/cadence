@@ -1896,7 +1896,7 @@ lots:
     finished: 2026-10-10
   - id: L165
     title: "Mesure de référence des corrections de vague : classer par cause les passes « fixing » des journaux .cadence/runs de tous les projets (spec floue ou critère absent, règle de gestion inventée, dérive d'architecture, données/SQL, bug de code, test manquant, faux constat de revue) à partir des verdicts de revue de chaque lot ; classement par l'IA locale (Ollama, hors quota) avec un échantillon relu à la main ; résultat : tableau par cause et par projet, taux de lots ≥1 et ≥2 corrections (61 % et 28 % sur 227 passages au 10-10), visibles vs non visibles — sert de point de référence au lot suivant"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-10
     started: 2026-10-10
@@ -1904,6 +1904,9 @@ lots:
       - { id: t1, title: "Régénérer docs/mesures/corrections-2026-10-10.md avec la commande de reproduction qu'il donne (l. 5), sur le code final (après e1a94e1) : tableau par cause, passes sans revue, échantillon relu et taux d'accord ; un test ou une vérification qui prouve que la commande redonne les chiffres du document", status: done }
       - { id: t2, title: "corrections --until : ne compter que les étapes terminées avant la date (ended ≤ until), pas toutes les étapes des vagues créées avant (la vague 2026-10-10-2010, créée 18:03Z, tourne encore) ; une vague sans date lisible est écartée sous --until ; retirer du cache versionné les causes modèle des 13 passes sans revue ; régénérer docs/mesures/corrections-2026-10-10.md et corriger le README", status: done }
     review: { date: 2026-10-10, verdict: "compliant: the three minor findings are fixed (README tied to the report by a test, sample fully reviewed with 17/24 and 59/77 recomputed, cache saved every 10 classifications), 1339 tests green, tsc clean, no new defect — orchestré (vague 2026-10-10-2135, 1 passe(s) de correction + passe des mineurs)", commit: bd6fbf76ae427429ace3cf3759f80c6cf1be42eb }
+    notes:
+      - { date: 2026-10-10, text: "Revue finale : un lot dont le cycle revue/fix n'est pas terminé à la date --until compte à 0 correction (cas limite, avatar-pandora L26) — accepté en note ; re-vérifié par le lead : build, typecheck, 1339 tests" }
+    finished: 2026-10-10
   - id: L166
     title: "Conception d'une étape spec avant l'implémentation dans orchestrate (lots visibles au-dessus d'un seuil : nouvelle page, nouveau composant, parcours modifié) : maquette HTML statique à la charte du projet rendue 1440/390 avec états vide/chargement/erreur + fiche d'écran lisible par machine (champs id/libellé/type/source API/obligatoire, règles de gestion numérotées R1… avec message, actions → appel API, chaque règle « sourcée » ou « hypothèse ») ; l'agent UX relit la maquette avant le code (boucle sur la maquette, pas sur le code), aucune validation humaine systématique (question ciblée seulement si le choix est coûteux à défaire), le brief d'implémentation reçoit la fiche, les tests citent les règles, la code review vérifie la couverture de la fiche, la passe UX après code devient une conformité légère, les hypothèses remontent dans l'entrée Nouveautés ; livrable : spec versionnée docs/ + plan de lots, essai prévu sur un écran d'une app loisir, critère de réussite mesuré contre le lot de mesure"
     status: todo
@@ -1915,7 +1918,7 @@ lots:
       - { date: 2026-10-10, text: "Le plan de lots produit par la conception inclut, en dernier, la mise à jour du schéma du workflow lead (docs/lead.md, L167) avec les étapes spec, revue UX de la maquette et tests d'acceptation (demande Sylvain 10-10)" }
   - id: L167
     title: "Doc docs/lead.md : schéma du workflow du skill lead en trois couloirs (humain, session lead, programme orchestrate et agents) en SVG compatible thème clair/sombre de GitHub, version générique (aucun nom de personne, de projet ni de chemin local) — tour, vague et étapes par lot, relais du journal et questions, re-vérification, raf ux/done, livraison et qa-reviewer, seuil de contexte 60 % et enchaînement, clôture ; règles permanentes et codes de sortie ; lien depuis le README"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-10
@@ -1923,6 +1926,7 @@ lots:
       - { date: 2026-10-10, text: Peut sortir avant L166 avec le workflow actuel ; sera refait quand les lots d'implémentation de l'étape spec seront livrés (demande Sylvain 10-10) }
     started: 2026-10-10
     review: { date: 2026-10-10, verdict: "compliant (2 minor notes: threshold box not linked in the diagram, journal arrow starts from the UX review box) — orchestré (vague 2026-10-10-2035, 0 passe(s) de correction)", commit: 2dbfcbf2dd6149a4e131e6778577eb374a9fb6aa }
+    finished: 2026-10-10
   - id: L168
     title: "orchestrate : les sessions de vague n'ont aucun accès au cluster de production — mesurer d'abord ce qu'une session hérite (env : KUBECONFIG, ~/.kube/config, jetons gh/cloud ; kubectl du PATH = symlink k3s) ; puis lancer chaque session (implement, fix, precheck, review, ux) sans kubeconfig (KUBECONFIG=/dev/null ou dossier HOME/.kube masqué) et sans variables de prod, clé cadence.yaml pour lever la restriction par projet si un lot en a vraiment besoin (défaut : coupé) ; deliver et verify restent au lead et gardent l'accès ; test qui prouve qu'une session de vague voit « kubectl get pods » échouer ; README + CHANGELOG ; idée reprise du sandbox de docker/docker-agent (réseau fermé par défaut), 10-10"
     status: todo

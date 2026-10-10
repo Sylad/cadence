@@ -301,7 +301,8 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     if (!isObject(o.spec)) throw bad('spec doit être un objet { dir, render }');
     for (const k of Object.keys(o.spec)) if (k !== 'dir' && k !== 'render') throw bad(`spec.${k} inconnu (attendu : dir, render)`);
     if (o.spec.dir != null) {
-      const d = typeof o.spec.dir === 'string' ? o.spec.dir.trim().replace(/\/+$/, '') : '';
+      const raw = typeof o.spec.dir === 'string' ? o.spec.dir.trim().replace(/\/+$/, '') : '';
+      const d = raw === '' ? '' : posix.normalize(raw).replace(/\/+$/, '');
       if (d === '' || isAbsolute(d) || d.split(/[\\/]/).includes('..')) throw bad('spec.dir : chemin relatif non vide au dépôt attendu, sans « .. »');
       config.spec.dir = d;
     }

@@ -113,6 +113,7 @@ describe('orchestrate.spec (L169, spec etape-spec S1)', () => {
     expect(read('orchestrate:\n  spec: { dir: docs/ecrans/, render: npx playwright test }\n').spec).toEqual({ dir: 'docs/ecrans', render: 'npx playwright test' });
   });
   it('refuse une clé inconnue, un dir absolu ou sortant, un render vide', () => {
+    expect(read('orchestrate:\n  spec: { dir: ./docs/./specs/ }\n').spec.dir).toBe('docs/specs');
     expect(() => read('orchestrate:\n  spec: { dossier: x }\n')).toThrow(/spec\.dossier inconnu \(attendu : dir, render\)/);
     expect(() => read('orchestrate:\n  spec: { dir: /tmp/x }\n')).toThrow(/spec\.dir : chemin relatif/);
     expect(() => read('orchestrate:\n  spec: { dir: ../x }\n')).toThrow(/spec\.dir : chemin relatif/);

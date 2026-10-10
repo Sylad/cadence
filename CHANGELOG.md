@@ -40,6 +40,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence orchestrate`: the sub-tasks a commit covers (L82) are read with the same left guard as the plan's references, so `fix(E-A2/t3,t4, A2/t1)` no longer proposes `A2/t3` and `A2/t4` (lot `A2` read inside `E-A2`), and a list that repeats the lot id, `fix(L1/t1, L1/t2,t3)`, is read to its end, `t3` included (L155).
+
 ### Changed
 
 - **qa-reviewer** walks only what a lot touched: given a lot id, the pages that call the changed endpoints, those of the screens it changed, and the home page — a backend-only lot that can empty a page stays in scope. Pages left out are named « Not walked », and the report opens with a **Scope** line (pages walked of pages in the expectations, captures taken) so a pass can be compared with the next. The page is read as text first; a capture is taken only for a gap (L123).

@@ -1182,6 +1182,33 @@ describe('sous-tâches couvertes (L82)', () => {
       const { dir, plan } = foreignPlan(['feat(B53/t4-ux1,t5): c']);
       expect(coveredTasks(plan, dir, 'B53').map((c) => c.task).sort()).toEqual(['t4-ux1', 't5']);
     });
+
+    /** Plans E-A2 et A2 (ids maritime) : A2 est un suffixe de E-A2. */
+    function suffixPlan(subjects: string[]) {
+      const dir = gitRepo();
+      const file = join(dir, 'taches.yaml');
+      writeFileSync(
+        file,
+        'taches:\n- { id: E-A2, titre: Epopee, etat: en_cours }\n- { id: A2, titre: Lot, etat: en_cours }\n' +
+          ['E-A2', 'A2'].flatMap((l) => ['t1', 't3', 't4'].map((t) => `- { id: ${l}/${t}, titre: ${t}, etat: en_cours, parent: ${l} }\n`)).join(''),
+      );
+      git(dir, 'add', 'taches.yaml');
+      commit(dir, 'plan: adoption');
+      for (const s of subjects) commit(dir, s);
+      const format = { lots: 'taches', fields: { title: ['titre'], status: ['etat'], parent: ['parent'] }, statuses: { prevu: 'todo' as const, en_cours: 'doing' as const, livre: 'done' as const }, estimates: {} };
+      return { dir, plan: Plan.load(file, { format }) };
+    }
+
+    it('fix(E-A2/t3,t4, A2/t1) ne propose pas A2/t3 ni A2/t4 (A2 lu à l\'intérieur de E-A2)', () => {
+      const { dir, plan } = suffixPlan(['fix(E-A2/t3,t4, A2/t1): c']);
+      expect(coveredTasks(plan, dir, 'A2').map((c) => c.task)).toEqual(['t1']);
+      expect(coveredTasks(plan, dir, 'E-A2').map((c) => c.task).sort()).toEqual(['t3', 't4']);
+    });
+
+    it('une liste qui répète l\'id du lot (fix(A2/t1, A2/t3,t4)) lit aussi les éléments qui suivent', () => {
+      const { dir, plan } = suffixPlan(['fix(A2/t1, A2/t3,t4): c']);
+      expect(coveredTasks(plan, dir, 'A2').map((c) => c.task).sort()).toEqual(['t1', 't3', 't4']);
+    });
   });
 });
 

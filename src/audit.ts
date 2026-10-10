@@ -222,7 +222,7 @@ export function coveredTasks(plan: Plan, root: string, lotId: string): { task: s
     const scope = scopeOf(c.subject);
     const text = scope !== null && plan.refs(scope).length > 0 ? scope : `${c.subject}\n${c.body}`;
     const element = '[\\w-]+(?:\\.[\\w-]+)*';
-    const listed = cited.length > 0 ? [...text.matchAll(new RegExp(`(?<![\\w/])${escapeRe(lotId)}/(${element}(?:\\s*,\\s*${element})*)`, 'g'))].flatMap((m) => m[1].split(/\s*,\s*/)).flatMap((e) => plan.refs(`${lotId}/${e}`).filter((r) => r.lot === lotId && r.task).map((r) => r.task!)) : [];
+    const listed = cited.length > 0 ? [...text.matchAll(new RegExp(`(?<![\\w/.-])${escapeRe(lotId)}/(${element}(?:\\s*,\\s*(?:${escapeRe(lotId)}/)?${element})*)`, 'g'))].flatMap((m) => m[1].split(/\s*,\s*/)).map((e) => (e.startsWith(`${lotId}/`) ? e.slice(lotId.length + 1) : e)).flatMap((e) => plan.refs(`${lotId}/${e}`).filter((r) => r.lot === lotId && r.task).map((r) => r.task!)) : [];
     for (const task of [...cited.map((r) => r.task!), ...listed]) if (open.has(task) && !found.has(task)) found.set(task, c.sha);
   }
   return lot.tasks.filter((t) => found.has(t.id)).map((t) => ({ task: t.id, sha: found.get(t.id)! }));

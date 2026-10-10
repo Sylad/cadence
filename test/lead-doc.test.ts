@@ -1,0 +1,66 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+// L167 : docs/lead.md — le schéma du workflow du skill lead, générique, clair/sombre.
+const root = join(import.meta.dirname, '..')
+const read = (file: string) => readFileSync(join(root, file), 'utf8')
+const svgs = { light: 'docs/lead-workflow-light.svg', dark: 'docs/lead-workflow-dark.svg' }
+
+describe('docs/lead.md', () => {
+  it('existe et affiche le schéma en deux variantes selon le thème GitHub', () => {
+    const md = read('docs/lead.md')
+    expect(md).toMatch(/<picture>/)
+    expect(md).toContain('prefers-color-scheme: dark')
+    for (const f of Object.values(svgs)) {
+      expect(md).toContain(f.replace('docs/', ''))
+      expect(existsSync(join(root, f)), f).toBe(true)
+    }
+  })
+
+  it('décrit les règles permanentes et les codes de sortie', () => {
+    const md = read('docs/lead.md')
+    expect(md).toMatch(/^## .*[Rr]ules/m)
+    expect(md).toMatch(/^## .*[Ee]xit codes/m)
+    expect(md).toContain('60 %')
+    expect(md).toContain('two subagents')
+    for (const code of ['0', '1', '2', '3']) expect(md).toMatch(new RegExp(`\\| \`${code}\` \\|`))
+  })
+
+  it('reste générique : aucun nom de personne, de projet ni de chemin local', () => {
+    const all = [read('docs/lead.md'), ...Object.values(svgs).map(read)].join('\n')
+    expect(all).not.toMatch(/\/home\/|\/mnt\/|~\/|[A-Z]:\\|sylvain|ladoire|developpeur|aetherwx|maritime|dark-blue|big-blue/i)
+  })
+
+  it('est liée depuis le README', () => {
+    expect(read('README.md')).toContain('docs/lead.md')
+  })
+})
+
+describe.each(Object.entries(svgs))('schéma %s', (variant, file) => {
+  const svg = read(file)
+
+  it('est un SVG autonome et équilibré', () => {
+    expect(svg.startsWith('<svg')).toBe(true)
+    expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
+    expect(svg).toMatch(/viewBox="0 0 \d+ \d+"/)
+    expect(svg).toMatch(/<title[^>]*>.+<\/title>/)
+    expect(svg).not.toMatch(/<script|href="http|<image/)
+    const open = (svg.match(/<(g|text|marker|defs|style)[\s>]/g) ?? []).length
+    const close = (svg.match(/<\/(g|text|marker|defs|style)>/g) ?? []).length
+    expect(open).toBe(close)
+  })
+
+  it('a trois couloirs et les étapes du workflow', () => {
+    for (const s of ['Human', 'Lead session', 'orchestrate', 'cadence lead tour', '--wave', 'journal.log',
+      '--resume --answer', 'raf ux', 'raf done', 'qa-reviewer', '60 %', 'session-close', 'session next', 'cadence deliver']) {
+      expect(svg, `${variant}: ${s}`).toContain(s)
+    }
+  })
+})
+
+it('les variantes clair et sombre diffèrent par les couleurs seulement', () => {
+  const strip = (s: string) => s.replace(/#[0-9a-fA-F]{6}/g, '#')
+  expect(strip(read(svgs.light))).toBe(strip(read(svgs.dark)))
+  expect(read(svgs.light)).not.toBe(read(svgs.dark))
+})

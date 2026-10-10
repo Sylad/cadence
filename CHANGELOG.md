@@ -40,6 +40,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `orchestrate.precheck: local`: the « deliverable already present? » pre-check runs on the local model (`claude-local`, Ollama), off the Anthropic quota | [0.28.0](#0280---2026-10-10) |
 | Stable contract under semantic versioning, README *Stability* section | [1.0.0](#100---2026-10-10) |
 
+## [Unreleased]
+
+### Added
+
+- `docs/lead.md`: the workflow of the `lead` skill drawn in three lanes (human, lead session, `orchestrate` program and agents) as an SVG that follows GitHub's light and dark themes, with the permanent rules and the exit codes; linked from the README (L167).
+
 ## [1.0.0] - 2026-10-10
 
 First major release: from now on cadence follows [semantic versioning](https://semver.org) for the surface the README's *Stability* section lists (L164).

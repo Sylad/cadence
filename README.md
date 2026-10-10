@@ -1277,7 +1277,8 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   one project at a time; a delivery that changes what a page shows or what it is
   served is then checked in the running app by the `qa-reviewer` agent, whose
   blocking findings come back to you. Two
-  subagents at most, never two in the same repository.
+  subagents at most, never two in the same repository. The whole flow is drawn in
+  [docs/lead.md](docs/lead.md).
 - **ux-reviewer** (agent): captures at 1440 and 390 px, findings grounded in a
   named rule (Nielsen, WCAG 2.2 AA) or a measurement, ranked, turned into
   `raf add --parent` sub-tasks, and a one-line verdict for `raf ux`. It never

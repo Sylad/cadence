@@ -1106,14 +1106,16 @@ lots:
     finished: 2026-10-07
   - id: L90
     title: "Test instable non identifié : 1 échec sur 7 passages de la suite complète le 07-10 (sous charge, une revue lançait la suite en parallèle), 6 passages suivants verts dont 3 en JSON — relancer sous charge (2 suites en parallèle) avec --reporter=json pour le nommer, puis le traiter comme L81/L85"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-07
     notes:
       - { date: 2026-10-07, text: "07-10 (L61/t1) : un test de deliver.test.ts a échoué 1 fois sur 2 sous charge — piste pour nommer le test instable" }
       - { date: 2026-10-07, text: "07-10 : instable nommé — test/verify.test.ts « pour de vrai : trois sleep 2 en session start prennent ~2 s, pas 6 » rouge 1 fois sur 3 passages de la suite (vague L97 venant de finir), vert seul et en suite complète ensuite ; seuil de durée sensible à la charge" }
+      - { date: 2026-10-10, text: "mineur revue 10-10 : test/verify.test.ts:187, le commentaire « 12 s laisse 7 s de marge » ignore que effectLines borne chaque vérification à attemptMs = MORNING_BUDGET_MS (10 s) ; commentaire à corriger à la prochaine retouche" }
     started: 2026-10-10
     review: { date: 2026-10-10, verdict: "compliant — orchestré (vague 2026-10-10-1150, 1 passe(s) de correction + passe des mineurs)", commit: cbec355bbe1a153f3deb66606d1bad72aa175a03 }
+    finished: 2026-10-10
   - id: L91
     title: "Doc des briefs Nouveautés hors vague : README l.743 (dry-run sans dossier de vague ; fix/fix-minors d'un lot visible ont le dossier Playwright et --add-dir) et paragraphe Browser d'implement.md qui promet un serveur lancé par l'orchestrateur même en délégation à la main (contredit « capture sous le dossier temporaire ») — mineurs de la 3e revue L48"
     status: done

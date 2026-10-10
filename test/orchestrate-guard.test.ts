@@ -107,7 +107,7 @@ describe('cadence.yaml : orchestrate', () => {
     return () => readOrchestrateConfig(f);
   };
   it('défauts', () => {
-    expect(readOrchestrateConfig('/nope')).toEqual({ precheck: true, precheckLocal: false, permissionMode: 'auto', addDirs: [], timeouts: { work: 2_700_000, review: 1_500_000 }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' } });
+    expect(readOrchestrateConfig('/nope')).toEqual({ precheck: true, precheckLocal: false, prodAccess: false, permissionMode: 'auto', addDirs: [], timeouts: { work: 2_700_000, review: 1_500_000 }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' } });
   });
   it('effort : un niveau par passe, défauts bas / moyen / haut, \'default\' = pas de --effort, valeurs invalides refusées (L137)', () => {
     expect(read('orchestrate:\n  effort: { review: xhigh, implement: default }\n')().effort).toEqual({ precheck: 'low', implement: 'default', fix: 'medium', review: 'xhigh', ux: 'high' });

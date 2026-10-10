@@ -1796,9 +1796,10 @@ lots:
     finished: 2026-10-10
   - id: L156
     title: "coveredTasks (L82) : lire aussi les commits du lot dans ses dépôts voisins (L62, repoWork les fournit déjà) — feat(L3/t2) commité dans le voisin laisse t2 ouverte et raf done refuse (revue 09-10)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-09
+    started: 2026-10-10
   - id: L157
     title: "CHANGELOG [Unreleased] : la ligne L83 sur les démons partagés dit l'inverse du défaut (« spared the lead's tmux panes » → tuer par la marque les TUAIT ; l'exclusion les épargne), aligner sur README:1125"
     estimate: 0.1

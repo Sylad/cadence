@@ -925,7 +925,8 @@ older `claude` is refused at launch unless every pass is `default`). Defaults: `
 `implement` and `fix` medium, `review` high (`review-small` follows `review`), `ux` high. A project overrides any of them
 in `cadence.yaml`; the levels are `low`, `medium`, `high`, `xhigh`, `max`, and `default` sends no `--effort` (the
 level of the session, as before this key). The format-retry session (`--resume`) keeps the level of its pass, and
-`--dry-run` shows the flag in each command line.
+`--dry-run` shows the flag in each command line, except for a `precheck: local` session: `claude-local` is launched
+without `--effort` (see below), so `effort.precheck` has no effect on it and the `precheck (local)` line does not show it.
 
 ```yaml
 orchestrate:
@@ -952,7 +953,8 @@ down, timeout, no structured report) or an unreadable report is replayed on Sonn
 only answer that hands the lot back without an implementation — is confirmed by Sonnet before it counts. A local `partiel`
 or `non` is taken as is. The default stays `true` (Sonnet): switch to `local` only after comparing verdicts and durations
 against Sonnet on a few lots, and go back to `true` the first time the local model gets a `partiel` wrong. `--dry-run`
-prints the step as `precheck (local)` with its `claude-local` arguments.
+prints the step as `precheck (local)` with its `claude-local` arguments. Those arguments carry neither `--model` nor `--effort` nor `--agents`: `effort.precheck` applies only to the Sonnet
+session (the fallback, or the confirmation of a local `oui`).
 
 The `precheck-reader` agent does not set `omitClaudeMd` (Claude Code 2.1.271), on purpose: measured on a project with a
 297-line `CLAUDE.md` (haiku, `--agents` + `--agent`, same prompt, with and without the flag), the session context is

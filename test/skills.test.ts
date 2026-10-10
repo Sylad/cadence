@@ -347,7 +347,7 @@ describe('skills install', () => {
     expect(scope).toContain('grep for their callers');
     // Le repli « diff non rattachable » est une phrase autonome, pas un renvoi à la phrase précédente.
     expect(scope).not.toContain('The same holds');
-    expect(scope.replace(/\s+/g, ' ')).toContain('If you cannot link the diff to any page (a shared helper, a utility), the fallback is mandatory too: walk every page and say so');
+    expect(scope).toContain('If you cannot link the diff to any page, or a backend part of it in a lot that also changes screens (a shared helper, a utility, a data source), the fallback is mandatory too: walk every page and say so');
     // Les pages hors périmètre sont nommées, jamais comptées comme vérifiées.
     expect(scope).toContain('named under « Not walked », never counted as checked');
     // Sans lot : tout est parcouru.

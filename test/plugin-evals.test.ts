@@ -94,6 +94,28 @@ describe('cohérence des graders (L139)', () => {
     expect(re.test('cadence orchestrate maritime-atlas:accueil-4-ux12@haiku')).toBe(false);
   });
 
+  it('le grader regex de livrer-sh-sans-bloc accepte le chemin du script entre guillemets', () => {
+    const g = grader('livrer-sh-sans-bloc', 'bloc-script.md');
+    const re = new RegExp(String(g.fm.pattern), String(g.fm.flags ?? ''));
+    expect(re.test('deliver:\n  script: ./livrer.sh $CADENCE_SHORT')).toBe(true);
+    expect(re.test('deliver:\n  script: "./livrer.sh $CADENCE_SHORT"')).toBe(true);
+    expect(re.test("deliver:\n  script: './livrer.sh'")).toBe(true);
+    expect(re.test('deliver:\n  script: ./autre.sh')).toBe(false);
+  });
+
+  it('les critères ne citent pas d\'option camelCase que ni un skill ni un agent ne porte', () => {
+    const porte = ['skills', 'agents']
+      .flatMap((d) => readdirSync(join(root, d), { recursive: true, withFileTypes: true }).filter((e) => e.isFile()).map((e) => readFileSync(join(e.parentPath, e.name), 'utf8')))
+      .join('\n');
+    for (const name of cases) {
+      for (const f of readdirSync(join(evalsDir, name, 'graders'))) {
+        for (const tok of grader(name, f).body.match(/\b[a-z]+[A-Z]\w*\b/g) ?? []) {
+          expect(porte, `${name}/${f} : « ${tok} » absent des skills et agents`).toContain(tok);
+        }
+      }
+    }
+  });
+
   it('les critères ne réclament que des faits portés par les skills (lecture seule, sans Bash)', () => {
     const all = cases
       .flatMap((name) => readdirSync(join(evalsDir, name, 'graders')).map((f) => grader(name, f).body + readFileSync(join(evalsDir, name, 'prompt.md'), 'utf8')));

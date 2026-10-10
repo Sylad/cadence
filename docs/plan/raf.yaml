@@ -1784,9 +1784,10 @@ lots:
     finished: 2026-10-09
   - id: L155
     title: "coveredTasks (L82) : même garde de gauche que plan.refs au format étranger — fix(E-A2/t3,t4, A2/t1) propose A2/t3 et A2/t4 (ids maritime E-A2/A2) ; et une liste qui répète l'id du lot, fix(L1/t1, L1/t2,t3), ne lit pas t3 → raf done refuse (revue 09-10)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-09
+    started: 2026-10-10
   - id: L156
     title: "coveredTasks (L82) : lire aussi les commits du lot dans ses dépôts voisins (L62, repoWork les fournit déjà) — feat(L3/t2) commité dans le voisin laisse t2 ouverte et raf done refuse (revue 09-10)"
     status: todo

@@ -293,7 +293,33 @@ export interface FindMarkedIo {
 }
 
 /**
- * Arguments de `ps` qui listent pid et commande suivie de l'ENVIRONNEMENT, sans limite de largeur, selon la plateforme.
+ * Démons partagés : lancés à la demande par la première session qui en a besoin, ils portent sa marque et la passent à
+ * tout client ou panneau venu d'ailleurs (serveur tmux, screen, gpg-agent, dirmngr). Ils servent d'autres que la session :
+ * tuer le serveur tmux d'une session tue les panneaux que le lead ouvre ensuite. Épargnés, avec tout ce qui en descend.
+ * Hors liste, faute de pouvoir les distinguer d'un client ordinaire par leur nom : le maître ssh (ControlPersist), le
+ * démon Gradle (java), pm2 (node) — ils restent tués s'ils portent la marque.
+ */
+const SHARED_DAEMONS = new Set(['tmux', 'screen', 'gpg-agent', 'dirmngr']);
+
+/** Nom d'un processus (comm ou premier mot de sa commande) : `tmux: server` → `tmux`, `/usr/bin/screen` → `screen`. */
+function isSharedDaemon(name: string): boolean {
+  const base = name.trim().split(/\s/)[0]!.replace(/:$/, '');
+  return SHARED_DAEMONS.has((base.split('/').pop() ?? '').toLowerCase());
+}
+
+/** Vrai si `pid` ou l'un de ses ancêtres est un démon partagé (`info` : nom et parent d'un pid, null s'il est illisible). */
+function underSharedDaemon(pid: number, info: (pid: number) => { name: string; ppid: number } | null): boolean {
+  for (let cur = pid, depth = 0; cur > 1 && depth < 64; depth++) {
+    const i = info(cur);
+    if (!i) return false;
+    if (isSharedDaemon(i.name)) return true;
+    cur = i.ppid;
+  }
+  return false;
+}
+
+/**
+ * Arguments de `ps` qui listent pid, ppid et commande suivie de l'ENVIRONNEMENT, sans limite de largeur, selon la plateforme.
  * macOS (ps BSD), page de manuel officielle : « -E  Display the environment as well.  This does not reflect changes
  * in the environment after process launch. » — alors que « -e  Display information about other users' processes,
  * including those without controlling terminals. Identical to -A. » : sur macOS, `-e` n'affiche PAS l'environnement.
@@ -301,10 +327,24 @@ export interface FindMarkedIo {
  * tiret, `-e` y signifie « tous les processus »).
  */
 export function psEnvArgs(platform: NodeJS.Platform = process.platform): string[] {
-  return [platform === 'darwin' ? '-axEww' : 'axeww', '-o', 'pid=,command='];
+  return [platform === 'darwin' ? '-axEww' : 'axeww', '-o', 'pid=,ppid=,command='];
 }
 
-/** Pids des processus (hors cadence) dont l'environnement porte `<SESSION_MARK_VAR>=<mark>` : /proc, sinon `ps` (`-E` sur macOS, `e` sur Linux). */
+/** Nom (comm) et parent d'un processus lus dans `<procRoot>/<pid>/stat` ; null s'il est sorti ou illisible. */
+function procInfo(procRoot: string, pid: number): { name: string; ppid: number } | null {
+  try {
+    const stat = readFileSync(`${procRoot}/${pid}/stat`, 'utf8');
+    const close = stat.lastIndexOf(')');
+    return { name: stat.slice(stat.indexOf('(') + 1, close), ppid: Number(stat.slice(close + 2).split(' ')[1]) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pids des processus (hors cadence) dont l'environnement porte `<SESSION_MARK_VAR>=<mark>` : /proc, sinon `ps` (`-E` sur
+ * macOS, `e` sur Linux). Les démons partagés (SHARED_DAEMONS) et leurs descendants n'en font pas partie.
+ */
 export function findMarked(mark: string, io: FindMarkedIo = {}): number[] {
   const { procRoot = '/proc', run = execFileSync, platform = process.platform } = io;
   const entry = `${SESSION_MARK_VAR}=${mark}`;
@@ -325,17 +365,21 @@ export function findMarked(mark: string, io: FindMarkedIo = {}): number[] {
         // sorti, zombie ou illisible (autre utilisateur)
       }
     }
-    return found;
+    return found.filter((pid) => !underSharedDaemon(pid, (p) => procInfo(procRoot, p)));
   }
   try {
     const out = run('ps', psEnvArgs(platform), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
+    const table = new Map<number, { name: string; ppid: number }>();
+    const marked: number[] = [];
     for (const line of out.split('\n')) {
-      const m = /^\s*(\d+)\s(.*)$/.exec(line);
+      const m = /^\s*(\d+)\s+(\d+)\s(.*)$/.exec(line);
       if (!m) continue;
       const pid = Number(m[1]);
+      table.set(pid, { name: m[3]!, ppid: Number(m[2]) });
       // la marque est un mot entier : `s1` ne reconnaît pas `s10` (comme la comparaison exacte des entrées de /proc)
-      if (pid !== process.pid && ` ${m[2]} `.includes(` ${entry} `)) found.push(pid);
+      if (pid !== process.pid && ` ${m[3]} `.includes(` ${entry} `)) marked.push(pid);
     }
+    found.push(...marked.filter((pid) => !underSharedDaemon(pid, (p) => table.get(p) ?? null)));
   } catch {
     // ps absent : rien à tuer de plus
   }

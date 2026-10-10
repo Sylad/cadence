@@ -1117,6 +1117,17 @@ every session carries a `CADENCE_SESSION=<id>` mark in its environment that all 
 re-parented to init (`nohup srv &` or `setsid srv &` from a shell that exits at once): at the end — as soon as the session's root process exits, not when its output closes, so a descendant holding stdout open cannot turn a session that exited with code 0 into a "time limit" failure — every process
 bearing the mark is killed (read from `/proc/<pid>/environ`, or, where there is no `/proc`, from `ps -axEww` on macOS — `-E` is the BSD option that prints the environment, `-e` only means "all processes" there — and `ps axeww` with procps on Linux).
 
+Limits of the mark, stated rather than hidden: it is read from the process environment, so a descendant that
+dropped it (`env -i`, `env -u CADENCE_SESSION`) is only reached by the tree tracking, and only if it was seen under
+the session between two samples (every 200 ms); a process whose environment is unreadable (another user) is never
+found; a process started through a daemon that already ran before the session (`docker compose up -d` talks to the
+Docker daemon, which owns the containers) is out of reach. **Shared daemons are spared**: a tmux server, `screen`,
+`gpg-agent` or `dirmngr` started on demand by a session carries its mark and would pass it to clients and panes opened
+later from elsewhere, so killing by mark would kill the lead's own tmux panes; those daemons, and everything that
+descends from them, are left alone (a dev server started inside a tmux pane therefore survives its session). Not in
+that list, because their name does not tell them from an ordinary client: the ssh master (`ControlPersist`), the
+Gradle daemon (java) and pm2 (node) — they are killed if they carry the mark.
+
 Briefs are the templates of `templates/orchestrate/` (`implement.md` is the `lead` skill's standard
 brief; `--dry-run` writes the rendered ones). The `implement` brief of a `visible` lot also carries the
 News instruction (`cadence news new <lot>`, factual user-side text, a screenshot in `docs/nouveautes/captures/` or

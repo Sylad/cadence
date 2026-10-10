@@ -1,4 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { findMarked, MAX_SNAPSHOT_AGE_MS, psEnvArgs, readPsProcs, SESSION_MARK_VAR, TreeTracker } from '../src/proc.js';
 
@@ -274,17 +277,51 @@ describe('findMarked — repli sans /proc (macOS)', () => {
   it('trouve le processus marqué dans la sortie de ps, ignore celui qui ne l\'est pas ni la marque d\'une autre session', () => {
     const { run, calls } = fakePs(
       [
-        '  101 node server.js PATH=/usr/bin CADENCE_SESSION=s1 HOME=/Users/x',
-        '  102 node other.js PATH=/usr/bin HOME=/Users/x',
-        '  103 sleep 9 CADENCE_SESSION=s10 HOME=/Users/x',
-        '  104 sh CADENCE_SESSION=s1',
-        '  105 grep XCADENCE_SESSION=s1',
-        `  ${process.pid} node cadence CADENCE_SESSION=s1`,
+        '  101 1 node server.js PATH=/usr/bin CADENCE_SESSION=s1 HOME=/Users/x',
+        '  102 1 node other.js PATH=/usr/bin HOME=/Users/x',
+        '  103 1 sleep 9 CADENCE_SESSION=s10 HOME=/Users/x',
+        '  104 1 sh CADENCE_SESSION=s1',
+        '  105 1 grep XCADENCE_SESSION=s1',
+        `  ${process.pid} 1 node cadence CADENCE_SESSION=s1`,
         '',
       ].join('\n'),
     );
     expect(findMarked('s1', { procRoot: NO_PROC, run, platform: 'darwin' })).toEqual([101, 104]);
-    expect(calls).toEqual([['ps', ['-axEww', '-o', 'pid=,command=']]]);
+    expect(calls).toEqual([['ps', ['-axEww', '-o', 'pid=,ppid=,command=']]]);
+  });
+
+  it("(L83/t1) un démon partagé (tmux, screen, gpg-agent) et ce qui descend de lui ne sont pas tués, même marqués ; un autre processus marqué l'est", () => {
+    const { run } = fakePs(
+      [
+        '  201 1 tmux: server CADENCE_SESSION=s1',
+        '  202 201 -bash CADENCE_SESSION=s1',
+        '  203 202 vim CADENCE_SESSION=s1',
+        '  204 1 /usr/bin/screen -dmS x CADENCE_SESSION=s1',
+        '  205 1 gpg-agent --daemon CADENCE_SESSION=s1',
+        '  206 1 node dev-server.js CADENCE_SESSION=s1',
+        '  207 206 sh -c tmuxinator CADENCE_SESSION=s1',
+        '',
+      ].join('\n'),
+    );
+    expect(findMarked('s1', { procRoot: NO_PROC, run, platform: 'linux' })).toEqual([206, 207]);
+  });
+
+  it("(L83/t1) avec /proc : un serveur tmux démarré par la session et son panneau sont épargnés, le serveur de dev voisin est trouvé", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cadence-shared-'));
+    const mark = `test-${process.pid}-${Date.now()}`;
+    const env = { ...process.env, [SESSION_MARK_VAR]: mark };
+    // un exécutable nommé « tmux » (comm = nom du fichier exécuté) dont l'enfant hérite de la marque
+    symlinkSync('/bin/sh', join(dir, 'tmux'));
+    const server = spawn(join(dir, 'tmux'), ['-c', 'sleep 30 & wait'], { env, stdio: 'ignore', detached: true });
+    const dev = spawn('sleep', ['30'], { env, stdio: 'ignore' });
+    try {
+      await new Promise((r) => setTimeout(r, 300));
+      expect(findMarked(mark)).toEqual([dev.pid]);
+    } finally {
+      process.kill(-server.pid!, 'SIGKILL'); // son groupe : le shell et son enfant sleep
+      dev.kill('SIGKILL');
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('ps absent ou en échec : rien à tuer, pas d\'exception', () => {
@@ -295,8 +332,8 @@ describe('findMarked — repli sans /proc (macOS)', () => {
   });
 
   it('l\'option de ps qui affiche l\'environnement dépend de la plateforme : -E sur macOS (BSD), e sur Linux (procps)', () => {
-    expect(psEnvArgs('darwin')).toEqual(['-axEww', '-o', 'pid=,command=']);
-    expect(psEnvArgs('linux')).toEqual(['axeww', '-o', 'pid=,command=']);
+    expect(psEnvArgs('darwin')).toEqual(['-axEww', '-o', 'pid=,ppid=,command=']);
+    expect(psEnvArgs('linux')).toEqual(['axeww', '-o', 'pid=,ppid=,command=']);
   });
 
   it('le vrai ps de cet hôte voit l\'environnement d\'un processus marqué, et pas celui d\'une autre session', async () => {

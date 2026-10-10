@@ -758,6 +758,7 @@ async function specStep(c: LotCtx): Promise<void> {
   for (const q of rep.questions) if (q.trim() && isNonQuestion(q)) l.warnings.push(`question ignorée (non-question) : « ${q.trim()} »`);
   if (questions.length) {
     l.questions = questions;
+    l.specAsked = undefined; // la prochaine réponse porte sur la question de la session, pas sur d'anciennes hypothèses coûteuses
     l.next = 'spec';
     transition(c, 'question', questions[0]);
     return;
@@ -794,6 +795,7 @@ async function specStep(c: LotCtx): Promise<void> {
     save(c);
     return;
   }
+  l.specProblems = undefined; // les contrôles passent : les écarts de la passe précédente sont corrigés
   const doc = parse(readFileSync(join(l.repo, fiche), 'utf8')) as { regles?: { statut?: unknown }[] };
   // Un choix coûteux à défaire n'est pas une hypothèse : la question remonte au lead, la session reprend avec sa réponse.
   const costly = costlyHypotheses(doc);

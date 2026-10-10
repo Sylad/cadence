@@ -309,6 +309,38 @@ describe('étape spec : question ciblée', () => {
     expect(kinds(h)).toEqual(['spec', 'spec', 'implement', 'review']);
   });
 
+  it('une question de la session après une hypothèse coûteuse tranchée : sa réponse n’est pas présentée comme celle des hypothèses', async () => {
+    const m = spec({ fiche: (d) => { d.regles[2].si_faux = 'Si faux, une migration du stockage des rappels serait à écrire.'; } });
+    const demande: Handler = () => claudeOut(specReport({ questions: ['Quelle route pour cet écran ?'] }));
+    const h = harness({ lots, script: { spec: [m, demande, spec()], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    c.lot.questions = [];
+    c.lot.pendingAnswer = 'confirmé, garder R3';
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    c.lot.questions = [];
+    c.lot.pendingAnswer = '/matchs';
+    await runLot(c);
+    expect(h.calls[2].brief).toContain('/matchs');
+    expect(h.calls[2].brief).not.toContain('The program asked the lead');
+    expect(kinds(h)).toEqual(['spec', 'spec', 'spec', 'implement', 'review']);
+  });
+
+  it('les écarts corrigés à la passe 2 ne sont pas redits quand la reprise suit une hypothèse coûteuse', async () => {
+    const m = spec({ sansCapture: ['maquette-vide-1440.png'] });
+    const cout = spec({ fiche: (d) => { d.regles[2].si_faux = 'Si faux, une migration du stockage des rappels serait à écrire.'; } });
+    const h = harness({ lots, script: { spec: [m, cout, spec()], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    c.lot.questions = [];
+    c.lot.pendingAnswer = 'confirmé, garder R3';
+    await runLot(c);
+    expect(h.calls[2].brief).not.toContain('fix exactly these points');
+  });
+
   it('une question du rapport arrête le lot en question, l’étape suivante reste spec', async () => {
     const h = harness({ lots, script: { spec: [() => claudeOut(specReport({ questions: ['Faut-il garder l’URL /match déjà publiée ?'] }))] } });
     const c = h.lot('L1', screen);

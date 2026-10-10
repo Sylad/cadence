@@ -1848,12 +1848,13 @@ lots:
     created: 2026-10-10
   - id: L161
     title: "Release 0.28.0 : L90 (test instable), L123 (qa-reviewer à périmètre réduit), L146 (precheck local), L155, L156 — recette : npm version + plugin.json + marketplace.json (hud inchangé depuis 0.27.1, ne pas le bumper), CHANGELOG [Unreleased] → [0.28.0] - 2026-10-10 + ligne Available since pour precheck local, README What's new préfixé 0.28.0, build + vitest verts, commit « release(L161): 0.28.0 — … », tag v0.28.0 à pousser par le lead"
-    status: doing
+    status: done
     estimate: 0.25
     after: [ L146 ]
     created: 2026-10-10
     started: 2026-10-10
     review: { date: 2026-10-10, verdict: "compliant — orchestré (vague 2026-10-10-1500, 0 passe(s) de correction)", commit: null }
+    finished: 2026-10-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -200,4 +200,32 @@ describe('citations en scalaire (revue L170)', () => {
     g.regles[0].champs = 'fantome';
     expect(checkFiche(g).join('\n')).toMatch(/R1 : champs doit être une liste/);
   });
+
+  it('signale chaque entrée de liste qui n\'est pas du bon type au lieu de la filtrer', () => {
+    for (const [liste, entree, attendu] of [
+      ['champs', null, /champ n° 1 : objet attendu/],
+      ['champs', 'seul', /champ n° 1 : objet attendu/],
+      ['regles', null, /règle n° 1 : objet attendu/],
+      ['regles', 'R1', /règle n° 1 : objet attendu/],
+      ['actions', null, /action n° 4 : objet attendu/],
+      ['actions', 'A4', /action n° 4 : objet attendu/],
+      ['etats', { vide: 1 }, /état n° 5 : texte attendu/],
+    ] as const) {
+      const f = fiche();
+      if (liste === 'champs' || liste === 'regles') f[liste][0] = entree;
+      else f[liste].push(entree);
+      expect(checkFiche(f).join('\n'), `${liste} ${String(entree)}`).toMatch(attendu);
+    }
+  });
+
+  it('spec check sort en code 1 et spec qa ne plante pas sur une action vide', () => {
+    const dir = tempDir();
+    const f = fiche();
+    f.actions.push(null);
+    writeFileSync(join(dir, 'f.yaml'), JSON.stringify(f));
+    expect(cadence(dir, 'spec', 'check', 'f.yaml').code).toBe(1);
+    const qa = cadence(dir, 'spec', 'qa', 'f.yaml');
+    expect(qa.code).toBe(1);
+    expect(qa.err).toMatch(/action n° 4 : objet attendu/);
+  });
 });

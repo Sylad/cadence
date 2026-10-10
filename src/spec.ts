@@ -32,15 +32,20 @@ export function checkFiche(doc: unknown): string[] {
   const etats: string[] = Array.isArray(doc.etats) ? doc.etats.filter(texte) : [];
   if (!Array.isArray(doc.etats)) p.push('etats : liste attendue');
   else {
+    for (const [i, e] of doc.etats.entries()) if (!texte(e)) p.push(`état n° ${i + 1} : texte attendu`);
     const manquants = ETATS_REQUIS.filter((e) => !etats.includes(e));
     if (manquants.length) p.push(`états : ${manquants.map((e) => `« ${e} »`).join(', ')} manquant(s) (vide, chargement et erreur sont requis)`);
     for (const e of new Set(etats.filter((x, i) => etats.indexOf(x) !== i))) p.push(`états : « ${e} » en double`);
   }
 
-  const champs: Obj[] = Array.isArray(doc.champs) ? doc.champs.filter(isObj) : [];
-  if (!Array.isArray(doc.champs) || champs.length === 0) p.push('champs : liste non vide attendue');
+  const champs: unknown[] = Array.isArray(doc.champs) ? doc.champs : [];
+  if (champs.length === 0) p.push('champs : liste non vide attendue');
   const ids = new Set<string>();
   for (const [i, c] of champs.entries()) {
+    if (!isObj(c)) {
+      p.push(`champ n° ${i + 1} : objet attendu`);
+      continue;
+    }
     const nom = texte(c.id) ? `« ${c.id} »` : `n° ${i + 1}`;
     if (!texte(c.id)) p.push(`champ ${nom} : id manquant`);
     else {
@@ -52,11 +57,16 @@ export function checkFiche(doc: unknown): string[] {
     if (typeof c.obligatoire !== 'boolean') p.push(`champ ${nom} : obligatoire doit valoir true ou false`);
   }
 
-  const regles: Obj[] = Array.isArray(doc.regles) ? doc.regles.filter(isObj) : [];
-  if (!Array.isArray(doc.regles) || regles.length === 0) p.push('regles : liste non vide attendue');
+  const regles: unknown[] = Array.isArray(doc.regles) ? doc.regles : [];
+  if (regles.length === 0) p.push('regles : liste non vide attendue');
   const ruleIds = new Set<string>();
   for (const [i, r] of regles.entries()) {
     const attendu = `R${i + 1}`;
+    if (!isObj(r)) {
+      p.push(`règle n° ${i + 1} : objet attendu`);
+      ruleIds.add(attendu);
+      continue;
+    }
     const id = texte(r.id) ? r.id : attendu;
     if (r.id !== attendu) p.push(`règle n° ${i + 1} : l'id doit être ${attendu} (R1, R2… dans l'ordre, sans trou), pas ${texte(r.id) ? r.id : 'absent'}`);
     ruleIds.add(id);
@@ -84,10 +94,14 @@ export function checkFiche(doc: unknown): string[] {
     for (const t of tests) if (typeof t !== 'string' || !t.startsWith(`${id} — `)) p.push(`${id} : le test « ${String(t)} » doit être nommé « ${id} — … »`);
   }
 
-  const actions: Obj[] = Array.isArray(doc.actions) ? doc.actions.filter(isObj) : [];
+  const actions: unknown[] = Array.isArray(doc.actions) ? doc.actions : [];
   if (!Array.isArray(doc.actions)) p.push('actions : liste attendue');
   for (const [i, a] of actions.entries()) {
     const attendu = `A${i + 1}`;
+    if (!isObj(a)) {
+      p.push(`action n° ${i + 1} : objet attendu`);
+      continue;
+    }
     const id = texte(a.id) ? a.id : attendu;
     if (a.id !== attendu) p.push(`action n° ${i + 1} : l'id doit être ${attendu} (A1, A2… dans l'ordre), pas ${texte(a.id) ? a.id : 'absent'}`);
     if (a.declencheur !== null && a.declencheur !== undefined && !(texte(a.declencheur) && ids.has(a.declencheur))) p.push(`${id} : déclencheur « ${String(a.declencheur)} » absent de la fiche (un id de champ, ou null pour le chargement)`);

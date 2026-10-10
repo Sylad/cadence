@@ -1944,9 +1944,10 @@ lots:
     finished: 2026-10-10
   - id: L169
     title: Champ screen des lots + clé orchestrate.spec (spec etape-spec, S1)
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-10
+    started: 2026-10-10
   - id: L170
     title: cadence spec check et spec qa, gabarit de fiche (spec etape-spec, S2)
     status: todo

@@ -1894,6 +1894,23 @@ lots:
     started: 2026-10-10
     review: { date: 2026-10-10, verdict: "conforme — 684a68c relu par le lead : les 4 mineurs de la revue corrigés (version ignorée, champs --json, precheck-reader interne, test de la ligne d'ouverture), build vert, 1302 tests", commit: 684a68c46e90900d5fe94eed6c523fdc41748a9b }
     finished: 2026-10-10
+  - id: L165
+    title: "Mesure de référence des corrections de vague : classer par cause les passes « fixing » des journaux .cadence/runs de tous les projets (spec floue ou critère absent, règle de gestion inventée, dérive d'architecture, données/SQL, bug de code, test manquant, faux constat de revue) à partir des verdicts de revue de chaque lot ; classement par l'IA locale (Ollama, hors quota) avec un échantillon relu à la main ; résultat : tableau par cause et par projet, taux de lots ≥1 et ≥2 corrections (61 % et 28 % sur 227 passages au 10-10), visibles vs non visibles — sert de point de référence au lot suivant"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-10
+  - id: L166
+    title: "Conception d'une étape spec avant l'implémentation dans orchestrate (lots visibles au-dessus d'un seuil : nouvelle page, nouveau composant, parcours modifié) : maquette HTML statique à la charte du projet rendue 1440/390 avec états vide/chargement/erreur + fiche d'écran lisible par machine (champs id/libellé/type/source API/obligatoire, règles de gestion numérotées R1… avec message, actions → appel API, chaque règle « sourcée » ou « hypothèse ») ; l'agent UX relit la maquette avant le code (boucle sur la maquette, pas sur le code), aucune validation humaine systématique (question ciblée seulement si le choix est coûteux à défaire), le brief d'implémentation reçoit la fiche, les tests citent les règles, la code review vérifie la couverture de la fiche, la passe UX après code devient une conformité légère, les hypothèses remontent dans l'entrée Nouveautés ; livrable : spec versionnée docs/ + plan de lots, essai prévu sur un écran d'une app loisir, critère de réussite mesuré contre le lot de mesure"
+    status: todo
+    estimate: 1
+    after: [ L165 ]
+    created: 2026-10-10
+  - id: L167
+    title: "Doc docs/lead.md : schéma du workflow du skill lead en trois couloirs (humain, session lead, programme orchestrate et agents) en SVG compatible thème clair/sombre de GitHub, version générique (aucun nom de personne, de projet ni de chemin local) — tour, vague et étapes par lot, relais du journal et questions, re-vérification, raf ux/done, livraison et qa-reviewer, seuil de contexte 60 % et enchaînement, clôture ; règles permanentes et codes de sortie ; lien depuis le README"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

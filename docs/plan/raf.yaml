@@ -1800,6 +1800,7 @@ lots:
     estimate: 0.25
     created: 2026-10-09
     started: 2026-10-10
+    review: { date: 2026-10-10, verdict: "compliant (0 bloquant, 0 majeur, 2 mineurs en note) — orchestré (vague 2026-10-10-1315, 0 passe(s) de correction)", commit: 1ff5a880381ff6c68e1d74518695419870fbb76d }
   - id: L157
     title: "CHANGELOG [Unreleased] : la ligne L83 sur les démons partagés dit l'inverse du défaut (« spared the lead's tmux panes » → tuer par la marque les TUAIT ; l'exclusion les épargne), aligner sur README:1125"
     estimate: 0.1

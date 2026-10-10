@@ -1281,9 +1281,9 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   documentation that does not follow the lot's change is a *major* finding.
 - **qa-reviewer** (agent): any web app (read-only like `ux-reviewer`: same tool list, no `Edit`, no `Write`); given a repository and a base URL (and
   optionally a lot id, to walk only the pages it touched — those that call the
-  changed endpoints, those of the screens it changed, and the home page; a
-  backend-only lot stays in scope, and when the endpoints cannot be mapped to pages
-  every page is walked; the others are named « Not walked »), it opens each page of
+  changed endpoints, those of the screens it changed, the pages that consume the services the lot changed,
+  and the home page; a backend-only lot stays in scope, and when the lot changes no route
+  and no screen, or the endpoints cannot be mapped to pages, every page is walked; the others are named « Not walked »), it opens each page of
   the project's expectations file in a real browser at 1440 and 390 px and
   measures: expected content present and non-empty, no error or missing-data
   message, every API call answered 2xx with a non-empty body, no console error,

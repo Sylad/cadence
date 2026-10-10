@@ -309,6 +309,19 @@ describe('skills install', () => {
     expect(qa.section('Output')).toContain('If the pass stopped before the end (budget spent, stop requested), say so in the first line');
   });
 
+  it('docs : README, lead et deliver suivent le repli et les services consommés du qa-reviewer (L123)', () => {
+    const readme = readFileSync(join(__dirname, '..', 'README.md'), 'utf8');
+    const i = readme.indexOf('- **qa-reviewer** (agent)');
+    const entry = readme.slice(i, readme.indexOf('\n- **', i + 10));
+    expect(entry).toContain('the pages that consume the services the lot changed');
+    expect(entry).toContain('changes no route');
+    for (const f of ['lead', 'deliver']) {
+      const skill = readFileSync(join(__dirname, '..', 'skills', f, 'SKILL.md'), 'utf8');
+      expect(skill).toContain('the pages that consume the services the lot changed');
+      expect(skill).toContain('no route');
+    }
+  });
+
   it('agent qa-reviewer : périmètre d’un lot et lecture du DOM en texte d’abord (L123)', () => {
     const qa = qaAgent();
     const scope = qa.section('Scope of a lot');
@@ -388,7 +401,7 @@ describe('skills install', () => {
     expect(delivery).toContain('give it the absolute path of the project, the base URL of the delivered app and the lot id.');
     // Les deux pannes à l'origine de l'agent venaient de lots sans écran : le lot n'a pas à être « visible ».
     expect(delivery).toContain('The lot need not be `visible`: a backend-only lot can empty a page without changing a screen.');
-    expect(delivery).toContain('With a lot id, the agent walks only the pages the lot touched (the pages that call the changed endpoints, the pages of the changed screens, the home page) and names the others under « Not walked »: they are not checked.');
+    expect(delivery).toContain('With a lot id, the agent walks only the pages the lot touched (the pages that call the changed endpoints, the pages of the changed screens, the pages that consume the services the lot changed, the home page; when the diff changes no route and no screen, or cannot be linked to pages, it walks every page and says so) and names the others under « Not walked »: they are not checked.');
     expect(delivery).not.toContain('lot marked `visible`');
     expect(delivery).toContain('Bring its blocking findings back to the human');
     expect(delivery).toContain('it reads only, and never logs in');
@@ -400,7 +413,7 @@ describe('skills install', () => {
     const deliver = skill('deliver');
     const step = deliver.slice(deliver.indexOf(' 6. '), deliver.indexOf('## Rules'));
     expect(step).toContain(`After a green delivery that ${QA_TRIGGER} — have the \`qa-reviewer\` agent walk the delivered app in a real browser, whether the lot is \`visible\` or not:`);
-    expect(step).toContain('With a lot id, the agent walks only the pages the lot touched (the pages that call the changed endpoints, the pages of the changed screens, the home page) and names the others under « Not walked »: they are not checked.');
+    expect(step).toContain('With a lot id, the agent walks only the pages the lot touched (the pages that call the changed endpoints, the pages of the changed screens, the pages that consume the services the lot changed, the home page; when the diff changes no route and no screen, or cannot be linked to pages, it walks every page and says so) and names the others under « Not walked »: they are not checked.');
     expect(step).not.toContain('delivery of a `visible` lot');
     // Ses entrées, la remontée des constats bloquants, et la livraison qui reste faite.
     expect(step).toContain('give it the repository path, the base URL and the lot id.');
@@ -433,7 +446,7 @@ describe('skills install', () => {
     const skills = flat(readme.slice(readme.indexOf('## Claude Code skills'), readme.indexOf('## Releasing')));
     expect(skills).toContain('after a green delivery that changes what a page shows or what it is served, the `qa-reviewer` agent walks the delivered app.');
     expect(skills).toContain('a delivery that changes what a page shows or what it is served is then checked in the running app by the `qa-reviewer` agent, whose blocking findings come back to you.');
-    expect(skills).toContain('optionally a lot id, to walk only the pages it touched — those that call the changed endpoints, those of the screens it changed, and the home page; a backend-only lot stays in scope');
+    expect(skills).toContain('optionally a lot id, to walk only the pages it touched — those that call the changed endpoints, those of the screens it changed, the pages that consume the services the lot changed, and the home page; a backend-only lot stays in scope, and when the lot changes no route and no screen, or the endpoints cannot be mapped to pages, every page is walked');
     expect(skills).not.toMatch(/visible lot[^.]*qa-reviewer/);
     // Les trois sortes de constat, comme dans le contrat de l'agent.
     expect(skills).toContain('Findings are defects (a line of the expectations broken, or a universal check failing with a visible effect, with or without an expectations file), suspects (it looks like missing or wrong data and no expectation settles it) or noise (a console error or a failed request with no visible effect, ranked minor)');

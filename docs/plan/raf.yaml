@@ -1042,6 +1042,7 @@ lots:
     review: { date: 2026-10-10, verdict: "conforme : 3 remarques mineures en note (garde `said` inutile et son test, commentaire « seul lecteur » faux à cause de hook.ts, limite ni /proc ni ps absente du README) — orchestré (vague 2026-10-10-0943, 1 passe(s) de correction + passe des mineurs)", commit: 8e3ac40905ccb097e88a7a1e349d3a41fb13d5af }
     notes:
       - { date: 2026-10-09, text: "Notes revue 09-10 : README:1114-1116 promet plus que le code (docker compose up -d, client tmux d'un serveur déjà lancé, env -i entre deux relevés, environ illisible) ; killMarked ne signale jamais un relevé impossible (EMFILE → [] en silence, TreeTracker a onUnavailable). Coût mesuré : findMarked 0,8 ms / 84 processus, 7,5 ms / 884 ; TreeTracker 200 ms ≈ 2,4 % de la boucle par session" }
+      - { date: 2026-10-10, text: "Mineurs revue 10-10 (notes, pas de lot) : garde said de killMarked inutile (proc.ts:403, un appel ne signale jamais deux fois) ; commentaire readStat « seul lecteur » faux, hook.ts:94 parentOf lit aussi /proc/<pid>/stat ; README « Limits of the mark » ne dit pas que sans /proc ni ps rien n'est tué et une ligne part sur stderr" }
     tasks:
       - { id: t1, title: "orchestrate : un démon partagé démarré à la demande par une session (serveur tmux, gpg-agent, maître ssh, démon Gradle) porte la marque CADENCE_SESSION et la passe aux clients venus d'ailleurs — killMarked tue alors les panneaux tmux du lead ; exclure (tmux, screen au moins) ou documenter", status: todo }
       - { id: t2, title: "orchestrate : test qui échoue sans le TreeTracker de realClaude (descendant setsid lancé avec env -u CADENCE_SESSION)", status: todo }
@@ -1778,6 +1779,11 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-09
+  - id: L157
+    title: "CHANGELOG [Unreleased] : la ligne L83 sur les démons partagés dit l'inverse du défaut (« spared the lead's tmux panes » → tuer par la marque les TUAIT ; l'exclusion les épargne), aligner sur README:1125"
+    status: todo
+    estimate: 1
+    created: 2026-10-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -1886,6 +1886,11 @@ lots:
     notes:
       - { date: 2026-10-10, text: 'Livré par les commits de L162 (ca9e7a9 unquotePath, 9c7856f voisin) — vérifié par le lead : test/orchestrate-cycle.test.ts:850 (capture-écran.png, x"y.png), :876 (collision .1), orchestrate-cycle-repos.test.ts:177 (voisin). Restent en note, sans effet observable : CHANGELOG:46 donne le chemin abrégé runs/<wave>/<lot>/stray/ (vrai : .cadence/runs/<vague>/<projet>--<lot>/stray/), pas de test du repli en incident quand le déplacement échoue.' }
     finished: 2026-10-10
+  - id: L164
+    title: "Release 1.0.0 (première majeure, contrat stable) : section README « Stabilité » qui liste la surface garantie — commandes et options de cadence et raf, clés de cadence.yaml, format du plan raf.yaml, noms des skills et des agents — et ce qui ne l'est pas (sorties texte, bande cadence-hud, journaux des vagues .cadence/runs) ; pas de version de schéma ni de migration ; recette : npm version major + plugin.json + marketplace.json (hud : bumper seulement s'il a changé depuis 0.27.1, sinon non), CHANGELOG [Unreleased] → [1.0.0] - 2026-10-10 avec une ligne d'ouverture sur l'engagement semver, README What's new préfixé 1.0.0, build + vitest verts, commit « release(L164): 1.0.0 — … » ; tag v1.0.0 poussé par le lead"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

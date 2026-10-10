@@ -133,7 +133,9 @@ lancer les tests du projet (pas le code d'implémentation à écrire). Contrat :
   règles. Un champ est **propre à un état** quand une règle d'état `vide` ou `erreur` le cite
   (comme message-vide) ; une règle ne cite donc dans `champs` que les champs qu'elle fait apparaître (ceux
   qu'elle masque restent dans son énoncé). Ensuite : `shows:` = champs obligatoires, **sauf** les champs propres à un état
-  (non visibles page chargée). `never:` = les messages des règles d'état `erreur`
+  (non visibles page chargée) ; la ligne `shows:` d'un champ qu'une règle `sourcee` d'état `vide` fait
+  disparaître (R2 de l'exemple : « aucun autre champ ») se termine par `— unless <énoncé>` (condition en
+  mots, comme `may be empty when`), sans quoi l'état vide prévu serait un faux constat. `never:` = les messages des règles d'état `erreur`
   (état dégradé) ; le message d'une règle d'état `vide` n'y va jamais, c'est un affichage prévu. `api:` = les seules `actions[]`
   de chargement (`declencheur: null`) en GET, la passe QA n'envoyant jamais de POST ; si une règle
   `sourcee` d'état `vide` porte l'action, la ligne `api:` se termine par `may be empty when <énoncé de la
@@ -218,24 +220,24 @@ conception ne les ajoute pas lui-même : ils deviennent prêts pour `orchestrate
 | S2 | Format de la fiche : `cadence spec check <fiche>` (invariants ci-dessus, codes de sortie), `cadence spec qa <fiche>` (dérive `expectations.md`), gabarit `templates/fiche.yaml` | 1 | S1 |
 | S3 | Étape `spec` d'orchestrate : agent `spec-writer`, brief, rendu Playwright 1440/390 des états, commit de la spec, règle « hypothèse coûteuse = question », sortie sous le seuil | 1 | S2 |
 | S4 | Revue UX de la maquette : mode « maquette » de `ux-reviewer`, cohérence maquette ↔ fiche, boucle ≤ 2 passes, rendu au lead | 0.75 | S3 |
-| S5 | Étape `accept` : session distincte, tests rouges vérifiés, empreinte `acceptation.json`, garde de `implement`/`fix` sur ces fichiers | 1 | S3 |
+| S5 | Étape `accept` : session distincte, tests rouges vérifiés, empreinte `acceptation.json`, garde de `implement`/`fix` sur ces fichiers pour toutes les sessions du dépôt (tous les lots), exclusion des fichiers listés dans les `acceptation.json` de `config.test` tant que leur lot n'est pas vert, commande dédiée du lot propriétaire | 1 | S3 |
 | S6 | Briefs aval : fiche donnée à `implement`, tests citant les règles, `code-reviewer` règle → test → vert, UX de conformité légère (remplace la passe complète des lots avec fiche), section « Hypothèses » de Nouveautés + contrôle de `news check` | 1 | S4, S5 |
 | S7 | Essai sur un écran d'une app loisir (à la main puis orchestré), note sur le fonctionnement de la fiche | 0.5 | S6 |
 | S8 | Mesure contre le lot de mesure, une fois 8 lots avec fiche livrés (ouvert tant qu'ils ne le sont pas), note de conclusion | 0.5 | S7 |
 | S9 | Mettre à jour `docs/lead.md` et ses deux SVG (L167) avec les étapes spec, revue UX de la maquette et tests d'acceptation, README (sections lead et orchestrate) : dès les étapes livrées, sans attendre la mesure | 0.25 | S6 |
 
-Commandes prêtes à lancer :
+Commandes prêtes à lancer (chaque titre cite la spec `etape-spec` et l'id S ; `<Sn>` = l'id donné par `raf add`) :
 
 ```sh
-raf add "Champ screen des lots + clé orchestrate.spec" --estimate 0.5            # S1
-raf add "cadence spec check et spec qa, gabarit de fiche" --estimate 1 --after <S1>
-raf add "Étape spec d'orchestrate (spec-writer, rendu 1440/390)" --estimate 1 --after <S2>
-raf add "Revue UX de la maquette (ux-reviewer mode maquette)" --estimate 0.75 --after <S3>
-raf add "Étape accept : tests d'acceptation rouges, verrou par empreinte" --estimate 1 --after <S3>
-raf add "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses" --estimate 1 --after <S4>,<S5>
-raf add "Essai étape spec sur un écran d'app loisir" --estimate 0.5 --after <S6>
-raf add "Mesure de l'étape spec contre le lot de mesure (8 lots avec fiche)" --estimate 0.5 --after <S7>
-raf add "docs/lead.md : schéma du workflow avec les étapes spec (L167)" --estimate 0.25 --after <S6>
+raf add "Champ screen des lots + clé orchestrate.spec (spec etape-spec, S1)" --estimate 0.5
+raf add "cadence spec check et spec qa, gabarit de fiche (spec etape-spec, S2)" --estimate 1 --after <S1>
+raf add "Étape spec d'orchestrate : spec-writer, rendu 1440/390 (spec etape-spec, S3)" --estimate 1 --after <S2>
+raf add "Revue UX de la maquette : ux-reviewer mode maquette (spec etape-spec, S4)" --estimate 0.75 --after <S3>
+raf add "Étape accept : tests rouges, verrou par empreinte sur toutes les sessions du dépôt, fichiers des acceptation.json exclus de config.test tant que le lot n'est pas vert, commande dédiée (spec etape-spec, S5)" --estimate 1 --after <S3>
+raf add "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses (spec etape-spec, S6)" --estimate 1 --after <S4>,<S5>
+raf add "Essai étape spec sur un écran d'app loisir (spec etape-spec, S7)" --estimate 0.5 --after <S6>
+raf add "Mesure de l'étape spec contre le lot de mesure, 8 lots avec fiche (spec etape-spec, S8)" --estimate 0.5 --after <S7>
+raf add "docs/lead.md : schéma du workflow avec les étapes spec, L167 (spec etape-spec, S9)" --estimate 0.25 --after <S6>
 ```
 
 ## Risques et ce qu'on ne fait pas

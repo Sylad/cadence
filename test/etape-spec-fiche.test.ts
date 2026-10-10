@@ -58,7 +58,8 @@ describe('fiche d\'écran de l\'exemple (L166)', () => {
   });
 
   it('ne laisse en hypothèse aucune règle dont si_faux touche un choix coûteux à défaire', () => {
-    const couteux = /stockage|clé|migration|contrat d'API|route|destructi|irréversible|suppression|paiement/i;
+    // les 4 catégories de la spec : modèle ou stockage, contrat d'API ou route publiée, action destructive, règle qui en contredit une sourcée
+    const couteux = /stockage|modèle de données|clé|migration|donnée utilisateur|contrat d'API|route|URL|destructi|irréversible|suppression|envoi|paiement|contredit|règle sourcée/i;
     for (const r of fiche.regles.filter((x: any) => x.statut === 'hypothese')) expect(r.si_faux).not.toMatch(couteux);
   });
 
@@ -90,5 +91,43 @@ describe('fiche d\'écran de l\'exemple (L166)', () => {
     expect(ligne('S8')).toMatch(/\| S7 \|$/);
     expect(ligne('S9')).toMatch(/docs\/lead\.md/);
     expect(ligne('S9')).toMatch(/\| S6 \|$/);
+  });
+
+  it('ajoute « — unless » aux lignes shows: des champs qu\'un état vide sourcé fait disparaître', () => {
+    expect(spec).toMatch(/`shows:`[\s\S]*?`— unless <énoncé>`/);
+    expect(spec).toMatch(/règle `sourcee` d'état `vide`[^\n]*\n?[^\n]*`shows:`|`shows:`[^\n]*\n?[^\n]*règle `sourcee` d'état `vide`/);
+    // l'exemple : R2 (vide, sourcée) masque les champs obligatoires affichés page chargée
+    const r2 = fiche.regles.find((r: any) => r.etat === 'vide' && r.statut === 'sourcee');
+    expect(r2).toBeTruthy();
+    expect(fiche.champs.some((c: any) => c.obligatoire && c.source !== 'statique')).toBe(true);
+  });
+
+  it('cite l\'erreur et le bouton Réessayer en champs, liés à R3 et à une action', () => {
+    for (const id of ['message-erreur', 'bouton-reessayer']) {
+      const c = fiche.champs.find((x: any) => x.id === id);
+      expect(c?.obligatoire).toBe(false);
+    }
+    const r3 = fiche.regles.find((r: any) => r.id === 'R3');
+    expect(r3.champs).toEqual(expect.arrayContaining(['message-erreur', 'bouton-reessayer']));
+    const a = fiche.actions.find((x: any) => x.declencheur === 'bouton-reessayer');
+    expect(a?.appel).toBe('GET /api/fixtures/next');
+    expect(a?.regles).toContain('R3');
+  });
+
+  it('porte dans S5 l\'exclusion de config.test, la commande dédiée et le verrou étendu, et cite spec et id S dans chaque raf add', () => {
+    const ligne = (id: string) => spec.split('\n').find((l) => l.startsWith(`| ${id} |`)) ?? '';
+    expect(ligne('S5')).toMatch(/acceptation\.json/);
+    expect(ligne('S5')).toMatch(/config\.test/);
+    expect(ligne('S5')).toMatch(/commande dédiée/);
+    expect(ligne('S5')).toMatch(/toutes les sessions|tous les lots/);
+    const cmds = spec.split('\n').filter((l) => l.startsWith('raf add '));
+    expect(cmds).toHaveLength(9);
+    cmds.forEach((l, i) => {
+      expect(l).toContain('spec etape-spec');
+      expect(l).toContain(`S${i + 1}`);
+    });
+    expect(cmds[4]).toMatch(/exclu[\s\S]*config\.test/);
+    expect(cmds[4]).toMatch(/commande dédiée/);
+    expect(cmds[4]).toMatch(/verrou/);
   });
 });

@@ -16,6 +16,8 @@ champs:
   - { id: score, libelle: Score, type: texte, source: "GET /api/fixtures/next → score", obligatoire: false }
   - { id: bouton-rappel, libelle: Me rappeler le match, type: bouton, source: "action A1", obligatoire: false }
   - { id: message-vide, libelle: Message d'état vide, type: texte, source: statique, obligatoire: true }
+  - { id: message-erreur, libelle: Message d'erreur de chargement, type: texte, source: statique, obligatoire: false }
+  - { id: bouton-reessayer, libelle: Réessayer, type: bouton, source: "action A3", obligatoire: false }
 
 regles:
   - id: R1
@@ -38,7 +40,7 @@ regles:
     etat: erreur
     enonce: Si l'appel échoue, l'écran affiche l'erreur et un bouton « Réessayer » qui rappelle l'API.
     message: "Impossible de charger le prochain match."
-    champs: []
+    champs: [message-erreur, bouton-reessayer]
     statut: hypothese
     si_faux: Si le club veut un affichage du dernier résultat connu à la place, seul ce bloc change (aucune donnée en jeu).
     tests: ["R3 — erreur : message et bouton Réessayer", "R3 — Réessayer relance l'appel"]
@@ -54,3 +56,4 @@ regles:
 actions:
   - { id: A1, declencheur: bouton-rappel, appel: "POST /api/fixtures/next/reminder", regles: [R4] }
   - { id: A2, declencheur: ~, appel: "GET /api/fixtures/next", regles: [R1, R2, R3] }
+  - { id: A3, declencheur: bouton-reessayer, appel: "GET /api/fixtures/next", regles: [R3] }

@@ -1,0 +1,42 @@
+# Gabarit de fiche d'écran (étape spec d'orchestrate, L170). Copier dans docs/specs/<écran>/fiche.yaml,
+# remplacer les valeurs, puis `cadence spec check docs/specs/<écran>/fiche.yaml`.
+# Chaque clé est décrite dans docs/superpowers/specs/2026-10-10-etape-spec-design.md (§ 2) ; l'exemple rempli
+# est 2026-10-10-etape-spec-fiche-exemple.yaml dans le même dossier.
+ecran:
+  id: mon-ecran                # kebab-case ; nom du dossier docs/specs/<id>/
+  titre: Mon écran
+  route: /mon-ecran            # commence par /
+  lot: L0                      # le lot d'implémentation
+  largeurs: [1440, 390]        # largeurs de rendu : toujours ces deux-là
+  maquette: docs/specs/mon-ecran/maquette.html
+etats: [vide, chargement, erreur, charge]   # au moins vide, chargement, erreur
+
+champs:                        # id unique en kebab-case : c'est aussi le data-testid de la maquette
+  - { id: titre-page, libelle: Titre de la page, type: texte, source: statique, obligatoire: true }
+  - { id: liste-elements, libelle: Liste des éléments, type: liste, source: "GET /api/elements → items", obligatoire: true }
+  - { id: message-vide, libelle: Message d'état vide, type: texte, source: statique, obligatoire: true }
+  - { id: message-erreur, libelle: Message d'erreur de chargement, type: texte, source: statique, obligatoire: false }
+  - { id: bouton-reessayer, libelle: Réessayer, type: bouton, source: "action A2", obligatoire: false }
+
+regles:                        # R1, R2… dans l'ordre, sans trou
+  - id: R1
+    etat: vide                 # l'un des etats : l'état où la règle s'applique et où son message est visible
+    enonce: Sans élément, l'écran affiche le message d'état vide à la place de la liste.
+    message: "Aucun élément pour le moment."   # texte exact à l'écran, ou ~ (null) s'il n'y en a pas
+    champs: [message-vide]     # les champs que la règle fait apparaître
+    masque: [liste-elements]   # (vide seulement) les champs que la règle fait disparaître ; ids de la fiche
+    statut: sourcee            # sourcee : dit d'où elle vient (source) ; hypothese : dit ce qui changerait (si_faux)
+    source: "demande du lot : « un état vide qui dit quoi faire »"
+    tests: ["R1 — état vide : le message s'affiche, pas de liste"]   # chaque test nommé « Rn — … »
+  - id: R2
+    etat: erreur
+    enonce: Si l'appel échoue, l'écran affiche l'erreur et un bouton « Réessayer » qui rappelle l'API.
+    message: "Impossible de charger les éléments."
+    champs: [message-erreur, bouton-reessayer]
+    statut: hypothese
+    si_faux: Si le message doit changer, seul ce bloc change (aucune donnée en jeu).
+    tests: ["R2 — erreur : message et bouton Réessayer", "R2 — Réessayer relance l'appel"]
+
+actions:                       # A1, A2… dans l'ordre
+  - { id: A1, declencheur: ~, appel: "GET /api/elements", regles: [R1, R2] }   # ~ : le chargement de l'écran
+  - { id: A2, declencheur: bouton-reessayer, appel: "GET /api/elements", regles: [R2] }

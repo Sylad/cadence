@@ -642,6 +642,20 @@ beside a pass in the cache file (one of the seven causes, else the command refus
 on the reviewed sample. `--until date` (ISO, e.g. `2026-10-10T18:31Z`) reads only the waves created up to then (`created` in the wave's `wave.json`) and, in them, only the steps ended by then (`ended`), so that neither later waves nor a wave still running at that time change a published baseline; a wave or a step with no readable date is left out. `--json` prints the measure as data. The command reads the journals and writes nothing but the cache.
 The first baseline is in [docs/mesures/corrections-2026-10-10.md](docs/mesures/corrections-2026-10-10.md); `test/corrections-mesure.test.ts` replays its command on the journals and checks the document's results word for word (skipped when the journals are not there).
 
+## spec
+
+`cadence spec check <fiche.yaml>` checks a **screen sheet** (`fiche.yaml`, the machine-readable output of the spec step designed in
+[docs/superpowers/specs/2026-10-10-etape-spec-design.md](docs/superpowers/specs/2026-10-10-etape-spec-design.md)). Start from the template
+[`templates/fiche.yaml`](templates/fiche.yaml) (it passes the check as is), a worked example sits next to the design. It prints one
+`✗ …` line per violation and exits **0** when the sheet is valid, **1** with violations, **2** when the file is missing, is not YAML or the usage is wrong. The invariants:
+
+- `ecran` has `id`, `titre`, `route` (starts with `/`), `lot`, `maquette`, and `largeurs: [1440, 390]`; `etats` holds at least `vide`, `chargement`, `erreur`, none twice;
+- `champs[]`: a unique kebab-case `id` (it is also the mockup's `data-testid`), `libelle`, `type`, `source`, and a boolean `obligatoire`;
+- `regles[]` are numbered `R1`, `R2`… in order with no gap; each has an `etat` that is one of `etats`, an `enonce`, a `message` (the exact text on screen, or `null`),
+  a `statut` — `sourcee` with the `source` it comes from, or `hypothese` with the `si_faux` that says what would change — and at least one planned test, named `Rn — …`;
+- `masque` (optional, only on a rule of state `vide`) lists the fields the rule makes disappear: every id must be a field of the sheet and none may be one the rule shows in `champs`;
+- `actions[]` are numbered `A1`… in order, their `declencheur` is a field id (or `null` for the page load), their `appel` reads `VERB /path`, and the `regles` they carry exist.
+
 ## deliver
 
 A delivery is done when its checks pass, not when a tool says "success".

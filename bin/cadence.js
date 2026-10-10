@@ -13,7 +13,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'spec'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -46,6 +46,8 @@ if (tool === 'raf') {
   cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--json]
                     la mesure des passes de correction des vagues (dossier/.cadence/runs) : lots à ≥1 et ≥2 corrections,
                     par projet, visibles ou non, passes par cause ; --classify les classe par Ollama (hors quota)
+  cadence spec check <fiche.yaml>
+                    les invariants d'une fiche d'écran (étape spec, gabarit templates/fiche.yaml) ; code 1 si un écart, 2 si illisible
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);
   process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;

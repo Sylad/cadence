@@ -61,7 +61,7 @@ Voir l'exemple. Clés de premier niveau :
 | `ecran` | `id`, `titre`, `route`, `lot`, `largeurs` (`[1440, 390]`), `maquette` (chemin) |
 | `etats` | au moins `vide`, `chargement`, `erreur` (+ `charge`) |
 | `champs[]` | `id` (kebab-case, unique : c'est aussi le `data-testid`), `libelle`, `type`, `source` (appel API et chemin dans la réponse, ou `statique`, ou `action Ax`), `obligatoire` (booléen) |
-| `regles[]` | `id` (`R1`, `R2`… dans l'ordre), `etat` (un des `etats` : l'état où la règle s'applique et où son message est visible), `enonce`, `message` (texte exact à l'écran, ou `null`), `champs` (ids concernés), `statut`, `tests[]` |
+| `regles[]` | `id` (`R1`, `R2`… dans l'ordre), `etat` (un des `etats` : l'état où la règle s'applique et où son message est visible), `enonce`, `message` (texte exact à l'écran, ou `null`), `champs` (ids que la règle fait apparaître), `masque` (facultatif, règle d'état `vide` : ids des champs qu'elle fait disparaître), `statut`, `tests[]` |
 | `actions[]` | `id` (`A1`…), `declencheur` (id d'un champ, ou `null` pour le chargement), `appel` (`VERBE /chemin`), `regles` (règles qu'elle porte) |
 
 **Statut d'une règle** — c'est ce qui rend l'invention visible :
@@ -71,10 +71,10 @@ Voir l'exemple. Clés de premier niveau :
 - `hypothese` : l'agent l'a posée faute de source. Elle dit ce qui changerait si elle était fausse
   (`si_faux:`) — ce qui permet de juger si la question était à poser.
 
-Invariants (vérifiés par le test de l'exemple, puis par `cadence spec check`, lot S2) : ids de champs
+Invariants (vérifiés par le test de l'exemple, puis par `cadence spec check`, lot S2, livré en L170) : ids de champs
 uniques ; règles numérotées sans trou ; chaque règle a un statut et sa justification ; les actions et
 les règles ne citent que des ids existants ; chaque règle a au moins un test prévu, nommé `Rn — …` ;
-au moins les états vide, chargement, erreur ; chaque règle a un `etat` qui est l'un des `etats`.
+au moins les états vide, chargement, erreur ; chaque règle a un `etat` qui est l'un des `etats` ; un `masque` n'est posé que sur une règle d'état `vide`, ne cite que des champs de la fiche et aucun de ceux que la règle fait apparaître dans `champs`.
 
 ### 3. Revue UX de la maquette
 

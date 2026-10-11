@@ -2162,15 +2162,21 @@ lots:
     created: 2026-10-11
   - id: L191
     title: "Budget d'un lot à étape spec : lotBudget (src/orchestrate/command.ts:73) ne compte que l'estimate, pas les sessions spec, maquette (≤ 2 passes) et accept — ol L25 rendu au lead le 11-10 à 503 k / 450 k avant sa passe fix (spec+maquette+accept ≈ 200 k) ; ajouter une allocation mesurée sur les journaux (L113, L25) pour un lot screen: ou spec:, montrée par --dry-run, test"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "conforme (1 note mineure : libellés « l'estimation tient dans le budget » du tirage --continue) — orchestré (vague 2026-10-11-2000, 0 passe(s) de correction + passe des mineurs)", commit: 40695617e59a22e88bd86de6220ca291561a10a8 }
+    finished: 2026-10-11
   - id: L192
     title: "cadence spec check, suites de la revue L187 : niveaux de log des piles du parc refusés par CODE_ERREUR (warning, info, critical, fatal, verbose) ; fiche back seule — règle avec etat reçoit deux écarts contradictoires (rattachee = ecranPart && aUnEtat), actions/etats/champs acceptés sans ecran (A1 en double avec un contrat) ; fiche mixte — action qui répète l'appel d'un contrat sans contrat: acceptée ; tests des branches non couvertes (hors_perimetre, forme A, id manquant, objet attendu)"
     status: todo
     estimate: 0.5
+    created: 2026-10-11
+  - id: L193
+    title: "test/orchestrate-pool.test.ts « jamais plus de deux sessions en même temps, jamais deux dans un dépôt » instable sous charge : rouge 1 fois dans la suite complète le 11-10 (re-vérif L191, une vague maritime tournait), vert 3/3 seul — dépendance au minutage à retirer"
+    status: todo
+    estimate: 0.25
     created: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

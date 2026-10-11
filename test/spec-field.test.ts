@@ -123,4 +123,12 @@ describe('champ spec des lots (L186, spec etape-spec-back B1)', () => {
       expect(r.err).toContain('cadence spec check|qa');
     }
   });
+
+  it('README : Stability liste raf screen et raf spec ; --spec dit où va la clé', () => {
+    const readme = readFileSync(join(__dirname, '..', 'README.md'), 'utf8');
+    const guaranteed = readme.slice(readme.indexOf('**Guaranteed**'), readme.indexOf('**The keys of'));
+    expect(guaranteed).toMatch(/`screen`, `spec`/);
+    expect(guaranteed).toContain('`cadence spec <lot> on|off`');
+    expect(readme).toContain('after `screen:`, `visible:`, `quickwin:` or `estimate:`');
+  });
 });

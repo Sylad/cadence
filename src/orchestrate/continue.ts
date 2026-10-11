@@ -63,7 +63,7 @@ export interface DrawOpts {
   priority: string[];
   /** Clés `projet:lot` déjà dans la vague (jouées, rendues ou en cours). */
   exclude: Set<string>;
-  /** Tokens comptés restant au budget : un lot dont le budget dérivé de l'estimate n'y tient pas n'est pas tiré. */
+  /** Tokens comptés restant au budget : un lot dont le budget (estimate, plus l'étape spec d'un lot à écran) n'y tient pas n'est pas tiré. */
   remaining: number;
 }
 

@@ -665,7 +665,8 @@ function overBudget(c: LotCtx, reserve = false): null {
   const l = c.lot;
   // Une réponse du lead encore en attente n'a pas été consommée : elle ne doit pas se perdre sans qu'on le dise.
   const answer = l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '';
-  const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (dérivé de l'estimate), il ne reste pas de quoi payer la revue qui suivrait la correction (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, dérivé de l'estimate)`;
+  const basis = l.screen ? 'estimate et étape spec' : "dérivé de l'estimate";
+  const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (${basis}), il ne reste pas de quoi payer la revue qui suivrait la correction (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, ${basis})`;
   // Tests rouges après une écriture : la passe fix refusée aurait suivi, le lot revient sans revue (L145) — la cause le dit.
   const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
   // Passe d'écriture qui vient d'être jouée, nommée d'après le compteur : l.pass - 1 passes de correction l'ont précédée (minorPass reste vrai après la passe des mineurs).

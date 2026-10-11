@@ -938,7 +938,7 @@ command warns `ne lit pas les demandes de contrôle` on the error output.
 plan too); then, each time the lots in play are finished, the wave **draws the next ready lots of the plan** — up to the
 session cap — and plays them in the same wave (same budget, same state folder, journal line `continue : tire …`). A lot
 is drawn when it is `todo`, its `after` is lifted, it is not recurring, neither its title nor a note says « à décider »
-(« à décider avec … », « (à décider) »: a lot waiting for a human decision), it is not already in the wave, and its own budget (derived from its estimate)
+(« à décider avec … », « (à décider) »: a lot waiting for a human decision), it is not already in the wave, and its own budget (derived from its estimate, plus the spec-stage allocation for a lot with `screen:`)
 fits in the budget left — otherwise the next one that fits is taken (a lot that does not fit in what is left of the current
 round is not dropped: it is tried again at the next round, once the budget allows it). A round takes at most **one lot per
 repository** while other repositories have ready lots — the pool plays the lots of one repository one after the other, so a

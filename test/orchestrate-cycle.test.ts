@@ -1033,6 +1033,15 @@ describe('budget et quota', () => {
     expect(c.lot.code?.conforme).toBe(false);
   });
 
+  it("L191 — lot à écran rendu pour budget : le message ne dit pas « dérivé de l'estimate » seul, le budget comprend l'étape spec", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: 1000, screen: 'page' });
+    c.lot.spec = { sousSeuil: 'test' };
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/budget du lot atteint \(\d+ \/ 1000 tokens comptés, estimate et étape spec\)/);
+  });
+
   it("L145 — la passe fix réserve le coût d'une revue : sous le budget mais sans de quoi relire, elle n'a pas lieu", async () => {
     const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
     const c = h.lot('L1', { budget: REVIEW_RESERVE }); // dépensé ≈ 3 k, moins que le budget, mais 3 k + réserve > budget

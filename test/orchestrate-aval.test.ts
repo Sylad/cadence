@@ -125,6 +125,25 @@ describe('cycle : un lot avec fiche', () => {
     expect(b).toContain('R4');
   });
 
+  it('un petit lot visible : la revue courte reçoit la consigne de revue puis celle de conformité UX', async () => {
+    const h = harness({ lots, script: { implement: [impl], 'review-small': [ok] } });
+    ecrit(h.repo);
+    await runLot(h.lot('L1', { ...screen, small: true }, { ux }));
+    expect(kinds(h)).toEqual(['implement', 'review-small']);
+    const b = brief(h, 'review-small');
+    expect(b).toContain('rule → test → green');
+    expect(b).toContain('conformity');
+    expect(b.indexOf('rule → test → green')).toBeLessThan(b.indexOf('not the full audit'));
+  });
+
+  it('un petit lot sans écran : la revue ne porte pas la conformité UX', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecrit(h.repo);
+    await runLot(h.lot('L1', { visible: false, screen: 'page' as const, small: true }, {}));
+    expect(brief(h, 'review')).toContain('rule → test → green');
+    expect(brief(h, 'review')).not.toContain('not the full audit');
+  });
+
   it('la passe UX remplace l\'audit complet : conformité à la maquette, l\'application reste jointe', async () => {
     const h = harness({ lots, script: { implement: [impl], ux: [ok], review: [ok] } });
     ecrit(h.repo);

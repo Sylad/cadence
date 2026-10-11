@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { run } from '../src/cli.js';
@@ -107,5 +107,51 @@ describe('cadence news check', () => {
     const ok = cli(dir, 'news', 'check');
     expect(ok.out).toContain('✓ Nouveautés cohérentes avec le plan');
     expect(ok.code).toBe(0);
+  });
+
+  const projet = (spec?: string) => {
+    const dir = gitRepo();
+    cli(dir, 'init', '--project', 'demo', '--no-hook');
+    cli(dir, 'add', 'Écran', '--visible');
+    cli(dir, 'start', 'L1');
+    if (spec) {
+      const cfg = join(dir, 'cadence.yaml');
+      const doc = (existsSync(cfg) ? parse(readFileSync(cfg, 'utf8')) : {}) as any;
+      doc.orchestrate = { ...(doc.orchestrate ?? {}), spec: { dir: spec } };
+      writeFileSync(cfg, stringify(doc));
+    }
+    const root = spec ?? 'docs/specs';
+    const fiche = parse(readFileSync(EXEMPLE, 'utf8')) as any;
+    fiche.ecran.lot = 'L1';
+    mkdirSync(join(dir, root, 'prochain-match'), { recursive: true });
+    writeFileSync(join(dir, root, 'prochain-match/fiche.yaml'), stringify(fiche));
+    mkdirSync(join(dir, 'docs/nouveautes'), { recursive: true });
+    writeFileSync(join(dir, 'docs/nouveautes/2026-10-11-ecran.md'), '---\ntitle: Écran\ndate: 2026-10-11\ncreated: 2026-10-11T10:00+00:00\nlots: [L1]\nnocapture: maquette\n---\nUn écran.\n');
+    return dir;
+  };
+
+  it('le dossier des fiches vient de orchestrate.spec.dir', () => {
+    const dir = projet('specs-perso');
+    expect(cli(dir, 'news', 'check').out).toContain('L1 : la fiche a des hypothèses (R3, R4)');
+  });
+
+  it('une configuration illisible : repli sur docs/specs, le contrôle continue', () => {
+    const dir = projet();
+    const cfg = join(dir, 'cadence.yaml');
+    writeFileSync(cfg, 'orchestrate:\n  inconnue: 1\n');
+    const r = cli(dir, 'news', 'check');
+    expect(r.out).toContain('L1 : la fiche a des hypothèses (R3, R4)');
+  });
+
+  it('news build ne tient pas compte des hypothèses, et publie la section en HTML', () => {
+    const dir = projet();
+    const r = cli(dir, 'news', 'build');
+    expect(r.out).not.toContain('hypothèses');
+    expect(r.code).toBe(0);
+    writeFileSync(join(dir, 'docs/nouveautes/2026-10-11-ecran.md'), `---\ntitle: Écran\ndate: 2026-10-11\ncreated: 2026-10-11T10:00+00:00\nlots: [L1]\nnocapture: maquette\n---\nUn écran.\n\n${SECTION}\n`);
+    expect(cli(dir, 'news', 'build').code).toBe(0);
+    const json = readFileSync(join(dir, 'docs/nouveautes/site/nouveautes.json'), 'utf8');
+    expect(json).not.toContain('## Hypothèses');
+    expect(json).toContain('<h3>Hypothèses</h3>');
   });
 });

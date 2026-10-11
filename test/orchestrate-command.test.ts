@@ -219,6 +219,12 @@ describe('refus avant d\'agir (code 2)', () => {
         expect(brief).not.toMatch(/\{\{/);
         expect(brief).toContain('<sujet>');
       }
+      // La consigne de revue de fiche n'appartient qu'au brief de la fiche : implement et review (délégués à la main depuis ces briefs) ne la portent pas.
+      for (const kind of ['implement', 'review']) {
+        const line = out.split('\n').find((l) => l.includes('brief :') && l.includes(`a--L1--${kind}.md`))!;
+        const brief = readFileSync(line.replace(/^\s*brief : /, '').trim(), 'utf8');
+        expect(brief).not.toMatch(/Sheet mode|first review of this sheet/);
+      }
     } finally {
       removeDryRunBriefs(r.out.join('\n'));
     }

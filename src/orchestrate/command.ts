@@ -377,7 +377,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     }
     for (const s of steps) {
       const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);
-      const brief = renderBrief(briefName(l, s.kind), vars, deps.templatesDir);
+      const brief = renderBrief(briefName(l, s.kind), s.kind === 'fiche' || vars.fiche === undefined ? vars : { ...vars, fiche: '' }, deps.templatesDir); // la consigne de revue de fiche ne sert qu'au brief de la fiche : implement et review en sont la base d'une délégation à la main
       writeFileSync(file, brief);
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small, !!l.screen).playwright;
       const local = s.model === 'local';

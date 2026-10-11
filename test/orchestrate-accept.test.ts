@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
-import { acceptationFile, checkAcceptation, isAcceptationFile, findAcceptation, lockViolations, redSha, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
+import { acceptationFile, checkAcceptation, isAcceptationFile, findAcceptation, lockViolations, lotStartHead, redSha, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { gitRepo } from './helpers.js';
 import { git } from './orchestrate-harness.js';
 import { DIR, ecritAcceptation } from './accept-helpers.js';
@@ -215,6 +215,39 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
       expect(lockViolations(repo, DIR, fiche).join('\n')).toContain(a.test);
       expect(lockViolations(repo, DIR, fiche, { lotCommits: [fiche] })).toEqual([]);
       expect(lockViolations(repo, DIR, fiche, { lotCommits: [head] }).join('\n')).toContain(a.test);
+    });
+
+    it("reprise dans une nouvelle vague (L184) : le lot qui retire son ajout, tests revenus à l'état d'avant le lot, n'est pas rendu — la référence est la tête d'avant le premier commit qui cite le lot", () => {
+      const { repo, a, head } = livre();
+      // vague 1 : le lot L9 fait évoluer la règle (fiche + tests), puis écrit dans un fichier verrouillé
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L9): R7 révisée', a.test, a.fiche);
+      const premier = git(repo, 'rev-parse', 'HEAD');
+      // vague 2 (reprise) : le lot retire son ajout, le fichier revient à l'état d'avant le lot
+      git(repo, 'checkout', '-q', head, '--', a.test);
+      commitPaths(repo, 'fix(L9): retire son ajout', a.test);
+      const vague2 = git(repo, 'rev-parse', 'HEAD');
+      const shas = [vague2, premier];
+      expect(lotStartHead(repo, shas)).toBe(head);
+      // la référence de la vague courante (tête de départ de la vague 2) rendrait le lot : fiche inchangée depuis, test changé
+      expect(lockViolations(repo, DIR, premier, { lotBase: premier, lot: 'L10' }).join('\n')).toContain(a.test);
+      expect(lockViolations(repo, DIR, premier, { lotBase: lotStartHead(repo, shas), lot: 'L10' })).toEqual([]);
+      expect(lockViolations(repo, DIR, vague2, { lotBase: lotStartHead(repo, shas), lot: 'L10' })).toEqual([]);
+    });
+
+    it("lotStartHead : le parent du plus ancien commit cité ; vide si aucun commit ou commit racine", () => {
+      const { repo, head } = livre();
+      writeFileSync(join(repo, 'x.txt'), '1\n');
+      commitPaths(repo, 'feat(L9): a', 'x.txt');
+      const a1 = git(repo, 'rev-parse', 'HEAD');
+      writeFileSync(join(repo, 'x.txt'), '2\n');
+      commitPaths(repo, 'feat(L9): b', 'x.txt');
+      const a2 = git(repo, 'rev-parse', 'HEAD');
+      expect(lotStartHead(repo, [a2, a1])).toBe(head);
+      expect(lotStartHead(repo, [a1, a2])).toBe(head);
+      expect(lotStartHead(repo, [])).toBeUndefined();
+      expect(lotStartHead(repo, [git(repo, 'rev-list', '--max-parents=0', 'HEAD').trim().split('\n')[0]])).toBeUndefined();
     });
 
     it('la fiche changée mais non commitée (arbre de travail) compte aussi', () => {

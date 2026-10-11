@@ -19,7 +19,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
-import { acceptationFile, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, parseAcceptation, redSha, sealAcceptation, setVert } from './accept.js';
+import { acceptationFile, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, redSha, sealAcceptation, setVert } from './accept.js';
 import { avalFicheText, ficheRules } from './aval.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheReady, findFiche, specText } from './spec.js';
@@ -1166,7 +1166,9 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     return;
   }
   // Verrou des tests d'acceptation (L173) : ceux de TOUS les lots du dépôt, pas seulement du lot courant ; une modification est une question au lead.
-  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: l.steps.find((s) => s.headBefore)?.headBefore, lotCommits: lotCommits(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) }) : [];
+  // Référence du lot (L184) : la tête d'avant le premier commit qui le cite, pas celle de la vague courante (une reprise repart d'un état déjà modifié par le lot).
+  const citing = done.step.headBefore ? lotCommits(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) : [];
+  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: lotStartHead(l.repo, citing) ?? l.steps.find((s) => s.headBefore)?.headBefore, lotCommits: citing }) : [];
   if (locked.length) {
     stop(c, 'handed-back', `verrou des tests d'acceptation : ${locked.join(' ; ')}`);
     return;

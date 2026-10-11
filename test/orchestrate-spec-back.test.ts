@@ -348,11 +348,10 @@ describe('étape spec back : briques', () => {
     expect(findFiche(h.repo, 'docs/specs', 'L2')).toBeNull();
   });
 
-  it('checkSpec d\'un lot back : sujet.id hors du dossier, fiche mixte sans sujet pour un lot spec: true', () => {
+  it('checkSpec d\'un lot back : fiche valide sans écart, fiche mixte sans sujet pour un lot spec: true', () => {
     const h = harness({ lots });
     const ok = ecritBack(h.repo);
     expect(checkSpec(h.repo, ok, 'L1', { screen: false, back: true })).toEqual([]);
-    expect(checkSpec(h.repo, ok, 'L1', { screen: false, back: true }).length).toBe(0);
     const screenOnly = ecrit(h.repo);
     expect(checkSpec(h.repo, screenOnly, 'L1', { screen: false, back: true }).join('\n')).toMatch(/sujet : bloc manquant/);
     expect(checkSpec(h.repo, screenOnly, 'L1', { screen: true, back: true }).join('\n')).toMatch(/sujet : bloc manquant/);

@@ -397,3 +397,38 @@ describe('étape spec : terminaison de la chaîne, tous les chemins', () => {
     }
   });
 });
+
+// L188, 2ᵉ revue : les deux bornes de l'étape spec (contrôle du programme, revues) partagent UN budget de deux sessions spec.
+describe('étape spec : deux sessions spec au plus, chemins asymétriques', () => {
+  const none: Handler = () => claudeOut(specReport({ fiche: '' }));
+  const specCount = (h: ReturnType<typeof harness>) => kinds(h).filter((x) => x === 'spec').length;
+
+  it('lot mixte dont le sujet n\'apparaît qu\'en passe 2 : fiche majeure puis maquette conforme ne rouvre pas la spec', async () => {
+    const mixte: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { mixte: true }) }));
+    const screenOnly: Handler = (call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }));
+    const h = harness({
+      lots: [{ title: 'Un écran', screen: 'page' }],
+      script: { spec: [screenOnly, mixte, mixte], maquette: [() => major(), ok, ok], fiche: [() => major(), () => major()], implement: [impl], review: [ok] },
+    });
+    const c = h.lot('L1', { screen: 'page' as const, visible: true }, { fiche: true, maquette: true });
+    await runLot(c);
+    expect(specCount(h)).toBeLessThanOrEqual(2);
+    expect(['ready', 'handed-back']).toContain(c.lot.status);
+  });
+
+  it('fiche refusée par le contrôle puis valide mais majeure : pas de 3ᵉ session spec', async () => {
+    const h = harness({ lots, script: { spec: [none, spec, spec], fiche: [() => major(), () => major()], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(specCount(h)).toBe(2);
+    expect(c.lot.status).toBe('handed-back');
+  });
+
+  it('refusée, valide, majeure : jamais de 4ᵉ session même si la suite échoue au contrôle', async () => {
+    const h = harness({ lots, script: { spec: [none, spec, none, spec], fiche: [() => major(), () => major()], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(specCount(h)).toBeLessThanOrEqual(2);
+    expect(c.lot.status).toBe('handed-back');
+  });
+});

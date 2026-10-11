@@ -99,6 +99,8 @@ export interface LotState {
   acceptProblems?: string[];
   /** Écarts de la spec relevés par le programme, rendus à la seconde passe `spec` (une seule). */
   specProblems?: string[];
+  /** Sessions spec jouées depuis la dernière question (2 au plus, tous chemins confondus : écarts du programme et constats des revues partagent ce budget). */
+  specRuns?: number;
   /** Questions posées par le programme sur des hypothèses coûteuses de la fiche (--answer vide `questions` : elles restent là pour le brief de reprise). */
   specAsked?: string[];
   /** Lot léger (estimate ≤ orchestrate.review.threshold, L108) : une revue légère, pas de passe des mineurs. Absent : lot ordinaire. */

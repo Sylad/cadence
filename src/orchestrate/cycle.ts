@@ -948,6 +948,7 @@ async function specStep(c: LotCtx): Promise<void> {
   const l = c.lot;
   const done = await session(c, 'spec');
   if (!done) return;
+  l.specRuns = (l.specRuns ?? 0) + 1;
   let rep: SpecReport;
   try {
     rep = checkShape<SpecReport>(done.report, SPEC_SCHEMA);
@@ -958,6 +959,7 @@ async function specStep(c: LotCtx): Promise<void> {
   const questions = takeReport(c, done, rep);
   if (questions.length) {
     l.questions = questions;
+    l.specRuns = undefined; // la réponse ouvre un nouveau budget de deux sessions
     l.specAsked = undefined; // la prochaine réponse porte sur la question de la session, pas sur d'anciennes hypothèses coûteuses
     l.next = 'spec';
     transition(c, 'question', questions[0]);
@@ -988,7 +990,7 @@ async function specStep(c: LotCtx): Promise<void> {
   const inDir = fiche === '' || fiche.startsWith(`${c.config.spec.dir.replace(/\/+$/, '')}/`);
   const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/${what}/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/${what}/fiche.yaml)`] : fiche ? checkSpec(l.repo, fiche, l.lot, partsOf(l, fiche)) : [`aucune fiche écrite : ${c.config.spec.dir}/${what}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
   if (problems.length) {
-    if (l.specProblems) {
+    if ((l.specRuns ?? 0) >= 2) {
       stop(c, 'handed-back', `spec non conforme après 2 passes : ${problems.join(' ; ')}`);
       return;
     }
@@ -1119,6 +1121,11 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
   }
   if (passes >= 2) {
     stop(c, 'handed-back', `${r.label} non conforme après 2 revues : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
+    return;
+  }
+  // Le budget de deux sessions spec est épuisé (écarts du programme compris) : un renvoi à la spec serait une 3ᵉ session.
+  if ((l.specRuns ?? 0) >= 2) {
+    stop(c, 'handed-back', `${r.label} non conforme et la spec a déjà joué 2 sessions : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
     return;
   }
   l[key] = constats.length ? constats : [{ source: r.source, gravite: 'majeur', texte: summary.verdict }];

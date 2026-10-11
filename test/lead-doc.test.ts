@@ -18,6 +18,13 @@ describe('docs/lead.md', () => {
     }
   })
 
+  it("décrit les étapes spec, maquette et accept d'un lot à écran (L177)", () => {
+    const md = read('docs/lead.md')
+    expect(md).toContain('`screen:`')
+    for (const s of ['spec-writer', 'mockup', '`orchestrate.accept`', 'conformity', '`orchestrate.maquette']) expect(md, s).toContain(s)
+    expect(md).toMatch(/precheck.*spec.*maquette.*accept.*implement.*ux.*review/s)
+  })
+
   it('décrit les règles permanentes et les codes de sortie', () => {
     const md = read('docs/lead.md')
     expect(md).toMatch(/^## .*[Rr]ules/m)
@@ -49,6 +56,21 @@ describe.each(Object.entries(svgs))('schéma %s', (variant, file) => {
     const open = (svg.match(/<(g|text|marker|defs|style)[\s>]/g) ?? []).length
     const close = (svg.match(/<\/(g|text|marker|defs|style)>/g) ?? []).length
     expect(open).toBe(close)
+  })
+
+  it("montre les étapes spec, maquette et accept avant l'implémentation (L177)", () => {
+    for (const s of ['spec-writer', 'Mockup review', 'Accept', 'red tests', 'Spec']) {
+      expect(svg, `${variant}: ${s}`).toContain(s)
+    }
+    const y = (id: string) => Number(new RegExp(`<g id="${id}"><rect x="(\\d+)" y="(\\d+)"`).exec(svg)?.[2])
+    const x = (id: string) => Number(new RegExp(`<g id="${id}"><rect x="(\\d+)"`).exec(svg)?.[1])
+    // les trois étapes sont dans le couloir orchestrate, au-dessus de l'implémentation, de gauche à droite
+    expect(x('spec')).toBeLessThan(x('mockup'))
+    expect(x('mockup')).toBeLessThan(x('accept'))
+    expect(y('spec')).toBeLessThan(y('implement'))
+    // aucune boîte ne sort du cadre
+    const h = Number(/viewBox="0 0 \d+ (\d+)"/.exec(svg)?.[1])
+    for (const id of ['spec', 'mockup', 'accept', 'implement', 'next']) expect(y(id) + 66, id).toBeLessThan(h)
   })
 
   it('a trois couloirs et les étapes du workflow', () => {

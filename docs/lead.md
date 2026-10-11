@@ -10,7 +10,7 @@ summaries, decides with the human, and leaves the work to fresh short sessions r
   <img alt="The lead workflow in three lanes (human, lead session, orchestrate program and agents), from the tour of the projects to the close of the session" src="lead-workflow-light.svg">
 </picture>
 
-Dashed boxes are conditional steps. The skill itself is `skills/lead/SKILL.md`; this page is its
+Dashed boxes are conditional steps (the spec and accept steps run only for a lot with a screen). The skill itself is `skills/lead/SKILL.md`; this page is its
 picture, not its source.
 
 ## The steps
@@ -20,11 +20,25 @@ picture, not its source.
    quick wins. It stops and waits: the human picks the lots and the order (`--priority`, or the
    `priority:` list of the parent folder's `cadence.yaml`).
 2. **Wave.** The lead starts `cadence orchestrate <project>:<lot> … --wave <id>` in the background.
-   For each lot the program runs, in fresh sessions and in this order: the implementation (test
-   first, commits citing the lot), a UX review if the lot is `visible` and the project says how to see
-   its app (`orchestrate.ux`), the code review (Opus; Sonnet for a lot of 0.25 day or less), a
-   correction in a new session if the review is not compliant (two passes at most, each followed by a
-   review), and it records `raf review` itself once the review is compliant.
+   For each lot the program runs, in fresh sessions and in this order: `precheck → spec → maquette →
+   accept → implement → ux → review`. The three middle steps before the code exist only for a lot that
+   declares `screen:` (a visible lot that creates or changes a screen), the other lots start at the
+   implementation:
+   - **spec**: the `spec-writer` agent draws a static mockup to the project's own style and writes the
+     screen sheet (`fiche.yaml`: fields, states, numbered rules), rendered at 1440 and 390 px;
+   - **maquette**: the `ux-reviewer` agent reviews the mockup (two passes at most, then the lot is handed
+     back) unless `orchestrate.maquette: false`;
+   - **accept**: a separate session writes the acceptance tests from the sheet, committed red and locked,
+     when the project declares `orchestrate.accept`; without it the step is skipped with a warning;
+   - the implementation (test first, commits citing the lot) makes them green without touching them;
+   - a UX pass if the lot is `visible` and the project says how to see its app (`orchestrate.ux`); for a
+     lot with a sheet it is a conformity pass against the mockup;
+   - the code review (Opus; Sonnet for a lot of 0.25 day or less), which also follows each rule of the
+     sheet to its test;
+   - a correction in a new session if the review is not compliant (two passes at most, each followed by
+     a review).
+
+   The program records `raf review` itself once the review is compliant.
 3. **Relay.** The lead follows the wave's journal (`tail -n +1 -F .cadence/runs/<id>/journal.log`, one
    line per transition) and tells the human each line in one sentence, with no polling loop. A
    question from a session comes back to the human at once; the answer goes in with

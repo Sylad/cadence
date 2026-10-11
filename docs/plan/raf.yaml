@@ -2011,6 +2011,7 @@ lots:
     started: 2026-10-11
     notes:
       - { date: 2026-10-11, text: "Rendu par la vague 2026-10-11-1035 (revue non conforme après 2 passes, 607 k). À corriger dans la reprise : (1) MAJEUR README.md:293 « The Markdown is deliberately small… » ne cite pas les titres #…###### que renderMarkdown rend depuis 0b3d02b (un niveau plus bas, coupent paragraphe et liste) — compléter la liste et ajouter une ligne au CHANGELOG ; (2) renderMarkdown (news.ts:296) : une hypothèse sur deux lignes (format spec §8, continuation indentée) sort en <p> à tirets bruts — accepter les lignes de continuation, test ; (3) README.md:39 : l'ancre #…-conformity-hypotheses ne mène pas au titre « … Hypothèses » (le slug GitHub garde le è) ; mineurs : news.ts:203 id de règle non échappé dans la RegExp (fiche id « R1( » fait planter news check), ficheHypotheses (spec.ts:167) duplique findFiche (orchestrate/spec.ts:14), test orchestrate-aval.test.ts:139 monté sur un état refusé par raf check (screen sans visible)." }
+    review: { date: 2026-10-11, verdict: "Conforme : les 4 correctifs tiennent (puce sur plusieurs lignes, id de règle échappé, fichesDuDossier, import mort retiré), 1578/1578 tests passent, tsc OK, et il reste 1 note mineure sur le titre d'un test. — orchestré (vague 2026-10-11-1105, 0 passe(s) de correction + passe des mineurs)", commit: 74d00dc955ac0b7377ce6ce652f061cc959e790b }
   - id: L175
     title: Essai étape spec sur un écran d'app loisir (spec etape-spec, S7)
     status: todo

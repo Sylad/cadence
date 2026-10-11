@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { readDocsConfig, readHookConfig, readNewsConfig, readPlanConfig, readSessionConfig } from './config.js';
+import { readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPlanConfig, readSessionConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
 import { audit, exemptPlanOnly, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
@@ -22,7 +22,7 @@ import { liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/comma
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
-import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
+import { checkFiche, deriveQa, ficheHypotheses, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
@@ -450,7 +450,15 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'news':
-      return news(rest, loadPlan(), newsDir, today, values, io, refuseLongTitle);
+      return news(rest, loadPlan(), newsDir, today, values, io, refuseLongTitle, () => {
+        let dir = 'docs/specs';
+        try {
+          dir = readOrchestrateConfig(configPath).spec.dir;
+        } catch {
+          // une configuration d'orchestrate illisible n'empêche pas de contrôler les Nouveautés : dossier par défaut
+        }
+        return ficheHypotheses(root, dir);
+      });
     default:
       throw new RafError(`commande inconnue : ${command} (raf --help)`);
   }
@@ -625,6 +633,7 @@ function news(
   values: { title?: string; output?: string },
   io: Io,
   refuseLongTitle: (text: string, hint?: string) => void,
+  hypotheses: () => Map<string, string[]>,
 ): number {
   const lots = plan.lots();
   switch (sub) {
@@ -649,7 +658,7 @@ function news(
     case 'check':
     case 'build': {
       const entries = loadEntries(dir);
-      const issues = newsIssues(lots, entries, dir);
+      const issues = newsIssues(lots, entries, dir, sub === 'check' ? hypotheses() : undefined);
       for (const i of issues) io.out(`✗ ${i.message}`);
       // Le build refuse seulement ce qu'il ne saurait pas publier : entrée illisible, capture absente.
       const blocking = sub === 'check' ? issues : issues.filter((i) => i.kind === 'bad-entry' || i.kind === 'missing-capture');

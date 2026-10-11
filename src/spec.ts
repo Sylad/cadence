@@ -1,5 +1,6 @@
 import { parse } from 'yaml';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { RafError } from './plan.js';
 
 /** Les largeurs de rendu d'une fiche (L170, spec etape-spec S2). */
@@ -157,4 +158,28 @@ export function deriveQa(doc: unknown): string {
     out.push(`- api: ${(a.appel as string).slice(4)}${peut.length ? ` — may be empty when ${peut.join(' ; ')}` : ''}`);
   }
   return `${out.join('\n')}\n`;
+}
+
+/**
+ * Les règles `hypothese` des fiches du dossier des specs (`<dir>/<écran>/fiche.yaml`), par lot (`ecran.lot`) — L174.
+ * Un lot sans hypothèse n'y figure pas ; un dossier absent ou une fiche illisible ne donnent rien (le contrôle des fiches est `cadence spec check`).
+ */
+export function ficheHypotheses(root: string, dir: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const base = join(root, dir);
+  if (!existsSync(base)) return out;
+  for (const name of readdirSync(base).sort()) {
+    const file = join(base, name, 'fiche.yaml');
+    if (!existsSync(file)) continue;
+    let doc: unknown;
+    try {
+      doc = parse(readFileSync(file, 'utf8'));
+    } catch {
+      continue;
+    }
+    if (!isObj(doc) || !isObj(doc.ecran) || !texte(doc.ecran.lot)) continue;
+    const ids = (Array.isArray(doc.regles) ? doc.regles : []).filter(isObj).filter((r) => r.statut === 'hypothese' && texte(r.id)).map((r) => String(r.id));
+    if (ids.length) out.set(doc.ecran.lot, [...(out.get(doc.ecran.lot) ?? []), ...ids]);
+  }
+  return out;
 }

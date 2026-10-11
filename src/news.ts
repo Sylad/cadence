@@ -24,7 +24,7 @@ export interface Entry {
 }
 
 export interface NewsIssue {
-  kind: 'bad-entry' | 'unknown-lot' | 'missing-capture' | 'no-capture' | 'no-time' | 'visible-without-entry';
+  kind: 'bad-entry' | 'unknown-lot' | 'missing-capture' | 'no-capture' | 'no-time' | 'visible-without-entry' | 'missing-hypotheses';
   message: string;
 }
 
@@ -160,7 +160,21 @@ export function loadEntries(dir: string, added: () => Map<string, number> = () =
   });
 }
 
-export function newsIssues(lots: Lot[], entries: Entry[], dir: string): NewsIssue[] {
+/** Lignes `- Rn — …` de la section `## Hypothèses` du corps d'une entrée : null sans la section. */
+function hypothesisLines(body: string): string[] | null {
+  const lines = body.split('\n');
+  const start = lines.findIndex((l) => /^##\s+Hypothèses\s*$/i.test(l));
+  if (start < 0) return null;
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((l) => /^#{1,6}\s/.test(l));
+  return (end < 0 ? rest : rest.slice(0, end)).filter((l) => /^\s*[-*]\s+R\d+(?!\d)/.test(l));
+}
+
+/**
+ * `hypotheses` : par lot, les règles `hypothese` de sa fiche (L174, `ficheHypotheses`). L'entrée d'un lot qui en a doit se terminer
+ * par une section `## Hypothèses` avec une ligne `- Rn — …` par règle.
+ */
+export function newsIssues(lots: Lot[], entries: Entry[], dir: string, hypotheses: Map<string, string[]> = new Map()): NewsIssue[] {
   const issues: NewsIssue[] = [];
   const ids = new Set(lots.map((l) => l.id));
   const covered = new Set(entries.flatMap((e) => e.lots));
@@ -182,6 +196,18 @@ export function newsIssues(lots: Lot[], entries: Entry[], dir: string): NewsIssu
     if (l.visible && l.status === 'done' && !covered.has(l.id)) {
       issues.push({ kind: 'visible-without-entry', message: `${l.id} est visible et terminé sans entrée Nouveautés — cadence news new ${l.id}` });
     }
+  }
+  for (const [id, rules] of hypotheses) {
+    const mine = entries.filter((e) => e.lots.includes(id));
+    if (!rules.length || !mine.length) continue;
+    const found = mine.map((e) => ({ e, lines: hypothesisLines(e.body) })).map(({ e, lines }) => ({ e, lines, missing: lines ? rules.filter((r) => !lines.some((l) => new RegExp(`^\\s*[-*]\\s+${r}(?!\\d)`).test(l))) : rules }));
+    if (found.some((f) => f.lines && f.missing.length === 0)) continue;
+    const withSection = found.filter((f) => f.lines).sort((a, b) => a.missing.length - b.missing.length)[0];
+    issues.push(
+      withSection
+        ? { kind: 'missing-hypotheses', message: `${id} : la section « ## Hypothèses » de ${withSection.e.file} n'a pas de ligne pour ${withSection.missing.join(', ')}` }
+        : { kind: 'missing-hypotheses', message: `${id} : la fiche a des hypothèses (${rules.join(', ')}) mais l'entrée ${mine[0].file} n'a pas la section « ## Hypothèses »` },
+    );
   }
   return issues;
 }

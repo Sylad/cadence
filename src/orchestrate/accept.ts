@@ -170,6 +170,15 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
   return problems;
 }
 
+/** La fiche a changé depuis `since` (commits et arbre de travail). Illisible pour git : non (le verrou reste entier). */
+function ficheChanged(repo: string, since: string, fiche: string): boolean {
+  try {
+    return git(repo, 'diff', '--name-only', since, '--', fiche).trim() !== '';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Le verrou (spec etape-spec § 5), valable pour toute session du dépôt : les tests d'acceptation de TOUS les lots sont inchangés depuis leur
  * commit rouge, au sens de git (arbre de travail compris), et chaque `acceptation.json` n'a bougé que par sa clé `vert` — posée par le
@@ -177,8 +186,10 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
  * Un fichier neuf est un écart, sauf `skip` : le fichier du lot que l'étape accept est en train d'écrire, pas encore scellé (les autres lots restent
  * verrouillés, y compris contre un fichier d'un autre lot créé au passage). `rouge` : le commit rouge rangé dans l'état du cycle pour un fichier ; si
  * le dernier commit qui l'a réécrit n'est plus celui-là, une session précédente (interrompue, donc jamais comparée) l'a réécrit.
+ * Exception (L183) : une acceptation à `vert: true` (lot livré) laisse modifier ses tests listés si la fiche de l'écran a changé depuis `lotBase` (la
+ * tête d'avant le premier travail du lot, par défaut `headBefore`), arbre de travail compris : la fiche fait évoluer les règles. `vert: false` : verrou entier.
  */
-export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string> } = {}): string[] {
+export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string>; lotBase?: string } = {}): string[] {
   const out: string[] = [];
   const before = new Set(listAcceptations(repo, dir, headBefore));
   const now = new Set(listAcceptations(repo, dir));
@@ -208,6 +219,7 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     } catch {
       changed = fichiers;
     }
+    if (cur.vert === true && typeof base.fiche === 'string' && ficheChanged(repo, opts.lotBase ?? headBefore, base.fiche)) continue;
     const lot = typeof base.lot === 'string' ? base.lot : '?';
     const emp = isObj(base.empreintes) ? base.empreintes : {};
     for (const f of fichiers) {

@@ -142,6 +142,70 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
     expect(lockViolations(repo, DIR, head)).toEqual([]);
   });
 
+  describe('acceptation à vert: true (lot livré) : la fiche fait évoluer les règles (L183)', () => {
+    function livre() {
+      const repo = gitRepo();
+      const a = ecritAcceptation(repo);
+      setVert(repo, a.json);
+      commitPaths(repo, 'chore(L1): vert', a.json);
+      return { repo, a, head: git(repo, 'rev-parse', 'HEAD') };
+    }
+    const changeFiche = (repo: string, fiche: string) => writeFileSync(join(repo, fiche), `${readFileSync(join(repo, fiche), 'utf8')}# R7 révisée\n`);
+
+    it('tests modifiés SANS changement de la fiche : écart comme avant', () => {
+      const { repo, a, head } = livre();
+      writeFileSync(join(repo, a.test), "it('R1', () => {});\n");
+      commitPaths(repo, 'feat(L9): change R7', a.test);
+      expect(lockViolations(repo, DIR, head).join('\n')).toContain(a.test);
+    });
+
+    it('tests ET fiche modifiés dans les commits du même lot : admis', () => {
+      const { repo, a, head } = livre();
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L9): R7 révisée', a.test, a.fiche);
+      expect(lockViolations(repo, DIR, head)).toEqual([]);
+    });
+
+    it('la fiche changée dans un commit antérieur du lot (lotBase) admet les tests modifiés par une session suivante', () => {
+      const { repo, a, head } = livre();
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L9): fiche', a.fiche);
+      const session = git(repo, 'rev-parse', 'HEAD');
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      expect(lockViolations(repo, DIR, session).join('\n')).toContain(a.test);
+      expect(lockViolations(repo, DIR, session, { lotBase: head })).toEqual([]);
+    });
+
+    it('la fiche changée mais non commitée (arbre de travail) compte aussi', () => {
+      const { repo, a, head } = livre();
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      expect(lockViolations(repo, DIR, head)).toEqual([]);
+    });
+
+    it('vert: false : verrou entier, même si la fiche change', () => {
+      const repo = gitRepo();
+      const a = ecritAcceptation(repo);
+      const head = git(repo, 'rev-parse', 'HEAD');
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L9): R7', a.test, a.fiche);
+      expect(lockViolations(repo, DIR, head).join('\n')).toContain(a.test);
+    });
+
+    it('acceptation.json lui-même reste verrouillé (liste réduite) même fiche changée', () => {
+      const { repo, a, head } = livre();
+      changeFiche(repo, a.fiche);
+      const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+      doc.fichiers = [];
+      writeFileSync(join(repo, a.json), JSON.stringify(doc));
+      commitPaths(repo, 'feat(L9): vide', a.json, a.fiche);
+      expect(lockViolations(repo, DIR, head).join('\n')).toContain(a.json);
+    });
+  });
+
   it('une session qui pose vert: true elle-même est signalée', () => {
     const repo = gitRepo();
     const a = ecritAcceptation(repo);

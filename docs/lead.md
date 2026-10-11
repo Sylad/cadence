@@ -21,11 +21,18 @@ picture, not its source.
    `priority:` list of the parent folder's `cadence.yaml`).
 2. **Wave.** The lead starts `cadence orchestrate <project>:<lot> … --wave <id>` in the background.
    For each lot the program runs, in fresh sessions and in this order: `precheck → spec → maquette →
-   accept → implement → ux → review`. The three middle steps before the code exist only for a lot that
-   declares `screen:` (a visible lot that creates or changes a screen), the other lots start at the
-   implementation:
+   accept → implement → ux → review`. The steps before the code exist only for a lot that declares
+   `screen:` (a visible lot that creates or changes a screen) or `spec: true` (a lot without a screen
+   that still has a behaviour to pin down: `precheck → spec → fiche → accept → implement → review`);
+   the other lots start at the implementation:
    - **spec**: the `spec-writer` agent draws a static mockup to the project's own style and writes the
      screen sheet (`fiche.yaml`: fields, states, numbered rules), rendered at 1440 and 390 px;
+   - **fiche** (a lot with a back-end part: `spec: true`, or a screen lot whose sheet has a `sujet` block):
+     the `code-reviewer` agent in sheet mode reviews the back-end sheet (two passes at most, then the lot
+     is handed back) unless `orchestrate.fiche: false`; a mixed lot has both reviews, and their findings
+     go together to a single second `spec` pass. A lot without a screen has no News entry: the
+     hypotheses of its final sheet become one note of the lot each, and the end-of-wave table lists them
+     as `hypothèse de la fiche : …` — the lead relays them to the human;
    - **maquette**: the `ux-reviewer` agent reviews the mockup (two passes at most, then the lot is handed
      back) unless `orchestrate.maquette: false`;
    - **accept**: a separate session writes the acceptance tests from the sheet, committed red and locked,

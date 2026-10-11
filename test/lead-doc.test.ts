@@ -25,6 +25,12 @@ describe('docs/lead.md', () => {
     expect(md).toMatch(/precheck.*spec.*maquette.*accept.*implement.*ux.*review/s)
   })
 
+  it("décrit l'étape fiche d'un lot spec: true et le relais des hypothèses (L188)", () => {
+    const md = read('docs/lead.md')
+    for (const s of ['`spec: true`', '**fiche**', '`orchestrate.fiche: false`', 'hypothèse de la fiche']) expect(md, s).toContain(s)
+    expect(read('skills/lead/SKILL.md')).toContain('hypothèse de la fiche')
+  })
+
   it('décrit les règles permanentes et les codes de sortie', () => {
     const md = read('docs/lead.md')
     expect(md).toMatch(/^## .*[Rr]ules/m)

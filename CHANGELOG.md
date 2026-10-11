@@ -50,6 +50,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - `cadence spec check` reads the **back-end sheet** of a lot without a screen (L187, second brick of the back-end spec step): `sujet` (id, titre, lot, perimetre), `cas` `C1…` with their alternatives, `regles` attached to cases, `contrats` `A1…` (call, input, output, errors as `{ code, message }`), `donnees` `D1…` (an existing object that is modified needs the lead's `decision`); a **mixed sheet** (`sujet` and `ecran`) shares the `A` ids between the screen's actions and the contracts (`contrat: Ax`). Template `templates/fiche-back.yaml`; a screen sheet stays valid unchanged; `cadence spec qa` refuses a sheet without `ecran`. (L187)
 - `cadence orchestrate`: a lot with `screen:` gets, on top of the budget derived from its estimate, an allocation of 350 k tokens for its spec, mockup (≤ 2 passes) and accept sessions, measured on the journals (ol L113: 349 k, ol L25: 202 k); ol L25 had been handed back at 503 k / 450 k before its fix pass. `--dry-run` shows both parts, and `--continue` draws with the full budget (L191).
 
+### Fixed
+
+- `cadence spec check` (L192, follow-ups of the L187 review): the log levels of the fleet's stacks are accepted as an error `code` (`log warning|info|critical|fatal|verbose` besides `debug|log|warn|error`); on a back-end-only sheet a rule with `etat` gets one report instead of two contradictory ones, and `actions`, `etats` and `champs` without `ecran` are refused instead of ignored; on a mixed sheet an action that repeats the `appel` of a contract without `contrat:` is reported. (L192)
+
 ## [1.1.0] - 2026-10-11
 
 ### Fixed

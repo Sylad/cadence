@@ -16,7 +16,7 @@ const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !
 const texte = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 
 const APPEL_BACK = /^((GET|POST|PUT|PATCH|DELETE) \/\S*|job \S+|commande \S+( \S+)*)$/;
-const CODE_ERREUR = /^(HTTP \d{3}|log (debug|log|warn|error))$/;
+const CODE_ERREUR = /^(HTTP \d{3}|log (debug|log|warn|warning|error|info|critical|fatal|verbose))$/;
 const MODIFICATIONS = ['aucune', 'ajout', 'changement'];
 
 const liste = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
@@ -67,6 +67,9 @@ export function checkFiche(doc: unknown): string[] {
       if (texte(sujet.lot) && texte(ecran.lot) && sujet.lot !== ecran.lot) p.push(`sujet.lot « ${sujet.lot} » et ecran.lot « ${ecran.lot} » diffèrent (c'est le lot d'implémentation)`);
     }
   }
+
+  // Sans partie écran, ces clés ne veulent rien dire : les ignorer en silence laisserait passer, par exemple, des actions A1… en double des contrats.
+  if (!ecranPart) for (const k of ['actions', 'etats', 'champs']) if (doc[k] !== undefined && doc[k] !== null) p.push(`${k} : n'a de sens que dans une fiche qui a une partie écran (ecran)`);
 
   let etats: string[] = [];
   let champs: unknown[] = [];
@@ -158,7 +161,7 @@ export function checkFiche(doc: unknown): string[] {
       else for (const c of r.cas) if (!casIds.has(String(c)) || !back) p.push(`${id} : cas « ${String(c)} » absent de la fiche`);
     }
     if (!texte(r.enonce)) p.push(`${id} : enonce manquant`);
-    const rattachee = !back || aUnEtat;
+    const rattachee = ecranPart && (!back || aUnEtat);
     if (rattachee) {
       if (!('message' in r) || !(r.message === null || typeof r.message === 'string')) p.push(`${id} : message attendu (le texte exact à l'écran, ou null)`);
     } else {
@@ -206,6 +209,10 @@ export function checkFiche(doc: unknown): string[] {
       if (!contratIds.has(a.contrat)) p.push(`${id} : contrat « ${a.contrat} » absent de la fiche (un id de contrats)`);
       if ('appel' in a && a.appel !== undefined && a.appel !== null) p.push(`${id} : une action qui renvoie à un contrat ne répète pas son appel (contrat ${a.contrat})`);
     } else if (!texte(a.appel) || !APPEL.test(a.appel)) p.push(`${id} : appel « ${String(a.appel ?? '')} » invalide (VERBE /chemin)`);
+    else if (commun) {
+      const meme = contrats.filter(isObj).find((c) => c.appel === a.appel && texte(c.id));
+      if (meme) p.push(`${id} : appel « ${a.appel} » déjà celui du contrat ${String(meme.id)} (renvoyer au contrat avec contrat: ${String(meme.id)}, sans répéter l'appel)`);
+    }
     if ('regles' in a && a.regles !== undefined && a.regles !== null && !Array.isArray(a.regles)) p.push(`${id} : regles doit être une liste d'ids de règles`);
     for (const r of Array.isArray(a.regles) ? a.regles : []) if (!ruleIds.has(String(r))) p.push(`${id} : règle « ${String(r)} » absente de la fiche`);
   }
@@ -230,7 +237,7 @@ export function checkFiche(doc: unknown): string[] {
           p.push(`${id} : erreur n° ${j + 1} : objet { code, message } attendu`);
           continue;
         }
-        if (!texte(e.code) || !CODE_ERREUR.test(e.code)) p.push(`${id} : erreur n° ${j + 1} : code « ${String(e.code ?? '')} » invalide (HTTP <n> ou log debug|log|warn|error)`);
+        if (!texte(e.code) || !CODE_ERREUR.test(e.code)) p.push(`${id} : erreur n° ${j + 1} : code « ${String(e.code ?? '')} » invalide (HTTP <n> ou log debug|log|warn|warning|error|info|critical|fatal|verbose)`);
         if (!texte(e.message)) p.push(`${id} : erreur n° ${j + 1} : message manquant (le texte exact)`);
       }
       if ('regles' in a && a.regles !== undefined && a.regles !== null && !Array.isArray(a.regles)) p.push(`${id} : regles doit être une liste d'ids de règles`);

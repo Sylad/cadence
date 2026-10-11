@@ -247,6 +247,104 @@ describe('cadence spec check : la fiche mixte (sujet et ecran)', () => {
   });
 });
 
+describe('cadence spec check : suites de la revue L187 (L192)', () => {
+  it('accepte les niveaux de log des piles du parc (NestJS, Python, Node) comme code d\'erreur', () => {
+    for (const niveau of ['debug', 'log', 'warn', 'error', 'warning', 'info', 'critical', 'fatal', 'verbose']) {
+      const f = back();
+      f.contrats[0].erreurs = [{ code: `log ${niveau}`, message: 'x' }];
+      expect(checkFiche(f), niveau).toEqual([]);
+    }
+    const g = back();
+    g.contrats[0].erreurs = [{ code: 'log trace', message: 'x' }];
+    expect(checkFiche(g).join('\n')).toMatch(/A1 : erreur n° 1 : code « log trace » invalide/);
+  });
+
+  it('une fiche back seule : une règle avec etat reçoit un seul écart, sans exiger de message', () => {
+    const f = back();
+    f.regles[0].etat = 'vide';
+    const p = checkFiche(f).filter((m) => m.startsWith('R1 :'));
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatch(/etat n'a de sens que dans une fiche qui a une partie écran/);
+  });
+
+  it('une fiche back seule refuse actions, etats et champs (sans ecran) au lieu de les ignorer', () => {
+    const f = back();
+    f.actions = [{ id: 'A1', declencheur: null, appel: 'GET /x' }];
+    f.etats = ['vide', 'chargement', 'erreur'];
+    f.champs = [{ id: 'x', libelle: 'X', type: 'texte', source: 's', obligatoire: true }];
+    const p = checkFiche(f).join('\n');
+    expect(p).toMatch(/actions : .*partie écran/);
+    expect(p).toMatch(/etats : .*partie écran/);
+    expect(p).toMatch(/champs : .*partie écran/);
+    // des listes vides ou nulles ne disent rien : le gabarit reste valide
+    const g = back();
+    g.actions = null;
+    expect(checkFiche(g)).toEqual([]);
+  });
+
+  it('une fiche mixte : une action qui répète l\'appel d\'un contrat sans contrat: est refusée', () => {
+    const f = mixte();
+    delete f.actions[0].contrat;
+    f.actions[0].appel = 'POST /api/fixtures/next/reminder';
+    expect(checkFiche(f).join('\n')).toMatch(/A6 : .*appel.*contrat A5.*contrat: A5/);
+    // un appel propre, absent des contrats, reste accepté
+    f.actions[0].appel = 'POST /api/autre';
+    expect(checkFiche(f)).toEqual([]);
+  });
+});
+
+describe('cadence spec check : branches de la fiche back sans test jusque-là (L192)', () => {
+  it('hors_perimetre : liste de textes, nulle ou absente', () => {
+    const f = back();
+    f.sujet.perimetre.hors_perimetre = null;
+    expect(checkFiche(f)).toEqual([]);
+    f.sujet.perimetre.hors_perimetre = ['le front'];
+    expect(checkFiche(f)).toEqual([]);
+    f.sujet.perimetre.hors_perimetre = 'le front';
+    expect(checkFiche(f).join('\n')).toMatch(/sujet\.perimetre\.hors_perimetre : liste de textes/);
+    f.sujet.perimetre.hors_perimetre = ['ok', ''];
+    expect(checkFiche(f).join('\n')).toMatch(/hors_perimetre : liste de textes/);
+  });
+
+  it('fiche mixte : l\'id d\'un contrat est de la forme A<n>, et celui d\'une action est exigé', () => {
+    const f = mixte();
+    f.contrats[4].id = 'X5';
+    expect(checkFiche(f).join('\n')).toMatch(/contrat n° 5 : l'id doit être de la forme A<n>/);
+    const g = mixte();
+    delete g.actions[0].id;
+    expect(checkFiche(g).join('\n')).toMatch(/action n° 1 : id manquant/);
+  });
+
+  it('un élément qui n\'est pas un objet est refusé : cas, règle, action, contrat, donnée, champ, alternative, erreur', () => {
+    const f = back();
+    f.cas[0] = 'C1';
+    f.cas[1].alternatives = ['si'];
+    f.regles[0] = 'R1';
+    f.contrats[0] = 'A1';
+    f.contrats[1].erreurs = ['HTTP 404'];
+    f.donnees[0] = 'D1';
+    const p = checkFiche(f).join('\n');
+    expect(p).toMatch(/cas n° 1 : objet attendu/);
+    expect(p).toMatch(/C2 : alternative n° 1 : objet attendu/);
+    expect(p).toMatch(/règle n° 1 : objet attendu/);
+    expect(p).toMatch(/contrat n° 1 : objet attendu/);
+    expect(p).toMatch(/A2 : erreur n° 1 : objet \{ code, message \} attendu/);
+    expect(p).toMatch(/donnée n° 1 : objet attendu/);
+    const e = mixte();
+    e.champs[0] = 'x';
+    e.actions[0] = 'A6';
+    const q = checkFiche(e).join('\n');
+    expect(q).toMatch(/champ n° 1 : objet attendu/);
+    expect(q).toMatch(/action n° 1 : objet attendu/);
+  });
+
+  it('un champ sans id est refusé', () => {
+    const f = mixte();
+    delete f.champs[0].id;
+    expect(checkFiche(f).join('\n')).toMatch(/champ n° 1 : id manquant/);
+  });
+});
+
 describe('cadence spec check en ligne de commande, fiche back', () => {
   it('code 0 et un résumé des cas, règles, contrats et données', () => {
     const r = cadence(tempDir(), 'spec', 'check', exempleBack);

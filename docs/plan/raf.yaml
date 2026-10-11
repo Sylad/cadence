@@ -2005,7 +2005,7 @@ lots:
   - id: L174
     title: "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses (spec etape-spec, S6)"
     status: todo
-    estimate: 1
+    estimate: 1.5
     after: [ L172, L173 ]
     created: 2026-10-10
   - id: L175

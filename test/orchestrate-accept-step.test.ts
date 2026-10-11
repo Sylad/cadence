@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { runLot } from '../src/orchestrate/cycle.js';
@@ -182,6 +182,19 @@ describe('étape accept : ce que le programme contrôle', () => {
     expect(c.lot.outcome).toMatch(/accept non conforme après 2 passes/);
   });
 
+  it('un fichier de tests déjà présent avant la première session accept est refusé par le cycle, aux deux passes', async () => {
+    const h = prepared({ accept: [accept(), accept()] });
+    mkdirSync(join(h.repo, 'test'), { recursive: true });
+    writeFileSync(join(h.repo, 'test/prochain-match.acceptation.test.ts'), "it('ordinaire', () => {});\n");
+    git(h.repo, 'add', '--', 'test/prochain-match.acceptation.test.ts');
+    git(h.repo, 'commit', '-q', '-m', 'test: un test ordinaire', '--', 'test/prochain-match.acceptation.test.ts');
+    const c = h.lot('L1', screen, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['accept', 'accept']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/existait avant la session accept/);
+  });
+
   it('config.test qui échoue avec les tests rouges commités (exclusion absente) : écart, jamais d’implémentation', async () => {
     const h = prepared({ accept: [accept(), accept()] });
     const c = h.lot('L1', screen, { ...config, test: 'false' });
@@ -268,6 +281,28 @@ describe('verrou et retour au vert pendant implement / fix', () => {
     await runLot(c);
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toMatch(/vert/);
+  });
+
+  it('une réécriture des tests commitée par une session interrompue est attrapée à la fin de la session suivante, par rapport au commit rouge', async () => {
+    const h = prepared({ implement: [green], review: [ok] });
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, a.json);
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', a.json);
+    const rouge = git(h.repo, 'rev-parse', 'HEAD');
+    const f = join(h.repo, a.json);
+    writeFileSync(f, JSON.stringify({ ...JSON.parse(readFileSync(f, 'utf8')), fiche: 'ailleurs.yaml' }, null, 2));
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'feat(L1): réécrit avant la coupure', '--', a.json);
+    const head = git(h.repo, 'rev-parse', 'HEAD');
+    const c = h.lot('L1', screen, config);
+    c.lot.accept = { acceptation: a.json, rouge };
+    c.lot.next = 'implement';
+    c.lot.status = 'suspended';
+    c.lot.steps.push({ n: 1, kind: 'implement', model: 'sonnet', status: 'interrupted', started: 'x', headBefore: head });
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/verrou des tests d'acceptation.*réécrit depuis son commit rouge/);
   });
 
   it('le verrou vaut pour les autres lots du dépôt : L2 ne touche pas aux tests de L1, même sans screen: ni orchestrate.accept', async () => {

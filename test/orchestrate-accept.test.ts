@@ -178,6 +178,45 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
       expect(lockViolations(repo, DIR, session, { lotBase: head })).toEqual([]);
     });
 
+    it("le lot SUIVANT une évolution admise ne voit aucun écart : les tests sont comparés à la tête d'avant le lot, plus au commit rouge", () => {
+      const { repo, a, head } = livre();
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L9): R7 révisée', a.test, a.fiche);
+      expect(lockViolations(repo, DIR, head)).toEqual([]);
+      writeFileSync(join(repo, 'autre.txt'), 'x\n');
+      commitPaths(repo, 'feat(L10): sans lien', 'autre.txt');
+      const avant = git(repo, 'rev-parse', 'HEAD');
+      writeFileSync(join(repo, 'autre.txt'), 'y\n');
+      commitPaths(repo, 'feat(L10): suite', 'autre.txt');
+      expect(lockViolations(repo, DIR, avant)).toEqual([]);
+      expect(lockViolations(repo, DIR, avant, { lotBase: avant })).toEqual([]);
+    });
+
+    it("après une évolution admise, un lot suivant qui retouche les tests sans la fiche reste un écart", () => {
+      const { repo, a, head } = livre();
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L9): R7 révisée', a.test, a.fiche);
+      const avant = git(repo, 'rev-parse', 'HEAD');
+      expect(head).not.toBe(avant);
+      writeFileSync(join(repo, a.test), "it('R1', () => {});\n");
+      commitPaths(repo, 'feat(L10): triche', a.test);
+      expect(lockViolations(repo, DIR, avant).join('\n')).toContain(a.test);
+    });
+
+    it('la fiche changée dans un commit du lot qui précède sa tête de départ (lots) admet les tests modifiés', () => {
+      const { repo, a, head } = livre();
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'docs(L9): fiche R7', a.fiche);
+      const fiche = git(repo, 'rev-parse', 'HEAD');
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      expect(lockViolations(repo, DIR, fiche).join('\n')).toContain(a.test);
+      expect(lockViolations(repo, DIR, fiche, { lotCommits: [fiche] })).toEqual([]);
+      expect(lockViolations(repo, DIR, fiche, { lotCommits: [head] }).join('\n')).toContain(a.test);
+    });
+
     it('la fiche changée mais non commitée (arbre de travail) compte aussi', () => {
       const { repo, a, head } = livre();
       writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");

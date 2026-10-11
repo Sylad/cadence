@@ -349,3 +349,61 @@ describe('verrou et retour au vert pendant implement / fix', () => {
     expect(existsSync(join(h.repo, JSON_PATH))).toBe(true);
   });
 });
+
+describe("acceptation d'un lot livré : la fiche évolue dans un lot suivant (L183)", () => {
+  const FICHE = `${DIR}/prochain-match/fiche.yaml`;
+  const TEST = 'test/prochain-match.acceptation.test.ts';
+  const touch = (cwd: string, file: string, text: string, msg: string) => {
+    writeFileSync(join(cwd, file), `${existsSync(join(cwd, file)) ? readFileSync(join(cwd, file), 'utf8') : ''}${text}`);
+    git(cwd, 'add', '--', file);
+    git(cwd, 'commit', '-q', '-m', msg, '--', file);
+  };
+  const major: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 1, texte: 'bug nommé' }], verdict: 'non conforme' }));
+  const lotsDeux = [{ title: 'Un écran', screen: 'page' as const }, { title: 'Suite' }];
+
+  it('implement change la fiche et les tests de L1 ; la correction qui suit (fix) et la revue ne sont pas rendues au lead', async () => {
+    const evolue: Handler = (call) => {
+      touch(call.opts.cwd, FICHE, '# R7 révisée\n', 'feat(L2): fiche R7');
+      touch(call.opts.cwd, TEST, '// R7 nouvelle\n', 'feat(L2): tests R7');
+      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'feat(L2): tests R7' }] }));
+    };
+    const h = prepared({ accept: [accept()], implement: [green, evolue], review: [ok, major, ok], fix: [notGreen] }, lotsDeux);
+    await runLot(h.lot('L1', screen, config));
+    const c2 = h.lot('L2', {}, config);
+    await runLot(c2);
+    expect(kinds(h)).toEqual(['accept', 'implement', 'review', 'implement', 'review', 'fix', 'review']);
+    expect(c2.lot.outcome ?? '').not.toMatch(/verrou/);
+    expect(c2.lot.status).toBe('ready');
+  });
+
+  it("la fiche changée par l'implement et les tests adaptés par le fix du même lot : la tête d'avant le lot (pas celle du fix) fait foi", async () => {
+    const fiche: Handler = (call) => {
+      touch(call.opts.cwd, FICHE, '# R7 révisée\n', 'feat: fiche R7');
+      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'feat: fiche R7' }] }));
+    };
+    const tests: Handler = (call) => {
+      touch(call.opts.cwd, TEST, '// R7 nouvelle\n', 'fix(L2): tests R7');
+      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'fix(L2): tests R7' }] }));
+    };
+    const h = prepared({ accept: [accept()], implement: [green, fiche], review: [ok, major, ok], fix: [tests] }, lotsDeux);
+    await runLot(h.lot('L1', screen, config));
+    const c2 = h.lot('L2', {}, config);
+    await runLot(c2);
+    expect(c2.lot.outcome ?? '').not.toMatch(/verrou/);
+    expect(c2.lot.status).toBe('ready');
+  });
+
+  it("une fiche posée et commitée par le lead AVANT la vague (commit qui cite le lot) admet l'implement qui adapte les tests", async () => {
+    const adapte: Handler = (call) => {
+      touch(call.opts.cwd, TEST, '// R7 nouvelle\n', 'feat(L2): tests R7');
+      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'feat(L2): tests R7' }] }));
+    };
+    const h = prepared({ accept: [accept()], implement: [green, adapte], review: [ok, ok] }, lotsDeux);
+    await runLot(h.lot('L1', screen, config));
+    touch(h.repo, FICHE, '# R7 révisée par le lead\n', 'docs(L2): fiche R7');
+    const c2 = h.lot('L2', {}, config);
+    await runLot(c2);
+    expect(c2.lot.outcome ?? '').not.toMatch(/verrou/);
+    expect(c2.lot.status).toBe('ready');
+  });
+});

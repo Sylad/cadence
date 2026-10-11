@@ -170,13 +170,14 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
   return problems;
 }
 
-/** La fiche a changé depuis `since` (commits et arbre de travail). Illisible pour git : non (le verrou reste entier). */
-function ficheChanged(repo: string, since: string, fiche: string): boolean {
+/** La fiche a changé depuis `since` (commits et arbre de travail), ou dans l'un des commits `cites` (ceux qui citent le lot). Illisible pour git : non (le verrou reste entier). */
+function ficheChanged(repo: string, since: string, fiche: string, cites: string[] = []): boolean {
   try {
-    return git(repo, 'diff', '--name-only', since, '--', fiche).trim() !== '';
+    if (git(repo, 'diff', '--name-only', since, '--', fiche).trim() !== '') return true;
   } catch {
     return false;
   }
+  return cites.some((sha) => gitOk(repo, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha, '--', fiche) && git(repo, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha, '--', fiche).trim() !== '');
 }
 
 /**
@@ -187,9 +188,12 @@ function ficheChanged(repo: string, since: string, fiche: string): boolean {
  * verrouillés, y compris contre un fichier d'un autre lot créé au passage). `rouge` : le commit rouge rangé dans l'état du cycle pour un fichier ; si
  * le dernier commit qui l'a réécrit n'est plus celui-là, une session précédente (interrompue, donc jamais comparée) l'a réécrit.
  * Exception (L183) : une acceptation à `vert: true` (lot livré) laisse modifier ses tests listés si la fiche de l'écran a changé depuis `lotBase` (la
- * tête d'avant le premier travail du lot, par défaut `headBefore`), arbre de travail compris : la fiche fait évoluer les règles. `vert: false` : verrou entier.
+ * tête d'avant le premier travail du lot, par défaut `headBefore`), arbre de travail compris, ou dans un commit de `lotCommits` (ceux qui citent le lot,
+ * posés avant la vague) : la fiche fait évoluer les règles. `vert: false` : verrou entier.
+ * Une fois livrée, une acceptation n'est plus comparée à son commit rouge (une évolution admise l'a dépassé et rien ne le rescelle) mais à `lotBase` :
+ * un test changé avant ce point l'a été par un lot qui avait la fiche pour lui, et ses empreintes scellées ne valent plus.
  */
-export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string>; lotBase?: string } = {}): string[] {
+export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string>; lotBase?: string; lotCommits?: string[] } = {}): string[] {
   const out: string[] = [];
   const before = new Set(listAcceptations(repo, dir, headBefore));
   const now = new Set(listAcceptations(repo, dir));
@@ -219,17 +223,28 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     } catch {
       changed = fichiers;
     }
-    if (cur.vert === true && typeof base.fiche === 'string' && ficheChanged(repo, opts.lotBase ?? headBefore, base.fiche)) continue;
+    const sinceRed = changed; // livrée : ces fichiers ont pu évoluer avec la fiche, leur empreinte scellée ne vaut plus
+    let depuis = red;
+    if (cur.vert === true && typeof base.fiche === 'string') {
+      const ref = opts.lotBase ?? headBefore;
+      if (ficheChanged(repo, ref, base.fiche, opts.lotCommits)) continue;
+      depuis = ref;
+      try {
+        changed = git(repo, 'diff', '--name-only', '-z', ref, '--', ...fichiers).split('\0').filter(Boolean);
+      } catch {
+        changed = fichiers;
+      }
+    }
     const lot = typeof base.lot === 'string' ? base.lot : '?';
     const emp = isObj(base.empreintes) ? base.empreintes : {};
     for (const f of fichiers) {
       const norm = posix.normalize(f); // sealAcceptation range les empreintes sous le chemin normalisé, et git diff le rend ainsi
       const want = emp[norm];
-      if (typeof want !== 'string' || changed.includes(norm)) continue; // déjà signalé ci-dessus
+      if (typeof want !== 'string' || changed.includes(norm) || (depuis !== red && sinceRed.includes(norm))) continue; // déjà signalé ci-dessus
       const have = existsSync(join(repo, norm)) ? git(repo, 'hash-object', '--', norm).trim() : null;
       if (have !== want) out.push(`${f} : empreinte différente de celle du scellé de ${p} (test d'acceptation de ${lot})`);
     }
-    for (const f of changed) out.push(`${f} : test d'acceptation de ${lot} : empreinte modifiée depuis le commit rouge ${red.slice(0, 7)} (verrou ${p})`);
+    for (const f of changed) out.push(`${f} : test d'acceptation de ${lot} : empreinte modifiée depuis ${depuis === red ? 'le commit rouge' : 'la tête d\'avant le lot'} ${depuis.slice(0, 7)} (verrou ${p})`);
   }
   return out;
 }

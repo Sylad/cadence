@@ -2145,7 +2145,7 @@ lots:
   - id: L188
     title: "Étape spec back d'orchestrate : gabarit spec back, code-reviewer en mode fiche, chaîne precheck→spec→revue de fiche→accept (spec etape-spec-back, B3)"
     status: doing
-    estimate: 1
+    estimate: 2
     after: [ L187 ]
     created: 2026-10-11
     notes:

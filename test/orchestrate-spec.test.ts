@@ -138,6 +138,16 @@ describe('étape spec : contrôles du programme', () => {
     expect(c.lot.outcome).toMatch(/spec/);
   });
 
+  it('une fiche sans bloc ecran (sujet seul) est refusée pour un lot à écran', async () => {
+    const back = spec({ dossier: 'prochain-match', fiche: (d) => { d.sujet = { id: 'cache', titre: 'Cache', lot: 'L1' }; delete d.ecran; } });
+    const h = harness({ lots, script: { spec: [back, back] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'spec']);
+    expect(h.calls[1].brief).toContain('ecran : bloc manquant');
+    expect(c.lot.status).toBe('handed-back');
+  });
+
   it('le chemin de fiche du rapport est normalisé : absolu ou préfixé ./, le lot passe', async () => {
     const absolu: Handler = (call) => claudeOut(specReport({ fiche: join(call.opts.cwd, ecrit(call.opts.cwd)) }));
     const pointe: Handler = (call) => claudeOut(specReport({ fiche: `./${ecrit(call.opts.cwd)}` }));

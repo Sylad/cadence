@@ -91,7 +91,9 @@ export function checkSpec(repo: string, fiche: string, lot: string): string[] {
     return [`${fiche} : YAML illisible (${(e as Error).message.split('\n')[0]})`];
   }
   const problems = checkFiche(doc).map((p) => `fiche : ${p}`);
-  if (!isObj(doc) || !isObj(doc.ecran)) return problems;
+  if (!isObj(doc)) return problems;
+  // un lot à écran écrit la partie écran : sans elle, ni lot, ni dossier, ni maquette, ni captures ne seraient contrôlés
+  if (!isObj(doc.ecran)) return [...problems.filter((p) => p !== 'fiche : ecran : bloc manquant'), 'fiche : ecran : bloc manquant (un lot à écran écrit la partie écran, même si la fiche a aussi un sujet)'];
   const folder = fiche.replace(/\/fiche\.yaml$/, '');
   const ecran = doc.ecran;
   if (typeof ecran.lot === 'string' && ecran.lot !== lot) problems.push(`ecran.lot : « ${ecran.lot} » au lieu de ${lot} (la fiche est celle du lot qui implémente l'écran)`);

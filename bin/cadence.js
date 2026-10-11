@@ -47,7 +47,7 @@ if (tool === 'raf') {
                     la mesure des passes de correction des vagues (dossier/.cadence/runs) : lots à ≥1 et ≥2 corrections,
                     par projet, visibles ou non, passes par cause ; --classify les classe par Ollama (hors quota)
   cadence spec check <fiche.yaml>
-                    les invariants d'une fiche d'écran (étape spec, gabarit templates/fiche.yaml) ; code 1 si un écart, 2 si illisible
+                    les invariants d'une fiche d'écran, back ou mixte (étape spec ; gabarits templates/fiche.yaml, fiche-back.yaml) ; code 1 si un écart, 2 si illisible
   cadence spec qa <fiche.yaml>
                     la section de docs/qa/expectations.md dérivée de la fiche (shows, never, api), sur la sortie standard
   cadence skills install [--dir .claude] [--force]

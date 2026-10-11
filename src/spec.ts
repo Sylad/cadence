@@ -164,7 +164,7 @@ export function checkFiche(doc: unknown): string[] {
     const rattachee = ecranPart && (!back || aUnEtat);
     if (rattachee) {
       if (!('message' in r) || !(r.message === null || typeof r.message === 'string')) p.push(`${id} : message attendu (le texte exact à l'écran, ou null)`);
-    } else {
+    } else if (!aUnEtat) {
       for (const k of ['message', 'champs', 'masque']) if (r[k] !== undefined && r[k] !== null) p.push(`${id} : ${k} n'a de sens que pour une règle rattachée à un état`);
     }
     if (r.statut !== 'sourcee' && r.statut !== 'hypothese') p.push(`${id} : statut « ${String(r.statut ?? '')} » inconnu (sourcee ou hypothese)`);

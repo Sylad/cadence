@@ -267,6 +267,14 @@ describe('cadence spec check : suites de la revue L187 (L192)', () => {
     expect(p[0]).toMatch(/etat n'a de sens que dans une fiche qui a une partie écran/);
   });
 
+  it('une fiche back seule : une règle d\'écran complète (etat + message, champs, masque) reçoit un seul écart', () => {
+    const f = back();
+    Object.assign(f.regles[0], { etat: 'vide', message: 'x', champs: ['a'], masque: ['b'] });
+    const p = checkFiche(f).filter((m) => m.startsWith('R1 :'));
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatch(/etat n'a de sens que dans une fiche qui a une partie écran/);
+  });
+
   it('une fiche back seule refuse actions, etats et champs (sans ecran) au lieu de les ignorer', () => {
     const f = back();
     f.actions = [{ id: 'A1', declencheur: null, appel: 'GET /x' }];

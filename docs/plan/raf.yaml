@@ -2140,6 +2140,7 @@ lots:
     after: [ L186 ]
     created: 2026-10-11
     started: 2026-10-11
+    review: { date: 2026-10-11, verdict: "compliant after 2 fixes — orchestré (vague 2026-10-11-1935, 2 passe(s) de correction)", commit: 6704c0e5ab272dfade940b83a6e7b481a2ea1254 }
   - id: L188
     title: "Étape spec back d'orchestrate : gabarit spec back, code-reviewer en mode fiche, chaîne precheck→spec→revue de fiche→accept (spec etape-spec-back, B3)"
     status: todo

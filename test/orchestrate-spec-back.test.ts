@@ -117,6 +117,18 @@ describe('étape spec back : conformité de la fiche écrite', () => {
   });
 });
 
+describe('étape spec back : messages d\'un lot sans écran', () => {
+  it('une fiche hors du dossier des specs parle de <sujet>, jamais de <écran>', async () => {
+    const hors: Handler = () => claudeOut(specReport({ fiche: 'autre/dossier/fiche.yaml' }));
+    const h = harness({ lots, script: { spec: [hors, hors] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(c.lot.outcome).toMatch(/<sujet>/);
+    expect(c.lot.outcome).not.toMatch(/<écran>/);
+    expect(h.calls[1].brief).not.toMatch(/<écran>/);
+  });
+});
+
 describe('étape spec back : revue de la fiche, deux passes au plus', () => {
   it('un majeur renvoie à la spec avec les constats, puis la fiche est relue', async () => {
     const h = harness({ lots, script: { spec: [spec, () => claudeOut(specReport({ fiche: 'docs/specs/cache-de-secours-365scores/fiche.yaml' }))], fiche: [() => major(), ok], implement: [impl], review: [ok] } });
@@ -172,6 +184,33 @@ describe('étape spec back : hypothèses', () => {
     expect(n).toBe(3); // R3, R5 et R8 de l'exemple, une fois chacune
   });
 
+  it('une seconde passe qui change ou retire une hypothèse : les notes disent la fiche finale, pas celle de la passe 1', async () => {
+    const pass2: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { fiche: (d) => { d.regles.find((r: any) => r.id === 'R3').enonce = 'Énoncé réécrit en passe deux'; d.regles.find((r: any) => r.id === 'R5').statut = 'sourcee'; d.regles.find((r: any) => r.id === 'R5').source = 'lineup.service.ts:42'; delete d.regles.find((r: any) => r.id === 'R5').si_faux; } }) }));
+    const h = harness({ lots, script: { spec: [spec, pass2], fiche: [() => major(), ok], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    const notes = h.plan().lot('L1').notes.map((n) => n.text).filter((t) => t.startsWith('Hypothèses (fiche'));
+    expect(notes.join('\n')).toContain('Énoncé réécrit en passe deux');
+    expect(notes.join('\n')).not.toMatch(/R5 : /);
+    expect(notes).toHaveLength(2);
+    expect(c.lot.hypotheses).toHaveLength(2);
+  });
+
+  it('une fiche déjà présente à la reprise donne ses notes et ses lignes du tableau', async () => {
+    const h = harness({ lots, script: { fiche: [ok], implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(h.plan().lot('L1').notes.filter((n) => n.text.startsWith('Hypothèses (fiche cache-de-secours-365scores)'))).toHaveLength(3);
+    expect(c.lot.hypotheses).toHaveLength(3);
+  });
+
+  it('une fiche rendue au lead (non conforme après 2 revues) ne laisse aucune note d\'hypothèse', async () => {
+    const h = harness({ lots, script: { spec: [spec, () => claudeOut(specReport({ fiche: 'docs/specs/cache-de-secours-365scores/fiche.yaml' }))], fiche: [() => major(), () => major()] } });
+    await runLot(h.lot('L1', back, config));
+    expect(h.plan().lot('L1').notes.filter((n) => n.text.startsWith('Hypothèses (fiche'))).toEqual([]);
+  });
+
   it('un lot à écran garde ses hypothèses pour la Nouveauté : pas de note', async () => {
     const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { spec: [(call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }))], implement: [impl], review: [ok] } });
     await runLot(h.lot('L1', { screen: 'page', visible: true }, { maquette: false }));
@@ -182,7 +221,8 @@ describe('étape spec back : hypothèses', () => {
 describe('étape spec back : lot mixte', () => {
   const mixte: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { mixte: true }) }));
   const mixteLots = [{ title: 'Un écran et son API', screen: 'page' as const }];
-  const over = { screen: 'page' as const, visible: true, specLot: true as const };
+  // Un lot mixte est un lot `screen:` dont la fiche a une partie sujet : jamais un champ `spec: true` à côté de `screen:` (décision du lead, 11-10).
+  const over = { screen: 'page' as const, visible: true };
 
   it('spec → revue de fiche → revue de maquette → implement', async () => {
     const h = harness({ lots: mixteLots, script: { spec: [mixte], fiche: [ok], maquette: [ok], implement: [impl], review: [ok] } });
@@ -198,6 +238,40 @@ describe('étape spec back : lot mixte', () => {
     const second = h.calls[3].brief;
     expect(second).toContain('R5 : source introuvable');
     expect(second).toContain('le message de R12 n’est pas visible');
+  });
+});
+
+describe('étape spec back : lot mixte jugé sur le contenu de la fiche', () => {
+  const ecran: Handler = (call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }));
+  const over = { screen: 'page' as const, visible: true };
+
+  it('un lot à écran dont la fiche n\'a pas de sujet n\'a pas de revue de fiche', async () => {
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { spec: [ecran], maquette: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', over, { fiche: true, maquette: true }));
+    expect(kinds(h)).toEqual(['spec', 'maquette', 'implement', 'review']);
+  });
+
+  it('une fiche d\'écran qui contient des contrats (bloc sujet) est revue, puis la maquette', async () => {
+    const mixte: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { mixte: true }) }));
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { spec: [mixte], fiche: [ok], maquette: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', over, { fiche: true, maquette: true }));
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'maquette', 'implement', 'review']);
+  });
+
+  it('une fiche mixte déjà commitée (reprise) est revue avant la maquette, sans rejouer la spec', async () => {
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { fiche: [ok], maquette: [ok], implement: [impl], review: [ok] } });
+    ecritBack(h.repo, { mixte: true });
+    await runLot(h.lot('L1', over, { fiche: true, maquette: true }));
+    expect(kinds(h)).toEqual(['fiche', 'maquette', 'implement', 'review']);
+  });
+
+  it('le brief de la spec d\'un lot à écran propose la partie back (gabarit joint), sans la dire obligatoire', async () => {
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { spec: [ecran], maquette: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', over, { fiche: true, maquette: true }));
+    const brief = h.calls[0].brief;
+    expect(brief).toContain('contrats:');
+    expect(brief).toMatch(/also changes a behaviour|also exposes/i);
+    expect(brief).not.toContain('spec: true');
   });
 });
 

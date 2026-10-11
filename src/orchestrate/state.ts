@@ -79,7 +79,7 @@ export interface LotState {
   small: boolean;
   /** Seuil de l'étape spec (clé de lot `screen:`, L169) : le lot passe par `spec` avant `implement`. Absent : chemin actuel. */
   screen?: Screen;
-  /** Seuil de l'étape spec back (clé de lot `spec: true`, L188) : le lot passe par `spec` avant `implement`, sans écran. Absent : pas d'étape spec back (un lot à `screen:` a l'étape sans ce drapeau). */
+  /** Lot à `spec: true` sans écran (L188) : il passe par `spec` avant `implement`, sa fiche est back seule. Jamais posé sur un lot à `screen:` : un lot mixte est un lot à écran dont la fiche a un bloc `sujet` (le cycle lit la fiche). */
   specLot?: true;
   /** Issue de l'étape spec : la fiche écrite (et le nombre de ses hypothèses), ou la raison d'une sortie sous le seuil. */
   spec?: { fiche: string; hypotheses: number } | { sousSeuil: string };

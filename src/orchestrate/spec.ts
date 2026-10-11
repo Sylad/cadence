@@ -47,6 +47,16 @@ export function costlyHypotheses(doc: unknown): { id: string; categorie: string;
   return out;
 }
 
+/** La fiche écrite porte une partie back (un bloc `sujet`) : c'est ce qui fait d'un lot à `screen:` un lot mixte (L188), jamais un champ `spec: true` à côté de `screen:`. */
+export function ficheHasBack(repo: string, fiche: string): boolean {
+  try {
+    const doc = parse(readFileSync(join(repo, fiche), 'utf8'));
+    return isObj(doc) && 'sujet' in doc;
+  } catch {
+    return false;
+  }
+}
+
 /** Une fiche déjà écrite ne dispense de la spec que si elle passe les contrôles du programme et ne porte aucune hypothèse coûteuse. */
 export function ficheReady(repo: string, fiche: string, lot: string, parts: FicheParts = { screen: true, back: false }): boolean {
   if (checkSpec(repo, fiche, lot, parts).length) return false;
@@ -169,8 +179,13 @@ export function specText(o: { dir: string; render?: string; screen?: string; bac
   if (o.back) {
     lines.push(
       o.screen
-        ? `The lot also changes a behaviour (\`spec: true\`): the sheet has both parts, \`sujet\`, \`cas\`, \`contrats\`, \`donnees\` next to \`ecran\`, in the same folder (\`sujet.id\` = \`ecran.id\` = the folder name, \`sujet.lot\` = \`ecran.lot\`); the API calls of the screen are listed once in \`contrats\`, and the actions point to them with \`contrat: Ax\`.`
+        ? `The sheet has both parts, \`sujet\`, \`cas\`, \`contrats\`, \`donnees\` next to \`ecran\`, in the same folder (\`sujet.id\` = \`ecran.id\` = the folder name, \`sujet.lot\` = \`ecran.lot\`); the API calls of the screen are listed once in \`contrats\`, and the actions point to them with \`contrat: Ax\`.`
         : `The lot declares \`spec: true\` (it changes a behaviour, with no screen). The specs of this project live in \`${o.dir}/<sujet>/\` (one folder per subject, \`<sujet>\` = the kebab-case \`sujet.id\` of the sheet); the sheet has no screen part.`,
+    );
+  }
+  if (o.screen && !o.back) {
+    lines.push(
+      `If the lot also changes a behaviour (an API call, a stored datum, a contract), add the back part to the same sheet: \`sujet\`, \`cas\`, \`contrats\`, \`donnees\` next to \`ecran\` (\`sujet.id\` = \`ecran.id\` = the folder name, \`sujet.lot\` = \`ecran.lot\`); the program then also has the sheet reviewed (rules sourced, contradictions, errors and limits, one test per rule), before the mockup. A lot that only draws a screen keeps a sheet without \`sujet\`.`,
     );
   }
   if (o.template) lines.push('', 'Template of the screen part of the sheet (`templates/fiche.yaml` of cadence; every key and invariant is checked by `cadence spec check`):', '```yaml', o.template.trimEnd(), '```');

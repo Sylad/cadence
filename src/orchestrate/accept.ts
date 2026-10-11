@@ -171,19 +171,23 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
 }
 
 /**
- * La tête d'avant le premier commit qui cite le lot (L184) : le parent du plus ancien de `shas` (ordre indifférent). Une reprise dans une nouvelle vague
+ * La tête d'avant le premier commit qui cite le lot (L184) : le parent du plus ancien commit de travail `work` (ordre indifférent), à défaut de `cites` (tous les commits qui citent le lot) ; `wave` (la tête de départ de la vague), s'il précède ce parent. Une reprise dans une nouvelle vague
  * ne doit pas repartir de sa propre tête de départ, sinon un lot qui retire son ajout est comparé à un état déjà modifié. Aucun commit, ou un commit
  * racine ou illisible : `undefined` (l'appelant garde sa référence).
  */
-export function lotStartHead(repo: string, shas: string[]): string | undefined {
+export function lotStartHead(repo: string, work: string[], cites: string[] = [], wave?: string): string | undefined {
+  // Le plus ancien commit de TRAVAIL (un commit de plan peut citer le lot bien avant son travail et reculer la référence derrière la fiche d'un autre lot) ; à défaut, tout commit qui cite le lot.
+  const shas = work.length ? work : cites;
   let oldest: { sha: string; depth: number } | undefined;
   for (const sha of shas) {
     if (!gitOk(repo, 'cat-file', '-e', `${sha}^{commit}`)) continue;
     const depth = Number(git(repo, 'rev-list', '--count', sha).trim());
     if (!oldest || depth < oldest.depth) oldest = { sha, depth };
   }
-  if (!oldest || !gitOk(repo, 'rev-parse', '--verify', '-q', `${oldest.sha}^`)) return undefined;
-  return git(repo, 'rev-parse', `${oldest.sha}^`).trim();
+  const start = oldest && gitOk(repo, 'rev-parse', '--verify', '-q', `${oldest.sha}^`) ? git(repo, 'rev-parse', `${oldest.sha}^`).trim() : undefined;
+  if (!start || !wave || !gitOk(repo, 'cat-file', '-e', `${wave}^{commit}`)) return start ?? undefined;
+  // La tête de la vague, si elle précède ce commit : le premier commit du lot (la fiche changée par l'implement) peut ne pas le citer.
+  return gitOk(repo, 'merge-base', '--is-ancestor', wave, start) ? wave : start;
 }
 
 /** La fiche a changé depuis `since` (commits et arbre de travail), ou dans l'un des commits `cites` (ceux qui citent le lot). Illisible pour git : non (le verrou reste entier). */
@@ -204,7 +208,7 @@ function ficheChanged(repo: string, since: string, fiche: string, cites: string[
  * verrouillés, y compris contre un fichier d'un autre lot créé au passage). `rouge` : le commit rouge rangé dans l'état du cycle pour un fichier ; si
  * le dernier commit qui l'a réécrit n'est plus celui-là, une session précédente (interrompue, donc jamais comparée) l'a réécrit.
  * Exception (L183) : une acceptation à `vert: true` (lot livré) laisse modifier ses tests listés si la fiche de l'écran a changé depuis `lotBase` (la
- * tête d'avant le premier commit qui cite le lot, `lotStartHead`, à défaut le premier travail du lot, par défaut `headBefore`), arbre de travail compris, ou dans un commit de `lotCommits` (ceux qui citent le lot,
+ * tête d'avant le premier commit de travail du lot, `lotStartHead`, à défaut d'un commit qui le cite, par défaut `headBefore`), arbre de travail compris, ou dans un commit de `lotCommits` (ceux qui citent le lot,
  * posés avant la vague) : la fiche fait évoluer les règles. `vert: false` : verrou entier.
  * Une fois livrée, une acceptation n'est plus comparée à son commit rouge (une évolution admise l'a dépassé et rien ne le rescelle) mais à `lotBase` :
  * un test changé avant ce point l'a été par un lot qui avait la fiche pour lui, et ses empreintes scellées ne valent plus.

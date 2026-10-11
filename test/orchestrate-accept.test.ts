@@ -236,6 +236,27 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
       expect(lockViolations(repo, DIR, vague2, { lotBase: lotStartHead(repo, shas), lot: 'L10' })).toEqual([]);
     });
 
+    it("lotStartHead (L184) : un commit de plan qui cite le lot avant son travail ne recule pas la référence ; sans commit de travail, repli sur les commits qui citent le lot", () => {
+      const { repo, a, head } = livre();
+      writeFileSync(join(repo, 'plan.txt'), 'plan\n');
+      commitPaths(repo, 'plan: L9 démarré', 'plan.txt');
+      const plan = git(repo, 'rev-parse', 'HEAD');
+      // un AUTRE lot change la fiche de l'écran entre le commit de plan et le travail du lot
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L8): fiche', a.fiche);
+      const avantTravail = git(repo, 'rev-parse', 'HEAD');
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): travail', a.test);
+      const travail = git(repo, 'rev-parse', 'HEAD');
+      expect(lotStartHead(repo, [travail], [travail, plan])).toBe(avantTravail);
+      expect(lotStartHead(repo, [], [travail, plan])).toBe(head);
+      // la tête de la vague, si elle précède le travail (un premier commit du lot qui ne le cite pas), l'emporte ; plus récente, elle est ignorée
+      expect(lotStartHead(repo, [travail], [travail, plan], plan)).toBe(plan);
+      expect(lotStartHead(repo, [travail], [travail, plan], travail)).toBe(avantTravail);
+      // fiche inchangée dans le lot : le test modifié n'est pas rendu à tort
+      expect(lockViolations(repo, DIR, travail, { lotBase: lotStartHead(repo, [travail], [travail, plan]), lot: 'L9' }).join('\n')).toContain(a.test);
+    });
+
     it("lotStartHead : le parent du plus ancien commit cité ; vide si aucun commit ou commit racine", () => {
       const { repo, head } = livre();
       writeFileSync(join(repo, 'x.txt'), '1\n');

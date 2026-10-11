@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { ecritAcceptation } from './accept-helpers.js';
-import { acceptReport, claudeOut, commitFile, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
+import { acceptReport, claudeOut, commitFile, git, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
 import { EXEMPLE_BACK, ecrit, ecritBack, ficheBack } from './spec-helpers.js';
 import { checkSpec, findFiche, hypothesisLines } from '../src/orchestrate/spec.js';
 import { readAgents } from '../src/orchestrate/launch.js';
@@ -209,6 +211,44 @@ describe('étape spec back : hypothèses', () => {
     const h = harness({ lots, script: { spec: [spec, () => claudeOut(specReport({ fiche: 'docs/specs/cache-de-secours-365scores/fiche.yaml' }))], fiche: [() => major(), () => major()] } });
     await runLot(h.lot('L1', back, config));
     expect(h.plan().lot('L1').notes.filter((n) => n.text.startsWith('Hypothèses (fiche'))).toEqual([]);
+  });
+
+  it('plan en lecture seule : les hypothèses deviennent des propositions « [note à poser] », le plan n\'est pas touché', async () => {
+    const h = harness({ lots, script: { fiche: [ok], implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    const c = h.lot('L1', { ...back, readOnlyPlan: true }, { ...config, start: 'true' });
+    const plan = c.loadPlan;
+    c.loadPlan = () => {
+      const p = plan();
+      Object.defineProperty(p, 'readonly', { get: () => true });
+      return p;
+    };
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(h.plan().lot('L1').notes.filter((n) => n.text.startsWith('Hypothèses (fiche'))).toEqual([]);
+    expect(c.lot.proposals.filter((p) => p.startsWith('[note à poser] Hypothèses (fiche cache-de-secours-365scores)'))).toHaveLength(3);
+  });
+
+  it('un arbre sale hors plan au moment de commiter les notes rend le lot', async () => {
+    const h = harness({ lots, script: { fiche: [ok], implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    writeFileSync(join(h.repo, 'stray.txt'), 'a');
+    git(h.repo, 'add', 'stray.txt');
+    git(h.repo, 'commit', '-q', '-m', 'chore: stray');
+    const c = h.lot('L1', back, config);
+    const plan = c.loadPlan;
+    c.loadPlan = () => {
+      const p = plan();
+      const save = p.save.bind(p);
+      p.save = () => {
+        save();
+        if (h.calls.length) writeFileSync(join(h.repo, 'stray.txt'), 'b'); // un outil du projet touche un autre fichier suivi pendant la pose des notes
+      };
+      return p;
+    };
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/notes des hypothèses de la fiche : arbre sale.*stray\.txt/);
   });
 
   it('un lot à écran garde ses hypothèses pour la Nouveauté : pas de note', async () => {

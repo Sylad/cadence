@@ -2023,6 +2023,7 @@ lots:
     started: 2026-10-11
     notes:
       - { date: 2026-10-11, text: "11-10 : écran choisi = ol-companion, page Équipe de France (lot à écran neuf, appel API, état d'erreur — critère de la spec §Essai). Lancé orchestré directement (vague 2026-10-11-1200) : les étapes S1–S6 sont outillées et testées, la reprise à la main sert si la fiche est rendue." }
+      - { date: 2026-10-11, text: "11-10, 1re observation de l'essai : la session spec a produit en 3 min une fiche complète (8 règles, choix de route /equipe-de-france, endpoint /api/france unique, effectif sans lien vers /player faute d'id commun) et 4 états de maquette à 1440/390 ; la vague s'est arrêtée sur une question fausse (négation « rien d'irréversible » lue comme action irréversible) — lot ouvert, réponse du lead : R2 confirmée." }
   - id: L176
     title: Mesure de l'étape spec contre le lot de mesure, 8 lots avec fiche (spec etape-spec, S8)
     status: todo
@@ -2058,6 +2059,11 @@ lots:
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant — orchestré (vague 2026-10-11-1105, 0 passe(s) de correction)", commit: a464b4d0f2cbb69f7d0f9ba9976083dae9baebb6 }
     finished: 2026-10-11
+  - id: L180
+    title: "Étape spec : le détecteur d'hypothèse coûteuse (src/orchestrate/spec.ts:30) lève une question sur une négation — fiche ol-companion R2 « rien d'irréversible » (bouton Réessayer, simple relecture) a déclenché « action destructive ou irréversible » ; ne lire que l'énoncé, ou ignorer les mots précédés d'une négation (rien, aucun, pas, sans), avec un test"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

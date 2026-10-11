@@ -1892,7 +1892,7 @@ lots:
     estimate: 0.25
     created: 2026-10-10
     started: 2026-10-10
-    review: { date: 2026-10-10, verdict: "conforme — 684a68c relu par le lead : les 4 mineurs de la revue corrigés (version ignorée, champs --json, precheck-reader interne, test de la ligne d'ouverture), build vert, 1302 tests", commit: 684a68c46e90900d5fe94eed6c523fdc41748a9b }
+    review: { date: 2026-10-11, verdict: "conforme — 85eead2 relu par le lead (test seul, sans code de production) : la version attendue devient « majeure ≥ 1 » et le paragraphe 1.0.0 doit rester dans What's new, au lieu d'épingler 1.0.0, qui cassait à toute release ; 1610 tests verts", commit: 85eead251a3c893e9d3e1d82f59b3e4e09ea54d0 }
     finished: 2026-10-10
   - id: L165
     title: "Mesure de référence des corrections de vague : classer par cause les passes « fixing » des journaux .cadence/runs de tous les projets (spec floue ou critère absent, règle de gestion inventée, dérive d'architecture, données/SQL, bug de code, test manquant, faux constat de revue) à partir des verdicts de revue de chaque lot ; classement par l'IA locale (Ollama, hors quota) avec un échantillon relu à la main ; résultat : tableau par cause et par projet, taux de lots ≥1 et ≥2 corrections (61 % et 28 % sur 227 passages au 10-10), visibles vs non visibles — sert de point de référence au lot suivant"

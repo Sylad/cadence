@@ -1980,10 +1980,12 @@ lots:
   - id: L172
     title: "Revue UX de la maquette : ux-reviewer mode maquette (spec etape-spec, S4)"
     status: doing
-    estimate: 0.75
+    estimate: 2
     after: [ L171 ]
     created: 2026-10-10
     started: 2026-10-11
+    notes:
+      - { date: 2026-10-11, text: "Rendu par la vague 2026-10-11-0045 (budget 528 k / 450 k après la 2e revue non conforme). À corriger dans la reprise : (1) un lot dont acceptation.json est vert: true, relancé dans une nouvelle vague, rejoue la revue de maquette (afterSpec cycle.ts:776, checkAcceptation refuse vert: true) — reconnaître l'acceptation verte comme preuve de revue dans afterSpec et afterMaquette, test de reprise (même racine que la note 2 de L173) ; (2) README « Minimal MCP servers per step » (l. 1373) et CHANGELOG : Playwright chargé pour maquette et spec avec --allow-unrestricted-file-access ; mineurs : afterSpec nomme sealed un contrôle qui ne lit pas les empreintes (cycle.ts:776, test orchestrate-maquette.test.ts:56 monté sans empreintes), maquetteStep sans fiche saute accept sans avertissement (cycle.ts:892). Estimation passée à 2." }
   - id: L173
     title: "Étape accept : tests rouges, verrou par empreinte sur toutes les sessions du dépôt, fichiers des acceptation.json exclus de config.test et de la CI (config du lanceur) tant que le lot n'est pas vert, commande dédiée, retour à vert: true posé par le cycle quand elle passe (spec etape-spec, S5)"
     status: doing

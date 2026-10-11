@@ -141,6 +141,9 @@ describe('étape spec back : revue de la fiche, deux passes au plus', () => {
     expect(h.calls[2].brief).toContain('R5 : la source citée ne dit pas cela');
     expect(h.calls[2].brief).toContain('lineup.service.ts:42');
     expect(h.calls[3].brief).toMatch(/second and last review/);
+    expect(h.calls[3].brief).toContain('Points of the first review that the spec writer had to fix:');
+    expect(h.calls[3].brief).toContain('- [majeur] lineup.service.ts:42 — R5 : la source citée ne dit pas cela');
+    expect(h.calls[1].brief).not.toContain('Points of the first review');
     expect(c.lot.fiche).toMatchObject({ passes: 2, conforme: true });
   });
 

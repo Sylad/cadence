@@ -275,6 +275,14 @@ describe('cadence spec check : suites de la revue L187 (L192)', () => {
     expect(p[0]).toMatch(/etat n'a de sens que dans une fiche qui a une partie écran/);
   });
 
+  it('une fiche back seule dont les actions sont refusées ne reçoit pas en plus un écart par action', () => {
+    const f = back();
+    f.actions = [{ id: 'A9', declencheur: 'inconnu', appel: 'pas un appel', regles: ['R99'] }, 'x'];
+    const p = checkFiche(f);
+    expect(p.filter((x) => /actions : /.test(x))).toHaveLength(1);
+    expect(p).toHaveLength(1);
+  });
+
   it('une fiche back seule refuse actions, etats et champs (sans ecran) au lieu de les ignorer', () => {
     const f = back();
     f.actions = [{ id: 'A1', declencheur: null, appel: 'GET /x' }];

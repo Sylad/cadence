@@ -190,7 +190,8 @@ export function checkFiche(doc: unknown): string[] {
     for (const t of tests) if (typeof t !== 'string' || !t.startsWith(`${id} — `)) p.push(`${id} : le test « ${String(t)} » doit être nommé « ${id} — … »`);
   }
 
-  const actions: unknown[] = Array.isArray(doc.actions) ? doc.actions : [];
+  // Sans partie écran, les actions sont déjà refusées d'un bloc : ne pas y ajouter un écart par action.
+  const actions: unknown[] = ecranPart && Array.isArray(doc.actions) ? doc.actions : [];
   if (ecranPart && !Array.isArray(doc.actions)) p.push('actions : liste attendue');
   const contrats: unknown[] = Array.isArray(doc.contrats) ? doc.contrats : [];
   // Les ids A sont communs aux actions de l'écran et aux contrats : sans trou sur l'ensemble (une fiche d'écran seule : dans l'ordre des actions).

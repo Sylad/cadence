@@ -2151,6 +2151,7 @@ lots:
     notes:
       - { date: 2026-10-11, text: "À inclure (revue L192, 11-10) : fiche back seule — une règle avec etat + message (ou champs/masque) reçoit encore deux écarts contradictoires (« etat n'a de sens… » + « message n'a de sens que pour une règle rattachée à un état ») : un seul écart ; actions refusées globalement (spec.ts:72) mais la boucle des actions (l. 193-218) ajoute des écarts en cascade ; test/etape-spec-back-fiche.test.ts:76 recopie l'ancienne regex des codes d'erreur au lieu d'importer CODE_ERREUR" }
       - { date: 2026-10-11, text: "Rendu 11-10 (vague 2026-10-11-2040, budget de lot atteint avant la passe fix) — à corriger : [majeur, DÉCISION LEAD] lot mixte = lot screen: dont la FICHE a une partie back (bloc sujet / contrats), jamais un champ spec: true à côté de screen: : le cycle doit tester le contenu de la fiche (cycle.ts:284 partsOf, cycle.ts:839 l.specLot), raf spec on reste sans effet sur un lot à écran (L186 inchangé), README l.1070 aligné sur l.108 (c'est ce que le design présenté à Sylvain dit : « le code-reviewer revoit aussi la fiche dès qu'elle contient des contrats ») ; [majeur] hypothèses d'un lot back : noteHypotheses ne fait qu'ajouter (cycle.ts:1031) — une passe 2 qui change/retire une hypothèse laisse la note de la passe 1 ; une fiche déjà présente à la reprise (firstWrite → afterSpec, cycle.ts:826) ne donne ni note ni ligne au tableau (table.ts:126) — lire la fiche à la fin de l'étape fiche et au tableau, tests de ces deux cas. Mineurs : ficheStep (cycle.ts:1050) recopie maquetteStep (1093) — factoriser ; messages « <écran> » pour un lot back (cycle.ts:983, agents/spec-writer.md:21) → « <sujet> »." }
+      - { date: 2026-10-11, text: "Reprise 2 (vague 2026-10-11-2105, budget) — CRITÈRE DE FIN pour la prochaine passe (décision lead, au lieu de corriger chemin par chemin) : TERMINAISON — quel que soit le chemin (écran seul, back seul, mixte ; sujet ajouté ou retiré en passe 2 ; codeAfterFiche / acceptationProof vrais ; reprise avec fiche présente), l'agent spec joue AU PLUS 2 sessions et la chaîne atteint accept ou rend le lot ; vider ficheConstats quand la revue de fiche n'a plus lieu d'être (afterMaquette ne renvoie plus spec) ; un test paramétré qui parcourt TOUS ces chemins et compte les sessions spec (≤ 2) et l'issue. Mineurs à faire dans la même passe : README l.1070 (« contracts » → bloc sujet), command.ts:376 back: toujours faux (code mort), launch.ts:56 Playwright pour spec seulement si screen:" }
     started: 2026-10-11
   - id: L189
     title: orchestrate.accept en liste de lanceurs, front et back (spec etape-spec-back, B4)
@@ -2184,6 +2185,11 @@ lots:
     title: "test/orchestrate-pool.test.ts « jamais plus de deux sessions en même temps, jamais deux dans un dépôt » instable sous charge : rouge 1 fois dans la suite complète le 11-10 (re-vérif L191, une vague maritime tournait), vert 3/3 seul — dépendance au minutage à retirer"
     status: todo
     estimate: 0.25
+    created: 2026-10-11
+  - id: L194
+    title: "Recalibrer lotBudget sur les totaux mesurés : un lot screen: coûte ~1,2 M au total (L113 ≈ 1,2 M ; L25 503 k + 776 k ; L50 > 850 k rendu à 800 k) et l'allocation L191 (+350 k, étapes spec seules) ne couvre pas UX de conformité + passes ; un lot de 1 j sans écran dépasse aussi 450 k (L188 483 k puis 495 k) — p90 du total par catégorie (écran / spec / ordinaire, par estimate) sur .cadence/runs, constantes et README mis à jour, --dry-run montre la base"
+    status: todo
+    estimate: 0.5
     created: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

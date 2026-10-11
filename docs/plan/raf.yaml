@@ -2144,7 +2144,7 @@ lots:
     finished: 2026-10-11
   - id: L188
     title: "Étape spec back d'orchestrate : gabarit spec back, code-reviewer en mode fiche, chaîne precheck→spec→revue de fiche→accept (spec etape-spec-back, B3)"
-    status: doing
+    status: done
     estimate: 2
     after: [ L187 ]
     created: 2026-10-11
@@ -2155,6 +2155,7 @@ lots:
       - { date: 2026-10-11, text: "Reprise 3 (vague 2026-10-11-2130) : terminaison OK. Reste SEULEMENT 2 majeurs = tests manquants (mutations survivantes) ; critère : chacune des mutations ci-dessous fait rougir la suite. (1) src/orchestrate/spec.ts:119 contrôle sujet.id ↔ dossier de la fiche : remplacé par if (false), la suite reste verte — test/orchestrate-spec-back.test.ts:348 (titre « sujet.id hors du dossier ») vérifie deux fois la même fiche valide : écrire le vrai cas. (2) src/orchestrate/aval.ts:78 consigne de revue des contrats d'un lot back (« Check each contract too… a contract that departs from the sheet is a major finding ») et src/orchestrate/accept.ts:289 consigne « The sheet also has a back part… write the cases of its rules too » d'un lot mixte : branches désactivées, suite verte — tester le texte propre à chaque consigne. Rien d'autre à changer." }
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "conforme — orchestré (vague 2026-10-11-2246, 1 passe(s) de correction + passe des mineurs)", commit: e985613fa5086c4dcc3aa4605b542cd98ab9a74d }
+    finished: 2026-10-11
   - id: L189
     title: orchestrate.accept en liste de lanceurs, front et back (spec etape-spec-back, B4)
     status: todo
@@ -2190,11 +2191,12 @@ lots:
     created: 2026-10-11
   - id: L194
     title: "Recalibrer lotBudget sur les totaux mesurés : un lot screen: coûte ~1,2 M au total (L113 ≈ 1,2 M ; L25 503 k + 776 k ; L50 > 850 k rendu à 800 k) et l'allocation L191 (+350 k, étapes spec seules) ne couvre pas UX de conformité + passes ; un lot de 1 j sans écran dépasse aussi 450 k (L188 483 k puis 495 k) — p90 du total par catégorie (écran / spec / ordinaire, par estimate) sur .cadence/runs, constantes et README mis à jour, --dry-run montre la base"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant — orchestré (vague 2026-10-11-2130, 1 passe(s) de correction + passe des mineurs)", commit: a09df1309bcc2863c2aea07e8a292de6ff84bb0b }
+    finished: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

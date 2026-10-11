@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { ecritAcceptation } from './accept-helpers.js';
@@ -354,6 +354,17 @@ describe('étape spec back : briques', () => {
     expect(checkSpec(h.repo, screenOnly, 'L1', { screen: false, back: true }).join('\n')).toMatch(/sujet : bloc manquant/);
     expect(checkSpec(h.repo, screenOnly, 'L1', { screen: true, back: true }).join('\n')).toMatch(/sujet : bloc manquant/);
     expect(checkSpec(h.repo, screenOnly, 'L1')).toEqual([]);
+  });
+
+  it('checkSpec d\'un lot back : sujet.id qui ne correspond pas au dossier de la fiche est un écart', () => {
+    const h = harness({ lots });
+    const ok = ecritBack(h.repo);
+    const autre = 'docs/specs/un-autre-dossier/fiche.yaml';
+    mkdirSync(join(h.repo, 'docs/specs/un-autre-dossier'), { recursive: true });
+    copyFileSync(join(h.repo, ok), join(h.repo, autre));
+    const problems = checkSpec(h.repo, autre, 'L1', { screen: false, back: true });
+    expect(problems.join('\n')).toMatch(/sujet\.id : « cache-de-secours-365scores » ne correspond pas au dossier docs\/specs\/un-autre-dossier/);
+    expect(checkSpec(h.repo, ok, 'L1', { screen: false, back: true }).join('\n')).not.toMatch(/sujet\.id/);
   });
 
   it('hypothesisLines : une ligne par hypothèse, R + énoncé + si faux', () => {

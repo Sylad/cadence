@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { renderBrief } from '../src/orchestrate/briefs.js';
+import { acceptText } from '../src/orchestrate/accept.js';
 import { avalFicheText, ficheRules } from '../src/orchestrate/aval.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { readAgents } from '../src/orchestrate/launch.js';
@@ -201,5 +202,21 @@ describe('docs', () => {
     const readme = readFileSync(join(__dirname, '..', 'README.md'), 'utf8');
     expect(readme).toContain('règle → test → vert');
     expect(readme).toContain('## Hypothèses');
+  });
+});
+
+describe('consignes propres à la partie back d\'une fiche', () => {
+  const rules = ['R1 — une règle'];
+  it('la revue d\'un lot back vérifie chaque contrat ; sans contrat, la consigne n\'y est pas', () => {
+    const avec = avalFicheText('review', { fiche: FICHE, rules, contracts: ['C1 — GET /x'], screen: false });
+    expect(avec).toContain('Check each contract too');
+    expect(avec).toContain('A contract that departs from the sheet is a major finding');
+    expect(avalFicheText('review', { fiche: FICHE, rules, screen: false })).not.toContain('Check each contract too');
+  });
+
+  it('l\'étape accept d\'un lot mixte demande aussi les cas des règles back ; un lot à écran seul non', () => {
+    const base = { fiche: FICHE, maquette: 'docs/specs/prochain-match/maquette.html', acceptation: 'docs/specs/prochain-match/acceptation.json', command: 'npm run accept' };
+    expect(acceptText({ ...base, back: true })).toContain('The sheet also has a back part (`cas`, `contrats`, `donnees`): write the cases of its rules too');
+    expect(acceptText({ ...base })).not.toContain('The sheet also has a back part');
   });
 });

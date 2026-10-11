@@ -406,4 +406,29 @@ describe("acceptation d'un lot livré : la fiche évolue dans un lot suivant (L1
     expect(c2.lot.outcome ?? '').not.toMatch(/verrou/);
     expect(c2.lot.status).toBe('ready');
   });
+
+  it("reprise dans une nouvelle vague (L184) : le lot qui retire son ajout, tests revenus à l'état d'avant le lot, n'est pas rendu au lead", async () => {
+    let avantLot = '';
+    const ajoute: Handler = (call) => {
+      avantLot = git(call.opts.cwd, 'rev-parse', 'HEAD');
+      touch(call.opts.cwd, 'notes.txt', 'début\n', 'feat(L2): début');
+      touch(call.opts.cwd, FICHE, '# R7 révisée\n', 'feat: fiche R7'); // un commit du lot qui ne le cite pas
+      touch(call.opts.cwd, TEST, '// R7 nouvelle\n', 'feat(L2): tests R7');
+      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'feat(L2): tests R7' }], questions: ['Garder cet ajout ?'] }));
+    };
+    const retire: Handler = (call) => {
+      git(call.opts.cwd, 'checkout', '-q', avantLot, '--', TEST);
+      git(call.opts.cwd, 'commit', '-q', '-m', 'fix(L2): retire son ajout', '--', TEST);
+      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'fix(L2): retire son ajout' }] }));
+    };
+    const h = prepared({ accept: [accept()], implement: [green, ajoute, retire], review: [ok, ok] }, lotsDeux);
+    await runLot(h.lot('L1', screen, config));
+    const vague1 = h.lot('L2', {}, config);
+    await runLot(vague1);
+    expect(vague1.lot.status).toBe('question');
+    const vague2 = h.lot('L2', {}, config);
+    await runLot(vague2);
+    expect(vague2.lot.outcome ?? '').not.toMatch(/verrou/);
+    expect(vague2.lot.status).toBe('ready');
+  });
 });

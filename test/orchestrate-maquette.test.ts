@@ -87,7 +87,18 @@ describe('revue de la maquette : où elle s’insère', () => {
     ecritAcceptation(h.repo, { sansFiche: true });
     const c = h.lot('L1', screen, { ...config, accept: 'true', test: 'true' });
     await runLot(c);
-    expect(kinds(h)[0]).toBe('maquette');
+    expect(kinds(h)).toEqual(['maquette', 'accept', 'accept']);
+    expect(c.lot.status).toBe('failed');
+  });
+
+  it('une acceptation commitée mais non scellée rejoue accept, même sans revue de maquette (orchestrate.maquette: false)', async () => {
+    const h = harness({ lots, script: { accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
+    ecrit(h.repo);
+    ecritAcceptation(h.repo, { sansFiche: true });
+    const c = h.lot('L1', screen, { maquette: false, accept: 'true', test: 'true' });
+    await runLot(c);
+    expect(kinds(h)[0]).toBe('accept');
+    expect(kinds(h)).not.toContain('implement');
   });
 
   it('sans fiche, la maquette est sautée et l’avertissement le dit', async () => {

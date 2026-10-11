@@ -130,7 +130,7 @@ describe('README (L169)', () => {
     expect(readme).toMatch(/^\s+spec: \{ dir: docs\/specs/m);
   });
   it('liste screen parmi les champs mappables d\'un plan externe', () => {
-    expect(readme).toMatch(/- Fields: [^\n]*\n?[^\n]*`visible`, `screen`, `public`/);
+    expect(readme).toMatch(/- Fields: [^\n]*\n?[^\n]*`visible`, `screen`, `spec`, `public`/);
   });
 });
 

@@ -2080,9 +2080,10 @@ lots:
     review: { date: 2026-10-11, verdict: "compliant (0 blocking, 0 major, 1 minor note) — commit 6cc2c96, vitest 1587/1587 verts (74 fichiers), tsc sans erreur ; les 3 choix d'interprétation de l'auteur tiennent (règle étendue aux chiffres qui doivent tomber juste, pas de garde programmatique, CHANGELOG sous Added) — orchestré (vague 2026-10-11-1300, 0 passe(s) de correction)", commit: 6cc2c96cccdd78e35e007fe829f012a490e46591 }
   - id: L182
     title: "README, étape accept : la commande orchestrate.accept lancée hors vague échoue (CADENCE_ACCEPTATION exigée par acceptationOnly) — dire comment la lancer à la main (CADENCE_ACCEPTATION=<chemin de l'acceptation> <commande>) et que les tests verts rejoignent le lanceur ordinaire — essai L175"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-11
+    started: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

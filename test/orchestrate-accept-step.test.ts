@@ -63,6 +63,21 @@ describe('étape accept : où elle s’insère', () => {
     expect(c.lot.accept?.acceptation).toBe(JSON_PATH);
   });
 
+  it('une acceptation scellée qui liste un chemin ./… est reconnue à la reprise (empreinte cherchée sous le chemin normalisé) (L178)', async () => {
+    const h = prepared({ implement: [green], review: [ok] });
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
+    doc.fichiers = [`./${a.test}`];
+    writeFileSync(join(h.repo, a.json), JSON.stringify(doc, null, 2));
+    sealAcceptation(h.repo, a.json);
+    expect(Object.keys(JSON.parse(readFileSync(join(h.repo, a.json), 'utf8')).empreintes)).toEqual([a.test]);
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', a.json);
+    const c = h.lot('L1', screen, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
   it('une acceptation commitée mais jamais scellée par le programme ne prouve rien : accept est rejoué', async () => {
     const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
     const a = ecritAcceptation(h.repo, { sansFiche: true }); // commitée sans empreintes (écrite à la main, ou scellé perdu)

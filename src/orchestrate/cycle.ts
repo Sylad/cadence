@@ -834,7 +834,7 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
   const emp = doc.empreintes;
   const sealed = doc.fichiers.every((f) => {
     const norm = posix.normalize(f);
-    return existsSync(join(l.repo, norm)) && emp[f] === git(l.repo, 'hash-object', '--', norm).trim();
+    return existsSync(join(l.repo, norm)) && emp[norm] === git(l.repo, 'hash-object', '--', norm).trim();
   });
   if (!sealed) return false;
   const vertMsg = checkAcceptation(l.repo, json, l.lot, fiche).filter((p) => !(doc.vert && p.includes('vert: true à l\'écriture')));

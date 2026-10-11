@@ -44,6 +44,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- `cadence orchestrate`: a sealed acceptance file that lists a test file as `./test/x.ts` is now recognised when a lot is resumed: the seal stores the fingerprint under the normalised path and the resume looked for it under the raw one, so the mockup review and the accept session were replayed for nothing (L178).
 - `cadence orchestrate`: the acceptance file is now **one per lot**, `<spec.dir>/<écran>/acceptation-<lot>.json` (L173): a second lot on the same screen no longer rewrites the lock and the tests of the first one (an older `acceptation.json` is still read, by its `lot` key); the runner template (`acceptationIgnored()`) reads every `acceptation*.json` of a screen folder. An unsealed acceptance still replays `accept`, and a sealed `vert: true` one goes straight to `implement`/`review` (tests added).
 - `cadence orchestrate`: resuming a lot whose `acceptation.json` is sealed (`empreintes`) no longer replays the mockup review, whether the acceptance is still red or already green (`vert: true`, lot relaunched in a new wave); an unsealed one proves nothing. A `maquette` step with no sheet now warns instead of silently skipping (L172).
 - `cadence orchestrate`: the Playwright server of the `maquette` and `spec` steps is launched with `--allow-unrestricted-file-access` (the mockup is opened by `file://`, blocked by default) (L172).

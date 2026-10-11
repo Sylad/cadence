@@ -114,6 +114,10 @@ describe('MCP minimaux par étape', () => {
   it('Playwright pour ux, et pour implement/fix d\'un lot visible (même dossier de captures) ; rien pour review, review-small, ni pour un lot sans écran (L74)', () => {
     const pw = { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', '/run/p--L1/playwright'] } };
     for (const k of ['implement', 'fix', 'ux'] as const) expect(mcpServersFor(k, true, '/run/p--L1/playwright'), k).toEqual(pw);
+    // maquette.html et son rendu sont des fichiers locaux : le serveur bloque file:// sans cette option (mesuré sur @playwright/mcp 0.0.83, L172)
+    const pwFile = { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--allow-unrestricted-file-access', '--output-dir', '/run/p--L1/playwright'] } };
+    expect(mcpServersFor('maquette', false, '/run/p--L1/playwright'), 'maquette').toEqual(pwFile);
+    expect(mcpServersFor('spec', true, '/run/p--L1/playwright'), 'spec visible').toEqual(pwFile);
     for (const k of ['implement', 'fix', 'review', 'review-small'] as const) expect(mcpServersFor(k, false, '/run/p--L1/playwright'), `${k} sans écran`).toEqual({});
     expect(mcpServersFor('review', true, '/run/p--L1/playwright'), 'review visible').toEqual({});
     expect(mcpServersFor('review', true, '/run/p--L1/playwright', true), 'review visible petit').toEqual({});

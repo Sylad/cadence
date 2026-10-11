@@ -54,7 +54,9 @@ export type McpServers = Record<string, { command: string; args: string[] }>;
  */
 export function mcpServersFor(kind: StepKind, visible: boolean, outputDir: string, small = false): McpServers {
   if (!(kind === 'ux' || kind === 'maquette' || (visible && (kind === 'spec' || kind === 'implement' || kind === 'fix' || (kind === 'review-small' && small))))) return {};
-  return { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', outputDir] } };
+  // La maquette est un fichier local : sans cette option le serveur bloque toute URL file:// (« Access to "file:" protocol is blocked »).
+  const files = kind === 'maquette' || kind === 'spec' ? ['--allow-unrestricted-file-access'] : [];
+  return { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', ...files, '--output-dir', outputDir] } };
 }
 
 /** Dossier de sortie du Playwright MCP d'un lot : `<lotDir>/playwright`, chemin absolu. */

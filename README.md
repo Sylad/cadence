@@ -105,7 +105,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf add "title" [--estimate d] [--quickwin] [--visible [--screen page\|component\|journey]] [--spec] [--public "title"] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id (`--public`: the lot's title in the public's words, written as `public:` right after `title:`; `--screen`: the screen a visible lot creates or changes — a new `page`, a new `component` or a modified `journey` — written as `screen:` right after `visible:`, shown by `raf show`; it requires `--visible`, and `raf check` reports a `screen:` without `visible:` or with another value as an error. It is what will trigger the spec step of `orchestrate`, never inferred from the title; `--spec`: the lot changes a behaviour (something a user, an API client or another service can observe), written as `spec: true` right after `screen:`, `visible:`, `quickwin:` or `estimate:` (whichever comes last), shown by `raf show`, refused on a sub-task. Also set by the lead at planning time, never inferred from the title) |
 | `raf add "title" --every <days>` · `raf did <id> ["text"]` | recurring lot: `every` (days) and `last` (last time done) fields; the lot stays `todo`, `raf now` and `session start` list it under « Récurrent » with « dû depuis N j » / « prochain dans N j »; `raf did` resets the count (spec: `docs/superpowers/specs/2026-10-04-L11-tache-recurrente.md`) |
 | `raf screen <id> page\|component\|journey\|none` | set, replace or remove `screen:` on an existing lot, to adopt the [spec step](#the-spec-step-of-a-lot-with-screen) on a plan already written; refused on a lot without `visible:` (like `raf add --screen`) and on a sub-task; `none` removes the key and leaves `visible:` alone |
-| `raf spec <id> on\|off` | set or remove `spec:` on an existing lot (a lot that changes a behaviour, for the back-end spec step designed in `docs/superpowers/specs/2026-10-11-etape-spec-back-design.md`); refused on a sub-task; `off` is refused on a lot that has `screen:` (the screen implies the spec: remove `screen:` first) and `on` there only says so and changes nothing. `raf spec` only takes `on`/`off`: `cadence spec check\|qa <fiche.yaml>` keeps its own subcommands. `raf check` reports a `spec:` that is neither `true` nor `false` (`spec : true ou false attendu`) |
+| `raf spec <id> on\|off` | set or remove `spec:` on an existing lot (a lot that changes a behaviour, for the back-end spec step of `cadence orchestrate`, see [The spec step of a lot with `spec: true`](#the-spec-step-of-a-lot-with-spec-true)); refused on a sub-task; `off` is refused on a lot that has `screen:` (the screen implies the spec: remove `screen:` first) and `on` there only says so and changes nothing. `raf spec` only takes `on`/`off`: `cadence spec check\|qa <fiche.yaml>` keeps its own subcommands. `raf check` reports a `spec:` that is neither `true` nor `false` (`spec : true ou false attendu`) |
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
@@ -1013,7 +1013,7 @@ without `--effort` (see below), so `effort.precheck` has no effect on it and the
 
 ```yaml
 orchestrate:
-  effort: { precheck: low, spec: medium, maquette: high, accept: medium, implement: medium, fix: medium, review: high, ux: high }   # defaults
+  effort: { precheck: low, spec: medium, maquette: high, fiche: medium, accept: medium, implement: medium, fix: medium, review: high, ux: high }   # defaults
 ```
 
 To measure what a level costs, run the same kind of wave before and after changing the key: each step of
@@ -1031,7 +1031,7 @@ lot that already has commits is never pre-checked (resuming it is legitimate). `
 ### The spec step of a lot with `screen:`
 
 A lot that declares `screen:` (`raf add … --visible --screen page|component|journey`, or `raf screen <id> page|component|journey` on a lot that already exists, see [raf](#raf)) gets one more session, `spec`, **after** the pre-check and **before**
-the first implementation: `precheck → spec → maquette → accept → implement → ux → review` (`maquette` unless `orchestrate.maquette: false`, see [The mockup review](#the-mockup-review-before-any-code); `accept` only when the project declares `orchestrate.accept`, see below). A lot without `screen:` follows the usual path, unchanged. `--dry-run` lists the step
+the first implementation: `precheck → spec → maquette → accept → implement → ux → review` (`maquette` unless `orchestrate.maquette: false`, see [The mockup review](#the-mockup-review-before-any-code); `accept` only when the project declares `orchestrate.accept`, see below). A lot without `screen:` or `spec: true` follows the usual path, unchanged (a lot with `spec: true` and no screen has its own chain, see [The spec step of a lot with `spec: true`](#the-spec-step-of-a-lot-with-spec-true)). `--dry-run` lists the step
 (`spec (sonnet)`), its command line and its brief `templates/orchestrate/spec.md`.
 
 - **The session** (L171): Sonnet, the `spec-writer` agent (it writes only the spec folder, never application code), Playwright loaded like for `implement`. It reads the lot,
@@ -1050,6 +1050,27 @@ the first implementation: `precheck → spec → maquette → accept → impleme
   The agent can also ask a question itself in its report.
 - **Under the threshold**: if the session finds that the lot changes no screen, it gives the reason in one line (`sousSeuil`), writes no mockup, and the lot goes on to `implement` as before; the reason is
   kept as a warning of the lot. On resume the spec step is skipped only when a sheet of the lot (`ecran.lot` is the lot) already passes the program's checks (`cadence spec check`, mockup, captures) and carries no costly hypothesis; otherwise the spec is played again. The sheet path in the report is relative to the repository (an absolute or `./` path is normalised, a path outside the repository is a finding).
+
+### The spec step of a lot with `spec: true`
+
+A lot that changes a behaviour but has no screen (`raf add … --spec`, or `raf spec <id> on`, see [raf](#raf); L188, design: [docs/superpowers/specs/2026-10-11-etape-spec-back-design.md](docs/superpowers/specs/2026-10-11-etape-spec-back-design.md)) is specified **before** it is coded, on a sheet, like a screen:
+`precheck → spec → fiche → accept → implement → review` (`fiche` unless `orchestrate.fiche: false`; `accept` only when the project declares `orchestrate.accept`). A lot with neither `screen:` nor `spec: true` keeps its path. `--dry-run` lists
+`spec (sonnet)`, `fiche (sonnet)` and `accept (sonnet)` with their command lines and briefs `templates/orchestrate/spec-back.md`, `fiche.md` and `accept-back.md`; the lot's budget gets the same 350 k allocation as a lot with a screen (measured on screens: the back chain has not been measured yet).
+
+- **The spec session**: Sonnet, the `spec-writer` agent, no Playwright. It reads the lot, the project's CLAUDE.md and the code and tests of the modules the lot touches (a rule already coded is a source, cited `file:line`), then writes only
+  `<orchestrate.spec.dir>/<sujet>/fiche.yaml` in the format of [`templates/fiche-back.yaml`](templates/fiche-back.yaml) (`sujet`, `cas`, `regles`, `contrats`, `donnees`; no mockup, no capture, no state) and commits it with a message that cites the lot.
+  The same rules as for a screen: a rule is `sourcee` or `hypothese` with its `si_faux`, and a hypothesis that hides a costly choice is a question (a stored model, a published contract or route, an irreversible action, a contradiction with a sourced or coded rule — the program's keyword safety net applies as is).
+  An optional field added to an existing response is not a break when a rule of the sheet proves the old response unchanged. A lot that changes no behaviour is reported under the threshold (`sousSeuil`, warning `étape spec : sous le seuil, aucune fiche — …`) and follows the usual path.
+- **What the program checks**: the sheet passes `cadence spec check`, has a `sujet` block, is the lot's (`sujet.lot`), sits in the folder named by `sujet.id`, and is committed with a clean tree. Anything missing goes back to **one second `spec` session**; still invalid, the lot is handed back (`spec non conforme après 2 passes : …`).
+  On a resume the step is skipped when a sheet of the lot (`sujet.lot`) already passes these checks and has no costly hypothesis.
+- **The sheet review** (`fiche`): a fresh session of the `code-reviewer` agent in **sheet mode** (Sonnet, read-only, no Playwright; `effort.fiche`, default `medium`). It reads the sheet, then the code, tests and sources of the perimeter, and checks (1) every `sourcee` rule cites a source that exists (it opens the file:line) and no `hypothese` hides a costly choice,
+  (2) no contradiction with a rule already coded or an existing contract, (3) every contract has its empty / absent / expired / oversized / duplicate inputs and the failures of its external sources covered by a rule or a motivated `sans_alternative` / `sans_erreur`, (4) every rule has a planned test whose name says what could fail.
+  Findings are ranked blocking / major / minor, each with its measurement. A blocking or major one sends the sheet back for a **second `spec` session** (its brief carries the findings), then the sheet is reviewed again; still not conforming, the lot is handed back with what remains (`fiche non conforme après 2 revues : …`).
+  Minor findings become proposals of the lot (`[mineur fiche] …`). This verdict is **not** `raf review`: the review of the code keeps that role. `orchestrate.fiche: false` skips the step.
+- **A lot with a screen and a behaviour** (`screen:` and `spec: true`): one sheet with both parts (`sujet` **and** `ecran`, the same folder), the chain `spec → fiche → maquette → accept`; the findings of the two reviews go together to a single second `spec` session.
+  A lot with only `screen:` keeps a sheet without `sujet`.
+- **Acceptance and code**: `accept` is the screen's step, with a back brief (`accept-back.md`: cases call the contracts of `contrats[]` as close as possible, external sources simulated from `entree`; no `data-testid`). `implement`, `fix` and `review` receive the sheet (cases, rules, contracts) as for a screen, without mockup; the review also checks that each contract is held (output, exact codes and messages of the errors).
+- **Hypotheses**: a lot without a screen has no News entry. After the spec, the program writes **one note of the lot per hypothesis** (`Hypothèses (fiche <sujet>) — R3 : … ; si faux : …`, not duplicated on a resume) and commits it with the plan; on a plan kept by another tool the lines become proposals (`[note à poser] …`). The end-of-wave table lists them under each lot (`hypothèse de la fiche : …`) for the lead to relay.
 
 ### The mockup review: before any code
 
@@ -1334,9 +1355,10 @@ orchestrate:
   precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it, local runs it on claude-local (Ollama) with Sonnet as fallback
   accept: npx vitest run -c vitest.acceptation.config.ts   # accept step (see « The accept step »): the dedicated command that runs ONLY the acceptance tests of the lot (optional; without it the step is skipped with a warning)
   maquette: true                         # default: UX review of the mockup between spec and accept (see « The mockup review »); false skips it
+  fiche: true                            # default: review of the back-end sheet of a lot with spec: true between spec and accept (see « The spec step of a lot with spec: true »); false skips it
   spec: { dir: docs/specs }              # spec step (see « The spec step of a lot with screen: »): folder of the screen specs, relative to the repository (default docs/specs); render: the command the spec session runs to render the mockups at 1440 and 390 px (optional, Playwright otherwise)
   prodAccess: false                      # default: wave sessions get no access to production (see « Production access of the sessions »); true lifts it for this project
-  effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, maquette, accept, implement, fix, review, ux
+  effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, maquette, fiche, accept, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default
   addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use

@@ -2144,12 +2144,13 @@ lots:
     finished: 2026-10-11
   - id: L188
     title: "Étape spec back d'orchestrate : gabarit spec back, code-reviewer en mode fiche, chaîne precheck→spec→revue de fiche→accept (spec etape-spec-back, B3)"
-    status: todo
+    status: doing
     estimate: 1
     after: [ L187 ]
     created: 2026-10-11
     notes:
       - { date: 2026-10-11, text: "À inclure (revue L192, 11-10) : fiche back seule — une règle avec etat + message (ou champs/masque) reçoit encore deux écarts contradictoires (« etat n'a de sens… » + « message n'a de sens que pour une règle rattachée à un état ») : un seul écart ; actions refusées globalement (spec.ts:72) mais la boucle des actions (l. 193-218) ajoute des écarts en cascade ; test/etape-spec-back-fiche.test.ts:76 recopie l'ancienne regex des codes d'erreur au lieu d'importer CODE_ERREUR" }
+    started: 2026-10-11
   - id: L189
     title: orchestrate.accept en liste de lanceurs, front et back (spec etape-spec-back, B4)
     status: todo

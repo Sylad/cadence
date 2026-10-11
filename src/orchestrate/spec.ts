@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
-import { checkFiche, LARGEURS } from '../spec.js';
+import { checkFiche, fichesDuDossier, LARGEURS } from '../spec.js';
 
 // Étape spec d'orchestrate (L171, spec etape-spec S3) : ce que le programme sait de la sortie de la session `spec`.
 
@@ -12,19 +12,8 @@ const list = (v: unknown): Obj[] => (Array.isArray(v) ? v.filter(isObj) : []);
 
 /** Chemin (relatif au dépôt) de la fiche du lot sous `<dir>/<écran>/fiche.yaml`, ou null : sert à ne pas rejouer une spec déjà écrite. */
 export function findFiche(repo: string, dir: string, lot: string): string | null {
-  const root = join(repo, dir);
-  if (!existsSync(root)) return null;
-  for (const name of readdirSync(root).sort()) {
-    const file = join(root, name, 'fiche.yaml');
-    if (!existsSync(file)) continue;
-    try {
-      const doc = parse(readFileSync(file, 'utf8')) as unknown;
-      if (isObj(doc) && isObj(doc.ecran) && doc.ecran.lot === lot) return `${dir}/${name}/fiche.yaml`;
-    } catch {
-      // fiche illisible : elle n'est pas « déjà écrite », la session la reprendra
-    }
-  }
-  return null;
+  const hit = fichesDuDossier(repo, dir).find(({ doc }) => isObj(doc.ecran) && doc.ecran.lot === lot);
+  return hit ? `${dir}/${hit.name}/fiche.yaml` : null;
 }
 
 /** Texte sans accents ni majuscules, pour les mots-clés. */

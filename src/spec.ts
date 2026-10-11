@@ -166,20 +166,28 @@ export function deriveQa(doc: unknown): string {
  */
 export function ficheHypotheses(root: string, dir: string): Map<string, string[]> {
   const out = new Map<string, string[]>();
+  for (const { doc } of fichesDuDossier(root, dir)) {
+    if (!isObj(doc.ecran) || !texte(doc.ecran.lot)) continue;
+    const ids = (Array.isArray(doc.regles) ? doc.regles : []).filter(isObj).filter((r) => r.statut === 'hypothese' && texte(r.id)).map((r) => String(r.id));
+    if (ids.length) out.set(doc.ecran.lot, [...(out.get(doc.ecran.lot) ?? []), ...ids]);
+  }
+  return out;
+}
+
+/** Les fiches lisibles de `<dir>/<écran>/fiche.yaml` (écrans triés), avec le nom du dossier : une fiche absente ou illisible est sautée. */
+export function fichesDuDossier(root: string, dir: string): { name: string; doc: Record<string, unknown> }[] {
   const base = join(root, dir);
+  const out: { name: string; doc: Record<string, unknown> }[] = [];
   if (!existsSync(base)) return out;
   for (const name of readdirSync(base).sort()) {
     const file = join(base, name, 'fiche.yaml');
     if (!existsSync(file)) continue;
-    let doc: unknown;
     try {
-      doc = parse(readFileSync(file, 'utf8'));
+      const doc: unknown = parse(readFileSync(file, 'utf8'));
+      if (isObj(doc)) out.push({ name, doc });
     } catch {
-      continue;
+      // fiche illisible : le contrôle des fiches est `cadence spec check`
     }
-    if (!isObj(doc) || !isObj(doc.ecran) || !texte(doc.ecran.lot)) continue;
-    const ids = (Array.isArray(doc.regles) ? doc.regles : []).filter(isObj).filter((r) => r.statut === 'hypothese' && texte(r.id)).map((r) => String(r.id));
-    if (ids.length) out.set(doc.ecran.lot, [...(out.get(doc.ecran.lot) ?? []), ...ids]);
   }
   return out;
 }

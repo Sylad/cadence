@@ -2125,11 +2125,14 @@ lots:
     finished: 2026-10-11
   - id: L186
     title: "Champ spec des lots : raf add --spec, raf spec <lot> on|off, raf check, README + CHANGELOG (spec etape-spec-back, B1)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "conforme — orchestré (vague 2026-10-11-1915, 1 passe(s) de correction + passe des mineurs)", commit: c6f5e4ee59f43ee49febb4b67e93cfb1c75ecb57 }
+    notes:
+      - { date: 2026-10-11, text: "Revue 11-10 (mineur, théorique) : src/plan.ts:571 setSpec sans cas -1 — sur un lot écrit à la main sans screen/visible/quickwin/estimate, spec: true s'insère avant id: (YAML valide) ; 626 lots des 9 plans ont tous l'une de ces clés" }
+    finished: 2026-10-11
   - id: L187
     title: "Format de la fiche back : cadence spec check (sujet, cas, règles, contrats, données), gabarit, exemple testé (spec etape-spec-back, B2)"
     status: todo

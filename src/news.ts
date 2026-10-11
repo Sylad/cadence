@@ -292,19 +292,29 @@ function inline(text: string): string {
     .join('');
 }
 
-/** Markdown minimal : paragraphes, listes « - », **gras**, `code`, [liens](url). Tout le reste est du texte échappé. */
+/** Markdown minimal : titres « ## », paragraphes, listes « - », **gras**, `code`, [liens](url). Tout le reste est du texte échappé. */
 export function renderMarkdown(md: string): string {
   return md
     .replace(/\r\n/g, '\n')
     .split(/\n\s*\n/)
     .map((block) => block.trim())
     .filter(Boolean)
-    .map((block) => {
-      const lines = block.split('\n');
-      if (lines.every((l) => /^\s*[-*] /.test(l))) {
-        return `<ul>${lines.map((l) => `<li>${inline(l.replace(/^\s*[-*] /, ''))}</li>`).join('')}</ul>`;
+    .flatMap((block) => {
+      // un titre tient sur sa ligne : ce qui le suit (liste, paragraphe) est un bloc à part, même sans ligne vide
+      const parts: string[][] = [];
+      for (const line of block.split('\n')) {
+        const prev = parts[parts.length - 1];
+        if (!prev || /^#{1,6} /.test(line) || /^#{1,6} /.test(prev[0])) parts.push([line]);
+        else prev.push(line);
       }
-      return `<p>${inline(block)}</p>`;
+      return parts.map((lines) => {
+        const heading = /^(#{1,6}) +(.+)$/.exec(lines[0]);
+        if (heading) return `<h${Math.min(heading[1].length + 1, 6)}>${inline(heading[2].trim())}</h${Math.min(heading[1].length + 1, 6)}>`;
+        if (lines.every((l) => /^\s*[-*] /.test(l))) {
+          return `<ul>${lines.map((l) => `<li>${inline(l.replace(/^\s*[-*] /, ''))}</li>`).join('')}</ul>`;
+        }
+        return `<p>${inline(lines.join('\n'))}</p>`;
+      });
     })
     .join('\n');
 }

@@ -37,6 +37,12 @@ describe('renderMarkdown', () => {
     );
   });
 
+  it('rend un titre « ## » et la liste qui le suit directement (section Hypothèses)', () => {
+    const html = renderMarkdown('Texte.\n\n## Hypothèses\n- R3 — a\n- R4 — **b**\n\nFin.');
+    expect(html).toBe('<p>Texte.</p>\n<h3>Hypothèses</h3>\n<ul><li>R3 — a</li><li>R4 — <strong>b</strong></li></ul>\n<p>Fin.</p>');
+    expect(html).not.toContain('##');
+  });
+
   it('refuses javascript: links', () => {
     expect(renderMarkdown('[x](javascript:alert(1))')).toBe('<p>[x](javascript:alert(1))</p>');
     expect(renderMarkdown('[x](\x01javascript:alert(1))')).not.toContain('<a');

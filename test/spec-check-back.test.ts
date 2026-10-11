@@ -284,10 +284,15 @@ describe('cadence spec check : suites de la revue L187 (L192)', () => {
     expect(p).toMatch(/actions : .*partie écran/);
     expect(p).toMatch(/etats : .*partie écran/);
     expect(p).toMatch(/champs : .*partie écran/);
-    // des listes vides ou nulles ne disent rien : le gabarit reste valide
+    // seule une valeur absente ou nulle est ignorée ; une liste vide est refusée comme les autres (le gabarit ne les écrit pas)
     const g = back();
     g.actions = null;
     expect(checkFiche(g)).toEqual([]);
+    for (const k of ['actions', 'etats', 'champs']) {
+      const h = back();
+      h[k] = [];
+      expect(checkFiche(h).join('\n'), k).toMatch(new RegExp(`${k} : .*partie écran`));
+    }
   });
 
   it('une fiche mixte : une action qui répète l\'appel d\'un contrat sans contrat: est refusée', () => {

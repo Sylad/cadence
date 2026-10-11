@@ -4,6 +4,8 @@ import { ecritAcceptation } from './accept-helpers.js';
 import { acceptReport, claudeOut, commitFile, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
 import { EXEMPLE_BACK, ecrit, ecritBack, ficheBack } from './spec-helpers.js';
 import { checkSpec, findFiche, hypothesisLines } from '../src/orchestrate/spec.js';
+import { readAgents } from '../src/orchestrate/launch.js';
+import { AGENTS_DIR } from '../src/skills.js';
 import { lotBudget, SPEC_STAGE_ALLOCATION } from '../src/orchestrate/command.js';
 
 // L188 (spec etape-spec-back, B3) : l'étape spec d'un lot sans écran (`spec: true`) — spec → revue de la fiche → accept → implement.
@@ -241,5 +243,27 @@ describe('étape spec back : briques', () => {
 
   it('un lot à étape spec back reçoit l\'allocation de l\'étape dans son budget', () => {
     expect(lotBudget(1, true)).toBe(lotBudget(1) + SPEC_STAGE_ALLOCATION);
+  });
+});
+
+describe('étape spec back : agents', () => {
+  it('code-reviewer décrit le mode fiche : lecture seule, quatre vérifications, constats mesurés, pas raf review', () => {
+    const a = readAgents(AGENTS_DIR)['code-reviewer'];
+    expect(a.prompt).toContain('Sheet mode');
+    const mode = a.prompt.slice(a.prompt.indexOf('Sheet mode'));
+    expect(mode).toMatch(/sourced or hypothesis/i);
+    expect(mode).toMatch(/contradiction/i);
+    expect(mode).toMatch(/errors and limits/i);
+    expect(mode).toMatch(/one test per rule/i);
+    expect(mode).toMatch(/`raf review`/);
+  });
+
+  it('spec-writer décrit la fiche back : sujet, cas, contrats, sousSeuil sans comportement ; acceptance-writer, les contrats', () => {
+    const w = readAgents(AGENTS_DIR)['spec-writer'];
+    expect(w.prompt).toMatch(/back|behaviour/i);
+    expect(w.prompt).toContain('sujet');
+    expect(w.prompt).toContain('contrats');
+    const a = readAgents(AGENTS_DIR)['acceptance-writer'];
+    expect(a.prompt).toContain('contrats[]');
   });
 });

@@ -14,6 +14,8 @@ Follow the brief you are given. The method:
 4. **Red for the right reason.** Run the dedicated command: every test must fail because the feature is missing. A test that passes before the code proves nothing; a test that fails on a typo proves nothing either. Run the project's ordinary tests: they must stay green.
 5. **One commit**, test files + the lot's acceptation file (`acceptation-<lot>.json`) (`lot`, `fiche`, `fichiers`, `vert: false`) + runner config, explicit paths, a message that cites the lot, a clean tree.
 
+For a back sheet (`sujet`, `cas`, `contrats[]`, no mockup), the cases call the contracts of `contrats[]` as close as possible — the controller or the service for an HTTP call, the method of the job for a `job` — and simulate the external sources from `entree`; there are no `data-testid`.
+
 - You edit only tests, the runner config and the lot's acceptation file (`acceptation-<lot>.json`): never application code, the sheet, the mockup or the plan. Do not push, deliver, run `raf start|done|note|review|ux`, or launch subagents.
 - Never write `vert: true` or the fingerprints: the program seals the file and the cycle turns it green.
 - Give the report in the structured output the brief asks for.

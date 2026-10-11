@@ -2004,10 +2004,11 @@ lots:
     finished: 2026-10-11
   - id: L174
     title: "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses (spec etape-spec, S6)"
-    status: todo
+    status: doing
     estimate: 1.5
     after: [ L172, L173 ]
     created: 2026-10-10
+    started: 2026-10-11
   - id: L175
     title: Essai étape spec sur un écran d'app loisir (spec etape-spec, S7)
     status: todo

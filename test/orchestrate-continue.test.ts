@@ -78,6 +78,18 @@ describe('candidats', () => {
     const found = candidates(parent, { priority: ['cadence', 'maritime'], exclude: new Set(['maritime-atlas:L1']), remaining: 1_000_000 });
     expect(found.map((c) => `${c.project}:${c.lot.id}`)).toEqual(['cadence:L2', 'ol:L1']);
   });
+  it('le budget d\'un lot à écran compte l\'étape spec : 0,5 j tient dans 800 k, pas dans 500 k', () => {
+    const parent = tempDir();
+    const dir = join(parent, 'ol');
+    mkdirSync(dir);
+    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'ol', 'L', '2026-09-01');
+    plan.add('écran', '2026-10-01', { estimate: 0.5, visible: true, screen: 'page' });
+    plan.add('sans écran', '2026-10-01', { estimate: 0.5 });
+    plan.save();
+    const draw = (remaining: number) => candidates(dir, { priority: [], exclude: new Set(), remaining }).map((c) => c.lot.id);
+    expect(draw(500_000)).toEqual(['L2']);
+    expect(draw(800_000)).toEqual(['L1', 'L2']);
+  });
   it('un dossier de projet : lui seul', () => {
     const parent = tempDir();
     const dir = project(parent, 'cadence', [{ title: 'a' }, { title: 'b' }]);

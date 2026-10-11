@@ -1012,7 +1012,11 @@ async function specStep(c: LotCtx): Promise<void> {
   l.spec = { fiche, hypotheses: (doc.regles ?? []).filter((r) => r.statut === 'hypothese').length };
   l.specProblems = undefined;
   l.hypotheses = undefined; // la fiche vient d'être (ré)écrite : ses hypothèses se posent une fois la fiche relue, pas avant (settleHypotheses)
+  // Les constats de la revue de fiche ont servi à cette passe : sans nouvelle revue de fiche derrière (partie back retirée, preuve d'acceptation), ils ne renvoient pas encore à la spec.
+  const kept = l.ficheConstats;
+  l.ficheConstats = undefined;
   l.next = afterSpec(c, fiche);
+  if (l.next === 'fiche') l.ficheConstats = kept; // la seconde revue de fiche les relit
   save(c);
 }
 

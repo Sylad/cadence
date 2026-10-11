@@ -239,6 +239,13 @@ describe('étape spec back : lot mixte', () => {
     expect(second).toContain('R5 : source introuvable');
     expect(second).toContain('le message de R12 n’est pas visible');
   });
+  it('une passe 2 qui retire la partie back : les constats de fiche ne rebouclent pas sur la spec', async () => {
+    const again: Handler = (call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }));
+    const h = harness({ lots: mixteLots, script: { spec: [mixte, again], fiche: [() => major('R5 : source introuvable')], maquette: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', over, { fiche: true, maquette: true }));
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'maquette', 'spec', 'implement', 'review']);
+    expect(h.calls.filter((x) => x.kind === 'spec')).toHaveLength(2);
+  });
 });
 
 describe('étape spec back : lot mixte jugé sur le contenu de la fiche', () => {

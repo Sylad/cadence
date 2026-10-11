@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readOrchestrateConfig } from '../src/config.js';
 import { runLot } from '../src/orchestrate/cycle.js';
@@ -63,6 +63,16 @@ describe('revue de la maquette : où elle s’insère', () => {
     expect(kinds(h)).not.toContain('spec');
   });
 
+  it('sans orchestrate.accept, un commit du lot limité au dossier de la fiche après le code ne masque pas ce code', async () => {
+    const h = harness({ lots, script: { review: [ok] } });
+    ecrit(h.repo);
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    commitFile(h.repo, 'docs/specs/prochain-match/maquette-erreur-390.png', 'fix(L1): capture à jour');
+    await runLot(h.lot('L1', screen, config));
+    expect(kinds(h)).not.toContain('maquette');
+    expect(kinds(h)).not.toContain('spec');
+  });
+
   const commite = (repo: string, json: string, msg: string) => {
     git(repo, 'add', '--', json);
     git(repo, 'commit', '-q', '-m', msg, '--', json);
@@ -88,6 +98,17 @@ describe('revue de la maquette : où elle s’insère', () => {
     commite(h.repo, a.json, 'chore(L1): acceptation verte');
     await runLot(h.lot('L1', screen, { ...config, accept: 'true', test: 'true' }));
     expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('une acceptation aux empreintes vides ou fausses ne prouve rien : la maquette est relue', async () => {
+    const h = harness({ lots, script: { maquette: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
+    ecrit(h.repo);
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
+    writeFileSync(join(h.repo, a.json), JSON.stringify({ ...doc, empreintes: {} }, null, 2));
+    commite(h.repo, a.json, 'test(L1): acceptation aux empreintes vides');
+    await runLot(h.lot('L1', screen, { ...config, accept: 'true', test: 'true' }));
+    expect(kinds(h)[0]).toBe('maquette');
   });
 
   it('une acceptation non scellée (sans empreintes) ne prouve rien : la maquette est relue', async () => {

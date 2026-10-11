@@ -796,15 +796,22 @@ function codeAfterFiche(c: LotCtx, fiche: string): boolean {
   const l = c.lot;
   let sha: string;
   try {
-    sha = git(l.repo, 'log', '-1', '--format=%H', '--', posix.dirname(fiche));
+    // Le point de départ est le commit qui a créé la fiche : un commit plus récent du dossier (capture corrigée) ne doit pas masquer le code commité avant lui.
+    sha = git(l.repo, 'log', '--diff-filter=A', '--format=%H', '--', fiche).split('\n').filter(Boolean).pop() ?? git(l.repo, 'log', '-1', '--format=%H', '--', posix.dirname(fiche));
   } catch {
     return false;
   }
   if (!sha) return false;
   const dir = `${posix.dirname(fiche)}/`;
   const after = new Set(readCommits(l.repo, { range: `${sha}..HEAD` }).map((k) => k.sha));
-  // Un commit de la session spec elle-même (fiche, maquette, captures) n'est pas du code.
-  return lotWork(c.loadPlan(), l.repo, l.lot).some((k) => after.has(k.sha) && changedFiles(l.repo, k.sha).some((f) => !f.startsWith(dir)));
+  // Un commit de la session spec elle-même (fiche, maquette, captures) ou de la session accept (tests listés) n'est pas du code.
+  const tests = new Set<string>();
+  const json = `${dir}acceptation.json`;
+  if (listed(c, json)) {
+    const doc = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
+    if (typeof doc !== 'string') for (const f of doc.fichiers) tests.add(posix.normalize(f));
+  }
+  return lotWork(c.loadPlan(), l.repo, l.lot).some((k) => after.has(k.sha) && changedFiles(l.repo, k.sha).some((f) => !f.startsWith(dir) && !tests.has(f)));
 }
 
 const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo, json));
@@ -819,6 +826,13 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
   if (!c.config.accept || !listed(c, json)) return false;
   const doc = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
   if (typeof doc === 'string' || !doc.empreintes) return false;
+  // Le scellé n'est posé que par le programme : chaque fichier listé doit porter l'empreinte git de son contenu actuel (une clé `empreintes` vide ou copiée d'un autre lot ne prouve rien).
+  const emp = doc.empreintes;
+  const sealed = doc.fichiers.every((f) => {
+    const norm = posix.normalize(f);
+    return existsSync(join(l.repo, norm)) && emp[f] === git(l.repo, 'hash-object', '--', norm).trim();
+  });
+  if (!sealed) return false;
   const vertMsg = checkAcceptation(l.repo, json, l.lot, fiche).filter((p) => !(doc.vert && p.includes('vert: true à l\'écriture')));
   return vertMsg.length === 0;
 }

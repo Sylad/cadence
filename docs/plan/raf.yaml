@@ -2016,10 +2016,13 @@ lots:
     finished: 2026-10-11
   - id: L175
     title: Essai étape spec sur un écran d'app loisir (spec etape-spec, S7)
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L174 ]
     created: 2026-10-10
+    started: 2026-10-11
+    notes:
+      - { date: 2026-10-11, text: "11-10 : écran choisi = ol-companion, page Équipe de France (lot à écran neuf, appel API, état d'erreur — critère de la spec §Essai). Lancé orchestré directement (vague 2026-10-11-1200) : les étapes S1–S6 sont outillées et testées, la reprise à la main sert si la fiche est rendue." }
   - id: L176
     title: Mesure de l'étape spec contre le lot de mesure, 8 lots avec fiche (spec etape-spec, S8)
     status: todo

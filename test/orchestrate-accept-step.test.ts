@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { sealAcceptation } from '../src/orchestrate/accept.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { readAgents } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -52,7 +53,10 @@ describe('étape accept : où elle s’insère', () => {
 
   it('une acceptation déjà commitée et conforme (reprise) évite de rejouer accept', async () => {
     const h = prepared({ implement: [green], review: [ok] });
-    ecritAcceptation(h.repo, { sansFiche: true });
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, a.json);
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', a.json);
     const c = h.lot('L1', screen, config);
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);

@@ -772,9 +772,7 @@ const NO_ACCEPT = 'étape accept ignorée : orchestrate.accept absent (commande 
  */
 function afterSpec(c: LotCtx, fiche: string): StepKind {
   const l = c.lot;
-  const json = `${posix.dirname(fiche)}/acceptation.json`;
-  const sealed = !!c.config.accept && listed(c, json) && checkAcceptation(l.repo, json, l.lot, fiche).length === 0;
-  if (c.config.maquette && !l.maquette?.conforme && !sealed) return 'maquette';
+  if (c.config.maquette && !l.maquette?.conforme && !acceptationProof(c, fiche)) return 'maquette';
   return afterMaquette(c, fiche);
 }
 
@@ -786,7 +784,7 @@ function afterMaquette(c: LotCtx, fiche: string): StepKind {
     return 'implement';
   }
   const json = `${posix.dirname(fiche)}/acceptation.json`;
-  if (listed(c, json) && checkAcceptation(l.repo, json, l.lot, fiche).length === 0) {
+  if (acceptationProof(c, fiche)) {
     l.accept = { acceptation: json, rouge: redSha(l.repo, json) ?? '' };
     return 'implement';
   }
@@ -794,6 +792,20 @@ function afterMaquette(c: LotCtx, fiche: string): StepKind {
 }
 
 const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo, json));
+
+/**
+ * Une acceptation conforme et SCELLÉE par le programme (empreintes posées), rouge ou verte (`vert: true`, lot relancé dans une nouvelle vague) :
+ * elle n'a pu être écrite qu'après la revue de la maquette et les tests rouges, qui ne sont donc pas rejoués. Sans `orchestrate.accept`, aucune preuve.
+ */
+function acceptationProof(c: LotCtx, fiche: string): boolean {
+  const l = c.lot;
+  const json = `${posix.dirname(fiche)}/acceptation.json`;
+  if (!c.config.accept || !listed(c, json)) return false;
+  const doc = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
+  if (typeof doc === 'string' || !doc.empreintes) return false;
+  const vertMsg = checkAcceptation(l.repo, json, l.lot, fiche).filter((p) => !(doc.vert && p.includes('vert: true à l\'écriture')));
+  return vertMsg.length === 0;
+}
 
 /**
  * Étape spec (L171, spec etape-spec S3) : la session écrit maquette, captures et fiche dans `<spec.dir>/<écran>/`, le programme
@@ -890,6 +902,7 @@ async function maquetteStep(c: LotCtx): Promise<void> {
   const l = c.lot;
   const fiche = ficheOf(c);
   if (!fiche) {
+    l.warnings.push('revue de la maquette ignorée : aucune fiche trouvée pour ce lot');
     l.next = 'implement';
     save(c);
     return;

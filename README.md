@@ -1044,7 +1044,7 @@ After a valid spec, a lot with a sheet gets a UX review of its mockup, `maquette
   that it checks the **consistency mockup ↔ sheet**: every field of the sheet in the mockup with its `data-testid`, every rule message visible, word for word, in the state its `etat` names, every state with its
   `#etat-<état>` section, the `masque` of an empty-state rule really hiding the fields it names. `effort.maquette` (default `high`) sets its effort level. Its verdict is **not** `raf ux`: the conformity pass after the code keeps that role.
 - **The loop, two reviews at most.** A blocking or major finding sends the mockup back to the spec writer: a **second `spec` session** (fresh, its brief carries the findings), then the mockup is reviewed again. If the second review is
-  still not conforming, the lot is handed back with what remains (`maquette non conforme après 2 revues : …`) and nothing is implemented. A conforming review goes on to `accept` (or `implement`).
+  still not conforming, the lot is handed back with what remains (`maquette non conforme après 2 revues : …`) and nothing is implemented. A conforming review goes on to `accept` (or `implement`). On a resume, a **sealed** `acceptation.json` (its `empreintes` set by the program), still red or already green (`vert: true`), proves the review was done and is not replayed; an unsealed one proves nothing. A `maquette` step with no sheet warns (`revue de la maquette ignorée : aucune fiche …`) and goes to `implement`.
 - **Minor findings** are not sent back: they are kept as proposals of the lot (`[mineur maquette] …`), like the minors of the other reviews. A report whose totals announce a major finding is not taken for conforming.
 - **On resume**, a sheet already committed is reviewed before the next step, unless the lot already has a sealed, conforming `acceptation.json` (it can only have been written after the review).
 
@@ -1370,12 +1370,13 @@ version and the folder searched — there is no silent fallback to the default N
 source (user, project, plugin servers: Serena, context7, Cloudflare…), so a session no longer starts a handful of
 `npx`/`uvx` servers it does not use. `review` and `review-recheck` always get an empty set
 (`{"mcpServers":{}}`); so do `implement`, `fix` and `fix-minors` on a lot without a screen. Playwright, launched as
-`npx -y @playwright/mcp@latest --output-dir <wave>/<project>--<lot>/playwright`, is loaded for the `ux` step and, on a
-`visible` lot, for `implement` and `fix` (`fix-minors` included) and, on a small `visible` lot, for `review-small` (its only
+`npx -y @playwright/mcp@latest --output-dir <wave>/<project>--<lot>/playwright`, is loaded for the `ux` and `maquette` steps and, on a
+`visible` lot, for `spec`, `implement` and `fix` (`fix-minors` included) and, on a small `visible` lot, for `review-small` (its only
 usability review; `review-small` of a small lot without a screen loads nothing), so the screenshots and snapshots of the work and of
 the review stay with the wave, outside the repository, where the lead can look at them; the final table prints that
 folder whenever Playwright was loaded for the lot, even if no `ux` step ran
-(`<project>:<lot> — captures Playwright : <dir>`; `uxCaptures` in the wave state). The `implement`, `fix`,
+(`<project>:<lot> — captures Playwright : <dir>`; `uxCaptures` in the wave state). For `maquette` and `spec` the server also gets
+`--allow-unrestricted-file-access`: the mockup is a local file, and by default the server blocks every `file://` URL. The `implement`, `fix`,
 `fix-minors`, `review-small` and `ux` briefs tell the session to give relative file names if a Playwright server is available, and
 otherwise to keep any Playwright CLI output outside the repository.
 `--dry-run` prints, under each step, `mcp : aucun` or `mcp : playwright (…)`. There is no per-project override in

@@ -6,7 +6,8 @@ import { runLot } from '../src/orchestrate/cycle.js';
 import { mcpServersFor, readAgents } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { DIR, ecritAcceptation } from './accept-helpers.js';
-import { acceptReport, claudeOut, commitFile, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
+import { sealAcceptation, setVert } from '../src/orchestrate/accept.js';
+import { acceptReport, claudeOut, commitFile, git, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
 import { ecrit } from './spec-helpers.js';
 import { tempDir } from './helpers.js';
 
@@ -53,12 +54,49 @@ describe('revue de la maquette : où elle s’insère', () => {
     expect(kinds(h)).toEqual(['maquette', 'implement', 'review']);
   });
 
-  it('une acceptation déjà scellée (reprise) prouve la maquette relue : pas de nouvelle revue', async () => {
+  const commite = (repo: string, json: string, msg: string) => {
+    git(repo, 'add', '--', json);
+    git(repo, 'commit', '-q', '-m', msg, '--', json);
+  };
+
+  it('une acceptation scellée (reprise) prouve la maquette relue : pas de nouvelle revue', async () => {
     const h = harness({ lots, script: { implement: [impl], review: [ok] } });
     ecrit(h.repo);
-    ecritAcceptation(h.repo, { sansFiche: true });
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, a.json);
+    commite(h.repo, a.json, 'test(L1): acceptation scellée');
     await runLot(h.lot('L1', screen, { ...config, accept: 'true', test: 'true' }));
     expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('une acceptation verte (vert: true, lot relancé dans une nouvelle vague) prouve aussi la revue', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecrit(h.repo);
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, a.json);
+    commite(h.repo, a.json, 'test(L1): acceptation scellée');
+    setVert(h.repo, a.json);
+    commite(h.repo, a.json, 'chore(L1): acceptation verte');
+    await runLot(h.lot('L1', screen, { ...config, accept: 'true', test: 'true' }));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('une acceptation non scellée (sans empreintes) ne prouve rien : la maquette est relue', async () => {
+    const h = harness({ lots, script: { maquette: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
+    ecrit(h.repo);
+    ecritAcceptation(h.repo, { sansFiche: true });
+    const c = h.lot('L1', screen, { ...config, accept: 'true', test: 'true' });
+    await runLot(c);
+    expect(kinds(h)[0]).toBe('maquette');
+  });
+
+  it('sans fiche, la maquette est sautée et l’avertissement le dit', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    const c = h.lot('L1', { visible: true, screen: 'page' as const }, config);
+    c.lot.next = 'maquette';
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.warnings.join('\n')).toMatch(/revue de la maquette ignorée : aucune fiche/);
   });
 
   it('une sortie sous le seuil de la spec ne déclenche aucune revue de maquette', async () => {

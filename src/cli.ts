@@ -302,8 +302,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'spec': {
-      need(2, 'spec <id> on|off');
-      if (rest.length > 2 || (rest[1] !== 'on' && rest[1] !== 'off')) throw new RafError('usage : raf spec <id> on|off (ou cadence spec check|qa <fiche.yaml>)');
+      if (rest.length !== 2 || (rest[1] !== 'on' && rest[1] !== 'off')) throw new RafError('usage : raf spec <id> on|off (ou cadence spec check|qa <fiche.yaml>)');
       const plan = loadPlan();
       if (!plan.setSpec(rest[0], rest[1] === 'on')) {
         io.out(`${rest[0]} a déjà screen: — l'écran implique la spec, rien à changer`);

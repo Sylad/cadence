@@ -113,4 +113,14 @@ describe('champ spec des lots (L186, spec etape-spec-back B1)', () => {
     expect(r.out).toMatch(/X2 : spec : true ou false attendu/);
     expect(r.out).not.toMatch(/X1 : spec/);
   });
+
+  it('raf spec sans argument ou à un argument cite aussi cadence spec check|qa, code 2', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    for (const argv of [['spec'], ['spec', 'fiche.yaml']]) {
+      const r = raf(dir, ...argv);
+      expect(r.code, argv.join(' ')).toBe(2);
+      expect(r.err).toContain('cadence spec check|qa');
+    }
+  });
 });

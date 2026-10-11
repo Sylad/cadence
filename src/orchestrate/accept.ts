@@ -5,7 +5,7 @@ import { parse } from 'yaml';
 
 // Étape accept d'orchestrate (L173, spec etape-spec S5) : le fichier acceptation.json d'un lot et le verrou de ses tests rouges.
 //
-// acceptation.json (`<spec.dir>/<écran>/acceptation.json`) : { lot, fiche, fichiers[], vert, empreintes? }.
+// acceptation.json (`<spec.dir>/<écran>/acceptation-<lot>.json`, un fichier par lot : deux lots sur un même écran ne se partagent pas le verrou) : { lot, fiche, fichiers[], vert, empreintes? }.
 // La session accept écrit lot, fiche, fichiers et `vert: false` ; une fois ses contrôles passés, le PROGRAMME scelle le fichier (`sealAcceptation` :
 // empreinte git de chaque fichier de tests) et le commite : ce commit est le commit rouge.
 // Le sha du commit rouge n'est écrit nulle part dans le fichier (une session pourrait le réécrire) : c'est le dernier commit de l'historique git
@@ -37,10 +37,16 @@ const gitOk = (repo: string, ...args: string[]): boolean => {
   }
 };
 
+/** Un fichier d'acceptation : `acceptation-<lot>.json` (ou l'ancien `acceptation.json`, lu tel quel). */
+export const isAcceptationFile = (path: string): boolean => /(^|\/)acceptation(-[^/]+)?\.json$/.test(path);
+
+/** Chemin attendu de l'acceptation d'un lot, à côté de la fiche de son écran : un fichier par lot (l'id de lot, `/` et autres réduits à `-`). */
+export const acceptationFile = (fiche: string, lot: string): string => posix.join(posix.dirname(fiche), `acceptation-${lot.replace(/[^A-Za-z0-9._-]+/g, '-')}.json`);
+
 /** Les `acceptation.json` suivis sous `dir` à une révision (HEAD par défaut). */
 export function listAcceptations(repo: string, dir: string, rev = 'HEAD'): string[] {
   try {
-    return git(repo, 'ls-tree', '-r', '--name-only', '-z', rev, '--', dir).split('\0').filter((f) => f.endsWith('/acceptation.json'));
+    return git(repo, 'ls-tree', '-r', '--name-only', '-z', rev, '--', dir).split('\0').filter(isAcceptationFile);
   } catch {
     return [];
   }
@@ -211,7 +217,7 @@ export function acceptText(o: { fiche: string; maquette: string; acceptation: st
   const lines = [
     `Sheet: \`${o.fiche}\` (rules, fields, actions). Mockup: \`${o.maquette}\` (every field carries \`data-testid="<field id>"\`). You get nothing else about the screen: the implementation does not exist yet.`,
     `The project declares the dedicated command that runs ONLY the acceptance tests of this lot (\`orchestrate.accept\`): \`${o.command}\` (from the repository root; the program sets \`CADENCE_ACCEPTATION\` to the absolute path of the lot's \`acceptation.json\`, and replaces \`{acceptation}\` with it).${o.test ? ` The project's ordinary test command is \`${o.test}\`: it must stay green with your red tests committed.` : ''}`,
-    `Write \`${o.acceptation}\`: \`{ "lot": "<lot>", "fiche": "${o.fiche}", "fichiers": ["<test file>", …], "vert": false }\` (paths relative to the repository). The ordinary test config of the project (shared with its CI) must exclude those files while \`vert\` is false; the dedicated config includes only them. Both read the file with this runner template (copy it into the project, e.g. \`tests/acceptation-runner.mjs\`):`,
+    `Write \`${o.acceptation}\` (one file per lot, next to the sheet: another lot on the same screen has its own, which you never touch, nor its tests — give your test files names of your own): \`{ "lot": "<lot>", "fiche": "${o.fiche}", "fichiers": ["<test file>", …], "vert": false }\` (paths relative to the repository). The ordinary test config of the project (shared with its CI) must exclude those files while \`vert\` is false; the dedicated config includes only them. Both read the file with this runner template (copy it into the project, e.g. \`tests/acceptation-runner.mjs\`):`,
   ];
   if (o.runner) lines.push('```js', o.runner.trimEnd(), '```');
   if (o.problems?.length) lines.push('', 'The program checked your previous pass and it did not pass; fix exactly these points (one more pass only, then the lot goes back to the lead):', ...o.problems.map((p) => `- ${p}`));

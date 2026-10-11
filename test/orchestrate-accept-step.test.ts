@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sealAcceptation } from '../src/orchestrate/accept.js';
+import { sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { readAgents } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -14,7 +14,7 @@ const kinds = (h: ReturnType<typeof harness>) => h.calls.map((c) => c.kind);
 const ok: Handler = () => claudeOut(reviewReport());
 const screen = { visible: true, screen: 'page' as const };
 const lots = [{ title: 'Un écran', screen: 'page' as const }];
-const JSON_PATH = `${DIR}/prochain-match/acceptation.json`;
+const JSON_PATH = `${DIR}/prochain-match/acceptation-L1.json`;
 const config = { accept: 'test -f done.flag', test: 'true' };
 
 /** Un agent accept : tests rouges, acceptation.json, un seul commit. */
@@ -61,6 +61,68 @@ describe('étape accept : où elle s’insère', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(c.lot.accept?.acceptation).toBe(JSON_PATH);
+  });
+
+  it('une acceptation commitée mais jamais scellée par le programme ne prouve rien : accept est rejoué', async () => {
+    const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
+    const a = ecritAcceptation(h.repo, { sansFiche: true }); // commitée sans empreintes (écrite à la main, ou scellé perdu)
+    const c = h.lot('L1', screen, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['accept', 'implement', 'review']);
+    expect(JSON.parse(readFileSync(join(h.repo, a.json), 'utf8')).empreintes).toBeTruthy();
+  });
+
+  it('un lot déjà vert (vert: true scellé), relancé dans une nouvelle vague, passe à implement et à la revue sans rejouer accept', async () => {
+    const h = prepared({ implement: [green], review: [ok] });
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, a.json);
+    setVert(h.repo, a.json);
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'chore(L1): acceptation verte', '--', a.json);
+    const c = h.lot('L1', screen, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.accept?.acceptation).toBe(a.json);
+  });
+
+  it('un second lot sur le même écran a son propre fichier : le verrou et les tests du premier restent intacts', async () => {
+    const h = prepared({ accept: [accept({ lot: 'L2' })], implement: [green, green], review: [ok, ok] }, [{ title: 'Un écran', screen: 'page' }, { title: 'Le même écran', screen: 'page' }]);
+    const premier = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, premier.json);
+    git(h.repo, 'add', '--', premier.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', premier.json);
+    const avant = readFileSync(join(h.repo, premier.json), 'utf8');
+    ecrit(h.repo, { fiche: (d) => { d.ecran.lot = 'L2'; } }); // la fiche de l'écran appartient désormais à L2
+    const c = h.lot('L2', screen, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['accept', 'implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.accept?.acceptation).toBe(`${DIR}/prochain-match/acceptation-L2.json`);
+    expect(readFileSync(join(h.repo, premier.json), 'utf8')).toBe(avant);
+    expect(existsSync(join(h.repo, `${DIR}/prochain-match/acceptation-L2.json`))).toBe(true);
+  });
+
+  it('un second lot dont les tests réécrivent ceux du premier est rendu, avec le fichier du premier nommé', async () => {
+    let premierTest = '';
+    const reecrit: Handler = (call) => {
+      ecritAcceptation(call.opts.cwd, { lot: 'L2', sansFiche: true });
+      writeFileSync(join(call.opts.cwd, premierTest), "it('R1', () => {});\n");
+      git(call.opts.cwd, 'add', '--', premierTest);
+      git(call.opts.cwd, 'commit', '-q', '--allow-empty', '-m', 'test(L2): réécrit', '--', premierTest);
+      return claudeOut(acceptReport());
+    };
+    const h = prepared({ accept: [reecrit, reecrit] }, [{ title: 'Un écran', screen: 'page' }, { title: 'Le même écran', screen: 'page' }]);
+    const premier = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, premier.json);
+    git(h.repo, 'add', '--', premier.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', premier.json);
+    ecrit(h.repo, { fiche: (d) => { d.ecran.lot = 'L2'; } });
+    premierTest = premier.test;
+    const c = h.lot('L2', screen, config);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain(premier.test);
   });
 
   it('un lot sans screen: ne passe jamais par accept', async () => {

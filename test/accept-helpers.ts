@@ -17,10 +17,10 @@ export function ecritAcceptation(repo: string, o: Opts = {}): { json: string; fi
   mkdirSync(dir, { recursive: true });
   const fiche = parse(readFileSync(EXEMPLE, 'utf8')) as any;
   const noms = (fiche.regles as any[]).flatMap((r) => r.tests as string[]);
-  const test = `test/${ecran}.acceptation.test.ts`;
+  const test = `test/${ecran}${lot === 'L1' ? '' : `.${lot}`}.acceptation.test.ts`;
   writeFileSync(join(repo, test), o.tests ?? noms.map((n) => `it('${n}', () => { throw new Error('rouge'); });`).join('\n'));
   if (!o.sansFiche) writeFileSync(join(dir, 'fiche.yaml'), readFileSync(EXEMPLE, 'utf8'));
-  const json = `${DIR}/${ecran}/acceptation.json`;
+  const json = `${DIR}/${ecran}/acceptation-${lot}.json`;
   writeFileSync(join(repo, json), JSON.stringify({ lot, fiche: `${DIR}/${ecran}/fiche.yaml`, fichiers: [test], vert: o.vert ?? false }, null, 2));
   const paths = [test, json, ...(o.sansFiche ? [] : [`${DIR}/${ecran}/fiche.yaml`])];
   git(repo, 'add', '--', ...paths);

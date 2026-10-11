@@ -22,15 +22,24 @@ const read = (file) => {
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Fichiers des acceptation.json à `vert: false` sous `<root>/<dir>/*`, relatifs à `root` ; `format: 'regex'` pour testPathIgnorePatterns. */
+/** Fichiers des acceptation-<lot>.json (ou acceptation.json) à `vert: false` sous `<root>/<dir>/*` (un fichier par lot : plusieurs par écran), relatifs à `root` ; `format: 'regex'` pour testPathIgnorePatterns. */
 export function acceptationIgnored(root = process.cwd(), dir = 'docs/specs', format = 'glob') {
   const base = join(root, dir);
   if (!existsSync(base)) return [];
   const out = [];
   for (const name of readdirSync(base).sort()) {
-    const doc = read(join(base, name, 'acceptation.json'));
-    if (!doc || doc.vert === true) continue;
-    for (const f of doc.fichiers) if (typeof f === 'string') out.push(format === 'regex' ? `${escape(f)}$` : f);
+    const folder = join(base, name);
+    let files = [];
+    try {
+      files = readdirSync(folder).filter((f) => /^acceptation(-.+)?\.json$/.test(f)).sort();
+    } catch {
+      continue; // pas un dossier d'écran
+    }
+    for (const file of files) {
+      const doc = read(join(folder, file));
+      if (!doc || doc.vert === true) continue;
+      for (const f of doc.fichiers) if (typeof f === 'string') out.push(format === 'regex' ? `${escape(f)}$` : f);
+    }
   }
   return out;
 }

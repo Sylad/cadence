@@ -10,7 +10,7 @@ function projet(): string {
   const root = tempDir();
   for (const [ecran, vert, fichiers] of [['a', false, ['test/a.acceptation.test.ts']], ['b', true, ['test/b.acceptation.test.ts']], ['c', false, ['test/c1.test.ts', 'test/c2.test.ts']]] as const) {
     mkdirSync(join(root, 'docs/specs', ecran), { recursive: true });
-    writeFileSync(join(root, 'docs/specs', ecran, 'acceptation.json'), JSON.stringify({ lot: ecran, fiche: 'f', fichiers, vert }));
+    writeFileSync(join(root, 'docs/specs', ecran, `acceptation-${ecran}.json`), JSON.stringify({ lot: ecran, fiche: 'f', fichiers, vert }));
   }
   mkdirSync(join(root, 'docs/specs/sans'), { recursive: true });
   writeFileSync(join(root, 'docs/specs/illisible.json'), '{');
@@ -28,13 +28,22 @@ describe('gabarit acceptation-runner.mjs', () => {
     expect(new RegExp(r[0]).test('/x/test/a.acceptation.test.ts')).toBe(true);
   });
 
+  it('plusieurs acceptations sur un même écran (un fichier par lot) : chacune compte, l’ancien acceptation.json aussi', () => {
+    const root = projet();
+    const d = join(root, 'docs/specs/a');
+    writeFileSync(join(d, 'acceptation-L2.json'), JSON.stringify({ lot: 'L2', fiche: 'f', fichiers: ['test/a2.test.ts'], vert: false }));
+    writeFileSync(join(d, 'acceptation.json'), JSON.stringify({ lot: 'L0', fiche: 'f', fichiers: ['test/a0.test.ts'], vert: false }));
+    writeFileSync(join(d, 'notes.json'), JSON.stringify({ fichiers: ['test/pas-un-lot.test.ts'], vert: false }));
+    expect(acceptationIgnored(root)).toEqual(['test/a2.test.ts', 'test/a.acceptation.test.ts', 'test/a0.test.ts', 'test/c1.test.ts', 'test/c2.test.ts']);
+  });
+
   it('un dossier de specs absent exclut rien', () => {
     expect(acceptationIgnored(tempDir())).toEqual([]);
   });
 
   it('la config dédiée n’inclut que les fichiers de l’acceptation.json donné', () => {
     const root = projet();
-    expect(acceptationOnly(join(root, 'docs/specs/c/acceptation.json'))).toEqual(['test/c1.test.ts', 'test/c2.test.ts']);
+    expect(acceptationOnly(join(root, 'docs/specs/c/acceptation-c.json'))).toEqual(['test/c1.test.ts', 'test/c2.test.ts']);
   });
 
   it('sans CADENCE_ACCEPTATION ni chemin, la config dédiée échoue haut et clair (elle ne lancerait rien)', () => {

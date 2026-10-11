@@ -12,7 +12,7 @@ import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
-import { acceptText } from './accept.js';
+import { acceptationFile, acceptText } from './accept.js';
 import { maquetteText } from './maquette.js';
 import { specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
@@ -360,7 +360,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     if (l.screen && env.config.maquette) vars.maquette = maquetteText({ fiche: `${env.config.spec.dir}/<écran>/fiche.yaml`, passes: 0 });
     if (l.screen && env.config.accept) {
       const folder = `${env.config.spec.dir}/<écran>`;
-      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, acceptation: `${folder}/acceptation.json`, command: env.config.accept, test: env.config.test });
+      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept, test: env.config.test });
     }
     for (const s of steps) {
       const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);

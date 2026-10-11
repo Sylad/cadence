@@ -19,7 +19,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
-import { acceptText, checkAcceptation, findAcceptation, lockViolations, parseAcceptation, redSha, sealAcceptation, setVert } from './accept.js';
+import { acceptationFile, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, parseAcceptation, redSha, sealAcceptation, setVert } from './accept.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheReady, findFiche, specText } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
@@ -121,7 +121,7 @@ async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
   const own = new Set([relative(repo, plan.path), ...plan.maintained]);
   // Les acceptation.json (L173) rejoignent les fichiers que le cycle a le droit de commiter : il y pose le scellé et `vert: true`.
   const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
-  const ownFile = (f: string) => own.has(f) || (f.startsWith(specDir) && f.endsWith('/acceptation.json'));
+  const ownFile = (f: string) => own.has(f) || (f.startsWith(specDir) && isAcceptationFile(f));
   const dirty = trackedPaths(await snapshot(repo, { remote: false }));
   if (dirty.length === 0) return null;
   const foreign = dirty.filter((f) => !ownFile(f));
@@ -303,7 +303,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   if (kind === 'accept') {
     const fiche = ficheOf(c) ?? '';
     const folder = posix.dirname(fiche);
-    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, acceptation: `${folder}/acceptation.json`, command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(), problems: l.acceptProblems });
+    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, acceptation: acceptationFile(fiche, l.lot), command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(), problems: l.acceptProblems });
     vars.objectif = ''; // l'oracle est écrit depuis la fiche et la maquette seules, pas depuis le texte du lot
     vars.commits = '';
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
@@ -783,7 +783,7 @@ function afterMaquette(c: LotCtx, fiche: string): StepKind {
     if (!l.warnings.includes(NO_ACCEPT)) l.warnings.push(NO_ACCEPT);
     return 'implement';
   }
-  const json = `${posix.dirname(fiche)}/acceptation.json`;
+  const json = lotAcceptation(c, fiche);
   if (acceptationProof(c, fiche)) {
     l.accept = { acceptation: json, rouge: redSha(l.repo, json) ?? '' };
     return 'implement';
@@ -806,13 +806,16 @@ function codeAfterFiche(c: LotCtx, fiche: string): boolean {
   const after = new Set(readCommits(l.repo, { range: `${sha}..HEAD` }).map((k) => k.sha));
   // Un commit de la session spec elle-même (fiche, maquette, captures) ou de la session accept (tests listés) n'est pas du code.
   const tests = new Set<string>();
-  const json = `${dir}acceptation.json`;
+  const json = lotAcceptation(c, fiche);
   if (listed(c, json)) {
     const doc = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
     if (typeof doc !== 'string') for (const f of doc.fichiers) tests.add(posix.normalize(f));
   }
   return lotWork(c.loadPlan(), l.repo, l.lot).some((k) => after.has(k.sha) && changedFiles(l.repo, k.sha).some((f) => !f.startsWith(dir) && !tests.has(f)));
 }
+
+/** L'acceptation du lot : celle que git suit déjà pour lui (même un ancien `acceptation.json`), sinon `acceptation-<lot>.json` à côté de la fiche. */
+const lotAcceptation = (c: LotCtx, fiche: string): string => findAcceptation(c.lot.repo, c.config.spec.dir, c.lot.lot) ?? acceptationFile(fiche, c.lot.lot);
 
 const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo, json));
 
@@ -822,7 +825,7 @@ const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo,
  */
 function acceptationProof(c: LotCtx, fiche: string): boolean {
   const l = c.lot;
-  const json = `${posix.dirname(fiche)}/acceptation.json`;
+  const json = lotAcceptation(c, fiche);
   if (!c.config.accept || !listed(c, json)) return false;
   const doc = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
   if (typeof doc === 'string' || !doc.empreintes) return false;
@@ -1002,7 +1005,7 @@ async function acceptStep(c: LotCtx): Promise<void> {
     save(c);
     return;
   }
-  const json = `${posix.dirname(fiche)}/acceptation.json`;
+  const json = lotAcceptation(c, fiche);
   const done = await session(c, 'accept');
   if (!done) return;
   let rep: AcceptReport;

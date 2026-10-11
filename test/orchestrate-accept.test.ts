@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
-import { checkAcceptation, findAcceptation, lockViolations, redSha, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
+import { acceptationFile, checkAcceptation, isAcceptationFile, findAcceptation, lockViolations, redSha, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { gitRepo } from './helpers.js';
 import { git } from './orchestrate-harness.js';
 import { DIR, ecritAcceptation } from './accept-helpers.js';
@@ -13,6 +13,17 @@ const commitPaths = (repo: string, message: string, ...paths: string[]) => {
   git(repo, 'add', '--', ...paths);
   git(repo, 'commit', '-q', '-m', message, '--', ...paths);
 };
+
+describe('acceptation-<lot>.json : un fichier par lot', () => {
+  it('le chemin suit le lot (id réduit aux caractères sûrs) et reste reconnu comme fichier d’acceptation', () => {
+    expect(acceptationFile('docs/specs/x/fiche.yaml', 'L173')).toBe('docs/specs/x/acceptation-L173.json');
+    expect(acceptationFile('docs/specs/x/fiche.yaml', 'app/L7')).toBe('docs/specs/x/acceptation-app-L7.json');
+    expect(isAcceptationFile('docs/specs/x/acceptation-app-L7.json')).toBe(true);
+    expect(isAcceptationFile('docs/specs/x/acceptation.json')).toBe(true);
+    expect(isAcceptationFile('docs/specs/x/acceptation-notes.txt')).toBe(false);
+    expect(isAcceptationFile('docs/specs/x/fiche.yaml')).toBe(false);
+  });
+});
 
 describe('acceptation.json : lecture et contrôles de l’étape', () => {
   it('un fichier conforme ne relève aucun écart', () => {

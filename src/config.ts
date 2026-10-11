@@ -219,7 +219,7 @@ export interface OrchestrateConfig {
   build?: string;
   /**
    * Commande dédiée de l'étape accept (L173, spec etape-spec S5) : ne lance QUE les tests d'acceptation du lot (config du lanceur
-   * `*.acceptation.config.*` qui lit `CADENCE_ACCEPTATION`, chemin de l'acceptation.json du lot, aussi substitué à `{acceptation}`).
+   * `*.acceptation.config.*` qui lit `CADENCE_ACCEPTATION`, chemin de l'acceptation-<lot>.json du lot, aussi substitué à `{acceptation}`).
    * Absente : l'étape accept n'a pas lieu (un lot avec fiche passe de spec à implement).
    */
   accept?: string;

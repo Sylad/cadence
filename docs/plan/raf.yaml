@@ -2061,11 +2061,14 @@ lots:
     finished: 2026-10-11
   - id: L180
     title: "Étape spec : le détecteur d'hypothèse coûteuse (src/orchestrate/spec.ts:30) lève une question sur une négation — fiche ol-companion R2 « rien d'irréversible » (bouton Réessayer, simple relecture) a déclenché « action destructive ou irréversible » ; ne lire que l'énoncé, ou ignorer les mots précédés d'une négation (rien, aucun, pas, sans), avec un test"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant — orchestré (vague 2026-10-11-1145, 0 passe(s) de correction)", commit: f884b6b31b6c04ae762909f37d3f3cfd13c3ac5b }
+    notes:
+      - { date: 2026-10-11, text: "Clos 11-10 (vague 2026-10-11-1145, conforme). Mineurs en note : « ni » n'est pas une négation (« pas de suppression ni de paiement » lève encore la question) ; « sans » retire le mot suivant même quand l'absence est le risque." }
+    finished: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

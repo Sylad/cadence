@@ -2135,10 +2135,11 @@ lots:
     finished: 2026-10-11
   - id: L187
     title: "Format de la fiche back : cadence spec check (sujet, cas, règles, contrats, données), gabarit, exemple testé (spec etape-spec-back, B2)"
-    status: todo
+    status: doing
     estimate: 1
     after: [ L186 ]
     created: 2026-10-11
+    started: 2026-10-11
   - id: L188
     title: "Étape spec back d'orchestrate : gabarit spec back, code-reviewer en mode fiche, chaîne precheck→spec→revue de fiche→accept (spec etape-spec-back, B3)"
     status: todo

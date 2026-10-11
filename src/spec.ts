@@ -16,7 +16,7 @@ const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !
 const texte = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 
 const APPEL_BACK = /^((GET|POST|PUT|PATCH|DELETE) \/\S*|job \S+|commande \S+( \S+)*)$/;
-const CODE_ERREUR = /^(HTTP \d{3}|log (debug|log|warn|warning|error|info|critical|fatal|verbose))$/;
+export const CODE_ERREUR = /^(HTTP \d{3}|log (debug|log|warn|warning|error|info|critical|fatal|verbose))$/;
 const MODIFICATIONS = ['aucune', 'ajout', 'changement'];
 
 const liste = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);

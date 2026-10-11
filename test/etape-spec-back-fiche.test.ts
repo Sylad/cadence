@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
+import { CODE_ERREUR } from '../src/spec.js';
 import { costlyHypotheses } from '../src/orchestrate/spec.js';
 
 // Design de l'étape spec des lots sans écran (back) : la fiche donnée en exemple doit respecter les invariants que le design énonce,
@@ -73,7 +74,7 @@ describe('fiche back de l\'exemple (étape spec back)', () => {
       for (const k of ['entree', 'sortie']) expect(typeof a[k]).toBe('string');
       if (a.erreurs.length === 0) expect(typeof a.sans_erreur).toBe('string');
       for (const e of a.erreurs) {
-        expect(e.code).toMatch(/^(HTTP \d{3}|log (debug|log|warn|error))$/);
+        expect(e.code).toMatch(CODE_ERREUR);
         expect(e.message.length).toBeGreaterThan(0);
       }
       for (const r of a.regles) expect(regles.has(r)).toBe(true);

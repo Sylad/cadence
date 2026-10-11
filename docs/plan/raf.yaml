@@ -2084,6 +2084,7 @@ lots:
     estimate: 0.25
     created: 2026-10-11
     started: 2026-10-11
+    review: { date: 2026-10-11, verdict: "compliant — 0 constat. Commit 5c0c88d : le README dit comment lancer `orchestrate.accept` à la main, d'accord avec `acceptationOnly()` et `cycle.ts:1011`. Vitest 1590/1590 verts (75 fichiers), `tsc --noEmit` sans erreur. Les 5 choix d'interprétation de l'auteur tiennent. — orchestré (vague 2026-10-11-1300, 0 passe(s) de correction)", commit: 5c0c88dc3106a5531ba12668a79f9fc85abee893 }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

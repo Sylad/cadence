@@ -48,6 +48,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- README, accept step: how to run the `orchestrate.accept` command by hand outside a wave (`CADENCE_ACCEPTATION=<path of the acceptation file> <command>`, otherwise `acceptationOnly()` makes it fail), and that green tests join the ordinary runner (L182).
 - `cadence orchestrate`, spec step: the brief asks the spec writer to compute the weekday of every date of the mockup instead of writing it from memory, and the mockup review ranks a wrong sample datum (weekday, date, figure that does not add up) as minor, not major, so it no longer costs a second review (L181).
 
 - `docs/lead.md` and its two SVG: the workflow of the `lead` skill now shows the spec step of `orchestrate` — `spec`, mockup review (`maquette`) and `accept` before the implementation for a lot that declares `screen:`, the conformity UX pass, with the order `precheck → spec → maquette → accept → implement → ux → review` spelled out in the steps (L177).

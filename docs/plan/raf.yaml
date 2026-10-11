@@ -2024,6 +2024,7 @@ lots:
     notes:
       - { date: 2026-10-11, text: "11-10 : écran choisi = ol-companion, page Équipe de France (lot à écran neuf, appel API, état d'erreur — critère de la spec §Essai). Lancé orchestré directement (vague 2026-10-11-1200) : les étapes S1–S6 sont outillées et testées, la reprise à la main sert si la fiche est rendue." }
       - { date: 2026-10-11, text: "11-10, 1re observation de l'essai : la session spec a produit en 3 min une fiche complète (8 règles, choix de route /equipe-de-france, endpoint /api/france unique, effectif sans lien vers /player faute d'id commun) et 4 états de maquette à 1440/390 ; la vague s'est arrêtée sur une question fausse (négation « rien d'irréversible » lue comme action irréversible) — lot ouvert, réponse du lead : R2 confirmée." }
+      - { date: 2026-10-11, text: "11-10, 2e observation : la revue de maquette (Opus) est fine et utile — 3 points corrigés en 1re revue, puis 1 majeur sur des données d'exemple (jour de la semaine faux) et 13 mineurs pertinents (sens du score, règle L47 du projet, role=status, aria-label sur span, reflow 320 px, champs sans fiche) ; mais 2 passes rendent le lot sur une erreur de donnée d'exemple triviale. Piste : le brief spec demande de vérifier chaque date d'exemple, et une erreur de donnée d'exemple compte comme mineur. Coût à 2 revues : ~25 min, ~300 k." }
   - id: L176
     title: Mesure de l'étape spec contre le lot de mesure, 8 lots avec fiche (spec etape-spec, S8)
     status: todo

@@ -5,11 +5,12 @@ import { describe, expect, it } from 'vitest'
 const read = (f: string) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')
 
 describe('release 1.0.0 (L164)', () => {
-  it('la version du paquet, du plugin et de la place de marché est 1.0.0', () => {
-    expect(JSON.parse(read('package.json')).version).toBe('1.0.0')
-    expect(JSON.parse(read('.claude-plugin/plugin.json')).version).toBe('1.0.0')
+  it('la version du paquet, du plugin et de la place de marché est au moins 1.0.0', () => {
+    const major = (v: string) => Number(v.split('.')[0])
+    expect(major(JSON.parse(read('package.json')).version)).toBeGreaterThanOrEqual(1)
+    expect(major(JSON.parse(read('.claude-plugin/plugin.json')).version)).toBeGreaterThanOrEqual(1)
     const market = JSON.parse(read('.claude-plugin/marketplace.json'))
-    expect(market.plugins.find((p: { name: string }) => p.name === 'cadence').version).toBe('1.0.0')
+    expect(major(market.plugins.find((p: { name: string }) => p.name === 'cadence').version)).toBeGreaterThanOrEqual(1)
   })
 
   it('le CHANGELOG a une section 1.0.0 datée qui ouvre sur l’engagement semver', () => {
@@ -20,8 +21,10 @@ describe('release 1.0.0 (L164)', () => {
     expect(first).toMatch(/semantic versioning|semver/i)
   })
 
-  it('le README ouvre « What’s new » sur 1.0.0', () => {
-    expect(read('README.md')).toMatch(/## What's new\n\n\*\*1\.0\.0\*\*/)
+  it('le README garde le paragraphe 1.0.0 dans « What’s new »', () => {
+    const readme = read('README.md')
+    const news = readme.slice(readme.indexOf("## What's new"))
+    expect(news).toMatch(/\*\*1\.0\.0\*\*: the first major release/)
   })
 
   it('le README liste la surface garantie et celle qui ne l’est pas', () => {

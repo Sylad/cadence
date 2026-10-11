@@ -3,6 +3,7 @@ This lot is small: one single pass covers the code review AND the usability revi
 You are given the repository path and the lot id only: read the diff yourself from the commits that
 cite the lot (`raf commits {{lot}}`, or `git log`), run the checks, report real defects only.
 {{repos}}
+{{fiche}}
 {{ux}}
 {{checks}}
 {{docs}}

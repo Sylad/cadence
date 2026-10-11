@@ -20,6 +20,7 @@ import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
 import { acceptationFile, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, parseAcceptation, redSha, sealAcceptation, setVert } from './accept.js';
+import { avalFicheText, ficheRules } from './aval.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheReady, findFiche, specText } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
@@ -280,6 +281,29 @@ function ficheOf(c: LotCtx): string | null {
   return l.spec && 'fiche' in l.spec ? l.spec.fiche : findFiche(l.repo, c.config.spec.dir, l.lot);
 }
 
+/**
+ * Consigne de la fiche pour les étapes en aval d'un lot qui en a une (L174) : implement, fix, revue de code, UX de conformité.
+ * Vide quand le lot n'a pas de fiche (sous le seuil, ou pas encore écrite) ou qu'elle est illisible.
+ */
+function avalOf(c: LotCtx, kind: StepKind): string {
+  const l = c.lot;
+  const step = kind === 'implement' || kind === 'fix' || kind === 'ux' ? kind : kind === 'review' || kind === 'review-small' ? 'review' : null;
+  const fiche = step ? ficheOf(c) : null;
+  if (!step || !fiche) return '';
+  let rules: string[];
+  try {
+    rules = ficheRules(parse(readFileSync(join(l.repo, fiche), 'utf8')));
+  } catch {
+    return '';
+  }
+  if (!rules.length) return '';
+  const acceptation = l.accept?.acceptation ?? findAcceptation(l.repo, c.config.spec.dir, l.lot) ?? undefined;
+  const o = { fiche, rules, acceptation, rouge: l.accept?.rouge };
+  const text = avalFicheText(step, o);
+  // la revue courte d'un petit lot visible est sa seule passe : elle porte aussi la conformité à la maquette
+  return kind === 'review-small' && l.small && l.visible ? `${text}\n${avalFicheText('ux', o)}` : text;
+}
+
 function briefFor(c: LotCtx, kind: StepKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
@@ -290,6 +314,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     vars.news = newsText(l.lot, pwDir);
     vars.captures = capturesText(pwDir);
   }
+  vars.fiche = l.screen ? avalOf(c, kind) : '';
   if (kind === 'spec') {
     vars.spec = specText({ dir: c.config.spec.dir, render: c.config.spec.render, screen: l.screen, problems: l.specProblems, review: l.maquetteConstats?.length ? reviewedText(l.maquetteConstats) : undefined, template: ficheTemplate() });
     const mine = lotCommitLines(c);

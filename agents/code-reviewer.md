@@ -58,9 +58,10 @@ fact. If the path or the id is missing, or the lot has no commit to review, say 
      to a log or to the repository;
    - a written convention of the project not followed: quote the line of CLAUDE.md.
    - documentation that does not follow the change: the lot changes a behaviour, a command, an option or a default and the README (or the project's usage documentation) still describes the old one or says nothing: name the file and the stale or missing passage.
+   - **a lot with a screen sheet** (the brief names `fiche.yaml`): check rule → test → green for each `Rn` of the sheet. The test exists (named after the rule, `R2 — …`), it is green (run it, or take the program's result), and the behaviour the rule states is in the diff. When an acceptance file (`acceptation-<lot>.json`) is named, each listed test file is unchanged since the red commit (`git diff <red commit> -- <file>` is empty). A rule without a test, an acceptance test modified since the red commit, a rule coded that is not in the sheet, and a test that is green without exercising its rule are *major* findings. You hold the code against the sheet: you do not rebuild the cases, and a rule's wording is not yours to rewrite.
 7. **Rank** each finding: *blocking* (wrong result, lost data, security hole, crash, a command that
    fails), *major* (breaks in a plausible scenario, behaviour changed without a test, a written
-   convention broken, a README or usage documentation that does not follow the change), *minor* (costs maintenance: duplication, dead code). Untested code that is
+   convention broken, a README or usage documentation that does not follow the change, a sheet rule without test, a modified acceptance test or a rule coded outside the sheet), *minor* (costs maintenance: duplication, dead code). Untested code that is
    practically unreachable, and a rule that holds as written while an edge defeats its purpose, are
    *minor* — unless they can lose or corrupt data.
 

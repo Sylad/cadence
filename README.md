@@ -36,7 +36,7 @@ lots that deliver it). Delivered so far: the sheet template `templates/fiche.yam
 (the sheet's invariants) and `cadence spec qa` (the screen's `docs/qa/expectations.md` section, derived
 from the sheet), see [spec](#spec) below, and the `spec` step of `orchestrate` itself (the `spec-writer` agent, the
 render at 1440 and 390 px, the commit of the spec), see [The spec step](#the-spec-step-of-a-lot-with-screen) in `orchestrate`; the `accept` step (red acceptance tests and the lock that protects them), see [The accept step](#the-accept-step-red-acceptance-tests-and-their-lock); the UX review of
-the mockup (the `ux-reviewer` agent in mockup mode), see [The mockup review](#the-mockup-review-before-any-code); the downstream briefs are not delivered yet.
+the mockup (the `ux-reviewer` agent in mockup mode), see [The mockup review](#the-mockup-review-before-any-code); and the downstream briefs (the sheet given to `implement`, rule → test → green in the code review, a light UX conformity pass, the `## Hypothèses` section of the news entry), see [The downstream briefs](#the-downstream-briefs-sheet-rule--test--green-conformity-hypotheses).
 
 ## What's new
 
@@ -285,7 +285,7 @@ captures:
 |---|---|
 | `cadence news new <lot…> [--title t]` | entry skeleton, dated and timed now (`date`, `created`), titled after the lot's public title (`public`), else its title; `--title` wins |
 | `cadence news list` | entries, newest first (see *Order* below) |
-| `cadence news check` | visible lots done without entry, unknown lots, missing or undeclared screenshots, entries without creation time, bad headers |
+| `cadence news check` | visible lots done without entry, unknown lots, missing or undeclared screenshots, entries without creation time, bad headers, a lot whose screen sheet has hypotheses and whose entry lacks the `## Hypothèses` section (or a line for one of them) |
 | `cadence news stamp` | migration: writes `created:` into entries without one (or with an empty one), from the author date of the commit that added the file under its current name (now if not committed yet) |
 | `cadence news build [-o dir]` | `nouveautes.json` + `index.html` + screenshots (default `docs/nouveautes/site`) |
 
@@ -1074,6 +1074,22 @@ session, `accept` (L173): `precheck → spec → maquette → accept → impleme
   `commitPlan` may commit the `acceptation.json` files, otherwise the dirty tree would stop the lot). The files then join `orchestrate.test` and the CI, which keep the lot green from then on; the following lot, running with `vert: true` in a file whose tests are unchanged, sees no difference but that key.
 - **When the lot is handed back** (question, budget, passes exhausted) its tests stay red but excluded from the project's runner and CI: the next lots and `cadence deliver` do not see them; `--resume` continues with the same lock. On resume, the step is skipped when the lot already has a valid committed **and sealed** `acceptation.json` (its `empreintes` set by the program); a conforming file without them proves nothing and `accept` runs again. The fingerprints are keyed by normalised path, so a listed `./test/x.ts` is recognised like `test/x.ts`.
 
+### The downstream briefs: sheet, rule → test → green, conformity, Hypothèses
+
+Once the sheet exists, the steps after it all read it (L174, `src/orchestrate/aval.ts`, the `{{fiche}}` marker of the templates `implement.md`, `fix.md`, `fix-minors.md`, `review.md`, `review-small.md` and `ux.md`). A lot without a sheet (no `screen:`, or under the threshold) keeps exactly the briefs it had.
+
+- **`implement` and `fix`** get the path of the sheet and of the mockup, and **one line per rule** (`- R3 [erreur, hypothese] statement. Message: « … ». Tests: « R3 — … »`). The session makes the acceptance tests green **without modifying them** (they are named when the `accept` step ran; the lock above hands the lot back otherwise), **the tests it writes in addition cite the rule** in their name (`R2 — …`), and it **does not invent a rule**: a case the sheet does not cover is written in the report (`nonVerifie` or `choix`), not coded. In a `fix` the sheet stays the reference: a finding that contradicts it is contested under `choix`.
+- **The code review (`review`, `review-small`) checks rule → test → green** (`règle → test → vert`). For each `Rn` of the sheet the reviewer checks that its test exists (named after the rule), that it is green, and that the behaviour is in the diff; when an acceptance file is named, that each listed test is unchanged since the red commit (`git diff <red commit> -- <file>` empty; the brief gives the red commit). A rule without a test, an acceptance test modified since the red commit, a rule coded that is not in the sheet, and a test that is green without exercising its rule are **major** findings. The reviewer no longer rebuilds the cases from the code.
+- **The UX pass becomes a conformity pass.** For a lot with a sheet, the `ux` session (the `ux-reviewer` agent, **conformity mode**) no longer audits the whole screen: it compares the running app to the mockup and to its captures `maquette-<état>-<largeur>.png`, state by state, at 1440 and 390 px, and reports the differences of rendering and ergonomics the tests do not cover, each tied to a rule or a measure. The rules of the sheet are the tests' job. Its verdict feeds `raf ux`, which stays the lead's, decided on the captures. A small visible lot (single `review-small` pass) gets the conformity instruction in that pass.
+- **The `## Hypothèses` section of the news entry.** The `implement` brief asks for an entry that ends with `## Hypothèses`: one line `- Rn — …` per rule whose status is `hypothese`, with what changes if it is wrong (its `si_faux`) — it is what the lead shows for the `raf ux` decision, the choices nobody validated.
+
+  ```markdown
+  ## Hypothèses
+  - R3 — erreur de chargement : message « Impossible de charger le prochain match. » et bouton Réessayer. À confirmer ; sinon seul ce bloc change.
+  ```
+
+  **`cadence news check`** (not `build`) flags a lot whose sheet has hypotheses — found under `orchestrate.spec.dir` (default `docs/specs`), by `ecran.lot` — when none of its entries has the section, or when the section lacks a `- Rn` line for one of the rules (`L7 : la fiche a des hypothèses (R3, R4) mais l'entrée … n'a pas la section « ## Hypothèses »`). A lot without hypothesis needs no section.
+
 **Production access of the sessions** (L168): a session of a wave (`implement`, `fix`, `precheck`, `spec`, `review`, `ux`) is
 started with no *default* access to the production cluster (a guard against the ordinary path, not a barrier). What a session inherits was measured on the dev machine: `KUBECONFIG` (pointing at
 `~/.kube/config`, the production cluster), the `kubectl` of the `PATH` (a link to `k3s`, which without `KUBECONFIG`
@@ -1590,7 +1606,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 - The **text of the outputs**: wording, layout, order of the lines and columns of every report, table and message
   (the `--json` outputs and the exit codes are part of the commands above). In a `--json` output a new field is a
   minor change, so consumers must tolerate unknown fields; removing or renaming a field is a major change.
-- The **`precheck-reader`**, **`spec-writer`** and **`acceptance-writer`** agents, and the mockup mode of **`ux-reviewer`**: internal to `cadence orchestrate`, not meant to be called by hand.
+- The **`precheck-reader`**, **`spec-writer`** and **`acceptance-writer`** agents, and the mockup and conformity modes of **`ux-reviewer`**: internal to `cadence orchestrate`, not meant to be called by hand.
 - The **`cadence-hud` band**: its segments, colours and layout; it is versioned on its own.
 - The **wave journals** under `.cadence/runs` and the files `cadence orchestrate` keeps there.
 - The wording of the briefs and of the instructions inside the skills and the agents.

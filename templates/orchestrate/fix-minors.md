@@ -1,6 +1,7 @@
 Work in `{{chemin}}` on lot `{{lot}}` — "{{titre}}" — of its plan.
 A fresh review found only minor findings: the lot is compliant, and this is the one pass that treats them.
 {{repos}}
+{{fiche}}
 Commits of the lot so far:
 {{commits}}
 

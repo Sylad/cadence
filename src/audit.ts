@@ -5,7 +5,8 @@ import type { Day } from './dates.js';
 import { parse } from 'yaml';
 import { changedFiles, fileAt, readCommits, type Commit } from './git.js';
 import { citedRefs, linkCommits, scopeOf, type Linked } from './link.js';
-import { readDocsConfig, readNewsConfig } from './config.js';
+import { readDocsConfig, readNewsConfig, readOrchestrateConfig } from './config.js';
+import { ficheHypotheses } from './spec.js';
 import { docSyncGaps, filesOf, gapMessage } from './docsync.js';
 import { type Entry, loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong, reusedNewsTitle } from './news.js';
 import { isRecurring } from './recurring.js';
@@ -169,10 +170,21 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
     const m = l.public ? publicTitleTooLong(l.public, max) : reused ? publicTitleTooLong(reused, max) : null;
     return m ? [{ message: `${l.id} : ${reused && !l.public ? m.replace('titre public', 'titre public repris de la Nouveauté') : m}` }] : [];
   });
-  const issues: AuditIssue[] = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, entries, newsDir), ...titles, ...gates, ...docSyncIssues(plan, root, all.byLot), ...(plan.hasPublicField ? missingPublicTitles(lots, entries) : []),
+  const issues: AuditIssue[] = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7), ...newsIssues(lots, entries, newsDir, hypothesesOf(root, plan.configFile ?? join(root, 'cadence.yaml'))), ...titles, ...gates, ...docSyncIssues(plan, root, all.byLot), ...(plan.hasPublicField ? missingPublicTitles(lots, entries) : []),
     ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
   // Un plan en lecture seule se corrige avec l'outil du projet : ne pas conseiller une commande raf qui refuserait.
   return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf (start|public) .*$/, '') })) : issues;
+}
+
+/** Hypothèses des fiches, dans le dossier de `orchestrate.spec.dir` ; une configuration d'orchestrate illisible n'empêche pas le contrôle : dossier par défaut. */
+export function hypothesesOf(root: string, configFile: string): Map<string, string[]> {
+  let dir = 'docs/specs';
+  try {
+    dir = readOrchestrateConfig(configFile).spec.dir;
+  } catch {
+    // dossier par défaut
+  }
+  return ficheHypotheses(root, dir);
 }
 
 /**

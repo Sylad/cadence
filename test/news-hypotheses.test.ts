@@ -130,6 +130,13 @@ describe('cadence news check', () => {
     return dir;
   };
 
+  it('raf check porte le même contrôle que news check (audit)', () => {
+    const dir = projet();
+    const r = cli(dir, 'check');
+    expect(r.out).toContain('L1 : la fiche a des hypothèses (R3, R4)');
+    expect(r.code).toBe(1);
+  });
+
   it('le dossier des fiches vient de orchestrate.spec.dir', () => {
     const dir = projet('specs-perso');
     expect(cli(dir, 'news', 'check').out).toContain('L1 : la fiche a des hypothèses (R3, R4)');

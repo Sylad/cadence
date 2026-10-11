@@ -190,10 +190,21 @@ export function lotStartHead(repo: string, work: string[], cites: string[] = [],
   return gitOk(repo, 'merge-base', '--is-ancestor', wave, start) ? wave : start;
 }
 
-/** La fiche a changé depuis `since` (commits et arbre de travail), ou dans l'un des commits `cites` (ceux qui citent le lot). Illisible pour git : non (le verrou reste entier). */
-function ficheChanged(repo: string, since: string, fiche: string, cites: string[] = []): boolean {
+/** Les commits de `since` à HEAD qui touchent la fiche, hors ceux dont le sujet cite un autre lot que `lot` (un lot intercalé entre deux vagues du lot ne fait pas évoluer ses règles). */
+function ficheCommitsOfLot(repo: string, since: string, fiche: string, lot?: string): boolean {
+  const log = git(repo, 'log', '--format=%H%x00%s', `${since}..HEAD`, '--', fiche).split('\n').filter(Boolean);
+  return log.some((line) => {
+    const subject = line.split('\0')[1] ?? '';
+    const ids = subject.match(/\bL\d+\b/g) ?? [];
+    return !lot || ids.every((id) => id === lot);
+  });
+}
+
+/** La fiche a changé depuis `since` dans les commits du lot (ou sans lot cité) ou dans l'arbre de travail, ou dans l'un des commits `cites` (ceux qui citent le lot). Illisible pour git : non (le verrou reste entier). */
+function ficheChanged(repo: string, since: string, fiche: string, cites: string[] = [], lot?: string): boolean {
   try {
-    if (git(repo, 'diff', '--name-only', since, '--', fiche).trim() !== '') return true;
+    if (git(repo, 'diff', '--name-only', 'HEAD', '--', fiche).trim() !== '') return true;
+    if (ficheCommitsOfLot(repo, since, fiche, lot)) return true;
   } catch {
     return false;
   }
@@ -248,7 +259,7 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     if (cur.vert === true && typeof base.fiche === 'string' && base.lot !== opts.lot) {
       // L'acceptation du lot en cours (vert posé dès l'implement) garde le verrou entier : l'exception ne vaut que pour un lot suivant.
       const ref = opts.lotBase ?? headBefore;
-      if (ficheChanged(repo, ref, base.fiche, opts.lotCommits)) continue;
+      if (ficheChanged(repo, ref, base.fiche, opts.lotCommits, opts.lot)) continue;
       // La référence ne quitte le commit rouge que si la fiche a évolué entre le rouge et `ref` : sinon tout test changé depuis le rouge reste un écart.
       if (gitOk(repo, 'diff', '--name-only', red, ref, '--', base.fiche) && git(repo, 'diff', '--name-only', red, ref, '--', base.fiche).trim() !== '') {
         depuis = ref;

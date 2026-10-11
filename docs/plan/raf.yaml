@@ -2026,6 +2026,7 @@ lots:
       - { date: 2026-10-11, text: "11-10, 1re observation de l'essai : la session spec a produit en 3 min une fiche complète (8 règles, choix de route /equipe-de-france, endpoint /api/france unique, effectif sans lien vers /player faute d'id commun) et 4 états de maquette à 1440/390 ; la vague s'est arrêtée sur une question fausse (négation « rien d'irréversible » lue comme action irréversible) — lot ouvert, réponse du lead : R2 confirmée." }
       - { date: 2026-10-11, text: "11-10, 2e observation : la revue de maquette (Opus) est fine et utile — 3 points corrigés en 1re revue, puis 1 majeur sur des données d'exemple (jour de la semaine faux) et 13 mineurs pertinents (sens du score, règle L47 du projet, role=status, aria-label sur span, reflow 320 px, champs sans fiche) ; mais 2 passes rendent le lot sur une erreur de donnée d'exemple triviale. Piste : le brief spec demande de vérifier chaque date d'exemple, et une erreur de donnée d'exemple compte comme mineur. Coût à 2 revues : ~25 min, ~300 k." }
       - { date: 2026-10-11, text: "11-10, 3e observation : bout à bout sur ol-companion L113 (vague 2026-10-11-1205, ~45 min) — spec corrigée → maquette conforme 1re revue → accept rouge en 2 passes (R1–R9, 22 cas, scellé 709708c) → implement → vert posé par le cycle (c01f9e7) → UX conforme → review conforme après 1 correction + mineurs. Ce que la fiche a apporté : les états chargement/erreur/vide existent et sont testés dès le départ, la règle L47 du projet reprise, le sens du score fixé avant le code. Ce qu'elle n'a pas vu : la langue de la source (365scores en anglais, langId), le staff dans l'effectif, l'erreur + anciennes données après un 2e échec (TanStack v5) — trouvés par UX et code review. La commande orchestrate.accept échoue hors vague (CADENCE_ACCEPTATION exigée) : attendu, à dire dans le README. Reste à clore après la livraison et le verdict de Sylvain." }
+      - { date: 2026-10-11, text: "11-10, 4e observation : le verrou protège encore les tests d'un lot vert et livré — un lot suivant (date des Bleus, QA prod) qui révise R7 dans la fiche et ses tests a été rendu ; lot L183 pour l'admettre quand la fiche change dans le même lot." }
   - id: L176
     title: Mesure de l'étape spec contre le lot de mesure, 8 lots avec fiche (spec etape-spec, S8)
     status: todo
@@ -2073,18 +2074,27 @@ lots:
     finished: 2026-10-11
   - id: L181
     title: "Étape spec : le brief demande de vérifier chaque date d'exemple de la maquette (jour de la semaine calculé, pas écrit de tête) et la revue de maquette classe une erreur de donnée d'exemple en mineur, pas en majeur — essai L175 : lot rendu après 2 revues sur « Mer. 03/09 » (un jeudi)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant (0 blocking, 0 major, 1 minor note) — commit 6cc2c96, vitest 1587/1587 verts (74 fichiers), tsc sans erreur ; les 3 choix d'interprétation de l'auteur tiennent (règle étendue aux chiffres qui doivent tomber juste, pas de garde programmatique, CHANGELOG sous Added) — orchestré (vague 2026-10-11-1300, 0 passe(s) de correction)", commit: 6cc2c96cccdd78e35e007fe829f012a490e46591 }
+    notes:
+      - { date: 2026-10-11, text: "Clos 11-10 (vague 2026-10-11-1300, conforme ; 1590 tests). Mineur en note : la règle « donnée d'exemple = mineur, jamais majeur » (agents/ux-reviewer.md:27, maquette.md:8) est absolue, alors qu'une donnée d'exemple peut contredire une règle de la fiche." }
+    finished: 2026-10-11
   - id: L182
     title: "README, étape accept : la commande orchestrate.accept lancée hors vague échoue (CADENCE_ACCEPTATION exigée par acceptationOnly) — dire comment la lancer à la main (CADENCE_ACCEPTATION=<chemin de l'acceptation> <commande>) et que les tests verts rejoignent le lanceur ordinaire — essai L175"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant — 0 constat. Commit 5c0c88d : le README dit comment lancer `orchestrate.accept` à la main, d'accord avec `acceptationOnly()` et `cycle.ts:1011`. Vitest 1590/1590 verts (75 fichiers), `tsc --noEmit` sans erreur. Les 5 choix d'interprétation de l'auteur tiennent. — orchestré (vague 2026-10-11-1300, 0 passe(s) de correction)", commit: 5c0c88dc3106a5531ba12668a79f9fc85abee893 }
+    finished: 2026-10-11
+  - id: L183
+    title: "Verrou d'acceptation : un acceptation à vert: true (lot livré) bloque un lot suivant qui fait évoluer la règle — essai : ol-companion rendu après QA prod (R7 de la fiche et ses tests changés ensemble, cohérents). Règle : vert: false → verrou entier ; vert: true → modification des tests listés admise si la fiche de l'écran change dans les commits du même lot (la fiche fait évoluer les règles), sinon écart comme aujourd'hui ; README (« The lock ») et tests"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

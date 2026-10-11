@@ -42,6 +42,8 @@ export interface Lot {
   visible: boolean;
   /** Écran que le lot crée ou change (L169, étape spec) : exige `visible`. Absent = pas d'étape spec. */
   screen?: Screen;
+  /** Le lot change un comportement (étape spec back) : posé à la planification, jamais déduit du titre. Absent = pas de spec. */
+  spec?: true;
   /** Titre public du lot, en langage du public (pages Nouveautés et Plan) ; absent = pas de titre public. */
   public?: string;
   /** Périodicité en jours : le lot est récurrent, il reste `todo` et se refait (`raf did`). */
@@ -77,7 +79,7 @@ export class RafError extends Error {}
 
 export type Ref = { lot: string; task?: string };
 
-export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'screen', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent'] as const;
+export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'screen', 'spec', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent'] as const;
 /** Nature de l'écran d'un lot visible : nouvelle page, nouveau composant, parcours modifié. */
 export const SCREENS = ['page', 'component', 'journey'] as const;
 export type Screen = (typeof SCREENS)[number];
@@ -413,7 +415,7 @@ export class Plan {
     return node as YAMLMap;
   }
 
-  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; public?: string; every?: number; after?: string[] } = {}): string {
+  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; public?: string; every?: number; after?: string[] } = {}): string {
     this.writable();
     if (opts.screen !== undefined) {
       if (!SCREENS.includes(opts.screen)) throw new RafError(`screen inconnu : ${String(opts.screen)} (${SCREENS.join(', ')})`);
@@ -434,6 +436,7 @@ export class Plan {
     if (opts.quickwin) entry.quickwin = true;
     if (opts.visible) entry.visible = true;
     if (opts.screen) entry.screen = opts.screen;
+    if (opts.spec) entry.spec = true;
     if (opts.every !== undefined) entry.every = opts.every;
     if (opts.after?.length) entry.after = opts.after;
     entry.created = today;
@@ -547,6 +550,29 @@ export class Plan {
     node.items.splice(keys.indexOf('visible') + 1, 0, this.doc.createPair('screen', screen));
   }
 
+  /** Pose (true) ou retire (false) le `spec:` d'un lot existant ; `screen:` l'implique, donc on ne retire pas la spec d'un lot à écran. Renvoie false quand `screen:` rendait la pose sans objet. */
+  setSpec(ref: string, on: boolean): boolean {
+    this.writable();
+    if (ref.includes('/')) throw new RafError(`la spec se pose sur un lot, pas une sous-tâche : ${ref}`);
+    const node = this.lotNode(ref);
+    if (this.lot(ref).screen) {
+      if (!on) throw new RafError(`${ref} a screen: — retirer d'abord screen: (raf screen ${ref} none), l'écran implique la spec`);
+      return false;
+    }
+    if (!on) {
+      node.delete('spec');
+      return true;
+    }
+    if (node.has('spec')) {
+      node.set('spec', true);
+      return true;
+    }
+    const keys = node.items.map((p) => String((p.key as { value?: unknown })?.value ?? p.key));
+    const at = Math.max(...['screen', 'visible', 'quickwin', 'estimate'].map((k) => keys.indexOf(k)));
+    node.items.splice(at + 1, 0, this.doc.createPair('spec', true));
+    return true;
+  }
+
   /** Un lot récurrent a été refait : `last` passe à aujourd'hui, avec une note si `text` est donné. */
   did(ref: string, today: Day, text?: string): void {
     this.writable();
@@ -611,6 +637,7 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
         quickwin: pick('quickwin'),
         visible: pick('visible'),
         screen: pick('screen'),
+        spec: pick('spec'),
         public: pick('public'),
         every: pick('every'),
         last: day('last'),
@@ -664,6 +691,11 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     else problems.push(`screen « ${String(raw.screen)} » inconnu (${SCREENS.join(', ')})`);
     if (screen && raw.visible !== true) problems.push(`screen « ${screen} » sans visible : un écran est un changement visible`);
   }
+  let spec: true | undefined;
+  if (raw.spec != null) {
+    if (raw.spec === true) spec = true;
+    else if (raw.spec !== false) problems.push(`spec : true ou false attendu (reçu « ${String(raw.spec)} »)`);
+  }
   return {
     id: String(raw.id),
     title: String(raw.title ?? ''),
@@ -672,6 +704,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     quickwin: raw.quickwin === true,
     visible: raw.visible === true,
     ...(screen ? { screen } : {}),
+    ...(spec ? { spec } : {}),
     ...(typeof raw.public === 'string' && raw.public.trim() !== '' ? { public: raw.public.trim() } : {}),
     ...(Number.isInteger(raw.every) && (raw.every as number) > 0 ? { every: raw.every as number } : {}),
     ...(last ? { last } : {}),

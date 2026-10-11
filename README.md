@@ -102,9 +102,10 @@ raf gantt                         # docs/plan/gantt.html
 | Command | Effect |
 |---|---|
 | `raf init [--project name] [--prefix L] [--no-hook]` | create the plan, install the hook, add `.playwright-mcp/` to `.gitignore` |
-| `raf add "title" [--estimate d] [--quickwin] [--visible [--screen page\|component\|journey]] [--public "title"] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id (`--public`: the lot's title in the public's words, written as `public:` right after `title:`; `--screen`: the screen a visible lot creates or changes — a new `page`, a new `component` or a modified `journey` — written as `screen:` right after `visible:`, shown by `raf show`; it requires `--visible`, and `raf check` reports a `screen:` without `visible:` or with another value as an error. It is what will trigger the spec step of `orchestrate`, never inferred from the title) |
+| `raf add "title" [--estimate d] [--quickwin] [--visible [--screen page\|component\|journey]] [--spec] [--public "title"] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id (`--public`: the lot's title in the public's words, written as `public:` right after `title:`; `--screen`: the screen a visible lot creates or changes — a new `page`, a new `component` or a modified `journey` — written as `screen:` right after `visible:`, shown by `raf show`; it requires `--visible`, and `raf check` reports a `screen:` without `visible:` or with another value as an error. It is what will trigger the spec step of `orchestrate`, never inferred from the title; `--spec`: the lot changes a behaviour (something a user, an API client or another service can observe), written as `spec: true` right after `screen:` (or `visible:`), shown by `raf show`, refused on a sub-task. Also set by the lead at planning time, never inferred from the title) |
 | `raf add "title" --every <days>` · `raf did <id> ["text"]` | recurring lot: `every` (days) and `last` (last time done) fields; the lot stays `todo`, `raf now` and `session start` list it under « Récurrent » with « dû depuis N j » / « prochain dans N j »; `raf did` resets the count (spec: `docs/superpowers/specs/2026-10-04-L11-tache-recurrente.md`) |
 | `raf screen <id> page\|component\|journey\|none` | set, replace or remove `screen:` on an existing lot, to adopt the [spec step](#the-spec-step-of-a-lot-with-screen) on a plan already written; refused on a lot without `visible:` (like `raf add --screen`) and on a sub-task; `none` removes the key and leaves `visible:` alone |
+| `raf spec <id> on\|off` | set or remove `spec:` on an existing lot (a lot that changes a behaviour, for the back-end spec step designed in `docs/superpowers/specs/2026-10-11-etape-spec-back-design.md`); refused on a sub-task; `off` is refused on a lot that has `screen:` (the screen implies the spec: remove `screen:` first) and `on` there only says so and changes nothing. `raf spec` only takes `on`/`off`: `cadence spec check\|qa <fiche.yaml>` keeps its own subcommands. `raf check` reports a `spec:` that is neither `true` nor `false` (`spec : true ou false attendu`) |
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
@@ -207,6 +208,7 @@ plan:
     title: titre
     public: titre_public        # the lot's title for the public; read when it is text, else ignored
     screen: ecran               # page, component or journey; only on a visible lot
+    spec: fiche                 # true or false: the lot changes a behaviour
     status: etat
     estimate: effort
     created: cree_le
@@ -223,7 +225,7 @@ plan:
   estimates: { S: 0.5, M: 1, L: 3 }   # their effort labels, in working days
 ```
 
-- Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `screen`, `public`, `every`, `last`, `after`, `created`, `started`,
+- Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `screen`, `spec`, `public`, `every`, `last`, `after`, `created`, `started`,
   `finished`, `notes`, `repos`, `parent`; one left out is read under its own name. A timestamp counts for
   its day; a note written as plain text is one note.
 - `parent`: an entry `B33/t1-fusion` whose parent is `B33` becomes the sub-task `t1-fusion` of `B33`.

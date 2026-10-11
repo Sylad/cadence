@@ -46,6 +46,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - `raf screen <id> page|component|journey|none`: sets, replaces or removes `screen:` on an existing lot, so a plan already written can adopt the spec step of `cadence orchestrate`. Refused on a lot without `visible:` (as `raf add --screen` is) and on a sub-task; `none` removes the key and keeps `visible:`. (L185)
+- `spec:` field of the lots (L186, first brick of the back-end spec step): `raf add "title" --spec` and `raf spec <id> on|off` set or remove it (refused on a sub-task; `off` refused on a lot with `screen:`, which implies the spec; `on` there changes nothing), `raf show` prints it, `plan.fields.spec` maps it in a foreign plan, and `raf check` reports a `spec:` that is neither `true` nor `false`. `cadence spec check|qa` is unchanged: only those two words go to the screen sheet. (L186)
 
 ## [1.1.0] - 2026-10-11
 

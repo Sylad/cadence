@@ -38,9 +38,10 @@ export interface Io {
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
 
   raf init [--project nom] [--prefix L] [--no-hook]
-  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--public "titre public"] [--every jours] [--after L2,L4] [--parent L3]
+  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--public "titre public"] [--every jours] [--after L2,L4] [--parent L3]
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (l'étape spec d'orchestrate)
+  raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf note <id> "texte"
   raf did <id> ["texte"]   un lot récurrent (--every) a été refait : le « dû depuis N j » repart de aujourd'hui
@@ -122,6 +123,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       quickwin: { type: 'boolean' },
       visible: { type: 'boolean' },
       screen: { type: 'string' },
+      spec: { type: 'boolean' },
       public: { type: 'string' },
       every: { type: 'string' },
       dir: { type: 'string' },
@@ -181,7 +183,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     return 0;
   }
   if (command === 'corrections') return corrections(rest, values, io);
-  if (command === 'spec') return spec(rest, io);
+  // `spec` est aussi un verbe de raf (raf spec <lot> on|off, L186) : seuls check et qa vont à la fiche.
+  if (command === 'spec' && (rest[0] === 'check' || rest[0] === 'qa')) return spec(rest, io);
   // --all balaie les sous-dossiers : il ne lit ni le plan ni le cadence.yaml du dossier courant.
   if (command === 'session' && (values.all || values.depth !== undefined)) return sessionAll(rest, values, io);
   // cadence.yaml peut dire où est le plan et, s'il est tenu par un autre outil, comment le lire.
@@ -221,6 +224,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       let id: string;
       if (values.parent) {
         if (values.screen !== undefined) throw new RafError('--screen se pose sur un lot, pas sur une sous-tâche');
+        if (values.spec) throw new RafError('--spec se pose sur un lot, pas sur une sous-tâche');
         if (values.public !== undefined) throw new RafError('--public se pose sur un lot, pas sur une sous-tâche');
         if (values.every !== undefined) throw new RafError('--every se pose sur un lot, pas sur une sous-tâche');
         id = plan.addTask(values.parent, rest.join(' '));
@@ -231,7 +235,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         const every = values.every === undefined ? undefined : Number(values.every);
         if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new RafError(`périodicité invalide : ${values.every} (un nombre entier de jours)`);
         if (values.public !== undefined) refuseLongTitle(values.public);
-        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, public: values.public, every, after });
+        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, public: values.public, every, after });
       }
       plan.save();
       io.out(id);
@@ -297,6 +301,17 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       plan.save();
       return 0;
     }
+    case 'spec': {
+      need(2, 'spec <id> on|off');
+      if (rest.length > 2 || (rest[1] !== 'on' && rest[1] !== 'off')) throw new RafError('usage : raf spec <id> on|off (ou cadence spec check|qa <fiche.yaml>)');
+      const plan = loadPlan();
+      if (!plan.setSpec(rest[0], rest[1] === 'on')) {
+        io.out(`${rest[0]} a déjà screen: — l'écran implique la spec, rien à changer`);
+        return 0;
+      }
+      plan.save();
+      return 0;
+    }
     case 'ux':
     case 'review':
       return gate(command, rest, loadPlan, root, today, io);
@@ -325,6 +340,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (lot.after.length) io.out(`after : ${lot.after.join(', ')}`);
       if (lot.public) io.out(`public : ${lot.public}`);
       if (lot.screen) io.out(`screen : ${lot.screen}`);
+      if (lot.spec) io.out('spec : true');
       if (notes.length) {
         io.out('notes :');
         // Les lignes suivantes d'une note multiligne s'alignent sous son texte, pas en colonne 0.

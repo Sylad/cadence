@@ -2077,6 +2077,7 @@ lots:
     estimate: 0.25
     created: 2026-10-11
     started: 2026-10-11
+    review: { date: 2026-10-11, verdict: "compliant (0 blocking, 0 major, 1 minor note) — commit 6cc2c96, vitest 1587/1587 verts (74 fichiers), tsc sans erreur ; les 3 choix d'interprétation de l'auteur tiennent (règle étendue aux chiffres qui doivent tomber juste, pas de garde programmatique, CHANGELOG sous Added) — orchestré (vague 2026-10-11-1300, 0 passe(s) de correction)", commit: 6cc2c96cccdd78e35e007fe829f012a490e46591 }
   - id: L182
     title: "README, étape accept : la commande orchestrate.accept lancée hors vague échoue (CADENCE_ACCEPTATION exigée par acceptationOnly) — dire comment la lancer à la main (CADENCE_ACCEPTATION=<chemin de l'acceptation> <commande>) et que les tests verts rejoignent le lanceur ordinaire — essai L175"
     status: todo

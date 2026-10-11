@@ -2092,11 +2092,14 @@ lots:
     finished: 2026-10-11
   - id: L183
     title: "Verrou d'acceptation : un acceptation à vert: true (lot livré) bloque un lot suivant qui fait évoluer la règle — essai : ol-companion rendu après QA prod (R7 de la fiche et ses tests changés ensemble, cohérents). Règle : vert: false → verrou entier ; vert: true → modification des tests listés admise si la fiche de l'écran change dans les commits du même lot (la fiche fait évoluer les règles), sinon écart comme aujourd'hui ; README (« The lock ») et tests"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "conforme — orchestré (vague 2026-10-11-1305, 2 passe(s) de correction)", commit: 9d59aa3f911f71b1bc8be179b718dff5ae9b5d19 }
+    notes:
+      - { date: 2026-10-11, text: "Clos 11-10 (vague 2026-10-11-1305, conforme après 2 corrections ; build + 1604 tests re-vérifiés). Mineur en note : n'importe quel changement de la fiche (même un espace) lève le verrou des tests d'un lot livré (accept.ts:174) — choix assumé, la revue de code voit le diff." }
+    finished: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

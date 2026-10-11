@@ -432,3 +432,34 @@ describe('étape spec : deux sessions spec au plus, chemins asymétriques', () =
     expect(c.lot.status).toBe('handed-back');
   });
 });
+
+// L188, 3ᵉ revue : une hypothèse coûteuse levée en question au lead ouvre un nouveau budget de deux sessions spec, comme une question de la session.
+describe('étape spec : la réponse à une hypothèse coûteuse remet le budget à zéro', () => {
+  const cout: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { fiche: (d) => { d.regles[2].si_faux = 'Si faux, une migration du stockage des rappels serait à écrire.'; } }) }));
+  const answer = async (c: ReturnType<ReturnType<typeof harness>['lot']>) => {
+    expect(c.lot.status).toBe('question');
+    c.lot.questions = [];
+    c.lot.pendingAnswer = 'confirmé';
+  };
+
+  it('back : spec coûteuse → réponse → spec → fiche majeure → seconde spec → seconde fiche', async () => {
+    const h = harness({ lots, script: { spec: [cout, spec, spec], fiche: [() => major(), ok], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    await answer(c);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'spec', 'fiche', 'spec', 'fiche', 'implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('écran : la maquette garde sa seconde revue après la réponse', async () => {
+    const screenSpec: Handler = (call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }));
+    const screenCout: Handler = (call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd, { fiche: (d) => { d.regles[2].si_faux = 'Si faux, une migration du stockage des rappels serait à écrire.'; } }) }));
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { spec: [screenCout, screenSpec, screenSpec], maquette: [() => major(), ok], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', { screen: 'page' as const, visible: true }, { maquette: true });
+    await runLot(c);
+    await answer(c);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'spec', 'maquette', 'spec', 'maquette', 'implement', 'review']);
+  });
+});

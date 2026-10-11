@@ -1006,6 +1006,7 @@ async function specStep(c: LotCtx): Promise<void> {
   if (costly.length) {
     l.questions = costly.map((x) => `${x.id} est posée comme hypothèse mais touche un choix coûteux à défaire (${x.categorie}) : « ${x.siFaux} » — la confirmer, ou la corriger, avant que la fiche serve de référence.`);
     l.specAsked = [...l.questions];
+    l.specRuns = undefined; // la réponse du lead ouvre un nouveau budget de deux sessions, comme celle d'une question de la session
     l.next = 'spec';
     transition(c, 'question', l.questions[0]);
     return;

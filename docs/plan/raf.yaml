@@ -2073,9 +2073,10 @@ lots:
     finished: 2026-10-11
   - id: L181
     title: "Étape spec : le brief demande de vérifier chaque date d'exemple de la maquette (jour de la semaine calculé, pas écrit de tête) et la revue de maquette classe une erreur de donnée d'exemple en mineur, pas en majeur — essai L175 : lot rendu après 2 revues sur « Mer. 03/09 » (un jeudi)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-11
+    started: 2026-10-11
   - id: L182
     title: "README, étape accept : la commande orchestrate.accept lancée hors vague échoue (CADENCE_ACCEPTATION exigée par acceptationOnly) — dire comment la lancer à la main (CADENCE_ACCEPTATION=<chemin de l'acceptation> <commande>) et que les tests verts rejoignent le lanceur ordinaire — essai L175"
     status: todo

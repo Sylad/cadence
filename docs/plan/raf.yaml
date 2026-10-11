@@ -2174,6 +2174,7 @@ lots:
     estimate: 0.5
     created: 2026-10-11
     started: 2026-10-11
+    review: { date: 2026-10-11, verdict: "conforme — orchestré (vague 2026-10-11-2025, 1 passe(s) de correction + passe des mineurs)", commit: 028fd5eef967a9aeb621674cfd720ef91eecf905 }
   - id: L193
     title: "test/orchestrate-pool.test.ts « jamais plus de deux sessions en même temps, jamais deux dans un dépôt » instable sous charge : rouge 1 fois dans la suite complète le 11-10 (re-vérif L191, une vague maritime tournait), vert 3/3 seul — dépendance au minutage à retirer"
     status: todo

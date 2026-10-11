@@ -211,9 +211,10 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     const lot = typeof base.lot === 'string' ? base.lot : '?';
     const emp = isObj(base.empreintes) ? base.empreintes : {};
     for (const f of fichiers) {
-      const want = emp[f];
-      if (typeof want !== 'string' || changed.includes(f)) continue; // déjà signalé ci-dessus
-      const have = existsSync(join(repo, f)) ? git(repo, 'hash-object', '--', f).trim() : null;
+      const norm = posix.normalize(f); // sealAcceptation range les empreintes sous le chemin normalisé, et git diff le rend ainsi
+      const want = emp[norm];
+      if (typeof want !== 'string' || changed.includes(norm)) continue; // déjà signalé ci-dessus
+      const have = existsSync(join(repo, norm)) ? git(repo, 'hash-object', '--', norm).trim() : null;
       if (have !== want) out.push(`${f} : empreinte différente de celle du scellé de ${p} (test d'acceptation de ${lot})`);
     }
     for (const f of changed) out.push(`${f} : test d'acceptation de ${lot} : empreinte modifiée depuis le commit rouge ${red.slice(0, 7)} (verrou ${p})`);

@@ -99,6 +99,21 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
     expect(v).toContain('L1');
   });
 
+  it('un fichier listé en ./test/x.ts est comparé à son empreinte rangée sous le chemin normalisé (L179)', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    doc.fichiers = [`./${a.test}`];
+    writeFileSync(join(repo, a.json), JSON.stringify(doc, null, 2));
+    sealAcceptation(repo, a.json);
+    const sealed = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    sealed.empreintes[a.test] = '0'.repeat(40); // empreinte qui ne correspond pas au fichier, inchangé depuis le commit rouge
+    writeFileSync(join(repo, a.json), JSON.stringify(sealed, null, 2));
+    commitPaths(repo, 'chore(L179): scellé', a.json);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    expect(lockViolations(repo, DIR, head).join('\n')).toContain('empreinte différente');
+  });
+
   it('une modification restée dans l’arbre (non commitée) est signalée aussi', () => {
     const repo = gitRepo();
     const a = ecritAcceptation(repo);

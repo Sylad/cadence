@@ -2166,6 +2166,7 @@ lots:
     estimate: 0.5
     created: 2026-10-11
     started: 2026-10-11
+    review: { date: 2026-10-11, verdict: "conforme (1 note mineure : libellés « l'estimation tient dans le budget » du tirage --continue) — orchestré (vague 2026-10-11-2000, 0 passe(s) de correction + passe des mineurs)", commit: 40695617e59a22e88bd86de6220ca291561a10a8 }
   - id: L192
     title: "cadence spec check, suites de la revue L187 : niveaux de log des piles du parc refusés par CODE_ERREUR (warning, info, critical, fatal, verbose) ; fiche back seule — règle avec etat reçoit deux écarts contradictoires (rattachee = ecranPart && aUnEtat), actions/etats/champs acceptés sans ecran (A1 en double avec un contrat) ; fiche mixte — action qui répète l'appel d'un contrat sans contrat: acceptée ; tests des branches non couvertes (hors_perimetre, forme A, id manquant, objet attendu)"
     status: todo

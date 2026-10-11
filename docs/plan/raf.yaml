@@ -2170,9 +2170,10 @@ lots:
     finished: 2026-10-11
   - id: L192
     title: "cadence spec check, suites de la revue L187 : niveaux de log des piles du parc refusés par CODE_ERREUR (warning, info, critical, fatal, verbose) ; fiche back seule — règle avec etat reçoit deux écarts contradictoires (rattachee = ecranPart && aUnEtat), actions/etats/champs acceptés sans ecran (A1 en double avec un contrat) ; fiche mixte — action qui répète l'appel d'un contrat sans contrat: acceptée ; tests des branches non couvertes (hors_perimetre, forme A, id manquant, objet attendu)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-11
+    started: 2026-10-11
   - id: L193
     title: "test/orchestrate-pool.test.ts « jamais plus de deux sessions en même temps, jamais deux dans un dépôt » instable sous charge : rouge 1 fois dans la suite complète le 11-10 (re-vérif L191, une vague maritime tournait), vert 3/3 seul — dépendance au minutage à retirer"
     status: todo

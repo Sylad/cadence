@@ -26,6 +26,19 @@ describe('acceptation-<lot>.json : un fichier par lot', () => {
 });
 
 describe('acceptation.json : lecture et contrôles de l’étape', () => {
+  it('un fichier de test qui existait avant la session accept ne peut pas être listé (ses tests ordinaires sortiraient de la CI)', () => {
+    const repo = gitRepo();
+    mkdirSync(join(repo, 'test'), { recursive: true });
+    writeFileSync(join(repo, 'test/prochain-match.acceptation.test.ts'), '// test ordinaire\n');
+    commitPaths(repo, 'test: existant', 'test/prochain-match.acceptation.test.ts');
+    const base = git(repo, 'rev-parse', 'HEAD').trim();
+    const a = ecritAcceptation(repo);
+    const p = checkAcceptation(repo, a.json, 'L1', a.fiche, base).join('\n');
+    expect(p).toContain(a.test);
+    expect(p).toMatch(/existait avant/);
+    expect(checkAcceptation(repo, a.json, 'L1', a.fiche).join('\n')).not.toMatch(/existait avant/);
+  });
+
   it('un fichier conforme ne relève aucun écart', () => {
     const repo = gitRepo();
     const a = ecritAcceptation(repo);
@@ -146,9 +159,35 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
     const repo2 = gitRepo();
     git(repo2, 'commit', '-q', '--allow-empty', '-m', 'chore: vide');
     const head2 = git(repo2, 'rev-parse', 'HEAD');
-    ecritAcceptation(repo2);
+    const a2 = ecritAcceptation(repo2);
     expect(lockViolations(repo2, DIR, head2).join('\n')).toContain('créé');
-    expect(lockViolations(repo2, DIR, head2, { created: 'allow' })).toEqual([]);
+    expect(lockViolations(repo2, DIR, head2, { skip: a2.json })).toEqual([]);
+  });
+
+  it('pendant accept, seul le fichier du lot (skip) peut être créé : l’acceptation d’un autre lot créée au passage est signalée', () => {
+    const repo = gitRepo();
+    git(repo, 'commit', '-q', '--allow-empty', '-m', 'chore: vide');
+    const head = git(repo, 'rev-parse', 'HEAD');
+    const own = ecritAcceptation(repo);
+    const other = ecritAcceptation(repo, { lot: 'ZZ', ecran: 'autre' });
+    const v = lockViolations(repo, DIR, head, { skip: own.json }).join('\n');
+    expect(v).toContain(other.json);
+    expect(v).toContain('créé');
+  });
+
+  it('une réécriture commitée par une session interrompue (tête d’avant la reprise déjà modifiée) est vue par l’ancre du commit rouge', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    sealAcceptation(repo, a.json);
+    commitPaths(repo, 'test(L1): scellé', a.json);
+    const rouge = redSha(repo, a.json) as string;
+    const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    doc.fichiers = ['test/ordinary.test.ts'];
+    writeFileSync(join(repo, a.json), JSON.stringify(doc));
+    commitPaths(repo, 'feat(L1): réécrit puis coupé', a.json);
+    const headReprise = git(repo, 'rev-parse', 'HEAD'); // la reprise part d'ici : la réécriture est déjà dans headBefore
+    expect(lockViolations(repo, DIR, headReprise)).toEqual([]); // sans ancre, rien ne bouge par rapport à headBefore
+    expect(lockViolations(repo, DIR, headReprise, { rouge: { [a.json]: rouge } }).join('\n')).toContain('commit rouge');
   });
 });
 

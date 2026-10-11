@@ -764,6 +764,7 @@ function firstWrite(c: LotCtx): StepKind {
   return fiche && ficheReady(l.repo, fiche, l.lot) ? afterSpec(c, fiche) : 'spec';
 }
 
+const NO_TEST_ACCEPT = 'étape accept : orchestrate.test absent, rien ne prouve que les tests rouges sont exclus du lanceur de tests et de la CI (vérifier à la main la config du lanceur avant de livrer)';
 const NO_ACCEPT = 'étape accept ignorée : orchestrate.accept absent (commande dédiée aux tests d\'acceptation), le lot passe de spec à implement sans tests rouges';
 
 /**
@@ -840,6 +841,27 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
   return vertMsg.length === 0;
 }
 
+/** Chemins salis par une session : suivis modifiés, nouveaux fichiers non suivis, et ceux des dépôts voisins. */
+function dirtAfter(done: Done): string[] {
+  return [
+    ...trackedPaths(done.after),
+    ...done.after.untracked.filter((f) => !done.before.untracked.includes(f)),
+    ...done.others.flatMap((o) => [...trackedPaths(o.after), ...o.after.untracked.filter((f) => !o.before.untracked.includes(f))].map((f) => `${o.repo.rel}: ${f}`)),
+  ];
+}
+
+/** Suite commune des étapes spec et accept : commits de la session (avertis s'ils ne citent pas le lot), choix reportés, vraies questions (les non-questions deviennent un avertissement). */
+function takeReport(c: LotCtx, done: Done, rep: { choix?: string[]; questions: string[] }): string[] {
+  const l = c.lot;
+  const commits: Commit[] = readCommits(l.repo, { range: done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined });
+  done.step.commits = commits.map(short).reverse();
+  for (const k of commits) if (!citedRefs(k, c.loadPlan().refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} : ${short(k)}`);
+  for (const x of rep.choix ?? []) if (!(l.choix ??= []).includes(x)) l.choix.push(x);
+  save(c);
+  for (const q of rep.questions) if (q.trim() && isNonQuestion(q)) l.warnings.push(`question ignorée (non-question) : « ${q.trim()} »`);
+  return rep.questions.filter((q) => !isNonQuestion(q));
+}
+
 /**
  * Étape spec (L171, spec etape-spec S3) : la session écrit maquette, captures et fiche dans `<spec.dir>/<écran>/`, le programme
  * en relève les écarts (une seconde passe, puis le lot est rendu), une hypothèse coûteuse à défaire devient une question au lead,
@@ -856,14 +878,7 @@ async function specStep(c: LotCtx): Promise<void> {
     badReport(c, done.step, e);
     return;
   }
-  const commits: Commit[] = readCommits(l.repo, { range: done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined });
-  done.step.commits = commits.map(short).reverse();
-  for (const k of commits) if (!citedRefs(k, c.loadPlan().refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} : ${short(k)}`);
-  for (const x of rep.choix ?? []) if (!(l.choix ??= []).includes(x)) l.choix.push(x);
-  save(c);
-
-  const questions = rep.questions.filter((q) => !isNonQuestion(q));
-  for (const q of rep.questions) if (q.trim() && isNonQuestion(q)) l.warnings.push(`question ignorée (non-question) : « ${q.trim()} »`);
+  const questions = takeReport(c, done, rep);
   if (questions.length) {
     l.questions = questions;
     l.specAsked = undefined; // la prochaine réponse porte sur la question de la session, pas sur d'anciennes hypothèses coûteuses
@@ -871,11 +886,7 @@ async function specStep(c: LotCtx): Promise<void> {
     transition(c, 'question', questions[0]);
     return;
   }
-  const dirt = [
-    ...trackedPaths(done.after),
-    ...done.after.untracked.filter((f) => !done.before.untracked.includes(f)),
-    ...done.others.flatMap((o) => [...trackedPaths(o.after), ...o.after.untracked.filter((f) => !o.before.untracked.includes(f))].map((f) => `${o.repo.rel}: ${f}`)),
-  ];
+  const dirt = dirtAfter(done);
   if (dirt.length) {
     stop(c, 'handed-back', `dépôt sale après spec : ${dirt.join(', ')}`);
     return;
@@ -980,12 +991,14 @@ const tail = (output: string, n = 40): string => output.trim().split('\n').slice
 /** Écarts des tests d'acceptation écrits par la session (vide = acceptés) : autres lots intacts, acceptation.json conforme, tests rouges, config.test toujours verte. */
 async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore: string | undefined): Promise<string[]> {
   const l = c.lot;
-  const out = headBefore ? lockViolations(l.repo, c.config.spec.dir, headBefore, { created: 'allow', skip: json }) : [];
-  out.push(...checkAcceptation(l.repo, json, l.lot, fiche));
+  const out = headBefore ? lockViolations(l.repo, c.config.spec.dir, headBefore, { skip: json }) : [];
+  out.push(...checkAcceptation(l.repo, json, l.lot, fiche, l.steps.find((s) => s.kind === 'accept')?.headBefore));
   if (out.length) return out;
   const red = await runAccept(c, json);
   if (red.code === 0) out.push(`la commande dédiée (orchestrate.accept) passe alors que le code n'existe pas : des tests verts avant le code ne prouvent rien — chaque test doit échouer parce que la fonctionnalité manque\n${tail(red.output, 15)}`);
-  if (c.config.test) {
+  if (!c.config.test) {
+    if (!l.warnings.includes(NO_TEST_ACCEPT)) l.warnings.push(NO_TEST_ACCEPT);
+  } else {
     const ordinary = await sh(c, c.config.test);
     if (ordinary.code !== 0) out.push(`orchestrate.test échoue (code ${ordinary.code}) avec les tests rouges commités : les fichiers listés dans ${json} ne sont pas exclus de la config du lanceur (partagée avec la CI) tant que vert est false\n${tail(ordinary.output, 15)}`);
   }
@@ -1015,25 +1028,14 @@ async function acceptStep(c: LotCtx): Promise<void> {
     badReport(c, done.step, e);
     return;
   }
-  const commits: Commit[] = readCommits(l.repo, { range: done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined });
-  done.step.commits = commits.map(short).reverse();
-  for (const k of commits) if (!citedRefs(k, c.loadPlan().refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} : ${short(k)}`);
-  for (const x of rep.choix ?? []) if (!(l.choix ??= []).includes(x)) l.choix.push(x);
-  save(c);
-
-  const questions = rep.questions.filter((q) => !isNonQuestion(q));
-  for (const q of rep.questions) if (q.trim() && isNonQuestion(q)) l.warnings.push(`question ignorée (non-question) : « ${q.trim()} »`);
+  const questions = takeReport(c, done, rep);
   if (questions.length) {
     l.questions = questions;
     l.next = 'accept';
     transition(c, 'question', questions[0]);
     return;
   }
-  const dirt = [
-    ...trackedPaths(done.after),
-    ...done.after.untracked.filter((f) => !done.before.untracked.includes(f)),
-    ...done.others.flatMap((o) => [...trackedPaths(o.after), ...o.after.untracked.filter((f) => !o.before.untracked.includes(f))].map((f) => `${o.repo.rel}: ${f}`)),
-  ];
+  const dirt = dirtAfter(done);
   if (dirt.length) {
     stop(c, 'handed-back', `dépôt sale après accept : ${dirt.join(', ')}`);
     return;
@@ -1133,17 +1135,13 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     transition(c, 'question', questions[0]);
     return;
   }
-  const dirt = [
-    ...trackedPaths(done.after),
-    ...done.after.untracked.filter((f) => !done.before.untracked.includes(f)),
-    ...done.others.flatMap((o) => [...trackedPaths(o.after), ...o.after.untracked.filter((f) => !o.before.untracked.includes(f))].map((f) => `${o.repo.rel}: ${f}`)),
-  ];
+  const dirt = dirtAfter(done);
   if (dirt.length) {
     stop(c, 'handed-back', `dépôt sale après ${kind} : ${dirt.join(', ')}`);
     return;
   }
   // Verrou des tests d'acceptation (L173) : ceux de TOUS les lots du dépôt, pas seulement du lot courant ; une modification est une question au lead.
-  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore) : [];
+  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {} }) : [];
   if (locked.length) {
     stop(c, 'handed-back', `verrou des tests d'acceptation : ${locked.join(' ; ')}`);
     return;

@@ -129,8 +129,8 @@ export function setVert(repo: string, path: string): void {
   writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
 }
 
-/** Écarts de l'`acceptation.json` écrit par la session accept (vide = accepté). */
-export function checkAcceptation(repo: string, path: string, lot: string, fiche: string): string[] {
+/** Écarts de l'`acceptation.json` écrit par la session accept (vide = accepté). `base` : la tête d'avant la première session accept ; un fichier de tests qui y existe déjà ne peut pas être listé. */
+export function checkAcceptation(repo: string, path: string, lot: string, fiche: string, base?: string): string[] {
   const file = join(repo, path);
   if (!existsSync(file)) return [`${path} : acceptation.json absent (le lister dans ${path}, avec les fichiers de tests, dans le commit rouge)`];
   const a = parseAcceptation(readFileSync(file, 'utf8'));
@@ -141,6 +141,8 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
   if (a.vert) problems.push(`${path} : vert: true à l'écriture (les tests sont rouges : vert: false ; seul le cycle pose vert: true)`);
   const sha = redSha(repo, path);
   if (!sha) problems.push(`${path} : non commité`);
+  // Reprise d'une acceptation déjà présente à la base (non scellée) : ses fichiers viennent d'une session accept précédente, pas d'un test ordinaire.
+  const fresh = base && !gitOk(repo, 'cat-file', '-e', `${base}:${path}`) ? base : null;
   let texts = '';
   for (const f of a.fichiers) {
     const norm = posix.normalize(f);
@@ -150,6 +152,10 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
     }
     if (!existsSync(join(repo, norm))) {
       problems.push(`${f} : fichier de test listé mais absent`);
+      continue;
+    }
+    if (fresh && gitOk(repo, 'cat-file', '-e', `${base}:${norm}`)) {
+      problems.push(`${f} : ce fichier de tests existait avant la session accept (donnez à vos tests des fichiers neufs : ses tests ordinaires sortiraient de config.test et de la CI tant que le lot n'est pas vert)`);
       continue;
     }
     if (sha && !gitOk(repo, 'cat-file', '-e', `${sha}:${norm}`)) problems.push(`${f} : absent du commit rouge de ${path} (fichiers de tests et acceptation.json vont dans le même commit)`);
@@ -168,10 +174,11 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
  * Le verrou (spec etape-spec § 5), valable pour toute session du dépôt : les tests d'acceptation de TOUS les lots sont inchangés depuis leur
  * commit rouge, au sens de git (arbre de travail compris), et chaque `acceptation.json` n'a bougé que par sa clé `vert` — posée par le
  * cycle, donc jamais modifiée pendant une session (comparée à `headBefore`). Vide = rien à signaler.
- * `created: 'allow'` : l'étape accept crée le fichier de son lot ; ailleurs, un fichier neuf est un écart. `skip` : le fichier du lot que l'étape accept
- * est en train d'écrire, pas encore scellé (les autres lots restent verrouillés).
+ * Un fichier neuf est un écart, sauf `skip` : le fichier du lot que l'étape accept est en train d'écrire, pas encore scellé (les autres lots restent
+ * verrouillés, y compris contre un fichier d'un autre lot créé au passage). `rouge` : le commit rouge rangé dans l'état du cycle pour un fichier ; si
+ * le dernier commit qui l'a réécrit n'est plus celui-là, une session précédente (interrompue, donc jamais comparée) l'a réécrit.
  */
-export function lockViolations(repo: string, dir: string, headBefore: string, opts: { created?: 'allow' | 'refuse'; skip?: string } = {}): string[] {
+export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string> } = {}): string[] {
   const out: string[] = [];
   const before = new Set(listAcceptations(repo, dir, headBefore));
   const now = new Set(listAcceptations(repo, dir));
@@ -179,7 +186,7 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
   for (const p of [...now].sort()) {
     if (p === opts.skip) continue;
     const isNew = !before.has(p);
-    if (isNew && opts.created !== 'allow') out.push(`${p} : acceptation.json créé hors de l'étape accept`);
+    if (isNew) out.push(`${p} : acceptation.json créé hors de l'étape accept`);
     const red = redSha(repo, p);
     const cur = show(repo, 'HEAD', p);
     const base = red ? show(repo, red, p) : null;
@@ -187,6 +194,8 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
       out.push(`${p} : acceptation.json sans commit rouge lisible`);
       continue;
     }
+    const anchor = opts.rouge?.[p];
+    if (anchor && red !== anchor) out.push(`${p} : acceptation.json réécrit depuis son commit rouge ${anchor.slice(0, 7)} (réécriture commitée par une session interrompue ; seule la clé vert, posée par le cycle, peut changer)`);
     const was = isNew ? undefined : show(repo, headBefore, p);
     // Le commit rouge est le dernier changement du fichier : il ne bouge que si une session l'a réécrit, ce que la comparaison à la tête d'avant la session attrape.
     if (was && canon(cur) !== canon(was)) out.push(`${p} : acceptation.json réécrit pendant la session (seule la clé vert, posée par le cycle, peut changer)`);

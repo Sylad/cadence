@@ -191,6 +191,13 @@ describe('étape accept : ce que le programme contrôle', () => {
     expect(kinds(h)).not.toContain('implement');
   });
 
+  it('sans orchestrate.test rien ne prouve l’exclusion des tests rouges : avertissement du lot', async () => {
+    const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
+    const c = h.lot('L1', screen, { accept: config.accept });
+    await runLot(c);
+    expect(c.lot.warnings.join('\n')).toMatch(/orchestrate\.test absent/);
+  });
+
   it('un test cité par la fiche et absent des fichiers : écart rendu à la seconde passe, qui le corrige', async () => {
     const partiel = accept({ tests: "it('R1 — le score est absent avant le coup d\\'envoi', () => { throw new Error('x'); });" });
     const h = prepared({ accept: [partiel, accept({ ecran: 'prochain-match', tests: undefined })], implement: [green], review: [ok] });

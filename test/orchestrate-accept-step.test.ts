@@ -407,14 +407,12 @@ describe("acceptation d'un lot livré : la fiche évolue dans un lot suivant (L1
     expect(c2.lot.status).toBe('ready');
   });
 
-  it("reprise dans une nouvelle vague (L184) : le lot qui retire son ajout, tests revenus à l'état d'avant le lot, n'est pas rendu au lead", async () => {
+  it("reprise dans une nouvelle vague (L184) : vague 1 rendue par le verrou (ajout dans un test verrouillé), vague 2 retire l'ajout — plus rendue", async () => {
     let avantLot = '';
     const ajoute: Handler = (call) => {
       avantLot = git(call.opts.cwd, 'rev-parse', 'HEAD');
-      touch(call.opts.cwd, 'notes.txt', 'début\n', 'feat(L2): début');
-      touch(call.opts.cwd, FICHE, '# R7 révisée\n', 'feat: fiche R7'); // un commit du lot qui ne le cite pas
-      touch(call.opts.cwd, TEST, '// R7 nouvelle\n', 'feat(L2): tests R7');
-      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'feat(L2): tests R7' }], questions: ['Garder cet ajout ?'] }));
+      touch(call.opts.cwd, TEST, '// ajout\n', 'feat(L2): ajout');
+      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'feat(L2): ajout' }] }));
     };
     const retire: Handler = (call) => {
       git(call.opts.cwd, 'checkout', '-q', avantLot, '--', TEST);
@@ -423,9 +421,13 @@ describe("acceptation d'un lot livré : la fiche évolue dans un lot suivant (L1
     };
     const h = prepared({ accept: [accept()], implement: [green, ajoute, retire], review: [ok, ok] }, lotsDeux);
     await runLot(h.lot('L1', screen, config));
+    // un lot antérieur a fait évoluer la règle (fiche et tests ensemble) : la référence de L1 n'est plus son commit rouge
+    touch(h.repo, FICHE, '# R7 révisée\n', 'feat(L9): fiche R7');
+    touch(h.repo, TEST, '// R7 nouvelle\n', 'feat(L9): tests R7');
     const vague1 = h.lot('L2', {}, config);
     await runLot(vague1);
-    expect(vague1.lot.status).toBe('question');
+    expect(vague1.lot.status).toBe('handed-back');
+    expect(vague1.lot.outcome ?? '').toMatch(/verrou/);
     const vague2 = h.lot('L2', {}, config);
     await runLot(vague2);
     expect(vague2.lot.outcome ?? '').not.toMatch(/verrou/);

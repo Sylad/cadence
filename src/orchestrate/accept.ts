@@ -171,40 +171,24 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
 }
 
 /**
- * La tête d'avant le premier commit qui cite le lot (L184) : le parent du plus ancien commit de travail `work` (ordre indifférent), à défaut de `cites` (tous les commits qui citent le lot) ; `wave` (la tête de départ de la vague), s'il précède ce parent. Une reprise dans une nouvelle vague
- * ne doit pas repartir de sa propre tête de départ, sinon un lot qui retire son ajout est comparé à un état déjà modifié. Aucun commit, ou un commit
- * racine ou illisible : `undefined` (l'appelant garde sa référence).
+ * La tête d'avant le premier commit de travail du lot (L184) : le parent du plus ancien des commits `work` (ordre indifférent, ceux que repère `plan.refs`).
+ * Aucun commit, un commit racine ou illisible : `undefined`.
  */
-export function lotStartHead(repo: string, work: string[], cites: string[] = [], wave?: string): string | undefined {
-  // Le plus ancien commit de TRAVAIL (un commit de plan peut citer le lot bien avant son travail et reculer la référence derrière la fiche d'un autre lot) ; à défaut, tout commit qui cite le lot.
-  const shas = work.length ? work : cites;
+export function lotStartHead(repo: string, work: string[]): string | undefined {
   let oldest: { sha: string; depth: number } | undefined;
-  for (const sha of shas) {
+  for (const sha of work) {
     if (!gitOk(repo, 'cat-file', '-e', `${sha}^{commit}`)) continue;
     const depth = Number(git(repo, 'rev-list', '--count', sha).trim());
     if (!oldest || depth < oldest.depth) oldest = { sha, depth };
   }
-  const start = oldest && gitOk(repo, 'rev-parse', '--verify', '-q', `${oldest.sha}^`) ? git(repo, 'rev-parse', `${oldest.sha}^`).trim() : undefined;
-  if (!start || !wave || !gitOk(repo, 'cat-file', '-e', `${wave}^{commit}`)) return start ?? undefined;
-  // La tête de la vague, si elle précède ce commit : le premier commit du lot (la fiche changée par l'implement) peut ne pas le citer.
-  return gitOk(repo, 'merge-base', '--is-ancestor', wave, start) ? wave : start;
+  if (!oldest || !gitOk(repo, 'rev-parse', '--verify', '-q', `${oldest.sha}^`)) return undefined;
+  return git(repo, 'rev-parse', `${oldest.sha}^`).trim();
 }
 
-/** Les commits de `since` à HEAD qui touchent la fiche, hors ceux dont le sujet cite un autre lot que `lot` (un lot intercalé entre deux vagues du lot ne fait pas évoluer ses règles). */
-function ficheCommitsOfLot(repo: string, since: string, fiche: string, lot?: string): boolean {
-  const log = git(repo, 'log', '--format=%H%x00%s', `${since}..HEAD`, '--', fiche).split('\n').filter(Boolean);
-  return log.some((line) => {
-    const subject = line.split('\0')[1] ?? '';
-    const ids = subject.match(/\bL\d+\b/g) ?? [];
-    return !lot || ids.every((id) => id === lot);
-  });
-}
-
-/** La fiche a changé depuis `since` dans les commits du lot (ou sans lot cité) ou dans l'arbre de travail, ou dans l'un des commits `cites` (ceux qui citent le lot). Illisible pour git : non (le verrou reste entier). */
-function ficheChanged(repo: string, since: string, fiche: string, cites: string[] = [], lot?: string): boolean {
+/** La fiche a changé depuis `since` (commits et arbre de travail), ou dans l'un des commits `cites` (ceux qui citent le lot). Illisible pour git : non (le verrou reste entier). */
+function ficheChanged(repo: string, since: string, fiche: string, cites: string[] = []): boolean {
   try {
-    if (git(repo, 'diff', '--name-only', 'HEAD', '--', fiche).trim() !== '') return true;
-    if (ficheCommitsOfLot(repo, since, fiche, lot)) return true;
+    if (git(repo, 'diff', '--name-only', since, '--', fiche).trim() !== '') return true;
   } catch {
     return false;
   }
@@ -219,12 +203,14 @@ function ficheChanged(repo: string, since: string, fiche: string, cites: string[
  * verrouillés, y compris contre un fichier d'un autre lot créé au passage). `rouge` : le commit rouge rangé dans l'état du cycle pour un fichier ; si
  * le dernier commit qui l'a réécrit n'est plus celui-là, une session précédente (interrompue, donc jamais comparée) l'a réécrit.
  * Exception (L183) : une acceptation à `vert: true` (lot livré) laisse modifier ses tests listés si la fiche de l'écran a changé depuis `lotBase` (la
- * tête d'avant le premier commit de travail du lot, `lotStartHead`, à défaut d'un commit qui le cite, par défaut `headBefore`), arbre de travail compris, ou dans un commit de `lotCommits` (ceux qui citent le lot,
+ * tête d'avant le premier travail du lot, par défaut `headBefore`), arbre de travail compris, ou dans un commit de `lotCommits` (ceux qui citent le lot,
  * posés avant la vague) : la fiche fait évoluer les règles. `vert: false` : verrou entier.
  * Une fois livrée, une acceptation n'est plus comparée à son commit rouge (une évolution admise l'a dépassé et rien ne le rescelle) mais à `lotBase` :
  * un test changé avant ce point l'a été par un lot qui avait la fiche pour lui, et ses empreintes scellées ne valent plus.
+ * Une seule exemption en plus (L184) : un fichier listé dont le contenu est identique à celui qu'il avait à `lotStart` (la tête d'avant le premier commit de
+ * travail du lot, `lotStartHead`) n'est pas un écart : le bilan est nul sur le lot, qui a retiré son propre ajout (une reprise dans une nouvelle vague part d'un état déjà modifié).
  */
-export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string>; lotBase?: string; lotCommits?: string[]; lot?: string } = {}): string[] {
+export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string>; lotBase?: string; lotStart?: string; lotCommits?: string[]; lot?: string } = {}): string[] {
   const out: string[] = [];
   const before = new Set(listAcceptations(repo, dir, headBefore));
   const now = new Set(listAcceptations(repo, dir));
@@ -259,7 +245,7 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     if (cur.vert === true && typeof base.fiche === 'string' && base.lot !== opts.lot) {
       // L'acceptation du lot en cours (vert posé dès l'implement) garde le verrou entier : l'exception ne vaut que pour un lot suivant.
       const ref = opts.lotBase ?? headBefore;
-      if (ficheChanged(repo, ref, base.fiche, opts.lotCommits, opts.lot)) continue;
+      if (ficheChanged(repo, ref, base.fiche, opts.lotCommits)) continue;
       // La référence ne quitte le commit rouge que si la fiche a évolué entre le rouge et `ref` : sinon tout test changé depuis le rouge reste un écart.
       if (gitOk(repo, 'diff', '--name-only', red, ref, '--', base.fiche) && git(repo, 'diff', '--name-only', red, ref, '--', base.fiche).trim() !== '') {
         depuis = ref;
@@ -272,10 +258,18 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     }
     const lot = typeof base.lot === 'string' ? base.lot : '?';
     const emp = isObj(base.empreintes) ? base.empreintes : {};
+    // Bilan nul sur le lot (L184) : contenu identique à celui d'avant le premier commit de travail du lot.
+    const unchangedByLot = (norm: string): boolean => {
+      if (!opts.lotStart) return false;
+      const was = gitOk(repo, 'cat-file', '-e', `${opts.lotStart}:${norm}`) ? git(repo, 'rev-parse', `${opts.lotStart}:${norm}`).trim() : null;
+      const now = existsSync(join(repo, norm)) ? git(repo, 'hash-object', '--', norm).trim() : null;
+      return was === now;
+    };
+    changed = changed.filter((f) => !unchangedByLot(f));
     for (const f of fichiers) {
       const norm = posix.normalize(f); // sealAcceptation range les empreintes sous le chemin normalisé, et git diff le rend ainsi
       const want = emp[norm];
-      if (typeof want !== 'string' || changed.includes(norm) || (depuis !== red && sinceRed.includes(norm))) continue; // déjà signalé ci-dessus
+      if (typeof want !== 'string' || changed.includes(norm) || (depuis !== red && sinceRed.includes(norm)) || unchangedByLot(norm)) continue; // déjà signalé ci-dessus, ou bilan nul sur le lot
       const have = existsSync(join(repo, norm)) ? git(repo, 'hash-object', '--', norm).trim() : null;
       if (have !== want) out.push(`${f} : empreinte différente de celle du scellé de ${p} (test d'acceptation de ${lot})`);
     }

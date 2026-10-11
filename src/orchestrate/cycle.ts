@@ -1166,10 +1166,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     return;
   }
   // Verrou des tests d'acceptation (L173) : ceux de TOUS les lots du dépôt, pas seulement du lot courant ; une modification est une question au lead.
-  // Référence du lot (L184) : la tête d'avant le premier commit de travail du lot (pas un commit de plan), ou celle de la vague si elle est plus ancienne (le premier commit du lot peut ne pas le citer), pas celle de la vague courante (une reprise repart d'un état déjà modifié par le lot).
-  const citing = done.step.headBefore ? lotCommits(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) : [];
-  const working = done.step.headBefore ? lotWork(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) : [];
-  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: lotStartHead(l.repo, working, citing, l.steps.find((s) => s.headBefore)?.headBefore), lotCommits: citing }) : [];
+  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: l.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(l.repo, lotWork(c.loadPlan(), l.repo, l.lot).map((k) => k.sha)), lotCommits: lotCommits(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) }) : [];
   if (locked.length) {
     stop(c, 'handed-back', `verrou des tests d'acceptation : ${locked.join(' ; ')}`);
     return;

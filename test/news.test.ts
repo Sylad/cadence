@@ -43,6 +43,15 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('##');
   });
 
+  it('une puce sur deux lignes (continuation indentée, format de la spec) reste dans son <li>', () => {
+    const html = renderMarkdown('## Hypothèses\n- R3 — erreur de chargement :\n  message « x ». À confirmer.\n- R4 — **b**');
+    expect(html).toBe('<h3>Hypothèses</h3>\n<ul><li>R3 — erreur de chargement :\nmessage « x ». À confirmer.</li><li>R4 — <strong>b</strong></li></ul>');
+  });
+
+  it('rend les titres de # à ######, un niveau plus bas, et ils coupent paragraphe et liste', () => {
+    expect(renderMarkdown('# A\n###### F\ntexte\n- x\n## B')).toBe('<h2>A</h2>\n<h6>F</h6>\n<p>texte\n- x</p>\n<h3>B</h3>');
+  });
+
   it('refuses javascript: links', () => {
     expect(renderMarkdown('[x](javascript:alert(1))')).toBe('<p>[x](javascript:alert(1))</p>');
     expect(renderMarkdown('[x](\x01javascript:alert(1))')).not.toContain('<a');

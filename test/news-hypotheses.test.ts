@@ -40,6 +40,11 @@ describe('newsIssues : section Hypothèses', () => {
     expect(issues.map((i) => i.message)).toEqual(["L1 : la section « ## Hypothèses » de a.md n'a pas de ligne pour R3, R4"]);
   });
 
+  it('un id de règle qui contient des caractères de RegExp ne fait pas planter le contrôle', () => {
+    const issues = newsIssues([lot('L1')], [entry('## Hypothèses\n- R1( — x')], gitRepo(), new Map([['L1', ['R1(']]]));
+    expect(issues).toEqual([]);
+  });
+
   it('un lot sans hypothèse n\'a pas à avoir la section, et une section en trop est permise', () => {
     expect(newsIssues([lot('L1')], [entry('Texte.')], gitRepo(), new Map())).toEqual([]);
     expect(newsIssues([lot('L1')], [entry('Texte.')], gitRepo(), new Map([['L1', []]]))).toEqual([]);

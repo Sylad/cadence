@@ -44,6 +44,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- `cadence news build`: the News Markdown renders headings `#` to `######` (one level lower, they cut the paragraph and the list around them), and a `-` bullet continued on an indented line stays in its `<li>` (a two-line hypothesis, L174). `cadence news check` no longer crashes on a sheet rule id that holds a regex character (`R1(`).
 - `cadence orchestrate`: the **downstream briefs of the spec step** (L174, sixth brick). For a lot with a sheet, `implement` and `fix` get the sheet, the mockup and one line per rule (acceptance tests made green without modifying them, the tests written in addition cite the rule `R2 — …`, no invented rule); the code review checks **rule → test → green** (missing test, acceptance test modified since the red commit, rule coded outside the sheet: major); the `ux` pass becomes a light **conformity** pass against the mockup (new conformity mode of `ux-reviewer`, not the full audit); the News entry ends with a `## Hypothèses` section, one line per `hypothese` rule. A lot without a sheet keeps its briefs.
 - `cadence news check` flags a lot whose sheet has hypotheses (`orchestrate.spec.dir`, by `ecran.lot`) when its entry lacks the `## Hypothèses` section or a `- Rn` line for one of them (L174).
 - `cadence orchestrate`: the acceptance lock now compares a test file listed as `./test/x.ts` to its sealed fingerprint: it was read under the raw path while the seal stores it under the normalised one, so such a file was never compared (L179).

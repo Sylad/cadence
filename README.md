@@ -36,7 +36,7 @@ lots that deliver it). Delivered so far: the sheet template `templates/fiche.yam
 (the sheet's invariants) and `cadence spec qa` (the screen's `docs/qa/expectations.md` section, derived
 from the sheet), see [spec](#spec) below, and the `spec` step of `orchestrate` itself (the `spec-writer` agent, the
 render at 1440 and 390 px, the commit of the spec), see [The spec step](#the-spec-step-of-a-lot-with-screen) in `orchestrate`; the `accept` step (red acceptance tests and the lock that protects them), see [The accept step](#the-accept-step-red-acceptance-tests-and-their-lock); the UX review of
-the mockup (the `ux-reviewer` agent in mockup mode), see [The mockup review](#the-mockup-review-before-any-code); and the downstream briefs (the sheet given to `implement`, rule → test → green in the code review, a light UX conformity pass, the `## Hypothèses` section of the news entry), see [The downstream briefs](#the-downstream-briefs-sheet-rule--test--green-conformity-hypotheses).
+the mockup (the `ux-reviewer` agent in mockup mode), see [The mockup review](#the-mockup-review-before-any-code); and the downstream briefs (the sheet given to `implement`, rule → test → green in the code review, a light UX conformity pass, the `## Hypothèses` section of the news entry), see [The downstream briefs](#the-downstream-briefs-sheet-rule--test--green-conformity-hypothèses).
 
 ## What's new
 
@@ -290,7 +290,7 @@ captures:
 | `cadence news build [-o dir]` | `nouveautes.json` + `index.html` + screenshots (default `docs/nouveautes/site`) |
 
 `--dir` changes the entries folder (default `docs/nouveautes` at the git root).
-The Markdown is deliberately small: paragraphs, `-` lists, `**bold**`,
+The Markdown is deliberately small: headings (`#` to `######`, rendered one level lower, `<h2>` to `<h6>`; a heading takes its own line and cuts the paragraph or list around it), paragraphs, `-` lists (a bullet may continue on the next lines, indented), `**bold**`,
 `` `code` ``, `[links](url)`; everything else is escaped text. The JSON holds
 `{ project, generated, entries: [{ slug, title, date, lots, captures, html }] }`,
 with screenshot paths relative to the JSON file. `captures` is always a list of

@@ -200,7 +200,7 @@ export function newsIssues(lots: Lot[], entries: Entry[], dir: string, hypothese
   for (const [id, rules] of hypotheses) {
     const mine = entries.filter((e) => e.lots.includes(id));
     if (!rules.length || !mine.length) continue;
-    const found = mine.map((e) => ({ e, lines: hypothesisLines(e.body) })).map(({ e, lines }) => ({ e, lines, missing: lines ? rules.filter((r) => !lines.some((l) => new RegExp(`^\\s*[-*]\\s+${r}(?!\\d)`).test(l))) : rules }));
+    const found = mine.map((e) => ({ e, lines: hypothesisLines(e.body) })).map(({ e, lines }) => ({ e, lines, missing: lines ? rules.filter((r) => !lines.some((l) => new RegExp(`^\\s*[-*]\\s+${r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\d)`).test(l))) : rules }));
     if (found.some((f) => f.lines && f.missing.length === 0)) continue;
     const withSection = found.filter((f) => f.lines).sort((a, b) => a.missing.length - b.missing.length)[0];
     issues.push(
@@ -292,7 +292,7 @@ function inline(text: string): string {
     .join('');
 }
 
-/** Markdown minimal : titres « ## », paragraphes, listes « - », **gras**, `code`, [liens](url). Tout le reste est du texte échappé. */
+/** Markdown minimal : titres « # » à « ###### », paragraphes, listes « - » (puce continuée sur une ligne indentée), **gras**, `code`, [liens](url). Tout le reste est du texte échappé. */
 export function renderMarkdown(md: string): string {
   return md
     .replace(/\r\n/g, '\n')
@@ -310,8 +310,14 @@ export function renderMarkdown(md: string): string {
       return parts.map((lines) => {
         const heading = /^(#{1,6}) +(.+)$/.exec(lines[0]);
         if (heading) return `<h${Math.min(heading[1].length + 1, 6)}>${inline(heading[2].trim())}</h${Math.min(heading[1].length + 1, 6)}>`;
-        if (lines.every((l) => /^\s*[-*] /.test(l))) {
-          return `<ul>${lines.map((l) => `<li>${inline(l.replace(/^\s*[-*] /, ''))}</li>`).join('')}</ul>`;
+        // une puce peut continuer sur la ligne suivante, indentée (format d'une hypothèse, spec §8)
+        if (/^\s*[-*] /.test(lines[0]) && lines.every((l) => /^\s*[-*] /.test(l) || /^\s+\S/.test(l))) {
+          const items: string[] = [];
+          for (const l of lines) {
+            if (/^\s*[-*] /.test(l)) items.push(l.replace(/^\s*[-*] /, ''));
+            else items[items.length - 1] += `\n${l.trim()}`;
+          }
+          return `<ul>${items.map((i) => `<li>${inline(i)}</li>`).join('')}</ul>`;
         }
         return `<p>${inline(lines.join('\n'))}</p>`;
       });

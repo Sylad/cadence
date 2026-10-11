@@ -41,6 +41,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | Stable contract under semantic versioning, README *Stability* section | [1.0.0](#100---2026-10-10) |
 | Spec step of a lot with a screen: screen sheet, reviewed mockup, acceptance tests written before the code (`cadence spec check\|qa`) | [1.1.0](#110---2026-10-11) |
 
+## [Unreleased]
+
+### Added
+
+- `raf screen <id> page|component|journey|none`: sets, replaces or removes `screen:` on an existing lot, so a plan already written can adopt the spec step of `cadence orchestrate`. Refused on a lot without `visible:` (as `raf add --screen` is) and on a sub-task; `none` removes the key and keeps `visible:`. (L185)
+
 ## [1.1.0] - 2026-10-11
 
 ### Fixed

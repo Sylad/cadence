@@ -41,6 +41,58 @@ describe('raf public', () => {
   });
 });
 
+describe('raf screen', () => {
+  const yaml = (dir: string) => readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+
+  it('pose screen: sur un lot visible existant, le remplace, puis le retire avec none', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'A', '--visible');
+    expect(raf(dir, 'screen', 'L1', 'page').code).toBe(0);
+    expect(yaml(dir)).toContain('screen: page');
+    expect(raf(dir, 'screen', 'L1', 'journey').code).toBe(0);
+    expect(yaml(dir)).toContain('screen: journey');
+    expect(yaml(dir)).not.toContain('screen: page');
+    expect(raf(dir, 'screen', 'L1', 'none').code).toBe(0);
+    expect(yaml(dir)).not.toContain('screen:');
+    expect(yaml(dir)).toContain('visible: true');
+  });
+
+  it('refuse un lot non visible, une valeur inconnue, une sous-tâche, un lot inconnu, un usage incomplet', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'A');
+    raf(dir, 'add', 'B', '--visible');
+    raf(dir, 'add', 'T', '--parent', 'L2');
+    const before = yaml(dir);
+    const sansVisible = raf(dir, 'screen', 'L1', 'page');
+    expect(sansVisible.code).not.toBe(0);
+    expect(sansVisible.err).toContain('visible');
+    expect(raf(dir, 'screen', 'L2', 'ecran').code).not.toBe(0);
+    expect(raf(dir, 'screen', 'L2/T1', 'page').code).not.toBe(0);
+    expect(raf(dir, 'screen', 'L9', 'page').code).not.toBe(0);
+    expect(raf(dir, 'screen', 'L2').code).not.toBe(0);
+    expect(yaml(dir)).toBe(before);
+  });
+
+  it('none sur un lot sans screen ne change rien, même non visible', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'A');
+    const before = yaml(dir);
+    expect(raf(dir, 'screen', 'L1', 'none').code).toBe(0);
+    expect(yaml(dir)).toBe(before);
+  });
+
+  it('raf show affiche le screen posé', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'A', '--visible');
+    raf(dir, 'screen', 'L1', 'component');
+    expect(raf(dir, 'show', 'L1').out).toContain('screen : component');
+  });
+});
+
 describe('raf public --clear', () => {
   it('refuse --clear accompagné d\'un titre sans toucher au titre public existant', () => {
     const dir = gitRepo();

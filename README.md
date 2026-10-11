@@ -104,6 +104,7 @@ raf gantt                         # docs/plan/gantt.html
 | `raf init [--project name] [--prefix L] [--no-hook]` | create the plan, install the hook, add `.playwright-mcp/` to `.gitignore` |
 | `raf add "title" [--estimate d] [--quickwin] [--visible [--screen page\|component\|journey]] [--public "title"] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id (`--public`: the lot's title in the public's words, written as `public:` right after `title:`; `--screen`: the screen a visible lot creates or changes — a new `page`, a new `component` or a modified `journey` — written as `screen:` right after `visible:`, shown by `raf show`; it requires `--visible`, and `raf check` reports a `screen:` without `visible:` or with another value as an error. It is what will trigger the spec step of `orchestrate`, never inferred from the title) |
 | `raf add "title" --every <days>` · `raf did <id> ["text"]` | recurring lot: `every` (days) and `last` (last time done) fields; the lot stays `todo`, `raf now` and `session start` list it under « Récurrent » with « dû depuis N j » / « prochain dans N j »; `raf did` resets the count (spec: `docs/superpowers/specs/2026-10-04-L11-tache-recurrente.md`) |
+| `raf screen <id> page\|component\|journey\|none` | set, replace or remove `screen:` on an existing lot, to adopt the [spec step](#the-spec-step-of-a-lot-with-screen) on a plan already written; refused on a lot without `visible:` (like `raf add --screen`) and on a sub-task; `none` removes the key and leaves `visible:` alone |
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
@@ -1013,7 +1014,7 @@ lot that already has commits is never pre-checked (resuming it is legitimate). `
 
 ### The spec step of a lot with `screen:`
 
-A lot that declares `screen:` (`raf add … --visible --screen page|component|journey`, see [raf](#raf)) gets one more session, `spec`, **after** the pre-check and **before**
+A lot that declares `screen:` (`raf add … --visible --screen page|component|journey`, or `raf screen <id> page|component|journey` on a lot that already exists, see [raf](#raf)) gets one more session, `spec`, **after** the pre-check and **before**
 the first implementation: `precheck → spec → maquette → accept → implement → ux → review` (`maquette` unless `orchestrate.maquette: false`, see [The mockup review](#the-mockup-review-before-any-code); `accept` only when the project declares `orchestrate.accept`, see below). A lot without `screen:` follows the usual path, unchanged. `--dry-run` lists the step
 (`spec (sonnet)`), its command line and its brief `templates/orchestrate/spec.md`.
 

@@ -528,6 +528,25 @@ export class Plan {
     node.items.splice(at + 1, 0, this.doc.createPair('public', value));
   }
 
+  /** Pose, remplace (nature) ou retire (null) le `screen:` d'un lot existant ; exige `visible`, comme `add`. */
+  setScreen(ref: string, screen: Screen | null): void {
+    this.writable();
+    if (ref.includes('/')) throw new RafError(`l'écran se pose sur un lot, pas une sous-tâche : ${ref}`);
+    const node = this.lotNode(ref);
+    if (screen === null) {
+      node.delete('screen');
+      return;
+    }
+    if (!SCREENS.includes(screen)) throw new RafError(`screen inconnu : ${String(screen)} (${SCREENS.join(', ')}, none)`);
+    if (this.lot(ref).visible !== true) throw new RafError(`${ref} n'est pas visible : un écran est un changement visible (raf add --visible)`);
+    if (node.has('screen')) {
+      node.set('screen', screen);
+      return;
+    }
+    const keys = node.items.map((p) => String((p.key as { value?: unknown })?.value ?? p.key));
+    node.items.splice(keys.indexOf('visible') + 1, 0, this.doc.createPair('screen', screen));
+  }
+
   /** Un lot récurrent a été refait : `last` passe à aujourd'hui, avec une note si `text` est donné. */
   did(ref: string, today: Day, text?: string): void {
     this.writable();

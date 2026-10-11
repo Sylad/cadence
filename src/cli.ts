@@ -13,7 +13,7 @@ import { gitRoot, readCommits, matchesHead, resolveCommit, stage, stagedFiles, s
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
-import { Plan, RafError, STATUSES, type Lot, type Screen, type Status } from './plan.js';
+import { Plan, RafError, SCREENS, STATUSES, type Lot, type Screen, type Status } from './plan.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
@@ -40,6 +40,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf init [--project nom] [--prefix L] [--no-hook]
   raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--public "titre public"] [--every jours] [--after L2,L4] [--parent L3]
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
+  raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (l'étape spec d'orchestrate)
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf note <id> "texte"
   raf did <id> ["texte"]   un lot récurrent (--every) a été refait : le « dû depuis N j » repart de aujourd'hui
@@ -284,6 +285,15 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       if (!values.clear) refuseLongTitle(rest.slice(1).join(' '));
       plan.setPublic(rest[0], values.clear ? null : rest.slice(1).join(' '));
+      plan.save();
+      return 0;
+    }
+    case 'screen': {
+      need(2, 'screen <id> page|component|journey|none');
+      if (rest.length > 2) throw new RafError('usage : raf screen <id> page|component|journey|none');
+      const plan = loadPlan();
+      if (rest[1] !== 'none' && !(SCREENS as readonly string[]).includes(rest[1])) throw new RafError(`screen inconnu : ${rest[1]} (${SCREENS.join(', ')}, none)`);
+      plan.setScreen(rest[0], rest[1] === 'none' ? null : (rest[1] as Screen));
       plan.save();
       return 0;
     }

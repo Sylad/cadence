@@ -2207,6 +2207,11 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-11
+  - id: L197
+    title: "Skill lead et docs/lead.md : le verdict UX (raf ux) peut être posé par le lead d'après le rapport du ux-reviewer et son propre regard sur les captures, l'humain n'étant consulté qu'en cas de doute (consigne de Sylvain 12-10 : « je ne suis pas UX, demande-moi un avis seulement si tu as des doutes ») — réglage du parent cadence.yaml (ex. lead.ux: lead | human, défaut human pour ne rien changer ailleurs), skill, README, test"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

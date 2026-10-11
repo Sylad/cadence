@@ -373,13 +373,13 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     if (l.specLot && env.config.fiche) vars.fiche = ficheReviewText({ fiche: `${env.config.spec.dir}/<sujet>/fiche.yaml`, passes: 0 });
     if (specStage && env.config.accept) {
       const folder = `${env.config.spec.dir}/${l.screen ? '<écran>' : '<sujet>'}`;
-      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: !!(l.screen && l.specLot), acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept, test: env.config.test });
+      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: false, acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept, test: env.config.test });
     }
     for (const s of steps) {
       const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);
       const brief = renderBrief(briefName(l, s.kind), vars, deps.templatesDir);
       writeFileSync(file, brief);
-      const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small).playwright;
+      const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small, !!l.screen).playwright;
       const local = s.model === 'local';
       const args = (local ? buildLocalArgs : buildArgs)(
         { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model === 'local' ? 'sonnet' : s.model, local, effort: env.config.effort[s.kind === 'review-small' ? 'review' : s.kind], schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'spec' ? 'spec-writer' : s.kind === 'accept' ? 'acceptance-writer' : s.kind === 'ux' || s.kind === 'maquette' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && (s.kind === 'implement' || s.kind === 'spec') ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright },
@@ -387,7 +387,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : ${local ? 'claude-local' : 'claude'} ${args.join(' ')}`);
       io.out(`    brief : ${file}`);
-      const servers = Object.keys(mcpServersFor(s.kind, l.visible, '', l.small));
+      const servers = Object.keys(mcpServersFor(s.kind, l.visible, '', l.small, !!l.screen));
       io.out(`    mcp : ${servers.length ? `${servers.join(', ')} (captures dans le dossier de la vague : <vague>/${lotSlug(l.project, l.lot)}/playwright)` : 'aucun'}`);
     }
   }

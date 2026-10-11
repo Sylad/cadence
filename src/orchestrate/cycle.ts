@@ -483,8 +483,8 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
     step.cause = (e as Error).message;
     return stop(c, 'failed', `brief de ${kind} : ${(e as Error).message}`);
   }
-  const mcpConfig = writeMcpConfig(w.store.lotDir(l.project, l.lot), kind, l.visible, l.small);
-  const playwright = !!mcpServersFor(kind, l.visible, '', l.small).playwright;
+  const mcpConfig = writeMcpConfig(w.store.lotDir(l.project, l.lot), kind, l.visible, l.small, !!l.screen);
+  const playwright = !!mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright;
   if (playwright) l.uxCaptures = join(dirname(mcpConfig), 'playwright');
   l.pendingAnswer = null; // la réponse est dans le brief : elle ne repart pas avec la session suivante
   const outcome = await runSession(

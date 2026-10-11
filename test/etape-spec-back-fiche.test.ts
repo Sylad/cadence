@@ -171,7 +171,8 @@ describe('design de l\'étape spec back', () => {
       expect(id[2]).toBe(String(i + 1));
       const lot = plan.lots.find((l) => l.id === id[1]);
       expect(lot?.title).toBe(titre);
-      expect(lot?.estimate).toBe(estimations[i]);
+      // B3 (L188) a été réestimé à 2 j au plan le 11-10 (trois sessions d'écriture) : le design garde l'estimation d'origine.
+      expect(lot?.estimate).toBe(id[1] === 'L188' ? 2 : estimations[i]);
       // chaîne : B1 sans dépendance, chaque autre après le précédent, dans la commande comme dans le plan
       const apres = cmd.match(/--after (L\d+)/)?.[1];
       if (i === 0) {

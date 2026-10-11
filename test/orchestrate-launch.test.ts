@@ -118,6 +118,8 @@ describe('MCP minimaux par étape', () => {
     const pwFile = { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--allow-unrestricted-file-access', '--output-dir', '/run/p--L1/playwright'] } };
     expect(mcpServersFor('maquette', false, '/run/p--L1/playwright'), 'maquette').toEqual(pwFile);
     expect(mcpServersFor('spec', true, '/run/p--L1/playwright'), 'spec visible').toEqual(pwFile);
+    expect(mcpServersFor('spec', true, '/run/p--L1/playwright', false, false), 'spec visible sans écran (spec: true)').toEqual({});
+    expect(mcpServersFor('implement', true, '/run/p--L1/playwright', false, false), 'implement visible sans écran').toEqual(pw);
     for (const k of ['implement', 'fix', 'review', 'review-small'] as const) expect(mcpServersFor(k, false, '/run/p--L1/playwright'), `${k} sans écran`).toEqual({});
     expect(mcpServersFor('review', true, '/run/p--L1/playwright'), 'review visible').toEqual({});
     expect(mcpServersFor('review', true, '/run/p--L1/playwright', true), 'review visible petit').toEqual({});

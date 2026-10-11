@@ -348,3 +348,52 @@ describe('étape spec back : agents', () => {
     expect(a.prompt).toContain('contrats[]');
   });
 });
+
+// Critère de fin de L188 : TERMINAISON. Quel que soit le chemin, l'agent spec joue au plus 2 sessions et la chaîne atteint l'implémentation (ready) ou rend le lot.
+describe('étape spec : terminaison de la chaîne, tous les chemins', () => {
+  type Kind = 'ecran' | 'back' | 'mixte';
+  const writes = (kind: Kind, sujet: boolean): Handler => (call) =>
+    claudeOut(specReport({ fiche: kind === 'back' ? ecritBack(call.opts.cwd) : sujet ? ecritBack(call.opts.cwd, { mixte: true }) : ecrit(call.opts.cwd) }));
+  const cases: { kind: Kind; pass1: boolean; pass2: boolean; ficheVerdict: 'ok' | 'major'; maquetteVerdict: 'ok' | 'major'; accept: boolean }[] = [];
+  for (const kind of ['ecran', 'back', 'mixte'] as Kind[])
+    for (const pass1 of [false, true])
+      for (const pass2 of [false, true])
+        for (const ficheVerdict of ['ok', 'major'] as const)
+          for (const maquetteVerdict of ['ok', 'major'] as const)
+            for (const accept of [false, true]) {
+              if (kind === 'back' && (!pass1 || !pass2)) continue; // un lot back garde son sujet
+              if (kind === 'mixte' && !pass1 && !pass2) continue;
+              if (kind === 'ecran' && (pass1 || pass2)) continue;
+              if (kind === 'back' && maquetteVerdict === 'major') continue; // pas de maquette
+              cases.push({ kind, pass1, pass2, ficheVerdict, maquetteVerdict, accept });
+            }
+
+  it.each(cases)('%j : au plus 2 sessions spec, et le lot est prêt ou rendu', async (k) => {
+    const never = () => claudeOut(reviewReport());
+    const acceptHandler: Handler = (call) => {
+      ecritAcceptation(call.opts.cwd, { sansFiche: k.kind === 'back', ecran: k.kind === 'back' ? 'cache-de-secours-365scores' : undefined, exemple: k.kind === 'back' ? EXEMPLE_BACK : undefined });
+      return claudeOut(acceptReport());
+    };
+    const verdict = (v: 'ok' | 'major'): Handler => (v === 'ok' ? never : () => major());
+    const h = harness({
+      lots: k.kind === 'back' ? lots : [{ title: 'Un écran', screen: 'page' }],
+      script: {
+        spec: [writes(k.kind, k.pass1), writes(k.kind, k.pass2), writes(k.kind, k.pass2)],
+        fiche: [verdict(k.ficheVerdict), verdict(k.ficheVerdict), verdict(k.ficheVerdict)],
+        maquette: [verdict(k.maquetteVerdict), verdict(k.maquetteVerdict), verdict(k.maquetteVerdict)],
+        accept: [acceptHandler, acceptHandler],
+        implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }))],
+        review: [never],
+      },
+    });
+    const over = k.kind === 'back' ? back : { screen: 'page' as const, visible: true };
+    const c = h.lot('L1', over, { fiche: true, maquette: true, ...(k.accept ? { accept: 'test -f done.flag', test: 'true' } : {}) });
+    await runLot(c);
+    expect(kinds(h).filter((x) => x === 'spec').length).toBeLessThanOrEqual(2);
+    expect(['ready', 'handed-back']).toContain(c.lot.status);
+    if (c.lot.status === 'ready') {
+      expect(kinds(h)).toContain('implement');
+      expect(c.lot.ficheConstats ?? []).toEqual([]); // plus de revue de fiche à venir : rien ne reste à renvoyer à la spec
+    }
+  });
+});

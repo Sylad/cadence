@@ -48,12 +48,12 @@ export interface StepSpec {
 export type McpServers = Record<string, { command: string; args: string[] }>;
 
 /**
- * Serveurs MCP d'une étape : Playwright pour `ux` et `maquette` (revue des captures et du HTML local, L172) et, sur un lot `visible`, pour `spec` (rendu 1440/390 de la maquette, L171), `implement` et `fix` (fix-minors compris) ;
+ * Serveurs MCP d'une étape : Playwright pour `ux` et `maquette` (revue des captures et du HTML local, L172) et, sur un lot `visible`, pour `spec` quand il a un écran `screen:` (rendu 1440/390 de la maquette, L171), `implement` et `fix` (fix-minors compris) ;
  * et `review-small` d'un petit lot visible (sa seule revue d'ergonomie) ; rien pour `review`, ni pour un lot sans écran.
  * Sorties dans `outputDir`, hors du dépôt.
  */
-export function mcpServersFor(kind: StepKind, visible: boolean, outputDir: string, small = false): McpServers {
-  if (!(kind === 'ux' || kind === 'maquette' || (visible && (kind === 'spec' || kind === 'implement' || kind === 'fix' || (kind === 'review-small' && small))))) return {};
+export function mcpServersFor(kind: StepKind, visible: boolean, outputDir: string, small = false, screen = true): McpServers {
+  if (!(kind === 'ux' || kind === 'maquette' || (visible && ((kind === 'spec' && screen) || kind === 'implement' || kind === 'fix' || (kind === 'review-small' && small))))) return {};
   // La maquette est un fichier local : sans cette option le serveur bloque toute URL file:// (« Access to "file:" protocol is blocked »).
   const files = kind === 'maquette' || kind === 'spec' ? ['--allow-unrestricted-file-access'] : [];
   return { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', ...files, '--output-dir', outputDir] } };
@@ -65,10 +65,10 @@ export function playwrightDir(lotDir: string): string {
 }
 
 /** Écrit `<lotDir>/mcp-<étape>.json` (et, si Playwright est chargé, le dossier `playwright/`) ; rend le chemin absolu du fichier. */
-export function writeMcpConfig(lotDir: string, kind: StepKind, visible: boolean, small = false): string {
+export function writeMcpConfig(lotDir: string, kind: StepKind, visible: boolean, small = false, screen = true): string {
   const dir = resolve(lotDir);
   const out = playwrightDir(dir);
-  const servers = mcpServersFor(kind, visible, out, small);
+  const servers = mcpServersFor(kind, visible, out, small, screen);
   if (servers.playwright) mkdirSync(out, { recursive: true });
   const file = join(dir, `mcp-${kind}.json`);
   writeFileSync(file, `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`);

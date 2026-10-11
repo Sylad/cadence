@@ -53,6 +53,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `cadence orchestrate` (L188): the spec chain always ends — whatever the path (screen, back-end or mixed lot, `sujet` block added or removed in the second pass, acceptance proof, resume with a sheet already there), the spec agent plays two sessions at most and the lot reaches `accept`/`implement` or is handed back (parametrised test over all paths); the spec session of a lot without a screen no longer loads Playwright; the `--dry-run` accept brief no longer carries a dead back flag. (L188)
 - `cadence spec check` (L192, follow-ups of the L187 review): the log levels of the fleet's stacks are accepted as an error `code` (`log warning|info|critical|fatal|verbose` besides `debug|log|warn|error`); on a back-end-only sheet a rule with `etat` gets one report instead of two contradictory ones, and `actions`, `etats` and `champs` without `ecran` are refused instead of ignored; on a mixed sheet an action that repeats the `appel` of a contract without `contrat:` is reported. (L192)
 - `cadence spec check` (L188, last follow-up of the L187 review): on a back-end sheet without a screen, `actions` is refused once, as a whole, instead of also adding one deviation per action (unknown trigger, invalid call, unknown rule).
 

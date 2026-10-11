@@ -44,7 +44,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- `cadence orchestrate`, the acceptance lock: a lot handed back for writing in a locked file and resumed in a new wave is no longer handed back again when it takes its addition back — a listed file identical to its content at the head before the lot's first work commit (found by the plan's refs) is not a deviation; the reference of the delivered-lot exception (sheet change) stays the wave's head (L184).
+- `cadence orchestrate`, the acceptance lock: a lot handed back for writing in a locked file and resumed in a new wave is no longer handed back again when it takes its addition back — a listed file identical to its content at the head before the lot's first work commit (found by the plan's refs) is not a deviation, unless the sheet of the screen changed since that head (an evolution admitted for another lot) or the file is absent at that head or deleted; the reference of the delivered-lot exception (sheet change) stays the wave's head (L184).
 - `cadence orchestrate`: the spec step no longer asks the lead a question about a negation: a `si_faux` such as « rien d'irréversible » (a retry button, a simple re-read) was read as an irreversible action; a keyword right after `rien`, `aucun(e)`, `pas`, `sans` or `jamais` is ignored (L180).
 
 ### Added

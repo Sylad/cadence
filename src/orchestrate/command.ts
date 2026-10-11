@@ -69,8 +69,17 @@ const LOT_BUDGET_PER_DAY = 400_000;
  */
 const LOT_BUDGET_FLOOR = 450_000;
 
-/** Budget d'un lot, dérivé de son estimate : empêche quelques lots d'avaler le budget de la vague au détriment des autres. */
-export const lotBudget = (estimate: number): number => Math.max(LOT_BUDGET_FLOOR, Math.round(estimate * LOT_BUDGET_PER_DAY));
+/**
+ * Allocation d'un lot à étape spec (L191), en plus du budget dérivé de l'estimate : les sessions spec, maquette (≤ 2 passes) et accept
+ * (≤ 2 passes) ne sont pas dans l'estimate d'écriture. Mesures de `.cadence/runs/2026-10-11-*` : ol L113 (vague conforme) spec 76 k +
+ * maquette 68 k et 83 k + accept 88 k et 35 k = 349 k ; ol L25 202 k (une maquette de 9 k puis 68 k, accept en une passe), rendu au lead à
+ * 503 k / 450 k avant sa passe fix. 350 k couvre le pire cas mesuré ; le plancher de 450 k garde de quoi payer l'écriture, sa revue et la correction.
+ */
+export const SPEC_STAGE_ALLOCATION = 350_000;
+
+/** Budget d'un lot, dérivé de son estimate : empêche quelques lots d'avaler le budget de la vague au détriment des autres. Un lot à étape spec (`screen:`) y ajoute l'allocation de cette étape (L191). */
+export const lotBudget = (estimate: number, specStage = false): number =>
+  Math.max(LOT_BUDGET_FLOOR, Math.round(estimate * LOT_BUDGET_PER_DAY)) + (specStage ? SPEC_STAGE_ALLOCATION : 0);
 /** Sessions simultanées, toutes vagues confondues (`--max-sessions`, ou CADENCE_MAX_SESSIONS). */
 export const DEFAULT_MAX_SESSIONS = 2;
 
@@ -292,7 +301,7 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, ...(lot.screen ? { screen: lot.screen } : {}), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.light = lot.estimate <= env.config.review.threshold;
-    state.budget = lotBudget(lot.estimate);
+    state.budget = lotBudget(lot.estimate, !!lot.screen);
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
     if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };
     lots.push(state);
@@ -331,7 +340,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const lot = env.loadPlan().lot(l.lot);
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
-    io.out(`  budget du lot : ${l.budget} tokens comptés (dérivé de l'estimate)`);
+    io.out(`  budget du lot : ${l.budget} tokens comptés (dérivé de l'estimate${l.screen ? ` : ${(l.budget ?? 0) - SPEC_STAGE_ALLOCATION}, plus ${SPEC_STAGE_ALLOCATION} pour les étapes spec, maquette et accept` : ''})`);
     io.out(`  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
     if (l.repos?.length) io.out(`  dépôts voisins : ${l.repos.map((r) => r.rel).join(', ')} (verrou, garde de push et --add-dir ; leurs commits citent ${l.lot})`);
     if (l.node) {

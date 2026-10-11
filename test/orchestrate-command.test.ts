@@ -1230,6 +1230,31 @@ describe('budget par lot (L78)', () => {
     }
   });
 
+  it("lot à étape spec (L191) : l'allocation mesurée de spec + maquette + accept s'ajoute au budget dérivé de l'estimate", () => {
+    expect(lotBudget(0.5, true)).toBe(450_000 + 350_000);
+    expect(lotBudget(1, true)).toBe(450_000 + 350_000);
+    expect(lotBudget(2.5, true)).toBe(1_000_000 + 350_000);
+    expect(lotBudget(0.5, false)).toBe(450_000);
+  });
+
+  it('l\'allocation couvre le pire cas mesuré sur les journaux : ol L113 (spec 76 k + maquette 2 passes 151 k + accept 2 passes 123 k = 349 k), ol L25 (202 k)', () => {
+    expect(lotBudget(0.5, true) - lotBudget(0.5)).toBeGreaterThanOrEqual(75_531 + 68_055 + 82_693 + 87_797 + 35_388);
+    expect(lotBudget(0.5, true) - lotBudget(0.5)).toBeGreaterThanOrEqual(3_659 + 48_010 + 8_799 + 67_556 + 73_899);
+  });
+
+  it("--dry-run dit le budget d'un lot à écran avec l'allocation de l'étape spec, et le détaille", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un écran', estimate: 0.5, screen: 'page' }], b: [{ title: 'sans écran', estimate: 0.5 }] });
+    const r = io(parent);
+    await orchestrate(['a:L1', 'b:L1', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      expect(text).toContain('budget du lot : 800000 tokens comptés (dérivé de l\'estimate : 450000, plus 350000 pour les étapes spec, maquette et accept)');
+      expect(text).toContain('budget du lot : 450000 tokens comptés (dérivé de l\'estimate)');
+    } finally {
+      removeDryRunBriefs(text);
+    }
+  });
+
   it("--dry-run dit le budget de chaque lot", async () => {
     const { parent } = parentWith({ a: [{ title: 'un', estimate: 1 }], b: [{ title: 'gros', estimate: 2 }] });
     const r = io(parent);

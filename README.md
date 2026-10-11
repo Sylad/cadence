@@ -1267,8 +1267,8 @@ upstream ref and `git ls-remote` are compared with the "before", and a read-only
 `CADENCE_ORCHESTRATED` is set.
 
 **Budget**: the wave counts input + cache writes + output tokens (default 2 M); cache reads are kept and
-shown apart. Each lot also has its own budget derived from its estimate (400 k tokens per day, floor 450 k — a write pass, its review, one fix pass and the short review after it —, shown by
-`--dry-run`): it bounds the *writing* passes, never the reviews. A lot that spent it gets no further implementation or
+shown apart. Each lot also has its own budget derived from its estimate (400 k tokens per day, floor 450 k — a write pass, its review, one fix pass and the short review after it —, plus 350 k for a lot with `screen:`: its spec, mockup (≤ 2 passes) and accept sessions, measured on the journals at 202 k to 349 k; shown by
+`--dry-run`, which gives both parts): it bounds the *writing* passes, never the reviews. A lot that spent it gets no further implementation or
 fix and is handed back to the lead, but its review (and UX review) is played first; a fix pass starts only if
 the remaining budget can also pay the review that follows it (65 k tokens reserved: a fixed amount close to the 90th
 percentile of the full reviews, 62.7 k over 187 reviews; the short review after the minors pass has a higher p90, 67.6 k

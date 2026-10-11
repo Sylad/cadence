@@ -2212,6 +2212,11 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-12
+  - id: L198
+    title: "RÉGRESSION de L186 : le champ spec: des lots (booléen) entre en collision avec le champ spec: existant du plan en lecture seule de maritime-atlas (chemin d'un document de spec, ~200 lots) → raf check / session close de maritime en erreur sur chaque lot (« spec : true ou false attendu (reçu « docs/… ») »), et risque qu'orchestrate prenne ces lots pour des lots à étape spec back (lot.spec vrai) — un plan en lecture seule ne lit spec que s'il est mappé dans cadence.yaml (plan.fields), seul true compte ailleurs ; test sur un plan mappé avec spec: <chemin> ; À FAIRE AVANT toute vague maritime"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

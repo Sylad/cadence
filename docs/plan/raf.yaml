@@ -1979,25 +1979,29 @@ lots:
     finished: 2026-10-11
   - id: L172
     title: "Revue UX de la maquette : ux-reviewer mode maquette (spec etape-spec, S4)"
-    status: doing
+    status: done
     estimate: 2
     after: [ L171 ]
     created: 2026-10-10
     started: 2026-10-11
     notes:
       - { date: 2026-10-11, text: "Rendu par la vague 2026-10-11-0045 (budget 528 k / 450 k après la 2e revue non conforme). À corriger dans la reprise : (1) un lot dont acceptation.json est vert: true, relancé dans une nouvelle vague, rejoue la revue de maquette (afterSpec cycle.ts:776, checkAcceptation refuse vert: true) — reconnaître l'acceptation verte comme preuve de revue dans afterSpec et afterMaquette, test de reprise (même racine que la note 2 de L173) ; (2) README « Minimal MCP servers per step » (l. 1373) et CHANGELOG : Playwright chargé pour maquette et spec avec --allow-unrestricted-file-access ; mineurs : afterSpec nomme sealed un contrôle qui ne lit pas les empreintes (cycle.ts:776, test orchestrate-maquette.test.ts:56 monté sans empreintes), maquetteStep sans fiche saute accept sans avertissement (cycle.ts:892). Estimation passée à 2." }
+      - { date: 2026-10-11, text: "Clos 11-10 (vague 2026-10-11-0910, conforme après 2 corrections ; build + 1537 tests re-vérifiés). Mineurs laissés en note : README l. 1049 « On resume » décrit encore la preuve d'avant 2288eb6 (compter depuis le commit qui crée la fiche, hors fichiers de tests listés) ; le scellé exigé par acceptationProof se réduit à la présence de la clé empreintes ({} passe), sans comparaison aux fichiers listés." }
     review: { date: 2026-10-11, verdict: "conforme : les 2 constats mineurs précédents sont corrigés et testés (les nouveaux tests échoueraient sans le correctif). Vitest passe en entier (72 fichiers, 1525 tests), tsc --noEmit ne signale rien. 2 nouveaux constats mineurs : un chemin ./ dans fichiers défait la preuve du scellé (régression introduite par 2288eb6), et le passage « On resume » du README est imprécis. — orchestré (vague 2026-10-11-0910, 2 passe(s) de correction + passe des mineurs)", commit: 2288eb654b791973954ebf1345edde7159fcd075 }
+    finished: 2026-10-11
   - id: L173
     title: "Étape accept : tests rouges, verrou par empreinte sur toutes les sessions du dépôt, fichiers des acceptation.json exclus de config.test et de la CI (config du lanceur) tant que le lot n'est pas vert, commande dédiée, retour à vert: true posé par le cycle quand elle passe (spec etape-spec, S5)"
-    status: doing
+    status: done
     estimate: 2
     after: [ L171 ]
     created: 2026-10-10
     notes:
       - { date: 2026-10-10, text: "Revue L166 : préciser la différence tolérée sur acceptation.json par le verrou (seule la clé vert, posée par le cycle) et où est rangé le sha rouge (hors d'acceptation.json, sinon une session peut le réécrire) — sinon le lot B voit un diff non vide après le vert: true du lot A" }
       - { date: 2026-10-11, text: "Rendu par la vague 2026-10-11-0045 (budget avant la correction), estimation passée à 2. 3 majeurs de la revue : (1) cycle.ts:772 afterSpec saute accept sur un acceptation.json jamais scellé (checkAcceptation statique : ni empreintes ni rouge vérifié) → exiger le scellé ; (2) un lot déjà vert: true relancé rejoue accept 2× puis est rendu (accept.ts:135 « vert: true à l'écriture ») → reconnaître un lot vert et passer à implement/review, test de reprise ; (3) cycle.ts:878 un écran = un dossier = un seul acceptation.json : un 2e lot sur le même écran réécrit le verrou et les tests du 1er sans écart relevé → un acceptation.json par lot ou refus mesuré" }
+      - { date: 2026-10-11, text: "Clos 11-10 (vague 2026-10-11-0910, conforme après 1 correction ; un acceptation-<lot>.json par lot). Mineurs laissés en note : la règle « chaque fichier de tests listé doit être neuf » (accept.ts:157) n'est pas dans le brief accept ni dans agents/acceptance-writer.md ; la base de reprise du garde-fou repart de la vague courante (state.ts:162 remet steps à []) ; l'ancre posée après le scellé peut différer de redSha quand la session a déjà écrit des empreintes exactes (cycle.ts:1061)." }
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "conforme : les 5 mineurs de la revue sont corrigés et testés (chaque nouveau test échoue quand on retire son correctif), vitest 72 fichiers / 1537 tests verts, tsc --noEmit propre ; 2 nouveaux mineurs notés (ancre rouge = HEAD au lieu de redSha, règle « fichier de tests neuf » absente du brief accept) — orchestré (vague 2026-10-11-0910, 1 passe(s) de correction + passe des mineurs)", commit: a00a55c8a55855871aaec0aced76f75b8169a384 }
+    finished: 2026-10-11
   - id: L174
     title: "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses (spec etape-spec, S6)"
     status: todo
@@ -2024,6 +2028,11 @@ lots:
     estimate: 0.25
     after: [ L174 ]
     created: 2026-10-10
+  - id: L178
+    title: "acceptationProof (cycle.ts:837) cherche l'empreinte sous le chemin brut emp[f] alors que sealAcceptation la range sous le chemin normalisé : une acceptation scellée qui liste un chemin ./… n'est pas reconnue à la reprise (maquette et accept rejoués) — chercher emp[norm], test de reprise"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

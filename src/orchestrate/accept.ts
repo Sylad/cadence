@@ -193,7 +193,7 @@ function ficheChanged(repo: string, since: string, fiche: string, cites: string[
  * Une fois livrée, une acceptation n'est plus comparée à son commit rouge (une évolution admise l'a dépassé et rien ne le rescelle) mais à `lotBase` :
  * un test changé avant ce point l'a été par un lot qui avait la fiche pour lui, et ses empreintes scellées ne valent plus.
  */
-export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string>; lotBase?: string; lotCommits?: string[] } = {}): string[] {
+export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string>; lotBase?: string; lotCommits?: string[]; lot?: string } = {}): string[] {
   const out: string[] = [];
   const before = new Set(listAcceptations(repo, dir, headBefore));
   const now = new Set(listAcceptations(repo, dir));
@@ -225,14 +225,18 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     }
     const sinceRed = changed; // livrée : ces fichiers ont pu évoluer avec la fiche, leur empreinte scellée ne vaut plus
     let depuis = red;
-    if (cur.vert === true && typeof base.fiche === 'string') {
+    if (cur.vert === true && typeof base.fiche === 'string' && base.lot !== opts.lot) {
+      // L'acceptation du lot en cours (vert posé dès l'implement) garde le verrou entier : l'exception ne vaut que pour un lot suivant.
       const ref = opts.lotBase ?? headBefore;
       if (ficheChanged(repo, ref, base.fiche, opts.lotCommits)) continue;
-      depuis = ref;
-      try {
-        changed = git(repo, 'diff', '--name-only', '-z', ref, '--', ...fichiers).split('\0').filter(Boolean);
-      } catch {
-        changed = fichiers;
+      // La référence ne quitte le commit rouge que si la fiche a évolué entre le rouge et `ref` : sinon tout test changé depuis le rouge reste un écart.
+      if (gitOk(repo, 'diff', '--name-only', red, ref, '--', base.fiche) && git(repo, 'diff', '--name-only', red, ref, '--', base.fiche).trim() !== '') {
+        depuis = ref;
+        try {
+          changed = git(repo, 'diff', '--name-only', '-z', ref, '--', ...fichiers).split('\0').filter(Boolean);
+        } catch {
+          changed = fichiers;
+        }
       }
     }
     const lot = typeof base.lot === 'string' ? base.lot : '?';

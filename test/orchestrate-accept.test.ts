@@ -224,6 +224,23 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
       expect(lockViolations(repo, DIR, head)).toEqual([]);
     });
 
+    it("l'acceptation du lot en cours (opts.lot) garde le verrou entier, même fiche changée dans le lot", () => {
+      const { repo, a, head } = livre();
+      changeFiche(repo, a.fiche);
+      writeFileSync(join(repo, a.test), "it('triche', () => {});\n");
+      commitPaths(repo, 'fix(L1): triche', a.test, a.fiche);
+      expect(lockViolations(repo, DIR, head, { lotBase: head, lot: 'L1' }).join('\n')).toContain(a.test);
+      expect(lockViolations(repo, DIR, head, { lotBase: head, lot: 'L9' })).toEqual([]);
+    });
+
+    it("un test réécrit hors vague, fiche inchangée, reste un écart contre le commit rouge même avec lotBase", () => {
+      const { repo, a } = livre();
+      writeFileSync(join(repo, a.test), "it('R1', () => {});\n");
+      commitPaths(repo, 'chore: hors vague', a.test);
+      const avant = git(repo, 'rev-parse', 'HEAD');
+      expect(lockViolations(repo, DIR, avant, { lotBase: avant }).join('\n')).toContain(a.test);
+    });
+
     it('vert: false : verrou entier, même si la fiche change', () => {
       const repo = gitRepo();
       const a = ecritAcceptation(repo);

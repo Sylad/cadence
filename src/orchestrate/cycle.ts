@@ -1166,7 +1166,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     return;
   }
   // Verrou des tests d'acceptation (L173) : ceux de TOUS les lots du dépôt, pas seulement du lot courant ; une modification est une question au lead.
-  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lotBase: l.steps.find((s) => s.headBefore)?.headBefore, lotCommits: lotCommits(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) }) : [];
+  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: l.steps.find((s) => s.headBefore)?.headBefore, lotCommits: lotCommits(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) }) : [];
   if (locked.length) {
     stop(c, 'handed-back', `verrou des tests d'acceptation : ${locked.join(' ; ')}`);
     return;

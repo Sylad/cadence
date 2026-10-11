@@ -2104,9 +2104,11 @@ lots:
   - id: L184
     title: "Verrou d'acceptation : la référence « tête d'avant le lot » (lotBase) repart de la vague courante — un lot rendu pour avoir écrit dans un fichier verrouillé, repris dans une nouvelle vague, est rendu de nouveau quand il RETIRE son ajout (fichier revenu à l'état d'avant le lot, mesuré : ol-companion, 2 vagues) ; prendre la tête d'avant le premier commit qui cite le lot, avec un test de reprise"
     status: doing
-    estimate: 0.25
+    estimate: 0.75
     created: 2026-10-11
     started: 2026-10-11
+    notes:
+      - { date: 2026-10-11, text: "Rendu par la vague 2026-10-11-1500 (2 majeurs : lotStartHead recule la référence avant la 1re vague et compte au lot repris le travail admis d'un autre lot entre ses vagues, accept.ts:261 ; ficheCommitsOfLot lit les lots avec /\\bL\\d+\\b/ au lieu de plan.refs, accept.ts:198). Décision du lead pour la reprise : revenir à la référence par vague d'avant L184 (lotBase de la vague, référence au commit rouge, règle L183 inchangée) et n'ajouter QU'UNE exemption étroite — un fichier verrouillé dont le contenu à la tête est identique à son contenu à la tête d'avant le premier commit de travail du lot (bilan nul sur le lot : il retire son propre ajout) n'est pas un écart ; commits du lot repérés par plan.refs ; test de cycle de la reprise (vague 1 rendue par le verrou, vague 2 retire l'ajout → pas rendu) ; CHANGELOG et commentaires de test alignés." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

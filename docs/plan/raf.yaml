@@ -2125,9 +2125,10 @@ lots:
     finished: 2026-10-11
   - id: L186
     title: "Champ spec des lots : raf add --spec, raf spec <lot> on|off, raf check, README + CHANGELOG (spec etape-spec-back, B1)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-11
+    started: 2026-10-11
   - id: L187
     title: "Format de la fiche back : cadence spec check (sujet, cas, règles, contrats, données), gabarit, exemple testé (spec etape-spec-back, B2)"
     status: todo

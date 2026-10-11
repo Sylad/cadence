@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { ecritAcceptation } from './accept-helpers.js';
+import { sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { acceptReport, claudeOut, commitFile, git, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
 import { EXEMPLE_BACK, ecrit, ecritBack, ficheBack } from './spec-helpers.js';
 import { checkSpec, findFiche, hypothesisLines } from '../src/orchestrate/spec.js';
@@ -501,5 +502,62 @@ describe('étape spec : la réponse à une hypothèse coûteuse remet le budget 
     await answer(c);
     await runLot(c);
     expect(kinds(h)).toEqual(['spec', 'spec', 'maquette', 'spec', 'maquette', 'implement', 'review']);
+  });
+});
+
+// L188, 3ᵉ revue : la revue de fiche est sautée sur une preuve (code déjà commité après la fiche, acceptation scellée), rejouée sans preuve.
+describe('étape spec back : reprise d\'un lot dont la fiche est déjà commitée', () => {
+  const commite = (repo: string, json: string, msg: string) => {
+    git(repo, 'add', '--', json);
+    git(repo, 'commit', '-q', '-m', msg, '--', json);
+  };
+  const acceptation = (repo: string) => ecritAcceptation(repo, { sansFiche: true, ecran: 'cache-de-secours-365scores', exemple: EXEMPLE_BACK });
+
+  it('du code du lot déjà commité après la fiche : pas de revue de fiche, sans orchestrate.accept', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    await runLot(h.lot('L1', back, config));
+    expect(kinds(h)).not.toContain('fiche');
+    expect(kinds(h)).not.toContain('spec');
+  });
+
+  it('une acceptation scellée : pas de revue de fiche', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    const a = acceptation(h.repo);
+    sealAcceptation(h.repo, a.json);
+    commite(h.repo, a.json, 'test(L1): acceptation scellée');
+    await runLot(h.lot('L1', back, { ...config, accept: 'true', test: 'true' }));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('une acceptation verte (nouvelle vague) : pas de revue de fiche non plus', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    const a = acceptation(h.repo);
+    sealAcceptation(h.repo, a.json);
+    commite(h.repo, a.json, 'test(L1): acceptation scellée');
+    setVert(h.repo, a.json);
+    commite(h.repo, a.json, 'chore(L1): acceptation verte');
+    await runLot(h.lot('L1', back, { ...config, accept: 'true', test: 'true' }));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('une acceptation non scellée ne prouve rien : la fiche est relue', async () => {
+    const h = harness({ lots, script: { fiche: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    acceptation(h.repo);
+    await runLot(h.lot('L1', back, { ...config, accept: 'true', test: 'true' }));
+    expect(kinds(h)[0]).toBe('fiche');
+  });
+
+  it('sans preuve, une fiche majeure à la reprise : une session spec, puis la seconde revue de fiche', async () => {
+    const h = harness({ lots, script: { fiche: [() => major(), ok], spec: [spec], implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['fiche', 'spec', 'fiche', 'implement', 'review']);
+    expect(c.lot.specRuns).toBe(1);
   });
 });

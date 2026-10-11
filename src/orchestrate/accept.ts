@@ -204,11 +204,11 @@ function ficheChanged(repo: string, since: string, fiche: string, cites: string[
  * le dernier commit qui l'a réécrit n'est plus celui-là, une session précédente (interrompue, donc jamais comparée) l'a réécrit.
  * Exception (L183) : une acceptation à `vert: true` (lot livré) laisse modifier ses tests listés si la fiche de l'écran a changé depuis `lotBase` (la
  * tête d'avant le premier travail du lot, par défaut `headBefore`), arbre de travail compris, ou dans un commit de `lotCommits` (ceux qui citent le lot,
- * posés avant la vague) : la fiche fait évoluer les règles. `vert: false` : verrou entier.
+ * posés avant la vague) : la fiche fait évoluer les règles. L'acceptation du lot en cours garde le verrou entier de l'exception L183.
  * Une fois livrée, une acceptation n'est plus comparée à son commit rouge (une évolution admise l'a dépassé et rien ne le rescelle) mais à `lotBase` :
  * un test changé avant ce point l'a été par un lot qui avait la fiche pour lui, et ses empreintes scellées ne valent plus.
  * Une seule exemption en plus (L184) : un fichier listé dont le contenu est identique à celui qu'il avait à `lotStart` (la tête d'avant le premier commit de
- * travail du lot, `lotStartHead`) n'est pas un écart : le bilan est nul sur le lot, qui a retiré son propre ajout (une reprise dans une nouvelle vague part d'un état déjà modifié).
+ * travail du lot, `lotStartHead`) n'est pas un écart : le bilan est nul sur le lot, qui a retiré son propre ajout (une reprise dans une nouvelle vague part d'un état déjà modifié). Un fichier absent à `lotStart` ou supprimé depuis n'a pas de contenu : jamais exempté. Le filtre vaut pour toutes les acceptations, `vert: false` comprises.
  */
 export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string>; lotBase?: string; lotStart?: string; lotCommits?: string[]; lot?: string } = {}): string[] {
   const out: string[] = [];
@@ -258,12 +258,12 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     }
     const lot = typeof base.lot === 'string' ? base.lot : '?';
     const emp = isObj(base.empreintes) ? base.empreintes : {};
-    // Bilan nul sur le lot (L184) : contenu identique à celui d'avant le premier commit de travail du lot.
+    // Bilan nul sur le lot (L184) : contenu identique à celui d'avant le premier commit de travail du lot (un fichier absent à cette tête n'est jamais exempté).
     const unchangedByLot = (norm: string): boolean => {
       if (!opts.lotStart) return false;
       const was = gitOk(repo, 'cat-file', '-e', `${opts.lotStart}:${norm}`) ? git(repo, 'rev-parse', `${opts.lotStart}:${norm}`).trim() : null;
       const now = existsSync(join(repo, norm)) ? git(repo, 'hash-object', '--', norm).trim() : null;
-      return was === now;
+      return was !== null && was === now; // absent n'a pas de contenu : un fichier supprimé, ou créé par le lot (commit rouge), n'est jamais un bilan nul
     };
     changed = changed.filter((f) => !unchangedByLot(f));
     for (const f of fichiers) {

@@ -131,6 +131,19 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
     expect(lockViolations(repo, DIR, head).join('\n')).toContain(a.test);
   });
 
+  it('un fichier de test supprimé est signalé même quand il est absent à la tête de départ du lot (L184 : absent des deux côtés n\'est pas un bilan nul)', () => {
+    const repo = gitRepo();
+    writeFileSync(join(repo, 'README.md'), 'x\n');
+    commitPaths(repo, 'chore: départ', 'README.md');
+    const lotStart = git(repo, 'rev-parse', 'HEAD').trim();
+    const a = ecritAcceptation(repo);
+    const head = git(repo, 'rev-parse', 'HEAD');
+    git(repo, 'rm', '-q', a.test);
+    git(repo, 'commit', '-q', '-m', 'feat(L1): supprime', '--', a.test);
+    const p = lockViolations(repo, DIR, head, { lot: 'L1', lotStart }).join('\n');
+    expect(p).toContain(a.test);
+  });
+
   it('seule la clé vert, posée par le cycle, est tolérée : setVert ne déclenche aucun écart au contrôle suivant', () => {
     const repo = gitRepo();
     const a = ecritAcceptation(repo);

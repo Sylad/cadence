@@ -45,7 +45,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- `cadence orchestrate` recalibrates the budget of a lot on the totals measured on `.cadence/runs` (L194): a lot with `screen:` gets 1.3 M (p90 of the total, spec, mockup, accept, conformity UX and passes included; it used to get the estimate budget plus 350 k and was handed back at 503 k, 776 k or 850 k), an ordinary lot of 0.5 to 1 day gets 750 k instead of 450 k (L188 cost 483 k then 495 k), then 570 k per day of estimate; up to 0.5 day the floor stays 450 k. `--dry-run` shows the basis of each lot's budget. A `--continue` wave draws fewer lots as a result.
+- `cadence orchestrate` recalibrates the budget of a lot on the totals measured on `.cadence/runs` (L194): a lot with `screen:` gets 1.3 M (p90 of the total, spec, mockup, accept, conformity UX and passes included; it used to get the estimate budget plus 350 k and was handed back at 503 k, 776 k or 850 k), an ordinary lot of 0.5 to 1 day gets 750 k instead of 450 k (L188 cost 483 k then 495 k), then 570 k per day of estimate (750 k staying the floor until that exceeds it, up to 1.3 day); up to 0.5 day the floor stays 450 k. `--dry-run` shows the basis of each lot's budget. A `--continue` wave draws fewer lots as a result.
 
 ### Added
 

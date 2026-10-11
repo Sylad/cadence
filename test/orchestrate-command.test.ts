@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { lotBudget, orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
+import { lotBudget, lotBudgetBasis, orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
@@ -1231,6 +1231,11 @@ describe('Node du projet (.nvmrc)', () => {
 });
 
 describe('budget par lot (L78, recalibré L194)', () => {
+  it("la base d'un lot de plus d'un jour dit que 750 k reste un plancher tant que l'estimate × 570 k ne le dépasse pas", () => {
+    expect(lotBudgetBasis(1.25)).toContain('plancher de 750000');
+    expect(lotBudgetBasis(2)).toContain('570000 par jour');
+    expect(lotBudgetBasis(1.25, 'spec')).toContain('plancher de 750000');
+  });
   it("lot ordinaire : plancher 450 k jusqu'à 0,5 j, 750 k jusqu'à 1 j (p90 mesuré 732 k), 570 k par jour au-delà (p90 mesuré 1,14 M pour 2 j)", () => {
     expect(lotBudget(0.1)).toBe(450_000);
     expect(lotBudget(0.5)).toBe(450_000);

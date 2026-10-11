@@ -2004,14 +2004,16 @@ lots:
     finished: 2026-10-11
   - id: L174
     title: "Briefs aval : fiche, tests citant les règles, revue règle→test→vert, UX légère, Hypothèses (spec etape-spec, S6)"
-    status: doing
+    status: done
     estimate: 1.5
     after: [ L172, L173 ]
     created: 2026-10-10
     started: 2026-10-11
     notes:
       - { date: 2026-10-11, text: "Rendu par la vague 2026-10-11-1035 (revue non conforme après 2 passes, 607 k). À corriger dans la reprise : (1) MAJEUR README.md:293 « The Markdown is deliberately small… » ne cite pas les titres #…###### que renderMarkdown rend depuis 0b3d02b (un niveau plus bas, coupent paragraphe et liste) — compléter la liste et ajouter une ligne au CHANGELOG ; (2) renderMarkdown (news.ts:296) : une hypothèse sur deux lignes (format spec §8, continuation indentée) sort en <p> à tirets bruts — accepter les lignes de continuation, test ; (3) README.md:39 : l'ancre #…-conformity-hypotheses ne mène pas au titre « … Hypothèses » (le slug GitHub garde le è) ; mineurs : news.ts:203 id de règle non échappé dans la RegExp (fiche id « R1( » fait planter news check), ficheHypotheses (spec.ts:167) duplique findFiche (orchestrate/spec.ts:14), test orchestrate-aval.test.ts:139 monté sur un état refusé par raf check (screen sans visible)." }
+      - { date: 2026-10-11, text: "Clos 11-10 (reprise vague 2026-10-11-1105, conforme sans correction ; 1581 tests re-vérifiés). Mineur en note : test/orchestrate-aval.test.ts:139 annonce « sans écran (ni fiche) » mais ecrit() commite une fiche." }
     review: { date: 2026-10-11, verdict: "Conforme : les 4 correctifs tiennent (puce sur plusieurs lignes, id de règle échappé, fichesDuDossier, import mort retiré), 1578/1578 tests passent, tsc OK, et il reste 1 note mineure sur le titre d'un test. — orchestré (vague 2026-10-11-1105, 0 passe(s) de correction + passe des mineurs)", commit: 74d00dc955ac0b7377ce6ce652f061cc959e790b }
+    finished: 2026-10-11
   - id: L175
     title: Essai étape spec sur un écran d'app loisir (spec etape-spec, S7)
     status: todo
@@ -2028,26 +2030,31 @@ lots:
       - { date: 2026-10-10, text: "Revue L166 : comparer à la référence des lots VISIBLES, pas « tous lots » (45 % corrigés contre 65 %) — src/corrections.ts doit sortir les causes par visibilité (byVisibility ne compte que lots et passes)" }
   - id: L177
     title: "docs/lead.md : schéma du workflow avec les étapes spec, L167 (spec etape-spec, S9)"
-    status: doing
+    status: done
     estimate: 0.25
     after: [ L174 ]
     created: 2026-10-10
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant (2 minors, notes only) — orchestré (vague 2026-10-11-1105, 0 passe(s) de correction)", commit: 9015a0cec6d3887b9e5b5cb744a00b4f85a7d4a3 }
+    notes:
+      - { date: 2026-10-11, text: "Clos 11-10 (vague 2026-10-11-1105, conforme). Mineurs en note : docs/lead.md:23 n'explique pas precheck (pas toujours joué) ; docs/lead-workflow-light.svg:144 la flèche « journal » (x=510) traverse les liaisons Spec → Mockup review et Accept → Implementation." }
+    finished: 2026-10-11
   - id: L178
     title: "acceptationProof (cycle.ts:837) cherche l'empreinte sous le chemin brut emp[f] alors que sealAcceptation la range sous le chemin normalisé : une acceptation scellée qui liste un chemin ./… n'est pas reconnue à la reprise (maquette et accept rejoués) — chercher emp[norm], test de reprise"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant — orchestré (vague 2026-10-11-1035, 0 passe(s) de correction)", commit: a1ef8b1dc8b237a211601ee905e214dac7f59fa6 }
+    finished: 2026-10-11
   - id: L179
     title: "Verrou d'acceptation (accept.ts:213) : emp[f] lu avec le chemin brut de base.fichiers alors que sealAcceptation range les empreintes sous le chemin normalisé — un chemin ./test/x.ts n'est jamais comparé (want undefined) ; chercher emp[norm], test"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant — orchestré (vague 2026-10-11-1105, 0 passe(s) de correction)", commit: a464b4d0f2cbb69f7d0f9ba9976083dae9baebb6 }
+    finished: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

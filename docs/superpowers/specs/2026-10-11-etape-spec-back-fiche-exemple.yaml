@@ -1,0 +1,180 @@
+# Fiche back — EXEMPLE ILLUSTRATIF (étape spec back, B2), pas la fiche d'un lot passé par l'étape : il montre le format.
+# Sujet réel : le lot L34 d'ol-companion (cache de secours quand 365scores est en panne), lu dans lineup.service.ts et
+# standings.service.ts le 2026-10-11. Un lot sans écran : ni `ecran`, ni `etats`, ni `champs`, ni maquette.
+sujet:
+  id: cache-de-secours-365scores
+  titre: Cache de secours quand 365scores est en panne
+  lot: L34
+  perimetre:
+    modules: [backend/src/modules/lineup, backend/src/modules/standings]
+    endpoints: ["GET /api/lineup", "GET /api/standings"]
+    jobs: [lineup-refresh, standings-refresh]
+    hors_perimetre: ["l'affichage de l'âge dans le frontend (un lot d'écran à part, avec screen:)"]
+
+cas:
+  - id: C1
+    titre: Le visiteur consulte la composition alors que 365scores est en panne
+    acteur: le visiteur, par le frontend d'ol-companion
+    declencheur: GET /api/lineup
+    preconditions:
+      - l'entrée de cache de la composition a plus de 6 h (TTL expiré) mais est lisible
+      - 365scores ne répond pas, ou répond sans composition exploitable
+    nominal:
+      - Le service constate que le cache est expiré et interroge 365scores.
+      - L'appel échoue (HTTP non 2xx, délai de 10 s ou 15 s dépassé, réponse sans composition).
+      - Le service relit l'entrée expirée et vérifie qu'elle a moins de 14 jours.
+      - Il la renvoie avec son âge en secondes et écrit un warning qui porte cet âge.
+    alternatives:
+      - { si: 365scores répond avec une composition, alors: "la réponse est fraîche, le cache est réécrit, aucun âge n'est annoncé", regles: [R3, R4] }
+      - { si: l'entrée a 14 jours ou plus, alors: la réponse reste null, regles: [R5] }
+      - { si: aucune entrée lisible (fichier absent ou illisible), alors: "null, comme aujourd'hui", regles: [R6] }
+    resultat: La composition du dernier succès, avec cacheAgeSeconds, au lieu de null.
+
+  - id: C2
+    titre: Le visiteur consulte le classement alors que 365scores est en panne
+    acteur: le visiteur, par le frontend d'ol-companion
+    declencheur: GET /api/standings
+    preconditions:
+      - l'entrée de cache du classement a plus de 1 h (TTL expiré) mais est lisible
+      - 365scores ne répond pas, ou répond un classement refusé (positions qui ne vont pas de 1 à 18)
+    nominal:
+      - Le service constate que le cache est expiré et interroge 365scores.
+      - L'appel échoue, ou la lecture refuse le classement.
+      - Le service relit l'entrée expirée et vérifie qu'elle a moins de 14 jours.
+      - Il la renvoie avec son âge en secondes et écrit un warning qui porte cet âge.
+    alternatives:
+      - { si: 365scores répond un classement valide, alors: "la réponse est fraîche, le cache est réécrit, aucun âge n'est annoncé", regles: [R3, R4] }
+      - { si: l'entrée a 14 jours ou plus, alors: la réponse reste null, regles: [R5] }
+      - { si: aucune entrée lisible, alors: "null, comme aujourd'hui", regles: [R6] }
+      - { si: la dernière lecture réussie avait été refusée pour ses positions, alors: "elle n'a jamais été écrite : le secours ne sert qu'un classement complet", regles: [R9] }
+    resultat: Le classement complet du dernier succès, avec cacheAgeSeconds, au lieu de null.
+
+  - id: C3
+    titre: Le rafraîchissement planifié échoue
+    acteur: le planificateur (cron lineup-refresh toutes les 15 min, standings-refresh toutes les heures)
+    declencheur: job lineup-refresh, job standings-refresh
+    preconditions:
+      - une entrée de cache existe, expirée ou non
+    nominal:
+      - Le job appelle getLatestLineup / getCurrentStandings avec force.
+      - 365scores échoue.
+      - Le job écrit son warning habituel et ne touche pas au fichier de cache.
+    alternatives:
+      - { si: 365scores répond, alors: "le cache est réécrit avec un horodatage neuf ; pour le classement, standings-changed suit la comparaison actuelle", regles: [R4, R10] }
+    resultat: Le fichier de cache est identique avant et après l'échec ; l'âge annoncé plus tard reste celui du dernier succès.
+
+regles:
+  - id: R1
+    cas: [C1, C2]
+    enonce: Quand 365scores échoue (HTTP non 2xx, délai dépassé, réponse sans donnée exploitable) et que l'entrée de cache est expirée, lisible et plus jeune que le plafond (R5), l'API sert cette entrée au lieu de null.
+    statut: sourcee
+    source: "lot L34 : « servir le dernier cache connu (composition, classement) … au lieu de null une fois le TTL expiré »"
+    tests:
+      - "R1 — composition : 365scores en panne, cache expiré, la composition est servie"
+      - "R1 — classement : 365scores en panne, cache expiré, le classement est servi"
+      - "R1 — réponse 200 sans composition exploitable : le cache expiré est servi"
+  - id: R2
+    cas: [C1, C2]
+    enonce: La réponse servie depuis une entrée expirée annonce son âge, en secondes entières écoulées depuis l'écriture de l'entrée (ts du fichier de cache).
+    statut: sourcee
+    source: "lot L34 : « avec son âge »"
+    tests:
+      - "R2 — l'âge annoncé est le nombre de secondes écoulées depuis l'écriture du cache"
+      - "R2 — l'âge est un entier supérieur ou égal à zéro"
+  - id: R3
+    cas: [C1, C2]
+    enonce: L'âge est le champ optionnel cacheAgeSeconds à la racine de la réponse ; il est absent d'une réponse fraîche et d'un cache encore valide, de sorte qu'un client qui lit l'ancienne forme n'est pas touché.
+    statut: hypothese
+    si_faux: Si le frontend préfère une date absolue ou un objet imbriqué, seuls le nom du champ et son calcul changent ; le frontend d'ol-companion est le seul client connu.
+    tests:
+      - "R3 — cacheAgeSeconds est absent d'une réponse fraîche"
+      - "R3 — cacheAgeSeconds est absent d'un cache encore valide"
+  - id: R4
+    cas: [C1, C2, C3]
+    enonce: Tant que 365scores répond ou que le cache est valide, le comportement est celui d'aujourd'hui — mêmes réponses, mêmes TTL (6 h pour la composition, 1 h pour le classement), même écriture du cache.
+    statut: sourcee
+    source: "lineup.service.ts CACHE_TTL_MS (6 h) et standings.service.ts CACHE_TTL_MS (1 h) ; réponses actuelles de GET /api/lineup et GET /api/standings"
+    tests:
+      - "R4 — réponse fraîche : identique à la réponse actuelle"
+      - "R4 — les TTL de 6 h et de 1 h sont inchangés"
+  - id: R5
+    cas: [C1, C2]
+    enonce: Une entrée de 14 jours ou plus n'est pas servie en secours ; l'API répond null comme aujourd'hui.
+    statut: hypothese
+    si_faux: Si un plafond plus court est voulu, ou aucun plafond, seule la constante change, avec les tests de la limite.
+    tests:
+      - "R5 — une entrée de 14 jours moins une seconde est servie"
+      - "R5 — une entrée de 14 jours est refusée : null"
+  - id: R6
+    cas: [C1, C2]
+    enonce: Sans entrée de cache lisible (fichier absent ou illisible), l'API répond null comme aujourd'hui, et le service écrit les mêmes journaux qu'aujourd'hui.
+    statut: sourcee
+    source: "lineup.service.ts getLatestLineup / readCache et standings.service.ts getCurrentStandings / readCache : null et warning « Failed to read … cache »"
+    tests:
+      - "R6 — aucun fichier de cache : null"
+      - "R6 — fichier de cache illisible : null et warning de lecture"
+  - id: R7
+    cas: [C1, C2, C3]
+    enonce: Un rafraîchissement qui échoue ne modifie pas l'entrée de cache, ni son contenu ni son horodatage ; l'âge annoncé reste celui du dernier succès.
+    statut: sourcee
+    source: "writeCache n'est appelé qu'après un appel réussi (lineup.service.ts, standings.service.ts) ; la règle garde cet acquis contre le repli"
+    tests:
+      - "R7 — un échec du cron laisse le fichier de cache identique octet pour octet"
+      - "R7 — l'âge annoncé après un échec est celui du dernier succès"
+  - id: R8
+    cas: [C1, C2]
+    enonce: "Chaque réponse servie depuis une entrée expirée écrit un warning « Serving expired <composition|classement> cache (age <n>s): 365scores unavailable » ; une panne n'est plus silencieuse."
+    statut: hypothese
+    si_faux: Si une ligne par appel fait trop de bruit, le warning passe à une ligne par heure et par service ; la réponse de l'API ne change pas.
+    tests:
+      - "R8 — un service de secours écrit le warning avec l'âge"
+  - id: R9
+    cas: [C2]
+    enonce: Un classement refusé à la lecture (positions qui ne vont pas de 1 à 18) n'est jamais écrit dans le cache ; le secours ne sert qu'un classement complet.
+    statut: sourcee
+    source: "scores365-standings.ts:115-127, table refusée si les positions ne sont pas 1..N ; lot L36"
+    tests:
+      - "R9 — un classement aux positions incomplètes n'est pas écrit dans le cache"
+      - "R9 — le secours ne sert jamais un classement incomplet"
+  - id: R10
+    cas: [C2, C3]
+    enonce: L'événement standings-changed garde son calcul actuel ; le point de comparaison reste le cache valide, jamais l'entrée expirée lue en secours.
+    statut: sourcee
+    source: "standings.service.ts:202-213, previous = readCache() (cache valide seulement) puis standingsTableChanged(previous, result) : sans entrée valide, l'événement est émis"
+    tests:
+      - "R10 — après expiration, un succès émet standings-changed comme aujourd'hui"
+      - "R10 — la lecture de secours ne sert pas de point de comparaison"
+
+contrats:
+  - id: A1
+    appel: GET /api/lineup
+    entree: aucune
+    sortie: "LineupResponse, ou null (corps vide, HTTP 200). Champ ajouté, optionnel : cacheAgeSeconds (entier ≥ 0), présent seulement pour une entrée expirée servie en secours."
+    erreurs:
+      - { code: log warn, message: "Serving expired lineup cache (age <n>s): 365scores unavailable" }
+    regles: [R1, R2, R3, R4, R5, R6, R8]
+  - id: A2
+    appel: GET /api/standings
+    entree: aucune
+    sortie: "SeasonStandings, ou null (corps vide, HTTP 200). Champ ajouté, optionnel : cacheAgeSeconds (entier ≥ 0), présent seulement pour une entrée expirée servie en secours."
+    erreurs:
+      - { code: log warn, message: "Serving expired standings cache (age <n>s): 365scores unavailable" }
+    regles: [R1, R2, R3, R4, R5, R6, R8, R9]
+  - id: A3
+    appel: job lineup-refresh
+    entree: "cron 0 */15 * * * *, fuseau Europe/Paris"
+    sortie: "fichier de cache réécrit après un succès, inchangé après un échec"
+    erreurs:
+      - { code: log warn, message: "Periodic lineup refresh failed: <message>" }
+    regles: [R4, R7]
+  - id: A4
+    appel: job standings-refresh
+    entree: "cron 0 0 * * * *, fuseau Europe/Paris"
+    sortie: "fichier de cache réécrit après un succès (et standings-changed selon R10), inchangé après un échec"
+    erreurs:
+      - { code: log warn, message: "Periodic standings refresh failed: <message>" }
+    regles: [R4, R7, R10]
+
+donnees:
+  - { id: D1, objet: "data/lineup-cache.json ({ ts, data })", existant: true, modification: aucune, note: "l'entrée expirée est relue ; le format et l'écriture ne changent pas" }
+  - { id: D2, objet: "data/standings-cache.json ({ ts, data })", existant: true, modification: aucune, note: "l'entrée expirée est relue ; le format et l'écriture ne changent pas" }

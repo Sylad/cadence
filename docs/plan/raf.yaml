@@ -2129,6 +2129,7 @@ lots:
     estimate: 0.5
     created: 2026-10-11
     started: 2026-10-11
+    review: { date: 2026-10-11, verdict: "conforme — orchestré (vague 2026-10-11-1915, 1 passe(s) de correction + passe des mineurs)", commit: c6f5e4ee59f43ee49febb4b67e93cfb1c75ecb57 }
   - id: L187
     title: "Format de la fiche back : cadence spec check (sujet, cas, règles, contrats, données), gabarit, exemple testé (spec etape-spec-back, B2)"
     status: todo

@@ -351,6 +351,10 @@ describe('étape spec : question ciblée', () => {
     ['Un paiement serait déclenché.', true],
     ['Cette règle contredit R4 du lot L12.', true],
     ['Si le club veut un autre libellé, seul ce bloc change.', false],
+    ['Rien d’irréversible : le bouton Réessayer relit simplement la liste.', false],
+    ['Aucune suppression, pas de paiement, sans envoi.', false],
+    ['Rien d’irréversible, mais une suppression des rappels.', true],
+    ['Pas de migration ; le paiement est déclenché.', true],
   ])('costlyHypotheses : %s', (siFaux, coûteux) => {
     const doc = { regles: [{ id: 'R1', statut: 'hypothese', si_faux: siFaux }, { id: 'R2', statut: 'sourcee', si_faux: 'une migration' }] };
     expect(costlyHypotheses(doc).map((x) => x.id)).toEqual(coûteux ? ['R1'] : []);

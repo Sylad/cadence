@@ -31,13 +31,16 @@ const COSTLY: [string, RegExp][] = [
   ['règle sourcée contredite', /contredit|contradiction/],
 ];
 
+/** Un mot de négation, ses articles éventuels et le mot qu'il nie (« rien d'irréversible », « sans suppression », « pas de paiement »). */
+const NEGATED = /\b(?:rien|aucune?|pas|sans|jamais)\s+(?:(?:d'|l'|de |du |des |d'un |d'une |un |une |le |la |les )\s*)*[\p{L}-]+/gu;
+
 /** Règles `hypothese` dont `si_faux` relève d'un choix coûteux à défaire : une question, pas une hypothèse. */
 export function costlyHypotheses(doc: unknown): { id: string; categorie: string; siFaux: string }[] {
   if (!isObj(doc)) return [];
   const out: { id: string; categorie: string; siFaux: string }[] = [];
   for (const r of list(doc.regles)) {
     if (r.statut !== 'hypothese' || typeof r.si_faux !== 'string') continue;
-    const text = plain(r.si_faux).replace(/[’‘]/g, "'");
+    const text = plain(r.si_faux).replace(/[’‘]/g, "'").replace(NEGATED, ' ');
     const hit = COSTLY.find(([, re]) => re.test(text));
     if (hit) out.push({ id: String(r.id), categorie: hit[0], siFaux: r.si_faux.trim() });
   }

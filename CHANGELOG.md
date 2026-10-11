@@ -42,6 +42,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence orchestrate`: the spec step no longer asks the lead a question about a negation: a `si_faux` such as « rien d'irréversible » (a retry button, a simple re-read) was read as an irreversible action; a keyword right after `rien`, `aucun(e)`, `pas`, `sans` or `jamais` is ignored (L180).
+
 ### Added
 
 - `docs/lead.md` and its two SVG: the workflow of the `lead` skill now shows the spec step of `orchestrate` — `spec`, mockup review (`maquette`) and `accept` before the implementation for a lot that declares `screen:`, the conformity UX pass, with the order `precheck → spec → maquette → accept → implement → ux → review` spelled out in the steps (L177).

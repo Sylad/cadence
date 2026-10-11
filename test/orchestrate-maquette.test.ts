@@ -168,6 +168,14 @@ describe('revue de la maquette : la session', () => {
     expect(call.brief).not.toContain('the running app');
   });
 
+  it('brief : une erreur de donnée d\'exemple (date, jour de la semaine) est un constat mineur, pas majeur (L181)', async () => {
+    const h = harness({ lots, script: { spec: [spec], maquette: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', screen, config));
+    expect(h.calls[1].brief).toMatch(/sample data/i);
+    expect(h.calls[1].brief).toMatch(/weekday/i);
+    expect(h.calls[1].brief).toMatch(/minor/i);
+  });
+
   it('mcpServersFor charge Playwright pour la maquette, même sur un lot non visible', () => {
     expect(Object.keys(mcpServersFor('maquette', true, '/run/p--L1/playwright'))).toEqual(['playwright']);
     expect(Object.keys(mcpServersFor('maquette', false, '/run/p--L1/playwright'))).toEqual(['playwright']);

@@ -85,6 +85,14 @@ describe('étape spec : la session', () => {
     expect(call.brief).toMatch(/maquette-<état>-<largeur>\.png/);
   });
 
+  it('brief : chaque date d\'exemple de la maquette est vérifiée, le jour de la semaine calculé et non écrit de tête (L181)', async () => {
+    const h = harness({ lots, script: { spec: [spec()], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', screen, { spec: { dir: 'docs/specs', render: 'npm run maquette:rendu' } }));
+    expect(h.calls[0].brief).toMatch(/every (example )?date/i);
+    expect(h.calls[0].brief).toMatch(/weekday/i);
+    expect(h.calls[0].brief).toMatch(/compute/i);
+  });
+
   it('mcpServersFor charge Playwright pour spec sur un lot visible, pas sans écran', () => {
     expect(Object.keys(mcpServersFor('spec', true, '/run/p--L1/playwright'))).toEqual(['playwright']);
     expect(mcpServersFor('spec', false, '/run/p--L1/playwright')).toEqual({});

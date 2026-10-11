@@ -24,6 +24,8 @@ On top of the usability and accessibility checks, check the **consistency mockup
 - every state of `etats` has its section `#etat-<état>`; the `masque` of an empty-state rule really hides the fields it names;
 - the units, formats and wording the sheet declares are those shown.
 
+Check the **sample data** too: recompute the weekday of every date shown (a command such as `date -d`), do not trust the one written. A wrong sample datum (weekday, date, figure that does not add up) is **minor**, never major: it changes no field, rule or state of the sheet, so it does not send the mockup back to the spec writer.
+
 A mismatch is a finding like any other (rule: the sheet is the reference of the later steps; a mockup that contradicts it misleads the acceptance tests). Rank blocking / major / minor as below: a blocking or major finding sends the mockup back to the spec writer, a minor one becomes a note of the lot. Leave the proposed sub-tasks empty — a mockup has no observable bug. This verdict is **not** `raf ux`: the conformity pass after the code keeps that role.
 
 ## Conformity mode

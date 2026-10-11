@@ -2123,6 +2123,35 @@ lots:
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant — orchestré (vague 2026-10-11-1845, 0 passe(s) de correction)", commit: 84131151be2c5689ed3b681042edf95b54043080 }
     finished: 2026-10-11
+  - id: L186
+    title: "Champ spec des lots : raf add --spec, raf spec <lot> on|off, raf check, README + CHANGELOG (spec etape-spec-back, B1)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-11
+  - id: L187
+    title: "Format de la fiche back : cadence spec check (sujet, cas, règles, contrats, données), gabarit, exemple testé (spec etape-spec-back, B2)"
+    status: todo
+    estimate: 1
+    after: [ L186 ]
+    created: 2026-10-11
+  - id: L188
+    title: "Étape spec back d'orchestrate : gabarit spec back, code-reviewer en mode fiche, chaîne precheck→spec→revue de fiche→accept (spec etape-spec-back, B3)"
+    status: todo
+    estimate: 1
+    after: [ L187 ]
+    created: 2026-10-11
+  - id: L189
+    title: orchestrate.accept en liste de lanceurs, front et back (spec etape-spec-back, B4)
+    status: todo
+    estimate: 0.5
+    after: [ L188 ]
+    created: 2026-10-11
+  - id: L190
+    title: Mesure de l'étape spec back après 8 lots avec fiche (spec etape-spec-back, B5)
+    status: todo
+    estimate: 0.5
+    after: [ L189 ]
+    created: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -2028,10 +2028,11 @@ lots:
       - { date: 2026-10-10, text: "Revue L166 : comparer à la référence des lots VISIBLES, pas « tous lots » (45 % corrigés contre 65 %) — src/corrections.ts doit sortir les causes par visibilité (byVisibility ne compte que lots et passes)" }
   - id: L177
     title: "docs/lead.md : schéma du workflow avec les étapes spec, L167 (spec etape-spec, S9)"
-    status: todo
+    status: doing
     estimate: 0.25
     after: [ L174 ]
     created: 2026-10-10
+    started: 2026-10-11
   - id: L178
     title: "acceptationProof (cycle.ts:837) cherche l'empreinte sous le chemin brut emp[f] alors que sealAcceptation la range sous le chemin normalisé : une acceptation scellée qui liste un chemin ./… n'est pas reconnue à la reprise (maquette et accept rejoués) — chercher emp[norm], test de reprise"
     status: doing

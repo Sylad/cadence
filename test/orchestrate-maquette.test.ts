@@ -54,6 +54,15 @@ describe('revue de la maquette : où elle s’insère', () => {
     expect(kinds(h)).toEqual(['maquette', 'implement', 'review']);
   });
 
+  it('sans orchestrate.accept, un lot dont le code est déjà commité après la fiche ne rejoue pas la revue', async () => {
+    const h = harness({ lots, script: { review: [ok] } });
+    ecrit(h.repo);
+    commitFile(h.repo, 'a.txt', 'feat(L1): a');
+    await runLot(h.lot('L1', screen, config));
+    expect(kinds(h)).not.toContain('maquette');
+    expect(kinds(h)).not.toContain('spec');
+  });
+
   const commite = (repo: string, json: string, msg: string) => {
     git(repo, 'add', '--', json);
     git(repo, 'commit', '-q', '-m', msg, '--', json);

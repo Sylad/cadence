@@ -1046,7 +1046,7 @@ After a valid spec, a lot with a sheet gets a UX review of its mockup, `maquette
 - **The loop, two reviews at most.** A blocking or major finding sends the mockup back to the spec writer: a **second `spec` session** (fresh, its brief carries the findings), then the mockup is reviewed again. If the second review is
   still not conforming, the lot is handed back with what remains (`maquette non conforme après 2 revues : …`) and nothing is implemented. A conforming review goes on to `accept` (or `implement`). On a resume, a **sealed** `acceptation.json` (its `empreintes` set by the program), still red or already green (`vert: true`), proves the review was done and is not replayed; an unsealed one proves nothing. A `maquette` step with no sheet warns (`revue de la maquette ignorée : aucune fiche …`) and goes to `implement`.
 - **Minor findings** are not sent back: they are kept as proposals of the lot (`[mineur maquette] …`), like the minors of the other reviews. A report whose totals announce a major finding is not taken for conforming.
-- **On resume**, a sheet already committed is reviewed before the next step, unless the lot already has a sealed, conforming `acceptation.json` (it can only have been written after the review).
+- **On resume**, a sheet already committed is reviewed before the next step, unless the lot already has a sealed, conforming `acceptation.json` (it can only have been written after the review), or already has code committed after the sheet (a commit citing the lot that touches a file outside the sheet's folder: `implement` only started once the review was done), including without `orchestrate.accept`.
 
 ### The accept step: red acceptance tests and their lock
 

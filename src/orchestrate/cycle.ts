@@ -8,7 +8,7 @@ import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
 import { docSyncBrief, docSyncGaps, filesOf } from '../docsync.js';
 import type { Day } from '../dates.js';
-import { readCommits, resolveCommit, type Commit } from '../git.js';
+import { changedFiles, readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
@@ -772,7 +772,7 @@ const NO_ACCEPT = 'étape accept ignorée : orchestrate.accept absent (commande 
  */
 function afterSpec(c: LotCtx, fiche: string): StepKind {
   const l = c.lot;
-  if (c.config.maquette && !l.maquette?.conforme && !acceptationProof(c, fiche)) return 'maquette';
+  if (c.config.maquette && !l.maquette?.conforme && !acceptationProof(c, fiche) && !codeAfterFiche(c, fiche)) return 'maquette';
   return afterMaquette(c, fiche);
 }
 
@@ -789,6 +789,22 @@ function afterMaquette(c: LotCtx, fiche: string): StepKind {
     return 'implement';
   }
   return 'accept';
+}
+
+/** Le lot a déjà du code commité après sa fiche : l'implémentation n'a pu partir qu'une fois la maquette relue, la revue n'est pas rejouée (même sans `orchestrate.accept`). */
+function codeAfterFiche(c: LotCtx, fiche: string): boolean {
+  const l = c.lot;
+  let sha: string;
+  try {
+    sha = git(l.repo, 'log', '-1', '--format=%H', '--', posix.dirname(fiche));
+  } catch {
+    return false;
+  }
+  if (!sha) return false;
+  const dir = `${posix.dirname(fiche)}/`;
+  const after = new Set(readCommits(l.repo, { range: `${sha}..HEAD` }).map((k) => k.sha));
+  // Un commit de la session spec elle-même (fiche, maquette, captures) n'est pas du code.
+  return lotWork(c.loadPlan(), l.repo, l.lot).some((k) => after.has(k.sha) && changedFiles(l.repo, k.sha).some((f) => !f.startsWith(dir)));
 }
 
 const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo, json));

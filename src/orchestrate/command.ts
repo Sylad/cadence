@@ -13,10 +13,11 @@ import { pidAlive, sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { acceptationFile, acceptText } from './accept.js';
+import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { Budget, DROPPED, MAX_PASSES, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
+import { Budget, DROPPED, MAX_PASSES, briefName, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -77,7 +78,7 @@ const LOT_BUDGET_FLOOR = 450_000;
  */
 export const SPEC_STAGE_ALLOCATION = 350_000;
 
-/** Budget d'un lot, dérivé de son estimate : empêche quelques lots d'avaler le budget de la vague au détriment des autres. Un lot à étape spec (`screen:`) y ajoute l'allocation de cette étape (L191). */
+/** Budget d'un lot, dérivé de son estimate : empêche quelques lots d'avaler le budget de la vague au détriment des autres. Un lot à étape spec (`screen:` ou `spec: true`) y ajoute l'allocation de cette étape (L191). */
 export const lotBudget = (estimate: number, specStage = false): number =>
   Math.max(LOT_BUDGET_FLOOR, Math.round(estimate * LOT_BUDGET_PER_DAY)) + (specStage ? SPEC_STAGE_ALLOCATION : 0);
 /** Sessions simultanées, toutes vagues confondues (`--max-sessions`, ou CADENCE_MAX_SESSIONS). */
@@ -298,10 +299,10 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       continue;
     }
     const small = lot.estimate <= 0.5 || lot.quickwin;
-    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, ...(lot.screen ? { screen: lot.screen } : {}), model: t.model, readOnlyPlan: plan.readonly });
+    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, ...(lot.screen ? { screen: lot.screen } : {}), ...(lot.spec ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.light = lot.estimate <= env.config.review.threshold;
-    state.budget = lotBudget(lot.estimate, !!lot.screen);
+    state.budget = lotBudget(lot.estimate, !!(lot.screen || lot.spec));
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
     if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };
     lots.push(state);
@@ -340,7 +341,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const lot = env.loadPlan().lot(l.lot);
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
-    io.out(`  budget du lot : ${l.budget} tokens comptés (dérivé de l'estimate${l.screen ? ` : ${(l.budget ?? 0) - SPEC_STAGE_ALLOCATION}, plus ${SPEC_STAGE_ALLOCATION} pour les étapes spec, maquette et accept` : ''})`);
+    io.out(`  budget du lot : ${l.budget} tokens comptés (dérivé de l'estimate${l.screen || l.specLot ? ` : ${(l.budget ?? 0) - SPEC_STAGE_ALLOCATION}, plus ${SPEC_STAGE_ALLOCATION} pour les étapes spec, ${l.screen ? 'maquette' : 'fiche'} et accept` : ''})`);
     io.out(`  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
     if (l.repos?.length) io.out(`  dépôts voisins : ${l.repos.map((r) => r.rel).join(', ')} (verrou, garde de push et --add-dir ; leurs commits citent ${l.lot})`);
     if (l.node) {
@@ -348,10 +349,12 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const skipped = sk?.length ? ` ; ${sk.join(', ')} ${sk.length > 1 ? 'écartées' : 'écartée'} : pas de node exécutable` : '';
       io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted}${skipped})`);
     }
-    const steps: { kind: 'precheck' | 'spec' | 'maquette' | 'accept' | 'implement' | 'ux' | 'review' | 'review-small'; model: StepModel }[] = [{ kind: 'implement', model: l.model }];
-    if (l.screen && env.config.accept) steps.unshift({ kind: 'accept', model: 'sonnet' });
+    const steps: { kind: 'precheck' | 'spec' | 'maquette' | 'fiche' | 'accept' | 'implement' | 'ux' | 'review' | 'review-small'; model: StepModel }[] = [{ kind: 'implement', model: l.model }];
+    const specStage = !!(l.screen || l.specLot);
+    if (specStage && env.config.accept) steps.unshift({ kind: 'accept', model: 'sonnet' });
     if (l.screen && env.config.maquette) steps.unshift({ kind: 'maquette', model: env.config.review.full });
-    if (l.screen) steps.unshift({ kind: 'spec', model: 'sonnet' });
+    if (l.specLot && env.config.fiche) steps.unshift({ kind: 'fiche', model: 'sonnet' });
+    if (specStage) steps.unshift({ kind: 'spec', model: 'sonnet' });
     if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos)) steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
     const { light, full } = env.config.review;
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
@@ -365,15 +368,16 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, lotSlug(l.project, l.lot), 'playwright');
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
     const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '' };
-    if (l.screen) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen });
+    if (specStage) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, back: !!l.specLot });
     if (l.screen && env.config.maquette) vars.maquette = maquetteText({ fiche: `${env.config.spec.dir}/<écran>/fiche.yaml`, passes: 0 });
-    if (l.screen && env.config.accept) {
-      const folder = `${env.config.spec.dir}/<écran>`;
-      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept, test: env.config.test });
+    if (l.specLot && env.config.fiche) vars.fiche = ficheReviewText({ fiche: `${env.config.spec.dir}/<sujet>/fiche.yaml`, passes: 0 });
+    if (specStage && env.config.accept) {
+      const folder = `${env.config.spec.dir}/${l.screen ? '<écran>' : '<sujet>'}`;
+      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: !!(l.screen && l.specLot), acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept, test: env.config.test });
     }
     for (const s of steps) {
       const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);
-      const brief = renderBrief(s.kind, vars, deps.templatesDir);
+      const brief = renderBrief(briefName(l, s.kind), vars, deps.templatesDir);
       writeFileSync(file, brief);
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small).playwright;
       const local = s.model === 'local';

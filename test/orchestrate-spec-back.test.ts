@@ -1,0 +1,245 @@
+import { describe, expect, it } from 'vitest';
+import { runLot } from '../src/orchestrate/cycle.js';
+import { ecritAcceptation } from './accept-helpers.js';
+import { acceptReport, claudeOut, commitFile, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
+import { EXEMPLE_BACK, ecrit, ecritBack, ficheBack } from './spec-helpers.js';
+import { checkSpec, findFiche, hypothesisLines } from '../src/orchestrate/spec.js';
+import { lotBudget, SPEC_STAGE_ALLOCATION } from '../src/orchestrate/command.js';
+
+// L188 (spec etape-spec-back, B3) : l'étape spec d'un lot sans écran (`spec: true`) — spec → revue de la fiche → accept → implement.
+const kinds = (h: ReturnType<typeof harness>) => h.calls.map((c) => c.kind);
+const impl: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }));
+const ok: Handler = () => claudeOut(reviewReport());
+const lots = [{ title: 'Un comportement', spec: true }];
+const back = { specLot: true as const };
+const config = { fiche: true };
+const spec: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd) }));
+const major = (texte = 'R5 : la source citée ne dit pas cela') => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'lineup.service.ts', ligne: 42, texte }], verdict: 'non conforme' }));
+
+describe('étape spec back : où elle s’insère', () => {
+  it('spec → revue de fiche → implement → revue, la revue de fiche est mémorisée', async () => {
+    const h = harness({ lots, script: { spec: [spec], fiche: [ok], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.fiche).toMatchObject({ passes: 1, conforme: true });
+    expect(c.lot.spec).toMatchObject({ fiche: 'docs/specs/cache-de-secours-365scores/fiche.yaml' });
+  });
+
+  it('la revue de fiche est faite par code-reviewer en Sonnet, avec la fiche dans le brief', async () => {
+    const h = harness({ lots, script: { spec: [spec], fiche: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', back, config));
+    const call = h.calls.find((x) => x.kind === 'fiche')!;
+    expect(call.args[call.args.indexOf('--agent') + 1]).toBe('code-reviewer');
+    expect(call.model).toBe('sonnet');
+    expect(call.brief).toContain('docs/specs/cache-de-secours-365scores/fiche.yaml');
+    expect(call.brief).toMatch(/first review/);
+  });
+
+  it('le brief de la spec back ne parle ni de maquette ni de captures, et joint le gabarit de la fiche back', async () => {
+    const h = harness({ lots, script: { spec: [spec], fiche: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', back, config));
+    const brief = h.calls.find((x) => x.kind === 'spec')!.brief;
+    expect(brief).toContain('sujet:');
+    expect(brief).toContain('contrats:');
+    expect(brief).not.toMatch(/maquette|mockup|1440/i);
+    expect(brief).toContain('docs/specs/<sujet>/fiche.yaml');
+  });
+
+  it('avec orchestrate.accept : spec → fiche → accept → implement, et le brief d’accept n’a pas de maquette', async () => {
+    const accept: Handler = (call) => {
+      ecritAcceptation(call.opts.cwd, { sansFiche: true, ecran: 'cache-de-secours-365scores', exemple: EXEMPLE_BACK });
+      return claudeOut(acceptReport());
+    };
+    const h = harness({ lots, script: { spec: [spec], fiche: [ok], accept: [accept], implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }))], review: [ok] } });
+    await runLot(h.lot('L1', back, { ...config, accept: 'test -f done.flag', test: 'true' }));
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'accept', 'implement', 'review']);
+    const brief = h.calls.find((x) => x.kind === 'accept')!.brief;
+    expect(brief).not.toMatch(/maquette|mockup|data-testid/i);
+    expect(brief).toMatch(/contrats/);
+  });
+
+  it('orchestrate.fiche: false : la revue de la fiche n’a pas lieu', async () => {
+    const h = harness({ lots, script: { spec: [spec], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', back, { fiche: false }));
+    expect(kinds(h)).toEqual(['spec', 'implement', 'review']);
+  });
+
+  it('un lot sans screen: ni spec: garde le chemin actuel', async () => {
+    const h = harness({ script: { implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', {}, config));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('une fiche déjà commitée (reprise) est relue avant implement, sans rejouer la spec', async () => {
+    const h = harness({ lots, script: { fiche: [ok], implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    await runLot(h.lot('L1', back, config));
+    expect(kinds(h)).toEqual(['fiche', 'implement', 'review']);
+  });
+
+  it('une sortie sous le seuil (le lot ne change aucun comportement) rend le lot au chemin actuel', async () => {
+    const h = harness({ lots, script: { spec: [() => claudeOut(specReport({ sousSeuil: 'renommage sans effet observable' }))], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'implement', 'review']);
+    expect(c.lot.warnings.join('\n')).toMatch(/sous le seuil.*renommage/);
+    expect(c.lot.warnings.join('\n')).not.toMatch(/maquette/);
+  });
+});
+
+describe('étape spec back : conformité de la fiche écrite', () => {
+  it('une fiche d’un autre lot est un écart, rendu à une seconde passe puis au lead', async () => {
+    const mauvaise: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { fiche: (d) => (d.sujet.lot = 'L99') }) }));
+    const h = harness({ lots, script: { spec: [mauvaise, mauvaise] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'spec']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/sujet\.lot.*L99/);
+    expect(h.calls[1].brief).toMatch(/sujet\.lot/);
+  });
+
+  it('une fiche sans bloc sujet est un écart', async () => {
+    const h = harness({ lots, script: { spec: [(call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) })), (call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }))] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(c.lot.outcome).toMatch(/sujet : bloc manquant/);
+  });
+
+  it('une fiche écrite mais non commitée est un écart de checkSpec', () => {
+    const h = harness({ lots });
+    const fiche = ecritBack(h.repo, { sansCommit: true });
+    expect(checkSpec(h.repo, fiche, 'L1', { screen: false, back: true }).join('\n')).toMatch(/fiche non commité/);
+  });
+});
+
+describe('étape spec back : revue de la fiche, deux passes au plus', () => {
+  it('un majeur renvoie à la spec avec les constats, puis la fiche est relue', async () => {
+    const h = harness({ lots, script: { spec: [spec, () => claudeOut(specReport({ fiche: 'docs/specs/cache-de-secours-365scores/fiche.yaml' }))], fiche: [() => major(), ok], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'spec', 'fiche', 'implement', 'review']);
+    expect(h.calls[2].brief).toContain('R5 : la source citée ne dit pas cela');
+    expect(h.calls[2].brief).toContain('lineup.service.ts:42');
+    expect(h.calls[3].brief).toMatch(/second and last review/);
+    expect(c.lot.fiche).toMatchObject({ passes: 2, conforme: true });
+  });
+
+  it('non conforme après deux revues : rendu au lead avec les constats', async () => {
+    const h = harness({ lots, script: { spec: [spec, () => claudeOut(specReport({ fiche: 'docs/specs/cache-de-secours-365scores/fiche.yaml' }))], fiche: [() => major(), () => major('R5 : toujours pas sourcée')] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'spec', 'fiche']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/fiche non conforme après 2 revues/);
+    expect(c.lot.outcome).toContain('R5 : toujours pas sourcée');
+  });
+
+  it('les mineurs vont en notes du lot, sans renvoyer à la spec', async () => {
+    const minor = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', fichier: 'x.ts', ligne: 3, texte: 'un test au nom vague' }] }));
+    const h = harness({ lots, script: { spec: [spec], fiche: [minor], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'implement', 'review']);
+    expect(c.lot.proposals.join('\n')).toMatch(/\[mineur fiche\].*un test au nom vague/);
+  });
+});
+
+describe('étape spec back : hypothèses', () => {
+  it('une ligne de note du lot par hypothèse, avec son si_faux, posée par le programme et commitée', async () => {
+    const h = harness({ lots, script: { spec: [spec], fiche: [ok], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    const notes = h.plan().lot('L1').notes.map((n) => n.text);
+    expect(notes.some((t) => /^Hypothèses \(fiche cache-de-secours-365scores\) — R3 : .*cacheAgeSeconds/.test(t))).toBe(true);
+    expect(c.lot.hypotheses?.[0]).toMatch(/^R3 : /);
+  });
+
+  it('une reprise ne pose pas la note deux fois', async () => {
+    const h = harness({ lots, script: { spec: [spec], fiche: [ok, ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', back, config));
+    const again = h.lot('L1', back, config);
+    again.lot.spec = undefined;
+    again.lot.next = null;
+    again.lot.status = 'queued';
+    again.lot.fiche = undefined;
+    await runLot(again);
+    const n = h.plan().lot('L1').notes.filter((x) => x.text.startsWith('Hypothèses (fiche')).length;
+    expect(n).toBe(3); // R3, R5 et R8 de l'exemple, une fois chacune
+  });
+
+  it('un lot à écran garde ses hypothèses pour la Nouveauté : pas de note', async () => {
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { spec: [(call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }))], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', { screen: 'page', visible: true }, { maquette: false }));
+    expect(h.plan().lot('L1').notes.filter((n) => n.text.startsWith('Hypothèses'))).toEqual([]);
+  });
+});
+
+describe('étape spec back : lot mixte', () => {
+  const mixte: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { mixte: true }) }));
+  const mixteLots = [{ title: 'Un écran et son API', screen: 'page' as const }];
+  const over = { screen: 'page' as const, visible: true, specLot: true as const };
+
+  it('spec → revue de fiche → revue de maquette → implement', async () => {
+    const h = harness({ lots: mixteLots, script: { spec: [mixte], fiche: [ok], maquette: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', over, { fiche: true, maquette: true }));
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'maquette', 'implement', 'review']);
+  });
+
+  it('les constats des deux revues partent ensemble à une seule passe 2', async () => {
+    const again: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { mixte: true, fiche: () => undefined }) }));
+    const h = harness({ lots: mixteLots, script: { spec: [mixte, again], fiche: [() => major('R5 : source introuvable'), ok], maquette: [() => major('le message de R12 n’est pas visible'), ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', over, { fiche: true, maquette: true }));
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'maquette', 'spec', 'fiche', 'maquette', 'implement', 'review']);
+    const second = h.calls[3].brief;
+    expect(second).toContain('R5 : source introuvable');
+    expect(second).toContain('le message de R12 n’est pas visible');
+  });
+});
+
+describe('étape spec back : la fiche vue en aval', () => {
+  it('l’implémenteur et la revue de code reçoivent la fiche back (cas, règles, contrats), sans maquette', async () => {
+    const h = harness({ lots, script: { spec: [spec], fiche: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', back, config));
+    const i = h.calls.find((x) => x.kind === 'implement')!.brief;
+    expect(i).toContain('docs/specs/cache-de-secours-365scores/fiche.yaml');
+    expect(i).toMatch(/R1 \[C1, C2, sourcee\]/);
+    expect(i).not.toMatch(/undefined|maquette|mockup/i);
+    const r = h.calls.find((x) => x.kind === 'review')!.brief;
+    expect(r).toMatch(/contract|contrat/i);
+    expect(r).not.toMatch(/undefined|maquette|mockup/i);
+  });
+});
+
+describe('étape spec back : briques', () => {
+  it('findFiche retrouve la fiche d\'un lot back par sujet.lot, et celle d\'un lot mixte par l\'un ou l\'autre', () => {
+    const h = harness({ lots });
+    ecritBack(h.repo);
+    expect(findFiche(h.repo, 'docs/specs', 'L1')).toBe('docs/specs/cache-de-secours-365scores/fiche.yaml');
+    expect(findFiche(h.repo, 'docs/specs', 'L2')).toBeNull();
+  });
+
+  it('checkSpec d\'un lot back : sujet.id hors du dossier, fiche mixte sans sujet pour un lot spec: true', () => {
+    const h = harness({ lots });
+    const ok = ecritBack(h.repo);
+    expect(checkSpec(h.repo, ok, 'L1', { screen: false, back: true })).toEqual([]);
+    expect(checkSpec(h.repo, ok, 'L1', { screen: false, back: true }).length).toBe(0);
+    const screenOnly = ecrit(h.repo);
+    expect(checkSpec(h.repo, screenOnly, 'L1', { screen: false, back: true }).join('\n')).toMatch(/sujet : bloc manquant/);
+    expect(checkSpec(h.repo, screenOnly, 'L1', { screen: true, back: true }).join('\n')).toMatch(/sujet : bloc manquant/);
+    expect(checkSpec(h.repo, screenOnly, 'L1')).toEqual([]);
+  });
+
+  it('hypothesisLines : une ligne par hypothèse, R + énoncé + si faux', () => {
+    const lines = hypothesisLines(ficheBack());
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toMatch(/^R3 : .*cacheAgeSeconds.* ; si faux : /);
+    expect(hypothesisLines(null)).toEqual([]);
+  });
+
+  it('un lot à étape spec back reçoit l\'allocation de l\'étape dans son budget', () => {
+    expect(lotBudget(1, true)).toBe(lotBudget(1) + SPEC_STAGE_ALLOCATION);
+  });
+});

@@ -232,6 +232,8 @@ export interface OrchestrateConfig {
   precheck: boolean;
   /** Revue UX de la maquette (L172, spec etape-spec S4) entre spec et accept ; `maquette: false` la saute (défaut : vrai). */
   maquette: boolean;
+  /** Revue de la fiche back (L188, spec etape-spec-back B3) entre spec et accept par `code-reviewer` en mode fiche ; `fiche: false` la saute (défaut : vrai). */
+  fiche: boolean;
   /** `precheck: local` (L146) : le contrôle préalable part sur `claude-local` (Ollama de Big-Blue) ; Sonnet reste le repli. */
   precheckLocal: boolean;
   /**
@@ -260,18 +262,18 @@ export interface OrchestrateConfig {
 
 const EFFORTS = ['default', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = (typeof EFFORTS)[number];
-export const EFFORT_STEPS = ['precheck', 'spec', 'maquette', 'accept', 'implement', 'fix', 'review', 'ux'] as const;
+export const EFFORT_STEPS = ['precheck', 'spec', 'maquette', 'fiche', 'accept', 'implement', 'fix', 'review', 'ux'] as const;
 export type EffortStep = (typeof EFFORT_STEPS)[number];
 
 const MODELS = ['haiku', 'sonnet', 'opus'] as const;
 export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'ux', 'precheck', 'prodAccess', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'fiche', 'ux', 'precheck', 'prodAccess', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, maquette: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', accept: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, maquette: true, fiche: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -299,6 +301,10 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   if (o.maquette != null) {
     if (typeof o.maquette !== 'boolean') throw bad('maquette : true ou false attendu');
     config.maquette = o.maquette;
+  }
+  if (o.fiche != null) {
+    if (typeof o.fiche !== 'boolean') throw bad('fiche : true ou false attendu');
+    config.fiche = o.fiche;
   }
   if (o.precheck != null) {
     if (typeof o.precheck !== 'boolean' && o.precheck !== 'local') throw bad('precheck : true, false ou local attendu');
@@ -339,7 +345,7 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     }
   }
   if (o.effort != null) {
-    if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, spec, maquette, accept, implement, fix, review, ux }');
+    if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, spec, maquette, fiche, accept, implement, fix, review, ux }');
     for (const [k, v] of Object.entries(o.effort)) {
       if (!(EFFORT_STEPS as readonly string[]).includes(k)) throw bad(`effort.${k} inconnu (attendu : ${EFFORT_STEPS.join(', ')})`);
       if (!EFFORTS.includes(v as Effort)) throw bad(`effort.${k} : ${EFFORTS.join(', ')} attendu`);

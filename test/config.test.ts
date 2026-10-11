@@ -397,6 +397,14 @@ describe('orchestrate.precheck: local (L146)', () => {
     writeFileSync(join(dir, 'cadence.yaml'), yaml);
     return readOrchestrateConfig(join(dir, 'cadence.yaml'));
   };
+  it('orchestrate.fiche (L188) : vrai par défaut, un booléen seulement, effort.fiche accepté', () => {
+    expect(read('orchestrate: {}\n').fiche).toBe(true);
+    expect(read('orchestrate:\n  fiche: false\n').fiche).toBe(false);
+    expect(() => read('orchestrate:\n  fiche: oui\n')).toThrow(/fiche : true ou false attendu/);
+    expect(read('orchestrate:\n  effort:\n    fiche: low\n').effort.fiche).toBe('low');
+    expect(read('orchestrate: {}\n').effort.fiche).toBe('medium');
+  });
+
   it('défaut : contrôle sur Sonnet, pas local', () => {
     expect(read('orchestrate: {}\n')).toMatchObject({ precheck: true, precheckLocal: false });
   });

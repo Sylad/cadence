@@ -9,7 +9,7 @@ import { sandboxEnv } from './sandbox.js';
 import { killMarked, SESSION_MARK_VAR, TreeTracker } from '../proc.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
-export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette';
+export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche';
 export type Model = 'sonnet' | 'opus' | 'haiku';
 /** Modèle d'une étape : celui de Claude, ou `local` (claude-local → Ollama, L146). */
 export type StepModel = Model | 'local';

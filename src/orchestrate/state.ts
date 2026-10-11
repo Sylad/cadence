@@ -79,6 +79,8 @@ export interface LotState {
   small: boolean;
   /** Seuil de l'étape spec (clé de lot `screen:`, L169) : le lot passe par `spec` avant `implement`. Absent : chemin actuel. */
   screen?: Screen;
+  /** Seuil de l'étape spec back (clé de lot `spec: true`, L188) : le lot passe par `spec` avant `implement`, sans écran. Absent : pas d'étape spec back (un lot à `screen:` a l'étape sans ce drapeau). */
+  specLot?: true;
   /** Issue de l'étape spec : la fiche écrite (et le nombre de ses hypothèses), ou la raison d'une sortie sous le seuil. */
   spec?: { fiche: string; hypotheses: number } | { sousSeuil: string };
   /** Issue de l'étape accept (L173) : l'acceptation.json du lot (chemin relatif au dépôt) et le commit rouge scellé par le programme, rangé ici et dans git, jamais dans le fichier. */
@@ -87,6 +89,12 @@ export interface LotState {
   maquette?: { passes: number; conforme: boolean; verdict: string };
   /** Constats bloquants et majeurs de la revue de maquette, rendus à la seconde passe `spec` (une seule). */
   maquetteConstats?: Constat[];
+  /** Revue de la fiche back (L188) : nombre de revues jouées (2 au plus), la dernière conforme ou non, son verdict. */
+  fiche?: { passes: number; conforme: boolean; verdict: string };
+  /** Constats bloquants et majeurs de la revue de fiche, rendus à la seconde passe `spec` (une seule, avec ceux de la maquette d'un lot mixte). */
+  ficheConstats?: Constat[];
+  /** Hypothèses de la fiche d'un lot sans écran, une ligne chacune (`R3 : … ; sinon …`) : posées en note du lot, reprises par le tableau de fin de vague (L188). */
+  hypotheses?: string[];
   /** Écarts de l'étape accept relevés par le programme, rendus à la seconde passe `accept` (une seule). */
   acceptProblems?: string[];
   /** Écarts de la spec relevés par le programme, rendus à la seconde passe `spec` (une seule). */
@@ -154,6 +162,7 @@ export interface NewLot {
   visible: boolean;
   small: boolean;
   screen?: Screen;
+  specLot?: true;
   model: Model;
   readOnlyPlan: boolean;
 }

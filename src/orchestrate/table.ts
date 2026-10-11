@@ -123,6 +123,7 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
     if (l.uxCaptures) out.push(`${l.project}:${l.lot} — captures Playwright : ${l.uxCaptures}`);
     for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);
     for (const x of l.choix ?? []) out.push(`${l.project}:${l.lot} — choix fait : ${x}`);
+    for (const h of l.hypotheses ?? []) out.push(`${l.project}:${l.lot} — hypothèse de la fiche : ${h}`);
     for (const p of l.proposals) out.push(`${l.project}:${l.lot} — proposé : ${p}`);
     if (l.uxVerdict && l.visible) out.push(`${l.project}:${l.lot} — verdict UX pour « raf ux » : ${l.uxVerdict}`);
   }

@@ -50,7 +50,7 @@ export const reviewReport = (over: Record<string, unknown> = {}) => ({
 export interface Call {
   args: string[];
   opts: LaunchOpts;
-  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette';
+  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche';
   model: string;
   effort?: string;
   brief: string;
@@ -75,6 +75,7 @@ export function kindOf(args: string[]): Call['kind'] {
   if (agent === 'ux-reviewer') return brief.includes('UX review of the mockup') ? 'maquette' : 'ux';
   if (agent === 'spec-writer') return 'spec';
   if (agent === 'acceptance-writer') return 'accept';
+  if (agent === 'code-reviewer' && brief.includes('Sheet review of lot')) return 'fiche';
   if (agent === 'code-reviewer') return brief.includes('single pass') || brief.includes('short re-review') ? 'review-small' : 'review';
   return brief.includes('found the defects below') || brief.includes('found only minor findings') ? 'fix' : 'implement';
 }
@@ -103,12 +104,12 @@ export interface Harness {
  * Dépôt jetable avec un plan, lots donnés ; le lanceur est un scénario : `script[kind]` est la file des
  * réponses de chaque type d'étape. Rien ne lance le vrai claude.
  */
-export function harness(opts: { lots?: { title: string; visible?: boolean; screen?: 'page' | 'component' | 'journey'; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number; templatesDir?: string } = {}): Harness {
+export function harness(opts: { lots?: { title: string; visible?: boolean; screen?: 'page' | 'component' | 'journey'; spec?: boolean; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number; templatesDir?: string } = {}): Harness {
   const repo = gitRepo();
   const planFile = join(repo, 'docs/plan/raf.yaml');
   const plan = Plan.create(planFile, 'demo', 'L', '2026-09-01');
   for (const l of opts.lots ?? [{ title: 'Un lot' }]) {
-    const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible || !!l.screen, screen: l.screen, quickwin: l.quickwin });
+    const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible || !!l.screen, screen: l.screen, spec: l.spec, quickwin: l.quickwin });
     if (l.status === 'doing') plan.setStatus(id, 'doing', '2026-10-01');
   }
   plan.save();

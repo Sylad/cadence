@@ -20,9 +20,10 @@ import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
 import { acceptationFile, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, redSha, sealAcceptation, setVert } from './accept.js';
-import { avalFicheText, ficheRules } from './aval.js';
+import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
+import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
-import { answeredText, checkSpec, costlyHypotheses, ficheReady, findFiche, specText } from './spec.js';
+import { answeredText, checkSpec, costlyHypotheses, ficheReady, findFiche, hypothesisLines, hypothesisNote, specText, type FicheParts } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 
@@ -251,7 +252,8 @@ function docsText(c: LotCtx): string {
 }
 
 /** Gabarit d'une étape : la passe des mineurs et la revue courte qui la suit ont chacune le leur. */
-function briefName(l: LotState, kind: StepKind): BriefName {
+export function briefName(l: LotState, kind: StepKind): BriefName {
+  if (l.specLot && !l.screen && (kind === 'spec' || kind === 'accept')) return `${kind}-back`;
   if (kind === 'fix' && l.minorFix) return 'fix-minors';
   if (kind === 'review-small' && l.minorPass && !(l.small && l.visible)) return 'review-recheck';
   return kind;
@@ -265,6 +267,21 @@ function ficheTemplate(): string | undefined {
     return undefined;
   }
 }
+
+/** Gabarit de la partie back de la fiche (L187), joint au brief de la spec d'un lot `spec: true`. */
+function ficheBackTemplate(): string | undefined {
+  try {
+    return readFileSync(join(TEMPLATES_DIR, '..', 'fiche-back.yaml'), 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+/** Le lot passe par l'étape spec : il déclare `screen:` (écran) ou `spec: true` (comportement sans écran, L188). */
+const hasSpecStage = (l: LotState): boolean => !!(l.screen || l.specLot);
+
+/** Les parties que la fiche du lot doit écrire : l'écran d'un lot à `screen:`, le sujet d'un lot à `spec: true` (les deux : un lot mixte). */
+const partsOf = (l: LotState): FicheParts => ({ screen: !!l.screen, back: !!l.specLot });
 
 /** Gabarit du lanceur de tests livré avec le paquet, joint au brief de l'étape accept. */
 function acceptRunner(): string | undefined {
@@ -291,17 +308,22 @@ function avalOf(c: LotCtx, kind: StepKind): string {
   const fiche = step ? ficheOf(c) : null;
   if (!step || !fiche) return '';
   let rules: string[];
+  let contracts: string[];
+  let screen: boolean;
   try {
-    rules = ficheRules(parse(readFileSync(join(l.repo, fiche), 'utf8')));
+    const doc = parse(readFileSync(join(l.repo, fiche), 'utf8'));
+    rules = ficheRules(doc);
+    contracts = ficheContracts(doc);
+    screen = hasScreenPart(doc);
   } catch {
     return '';
   }
-  if (!rules.length) return '';
+  if (!rules.length || (step === 'ux' && !screen)) return '';
   const acceptation = l.accept?.acceptation ?? findAcceptation(l.repo, c.config.spec.dir, l.lot) ?? undefined;
-  const o = { fiche, rules, acceptation, rouge: l.accept?.rouge };
+  const o = { fiche, rules, acceptation, rouge: l.accept?.rouge, contracts, screen };
   const text = avalFicheText(step, o);
   // la revue courte d'un petit lot visible est sa seule passe : elle porte aussi la conformité à la maquette
-  return kind === 'review-small' && l.small && l.visible ? `${text}\n${avalFicheText('ux', o)}` : text;
+  return kind === 'review-small' && l.small && l.visible && screen ? `${text}\n${avalFicheText('ux', o)}` : text;
 }
 
 function briefFor(c: LotCtx, kind: StepKind): string {
@@ -314,12 +336,26 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     vars.news = newsText(l.lot, pwDir);
     vars.captures = capturesText(pwDir);
   }
-  vars.fiche = l.screen ? avalOf(c, kind) : '';
+  vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';
   if (kind === 'spec') {
-    vars.spec = specText({ dir: c.config.spec.dir, render: c.config.spec.render, screen: l.screen, problems: l.specProblems, review: l.maquetteConstats?.length ? reviewedText(l.maquetteConstats) : undefined, template: ficheTemplate() });
+    const reviewed = [...(l.ficheConstats ?? []), ...(l.maquetteConstats ?? [])];
+    vars.spec = specText({
+      dir: c.config.spec.dir,
+      render: c.config.spec.render,
+      screen: l.screen,
+      back: !!l.specLot,
+      problems: l.specProblems,
+      review: !reviewed.length ? undefined : l.specLot ? reviewedSheetText(reviewed, !!l.screen) : reviewedText(reviewed),
+      template: l.screen ? ficheTemplate() : undefined,
+      templateBack: l.specLot ? ficheBackTemplate() : undefined,
+    });
     const mine = lotCommitLines(c);
     if (mine) vars.commits = `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}`;
     if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer) : `Answer from the human to your earlier question: ${l.pendingAnswer}`;
+  }
+  if (kind === 'fiche') {
+    vars.fiche = ficheReviewText({ fiche: ficheOf(c) ?? '', passes: l.fiche?.passes ?? 0, previous: l.ficheConstats });
+    vars.reponse = '';
   }
   if (kind === 'maquette') {
     vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, previous: l.maquetteConstats });
@@ -328,7 +364,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   if (kind === 'accept') {
     const fiche = ficheOf(c) ?? '';
     const folder = posix.dirname(fiche);
-    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, acceptation: acceptationFile(fiche, l.lot), command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(), problems: l.acceptProblems });
+    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: !!(l.screen && l.specLot), acceptation: acceptationFile(fiche, l.lot), command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(), problems: l.acceptProblems });
     vars.objectif = ''; // l'oracle est écrit depuis la fiche et la maquette seules, pas depuis le texte du lot
     vars.commits = '';
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
@@ -421,7 +457,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est jouée dès que le code est à relire (sauf tests rouges après une écriture, cf. REVIEW_RESERVE), la passe fix réserve son coût.
   if (write && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
-  const model: StepModel = kind === 'spec' || kind === 'accept' ? 'sonnet' : write ? l.model : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
+  const model: StepModel = kind === 'spec' || kind === 'accept' || kind === 'fiche' ? 'sonnet' : write ? l.model : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
   const before = await snapshot(l.repo);
   const neighbours = l.repos ?? [];
@@ -430,7 +466,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   const sessionId = randomUUID();
   const step: StepState = { n, kind, model, ...(effort !== 'default' ? { effort } : {}), status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
   l.steps.push(step);
-  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing', spec: 'implementing', accept: 'implementing', maquette: 'reviewing' } as const;
+  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing', spec: 'implementing', accept: 'implementing', maquette: 'reviewing', fiche: 'reviewing' } as const;
   transition(c, label[kind]);
   w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} (${model})`);
 
@@ -665,7 +701,7 @@ function overBudget(c: LotCtx, reserve = false): null {
   const l = c.lot;
   // Une réponse du lead encore en attente n'a pas été consommée : elle ne doit pas se perdre sans qu'on le dise.
   const answer = l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '';
-  const basis = l.screen ? 'estimate et étape spec' : "dérivé de l'estimate";
+  const basis = hasSpecStage(l) ? 'estimate et étape spec' : "dérivé de l'estimate";
   const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (${basis}), il ne reste pas de quoi payer la revue qui suivrait la correction (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, ${basis})`;
   // Tests rouges après une écriture : la passe fix refusée aurait suivi, le lot revient sans revue (L145) — la cause le dit.
   const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
@@ -782,12 +818,12 @@ async function precheck(c: LotCtx): Promise<void> {
   save(c);
 }
 
-/** Première session d'écriture d'un lot : la spec de son écran quand il déclare `screen:` et qu'aucune fiche n'est écrite, sinon l'implémentation. */
+/** Première session d'écriture d'un lot : la spec quand il déclare `screen:` ou `spec: true` et qu'aucune fiche n'est écrite, sinon l'implémentation. */
 function firstWrite(c: LotCtx): StepKind {
   const l = c.lot;
-  if (!l.screen || l.spec) return 'implement';
+  if (!hasSpecStage(l) || l.spec) return 'implement';
   const fiche = findFiche(l.repo, c.config.spec.dir, l.lot);
-  return fiche && ficheReady(l.repo, fiche, l.lot) ? afterSpec(c, fiche) : 'spec';
+  return fiche && ficheReady(l.repo, fiche, l.lot, partsOf(l)) ? afterSpec(c, fiche) : 'spec';
 }
 
 const NO_TEST_ACCEPT = 'étape accept : orchestrate.test absent, rien ne prouve que les tests rouges sont exclus du lanceur de tests et de la CI (vérifier à la main la config du lanceur avant de livrer)';
@@ -799,13 +835,23 @@ const NO_ACCEPT = 'étape accept ignorée : orchestrate.accept absent (commande 
  */
 function afterSpec(c: LotCtx, fiche: string): StepKind {
   const l = c.lot;
-  if (c.config.maquette && !l.maquette?.conforme && !acceptationProof(c, fiche) && !codeAfterFiche(c, fiche)) return 'maquette';
+  // Revue de la fiche back (L188) d'abord, puis celle de la maquette d'un lot mixte ; la même preuve (acceptation scellée, code déjà commité) dispense des deux.
+  if (c.config.fiche && l.specLot && !l.fiche?.conforme && !acceptationProof(c, fiche) && !codeAfterFiche(c, fiche)) return 'fiche';
+  return afterFiche(c, fiche);
+}
+
+/** Étape qui suit une fiche relue : la revue UX de la maquette d'un lot à écran (S4), sinon `afterMaquette`. */
+function afterFiche(c: LotCtx, fiche: string): StepKind {
+  const l = c.lot;
+  if (l.screen && c.config.maquette && !l.maquette?.conforme && !acceptationProof(c, fiche) && !codeAfterFiche(c, fiche)) return 'maquette';
   return afterMaquette(c, fiche);
 }
 
-/** Étape qui suit une maquette relue : les tests d'acceptation rouges (S5) quand le projet déclare sa commande dédiée et qu'aucune acceptation conforme n'est déjà commitée, sinon l'implémentation. */
+/** Étape qui suit une maquette relue (ou une fiche, pour un lot sans écran) : les tests d'acceptation rouges (S5) quand le projet déclare sa commande dédiée et qu'aucune acceptation conforme n'est déjà commitée, sinon l'implémentation. */
 function afterMaquette(c: LotCtx, fiche: string): StepKind {
   const l = c.lot;
+  // Des constats de la revue de fiche attendent la revue de la maquette (lot mixte) : les deux partent ensemble à la seconde passe `spec`.
+  if (l.ficheConstats?.length) return 'spec';
   if (!c.config.accept) {
     if (!l.warnings.includes(NO_ACCEPT)) l.warnings.push(NO_ACCEPT);
     return 'implement';
@@ -922,7 +968,7 @@ async function specStep(c: LotCtx): Promise<void> {
   if (reason) {
     l.spec = { sousSeuil: reason };
     l.specProblems = undefined;
-    l.warnings.push(`étape spec : sous le seuil, aucune maquette — ${reason}`);
+    l.warnings.push(`étape spec : sous le seuil, ${l.screen ? 'aucune maquette' : 'aucune fiche'} — ${reason}`);
     l.next = 'implement';
     save(c);
     return;
@@ -934,7 +980,7 @@ async function specStep(c: LotCtx): Promise<void> {
   const outside = asked === '..' || asked.startsWith('../') || isAbsolute(asked);
   const fiche = outside ? '' : asked || findFiche(l.repo, c.config.spec.dir, l.lot) || '';
   const inDir = fiche === '' || fiche.startsWith(`${c.config.spec.dir.replace(/\/+$/, '')}/`);
-  const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/<écran>/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/<écran>/fiche.yaml)`] : fiche ? checkSpec(l.repo, fiche, l.lot) : [`aucune fiche écrite : ${c.config.spec.dir}/<écran>/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change aucun écran)`];
+  const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/<écran>/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/<écran>/fiche.yaml)`] : fiche ? checkSpec(l.repo, fiche, l.lot, partsOf(l)) : [`aucune fiche écrite : ${c.config.spec.dir}/${l.screen ? '<écran>' : '<sujet>'}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
   if (problems.length) {
     if (l.specProblems) {
       stop(c, 'handed-back', `spec non conforme après 2 passes : ${problems.join(' ; ')}`);
@@ -946,7 +992,7 @@ async function specStep(c: LotCtx): Promise<void> {
     return;
   }
   l.specProblems = undefined; // les contrôles passent : les écarts de la passe précédente sont corrigés
-  const doc = parse(readFileSync(join(l.repo, fiche), 'utf8')) as { regles?: { statut?: unknown }[] };
+  const doc = parse(readFileSync(join(l.repo, fiche), 'utf8')) as { regles?: { statut?: unknown }[]; sujet?: { id?: unknown } };
   // Un choix coûteux à défaire n'est pas une hypothèse : la question remonte au lead, la session reprend avec sa réponse.
   const costly = costlyHypotheses(doc);
   if (costly.length) {
@@ -959,7 +1005,83 @@ async function specStep(c: LotCtx): Promise<void> {
   l.specAsked = undefined;
   l.spec = { fiche, hypotheses: (doc.regles ?? []).filter((r) => r.statut === 'hypothese').length };
   l.specProblems = undefined;
+  // Un lot sans écran n'a pas de Nouveauté : ses hypothèses vont en notes du lot (une par règle) et au tableau de fin de vague (spec etape-spec-back § 7).
+  if (!l.screen) {
+    const handedBack = await noteHypotheses(c, hypothesisLines(doc), typeof doc.sujet?.id === 'string' ? doc.sujet.id : posix.basename(posix.dirname(fiche)));
+    if (handedBack) return;
+  }
   l.next = afterSpec(c, fiche);
+  save(c);
+}
+
+/**
+ * Pose en note du lot une ligne par hypothèse de la fiche (rien de plus que ce que la note dit déjà : une reprise ne duplique pas) et la commite avec le
+ * plan. Un plan tenu par un autre outil (lecture seule) ne reçoit rien : la ligne devient une proposition rendue au lead. Rend vrai quand le lot est rendu.
+ */
+async function noteHypotheses(c: LotCtx, lines: string[], sujet: string): Promise<boolean> {
+  const l = c.lot;
+  l.hypotheses = lines;
+  if (!lines.length) return false;
+  const plan = c.loadPlan();
+  const texts = lines.map((x) => hypothesisNote(sujet, x));
+  if (plan.readonly) {
+    for (const t of texts) propose(c, `[note à poser] ${t}`);
+    return false;
+  }
+  const have = new Set(plan.lot(l.lot).notes.map((n) => n.text));
+  const fresh = texts.filter((t) => !have.has(t));
+  if (!fresh.length) return false;
+  for (const t of fresh) plan.note(l.lot, t, c.wave.today);
+  plan.save();
+  const dirty = await commitPlan(c, `plan: ${l.lot} hypothèses de la fiche ${sujet} notées (orchestrate ${c.wave.id})`);
+  if (dirty) {
+    stop(c, 'handed-back', `notes des hypothèses de la fiche : ${dirty}`);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Étape fiche (L188, spec etape-spec-back B3) : l'agent code-reviewer, en lecture seule, relit la fiche back (sources, contradictions, erreurs
+ * et limites, un test par règle). Un bloquant ou un majeur renvoie à la spec (une seule seconde passe, avec les constats ; pour un lot mixte, avec
+ * ceux de la revue de maquette), puis la fiche est relue ; ce qui reste après la seconde revue est rendu au lead. Les mineurs vont en notes du lot.
+ * Ce verdict n'est pas `raf review` : la revue de code après l'implémentation garde ce rôle.
+ */
+async function ficheStep(c: LotCtx): Promise<void> {
+  const l = c.lot;
+  const fiche = ficheOf(c);
+  if (!fiche) {
+    l.warnings.push('revue de la fiche ignorée : aucune fiche trouvée pour ce lot');
+    l.next = 'implement';
+    save(c);
+    return;
+  }
+  const done = await session(c, 'fiche');
+  if (!done) return;
+  let rep: ReviewReport;
+  try {
+    rep = checkShape<ReviewReport>(done.report, REVIEW_SCHEMA);
+  } catch (e) {
+    badReport(c, done.step, e);
+    return;
+  }
+  const summary = summarize(rep, done.after.head ?? '');
+  const passes = (l.fiche?.passes ?? 0) + 1;
+  l.fiche = { passes, conforme: summary.conforme, verdict: summary.verdict };
+  addProposals(c, rep, 'fiche');
+  const constats = blockingConstats(rep, 'code');
+  if (summary.conforme) {
+    l.ficheConstats = undefined;
+    l.next = afterFiche(c, fiche);
+    save(c);
+    return;
+  }
+  if (passes >= 2) {
+    stop(c, 'handed-back', `fiche non conforme après 2 revues : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
+    return;
+  }
+  l.ficheConstats = constats.length ? constats : [{ source: 'code', gravite: 'majeur', texte: summary.verdict }];
+  l.next = afterFiche(c, fiche);
   save(c);
 }
 
@@ -1511,6 +1633,7 @@ export async function runLot(c: LotCtx): Promise<void> {
       const kind = l.next;
       if (kind === 'precheck') await precheck(c);
       else if (kind === 'spec') await specStep(c);
+      else if (kind === 'fiche') await ficheStep(c);
       else if (kind === 'maquette') await maquetteStep(c);
       else if (kind === 'accept') await acceptStep(c);
       else if (kind === 'implement' || kind === 'fix') await work(c, kind);

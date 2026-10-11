@@ -76,11 +76,14 @@ export function capturesText(captureDir: string): string {
 }
 
 /** Un gabarit : un par étape, plus deux variantes (passe des mineurs, revue courte qui la suit). */
-export type BriefName = StepKind | 'fix-minors' | 'review-recheck';
+export type BriefName = StepKind | 'fix-minors' | 'review-recheck' | 'spec-back' | 'accept-back';
 
 const FILES: Record<BriefName, string> = {
   precheck: 'precheck.md',
   spec: 'spec.md',
+  'spec-back': 'spec-back.md',
+  'accept-back': 'accept-back.md',
+  fiche: 'fiche.md',
   accept: 'accept.md',
   maquette: 'maquette.md',
   implement: 'implement.md',

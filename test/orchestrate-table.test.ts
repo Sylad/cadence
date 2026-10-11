@@ -21,6 +21,13 @@ describe('renderTable : choix et propositions', () => {
     expect(out).toContain('demo:L1 — choix fait : message en français');
   });
 
+  it('les hypothèses de la fiche d\'un lot back sont listées au tableau de fin de vague (L188)', () => {
+    const l = lot();
+    l.status = 'ready';
+    l.hypotheses = ['R3 : champ cacheAgeSeconds ; si faux : seul son nom change'];
+    expect(renderTable(wave, [l])).toContain('demo:L1 — hypothèse de la fiche : R3 : champ cacheAgeSeconds ; si faux : seul son nom change');
+  });
+
   it('sans choix, aucune ligne « choix fait »', () => {
     const l = lot();
     l.status = 'ready';

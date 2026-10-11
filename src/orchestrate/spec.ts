@@ -10,9 +10,9 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const list = (v: unknown): Obj[] => (Array.isArray(v) ? v.filter(isObj) : []);
 
-/** Chemin (relatif au dépôt) de la fiche du lot sous `<dir>/<écran>/fiche.yaml`, ou null : sert à ne pas rejouer une spec déjà écrite. */
+/** Chemin (relatif au dépôt) de la fiche du lot sous `<dir>/<écran ou sujet>/fiche.yaml` (`ecran.lot` ou `sujet.lot`), ou null : sert à ne pas rejouer une spec déjà écrite. */
 export function findFiche(repo: string, dir: string, lot: string): string | null {
-  const hit = fichesDuDossier(repo, dir).find(({ doc }) => isObj(doc.ecran) && doc.ecran.lot === lot);
+  const hit = fichesDuDossier(repo, dir).find(({ doc }) => (isObj(doc.ecran) && doc.ecran.lot === lot) || (isObj(doc.sujet) && doc.sujet.lot === lot));
   return hit ? `${dir}/${hit.name}/fiche.yaml` : null;
 }
 
@@ -48,8 +48,8 @@ export function costlyHypotheses(doc: unknown): { id: string; categorie: string;
 }
 
 /** Une fiche déjà écrite ne dispense de la spec que si elle passe les contrôles du programme et ne porte aucune hypothèse coûteuse. */
-export function ficheReady(repo: string, fiche: string, lot: string): boolean {
-  if (checkSpec(repo, fiche, lot).length) return false;
+export function ficheReady(repo: string, fiche: string, lot: string, parts: FicheParts = { screen: true, back: false }): boolean {
+  if (checkSpec(repo, fiche, lot, parts).length) return false;
   try {
     return costlyHypotheses(parse(readFileSync(join(repo, fiche), 'utf8'))).length === 0;
   } catch {
@@ -76,14 +76,20 @@ function tracked(repo: string, dir: string): Set<string> {
   }
 }
 
+/** Les parties que la fiche du lot doit avoir : `screen` (lot à `screen:`) et `back` (lot à `spec: true`, ou mixte). */
+export interface FicheParts {
+  screen: boolean;
+  back: boolean;
+}
+
 /**
  * Les écarts de la spec écrite par la session, relevés par le programme (vide = acceptée) : la fiche passe `cadence spec check`,
  * elle est celle du lot et de son dossier, la maquette existe avec une section `#etat-<état>` par état et un
  * `data-testid` par champ, et chaque état a sa capture à chaque largeur — le tout commité.
  */
-export function checkSpec(repo: string, fiche: string, lot: string): string[] {
+export function checkSpec(repo: string, fiche: string, lot: string, parts: FicheParts = { screen: true, back: false }): string[] {
   const file = join(repo, fiche);
-  if (!existsSync(file)) return [`${fiche} : fiche absente (écrire docs/specs/<écran>/fiche.yaml et la commiter)`];
+  if (!existsSync(file)) return [`${fiche} : fiche absente (écrire ${fiche.replace(/[^/]+\/fiche\.yaml$/, parts.screen ? '<écran>' : '<sujet>')}/fiche.yaml et la commiter)`];
   let doc: unknown;
   try {
     doc = parse(readFileSync(file, 'utf8'));
@@ -92,9 +98,21 @@ export function checkSpec(repo: string, fiche: string, lot: string): string[] {
   }
   const problems = checkFiche(doc).map((p) => `fiche : ${p}`);
   if (!isObj(doc)) return problems;
+  const folder = fiche.replace(/\/fiche\.yaml$/, '');
+  // un lot back (`spec: true`, avec ou sans écran) écrit la partie sujet : sans elle, ni lot ni dossier ne seraient contrôlés
+  if (parts.back) {
+    if (!isObj(doc.sujet)) {
+      if (!('sujet' in doc) && 'ecran' in doc) problems.push('fiche : sujet : bloc manquant (un lot qui change un comportement écrit la partie sujet, même si la fiche a aussi un écran)');
+    } else {
+      const sujet = doc.sujet;
+      if (typeof sujet.lot === 'string' && sujet.lot !== lot) problems.push(`sujet.lot : « ${sujet.lot} » au lieu de ${lot} (la fiche est celle du lot qui implémente le comportement)`);
+      if (typeof sujet.id === 'string' && !folder.endsWith(`/${sujet.id}`)) problems.push(`sujet.id : « ${sujet.id} » ne correspond pas au dossier ${folder}`);
+      if (!parts.screen && !tracked(repo, folder).has(fiche)) problems.push(`${fiche} : fiche non commité`);
+    }
+  }
+  if (!parts.screen) return problems;
   // un lot à écran écrit la partie écran : sans elle, ni lot, ni dossier, ni maquette, ni captures ne seraient contrôlés
   if (!isObj(doc.ecran)) return [...problems.filter((p) => p !== 'fiche : ecran : bloc manquant'), 'fiche : ecran : bloc manquant (un lot à écran écrit la partie écran, même si la fiche a aussi un sujet)'];
-  const folder = fiche.replace(/\/fiche\.yaml$/, '');
   const ecran = doc.ecran;
   if (typeof ecran.lot === 'string' && ecran.lot !== lot) problems.push(`ecran.lot : « ${ecran.lot} » au lieu de ${lot} (la fiche est celle du lot qui implémente l'écran)`);
   if (typeof ecran.id === 'string' && !folder.endsWith(`/${ecran.id}`)) problems.push(`ecran.id : « ${ecran.id} » ne correspond pas au dossier ${folder}`);
@@ -117,16 +135,46 @@ export function checkSpec(repo: string, fiche: string, lot: string): string[] {
   return problems;
 }
 
+/** Première phrase d'un texte, ramenée à une longueur lisible dans une note. */
+const sentence = (t: string, max = 160): string => {
+  const flat = t.replace(/\s+/g, ' ').trim();
+  const end = flat.search(/[.!?](\s|$)/);
+  const first = end > 0 ? flat.slice(0, end) : flat;
+  return first.length > max ? `${first.slice(0, max - 1).trimEnd()}…` : first;
+};
+
+/** Une ligne par règle `hypothese` de la fiche (`R3 : ce que la règle dit ; si faux : ce qui changerait`), pour la note du lot et le tableau de fin de vague (spec etape-spec-back § 7). */
+export function hypothesisLines(doc: unknown): string[] {
+  if (!isObj(doc)) return [];
+  return list(doc.regles)
+    .filter((r) => r.statut === 'hypothese' && typeof r.id === 'string')
+    .map((r) => `${String(r.id)} : ${sentence(String(r.enonce ?? ''))} ; si faux : ${sentence(String(r.si_faux ?? ''))}`);
+}
+
+/** Texte de la note du lot pour une hypothèse (une note par règle). */
+export const hypothesisNote = (sujet: string, line: string): string => `Hypothèses (fiche ${sujet}) — ${line}`;
+
 /** Consigne propre à l'étape spec dans le brief : dossier, largeurs, commande de rendu, et les écarts de la passe précédente. */
-export function specText(o: { dir: string; render?: string; screen?: string; problems?: string[]; review?: string; template?: string }): string {
-  const lines = [
-    `The lot declares \`screen: ${o.screen ?? 'page'}\`. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
-    `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-vide-1440.png\`).`,
-    o.render
-      ? `The project declares how to render mockups (\`orchestrate.spec.render\`): \`${o.render}\` (from the repository root). Use it; fall back on Playwright only if it cannot run, and say so under "nonVerifie".`
-      : 'No render command is declared (`orchestrate.spec.render`): render with Playwright (open `maquette.html` as a local file, resize to each width, open each `#etat-<état>`).',
-  ];
-  if (o.template) lines.push('', 'Template of the sheet (`templates/fiche.yaml` of cadence; every key and invariant is checked by `cadence spec check`):', '```yaml', o.template.trimEnd(), '```');
+export function specText(o: { dir: string; render?: string; screen?: string; back?: boolean; problems?: string[]; review?: string; template?: string; templateBack?: string }): string {
+  const lines: string[] = [];
+  if (o.screen) {
+    lines.push(
+      `The lot declares \`screen: ${o.screen}\`. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
+      `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-vide-1440.png\`).`,
+      o.render
+        ? `The project declares how to render mockups (\`orchestrate.spec.render\`): \`${o.render}\` (from the repository root). Use it; fall back on Playwright only if it cannot run, and say so under "nonVerifie".`
+        : 'No render command is declared (`orchestrate.spec.render`): render with Playwright (open `maquette.html` as a local file, resize to each width, open each `#etat-<état>`).',
+    );
+  }
+  if (o.back) {
+    lines.push(
+      o.screen
+        ? `The lot also changes a behaviour (\`spec: true\`): the sheet has both parts, \`sujet\`, \`cas\`, \`contrats\`, \`donnees\` next to \`ecran\`, in the same folder (\`sujet.id\` = \`ecran.id\` = the folder name, \`sujet.lot\` = \`ecran.lot\`); the API calls of the screen are listed once in \`contrats\`, and the actions point to them with \`contrat: Ax\`.`
+        : `The lot declares \`spec: true\` (it changes a behaviour, with no screen). The specs of this project live in \`${o.dir}/<sujet>/\` (one folder per subject, \`<sujet>\` = the kebab-case \`sujet.id\` of the sheet); the sheet has no screen part.`,
+    );
+  }
+  if (o.template) lines.push('', 'Template of the screen part of the sheet (`templates/fiche.yaml` of cadence; every key and invariant is checked by `cadence spec check`):', '```yaml', o.template.trimEnd(), '```');
+  if (o.templateBack) lines.push('', 'Template of the back part of the sheet (`templates/fiche-back.yaml` of cadence; every key and invariant is checked by `cadence spec check`):', '```yaml', o.templateBack.trimEnd(), '```');
   if (o.problems?.length) lines.push('', 'The program checked your previous spec and it did not pass; fix exactly these points (one more pass only, then the lot goes back to the lead):', ...o.problems.map((p) => `- ${p}`));
   if (o.review) lines.push('', o.review);
   return lines.join('\n');

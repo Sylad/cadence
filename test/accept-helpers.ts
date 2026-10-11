@@ -6,7 +6,7 @@ import { EXEMPLE } from './spec-helpers.js';
 
 export const DIR = 'docs/specs';
 
-export interface Opts { lot?: string; vert?: boolean; tests?: string; ecran?: string; sansFiche?: boolean }
+export interface Opts { lot?: string; vert?: boolean; tests?: string; ecran?: string; sansFiche?: boolean; exemple?: string }
 
 /** Ce que fait l'agent accept : fiche + fichiers de tests + acceptation.json, dans un seul commit rouge. */
 export function ecritAcceptation(repo: string, o: Opts = {}): { json: string; fiche: string; sha: string; test: string } {
@@ -15,7 +15,7 @@ export function ecritAcceptation(repo: string, o: Opts = {}): { json: string; fi
   const dir = join(repo, DIR, ecran);
   mkdirSync(join(repo, 'test'), { recursive: true });
   mkdirSync(dir, { recursive: true });
-  const fiche = parse(readFileSync(EXEMPLE, 'utf8')) as any;
+  const fiche = parse(readFileSync(o.exemple ?? EXEMPLE, 'utf8')) as any;
   const noms = (fiche.regles as any[]).flatMap((r) => r.tests as string[]);
   const test = `test/${ecran}${lot === 'L1' ? '' : `.${lot}`}.acceptation.test.ts`;
   writeFileSync(join(repo, test), o.tests ?? noms.map((n) => `it('${n}', () => { throw new Error('rouge'); });`).join('\n'));

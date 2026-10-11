@@ -249,6 +249,36 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
       expect(lockViolations(repo, DIR, vague2, { lotBase: premier, lot: 'L10', lotStart: head }).join('\n')).toContain(a.test);
     });
 
+    it("bilan nul sur le lot (L184) après une évolution admise : l'exemption seule retire l'écart (la référence est lotBase, pas le commit rouge)", () => {
+      const { repo, a } = livre();
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L8): R7 révisée', a.test, a.fiche);
+      const debut = git(repo, 'rev-parse', 'HEAD');
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\nit('ajout', () => {});\n");
+      commitPaths(repo, 'feat(L9): ajout', a.test);
+      const premier = git(repo, 'rev-parse', 'HEAD');
+      git(repo, 'checkout', '-q', debut, '--', a.test);
+      commitPaths(repo, 'fix(L9): retire son ajout', a.test);
+      const vague2 = git(repo, 'rev-parse', 'HEAD');
+      expect(lockViolations(repo, DIR, vague2, { lotBase: premier, lot: 'L10', lotStart: debut })).toEqual([]);
+      expect(lockViolations(repo, DIR, vague2, { lotBase: premier, lot: 'L10' }).join('\n')).toContain(a.test);
+    });
+
+    it("bilan nul sur le lot (L184) : la fiche changée depuis la tête de départ du lot (évolution admise d'un autre lot) ôte l'exemption — revenir à l'ancien contenu annule cette évolution", () => {
+      const { repo, a, head } = livre();
+      writeFileSync(join(repo, 'x.txt'), '1\n');
+      commitPaths(repo, 'feat(L2): travail', 'x.txt');
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L9): R7 révisée', a.test, a.fiche);
+      const base = git(repo, 'rev-parse', 'HEAD');
+      git(repo, 'checkout', '-q', head, '--', a.test);
+      commitPaths(repo, 'fix(L2): remet le test', a.test);
+      const fin = git(repo, 'rev-parse', 'HEAD');
+      expect(lockViolations(repo, DIR, fin, { lotBase: base, lot: 'L2', lotStart: head }).join('\n')).toContain(a.test);
+    });
+
     it("lotStartHead (L184) : le parent du plus ancien commit de travail, quel que soit l'ordre ; undefined sans commit ou pour un commit racine", () => {
       const { repo, head } = livre();
       writeFileSync(join(repo, 'x.txt'), '1\n');

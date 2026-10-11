@@ -208,7 +208,7 @@ function ficheChanged(repo: string, since: string, fiche: string, cites: string[
  * Une fois livrée, une acceptation n'est plus comparée à son commit rouge (une évolution admise l'a dépassé et rien ne le rescelle) mais à `lotBase` :
  * un test changé avant ce point l'a été par un lot qui avait la fiche pour lui, et ses empreintes scellées ne valent plus.
  * Une seule exemption en plus (L184) : un fichier listé dont le contenu est identique à celui qu'il avait à `lotStart` (la tête d'avant le premier commit de
- * travail du lot, `lotStartHead`) n'est pas un écart : le bilan est nul sur le lot, qui a retiré son propre ajout (une reprise dans une nouvelle vague part d'un état déjà modifié). Un fichier absent à `lotStart` ou supprimé depuis n'a pas de contenu : jamais exempté. Le filtre vaut pour toutes les acceptations, `vert: false` comprises.
+ * travail du lot, `lotStartHead`) n'est pas un écart : le bilan est nul sur le lot, qui a retiré son propre ajout (une reprise dans une nouvelle vague part d'un état déjà modifié). Un fichier absent à `lotStart` ou supprimé depuis n'a pas de contenu : jamais exempté ; la fiche changée depuis `lotStart` (évolution admise d'un autre lot) ôte l'exemption. Le filtre vaut pour toutes les acceptations, `vert: false` comprises.
  */
 export function lockViolations(repo: string, dir: string, headBefore: string, opts: { skip?: string; rouge?: Record<string, string>; lotBase?: string; lotStart?: string; lotCommits?: string[]; lot?: string } = {}): string[] {
   const out: string[] = [];
@@ -259,8 +259,10 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     const lot = typeof base.lot === 'string' ? base.lot : '?';
     const emp = isObj(base.empreintes) ? base.empreintes : {};
     // Bilan nul sur le lot (L184) : contenu identique à celui d'avant le premier commit de travail du lot (un fichier absent à cette tête n'est jamais exempté).
+    // Une fiche changée depuis cette tête (évolution admise d'un autre lot) ôte l'exemption : revenir à l'ancien contenu annulerait cette évolution, pas l'ajout du lot.
+    const ficheMoved = typeof base.fiche === 'string' && opts.lotStart !== undefined && (!gitOk(repo, 'diff', '--quiet', opts.lotStart, '--', base.fiche));
     const unchangedByLot = (norm: string): boolean => {
-      if (!opts.lotStart) return false;
+      if (!opts.lotStart || ficheMoved) return false;
       const was = gitOk(repo, 'cat-file', '-e', `${opts.lotStart}:${norm}`) ? git(repo, 'rev-parse', `${opts.lotStart}:${norm}`).trim() : null;
       const now = existsSync(join(repo, norm)) ? git(repo, 'hash-object', '--', norm).trim() : null;
       return was !== null && was === now; // absent n'a pas de contenu : un fichier supprimé, ou créé par le lot (commit rouge), n'est jamais un bilan nul

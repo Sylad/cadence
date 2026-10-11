@@ -2071,6 +2071,16 @@ lots:
     notes:
       - { date: 2026-10-11, text: "Clos 11-10 (vague 2026-10-11-1145, conforme). Mineurs en note : « ni » n'est pas une négation (« pas de suppression ni de paiement » lève encore la question) ; « sans » retire le mot suivant même quand l'absence est le risque." }
     finished: 2026-10-11
+  - id: L181
+    title: "Étape spec : le brief demande de vérifier chaque date d'exemple de la maquette (jour de la semaine calculé, pas écrit de tête) et la revue de maquette classe une erreur de donnée d'exemple en mineur, pas en majeur — essai L175 : lot rendu après 2 revues sur « Mer. 03/09 » (un jeudi)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-11
+  - id: L182
+    title: "README, étape accept : la commande orchestrate.accept lancée hors vague échoue (CADENCE_ACCEPTATION exigée par acceptationOnly) — dire comment la lancer à la main (CADENCE_ACCEPTATION=<chemin de l'acceptation> <commande>) et que les tests verts rejoignent le lanceur ordinaire — essai L175"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

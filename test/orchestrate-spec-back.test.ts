@@ -364,7 +364,7 @@ describe('étape spec back : briques', () => {
   });
 
   it('un lot à étape spec back reçoit l\'allocation de l\'étape dans son budget', () => {
-    expect(lotBudget(1, true)).toBe(lotBudget(1) + SPEC_STAGE_ALLOCATION);
+    expect(lotBudget(1, 'spec')).toBe(lotBudget(1) + SPEC_STAGE_ALLOCATION);
   });
 });
 

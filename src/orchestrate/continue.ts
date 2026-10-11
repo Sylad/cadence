@@ -84,7 +84,7 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
       continue;
     }
     for (const lot of ready) {
-      if (o.exclude.has(`${project}:${lot.id}`) || decisionPending(lot) || lotBudget(lot.estimate, !!(lot.screen || lot.spec)) > o.remaining) continue;
+      if (o.exclude.has(`${project}:${lot.id}`) || decisionPending(lot) || lotBudget(lot.estimate, lot.screen ? 'screen' : lot.spec ? 'spec' : undefined) > o.remaining) continue;
       out.push({ project, dir, lot });
     }
   }

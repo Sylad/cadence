@@ -1055,7 +1055,7 @@ the first implementation: `precheck → spec → maquette → accept → impleme
 
 A lot that changes a behaviour but has no screen (`raf add … --spec`, or `raf spec <id> on`, see [raf](#raf); L188, design: [docs/superpowers/specs/2026-10-11-etape-spec-back-design.md](docs/superpowers/specs/2026-10-11-etape-spec-back-design.md)) is specified **before** it is coded, on a sheet, like a screen:
 `precheck → spec → fiche → accept → implement → review` (`fiche` unless `orchestrate.fiche: false`; `accept` only when the project declares `orchestrate.accept`). A lot with neither `screen:` nor `spec: true` keeps its path. `--dry-run` lists
-`spec (sonnet)`, `fiche (sonnet)` and `accept (sonnet)` with their command lines and briefs `templates/orchestrate/spec-back.md`, `fiche.md` and `accept-back.md`; the lot's budget gets the same 350 k allocation as a lot with a screen (measured on screens: the back chain has not been measured yet).
+`spec (sonnet)`, `fiche (sonnet)` and `accept (sonnet)` with their command lines and briefs `templates/orchestrate/spec-back.md`, `fiche.md` and `accept-back.md`; the lot's budget gets a 350 k allocation on top of its estimate-derived budget (the worst case measured on a screen lot's steps: the back chain has not been measured yet).
 
 - **The spec session**: Sonnet, the `spec-writer` agent, no Playwright. It reads the lot, the project's CLAUDE.md and the code and tests of the modules the lot touches (a rule already coded is a source, cited `file:line`), then writes only
   `<orchestrate.spec.dir>/<sujet>/fiche.yaml` in the format of [`templates/fiche-back.yaml`](templates/fiche-back.yaml) (`sujet`, `cas`, `regles`, `contrats`, `donnees`; no mockup, no capture, no state) and commits it with a message that cites the lot.
@@ -1289,8 +1289,8 @@ upstream ref and `git ls-remote` are compared with the "before", and a read-only
 `CADENCE_ORCHESTRATED` is set.
 
 **Budget**: the wave counts input + cache writes + output tokens (default 2 M); cache reads are kept and
-shown apart. Each lot also has its own budget derived from its estimate (400 k tokens per day, floor 450 k — a write pass, its review, one fix pass and the short review after it —, plus 350 k for a lot with `screen:`: its spec, mockup (≤ 2 passes) and accept sessions, measured on the journals at 202 k to 349 k; shown by
-`--dry-run`, which gives both parts): it bounds the *writing* passes, never the reviews. A lot that spent it gets no further implementation or
+shown apart. Each lot also has its own budget, the 90th percentile of the *total* measured per lot on `.cadence/runs` (all the waves a lot went through, 250 lots) for its category (L194): an ordinary lot of up to 0.5 day gets 450 k (floor: a write pass, its review, one fix pass and the short review after it; measured p90 374 k), 0.5 to 1 day 750 k (p90 732 k), then 570 k per day of estimate (p90 1.14 M for 2 days); a lot with `screen:` gets 1.3 M whatever its estimate (p90 1.28 M: spec, mockup, accept, conformity UX and passes), or its ordinary budget plus 350 k beyond that; a lot with `spec: true` gets its ordinary budget plus 350 k (no such lot measured yet); shown by
+`--dry-run` with its basis): it bounds the *writing* passes, never the reviews. A lot that spent it gets no further implementation or
 fix and is handed back to the lead, but its review (and UX review) is played first; a fix pass starts only if
 the remaining budget can also pay the review that follows it (65 k tokens reserved: a fixed amount close to the 90th
 percentile of the full reviews, 62.7 k over 187 reviews; the short review after the minors pass has a higher p90, 67.6 k

@@ -2009,6 +2009,8 @@ lots:
     after: [ L172, L173 ]
     created: 2026-10-10
     started: 2026-10-11
+    notes:
+      - { date: 2026-10-11, text: "Rendu par la vague 2026-10-11-1035 (revue non conforme après 2 passes, 607 k). À corriger dans la reprise : (1) MAJEUR README.md:293 « The Markdown is deliberately small… » ne cite pas les titres #…###### que renderMarkdown rend depuis 0b3d02b (un niveau plus bas, coupent paragraphe et liste) — compléter la liste et ajouter une ligne au CHANGELOG ; (2) renderMarkdown (news.ts:296) : une hypothèse sur deux lignes (format spec §8, continuation indentée) sort en <p> à tirets bruts — accepter les lignes de continuation, test ; (3) README.md:39 : l'ancre #…-conformity-hypotheses ne mène pas au titre « … Hypothèses » (le slug GitHub garde le è) ; mineurs : news.ts:203 id de règle non échappé dans la RegExp (fiche id « R1( » fait planter news check), ficheHypotheses (spec.ts:167) duplique findFiche (orchestrate/spec.ts:14), test orchestrate-aval.test.ts:139 monté sur un état refusé par raf check (screen sans visible)." }
   - id: L175
     title: Essai étape spec sur un écran d'app loisir (spec etape-spec, S7)
     status: todo
@@ -2036,6 +2038,11 @@ lots:
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant — orchestré (vague 2026-10-11-1035, 0 passe(s) de correction)", commit: a1ef8b1dc8b237a211601ee905e214dac7f59fa6 }
+  - id: L179
+    title: "Verrou d'acceptation (accept.ts:213) : emp[f] lu avec le chemin brut de base.fichiers alors que sealAcceptation range les empreintes sous le chemin normalisé — un chemin ./test/x.ts n'est jamais comparé (want undefined) ; chercher emp[norm], test"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

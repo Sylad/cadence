@@ -136,11 +136,11 @@ describe('cycle : un lot avec fiche', () => {
     expect(b.indexOf('rule → test → green')).toBeLessThan(b.indexOf('not the full audit'));
   });
 
-  it('un petit lot sans écran : la revue ne porte pas la conformité UX', async () => {
+  it('un petit lot sans écran (ni fiche) : la revue garde ses consignes d\'avant, sans règle → test → vert ni conformité UX', async () => {
     const h = harness({ lots, script: { implement: [impl], review: [ok] } });
     ecrit(h.repo);
-    await runLot(h.lot('L1', { visible: false, screen: 'page' as const, small: true }, {}));
-    expect(brief(h, 'review')).toContain('rule → test → green');
+    await runLot(h.lot('L1', { visible: false, small: true }, {}));
+    expect(brief(h, 'review')).not.toContain('rule → test → green');
     expect(brief(h, 'review')).not.toContain('not the full audit');
   });
 

@@ -15,7 +15,7 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const texte = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 
-const APPEL_BACK = /^((GET|POST|PUT|PATCH|DELETE) \/\S*|job \S+|commande \S+)$/;
+const APPEL_BACK = /^((GET|POST|PUT|PATCH|DELETE) \/\S*|job \S+|commande \S+( \S+)*)$/;
 const CODE_ERREUR = /^(HTTP \d{3}|log (debug|log|warn|error))$/;
 const MODIFICATIONS = ['aucune', 'ajout', 'changement'];
 

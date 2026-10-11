@@ -163,6 +163,12 @@ describe('cadence spec check : la fiche back (L187)', () => {
     f.contrats[2].appel = 'job nettoyage';
     f.contrats[3].appel = 'commande purge-cache';
     expect(checkFiche(f).join('\n')).not.toMatch(/appel/);
+    f.contrats[3].appel = 'commande raf spec';
+    expect(checkFiche(f).join('\n')).not.toMatch(/appel/);
+    f.contrats[3].appel = 'commande cadence spec check';
+    expect(checkFiche(f).join('\n')).not.toMatch(/appel/);
+    f.contrats[3].appel = 'commande ';
+    expect(checkFiche(f).join('\n')).toMatch(/A4 : appel/);
   });
 
   it('numérote les contrats A1… sans trou', () => {

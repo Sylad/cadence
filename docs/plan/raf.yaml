@@ -2135,12 +2135,13 @@ lots:
     finished: 2026-10-11
   - id: L187
     title: "Format de la fiche back : cadence spec check (sujet, cas, règles, contrats, données), gabarit, exemple testé (spec etape-spec-back, B2)"
-    status: doing
+    status: done
     estimate: 1
     after: [ L186 ]
     created: 2026-10-11
     started: 2026-10-11
     review: { date: 2026-10-11, verdict: "compliant after 2 fixes — orchestré (vague 2026-10-11-1935, 2 passe(s) de correction)", commit: 6704c0e5ab272dfade940b83a6e7b481a2ea1254 }
+    finished: 2026-10-11
   - id: L188
     title: "Étape spec back d'orchestrate : gabarit spec back, code-reviewer en mode fiche, chaîne precheck→spec→revue de fiche→accept (spec etape-spec-back, B3)"
     status: todo
@@ -2158,6 +2159,16 @@ lots:
     status: todo
     estimate: 0.5
     after: [ L189 ]
+    created: 2026-10-11
+  - id: L191
+    title: "Budget d'un lot à étape spec : lotBudget (src/orchestrate/command.ts:73) ne compte que l'estimate, pas les sessions spec, maquette (≤ 2 passes) et accept — ol L25 rendu au lead le 11-10 à 503 k / 450 k avant sa passe fix (spec+maquette+accept ≈ 200 k) ; ajouter une allocation mesurée sur les journaux (L113, L25) pour un lot screen: ou spec:, montrée par --dry-run, test"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-11
+  - id: L192
+    title: "cadence spec check, suites de la revue L187 : niveaux de log des piles du parc refusés par CODE_ERREUR (warning, info, critical, fatal, verbose) ; fiche back seule — règle avec etat reçoit deux écarts contradictoires (rattachee = ecranPart && aUnEtat), actions/etats/champs acceptés sans ecran (A1 en double avec un contrat) ; fiche mixte — action qui répète l'appel d'un contrat sans contrat: acceptée ; tests des branches non couvertes (hors_perimetre, forme A, id manquant, objet attendu)"
+    status: todo
+    estimate: 0.5
     created: 2026-10-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

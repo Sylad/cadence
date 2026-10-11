@@ -1,0 +1,75 @@
+# Gabarit de fiche back (lot sans écran, étape spec back d'orchestrate, L187). Copier dans docs/specs/<sujet>/fiche.yaml,
+# remplacer les valeurs, puis `cadence spec check docs/specs/<sujet>/fiche.yaml`.
+# Chaque clé et les invariants vérifiés sont décrits dans la section « spec » du README de cadence.
+# Un lot qui a aussi un écran (screen:) ajoute à ce fichier la partie écran du gabarit templates/fiche.yaml
+# (ecran, etats, champs, actions) : sujet.id et ecran.id sont alors le nom du dossier.
+sujet:
+  id: mon-sujet                # kebab-case ; nom du dossier docs/specs/<id>/
+  titre: Mon sujet
+  lot: L0                      # le lot d'implémentation
+  perimetre:                   # ce que le lot touche : au moins un module, un endpoint ou un job
+    modules: [backend/src/modules/mon-module]
+    endpoints: ["GET /api/elements"]
+    jobs: []
+    hors_perimetre: ["l'affichage dans le frontend (un lot d'écran à part)"]   # facultatif : ce que le lot ne fait pas
+
+cas:                           # C1, C2… dans l'ordre, sans trou
+  - id: C1
+    titre: Le client lit la liste alors que la source est en panne
+    acteur: un client de l'API
+    declencheur: GET /api/elements     # un appel de contrat, un job ou une commande
+    preconditions:
+      - la source externe ne répond pas
+    nominal:                   # les étapes du cas passant
+      - Le service interroge la source.
+      - L'appel échoue.
+      - Le service renvoie la dernière liste connue et écrit un warning.
+    alternatives:              # { si, alors, regles } : chaque alternative cite au moins une règle
+      - { si: la source répond, alors: la réponse est fraîche, regles: [R2] }
+    resultat: La dernière liste connue au lieu d'une erreur.
+  - id: C2
+    titre: Le planificateur rafraîchit la liste
+    acteur: le planificateur
+    declencheur: job elements-refresh
+    preconditions:
+      - une liste est en cache
+    nominal:
+      - Le job appelle la source.
+      - Le cache est réécrit.
+    alternatives: []
+    sans_alternative: le seul échec du job est celui de C1 (R1) ; il n'a pas d'autre branche   # obligatoire quand alternatives est vide
+    resultat: Le cache porte l'horodatage du dernier succès.
+
+regles:                        # R1, R2… dans l'ordre, sans trou
+  - id: R1
+    cas: [C1, C2]              # une règle back est rattachée à au moins un cas (une règle d'écran à un état : etat)
+    enonce: Quand la source échoue, l'API sert la dernière liste connue au lieu d'une erreur.
+    statut: sourcee            # sourcee : dit d'où elle vient (source) ; hypothese : dit ce qui changerait (si_faux)
+    source: "demande du lot : « servir le dernier cache connu au lieu d'une erreur »"   # une ligne du lot, un fichier:ligne, un contrat existant…
+    tests: ["R1 — source en panne : la dernière liste est servie"]   # chaque test nommé « Rn — … »
+  - id: R2
+    cas: [C1]
+    enonce: Une réponse fraîche ne porte pas le champ ageSecondes.
+    statut: hypothese
+    si_faux: Si le champ doit toujours être présent, seul son contenu change (aucune donnée en jeu).
+    tests: ["R2 — réponse fraîche : ageSecondes absent"]
+
+contrats:                      # A1, A2… dans l'ordre (dans une fiche mixte, communs avec les actions de l'écran)
+  - id: A1
+    appel: GET /api/elements   # VERBE /chemin, job <nom> ou commande <nom>
+    entree: aucune
+    sortie: "la liste, ou une liste vide (HTTP 200)"
+    erreurs:                   # { code, message } : code « HTTP <n> » ou « log <niveau> », message = le texte exact
+      - { code: log warn, message: "Serving cached list: source unavailable" }
+    regles: [R1, R2]
+  - id: A2
+    appel: job elements-refresh
+    entree: "cron 0 */15 * * * *"
+    sortie: "cache réécrit après un succès, inchangé après un échec"
+    erreurs: []
+    sans_erreur: le job ne répond à aucun appelant ; son échec est un warning déjà couvert par A1   # obligatoire quand erreurs est vide
+    regles: [R1]
+
+donnees:                       # D1… : les données touchées ([] si aucune)
+  - { id: D1, objet: "data/elements-cache.json ({ ts, data })", existant: true, modification: aucune, note: "relu en secours, format et écriture inchangés" }
+  # existant: true avec modification: ajout|changement exige  decision: <la réponse du lead à la question ciblée>

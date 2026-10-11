@@ -32,7 +32,7 @@ acceptance tests are written from the sheet, red, by a session other than the im
 implementation gets the sheet, the code review checks rule → test → green, the hypotheses go into the
 lot's news entry, and a human is asked only about a choice that is costly to undo. The design is in
 `docs/superpowers/specs/2026-10-10-etape-spec-design.md` (with an example sheet and the plan of the
-lots that deliver it). Delivered so far: the sheet template `templates/fiche.yaml`, `cadence spec check`
+lots that deliver it). Delivered so far: the sheet templates `templates/fiche.yaml` (screen) and `templates/fiche-back.yaml` (a lot without a screen: `sujet`, `cas`, `regles`, `contrats`, `donnees`), `cadence spec check`
 (the sheet's invariants) and `cadence spec qa` (the screen's `docs/qa/expectations.md` section, derived
 from the sheet), see [spec](#spec) below, and the `spec` step of `orchestrate` itself (the `spec-writer` agent, the
 render at 1440 and 390 px, the commit of the spec), see [The spec step](#the-spec-step-of-a-lot-with-screen) in `orchestrate`; the `accept` step (red acceptance tests and the lock that protects them), see [The accept step](#the-accept-step-red-acceptance-tests-and-their-lock); the UX review of
@@ -651,7 +651,7 @@ The first baseline is in [docs/mesures/corrections-2026-10-10.md](docs/mesures/c
 
 ## spec
 
-`cadence spec check <fiche.yaml>` checks a **screen sheet** (`fiche.yaml`, the machine-readable output of the spec step designed in
+`cadence spec check <fiche.yaml>` checks a **sheet** (`fiche.yaml`, the machine-readable output of the spec step): a **screen sheet** (a lot with `screen:`), a **back-end sheet** (a lot that changes a behaviour without a screen) or a **mixed sheet** with both parts. The screen part is designed in
 [docs/superpowers/specs/2026-10-10-etape-spec-design.md](docs/superpowers/specs/2026-10-10-etape-spec-design.md)). Start from the template
 [`templates/fiche.yaml`](templates/fiche.yaml) (it passes the check as is), a worked example sits next to the design. It prints one
 `✗ …` line per violation and exits **0** when the sheet is valid, **1** with violations, **2** when the file is missing, is not YAML or the usage is wrong. The invariants:
@@ -663,6 +663,18 @@ The first baseline is in [docs/mesures/corrections-2026-10-10.md](docs/mesures/c
 - `masque` (optional, only on a rule of state `vide`) lists the fields the rule makes disappear: every id must be a field of the sheet and none may be one the rule shows in `champs`;
 - `actions[]` are numbered `A1`… in order, their `declencheur` is a field id (or `null` for the page load), their `appel` reads `VERB /path`, and the `regles` they carry exist.
 
+**Back-end sheet** (L187; design: [docs/superpowers/specs/2026-10-11-etape-spec-back-design.md](docs/superpowers/specs/2026-10-11-etape-spec-back-design.md)). Start from [`templates/fiche-back.yaml`](templates/fiche-back.yaml) (it passes the check as is); a worked example, a real lot of ol-companion, sits next to the design. The sheet has `sujet` instead of `ecran` (no `etats`, `champs`, mockup), and the same `regles`. The back-end invariants, one `✗ …` line each:
+
+- `sujet` has `id` (kebab-case, the folder name `docs/specs/<id>/`), `titre`, `lot`, and a `perimetre` with `modules`, `endpoints` and `jobs` (lists of texts, at least one entry in the three) and an optional `hors_perimetre`;
+- `cas[]` are numbered `C1`, `C2`… with no gap, each with `titre`, `acteur`, `declencheur`, `preconditions`, `nominal` (a non-empty list of steps), `resultat`, and `alternatives` — a list of `{ si, alors, regles }`, each citing at least one existing rule — or `alternatives: []` with its reason in `sans_alternative`; every case is cited by at least one rule;
+- a back-end rule has `cas` (at least one existing case id) instead of `etat`, plus the screen rule's `enonce`, `statut` (`sourcee` + `source`, or `hypothese` + `si_faux`) and tests named `Rn — …`; `message`, `champs` and `masque` only make sense on a rule attached to a state;
+- `contrats[]` are numbered `A1`… with no gap, each with an `appel` (`VERB /path`, `job <name>` or `commande <name>`), `entree`, `sortie`, `erreurs` — a list of `{ code, message }` where `code` is `HTTP <n>` or `log debug|log|warn|error` and `message` the exact text — or `erreurs: []` with its reason in `sans_erreur`, and the `regles` it carries exist;
+- `donnees[]` are numbered `D1`…, each with `objet`, `note`, a boolean `existant` and a `modification` (`aucune`, `ajout` or `changement`); an existing object that is modified carries the `decision` of the lead (the answer to the targeted question). The list may be empty (`[]`: the lot touches no data).
+
+**Mixed sheet** (a lot with `screen:` and a back-end part): `sujet` **and** `ecran` side by side, with the same `id` (the folder name) and the same `lot`. A rule is attached to a state (`etat`, a screen rule) or to cases (`cas`), at least one of the two. The `A` ids are shared: the actions of the screen and the `contrats` are numbered `A1…An` with no gap over the whole, and an action that calls an API already listed in `contrats` points to it with `contrat: Ax` instead of repeating its `appel`. A sheet that only has `ecran` stays valid as it is (no migration); `sujet` is required as soon as the lot is back-end or mixed.
+
+`cadence spec check` prints the same summary line for each kind (`N cas, N règles (N hypothèses), N contrats, N données` for a back-end sheet) and keeps its exit codes: 0 valid, 1 violations, 2 usage.
+
 `cadence spec qa <fiche.yaml>` derives from a valid sheet the section of `docs/qa/expectations.md` for its screen and prints it on the standard output
 (it never writes the file: you paste the section, and the lead commits it like the rest of the plan files). A sheet with violations prints them on the
 error output, nothing on the standard one, and exits 1. The derivation is built so that the planned empty and error states are never reported as defects:
@@ -673,6 +685,8 @@ error output, nothing on the standard one, and exits 1. The derivation is built 
 - `never:` — the messages of the rules of state `erreur`, on one line; the message of a rule of state `vide` is a planned display and never goes there;
 - `api:` — the load actions only (`declencheur: null`) in `GET` (the QA pass never sends a POST); the line ends with `may be empty when <the rule's statement>` when a `sourcee` rule of state `vide` carries the action.
   Actions triggered by a field stay with the acceptance tests.
+
+`spec qa` only derives the **screen** part: a back-end sheet, which has no `ecran`, is refused (exit 2, « la fiche n'a pas de partie écran »); on a mixed sheet it reads the actions' calls through their `contrat`.
 
 
 ## deliver
@@ -1616,7 +1630,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 - The **`cadence-hud` band**: its segments, colours and layout; it is versioned on its own.
 - The **wave journals** under `.cadence/runs` and the files `cadence orchestrate` keeps there.
 - The wording of the briefs and of the instructions inside the skills and the agents.
-- The **format of the screen sheet** (`fiche.yaml`, `templates/fiche.yaml`) and so the invariants `cadence spec check` enforces: experimental while the next bricks of the spec step (S3–S6) still reshape it, a sheet that passes today may be refused by a later release. The `spec` commands and their exit codes are guaranteed, the keys they read are not yet.
+- The **format of the sheets** (`fiche.yaml`: the screen sheet `templates/fiche.yaml`, the back-end sheet `templates/fiche-back.yaml`, the mixed sheet) and so the invariants `cadence spec check` enforces: experimental while the next bricks of the spec step (S3–S6) still reshape it, a sheet that passes today may be refused by a later release. The `spec` commands and their exit codes are guaranteed, the keys they read are not yet.
 
 There is no schema version and no migration: a file written by an earlier release keeps working, and a key a
 release adds is optional.

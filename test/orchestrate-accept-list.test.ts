@@ -180,6 +180,23 @@ describe('liste de lanceurs : le cycle', () => {
     const lines = readFileSync(log, 'utf8').trim().split('\n');
     expect(new Set(lines)).toEqual(new Set(['root=.']));
   });
+
+  it('une liste d’un seul lanceur lance sous sa racine (pas comme une chaîne) : CADENCE_ACCEPTATION_ROOT vaut « frontend », un fichier hors de ce dossier est orphelin', async () => {
+    const h = prepared({ accept: [accept([])], implement: [flag('done.flag')], review: [ok] });
+    const log = join(tempDir(), 'root1.log');
+    const c = h.lot('L1', screen, { accept: [`cd frontend && echo "root=$CADENCE_ACCEPTATION_ROOT" >> ${log}; test -f ../done.flag`], test: 'true' });
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(vert(h)).toBe(true);
+    expect(new Set(readFileSync(log, 'utf8').trim().split('\n'))).toEqual(new Set(['root=frontend']));
+  });
+
+  it('une liste d’un seul lanceur : un fichier listé hors de sa racine est un écart (une chaîne seule le laisserait passer)', async () => {
+    const h = prepared({ accept: [accept(), accept()] });
+    const c = h.lot('L1', screen, { accept: [front('done.flag')], test: 'true' });
+    await runLot(c);
+    expect(h.calls[1].brief).toMatch(/sous la racine d'aucune commande de orchestrate\.accept.*backend\/b\.test\.ts/s);
+  });
 });
 
 describe('liste de lanceurs : brief et cycle décident par la même fonction', () => {

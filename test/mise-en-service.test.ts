@@ -166,4 +166,25 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(() => checkLotsDone(dir, next, old)).not.toThrow();
     expect(first).toBeTruthy();
   });
+
+  it('refuse aussi les commits de sous-tâches (fix(L2/t1), listes, « fix: L2/t1 ») d\'un lot non rendu', () => {
+    for (const [n, subject] of [['a', 'fix(L2/t1): correction non revue'], ['b', 'fix(L1/t1, L2/t2,t3): liste'], ['c', 'fix: L2/t1 sans portée'], ['d', 'chore(L1,L2): plusieurs lots']]) {
+      const { dir } = workRepo({ L1: 'done', L2: 'doing' });
+      writeFileSync(join(dir, `${n}.txt`), n);
+      const sha = commitAll(dir, subject, `${n}.txt`);
+      const { root, binDir } = places();
+      expect(() => mettreEnService({ repo: dir, rev: sha, root, binDir, install }), subject).toThrow(/L2 \(doing\)/);
+    }
+  });
+
+  it('une installation interrompue (dossier resté sans marqueur) est refaite à la relance, jamais mise en service telle quelle', () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    // interruption simulée : le worktree existe, l'installation n'a pas fini (ni node_modules ni dist)
+    git(dir, 'worktree', 'add', '--detach', join(root, 'releases', first.slice(0, 12)), first);
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    expect(existsSync(join(root, 'service', 'dist', 'cli.js'))).toBe(true);
+    expect(existsSync(join(root, 'service', 'node_modules'))).toBe(true);
+    expect(execFileSync(join(binDir, 'cadence'), ['--version'], { encoding: 'utf8' }).trim()).toMatch(/^\d+/);
+  });
 });

@@ -6,7 +6,7 @@
 // <bin-dir>/raf et <bin-dir>/cadence : liens vers <root>/service/bin/*.js.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +21,9 @@ const gitOk = (repo, ...args) => {
     return false;
   }
 };
+
+/** Posé à la fin d'une installation réussie : sans lui, le dossier de la version n'est pas servi. */
+const COMPLETE = '.mise-en-service-ok';
 
 export const defaultRoot = () => join(homedir(), '.local', 'share', 'cadence');
 export const defaultBinDir = () => join(homedir(), '.local', 'bin');
@@ -67,8 +70,12 @@ export function checkLotsDone(repo, sha, served) {
   const open = new Set();
   for (const subject of git(repo, 'log', '--format=%s', ...range).split('\n')) {
     if (/^plan:/.test(subject)) continue;
-    const m = /^[a-z]+\((L\d+)\)/.exec(subject);
-    if (m && status.get(m[1]) !== 'done') open.add(`${m[1]} (${status.get(m[1]) ?? 'absent du plan'})`);
+    // la portée « type(L1, L2/t3): » décide seule ; sans portée citant un lot, tout le sujet est lu (« fix: L3/t1 »)
+    const scope = /^[a-z]+\(([^)]*)\)!?:/.exec(subject)?.[1] ?? '';
+    const text = /(?<![\w-])L\d+(?![\w.]*\w)/.test(scope) ? scope : subject;
+    for (const id of text.match(/(?<![\w-])L\d+(?![\w.]*\w)/g) ?? []) {
+      if (status.get(id) !== 'done') open.add(`${id} (${status.get(id) ?? 'absent du plan'})`);
+    }
   }
   if (open.size) {
     throw new Error(`mise en service refusée : lot non accepté au-dessous de ${sha.slice(0, 7)} — ${[...open].join(', ')} (raf done d'abord, après la revue)`);
@@ -96,10 +103,17 @@ export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defa
   const releases = join(root, 'releases');
   const dir = join(releases, sha.slice(0, 12));
   mkdirSync(releases, { recursive: true });
-  if (!existsSync(dir)) {
+  // un dossier sans marqueur est une installation interrompue (Ctrl-C, kill) : on le refait, on ne le sert jamais
+  if (!existsSync(join(dir, COMPLETE))) {
+    if (existsSync(dir)) {
+      gitOk(repo, 'worktree', 'remove', '--force', dir);
+      rmSync(dir, { recursive: true, force: true });
+      gitOk(repo, 'worktree', 'prune');
+    }
     git(repo, 'worktree', 'add', '--detach', dir, sha);
     try {
       install(dir);
+      writeFileSync(join(dir, COMPLETE), `${sha}\n`);
     } catch (e) {
       gitOk(repo, 'worktree', 'remove', '--force', dir);
       throw new Error(`mise en service interrompue, rien n'a changé : ${e instanceof Error ? e.message : e}`);

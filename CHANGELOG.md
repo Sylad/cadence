@@ -40,8 +40,13 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `orchestrate.precheck: local`: the « deliverable already present? » pre-check runs on the local model (`claude-local`, Ollama), off the Anthropic quota | [0.28.0](#0280---2026-10-10) |
 | Stable contract under semantic versioning, README *Stability* section | [1.0.0](#100---2026-10-10) |
 | Spec step of a lot with a screen: screen sheet, reviewed mockup, acceptance tests written before the code (`cadence spec check\|qa`) | [1.1.0](#110---2026-10-11) |
+| Back-end spec step: `spec:` field (`raf add --spec`, `raf spec`), back-end sheet (`cadence spec check`), sheet review before the code, `raf screen` to adopt the spec step on an existing lot | [1.2.0](#120---2026-10-12) |
+| `orchestrate.accept` as a list of runners (front and back), each under its own root | [1.2.0](#120---2026-10-12) |
+| `cadence spec reseal <lot> <test> --reason`: the lead re-seals one acceptance test that contradicts its unchanged sheet | [1.2.0](#120---2026-10-12) |
+| `lead.ux: lead` in the `cadence.yaml` of the lead's folder: the lead forms the UX verdict itself | [1.2.0](#120---2026-10-12) |
+| `cadence lead tour --depth n` and the `depth:` key of the folder's `cadence.yaml` | [1.2.0](#120---2026-10-12) |
 
-## [Unreleased]
+## [1.2.0] - 2026-10-12
 
 ### Fixed
 

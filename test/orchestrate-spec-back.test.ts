@@ -55,7 +55,7 @@ describe('étape spec back : où elle s’insère', () => {
   it('avec orchestrate.accept : spec → fiche → accept → implement, et le brief d’accept n’a pas de maquette', async () => {
     const accept: Handler = (call) => {
       ecritAcceptation(call.opts.cwd, { sansFiche: true, ecran: 'cache-de-secours-365scores', exemple: EXEMPLE_BACK });
-      return claudeOut(acceptReport({}, call.opts.cwd));
+      return claudeOut(acceptReport());
     };
     const h = harness({ lots, script: { spec: [spec], fiche: [ok], accept: [accept], implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }))], review: [ok] } });
     await runLot(h.lot('L1', back, { ...config, accept: 'test -f done.flag', test: 'true' }));
@@ -442,7 +442,7 @@ describe('étape spec : terminaison de la chaîne, tous les chemins', () => {
     const never = () => claudeOut(reviewReport());
     const acceptHandler: Handler = (call) => {
       ecritAcceptation(call.opts.cwd, { sansFiche: k.kind === 'back', ecran: k.kind === 'back' ? 'cache-de-secours-365scores' : undefined, exemple: k.kind === 'back' ? EXEMPLE_BACK : undefined });
-      return claudeOut(acceptReport({}, call.opts.cwd));
+      return claudeOut(acceptReport());
     };
     const verdict = (v: 'ok' | 'major'): Handler => (v === 'ok' ? never : () => major());
     const h = harness({
@@ -574,7 +574,7 @@ describe('étape spec back : reprise d\'un lot dont la fiche est déjà commité
   });
 
   it('une acceptation non scellée ne prouve rien : la fiche est relue', async () => {
-    const h = harness({ lots, script: { fiche: [ok], accept: [(call) => claudeOut(acceptReport({}, call.opts.cwd))], implement: [impl], review: [ok] } });
+    const h = harness({ lots, script: { fiche: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
     ecritBack(h.repo);
     acceptation(h.repo);
     await runLot(h.lot('L1', back, { ...config, accept: 'true', test: 'true' }));

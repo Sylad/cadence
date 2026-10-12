@@ -169,4 +169,15 @@ describe('liste de lanceurs : le cycle', () => {
     expect(c.lot.status).toBe('ready');
     expect(vert(h)).toBe(true);
   });
+
+  it('une chaîne unique qui commence par un cd garde le dépôt pour racine : fichier hors du dossier accepté, CADENCE_ACCEPTATION_ROOT vaut « . »', async () => {
+    const h = prepared({ accept: [accept()], implement: [flag('done.flag')], review: [ok] });
+    const log = join(tempDir(), 'root.log');
+    const c = h.lot('L1', screen, { accept: `cd frontend && echo "root=$CADENCE_ACCEPTATION_ROOT" >> ${log}; test -f ../done.flag`, test: 'true' });
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(vert(h)).toBe(true);
+    const lines = readFileSync(log, 'utf8').trim().split('\n');
+    expect(new Set(lines)).toEqual(new Set(['root=.']));
+  });
 });

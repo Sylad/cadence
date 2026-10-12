@@ -128,6 +128,31 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(first).toBeTruthy();
   });
 
+  it("un lot abandonné (dropped) dont chaque commit est annulé par un git revert sous le sha ne bloque plus (L207)", () => {
+    const { dir } = workRepo({ L1: 'done', L2: 'dropped' });
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    commitAll(dir, 'feat(L2): travail', 'a.txt');
+    git(dir, 'revert', '--no-edit', 'HEAD');
+    const { root, binDir } = places();
+    const r = mettreEnService({ repo: dir, rev: 'HEAD', root, binDir, install });
+    expect(r.sha).toBe(git(dir, 'rev-parse', 'HEAD'));
+  });
+
+  it("un lot abandonné dont un commit n'est pas annulé bloque toujours (L207)", () => {
+    const { dir } = workRepo({ L1: 'done', L2: 'dropped' });
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    commitAll(dir, 'feat(L2): annulé', 'a.txt');
+    git(dir, 'revert', '--no-edit', 'HEAD');
+    writeFileSync(join(dir, 'b.txt'), 'b');
+    commitAll(dir, 'fix(L2): resté', 'b.txt');
+    expect(() => checkLotsDone(dir, 'HEAD', undefined)).toThrow(/L2 \(dropped\)/);
+    // un lot abandonné sans aucun revert bloque aussi
+    const seul = workRepo({ L1: 'done', L3: 'dropped' });
+    writeFileSync(join(seul.dir, 'c.txt'), 'c');
+    commitAll(seul.dir, 'feat(L3): jamais annulé', 'c.txt');
+    expect(() => checkLotsDone(seul.dir, 'HEAD', undefined)).toThrow(/L3 \(dropped\)/);
+  });
+
   it("une installation qui échoue ne change rien : ni service/, ni liens, ni worktree restant", () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();

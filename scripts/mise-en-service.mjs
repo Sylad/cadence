@@ -66,18 +66,33 @@ export function checkAccepted(repo, rev) {
   return sha;
 }
 
-/** Les lots cités par les commits (scope « type(L123): ») entre le sha déjà en service et <sha> doivent être rendus (done). */
+/** Les lots cités par les commits (scope « type(L123): ») entre le sha déjà en service et <sha> doivent être rendus (done) ; un lot abandonné (dropped) passe si chacun de ses commits est annulé par un git revert présent sous <sha>. */
 export function checkLotsDone(repo, sha, served) {
   const status = planStatuses(repo);
   const range = served && gitOk(repo, 'merge-base', '--is-ancestor', served, sha) ? [`${served}..${sha}`] : ['-1', sha];
   const open = new Set();
-  for (const subject of git(repo, 'log', '--format=%s', ...range).split('\n')) {
-    if (/^plan:/.test(subject)) continue;
+  const droppedCommits = new Map(); // lot abandonné -> shas de ses commits
+  const SEP = '\u0001';
+  const log = git(repo, 'log', `--format=%H${SEP}%s`, ...range);
+  for (const line of log.split('\n')) {
+    const [commit, subject] = line.split(SEP);
+    if (!subject || /^plan:/.test(subject)) continue;
     // la portée « type(L1, L2/t3): » décide seule ; sans portée citant un lot, tout le sujet est lu (« fix: L3/t1 »)
     const scope = /^[a-z]+\(([^)]*)\)!?:/.exec(subject)?.[1] ?? '';
     const text = /(?<![\w-])L\d+(?![\w.]*\w)/.test(scope) ? scope : subject;
     for (const id of text.match(/(?<![\w-])L\d+(?![\w.]*\w)/g) ?? []) {
-      if (status.get(id) !== 'done') open.add(`${id} (${status.get(id) ?? 'absent du plan'})`);
+      if (status.get(id) === 'dropped') droppedCommits.set(id, [...(droppedCommits.get(id) ?? []), commit]);
+      else if (status.get(id) !== 'done') open.add(`${id} (${status.get(id) ?? 'absent du plan'})`);
+    }
+  }
+  if (droppedCommits.size) {
+    const reverted = new Set();
+    const bodies = git(repo, 'log', `--format=%B${SEP}`, sha);
+    for (const m of bodies.matchAll(/This reverts commit ([0-9a-f]{40})/g)) reverted.add(m[1]);
+    for (const [id, commits] of droppedCommits) {
+      // un commit « Revert … » est lui-même annulant : seul compte le travail du lot, non annulé
+      const isRevert = (c) => /^Revert "/.test(git(repo, 'log', '-1', '--format=%s', c));
+      if (commits.some((c) => !isRevert(c) && !reverted.has(c))) open.add(`${id} (dropped)`);
     }
   }
   if (open.size) {

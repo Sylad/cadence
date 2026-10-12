@@ -800,8 +800,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     const free = await acquireSlot(home, cap, {
       wave: wave.id,
       pollMs: deps.slotPollMs,
-      onWait: (h, ms) => wctx.log(`en attente d'un créneau de session depuis ${duration(ms)} (${h.length}/${cap} en cours : ${[...new Set(h.map((x) => x.wave))].join(', ')})`),
-      onGot: (ms) => wctx.log(`créneau de session obtenu après ${duration(ms)} d'attente`),
+      onWait: (h, ms) => wctx.log(`${o.lot ? `${o.lot} · ` : ''}en attente d'un créneau de session depuis ${duration(ms)} (${h.length}/${cap} en cours : ${[...new Set(h.map((x) => x.wave))].join(', ')})`),
+      onGot: (ms) => wctx.log(`${o.lot ? `${o.lot} · ` : ''}créneau de session obtenu après ${duration(ms)} d'attente`),
     });
     try {
       return await deps.claude(args, o);

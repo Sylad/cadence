@@ -529,6 +529,7 @@ describe('plafond de sessions simultanées et --status (L71)', () => {
       expect(await done).toBe(0);
       expect(f.calls.length).toBeGreaterThan(0);
       expect(r.out.join('\n')).toMatch(/créneau de session obtenu après \d+ s d'attente/);
+      expect(r.out.join('\n')).toMatch(/\S+:L\d+ · créneau de session obtenu après/); // L206 : l'attente porte son lot, pour l'apparier à deux attentes simultanées
       y();
       expect(liveSlots(home)).toEqual([]); // tous les créneaux de la vague sont rendus
     } finally {

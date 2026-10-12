@@ -31,6 +31,37 @@ describe('parseWaits', () => {
     expect(w.waits.map((x) => [x.day, x.ms])).toEqual([['2026-10-12', 267_000], ['2026-10-13', 30_000]]);
     expect(w.unfinished).toBe(1);
   });
+  it('deux lots d\'une même vague qui attendent en même temps : chaque attente est appariée à son lot, aucune n\'est comptée sans créneau', () => {
+    const t = '2026-10-12T10:00:00.000Z';
+    const j = [
+      `${t} cadence:L1 · en attente d'un créneau de session depuis 0 s (2/2 en cours : a)`,
+      `${t} autre:L9 · en attente d'un créneau de session depuis 0 s (2/2 en cours : a)`,
+      `${t} cadence:L1 · en attente d'un créneau de session depuis 1 min 00 s (2/2 en cours : a)`,
+      `${t} autre:L9 · en attente d'un créneau de session depuis 1 min 00 s (2/2 en cours : a)`,
+      `${t} cadence:L1 · créneau de session obtenu après 1 min 30 s d'attente`,
+      `${t} autre:L9 · créneau de session obtenu après 1 min 31 s d'attente`,
+      '',
+    ].join('\n');
+    const w = parseWaits(j);
+    expect(w.waits.map((x) => x.ms)).toEqual([90_000, 91_000]);
+    expect(w.unfinished).toBe(0);
+  });
+  it('deux attentes simultanées dont une seule aboutit : l\'autre reste sans créneau', () => {
+    const t = '2026-10-12T10:00:00.000Z';
+    const j = [
+      `${t} cadence:L1 · en attente d'un créneau de session depuis 0 s (2/2 en cours : a)`,
+      `${t} autre:L9 · en attente d'un créneau de session depuis 0 s (2/2 en cours : a)`,
+      `${t} cadence:L1 · créneau de session obtenu après 5 s d'attente`,
+      '',
+    ].join('\n');
+    const w = parseWaits(j);
+    expect(w.waits).toHaveLength(1);
+    expect(w.unfinished).toBe(1);
+  });
+  it('un journal sans lot (avant L206 reprise) garde l\'appariement par vague', () => {
+    const j = WAIT('2026-10-12T10:00:00.000Z', '4 s') + `2026-10-12T11:00:00.000Z en attente d'un créneau de session depuis 3 s (2/2 en cours : a)\n`;
+    expect(parseWaits(j).unfinished).toBe(1);
+  });
   it('un journal sans attente : rien', () => {
     expect(parseWaits('2026-10-12T10:00:00.000Z cadence:L1 → implementing\n')).toEqual({ waits: [], unfinished: 0 });
   });

@@ -28,6 +28,8 @@ export interface StepSpec {
   agent?: string;
   cwd: string;
   wave: string;
+  /** Clé du lot (`projet:lot`), pour le journal de l'attente d'un créneau. */
+  lot?: string;
   permissionMode: string;
   addDirs: string[];
   timeoutMs: number;
@@ -99,6 +101,8 @@ export interface LaunchOpts {
   local?: boolean;
   /** Variables retirées de l'environnement hérité (accès à la production, L168). */
   unset?: string[];
+  /** Clé du lot (`projet:lot`) qui lance la session : l'attente d'un créneau s'inscrit au journal sous ce lot. */
+  lot?: string;
 }
 
 /** Le lanceur : injecté dans les tests, `realClaude` en vrai. Jamais `--resume` d'une session de travail, sauf la relance de mise en forme. */
@@ -204,7 +208,7 @@ export async function runSession(
 ): Promise<SessionOutcome> {
   const sandbox = sandboxEnv(!!spec.prodAccess);
   const launch = (args: string[]) =>
-    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...sandbox.set, ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn });
+    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...sandbox.set, ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn, lot: spec.lot });
   const out = await launch(spec.local ? buildLocalArgs(spec, deps.agents) : buildArgs(spec, deps.agents));
   const first = classify(out);
   if (spec.local) return first; // pas de relance de mise en forme : l'appelant se replie sur Sonnet

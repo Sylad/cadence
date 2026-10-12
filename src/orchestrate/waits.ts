@@ -15,28 +15,33 @@ export interface Wait {
   ms: number;
 }
 
-/** Les attentes d'un créneau d'un journal : comptées à l'obtention (« obtenu après … »), au jour de cette ligne ; `unfinished` = attentes commencées sans créneau obtenu. */
+/**
+ * Les attentes d'un créneau d'un journal : comptées à l'obtention (« obtenu après … »), au jour de cette ligne ; `unfinished` = attentes commencées sans créneau obtenu.
+ * Chaque attente est appariée à son lot (« <projet>:<lot> · … ») : deux lots d'une même vague (un par dépôt, runPool) attendent en même temps. Une ligne sans lot (journal d'avant) est celle de la vague entière.
+ */
 export function parseWaits(journal: string): { waits: Wait[]; unfinished: number } {
   const waits: Wait[] = [];
   let unfinished = 0;
-  let open = false;
-  let since = 0; // « depuis » de la dernière ligne d'attente : une ligne dont il recule est celle d'une nouvelle attente
+  const state = new Map<string, { open: boolean; since: number }>(); // « depuis » de la dernière ligne d'attente : une ligne dont il recule est celle d'une nouvelle attente
   for (const line of journal.split('\n')) {
-    const m = /^(\S+) (?:en attente d'un créneau de session depuis (.+?) \(|créneau de session obtenu après (.+?) d'attente)/.exec(line);
+    const m = /^(\S+) (?:(\S+) · )?(?:en attente d'un créneau de session depuis (.+?) \(|créneau de session obtenu après (.+?) d'attente)/.exec(line);
     if (!m) continue;
-    if (m[3] === undefined) {
-      const ms = parseWaitMs(m[2]) ?? 0;
-      if (open && ms < since) unfinished++;
-      open = true;
-      since = ms;
+    const key = m[2] ?? '';
+    let s = state.get(key);
+    if (!s) state.set(key, (s = { open: false, since: 0 }));
+    if (m[4] === undefined) {
+      const ms = parseWaitMs(m[3]) ?? 0;
+      if (s.open && ms < s.since) unfinished++;
+      s.open = true;
+      s.since = ms;
       continue;
     }
-    const ms = parseWaitMs(m[3]);
+    const ms = parseWaitMs(m[4]);
     const at = new Date(m[1]);
     if (ms !== null && !Number.isNaN(at.getTime())) waits.push({ day: toDay(at), ms });
-    open = false;
+    s.open = false;
   }
-  if (open) unfinished++;
+  for (const s of state.values()) if (s.open) unfinished++;
   return { waits, unfinished };
 }
 

@@ -501,6 +501,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       agent: kind === 'spec' ? 'spec-writer' : kind === 'accept' ? 'acceptance-writer' : kind === 'ux' || kind === 'maquette' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
       cwd: l.repo,
       wave: w.id,
+      lot: lotKey(l.project, l.lot),
       permissionMode: c.config.permissionMode,
       prodAccess: c.config.prodAccess,
       addDirs: [...c.config.addDirs, ...(playwright && write ? [playwrightDir(dirname(mcpConfig))] : []), ...neighbourDirs(l)],

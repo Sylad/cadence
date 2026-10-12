@@ -159,16 +159,29 @@ describe('cadence lead tour', () => {
     const { root } = await parent();
     await nested(root);
     expect(await names(root)).toEqual(['alpha', 'beta']);
-    expect(await names(root, '--depth', '2')).toEqual(['alpha', 'beta', 'gamma']);
-    expect((await cad(root, 'lead', 'tour', '--depth=2')).out).toMatch(/^gamma · /m);
+    expect(await names(root, '--depth', '2')).toEqual(['alpha', 'beta', 'groupe/gamma']);
+    expect((await cad(root, 'lead', 'tour', '--depth=2')).out).toMatch(/^groupe\/gamma · /m);
   });
 
   it('la clé depth: du cadence.yaml du dossier fait de même, à côté de priority: ; --depth l\'emporte (L201)', async () => {
     const { root } = await parent();
     await nested(root);
     writeFileSync(join(root, 'cadence.yaml'), 'priority: [gamma]\ndepth: 2\n');
-    expect(await names(root)).toEqual(['gamma', 'alpha', 'beta']);
+    expect(await names(root)).toEqual(['groupe/gamma', 'alpha', 'beta']);
     expect(await names(root, '--depth', '1')).toEqual(['alpha', 'beta']);
+  });
+
+  it('un projet imbriqué est nommé par son chemin relatif : unique malgré des homonymes, et adressable depuis le dossier (revue L201)', async () => {
+    const { root } = await parent();
+    await nested(root);
+    const other = join(root, 'aaa', 'zeta');
+    mkdirSync(other, { recursive: true });
+    for (const a of [['init', '-q', '-b', 'main'], ['config', 'user.email', 't@e.x'], ['config', 'user.name', 'T'], ['config', 'commit.gpgsign', 'false']]) git(other, ...a);
+    await cad(other, 'init', '--project', 'zeta', '--no-hook');
+    git(other, 'add', '.');
+    commit(other, 'chore: plan', '2026-09-20T09:00:00');
+    // hors priorité : l'ordre alphabétique des noms de dossier, pas celui des chemins complets (aaa/zeta ne passe pas devant beta)
+    expect(await names(root, '--depth', '2')).toEqual(['alpha', 'beta', 'groupe/gamma', 'aaa/zeta']);
   });
 
   it.each(['0', '1.5', 'x', '-1'])('--depth %s est refusé (un entier ≥ 1), comme pour session start (L201)', async (d) => {

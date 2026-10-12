@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, join, relative, sep } from 'node:path';
 import { audit, nextUp, planCommits } from './audit.js';
 import { planLoader, readPlanConfig } from './config.js';
 import { diffDays, type Day } from './dates.js';
@@ -113,8 +113,8 @@ export function findProjects(parent: string, depth = 1): string[] {
 }
 
 /** Les faits de `cadence session start` pour un projet, sous forme de données ; lecture seule. */
-export function tourRow(dir: string, today: Day, idle = TOUR_IDLE): TourRow {
-  const row = empty(basename(dir));
+export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basename(dir)): TourRow {
+  const row = empty(name);
   try {
     const root = gitRoot(dir) ?? dir;
     const plan = planLoader(root)();
@@ -169,9 +169,10 @@ export function leadTour(parent: string, today: Day, idle = TOUR_IDLE, depth?: n
   const levels = depth ?? attempt(() => readDepth(parent), 1);
   const dirs = findProjects(parent, levels);
   if (dirs.length === 0 && isProject(parent)) return [...problems, tourRow(parent, today, idle)];
-  const rows = dirs.map((dir) => tourRow(dir, today, idle));
+  // un projet imbriqué est nommé par son chemin depuis le dossier : unique, et adressable par `orchestrate <projet>:<lot>` lancé d'ici ; la priorité et l'ordre alphabétique lisent le nom du dossier, comme orchestrate --continue
+  const rows = dirs.map((dir) => ({ dir, key: basename(dir), row: tourRow(dir, today, idle, relative(parent, dir).split(sep).join('/')) }));
   const priority = attempt(() => readPriority(parent), [] as string[]);
-  const sorted = rows.map((r, i) => ({ r, i })).sort((a, b) => priorityRank(a.r.project, priority) - priorityRank(b.r.project, priority) || a.i - b.i).map((x) => x.r);
+  const sorted = rows.sort((a, b) => priorityRank(a.key, priority) - priorityRank(b.key, priority) || a.key.localeCompare(b.key) || a.row.project.localeCompare(b.row.project)).map((x) => x.row);
   return [...problems, ...sorted];
 }
 

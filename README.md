@@ -625,7 +625,7 @@ a `priority:` that is not a list of names (`priority: ol`, `priority: []`) keeps
 Sub-projects are looked for one level down by default. `--depth n` goes `n` levels down (same meaning as in `cadence session start --all --depth n`:
 a folder that is a project is not entered; an integer ≥ 1, otherwise refused), and the `depth:` key of the folder's `cadence.yaml`, next to `priority:`, sets it once for all
 (`depth: 2`); `--depth` wins over the key, and a `depth:` that is not an integer ≥ 1 adds the same first row `cadence.yaml · ✗ erreur : …` and leaves one level read.
-`cadence-hud` asks the tour from the folder of the session, so it follows the key with no change. A project is named by its folder's name, wherever it sits.
+`cadence-hud` asks the tour from the folder of the session, so it follows the key with no change. A project is named by its folder's name; one found below the first level is named by its path from the folder (`groupe/gamma`), unique and ready for `cadence orchestrate groupe/gamma:L1` run from there, while `priority:` and the alphabetical order read the folder's own name.
 "Created in the last 7 days" means today and the six days before. When the folder has no sub-project but is itself a project, the tour is that project's single line
 (this is what `cadence-hud` asks from a session opened inside a project). The tour is read-only: it changes
 no plan. It exits 0 even when a project is in error — that project's line reads

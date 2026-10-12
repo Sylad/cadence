@@ -231,8 +231,8 @@ export function plannedTests(repo: string, fiche: string): string[] {
   }
 }
 
-/** Une erreur du test lui-même, pas de la fonctionnalité qui manque : variable ou import cassé, syntaxe. */
-const TEST_SIDE = /\b(ReferenceError|SyntaxError)\b|Cannot find module|Failed to resolve import|is not defined/;
+/** Une erreur du test lui-même, pas de la fonctionnalité qui manque : variable cassée, syntaxe. Un import introuvable n'en est pas une : un lot qui crée un module neuf échoue ainsi, et la session accept ne peut pas le créer. */
+const TEST_SIDE = /\b(ReferenceError|SyntaxError)\b|is not defined/;
 /** Un lanceur qui sort en échec parce qu'il n'a trouvé aucun test : un rouge sans test. */
 const NO_TESTS = /no tests? (files? )?found/i;
 

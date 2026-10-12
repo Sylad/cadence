@@ -28,9 +28,15 @@ describe('checkRouges : le contrôle pur', () => {
     expect(p.join('\n')).toMatch(/R2 — b.*autre raison que la fonctionnalité absente/);
   });
 
-  it('un échec qui est une erreur du test lui-même (ReferenceError, SyntaxError, import introuvable) est refusé', () => {
-    for (const echec of ['ReferenceError: lastY is not defined', 'SyntaxError: Unexpected token', "Error: Cannot find module './helpers'"]) {
+  it('un échec qui est une erreur du test lui-même (ReferenceError, SyntaxError) est refusé', () => {
+    for (const echec of ['ReferenceError: lastY is not defined', 'SyntaxError: Unexpected token']) {
       expect(checkRouges([R(PLAN[0], { echec }), R(PLAN[1])], PLAN, []).join('\n'), echec).toContain('R1 — a');
+    }
+  });
+
+  it('un module à créer par le lot (import introuvable) est la fonctionnalité absente : accepté', () => {
+    for (const echec of ["Cannot find module './cache.service' from 'test/cache.spec.ts'", 'Failed to resolve import "./cache.service" from "test/cache.spec.ts"']) {
+      expect(checkRouges(PLAN.map((t) => R(t, { echec })), PLAN, []), echec).toEqual([]);
     }
   });
 

@@ -42,4 +42,9 @@ describe('README, étape accept lancée à la main', () => {
     expect(agent).toContain('"e2e": true')
     expect(agent).toContain('acceptationE2e()')
   })
+
+  it("la règle e2e n'est écrite qu'à un endroit : la section accept, pas l'étape spec", () => {
+    expect(text.match(/End-to-end acceptance \(browser, build required\)/g)).toBeNull()
+    expect(section).toMatch(/must build and start what the browser needs/)
+  })
 })

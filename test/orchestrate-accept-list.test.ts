@@ -45,6 +45,11 @@ describe('liste de lanceurs : commandes et racines', () => {
     expect(planAcceptRuns(['a'], ['frontend/x.test.ts', 'y.test.ts'])).toEqual({ runs: [{ command: 'a', root: '' }], orphans: [] });
   });
 
+  it('une chaîne seule garde le dépôt pour racine, même avec un cd initial (comportement d’avant la liste)', () => {
+    expect(planAcceptRuns(['cd frontend && a'], ['frontend/x.test.ts', 'y.test.ts'], true)).toEqual({ runs: [{ command: 'cd frontend && a', root: '' }], orphans: [] });
+    expect(planAcceptRuns(['cd frontend && a'], ['y.test.ts'])).toEqual({ runs: [], orphans: ['y.test.ts'] });
+  });
+
   it('le brief donne toutes les commandes et leur racine', () => {
     const t = acceptText({ fiche: 'f', maquette: 'm', acceptation: 'a.json', command: ['cd frontend && vt', 'cd backend && jest'] });
     expect(t).toContain('`cd frontend && vt`');

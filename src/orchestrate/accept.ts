@@ -346,9 +346,9 @@ export const underRoot = (file: string, root: string): boolean => {
   return root === '' || f.startsWith(`${root}/`);
 };
 
-/** Lancements d'une liste de commandes pour les fichiers de l'acceptation : une commande sans fichier sous sa racine n'est pas lancée ; un fichier sous aucune racine est un orphelin. */
-export function planAcceptRuns(commands: string[], fichiers: string[]): { runs: { command: string; root: string }[]; orphans: string[] } {
-  const all = commands.map((command) => ({ command, root: acceptRoot(command) }));
+/** Lancements d'une liste de commandes (`single` : la chaîne seule de `orchestrate.accept`, dont la racine reste le dépôt, `cd` ou non, comme avant la liste) pour les fichiers de l'acceptation : une commande sans fichier sous sa racine n'est pas lancée ; un fichier sous aucune racine est un orphelin. */
+export function planAcceptRuns(commands: string[], fichiers: string[], single = false): { runs: { command: string; root: string }[]; orphans: string[] } {
+  const all = commands.map((command) => ({ command, root: single ? '' : acceptRoot(command) }));
   return { runs: all.filter((r) => fichiers.some((f) => underRoot(f, r.root))), orphans: fichiers.filter((f) => !all.some((r) => underRoot(f, r.root))) };
 }
 

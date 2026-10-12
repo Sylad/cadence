@@ -1176,7 +1176,7 @@ interface AcceptRun { command: string; code: number; output: string }
 async function runAccept(c: LotCtx, json: string): Promise<{ runs: AcceptRun[]; orphans: string[] }> {
   const abs = join(c.lot.repo, json);
   const doc = parseAcceptation(readFileSync(abs, 'utf8'));
-  const plan = planAcceptRuns(acceptCommands(c.config.accept), typeof doc === 'string' ? [] : doc.fichiers);
+  const plan = planAcceptRuns(acceptCommands(c.config.accept), typeof doc === 'string' ? [] : doc.fichiers, !Array.isArray(c.config.accept));
   if (plan.orphans.length) return { runs: [], orphans: plan.orphans };
   const runs: AcceptRun[] = [];
   for (const r of plan.runs) runs.push({ command: r.command, ...(await sh(c, r.command.replaceAll('{acceptation}', abs), 30 * 60_000, { CADENCE_ACCEPTATION: abs, CADENCE_ACCEPTATION_ROOT: r.root || '.' })) });

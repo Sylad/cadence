@@ -871,25 +871,33 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
 
   it('(a) Ctrl-C : un enfant en arrière-plan qui ignore SIGINT, son shell mort, est tué au plus tard à l’échéance de la grâce — un seul bump', async () => {
     const logs = tempDir();
-    // `&` dans un sh non interactif : l'enfant ignore SIGINT ; le script, lui, meurt du signal dans `wait`
-    const dir = scriptRepo(logs, `  sh -c "sleep 8; echo bumped >> '${logs}/bumps'" &\n  wait`);
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    // `&` dans un sh non interactif : l'enfant ignore SIGINT ; le script, lui, meurt du signal dans `wait`.
+    // L202 : l'enfant dort 60 s (au-delà du délai du test) et note son pid ; aucune borne de durée n'est mesurée (elle
+    // dépendait de la charge) : cadence ne sort que si l'enfant est tué, et on le constate à son pid, pas à l'horloge.
+    const dir = scriptRepo(logs, `  sh -c "echo \\$\\$ > '${logs}/child'; sleep 60; echo bumped >> '${logs}/bumps'" &\n  wait`);
     const first = startFirst(logs, dir);
     try {
-      expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
+      expect(await until(() => existsSync(join(logs, 'first')) && existsSync(join(logs, 'child')), 15_000)).toBe(true);
       await pause(600); // au moins deux relevés du suivi : l'enfant est connu
-      const t = Date.now();
+      const childPid = Number(readFileSync(join(logs, 'child'), 'utf8').trim());
+      expect(alive(childPid)).toBe(true);
       process.kill(-first.child.pid!, 'SIGINT'); // ce que fait le terminal
-      const end = await first.exited;
-      // L150 : la grâce (2 s) plus la sortie de vite-node, qui s'allonge sous charge ; l'enfant, lui, vit encore ~7 s :
-      // la borne reste très en dessous de sa fin, donc elle prouve toujours « la grâce, pas la fin de l'enfant ».
-      expect(end - t).toBeLessThan(2_000 + 3_000);
+      await first.exited; // sans la mise à mort à l'échéance de la grâce, cadence attendrait l'enfant (60 s) : le test expirerait
+      expect(await until(() => !alive(childPid), 10_000)).toBe(true); // l'enfant est mort, il n'a pas fini son sommeil
       expect(await cad(dir)).toBe(0); // seconde livraison : bumpe tout de suite
-      await pause(6_500); // au-delà du réveil de l'enfant de la première (8 s après son lancement)
       expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
     } finally {
       first.cleanup();
     }
-  }, 30_000);
+  }, 40_000);
 
   it('(b) Ctrl-C : le verrou reste tenu pendant la grâce, même après la sortie du script — une seconde livraison est refusée, un seul bump', async () => {
     const logs = tempDir();

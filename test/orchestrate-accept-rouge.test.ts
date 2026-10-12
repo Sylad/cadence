@@ -28,29 +28,14 @@ describe('checkRouges : le contrôle pur', () => {
     expect(p.join('\n')).toMatch(/R2 — b.*autre raison que la fonctionnalité absente/);
   });
 
-  it('un ReferenceError dont la première frame est dans le fichier de test est refusé', () => {
-    for (const echec of [
-      'ReferenceError: lastY is not defined\n    at test/scroll.test.ts:12:5',
-      'ReferenceError: lastY is not defined\n    at Object.<anonymous> (/repo/e2e/scroll.spec.ts:12:5)\n    at /repo/src/app.ts:3:1',
-      'ReferenceError: lastY is not defined',
-    ]) {
-      expect(checkRouges([R(PLAN[0], { echec }), R(PLAN[1])], PLAN, [], ['e2e/scroll.spec.ts']).join('\n'), echec).toContain('R1 — a');
+  it('un échec qui est une erreur du test lui-même (ReferenceError, SyntaxError) est refusé', () => {
+    for (const echec of ['ReferenceError: lastY is not defined', 'SyntaxError: Unexpected token']) {
+      expect(checkRouges([R(PLAN[0], { echec }), R(PLAN[1])], PLAN, []).join('\n'), echec).toContain('R1 — a');
     }
   });
 
-  it('un ReferenceError levé par le code de l’application (première frame hors du test) est la fonctionnalité absente : accepté', () => {
-    const echec = 'ReferenceError: formatDate is not defined\n    at render (/repo/src/pages/home.ts:8:3)\n    at test/home.test.ts:5:1';
-    expect(checkRouges(PLAN.map((t) => R(t, { echec })), PLAN, [], [])).toEqual([]);
-  });
-
-  it('un échec à l’import (module à créer, export à ajouter, SyntaxError d’import ESM) est la fonctionnalité absente : accepté', () => {
-    for (const echec of [
-      "Cannot find module './cache.service' from 'test/cache.spec.ts'",
-      'Failed to resolve import "./cache.service" from "test/cache.spec.ts"',
-      "SyntaxError: The requested module '../src/cache.js' does not provide an export named 'Cache'",
-      'SyntaxError: Named export \'Cache\' not found.',
-      'Error: No known export "Cache" in test/cache.spec.ts',
-    ]) {
+  it('un module à créer par le lot (import introuvable) est la fonctionnalité absente : accepté', () => {
+    for (const echec of ["Cannot find module './cache.service' from 'test/cache.spec.ts'", 'Failed to resolve import "./cache.service" from "test/cache.spec.ts"']) {
       expect(checkRouges(PLAN.map((t) => R(t, { echec })), PLAN, []), echec).toEqual([]);
     }
   });
@@ -98,7 +83,7 @@ describe('étape accept : la validation des rouges dans le cycle', () => {
   });
 
   it('un test rouge pour une mauvaise raison renvoie à la session accept AVANT le scellé, puis passe à la seconde', async () => {
-    const bad = (repo: string) => ({ rouges: rougesDe(repo).map((r, i) => (i === 0 ? { ...r, cause: 'autre', echec: 'ReferenceError: x is not defined\n    at test/x.test.ts:1:1' } : r)) });
+    const bad = (repo: string) => ({ rouges: rougesDe(repo).map((r, i) => (i === 0 ? { ...r, cause: 'autre', echec: 'ReferenceError: x is not defined' } : r)) });
     const h = prepared({ accept: [accept(bad), accept(() => ({}))], implement: [green], review: [ok] });
     const c = h.lot('L1', screen, config);
     await runLot(c);

@@ -40,4 +40,31 @@ describe('mesure de l\'étape spec (L176, S8)', () => {
     expect(spec).not.toMatch(/La comparaison porte donc sur\s+les trois autres lignes/);
     expect(spec).toMatch(/Limite connue[\s\S]*cible de la 3e ligne/);
   });
+
+  it('compte le coût de l\'étape sans le précontrôle, et la somme des postes retombe sur le total', () => {
+    const note = readFileSync(NOTE, 'utf8');
+    const nombres = (l: string) => l.split('|').slice(2, 4).map((c) => Number(c.replace(/[^\d]/g, '')));
+    const [, specMaquette] = nombres(ligne(note, '| spec + revue de maquette |'));
+    const [, accept] = nombres(ligne(note, '| accept |'));
+    const [, total] = nombres(ligne(note, '| **Étape spec'));
+    expect(ligne(note, '| spec + revue de maquette |')).not.toMatch(/précontrôle/);
+    expect(specMaquette + accept).toBe(total);
+    expect(total).toBe(4569881);
+    expect(note).not.toMatch(/590 000|591 759/);
+  });
+
+  it('présente la décision comme la spec : resserrer le seuil avant d\'abandonner', () => {
+    const note = readFileSync(NOTE, 'utf8');
+    const conclusion = ligne(note, '**Conclusion');
+    expect(conclusion).not.toMatch(/l'abandonner ou la resserrer/);
+    expect(conclusion).toMatch(/resserr/);
+  });
+
+  it('ne compte en ligne 4 que les bloquants UX causés par le lot (L50, L49), les antérieurs sont signalés', () => {
+    const note = readFileSync(NOTE, 'utf8');
+    const l = ligne(note, '| lot qui revient d\'une revue UX');
+    expect(l).toMatch(/2 lots sur 8 \(L50, L49\)/);
+    expect(l).toMatch(/L25, L47/);
+    expect(l).toMatch(/\*\*non atteint\*\*/);
+  });
 });

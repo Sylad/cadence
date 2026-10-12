@@ -2,7 +2,7 @@
 
 Relevé du 2026-10-12 (soir), journaux `.cadence/runs` de `~/projects/developpeur`, vagues jusqu'à 2026-10-12-1955. Critère : [`2026-10-10-etape-spec-design.md`](../superpowers/specs/2026-10-10-etape-spec-design.md), section « Mesure : critère de réussite », contre la référence des **lots visibles** de [`corrections-2026-10-10.md`](corrections-2026-10-10.md). La cible de la 3e ligne (≤ 8 %) a été fixée par le lead avant la mesure.
 
-**Conclusion : le critère n'est atteint sur aucune des quatre lignes, et l'étape coûte plus de tokens qu'elle ne fait économiser de passes (aucune passe évitée). Ces chiffres ne justifient pas de généraliser l'étape ; l'abandonner ou la resserrer est la décision du lead.**
+**Conclusion : le critère n'est atteint sur aucune des quatre lignes, et l'étape coûte plus de tokens qu'elle ne fait économiser de passes (aucune passe évitée). Ces chiffres ne justifient pas de généraliser l'étape ; la spec veut que le seuil (`screen:`) soit resserré avant d'abandonner l'étape : c'est la décision du lead.**
 
 ## Échantillon
 
@@ -16,7 +16,7 @@ Relevé du 2026-10-12 (soir), journaux `.cadence/runs` de `~/projects/developpeu
 | ol L85 | parcours (petit lot) | 3 | 5 | pas de revue UX (revue allégée) |
 | ol L43 | composant | 1 | 3 | non |
 | wh L35 | page | 2 | 5 | non |
-| wh L47 | parcours | 3 | 7 | oui (1re revue de la reprise) |
+| wh L47 | parcours | 3 | 7 | oui (bloquant antérieur au lot : hero tronqué, versé à L62) |
 | wh L49 | parcours | 3 | 4 | oui (3 revues de suite) |
 
 ## Résultats par ligne du tableau
@@ -28,7 +28,7 @@ Méthode de la référence : un lot compte à chaque enregistrement de journal o
 | lots avec au moins 1 correction | 45 % (25 sur 55) | ≤ 30 % | 100 % (8 sur 8) par lot ; 82 % (14 sur 17) par passage | **non atteint** |
 | lots avec au moins 2 corrections | 25 % (14 sur 55) | ≤ 12 % | 88 % (7 sur 8) par lot ; 65 % (11 sur 17) par passage | **non atteint** |
 | passes dues à « spec floue », « règle inventée » ou « test manquant » (part des passes) | 16 % (7 sur 45) | ≤ 8 % | 20 % (6 sur 30) | **non atteint** |
-| lot qui revient d'une revue UX avec un bloquant | non mesuré | aucun | 4 lots sur 8 (L25, L50, L47, L49), 4 sur les 7 qui ont une revue UX | **non atteint** |
+| lot qui revient d'une revue UX avec un bloquant | non mesuré | aucun | 2 lots sur 8 (L50, L49), 2 sur les 7 qui ont une revue UX, pour ce que le lot a causé ; 4 sur 8 (+ L25, L47) si l'on compte les défauts antérieurs au lot, qu'une fiche ne prévient pas | **non atteint** |
 
 ### Passes par cause (30 passes)
 
@@ -51,21 +51,21 @@ Les 5 passes « sans revue » (L43 ×2, L35 ×2, L47 ×1) sont des tests rouges 
 
 ## Coût
 
-Tokens comptés des journaux (entrée, écriture de cache, sortie ; hors lecture de cache), sur toutes les vagues des 8 lots :
+Tokens comptés des journaux (entrée, écriture de cache, sortie ; hors lecture de cache), sur toutes les vagues des 8 lots. Le précontrôle (7 sessions, 164 192 tokens) n'est pas compté : il tourne pour tout lot sans commit, avec ou sans fiche, ce n'est pas un coût de l'étape.
 
 | Poste | Sessions | Tokens | Par lot |
 |---|---|---|---|
-| spec + revue de maquette + précontrôle | 68 | 3 956 379 | 494 547 |
+| spec + revue de maquette | 61 | 3 792 187 | 474 023 |
 | accept | 10 | 777 694 | 97 212 |
-| **Étape spec (spec + maquette + accept)** | 78 | **4 734 073** | **591 759** |
+| **Étape spec (spec + maquette + accept)** | 71 | **4 569 881** | **571 235** |
 | passes de correction | 30 | 1 741 318 | 217 665 (58 044 par passe) |
 
-Passes évitées : **aucune**. Les 8 lots font 3,75 passes en moyenne contre 0,82 (45 sur 55) pour les lots visibles de la référence. Même si l'étape supprimait toutes les passes attendues à ce taux (6,5 passes ≈ 380 000 tokens), elle coûterait plus de 12 fois ce qu'elle ferait économiser. Les 68 sessions de spec et de maquette (8,5 par lot) viennent des vagues rendues au lead après chaque boucle de maquette ; l'étape ne se paie pas qu'une fois.
+Passes évitées : **aucune**. Les 8 lots font 3,75 passes en moyenne contre 0,82 (45 sur 55) pour les lots visibles de la référence. Même si l'étape supprimait toutes les passes attendues à ce taux (6,5 passes ≈ 380 000 tokens), elle coûterait plus de 12 fois ce qu'elle ferait économiser. Les 61 sessions de spec et de maquette (7,6 par lot) viennent des vagues rendues au lead après chaque boucle de maquette ; l'étape ne se paie pas qu'une fois.
 
 ## Verdict
 
 - Sur 8 lots, deux projets, **le critère de réussite n'est atteint sur aucune ligne** ; avec 8 lots le résultat est un verdict (seuil de la spec), non une note.
-- Aucune baisse des corrections ne compense le coût : ni les lots ni les passes n'ont diminué, et l'étape ajoute environ 590 000 tokens par lot.
+- Aucune baisse des corrections ne compense le coût : ni les lots ni les passes n'ont diminué, et l'étape ajoute environ 570 000 tokens par lot.
 - Ce que la fiche apporte reste vrai (états prévus, règles reprises, « règle inventée » rendue visible par la revue), mais cela n'a pas réduit les passes.
 - Conformément à la spec, **le seuil (`screen:`) est à resserrer avant d'abandonner l'étape** : décision du lead. Pistes lues dans les chiffres, non démontrées : les parcours coûtent le plus de passes (4,5 par lot, 18 sur 4 lots) contre 3,0 pour les pages (9 sur 3) ; les 5 passes « sans revue » viennent de tests d'acceptation rouges après l'écriture.
 - Le critère de l'étape back (B1–B5, lots non visibles) est inchangé par cette mesure.

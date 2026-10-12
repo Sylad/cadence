@@ -240,22 +240,13 @@ export function plannedTests(repo: string, fiche: string): string[] {
 const REFERENCE = /\bReferenceError\b|is not defined/;
 const FRAME = /^\s*(?:at\s+|❯\s*)?(?:.*?\()?((?:file:\/\/)?[^\s()]+?):\d+(?::\d+)?\)?\s*$/;
 const TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)(?:tests?|__tests__|e2e)\/)/;
-/** Frame sans fichier propre (code évalué par `page.evaluate` : `<anonymous>`, `eval`), interne à Node ou au lanceur : on passe à la suivante. */
-const INTERNAL = /^(?:<|node:|internal\/)|node_modules\/(?:playwright|@playwright|vitest|jest)/;
-/**
- * L'erreur relevée est un ReferenceError dont la première frame à fichier lisible est dans le test. Le code évalué au navigateur n'a que des frames
- * anonymes : la première frame lisible est alors celle du test. Sans aucune frame lisible (`echec` ne porte que le message), rien n'est classé.
- */
+/** L'erreur relevée est un ReferenceError dont la première frame est dans le test (sans frame lisible : par prudence, le test). */
 export function testSideError(echec: string, fichiers: string[] = []): boolean {
   if (!REFERENCE.test(echec)) return false;
-  const frame = echec.split('\n').slice(1).map((l) => FRAME.exec(l)?.[1]).find((f) => f && !INTERNAL.test(f.replace(/^file:\/\//, '')));
-  if (!frame) return false;
-  const path = posix.normalize(frame.replace(/^file:\/\//, ''));
-  return TEST_FILE.test(path) || fichiers.some((f) => {
-    const own = posix.normalize(f);
-    // Un lanceur sous « cd <dossier> && » donne la frame relative à ce dossier : `acceptance/x.ts` pour `frontend/acceptance/x.ts`.
-    return path === own || path.endsWith(`/${own}`) || own.endsWith(`/${path}`);
-  });
+  const frame = echec.split('\n').slice(1).map((l) => FRAME.exec(l)?.[1]).find(Boolean);
+  if (!frame) return true;
+  const path = frame.replace(/^file:\/\//, '');
+  return TEST_FILE.test(path) || fichiers.some((f) => path.endsWith(f.replace(/^\.\//, '')));
 }
 /** Un lanceur qui sort en échec parce qu'il n'a trouvé aucun test : un rouge sans test. */
 const NO_TESTS = /no tests? (files? )?found/i;

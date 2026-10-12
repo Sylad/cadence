@@ -2186,9 +2186,10 @@ lots:
     finished: 2026-10-11
   - id: L193
     title: "test/orchestrate-pool.test.ts « jamais plus de deux sessions en même temps, jamais deux dans un dépôt » instable sous charge : rouge 1 fois dans la suite complète le 11-10 (re-vérif L191, une vague maritime tournait), vert 3/3 seul — dépendance au minutage à retirer"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-11
+    started: 2026-10-12
   - id: L194
     title: "Recalibrer lotBudget sur les totaux mesurés : un lot screen: coûte ~1,2 M au total (L113 ≈ 1,2 M ; L25 503 k + 776 k ; L50 > 850 k rendu à 800 k) et l'allocation L191 (+350 k, étapes spec seules) ne couvre pas UX de conformité + passes ; un lot de 1 j sans écran dépasse aussi 450 k (L188 483 k puis 495 k) — p90 du total par catégorie (écran / spec / ordinaire, par estimate) sur .cadence/runs, constantes et README mis à jour, --dry-run montre la base"
     status: done

@@ -1204,6 +1204,12 @@ The sessions of the wave also get `.cadence/runs/<wave>/tool/bin` (the `raf` and
 `PATH`**, ahead of the per-project Node below and of the usual `PATH`: the `raf` a reviewer runs (`raf commits`…) is the
 snapshot's, not the installed one. A wave without a snapshot leaves the `PATH` as it is.
 
+**The `dist/` in service (L195)**: on cadence's own repository, `bin/raf.js` and `bin/cadence.js` (the `raf` and `cadence` of your `PATH`) load `dist/`.
+The snapshot protects the wave running, not that installed tool, so `npm run build` no longer writes `dist/`: it only
+type-checks the build (`tsc -p tsconfig.build.json --noEmit`), which is what a session of a wave runs, with the tests, before its report. Code that no one has
+reviewed therefore never goes into service by itself. `npm run build:service` is the only script that writes `dist/` (`prepare` runs it, so
+`npm install` and the publication still produce it): the lead runs it after the review, once the lots are accepted.
+
 ### A lot whose work is in a neighbouring repository
 
 Some lots are done in another repository that is not a cadence project (B64 of `maritime-atlas` lives in

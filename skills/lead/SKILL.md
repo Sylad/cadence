@@ -146,6 +146,8 @@ lot, the chain goes on with the other lots and does not wait for it. A delivery 
 2. **The lead re-verifies itself**: `git log` shows the commits, the test suite and build pass when
    run by the lead, `raf check` is clean. A subagent is green on what it *could* test; say plainly
    what nobody could verify.
+   On the cadence repository itself, `npm run build` only type-checks; the lead puts the reviewed code in
+   service with `npm run build:service` (it rewrites `dist/`, the `raf` of the `PATH`).
 3. Fix or re-delegate what the review found; then record the verdict, `raf review <lot> "…"` with
    the code reviewer's last line brought up to date (and `raf ux <lot> "…"` for a visible lot, with
    the UX reviewer's), then `raf done <lot>`. Where the gate is on (`raf review enable`, the

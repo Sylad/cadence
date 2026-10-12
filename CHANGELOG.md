@@ -45,6 +45,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- On the cadence repository, `npm run build` no longer rewrites `dist/`, the `raf` and `cadence` of the `PATH` (L195): a wave there put unreviewed code in service (after wave 2026-10-11-2130, `--dry-run` already showed L194's budgets and L188's non-compliant code ran). `build` now only type-checks; `npm run build:service` writes `dist/` and is run by the lead after the review (`prepare` runs it, so `npm install` and the publication are unchanged).
 - A read-only plan's `spec:` (often the path of a spec document) no longer fails `raf check` and `session close` with « spec : true ou false attendu », nor makes `cadence orchestrate` take the lot for one with a spec step (L198, regression of L186): the field is read only when `plan.fields.spec` maps it, and then only `true` counts.
 
 ### Changed

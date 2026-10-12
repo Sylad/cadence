@@ -1,0 +1,46 @@
+import { execFileSync } from 'node:child_process';
+import { cpSync, existsSync, readFileSync, symlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, describe, expect, it } from 'vitest';
+import { cleanupTempDirs, tempDir } from './helpers.js';
+
+const REPO = fileURLToPath(new URL('..', import.meta.url));
+afterAll(cleanupTempDirs);
+
+/** Copie du paquet (sources et scripts) : on y lance les scripts npm sans toucher au dist/ en service du dépôt. */
+function copyOfPackage(): string {
+  const dir = tempDir();
+  for (const n of ['src', 'package.json', 'tsconfig.json', 'tsconfig.build.json']) cpSync(join(REPO, n), join(dir, n), { recursive: true });
+  symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), 'dir');
+  return dir;
+}
+
+const npm = (dir: string, script: string) => execFileSync('npm', ['run', '--silent', script], { cwd: dir, encoding: 'utf8', stdio: 'pipe', env: { ...process.env, npm_config_loglevel: 'error' } });
+
+describe('le dist/ en service (L195)', () => {
+  const scripts = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')).scripts as Record<string, string>;
+
+  it('npm run build vérifie la compilation sans écrire dist/ : une session de vague ne met pas du code non revu en service', () => {
+    const dir = copyOfPackage();
+    npm(dir, 'build');
+    expect(existsSync(join(dir, 'dist'))).toBe(false);
+  });
+
+  it('npm run build échoue sur une erreur de type, comme avant', () => {
+    const dir = copyOfPackage();
+    execFileSync('node', ['-e', "require('fs').appendFileSync('src/dates.ts', '\\nexport const casse: number = \"x\";\\n')"], { cwd: dir });
+    expect(() => npm(dir, 'build')).toThrow();
+    expect(existsSync(join(dir, 'dist'))).toBe(false);
+  });
+
+  it('npm run build:service écrit dist/ (la mise en service, faite par le lead après revue)', () => {
+    const dir = copyOfPackage();
+    npm(dir, 'build:service');
+    expect(existsSync(join(dir, 'dist', 'cli.js'))).toBe(true);
+  });
+
+  it('prepare (npm install, publication) construit dist/ : le paquet publié l’embarque', () => {
+    expect(scripts.prepare).toBe('npm run build:service');
+  });
+});

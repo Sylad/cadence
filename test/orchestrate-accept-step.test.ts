@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sealAcceptation, setVert } from '../src/orchestrate/accept.js';
+import { resealAcceptation, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { readAgents } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -318,6 +318,26 @@ describe('verrou et retour au vert pendant implement / fix', () => {
     await runLot(c);
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toMatch(/verrou des tests d'acceptation.*réécrit depuis son commit rouge/);
+  });
+
+  it('un lot en question dont le test a été rescellé par le lead (L200) reprend avec l’ancre déplacée : le verrou ne crie pas à la réécriture', async () => {
+    const ask: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')], questions: ['la regex ?'] }));
+    const h = prepared({ accept: [accept()], implement: [ask, green], review: [ok] });
+    const c = h.lot('L1', screen, config);
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    const ancre = c.lot.accept!.rouge;
+    const a = JSON.parse(readFileSync(join(h.repo, JSON_PATH), 'utf8')).fichiers[0] as string;
+    writeFileSync(join(h.repo, a), `${readFileSync(join(h.repo, a), 'utf8')}// corrigé par le lead\n`);
+    resealAcceptation(h.repo, JSON_PATH, a, 'contredit la fiche', '2026-10-12');
+    git(h.repo, 'add', '--', JSON_PATH, a);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation rescellée', '--', JSON_PATH, a);
+    c.lot.pendingAnswer = 'oui';
+    c.lot.answers.push('oui');
+    await runLot(c);
+    expect(c.lot.outcome ?? '').not.toMatch(/réécrit depuis son commit rouge/);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.accept?.rouge).not.toBe(ancre);
   });
 
   it('le verrou vaut pour les autres lots du dépôt : L2 ne touche pas aux tests de L1, même sans screen: ni orchestrate.accept', async () => {

@@ -2038,6 +2038,7 @@ lots:
     created: 2026-10-10
     notes:
       - { date: 2026-10-10, text: "Revue L166 : comparer à la référence des lots VISIBLES, pas « tous lots » (45 % corrigés contre 65 %) — src/corrections.ts doit sortir les causes par visibilité (byVisibility ne compte que lots et passes)" }
+      - { date: 2026-10-12, text: "Lead 12-10 22 h : les 8 lots avec fiche SONT livrés (L113, L25, L50, L85, L43, L35, L47, L49 — cadence, ol-companion, warhammer40k ; spec.fiche dans les journaux de vague de ~/projects/developpeur/.cadence/runs) → faire MAINTENANT la mesure S8 et écrire la note de conclusion (docs/mesures/, verdict par ligne du tableau, coût tokens spec+maquette+accept à côté des passes évitées). Cible de la 3e ligne fixée par le lead AVANT la mesure : ≤ 8 % (moitié de la référence 16 %, comme la ligne 2) — corriger la spec en conséquence. Le lot n'est fini qu'avec ce verdict." }
     started: 2026-10-12
     review: { date: 2026-10-12, verdict: "Conforme : les 2 constats mineurs sont corrigés. Il reste une note mineure : le seuil ≤ 15 % se compare désormais à une référence de 16 %, et c'est au lead de le revoir avant la mesure S8. — orchestré (vague 2026-10-12-2155, 0 passe(s) de correction + passe des mineurs)", commit: 5b3a88965124a48c1c11262764481215cc1d3a15 }
   - id: L177

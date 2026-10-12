@@ -157,13 +157,29 @@ describe('étape spec back : revue de la fiche, deux passes au plus', () => {
     expect(c.lot.outcome).toContain('R5 : toujours pas sourcée');
   });
 
-  it('les mineurs vont en notes du lot, sans renvoyer à la spec', async () => {
+  it('les mineurs vont en notes du lot, sans renvoyer à la spec ni devenir des propositions du tableau final', async () => {
     const minor = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', fichier: 'x.ts', ligne: 3, texte: 'un test au nom vague' }] }));
     const h = harness({ lots, script: { spec: [spec], fiche: [minor], implement: [impl], review: [ok] } });
     const c = h.lot('L1', back, config);
     await runLot(c);
     expect(kinds(h)).toEqual(['spec', 'fiche', 'implement', 'review']);
-    expect(c.lot.proposals.join('\n')).toMatch(/\[mineur fiche\].*un test au nom vague/);
+    const notes = h.plan().lot('L1').notes.map((n) => n.text).filter((t) => t.startsWith('Revue de la fiche'));
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatch(/mineur.*x\.ts:3.*un test au nom vague/);
+    expect(c.lot.proposals.join('\n')).not.toMatch(/un test au nom vague/);
+  });
+
+  it('un mineur déjà noté n\'est pas noté deux fois (reprise)', async () => {
+    const minor = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', texte: 'nom vague' }] }));
+    const h = harness({ lots, script: { spec: [spec], fiche: [minor, minor], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', back, config));
+    const again = h.lot('L1', back, config);
+    again.lot.spec = undefined;
+    again.lot.next = null;
+    again.lot.status = 'queued';
+    again.lot.fiche = undefined;
+    await runLot(again);
+    expect(h.plan().lot('L1').notes.filter((n) => n.text.startsWith('Revue de la fiche'))).toHaveLength(1);
   });
 });
 

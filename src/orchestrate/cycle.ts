@@ -1070,6 +1070,32 @@ async function noteHypotheses(c: LotCtx, lines: string[], sujet: string): Promis
   return false;
 }
 
+/**
+ * Les mineurs de la revue de la fiche vont en notes du lot (spec etape-spec-back § 4), pas au tableau de fin de vague : une note par constat, sans doublon
+ * à la reprise, commitée avec le plan. Un plan en lecture seule ne reçoit rien : la ligne devient une proposition `[note à poser]` rendue au lead.
+ * Rend vrai quand le lot est rendu (arbre sale).
+ */
+async function noteMinors(c: LotCtx, rep: ReviewReport, label: string): Promise<boolean> {
+  const texts = rep.constats.filter((k) => k.gravite === 'mineur').map((k) => `Revue de ${label} — mineur : ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`);
+  if (!texts.length) return false;
+  const plan = c.loadPlan();
+  if (plan.readonly) {
+    for (const t of texts) propose(c, `[note à poser] ${t}`);
+    return false;
+  }
+  const have = new Set(plan.lot(c.lot.lot).notes.map((n) => n.text));
+  const fresh = [...new Set(texts)].filter((t) => !have.has(t));
+  if (!fresh.length) return false;
+  for (const t of fresh) plan.note(c.lot.lot, t, c.wave.today);
+  plan.save();
+  const dirty = await commitPlan(c, `plan: ${c.lot.lot} mineurs de la revue de ${label} notés (orchestrate ${c.wave.id})`);
+  if (dirty) {
+    stop(c, 'handed-back', `notes des mineurs de la revue de ${label} : ${dirty}`);
+    return true;
+  }
+  return false;
+}
+
 /** Ce qui distingue les deux revues de la spec : la fiche back relue par code-reviewer (L188), la maquette relue par ux-reviewer (L172). */
 interface SpecReview {
   kind: 'fiche' | 'maquette';
@@ -1088,7 +1114,7 @@ const MAQUETTE_REVIEW: SpecReview = { kind: 'maquette', label: 'maquette', sourc
 /**
  * Revue de la spec (fiche ou maquette) : une session de lecture seule. Un bloquant ou un majeur renvoie à la spec (une seule seconde passe, avec
  * les constats ; pour un lot mixte, ceux des deux revues ensemble), puis la spec est relue ; ce qui reste après la seconde revue est rendu au lead.
- * Les mineurs vont en notes du lot. Ce verdict n'est pas `raf review` ni `raf ux` : la revue après code garde ce rôle.
+ * Les mineurs de la fiche vont en notes du lot (ceux de la maquette restent des propositions). Ce verdict n'est pas `raf review` ni `raf ux` : la revue après code garde ce rôle.
  */
 async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
   const l = c.lot;
@@ -1111,7 +1137,9 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
   const summary = summarize(rep, done.after.head ?? '');
   const passes = (l[r.kind]?.passes ?? 0) + 1;
   l[r.kind] = { passes, conforme: summary.conforme, verdict: summary.verdict };
-  addProposals(c, rep, r.kind);
+  // Fiche : les mineurs sont des notes du lot (design § 4). Maquette : inchangé (propositions du tableau final).
+  addProposals(c, rep, r.kind, r.kind !== 'fiche');
+  if (r.kind === 'fiche' && (await noteMinors(c, rep, `la ${r.label}`))) return;
   const constats = blockingConstats(rep, r.source);
   const key = r.kind === 'fiche' ? 'ficheConstats' : 'maquetteConstats';
   if (summary.conforme) {

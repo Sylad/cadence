@@ -2032,12 +2032,13 @@ lots:
     finished: 2026-10-11
   - id: L176
     title: Mesure de l'étape spec contre le lot de mesure, 8 lots avec fiche (spec etape-spec, S8)
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L175 ]
     created: 2026-10-10
     notes:
       - { date: 2026-10-10, text: "Revue L166 : comparer à la référence des lots VISIBLES, pas « tous lots » (45 % corrigés contre 65 %) — src/corrections.ts doit sortir les causes par visibilité (byVisibility ne compte que lots et passes)" }
+    started: 2026-10-12
   - id: L177
     title: "docs/lead.md : schéma du workflow avec les étapes spec, L167 (spec etape-spec, S9)"
     status: done

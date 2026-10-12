@@ -19,4 +19,14 @@ describe('README, étape accept lancée à la main', () => {
   it("dit que les tests verts rejoignent le lanceur ordinaire", () => {
     expect(section).toMatch(/green[^.]*join[^.]*ordinary (runner|test)/)
   })
+
+  it('dit de poser CADENCE_ACCEPTATION_ROOT pour un lanceur d’une liste, sinon la racine est le dépôt', () => {
+    expect(section).toContain('CADENCE_ACCEPTATION_ROOT=<root of the command>')
+    expect(section).toMatch(/list[^.]*CADENCE_ACCEPTATION_ROOT|CADENCE_ACCEPTATION_ROOT[^.]*list/)
+  })
+
+  it('la consigne de la session accept le dit aussi', () => {
+    const agent = readFileSync(new URL('../agents/acceptance-writer.md', import.meta.url), 'utf8')
+    expect(agent).toContain('CADENCE_ACCEPTATION_ROOT')
+  })
 })

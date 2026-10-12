@@ -2289,9 +2289,10 @@ lots:
     started: 2026-10-12
   - id: L205
     title: "Passe de correction de plus quand la revue converge : si le nombre de bloquants+majeurs baisse d'une revue à l'autre et qu'il en reste un seul, une 3e passe au lieu de rendre le lot au lead (vécu 12-10 : L47 rendu deux fois pour une ligne, 6 rendus « non conforme après 2 passes ») ; plafond inchangé sinon ; budget respecté ; README, test"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-12
+    started: 2026-10-12
   - id: L206
     title: "Mesure : attente de créneau des vagues (58 min cumulées le 12-10 avec 2 sessions) — sortir des journaux .cadence/runs le temps d'attente par vague et par jour, le coût d'un 3e créneau (RAM, CPU, quota) sur Big-Blue, et recommander garder 2 ou passer à 3 (décision de Sylvain) ; aucun changement de --max-sessions dans ce lot"
     status: todo

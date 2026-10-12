@@ -2158,10 +2158,11 @@ lots:
     finished: 2026-10-11
   - id: L189
     title: orchestrate.accept en liste de lanceurs, front et back (spec etape-spec-back, B4)
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L188 ]
     created: 2026-10-11
+    started: 2026-10-12
   - id: L190
     title: Mesure de l'étape spec back après 8 lots avec fiche (spec etape-spec-back, B5)
     status: todo

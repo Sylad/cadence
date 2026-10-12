@@ -30,6 +30,22 @@ export function readLeadUx(parent: string): 'lead' | 'human' {
   return ux;
 }
 
+/** Clé `depth:` du cadence.yaml du dossier parent (L201, issue #8), à côté de `priority:` : combien de niveaux `lead tour` parcourt (1 : sous-dossiers directs, le défaut). */
+export function readDepth(parent: string): number {
+  const file = join(parent, 'cadence.yaml');
+  if (!existsSync(file)) return 1;
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const d = (raw as { depth?: unknown } | null)?.depth;
+  if (d == null) return 1;
+  if (typeof d !== 'number' || !Number.isInteger(d) || d < 1) throw new RafError(`${file} : depth doit être un entier ≥ 1`);
+  return d;
+}
+
 export const NOTES_MAX = 120;
 export const TITLE_MAX = 60;
 /** Au-delà de ce nombre de jours sans activité, un lot en cours est dit silencieux. */
@@ -135,22 +151,28 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE): TourRow {
 
 /**
  * Les projets rangés par la clé `priority:` du cadence.yaml du dossier (L149) ; les autres après, par ordre alphabétique.
- * Une priorité illisible ou invalide ne vide pas le tableau : l'ordre alphabétique reste, et une première ligne `cadence.yaml` en erreur le dit.
+ * Une clé `depth:` invalide se signale de même. Une priorité illisible ou invalide ne vide pas le tableau : l'ordre alphabétique reste, et une première ligne `cadence.yaml` en erreur le dit.
  * Un dossier qui n'a aucun sous-projet mais est lui-même un projet donne la ligne de ce projet seul (la bande l'interroge depuis le dossier de la session).
  */
-export function leadTour(parent: string, today: Day, idle = TOUR_IDLE): TourRow[] {
-  const dirs = findProjects(parent);
-  if (dirs.length === 0 && isProject(parent)) return [tourRow(parent, today, idle)];
+export function leadTour(parent: string, today: Day, idle = TOUR_IDLE, depth?: number): TourRow[] {
+  const problems: TourRow[] = [];
+  const attempt = <T>(read: () => T, fallback: T): T => {
+    try {
+      return read();
+    } catch (e) {
+      const error = (e instanceof Error ? e.message : String(e)).split('\n')[0]!;
+      if (!problems.some((p) => p.error === error)) problems.push({ ...empty('cadence.yaml'), error }); // un yaml illisible l'est pour les deux clés : une seule ligne
+      return fallback;
+    }
+  };
+  // --depth l'emporte sur la clé `depth:` ; une clé invalide se signale et laisse un seul niveau
+  const levels = depth ?? attempt(() => readDepth(parent), 1);
+  const dirs = findProjects(parent, levels);
+  if (dirs.length === 0 && isProject(parent)) return [...problems, tourRow(parent, today, idle)];
   const rows = dirs.map((dir) => tourRow(dir, today, idle));
-  let priority: string[] = [];
-  let problem: TourRow | undefined;
-  try {
-    priority = readPriority(parent);
-  } catch (e) {
-    problem = { ...empty('cadence.yaml'), error: (e instanceof Error ? e.message : String(e)).split('\n')[0]! };
-  }
+  const priority = attempt(() => readPriority(parent), [] as string[]);
   const sorted = rows.map((r, i) => ({ r, i })).sort((a, b) => priorityRank(a.r.project, priority) - priorityRank(b.r.project, priority) || a.i - b.i).map((x) => x.r);
-  return problem ? [problem, ...sorted] : sorted;
+  return [...problems, ...sorted];
 }
 
 const DRIFT_SHOWN = 2;

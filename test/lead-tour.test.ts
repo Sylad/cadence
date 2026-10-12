@@ -144,6 +144,54 @@ describe('cadence lead tour', () => {
     expect(rows.map((r) => r.project)).toEqual(['beta', 'alpha']);
   });
 
+  /** Un projet « gamma » à deux niveaux sous la racine (root/groupe/gamma). */
+  async function nested(root: string) {
+    const gamma = join(root, 'groupe', 'gamma');
+    mkdirSync(gamma, { recursive: true });
+    for (const a of [['init', '-q', '-b', 'main'], ['config', 'user.email', 't@e.x'], ['config', 'user.name', 'T'], ['config', 'commit.gpgsign', 'false']]) git(gamma, ...a);
+    await cad(gamma, 'init', '--project', 'gamma', '--no-hook');
+    git(gamma, 'add', '.');
+    commit(gamma, 'chore: plan', '2026-09-20T09:00:00');
+  }
+  const names = async (root: string, ...argv: string[]) => (JSON.parse((await cad(root, 'lead', 'tour', '--json', ...argv)).out) as Array<{ project: string }>).map((r) => r.project);
+
+  it('--depth 2 descend d\'un niveau de plus, comme session start --all ; sans lui, un seul niveau (issue #8, L201)', async () => {
+    const { root } = await parent();
+    await nested(root);
+    expect(await names(root)).toEqual(['alpha', 'beta']);
+    expect(await names(root, '--depth', '2')).toEqual(['alpha', 'beta', 'gamma']);
+    expect((await cad(root, 'lead', 'tour', '--depth=2')).out).toMatch(/^gamma · /m);
+  });
+
+  it('la clé depth: du cadence.yaml du dossier fait de même, à côté de priority: ; --depth l\'emporte (L201)', async () => {
+    const { root } = await parent();
+    await nested(root);
+    writeFileSync(join(root, 'cadence.yaml'), 'priority: [gamma]\ndepth: 2\n');
+    expect(await names(root)).toEqual(['gamma', 'alpha', 'beta']);
+    expect(await names(root, '--depth', '1')).toEqual(['alpha', 'beta']);
+  });
+
+  it.each(['0', '1.5', 'x', '-1'])('--depth %s est refusé (un entier ≥ 1), comme pour session start (L201)', async (d) => {
+    const { root } = await parent();
+    const r = await cad(root, 'lead', 'tour', `--depth=${d}`);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/--depth invalide/);
+    expect(r.out).toBe('');
+  });
+
+  it.each([
+    ['depth: 0\n'],
+    ['depth: deux\n'],
+    ['depth: 1.5\n'],
+  ])('une clé depth: invalide (%j) est signalée sur une ligne « cadence.yaml » en erreur, un seul niveau restant lu (L201)', async (yaml) => {
+    const { root } = await parent();
+    await nested(root);
+    writeFileSync(join(root, 'cadence.yaml'), yaml);
+    const rows = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as Array<{ project: string; error?: string }>;
+    expect(rows.map((r) => r.project)).toEqual(['cadence.yaml', 'alpha', 'beta']);
+    expect(rows[0]!.error).toMatch(/depth doit être un entier ≥ 1/);
+  });
+
   it("les lots « ajoutés cette semaine » sont ceux de moins de 7 jours : 6 jours comptent, 7 non (L149)", async () => {
     const { root, alpha } = await parent();
     const plan = join(alpha, 'docs/plan/raf.yaml');

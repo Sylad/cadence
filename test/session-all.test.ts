@@ -143,7 +143,7 @@ describe('cadence session start|close --all', () => {
   it('--all et --depth sont refusés hors de session, au lieu d\'être ignorés en silence', async () => {
     const root = tempDir();
     await project(join(root, 'alpha'), 'alpha');
-    for (const argv of [['lead', 'tour', '--depth', '2'], ['list', '--all'], ['lead', 'tour', '--all']]) {
+    for (const argv of [['list', '--depth', '2'], ['list', '--all'], ['lead', 'tour', '--all']]) {
       const { code, err } = await cad(root, ...argv);
       expect(code).toBe(2);
       expect(err).toMatch(/ne va qu'avec session/);

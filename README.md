@@ -526,7 +526,7 @@ them without running `session start` again.
 to look for another. `--since` and `--idle` go to every project; an error in one
 project is printed in its section and the others still run. It replaces the shell
 loop over the sub-folders. A project that is not the root of its own git repository gets a `✗` line
-(and exit 2) instead of the parent repository's plan. `--all` and `--depth` are refused outside `session`,
+(and exit 2) instead of the parent repository's plan. `--all` and `--depth` are refused outside `session` (`--depth` is also read by `cadence lead tour`),
 and `--all` refuses `--file`, `--config` and `RAF_FILE`: each project reads its own plan. For a one-line-per-project overview, `cadence lead tour`.
 
 `cadence session next` without a line refuses (exit 2) and leaves the notes of the
@@ -595,7 +595,7 @@ the exit code nor the verdict.
 
 ## lead tour
 
-`cadence lead tour [folder] [--idle 3] [--json]` is the lead's morning table, with no model in
+`cadence lead tour [folder] [--idle 3] [--depth n] [--json]` is the lead's morning table, with no model in
 the loop. From a parent folder (default: the current one) it takes every direct sub-folder that
 holds `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key (a plan kept by another tool
 included), and for each one reads the same facts as `cadence session start` — in-process, no
@@ -622,6 +622,10 @@ the lots done / in progress / to do (dropped and recurring lots left out) and th
 [`cadence-hud`](plugins/cadence-hud/README.md) draws as one progress bar per project. Projects come in the order of the
 `priority:` key of the folder's `cadence.yaml` (the one `orchestrate --continue` reads), the others after, alphabetically; an unreadable `cadence.yaml` or
 a `priority:` that is not a list of names (`priority: ol`, `priority: []`) keeps the alphabetical order and adds a first row `cadence.yaml · ✗ erreur : <cause>` (`project: "cadence.yaml"` with `error` in `--json`).
+Sub-projects are looked for one level down by default. `--depth n` goes `n` levels down (same meaning as in `cadence session start --all --depth n`:
+a folder that is a project is not entered; an integer ≥ 1, otherwise refused), and the `depth:` key of the folder's `cadence.yaml`, next to `priority:`, sets it once for all
+(`depth: 2`); `--depth` wins over the key, and a `depth:` that is not an integer ≥ 1 adds the same first row `cadence.yaml · ✗ erreur : …` and leaves one level read.
+`cadence-hud` asks the tour from the folder of the session, so it follows the key with no change. A project is named by its folder's name, wherever it sits.
 "Created in the last 7 days" means today and the six days before. When the folder has no sub-project but is itself a project, the tour is that project's single line
 (this is what `cadence-hud` asks from a session opened inside a project). The tour is read-only: it changes
 no plan. It exits 0 even when a project is in error — that project's line reads
@@ -1685,7 +1689,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
   `cadence news`, `session` (`start`, `close`, `next`, `context`), `lead tour`, `corrections`, `deliver`, `verify`, `orchestrate`,
   `skills`, `spec` (`cadence spec <lot> on|off` is `raf spec`; `check`, `qa`: exit **0** when the sheet is valid and the section is printed, **1** with violations, **2** on a missing or unreadable file or a wrong usage);
   their options and exit codes as this README documents them. A new command or option is a minor change.
-- **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`, `lead` (`lead.ux`)
+- **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`, `depth`, `lead` (`lead.ux`)
   and the keys each of them takes. A key is not renamed nor removed, nor does its meaning change; a new key is a minor change.
 - **The plan file** (`docs/plan/raf.yaml`): `project`, `prefix`, `since`, `ignore`, `lots` (with their
   fields, `tasks`, `notes`, `repos`) and `acknowledged`, and the plan formats `plan:` in `cadence.yaml` can read.

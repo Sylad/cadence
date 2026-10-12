@@ -2199,9 +2199,10 @@ lots:
     finished: 2026-10-11
   - id: L195
     title: "Une vague sur le dépôt cadence met en service du code non revu : ses sessions lancent npm run build, qui réécrit dist/ = le raf/cadence du PATH (constaté 11-10 : après la vague 2026-10-11-2130, le --dry-run montrait déjà les budgets de L194 et le code de L188, rendu non conforme, était en service) — builder dans un dossier jetable ou séparer le dist en service, mis à jour par le lead après revue ; test"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-11
+    started: 2026-10-12
   - id: L196
     title: "Revue de fiche : les constats mineurs deviennent des propositions du tableau final et non des notes du lot, contrairement au design § 4 et aux consignes (templates/orchestrate/fiche.md:12, agents/code-reviewer.md:67 « a minor one becomes a note ») — aligner le programme sur le design, test"
     status: todo

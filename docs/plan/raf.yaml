@@ -2039,6 +2039,7 @@ lots:
     notes:
       - { date: 2026-10-10, text: "Revue L166 : comparer à la référence des lots VISIBLES, pas « tous lots » (45 % corrigés contre 65 %) — src/corrections.ts doit sortir les causes par visibilité (byVisibility ne compte que lots et passes)" }
     started: 2026-10-12
+    review: { date: 2026-10-12, verdict: "Conforme : les 2 constats mineurs sont corrigés. Il reste une note mineure : le seuil ≤ 15 % se compare désormais à une référence de 16 %, et c'est au lead de le revoir avant la mesure S8. — orchestré (vague 2026-10-12-2155, 0 passe(s) de correction + passe des mineurs)", commit: 5b3a88965124a48c1c11262764481215cc1d3a15 }
   - id: L177
     title: "docs/lead.md : schéma du workflow avec les étapes spec, L167 (spec etape-spec, S9)"
     status: done

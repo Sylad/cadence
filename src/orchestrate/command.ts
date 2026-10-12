@@ -12,6 +12,7 @@ import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
+import { readWaits, renderWaits } from './waits.js';
 import { acceptationFile, acceptText } from './accept.js';
 import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
@@ -106,6 +107,9 @@ export interface Args {
   lots: { project?: string; lot: string; model?: Model }[];
   dryRun: boolean;
   status?: string | true;
+  /** `--waits` : l'attente de créneau de session par jour et par vague, lue dans les journaux ; `--since` écarte les vagues d'avant. */
+  waits: boolean;
+  since?: string;
   watch: boolean;
   /** Secondes entre deux rendus de `--status --watch`. */
   interval?: number;
@@ -155,7 +159,7 @@ function lotArg(text: string): { project?: string; lot: string; model?: Model } 
 }
 
 export function parseOrchestrateArgs(argv: string[]): Args {
-  const a: Args = { lots: [], dryRun: false, watch: false, continue: false, answers: [], drop: [], stopAfterCurrent: false };
+  const a: Args = { lots: [], dryRun: false, waits: false, watch: false, continue: false, answers: [], drop: [], stopAfterCurrent: false };
   const optional = (i: number) => (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) ? argv[i + 1] : undefined);
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
@@ -168,6 +172,10 @@ export function parseOrchestrateArgs(argv: string[]): Args {
       const v = optional(i);
       if (v !== undefined) i++;
       a[t === '--status' ? 'status' : 'resume'] = v ?? true;
+    } else if (t === '--waits') a.waits = true;
+    else if (t === '--since') {
+      a.since = value(t);
+      if (!isDay(a.since)) throw new RafError(`--since invalide : ${a.since} (AAAA-MM-JJ)`);
     } else if (t === '--watch') a.watch = true;
     else if (t === '--interval') a.interval = parseMaxSessions(value(t), '--interval');
     else if (t === '--budget') a.budget = parseBudget(value(t));
@@ -468,6 +476,12 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   // --drop / --stop-after-current (L79) pilotent une vague VIVANTE : ni avec --status (rien à piloter), ni --stop-after-current avec --resume (il le contredit). --resume --drop retire le lot avant de rejouer la vague arrêtée.
   if (args.status !== undefined && (args.drop.length || args.stopAfterCurrent)) throw new RafError('--status ne se combine pas avec --drop / --stop-after-current');
   if (args.resume !== undefined && args.stopAfterCurrent) throw new RafError('--resume ne se combine pas avec --stop-after-current (il reprend la vague, il ne l\'arrête pas)');
+  if (args.since !== undefined && !args.waits) throw new RafError('--since s\'utilise avec --waits');
+  if (args.waits) {
+    if (args.lots.length || args.status !== undefined || args.resume !== undefined || args.watch || args.drop.length || args.stopAfterCurrent || args.continue || args.dryRun) throw new RafError('--waits ne se combine avec aucune autre action');
+    for (const line of renderWaits(readWaits(launch, args.since))) io.out(line);
+    return 0;
+  }
   if (args.status !== undefined) {
     maxSessions(args, io); // une valeur invalide est refusée ici aussi
     if (!args.watch) {
@@ -497,7 +511,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] | --drop projet:lot | --stop-after-current');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] | --drop projet:lot | --stop-after-current');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);

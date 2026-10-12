@@ -915,6 +915,7 @@ cadence orchestrate … --budget 1.5M          # 1500000, 1.5M, 800k; default 2M
 cadence orchestrate … --max-sessions 3       # sessions running at the same moment, all waves together; default 2
 cadence orchestrate … --dry-run              # preconditions + the plan of the wave; nothing is started
 cadence orchestrate --continue [--until 18:00] [--priority cadence,maritime]   # the wave draws the next ready lot itself (below)
+cadence orchestrate --waits [--since 2026-10-12]   # time spent waiting for a session slot, per day and per wave (below)
 cadence orchestrate --status [<wave>]        # the live waves and the repositories they hold, then the table (default: the last wave of this folder)
 cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running (with an explicit `<wave>`: when that wave is no longer running)
 cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
@@ -1329,6 +1330,7 @@ every wave the same value: each wave counts ALL live sessions, whatever their sl
 count has reached ITS OWN cap, so with different caps the highest one can push the total past the lowest
 (which then waits). A session that finds no free slot **waits** (the wave is not refused; the journal says
 `en attente d'un créneau de session depuis …`, repeated every minute, then `créneau de session obtenu après …`).
+`cadence orchestrate --waits [--since YYYY-MM-DD]` adds those waits up from the journals of `.cadence/runs/` of the launch folder — per day (cumulated wait, number of waits, waves, waves stopped by the quota, tokens) and per wave that waited (the longest wait, a wait that never got its slot) — to decide the cap from figures; it reads only, and refuses any other action in the same call. The figures of 2026-10-12 and the cost of a third slot are in `docs/mesures/attente-creneaux-2026-10-12.md`.
 A slot or a registry entry is owned by a pid **and** its start time: a reused pid is a dead owner. Wave
 identifiers are reserved atomically (`-2`, `-3` suffix when two waves start in the same minute; an existing
 `--wave` is refused). The registry of live waves and the slots live under `~/.cadence/orchestrate/` (`CADENCE_HOME`

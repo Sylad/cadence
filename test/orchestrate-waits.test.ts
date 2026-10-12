@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RafError } from '../src/plan.js';
-import { parseWaitMs, parseWaits, readWaits, renderWaits } from '../src/orchestrate/waits.js';
+import { parseQuotaStops, parseWaitMs, parseWaits, readWaits, renderWaits } from '../src/orchestrate/waits.js';
 import { orchestrate, parseOrchestrateArgs } from '../src/orchestrate/command.js';
 import { tempDir } from './helpers.js';
 
@@ -36,11 +36,26 @@ describe('parseWaits', () => {
   });
 });
 
+describe('parseQuotaStops', () => {
+  it('compte les lignes « → suspended — quota atteint », au jour de la ligne ; les autres suspensions non', () => {
+    const j = '2026-10-04T16:30:00.000Z cadence:L27 → suspended — quota atteint\n2026-10-04T17:00:00.000Z cadence:L28 → suspended — budget\n2026-10-05T01:00:00.000Z cadence:L27 → suspended — quota atteint\n';
+    expect(parseQuotaStops(j)).toEqual(['2026-10-04', '2026-10-05']);
+  });
+});
+
+describe('quota atteint après --resume', () => {
+  it('une vague reprise (wave.json « done ») compte quand même son arrêt, lu dans le journal', () => {
+    const root = tempDir();
+    wave(root, '2026-10-04-1609', '2026-10-04T16:30:00.000Z cadence:L27 → suspended — quota atteint\n', { status: 'done' });
+    expect(readWaits(root).days.map((d) => [d.day, d.quotaHits])).toEqual([['2026-10-04', 1]]);
+  });
+});
+
 describe('readWaits / renderWaits', () => {
   it('attente par vague et par jour, jetons et quota de la vague', () => {
     const root = tempDir();
     wave(root, '2026-10-12-0800', WAIT('2026-10-12T08:05:00.000Z', '10 min 00 s') + WAIT('2026-10-12T09:05:00.000Z', '2 min 00 s'), { consumed: 2000 });
-    wave(root, '2026-10-12-1100', WAIT('2026-10-12T11:05:00.000Z', '1 min 00 s'), { status: 'suspended-quota' });
+    wave(root, '2026-10-12-1100', WAIT('2026-10-12T11:05:00.000Z', '1 min 00 s') + '2026-10-12T11:30:00.000Z cadence:L27 → suspended — quota atteint\n');
     wave(root, '2026-10-11-1100', '', {});
     const r = readWaits(root);
     expect(r.waves.map((x) => [x.id, x.totalMs, x.count])).toEqual([['2026-10-11-1100', 0, 0], ['2026-10-12-0800', 720_000, 2], ['2026-10-12-1100', 60_000, 1]]);
@@ -69,6 +84,14 @@ describe('cadence orchestrate --waits', () => {
   it('s\'analyse avec --since, et refuse un jour invalide', () => {
     expect(parseOrchestrateArgs(['--waits', '--since', '2026-10-12'])).toMatchObject({ waits: true, since: '2026-10-12' });
     expect(() => parseOrchestrateArgs(['--waits', '--since', 'hier'])).toThrow(RafError);
+  });
+  it('refuse --since sans --waits et --waits combiné à une autre action, avant d\'agir', async () => {
+    const root = tempDir();
+    const run = (argv: string[]) => orchestrate(argv, { cwd: root, env: {}, now: () => new Date('2026-10-12T20:00:00Z'), out: () => {}, err: () => {} } as never, {} as never);
+    await expect(run(['--since', '2026-10-12'])).rejects.toThrow(/s'utilise avec --waits/);
+    for (const other of [['--status'], ['--resume', 'x'], ['--continue'], ['--dry-run'], ['--drop', 'L1'], ['--stop-after-current'], ['L1']]) {
+      await expect(run(['--waits', ...other])).rejects.toThrow(/aucune autre action/);
+    }
   });
   it('affiche le tableau du dossier de lancement, sans rien lancer', async () => {
     const root = tempDir();

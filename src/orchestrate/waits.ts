@@ -40,6 +40,17 @@ export function parseWaits(journal: string): { waits: Wait[]; unfinished: number
   return { waits, unfinished };
 }
 
+/** Les arrêts par le quota d'un journal (« … → suspended — quota atteint », cycle.ts), au jour de la ligne : le statut final de wave.json ne les garde pas, `--resume` le remet à `running` puis `done`. */
+export function parseQuotaStops(journal: string): Day[] {
+  const days: Day[] = [];
+  for (const line of journal.split('\n')) {
+    const m = /^(\S+) \S+ → suspended — quota atteint$/.exec(line);
+    const at = m ? new Date(m[1]) : null;
+    if (at && !Number.isNaN(at.getTime())) days.push(toDay(at));
+  }
+  return days;
+}
+
 export interface WaveWaits {
   id: string;
   totalMs: number;
@@ -85,12 +96,13 @@ export function readWaits(launchDir: string, since?: Day): WaitsReport {
       // wave.json illisible : la vague compte sans jetons
     }
     const journalFile = join(base, id, 'journal.log');
-    const { waits, unfinished } = parseWaits(existsSync(journalFile) ? readFileSync(journalFile, 'utf8') : '');
+    const journal = existsSync(journalFile) ? readFileSync(journalFile, 'utf8') : '';
+    const { waits, unfinished } = parseWaits(journal);
     waves.push({ id, totalMs: waits.reduce((s, w) => s + w.ms, 0), count: waits.length, maxMs: Math.max(0, ...waits.map((w) => w.ms)), unfinished, status: meta.status ?? '?', consumed: meta.consumed ?? 0 });
     const d = dayOf(idDay);
     d.waves++;
     d.consumed += meta.consumed ?? 0;
-    if (meta.status === 'suspended-quota') d.quotaHits++;
+    for (const day of parseQuotaStops(journal)) dayOf(day).quotaHits++;
     for (const w of waits) {
       const dw = dayOf(w.day);
       dw.totalMs += w.ms;

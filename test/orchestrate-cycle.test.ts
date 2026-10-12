@@ -2347,10 +2347,12 @@ describe('revue qui converge (L205)', () => {
 
   it('budget du lot trop juste pour payer la revue suivante : pas de 3e passe', async () => {
     const h = harness({ script: { implement: [impl()], review: [nMajors(3), nMajors(2), nMajors(1), ok], fix: fixes() } });
-    const c = h.lot('L1', { budget: REVIEW_RESERVE + 6000 });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE + 7500 });
     await runLot(c);
-    expect(c.lot.pass).toBe(2);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review']);
+    expect(c.lot.pass).toBe(3);
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toMatch(/budget/);
+    expect(c.lot.outcome).toContain('« fix » non jouée');
   });
 });

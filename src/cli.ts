@@ -732,6 +732,10 @@ const git = (cwd: string, args: string[]): string => execFileSync('git', args, {
 function specReseal(args: string[], reason: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
   if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche"');
   if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec reseal refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
+  // Comme `deliver` : la vague tient le verrou du dépôt tant qu'un de ses lots y travaille (état illisible : on refuse) ; un commit du lead en pleine passe ferait signaler au lot suivant un écart qui n'est pas le sien.
+  const orchestrating = activeLock(join(sharedStateDir(ctx.root), REPO_LOCK));
+  const stillOpen = orchestrating ? openLotsIn(cadenceHome(), orchestrating.pid, ctx.root) : null;
+  if (orchestrating && (stillOpen === null || stillOpen.length > 0)) throw new RafError(`spec reseal : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — rescellé une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
   const [lotId, test] = args as [string, string];
   const plan = ctx.loadPlan();
   const lot = plan.lot(lotId);

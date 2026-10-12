@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { lockViolations, redSha, resealAcceptation, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
+import { REPO_LOCK } from '../src/orchestrate/lock.js';
+import { sharedStateDir } from '../src/state.js';
+import { lockViolations, redSha, resealAcceptation, resealedRouge, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { run } from '../src/cli.js';
 import { gitRepo } from './helpers.js';
 import { git } from './orchestrate-harness.js';
@@ -85,6 +87,29 @@ describe('resealAcceptation : refaire l’empreinte d’un seul test, la fiche i
     expect(() => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-12')).toThrow(new RegExp(second.replace(/\./g, '\\.')));
   });
 
+  it('à la reprise, l’ancre du commit rouge suit un rescellé commité, mais pas une réécriture ordinaire', () => {
+    const { repo, a } = lotScelle();
+    const ancre = redSha(repo, a.json)!;
+    expect(resealedRouge(repo, a.json, ancre)).toBeNull(); // rien n'a bougé
+    writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+    resealAcceptation(repo, a.json, a.test, 'contredit la fiche', '2026-10-12');
+    commitPaths(repo, 'test(L1): acceptation rescellée', a.json, a.test);
+    const rescelle = git(repo, 'rev-parse', 'HEAD').trim();
+    expect(lockViolations(repo, DIR, rescelle, { rouge: { [a.json]: ancre } }).join('\n')).toContain('réécrit depuis son commit rouge'); // l'ancre périmée
+    expect(resealedRouge(repo, a.json, ancre)).toBe(rescelle);
+    expect(lockViolations(repo, DIR, rescelle, { rouge: { [a.json]: rescelle } })).toEqual([]);
+  });
+
+  it('une réécriture d’acceptation.json sans journal de rescellé n’est pas adoptée comme nouvelle ancre', () => {
+    const { repo, a } = lotScelle();
+    const ancre = redSha(repo, a.json)!;
+    const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    doc.empreintes[a.test] = 'forgé';
+    writeFileSync(join(repo, a.json), JSON.stringify(doc, null, 2));
+    commitPaths(repo, 'réécriture par une session', a.json);
+    expect(resealedRouge(repo, a.json, ancre)).toBeNull();
+  });
+
   it('refuse une acceptation non scellée', () => {
     const repo = gitRepo();
     const a = ecritAcceptation(repo);
@@ -129,5 +154,15 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     const todo = avecPlan('todo');
     writeFileSync(join(todo.repo, todo.a.test), 'autre\n');
     expect(cli(todo.repo, {}, 'spec', 'reseal', 'L1', todo.a.test, '--reason', 'x').err).toMatch(/pas en cours/);
+  });
+
+  it('refuse tant qu’une vague tient le verrou du dépôt (le lot suivant de la file travaille sur la même branche)', () => {
+    const { repo, a } = avecPlan();
+    writeFileSync(join(repo, a.test), 'autre\n');
+    writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid: process.pid, wave: 'w9', started: 'x' }));
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/orchestration en cours \(vague w9/);
+    expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
   });
 });

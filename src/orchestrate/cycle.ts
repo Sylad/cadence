@@ -19,7 +19,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
-import { acceptationFile, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, redSha, sealAcceptation, setVert } from './accept.js';
+import { acceptationFile, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
 import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
@@ -1641,6 +1641,8 @@ export async function runLot(c: LotCtx): Promise<void> {
       return;
     }
     if (l.status === 'question' && !l.pendingAnswer) return;
+    // Un test rescellé par le lead pendant la question (L200) a déplacé le commit rouge : l'ancre suit, le verrou garde le reste.
+    if (l.status === 'question' && l.accept?.rouge) l.accept.rouge = resealedRouge(l.repo, l.accept.acceptation, l.accept.rouge) ?? l.accept.rouge;
     if (l.next === null && l.steps.length === 0) {
       if (dropped(c)) {
         stop(c, 'handed-back', DROPPED);

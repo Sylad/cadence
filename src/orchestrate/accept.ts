@@ -102,6 +102,20 @@ export function redSha(repo: string, path: string): string | null {
   return null;
 }
 
+/**
+ * Le commit rouge a bougé depuis `anchor` par un rescellé du lead (`cadence spec reseal`, L200) : le nouveau sha, sinon null.
+ * Seul un commit qui a allongé le journal `resceaux` est adopté ; toute autre réécriture reste un écart pour le verrou.
+ */
+export function resealedRouge(repo: string, path: string, anchor: string): string | null {
+  const now = redSha(repo, path);
+  if (!now || now === anchor) return null;
+  const journal = (rev: string): number => {
+    const r = show(repo, rev, path)?.resceaux;
+    return Array.isArray(r) ? r.length : 0;
+  };
+  return journal(now) > journal(anchor) ? now : null;
+}
+
 /** Chemin (relatif au dépôt) de l'`acceptation.json` du lot sous `dir`, ou null. */
 export function findAcceptation(repo: string, dir: string, lot: string): string | null {
   for (const path of listAcceptations(repo, dir).sort()) {

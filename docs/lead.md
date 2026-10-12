@@ -42,8 +42,8 @@ picture, not its source.
      lot with a sheet it is a conformity pass against the mockup;
    - the code review (Opus; Sonnet for a lot of 0.25 day or less), which also follows each rule of the
      sheet to its test;
-   - a correction in a new session if the review is not compliant (two passes at most, each followed by
-     a review).
+   - a correction in a new session if the review is not compliant (two passes at most, a third when the review
+     converges — blocking + major findings down and only one left —, each followed by a review).
 
    The program records `raf review` itself once the review is compliant.
 3. **Relay.** The lead follows the wave's journal (`tail -n +1 -F .cadence/runs/<id>/journal.log`, one

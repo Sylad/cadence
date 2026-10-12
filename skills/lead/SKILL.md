@@ -92,7 +92,7 @@ and the project declares how to see its app (`orchestrate.ux` in `cadence.yaml`)
 (Opus, the `code-reviewer` agent; Sonnet, with no pass on the minor findings, for a lot whose estimate is
 ≤ 0.25 d — `orchestrate.review` in `cadence.yaml`; a blocker or major finding still brings a correction and an
 Opus review), a correction in a new session if the review is not compliant (two
-passes at most) — and records `raf review` itself when the code review is compliant. A lot with `spec: true` (no screen) goes `spec → fiche → accept` before the code: the `code-reviewer` reviews its back-end sheet, and the hypotheses of the final sheet come back in the table as « hypothèse de la fiche » lines, which the lead relays to the human. The state is in
+passes at most, a third when the review converges: blocking + major findings down from one review to the next and only one left) — and records `raf review` itself when the code review is compliant. A lot with `spec: true` (no screen) goes `spec → fiche → accept` before the code: the `code-reviewer` reviews its back-end sheet, and the hypotheses of the final sheet come back in the table as « hypothèse de la fiche » lines, which the lead relays to the human. The state is in
 `.cadence/runs/<wave>/`, not in this conversation. `@haiku` only when the human writes it, for a
 mechanical lot. Exit code: 0 all ready · 1 some lots handed back · 2 refused before acting · 3 wave
 suspended (budget or usage limit; `--resume --budget …` continues).

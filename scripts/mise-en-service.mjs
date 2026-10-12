@@ -6,7 +6,7 @@
 // <bin-dir>/raf et <bin-dir>/cadence : liens vers <root>/service/bin/*.js.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -120,6 +120,16 @@ export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defa
     } catch (e) {
       gitOk(repo, 'worktree', 'remove', '--force', dir);
       throw new Error(`mise en service interrompue, rien n'a changé : ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  // le délai de rétention court depuis la sortie du service, pas depuis l'installation : une version restée longtemps
+  // en service a pu lancer une vague qui tourne encore
+  if (served && served !== sha.slice(0, 12)) {
+    try {
+      const now = new Date();
+      utimesSync(join(releases, served, COMPLETE), now, now);
+    } catch {
+      /* version sortante absente : rien à protéger */
     }
   }
   replaceLink(dir, join(root, 'service'));

@@ -182,6 +182,20 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(existsSync(join(tool, 'node_modules', 'yaml', 'package.json'))).toBe(true);
   });
 
+  it("une version restée longtemps en service garde ses 7 jours à partir de sa sortie du service (la vague lancée depuis elle)", () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    const v1 = join(root, 'releases', first.slice(0, 12));
+    const longAgo = new Date(Date.now() - 10 * 24 * 3600 * 1000);
+    utimesSync(join(v1, '.mise-en-service-ok'), longAgo, longAgo);
+    for (const n of ['b', 'c']) {
+      writeFileSync(join(dir, `${n}.txt`), n);
+      mettreEnService({ repo: dir, rev: commitAll(dir, `feat(L1): ${n}`, `${n}.txt`), root, binDir, install });
+    }
+    expect(existsSync(v1)).toBe(true);
+  });
+
   it('checkLotsDone ne regarde que les commits au-dessus du sha déjà en service (le seul sha, au premier service)', () => {
     const { dir, first } = workRepo({ L1: 'done', L0: 'doing' });
     writeFileSync(join(dir, 'z.txt'), 'z');

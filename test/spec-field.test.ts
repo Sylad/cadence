@@ -100,18 +100,30 @@ describe('champ spec des lots (L186, spec etape-spec-back B1)', () => {
     }
   });
 
-  it('plan externe : plan.fields.spec est lu, show l\'affiche, check refuse un non-booléen', () => {
+  it('plan externe : plan.fields.spec est lu, show l\'affiche, seul true compte (un chemin n\'est ni une erreur ni une spec)', () => {
     const dir = gitRepo();
     writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, spec: fiche }\n  statuses: { todo: prevu }\n');
     writeFileSync(join(dir, 'taches.yaml'), `taches:
   - { id: X1, titre: Ok, etat: prevu, fiche: true }
-  - { id: X2, titre: Mauvais, etat: prevu, fiche: peut-etre }
+  - { id: X2, titre: Chemin, etat: prevu, fiche: docs/specs/x.md }
 `);
     expect(raf(dir, 'show', 'X1').out).toContain('spec : true');
+    expect(raf(dir, 'show', 'X2').out).not.toContain('spec :');
     const r = raf(dir, 'check');
-    expect(r.code).toBe(1);
-    expect(r.out).toMatch(/X2 : spec : true ou false attendu/);
-    expect(r.out).not.toMatch(/X1 : spec/);
+    expect(r.out).not.toMatch(/spec/);
+  });
+
+  it('plan externe sans plan.fields.spec : un champ spec: (chemin d\'un document) n\'est pas lu — ni erreur, ni spec vraie', () => {
+    const dir = gitRepo();
+    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat }\n  statuses: { todo: prevu }\n');
+    writeFileSync(join(dir, 'taches.yaml'), `taches:
+  - { id: X1, titre: Chemin, etat: prevu, spec: docs/specs/x.md }
+  - { id: X2, titre: Vrai, etat: prevu, spec: true }
+`);
+    expect(raf(dir, 'show', 'X1').out).not.toContain('spec :');
+    expect(raf(dir, 'show', 'X2').out).not.toContain('spec :');
+    expect(raf(dir, 'check').out).not.toMatch(/spec : true ou false/);
+    expect(raf(dir, 'check').out).not.toMatch(/X1 : spec/);
   });
 
   it('raf spec sans argument ou à un argument cite aussi cadence spec check|qa, code 2', () => {

@@ -637,7 +637,8 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
         quickwin: pick('quickwin'),
         visible: pick('visible'),
         screen: pick('screen'),
-        spec: pick('spec'),
+        // Le `spec:` d'un plan tenu par un autre outil n'est à nous que s'il est mappé, et seul `true` compte : ailleurs c'est souvent un chemin de document (L198).
+        spec: format.fields.spec && pick('spec') === true ? true : undefined,
         public: pick('public'),
         every: pick('every'),
         last: day('last'),

@@ -228,6 +228,7 @@ plan:
 - Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `screen`, `spec`, `public`, `every`, `last`, `after`, `created`, `started`,
   `finished`, `notes`, `repos`, `parent`; one left out is read under its own name. A timestamp counts for
   its day; a note written as plain text is one note.
+- `spec` is the exception to « a left-out field is read under its own name »: a read-only plan's `spec:` is often the path of a spec document, so it is read only when `plan.fields.spec` maps it, and then only `true` counts (any other value is neither an error nor a spec step). Natively, `spec:` stays `true` or `false` (L198).
 - `parent`: an entry `B33/t1-fusion` whose parent is `B33` becomes the sub-task `t1-fusion` of `B33`.
 - Ids need no prefix: a commit belongs to a lot when its message cites one of the plan's ids as a
   whole word (`E-A2`, `NC2.4`, `B33/t1-fusion`).

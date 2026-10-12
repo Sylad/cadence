@@ -17,7 +17,7 @@ import { Plan, RafError, SCREENS, STATUSES, type Lot, type Screen, type Status }
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
-import { findProjects, leadTour, tourLine } from './lead.js';
+import { findProjects, leadTour, readLeadUx, tourLine } from './lead.js';
 import { liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
@@ -179,6 +179,13 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
       const [slots] = liveLines();
       if (slots) io.out(slots);
+      // le réglage lead.ux du cadence.yaml du dossier (L197) : le lead lit ici qui pose le verdict UX, au lieu d'ouvrir le fichier
+      try {
+        if (readLeadUx(parent) === 'lead') io.out('verdict UX : lead (le lead pose raf ux d\'après le rapport du ux-reviewer et les captures ; l\'humain n\'est consulté qu\'en cas de doute)');
+      } catch (e) {
+        // un cadence.yaml illisible a déjà sa ligne d'erreur en tête de tour
+        if (/lead\.ux/.test((e as Error).message)) io.out(`cadence.yaml · ✗ erreur : ${(e as Error).message.replace(/^.*cadence\.yaml : /, '')}`);
+      }
     }
     return 0;
   }

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { findProjects, tourLine, type TourRow } from '../src/lead.js';
+import { findProjects, readLeadUx, tourLine, type TourRow } from '../src/lead.js';
 import { sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
 import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -258,5 +258,35 @@ describe('point d\'entrée', () => {
     const bin = readFileSync(new URL('../bin/cadence.js', import.meta.url), 'utf8');
     expect(bin).toMatch(/\[[^\]]*'lead'[^\]]*\]\.includes\(tool\)/);
     expect(bin).toContain('cadence lead tour [dossier]');
+  });
+  describe('lead.ux du cadence.yaml du dossier (L197)', () => {
+    it('défaut human : aucune ligne de plus, rien ne change', async () => {
+      const { root } = await parent();
+      expect(readLeadUx(root)).toBe('human');
+      writeFileSync(join(root, 'cadence.yaml'), 'priority: [beta]\n');
+      expect(readLeadUx(root)).toBe('human');
+      writeFileSync(join(root, 'cadence.yaml'), 'lead:\n  ux: human\n');
+      expect((await cad(root, 'lead', 'tour')).out).not.toMatch(/verdict UX/);
+    });
+
+    it('lead : le tour le dit sur une ligne, absente de --json', async () => {
+      const { root } = await parent();
+      writeFileSync(join(root, 'cadence.yaml'), 'lead:\n  ux: lead\n');
+      expect(readLeadUx(root)).toBe('lead');
+      const t = await cad(root, 'lead', 'tour');
+      expect(t.code).toBe(0);
+      expect(t.out.split('\n').at(-1)).toMatch(/^verdict UX : lead /);
+      const rows = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as unknown[];
+      expect(rows).toHaveLength(2);
+    });
+
+    it.each(['lead:\n  ux: moi\n', 'lead: oui\n', 'lead:\n  ux: [lead]\n'])('une valeur invalide (%j) est refusée par readLeadUx et signalée par le tour', async (yaml) => {
+      const { root } = await parent();
+      writeFileSync(join(root, 'cadence.yaml'), yaml);
+      expect(() => readLeadUx(root)).toThrow(/lead\.ux/);
+      const t = await cad(root, 'lead', 'tour');
+      expect(t.code).toBe(0);
+      expect(t.out).toMatch(/lead\.ux doit être « lead » ou « human »/);
+    });
   });
 });

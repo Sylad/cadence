@@ -31,6 +31,18 @@ describe('docs/lead.md', () => {
     expect(read('skills/lead/SKILL.md')).toContain('hypothèse de la fiche')
   })
 
+  it('décrit le réglage lead.ux : le lead peut poser le verdict UX, l\'humain consulté en cas de doute (L197)', () => {
+    const md = read('docs/lead.md')
+    const skill = read('skills/lead/SKILL.md')
+    for (const [name, text] of [['docs/lead.md', md], ['skill', skill], ['README', read('README.md')]] as const) {
+      expect(text, name).toContain('lead.ux')
+      expect(text, name).toMatch(/lead\.ux: lead/)
+      expect(text, name).toMatch(/doubt|doute/)
+    }
+    expect(skill).toMatch(/lead\.ux.*human/s)
+    expect(read('README.md')).toContain('verdict UX : lead')
+  })
+
   it('décrit les règles permanentes et les codes de sortie', () => {
     const md = read('docs/lead.md')
     expect(md).toMatch(/^## .*[Rr]ules/m)

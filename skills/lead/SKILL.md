@@ -53,7 +53,7 @@ like (the human's words) and keeps the rest verbatim.
 
 A lot that adds or changes a screen is `visible`: after the implementation, have the
 `ux-reviewer` agent review it (give it the URL or the way to run the app) and bring its verdict and
-proposed sub-tasks back to the human.
+proposed sub-tasks back to the human — or, where the folder's `cadence.yaml` says `lead.ux: lead`, form the UX verdict yourself (see « The UX verdict » in section 2c).
 
 ### 2b. A wave through `cadence orchestrate`
 
@@ -99,7 +99,7 @@ suspended (budget or usage limit; `--resume --budget …` continues).
 
 What the orchestrator does **not** do, and stays with the lead: choose the lots (with the human), bring the
 questions back (`--resume --answer <project>:<lot> "…"`), look at the UX reviewer's captures and record
-`raf ux` (the orchestrator reports its verdict, it never records it), re-verify (section 3, point 2),
+`raf ux` (the orchestrator reports its verdict, it never records it; who decides it is the `lead.ux` setting, section 2c), re-verify (section 3, point 2),
 `raf done`, push and deliver. Minor findings and proposed sub-tasks come back in the table: adding them to
 the plan is the lead's decision. A minor finding becomes a lot of its own only if it describes an observable bug (a wrong output, a crash, a measured regression); otherwise it stays a note of the originating lot, so that a review never feeds the next one. If an orchestrated wave is running in a repository, do not commit there
 and do not deliver it (`cadence deliver` refuses).
@@ -109,7 +109,7 @@ and do not deliver it (`cadence deliver` refuses).
 Once the human has given the **first choice and the order** (the lots, and the priority: `--priority` or the
 `priority:` list of the parent folder's `cadence.yaml`), the lead does not come back to ask « next? ». For each lot a
 wave hands back **ready**, it chains, in this order, one project at a time: re-verify it yourself (section 3, point 2),
-`raf done` (a read-only plan: the project's own command; a `visible` lot first waits for the human's UX verdict, `raf ux`, and is neither closed nor delivered without it — the chain goes on with the other lots), push, deliver (section 4; when the final table gives « livrable jusqu'à <sha> » for a repository — a ready lot under a handed-back one — push that sha alone with `git push origin <sha>:main`, then `cadence deliver --sha <sha>`, never HEAD, which holds the unreviewed code of the lot above), the `qa-reviewer` check that
+`raf done` (a read-only plan: the project's own command; a `visible` lot first waits for the human's UX verdict, `raf ux` (the lead's own where the UX-verdict setting below hands it over), and is neither closed nor delivered without it — the chain goes on with the other lots), push, deliver (section 4; when the final table gives « livrable jusqu'à <sha> » for a repository — a ready lot under a handed-back one — push that sha alone with `git push origin <sha>:main`, then `cadence deliver --sha <sha>`, never HEAD, which holds the unreviewed code of the lot above), the `qa-reviewer` check that
 section asks for; then it starts the next wave, in the declared priority — `cadence orchestrate --continue --priority …` draws the next ready lot
 of the plan itself (section 2b), and the limits of section « Limits that always apply » still hold. A lot that was not
 handed back ready (refused, review not compliant after the correction passes, red delivery, blocking QA finding) is
@@ -130,10 +130,28 @@ that was about to start comes first among them. Under it, chain. The lead says i
 it is on each time it chains or stops; it never waits for the figure to move (never a polling loop).
 
 **What stays with the human**: the first choice and the order; the questions a session raised (the lead brings them
-back at once and does not answer in the human's place); the UX reservations (`raf ux` is recorded on the human's
-verdict, a UX reviewer's captures are looked at by the human). While a question or a UX reservation is pending on a
+back at once and does not answer in the human's place); the UX reservations (by default `raf ux` is recorded on the human's
+verdict and a UX reviewer's captures are looked at by the human; with `lead.ux: lead` only a doubt comes back to them, see below). While a question or a UX reservation is pending on a
 lot, the chain goes on with the other lots and does not wait for it. A delivery that needs the human's confirmation
 (their standing instructions, section 4) is a stop of the chain, not a bypass.
+
+**The UX verdict.** By default (`lead.ux: human`, or no `lead:` key) the human gives the UX verdict of every `visible` lot.
+Where the `cadence.yaml` of the parent folder says
+
+```yaml
+lead:
+  ux: lead     # lead | human — default human
+```
+
+the human has said they are not a UX judge and want to be asked only when in doubt (`cadence lead tour` prints
+`verdict UX : lead …` as its last line when the setting is on, and `cadence.yaml · ✗ erreur : lead.ux …` for a value
+other than `lead` or `human`). The lead then forms the verdict itself: it reads the `ux-reviewer`'s report, **looks at the
+captures itself** (it opens the images, it does not trust the report's words), and records `raf ux <lot> "…"` with the
+reviewer's last line brought up to date. It does so only when the reviewer has no reservation left and the captures show
+what the lot promised. At the **slightest doubt** — a reservation of the reviewer it cannot settle, a capture it cannot read,
+a layout or wording choice that is a matter of taste, a state the captures do not show — it records nothing, brings the
+captures and the question to the human, and the chain goes on with the other lots as for any UX reservation. The verdict
+is always recorded by the lead's own `raf ux`, never by a subagent.
 
 ## 3. Check
 
@@ -148,7 +166,7 @@ lot, the chain goes on with the other lots and does not wait for it. A delivery 
    what nobody could verify.
 3. Fix or re-delegate what the review found; then record the verdict, `raf review <lot> "…"` with
    the code reviewer's last line brought up to date (and `raf ux <lot> "…"` for a visible lot, with
-   the UX reviewer's), then `raf done <lot>`. Where the gate is on (`raf review enable`, the
+   the UX reviewer's; with `lead.ux: lead` the lead has formed that verdict, section 2c), then `raf done <lot>`. Where the gate is on (`raf review enable`, the
    human's decision for each repository), `raf done` refuses a lot that has commits and no
    verdict, or a verdict older than its latest commit: a fix made after the review means a new
    review of the lot, not an edited verdict. A read-only plan has no gate in `raf` (a `uxSince` or `reviewSince` written in it is

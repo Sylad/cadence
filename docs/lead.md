@@ -56,7 +56,7 @@ picture, not its source.
    the table: one becomes a lot of its own only if it describes an observable bug.
 5. **Re-check.** The lead verifies itself, one project at a time: `git log`, the test suite and the
    build run by the lead, `raf check` clean. A `visible` lot waits for the human to look at the
-   UX reviewer's captures: the lead records `raf ux` on the human's verdict, never on its own. Then
+   UX reviewer's captures: the lead records `raf ux` on the human's verdict, never on its own — unless the parent folder's `cadence.yaml` says `lead.ux: lead`: then the lead forms the verdict from the reviewer's report and its own look at the captures, and asks the human only at the slightest doubt. Then
    `raf done`.
 6. **Delivery.** Push (for a « livrable jusqu'à <sha> », that sha alone, never HEAD), then
    `cadence deliver`. After a green delivery that changes what a page shows or what it is served, the
@@ -79,6 +79,7 @@ picture, not its source.
 | At most **two subagents** running at once, orchestrate sessions included | `cadence orchestrate --status` and `cadence lead tour` print `créneaux libres : N sur 2`; never raise `--max-sessions` above two |
 | Never two sessions in the same repository at the same time; the lead does not commit where a wave runs | a wave's lock refuses `cadence deliver` while a lot still works there |
 | Deliveries and the `raf ux` / `raf review` verdicts belong to the lead, one project at a time | never to a subagent, never two deliveries in parallel |
+| The UX verdict is the human's unless `lead.ux: lead` (parent `cadence.yaml`, default `human`) | then the lead decides from the report and the captures, and brings any doubt to the human |
 | A session cannot ask the human anything | it stops and reports; the lead brings the question back |
 | Never push or deliver HEAD above a handed-back lot | HEAD holds code that was not reviewed |
 | A plan kept by another tool is read-only for `raf` | its own commands record the lot's state |

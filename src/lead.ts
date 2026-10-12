@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { audit, nextUp, planCommits } from './audit.js';
 import { planLoader, readPlanConfig } from './config.js';
@@ -6,8 +6,29 @@ import { diffDays, type Day } from './dates.js';
 import { gitRoot, repoStatus } from './git.js';
 import { linkCommits } from './link.js';
 import { lastActivity, lockStatus } from './session.js';
+import { parse } from 'yaml';
+import { RafError } from './plan.js';
 import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { readNext, sharedStateDir, stateDir } from './state.js';
+
+/** Clé `lead.ux` du cadence.yaml du dossier parent (L197) : qui pose le verdict UX (`raf ux`) d'un lot visible. `human` (défaut) : l'humain ; `lead` : le lead, l'humain n'étant consulté qu'en cas de doute. */
+export function readLeadUx(parent: string): 'lead' | 'human' {
+  const file = join(parent, 'cadence.yaml');
+  if (!existsSync(file)) return 'human';
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const l = (raw as { lead?: unknown } | null)?.lead;
+  if (l == null) return 'human';
+  const ux = (l as { ux?: unknown }).ux;
+  if (typeof l !== 'object' || Array.isArray(l)) throw new RafError(`${file} : lead.ux doit être « lead » ou « human »`);
+  if (ux == null) return 'human';
+  if (ux !== 'lead' && ux !== 'human') throw new RafError(`${file} : lead.ux doit être « lead » ou « human »`);
+  return ux;
+}
 
 export const NOTES_MAX = 120;
 export const TITLE_MAX = 60;

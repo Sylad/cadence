@@ -964,6 +964,20 @@ limit. Before each new wave it reads the context of its own session with `cadenc
 time (`cadence session next`). Stays with the human: the first choice and the order, the questions a session raised, the UX
 reservations; a lot that is not ready, a red delivery or a blocking QA finding is reported and not chained over.
 
+**Who gives the UX verdict (L197)**: by default the human looks at the `ux-reviewer`'s captures and gives the verdict of a `visible`
+lot (`raf ux`). A human who is not a UX judge can set, in the `cadence.yaml` of the folder the `lead` skill works from:
+
+```yaml
+lead:
+  ux: lead     # lead | human — default human, nothing changes without the key
+```
+
+With `lead.ux: lead` the lead forms the verdict itself, from the reviewer's report and its own look at the captures, records
+`raf ux` and goes on; the human is consulted only at the slightest doubt (a reservation it cannot settle, a capture it
+cannot read, a matter of taste), and the chain goes on with the other lots meanwhile. `cadence lead tour` prints
+`verdict UX : lead …` as a last line when the setting is on (not part of `--json`), and `cadence.yaml · ✗ erreur : lead.ux doit
+être « lead » ou « human »` for any other value. The setting is read from the parent folder only: a project's own `cadence.yaml` ignores it.
+
 **Lot ids containing `/` (L120)**: the first `:` separates the project from the lot, a final `@` the model, and the lot
 keeps its `/` (`maritime-atlas:Q4/accueil-4-ux12@haiku`); this holds for `--dry-run`, `--status`, `--resume` and
 `--answer` too. In `.cadence/runs/<wave>/` the `/` of the lot becomes `__` (`maritime-atlas--Q4__accueil-4-ux12.json`,
@@ -1643,7 +1657,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
   `cadence news`, `session` (`start`, `close`, `next`, `context`), `lead tour`, `corrections`, `deliver`, `verify`, `orchestrate`,
   `skills`, `spec` (`cadence spec <lot> on|off` is `raf spec`; `check`, `qa`: exit **0** when the sheet is valid and the section is printed, **1** with violations, **2** on a missing or unreadable file or a wrong usage);
   their options and exit codes as this README documents them. A new command or option is a minor change.
-- **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`
+- **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`, `lead` (`lead.ux`)
   and the keys each of them takes. A key is not renamed nor removed, nor does its meaning change; a new key is a minor change.
 - **The plan file** (`docs/plan/raf.yaml`): `project`, `prefix`, `since`, `ignore`, `lots` (with their
   fields, `tasks`, `notes`, `repos`) and `acknowledged`, and the plan formats `plan:` in `cadence.yaml` can read.

@@ -29,4 +29,17 @@ describe('README, étape accept lancée à la main', () => {
     const agent = readFileSync(new URL('../agents/acceptance-writer.md', import.meta.url), 'utf8')
     expect(agent).toContain('CADENCE_ACCEPTATION_ROOT')
   })
+
+  // L203 : la section accept et l'agent disent l'exception e2e, sans règle absolue contraire.
+  it("la section accept dit que l'acceptation e2e ne rejoint jamais le lanceur ordinaire", () => {
+    expect(section).toContain('"e2e": true')
+    expect(section).toContain('acceptationE2e()')
+    expect(section).toMatch(/except an `"e2e": true` acceptation/)
+  })
+
+  it("l'agent acceptance-writer connaît la clé e2e", () => {
+    const agent = readFileSync(new URL('../agents/acceptance-writer.md', import.meta.url), 'utf8')
+    expect(agent).toContain('"e2e": true')
+    expect(agent).toContain('acceptationE2e()')
+  })
 })

@@ -104,3 +104,13 @@ it('les variantes clair et sombre diffèrent par les couleurs seulement', () => 
   expect(strip(read(svgs.light))).toBe(strip(read(svgs.dark)))
   expect(read(svgs.light)).not.toBe(read(svgs.dark))
 })
+
+describe('cadence spec reseal : le chemin du lead pour un test scellé faux (L200)', () => {
+  it('est décrit par le README, le skill lead et docs/lead.md', () => {
+    for (const [name, text] of [['README', read('README.md')], ['skill', read('skills/lead/SKILL.md')], ['docs/lead.md', read('docs/lead.md')]] as const) {
+      expect(text, name).toContain('cadence spec reseal')
+      expect(text, name).toContain('--reason')
+    }
+    expect(read('README.md')).toContain('resceaux')
+  })
+})

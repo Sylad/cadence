@@ -48,7 +48,7 @@ describe('docs/lead.md', () => {
     expect(md).toMatch(/^## .*[Rr]ules/m)
     expect(md).toMatch(/^## .*[Ee]xit codes/m)
     expect(md).toContain('60 %')
-    expect(md).toContain('two subagents')
+    expect(md).toContain('as many subagents as the session cap') // le plafond est réglé par l'humain, plus 2 en dur (L208)
     for (const code of ['0', '1', '2', '3']) expect(md).toMatch(new RegExp(`\\| \`${code}\` \\|`))
   })
 

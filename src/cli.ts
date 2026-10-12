@@ -19,7 +19,7 @@ import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { findProjects, leadTour, readLeadUx, tourLine } from './lead.js';
-import { liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
+import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
@@ -181,7 +181,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     else {
       for (const r of rows) io.out(tourLine(r));
       // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
-      const [slots] = liveLines();
+      const [slots] = liveLines(configuredCap(io.env));
       if (slots) io.out(slots);
       // le réglage lead.ux du cadence.yaml du dossier (L197) : le lead lit ici qui pose le verdict UX, au lieu d'ouvrir le fichier
       try {

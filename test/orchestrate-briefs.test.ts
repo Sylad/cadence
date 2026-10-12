@@ -173,8 +173,19 @@ describe('skill lead : source unique', () => {
     expect(skill).toMatch(/sessions of an orchestrated wave[^\n]*\n?[^\n]*count toward this limit/i);
     expect(skill).toContain('--max-sessions');
     expect(skill).toMatch(/before starting a\s+subagent, check `cadence orchestrate --status`/);
-    expect(skill).toContain('créneaux libres : N sur 2'); // le skill lit le chiffre du registre (L141)
+    expect(skill).toContain('créneaux libres : N sur M'); // le skill lit le chiffre du registre (L141)
     expect(skill).not.toMatch(/2 − Σ/);
+  });
+  it('le plafond de sessions est réglé par l\'humain : le skill et docs/lead.md le lisent, ne le relèvent jamais seuls (L208)', () => {
+    const skill = read('../skills/lead/SKILL.md').replace(/\s+/g, ' ');
+    expect(skill).toContain('CADENCE_MAX_SESSIONS');
+    expect(skill).toMatch(/never raise `--max-sessions` or `CADENCE_MAX_SESSIONS` yourself/i);
+    expect(skill).not.toMatch(/above two/i);
+    expect(skill).not.toContain('N sur 2');
+    const doc = read('../docs/lead.md').replace(/\s+/g, ' ');
+    expect(doc).toContain('créneaux libres : N sur M');
+    expect(doc).toContain('CADENCE_MAX_SESSIONS');
+    expect(doc).not.toMatch(/above two/i);
   });
   it('le lead enchaîne sans le humain sous un seuil de contexte, et ce qui reste au humain est nommé (L148)', () => {
     const skill = read('../skills/lead/SKILL.md').replace(/\s+/g, ' ');

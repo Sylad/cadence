@@ -9,9 +9,13 @@ import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/re
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 async function cad(dir: string, ...argv: string[]) {
+  return cadEnv(dir, {}, ...argv);
+}
+
+async function cadEnv(dir: string, env: Record<string, string>, ...argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-09-28' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-09-28T18:30:00') });
+  const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-09-28', ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-09-28T18:30:00') });
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
@@ -94,6 +98,17 @@ describe('cadence lead tour', () => {
     expect(out.split('\n')[2]).toBe('vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2');
     const json = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out);
     expect(Array.isArray(json)).toBe(true);
+    unregisterWave(cadenceHome(), process.ppid);
+  });
+
+  it('les créneaux libres suivent le plafond réglé par CADENCE_MAX_SESSIONS, pas un 2 en dur (L208)', async () => {
+    const { root } = await parent();
+    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-09-1253', started: '2026-10-09T12:53:00Z', cwd: root, repos: ['/x/a'], cap: 3 });
+    const { out } = await cadEnv(root, { CADENCE_MAX_SESSIONS: '3' }, 'lead', 'tour');
+    expect(out.split('\n')[2]).toBe('vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 2 sur 3');
+    // un réglage invalide ne casse pas le tour : retour au défaut
+    const bad = await cadEnv(root, { CADENCE_MAX_SESSIONS: 'abc' }, 'lead', 'tour');
+    expect(bad.out.split('\n')[2]).toBe('vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2');
     unregisterWave(cadenceHome(), process.ppid);
   });
 

@@ -425,18 +425,28 @@ function maxSessions(args: Args, io: OrchestrateIo): number {
   return env ? parseMaxSessions(env, 'CADENCE_MAX_SESSIONS') : DEFAULT_MAX_SESSIONS;
 }
 
+/** Plafond à AFFICHER (`--status`, `lead tour`) : le réglage de l'humain, jamais 2 en dur. Un réglage invalide ne casse pas l'affichage (le lancement, lui, le refuse) : retour au défaut. */
+export function configuredCap(env: Record<string, string | undefined>, flag?: number): number {
+  if (flag !== undefined) return flag;
+  try {
+    return env.CADENCE_MAX_SESSIONS ? parseMaxSessions(env.CADENCE_MAX_SESSIONS, 'CADENCE_MAX_SESSIONS') : DEFAULT_MAX_SESSIONS;
+  } catch {
+    return DEFAULT_MAX_SESSIONS;
+  }
+}
+
 function duration(ms: number): string {
   const s = Math.round(ms / 1000);
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
 }
 
 /** Vagues vivantes (toutes, quel que soit leur dossier de départ), créneaux libres et dépôts qu'elles tiennent. */
-export function liveLines(): string[] {
+export function liveLines(cap = DEFAULT_MAX_SESSIONS): string[] {
   const home = cadenceHome();
   const waves = liveWaves(home);
   if (waves.length === 0) return [];
   const slots = liveSlots(home).length;
-  const lines = [`vagues en cours : ${waves.length} · sessions en cours : ${slots} · créneaux libres : ${freeSlots(waves, DEFAULT_MAX_SESSIONS)} sur ${DEFAULT_MAX_SESSIONS}`];
+  const lines = [`vagues en cours : ${waves.length} · sessions en cours : ${slots} · créneaux libres : ${freeSlots(waves, cap)} sur ${cap}`];
   for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · plafond ${w.cap ?? '?'} · dépôts : ${w.repos.join(', ')}`);
   return lines;
 }
@@ -446,9 +456,9 @@ const CLEAR_SCREEN = '\x1b[H\x1b[2J';
 const DEFAULT_WATCH_INTERVAL = 10;
 
 /** Ce que `--status` montre à un instant : les vagues vivantes, puis le tableau (absent si seules les vagues vivantes comptent). */
-function statusView(args: Args, launch: string): { live: string[]; table?: string[]; running: boolean } {
+function statusView(args: Args, launch: string, cap: number): { live: string[]; table?: string[]; running: boolean } {
   const store = typeof args.status === 'string' ? RunStore.find(launch, args.status) : RunStore.last(launch);
-  const live = liveLines();
+  const live = liveLines(cap);
   if (!store && live.length && args.status === true) return { live, running: true };
   if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');
   // `running` : la vague suivie tourne — pour un <id> explicite, elle seule compte, pas les autres vagues de la machine
@@ -485,7 +495,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.status !== undefined) {
     maxSessions(args, io); // une valeur invalide est refusée ici aussi
     if (!args.watch) {
-      const { live, table } = statusView(args, launch);
+      const { live, table } = statusView(args, launch, configuredCap(io.env, args.maxSessions));
       for (const line of live) io.out(line);
       if (!table) return 0; // sans identifiant : les vagues vivantes suffisent
       if (live.length) io.out('');
@@ -495,7 +505,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     // --watch : le même tableau, rafraîchi ; il s'arrête seul quand plus aucune vague ne tourne (le dernier rendu reste affiché)
     const sleep = deps.watchSleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
     for (;;) {
-      const { live, table, running } = statusView(args, launch);
+      const { live, table, running } = statusView(args, launch, configuredCap(io.env, args.maxSessions));
       io.out(CLEAR_SCREEN);
       for (const line of live) io.out(line);
       if (table) {

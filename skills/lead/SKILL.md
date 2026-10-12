@@ -14,13 +14,16 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
 
 ## Limits that always apply
 
-- **At most two subagents running at once.** Queue the rest. The sessions of an orchestrated wave
-  (section 2b) count toward this limit: orchestrate sessions plus subagents never exceed two. A wave
-  already caps itself (`--max-sessions`, 2 by default, shared by every wave); before starting a
-  subagent, check `cadence orchestrate --status`, and while a wave runs, start none beyond the free
-  slots. Read the free slots, do not compute them: `cadence orchestrate --status` and `cadence lead tour` print
-  `créneaux libres : N sur 2` (the registry subtracts, for each live wave, min(cap, repositories it still holds)
-  from the two slots; no line from `lead tour` means no live wave, so both are free). Never raise `--max-sessions` above two to speed a wave up.
+- **At most as many subagents running at once as the session cap, 2 unless the human set another.** Queue
+  the rest. The cap is the human's setting (`CADENCE_MAX_SESSIONS`, or `--max-sessions` on a wave; 2 by
+  default, shared by every wave). The sessions of an orchestrated wave (section 2b) count toward this limit:
+  orchestrate sessions plus subagents never exceed the cap. A wave already caps itself; before starting a
+  subagent, check `cadence orchestrate --status`, and while a wave runs, start none beyond the free slots. Read the cap and the
+  free slots, do not compute them: `cadence orchestrate --status` and `cadence lead tour` print
+  `créneaux libres : N sur M` (M is the configured cap; the registry subtracts, for each live wave, min(cap,
+  repositories it still holds) from the M slots; no line from `lead tour` means no live wave, so all M are free).
+  Never raise `--max-sessions` or `CADENCE_MAX_SESSIONS` yourself to speed a wave up: raising the cap is a decision of
+  the human (a trial at 3 was decided on 2026-10-12); if the slots are the bottleneck, say so and let them decide.
 - **Never two subagents in the same repository at the same time**, and the lead does not commit in a
   repository where a subagent is working.
 - **Deliveries and `raf ux` / `raf review` verdicts are done by the lead, one project at a time** —

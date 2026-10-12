@@ -583,6 +583,18 @@ describe('--status : créneaux libres et vague choisie (L141)', () => {
     unregisterWave(cadenceHome(), process.ppid);
   });
 
+  it('--status suit le plafond réglé (CADENCE_MAX_SESSIONS ou --max-sessions), pas 2 en dur (L208)', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-09-1253', started: '2026-10-09T12:53:00Z', cwd: '/ailleurs', repos: ['/x/a'], cap: 3 });
+    const viaEnv = io(parent, { CADENCE_MAX_SESSIONS: '3' });
+    await orchestrate(['--status'], viaEnv.io, fakeDeps().deps);
+    expect(viaEnv.out.join('\n')).toContain('créneaux libres : 2 sur 3');
+    const viaFlag = io(parent);
+    await orchestrate(['--status', '--max-sessions', '4'], viaFlag.io, fakeDeps().deps);
+    expect(viaFlag.out.join('\n')).toContain('créneaux libres : 3 sur 4');
+    unregisterWave(cadenceHome(), process.ppid);
+  });
+
   it('sans identifiant, montre le tableau de la vague la plus récemment lancée, pas la dernière par ordre alphabétique', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }] });
     const f = fakeDeps();

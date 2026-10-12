@@ -76,7 +76,7 @@ picture, not its source.
 
 | Rule | Why |
 |---|---|
-| At most **two subagents** running at once, orchestrate sessions included | `cadence orchestrate --status` and `cadence lead tour` print `créneaux libres : N sur 2`; never raise `--max-sessions` above two |
+| At most **as many subagents as the session cap** running at once (2 by default; the human sets it with `CADENCE_MAX_SESSIONS`), orchestrate sessions included | `cadence orchestrate --status` and `cadence lead tour` print `créneaux libres : N sur M`, M being the configured cap; the lead never raises `--max-sessions` or `CADENCE_MAX_SESSIONS` itself |
 | Never two sessions in the same repository at the same time; the lead does not commit where a wave runs | a wave's lock refuses `cadence deliver` while a lot still works there |
 | A locked acceptance test that contradicts the sheet is corrected by the lead with `cadence spec reseal <lot> <test> --reason "…"` (sheet unchanged, lot in progress, outside a wave), then `--resume --answer` for a lot in question, or a new `cadence orchestrate <project>:<lot>` for a lot handed back (`--resume` skips it) | never by a session, never by editing `acceptation.json` |
 | Deliveries and the `raf ux` / `raf review` verdicts belong to the lead, one project at a time | never to a subagent, never two deliveries in parallel |

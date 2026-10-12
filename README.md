@@ -614,7 +614,7 @@ beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second 
 | `prochain` | the first ready lot (quick wins first) — id and title cut at 60 characters |
 | `dépôt` | `non commité` (modified or untracked files), `non poussé` (commits ahead of the upstream), `livraison en cours` (live delivery lock); `propre` otherwise |
 
-When an orchestrated wave is live, one more line closes the tour (not part of `--json`): `vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2` — the lead reads the free slots there instead of computing them (L141).
+When an orchestrated wave is live, one more line closes the tour (not part of `--json`): `vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2` — the lead reads the free slots there instead of computing them (L141). The `sur M` is the cap the human set (`CADENCE_MAX_SESSIONS`, 2 by default), not a fixed 2 (L208); an invalid value falls back to 2 in this display.
 
 `--json` prints the same content as an array of objects (`project`, `doing`, `drift`, `notes`,
 `next`, `repo`, and `error` when the project could not be read), plus `progress` — `{ done, doing, todo, added7 }`,
@@ -1334,7 +1334,7 @@ A slot or a registry entry is owned by a pid **and** its start time: a reused pi
 identifiers are reserved atomically (`-2`, `-3` suffix when two waves start in the same minute; an existing
 `--wave` is refused). The registry of live waves and the slots live under `~/.cadence/orchestrate/` (`CADENCE_HOME`
 to move it): `cadence orchestrate --status` lists, from any folder, the live waves, the repositories each
-still holds (those not yet released), the cap of each wave, the slots in use and the **free slots** (`créneaux libres : N sur 2`: 2 minus, for each live wave, the smaller of its cap and the repositories it still holds — the figure the `lead` skill reads before starting a subagent). Without an identifier it then prints the table of the wave launched most recently from this folder (by launch time, not by alphabetical order of the identifier).
+still holds (those not yet released), the cap of each wave, the slots in use and the **free slots** (`créneaux libres : N sur M`: M — the cap set with `--max-sessions` or `CADENCE_MAX_SESSIONS`, 2 by default — minus, for each live wave, the smaller of its cap and the repositories it still holds — the figure the `lead` skill reads before starting a subagent; the lead never raises the cap itself, that is the human's decision, L208). Without an identifier it then prints the table of the wave launched most recently from this folder (by launch time, not by alphabetical order of the identifier).
 
 **Guards, imposed by the code**: a global cap of simultaneous sessions, one wave per repository at
 a time (above); `Agent`, `git push`, `cadence deliver`, `raf done|review|ux` are denied to the sessions; a

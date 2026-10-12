@@ -6,7 +6,7 @@
 // <bin-dir>/raf et <bin-dir>/cadence : liens vers <root>/service/bin/*.js.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +24,9 @@ const gitOk = (repo, ...args) => {
 
 /** Posé à la fin d'une installation réussie : sans lui, le dossier de la version n'est pas servi. */
 const COMPLETE = '.mise-en-service-ok';
+
+/** Une version plus ancienne que ça (et ni en service ni la précédente) peut partir : l'instantané d'une vague pointe sur son node_modules. */
+const RETENTION_MS = 7 * 24 * 3600 * 1000;
 
 export const defaultRoot = () => join(homedir(), '.local', 'share', 'cadence');
 export const defaultBinDir = () => join(homedir(), '.local', 'bin');
@@ -121,12 +124,19 @@ export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defa
   }
   replaceLink(dir, join(root, 'service'));
   for (const [name, js] of [['raf', 'raf.js'], ['cadence', 'cadence.js']]) replaceLink(join(root, 'service', 'bin', js), join(binDir, name));
-  // la version précédente reste (retour en arrière) ; les plus anciennes partent
+  // la version précédente reste (retour en arrière) ; les autres partent une fois vieilles seulement : l'instantané d'une
+  // vague en cours lie son node_modules à celui de la version qui l'a lancée, qu'on ne retire pas sous ses pieds
   for (const old of readdirSync(releases)) {
-    if (old !== sha.slice(0, 12) && old !== served) {
-      gitOk(repo, 'worktree', 'remove', '--force', join(releases, old));
-      rmSync(join(releases, old), { recursive: true, force: true });
+    if (old === sha.slice(0, 12) || old === served) continue;
+    let age = Infinity;
+    try {
+      age = Date.now() - statSync(join(releases, old, COMPLETE)).mtimeMs;
+    } catch {
+      /* sans marqueur : installation interrompue, sans vague possible dessus */
     }
+    if (age < RETENTION_MS) continue;
+    gitOk(repo, 'worktree', 'remove', '--force', join(releases, old));
+    rmSync(join(releases, old), { recursive: true, force: true });
   }
   gitOk(repo, 'worktree', 'prune');
   return { sha, dir, fingerprint: fingerprint(dir) };

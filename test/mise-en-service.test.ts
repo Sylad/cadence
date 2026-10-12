@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { checkAccepted, checkLotsDone, fingerprint, mettreEnService } from '../scripts/mise-en-service.mjs';
+import { takeSnapshot } from '../src/orchestrate/snapshot.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -151,7 +152,34 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     }
     expect(git(join(root, 'service'), 'rev-parse', 'HEAD')).toBe(shas[2]);
     expect(existsSync(join(root, 'releases', shas[1].slice(0, 12)))).toBe(true);
-    expect(existsSync(join(root, 'releases', shas[0].slice(0, 12)))).toBe(false);
+    // la plus ancienne n'est retirée qu'une fois vieille : une vague lancée dessus garde ses dépendances (voir plus bas)
+    const old = join(root, 'releases', shas[0].slice(0, 12));
+    expect(existsSync(old)).toBe(true);
+    const longAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+    utimesSync(join(old, '.mise-en-service-ok'), longAgo, longAgo);
+    writeFileSync(join(dir, 'd.txt'), 'd');
+    mettreEnService({ repo: dir, rev: commitAll(dir, 'feat(L1): d', 'd.txt'), root, binDir, install });
+    expect(existsSync(old)).toBe(false);
+  });
+
+  it("deux mises en service après le lancement d'une vague ne lui retirent pas ses dépendances (instantané lié au node_modules de la version)", () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    // installation avec un vrai node_modules dans la version, comme `npm ci` : c'est lui que l'instantané vise
+    const installReal = (d: string) => {
+      install(d);
+      rmSync(join(d, 'node_modules'));
+      mkdirSync(join(d, 'node_modules'));
+      cpSync(join(REPO, 'node_modules', 'yaml'), join(d, 'node_modules', 'yaml'), { recursive: true });
+    };
+    mettreEnService({ repo: dir, rev: first, root, binDir, install: installReal });
+    const wave = tempDir();
+    const tool = takeSnapshot(wave, join(root, 'service'));
+    for (const n of ['b', 'c']) {
+      writeFileSync(join(dir, `${n}.txt`), n);
+      mettreEnService({ repo: dir, rev: commitAll(dir, `feat(L1): ${n}`, `${n}.txt`), root, binDir, install: installReal });
+    }
+    expect(existsSync(join(tool, 'node_modules', 'yaml', 'package.json'))).toBe(true);
   });
 
   it('checkLotsDone ne regarde que les commits au-dessus du sha déjà en service (le seul sha, au premier service)', () => {

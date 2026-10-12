@@ -1234,7 +1234,7 @@ npm run service -- <sha>   # [--root dir] [--bin-dir dir] [--repo dir]
 The script refuses a sha that is not an ancestor of HEAD, and a sha whose commits (since the one in service; only the sha itself the first time)
 cite a lot whose status is not `done` (`plan:` commits are ignored). It builds the new copy aside (`npm ci --ignore-scripts`, then `tsc`) and switches
 `service` and the two links only once the build succeeded (atomic renames): a failed install changes nothing. The previous copy is kept for a
-rollback, the older ones are removed. The first run is also what installs the links in `~/.local/bin`. It prints the fingerprint of the copy
+rollback, the older ones are removed only once they are more than 7 days old (a wave's snapshot links its `node_modules` to the copy that launched it). The first run is also what installs the links in `~/.local/bin`. It prints the fingerprint of the copy
 (bin, dist, package.json).
 
 ### A lot whose work is in a neighbouring repository

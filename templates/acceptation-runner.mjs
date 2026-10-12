@@ -4,12 +4,12 @@
 //   vitest.config.ts          test: { exclude: [...configDefaults.exclude, ...acceptationIgnored()] }
 //   jest.config.js            testPathIgnorePatterns: ['/node_modules/', ...acceptationIgnored(process.cwd(), 'docs/specs', 'regex')]
 //   vitest.acceptation.config.ts   (commande dédiée, orchestrate.accept)
-//                             test: { include: acceptationOnly() }
+//                             test: { include: acceptationOnly() }   (une LISTE de lanceurs : chacun ne voit que les fichiers sous sa racine, cf. acceptationOnly)
 //
 // Un acceptation.json à `vert: false` (tests rouges du lot, pas encore implémenté) exclut ses fichiers du lanceur du projet et de la CI ;
 // le cycle pose `vert: true` quand la commande dédiée passe, et les fichiers rejoignent alors le lanceur ordinaire.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 
 const read = (file) => {
   try {
@@ -44,10 +44,18 @@ export function acceptationIgnored(root = process.cwd(), dir = 'docs/specs', for
   return out;
 }
 
-/** Fichiers de l'acceptation.json donné (par défaut celui de `CADENCE_ACCEPTATION`, posé par le cycle) : l'`include` de la config dédiée. */
-export function acceptationOnly(file = process.env.CADENCE_ACCEPTATION) {
+/**
+ * Fichiers de l'acceptation.json donné (par défaut celui de `CADENCE_ACCEPTATION`, posé par le cycle) : l'`include` de la config dédiée.
+ * Avec une liste de lanceurs (`orchestrate.accept` en liste), chaque lanceur ne prend que les fichiers sous SA racine, le dossier de son
+ * `cd <dossier> &&` initial (`CADENCE_ACCEPTATION_ROOT`, posé par le cycle ; '.' ou absent = le dépôt) : ils sont rendus relatifs à cette racine,
+ * là où le lanceur est démarré.
+ */
+export function acceptationOnly(file = process.env.CADENCE_ACCEPTATION, root = process.env.CADENCE_ACCEPTATION_ROOT ?? '.') {
   if (!file) throw new Error('CADENCE_ACCEPTATION : chemin de l\'acceptation.json du lot attendu (posé par la commande orchestrate.accept)');
   const doc = read(file);
   if (!doc) throw new Error(`${file} : acceptation.json illisible`);
-  return doc.fichiers.filter((f) => typeof f === 'string');
+  const files = doc.fichiers.filter((f) => typeof f === 'string');
+  const base = posix.normalize(root.replace(/\\/g, '/')).replace(/\/$/, '');
+  if (base === '.' || base === '') return files;
+  return files.filter((f) => posix.normalize(f).startsWith(`${base}/`)).map((f) => posix.normalize(f).slice(base.length + 1));
 }

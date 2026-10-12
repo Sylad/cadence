@@ -391,7 +391,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     if (l.specLot && env.config.fiche) vars.fiche = ficheReviewText({ fiche: `${env.config.spec.dir}/<sujet>/fiche.yaml`, passes: 0 });
     if (specStage && env.config.accept) {
       const folder = `${env.config.spec.dir}/${l.screen ? '<écran>' : '<sujet>'}`;
-      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: false, acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept, test: env.config.test });
+      vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: false, acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept ?? '', test: env.config.test });
     }
     for (const s of steps) {
       const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);

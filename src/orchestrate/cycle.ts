@@ -19,7 +19,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
-import { acceptationFile, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
+import { acceptationFile, acceptCommands, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
 import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
@@ -1165,10 +1165,22 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
 const ficheStep = (c: LotCtx): Promise<void> => reviewSpecStep(c, FICHE_REVIEW);
 const maquetteStep = (c: LotCtx): Promise<void> => reviewSpecStep(c, MAQUETTE_REVIEW);
 
-/** Commande dédiée aux tests d'acceptation du lot : `{acceptation}` y est remplacé, `CADENCE_ACCEPTATION` posé, chemin absolu dans les deux cas. */
-function runAccept(c: LotCtx, json: string): Promise<{ code: number; output: string }> {
+/** Résultat d'une commande de `orchestrate.accept` lancée pour le lot. */
+interface AcceptRun { command: string; code: number; output: string }
+
+/**
+ * Commandes dédiées aux tests d'acceptation du lot (une chaîne ou une liste, L189) : `{acceptation}` y est remplacé, `CADENCE_ACCEPTATION` (chemin absolu
+ * dans les deux cas) et `CADENCE_ACCEPTATION_ROOT` (sa racine) posés. Une commande sans fichier listé sous sa racine n'est pas lancée ; les fichiers
+ * listés sous aucune racine sont rendus (`orphans`) sans rien lancer.
+ */
+async function runAccept(c: LotCtx, json: string): Promise<{ runs: AcceptRun[]; orphans: string[] }> {
   const abs = join(c.lot.repo, json);
-  return sh(c, (c.config.accept ?? '').replaceAll('{acceptation}', abs), 30 * 60_000, { CADENCE_ACCEPTATION: abs });
+  const doc = parseAcceptation(readFileSync(abs, 'utf8'));
+  const plan = planAcceptRuns(acceptCommands(c.config.accept), typeof doc === 'string' ? [] : doc.fichiers);
+  if (plan.orphans.length) return { runs: [], orphans: plan.orphans };
+  const runs: AcceptRun[] = [];
+  for (const r of plan.runs) runs.push({ command: r.command, ...(await sh(c, r.command.replaceAll('{acceptation}', abs), 30 * 60_000, { CADENCE_ACCEPTATION: abs, CADENCE_ACCEPTATION_ROOT: r.root || '.' })) });
+  return { runs, orphans: [] };
 }
 
 const tail = (output: string, n = 40): string => output.trim().split('\n').slice(-n).join('\n');
@@ -1180,7 +1192,8 @@ async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore
   out.push(...checkAcceptation(l.repo, json, l.lot, fiche, l.steps.find((s) => s.kind === 'accept')?.headBefore));
   if (out.length) return out;
   const red = await runAccept(c, json);
-  if (red.code === 0) out.push(`la commande dédiée (orchestrate.accept) passe alors que le code n'existe pas : des tests verts avant le code ne prouvent rien — chaque test doit échouer parce que la fonctionnalité manque\n${tail(red.output, 15)}`);
+  if (red.orphans.length) out.push(`fichiers listés dans ${json} sous la racine d'aucune commande de orchestrate.accept (le dossier de son « cd <dossier> && » initial, sinon le dépôt) : ${red.orphans.join(', ')} — aucun lanceur ne les prendrait`);
+  for (const r of red.runs) if (r.code === 0) out.push(`la commande dédiée « ${r.command} » (orchestrate.accept) passe alors que le code n'existe pas : des tests verts avant le code ne prouvent rien — chaque test doit échouer parce que la fonctionnalité manque\n${tail(r.output, 15)}`);
   if (!c.config.test) {
     if (!l.warnings.includes(NO_TEST_ACCEPT)) l.warnings.push(NO_TEST_ACCEPT);
   } else {
@@ -1259,8 +1272,10 @@ async function acceptGreen(c: LotCtx): Promise<Constat | null> {
   if (!json || !existsSync(join(l.repo, json))) return null;
   const a = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
   if (typeof a === 'string' || a.vert) return null;
-  const r = await runAccept(c, json);
-  if (r.code !== 0) return { source: 'tests', gravite: 'bloquant', texte: `tests d'acceptation encore rouges (${c.config.accept}, code ${r.code}) : à rendre verts sans modifier les fichiers listés dans ${json} :\n${tail(r.output)}` };
+  const { runs, orphans } = await runAccept(c, json);
+  if (orphans.length) return { source: 'tests', gravite: 'bloquant', texte: `fichiers listés dans ${json} sous la racine d'aucune commande de orchestrate.accept : ${orphans.join(', ')}` };
+  const failed = runs.filter((r) => r.code !== 0);
+  if (failed.length) return { source: 'tests', gravite: 'bloquant', texte: `tests d'acceptation encore rouges (${failed.map((r) => `${r.command}, code ${r.code}`).join(' ; ')}) : à rendre verts sans modifier les fichiers listés dans ${json} :\n${failed.map((r) => (failed.length > 1 ? `$ ${r.command}\n` : '') + tail(r.output)).join('\n')}` };
   setVert(l.repo, json);
   const dirty = await commitPlan(c, `chore(${l.lot}): acceptation verte, vert: true posé par le cycle (orchestrate ${c.wave.id})`);
   if (dirty) return { source: 'tests', gravite: 'bloquant', texte: `vert: true de ${json} : ${dirty}` };

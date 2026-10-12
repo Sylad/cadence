@@ -1107,13 +1107,23 @@ After a valid spec, a lot with a sheet gets a UX review of its mockup, `maquette
 
 ### The accept step: red acceptance tests and their lock
 
-After a valid spec, and only when `cadence.yaml` declares `orchestrate.accept` (the project's **dedicated command**, which runs *only* the acceptance tests of one lot), a lot with a sheet gets one more
+After a valid spec, and only when `cadence.yaml` declares `orchestrate.accept` (the project's **dedicated command**, or a list of them, which run *only* the acceptance tests of one lot), a lot with a sheet gets one more
 session, `accept` (L173): `precheck → spec → maquette → accept → implement → ux → review`. Without `orchestrate.accept` the step is skipped, with a warning on the lot (`étape accept ignorée …`), and the lot goes from `spec` to `implement` as before.
 `--dry-run` lists the step (`accept (sonnet)`) and its brief `templates/orchestrate/accept.md`.
 
 - **The session**: Sonnet, the `acceptance-writer` agent, a session other than the implementer's. Its brief gives it the sheet, the mockup and how to run the project's tests (the dedicated command, and the runner template below) — not the lot's objective, notes or
   sub-tasks, and no implementation. It writes one or more cases per rule, **named as the sheet plans them** (`regles[].tests`, e.g. `R3 — erreur : message et bouton Réessayer`), selectors = the `data-testid` of the fields, API calls simulated from `actions[]`,
   and commits them **red** in one commit (`test(L7): acceptation R1–Rn (rouge)`) with `<spec.dir>/<écran>/acceptation-<lot>.json` (**one file per lot**: two lots on the same screen never share a lock or a file; the id is reduced to `A-Za-z0-9._-`, so `app/L7` gives `acceptation-app-L7.json`; an older `acceptation.json` is still read, by its `lot` key) — `{ "lot", "fiche", "fichiers": [...], "vert": false }` — and the runner configuration. A second lot's tests that rewrite the first lot's test files hand the lot back, with the file named (the lock below). `effort.accept` (default `medium`) sets its effort.
+- **One command or a list of runners** (L189). `orchestrate.accept` is a string or a **list** of commands, for a project with a front and a back runner (Vitest in `frontend/`, Jest in `backend/`):
+
+  ```yaml
+  orchestrate:
+    accept:
+      - cd frontend && npx vitest run -c vitest.acceptation.config.ts
+      - cd backend && npx jest -c jest.acceptation.config.js
+  ```
+
+  The program runs **each** command from the repository root with `CADENCE_ACCEPTATION` (and `{acceptation}` substituted) and `CADENCE_ACCEPTATION_ROOT`, the command's **root**: the folder of its leading `cd <folder> &&`, else the repository (`.`). A command takes **only the files listed under its root**: `acceptationOnly()` of the runner template returns them relative to that root, where the runner starts. A command with **no listed file under its root is not run**; a listed file under **no root** is a deviation of the step (`fichiers listés … sous la racine d'aucune commande de orchestrate.accept`, one second pass, then `accept non conforme après 2 passes`). **Red check**: every command that is run must fail (the deviation names the one that passes); **green**: `vert: true` is set only when all of them pass, and a lot sent back to `fix` is told which commands are still red. A string keeps its behaviour (no `cd`: the whole repository is its root). One lot per app wires its back runner (dedicated config, `exclude` in the ordinary one, a line in `cadence.yaml`): that is the app's plan, not cadence's.
 - **Out of the ordinary test run and the CI while the lot is not green.** Red tests committed would fail `orchestrate.test` (after every `implement`/`fix`) and the project's CI (which `cadence deliver` waits for), for lots that are not theirs. So the
   runner configuration shared by `orchestrate.test` and the CI excludes the files listed in every acceptation file (`acceptation-<lot>.json`) whose `vert` is `false`, and only the dedicated command runs them. `templates/acceptation-runner.mjs` is the helper the session copies
   into the project: `acceptationIgnored()` (Vitest `exclude`; `acceptationIgnored(root, dir, 'regex')` for Jest `testPathIgnorePatterns`) and `acceptationOnly()` (the `include` of the dedicated config, which reads the environment variable `CADENCE_ACCEPTATION`:

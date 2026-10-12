@@ -50,7 +50,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- Acceptance tests validated when written (L204): the `accept` session runs them against the empty screen (or the stub), reads each failure and reports `rouges` (`test`, `echec`, `cause` `absent`/`autre`); a test missing from the report, a cause other than the feature being absent, an error of the test itself (`ReferenceError`, broken import…) or a runner red only for finding no test sends the lot back to the `accept` session before the seal, instead of a wrong sealed test found later (lived 2026-10-12, four sealed tests wrong).
+- Acceptance tests validated when written (L204): the `accept` session runs them against the empty screen (or the stub), reads each failure and reports `rouges` (`test`, `echec`, `cause` `absent`/`autre`); a test missing from the report, a cause other than the feature being absent, an error of the test itself (`ReferenceError`, `SyntaxError`…; a not-yet-existing module to be created by the lot is accepted) or a runner red only for finding no test sends the lot back to the `accept` session before the seal, instead of a wrong sealed test found later (lived 2026-10-12, four sealed tests wrong).
 - End-to-end acceptance (L203): an acceptation file with `"e2e": true` (browser, build required) stays out of the ordinary runner and the unit CI even at `vert: true`, instead of turning them red without `dist` or Chromium. `acceptationIgnored()` of `templates/acceptation-runner.mjs` excludes it, the new `acceptationE2e()` lists its files for the e2e suite run after the build, and the accept brief asks the session to set the key. Copy the runner template again to get it.
 
 ## [1.2.0] - 2026-10-12

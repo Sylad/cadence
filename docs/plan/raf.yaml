@@ -2205,9 +2205,10 @@ lots:
     started: 2026-10-12
   - id: L196
     title: "Revue de fiche : les constats mineurs deviennent des propositions du tableau final et non des notes du lot, contrairement au design § 4 et aux consignes (templates/orchestrate/fiche.md:12, agents/code-reviewer.md:67 « a minor one becomes a note ») — aligner le programme sur le design, test"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-11
+    started: 2026-10-12
   - id: L197
     title: "Skill lead et docs/lead.md : le verdict UX (raf ux) peut être posé par le lead d'après le rapport du ux-reviewer et son propre regard sur les captures, l'humain n'étant consulté qu'en cas de doute (consigne de Sylvain 12-10 : « je ne suis pas UX, demande-moi un avis seulement si tu as des doutes ») — réglage du parent cadence.yaml (ex. lead.ux: lead | human, défaut human pour ne rien changer ailleurs), skill, README, test"
     status: doing

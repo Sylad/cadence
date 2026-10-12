@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readOrchestrateConfig } from '../src/config.js';
-import { acceptCommands, acceptRoot, acceptText, planAcceptRuns } from '../src/orchestrate/accept.js';
+import { acceptCommands, isAcceptList, acceptRoot, acceptText, planAcceptRuns } from '../src/orchestrate/accept.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 // @ts-expect-error gabarit .mjs livré tel quel, sans déclaration de types
 import { acceptationOnly } from '../templates/acceptation-runner.mjs';
@@ -181,3 +181,19 @@ describe('liste de lanceurs : le cycle', () => {
     expect(new Set(lines)).toEqual(new Set(['root=.']));
   });
 });
+
+describe('liste de lanceurs : brief et cycle décident par la même fonction', () => {
+  const cas: [string, string | string[], boolean][] = [
+    ['une chaîne', 'cd frontend && vt', false],
+    ['une liste de 1 élément', ['cd frontend && vt'], true],
+    ['une liste de 2 éléments', ['cd frontend && vt', 'cd backend && jest'], true],
+  ];
+  it.each(cas)('%s : isAcceptList, planAcceptRuns et le brief concordent', (_nom, accept, liste) => {
+    expect(isAcceptList(accept)).toBe(liste);
+    const plan = planAcceptRuns(acceptCommands(accept), ['frontend/a.test.ts'], !isAcceptList(accept));
+    expect(plan.runs[0].root).toBe(liste ? 'frontend' : '');
+    const brief = acceptText({ fiche: 'f', maquette: 'm', acceptation: 'a.json', command: accept });
+    expect(/only the files listed under its root/.test(brief)).toBe(liste);
+  });
+});
+

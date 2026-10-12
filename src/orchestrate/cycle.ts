@@ -19,7 +19,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
-import { acceptationFile, acceptCommands, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
+import { acceptationFile, acceptCommands, isAcceptList, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
 import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
@@ -1176,7 +1176,7 @@ interface AcceptRun { command: string; code: number; output: string }
 async function runAccept(c: LotCtx, json: string): Promise<{ runs: AcceptRun[]; orphans: string[] }> {
   const abs = join(c.lot.repo, json);
   const doc = parseAcceptation(readFileSync(abs, 'utf8'));
-  const plan = planAcceptRuns(acceptCommands(c.config.accept), typeof doc === 'string' ? [] : doc.fichiers, !Array.isArray(c.config.accept));
+  const plan = planAcceptRuns(acceptCommands(c.config.accept), typeof doc === 'string' ? [] : doc.fichiers, !isAcceptList(c.config.accept));
   if (plan.orphans.length) return { runs: [], orphans: plan.orphans };
   const runs: AcceptRun[] = [];
   for (const r of plan.runs) runs.push({ command: r.command, ...(await sh(c, r.command.replaceAll('{acceptation}', abs), 30 * 60_000, { CADENCE_ACCEPTATION: abs, CADENCE_ACCEPTATION_ROOT: r.root || '.' })) });

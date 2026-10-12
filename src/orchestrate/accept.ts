@@ -329,9 +329,14 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
   return out;
 }
 
+/** Une liste (même d'un seul élément) lance chaque entrée sous sa racine ; une chaîne garde le dépôt pour racine. Le brief et le cycle décident par cette seule fonction. */
+export function isAcceptList(accept: string | string[] | undefined): accept is string[] {
+  return Array.isArray(accept);
+}
+
 /** Commandes de `orchestrate.accept` : une chaîne ou une liste (L189), toujours rendue en liste. */
 export function acceptCommands(accept: string | string[] | undefined): string[] {
-  return accept === undefined ? [] : Array.isArray(accept) ? accept : [accept];
+  return accept === undefined ? [] : isAcceptList(accept) ? accept : [accept];
 }
 
 /** Racine d'une commande : le dossier de son `cd <dossier> &&` initial (relatif au dépôt, normalisé), sinon le dépôt (''). Un `cd` qui sort du dépôt n'est pas une racine. */
@@ -361,7 +366,7 @@ export function acceptText(o: { fiche: string; maquette: string; screen?: boolea
     !screen
       ? `Sheet: \`${o.fiche}\` (cases, rules, contracts, data). You get nothing else about the behaviour: the implementation does not exist yet.`
       : `Sheet: \`${o.fiche}\` (rules, fields, actions). Mockup: \`${o.maquette}\` (every field carries \`data-testid="<field id>"\`). You get nothing else about the screen: the implementation does not exist yet.${o.back ? ' The sheet also has a back part (`cas`, `contrats`, `donnees`): write the cases of its rules too, calling the contracts of `contrats[]` as close as possible and simulating the external sources from `entree`.' : ''}`,
-    commands.length > 1
+    isAcceptList(o.command)
       ? `The project declares several dedicated commands (\`orchestrate.accept\`, one per test runner), each of which runs ONLY the acceptance tests of this lot that sit under its root (the folder of its leading \`cd <folder> &&\`, else the repository): ${commands.map((x) => `\`${x}\` (root \`${acceptRoot(x) || '.'}\`)`).join(', ')}. Each is run from the repository root and gets \`CADENCE_ACCEPTATION\` (the absolute path of the lot's \`acceptation.json\`, also substituted for \`{acceptation}\`) and \`CADENCE_ACCEPTATION_ROOT\` (its root); it takes only the files listed under its root, a command with no listed file under its root is not run, and a listed file under no root is refused. Put each test file where its runner looks, and list every file in \`fichiers\`.${o.test ? ` The project's ordinary test command is \`${o.test}\`: it must stay green with your red tests committed.` : ''}`
       : `The project declares the dedicated command that runs ONLY the acceptance tests of this lot (\`orchestrate.accept\`): \`${commands[0]}\` (from the repository root; the program sets \`CADENCE_ACCEPTATION\` to the absolute path of the lot's \`acceptation.json\`, and replaces \`{acceptation}\` with it).${o.test ? ` The project's ordinary test command is \`${o.test}\`: it must stay green with your red tests committed.` : ''}`,
     `Write \`${o.acceptation}\` (one file per lot, next to the sheet: another lot on the same ${screen ? 'screen' : 'subject'} has its own, which you never touch, nor its tests — give your test files names of your own): \`{ "lot": "<lot>", "fiche": "${o.fiche}", "fichiers": ["<test file>", …], "vert": false }\` (paths relative to the repository). The ordinary test config of the project (shared with its CI) must exclude those files while \`vert\` is false; the dedicated config includes only them. Both read the file with this runner template (copy it into the project, e.g. \`tests/acceptation-runner.mjs\`):`,

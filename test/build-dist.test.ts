@@ -43,4 +43,14 @@ describe('le dist/ en service (L195)', () => {
   it('prepare (npm install, publication) construit dist/ : le paquet publié l’embarque', () => {
     expect(scripts.prepare).toBe('npm run build:service');
   });
+
+  it('le skill lead ne met en service qu’après le verdict : build:service est à l’étape 3, après raf done, pas à l’étape 2', () => {
+    const skill = readFileSync(join(REPO, 'skills', 'lead', 'SKILL.md'), 'utf8');
+    const check = skill.slice(skill.indexOf('## 3. Check'), skill.indexOf('## 4. Delivery'));
+    const step2 = check.slice(check.indexOf('\n2. '), check.indexOf('\n3. '));
+    const step3 = check.slice(check.indexOf('\n3. '));
+    expect(step2).not.toContain('build:service');
+    expect(step3).toContain('build:service');
+    expect(step3.indexOf('build:service')).toBeGreaterThan(step3.indexOf('raf done'));
+  });
 });

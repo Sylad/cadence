@@ -1324,6 +1324,13 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   for (const x of rep.choix ?? []) if (!(l.choix ??= []).includes(x)) l.choix.push(x);
   save(c);
 
+  // Verrou des tests d'acceptation (L173) : ceux de TOUS les lots du dépôt, pas seulement du lot courant ; une modification est une question au lead. Contrôlé à CHAQUE fin de session, une question comprise (L200) :
+  // une session qui remplace un test scellé puis pose une question ne passe pas par la reprise du lead pour se faire adopter.
+  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: l.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(l.repo, lotWork(c.loadPlan(), l.repo, l.lot).map((k) => k.sha)), lotCommits: lotCommits(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) }) : [];
+  if (locked.length) {
+    stop(c, 'handed-back', `verrou des tests d'acceptation : ${locked.join(' ; ')}`);
+    return;
+  }
   // La passe des mineurs ne bloque jamais le lot (revue conforme déjà acquise) : une question est rendue en proposition.
   const questions = rep.questions.filter((q) => !isNonQuestion(q));
   // Une entrée filtrée reste visible (avertissement du lot, donc tableau de fin de vague) ; l'entrée vide n'a rien à montrer.
@@ -1338,12 +1345,6 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const dirt = dirtAfter(done);
   if (dirt.length) {
     stop(c, 'handed-back', `dépôt sale après ${kind} : ${dirt.join(', ')}`);
-    return;
-  }
-  // Verrou des tests d'acceptation (L173) : ceux de TOUS les lots du dépôt, pas seulement du lot courant ; une modification est une question au lead.
-  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: l.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(l.repo, lotWork(c.loadPlan(), l.repo, l.lot).map((k) => k.sha)), lotCommits: lotCommits(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) }) : [];
-  if (locked.length) {
-    stop(c, 'handed-back', `verrou des tests d'acceptation : ${locked.join(' ; ')}`);
     return;
   }
   // Reprise : une session précédente de l'étape (correction ordinaire ou passe des mineurs) a pu commiter avant d'être coupée ; la revue d'origine ne vaut alors plus.
@@ -1645,6 +1646,27 @@ export function handBackDroppedQuestions(ctxs: LotCtx[]): void {
   }
 }
 
+/**
+ * Prédicat « ce commit est l'œuvre d'une session de la vague » (L200) : les commits connus des étapes de TOUS les lots de la vague
+ * (`steps[].commits`) et ceux de `headBefore..headAfter` de chaque session terminée. Un rescellé du lead se fait entre deux sessions, hors de ces plages.
+ */
+function waveCommits(c: LotCtx, repo: string): (sha: string) => boolean {
+  const known = new Set<string>();
+  const prefixes: string[] = [];
+  for (const l of [c.lot, ...c.wave.store.lots().filter((x) => lotKey(x.project, x.lot) !== lotKey(c.lot.project, c.lot.lot))]) {
+    for (const s of l.steps) {
+      for (const k of s.commits ?? []) if (/^[0-9a-f]{7,40}\b/i.test(k)) prefixes.push(k.split(' ')[0]!.toLowerCase());
+      if (!s.headBefore || !s.headAfter || l.repo !== repo) continue;
+      try {
+        for (const sha of git(repo, 'rev-list', `${s.headBefore}..${s.headAfter}`).split('\n')) if (sha) known.add(sha);
+      } catch {
+        // plage illisible (historique réécrit) : les commits connus de l'étape restent comptés
+      }
+    }
+  }
+  return (sha) => known.has(sha) || prefixes.some((p) => sha.startsWith(p));
+}
+
 /** Joue le cycle d'un lot jusqu'à son terme, ou jusqu'à l'arrêt (question, budget, quota). Ne lève jamais. */
 export async function runLot(c: LotCtx): Promise<void> {
   const l = c.lot;
@@ -1657,7 +1679,7 @@ export async function runLot(c: LotCtx): Promise<void> {
     }
     if (l.status === 'question' && !l.pendingAnswer) return;
     // Un test rescellé par le lead pendant la question (L200) a déplacé le commit rouge : l'ancre suit, le verrou garde le reste.
-    if (l.status === 'question' && l.accept?.rouge) l.accept.rouge = resealedRouge(l.repo, l.accept.acceptation, l.accept.rouge) ?? l.accept.rouge;
+    if (l.status === 'question' && l.accept?.rouge) l.accept.rouge = resealedRouge(l.repo, l.accept.acceptation, l.accept.rouge, waveCommits(c, l.repo)) ?? l.accept.rouge;
     if (l.next === null && l.steps.length === 0) {
       if (dropped(c)) {
         stop(c, 'handed-back', DROPPED);

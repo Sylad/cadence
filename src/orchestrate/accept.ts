@@ -104,11 +104,12 @@ export function redSha(repo: string, path: string): string | null {
 
 /**
  * Le commit rouge a bougé depuis `anchor` par un rescellé du lead (`cadence spec reseal`, L200) : le nouveau sha, sinon null.
- * Seul un commit qui a allongé le journal `resceaux` est adopté ; toute autre réécriture reste un écart pour le verrou.
+ * Seul un commit qui a allongé le journal `resceaux` ET qu'aucune session de la vague n'a fait (`bySession`) est adopté ; toute autre réécriture reste un écart pour le verrou.
  */
-export function resealedRouge(repo: string, path: string, anchor: string): string | null {
+export function resealedRouge(repo: string, path: string, anchor: string, bySession: (sha: string) => boolean = () => false): string | null {
   const now = redSha(repo, path);
   if (!now || now === anchor) return null;
+  if (bySession(now)) return null; // un commit de session n'est jamais un rescellé du lead : il reste un écart pour le verrou
   const journal = (rev: string): number => {
     const r = show(repo, rev, path)?.resceaux;
     return Array.isArray(r) ? r.length : 0;

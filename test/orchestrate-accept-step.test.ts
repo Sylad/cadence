@@ -340,6 +340,45 @@ describe('verrou et retour au vert pendant implement / fix', () => {
     expect(c.lot.accept?.rouge).not.toBe(ancre);
   });
 
+  it('une session qui remplace le test, refait l’empreinte, commite puis pose une question finit handed-back, sans attendre la réponse du lead (L200)', async () => {
+    const replace: Handler = (call) => {
+      const cwd = call.opts.cwd;
+      const a = JSON.parse(readFileSync(join(cwd, JSON_PATH), 'utf8')).fichiers[0] as string;
+      writeFileSync(join(cwd, a), `${readFileSync(join(cwd, a), 'utf8')}// remplacé par la session\n`);
+      resealAcceptation(cwd, JSON_PATH, a, 'la session trouve le test faux', '2026-10-12');
+      git(cwd, 'add', '--', JSON_PATH, a);
+      git(cwd, 'commit', '-q', '-m', 'feat(L1): rescellé par la session', '--', JSON_PATH, a);
+      return claudeOut(workReport({ commits: [{ sha: git(cwd, 'rev-parse', 'HEAD'), sujet: 'feat(L1): rescellé par la session' }], questions: ['le test est-il faux ?'] }));
+    };
+    const h = prepared({ accept: [accept()], implement: [replace, green], review: [ok] });
+    const c = h.lot('L1', screen, config);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/verrou des tests d'acceptation/);
+  });
+
+  it('un rescellé dont le commit appartient à une session de la vague n’est pas adopté à la reprise d’un lot en question (L200)', async () => {
+    const ask: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')], questions: ['la regex ?'] }));
+    const h = prepared({ accept: [accept()], implement: [ask, green], review: [ok] });
+    const c = h.lot('L1', screen, config);
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    const ancre = c.lot.accept!.rouge;
+    const a = JSON.parse(readFileSync(join(h.repo, JSON_PATH), 'utf8')).fichiers[0] as string;
+    writeFileSync(join(h.repo, a), `${readFileSync(join(h.repo, a), 'utf8')}// corrigé\n`);
+    resealAcceptation(h.repo, JSON_PATH, a, 'contredit la fiche', '2026-10-12');
+    git(h.repo, 'add', '--', JSON_PATH, a);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation rescellée', '--', JSON_PATH, a);
+    // ce commit est rangé dans la plage de la dernière session : c'est un commit de session, plus un acte du lead
+    c.lot.steps[c.lot.steps.length - 1]!.headAfter = git(h.repo, 'rev-parse', 'HEAD');
+    c.lot.pendingAnswer = 'oui';
+    c.lot.answers.push('oui');
+    await runLot(c);
+    expect(c.lot.accept?.rouge).toBe(ancre);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/verrou des tests d'acceptation/);
+  });
+
   it('le verrou vaut pour les autres lots du dépôt : L2 ne touche pas aux tests de L1, même sans screen: ni orchestrate.accept', async () => {
     const h = harness({
       lots: [{ title: 'Un écran', screen: 'page' }, { title: 'Un autre lot' }],

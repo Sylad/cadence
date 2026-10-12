@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { sharedStateDir } from '../src/state.js';
 import { lockViolations, redSha, resealAcceptation, resealedRouge, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { run } from '../src/cli.js';
+import { DISALLOWED } from '../src/orchestrate/launch.js';
 import { gitRepo } from './helpers.js';
 import { git } from './orchestrate-harness.js';
 import { DIR, ecritAcceptation } from './accept-helpers.js';
@@ -100,6 +101,17 @@ describe('resealAcceptation : refaire l’empreinte d’un seul test, la fiche i
     expect(lockViolations(repo, DIR, rescelle, { rouge: { [a.json]: rescelle } })).toEqual([]);
   });
 
+  it('un rescellé fait par une session de la vague n’est pas adopté, celui du lead (hors de toute session) l’est', () => {
+    const { repo, a } = lotScelle();
+    const ancre = redSha(repo, a.json)!;
+    writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+    resealAcceptation(repo, a.json, a.test, 'contredit la fiche', '2026-10-12');
+    commitPaths(repo, 'test(L1): acceptation rescellée', a.json, a.test);
+    const rescelle = git(repo, 'rev-parse', 'HEAD').trim();
+    expect(resealedRouge(repo, a.json, ancre, (sha) => sha === rescelle)).toBeNull();
+    expect(resealedRouge(repo, a.json, ancre, () => false)).toBe(rescelle);
+  });
+
   it('une réécriture d’acceptation.json sans journal de rescellé n’est pas adoptée comme nouvelle ancre', () => {
     const { repo, a } = lotScelle();
     const ancre = redSha(repo, a.json)!;
@@ -177,6 +189,41 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/orchestration en cours \(vague w9/);
     expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
+  });
+});
+
+describe('rescellé atomique et interdit aux sessions', () => {
+  it('un commit refusé (hook pre-commit) restaure acceptation.json et le test, sans index à moitié prêt, et lève une erreur lisible', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    sealAcceptation(repo, a.json);
+    commitPaths(repo, 'test(L1): acceptation scellée', a.json);
+    const cli = (...argv: string[]) => {
+      const err: string[] = [];
+      const code = run(argv, { cwd: repo, env: { RAF_TODAY: '2026-10-12' }, out: () => {}, err: (l) => err.push(l), now: () => new Date('2026-10-12T10:00:00') });
+      return { code, err: err.join('\n') };
+    };
+    cli('init', '--project', 'demo');
+    cli('add', 'Lot un');
+    cli('start', 'L1');
+    commitPaths(repo, 'plan: L1', 'docs/plan/raf.yaml', '.gitignore');
+    writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+    const jsonAvant = readFileSync(join(repo, a.json), 'utf8');
+    const testAvant = readFileSync(join(repo, a.test), 'utf8');
+    const hook = join(repo, '.git', 'hooks', 'pre-commit');
+    writeFileSync(hook, '#!/bin/sh\necho "refusé par le hook" >&2\nexit 1\n');
+    chmodSync(hook, 0o755);
+    const r = cli('spec', 'reseal', 'L1', a.test, '--reason', 'le test contredit la fiche');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/commit du rescellé a échoué.*rien n'est rescellé.*refusé par le hook/);
+    expect(readFileSync(join(repo, a.json), 'utf8')).toBe(jsonAvant);
+    expect(readFileSync(join(repo, a.test), 'utf8')).toBe(testAvant);
+    expect(git(repo, 'diff', '--cached', '--name-only').trim()).toBe('');
+    expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
+  });
+
+  it('cadence spec reseal est interdit aux sessions, comme raf done/review/ux', () => {
+    expect(DISALLOWED).toContain('Bash(cadence spec reseal:*)');
   });
 });
 

@@ -446,10 +446,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'deliver': {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
-      const orchestrating = activeLock(join(sharedStateDir(root), REPO_LOCK));
-      // La vague tient le verrou jusqu'à la fin de ses lots ; ne refuse que si l'un d'eux travaille encore dans CE dépôt (état illisible : on refuse).
-      const stillOpen = orchestrating ? openLotsIn(cadenceHome(), orchestrating.pid, root) : null;
-      if (orchestrating && (stillOpen === null || stillOpen.length > 0)) throw new RafError(`deliver : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — livrer une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
+      const orchestrating = waveHolding(root);
+      if (orchestrating) throw new RafError(`deliver : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — livrer une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans le README)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const plan = existsSync(planPath) ? loadPlan() : null;
@@ -722,6 +720,14 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
   }
 }
 
+/** La vague qui tient le verrou du dépôt tant qu'un de ses lots y travaille encore (état illisible : on la tient pour active) ; null si le dépôt est libre. Partagé par `deliver` et `spec reseal`. */
+function waveHolding(root: string): { wave: string; pid: number } | null {
+  const orchestrating = activeLock(join(sharedStateDir(root), REPO_LOCK));
+  if (!orchestrating) return null;
+  const stillOpen = openLotsIn(cadenceHome(), orchestrating.pid, root);
+  return stillOpen === null || stillOpen.length > 0 ? orchestrating : null;
+}
+
 /**
  * `cadence spec reseal <lot> <test> --reason texte` (L200) : le chemin du lead quand un test d'acceptation scellé du lot EN COURS contredit la fiche.
  * Le test est corrigé dans l'arbre de travail (fiche inchangée) ; la commande refait l'empreinte de ce seul test, journalise la raison dans
@@ -733,9 +739,8 @@ function specReseal(args: string[], reason: string | undefined, ctx: { root: str
   if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche"');
   if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec reseal refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
   // Comme `deliver` : la vague tient le verrou du dépôt tant qu'un de ses lots y travaille (état illisible : on refuse) ; un commit du lead en pleine passe ferait signaler au lot suivant un écart qui n'est pas le sien.
-  const orchestrating = activeLock(join(sharedStateDir(ctx.root), REPO_LOCK));
-  const stillOpen = orchestrating ? openLotsIn(cadenceHome(), orchestrating.pid, ctx.root) : null;
-  if (orchestrating && (stillOpen === null || stillOpen.length > 0)) throw new RafError(`spec reseal : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — rescellé une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
+  const orchestrating = waveHolding(ctx.root);
+  if (orchestrating) throw new RafError(`spec reseal : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — rescellé une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
   const [lotId, test] = args as [string, string];
   const plan = ctx.loadPlan();
   const lot = plan.lot(lotId);
@@ -744,6 +749,7 @@ function specReseal(args: string[], reason: string | undefined, ctx: { root: str
   const dir = readOrchestrateConfig(ctx.configPath).spec.dir;
   const json = findAcceptation(repo, dir, lotId);
   if (!json) throw new RafError(`${lotId} : aucune acceptation sous ${dir} (le lot n'a pas passé l'étape accept)`);
+  const before = { json: readFileSync(join(repo, json), 'utf8'), test: existsSync(join(repo, test)) ? readFileSync(join(repo, test), 'utf8') : '' };
   let r: { avant: string; apres: string };
   try {
     r = resealAcceptation(repo, json, test, reason, ctx.today);
@@ -751,8 +757,21 @@ function specReseal(args: string[], reason: string | undefined, ctx: { root: str
     throw new RafError((e as Error).message);
   }
   const norm = posix.normalize(test);
-  git(repo, ['add', '--', json, norm]);
-  git(repo, ['commit', '-q', '-m', `test(${lotId}): acceptation rescellée, ${norm} : ${reason.trim()}`, '--', json, norm]);
+  try {
+    git(repo, ['add', '--', json, norm]);
+    git(repo, ['commit', '-q', '-m', `test(${lotId}): acceptation rescellée, ${norm} : ${reason.trim()}`, '--', json, norm]);
+  } catch (e) {
+    // Atomique : un commit refusé (hook pre-commit, ...) ne laisse ni empreinte refaite ni index à moitié prêt ; le test retrouve le texte du lead.
+    writeFileSync(join(repo, json), before.json);
+    writeFileSync(join(repo, norm), before.test);
+    try {
+      git(repo, ['reset', '-q', '--', json, norm]);
+    } catch {
+      // rien d'indexé : rien à défaire
+    }
+    const out = e as { stderr?: string; stdout?: string; message: string };
+    throw new RafError(`spec reseal : le commit du rescellé a échoué, ${json} et ${norm} sont revenus tels qu'avant la commande (rien n'est rescellé) — ${(out.stderr || out.stdout || out.message).trim().split('\n').slice(-5).join(' | ')}`);
+  }
   const sha = git(repo, ['rev-parse', '--short', 'HEAD']).trim();
   // Un plan tenu par un autre outil ne se modifie pas d'ici : la raison est déjà dans acceptation.json et dans le commit, la note reste à la main du lead.
   if (plan.readonly) {

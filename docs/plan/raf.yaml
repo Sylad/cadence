@@ -2190,6 +2190,7 @@ lots:
     estimate: 0.25
     created: 2026-10-11
     started: 2026-10-12
+    review: { date: 2026-10-12, verdict: "compliant (1 minor note) — orchestré (vague 2026-10-12-0800, 0 passe(s) de correction)", commit: 804d747c050786995b643e626eda1b8ee93c5e68 }
   - id: L194
     title: "Recalibrer lotBudget sur les totaux mesurés : un lot screen: coûte ~1,2 M au total (L113 ≈ 1,2 M ; L25 503 k + 776 k ; L50 > 850 k rendu à 800 k) et l'allocation L191 (+350 k, étapes spec seules) ne couvre pas UX de conformité + passes ; un lot de 1 j sans écran dépasse aussi 450 k (L188 483 k puis 495 k) — p90 du total par catégorie (écran / spec / ordinaire, par estimate) sur .cadence/runs, constantes et README mis à jour, --dry-run montre la base"
     status: done

@@ -105,7 +105,7 @@ export interface LaunchOpts {
 export type ClaudeFn = (args: string[], opts: LaunchOpts) => Promise<LaunchOutcome>;
 
 /** Outils interdits à toute session : pas de sous-agent, pas de push, de livraison, de verdict ni de rescellé d'un test d'acceptation (le chemin du lead, L200). */
-export const DISALLOWED = ['Agent', 'Bash(git push:*)', 'Bash(cadence deliver:*)', 'Bash(raf done:*)', 'Bash(raf review:*)', 'Bash(raf ux:*)', 'Bash(cadence spec reseal:*)'];
+export const DISALLOWED = ['Agent', 'Bash(git push:*)', 'Bash(cadence deliver:*)', 'Bash(raf done:*)', 'Bash(raf review:*)', 'Bash(raf ux:*)', 'Bash(cadence spec reseal:*)', 'Bash(raf spec reseal:*)'];
 
 /** Outils MCP du serveur Playwright, par le préfixe du serveur (sonde réelle du 07-10 : `mcp__playwright` expose tous les `browser_*`). */
 export const PLAYWRIGHT_TOOLS = 'mcp__playwright';

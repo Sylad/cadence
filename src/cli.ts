@@ -784,8 +784,14 @@ function specReseal(args: string[], reason: string | undefined, ctx: { root: str
   const planRel = relative(repo, plan.path);
   const tracked = !planRel.startsWith('..') && git(repo, ['ls-files', '--', planRel]).trim() !== '';
   if (tracked) {
-    git(repo, ['add', '--', planRel]);
-    git(repo, ['commit', '-q', '-m', `plan: ${lotId} test d'acceptation rescellé (${norm})`, '--', planRel]);
+    try {
+      git(repo, ['add', '--', planRel]);
+      git(repo, ['commit', '-q', '-m', `plan: ${lotId} test d'acceptation rescellé (${norm})`, '--', planRel]);
+    } catch (e) {
+      // Le rescellé est fait (commit ${sha}) : on ne le défait pas, on dit où en est la note, au lieu d'une pile d'appels.
+      const out = e as { stderr?: string; stdout?: string; message: string };
+      throw new RafError(`spec reseal : le rescellé a eu lieu (commit ${sha}) mais le commit de la note du lot a échoué — la note est écrite dans ${planRel}, à commiter à la main (un plan sale arrêterait la vague suivante) — ${(out.stderr || out.stdout || out.message).trim().split('\n').slice(-5).join(' | ')}`);
+    }
   }
   io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et en note du lot${tracked ? '' : ' (plan à commiter)'}`);
   return 0;

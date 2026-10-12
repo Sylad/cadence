@@ -190,6 +190,20 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     expect(r.err).toMatch(/orchestration en cours \(vague w9/);
     expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
   });
+
+  it('le commit de la note du plan refusé (commit-msg) : erreur lisible qui dit que le rescellé a eu lieu et que la note reste à commiter', () => {
+    const { repo, a } = avecPlan();
+    writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+    const hook = join(repo, '.git', 'hooks', 'commit-msg');
+    writeFileSync(hook, '#!/bin/sh\ncase "$(head -1 "$1")" in plan:*) echo "plan refusé" >&2; exit 1;; esac\n');
+    chmodSync(hook, 0o755);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'le test contredit la fiche');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/rescellé a eu lieu.*commit [0-9a-f]+.*note.*à commiter.*plan refusé/);
+    expect(r.err).not.toMatch(/\n\s+at /);
+    expect(git(repo, 'log', '-1', '--format=%s').trim()).toMatch(/^test\(L1\): acceptation rescellée/);
+    expect(readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')).toContain('le test contredit la fiche');
+  });
 });
 
 describe('rescellé atomique et interdit aux sessions', () => {
@@ -224,6 +238,10 @@ describe('rescellé atomique et interdit aux sessions', () => {
 
   it('cadence spec reseal est interdit aux sessions, comme raf done/review/ux', () => {
     expect(DISALLOWED).toContain('Bash(cadence spec reseal:*)');
+  });
+
+  it('raf spec reseal (même dispatch, bin/raf.js) est interdit aux sessions aussi', () => {
+    expect(DISALLOWED).toContain('Bash(raf spec reseal:*)');
   });
 });
 

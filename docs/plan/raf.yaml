@@ -2259,9 +2259,10 @@ lots:
     finished: 2026-10-12
   - id: L201
     title: "lead tour : --depth N (même sémantique que session start) et clé depth: du cadence.yaml du dossier parent, à côté de priority:, lue par lead tour (la bande cadence-hud marche sans changement) ; issue #8 ; README, test"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-12
+    started: 2026-10-12
   - id: L202
     title: "test/deliver.test.ts « (a) Ctrl-C : un enfant en arrière-plan qui ignore SIGINT… tué au plus tard à l'échéance de la grâce » instable sous charge : rouge 1 fois dans la suite complète le 12-10 (re-vérif L200/L189, deux vagues), vert 3/3 seul — dépendance au minutage à retirer (comme L193, L199)"
     status: todo

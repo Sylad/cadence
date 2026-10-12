@@ -2283,28 +2283,32 @@ lots:
     finished: 2026-10-12
   - id: L204
     title: "Étape accept : les tests d'acceptation sont validés dès leur écriture — lancés contre l'écran vide (ou le stub), chacun doit échouer pour la BONNE raison (élément ou comportement absent) et non à cause du test lui-même (regex trop large, route d'API non simulée, variable locale capturée, délai, e2e rangé en unitaire) ; un rouge pour une mauvaise raison renvoie à la session accept avant le scellé. Vécu 12-10 : 4 tests scellés faux (warhammer L35 R2 regex, L49 scrollY ×3 et R10 route non simulée, L47 e2e dans la suite unitaire) = 4 allers-retours + rescellés humains ; test"
-    status: doing
+    status: dropped
     estimate: 1
     created: 2026-10-12
     started: 2026-10-12
     notes:
       - { date: 2026-10-12, text: "DÉCISION LEAD 12-10 (rendu non conforme après 2 passes, vague 2026-10-12-1905 : chaque revue trouve un cas où classer le message d erreur se trompe — module à créer, export nommé en SyntaxError ESM). Constat : des 4 tests faux du 12-10, seul scrollY aurait été vu contre un écran vide. CRITÈRE DE FIN RÉDUIT : faute du test = ReferenceError / « is not defined » dont la PREMIÈRE frame est dans le fichier de test (ou dans le code qu il fait évaluer au navigateur) ; tout échec à l import (module ou export manquant, SyntaxError d import ESM comprise) = fonctionnalité absente, accepté ; rien d autre n est classé. Gabarits accept.md, accept-back.md, agents/acceptance-writer.md, README, CHANGELOG alignés ; test paramétré sur ces cas (module à créer, export à ajouter, ReferenceError du test, ReferenceError du code)." }
+      - { date: 2026-10-12, text: "abandonné : abandonné par le lead le 12-10 après 2 vagues : classer un rouge « bonne/mauvaise raison » en lisant les traces de pile Vitest par regex est fragile (chaque revue trouvait un nouveau format), et le gain mesuré est faible (1 des 4 tests scellés faux du 12-10) ; commits annulés (926427e..47d0a5d) ; remèdes retenus : L205 (passe de plus si la revue converge) et cadence spec reseal (L200)" }
+    finished: 2026-10-12
   - id: L205
     title: "Passe de correction de plus quand la revue converge : si le nombre de bloquants+majeurs baisse d'une revue à l'autre et qu'il en reste un seul, une 3e passe au lieu de rendre le lot au lead (vécu 12-10 : L47 rendu deux fois pour une ligne, 6 rendus « non conforme après 2 passes ») ; plafond inchangé sinon ; budget respecté ; README, test"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-12
     started: 2026-10-12
     review: { date: 2026-10-12, verdict: "conforme — orchestré (vague 2026-10-12-1905, 1 passe(s) de correction + passe des mineurs)", commit: ce83fabe8c6ad305187b7ee1144909a37722a63d }
+    finished: 2026-10-12
   - id: L206
     title: "Mesure : attente de créneau des vagues (58 min cumulées le 12-10 avec 2 sessions) — sortir des journaux .cadence/runs le temps d'attente par vague et par jour, le coût d'un 3e créneau (RAM, CPU, quota) sur Big-Blue, et recommander garder 2 ou passer à 3 (décision de Sylvain) ; aucun changement de --max-sessions dans ce lot"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-12
     started: 2026-10-12
     notes:
       - { date: 2026-10-12, text: "Reprise 12-10 (rendu après 2 passes, revue « conforme après 1 correctif ») — SEUL point : waits.ts:29, le compte « sans créneau obtenu » est faux quand deux lots d une même vague attendent en même temps (runPool, un lot par dépôt) : apparier chaque attente à son lot (clé vague+lot), test avec deux attentes simultanées. La mesure docs/mesures/attente-creneaux-2026-10-12.md est retenue (recommandation : essai à 3, décision de Sylvain)." }
     review: { date: 2026-10-12, verdict: "conforme — orchestré (vague 2026-10-12-2010, 0 passe(s) de correction + passe des mineurs)", commit: 70960326992fa3c17b6f48be538d37fb93239678 }
+    finished: 2026-10-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

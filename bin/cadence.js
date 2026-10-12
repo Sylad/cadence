@@ -50,6 +50,9 @@ if (tool === 'raf') {
                     les invariants d'une fiche d'écran, back ou mixte (étape spec ; gabarits templates/fiche.yaml, fiche-back.yaml) ; code 1 si un écart, 2 si illisible
   cadence spec qa <fiche.yaml>
                     la section de docs/qa/expectations.md dérivée de la fiche (shows, never, api), sur la sortie standard
+  cadence spec reseal <lot> <test> --reason "pourquoi"
+                    le chemin du lead quand un test d'acceptation scellé du lot en cours contredit la fiche : le test corrigé dans l'arbre,
+                    l'empreinte de ce seul test refaite, la raison dans acceptation.json et en note du lot ; hors vague orchestrée
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);
   process.exitCode = !tool || ['help', '--help', '-h'].includes(tool) ? 0 : 2;

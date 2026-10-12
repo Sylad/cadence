@@ -179,3 +179,9 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
   });
 });
+
+describe('aide de cadence', () => {
+  it('liste cadence spec reseal, le seul chemin de correction d’un test scellé faux', () => {
+    expect(readFileSync(join(__dirname, '..', 'bin', 'cadence.js'), 'utf8')).toContain('cadence spec reseal <lot> <test> --reason');
+  });
+});

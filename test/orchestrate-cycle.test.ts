@@ -2345,6 +2345,28 @@ describe('revue qui converge (L205)', () => {
     expect(c.lot.status).toBe('handed-back');
   });
 
+  it('une revue conforme entre deux revues non conformes compte pour 0 : 3, 2, conforme (mineur), puis 1 ne converge pas', async () => {
+    const minor: Handler = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', fichier: 'a.txt', ligne: 1, texte: 'nommage' }] }));
+    const h = harness({ script: { implement: [impl()], review: [nMajors(3), nMajors(2), minor], fix: fixes(), 'review-small': [nMajors(1), nMajors(1)] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review', 'fix', 'review-small']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.pass).toBe(2);
+    expect(c.lot.outcome).toContain('après 2 passe(s) de correction');
+  });
+
+  it('tests rouges après la 2e passe alors que la revue converge : rendu sans 3e passe ni revue', async () => {
+    const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'c.txt', 'fix(L1): c.txt')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }));
+    const h = harness({ script: { implement: [impl()], review: [nMajors(2), nMajors(1)], fix: [fix('b.txt'), redFix, fix('d.txt')] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('tests rouges après 2 passe(s) de correction');
+    expect(c.lot.reviewCounts).toEqual([2, 1]);
+  });
+
   it('budget du lot trop juste pour payer la revue suivante : pas de 3e passe', async () => {
     const h = harness({ script: { implement: [impl()], review: [nMajors(3), nMajors(2), nMajors(1), ok], fix: fixes() } });
     const c = h.lot('L1', { budget: REVIEW_RESERVE + 7500 });

@@ -1540,6 +1540,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     l.minorLines = [];
   }
   addProposals(c, rep, 'code', !minorPass);
+  if (summary.conforme && uxOk) (l.reviewCounts ??= []).push(0); // une revue conforme compte pour 0 dans la comparaison de la convergence (L205)
   if (minorPass) {
     l.minorPass = true;
     l.minorPassAt = l.pass;

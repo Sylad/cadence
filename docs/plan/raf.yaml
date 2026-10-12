@@ -2210,9 +2210,10 @@ lots:
     created: 2026-10-11
   - id: L197
     title: "Skill lead et docs/lead.md : le verdict UX (raf ux) peut être posé par le lead d'après le rapport du ux-reviewer et son propre regard sur les captures, l'humain n'étant consulté qu'en cas de doute (consigne de Sylvain 12-10 : « je ne suis pas UX, demande-moi un avis seulement si tu as des doutes ») — réglage du parent cadence.yaml (ex. lead.ux: lead | human, défaut human pour ne rien changer ailleurs), skill, README, test"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-12
+    started: 2026-10-12
   - id: L198
     title: "RÉGRESSION de L186 : le champ spec: des lots (booléen) entre en collision avec le champ spec: existant du plan en lecture seule de maritime-atlas (chemin d'un document de spec, ~200 lots) → raf check / session close de maritime en erreur sur chaque lot (« spec : true ou false attendu (reçu « docs/… ») »), et risque qu'orchestrate prenne ces lots pour des lots à étape spec back (lot.spec vrai) — un plan en lecture seule ne lit spec que s'il est mappé dans cadence.yaml (plan.fields), seul true compte ailleurs ; test sur un plan mappé avec spec: <chemin> ; À FAIRE AVANT toute vague maritime"
     status: doing

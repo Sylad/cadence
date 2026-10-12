@@ -20,7 +20,7 @@ const config = { accept: 'test -f done.flag', test: 'true' };
 /** Un agent accept : tests rouges, acceptation.json, un seul commit. */
 const accept = (o: Parameters<typeof ecritAcceptation>[1] = {}, over: Record<string, unknown> = {}): Handler => (call) => {
   ecritAcceptation(call.opts.cwd, { sansFiche: true, ...o });
-  return claudeOut(acceptReport(over));
+  return claudeOut(acceptReport(over, call.opts.cwd));
 };
 /** Une implémentation qui rend les tests verts : le drapeau que lit la commande dédiée. */
 const green: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }));
@@ -125,7 +125,7 @@ describe('étape accept : où elle s’insère', () => {
       writeFileSync(join(call.opts.cwd, premierTest), "it('R1', () => {});\n");
       git(call.opts.cwd, 'add', '--', premierTest);
       git(call.opts.cwd, 'commit', '-q', '--allow-empty', '-m', 'test(L2): réécrit', '--', premierTest);
-      return claudeOut(acceptReport());
+      return claudeOut(acceptReport({}, call.opts.cwd));
     };
     const h = prepared({ accept: [reecrit, reecrit] }, [{ title: 'Un écran', screen: 'page' }, { title: 'Le même écran', screen: 'page' }]);
     const premier = ecritAcceptation(h.repo, { sansFiche: true });
@@ -178,7 +178,7 @@ describe('étape accept : la session', () => {
   });
 
   it('un dépôt sale après la session rend le lot', async () => {
-    const h = prepared({ accept: [(call) => { writeFileSync(join(call.opts.cwd, 'docs/plan/raf.yaml'), 'x'); return claudeOut(acceptReport()); }] });
+    const h = prepared({ accept: [(call) => { writeFileSync(join(call.opts.cwd, 'docs/plan/raf.yaml'), 'x'); return claudeOut(acceptReport({}, call.opts.cwd)); }] });
     const c = h.lot('L1', screen, config);
     await runLot(c);
     expect(c.lot.status).toBe('handed-back');

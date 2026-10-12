@@ -105,7 +105,7 @@ describe('cycle : un lot avec fiche', () => {
   });
 
   it('avec une acceptation scellée, implement et la revue la nomment ; la revue reçoit le commit rouge', async () => {
-    const h = harness({ lots, script: { accept: [(call) => { ecritAcceptation(call.opts.cwd, { sansFiche: true }); return claudeOut(acceptReport()); }], implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }))], ux: [ok], review: [ok] } });
+    const h = harness({ lots, script: { accept: [(call) => { ecritAcceptation(call.opts.cwd, { sansFiche: true }); return claudeOut(acceptReport({}, call.opts.cwd)); }], implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }))], ux: [ok], review: [ok] } });
     ecrit(h.repo);
     const c = h.lot('L1', screen, { ux, accept: 'test -f done.flag', test: 'true' });
     await runLot(c);

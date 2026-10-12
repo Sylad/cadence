@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parse } from 'yaml';
 import { readOrchestrateConfig, type OrchestrateConfig } from '../src/config.js';
 import { loadTemplates, TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { Budget, type LotCtx, type WaveCtx } from '../src/orchestrate/cycle.js';
@@ -61,7 +62,21 @@ export interface Call {
 export const specReport = (over: Record<string, unknown> = {}) => ({ commits: [], nonVerifie: [], questions: [], choix: [], sousSeuil: '', fiche: '', resume: 'spec écrite', ...over });
 
 /** Rapport d'une étape accept. */
-export const acceptReport = (over: Record<string, unknown> = {}) => ({ commits: [], nonVerifie: [], questions: [], choix: [], resume: 'tests rouges écrits', ...over });
+export const acceptReport = (over: Record<string, unknown> = {}, repo?: string) => ({ commits: [], nonVerifie: [], questions: [], choix: [], resume: 'tests rouges écrits', rouges: repo ? rougesDe(repo) : [], ...over });
+
+/** Les rouges (L204) d'une session accept sincère : une entrée par test que les fiches du dépôt prévoient, absent de la fonctionnalité. */
+export function rougesDe(repo: string): { test: string; echec: string; cause: string }[] {
+  const out: { test: string; echec: string; cause: string }[] = [];
+  const root = join(repo, 'docs/specs');
+  if (!existsSync(root)) return out;
+  for (const d of readdirSync(root)) {
+    const f = join(root, d, 'fiche.yaml');
+    if (!existsSync(f)) continue;
+    const doc = parse(readFileSync(f, 'utf8')) as { regles?: { tests?: string[] }[] };
+    for (const r of doc.regles ?? []) for (const t of r.tests ?? []) out.push({ test: t, echec: `Error: rouge — ${t} : élément absent`, cause: 'absent' });
+  }
+  return out;
+}
 
 export const precheckReport = (over: Record<string, unknown> = {}) => ({ dejaPresent: 'non', preuves: [], resume: 'rien de présent', ...over });
 

@@ -19,7 +19,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
-import { acceptationFile, acceptCommands, isAcceptList, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
+import { acceptationFile, acceptCommands, checkRouges, plannedTests, isAcceptList, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
 import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
@@ -1186,13 +1186,14 @@ async function runAccept(c: LotCtx, json: string): Promise<{ runs: AcceptRun[]; 
 const tail = (output: string, n = 40): string => output.trim().split('\n').slice(-n).join('\n');
 
 /** Écarts des tests d'acceptation écrits par la session (vide = acceptés) : autres lots intacts, acceptation.json conforme, tests rouges, config.test toujours verte. */
-async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore: string | undefined): Promise<string[]> {
+async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore: string | undefined, rouges: AcceptReport['rouges']): Promise<string[]> {
   const l = c.lot;
   const out = headBefore ? lockViolations(l.repo, c.config.spec.dir, headBefore, { skip: json }) : [];
   out.push(...checkAcceptation(l.repo, json, l.lot, fiche, l.steps.find((s) => s.kind === 'accept')?.headBefore));
   if (out.length) return out;
   const red = await runAccept(c, json);
   if (red.orphans.length) out.push(`fichiers listés dans ${json} sous la racine d'aucune commande de orchestrate.accept (le dossier de son « cd <dossier> && » initial, sinon le dépôt) : ${red.orphans.join(', ')} — aucun lanceur ne les prendrait`);
+  out.push(...checkRouges(rouges, plannedTests(l.repo, fiche), red.runs.filter((r) => r.code !== 0)));
   for (const r of red.runs) if (r.code === 0) out.push(`la commande dédiée « ${r.command} » (orchestrate.accept) passe alors que le code n'existe pas : des tests verts avant le code ne prouvent rien — chaque test doit échouer parce que la fonctionnalité manque\n${tail(r.output, 15)}`);
   if (!c.config.test) {
     if (!l.warnings.includes(NO_TEST_ACCEPT)) l.warnings.push(NO_TEST_ACCEPT);
@@ -1238,7 +1239,7 @@ async function acceptStep(c: LotCtx): Promise<void> {
     stop(c, 'handed-back', `dépôt sale après accept : ${dirt.join(', ')}`);
     return;
   }
-  const problems = await acceptProblems(c, fiche, json, done.step.headBefore);
+  const problems = await acceptProblems(c, fiche, json, done.step.headBefore, rep.rouges);
   if (problems.length) {
     if (l.acceptProblems) {
       stop(c, 'handed-back', `accept non conforme après 2 passes : ${problems.join(' ; ')}`);

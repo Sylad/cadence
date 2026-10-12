@@ -221,6 +221,48 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
   return problems;
 }
 
+/** Les noms de tests que la fiche prévoit (`regles[].tests`). Fiche illisible : aucun (checkAcceptation la signale). */
+export function plannedTests(repo: string, fiche: string): string[] {
+  try {
+    const doc = parse(readFileSync(join(repo, fiche), 'utf8')) as { regles?: { tests?: unknown }[] };
+    return (doc.regles ?? []).flatMap((r) => (Array.isArray(r.tests) ? r.tests.filter((t): t is string => typeof t === 'string') : []));
+  } catch {
+    return [];
+  }
+}
+
+/** Une erreur du test lui-même, pas de la fonctionnalité qui manque : variable ou import cassé, syntaxe. */
+const TEST_SIDE = /\b(ReferenceError|SyntaxError)\b|Cannot find module|Failed to resolve import|is not defined/;
+/** Un lanceur qui sort en échec parce qu'il n'a trouvé aucun test : un rouge sans test. */
+const NO_TESTS = /no tests? (files? )?found/i;
+
+/** Le rouge d'un test, relevé par la session accept : l'échec observé et sa cause (`absent` = élément ou comportement absent, `autre` = le test lui-même). */
+export interface Rouge { test: string; echec: string; cause: string }
+
+/**
+ * Validation des tests dès leur écriture (L204) : chaque test prévu doit échouer pour la BONNE raison — l'élément ou le comportement manque —
+ * et non à cause du test (regex trop large, route d'API non simulée, variable locale capturée, délai, e2e rangé en unitaire). Le programme ne
+ * lit pas le test : il exige de la session, pour chaque nom prévu, l'échec observé et sa cause, refuse la cause `autre` et les erreurs du test
+ * lui-même, et refuse un lanceur rouge faute de tests trouvés. Vide = acceptés.
+ */
+export function checkRouges(rouges: Rouge[], planned: string[], runs: { command: string; output: string }[]): string[] {
+  const problems: string[] = [];
+  for (const t of planned) {
+    const r = rouges.find((x) => x.test === t);
+    if (!r) {
+      problems.push(`test « ${t} » : aucune entrée dans « rouges » (lancer les tests contre l'écran vide, relever pourquoi CE test échoue)`);
+    } else if (!r.echec.trim()) {
+      problems.push(`test « ${t} » : « echec » vide (recopier le message d'échec observé)`);
+    } else if (r.cause !== 'absent') {
+      problems.push(`test « ${t} » : rouge pour une autre raison que la fonctionnalité absente (cause « ${r.cause} ») — corriger le test (regex trop large, route d'API non simulée, variable locale capturée, délai, e2e rangé en unitaire) jusqu'à ce qu'il échoue parce que l'élément ou le comportement manque`);
+    } else if (TEST_SIDE.test(r.echec)) {
+      problems.push(`test « ${t} » : l'échec relevé (${r.echec.trim().slice(0, 120)}) vient du test lui-même, pas de la fonctionnalité absente`);
+    }
+  }
+  for (const run of runs) if (NO_TESTS.test(run.output)) problems.push(`la commande dédiée « ${run.command} » échoue faute de tests trouvés (aucun test lancé) : ce rouge ne prouve rien — vérifier ses include et CADENCE_ACCEPTATION`);
+  return problems;
+}
+
 /**
  * La tête d'avant le premier commit de travail du lot (L184) : le parent du plus ancien des commits `work` (ordre indifférent, ceux que repère `plan.refs`).
  * Aucun commit, un commit racine ou illisible : `undefined`.

@@ -33,8 +33,23 @@ export const SPEC_SCHEMA = {
 /** Sortie de l'étape accept : les tests d'acceptation rouges, commités avec leur acceptation.json. */
 export const ACCEPT_SCHEMA = {
   type: 'object',
-  properties: { commits: WORK_SCHEMA.properties.commits, nonVerifie: strings, questions: strings, choix: strings, resume: str },
-  required: ['commits', 'nonVerifie', 'questions', 'resume'],
+  properties: {
+    commits: WORK_SCHEMA.properties.commits,
+    rouges: {
+      type: 'array',
+      description: 'one entry per planned test: the failure observed against the empty screen / stub, and its cause',
+      items: {
+        type: 'object',
+        properties: { test: str, echec: { type: 'string', description: 'the failure message observed when the test ran' }, cause: { type: 'string', enum: ['absent', 'autre'], description: 'absent = the element or behaviour is missing; autre = the test itself is at fault' } },
+        required: ['test', 'echec', 'cause'],
+      },
+    },
+    nonVerifie: strings,
+    questions: strings,
+    choix: strings,
+    resume: str,
+  },
+  required: ['commits', 'rouges', 'nonVerifie', 'questions', 'resume'],
 } as const;
 
 /** Sortie d'une revue (code, UX ou passe unique) : `verdict` est la ligne pour `raf review` / `raf ux`. */
@@ -91,6 +106,7 @@ export interface SpecReport {
 
 export interface AcceptReport {
   commits: { sha: string; sujet: string }[];
+  rouges: { test: string; echec: string; cause: string }[];
   nonVerifie: string[];
   questions: string[];
   choix?: string[];

@@ -106,7 +106,7 @@ describe('liste de lanceurs : le cycle', () => {
   /** Tests rouges sous frontend/ (fichier principal) et backend/ : un fichier par racine. */
   const accept = (extra: string[] = [BACK]): Handler => (call) => {
     ecritAcceptation(call.opts.cwd, { sansFiche: true, racine: 'frontend', extra });
-    return claudeOut(acceptReport());
+    return claudeOut(acceptReport({}, call.opts.cwd));
   };
   const flag = (name: string, subject = 'feat(L1): a'): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, name, subject)] }));
   const front = (flagFile: string) => `cd frontend && test -f ../${flagFile}`;

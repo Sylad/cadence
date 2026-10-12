@@ -34,7 +34,7 @@ describe('revue de la maquette : où elle s’insère', () => {
   it('avec orchestrate.accept : spec → maquette → accept → implement', async () => {
     const accept: Handler = (call) => {
       ecritAcceptation(call.opts.cwd, { sansFiche: true });
-      return claudeOut(acceptReport());
+      return claudeOut(acceptReport({}, call.opts.cwd));
     };
     const h = harness({ lots, script: { spec: [spec], maquette: [ok], accept: [accept], implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }))], review: [ok] } });
     await runLot(h.lot('L1', screen, { ...config, accept: 'test -f done.flag', test: 'true' }));
@@ -101,7 +101,7 @@ describe('revue de la maquette : où elle s’insère', () => {
   });
 
   it('une acceptation aux empreintes vides ou fausses ne prouve rien : la maquette est relue', async () => {
-    const h = harness({ lots, script: { maquette: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
+    const h = harness({ lots, script: { maquette: [ok], accept: [(call) => claudeOut(acceptReport({}, call.opts.cwd))], implement: [impl], review: [ok] } });
     ecrit(h.repo);
     const a = ecritAcceptation(h.repo, { sansFiche: true });
     const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
@@ -112,7 +112,7 @@ describe('revue de la maquette : où elle s’insère', () => {
   });
 
   it('une acceptation non scellée (sans empreintes) ne prouve rien : la maquette est relue', async () => {
-    const h = harness({ lots, script: { maquette: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
+    const h = harness({ lots, script: { maquette: [ok], accept: [(call) => claudeOut(acceptReport({}, call.opts.cwd))], implement: [impl], review: [ok] } });
     ecrit(h.repo);
     ecritAcceptation(h.repo, { sansFiche: true });
     const c = h.lot('L1', screen, { ...config, accept: 'true', test: 'true' });
@@ -122,7 +122,7 @@ describe('revue de la maquette : où elle s’insère', () => {
   });
 
   it('une acceptation commitée mais non scellée rejoue accept, même sans revue de maquette (orchestrate.maquette: false)', async () => {
-    const h = harness({ lots, script: { accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
+    const h = harness({ lots, script: { accept: [(call) => claudeOut(acceptReport({}, call.opts.cwd))], implement: [impl], review: [ok] } });
     ecrit(h.repo);
     ecritAcceptation(h.repo, { sansFiche: true });
     const c = h.lot('L1', screen, { maquette: false, accept: 'true', test: 'true' });

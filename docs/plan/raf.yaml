@@ -2283,9 +2283,10 @@ lots:
     finished: 2026-10-12
   - id: L204
     title: "Étape accept : les tests d'acceptation sont validés dès leur écriture — lancés contre l'écran vide (ou le stub), chacun doit échouer pour la BONNE raison (élément ou comportement absent) et non à cause du test lui-même (regex trop large, route d'API non simulée, variable locale capturée, délai, e2e rangé en unitaire) ; un rouge pour une mauvaise raison renvoie à la session accept avant le scellé. Vécu 12-10 : 4 tests scellés faux (warhammer L35 R2 regex, L49 scrollY ×3 et R10 route non simulée, L47 e2e dans la suite unitaire) = 4 allers-retours + rescellés humains ; test"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-10-12
+    started: 2026-10-12
   - id: L205
     title: "Passe de correction de plus quand la revue converge : si le nombre de bloquants+majeurs baisse d'une revue à l'autre et qu'il en reste un seul, une 3e passe au lieu de rendre le lot au lead (vécu 12-10 : L47 rendu deux fois pour une ligne, 6 rendus « non conforme après 2 passes ») ; plafond inchangé sinon ; budget respecté ; README, test"
     status: todo

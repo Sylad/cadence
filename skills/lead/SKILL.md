@@ -171,11 +171,13 @@ is always recorded by the lead's own `raf ux`, never by a subagent.
    verdict, or a verdict older than its latest commit: a fix made after the review means a new
    review of the lot, not an edited verdict. A read-only plan has no gate in `raf` (a `uxSince` or `reviewSince` written in it is
    ignored): the verdict goes into the project's own tool.
-   On the cadence repository itself, `npm run build` only type-checks; once the verdict is recorded and the lot
-   accepted (`raf done`), the lead puts the reviewed code in service with `npm run build:service` (it rewrites
-   `dist/`, the `raf` of the `PATH`). `build:service` compiles the current tree, i.e. HEAD: run it only when HEAD is the accepted code. When the wave's table gives
-   « livrable jusqu'à <sha> » (a handed-back lot is stacked above), HEAD holds unreviewed code: never HEAD, put nothing in
-   service yet, and run `build:service` once the lot above is fixed and accepted. A lot found non-compliant is never put in service.
+   On the cadence repository itself, the `raf` and `cadence` of the `PATH` are not the working repository's `dist/`: they
+   are a separate, detached copy (`~/.local/share/cadence/service`, built there), so nothing a session or a wave does in the working
+   repository (`npm run build`, `npm install`, `npm ci`, uncommitted `src/` files) changes the code in service. Once the verdict is recorded
+   and the lot accepted (`raf done`), the lead updates that copy with `npm run service -- <sha>`, where `<sha>` is the accepted code, not HEAD
+   when a handed-back lot is stacked above it (the wave's table says « livrable jusqu'à <sha> »). The script refuses a sha that is not an
+   ancestor of HEAD, or whose commits cite a lot that is not done; it builds the new copy aside and switches only when the build succeeded.
+   A lot found non-compliant is never put in service.
 
 ## 4. Delivery
 

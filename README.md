@@ -1218,11 +1218,24 @@ The sessions of the wave also get `.cadence/runs/<wave>/tool/bin` (the `raf` and
 `PATH`**, ahead of the per-project Node below and of the usual `PATH`: the `raf` a reviewer runs (`raf commits`…) is the
 snapshot's, not the installed one. A wave without a snapshot leaves the `PATH` as it is.
 
-**The `dist/` in service (L195)**: on cadence's own repository, `bin/raf.js` and `bin/cadence.js` (the `raf` and `cadence` of your `PATH`) load `dist/`.
-The snapshot protects the wave running, not that installed tool, so `npm run build` no longer writes `dist/`: it only
-type-checks the build (`tsc -p tsconfig.build.json --noEmit`), which is what a session of a wave runs, with the tests, before its report. Code that no one has
-reviewed therefore never goes into service by itself. `npm run build:service` is the only script that writes `dist/` (`prepare` runs it, so
-`npm install` and the publication still produce it): the lead runs it after the review, once the lots are accepted.
+**The code in service (L195)**: on cadence's own repository, `bin/raf.js` and `bin/cadence.js` load `dist/`, so the `raf` and `cadence` of your
+`PATH` used to be whatever the working repository last built. The snapshot protects the wave running, not that installed tool, and a wave's
+sessions run `npm run build`, `npm install`… The code in service now lives in a **separate copy**: a detached git worktree built there,
+`<root>/releases/<sha12>`, with `<root>/service` pointing at the current one (`<root>` is `~/.local/share/cadence`), and `~/.local/bin/raf` and
+`~/.local/bin/cadence` linked to `<root>/service/bin/`. Nothing in the working repository (`npm run build`, `prepare`, `npm install`, `npm ci`,
+an uncommitted `src/` file) touches it. `npm run build` only type-checks, which is what a session of a wave runs, with the tests, before its report.
+
+The lead updates the copy after the review, once the lot is accepted (`raf done`):
+
+```
+npm run service -- <sha>   # [--root dir] [--bin-dir dir] [--repo dir]
+```
+
+The script refuses a sha that is not an ancestor of HEAD, and a sha whose commits (since the one in service; only the sha itself the first time)
+cite a lot whose status is not `done` (`plan:` commits are ignored). It builds the new copy aside (`npm ci --ignore-scripts`, then `tsc`) and switches
+`service` and the two links only once the build succeeded (atomic renames): a failed install changes nothing. The previous copy is kept for a
+rollback, the older ones are removed. The first run is also what installs the links in `~/.local/bin`. It prints the fingerprint of the copy
+(bin, dist, package.json).
 
 ### A lot whose work is in a neighbouring repository
 

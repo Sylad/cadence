@@ -24,11 +24,11 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json --noEmit",
-    "build:service": "tsc -p tsconfig.build.json",
+    "service": "node scripts/mise-en-service.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "eval:plugin": "claude plugin eval . --max-cost-usd 5 --no-publish",
-    "prepare": "npm run build:service",
+    "prepare": "tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run typecheck && npm test"
   },
   "dependencies": {

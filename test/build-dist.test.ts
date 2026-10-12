@@ -34,32 +34,29 @@ describe('le dist/ en service (L195)', () => {
     expect(existsSync(join(dir, 'dist'))).toBe(false);
   });
 
-  it('npm run build:service écrit dist/ (la mise en service, faite par le lead après revue)', () => {
-    const dir = copyOfPackage();
-    npm(dir, 'build:service');
-    expect(existsSync(join(dir, 'dist', 'cli.js'))).toBe(true);
+  it('prepare (npm install, publication) construit dist/ : le paquet publié l’embarque ; il n’y a plus de build:service', () => {
+    expect(scripts.prepare).toBe('tsc -p tsconfig.build.json');
+    expect(scripts['build:service']).toBeUndefined();
+    expect(scripts.service).toBe('node scripts/mise-en-service.mjs');
   });
 
-  it('prepare (npm install, publication) construit dist/ : le paquet publié l’embarque', () => {
-    expect(scripts.prepare).toBe('npm run build:service');
-  });
-
-  it('le skill lead ne met en service qu’après le verdict : build:service est à l’étape 3, après raf done, pas à l’étape 2', () => {
+  it('le skill lead ne met en service qu’après le verdict : la mise en service (npm run service) est à l’étape 3, après raf done, pas à l’étape 2', () => {
     const skill = readFileSync(join(REPO, 'skills', 'lead', 'SKILL.md'), 'utf8');
     const check = skill.slice(skill.indexOf('## 3. Check'), skill.indexOf('## 4. Delivery'));
     const step2 = check.slice(check.indexOf('\n2. '), check.indexOf('\n3. '));
     const step3 = check.slice(check.indexOf('\n3. '));
-    expect(step2).not.toContain('build:service');
-    expect(step3).toContain('build:service');
-    expect(step3.indexOf('build:service')).toBeGreaterThan(step3.indexOf('raf done'));
+    expect(step2).not.toContain('npm run service');
+    expect(step3).toContain('npm run service');
+    expect(step3.indexOf('npm run service')).toBeGreaterThan(step3.indexOf('raf done'));
   });
 
-  it('le skill lead ne met pas HEAD en service quand un lot rendu est au-dessus : build:service attend que HEAD soit le code accepté', () => {
+  it('le skill lead ne met pas HEAD en service quand un lot rendu est au-dessus : la mise en service prend un sha accepté, jamais HEAD quand un lot rendu est au-dessus', () => {
     const skill = readFileSync(join(REPO, 'skills', 'lead', 'SKILL.md'), 'utf8');
     const check = skill.slice(skill.indexOf('## 3. Check'), skill.indexOf('## 4. Delivery'));
     const step3 = check.slice(check.indexOf('\n3. '));
-    const service = step3.slice(step3.indexOf('build:service'));
+    const service = step3.slice(step3.indexOf('npm run service'));
     expect(service).toContain('livrable jusqu');
-    expect(service).toMatch(/never HEAD/);
+    expect(service).toMatch(/not HEAD/);
+    expect(service).toMatch(/ancestor/);
   });
 });

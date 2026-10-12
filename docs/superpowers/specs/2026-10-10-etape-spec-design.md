@@ -199,14 +199,15 @@ fonctionnement, sans valeur statistique) :
 |---|---|---|
 | lots avec au moins 1 correction | 45 % (25 sur 55) | ≤ 30 % |
 | lots avec au moins 2 corrections | 25 % (14 sur 55) | ≤ 12 % |
-| passes dues à « spec floue », « règle inventée » ou « test manquant » (part des passes) | 16 % (7 sur 45, lots visibles) | ≤ 15 % |
+| passes dues à « spec floue », « règle inventée » ou « test manquant » (part des passes) | 16 % (7 sur 45, lots visibles) | ≤ 8 % |
 | lot qui revient d'une revue UX avec un bloquant | non mesuré | aucun à la conformité |
 
 Le coût s'ajoute : tokens de `spec` + revue de maquette + `accept` par lot, relevés dans les journaux
 de vague, présentés à côté des corrections évitées. Si les corrections baissent mais que le coût de
 l'étape dépasse celui des passes évitées, la conclusion le dit. Sous la barre de 8 lots, le résultat
 est une note, non un verdict. Si le critère n'est pas atteint, le seuil (`screen:`) est resserré avant
-d'abandonner l'étape.
+d'abandonner l'étape. La cible de la 3e ligne (≤ 8 %, la moitié de la référence de 16 %, comme la ligne 2) a été fixée par le lead
+le 12-10, avant la mesure ; la mesure est dans [`etape-spec-2026-10-12.md`](../../mesures/etape-spec-2026-10-12.md).
 
 Limite connue : la cause « règle de gestion inventée » vaut 0 % dans la référence, faute de constat
 classé ainsi ; la fiche la rend mesurable (les hypothèses sont écrites). La comparaison porte donc sur

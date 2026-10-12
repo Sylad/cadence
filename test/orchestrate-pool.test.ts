@@ -5,19 +5,27 @@ import type { ClaudeFn } from '../src/orchestrate/launch.js';
 import { claudeOut, commitFile, harness, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
 
 /** Trois dépôts, deux lots dans le premier ; un lanceur qui mesure la concurrence. */
-function setup(budget?: number) {
+function setup(budget?: number, rendezvous = false) {
   const hs = [harness({ lots: [{ title: 'a1' }, { title: 'a2' }], budget }), harness(), harness()];
   const active = new Map<string, number>();
   let peak = 0;
   let peakRepo = 0;
   const log: string[] = [];
+  // Rendez-vous sans minuteur : la première session de chaque dépôt attend qu'un autre dépôt soit actif aussi,
+  // au lieu de compter sur un chevauchement de quelques ms (instable sous charge).
+  let meet: () => void = () => {};
+  const met = new Promise<void>((r) => (meet = r));
   const claude: ClaudeFn = async (args, o) => {
     const kind = kindOf(args);
     active.set(o.cwd, (active.get(o.cwd) ?? 0) + 1);
     peakRepo = Math.max(peakRepo, active.get(o.cwd)!);
     peak = Math.max(peak, [...active.values()].reduce((a, b) => a + b, 0));
     log.push(`${o.cwd}:${kind}`);
-    await new Promise((r) => setTimeout(r, 15));
+    if (rendezvous) {
+      if ([...active.values()].filter((n) => n > 0).length >= 2) meet();
+      await met;
+    }
+    await new Promise((r) => setImmediate(r));
     let out;
     if (kind === 'implement') {
       const lot = /on lot `(L\d)`/.exec(args[1])![1];
@@ -41,7 +49,7 @@ function setup(budget?: number) {
 
 describe('ordonnanceur', () => {
   it('jamais plus de deux sessions en même temps, jamais deux dans un dépôt', async () => {
-    const s = setup();
+    const s = setup(undefined, true);
     await runPool(s.ctxs);
     expect(s.ctxs.map((c) => c.lot.status)).toEqual(['ready', 'ready', 'ready', 'ready']);
     expect(s.peak()).toBeLessThanOrEqual(2);

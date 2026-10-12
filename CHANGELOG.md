@@ -46,6 +46,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `lead.ux: lead` in the `cadence.yaml` of the lead's folder: the lead forms the UX verdict itself | [1.2.0](#120---2026-10-12) |
 | `cadence lead tour --depth n` and the `depth:` key of the folder's `cadence.yaml` | [1.2.0](#120---2026-10-12) |
 
+## [Unreleased]
+
+### Added
+
+- End-to-end acceptance (L203): an acceptation file with `"e2e": true` (browser, build required) stays out of the ordinary runner and the unit CI even at `vert: true`, instead of turning them red without `dist` or Chromium. `acceptationIgnored()` of `templates/acceptation-runner.mjs` excludes it, the new `acceptationE2e()` lists its files for the e2e suite run after the build, and the accept brief asks the session to set the key. Copy the runner template again to get it.
+
 ## [1.2.0] - 2026-10-12
 
 ### Fixed

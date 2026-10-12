@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 // @ts-expect-error gabarit .mjs livré tel quel, sans déclaration de types
-import { acceptationIgnored, acceptationOnly } from '../templates/acceptation-runner.mjs';
+import { acceptationE2e, acceptationIgnored, acceptationOnly } from '../templates/acceptation-runner.mjs';
 import { tempDir } from './helpers.js';
+import { parseAcceptation, acceptText } from '../src/orchestrate/accept.js';
 
 // L173 (spec etape-spec, S5) : le gabarit que la config du lanceur de tests du projet importe (exclusion de config.test et de la CI, config dédiée).
 function projet(): string {
@@ -48,5 +49,31 @@ describe('gabarit acceptation-runner.mjs', () => {
 
   it('sans CADENCE_ACCEPTATION ni chemin, la config dédiée échoue haut et clair (elle ne lancerait rien)', () => {
     expect(() => acceptationOnly(undefined)).toThrow(/CADENCE_ACCEPTATION/);
+  });
+
+  // L203 : une acceptation e2e (navigateur, build requis) ne rejoint jamais le lanceur ordinaire, même à vert: true.
+  function projetE2e(vert: boolean): string {
+    const root = tempDir();
+    mkdirSync(join(root, 'docs/specs/e'), { recursive: true });
+    writeFileSync(join(root, 'docs/specs/e/acceptation-e.json'), JSON.stringify({ lot: 'e', fiche: 'f', fichiers: ['e2e/e.spec.ts'], vert, e2e: true }));
+    writeFileSync(join(root, 'docs/specs/e/acceptation-u.json'), JSON.stringify({ lot: 'u', fiche: 'f', fichiers: ['test/u.test.ts'], vert: true }));
+    return root;
+  }
+
+  it('une acceptation e2e à vert: true reste hors du lanceur ordinaire (sans dist ni Chromium, il serait rouge)', () => {
+    expect(acceptationIgnored(projetE2e(true))).toEqual(['e2e/e.spec.ts']);
+    expect(acceptationIgnored(projetE2e(false))).toEqual(['e2e/e.spec.ts']);
+  });
+
+  it('acceptationE2e() liste les fichiers e2e, verts ou rouges, pour la suite e2e lancée après le build', () => {
+    expect(acceptationE2e(projetE2e(true))).toEqual(['e2e/e.spec.ts']);
+    expect(acceptationE2e(projet())).toEqual([]);
+  });
+
+  it('le programme lit la clé e2e et le brief accept demande de la poser', () => {
+    const a = parseAcceptation(JSON.stringify({ lot: 'e', fiche: 'f', fichiers: ['x'], vert: false, e2e: true }));
+    expect(a).toMatchObject({ e2e: true });
+    expect(parseAcceptation(JSON.stringify({ lot: 'e', fiche: 'f', fichiers: ['x'], vert: false }))).not.toHaveProperty('e2e');
+    expect(acceptText({ fiche: 'f', maquette: 'm', acceptation: 'a.json', command: 'vt' })).toMatch(/"e2e": true/);
   });
 });

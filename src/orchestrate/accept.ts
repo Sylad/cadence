@@ -17,6 +17,8 @@ export interface Acceptation {
   fiche: string;
   fichiers: string[];
   vert: boolean;
+  /** Acceptation de bout en bout (navigateur, build requis, L203) : même à `vert: true` elle reste hors du lanceur ordinaire et de la CI unitaire ; la suite e2e la lance après le build. */
+  e2e?: boolean;
   /** Empreinte git (blob) de chaque fichier de tests, posée par le programme au scellé. */
   empreintes?: Record<string, string>;
   /** Journal des rescellés d'un seul test (`cadence spec reseal`, L200) : le test, la raison donnée par le lead, la date et les deux empreintes. */
@@ -70,7 +72,7 @@ export function parseAcceptation(text: string): Acceptation | string {
   if (typeof vert !== 'boolean') return 'clé « vert » (booléen) attendue';
   const empreintes = isObj(doc.empreintes) ? (Object.fromEntries(Object.entries(doc.empreintes).filter(([, v]) => typeof v === 'string')) as Record<string, string>) : undefined;
   const resceaux = Array.isArray(doc.resceaux) ? (doc.resceaux.filter((r) => isObj(r) && ['test', 'raison', 'date', 'avant', 'apres'].every((k) => typeof r[k] === 'string')) as NonNullable<Acceptation['resceaux']>) : undefined;
-  return { lot, fiche, fichiers: fichiers as string[], vert, ...(empreintes ? { empreintes } : {}), ...(resceaux?.length ? { resceaux } : {}) };
+  return { lot, fiche, fichiers: fichiers as string[], vert, ...(doc.e2e === true ? { e2e: true } : {}), ...(empreintes ? { empreintes } : {}), ...(resceaux?.length ? { resceaux } : {}) };
 }
 
 /** JSON à clés triées, sans la clé `vert` : la forme que le verrou compare. */
@@ -369,7 +371,7 @@ export function acceptText(o: { fiche: string; maquette: string; screen?: boolea
     isAcceptList(o.command)
       ? `The project declares several dedicated commands (\`orchestrate.accept\`, one per test runner), each of which runs ONLY the acceptance tests of this lot that sit under its root (the folder of its leading \`cd <folder> &&\`, else the repository): ${commands.map((x) => `\`${x}\` (root \`${acceptRoot(x) || '.'}\`)`).join(', ')}. Each is run from the repository root and gets \`CADENCE_ACCEPTATION\` (the absolute path of the lot's \`acceptation.json\`, also substituted for \`{acceptation}\`) and \`CADENCE_ACCEPTATION_ROOT\` (its root); it takes only the files listed under its root, a command with no listed file under its root is not run, and a listed file under no root is refused. Put each test file where its runner looks, and list every file in \`fichiers\`.${o.test ? ` The project's ordinary test command is \`${o.test}\`: it must stay green with your red tests committed.` : ''}`
       : `The project declares the dedicated command that runs ONLY the acceptance tests of this lot (\`orchestrate.accept\`): \`${commands[0]}\` (from the repository root; the program sets \`CADENCE_ACCEPTATION\` to the absolute path of the lot's \`acceptation.json\`, and replaces \`{acceptation}\` with it).${o.test ? ` The project's ordinary test command is \`${o.test}\`: it must stay green with your red tests committed.` : ''}`,
-    `Write \`${o.acceptation}\` (one file per lot, next to the sheet: another lot on the same ${screen ? 'screen' : 'subject'} has its own, which you never touch, nor its tests — give your test files names of your own): \`{ "lot": "<lot>", "fiche": "${o.fiche}", "fichiers": ["<test file>", …], "vert": false }\` (paths relative to the repository). The ordinary test config of the project (shared with its CI) must exclude those files while \`vert\` is false; the dedicated config includes only them. Both read the file with this runner template (copy it into the project, e.g. \`tests/acceptation-runner.mjs\`):`,
+    `Write \`${o.acceptation}\` (one file per lot, next to the sheet: another lot on the same ${screen ? 'screen' : 'subject'} has its own, which you never touch, nor its tests — give your test files names of your own): \`{ "lot": "<lot>", "fiche": "${o.fiche}", "fichiers": ["<test file>", …], "vert": false }\` (paths relative to the repository). If the tests need a build or a browser (Playwright, Chromium, \`dist\`), add \`"e2e": true\` to it: those files then stay out of the ordinary runner and the unit CI even once green (they would turn it red without \`dist\` or Chromium) and belong to the project's e2e suite, run after the build (\`acceptationE2e()\` of the runner template lists them). The ordinary test config of the project (shared with its CI) must exclude those files while \`vert\` is false; the dedicated config includes only them. Both read the file with this runner template (copy it into the project, e.g. \`tests/acceptation-runner.mjs\`):`,
   ];
   if (o.runner) lines.push('```js', o.runner.trimEnd(), '```');
   if (o.problems?.length) lines.push('', 'The program checked your previous pass and it did not pass; fix exactly these points (one more pass only, then the lot goes back to the lead):', ...o.problems.map((p) => `- ${p}`));

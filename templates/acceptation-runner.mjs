@@ -6,8 +6,11 @@
 //   vitest.acceptation.config.ts   (commande dédiée, orchestrate.accept)
 //                             test: { include: acceptationOnly() }   (une LISTE de lanceurs : chacun ne voit que les fichiers sous sa racine, cf. acceptationOnly)
 //
+//   playwright.config.ts      testMatch: acceptationE2e()   (suite e2e, lancée APRÈS le build : une acceptation `"e2e": true`, navigateur et dist requis)
+//
 // Un acceptation.json à `vert: false` (tests rouges du lot, pas encore implémenté) exclut ses fichiers du lanceur du projet et de la CI ;
 // le cycle pose `vert: true` quand la commande dédiée passe, et les fichiers rejoignent alors le lanceur ordinaire.
+// Exception (L203) : une acceptation `"e2e": true` ne le rejoint JAMAIS (sans dist ni Chromium elle le rendrait rouge) : elle reste exclue, verte ou non, et va dans la suite e2e.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
@@ -22,8 +25,7 @@ const read = (file) => {
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Fichiers des acceptation-<lot>.json (ou acceptation.json) à `vert: false` sous `<root>/<dir>/*` (un fichier par lot : plusieurs par écran), relatifs à `root` ; `format: 'regex'` pour testPathIgnorePatterns. */
-export function acceptationIgnored(root = process.cwd(), dir = 'docs/specs', format = 'glob') {
+function collect(root, dir, format, keep) {
   const base = join(root, dir);
   if (!existsSync(base)) return [];
   const out = [];
@@ -37,11 +39,21 @@ export function acceptationIgnored(root = process.cwd(), dir = 'docs/specs', for
     }
     for (const file of files) {
       const doc = read(join(folder, file));
-      if (!doc || doc.vert === true) continue;
+      if (!doc || !keep(doc)) continue;
       for (const f of doc.fichiers) if (typeof f === 'string') out.push(format === 'regex' ? `${escape(f)}$` : f);
     }
   }
   return out;
+}
+
+/** Fichiers des acceptation-<lot>.json (ou acceptation.json) à `vert: false`, ou à `e2e: true` (verts ou non), sous `<root>/<dir>/*` (un fichier par lot : plusieurs par écran), relatifs à `root` ; `format: 'regex'` pour testPathIgnorePatterns. */
+export function acceptationIgnored(root = process.cwd(), dir = 'docs/specs', format = 'glob') {
+  return collect(root, dir, format, (doc) => doc.vert !== true || doc.e2e === true);
+}
+
+/** Fichiers des acceptations `e2e: true` (vertes ou rouges) sous `<root>/<dir>/*`, relatifs à `root` : le `testMatch` de la suite e2e, lancée après le build. */
+export function acceptationE2e(root = process.cwd(), dir = 'docs/specs', format = 'glob') {
+  return collect(root, dir, format, (doc) => doc.e2e === true);
 }
 
 /**

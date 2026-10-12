@@ -1195,7 +1195,7 @@ async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore
   if (out.length) return out;
   const red = await runAccept(c, json);
   if (red.orphans.length) out.push(`fichiers listés dans ${json} sous la racine d'aucune commande de orchestrate.accept (le dossier de son « cd <dossier> && » initial, sinon le dépôt) : ${red.orphans.join(', ')} — aucun lanceur ne les prendrait`);
-  out.push(...checkRouges(rouges, plannedTests(l.repo, fiche), red.runs.filter((r) => r.code !== 0)));
+  out.push(...checkRouges(rouges, plannedTests(l.repo, fiche), red.runs.filter((r) => r.code !== 0), (parseAcceptation(readFileSync(join(l.repo, json), 'utf8')) as { fichiers?: string[] }).fichiers ?? []));
   for (const r of red.runs) if (r.code === 0) out.push(`la commande dédiée « ${r.command} » (orchestrate.accept) passe alors que le code n'existe pas : des tests verts avant le code ne prouvent rien — chaque test doit échouer parce que la fonctionnalité manque\n${tail(r.output, 15)}`);
   if (!c.config.test) {
     if (!l.warnings.includes(NO_TEST_ACCEPT)) l.warnings.push(NO_TEST_ACCEPT);

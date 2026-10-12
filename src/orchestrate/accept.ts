@@ -231,8 +231,23 @@ export function plannedTests(repo: string, fiche: string): string[] {
   }
 }
 
-/** Une erreur du test lui-même, pas de la fonctionnalité qui manque : variable cassée, syntaxe. Un import introuvable n'en est pas une : un lot qui crée un module neuf échoue ainsi, et la session accept ne peut pas le créer. */
-const TEST_SIDE = /\b(ReferenceError|SyntaxError)\b|is not defined/;
+/**
+ * Critère réduit (décision du lead, 12-10) : la seule faute du test que le programme reconnaît est un `ReferenceError` / « is not defined » dont la PREMIÈRE frame
+ * est dans un fichier de test (ou dans le code que le test fait évaluer au navigateur : sa frame est alors dans le test). Tout échec à l'import (module ou export
+ * manquant, `SyntaxError` d'import ESM comprise) est la fonctionnalité absente : un lot qui crée un module neuf échoue ainsi, et la session accept ne peut pas le créer.
+ * Un `ReferenceError` levé par le code de l'application n'est pas une faute du test. Rien d'autre n'est classé.
+ */
+const REFERENCE = /\bReferenceError\b|is not defined/;
+const FRAME = /^\s*(?:at\s+|❯\s*)?(?:.*?\()?((?:file:\/\/)?[^\s()]+?):\d+(?::\d+)?\)?\s*$/;
+const TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)(?:tests?|__tests__|e2e)\/)/;
+/** L'erreur relevée est un ReferenceError dont la première frame est dans le test (sans frame lisible : par prudence, le test). */
+export function testSideError(echec: string, fichiers: string[] = []): boolean {
+  if (!REFERENCE.test(echec)) return false;
+  const frame = echec.split('\n').slice(1).map((l) => FRAME.exec(l)?.[1]).find(Boolean);
+  if (!frame) return true;
+  const path = frame.replace(/^file:\/\//, '');
+  return TEST_FILE.test(path) || fichiers.some((f) => path.endsWith(f.replace(/^\.\//, '')));
+}
 /** Un lanceur qui sort en échec parce qu'il n'a trouvé aucun test : un rouge sans test. */
 const NO_TESTS = /no tests? (files? )?found/i;
 
@@ -242,10 +257,10 @@ export interface Rouge { test: string; echec: string; cause: string }
 /**
  * Validation des tests dès leur écriture (L204) : chaque test prévu doit échouer pour la BONNE raison — l'élément ou le comportement manque —
  * et non à cause du test (regex trop large, route d'API non simulée, variable locale capturée, délai, e2e rangé en unitaire). Le programme ne
- * lit pas le test : il exige de la session, pour chaque nom prévu, l'échec observé et sa cause, refuse la cause `autre` et les erreurs du test
+ * lit pas le test : il exige de la session, pour chaque nom prévu, l'échec observé et sa cause, refuse la cause `autre` et le ReferenceError du test
  * lui-même, et refuse un lanceur rouge faute de tests trouvés. Vide = acceptés.
  */
-export function checkRouges(rouges: Rouge[], planned: string[], runs: { command: string; output: string }[]): string[] {
+export function checkRouges(rouges: Rouge[], planned: string[], runs: { command: string; output: string }[], fichiers: string[] = []): string[] {
   const problems: string[] = [];
   for (const t of planned) {
     const r = rouges.find((x) => x.test === t);
@@ -255,8 +270,8 @@ export function checkRouges(rouges: Rouge[], planned: string[], runs: { command:
       problems.push(`test « ${t} » : « echec » vide (recopier le message d'échec observé)`);
     } else if (r.cause !== 'absent') {
       problems.push(`test « ${t} » : rouge pour une autre raison que la fonctionnalité absente (cause « ${r.cause} ») — corriger le test (regex trop large, route d'API non simulée, variable locale capturée, délai, e2e rangé en unitaire) jusqu'à ce qu'il échoue parce que l'élément ou le comportement manque`);
-    } else if (TEST_SIDE.test(r.echec)) {
-      problems.push(`test « ${t} » : l'échec relevé (${r.echec.trim().slice(0, 120)}) vient du test lui-même, pas de la fonctionnalité absente`);
+    } else if (testSideError(r.echec, fichiers)) {
+      problems.push(`test « ${t} » : l'échec relevé (${r.echec.trim().slice(0, 120)}) est un ReferenceError levé dans le test lui-même, pas par la fonctionnalité absente`);
     }
   }
   for (const run of runs) if (NO_TESTS.test(run.output)) problems.push(`la commande dédiée « ${run.command} » échoue faute de tests trouvés (aucun test lancé) : ce rouge ne prouve rien — vérifier ses include et CADENCE_ACCEPTATION`);

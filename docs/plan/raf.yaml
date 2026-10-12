@@ -2317,6 +2317,11 @@ lots:
     started: 2026-10-12
     review: { date: 2026-10-12, verdict: "compliant (1 minor note: revert-de-revert à l'ancien format « Revert \\\"Revert … » ignoré) — orchestré (vague 2026-10-12-2050, 0 passe(s) de correction)", commit: 639994f2f255dcbb09a38044a45496ff4e7c7380 }
     finished: 2026-10-12
+  - id: L208
+    title: "Plafond de sessions réglé par l'humain (CADENCE_MAX_SESSIONS, essai à 3 décidé par Sylvain le 12-10) : le skill lead (« never raise --max-sessions above two »), docs/lead.md et l'affichage « créneaux libres N sur 2 » (lead tour, --status) suivent le plafond réglé au lieu de 2 en dur ; le lead ne le relève jamais seul ; README, test"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

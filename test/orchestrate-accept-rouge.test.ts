@@ -32,10 +32,33 @@ describe('checkRouges : le contrôle pur', () => {
     for (const echec of [
       'ReferenceError: lastY is not defined\n    at test/scroll.test.ts:12:5',
       'ReferenceError: lastY is not defined\n    at Object.<anonymous> (/repo/e2e/scroll.spec.ts:12:5)\n    at /repo/src/app.ts:3:1',
-      'ReferenceError: lastY is not defined',
     ]) {
       expect(checkRouges([R(PLAN[0], { echec }), R(PLAN[1])], PLAN, [], ['e2e/scroll.spec.ts']).join('\n'), echec).toContain('R1 — a');
     }
+  });
+
+  it('un ReferenceError levé dans le code que le test fait évaluer au navigateur (page.evaluate : frames anonymes, puis le test) est refusé', () => {
+    const echec = [
+      'page.evaluate: ReferenceError: scrollY2 is not defined',
+      '    at eval (eval at evaluate (:311:30), <anonymous>:1:7)',
+      '    at UtilityScript.evaluate (<anonymous>:313:16)',
+      '    at UtilityScript.<anonymous> (<anonymous>:1:44)',
+      '    at /repo/e2e/galerie-filtres-l49.acceptation.spec.mjs:20:20',
+    ].join('\n');
+    expect(checkRouges([R(PLAN[0], { echec }), R(PLAN[1])], PLAN, [], []).join('\n')).toContain('R1 — a');
+  });
+
+  it('un ReferenceError sans aucune frame lisible n’est pas classé : accepté', () => {
+    const echec = 'ReferenceError: formatDate is not defined';
+    expect(checkRouges(PLAN.map((t) => R(t, { echec })), PLAN, [], ['e2e/a.spec.ts'])).toEqual([]);
+  });
+
+  it('les fichiers de l’acceptation : une frame relative à la racine de la commande (cd frontend &&) est reconnue, une frame d’un autre fichier non', () => {
+    const at = (f: string) => `ReferenceError: x is not defined\n    ❯ ${f}:1:61`;
+    const fichiers = ['frontend/acceptance/galerie.ts'];
+    expect(checkRouges([R(PLAN[0], { echec: at('acceptance/galerie.ts') }), R(PLAN[1])], PLAN, [], fichiers).join('\n')).toContain('R1 — a');
+    expect(checkRouges([R(PLAN[0], { echec: at('/repo/frontend/acceptance/galerie.ts') }), R(PLAN[1])], PLAN, [], fichiers).join('\n')).toContain('R1 — a');
+    expect(checkRouges(PLAN.map((t) => R(t, { echec: at('src/galerie.ts') })), PLAN, [], fichiers)).toEqual([]);
   });
 
   it('un ReferenceError levé par le code de l’application (première frame hors du test) est la fonctionnalité absente : accepté', () => {

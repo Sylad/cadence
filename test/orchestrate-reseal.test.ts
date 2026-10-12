@@ -146,6 +146,19 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
   });
 
+  it('un plan tenu par un autre outil (lecture seule) : le rescellé réussit, la note du lot reste à la main du lead', () => {
+    const { repo, a } = avecPlan();
+    writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: docs/plan/raf.yaml\n  lots: lots\n');
+    writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'le test contredit la fiche');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/rescellé/);
+    expect(r.out).toMatch(/note à ajouter/);
+    expect(git(repo, 'log', '-1', '--format=%s').trim()).toMatch(/^test\(L1\): acceptation rescellée/);
+    expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
+  });
+
   it('exige --reason, un lot en cours, et refuse pendant une vague orchestrée', () => {
     const { repo, a } = avecPlan();
     writeFileSync(join(repo, a.test), 'autre\n');

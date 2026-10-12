@@ -753,9 +753,14 @@ function specReseal(args: string[], reason: string | undefined, ctx: { root: str
   const norm = posix.normalize(test);
   git(repo, ['add', '--', json, norm]);
   git(repo, ['commit', '-q', '-m', `test(${lotId}): acceptation rescellée, ${norm} : ${reason.trim()}`, '--', json, norm]);
+  const sha = git(repo, ['rev-parse', '--short', 'HEAD']).trim();
+  // Un plan tenu par un autre outil ne se modifie pas d'ici : la raison est déjà dans acceptation.json et dans le commit, la note reste à la main du lead.
+  if (plan.readonly) {
+    io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et dans le commit — note à ajouter au lot avec l'outil du projet (plan en lecture seule)`);
+    return 0;
+  }
   plan.note(lotId, `test d'acceptation rescellé (${norm}, fiche inchangée) : ${reason.trim()}`, ctx.today);
   plan.save();
-  const sha = git(repo, ['rev-parse', '--short', 'HEAD']).trim();
   // La note du lot rejoint le dépôt dans la foulée (un dépôt sale arrêterait la vague suivante) ; un plan hors du dépôt ou non suivi reste à la main du lead.
   const planRel = relative(repo, plan.path);
   const tracked = !planRel.startsWith('..') && git(repo, ['ls-files', '--', planRel]).trim() !== '';

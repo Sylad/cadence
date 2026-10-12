@@ -2296,9 +2296,10 @@ lots:
     review: { date: 2026-10-12, verdict: "conforme — orchestré (vague 2026-10-12-1905, 1 passe(s) de correction + passe des mineurs)", commit: ce83fabe8c6ad305187b7ee1144909a37722a63d }
   - id: L206
     title: "Mesure : attente de créneau des vagues (58 min cumulées le 12-10 avec 2 sessions) — sortir des journaux .cadence/runs le temps d'attente par vague et par jour, le coût d'un 3e créneau (RAM, CPU, quota) sur Big-Blue, et recommander garder 2 ou passer à 3 (décision de Sylvain) ; aucun changement de --max-sessions dans ce lot"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-12
+    started: 2026-10-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

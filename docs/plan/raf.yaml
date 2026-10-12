@@ -2242,6 +2242,11 @@ lots:
     started: 2026-10-12
     review: { date: 2026-10-12, verdict: "compliant — orchestré (vague 2026-10-12-0905, 0 passe(s) de correction)", commit: a285835b1e91678c741e1dafd1bc33f101ca40ab }
     finished: 2026-10-12
+  - id: L200
+    title: "Test d'acceptation scellé qui contredit la fiche dans le lot en cours : aucun chemin de correction (verrou total, README « Exception — a delivered lot » ne vaut que pour vert: true) — chemin tracé par le lead (ex. cadence spec reseal <lot> <test> --reason, ou réouverture de l'étape accept sur ce seul test : fiche inchangée, empreinte refaite, raison dans acceptation.json et en note du lot), le verrou garde tout le reste ; vécu warhammer L35 12-10 (regex /\\d{1,2} / contre « T3 2027 annoncée ») ; README, skill lead, test"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

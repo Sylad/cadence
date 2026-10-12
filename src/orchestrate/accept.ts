@@ -19,6 +19,8 @@ export interface Acceptation {
   vert: boolean;
   /** Empreinte git (blob) de chaque fichier de tests, posée par le programme au scellé. */
   empreintes?: Record<string, string>;
+  /** Journal des rescellés d'un seul test (`cadence spec reseal`, L200) : le test, la raison donnée par le lead, la date et les deux empreintes. */
+  resceaux?: { test: string; raison: string; date: string; avant: string; apres: string }[];
 }
 
 type Obj = Record<string, unknown>;
@@ -67,7 +69,8 @@ export function parseAcceptation(text: string): Acceptation | string {
   if (!Array.isArray(fichiers) || fichiers.length === 0 || fichiers.some((f) => typeof f !== 'string' || !f)) return 'clé « fichiers » : liste non vide de chemins attendue';
   if (typeof vert !== 'boolean') return 'clé « vert » (booléen) attendue';
   const empreintes = isObj(doc.empreintes) ? (Object.fromEntries(Object.entries(doc.empreintes).filter(([, v]) => typeof v === 'string')) as Record<string, string>) : undefined;
-  return { lot, fiche, fichiers: fichiers as string[], vert, ...(empreintes ? { empreintes } : {}) };
+  const resceaux = Array.isArray(doc.resceaux) ? (doc.resceaux.filter((r) => isObj(r) && ['test', 'raison', 'date', 'avant', 'apres'].every((k) => typeof r[k] === 'string')) as NonNullable<Acceptation['resceaux']>) : undefined;
+  return { lot, fiche, fichiers: fichiers as string[], vert, ...(empreintes ? { empreintes } : {}), ...(resceaux?.length ? { resceaux } : {}) };
 }
 
 /** JSON à clés triées, sans la clé `vert` : la forme que le verrou compare. */
@@ -119,6 +122,37 @@ export function sealAcceptation(repo: string, path: string): void {
   const fichiers = (doc.fichiers as string[]).map((f) => posix.normalize(f));
   doc.empreintes = Object.fromEntries(fichiers.map((f) => [f, git(repo, 'hash-object', '--', f).trim()]));
   writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
+}
+
+/**
+ * Rescelle UN test (L200, `cadence spec reseal`, le lead — jamais une session) : le test d'un lot en cours contredit sa fiche et le verrou total
+ * ne laisse aucun chemin de correction. La fiche reste inchangée depuis le commit rouge, les autres fichiers listés aussi : seule l'empreinte
+ * du test nommé est refaite, la raison et les deux empreintes vont dans `resceaux`. Le commit (test + acceptation) est à faire : il devient le commit rouge.
+ */
+export function resealAcceptation(repo: string, path: string, test: string, reason: string, today: string): { avant: string; apres: string; lot: string } {
+  const file = join(repo, path);
+  const a = parseAcceptation(readFileSync(file, 'utf8'));
+  if (typeof a === 'string') throw new Error(`${path} : ${a}`);
+  if (!reason.trim()) throw new Error('--reason est obligatoire : la raison du rescellé va dans acceptation.json et en note du lot');
+  const norm = posix.normalize(test);
+  const fichiers = a.fichiers.map((f) => posix.normalize(f));
+  if (!fichiers.includes(norm)) throw new Error(`${test} n'est pas listé dans ${path} (fichiers : ${fichiers.join(', ')})`);
+  const avant = a.empreintes?.[norm];
+  if (!a.empreintes || !avant) throw new Error(`${path} n'est pas scellée (pas d'empreinte pour ${norm}) : l'étape accept n'est pas finie, rien à resceller`);
+  const red = redSha(repo, path);
+  if (!red) throw new Error(`${path} : pas de commit rouge lisible`);
+  if (!existsSync(join(repo, norm))) throw new Error(`${norm} : fichier absent (un test supprimé ne se rescelle pas)`);
+  if (!gitOk(repo, 'diff', '--quiet', red, '--', a.fiche)) throw new Error(`la fiche ${a.fiche} a changé depuis le commit rouge ${red.slice(0, 7)} : le rescellé ne vaut que fiche inchangée (une fiche qui évolue passe par le lot et sa revue)`);
+  const touches = fichiers.filter((f) => f !== norm && (!gitOk(repo, 'diff', '--quiet', red, '--', f) || !existsSync(join(repo, f)) || a.empreintes?.[f] !== git(repo, 'hash-object', '--', f).trim()));
+  if (touches.length) throw new Error(`autre(s) test(s) listé(s) modifié(s) depuis le commit rouge : ${touches.join(', ')} (le rescellé ne couvre que ${norm}, le verrou garde le reste)`);
+  const apres = git(repo, 'hash-object', '--', norm).trim();
+  if (apres === avant) throw new Error(`${norm} est inchangé depuis le scellé : rien à resceller`);
+  const doc = JSON.parse(readFileSync(file, 'utf8')) as Obj;
+  (doc.empreintes as Record<string, string>)[norm] = apres;
+  const journal = Array.isArray(doc.resceaux) ? doc.resceaux : [];
+  doc.resceaux = [...journal, { test: norm, raison: reason.trim(), date: today, avant, apres }];
+  writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
+  return { avant, apres, lot: a.lot };
 }
 
 /** Pose `vert: true` dans le fichier (le cycle, jamais une session) ; le commit est à faire. */

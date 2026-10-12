@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { readDocsConfig, readHookConfig, readNewsConfig, readPlanConfig, readSessionConfig } from './config.js';
+import { readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPlanConfig, readSessionConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
 import { audit, exemptPlanOnly, hypothesesOf, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
@@ -22,6 +23,7 @@ import { liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/comma
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
+import { findAcceptation, resealAcceptation } from './orchestrate/accept.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
@@ -192,6 +194,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   if (command === 'corrections') return corrections(rest, values, io);
   // `spec` est aussi un verbe de raf (raf spec <lot> on|off, L186) : seuls check et qa vont à la fiche.
   if (command === 'spec' && (rest[0] === 'check' || rest[0] === 'qa')) return spec(rest, io);
+  const reseal = command === 'spec' && rest[0] === 'reseal';
   // --all balaie les sous-dossiers : il ne lit ni le plan ni le cadence.yaml du dossier courant.
   if (command === 'session' && (values.all || values.depth !== undefined)) return sessionAll(rest, values, io);
   // cadence.yaml peut dire où est le plan et, s'il est tenu par un autre outil, comment le lire.
@@ -309,6 +312,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'spec': {
+      if (reseal) return specReseal(rest.slice(1), values.reason, { root, loadPlan, configPath, today }, io);
       if (rest.length !== 2 || (rest[1] !== 'on' && rest[1] !== 'off')) throw new RafError('usage : raf spec <id> on|off (ou cadence spec check|qa <fiche.yaml>)');
       const plan = loadPlan();
       if (!plan.setSpec(rest[0], rest[1] === 'on')) {
@@ -716,6 +720,47 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
   } catch (e) {
     return [`✗ ${(e as Error).message}`];
   }
+}
+
+/**
+ * `cadence spec reseal <lot> <test> --reason texte` (L200) : le chemin du lead quand un test d'acceptation scellé du lot EN COURS contredit la fiche.
+ * Le test est corrigé dans l'arbre de travail (fiche inchangée) ; la commande refait l'empreinte de ce seul test, journalise la raison dans
+ * acceptation.json, commite test + acceptation (le nouveau commit rouge), et note la raison au lot. Le verrou garde tout le reste.
+ */
+const git = (cwd: string, args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+function specReseal(args: string[], reason: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
+  if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche"');
+  if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec reseal refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
+  const [lotId, test] = args as [string, string];
+  const plan = ctx.loadPlan();
+  const lot = plan.lot(lotId);
+  if (lot.status !== 'doing') throw new RafError(`${lotId} n'est pas en cours (${lot.status}) : le rescellé ne vaut que pour le lot en cours ; un lot livré évolue avec sa fiche (README, « Exception — a delivered lot »)`);
+  const repo = gitRoot(ctx.root) ?? ctx.root;
+  const dir = readOrchestrateConfig(ctx.configPath).spec.dir;
+  const json = findAcceptation(repo, dir, lotId);
+  if (!json) throw new RafError(`${lotId} : aucune acceptation sous ${dir} (le lot n'a pas passé l'étape accept)`);
+  let r: { avant: string; apres: string };
+  try {
+    r = resealAcceptation(repo, json, test, reason, ctx.today);
+  } catch (e) {
+    throw new RafError((e as Error).message);
+  }
+  const norm = posix.normalize(test);
+  git(repo, ['add', '--', json, norm]);
+  git(repo, ['commit', '-q', '-m', `test(${lotId}): acceptation rescellée, ${norm} : ${reason.trim()}`, '--', json, norm]);
+  plan.note(lotId, `test d'acceptation rescellé (${norm}, fiche inchangée) : ${reason.trim()}`, ctx.today);
+  plan.save();
+  const sha = git(repo, ['rev-parse', '--short', 'HEAD']).trim();
+  // La note du lot rejoint le dépôt dans la foulée (un dépôt sale arrêterait la vague suivante) ; un plan hors du dépôt ou non suivi reste à la main du lead.
+  const planRel = relative(repo, plan.path);
+  const tracked = !planRel.startsWith('..') && git(repo, ['ls-files', '--', planRel]).trim() !== '';
+  if (tracked) {
+    git(repo, ['add', '--', planRel]);
+    git(repo, ['commit', '-q', '-m', `plan: ${lotId} test d'acceptation rescellé (${norm})`, '--', planRel]);
+  }
+  io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et en note du lot${tracked ? '' : ' (plan à commiter)'}`);
+  return 0;
 }
 
 /** `cadence spec check|qa <fiche>` (L170) : code 0 valide, 1 écarts, 2 usage ou fichier illisible. `qa` imprime la section expectations.md de l'écran. */

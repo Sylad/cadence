@@ -66,6 +66,13 @@ describe('checkRouges : le contrôle pur', () => {
     expect(checkRouges(PLAN.map((t) => R(t, { echec })), PLAN, [], [])).toEqual([]);
   });
 
+  it('format Vitest (❯ méthode chemin:l:c) : un ReferenceError levé par une fonction nommée de l’application est accepté, celui du test refusé', () => {
+    const app = 'ReferenceError: formatDate is not defined\n ❯ Module.render src/home.ts:3:3\n ❯ test/home.test.ts:4:10';
+    expect(checkRouges(PLAN.map((t) => R(t, { echec: app })), PLAN, [], [])).toEqual([]);
+    const test = 'ReferenceError: x is not defined\n ❯ test/home.test.ts:4:10';
+    expect(checkRouges([R(PLAN[0], { echec: test }), R(PLAN[1])], PLAN, [], ['test/home.test.ts']).join('\n')).toContain('R1 — a');
+  });
+
   it('un échec à l’import (module à créer, export à ajouter, SyntaxError d’import ESM) est la fonctionnalité absente : accepté', () => {
     for (const echec of [
       "Cannot find module './cache.service' from 'test/cache.spec.ts'",

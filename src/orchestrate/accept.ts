@@ -238,7 +238,7 @@ export function plannedTests(repo: string, fiche: string): string[] {
  * Un `ReferenceError` levé par le code de l'application n'est pas une faute du test. Rien d'autre n'est classé.
  */
 const REFERENCE = /\bReferenceError\b|is not defined/;
-const FRAME = /^\s*(?:at\s+|❯\s*)?(?:.*?\()?((?:file:\/\/)?[^\s()]+?):\d+(?::\d+)?\)?\s*$/;
+const FRAME = /^\s*(?:at\s+|❯\s*)?(?:.*?\(|(?<=❯\s*)[^\s()]+\s+)?((?:file:\/\/)?[^\s()]+?):\d+(?::\d+)?\)?\s*$/;
 const TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)(?:tests?|__tests__|e2e)\/)/;
 /** Frame sans fichier propre (code évalué par `page.evaluate` : `<anonymous>`, `eval`), interne à Node ou au lanceur : on passe à la suivante. */
 const INTERNAL = /^(?:<|node:|internal\/)|node_modules\/(?:playwright|@playwright|vitest|jest)/;

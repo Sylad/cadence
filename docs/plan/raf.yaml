@@ -2202,13 +2202,14 @@ lots:
     finished: 2026-10-11
   - id: L195
     title: "Une vague sur le dépôt cadence met en service du code non revu : ses sessions lancent npm run build, qui réécrit dist/ = le raf/cadence du PATH (constaté 11-10 : après la vague 2026-10-11-2130, le --dry-run montrait déjà les budgets de L194 et le code de L188, rendu non conforme, était en service) — builder dans un dossier jetable ou séparer le dist en service, mis à jour par le lead après revue ; test"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-11
     started: 2026-10-12
     notes:
       - { date: 2026-10-12, text: "DÉCISION LEAD 12-10 (rendu non conforme après 2 passes, vague 2026-10-12-0800 : chaque passe bouche un chemin, la revue en trouve un autre — prepare via npm install/npm ci, build:service qui compile l'arbre non commité). Cause = conception : le raf/cadence du PATH (~/.local/bin → cadence/bin/*.js → ../dist) lit le dist/ du dépôt de TRAVAIL. CRITÈRE DE FIN UNIQUE : le code en service vit dans une copie séparée (worktree git détaché, ex. ~/.local/share/cadence/service, construit là) ; ~/.local/bin/raf et cadence pointent dessus ; seul un script de mise en service <sha> lancé par le lead après raf done la met à jour (refuse un sha qui n'est pas un ancêtre de HEAD accepté / avec un lot rendu au-dessus). Plus rien dans le dépôt de travail (npm run build, prepare, npm install, npm ci, fichiers src non commités) ne touche le service. Test : npm ci + npm run build + un fichier src modifié dans le dépôt de travail laissent l'empreinte du service inchangée. Retirer build:service de 09e9179 s'il ne sert plus ; skill lead et README alignés. Réestimé 0.5 → 1." }
     review: { date: 2026-10-12, verdict: "conforme : le constat mineur 1 (rétention comptée depuis la sortie du service) est corrigé et testé, les constats 2 et 3 restent des notes motivées, la suite est verte (1802 tests), le typecheck et le build sont propres — orchestré (vague 2026-10-12-0905, 2 passe(s) de correction + passe des mineurs)", commit: c1039d155f323e6744a6f9b9d340942a82bd6af3 }
+    finished: 2026-10-12
   - id: L196
     title: "Revue de fiche : les constats mineurs deviennent des propositions du tableau final et non des notes du lot, contrairement au design § 4 et aux consignes (templates/orchestrate/fiche.md:12, agents/code-reviewer.md:67 « a minor one becomes a note ») — aligner le programme sur le design, test"
     status: done
@@ -2235,11 +2236,12 @@ lots:
     finished: 2026-10-12
   - id: L199
     title: "test/orchestrate-app.test.ts « délai dépassé après une attente du verrou » (L60) instable sous charge : rouge 1 fois sur 3 seul pendant deux vagues (12-10, re-vérif L198 à 2ef7fbf), « url tenue par une autre vague » au lieu de « n'a pas répondu en [0-2] s » — le verrou libéré par un setTimeout de 1 s contre un délai de 3 s dépend du minutage, à retirer (comme L193)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-12
     started: 2026-10-12
     review: { date: 2026-10-12, verdict: "compliant — orchestré (vague 2026-10-12-0905, 0 passe(s) de correction)", commit: a285835b1e91678c741e1dafd1bc33f101ca40ab }
+    finished: 2026-10-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

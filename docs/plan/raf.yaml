@@ -2309,6 +2309,11 @@ lots:
       - { date: 2026-10-12, text: "Reprise 12-10 (rendu après 2 passes, revue « conforme après 1 correctif ») — SEUL point : waits.ts:29, le compte « sans créneau obtenu » est faux quand deux lots d une même vague attendent en même temps (runPool, un lot par dépôt) : apparier chaque attente à son lot (clé vague+lot), test avec deux attentes simultanées. La mesure docs/mesures/attente-creneaux-2026-10-12.md est retenue (recommandation : essai à 3, décision de Sylvain)." }
     review: { date: 2026-10-12, verdict: "conforme — orchestré (vague 2026-10-12-2010, 0 passe(s) de correction + passe des mineurs)", commit: 70960326992fa3c17b6f48be538d37fb93239678 }
     finished: 2026-10-12
+  - id: L207
+    title: "Mise en service : un lot abandonné (dropped) dont chaque commit est annulé par un git revert présent sous le sha ne bloque plus npm run service (aujourd'hui « lot non accepté au-dessous de … — L204 (dropped) », vécu 12-10) ; un lot abandonné dont un commit n'est pas annulé bloque toujours ; README, test"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

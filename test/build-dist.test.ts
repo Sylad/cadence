@@ -53,4 +53,13 @@ describe('le dist/ en service (L195)', () => {
     expect(step3).toContain('build:service');
     expect(step3.indexOf('build:service')).toBeGreaterThan(step3.indexOf('raf done'));
   });
+
+  it('le skill lead ne met pas HEAD en service quand un lot rendu est au-dessus : build:service attend que HEAD soit le code accepté', () => {
+    const skill = readFileSync(join(REPO, 'skills', 'lead', 'SKILL.md'), 'utf8');
+    const check = skill.slice(skill.indexOf('## 3. Check'), skill.indexOf('## 4. Delivery'));
+    const step3 = check.slice(check.indexOf('\n3. '));
+    const service = step3.slice(step3.indexOf('build:service'));
+    expect(service).toContain('livrable jusqu');
+    expect(service).toMatch(/never HEAD/);
+  });
 });

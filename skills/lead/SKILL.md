@@ -155,7 +155,9 @@ lot, the chain goes on with the other lots and does not wait for it. A delivery 
    ignored): the verdict goes into the project's own tool.
    On the cadence repository itself, `npm run build` only type-checks; once the verdict is recorded and the lot
    accepted (`raf done`), the lead puts the reviewed code in service with `npm run build:service` (it rewrites
-   `dist/`, the `raf` of the `PATH`). A lot found non-compliant is never put in service.
+   `dist/`, the `raf` of the `PATH`). `build:service` compiles the current tree, i.e. HEAD: run it only when HEAD is the accepted code. When the wave's table gives
+   « livrable jusqu'à <sha> » (a handed-back lot is stacked above), HEAD holds unreviewed code: never HEAD, put nothing in
+   service yet, and run `build:service` once the lot above is fixed and accepted. A lot found non-compliant is never put in service.
 
 ## 4. Delivery
 

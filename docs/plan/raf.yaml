@@ -2158,7 +2158,7 @@ lots:
     finished: 2026-10-11
   - id: L189
     title: orchestrate.accept en liste de lanceurs, front et back (spec etape-spec-back, B4)
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L188 ]
     created: 2026-10-11
@@ -2166,6 +2166,7 @@ lots:
     notes:
       - { date: 2026-10-12, text: "DÉCISION LEAD 12-10 (rendu non conforme après 2 passes, vague 2026-10-12-1030 : un nouveau majeur par revue — liste d un élément, passage chaîne → liste). CRITÈRE DE FIN UNIQUE : une chaîne garde EXACTEMENT le comportement actuel (racine du dépôt, pas de CADENCE_ACCEPTATION_ROOT) ; une liste, de 1 élément ou plus, lance chaque entrée sous sa racine avec CADENCE_ACCEPTATION_ROOT ; le brief (acceptText) et le cycle (runAccept, planAcceptRuns) décident par la MÊME fonction exportée (Array.isArray) ; test paramétré chaîne / liste de 1 / liste de 2 qui vérifie que brief et cycle concordent ; README : section « passer d une chaîne à une liste » (config du lanceur qui résout depuis sa racine, copie du gabarit à refaire) ; aucun projet migré dans ce lot (ol et warhammer restent en chaîne)." }
     review: { date: 2026-10-12, verdict: "conforme (1 note mineure : CADENCE_ACCEPTATION_ROOT=. posé aussi pour une chaîne, sans effet observable) — orchestré (vague 2026-10-12-1100, 1 passe(s) de correction + passe des mineurs sans commit)", commit: 6bbcc72a452e098a62e2b6114d0e2b5b04eb065a }
+    finished: 2026-10-12
   - id: L190
     title: Mesure de l'étape spec back après 8 lots avec fiche (spec etape-spec-back, B5)
     status: todo
@@ -2248,13 +2249,24 @@ lots:
     finished: 2026-10-12
   - id: L200
     title: "Test d'acceptation scellé qui contredit la fiche dans le lot en cours : aucun chemin de correction (verrou total, README « Exception — a delivered lot » ne vaut que pour vert: true) — chemin tracé par le lead (ex. cadence spec reseal <lot> <test> --reason, ou réouverture de l'étape accept sur ce seul test : fiche inchangée, empreinte refaite, raison dans acceptation.json et en note du lot), le verrou garde tout le reste ; vécu warhammer L35 12-10 (regex /\\d{1,2} / contre « T3 2027 annoncée ») ; README, skill lead, test"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-12
     started: 2026-10-12
     notes:
       - { date: 2026-10-12, text: "DÉCISION LEAD 12-10 (rendu non conforme après 2 passes, vague 2026-10-12-1030). CRITÈRE DE FIN : (1) un rescellé n est valable que si son commit n appartient à AUCUNE session de la vague (commits connus par steps[].commits ou headBefore..headAfter de chaque session) — fait par le lead entre deux sessions ; sinon écart du verrou ; (2) la commande de rescellé est dans les disallowedTools des sessions (comme raf done/review/ux) ; (3) le contrôle du verrou tourne à CHAQUE fin de session, question comprise (cycle.ts:1318). Test : le scénario de la revue (session qui remplace le test, appelle le rescellé, commite, pose une question, --answer) finit handed-back. Majeur : rescellé atomique — sur échec du commit (hook pre-commit exit 1), restaurer acceptation.json et le test, RafError lisible, test. Mineurs : README/skill pour un plan en lecture seule ou non suivi ; contrôle du verrou de vague factorisé avec deliver. Réestimé 0.5 → 1." }
     review: { date: 2026-10-12, verdict: "conforme — orchestré (vague 2026-10-12-1100, 0 passe(s) de correction + passe des mineurs)", commit: f5682022b923296f311412e646018612954fd7a9 }
+    finished: 2026-10-12
+  - id: L201
+    title: "lead tour : --depth N (même sémantique que session start) et clé depth: du cadence.yaml du dossier parent, à côté de priority:, lue par lead tour (la bande cadence-hud marche sans changement) ; issue #8 ; README, test"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-12
+  - id: L202
+    title: "test/deliver.test.ts « (a) Ctrl-C : un enfant en arrière-plan qui ignore SIGINT… tué au plus tard à l'échéance de la grâce » instable sous charge : rouge 1 fois dans la suite complète le 12-10 (re-vérif L200/L189, deux vagues), vert 3/3 seul — dépendance au minutage à retirer (comme L193, L199)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

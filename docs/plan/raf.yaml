@@ -2165,6 +2165,7 @@ lots:
     started: 2026-10-12
     notes:
       - { date: 2026-10-12, text: "DÉCISION LEAD 12-10 (rendu non conforme après 2 passes, vague 2026-10-12-1030 : un nouveau majeur par revue — liste d un élément, passage chaîne → liste). CRITÈRE DE FIN UNIQUE : une chaîne garde EXACTEMENT le comportement actuel (racine du dépôt, pas de CADENCE_ACCEPTATION_ROOT) ; une liste, de 1 élément ou plus, lance chaque entrée sous sa racine avec CADENCE_ACCEPTATION_ROOT ; le brief (acceptText) et le cycle (runAccept, planAcceptRuns) décident par la MÊME fonction exportée (Array.isArray) ; test paramétré chaîne / liste de 1 / liste de 2 qui vérifie que brief et cycle concordent ; README : section « passer d une chaîne à une liste » (config du lanceur qui résout depuis sa racine, copie du gabarit à refaire) ; aucun projet migré dans ce lot (ol et warhammer restent en chaîne)." }
+    review: { date: 2026-10-12, verdict: "conforme (1 note mineure : CADENCE_ACCEPTATION_ROOT=. posé aussi pour une chaîne, sans effet observable) — orchestré (vague 2026-10-12-1100, 1 passe(s) de correction + passe des mineurs sans commit)", commit: 6bbcc72a452e098a62e2b6114d0e2b5b04eb065a }
   - id: L190
     title: Mesure de l'étape spec back après 8 lots avec fiche (spec etape-spec-back, B5)
     status: todo

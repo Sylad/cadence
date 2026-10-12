@@ -35,4 +35,9 @@ describe('mesure de l\'étape spec (L176, S8)', () => {
     const trois = cause('spec floue ou critère absent') + cause('règle de gestion inventée') + cause('test manquant');
     expect(ligne(note, '| passes dues à « spec floue »')).toContain(`${Math.round((100 * trois) / 30)} % (${trois} sur 30)`);
   });
+
+  it('ne dit plus que la 3e ligne est hors comparaison, puisque la spec lui pose une cible', () => {
+    expect(spec).not.toMatch(/La comparaison porte donc sur\s+les trois autres lignes/);
+    expect(spec).toMatch(/Limite connue[\s\S]*cible de la 3e ligne/);
+  });
 });

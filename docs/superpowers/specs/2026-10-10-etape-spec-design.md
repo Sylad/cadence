@@ -210,8 +210,9 @@ d'abandonner l'étape. La cible de la 3e ligne (≤ 8 %, la moitié de la réfé
 le 12-10, avant la mesure ; la mesure est dans [`etape-spec-2026-10-12.md`](../../mesures/etape-spec-2026-10-12.md).
 
 Limite connue : la cause « règle de gestion inventée » vaut 0 % dans la référence, faute de constat
-classé ainsi ; la fiche la rend mesurable (les hypothèses sont écrites). La comparaison porte donc sur
-les trois autres lignes, et le nombre d'hypothèses par fiche est suivi à part.
+classé ainsi ; la fiche la rend mesurable (les hypothèses sont écrites). La cible de la 3e ligne porte
+sur les trois causes ensemble, mais la mesure donne aussi la part hors « règle inventée », seule
+comparable à la référence ; le nombre d'hypothèses par fiche est suivi à part.
 
 ## Essai prévu
 

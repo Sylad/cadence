@@ -1006,7 +1006,8 @@ The Claude Code status band is the `cadence-hud` plugin.
 declared → **code review**, which always comes last (a UX fix changes code) → compliant (no blocking, no
 major finding) → `raf review` is recorded by the orchestrator with the sha the review read, then
 "ready to deliver". Not compliant → a correction in a new session, then a new review (the UX review of a
-visible lot is replayed too, the code having changed), **two passes at most**, then the lot goes back to
+visible lot is replayed too, the code having changed), **two passes at most** (a third when the review converges: the count of blocking + major findings dropped
+since the previous review and exactly one is left; the lot budget still applies), then the lot goes back to
 you with the findings. A small lot (`estimate` ≤ 0.5 or `quickwin`) gets one single Opus pass for code and
 usability (code only when the lot is not `visible`). Failing tests (reported red, or red when
 `orchestrate.test` is run) go straight to a correction.
@@ -1014,7 +1015,7 @@ usability (code only when the lot is not `visible`). Failing tests (reported red
 **Review sized to the lot (L108)**: a lot whose `estimate` is ≤ `orchestrate.review.threshold` (0.25 day by default)
 is *light*: one single review (Sonnet by default, `code-reviewer` agent, same criteria), no minors pass — the minors are
 returned to the lead as notes (proposals). A blocking or major finding on a light lot still triggers a correction, and
-the review that follows is the full one (Opus); the cap of two correction passes is unchanged. A bigger lot keeps the
+the review that follows is the full one (Opus); the cap of two correction passes is unchanged (except the convergence pass above). A bigger lot keeps the
 chain described above (Opus, two corrections, minors pass). `--dry-run` shows « revue légère » on a light lot.
 
 ```yaml
@@ -1355,7 +1356,7 @@ the red tests: the pass it names is the one whose tests were red, counted by its
 finish, the wave is *suspended* (exit code 3) and `--resume --budget …` continues. A session that returns
 nothing readable, times out (45 min for work, 25 for a review) or fails is not retried; the lot is handed
 back with the cause. Exit codes: 0 every lot ready · 1 at least one lot handed back (question, failure,
-review still not compliant after two passes) · 2 refused before acting · 3 wave suspended.
+review still not compliant after two passes, or three when it converges) · 2 refused before acting · 3 wave suspended.
 
 **Stacked lots** (L76): lots of one repository commit on top of each other on `main`. When a ready lot sits under a lot that
 is not ready (handed back, failed…), the final table adds a line `<project>:<lot> — livrable jusqu'à <sha> … : git push origin <sha>:main && cadence deliver --sha <sha>`:

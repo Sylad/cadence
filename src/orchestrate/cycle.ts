@@ -29,6 +29,8 @@ import { lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
 export const MAX_PASSES = 2;
+/** Plafond quand la revue converge (L205) : le nombre de bloquants+majeurs a baissé d'une revue à l'autre et il n'en reste qu'un. */
+export const MAX_PASSES_CONVERGING = MAX_PASSES + 1;
 
 export class Budget {
   consumed = 0;
@@ -1428,8 +1430,12 @@ function firstReview(c: LotCtx): StepKind {
 function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const l = c.lot;
   l.constats = constats;
-  if (l.pass >= MAX_PASSES) {
-    stop(c, 'handed-back', `${what} après ${MAX_PASSES} passe(s) de correction`);
+  // Revue qui converge (L205) : un seul constat bloquant ou majeur reste, après une baisse d'une revue à l'autre → une passe de plus (budget : fixAffordable, à l'entrée de la session).
+  const counts = l.reviewCounts ?? [];
+  const converging = what === 'revue non conforme' && counts.length >= 2 && counts[counts.length - 1] === 1 && counts[counts.length - 1] < counts[counts.length - 2];
+  const cap = converging ? MAX_PASSES_CONVERGING : MAX_PASSES;
+  if (l.pass >= cap) {
+    stop(c, 'handed-back', `${what} après ${l.pass} passe(s) de correction`);
     return;
   }
   l.pass += 1;
@@ -1549,6 +1555,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     return;
   }
   const constats = [...blockingConstats(rep, 'code'), ...(!l.small && l.ux && !l.ux.conforme ? uxConstatsKept(c) : [])];
+  (l.reviewCounts ??= []).push(constats.length);
   toFix(c, constats, 'revue non conforme');
 }
 

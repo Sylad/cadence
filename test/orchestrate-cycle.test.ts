@@ -2305,3 +2305,52 @@ describe('accès à la production des sessions de vague (L168)', () => {
     }
   });
 });
+
+describe('revue qui converge (L205)', () => {
+  const nMajors = (n: number): Handler => () =>
+    claudeOut(reviewReport({ majeurs: n, constats: Array.from({ length: n }, (_, i) => ({ gravite: 'majeur', fichier: 'a.txt', ligne: i + 1, texte: `bug ${i}` })), verdict: 'non conforme' }));
+  const fixes = () => [fix('b.txt'), fix('c.txt'), fix('d.txt')];
+
+  it('2 puis 1 bloquant/majeur après deux passes : une 3e passe, puis conforme', async () => {
+    const h = harness({ script: { implement: [impl()], review: [nMajors(3), nMajors(2), nMajors(1), ok], fix: fixes() } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review', 'fix', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.pass).toBe(3);
+  });
+
+  it('encore un seul après la 3e passe : plafond à trois, rendu au lead', async () => {
+    const h = harness({ script: { implement: [impl()], review: [nMajors(3), nMajors(2), nMajors(1), nMajors(1)], fix: fixes() } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.pass).toBe(3);
+    expect(c.lot.outcome).toContain('après 3 passe(s) de correction');
+  });
+
+  it('un seul constat mais sans baisse (1, 1, 1) : plafond inchangé à deux', async () => {
+    const h = harness({ script: { implement: [impl()], review: [nMajors(1), nMajors(1), nMajors(1)], fix: fixes() } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.pass).toBe(2);
+    expect(c.lot.outcome).toContain('après 2 passe(s) de correction');
+  });
+
+  it('baisse mais il en reste deux (4, 3, 2) : plafond inchangé à deux', async () => {
+    const h = harness({ script: { implement: [impl()], review: [nMajors(4), nMajors(3), nMajors(2)], fix: fixes() } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.pass).toBe(2);
+    expect(c.lot.status).toBe('handed-back');
+  });
+
+  it('budget du lot trop juste pour payer la revue suivante : pas de 3e passe', async () => {
+    const h = harness({ script: { implement: [impl()], review: [nMajors(3), nMajors(2), nMajors(1), ok], fix: fixes() } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE + 6000 });
+    await runLot(c);
+    expect(c.lot.pass).toBe(2);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/budget/);
+  });
+});

@@ -32,6 +32,23 @@ describe('relevé de référence des corrections (L165)', () => {
     expect(doc).toContain(`le modèle est d'accord avec la relecture sur ${accord} passes sur 24 (${Math.round((accord / 24) * 100)} %)`);
   });
 
+  it.skipIf(!existsSync(runs))('les parts « spec floue + règle inventée + test manquant » écrites à la main (relevé, README, spec) sont celles du tableau', () => {
+    const until = /^Reproduction : .*--until (\S+?)`? /m.exec(doc)?.[1];
+    const m = measure(readRuns(runs, until), readCache(join(root, 'docs', 'mesures', 'corrections-classement.json')));
+    const part = (byC: Record<string, number>, passes: number) => {
+      const n = byC['spec-floue']! + byC['regle-inventee']! + byC['test-manquant']!;
+      return { n, passes, pct: Math.round((n / passes) * 100) };
+    };
+    const v = part(m.byVisibilityCause.visible, m.byVisibility.visible.passes);
+    const h = part(m.byVisibilityCause.hidden, m.byVisibility.hidden.passes);
+    const all = part(m.byCause, m.total.passes);
+    expect(doc).toContain(`de ${v.pct} % (${v.n} sur ${v.passes}) pour les lots visibles et de ${h.pct} % (${h.n} sur ${h.passes}) pour les autres, soit ${all.pct} % tous lots`);
+    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    expect(readme).toContain(`${v.pct} % of ${v.passes} passes against ${all.pct} % overall`);
+    const spec = readFileSync(join(root, 'docs', 'superpowers', 'specs', '2026-10-10-etape-spec-design.md'), 'utf8');
+    expect(spec).toContain(`| ${v.pct} % (${v.n} sur ${v.passes}, lots visibles) |`);
+  });
+
   it('le README cite le nombre de lots et le taux à deux corrections du relevé publié', () => {
     const lots = /\*\*(\d+) lots\*\*/.exec(doc)?.[1];
     const un = /(\d+) % des lots ont eu/.exec(doc)?.[1];

@@ -199,7 +199,7 @@ fonctionnement, sans valeur statistique) :
 |---|---|---|
 | lots avec au moins 1 correction | 45 % (25 sur 55) | ≤ 30 % |
 | lots avec au moins 2 corrections | 25 % (14 sur 55) | ≤ 12 % |
-| passes dues à « spec floue », « règle inventée » ou « test manquant » (part des passes) | 31 % (tous lots) | ≤ 15 % |
+| passes dues à « spec floue », « règle inventée » ou « test manquant » (part des passes) | 16 % (7 sur 45, lots visibles) | ≤ 15 % |
 | lot qui revient d'une revue UX avec un bloquant | non mesuré | aucun à la conformité |
 
 Le coût s'ajoute : tokens de `spec` + revue de maquette + `accept` par lot, relevés dans les journaux

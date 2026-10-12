@@ -46,6 +46,19 @@ describe('parseWaits', () => {
     expect(w.waits.map((x) => x.ms)).toEqual([90_000, 91_000]);
     expect(w.unfinished).toBe(0);
   });
+  it('une attente interrompue dans sa première minute puis reprise (« depuis 0 s » deux fois) est comptée sans créneau', () => {
+    const t = '2026-10-12T10:00:00.000Z';
+    const j = [
+      `${t} cadence:L1 · en attente d'un créneau de session depuis 0 s (2/2 en cours : a)`,
+      `${t} cadence:L1 → interrupted`,
+      `${t} cadence:L1 · en attente d'un créneau de session depuis 0 s (2/2 en cours : a)`,
+      `${t} cadence:L1 · créneau de session obtenu après 20 s d'attente`,
+      '',
+    ].join('\n');
+    const w = parseWaits(j);
+    expect(w.waits.map((x) => x.ms)).toEqual([20_000]);
+    expect(w.unfinished).toBe(1);
+  });
   it('deux attentes simultanées dont une seule aboutit : l\'autre reste sans créneau', () => {
     const t = '2026-10-12T10:00:00.000Z';
     const j = [

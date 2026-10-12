@@ -22,7 +22,7 @@ export interface Wait {
 export function parseWaits(journal: string): { waits: Wait[]; unfinished: number } {
   const waits: Wait[] = [];
   let unfinished = 0;
-  const state = new Map<string, { open: boolean; since: number }>(); // « depuis » de la dernière ligne d'attente : une ligne dont il recule est celle d'une nouvelle attente
+  const state = new Map<string, { open: boolean; since: number }>(); // « depuis » de la dernière ligne d'attente : une ligne dont il ne progresse pas (recule, ou « depuis 0 s » de nouveau) est celle d'une nouvelle attente
   for (const line of journal.split('\n')) {
     const m = /^(\S+) (?:(\S+) · )?(?:en attente d'un créneau de session depuis (.+?) \(|créneau de session obtenu après (.+?) d'attente)/.exec(line);
     if (!m) continue;
@@ -31,7 +31,7 @@ export function parseWaits(journal: string): { waits: Wait[]; unfinished: number
     if (!s) state.set(key, (s = { open: false, since: 0 }));
     if (m[4] === undefined) {
       const ms = parseWaitMs(m[3]) ?? 0;
-      if (s.open && ms < s.since) unfinished++;
+      if (s.open && ms <= s.since) unfinished++;
       s.open = true;
       s.since = ms;
       continue;

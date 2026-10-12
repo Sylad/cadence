@@ -11,6 +11,7 @@ Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/c
 - **Premier essai écarté** : avec un premier prompt, le modèle mettait 169 passes sur 254 en « spec floue » et n'était d'accord avec la relecture que sur 5 passes sur 24 ; le prompt a été resserré (bug de code par défaut, « spec floue » seulement si le constat dit que l'énoncé est flou). Le classement ci-dessous est le second.
 - **Fiabilité** : l'échantillon de `--sample 24` (24 passes réparties sur les clés triées, qui ont toutes des constats) a été relu en entier sur le code final : le modèle est d'accord avec la relecture sur 17 passes sur 24 (71 %). Au total 77 passes ont été relues (cet échantillon et ceux des relevés précédents, dont les clés ont changé quand le nombre de passes a changé) : accord sur 59 (77 %). Les relectures priment dans les tableaux. Les désaccords viennent de la frontière entre bug de code, test manquant (un test qui ne peut pas échouer ou une sonde non mise à jour y sont rangés) et dérive d'architecture (doc non suivie) : lire les parts par cause comme un ordre de grandeur, pas comme une mesure exacte. La relecture est celle d'une seule personne, et elle lit le premier constat de chaque passe.
 - **Passes sans revue** : 13 passes (cadence L84 et L154, claude-code-codex L16, evatosorus L24 ×2 et L33, finance-tracker L3, warhammer40k L54, L60 ×2, L74, L80, L91) n'ont aucun constat à lire : déclenchées par des tests rouges juste après l'écriture, ou deuxième passe `fix` d'une revue déjà traitée par la première. Elles sont comptées à part et ne passent pas par le modèle. Une première version les envoyait au modèle, qui en classait en « faux constat de revue » : cette ligne mesurait donc des passes sans revue, non des erreurs de revue (elle vaut 0).
+- **Visibles et non visibles** : la section « Par cause et par visibilité » sépare les causes des lots visibles (45 passes) de celles des autres (208). La part « spec floue + règle inventée + test manquant » est de 16 % (7 sur 45) pour les lots visibles et de 34 % (71 sur 208) pour les autres, soit 31 % tous lots confondus : la comparaison de l'étape spec se fait contre les lots visibles (revue de L166).
 - Limite : une passe peut avoir plusieurs constats de causes différentes ; seule la plus grave est comptée. « Faux constat de revue » et « données / SQL » valent 0 : aucun constat relu n'était une erreur de la revue elle-même, et les projets mesurés n'ont guère de SQL.
 
 ## Résultats
@@ -63,5 +64,12 @@ Reproduction : `cadence corrections <dossier-des-projets> --cache docs/mesures/c
 |---|---|---|---|---|
 | visibles | 55 | 25 (45 %) | 14 (25 %) | 45 |
 | non visibles | 208 | 135 (65 %) | 61 (29 %) | 208 |
+
+### Par cause et par visibilité (passes)
+
+| Lots | Lots | Passes | spec floue ou critère absent | règle de gestion inventée | dérive d'architecture | données / SQL | bug de code | test manquant | faux constat de revue | sans revue (tests rouges) | Spec floue, règle inventée ou test manquant |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| visibles | 55 | 45 | 3 | 0 | 6 | 0 | 26 | 4 | 0 | 6 | 7 (16 %) |
+| non visibles | 208 | 208 | 22 | 1 | 26 | 0 | 104 | 48 | 0 | 7 | 71 (34 %) |
 
 Échantillon relu à la main : 77 passes, le modèle local est d'accord avec la relecture sur 59 (77 %) ; la cause relue prime dans les tableaux.

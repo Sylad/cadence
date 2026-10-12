@@ -50,6 +50,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- `cadence corrections` (L176): a new table « Par cause et par visibilité » gives the passes by cause for visible and non-visible lots separately, with the share of `spec floue`, `règle inventée` and `test manquant`; `--json` carries it as `byVisibilityCause`. The reference of a screen-sheet measure is the visible lots, not « all lots »: in the 10-10 baseline that share is 16 % (7 of 45 passes) for visible lots, against 31 % overall.
 - Session cap set by the human (L208): `créneaux libres : N sur M` in `cadence orchestrate --status` and `cadence lead tour` now shows the configured cap (`CADENCE_MAX_SESSIONS`, or `--max-sessions` on `--status`; 2 by default) instead of a fixed 2, and the `lead` skill and `docs/lead.md` follow that cap for the number of subagents; the lead never raises it itself (a trial at 3 was decided on 2026-10-12).
 - `npm run service` (L207): a `dropped` lot whose every commit is undone by a `git revert` present under the sha no longer blocks the mise en service (it used to refuse with « lot non accepté … — L204 (dropped) »); a dropped lot with a commit left un-reverted still blocks
 - `cadence orchestrate --waits` (L206, resumed): the slot-wait lines of the journal now carry their lot (`project:lot · …`) and are paired by lot, so two lots of one wave waiting at the same time no longer give a false "sans créneau obtenu" count; journals without a lot keep the per-wave pairing.

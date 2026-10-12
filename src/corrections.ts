@@ -137,6 +137,8 @@ export interface Measure {
   byProject: Record<string, Tally>;
   byVisibility: { visible: Tally; hidden: Tally };
   byCause: Record<CauseOrNone, number>;
+  /** Les causes par visibilité du lot : la référence de l'étape spec est celle des lots visibles, non « tous lots » (L176). */
+  byVisibilityCause: { visible: Record<CauseOrNone, number>; hidden: Record<CauseOrNone, number> };
   byProjectCause: Record<string, Record<CauseOrNone, number>>;
   agreement: { reviewed: number; agree: number };
 }
@@ -145,7 +147,7 @@ const tally = (): Tally => ({ lots: 0, atLeast1: 0, atLeast2: 0, passes: 0 });
 const causes = (): Record<CauseOrNone, number> => ({ ...Object.fromEntries([...CAUSES, 'sans-constat', 'non-classe'].map((c) => [c, 0])) } as Record<CauseOrNone, number>);
 
 export function measure(data: Runs, cache: Map<string, Classification>): Measure {
-  const m: Measure = { total: tally(), byProject: {}, byVisibility: { visible: tally(), hidden: tally() }, byCause: causes(), byProjectCause: {}, agreement: { reviewed: 0, agree: 0 } };
+  const m: Measure = { total: tally(), byProject: {}, byVisibility: { visible: tally(), hidden: tally() }, byCause: causes(), byVisibilityCause: { visible: causes(), hidden: causes() }, byProjectCause: {}, agreement: { reviewed: 0, agree: 0 } };
   for (const l of data.lots) {
     const groups = [m.total, (m.byProject[l.project] ??= tally()), l.visible ? m.byVisibility.visible : m.byVisibility.hidden];
     for (const t of groups) {
@@ -159,6 +161,7 @@ export function measure(data: Runs, cache: Map<string, Classification>): Measure
     const c = cache.get(p.key);
     const cause: CauseOrNone = p.findings.length === 0 ? 'sans-constat' : c ? (c.manual ?? c.cause) : 'non-classe';
     m.byCause[cause]++;
+    (p.visible ? m.byVisibilityCause.visible : m.byVisibilityCause.hidden)[cause]++;
     (m.byProjectCause[p.project] ??= causes())[cause]++;
     if (c?.manual && cause !== 'sans-constat') {
       m.agreement.reviewed++;
@@ -263,6 +266,8 @@ export function serializeCache(cache: Map<string, Classification>): string {
 }
 
 const pct = (a: number, b: number) => (b === 0 ? '—' : `${Math.round((100 * a) / b)} %`);
+/** Les causes qu'une meilleure spécification évite (critère de réussite de l'étape spec). */
+const SPEC_CAUSES: Cause[] = ['spec-floue', 'regle-inventee', 'test-manquant'];
 const row = (name: string, t: Tally) => `| ${name} | ${t.lots} | ${t.atLeast1} (${pct(t.atLeast1, t.lots)}) | ${t.atLeast2} (${pct(t.atLeast2, t.lots)}) | ${t.passes} |`;
 
 export function renderReport(m: Measure): string {
@@ -277,6 +282,12 @@ export function renderReport(m: Measure): string {
   for (const p of projects) out.push(`| ${p} | ${used.map((c) => m.byProjectCause[p]?.[c] ?? 0).join(' | ')} | ${m.byProject[p]!.passes} |`);
   out.push('', '### Lots avec correction', '', '| Projet | Lots | ≥ 1 correction | ≥ 2 corrections | Passes |', '|---|---|---|---|---|', ...projects.map((p) => row(p, m.byProject[p]!)), row('**Total**', m.total), '');
   out.push('### Lots visibles et non visibles', '', '| Lots | Lots | ≥ 1 correction | ≥ 2 corrections | Passes |', '|---|---|---|---|---|', row('visibles', m.byVisibility.visible), row('non visibles', m.byVisibility.hidden), '');
+  out.push('### Par cause et par visibilité (passes)', '', `| Lots | Lots | Passes | ${used.map((c) => LABELS[c]).join(' | ')} | Spec floue, règle inventée ou test manquant |`, `|---|---|---|${used.map(() => '---').join('|')}|---|`);
+  for (const [name, t, byC] of [['visibles', m.byVisibility.visible, m.byVisibilityCause.visible], ['non visibles', m.byVisibility.hidden, m.byVisibilityCause.hidden]] as const) {
+    const spec = SPEC_CAUSES.reduce((n, c) => n + byC[c], 0);
+    out.push(`| ${name} | ${t.lots} | ${t.passes} | ${used.map((c) => byC[c]).join(' | ')} | ${spec} (${pct(spec, t.passes)}) |`);
+  }
+  out.push('');
   if (m.agreement.reviewed > 0) out.push(`Échantillon relu à la main : ${m.agreement.reviewed} passes, le modèle local est d'accord avec la relecture sur ${m.agreement.agree} (${pct(m.agreement.agree, m.agreement.reviewed)}) ; la cause relue prime dans les tableaux.`, '');
   return out.join('\n');
 }

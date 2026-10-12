@@ -84,6 +84,17 @@ describe('measure', () => {
     expect(m.byProjectCause.beta!['test-manquant']).toBe(1);
   });
 
+  it('sort les causes par visibilité (L176) : les passes d\'un lot visible ne se mêlent pas à celles des autres', () => {
+    const data = readRuns(fixture());
+    const m = measure(data, new Map([cls('w1/alpha--L1/3', 'spec-floue'), cls('w2/beta--L3/3', 'test-manquant'), cls('w2/beta--L3/5', 'bug-code')]));
+    expect(m.byVisibilityCause.visible['test-manquant']).toBe(1);
+    expect(m.byVisibilityCause.visible['bug-code']).toBe(1);
+    expect(m.byVisibilityCause.visible['spec-floue']).toBe(0);
+    expect(m.byVisibilityCause.hidden['spec-floue']).toBe(1);
+    expect(m.byVisibilityCause.hidden['test-manquant']).toBe(0);
+    for (const c of CAUSES) expect(m.byVisibilityCause.visible[c] + m.byVisibilityCause.hidden[c]).toBe(m.byCause[c]);
+  });
+
   it('la relecture manuelle prime sur le classement du modèle et donne un taux d\'accord', () => {
     const data = readRuns(fixture());
     const c = new Map<string, Classification>([['w1/alpha--L1/3', { cause: 'spec-floue', by: 'ollama:m', manual: 'bug-code' }], ['w2/beta--L3/3', { cause: 'test-manquant', by: 'ollama:m', manual: 'test-manquant' }]]);
@@ -222,6 +233,16 @@ describe('renderReport', () => {
     expect(md).toContain('33 %'); // 1 lot sur 3 à ≥2
     expect(md).toContain('visibles');
     expect(md).toContain('non classé');
+  });
+
+  it('donne les causes des lots visibles à part, avec la part « spec floue + règle inventée + test manquant » de leurs passes (L176)', () => {
+    const data = readRuns(fixture());
+    const md = renderReport(measure(data, new Map([['w1/alpha--L1/3', { cause: 'spec-floue', by: 'ollama:m' }], ['w2/beta--L3/3', { cause: 'test-manquant', by: 'ollama:m' }], ['w2/beta--L3/5', { cause: 'bug-code', by: 'ollama:m' }]])));
+    const section = md.split('### Par cause et par visibilité')[1]!;
+    expect(section).toBeDefined();
+    expect(section).toContain('| Lots | Passes | spec floue ou critère absent |');
+    expect(section).toContain('| visibles | 1 | 2 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 (50 %) |'); // 1 passe sur 2 : test manquant
+    expect(section).toContain('| non visibles | 2 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 (100 %) |'); // 1 passe sur 1 : spec floue
   });
 });
 

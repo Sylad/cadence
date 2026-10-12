@@ -639,7 +639,7 @@ has to correct itself. From the folder a wave was launched from (default: the cu
 
 - the **lots with a correction**: of the lots that went through a successful write session, the share with at least one
   and at least two `fix` passes, per project and for visible versus non-visible lots (`61 %` and `29 %` of 263 lots in the 10-10 baseline);
-- the **passes by cause**, in total and per project. The cause of a pass is read from the findings of the review that
+- the **passes by cause**, in total, per project and **per visibility** (visible lots apart from the others, with the share of `spec-floue`, `regle-inventee` and `test-manquant` among each one's passes — the reference an evolution aimed at screens is compared to is that of the visible lots, not « all lots »: 16 % of 45 passes against 31 % overall in the 10-10 baseline). The cause of a pass is read from the findings of the review that
   precedes it, among: unclear spec or missing criterion (`spec-floue`), invented business rule (`regle-inventee`),
   architecture drift (`derive-architecture`), data / SQL (`donnees-sql`), code bug (`bug-code`), missing test
   (`test-manquant`), false review finding (`faux-constat`). One cause per pass: the root of what forced the fix. A pass with no review finding to read (triggered by red tests right after the write session) is counted apart as `sans-constat` and never sent to the model.

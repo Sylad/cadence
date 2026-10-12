@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { lotSlug } from '../src/orchestrate/state.js';
 import { lotBudget, lotBudgetBasis, orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
@@ -47,7 +48,7 @@ function parentWith(projects: Record<string, { title: string; estimate?: number;
   const dirs: Record<string, string> = {};
   for (const [name, lots] of Object.entries(projects)) {
     const dir = join(parent, name);
-    mkdirSync(dir);
+    mkdirSync(dir, { recursive: true });
     git(dir, 'init', '-q', '-b', 'main');
     git(dir, 'config', 'user.email', 't@example.com');
     git(dir, 'config', 'user.name', 'T');
@@ -107,6 +108,15 @@ describe('arguments', () => {
     expect(() => parseOrchestrateArgs(['a:L1@gpt'])).toThrow(/modèle inconnu/);
     expect(() => parseOrchestrateArgs(['--parallel'])).toThrow(/option inconnue/);
   });
+  it('L201 — le projet d\'un lot peut être un chemin (projet imbriqué de lead tour --depth) : groupe/gamma:L1', () => {
+    expect(parseOrchestrateArgs(['groupe/gamma:L1', 'groupe/gamma:Q4/x-1@haiku', 'a/b/c:L2']).lots).toEqual([
+      { project: 'groupe/gamma', lot: 'L1', model: undefined },
+      { project: 'groupe/gamma', lot: 'Q4/x-1', model: 'haiku' },
+      { project: 'a/b/c', lot: 'L2', model: undefined },
+    ]);
+    expect(parseOrchestrateArgs(['--resume', 'groupe/gamma:L1']).lots).toEqual([{ project: 'groupe/gamma', lot: 'L1', model: undefined }]);
+    expect(lotSlug('groupe/gamma', 'L1')).toBe('groupe__gamma--L1');
+  });
   it('L120 — un id de lot peut contenir « / » : le premier « : » sépare le projet, « @ » final le modèle', () => {
     expect(parseOrchestrateArgs(['maritime-atlas:Q4/accueil-4-ux12', 'a:Q4/x-1@haiku', 'Q4/y-2']).lots).toEqual([
       { project: 'maritime-atlas', lot: 'Q4/accueil-4-ux12', model: undefined },
@@ -161,6 +171,18 @@ describe('refus avant d\'agir (code 2)', () => {
       expect(ok.code).toBe(0);
     } finally {
       removeDryRunBriefs(ok.out.join('\n'));
+    }
+  });
+
+  it('L201 — un projet imbriqué nommé par son chemin (lead tour --depth 2) est adressable : groupe/gamma:L1 --dry-run', async () => {
+    const { parent } = parentWith({ 'groupe/gamma': [{ title: 'un' }] });
+    const r = await run(parent, ['groupe/gamma:L1', '--dry-run']);
+    try {
+      expect(r.err.join('\n')).toBe('');
+      expect(r.code).toBe(0);
+      expect(r.out.join('\n')).toContain('groupe/gamma:L1');
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
     }
   });
 

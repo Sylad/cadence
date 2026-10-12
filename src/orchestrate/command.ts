@@ -143,12 +143,12 @@ export function parseMaxSessions(text: string, what = '--max-sessions'): number 
 }
 
 // une vague (2026-10-04-1412) n'a ni « : » ni « / » : leur présence désigne un lot, quel que soit son motif (R-M7/ux-1)
-const LOT_LIKE = /^(?:[\w.-]+:[\w.-][\w./-]*|[\w.-]+\/[\w./-]*|[A-Za-z]+\d+)(?:@\w+)?$/;
+const LOT_LIKE = /^(?:[\w.-]+(?:\/[\w.-]+)*:[\w.-][\w./-]*|[\w.-]+\/[\w./-]*|[A-Za-z]+\d+)(?:@\w+)?$/;
 const MODELS = ['sonnet', 'opus', 'haiku'];
 
 function lotArg(text: string): { project?: string; lot: string; model?: Model } {
-  // le premier « : » sépare le projet du lot, un « @ » final le modèle ; le lot garde ses « / » (L120)
-  const m = /^(?:([\w.-]+):)?([\w.-][\w./-]*?)(?:@(\w+))?$/.exec(text);
+  // le premier « : » sépare le projet du lot, un « @ » final le modèle ; le lot garde ses « / » (L120), le projet peut être un chemin depuis le dossier (`groupe/gamma`, projet imbriqué de lead tour --depth, L201)
+  const m = /^(?:([\w.-]+(?:\/[\w.-]+)*):)?([\w.-][\w./-]*?)(?:@(\w+))?$/.exec(text);
   if (!m) throw new RafError(`lot invalide : ${text} (projet:lot, lot, projet:lot@haiku)`);
   if (m[3] && !MODELS.includes(m[3])) throw new RafError(`modèle inconnu : @${m[3]} (attendu : ${MODELS.join(', ')})`);
   return { project: m[1], lot: m[2], model: m[3] as Model | undefined };

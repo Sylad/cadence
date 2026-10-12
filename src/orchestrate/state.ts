@@ -183,8 +183,8 @@ export const lotRepoPaths = (l: Pick<LotState, 'repo' | 'repos'>): string[] => [
 export const neighbourDirs = (l: Pick<LotState, 'repos'>): string[] => (l.repos ?? []).map((r) => r.path);
 
 export const lotKey = (project: string, lot: string) => `${project}:${lot}`;
-/** Nom de dossier d'un lot dans la vague : le « / » d'un id de sous-tâche (`Q4/accueil-4-ux12`) devient « __ » ; un id sans « / » est inchangé. */
-export const lotSlug = (project: string, lot: string) => `${project}--${lot.split('/').join('__')}`;
+/** Nom de dossier d'un lot dans la vague : le « / » d'un id de sous-tâche (`Q4/accueil-4-ux12`) ou d'un projet imbriqué (`groupe/gamma`) devient « __ » ; sans « / » le nom est inchangé. */
+export const lotSlug = (project: string, lot: string) => `${project.split('/').join('__')}--${lot.split('/').join('__')}`;
 const lotFile = (project: string, lot: string) => `${lotSlug(project, lot)}.json`;
 
 function atomicWrite(file: string, data: unknown): void {

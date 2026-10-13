@@ -43,8 +43,8 @@ app (`orchestrate.ux`); the **code review** (Opus, Sonnet for a lot of 0.25 day 
 **correction** in a fresh session if the review is not compliant, two passes at most, and a third
 only when the review converges (the count of blocking + major findings dropped and only one is
 left), each followed by a review. A compliant review makes the program record `raf review` itself.
-A small lot (estimate of 0.5 day or less, or `quickwin`) has a single `review-small` pass that covers
-code and usability, with no separate UX pass.
+A small lot (estimate of 0.5 day or less, or `quickwin`) has a single review pass, with no separate UX pass:
+`review-small` covering code and usability when the lot is `visible`, a code `review` otherwise.
 
 ## 3. The lead drives the waves
 

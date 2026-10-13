@@ -42,6 +42,16 @@ describe('docs/fonctionnement.md (L211)', () => {
       'cadence spec reseal', 'npm run service', '~/.local/share/cadence', 'screen: page', 'spec: true', 'raf check']) expect(md, s).toContain(s)
   })
 
+  it('le petit lot : revue ergonomie seulement s’il est visible, sinon revue de code (doc et figure)', () => {
+    const md = read('docs/fonctionnement.md')
+    expect(md).toContain('code `review` otherwise')
+    for (const v of ['light', 'dark']) {
+      const s = read(`docs/fonctionnement-wave-${v}.svg`)
+      expect(s, v).not.toContain('for code and UX')
+      expect(s, v).toContain('review-small if visible')
+    }
+  })
+
   it('est lié depuis le README et depuis docs/lead.md', () => {
     expect(read('README.md')).toContain('docs/fonctionnement.md')
     expect(read('docs/lead.md')).toContain('fonctionnement.md')

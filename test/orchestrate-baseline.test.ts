@@ -17,6 +17,13 @@ describe('failedTests : les tests en échec lus dans la sortie du lanceur', () =
     expect(failedTests(out)).toEqual(['TestB', 'cas c', 'suite › cas d', 'tests/test_x.py::test_a']);
   });
 
+  it('pytest : le message d\'un assert simple ou variable n\'entre pas dans le nom', () => {
+    const a = failedTests('FAILED test_x.py::test_a - assert 1 == 2\nFAILED test_x.py::test_b - assert /tmp/pytest-3/x == 0x7f1\nFAILED t.py::test_c[a - b] - assert 0\nERROR t.py::test_d - fixture \'x\' not found');
+    const b = failedTests('FAILED test_x.py::test_a - assert 3 == 4\nFAILED test_x.py::test_b - assert /tmp/pytest-9/x == 0x7f9\nFAILED t.py::test_c[a - b]\nERROR t.py::test_d');
+    expect(a).toEqual(['t.py::test_c[a - b]', 't.py::test_d', 'test_x.py::test_a', 'test_x.py::test_b']);
+    expect(b).toEqual(a);
+  });
+
   it('sans doublon, trié, vide quand rien n\'est identifiable', () => {
     expect(failedTests(' FAIL  b\n FAIL  a\n FAIL  b')).toEqual(['a', 'b']);
     expect(failedTests('boom\nexit 3')).toEqual([]);

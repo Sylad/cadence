@@ -357,3 +357,13 @@ describe('agents hors orchestrate : même consigne Playwright que les briefs (L8
     expect(agent).not.toContain('was cached for 4 hours');
   });
 });
+
+describe('ligne de base des tests dans les briefs (L213)', () => {
+  it('implement et fix demandent de vérifier les échecs au sha de départ et de les lister sous echecsDeBase', () => {
+    for (const name of ['implement', 'fix'] as const) {
+      const text = readFileSync(join(TEMPLATES_DIR, `${name}.md`), 'utf8');
+      expect(text).toContain('Tests already red before the lot');
+      expect(text).toContain('echecsDeBase');
+    }
+  });
+});

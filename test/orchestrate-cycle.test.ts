@@ -2378,3 +2378,62 @@ describe('revue qui converge (L205)', () => {
     expect(c.lot.outcome).toContain('« fix » non jouée');
   });
 });
+
+describe('ligne de base des tests (L213)', () => {
+  const old = " FAIL  autre-lot > cas ancien";
+
+  it('mêmes tests rouges au sha de départ : pas un défaut du lot, listés à part, la revue a lieu', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, { test: `echo '${old}'; exit 1` });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.pass).toBe(0);
+    expect(c.lot.baseline?.failures).toEqual(['autre-lot > cas ancien']);
+    expect(c.lot.baseline?.sha).toBe(c.lot.steps[0].headBefore);
+    expect(c.lot.warnings.join('\n')).toContain('déjà rouge(s) au sha de départ');
+    const table = renderTable({ id: 'w1', created: '2026-10-13T10:00:00Z', cwd: '/x', budget: 2_000_000, consumed: 0, cacheRead: 0, status: 'done', pid: 1, lots: ['demo:L1'] }, [c.lot]).join('\n');
+    expect(table).toContain('demo:L1 — déjà rouge au départ (');
+    expect(table).toContain('autre-lot > cas ancien');
+    // le relecteur sait que ces échecs ne sont pas ceux du lot
+    expect(h.calls[1].brief).toContain('already red at the start sha');
+    expect(git(h.repo, 'worktree', 'list')).not.toContain('baseline');
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
+  });
+
+  it('un échec nouveau reste rouge : seul lui est rendu à la correction, les anciens sont comptés à part', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const c = h.lot('L1', {}, { test: `echo '${old}'; if [ -f a.txt ] && [ ! -f b.txt ]; then echo ' FAIL  lot > cas nouveau'; fi; exit 1` });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    expect(h.calls[1].brief).toContain('lot > cas nouveau');
+    expect(h.calls[1].brief).not.toContain('- autre-lot > cas ancien');
+    expect(h.calls[1].brief).toContain('1 autre(s) test(s) déjà rouge(s) au sha de départ');
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('sortie sans test identifiable : on ne peut rien comparer, les tests restent rouges', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'test -f b.txt || { echo boom >&2; exit 3; }' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    expect(c.lot.baseline).toBeUndefined();
+  });
+
+  it('tests annoncés rouges par la session mais déjà rouges au départ pour le programme : pas de correction', async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: '23 failed', vert: false } })], review: [ok] } });
+    const c = h.lot('L1', {}, { test: `echo '${old}'; exit 1` });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.pass).toBe(0);
+  });
+
+  it('sans orchestrate.test : les échecs de base annoncés par la session sont listés à part, non vérifiés', async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: '23 failed', vert: false }, echecsDeBase: ['autre-lot > cas ancien'] })], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.baseline?.failures).toEqual(['autre-lot > cas ancien']);
+    expect(c.lot.warnings.join('\n')).toContain('non vérifié par le programme');
+  });
+});

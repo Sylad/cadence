@@ -98,6 +98,9 @@ function deliverable(lots: LotState[], ancestor: (repo: string, a: string, b: st
   return out;
 }
 
+/** Tests déjà rouges au départ listés un par un dans le tableau ; au-delà, un compte. */
+const BASELINE_LISTED = 30;
+
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. */
 export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[] } = {}): string[] {
   const rows = lots.map((l) => [`${l.project}:${l.lot}`, LABEL[l.status], String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`]);
@@ -122,6 +125,13 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
     if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);
     if (l.uxCaptures) out.push(`${l.project}:${l.lot} — captures Playwright : ${l.uxCaptures}`);
     for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);
+    // Ligne de base des tests (L213) : les échecs déjà présents au sha de départ, à part de ceux du lot.
+    const base = l.baseline;
+    if (base?.failures.length) {
+      const where = `${base.sha ? ` (${base.sha.slice(0, 7)}${base.verified ? '' : ', annoncé par la session, non vérifié'})` : ''}`;
+      for (const t of base.failures.slice(0, BASELINE_LISTED)) out.push(`${l.project}:${l.lot} — déjà rouge au départ${where} : ${t}`);
+      if (base.failures.length > BASELINE_LISTED) out.push(`${l.project}:${l.lot} — déjà rouge au départ${where} : … et ${base.failures.length - BASELINE_LISTED} autre(s)`);
+    }
     for (const x of l.choix ?? []) out.push(`${l.project}:${l.lot} — choix fait : ${x}`);
     for (const h of l.hypotheses ?? []) out.push(`${l.project}:${l.lot} — hypothèse de la fiche : ${h}`);
     for (const p of l.proposals) out.push(`${l.project}:${l.lot} — proposé : ${p}`);

@@ -15,6 +15,7 @@ export const WORK_SCHEMA = {
     nonVerifie: strings,
     questions: strings,
     choix: strings,
+    echecsDeBase: strings,
     resume: str,
   },
   required: ['commits', 'tests', 'build', 'nonVerifie', 'questions', 'resume'],
@@ -76,6 +77,8 @@ export interface WorkReport {
   questions: string[];
   /** Choix d'interprétation faits par l'auteur ; absent d'un ancien rapport. */
   choix?: string[];
+  /** Tests rouges déjà au sha de départ de la session, vérifiés par elle (L213) ; absent ou vide : aucun. */
+  echecsDeBase?: string[];
   resume: string;
 }
 

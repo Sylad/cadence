@@ -3,7 +3,8 @@ import { parse } from 'yaml';
 import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
 import { docSyncBrief, docSyncGaps, filesOf } from '../docsync.js';
@@ -13,6 +14,7 @@ import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
+import { compareBaseline, failedTests } from './baseline.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, newsText, objective, renderBrief, reposText, TEMPLATES_DIR, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
@@ -135,12 +137,70 @@ async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
   return null;
 }
 
+/** Sha d'où le lot est parti : le HEAD d'avant sa première session. */
+const startSha = (l: LotState): string | undefined => l.steps.find((s) => s.headBefore)?.headBefore;
+
+/**
+ * Échecs des tests au sha de départ du lot (L213) : la commande est rejouée dans un worktree jetable de ce sha, hors du dépôt,
+ * avec des liens vers les dossiers ignorés de la racine (node_modules, dist…) pour que les dépendances s'y trouvent. Null quand
+ * le worktree ne peut être monté : l'appelant garde alors les tests pour rouges.
+ */
+async function baselineFailures(c: LotCtx, command: string): Promise<string[] | null> {
+  const l = c.lot;
+  const sha = startSha(l);
+  if (!sha) return null;
+  if (l.baseline?.verified && l.baseline.sha === sha && l.baseline.command === command) return l.baseline.failures;
+  const dir = mkdtempSync(join(tmpdir(), 'cadence-baseline-'));
+  const links: string[] = [];
+  try {
+    git(l.repo, 'worktree', 'add', '--detach', '-f', dir, sha);
+    const ignored = git(l.repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.includes('/') && !f.startsWith('.cadence'));
+    for (const name of ignored) {
+      const to = join(dir, name);
+      if (existsSync(to)) continue;
+      symlinkSync(join(l.repo, name), to);
+      links.push(to);
+    }
+    const r = await sh(c, command, 30 * 60_000, {}, dir);
+    const failures = r.code === 0 ? [] : failedTests(r.output);
+    l.baseline = { sha, command, failures, verified: true };
+    save(c);
+    return failures;
+  } catch {
+    return null;
+  } finally {
+    for (const k of links) if (lstatSync(k, { throwIfNoEntry: false })?.isSymbolicLink()) unlinkSync(k);
+    try {
+      git(l.repo, 'worktree', 'remove', '--force', dir);
+    } catch {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    try {
+      git(l.repo, 'worktree', 'prune');
+    } catch {
+      // rien à élaguer
+    }
+  }
+}
+
+type VsBase = { kind: 'unknown' } | { kind: 'existing'; n: number } | { kind: 'new'; nouveaux: string[]; existants: number };
+
+/** Des tests rouges comparés à la ligne de base (L213) : tous déjà rouges au départ, ou au moins un nouveau, ou rien de comparable. */
+async function againstBaseline(c: LotCtx, command: string, output: string): Promise<VsBase> {
+  const now = failedTests(output);
+  if (!now.length) return { kind: 'unknown' };
+  const base = await baselineFailures(c, command);
+  if (!base?.length) return { kind: 'unknown' };
+  const { nouveaux, existants } = compareBaseline(now, base);
+  return nouveaux.length ? { kind: 'new', nouveaux, existants: existants.length } : { kind: 'existing', n: existants.length };
+}
+
 const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g, '\\$&');
 
 /** Commande du projet, asynchrone : la boucle d'événements reste libre (délai de l'autre créneau, signaux). Son groupe est tué au délai et au signal. */
-function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000, env: Record<string, string> = {}): Promise<{ code: number; output: string }> {
+function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000, env: Record<string, string> = {}, cwd = c.lot.repo): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
-    const child = spawn('sh', ['-c', command], { cwd: c.lot.repo, env: { ...withoutLaunchVars(process.env), ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawn('sh', ['-c', command], { cwd, env: { ...withoutLaunchVars(process.env), ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const pid = child.pid;
     if (pid === undefined) {
       child.once('error', (e) => resolve({ code: 127, output: String(e.message) }));
@@ -241,7 +301,7 @@ function choixText(choix: string[]): string {
 function checksText(c: LotCtx): string {
   const k = c.lot.checks;
   if (!k?.runs.length || k.head !== git(c.lot.repo, 'rev-parse', 'HEAD')) return '';
-  const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? 'green' : `RED, exit code ${r.code}`}`);
+  const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? 'green' : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`}`);
   return [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
 }
 
@@ -1378,7 +1438,17 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   else if (made === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
   const red: Constat[] = [];
-  if (!rep.tests.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` });
+  // Tests annoncés rouges (L213) : avec orchestrate.test, le programme rejoue et compare à la ligne de base, la session n'est crue que si les tests y sont rouges autrement que par des échecs de départ ; sans, la liste des échecs de base de la session, non vérifiée.
+  const claimed: Constat = { source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` };
+  let deferred = false;
+  if (!rep.tests.vert) {
+    const declared = (rep.echecsDeBase ?? []).map((t) => t.trim()).filter(Boolean);
+    if (c.config.test) deferred = true;
+    else if (declared.length) {
+      l.baseline = { sha: startSha(l) ?? '', failures: declared, verified: false };
+      l.warnings.push(`tests rouges annoncés par la session, tous déjà rouges au sha de départ selon elle (${declared.length}) : non vérifié par le programme (orchestrate.test absent)`);
+    } else red.push(claimed);
+  }
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
   const runs: NonNullable<LotState['checks']>['runs'] = [];
   if (red.length === 0) {
@@ -1389,13 +1459,26 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     for (const [label, command] of [['tests', c.config.test], ['build', c.config.build]] as const) {
       if (!command) continue;
       const r = await sh(c, command);
-      runs.push({ label, command, code: r.code });
-      if (r.code !== 0) {
-        red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
+      const run: (typeof runs)[number] = { label, command, code: r.code };
+      runs.push(run);
+      if (r.code === 0) continue;
+      const vs: VsBase = label === 'tests' ? await againstBaseline(c, command, r.output) : { kind: 'unknown' };
+      if (vs.kind === 'existing') {
+        run.dejaRouges = vs.n;
+        const note = `${vs.n} test(s) déjà rouge(s) au sha de départ ${(l.baseline?.sha ?? '').slice(0, 7)}, pas un défaut du lot : listés à part, la revue a lieu`;
+        if (!l.warnings.includes(note)) l.warnings.push(note);
+        continue;
+      }
+      if (vs.kind === 'new') {
+        red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) : ${vs.nouveaux.length} test(s) rouge(s) qui ne l'étaient pas au sha de départ :\n${vs.nouveaux.map((t) => `- ${t}`).join('\n')}${vs.existants ? `\n(${vs.existants} autre(s) test(s) déjà rouge(s) au sha de départ : à ne pas corriger)` : ''}` });
         break;
       }
+      red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
+      break;
     }
   }
+  // La session annonçait des tests rouges et le programme ne les voit pas rouges au départ : l'annonce vaut.
+  if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && r.dejaRouges)) red.push(claimed);
   if (red.length) {
     toFix(c, red, 'tests rouges');
     return;

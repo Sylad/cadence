@@ -138,7 +138,9 @@ export interface LotState {
   ux?: ReviewSummary;
   uxNote?: string;
   /** Contrôles lancés par le programme (tests, build) au `head` indiqué, passés au relecteur tant que HEAD n'a pas bougé. */
-  checks?: { head: string; runs: { label: 'tests' | 'build'; command: string; code: number }[] };
+  checks?: { head: string; runs: { label: 'tests' | 'build'; command: string; code: number; /** Tests rouges dont tous les échecs l'étaient déjà au sha de départ (L213) : nombre d'échecs, pas un défaut du lot. */ dejaRouges?: number }[] };
+  /** Ligne de base des tests (L213) : échecs déjà présents au sha de départ du lot, listés à part dans le tableau de fin de vague. `verified` : rejoués par le programme à ce sha ; sinon annoncés par la session, non vérifiés. */
+  baseline?: { sha: string; command?: string; failures: string[]; verified: boolean };
   /** Dossier où le Playwright d'une étape (ux, ou implement/fix d'un lot visible) a rangé captures et snapshots (dans le dossier de la vague, hors du dépôt). */
   uxCaptures?: string;
   /** Constat du contrôle préalable (livrable en partie présent), joint au brief de la première implémentation. */

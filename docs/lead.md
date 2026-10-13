@@ -101,5 +101,6 @@ picture, not its source.
 the folder without `$CLAUDE_CODE_SESSION_ID`, figure older than two minutes): the lead then treats it
 as being at the threshold.
 
-See also the README's [lead tour](../README.md#lead-tour) and [orchestrate](../README.md#orchestrate)
+The mechanics around it (the life of a lot in the plan, a lot inside a wave, putting cadence in service, the budgets) are drawn in
+[fonctionnement.md](fonctionnement.md). See also the README's [lead tour](../README.md#lead-tour) and [orchestrate](../README.md#orchestrate)
 sections.

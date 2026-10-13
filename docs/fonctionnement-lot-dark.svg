@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 190" width="1100" height="190" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#e6edf3">
+<title>Life of a lot in the plan</title>
+<desc>A lot goes from todo to doing, receives commits that cite it, gets its review and UX verdicts, becomes done, then is delivered by cadence deliver.</desc>
+<defs><marker id="arr1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker></defs>
+<rect width="1100" height="190" fill="#0d1117"/>
+<rect x="20" y="40" width="110" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="75" y="64.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">todo</text>
+<text x="75" y="79.5" text-anchor="middle" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#8b949e">raf add</text>
+<rect x="230" y="40" width="130" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="295" y="64.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">doing</text>
+<text x="295" y="79.5" text-anchor="middle" font-size="11.5" fill="#8b949e">commits « Lx »</text>
+<rect x="470" y="40" width="170" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="555" y="64.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">Verdicts recorded</text>
+<text x="555" y="79.5" text-anchor="middle" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#8b949e">raf review · raf ux</text>
+<rect x="740" y="40" width="110" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="795" y="64.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">done</text>
+<text x="795" y="79.5" text-anchor="middle" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#8b949e">raf done</text>
+<rect x="950" y="40" width="130" height="56" rx="6" fill="#0c2d6b" stroke="#58a6ff" stroke-width="2"/>
+<text x="1015" y="64.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">Delivered</text>
+<text x="1015" y="79.5" text-anchor="middle" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#8b949e">cadence deliver</text>
+<polyline points="130,68 228,68" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr1)"/>
+<text x="180" y="60" text-anchor="middle" font-size="11.5" fill="#8b949e">raf start</text>
+<polyline points="360,68 468,68" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr1)"/>
+<text x="415" y="60" text-anchor="middle" font-size="11.5" fill="#8b949e">reviews</text>
+<polyline points="640,68 738,68" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr1)"/>
+<text x="690" y="60" text-anchor="middle" font-size="11.5" fill="#8b949e">gates passed</text>
+<polyline points="850,68 948,68" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr1)"/>
+<text x="900" y="60" text-anchor="middle" font-size="11.5" fill="#8b949e">push</text>
+<text x="75" y="124" text-anchor="middle" font-size="11.5" fill="#8b949e">raf drop → dropped</text>
+<text x="295" y="124" text-anchor="middle" font-size="11.5" fill="#8b949e">pre-commit: hook.autostart</text>
+<text x="295" y="140" text-anchor="middle" font-size="11.5" fill="#8b949e">warn · refuse · start</text>
+<text x="555" y="124" text-anchor="middle" font-size="11.5" fill="#8b949e">review: any lot with commits</text>
+<text x="555" y="140" text-anchor="middle" font-size="11.5" fill="#8b949e">ux: visible lot</text>
+<text x="795" y="124" text-anchor="middle" font-size="11.5" fill="#8b949e">refused with an open sub-task</text>
+<text x="1015" y="124" text-anchor="middle" font-size="11.5" fill="#8b949e">CI of the sha → deploy</text>
+<text x="1015" y="140" text-anchor="middle" font-size="11.5" fill="#8b949e">→ effect checks</text>
+<text x="1015" y="164" text-anchor="middle" font-size="11.5" fill="#8b949e">visible lot: news entry + capture</text>
+</svg>

@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1290 372" width="1290" height="372" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#1f2328">
+<title>The lead drives the waves</title>
+<desc>Three lanes: the human chooses and decides, the lead starts, relays, re-verifies and delivers, the orchestrate program runs the lots and chains the next wave while the context stays under 60 percent.</desc>
+<defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#57606a"/></marker></defs>
+<rect width="1290" height="372" fill="#ffffff"/>
+<rect x="0" y="30" width="1290" height="90" fill="#f6f8fa"/>
+<rect x="0" y="230" width="1290" height="90" fill="#f6f8fa"/>
+<text x="12" y="71" text-anchor="start" font-weight="600" font-size="13.5" fill="#1f2328">Human</text>
+<text x="12" y="88" text-anchor="start" font-size="11.5" fill="#57606a">chooses, decides</text>
+<text x="12" y="171" text-anchor="start" font-weight="600" font-size="13.5" fill="#1f2328">Lead</text>
+<text x="12" y="188" text-anchor="start" font-size="11.5" fill="#57606a">short session</text>
+<text x="12" y="271" text-anchor="start" font-weight="600" font-size="13.5" fill="#1f2328">orchestrate</text>
+<text x="12" y="288" text-anchor="start" font-size="11.5" fill="#57606a">fresh sessions</text>
+<text x="200" y="20" text-anchor="middle" font-weight="600" font-size="12" letter-spacing="0.7" fill="#57606a">1 TOUR</text>
+<text x="344" y="20" text-anchor="middle" font-weight="600" font-size="12" letter-spacing="0.7" fill="#57606a">2 WAVE</text>
+<text x="488" y="20" text-anchor="middle" font-weight="600" font-size="12" letter-spacing="0.7" fill="#57606a">3 RELAY</text>
+<text x="632" y="20" text-anchor="middle" font-weight="600" font-size="12" letter-spacing="0.7" fill="#57606a">4 TABLE</text>
+<text x="776" y="20" text-anchor="middle" font-weight="600" font-size="12" letter-spacing="0.7" fill="#57606a">5 RE-CHECK</text>
+<text x="920" y="20" text-anchor="middle" font-weight="600" font-size="12" letter-spacing="0.7" fill="#57606a">6 DELIVERY</text>
+<text x="1064" y="20" text-anchor="middle" font-weight="600" font-size="12" letter-spacing="0.7" fill="#57606a">7 THRESHOLD</text>
+<text x="1208" y="20" text-anchor="middle" font-weight="600" font-size="12" letter-spacing="0.7" fill="#57606a">8 CLOSE</text>
+<rect x="136" y="46" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="200" y="71.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Chooses</text>
+<text x="200" y="86.5" text-anchor="middle" font-size="11.5" fill="#57606a">lots + order</text>
+<rect x="424" y="46" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="488" y="71.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Answers</text>
+<text x="488" y="86.5" text-anchor="middle" font-size="11.5" fill="#57606a">on a question</text>
+<rect x="712" y="46" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="776" y="71.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">UX verdict</text>
+<text x="776" y="86.5" text-anchor="middle" font-size="11.5" fill="#57606a">or lead (lead.ux)</text>
+<rect x="1144" y="46" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="1208" y="71.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Report</text>
+<text x="1208" y="86.5" text-anchor="middle" font-size="11.5" fill="#57606a">1 line / project</text>
+<rect x="136" y="146" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="200" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">lead tour</text>
+<text x="200" y="186.5" text-anchor="middle" font-size="11.5" fill="#57606a">3 proposals</text>
+<rect x="280" y="146" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="344" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Starts</text>
+<text x="344" y="186.5" text-anchor="middle" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">--wave</text>
+<rect x="424" y="146" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="488" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Relays</text>
+<text x="488" y="186.5" text-anchor="middle" font-size="11.5" fill="#57606a">1 sentence / line</text>
+<rect x="568" y="146" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="632" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Triages</text>
+<text x="632" y="186.5" text-anchor="middle" font-size="11.5" fill="#57606a">observable bug → lot</text>
+<rect x="712" y="146" width="128" height="58" rx="6" fill="#ddf4ff" stroke="#0969da" stroke-width="2"/>
+<text x="776" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Re-verifies</text>
+<text x="776" y="186.5" text-anchor="middle" font-size="11.5" fill="#57606a">tests · build · check</text>
+<rect x="856" y="146" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="920" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Delivers</text>
+<text x="920" y="186.5" text-anchor="middle" font-size="11.5" fill="#57606a">push + deliver</text>
+<rect x="1000" y="146" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="1064" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">&lt; 60 % ?</text>
+<text x="1064" y="186.5" text-anchor="middle" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">session context</text>
+<rect x="1144" y="146" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="1208" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Close</text>
+<text x="1208" y="186.5" text-anchor="middle" font-size="11.5" fill="#57606a">if ≥ 60 %</text>
+<rect x="280" y="246" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="344" y="271.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Lots</text>
+<text x="344" y="286.5" text-anchor="middle" font-size="11.5" fill="#57606a">figure 2, per lot</text>
+<rect x="424" y="246" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="488" y="271.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">journal.log</text>
+<text x="488" y="286.5" text-anchor="middle" font-size="11.5" fill="#57606a">1 line / transition</text>
+<rect x="568" y="246" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="632" y="271.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Final table</text>
+<text x="632" y="286.5" text-anchor="middle" font-size="11.5" fill="#57606a">ready · handed back</text>
+<rect x="856" y="246" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="920" y="271.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">qa-reviewer</text>
+<text x="920" y="286.5" text-anchor="middle" font-size="11.5" fill="#57606a">read only</text>
+<rect x="1000" y="246" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="1064" y="271.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">--continue</text>
+<text x="1064" y="286.5" text-anchor="middle" font-size="11.5" fill="#57606a">next ready lot</text>
+<polyline points="180,146 180,106" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="264,75 344,75 344,144" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<text x="300" y="68" text-anchor="middle" font-size="11.5" fill="#57606a">priority</text>
+<polyline points="408,175 422,175" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="552,175 566,175" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="696,175 710,175" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="840,175 854,175" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="984,175 998,175" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="1128,175 1142,175" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="344,204 344,244" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<text x="350" y="228" text-anchor="start" font-size="11.5" fill="#57606a">starts</text>
+<polyline points="408,275 422,275" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="552,275 566,275" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="488,246 488,206" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<text x="494" y="230" text-anchor="start" font-size="11.5" fill="#57606a">journal</text>
+<polyline points="488,146 488,106" fill="none" stroke="#57606a" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr3)"/>
+<text x="494" y="130" text-anchor="start" font-size="11.5" fill="#57606a">question</text>
+<polyline points="632,246 632,206" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<text x="638" y="230" text-anchor="start" font-size="11.5" fill="#57606a">wave ends</text>
+<polyline points="776,146 776,106" fill="none" stroke="#57606a" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr3)"/>
+<text x="782" y="130" text-anchor="start" font-size="11.5" fill="#57606a">captures</text>
+<polyline points="920,204 920,244" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<text x="926" y="228" text-anchor="start" font-size="11.5" fill="#57606a">if a page changes</text>
+<polyline points="1064,204 1064,244" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<text x="1070" y="228" text-anchor="start" font-size="11.5" fill="#57606a">yes</text>
+<polyline points="1208,146 1208,106" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<polyline points="1064,304 1064,346 344,346 344,306" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr3)"/>
+<text x="704" y="340" text-anchor="middle" font-size="11.5" fill="#57606a">next wave, without asking the human again</text>
+</svg>

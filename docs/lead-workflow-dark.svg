@@ -43,25 +43,41 @@
 <text x="420" y="374.5" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="11.5">orchestrate … --wave</text>
 <text x="420" y="390.5" text-anchor="middle">in the background</text>
 </g>
+<g id="precheck"><rect x="161" y="508" width="158" height="82" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5"/>
+<text x="240" y="529.5" text-anchor="middle" font-weight="600">Precheck</text>
+<text x="240" y="545.5" text-anchor="middle">local model or Sonnet:</text>
+<text x="240" y="561.5" text-anchor="middle">already delivered?</text>
+<text x="240" y="577.5" text-anchor="middle">yes → back to lead</text>
+</g>
+<g id="spec"><rect x="341" y="480" width="158" height="66" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="420" y="501.5" text-anchor="middle" font-weight="600">Spec (screen: page)</text>
+<text x="420" y="517.5" text-anchor="middle">spec-writer: mockup</text>
+<text x="420" y="533.5" text-anchor="middle">+ sheet, 1440 / 390</text>
+</g>
+<g id="mockup"><rect x="521" y="480" width="158" height="66" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="600" y="501.5" text-anchor="middle" font-weight="600">Mockup review</text>
+<text x="600" y="517.5" text-anchor="middle">ux-reviewer, 2 passes</text>
+<text x="600" y="533.5" text-anchor="middle">max, then handed back</text>
+</g>
+<g id="backspec"><rect x="341" y="552" width="158" height="66" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="420" y="573.5" text-anchor="middle" font-weight="600">Back-end spec</text>
+<text x="420" y="589.5" text-anchor="middle">spec: true: cases,</text>
+<text x="420" y="605.5" text-anchor="middle">rules, contracts</text>
+</g>
+<g id="sheetreview"><rect x="521" y="552" width="158" height="66" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="600" y="573.5" text-anchor="middle" font-weight="600">Sheet review</text>
+<text x="600" y="589.5" text-anchor="middle">code-reviewer, 2</text>
+<text x="600" y="605.5" text-anchor="middle">passes max</text>
+</g>
+<g id="accept"><rect x="701" y="480" width="158" height="138" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="780" y="543" text-anchor="middle" font-weight="600">Accept</text>
+<text x="780" y="559" text-anchor="middle">red tests + lock</text>
+<text x="780" y="575" text-anchor="middle">if accept declared</text>
+</g>
 <g id="implement"><rect x="341" y="650" width="158" height="66" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5"/>
 <text x="420" y="671.5" text-anchor="middle" font-weight="600">Implementation</text>
 <text x="420" y="687.5" text-anchor="middle">test first, commits</text>
 <text x="420" y="703.5" text-anchor="middle">cite the lot</text>
-</g>
-<g id="spec"><rect x="341" y="490" width="158" height="66" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
-<text x="420" y="511.5" text-anchor="middle" font-weight="600">Spec (screen: page)</text>
-<text x="420" y="527.5" text-anchor="middle">spec-writer: mockup</text>
-<text x="420" y="543.5" text-anchor="middle">+ sheet, 1440 / 390</text>
-</g>
-<g id="mockup"><rect x="521" y="490" width="158" height="66" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
-<text x="600" y="511.5" text-anchor="middle" font-weight="600">Mockup review</text>
-<text x="600" y="527.5" text-anchor="middle">ux-reviewer, 2 passes</text>
-<text x="600" y="543.5" text-anchor="middle">max, then handed back</text>
-</g>
-<g id="accept"><rect x="701" y="490" width="158" height="66" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
-<text x="780" y="511.5" text-anchor="middle" font-weight="600">Accept</text>
-<text x="780" y="527.5" text-anchor="middle">red tests + lock</text>
-<text x="780" y="543.5" text-anchor="middle">if accept declared</text>
 </g>
 <g id="relay"><rect x="521" y="337" width="158" height="66" rx="8" fill="#0c2d6b" stroke="#58a6ff" stroke-width="1.5"/>
 <text x="600" y="358.5" text-anchor="middle" font-weight="600">Relays the journal</text>
@@ -85,8 +101,8 @@
 </g>
 <g id="fix"><rect x="881" y="650" width="158" height="66" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
 <text x="960" y="671.5" text-anchor="middle" font-weight="600">Correction</text>
-<text x="960" y="687.5" text-anchor="middle">if not compliant: new</text>
-<text x="960" y="703.5" text-anchor="middle">session, 2 passes max</text>
+<text x="960" y="687.5" text-anchor="middle">new session, 2 passes</text>
+<text x="960" y="703.5" text-anchor="middle">3rd if it converges</text>
 </g>
 <g id="table"><rect x="701" y="337" width="158" height="66" rx="8" fill="#0c2d6b" stroke="#58a6ff" stroke-width="1.5"/>
 <text x="780" y="358.5" text-anchor="middle" font-weight="600">Final table</text>
@@ -137,7 +153,6 @@
 <text x="248" y="236" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">proposals</text>
 <polyline points="319,170 420,170 420,337" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <text x="414" y="164" text-anchor="end" font-size="11" fill="#8b949e" class="lbl">choice</text>
-<polyline points="420,403 420,490" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <polyline points="499,683 521,683" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <polyline points="679,683 701,683" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <polyline points="859,683 881,683" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
@@ -146,14 +161,15 @@
 <polyline points="870,683 870,430 780,430 780,403" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <text x="876" y="446" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">wave ends</text>
 <polyline points="510,683 510,430 600,430 600,403" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
-<text x="504" y="640" text-anchor="end" font-size="11" fill="#8b949e" class="lbl">journal</text>
+<text x="516" y="646" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">journal</text>
 <polyline points="630,337 630,203" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <text x="636" y="236" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">question</text>
 <polyline points="570,203 570,337" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <text x="564" y="236" text-anchor="end" font-size="11" class="lbl" fill="#8b949e">--resume --answer</text>
 <polyline points="859,370 881,370" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <polyline points="960,203 960,337" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
-<text x="968" y="236" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">on the human's verdict</text>
+<text x="968" y="236" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">on the human's verdict,</text>
+<text x="968" y="251" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">or the lead's (lead.ux: lead)</text>
 <polyline points="1039,370 1061,370" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <polyline points="1140,403 1140,650" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <polyline points="1320,403 1320,650" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
@@ -165,12 +181,20 @@
 <text x="870" y="740" text-anchor="middle" font-size="11" fill="#8b949e" class="lbl">next wave: back to step 2, the limits still apply</text>
 <rect x="170" y="760" width="22" height="14" rx="3" fill="none" stroke="#8b949e" stroke-dasharray="5 3"/>
 <text x="200" y="771" font-size="11.5" fill="#8b949e">conditional step</text>
-<text x="340" y="771" font-size="11.5" fill="#8b949e">The lead never commits where a wave runs, and never delivers two projects at once. At most two sessions or subagents at a time.</text>
-<polyline points="499,523 521,523" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
-<polyline points="679,523 701,523" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
-<polyline points="780,556 780,598 420,598 420,650" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
-<text x="170" y="508" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">lots with screen: page</text>
-<text x="170" y="523" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">spec, mockup, accept</text>
-<text x="333" y="672" text-anchor="end" font-size="11" fill="#8b949e" class="lbl">other lots start</text>
-<text x="333" y="687" text-anchor="end" font-size="11" fill="#8b949e" class="lbl">at Implementation →</text>
+<text x="340" y="771" font-size="11.5" fill="#8b949e">The lead never commits where a wave runs, and never delivers two projects at once. At most as many sessions or subagents as the cap the human sets (CADENCE_MAX_SESSIONS, 2 by default).</text>
+<polyline points="420,403 420,440 240,440 240,508" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="319,549 330,549 330,513 341,513" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="330,549 330,585 341,585" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="499,513 521,513" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="679,513 701,513" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="499,585 521,585" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="679,585 701,585" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="240,590 240,683 341,683" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
+<polyline points="780,618 780,634 420,634 420,650" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
+<text x="232" y="640" text-anchor="end" font-size="11" fill="#8b949e" class="lbl">other lots</text>
+<text x="232" y="655" text-anchor="end" font-size="11" fill="#8b949e" class="lbl">go straight on</text>
+<text x="890" y="508" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">lots with screen: page</text>
+<text x="890" y="523" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">spec, mockup, accept</text>
+<text x="890" y="568" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">lots with spec: true</text>
+<text x="890" y="583" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">spec, sheet review, accept</text>
 </svg>

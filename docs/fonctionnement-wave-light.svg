@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 350" width="1320" height="350" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#1f2328">
+<title>A lot inside an orchestrate wave</title>
+<desc>Each lot goes through a precheck, then by type through spec, mockup or sheet review and sealed acceptance tests, or straight to the implementation; then the UX pass if visible, the code review, corrections (two passes, a third if the review converges) and an automatic raf review.</desc>
+<defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#57606a"/></marker></defs>
+<rect width="1320" height="350" fill="#ffffff"/>
+<rect x="20" y="140" width="120" height="52" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="80" y="162.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Precheck</text>
+<text x="80" y="177.5" text-anchor="middle" font-size="11.5" fill="#57606a">local or Sonnet</text>
+<text x="80" y="212" text-anchor="middle" font-size="11.5" fill="#57606a">already delivered?</text>
+<text x="80" y="227" text-anchor="middle" font-size="11.5" fill="#57606a">yes → handed to the lead</text>
+<polyline points="140,166 165,166 165,60 198,60" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<polyline points="165,166 198,166" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<polyline points="165,166 165,272 728,272" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<text x="200" y="26" text-anchor="start" font-size="11.5" fill="#57606a">screen: page only</text>
+<rect x="200" y="34" width="130" height="52" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="265" y="56.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Spec</text>
+<text x="265" y="71.5" text-anchor="middle" font-size="11.5" fill="#57606a">mockup + sheet</text>
+<rect x="360" y="34" width="150" height="52" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="435" y="56.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Mockup review</text>
+<text x="435" y="71.5" text-anchor="middle" font-size="11.5" fill="#57606a">ux-reviewer · ≤ 2</text>
+<polyline points="330,60 358,60" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<polyline points="510,60 558,60" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<text x="200" y="132" text-anchor="start" font-size="11.5" fill="#57606a">spec: true</text>
+<rect x="200" y="140" width="130" height="52" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="265" y="162.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Back-end spec</text>
+<text x="265" y="177.5" text-anchor="middle" font-size="11.5" fill="#57606a">cases · rules · contracts</text>
+<rect x="360" y="140" width="150" height="52" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="435" y="162.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Sheet review</text>
+<text x="435" y="177.5" text-anchor="middle" font-size="11.5" fill="#57606a">code-reviewer · ≤ 2</text>
+<polyline points="330,166 358,166" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<polyline points="510,166 558,166" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="560" y="34" width="130" height="158" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="625" y="98" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Accept</text>
+<text x="625" y="116" text-anchor="middle" font-size="11.5" fill="#57606a">red tests</text>
+<text x="625" y="131" text-anchor="middle" font-size="11.5" fill="#57606a">sealed</text>
+<text x="625" y="146" text-anchor="middle" font-size="11.5" fill="#57606a">if orchestrate.accept</text>
+<polyline points="690,166 728,166" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<text x="200" y="262" text-anchor="start" font-size="11.5" fill="#57606a">any other lot, component and journey included</text>
+<rect x="730" y="140" width="130" height="158" rx="6" fill="#ddf4ff" stroke="#0969da" stroke-width="2"/>
+<text x="795" y="208" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Implementation</text>
+<text x="795" y="223" text-anchor="middle" font-size="11.5" fill="#57606a">test first</text>
+<text x="795" y="238" text-anchor="middle" font-size="11.5" fill="#57606a">commits citing the lot</text>
+<rect x="900" y="193" width="120" height="52" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="960" y="215.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">UX pass</text>
+<text x="960" y="230.5" text-anchor="middle" font-size="11.5" fill="#57606a">visible lot</text>
+<polyline points="860,219 898,219" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="1050" y="193" width="140" height="52" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="1120" y="215.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Code review</text>
+<text x="1120" y="230.5" text-anchor="middle" font-size="11.5" fill="#57606a">Opus, Sonnet if ≤ 0.25 d</text>
+<polyline points="1020,219 1048,219" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<rect x="1050" y="286" width="140" height="48" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="1120" y="306.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Correction</text>
+<text x="1120" y="321.5" text-anchor="middle" font-size="11.5" fill="#57606a">fresh session</text>
+<polyline points="1100,245 1100,284" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<text x="1094" y="270" text-anchor="end" font-size="11.5" fill="#57606a">not compliant</text>
+<polyline points="1140,286 1140,247" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<text x="1147" y="262" text-anchor="start" font-size="11.5" fill="#57606a">≤ 2 passes,</text>
+<text x="1147" y="277" text-anchor="start" font-size="11.5" fill="#57606a">3rd if it converges</text>
+<rect x="1230" y="193" width="80" height="52" rx="6" fill="#ddf4ff" stroke="#0969da" stroke-width="2"/>
+<text x="1270" y="215.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">raf review</text>
+<text x="1270" y="230.5" text-anchor="middle" font-size="11.5" fill="#57606a">recorded</text>
+<polyline points="1190,219 1228,219" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr2)"/>
+<text x="1210" y="186" text-anchor="middle" font-size="11.5" fill="#57606a">compliant</text>
+</svg>

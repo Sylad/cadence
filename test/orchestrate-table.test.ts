@@ -244,3 +244,34 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
     expect(renderTable(wave, lots).filter((x) => x.includes('livrable jusqu'))).toEqual([`demo:L2 — livrable jusqu'à ${b1.slice(0, 7)} (dernier commit de L2, sous L3 rendu) : git push origin ${b1.slice(0, 7)}:main && cadence deliver --sha ${b1.slice(0, 7)}`]);
   });
 });
+
+describe('renderTable : ligne de base (L213)', () => {
+  const base = (n: number) => Array.from({ length: n }, (_, i) => `suite ${i} > test ${i}`);
+
+  it('liste au plus 30 tests déjà rouges au départ, puis un compte', () => {
+    const l = lot();
+    l.status = 'ready';
+    l.baseline = { sha: 'abcdef1234567', failures: base(35), verified: true };
+    const out = renderTable(wave, [l]).filter((x) => x.includes('déjà rouge au départ'));
+    expect(out).toHaveLength(31);
+    expect(out[0]).toBe('demo:L1 — déjà rouge au départ (abcdef1) : suite 0 > test 0');
+    expect(out[29]).toContain('suite 29 > test 29');
+    expect(out[30]).toBe('demo:L1 — déjà rouge au départ (abcdef1) : … et 5 autre(s)');
+  });
+
+  it('pile 30 tests : tous listés, aucun compte', () => {
+    const l = lot();
+    l.status = 'ready';
+    l.baseline = { sha: 'abcdef1234567', failures: base(30), verified: true };
+    const out = renderTable(wave, [l]).filter((x) => x.includes('déjà rouge au départ'));
+    expect(out).toHaveLength(30);
+    expect(out.join('\n')).not.toContain('autre(s)');
+  });
+
+  it('une base annoncée par la session est marquée non vérifiée', () => {
+    const l = lot();
+    l.status = 'ready';
+    l.baseline = { sha: 'abcdef1234567', failures: base(1), verified: false };
+    expect(renderTable(wave, [l]).join('\n')).toContain('(abcdef1, annoncé par la session, non vérifié)');
+  });
+});

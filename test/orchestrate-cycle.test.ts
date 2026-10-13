@@ -2484,4 +2484,20 @@ describe('ligne de base des tests (L213)', () => {
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(existsSync(join(h.repo, 'dist/built'))).toBe(false);
   });
+  it('monorepo : les dossiers ignorés imbriqués (packages/x/node_modules) sont liés dans le worktree de base', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    writeFileSync(join(h.repo, '.gitignore'), 'node_modules/\ndist/\n');
+    mkdirSync(join(h.repo, 'packages/web'), { recursive: true });
+    writeFileSync(join(h.repo, 'packages/web/package.json'), '{}');
+    git(h.repo, 'add', '--', '.gitignore', 'packages/web/package.json');
+    git(h.repo, 'commit', '-q', '-m', 'chore: monorepo');
+    mkdirSync(join(h.repo, 'node_modules'));
+    mkdirSync(join(h.repo, 'packages/web/node_modules'));
+    mkdirSync(join(h.repo, 'packages/web/dist'));
+    const c = h.lot('L1', {}, { test: `case "$PWD" in *cadence-baseline*) mkdir -p packages/web/dist; echo old > packages/web/dist/built; test -d packages/web/node_modules || exit 1;; esac; echo '${old}'; exit 1` });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(existsSync(join(h.repo, 'packages/web/dist/built'))).toBe(false);
+    expect(existsSync(join(h.repo, 'packages/web/node_modules'))).toBe(true);
+  });
 });

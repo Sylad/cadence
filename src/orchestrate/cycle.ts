@@ -160,10 +160,12 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
   const links: string[] = [];
   try {
     git(l.repo, 'worktree', 'add', '--detach', '-f', dir, sha);
-    const ignored = git(l.repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.includes('/') && !f.startsWith('.cadence') && !OUTPUT_DIRS.has(f));
+    // Tous niveaux : en monorepo les dépendances vivent dans packages/*/node_modules. `--directory` ne descend pas dans un dossier ignoré, donc
+    // chaque entrée est le dossier ou fichier ignoré le plus haut ; son parent doit exister au sha de départ (sinon rien où le relier).
+    const ignored = git(l.repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.startsWith('.cadence') && !f.split('/').some((p) => OUTPUT_DIRS.has(p)));
     for (const name of ignored) {
       const to = join(dir, name);
-      if (existsSync(to)) continue;
+      if (existsSync(to) || !existsSync(dirname(to))) continue;
       symlinkSync(join(l.repo, name), to);
       links.push(to);
     }

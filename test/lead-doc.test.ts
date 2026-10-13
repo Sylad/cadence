@@ -32,9 +32,13 @@ describe('docs/lead.md', () => {
     expect(md).toMatch(/`screen: component`|`component`/)
   })
 
-  it("légende de la figure : les étapes spec et accept ne concernent que screen: page (L209)", () => {
+  it("légende de la figure : precheck conditionnel, spec/accept pour screen: page ou spec: true (L211)", () => {
     const md = read('docs/lead.md')
-    expect(md).toContain('the spec and accept steps run only for a `screen: page` lot')
+    const legend = md.split('\n').find((l) => l.startsWith('Dashed boxes')) ?? ''
+    expect(legend).toContain('`screen: page`')
+    expect(legend).toContain('`spec: true`')
+    expect(legend).toContain('precheck')
+    expect(legend).not.toContain('(the spec and accept steps run only for a `screen: page` lot)')
     expect(md).not.toContain('only for a lot with a screen')
   })
 

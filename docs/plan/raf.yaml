@@ -2373,12 +2373,15 @@ lots:
     finished: 2026-10-13
   - id: L213
     title: "orchestrate : un lot n'est plus rendu « tests rouges » pour des échecs déjà présents au sha de départ — la session (ou le programme) compare à la ligne de base (mêmes tests rouges avant le lot = pas un défaut du lot), le rapport les liste à part et la revue de code a lieu ; vécu 13-10 maritime B18.2 : 23 échecs de 5 autres lots sur base TimescaleDB neuve, suite du lot verte, rendu après 2 passes sans aucune revue sur le fond"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-13
     started: 2026-10-13
     notes:
       - { date: 2026-10-13, text: "13-10 : rendu au lead (vague 2026-10-13-1615, 2 corrections, 4 majeurs restants) — (1) cycle.ts:162 le worktree de base ne relie que les dossiers ignorés de 1er niveau : en monorepo (maritime-atlas : 6 node_modules imbriqués) la base est inutilisable, c'est le cas d'origine ; (2) cycle.ts:144 lot repris : sha de départ = parent du premier commit du lot (lotStartHead), contraire au choix déclaré — trancher et documenter ; (3) README.md:1016 phrase cassée et comportement sans orchestrate.test mal décrit ; (4) table.ts:133 plafond de 30 sans test. Reprendre dans une nouvelle vague (budget 750 k : estimate à 1 j)." }
+      - { date: 2026-10-13, text: "mineur laissé en note (revue 13-10) : avec orchestrate.test, une session qui annonce tests ET build rouges — le brief de correction ne cite que le build (cycle.ts ~1513/1545), les tests reviennent à la passe suivante ; limite connue : vitest 3.x non mesuré, workspace consommé par dist/ garde « tests rouges »" }
+    review: { date: 2026-10-13, verdict: "compliant — 4 revues fraîches (2 majeurs workspace node_modules + README, puis vitest fichier non chargé, puis workspace en sous-dossier) tous corrigés ; 1967 tests, typecheck, build verts ; 1 mineur laissé en note", commit: 305e4d78636858a0bdc3120dfb24749b0f490e61 }
+    finished: 2026-10-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

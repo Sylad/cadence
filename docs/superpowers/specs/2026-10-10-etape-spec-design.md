@@ -21,7 +21,7 @@ changer. L'étape spec déplace cette boucle **avant le code**, sur une maquette
 
 | Sujet | Choix |
 |---|---|
-| Seuil | Un lot `visible` qui déclare `screen:` — `page` (nouvelle page), `component` (nouveau composant) ou `journey` (parcours modifié). Sans `screen:`, le workflow actuel, inchangé. Le champ est posé à la planification (`raf add … --screen page`), jamais déduit du titre. |
+| Seuil | Un lot `visible` qui déclare `screen: page` (nouvelle page). **Resserré le 13-10 (L209)** après la mesure du 12-10 (aucune ligne du critère atteinte, ~570 k tokens par lot, parcours à 4,5 passes par lot) : `component` (nouveau composant) et `journey` (parcours modifié) restent des valeurs acceptées du champ `screen:` mais n'entrent plus dans la chaîne — le lot suit le chemin ordinaire, au budget ordinaire (sans le forfait de 1,3 M). Un lot déjà entré dans la chaîne (sa fiche ou son `acceptation-<lot>.json` existent) garde sa fiche et son verrou. Sans `screen:`, le workflow actuel, inchangé. Le champ est posé à la planification (`raf add … --screen page`), jamais déduit du titre. |
 | Sortie sous le seuil | Si l'agent spec constate que le lot ne change aucun écran, il l'écrit (une ligne, raison) et l'étape se termine sans maquette ; le lot reprend le chemin actuel. |
 | Où vit la spec | `docs/specs/<écran>/` du projet cible : `maquette.html`, `fiche.yaml`, captures `maquette-<état>-<largeur>.png`. Versionnée, citée par le lot (`feat(Lx): spec …`). |
 | Validation humaine | Aucune systématique. Une **question ciblée** au lead seulement si le choix est coûteux à défaire (voir plus bas). |
@@ -206,7 +206,7 @@ Le coût s'ajoute : tokens de `spec` + revue de maquette + `accept` par lot, rel
 de vague, présentés à côté des corrections évitées. Si les corrections baissent mais que le coût de
 l'étape dépasse celui des passes évitées, la conclusion le dit. Sous la barre de 8 lots, le résultat
 est une note, non un verdict. Si le critère n'est pas atteint, le seuil (`screen:`) est resserré avant
-d'abandonner l'étape. La cible de la 3e ligne (≤ 8 %, la moitié de la référence de 16 %, comme la ligne 2) a été fixée par le lead
+d'abandonner l'étape : c'est fait le 13-10 (L209), le seuil est `screen: page` seul, et **la prochaine mesure porte sur 8 lots `screen: page`**, même critère, mêmes quatre lignes, coût comparé à nouveau ; les lots `component` et `journey` n'y comptent pas. La cible de la 3e ligne (≤ 8 %, la moitié de la référence de 16 %, comme la ligne 2) a été fixée par le lead
 le 12-10, avant la mesure ; la mesure est dans [`etape-spec-2026-10-12.md`](../../mesures/etape-spec-2026-10-12.md).
 
 Limite connue : la cause « règle de gestion inventée » vaut 0 % dans la référence, faute de constat

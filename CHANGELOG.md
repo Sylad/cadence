@@ -48,6 +48,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- Spec step threshold narrowed to `screen: page` (L209): after the measure of 2026-10-12 (no row reached, about 570 k tokens per lot, 4.5 passes per journey lot), a lot declaring `screen: component` or `screen: journey` no longer goes through spec + mockup + accept; it follows the ordinary path and its budget is the ordinary one (no 1.3 M flat rate), in `orchestrate` and in the `--continue` draw. Both values stay accepted by `raf`, so no plan breaks. A lot already in the chain (its sheet or `acceptation-<lot>.json` exists) keeps its sheet and its lock; the `spec: true` step and the back part of a mixed lot are unchanged. The next measure covers 8 `page` lots.
+
 ### Added
 
 - Measure of the screen-sheet step (L176, `docs/mesures/etape-spec-2026-10-12.md`): on 8 visible lots with a sheet (ol-companion, warhammer40k), none of the four rows of the success table is reached (100 % of lots with a correction against ≤ 30 %, 88 % with two or more against ≤ 12 %, 20 % of passes from a vague spec, an invented rule or a missing test against the new ≤ 8 % target, 2 lots back from the UX review with a blocker the lot caused, 4 counting defects that predate it); the step costs about 570 000 tokens per lot and avoided no pass. Keeping or tightening the step is the lead's call.

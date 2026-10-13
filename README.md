@@ -24,7 +24,7 @@ Code prompt that shows the session's context, quota, cost and the orchestrate wa
 
 ### Spec step (design, first steps delivered)
 
-For a visible lot that adds a page, a component or changes a journey, `orchestrate` gets a step
+For a visible lot that adds a page (`screen: page`; a component or a journey follows the ordinary path since L209), `orchestrate` gets a step
 before the code: a static HTML mockup in the project's own style (1440 and 390 px; empty, loading and
 error states) and a machine-readable screen sheet (fields, numbered rules `R1…` each marked *sourced*
 or *hypothesis*, actions → API calls). The `ux-reviewer` agent reads the mockup before any code; the
@@ -207,7 +207,7 @@ plan:
   fields:                       # raf field: key in the file (a list = first one present)
     title: titre
     public: titre_public        # the lot's title for the public; read when it is text, else ignored
-    screen: ecran               # page, component or journey; only on a visible lot
+    screen: ecran               # page, component or journey; only on a visible lot (only `page` enters the spec step)
     spec: fiche                 # true or false: the lot changes a behaviour
     status: etat
     estimate: effort
@@ -1053,10 +1053,11 @@ lot that already has commits is never pre-checked (resuming it is legitimate). `
 
 ### The spec step of a lot with `screen:`
 
-A lot that declares `screen:` (`raf add … --visible --screen page|component|journey`, or `raf screen <id> page|component|journey` on a lot that already exists, see [raf](#raf)) gets one more session, `spec`, **after** the pre-check and **before**
+A lot that declares `screen:` (`raf add … --visible --screen page|component|journey`, or `raf screen <id> page|component|journey` on a lot that already exists, see [raf](#raf)) gets, when it is `page`, one more session, `spec`, **after** the pre-check and **before**
 the first implementation: `precheck → spec → maquette → accept → implement → ux → review` (`maquette` unless `orchestrate.maquette: false`, see [The mockup review](#the-mockup-review-before-any-code); `accept` only when the project declares `orchestrate.accept`, see below). A lot without `screen:` or `spec: true` follows the usual path, unchanged (a lot with `spec: true` and no screen has its own chain, see [The spec step of a lot with `spec: true`](#the-spec-step-of-a-lot-with-spec-true)). `--dry-run` lists the step
 (`spec (sonnet)`), its command line and its brief `templates/orchestrate/spec.md`.
 
+- **Threshold** (L209): only `screen: page` enters this chain. The measure of 2026-10-12 (no row of the success table reached, about 570 k tokens per lot, 4.5 correction passes per journey lot) narrowed it: `component` and `journey` stay valid values of `screen:` (no existing plan breaks, `raf screen` still sets them) but a lot that carries one follows the ordinary path and gets the ordinary budget, without the 1.3 M flat rate. A lot already in the chain (its sheet, or its `acceptation-<lot>.json`, exists) keeps its sheet and its lock. The `spec: true` step and the back part of a mixed lot do not change. The next measure covers 8 `page` lots.
 - **The session** (L171): Sonnet, the `spec-writer` agent (it writes only the spec folder, never application code), Playwright loaded like for `implement`. It reads the lot,
   the project's CLAUDE.md and its charter (CSS, neighbouring components, `docs/qa/expectations.md`, existing routes and API contracts), then writes in
   `<orchestrate.spec.dir>/<écran>/` (`docs/specs` by default): `maquette.html` (static HTML + CSS to the project's own style; one section `#etat-vide`, `#etat-chargement`,

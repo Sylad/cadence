@@ -2388,12 +2388,16 @@ lots:
     estimate: 1
     created: 2026-10-13
     started: 2026-10-13
+    notes:
+      - { date: 2026-10-13, text: "13-10 rendu (2 corrections). Décision du lead : garder les briefs qui interdisent checkout/switch (9fd6cdc, e9db27e). Bloquant à corriger (cf834d4 laisse le dépôt sur le mauvais HEAD, le lot suivant commite hors branche) : après une session d'écriture, si HEAD n'est plus sur la branche de départ — arbre propre et aucun commit hors de la branche → le programme remet la branche (git checkout <branche>), avertissement au journal, le lot continue ; sinon → lot rendu, cause « HEAD déplacé », file du dépôt retenue (les autres dépôts continuent). Tester l'issue du lot ET la base du lot suivant dans le même dépôt, pas seulement l'avertissement. README + CHANGELOG à jour." }
   - id: L215
     title: "orchestrate sans orchestrate.test : une session qui déclare vert:false avec pour seul échec un test listé dans echecsDeBase relance une correction à chaque passe (vécu 13-10 maritime B18.2 et Q-T1.1 : 2-3 passes perdues, lot rendu « tests rouges » malgré une revue conforme) — vert:false + tous les échecs dans echecsDeBase = pas une raison de correction"
     status: doing
     estimate: 1
     created: 2026-10-13
     started: 2026-10-13
+    notes:
+      - { date: 2026-10-13, text: "13-10 rendu (2 corrections, 2 majeurs sur la lecture de la prose). Décision du lead : ne PAS deviner depuis le texte du rapport. Ajouter au schéma du rapport un champ structuré nouveauxEchecs (liste) ; sans orchestrate.test : vert:false + echecsDeBase non vide + nouveauxEchecs vide → pas de correction, le lot va en revue (base non vérifiée signalée au relecteur) ; nouveauxEchecs non vide → correction. Retirer les heuristiques de prose (comptes « failed/rouge », repères N1b-6/(4)) de 4870ad8/6e0b9f2. Briefs implement/fix : remplir nouveauxEchecs. README + CHANGELOG." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

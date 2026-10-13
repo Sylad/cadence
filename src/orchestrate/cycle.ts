@@ -722,6 +722,13 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       w.saveWave();
       return stop(c, 'failed', `incident : ${w.incident}`);
     }
+    if (b.guard && !a.guard) {
+      step.status = 'failed';
+      step.cause = `le hook pre-push de garde a disparu${where}`;
+      w.incident = `le hook pre-push de garde a été supprimé${where} pendant ${lotKey(l.project, l.lot)} (${kind})`;
+      w.saveWave();
+      return stop(c, 'failed', `incident : ${w.incident}`);
+    }
     // Session d'écriture finie sur une autre branche ou en HEAD détaché (L214) : pas un push, mais les contrôles et le lot suivant partiraient d'un HEAD qui n'est plus la branche du lot.
     if (write && b.branch !== a.branch) {
       const was = `${a.branch ? `sur la branche ${a.branch}` : `en HEAD détaché (${(a.head ?? '').slice(0, 7)})`} au lieu de ${b.branch ?? 'HEAD détaché'}`;
@@ -744,13 +751,6 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
         (w.movedRepos ??= new Set()).add(path);
         return stop(c, 'handed-back', `incident : HEAD déplacé${where} pendant ${lotKey(l.project, l.lot)} (${kind}) : la session a fini ${was} et ${why}`);
       }
-    }
-    if (b.guard && !a.guard) {
-      step.status = 'failed';
-      step.cause = `le hook pre-push de garde a disparu${where}`;
-      w.incident = `le hook pre-push de garde a été supprimé${where} pendant ${lotKey(l.project, l.lot)} (${kind})`;
-      w.saveWave();
-      return stop(c, 'failed', `incident : ${w.incident}`);
     }
     // Étape en lecture seule qui n'a laissé que des fichiers NON SUIVIS (captures d'un script en chemin relatif, L162) : déplacés dans le dossier du lot, avertissement, le verdict est gardé.
     if (!write && b.head === a.head && b.tracked.join() === a.tracked.join() && b.untracked.join() !== a.untracked.join() && b.untracked.every((f) => a.untracked.includes(f))) {

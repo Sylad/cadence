@@ -2602,6 +2602,22 @@ describe('session d\'écriture qui finit hors de sa branche (L214)', () => {
     expect(c.lot.warnings.some((w) => w.includes('main') && w.includes('ailleurs'))).toBe(true);
   });
 
+  it('HEAD déplacé ET hook de garde supprimé : l\'incident du hook arrête la vague (L214)', async () => {
+    const both: Handler = (call) => {
+      git(call.opts.cwd, 'checkout', '-q', '--detach');
+      const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
+      rmSync(join(call.opts.cwd, '.githooks/pre-push'));
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const h = harness({ script: { implement: [both] } });
+    git(h.repo, 'config', 'core.hooksPath', '.githooks');
+    installPrePush(h.repo, 'w1');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(h.wave.incident).toMatch(/hook pre-push de garde a été supprimé/);
+  });
+
   it('commit fait hors de la branche : lot rendu « HEAD déplacé », file du dépôt retenue, autre dépôt libre', async () => {
     const wander: Handler = (call) => {
       git(call.opts.cwd, 'checkout', '-q', '--detach');

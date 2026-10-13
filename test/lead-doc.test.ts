@@ -32,6 +32,12 @@ describe('docs/lead.md', () => {
     expect(md).toMatch(/`screen: component`|`component`/)
   })
 
+  it("README, vue d'ensemble du lead : seul screen: page passe par spec, maquette et accept (L209)", () => {
+    const readme = read('README.md')
+    expect(readme).toContain('a lot with `screen: page` first goes through the [spec, mockup review and accept steps]')
+    expect(readme).not.toContain('a lot with a `screen:` first goes through')
+  })
+
   it("décrit l'étape fiche d'un lot spec: true et le relais des hypothèses (L188)", () => {
     const md = read('docs/lead.md')
     for (const s of ['`spec: true`', '**fiche**', '`orchestrate.fiche: false`', 'hypothèse de la fiche']) expect(md, s).toContain(s)

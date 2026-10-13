@@ -1538,7 +1538,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   no model: see [lead tour](#lead-tour)) prints one line of facts per project, you choose the priorities, the lots are delegated with
   `cadence orchestrate` (fresh short sessions with a standard brief — test first,
   README and usage documentation updated with the change, commits citing the lot, no push — reviewed by the `code-reviewer` agent, see
-  [orchestrate](#orchestrate); a lot with a `screen:` first goes through the [spec, mockup review and accept steps](#the-spec-step-of-a-lot-with-screen)), re-verified by the lead, then delivered
+  [orchestrate](#orchestrate); a lot with `screen: page` first goes through the [spec, mockup review and accept steps](#the-spec-step-of-a-lot-with-screen)), re-verified by the lead, then delivered
   one project at a time; a delivery that changes what a page shows or what it is
   served is then checked in the running app by the `qa-reviewer` agent, whose
   blocking findings come back to you. Two

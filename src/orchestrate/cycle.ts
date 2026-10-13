@@ -719,6 +719,12 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       w.saveWave();
       return stop(c, 'failed', `incident : ${w.incident}`);
     }
+    // Session d'écriture finie sur une autre branche ou en HEAD détaché (L214) : pas un push, mais les contrôles et le lot suivant partiraient d'un HEAD qui n'est plus la branche du lot.
+    if (write && b.branch !== a.branch) {
+      const text = `${kind} : la session a fini${where} ${a.branch ? `sur la branche ${a.branch}` : `en HEAD détaché (${(a.head ?? '').slice(0, 7)})`} au lieu de ${b.branch ?? 'HEAD détaché'} — les commits du lot sont peut-être hors de la branche`;
+      c.lot.warnings.push(text);
+      w.log(`${lotKey(l.project, l.lot)} · ${text}`);
+    }
     if (b.guard && !a.guard) {
       step.status = 'failed';
       step.cause = `le hook pre-push de garde a disparu${where}`;

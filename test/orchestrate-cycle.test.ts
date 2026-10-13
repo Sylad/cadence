@@ -2537,3 +2537,32 @@ describe('ligne de base des tests (L213)', () => {
     expect(git(h.repo, 'worktree', 'list')).not.toContain('baseline');
   });
 });
+
+describe('session d\'écriture qui finit hors de sa branche (L214)', () => {
+  it('HEAD détaché en fin de session : ni push ni arrêt, mais un avertissement du lot', async () => {
+    let sha = '';
+    const wander: Handler = (call) => {
+      sha = git(call.opts.cwd, 'rev-parse', 'HEAD');
+      const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
+      git(call.opts.cwd, 'checkout', '-q', sha);
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const h = harness({ script: { implement: [wander], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(h.wave.incident).toBeNull();
+    expect(c.lot.warnings.some((w) => /HEAD détaché/.test(w) && /implement/.test(w))).toBe(true);
+  });
+
+  it('autre branche en fin de session : avertissement nommant les deux branches', async () => {
+    const wander: Handler = (call) => {
+      const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
+      git(call.opts.cwd, 'checkout', '-q', '-b', 'ailleurs');
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const h = harness({ script: { implement: [wander], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.warnings.some((w) => w.includes('main') && w.includes('ailleurs'))).toBe(true);
+  });
+});

@@ -77,6 +77,8 @@ export interface WaveCtx {
   incident: string | null;
   /** Dépôts salis par une revue (L133) → lot en cause : les lots qui restent dans leur file sont suspendus, ceux des autres dépôts continuent. */
   dirtyRepos?: Map<string, string>;
+  /** Parmi `dirtyRepos`, ceux laissés en HEAD déplacé par une session d'écriture (L214) : même file retenue, autre message. */
+  movedRepos?: Set<string>;
   log: (line: string) => void;
   saveWave: () => void;
 }
@@ -557,6 +559,7 @@ function halted(w: WaveCtx, lot?: LotState): string | null {
   if (lot && w.dirtyRepos) {
     for (const r of lotRepoPaths(lot)) {
       const by = w.dirtyRepos.get(r);
+      if (by && w.movedRepos?.has(r)) return `dépôt ${r} laissé en HEAD déplacé par ${by} : à remettre sur sa branche par le lead avant de reprendre`;
       if (by) return `dépôt ${r} sali par la revue de ${by} : à nettoyer par le lead avant de reprendre`;
     }
   }
@@ -721,9 +724,26 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
     }
     // Session d'écriture finie sur une autre branche ou en HEAD détaché (L214) : pas un push, mais les contrôles et le lot suivant partiraient d'un HEAD qui n'est plus la branche du lot.
     if (write && b.branch !== a.branch) {
-      const text = `${kind} : la session a fini${where} ${a.branch ? `sur la branche ${a.branch}` : `en HEAD détaché (${(a.head ?? '').slice(0, 7)})`} au lieu de ${b.branch ?? 'HEAD détaché'} — les commits du lot sont peut-être hors de la branche`;
-      c.lot.warnings.push(text);
-      w.log(`${lotKey(l.project, l.lot)} · ${text}`);
+      const was = `${a.branch ? `sur la branche ${a.branch}` : `en HEAD détaché (${(a.head ?? '').slice(0, 7)})`} au lieu de ${b.branch ?? 'HEAD détaché'}`;
+      const why = b.branch ? headStranded(path, b, a) : 'le dépôt n\'était pas sur une branche au départ';
+      if (b.branch && why === null) {
+        git(path, 'checkout', '-q', b.branch);
+        Object.assign(a, await snapshot(path));
+        if (path === l.repo) step.headAfter = a.head ?? undefined;
+        const text = `${kind} : la session a fini${where} ${was} (arbre propre, rien hors de la branche) — branche ${b.branch} remise`;
+        l.warnings.push(text);
+        w.log(`${lotKey(l.project, l.lot)} · ${text}`);
+      } else if (!b.branch) {
+        const text = `${kind} : la session a fini${where} ${was} — ${why}`;
+        l.warnings.push(text);
+        w.log(`${lotKey(l.project, l.lot)} · ${text}`);
+      } else {
+        step.status = 'failed';
+        step.cause = `HEAD déplacé${where}`;
+        (w.dirtyRepos ??= new Map()).set(path, lotKey(l.project, l.lot));
+        (w.movedRepos ??= new Set()).add(path);
+        return stop(c, 'handed-back', `incident : HEAD déplacé${where} pendant ${lotKey(l.project, l.lot)} (${kind}) : la session a fini ${was} et ${why}`);
+      }
     }
     if (b.guard && !a.guard) {
       step.status = 'failed';
@@ -754,6 +774,17 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   step.status = 'ok';
   save(c);
   return { step, report: res.structured, before, after, others };
+}
+
+/** Pourquoi la branche de départ ne peut pas être remise sans risque après un HEAD déplacé (L214), null si elle le peut : arbre propre et rien hors de la branche. */
+function headStranded(path: string, b: Snapshot, a: Snapshot): string | null {
+  if (a.tracked.length || a.untracked.join() !== b.untracked.join()) return 'l\'arbre n\'est pas propre';
+  try {
+    git(path, 'merge-base', '--is-ancestor', a.head ?? 'HEAD', `refs/heads/${b.branch}`);
+  } catch {
+    return `des commits ne sont pas dans la branche ${b.branch}`;
+  }
+  return null;
 }
 
 /** Incident du LOT (L133) : la revue a laissé des traces (captures, commit), ni push ni garde supprimée — les lots des autres dépôts continuent. */

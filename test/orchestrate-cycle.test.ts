@@ -2554,22 +2554,42 @@ describe('ligne de base des tests (L213)', () => {
 });
 
 describe('session d\'écriture qui finit hors de sa branche (L214)', () => {
-  it('HEAD détaché en fin de session : ni push ni arrêt, mais un avertissement du lot', async () => {
-    let sha = '';
+  it('HEAD détaché, arbre propre, rien hors de la branche : la branche est remise, avertissement, le lot continue', async () => {
     const wander: Handler = (call) => {
-      sha = git(call.opts.cwd, 'rev-parse', 'HEAD');
       const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
-      git(call.opts.cwd, 'checkout', '-q', sha);
+      git(call.opts.cwd, 'checkout', '-q', '--detach'); // HEAD détaché sur le sommet de main
       return claudeOut(workReport({ commits: [c] }));
     };
     const h = harness({ script: { implement: [wander], review: [ok] } });
     const c = h.lot('L1');
     await runLot(c);
     expect(h.wave.incident).toBeNull();
-    expect(c.lot.warnings.some((w) => /HEAD détaché/.test(w) && /implement/.test(w))).toBe(true);
+    expect(git(h.repo, 'symbolic-ref', '--short', 'HEAD')).toBe('main');
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.warnings.some((w) => /HEAD détaché/.test(w) && /implement/.test(w) && /remise/.test(w))).toBe(true);
   });
 
-  it('autre branche en fin de session : avertissement nommant les deux branches', async () => {
+  it('la base du lot suivant du même dépôt est la branche : son commit y atterrit, pas hors branche', async () => {
+    const wander: Handler = (call) => {
+      const c = commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a.txt');
+      git(call.opts.cwd, 'checkout', '-q', '--detach');
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const second: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.txt', 'feat(L2): b.txt')] }));
+    const h = harness({ lots: [{ title: 'Un' }, { title: 'Deux' }], script: { implement: [wander, second], review: [ok, ok] } });
+    const c1 = h.lot('L1');
+    const c2 = h.lot('L2');
+    await runPool([c1, c2], 1);
+    expect(c2.lot.status).not.toBe('suspended');
+    expect(git(h.repo, 'symbolic-ref', '--short', 'HEAD')).toBe('main');
+    const base = c2.lot.steps[0].headBefore as string;
+    const first = git(h.repo, 'log', '--format=%H', '--grep=L1): a.txt', 'main');
+    expect(() => git(h.repo, 'merge-base', '--is-ancestor', first, base)).not.toThrow(); // le lot 2 part après le commit du lot 1
+    expect(() => git(h.repo, 'merge-base', '--is-ancestor', base, 'main')).not.toThrow(); // et de la branche
+    expect(git(h.repo, 'log', '--format=%s', 'main')).toMatch(/L2\): b\.txt[\s\S]*L1\): a\.txt/);
+  });
+
+  it('autre branche sans commit en plus : remise, avertissement nommant les deux branches', async () => {
     const wander: Handler = (call) => {
       const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
       git(call.opts.cwd, 'checkout', '-q', '-b', 'ailleurs');
@@ -2578,6 +2598,40 @@ describe('session d\'écriture qui finit hors de sa branche (L214)', () => {
     const h = harness({ script: { implement: [wander], review: [ok] } });
     const c = h.lot('L1');
     await runLot(c);
+    expect(git(h.repo, 'symbolic-ref', '--short', 'HEAD')).toBe('main');
     expect(c.lot.warnings.some((w) => w.includes('main') && w.includes('ailleurs'))).toBe(true);
+  });
+
+  it('commit fait hors de la branche : lot rendu « HEAD déplacé », file du dépôt retenue, autre dépôt libre', async () => {
+    const wander: Handler = (call) => {
+      git(call.opts.cwd, 'checkout', '-q', '--detach');
+      const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const h = harness({ lots: [{ title: 'Un' }, { title: 'Deux' }], script: { implement: [wander, impl('b.txt')], review: [ok] } });
+    const c1 = h.lot('L1');
+    const c2 = h.lot('L2');
+    await runPool([c1, c2], 1);
+    expect(c1.lot.status).toBe('handed-back');
+    expect(c1.lot.outcome).toMatch(/HEAD déplacé/);
+    expect(h.wave.incident).toBeNull();
+    expect(c2.lot.status).toBe('suspended');
+    expect(c2.lot.outcome).toMatch(/HEAD déplacé/);
+    expect(c2.lot.steps).toHaveLength(0);
+  });
+
+  it('arbre sale après le déplacement : lot rendu, branche non touchée', async () => {
+    const wander: Handler = (call) => {
+      const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
+      git(call.opts.cwd, 'checkout', '-q', '--detach');
+      writeFileSync(join(call.opts.cwd, 'x.txt'), 'sale');
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const h = harness({ script: { implement: [wander], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/HEAD déplacé/);
+    expect(git(h.repo, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('HEAD');
   });
 });

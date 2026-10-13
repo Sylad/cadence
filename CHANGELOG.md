@@ -45,8 +45,13 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence spec reseal <lot> <test> --reason`: the lead re-seals one acceptance test that contradicts its unchanged sheet | [1.2.0](#120---2026-10-12) |
 | `lead.ux: lead` in the `cadence.yaml` of the lead's folder: the lead forms the UX verdict itself | [1.2.0](#120---2026-10-12) |
 | `cadence lead tour --depth n` and the `depth:` key of the folder's `cadence.yaml` | [1.2.0](#120---2026-10-12) |
+| `cadence spec reseal <lot> <test> --porteur <lot>`: re-seal the unstable sealed test of a delivered lot whose contract does not change | [1.3.0](#130---2026-10-13) |
+| `cadence orchestrate --waits [--since date]`: time waves spent waiting for a session slot | [1.3.0](#130---2026-10-13) |
+| `"e2e": true` acceptation files kept out of the unit runner, `acceptationE2e()` for the e2e suite | [1.3.0](#130---2026-10-13) |
 
 ## [Unreleased]
+
+## [1.3.0] - 2026-10-13
 
 ### Changed
 

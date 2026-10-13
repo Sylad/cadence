@@ -359,14 +359,13 @@ function choixText(choix: string[]): string {
 /** Tests et build déjà lancés par le programme au HEAD relu : le relecteur ne les refait pas (L75). Vide si HEAD a bougé depuis ou si rien n'a tourné. */
 function checksText(c: LotCtx): string {
   const b = c.lot.baseline;
-  // Sans orchestrate.test aucun run : la base annoncée par la session (non vérifiée) est la seule trace des échecs de départ.
-  if (b && !b.verified && b.failures.length) {
-    return `The author reports ${b.failures.length} test(s) already red at the start sha${b.sha ? ` ${b.sha.slice(0, 7)}` : ''}, before this lot (not verified by the program):\n${b.failures.map((t) => `- ${t}`).join('\n')}\nThey are not defects of this lot, do not report them as findings; a failing test outside this list is still a finding.`;
-  }
+  // Sans orchestrate.test aucun rejeu : la base annoncée par la session (non vérifiée) est la seule trace des échecs de départ ; elle s'ajoute aux runs du programme (le build), elle ne les remplace pas.
+  const declared = b && !b.verified && b.failures.length ? `The author reports ${b.failures.length} test(s) already red at the start sha${b.sha ? ` ${b.sha.slice(0, 7)}` : ''}, before this lot (not verified by the program):\n${b.failures.map((t) => `- ${t}`).join('\n')}\nThey are not defects of this lot, do not report them as findings; a failing test outside this list is still a finding.` : '';
   const k = c.lot.checks;
-  if (!k?.runs.length || k.head !== git(c.lot.repo, 'rev-parse', 'HEAD')) return '';
+  if (!k?.runs.length || k.head !== git(c.lot.repo, 'rev-parse', 'HEAD')) return declared;
   const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? 'green' : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`}`);
-  return [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
+  const ran = [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
+  return declared ? `${ran}\n${declared}` : ran;
 }
 
 /** Consigne docs.sync du brief de revue (L143) : calculée sur les commits du lot au moment de la revue, pas écrite d'avance. */

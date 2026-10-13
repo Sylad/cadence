@@ -2444,6 +2444,15 @@ describe('ligne de base des tests (L213)', () => {
     expect(h.calls[1].brief).toContain('autre-lot > cas ancien');
     expect(h.calls[1].brief).toContain('already red at the start sha');
   });
+  it('sans orchestrate.test mais avec orchestrate.build : le brief de revue porte la base annoncée ET le run du build', async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { echecsDeBase: ['autre-lot > cas ancien'] })], review: [ok] } });
+    const c = h.lot('L1', {}, { build: 'true' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(h.calls[1].brief).toContain('autre-lot > cas ancien');
+    expect(h.calls[1].brief).toContain('`true` (build): green');
+    expect(h.calls[1].brief).toContain('do not rebuild');
+  });
   it('session verte qui liste des échecs de base (brief) : listés à part, non vérifiés', async () => {
     const h = harness({ script: { implement: [impl('a.txt', { echecsDeBase: ['autre-lot > cas ancien'] })], review: [ok] } });
     const c = h.lot('L1');

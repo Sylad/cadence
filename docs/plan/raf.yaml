@@ -2177,6 +2177,8 @@ lots:
     estimate: 0.5
     after: [ L189 ]
     created: 2026-10-11
+    notes:
+      - { date: 2026-10-13, text: "13-10 : condition non remplie — 0 lot spec: true et 0 fiche back (bloc sujet) dans les projets ; ne pas tirer avant 8 lots back faits avec fiche." }
   - id: L191
     title: "Budget d'un lot à étape spec : lotBudget (src/orchestrate/command.ts:73) ne compte que l'estimate, pas les sessions spec, maquette (≤ 2 passes) et accept — ol L25 rendu au lead le 11-10 à 503 k / 450 k avant sa passe fix (spec+maquette+accept ≈ 200 k) ; ajouter une allocation mesurée sur les journaux (L113, L25) pour un lot screen: ou spec:, montrée par --dry-run, test"
     status: done

@@ -1337,6 +1337,24 @@ describe('budget par lot (L78, recalibré L194)', () => {
     }
   });
 
+  it("--dry-run (L209) : un lot screen: component ou journey avec spec: true et sans fiche à écran reste un lot de spec back — spec → fiche, budget ordinaire plus 350000, pas la chaîne écran", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component', spec: true }, { title: 'un parcours', estimate: 0.5, screen: 'journey', spec: true }] });
+    const r = io(parent);
+    await orchestrate(['a:L1', 'a:L2', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      const [, comp, journey] = text.split('étapes :');
+      for (const part of [comp, journey]) {
+        expect(part).toMatch(/^\s*spec \(sonnet\) → fiche \(sonnet\) → implement/);
+        expect(part).not.toMatch(/maquette/);
+      }
+      expect(text.match(/plus 350000 pour les étapes spec, fiche et accept/g)).toHaveLength(2);
+      expect(text).not.toContain('budget du lot : 1300000');
+    } finally {
+      removeDryRunBriefs(text);
+    }
+  });
+
   it("--dry-run (L209) : un lot component déjà entré dans la chaîne (fiche ou acceptation présentes) garde son étape spec et son budget d'écran", async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component' }, { title: 'un autre', estimate: 0.5, screen: 'journey' }] });
     mkdirSync(join(dirs.a, 'docs/specs/carte'), { recursive: true });

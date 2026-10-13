@@ -788,7 +788,7 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   const sha = git(repo, ['rev-parse', '--short', 'HEAD']).trim();
   // Un plan tenu par un autre outil ne se modifie pas d'ici : la raison est déjà dans acceptation.json et dans le commit, la note reste à la main du lead.
   if (plan.readonly) {
-    io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et dans le commit — note à ajouter au lot avec l'outil du projet (plan en lecture seule)`);
+    io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et dans le commit — note à ajouter au lot ${cite} avec l'outil du projet (plan en lecture seule)`);
     return 0;
   }
   plan.note(cite, `test d'acceptation rescellé${livre ? ` (lot livré ${lotId}, ` : ' ('}${norm}, fiche inchangée) : ${reason.trim()}`, ctx.today);
@@ -806,7 +806,7 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
       throw new RafError(`spec reseal : le rescellé a eu lieu (commit ${sha}) mais le commit de la note du lot a échoué — la note est écrite dans ${planRel}, à commiter à la main (un plan sale arrêterait la vague suivante) — ${(out.stderr || out.stdout || out.message).trim().split('\n').slice(-5).join(' | ')}`);
     }
   }
-  io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et en note du lot${tracked ? '' : ' (plan à commiter)'}`);
+  io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et en note du lot ${cite}${tracked ? '' : ' (plan à commiter)'}`);
   return 0;
 }
 

@@ -262,10 +262,37 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
     expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L3');
   });
 
-  it('--porteur n’a de sens que pour un lot livré ; un lot clos sans acceptation verte reste refusé', () => {
+  it('--porteur n’a de sens que pour un lot livré : refusé sur un lot en cours', () => {
     const { repo, a } = avecPlanEnCours();
     writeFileSync(join(repo, a.test), 'autre\n');
     expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L2').err).toMatch(/lot livré/);
+  });
+
+  it('un lot clos sans acceptation verte reste refusé, --porteur ou non', () => {
+    const s = lotScelle();
+    cli(s.repo, {}, 'init', '--project', 'demo');
+    cli(s.repo, {}, 'add', 'Lot un');
+    cli(s.repo, {}, 'add', 'Lot deux');
+    cli(s.repo, {}, 'start', 'L1');
+    cli(s.repo, {}, 'done', 'L1', '--force');
+    cli(s.repo, {}, 'start', 'L2');
+    commitPaths(s.repo, 'plan: L1 L2', 'docs/plan/raf.yaml', '.gitignore');
+    writeFileSync(join(s.repo, s.a.test), 'autre\n');
+    const r = cli(s.repo, {}, 'spec', 'reseal', 'L1', s.a.test, '--reason', 'x', '--porteur', 'L2');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/L1 n'est pas en cours/);
+    expect(git(s.repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1 L2');
+  });
+
+  it('les messages de sortie nomment le lot porteur pour la note, pas le lot livré (plan en lecture seule, puis cas nominal)', () => {
+    const ro = livre();
+    writeFileSync(join(ro.repo, 'cadence.yaml'), 'plan:\n  path: docs/plan/raf.yaml\n  lots: lots\n');
+    const r1 = cli(ro.repo, {}, 'spec', 'reseal', 'L1', ro.a.test, '--reason', 'x', '--porteur', 'L2');
+    expect(r1.err).toBe('');
+    expect(r1.out).toMatch(/note à ajouter au lot L2 /);
+    const nom = livre();
+    const r2 = cli(nom.repo, {}, 'spec', 'reseal', 'L1', nom.a.test, '--reason', 'x', '--porteur', 'L2');
+    expect(r2.out).toMatch(/en note du lot L2/);
   });
 
   it('refuse pendant une vague orchestrée, comme pour un lot en cours', () => {

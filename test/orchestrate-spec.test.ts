@@ -4,9 +4,9 @@ import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { mcpServersFor, readAgents } from '../src/orchestrate/launch.js';
-import { costlyHypotheses } from '../src/orchestrate/spec.js';
+import { costlyHypotheses, specScreen } from '../src/orchestrate/spec.js';
 import { AGENTS_DIR } from '../src/skills.js';
-import { gitRepo } from './helpers.js';
+import { gitRepo, tempDir } from './helpers.js';
 import { ecrit, EXEMPLE, type Écrit } from './spec-helpers.js';
 import { claudeOut, commitFile, git, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
 
@@ -376,5 +376,28 @@ describe('étape spec : question ciblée', () => {
   ])('costlyHypotheses : %s', (siFaux, coûteux) => {
     const doc = { regles: [{ id: 'R1', statut: 'hypothese', si_faux: siFaux }, { id: 'R2', statut: 'sourcee', si_faux: 'une migration' }] };
     expect(costlyHypotheses(doc).map((x) => x.id)).toEqual(coûteux ? ['R1'] : []);
+  });
+});
+
+describe('specScreen (L209) : un lot component déjà entré dans la chaîne', () => {
+  const repoWith = (files: Record<string, string>): string => {
+    const repo = tempDir();
+    for (const [f, text] of Object.entries(files)) {
+      mkdirSync(join(repo, 'docs/specs', f.split('/')[0]), { recursive: true });
+      writeFileSync(join(repo, 'docs/specs', f), text);
+    }
+    return repo;
+  };
+
+  it('une fiche back (bloc sujet seul) ou son acceptation ne fait pas entrer un lot component : c\'est la spec back d\'un lot spec: true', () => {
+    const repo = repoWith({ 'import/fiche.yaml': 'sujet:\n  id: import\n  lot: L3\n', 'import/acceptation-L3.json': '{}' });
+    expect(specScreen(repo, 'docs/specs', { id: 'L3', screen: 'component' })).toBeUndefined();
+    expect(specScreen(repo, 'docs/specs', { id: 'L3', screen: 'journey' })).toBeUndefined();
+  });
+
+  it('une fiche avec un bloc ecran du lot, ou une acceptation voisine d\'une fiche à ecran, le fait entrer', () => {
+    const repo = repoWith({ 'carte/fiche.yaml': 'ecran:\n  id: carte\n  lot: L1\n', 'carte/acceptation-L2.json': '{}' });
+    expect(specScreen(repo, 'docs/specs', { id: 'L1', screen: 'component' })).toBe('component');
+    expect(specScreen(repo, 'docs/specs', { id: 'L2', screen: 'journey' })).toBe('journey');
   });
 });

@@ -25,6 +25,13 @@ describe('docs/lead.md', () => {
     expect(md).toMatch(/precheck.*spec.*maquette.*accept.*implement.*ux.*review/s)
   })
 
+  it("réserve les étapes spec, maquette et accept à screen: page (L209)", () => {
+    const md = read('docs/lead.md')
+    expect(md).toContain('`screen:` of `page`')
+    expect(md).not.toContain('only for a lot that declares `screen:`')
+    expect(md).toMatch(/`screen: component`|`component`/)
+  })
+
   it("décrit l'étape fiche d'un lot spec: true et le relais des hypothèses (L188)", () => {
     const md = read('docs/lead.md')
     for (const s of ['`spec: true`', '**fiche**', '`orchestrate.fiche: false`', 'hypothèse de la fiche']) expect(md, s).toContain(s)

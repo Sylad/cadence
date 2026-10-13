@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
@@ -2499,5 +2499,32 @@ describe('ligne de base des tests (L213)', () => {
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(existsSync(join(h.repo, 'packages/web/dist/built'))).toBe(false);
     expect(existsSync(join(h.repo, 'packages/web/node_modules'))).toBe(true);
+  });
+  it('workspace npm/pnpm : les liens node_modules vers un paquet du dépôt résolvent dans le worktree de base, pas dans le dépôt vivant', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    writeFileSync(join(h.repo, '.gitignore'), 'node_modules/\n');
+    mkdirSync(join(h.repo, 'packages/shared'), { recursive: true });
+    writeFileSync(join(h.repo, 'packages/shared/v.txt'), 'old\n');
+    git(h.repo, 'add', '--', '.gitignore', 'packages/shared/v.txt');
+    git(h.repo, 'commit', '-q', '-m', 'chore: workspace');
+    // le lot casse le paquet partagé : c'est son propre code, pas un échec de départ
+    writeFileSync(join(h.repo, 'packages/shared/v.txt'), 'new\n');
+    git(h.repo, 'add', '--', 'packages/shared/v.txt');
+    git(h.repo, 'commit', '-q', '-m', 'feat(L1): casse le paquet partagé');
+    mkdirSync(join(h.repo, 'node_modules/@x'), { recursive: true });
+    mkdirSync(join(h.repo, 'node_modules/tiers'));
+    writeFileSync(join(h.repo, 'node_modules/tiers/v.txt'), 'tiers\n');
+    symlinkSync('../../packages/shared', join(h.repo, 'node_modules/@x/shared'));
+    symlinkSync('../packages/shared', join(h.repo, 'node_modules/shared-lib'));
+    const c = h.lot('L1', {}, { test: `if [ ! -f b.txt ] && [ "$(cat node_modules/@x/shared/v.txt)" = new ] && [ "$(cat node_modules/shared-lib/v.txt)" = new ] && [ "$(cat node_modules/tiers/v.txt)" = tiers ]; then echo ' FAIL  web > casse'; exit 1; fi` });
+    await runLot(c);
+    // au sha de départ le paquet vaut « old » : le test y est vert, l'échec est nouveau
+    expect(c.lot.baseline?.failures).toEqual([]);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    expect(h.calls[1].brief).toContain('web > casse');
+    // rien du dépôt vivant n'a été touché, et les liens de dépendances tierces restent des liens vers le dépôt vivant
+    expect(readlinkSync(join(h.repo, 'node_modules/@x/shared'))).toBe('../../packages/shared');
+    expect(lstatSync(join(h.repo, 'node_modules/tiers')).isDirectory()).toBe(true);
+    expect(git(h.repo, 'worktree', 'list')).not.toContain('baseline');
   });
 });

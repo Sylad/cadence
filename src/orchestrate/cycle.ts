@@ -2,8 +2,8 @@ import { execFileSync, spawn } from 'node:child_process';
 import { parse } from 'yaml';
 import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
-import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
@@ -147,9 +147,56 @@ const startSha = (c: LotCtx): string | undefined => lotStartHead(c.lot.repo, lot
 const OUTPUT_DIRS = new Set(['dist', 'build', 'out', 'coverage', 'target', '.next', '.nuxt', '.output', '.angular', '.turbo', '.svelte-kit', '.parcel-cache']);
 
 /**
+ * Un `node_modules` dans le worktree de base (L213) : un vrai dossier dont chaque entrée est un lien vers celle du dépôt vivant, SAUF les liens
+ * de workspace (npm, pnpm, yarn : `node_modules/@x/shared -> ../../packages/shared`) qui pointent vers du code du dépôt hors de tout
+ * `node_modules`. Lier le dossier d'un bloc les ferait résoudre dans le dépôt vivant, donc exécuter le code du lot au lieu de celui du sha de
+ * départ ; ils sont refaits vers la copie du worktree (absente au sha de départ : pas de lien). Les dossiers de portée `@x` sont parcourus,
+ * pas les paquets. Ajoute chaque lien créé à `links`.
+ */
+function mirrorNodeModules(repo: string, dir: string, name: string, links: string[]): void {
+  const repoReal = realpathSync(repo);
+  const workspaceCopy = (live: string): string | null => {
+    let real: string;
+    try {
+      real = realpathSync(live);
+    } catch {
+      return null; // lien mort dans le dépôt vivant : rien à refaire
+    }
+    const rel = relative(repoReal, real);
+    if (!rel || rel.startsWith('..') || isAbsolute(rel) || rel.split(sep).includes('node_modules')) return null;
+    return join(dir, rel);
+  };
+  const link = (target: string, at: string): void => {
+    symlinkSync(target, at);
+    links.push(at);
+  };
+  const mirror = (liveDir: string, to: string, scope: boolean): void => {
+    mkdirSync(to);
+    for (const e of readdirSync(liveDir, { withFileTypes: true })) {
+      const live = join(liveDir, e.name);
+      const at = join(to, e.name);
+      if (e.isSymbolicLink()) {
+        const copy = workspaceCopy(live);
+        if (copy) {
+          if (existsSync(copy)) link(copy, at);
+          continue;
+        }
+      } else if (!scope && e.isDirectory() && e.name.startsWith('@')) {
+        mirror(live, at, true);
+        continue;
+      }
+      link(live, at);
+    }
+  };
+  mirror(join(repo, name), join(dir, name), false);
+}
+
+/**
  * Échecs des tests au sha de départ du lot (L213) : la commande est rejouée dans un worktree jetable de ce sha, hors du dépôt,
- * avec des liens vers les dossiers ignorés de la racine (node_modules, dist…) pour que les dépendances s'y trouvent. Null quand
- * le worktree ne peut être monté : l'appelant garde alors les tests pour rouges.
+ * avec des liens vers les dossiers ignorés de tout niveau (node_modules, .venv… ; `dist` et les autres sorties de build exclus, une commande
+ * de tests qui y écrit toucherait le build du lot) pour que les dépendances s'y trouvent. Les `node_modules` sont recréés entrée par entrée
+ * pour que les paquets de workspace résolvent dans le worktree (`mirrorNodeModules`). Null quand le worktree ne peut être monté :
+ * l'appelant garde alors les tests pour rouges.
  */
 async function baselineFailures(c: LotCtx, command: string): Promise<string[] | null> {
   const l = c.lot;
@@ -166,6 +213,10 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
     for (const name of ignored) {
       const to = join(dir, name);
       if (existsSync(to) || !existsSync(dirname(to))) continue;
+      if (basename(name) === 'node_modules' && lstatSync(join(l.repo, name)).isDirectory()) {
+        mirrorNodeModules(l.repo, dir, name, links);
+        continue;
+      }
       symlinkSync(join(l.repo, name), to);
       links.push(to);
     }

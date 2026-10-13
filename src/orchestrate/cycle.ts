@@ -305,6 +305,11 @@ function choixText(choix: string[]): string {
 
 /** Tests et build déjà lancés par le programme au HEAD relu : le relecteur ne les refait pas (L75). Vide si HEAD a bougé depuis ou si rien n'a tourné. */
 function checksText(c: LotCtx): string {
+  const b = c.lot.baseline;
+  // Sans orchestrate.test aucun run : la base annoncée par la session (non vérifiée) est la seule trace des échecs de départ.
+  if (b && !b.verified && b.failures.length) {
+    return `The author reports ${b.failures.length} test(s) already red at the start sha${b.sha ? ` ${b.sha.slice(0, 7)}` : ''}, before this lot (not verified by the program):\n${b.failures.map((t) => `- ${t}`).join('\n')}\nThey are not defects of this lot, do not report them as findings; a failing test outside this list is still a finding.`;
+  }
   const k = c.lot.checks;
   if (!k?.runs.length || k.head !== git(c.lot.repo, 'rev-parse', 'HEAD')) return '';
   const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? 'green' : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`}`);
@@ -1454,7 +1459,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   if (!rep.tests.vert) {
     if (c.config.test) deferred = true;
-    else if (!declared.length) red.push(claimed);
+    else red.push(claimed); // le brief demande de ne pas annoncer rouge pour les seuls échecs de base : rouge + base = de nouveaux échecs
   }
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
   const runs: NonNullable<LotState['checks']>['runs'] = [];

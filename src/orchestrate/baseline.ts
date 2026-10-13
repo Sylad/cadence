@@ -35,3 +35,11 @@ export function compareBaseline(now: string[], base: string[]): { nouveaux: stri
   const was = new Set(base);
   return { nouveaux: now.filter((t) => !was.has(t)), existants: now.filter((t) => was.has(t)) };
 }
+
+/**
+ * Un échec que la sortie ne rattache à aucun test : erreur non gérée (vitest « Unhandled Errors », promesse rejetée), seuil de
+ * couverture non atteint. Comparer les seuls noms lus le masquerait derrière d'anciens échecs : l'appelant garde les tests pour rouges.
+ */
+export function hasUnnamedFailure(output: string): boolean {
+  return /Unhandled (?:Errors?|Rejections?)|caught \d+ unhandled|coverage threshold|Coverage for \w+ \([\d.]+%\) does not meet/i.test(output.replace(ANSI, ''));
+}

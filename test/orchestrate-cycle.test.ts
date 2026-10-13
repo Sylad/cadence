@@ -2436,4 +2436,44 @@ describe('ligne de base des tests (L213)', () => {
     expect(c.lot.baseline?.failures).toEqual(['autre-lot > cas ancien']);
     expect(c.lot.warnings.join('\n')).toContain('non vérifié par le programme');
   });
+  it('session verte qui liste des échecs de base (brief) : listés à part, non vérifiés', async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { echecsDeBase: ['autre-lot > cas ancien'] })], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.baseline?.failures).toEqual(['autre-lot > cas ancien']);
+    expect(c.lot.baseline?.verified).toBe(false);
+    const table = renderTable({ id: 'w1', created: '2026-10-13T10:00:00Z', cwd: '/x', budget: 2_000_000, consumed: 0, cacheRead: 0, status: 'done', pid: 1, lots: ['demo:L1'] }, [c.lot]).join('\n');
+    expect(table).toContain('déjà rouge au départ');
+  });
+
+  it('lot relancé : la base est le parent du premier commit du lot, pas le HEAD de la vague', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    commitFile(h.repo, 'pre.txt', 'feat(L1): pre');
+    const c = h.lot('L1', {}, { test: `if [ -f pre.txt ] && [ ! -f b.txt ]; then echo ' FAIL  lot > casse'; exit 1; fi` });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    expect(c.lot.baseline?.failures).toEqual([]);
+    expect(h.calls[1].brief).toContain('lot > casse');
+  });
+
+  it('un échec sans nom (erreur non gérée) à côté d\'anciens échecs reste rouge', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const c = h.lot('L1', {}, { test: `echo '${old}'; if [ -f a.txt ] && [ ! -f b.txt ]; then echo '⎯⎯ Unhandled Errors ⎯⎯'; fi; exit 1` });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+  });
+
+  it('le worktree de base ne laisse rien dans les dossiers de sortie ignorés du dépôt', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    writeFileSync(join(h.repo, '.gitignore'), 'dist/\nnode_modules/\n');
+    git(h.repo, 'add', '--', '.gitignore');
+    git(h.repo, 'commit', '-q', '-m', 'chore: ignore');
+    mkdirSync(join(h.repo, 'dist'));
+    mkdirSync(join(h.repo, 'node_modules'));
+    const c = h.lot('L1', {}, { test: `case "$PWD" in *cadence-baseline*) mkdir -p dist; echo old > dist/built; test -d node_modules || echo ' FAIL  deps manquantes';; esac; echo '${old}'; exit 1` });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(existsSync(join(h.repo, 'dist/built'))).toBe(false);
+  });
 });

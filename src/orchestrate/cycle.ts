@@ -14,7 +14,7 @@ import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
-import { compareBaseline, failedTests } from './baseline.js';
+import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, newsText, objective, renderBrief, reposText, TEMPLATES_DIR, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
@@ -137,8 +137,14 @@ async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
   return null;
 }
 
-/** Sha d'où le lot est parti : le HEAD d'avant sa première session. */
-const startSha = (l: LotState): string | undefined => l.steps.find((s) => s.headBefore)?.headBefore;
+/**
+ * Sha d'où le lot est parti : le parent de son plus ancien commit de travail (un lot relancé, ou déjà en partie commité, a ses propres
+ * commits avant la vague), à défaut le HEAD d'avant la première session de la vague.
+ */
+const startSha = (c: LotCtx): string | undefined => lotStartHead(c.lot.repo, lotWork(c.loadPlan(), c.lot.repo, c.lot.lot).map((k) => k.sha)) ?? c.lot.steps.find((s) => s.headBefore)?.headBefore;
+
+/** Dossiers ignorés de sortie de build : jamais liés dans le worktree jetable, une commande de tests qui y écrit toucherait le build du lot. */
+const OUTPUT_DIRS = new Set(['dist', 'build', 'out', 'coverage', 'target', '.next', '.nuxt', '.output', '.angular', '.turbo', '.svelte-kit', '.parcel-cache']);
 
 /**
  * Échecs des tests au sha de départ du lot (L213) : la commande est rejouée dans un worktree jetable de ce sha, hors du dépôt,
@@ -147,14 +153,14 @@ const startSha = (l: LotState): string | undefined => l.steps.find((s) => s.head
  */
 async function baselineFailures(c: LotCtx, command: string): Promise<string[] | null> {
   const l = c.lot;
-  const sha = startSha(l);
+  const sha = startSha(c);
   if (!sha) return null;
   if (l.baseline?.verified && l.baseline.sha === sha && l.baseline.command === command) return l.baseline.failures;
   const dir = mkdtempSync(join(tmpdir(), 'cadence-baseline-'));
   const links: string[] = [];
   try {
     git(l.repo, 'worktree', 'add', '--detach', '-f', dir, sha);
-    const ignored = git(l.repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.includes('/') && !f.startsWith('.cadence'));
+    const ignored = git(l.repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.includes('/') && !f.startsWith('.cadence') && !OUTPUT_DIRS.has(f));
     for (const name of ignored) {
       const to = join(dir, name);
       if (existsSync(to)) continue;
@@ -188,7 +194,7 @@ type VsBase = { kind: 'unknown' } | { kind: 'existing'; n: number } | { kind: 'n
 /** Des tests rouges comparés à la ligne de base (L213) : tous déjà rouges au départ, ou au moins un nouveau, ou rien de comparable. */
 async function againstBaseline(c: LotCtx, command: string, output: string): Promise<VsBase> {
   const now = failedTests(output);
-  if (!now.length) return { kind: 'unknown' };
+  if (!now.length || hasUnnamedFailure(output)) return { kind: 'unknown' };
   const base = await baselineFailures(c, command);
   if (!base?.length) return { kind: 'unknown' };
   const { nouveaux, existants } = compareBaseline(now, base);
@@ -1441,13 +1447,14 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   // Tests annoncés rouges (L213) : avec orchestrate.test, le programme rejoue et compare à la ligne de base, la session n'est crue que si les tests y sont rouges autrement que par des échecs de départ ; sans, la liste des échecs de base de la session, non vérifiée.
   const claimed: Constat = { source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` };
   let deferred = false;
+  const declared = (rep.echecsDeBase ?? []).map((t) => t.trim()).filter(Boolean);
+  if (!c.config.test && declared.length) {
+    l.baseline = { sha: startSha(c) ?? '', failures: declared, verified: false };
+    l.warnings.push(`échecs déjà présents au sha de départ selon la session (${declared.length}) : non vérifié par le programme (orchestrate.test absent)`);
+  }
   if (!rep.tests.vert) {
-    const declared = (rep.echecsDeBase ?? []).map((t) => t.trim()).filter(Boolean);
     if (c.config.test) deferred = true;
-    else if (declared.length) {
-      l.baseline = { sha: startSha(l) ?? '', failures: declared, verified: false };
-      l.warnings.push(`tests rouges annoncés par la session, tous déjà rouges au sha de départ selon elle (${declared.length}) : non vérifié par le programme (orchestrate.test absent)`);
-    } else red.push(claimed);
+    else if (!declared.length) red.push(claimed);
   }
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
   const runs: NonNullable<LotState['checks']>['runs'] = [];

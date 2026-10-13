@@ -366,4 +366,12 @@ describe('ligne de base des tests dans les briefs (L213)', () => {
       expect(text).toContain('echecsDeBase');
     }
   });
+  it('le sha de départ du brief est celui du code : parent du plus ancien commit de travail, identique dans implement et fix', () => {
+    const line = (name: string) => readFileSync(join(TEMPLATES_DIR, `${name}.md`), 'utf8').split('\n').find((l) => l.startsWith('Tests already red before the lot'));
+    expect(line('implement')).toBeDefined();
+    expect(line('fix')).toBe(line('implement'));
+    expect(line('implement')).toContain('the parent of the oldest work commit that cites {{lot}}');
+    expect(line('implement')).toContain('plan-only commits left out');
+    expect(line('implement')).not.toContain('first commit that cites');
+  });
 });

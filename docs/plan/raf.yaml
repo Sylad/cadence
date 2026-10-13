@@ -2333,7 +2333,7 @@ lots:
     finished: 2026-10-12
   - id: L209
     title: "Étape spec : seuil resserré à screen: page — component et journey ne déclenchent plus spec + maquette + accept et reprennent le chemin ordinaire (mesure S8 du 12-10 : aucune ligne atteinte, ~570 k tokens/lot, parcours 4,5 passes/lot) ; spec, README, CHANGELOG, mesure suivante après 8 lots page"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-13
     notes:
@@ -2341,6 +2341,13 @@ lots:
       - { date: 2026-10-13, text: "13-10 : rendu au lead (budget 436 k/450 k, revues 3 → 2 → 1). Reste 1 majeur, doc seule : README.md:1095 dit « raf spec <id> on has no effect on a lot with a screen » alors que depuis 74d27db seul screen: page refuse spec: true (component/journey + spec: true = lot de spec back, budget ordinaire + 350 k). Corriger cette phrase et toute autre mention du même genre (grep « no effect », « beside  »), rien d'autre. Estimate relevée à 1 j." }
     started: 2026-10-13
     review: { date: 2026-10-13, verdict: "conforme (1 constat mineur restant : les libellés des SVG du lead disent « lots with a screen ») — orchestré (vague 2026-10-13-0800r, 1 passe(s) de correction + passe des mineurs)", commit: fdade787436d7155bd53c8d752fa1404094edd2a }
+    finished: 2026-10-13
+  - id: L210
+    title: "Doc du seuil resserré (suite L209) : aide de raf screen (src/cli.ts:45) et ligne raf screen du README (l. 107) — seule la valeur page adopte l'étape spec ; entrée CHANGELOG L209 complétée (raf spec on|off pose ou retire spec: sur un lot component ou journey, avant refusé ou sans effet) ; libellés des deux SVG du lead (« lots with a screen: », « Spec (screen lots) ») passés à screen: page"
+    status: todo
+    estimate: 0.25
+    after: [ L209 ]
+    created: 2026-10-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

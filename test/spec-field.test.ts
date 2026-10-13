@@ -82,6 +82,22 @@ describe('champ spec des lots (L186, spec etape-spec-back B1)', () => {
     expect(yaml(dir)).toBe(before);
   });
 
+  it('L209 : sur un lot screen: component ou journey, spec on pose spec: true et off le retire', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'A', '--visible', '--screen', 'component');
+    raf(dir, 'add', 'B', '--visible', '--screen', 'journey');
+    const before = yaml(dir);
+    for (const id of ['L1', 'L2']) {
+      const on = raf(dir, 'spec', id, 'on');
+      expect(on.code).toBe(0);
+      expect(on.out).not.toContain('déjà');
+    }
+    expect(yaml(dir).match(/spec: true/g)).toHaveLength(2);
+    for (const id of ['L1', 'L2']) expect(raf(dir, 'spec', id, 'off').code).toBe(0);
+    expect(yaml(dir)).toBe(before);
+  });
+
   it('raf check : spec qui n\'est ni true ni false est une erreur ; false et true passent ; spec avec screen accepté', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--project', 'demo');

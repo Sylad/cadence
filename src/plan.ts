@@ -550,13 +550,13 @@ export class Plan {
     node.items.splice(keys.indexOf('visible') + 1, 0, this.doc.createPair('screen', screen));
   }
 
-  /** Pose (true) ou retire (false) le `spec:` d'un lot existant ; `screen:` l'implique, donc on ne retire pas la spec d'un lot à écran. Renvoie false quand `screen:` rendait la pose sans objet. */
+  /** Pose (true) ou retire (false) le `spec:` d'un lot existant ; `screen: page` l'implique, donc on ne retire pas la spec d'un lot à page (`component` et `journey` suivent le chemin ordinaire depuis L209 : leur `spec: true` est la spec back). Renvoie false quand `screen: page` rendait la pose sans objet. */
   setSpec(ref: string, on: boolean): boolean {
     this.writable();
     if (ref.includes('/')) throw new RafError(`la spec se pose sur un lot, pas une sous-tâche : ${ref}`);
     const node = this.lotNode(ref);
-    if (this.lot(ref).screen) {
-      if (!on) throw new RafError(`${ref} a screen: — retirer d'abord screen: (raf screen ${ref} none), l'écran implique la spec`);
+    if (this.lot(ref).screen === 'page') {
+      if (!on) throw new RafError(`${ref} a screen: page — retirer d'abord screen: (raf screen ${ref} none), l'écran implique la spec`);
       return false;
     }
     if (!on) {

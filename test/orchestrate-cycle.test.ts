@@ -2452,6 +2452,13 @@ describe('ligne de base des tests (L213)', () => {
     expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
     expect(h.calls[1]!.brief).toContain('lot > nouveau');
   });
+  it('sans orchestrate.test : vert:true mais nouveauxEchecs non vide : pas de correction, avertissement sur le rapport incohérent (L215)', async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { nouveauxEchecs: ['lot > nouveau'] })], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.warnings.join('\n')).toContain('lot > nouveau');
+  });
   it('sans orchestrate.test : vert:false sans nouveauxEchecs (champ absent) : correction, comme avant', async () => {
     const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: '1 failed : autre-lot > cas ancien', vert: false }, echecsDeBase: ['autre-lot > cas ancien'] })], fix: [fix('b.txt')], review: [ok] } });
     const c = h.lot('L1');

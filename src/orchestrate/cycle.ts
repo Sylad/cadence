@@ -1563,6 +1563,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     else if (newFailures?.length) red.push({ ...claimed, texte: `${claimed.texte} — nouveaux échecs déclarés par la session : ${newFailures.join(' ; ')}` });
     else red.push(claimed);
   }
+  if (rep.tests.vert && !c.config.test && newFailures?.length) l.warnings.push(`rapport incohérent : tests annoncés verts mais nouveaux échecs déclarés (${newFailures.join(' ; ')}) ; pas de correction, non vérifié par le programme (orchestrate.test absent)`);
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
   const runs: NonNullable<LotState['checks']>['runs'] = [];
   if (red.length === 0) {

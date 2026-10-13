@@ -714,7 +714,8 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   step.headAfter = after.head ?? undefined;
   // Le dépôt du projet d'abord, puis chaque voisin : mêmes contrôles, l'incident nomme le dépôt voisin.
   const watched = [{ where: '', path: l.repo, before, after }, ...others.map((o) => ({ where: ` dans ${o.repo.rel}`, path: o.repo.path, before: o.before, after: o.after }))];
-  for (const { where, path, before: b, after: a } of watched) {
+  // Les incidents d'abord, dans TOUS les dépôts surveillés (projet et voisins) : un push ou un hook de garde supprimé où que ce soit arrête la vague, avant tout traitement d'un HEAD déplacé ou d'un lot rendu (L214).
+  for (const { where, before: b, after: a } of watched) {
     if (pushed(b, a)) {
       step.status = 'failed';
       step.cause = `push détecté${where}`;
@@ -729,6 +730,8 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       w.saveWave();
       return stop(c, 'failed', `incident : ${w.incident}`);
     }
+  }
+  for (const { where, path, before: b, after: a } of watched) {
     // Session d'écriture finie sur une autre branche ou en HEAD détaché (L214) : pas un push, mais les contrôles et le lot suivant partiraient d'un HEAD qui n'est plus la branche du lot.
     if (write && b.branch !== a.branch) {
       const was = `${a.branch ? `sur la branche ${a.branch}` : `en HEAD détaché (${(a.head ?? '').slice(0, 7)})`} au lieu de ${b.branch ?? 'HEAD détaché'}`;

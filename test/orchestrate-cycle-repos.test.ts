@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { OrchestrateConfig } from '../src/config.js';
 import { renderBrief, reposText, type BriefVars } from '../src/orchestrate/briefs.js';
 import { runLot } from '../src/orchestrate/cycle.js';
+import { installPrePush } from '../src/orchestrate/guard.js';
 import { claudeOut, commitFile, git, harness, precheckReport, reviewReport, workReport, type Call, type Handler } from './orchestrate-harness.js';
 import { gitRepo, tempDir } from './helpers.js';
 
@@ -211,6 +212,46 @@ describe('sessions d\'un lot à dépôt voisin (L62)', () => {
     await runLot(c);
     expect(c.lot.status).toBe('failed');
     expect(h.wave.incident).toMatch(/push détecté .*\.\.\/gitops/);
+  });
+
+  it('HEAD déplacé dans le projet ET push depuis le voisin : l\'incident arrête la vague, ce n\'est pas un simple lot rendu (L214)', async () => {
+    const { h, c, nb } = scenario((n) => ({
+      implement: [
+        (call) => {
+          git(call.opts.cwd, 'checkout', '-q', '--detach');
+          const p = commitFile(call.opts.cwd, 'a.txt', 'feat(L1): hors branche'); // le projet : HEAD déplacé, lot à rendre
+          commitFile(n, 'x.yaml', 'feat(L1): voisin');
+          git(n, 'push', '-q');
+          return claudeOut(workReport({ commits: [p] }));
+        },
+      ],
+    }));
+    const bare = join(tempDir(), 'origin-nb2.git');
+    git(nb, 'init', '-q', '--bare', '-b', 'main', bare);
+    git(nb, 'remote', 'add', 'origin', bare);
+    git(nb, 'push', '-q', '-u', 'origin', 'main');
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(h.wave.incident).toMatch(/push détecté .*\.\.\/gitops/);
+    expect(h.wave.movedRepos?.has(h.repo) ?? false).toBe(false);
+  });
+
+  it('HEAD déplacé dans le projet ET hook de garde supprimé dans le voisin : l\'incident du hook arrête la vague (L214)', async () => {
+    const { h, c, nb } = scenario((n) => ({
+      implement: [
+        (call) => {
+          git(call.opts.cwd, 'checkout', '-q', '--detach');
+          const p = commitFile(call.opts.cwd, 'a.txt', 'feat(L1): hors branche');
+          rmSync(join(n, '.githooks/pre-push'));
+          return claudeOut(workReport({ commits: [p] }));
+        },
+      ],
+    }));
+    git(nb, 'config', 'core.hooksPath', '.githooks');
+    installPrePush(nb, 'w1');
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(h.wave.incident).toMatch(/hook pre-push de garde a été supprimé dans \.\.\/gitops/);
   });
 
   it('la revue qui modifie le voisin rend le lot au lead (pas la vague), aucun verdict enregistré (L133)', async () => {

@@ -250,6 +250,18 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
     expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1 L2');
   });
 
+  it('refuse un porteur existant mais pas en cours (lot clos)', () => {
+    const { repo, a } = livre();
+    cli(repo, {}, 'add', 'Lot trois');
+    cli(repo, {}, 'start', 'L3');
+    cli(repo, {}, 'done', 'L3', '--force');
+    commitPaths(repo, 'plan: L3', 'docs/plan/raf.yaml');
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L3');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/L3 n'est pas en cours/);
+    expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L3');
+  });
+
   it('--porteur n’a de sens que pour un lot livré ; un lot clos sans acceptation verte reste refusé', () => {
     const { repo, a } = avecPlanEnCours();
     writeFileSync(join(repo, a.test), 'autre\n');

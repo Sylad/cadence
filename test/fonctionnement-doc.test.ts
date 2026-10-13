@@ -57,3 +57,14 @@ describe('schéma du lead remis à jour (L211)', () => {
     }
   })
 })
+
+describe('précontrôle conditionnel (L211)', () => {
+  it('la doc et les figures le disent conditionnel : lot sans commit, sauf orchestrate.precheck: false', () => {
+    expect(read('docs/fonctionnement.md')).toContain('orchestrate.precheck: false')
+    expect(read('docs/fonctionnement.md')).not.toContain('Every lot starts with')
+    for (const v of ['light', 'dark']) {
+      expect(read(`docs/fonctionnement-wave-${v}.svg`), v).toMatch(/<rect x="20" y="140"[^>]*stroke-dasharray=/)
+      expect(read(`docs/lead-workflow-${v}.svg`), v).toMatch(/<g id="precheck"><rect[^>]*stroke-dasharray=/)
+    }
+  })
+})

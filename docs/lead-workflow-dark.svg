@@ -43,7 +43,7 @@
 <text x="420" y="374.5" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="11.5">orchestrate … --wave</text>
 <text x="420" y="390.5" text-anchor="middle">in the background</text>
 </g>
-<g id="precheck"><rect x="161" y="508" width="158" height="82" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5"/>
+<g id="precheck"><rect x="161" y="508" width="158" height="82" rx="8" fill="#0f2d1a" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="5 3"/>
 <text x="240" y="529.5" text-anchor="middle" font-weight="600">Precheck</text>
 <text x="240" y="545.5" text-anchor="middle">local model or Sonnet:</text>
 <text x="240" y="561.5" text-anchor="middle">already delivered?</text>

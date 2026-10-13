@@ -25,7 +25,7 @@ while a sub-task is open. A delivery is finished only when its effect checks pas
   <img alt="Each lot goes through a precheck, then by type through spec, mockup or sheet review and sealed acceptance tests, or straight to the implementation; then the UX pass if visible, the code review, corrections and an automatic raf review" src="fonctionnement-wave-light.svg">
 </picture>
 
-Every lot starts with the **precheck**: is the deliverable already there? « Yes » hands the lot back
+A lot without commits yet starts with the **precheck** (unless `orchestrate.precheck: false`; a lot that already has commits is never pre-checked): is the deliverable already there? « Yes » hands the lot back
 to the lead; « partial » passes what exists to the implementation. Then:
 
 - `screen: page` only: **spec** (mockup and screen sheet), **mockup review** (`ux-reviewer`, two

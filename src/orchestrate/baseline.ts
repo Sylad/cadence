@@ -18,6 +18,9 @@ function pytestId(s: string): string {
   return s;
 }
 
+/** vitest, fichier de test qui ne se charge pas : « FAIL  a.test.ts [ a.test.ts ] » (le nom du fichier répété entre crochets, avec « |projet| » en espace de travail). */
+const FILE_LOAD_FAIL = /^\s*FAIL\s+(?:\|[^|]*\|\s+)?(\S+)\s+\[\s*\1\s*\]\s*$/;
+
 const clean = (s: string): string =>
   pytestId(s)
     .replace(/\s+-\s+(?:Assertion|\w*Error)\b.*$/, '') // pytest : « - AssertionError: … »
@@ -31,6 +34,7 @@ const clean = (s: string): string =>
 export function failedTests(output: string): string[] {
   const found = new Set<string>();
   for (const raw of output.replace(ANSI, '').split('\n')) {
+    if (FILE_LOAD_FAIL.test(raw)) continue; // échec sans nom (cf. hasUnnamedFailure), pas un test
     for (const re of MARKERS) {
       const m = re.exec(raw);
       if (!m) continue;
@@ -49,9 +53,11 @@ export function compareBaseline(now: string[], base: string[]): { nouveaux: stri
 }
 
 /**
- * Un échec que la sortie ne rattache à aucun test : erreur non gérée (vitest « Unhandled Errors », promesse rejetée), fichier de spec qui ne se charge plus (jest « Test suite failed to run », dont le FAIL de fichier existait peut-être au départ), seuil de
+ * Un échec que la sortie ne rattache à aucun test : erreur non gérée (vitest « Unhandled Errors », promesse rejetée), fichier de spec qui ne se charge plus (jest « Test suite failed to run », vitest « FAIL  a.test.ts [ a.test.ts ] » : le FAIL de fichier existait peut-être au départ), seuil de
  * couverture non atteint. Comparer les seuls noms lus le masquerait derrière d'anciens échecs : l'appelant garde les tests pour rouges.
  */
 export function hasUnnamedFailure(output: string): boolean {
-  return /Unhandled (?:Errors?|Rejections?)|Test suite failed to run|caught \d+ unhandled|coverage threshold|Coverage for \w+ \([\d.]+%\) does not meet/i.test(output.replace(ANSI, ''));
+  const text = output.replace(ANSI, '');
+  if (text.split('\n').some((l) => FILE_LOAD_FAIL.test(l))) return true;
+  return /Unhandled (?:Errors?|Rejections?)|Test suite failed to run|caught \d+ unhandled|coverage threshold|Coverage for \w+ \([\d.]+%\) does not meet/i.test(text);
 }

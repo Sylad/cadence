@@ -44,3 +44,44 @@ describe('hasUnnamedFailure : jest « Test suite failed to run »', () => {
     expect(hasUnnamedFailure(' FAIL  src/db.spec.ts (5.2 s)\n  ● Repo › reads timescale')).toBe(false);
   });
 });
+
+describe('hasUnnamedFailure : vitest, fichier de test qui ne se charge pas', () => {
+  // Sortie réelle de vitest 2.1.9 (a.test.ts importe un module absent, b.test.ts a un test rouge).
+  const real = [
+    ' RUN  v2.1.9 /tmp/x',
+    '',
+    ' ❯ a.test.ts (0 test)',
+    ' ❯ b.test.ts (1 test | 1 failed) 5ms',
+    '   × suite > name 4ms',
+    '',
+    '⎯⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯',
+    '',
+    ' FAIL  a.test.ts [ a.test.ts ]',
+    'Error: Failed to load url ./missing.js (resolved id: ./missing.js) in /tmp/x/a.test.ts. Does the file exist?',
+    '',
+    '⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯',
+    '',
+    ' FAIL  b.test.ts > suite > name',
+    'AssertionError: expected 1 to be 2 // Object.is equality',
+    '',
+    ' Test Files  2 failed (2)',
+    '      Tests  1 failed (1)',
+  ].join('\n');
+
+  it('un fichier qui échoue au chargement est un échec sans nom, jamais excusé par la ligne de base', () => {
+    expect(hasUnnamedFailure(real)).toBe(true);
+    // Comparée à elle-même, la sortie ne doit pas passer pour « que des échecs existants ».
+    const names = failedTests(real);
+    expect(compareBaseline(names, names).nouveaux).toEqual([]);
+  });
+
+  it('le fichier en échec de chargement n\'est pas lu comme un test nommé', () => {
+    expect(failedTests(real)).toEqual(['b.test.ts > suite > name']);
+  });
+
+  it('un test vitest en échec ordinaire reste un test nommé, sans échec sans nom', () => {
+    const ok = ' FAIL  b.test.ts > suite > name\nAssertionError: expected 1 to be 2\n Test Files  1 failed (1)';
+    expect(failedTests(ok)).toEqual(['b.test.ts > suite > name']);
+    expect(hasUnnamedFailure(ok)).toBe(false);
+  });
+});

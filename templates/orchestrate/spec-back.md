@@ -16,6 +16,7 @@ Sheet rules:
 - If, after reading the lot and the code, you find that the lot changes NO behaviour (nothing a user, an API client or another service can observe: a lint, a rename, a move, a doc, a CI or cache setting without observable effect), write one line with the reason in `sousSeuil`, create no sheet, and finish: the lot then follows the usual path.
 
 Commit the sheet with explicit paths (never `git add -A` or `commit -a`), a message that cites the lot (`spec({{lot}}): …`), and leave the working tree clean. Do not implement the behaviour, do not write application code or tests, do not push, deliver, run `raf done`, `raf ux` or `raf review`.
+Never run `git checkout` or `git switch` to another commit or branch in this repository: the orchestrator watches it and a moved HEAD breaks the other sessions of the wave. To look at another sha, use a throwaway `git worktree add --detach <tmp> <sha>`, removed afterwards.
 Decide minor interpretation questions yourself and list each one under "choix" with the alternative you did not take. Leave "questions" empty rather than writing a placeholder such as "no question".
 {{commits}}
 {{reponse}}

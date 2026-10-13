@@ -7,6 +7,7 @@ Rules:
 - Every test must FAIL for now, because the feature is missing (not because of a typo or a broken setup): the program runs the dedicated command and refuses tests that pass.
 - Do not touch the sheet, the plan or any application code. Do not push, deliver, run `raf done`, `raf ux` or `raf review`.
 - Commit with explicit paths (never `git add -A` or `commit -a`), ONE commit citing the lot (`test({{lot}}): acceptation R1–Rn (rouge)`) with the test files, the acceptation file and the runner configuration, and leave the working tree clean. The program seals the acceptation file afterwards (it adds the fingerprint of each test file): never write `empreintes` or `vert: true` yourself.
+Never run `git checkout` or `git switch` to another commit or branch in this repository: the orchestrator watches it and a moved HEAD breaks the other sessions of the wave. To look at another sha, use a throwaway `git worktree add --detach <tmp> <sha>`, removed afterwards.
 Decide minor interpretation questions yourself and list each one under "choix" with the alternative you did not take. Leave "questions" empty rather than writing a placeholder such as "no question".
 {{commits}}
 {{reponse}}

@@ -53,7 +53,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- `cadence orchestrate`: a session that runs `git checkout <sha>` in the repository (detached `HEAD`, nothing pushed) no longer stops the wave with « push détecté ». The upstream ref is compared only when it is the same branch before and after (a detached `HEAD`, a branch switch or a missing upstream moves `HEAD`, not origin); a real push is still caught by `git ls-remote`. The `implement`, `fix` and `fix-minors` briefs now forbid `git checkout` / `git switch` in the repository and name a throwaway `git worktree add --detach <tmp> <sha>` instead (L214).
+- `cadence orchestrate`: a session that runs `git checkout <sha>` in the repository (detached `HEAD`, nothing pushed) no longer stops the wave with « push détecté ». The upstream ref is compared only when it is the same branch before and after (a detached `HEAD`, a branch switch or a missing upstream moves `HEAD`, not origin); a real push is still caught by `git ls-remote`. The briefs of the sessions that write (`implement`, `fix`, `fix-minors`, `spec`, `spec-back`, `accept`, `accept-back`) now forbid `git checkout` / `git switch` in the repository and name a throwaway `git worktree add --detach <tmp> <sha>` instead (L214).
 
 ### Changed
 

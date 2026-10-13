@@ -52,10 +52,10 @@ describe('gabarits', () => {
   });
 
   it('les briefs qui écrivent interdisent le git checkout / switch du dépôt, avec le worktree jetable en recours (L214)', () => {
-    for (const kind of ['implement', 'fix', 'fix-minors'] as const) {
+    for (const kind of ['implement', 'fix', 'fix-minors', 'spec', 'spec-back', 'accept', 'accept-back'] as const) {
       const out = renderBrief(kind, vars);
-      expect(out).toContain('Never run `git checkout` or `git switch` to another commit or branch in this repository');
-      expect(out).toContain('`git worktree add --detach <tmp> <sha>`');
+      expect(out, kind).toContain('Never run `git checkout` or `git switch` to another commit or branch in this repository');
+      expect(out, kind).toContain('`git worktree add --detach <tmp> <sha>`');
     }
   });
 

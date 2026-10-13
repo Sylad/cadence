@@ -155,4 +155,8 @@ describe('cadence spec reseal : le chemin du lead pour un test scellé faux (L20
     }
     expect(read('README.md')).toContain('resceaux')
   })
+
+  it('L212 : le rescellé d’un lot livré (--porteur) est décrit par le README, le CHANGELOG, le skill lead et docs/lead.md', () => {
+    for (const [name, text] of [['README', read('README.md')], ['CHANGELOG', read('CHANGELOG.md')], ['skill', read('skills/lead/SKILL.md')], ['docs/lead.md', read('docs/lead.md')]] as const) expect(text, name).toContain('--porteur')
+  })
 })

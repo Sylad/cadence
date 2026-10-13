@@ -22,7 +22,7 @@ export interface Acceptation {
   /** Empreinte git (blob) de chaque fichier de tests, posée par le programme au scellé. */
   empreintes?: Record<string, string>;
   /** Journal des rescellés d'un seul test (`cadence spec reseal`, L200) : le test, la raison donnée par le lead, la date et les deux empreintes. */
-  resceaux?: { test: string; raison: string; date: string; avant: string; apres: string }[];
+  resceaux?: { test: string; raison: string; date: string; avant: string; apres: string; porteur?: string }[];
 }
 
 type Obj = Record<string, unknown>;
@@ -146,11 +146,12 @@ export function sealAcceptation(repo: string, path: string): void {
  * ne laisse aucun chemin de correction. La fiche reste inchangée depuis le commit rouge, les autres fichiers listés aussi : seule l'empreinte
  * du test nommé est refaite, la raison et les deux empreintes vont dans `resceaux`. Le commit (test + acceptation) est à faire : il devient le commit rouge.
  */
-export function resealAcceptation(repo: string, path: string, test: string, reason: string, today: string): { avant: string; apres: string; lot: string } {
+export function resealAcceptation(repo: string, path: string, test: string, reason: string, today: string, porteur?: string): { avant: string; apres: string; lot: string } {
   const file = join(repo, path);
   const a = parseAcceptation(readFileSync(file, 'utf8'));
   if (typeof a === 'string') throw new Error(`${path} : ${a}`);
   if (!reason.trim()) throw new Error('--reason est obligatoire : la raison du rescellé va dans acceptation.json et en note du lot');
+  if (porteur && !a.vert) throw new Error(`${path} n'est pas verte : un lot porteur (${porteur}) ne vaut que pour le test scellé d'un lot livré (vert: true)`);
   const norm = posix.normalize(test);
   const fichiers = a.fichiers.map((f) => posix.normalize(f));
   if (!fichiers.includes(norm)) throw new Error(`${test} n'est pas listé dans ${path} (fichiers : ${fichiers.join(', ')})`);
@@ -167,7 +168,7 @@ export function resealAcceptation(repo: string, path: string, test: string, reas
   const doc = JSON.parse(readFileSync(file, 'utf8')) as Obj;
   (doc.empreintes as Record<string, string>)[norm] = apres;
   const journal = Array.isArray(doc.resceaux) ? doc.resceaux : [];
-  doc.resceaux = [...journal, { test: norm, raison: reason.trim(), date: today, avant, apres }];
+  doc.resceaux = [...journal, { test: norm, raison: reason.trim(), date: today, avant, apres, ...(porteur ? { porteur } : {}) }];
   writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
   return { avant, apres, lot: a.lot };
 }

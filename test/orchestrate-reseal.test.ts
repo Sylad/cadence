@@ -206,6 +206,73 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
   });
 });
 
+describe('cadence spec reseal d’un lot livré (L212)', () => {
+  function cli(repo: string, env: Record<string, string>, ...argv: string[]) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = run(argv, { cwd: repo, env: { RAF_TODAY: '2026-10-13', ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-13T10:00:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  }
+  /** L1 livré (acceptation verte, lot clos), L2 en cours : le lot porteur du rescellé. */
+  function livre() {
+    const s = lotScelle({ vert: true });
+    cli(s.repo, {}, 'init', '--project', 'demo');
+    cli(s.repo, {}, 'add', 'Lot un');
+    cli(s.repo, {}, 'add', 'Lot deux');
+    cli(s.repo, {}, 'start', 'L1');
+    cli(s.repo, {}, 'done', 'L1', '--force');
+    cli(s.repo, {}, 'start', 'L2');
+    commitPaths(s.repo, 'plan: L1 L2', 'docs/plan/raf.yaml', '.gitignore');
+    writeFileSync(join(s.repo, s.a.test), `${readFileSync(join(s.repo, s.a.test), 'utf8')}// test instable corrigé\n`);
+    return s;
+  }
+
+  it('rescelle le test d’un lot livré : le commit cite le lot porteur, le journal porte la date, la raison et le porteur, vert reste vrai', () => {
+    const { repo, a } = livre();
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'onglet lu à « blank » en CI', '--porteur', 'L2');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(git(repo, 'log', '-2', '--format=%s').split('\n')[1]).toBe(`test(L2): acceptation rescellée du lot livré L1, ${a.test} : onglet lu à « blank » en CI`);
+    const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    expect(doc.vert).toBe(true);
+    expect(doc.resceaux).toHaveLength(1);
+    expect(doc.resceaux[0]).toMatchObject({ test: a.test, raison: 'onglet lu à « blank » en CI', date: '2026-10-13', porteur: 'L2' });
+    expect(readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')).toContain('onglet lu à « blank » en CI');
+    expect(git(repo, 'status', '--porcelain').trim()).toBe('');
+    expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
+  });
+
+  it('exige le lot porteur, en cours et distinct du lot livré', () => {
+    const { repo, a } = livre();
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x').err).toMatch(/--porteur/);
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L1').err).toMatch(/porteur/);
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L9').err).toMatch(/L9/);
+    expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1 L2');
+  });
+
+  it('--porteur n’a de sens que pour un lot livré ; un lot clos sans acceptation verte reste refusé', () => {
+    const { repo, a } = avecPlanEnCours();
+    writeFileSync(join(repo, a.test), 'autre\n');
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L2').err).toMatch(/lot livré/);
+  });
+
+  it('refuse pendant une vague orchestrée, comme pour un lot en cours', () => {
+    const { repo, a } = livre();
+    expect(cli(repo, { CADENCE_ORCHESTRATED: 'w1' }, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L2').err).toMatch(/vague orchestrée/);
+  });
+
+  function avecPlanEnCours() {
+    const s = lotScelle();
+    cli(s.repo, {}, 'init', '--project', 'demo');
+    cli(s.repo, {}, 'add', 'Lot un');
+    cli(s.repo, {}, 'add', 'Lot deux');
+    cli(s.repo, {}, 'start', 'L1');
+    cli(s.repo, {}, 'start', 'L2');
+    commitPaths(s.repo, 'plan: L1 L2', 'docs/plan/raf.yaml', '.gitignore');
+    return s;
+  }
+});
+
 describe('rescellé atomique et interdit aux sessions', () => {
   it('un commit refusé (hook pre-commit) restaure acceptation.json et le test, sans index à moitié prêt, et lève une erreur lisible', () => {
     const repo = gitRepo();

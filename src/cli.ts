@@ -23,7 +23,7 @@ import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './or
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
-import { findAcceptation, resealAcceptation } from './orchestrate/accept.js';
+import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
@@ -134,6 +134,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       parent: { type: 'string' },
       force: { type: 'boolean' },
       reason: { type: 'string' },
+      porteur: { type: 'string' },
       status: { type: 'string' },
       since: { type: 'string' },
       idle: { type: 'string' },
@@ -314,7 +315,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'spec': {
-      if (reseal) return specReseal(rest.slice(1), values.reason, { root, loadPlan, configPath, today }, io);
+      if (reseal) return specReseal(rest.slice(1), values.reason, values.porteur, { root, loadPlan, configPath, today }, io);
       if (rest.length !== 2 || (rest[1] !== 'on' && rest[1] !== 'off')) throw new RafError('usage : raf spec <id> on|off (ou cadence spec check|qa <fiche.yaml>)');
       const plan = loadPlan();
       if (!plan.setSpec(rest[0], rest[1] === 'on')) {
@@ -737,8 +738,8 @@ function waveHolding(root: string): { wave: string; pid: number } | null {
  */
 const git = (cwd: string, args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
-function specReseal(args: string[], reason: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
-  if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche"');
+function specReseal(args: string[], reason: string | undefined, porteur: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
+  if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche" [--porteur <lot en cours>, pour un lot livré]');
   if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec reseal refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
   // Comme `deliver` : la vague tient le verrou du dépôt tant qu'un de ses lots y travaille (état illisible : on refuse) ; un commit du lead en pleine passe ferait signaler au lot suivant un écart qui n'est pas le sien.
   const orchestrating = waveHolding(ctx.root);
@@ -746,22 +747,32 @@ function specReseal(args: string[], reason: string | undefined, ctx: { root: str
   const [lotId, test] = args as [string, string];
   const plan = ctx.loadPlan();
   const lot = plan.lot(lotId);
-  if (lot.status !== 'doing') throw new RafError(`${lotId} n'est pas en cours (${lot.status}) : le rescellé ne vaut que pour le lot en cours ; un lot livré évolue avec sa fiche (README, « Exception — a delivered lot »)`);
   const repo = gitRoot(ctx.root) ?? ctx.root;
   const dir = readOrchestrateConfig(ctx.configPath).spec.dir;
   const json = findAcceptation(repo, dir, lotId);
+  // Un lot livré (acceptation verte) se rescelle pour un test instable dont le contrat ne change pas : le lot en cours qui porte la correction est nommé (--porteur) et cité dans le commit.
+  const livre = lot.status !== 'doing' && !!json && ((a) => typeof a !== 'string' && a.vert)(parseAcceptation(readFileSync(join(repo, json), 'utf8')));
+  if (lot.status !== 'doing' && !livre) throw new RafError(`${lotId} n'est pas en cours (${lot.status}) : le rescellé vaut pour le lot en cours, ou pour un lot livré dont l'acceptation est verte (vert: true) avec --porteur <lot en cours>`);
+  if (porteur && lot.status === 'doing') throw new RafError(`--porteur n'a de sens que pour un lot livré : ${lotId} est en cours, son rescellé est cité sous son propre id`);
+  if (livre && !porteur?.trim()) throw new RafError(`${lotId} est livré : --porteur <lot en cours> est obligatoire (le lot dont le commit porte la correction du test)`);
+  if (livre && porteur) {
+    if (porteur === lotId) throw new RafError(`--porteur doit être un autre lot que ${lotId} (le lot livré est clos)`);
+    const carrier = plan.lot(porteur);
+    if (carrier.status !== 'doing') throw new RafError(`--porteur ${porteur} n'est pas en cours (${carrier.status}) : le lot porteur est celui dont le commit porte la correction`);
+  }
+  const cite = livre ? (porteur as string) : lotId;
   if (!json) throw new RafError(`${lotId} : aucune acceptation sous ${dir} (le lot n'a pas passé l'étape accept)`);
   const before = { json: readFileSync(join(repo, json), 'utf8'), test: existsSync(join(repo, test)) ? readFileSync(join(repo, test), 'utf8') : '' };
   let r: { avant: string; apres: string };
   try {
-    r = resealAcceptation(repo, json, test, reason, ctx.today);
+    r = resealAcceptation(repo, json, test, reason, ctx.today, livre ? porteur : undefined);
   } catch (e) {
     throw new RafError((e as Error).message);
   }
   const norm = posix.normalize(test);
   try {
     git(repo, ['add', '--', json, norm]);
-    git(repo, ['commit', '-q', '-m', `test(${lotId}): acceptation rescellée, ${norm} : ${reason.trim()}`, '--', json, norm]);
+    git(repo, ['commit', '-q', '-m', `test(${cite}): acceptation rescellée${livre ? ` du lot livré ${lotId}` : ''}, ${norm} : ${reason.trim()}`, '--', json, norm]);
   } catch (e) {
     // Atomique : un commit refusé (hook pre-commit, ...) ne laisse ni empreinte refaite ni index à moitié prêt ; le test retrouve le texte du lead.
     writeFileSync(join(repo, json), before.json);
@@ -780,7 +791,7 @@ function specReseal(args: string[], reason: string | undefined, ctx: { root: str
     io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et dans le commit — note à ajouter au lot avec l'outil du projet (plan en lecture seule)`);
     return 0;
   }
-  plan.note(lotId, `test d'acceptation rescellé (${norm}, fiche inchangée) : ${reason.trim()}`, ctx.today);
+  plan.note(cite, `test d'acceptation rescellé${livre ? ` (lot livré ${lotId}, ` : ' ('}${norm}, fiche inchangée) : ${reason.trim()}`, ctx.today);
   plan.save();
   // La note du lot rejoint le dépôt dans la foulée (un dépôt sale arrêterait la vague suivante) ; un plan hors du dépôt ou non suivi reste à la main du lead.
   const planRel = relative(repo, plan.path);
@@ -788,7 +799,7 @@ function specReseal(args: string[], reason: string | undefined, ctx: { root: str
   if (tracked) {
     try {
       git(repo, ['add', '--', planRel]);
-      git(repo, ['commit', '-q', '-m', `plan: ${lotId} test d'acceptation rescellé (${norm})`, '--', planRel]);
+      git(repo, ['commit', '-q', '-m', `plan: ${cite} test d'acceptation rescellé (${norm})`, '--', planRel]);
     } catch (e) {
       // Le rescellé est fait (commit ${sha}) : on ne le défait pas, on dit où en est la note, au lieu d'une pile d'appels.
       const out = e as { stderr?: string; stdout?: string; message: string };

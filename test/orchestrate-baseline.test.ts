@@ -143,4 +143,25 @@ describe('onlyDeclaredFailures : le résultat annoncé par la session ne nomme q
   it('échec sans nom (erreur non gérée) : non', () => {
     expect(onlyDeclaredFailures('1 failed : autre-lot > cas ancien ; Unhandled Errors', base)).toBe(false);
   });
+  describe('rapports réels de la vague maritime B18.2 : le test déclaré est cité à la façon de la session, pas mot pour mot', () => {
+    const long = ['N1b-6 — pressure_centres (Postgres jetable TimescaleDB + PostGIS) › (4) validité la plus proche (≤ 90 min) et dernier run — requête du contrôleur'];
+    it('4-fix : « le test N1b-6 (4) déjà rouge avant le lot » pour le nom complet déclaré', () => {
+      const r = 'jest : 160 suites passées, 36 ignorées, 2271 tests verts. test:db (dernier passage, 2 sur 2) : 206 verts, 1 rouge, le test N1b-6 (4) déjà rouge avant le lot.';
+      expect(onlyDeclaredFailures(r, long)).toBe(true);
+    });
+    it('3-fix : la déclaration est une phrase, le résultat cite « N1b-6 (4) »', () => {
+      const r = 'jest : 160 suites passées, 2271 tests verts. test:db : 34 suites passées, 1 en échec (206 tests verts, 1 rouge) : pressure-centres.db.spec.ts « N1b-6 (4) validité la plus proche ». Cet échec est présent sans mon changement.';
+      const d = ['services/api pressure-centres/pressure-centres.db.spec.ts : N1b-6 (4) « validité la plus proche (≤ 90 min) et dernier run — requête du contrôleur » en échec sous test:db. Constaté aussi sans mon changement.'];
+      expect(onlyDeclaredFailures(r, d)).toBe(true);
+    });
+    it('un autre cas du même groupe (N1b-6 (5)) n\'est pas le déclaré : non', () => {
+      expect(onlyDeclaredFailures('1 rouge : le test N1b-6 (5)', long)).toBe(false);
+    });
+    it('rien du déclaré cité : non', () => {
+      expect(onlyDeclaredFailures('1 rouge, déjà rouge avant le lot', long)).toBe(false);
+    });
+    it('plus d\'échecs annoncés que de nommés : non', () => {
+      expect(onlyDeclaredFailures('3 failed dont le test N1b-6 (4)', long)).toBe(false);
+    });
+  });
 });

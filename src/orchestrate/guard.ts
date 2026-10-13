@@ -260,18 +260,21 @@ export interface Snapshot {
   upstreamRef: string | null;
   /** Branche courante (`main`) ; null en HEAD détaché (L214). */
   branch: string | null;
+  /** Nombre d'entrées du reflog de HEAD : celles ajoutées pendant une session disent les commits faits en chemin, même si le HEAD final est revenu sur la branche (L214). */
+  reflog: number;
   remote: string | null;
   /** Le hook pre-push de la vague est en place (un hook exclu de git n'apparaît plus dans le statut). */
   guard: boolean;
 }
 
 export async function snapshot(repo: string, opts: { remote?: boolean } = {}): Promise<Snapshot> {
-  const [status, head, upstream, upstreamRef, branch, remote] = await Promise.all([
+  const [status, head, upstream, upstreamRef, branch, reflog, remote] = await Promise.all([
     out(repo, ['status', '--porcelain', '--untracked-files=all']),
     out(repo, ['rev-parse', '--verify', '-q', 'HEAD']),
     out(repo, ['rev-parse', '-q', '--verify', '@{u}']),
     out(repo, ['rev-parse', '-q', '--symbolic-full-name', '@{u}']),
     out(repo, ['symbolic-ref', '-q', '--short', 'HEAD']),
+    out(repo, ['reflog', '--format=%H', 'HEAD']),
     opts.remote === false ? Promise.resolve(null) : out(repo, ['ls-remote', '--heads']),
   ]);
   const lines = (status ?? '').split('\n').filter(Boolean);
@@ -284,6 +287,7 @@ export async function snapshot(repo: string, opts: { remote?: boolean } = {}): P
     upstream,
     upstreamRef: upstreamRef?.trim() || null,
     branch: branch?.trim() || null,
+    reflog: (reflog ?? '').split('\n').filter(Boolean).length,
     guard: guardPresent(repo),
     remote,
   };

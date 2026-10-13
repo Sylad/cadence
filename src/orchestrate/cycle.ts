@@ -779,10 +779,19 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
 /** Pourquoi la branche de départ ne peut pas être remise sans risque après un HEAD déplacé (L214), null si elle le peut : arbre propre et rien hors de la branche. */
 function headStranded(path: string, b: Snapshot, a: Snapshot): string | null {
   if (a.tracked.length || a.untracked.join() !== b.untracked.join()) return 'l\'arbre n\'est pas propre';
+  // Le HEAD final, et chaque position prise par HEAD pendant la session (reflog) : un commit fait en chemin puis quitté n'est plus que dans le reflog.
+  let seen: string[] = [];
   try {
-    git(path, 'merge-base', '--is-ancestor', a.head ?? 'HEAD', `refs/heads/${b.branch}`);
+    seen = git(path, 'reflog', '--format=%H', `-n${Math.max(0, a.reflog - b.reflog)}`, 'HEAD').split('\n').filter(Boolean);
   } catch {
-    return `des commits ne sont pas dans la branche ${b.branch}`;
+    // reflog illisible : le HEAD final seul juge
+  }
+  for (const sha of [a.head ?? 'HEAD', ...seen]) {
+    try {
+      git(path, 'merge-base', '--is-ancestor', sha, `refs/heads/${b.branch}`);
+    } catch {
+      return `des commits ne sont pas dans la branche ${b.branch}`;
+    }
   }
   return null;
 }

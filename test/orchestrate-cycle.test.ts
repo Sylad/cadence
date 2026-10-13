@@ -2620,6 +2620,38 @@ describe('session d\'écriture qui finit hors de sa branche (L214)', () => {
     expect(c2.lot.steps).toHaveLength(0);
   });
 
+  it('commit fait pendant le déplacement puis HEAD revenu sur un ancêtre de la branche : le commit hors branche est vu (reflog), lot rendu', async () => {
+    const wander: Handler = (call) => {
+      git(call.opts.cwd, 'checkout', '-q', '--detach');
+      const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
+      git(call.opts.cwd, 'checkout', '-q', '--detach', 'main'); // le HEAD final est le sommet de main : seul le reflog garde X
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const h = harness({ script: { implement: [wander], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/HEAD déplacé/);
+    expect(c.lot.warnings.some((w) => /remise/.test(w))).toBe(false);
+    expect(git(h.repo, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('HEAD');
+  });
+
+  it('fichier non suivi nouveau après le déplacement : lot rendu, branche non touchée', async () => {
+    const wander: Handler = (call) => {
+      const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
+      git(call.opts.cwd, 'checkout', '-q', '--detach');
+      writeFileSync(join(call.opts.cwd, 'brouillon.txt'), 'x');
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const h = harness({ script: { implement: [wander], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/HEAD déplacé/);
+    expect(c.lot.outcome).toMatch(/pas propre/);
+    expect(git(h.repo, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('HEAD');
+  });
+
   it('arbre sale après le déplacement : lot rendu, branche non touchée', async () => {
     const wander: Handler = (call) => {
       const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');

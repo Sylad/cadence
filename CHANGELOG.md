@@ -50,7 +50,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- Spec step threshold narrowed to `screen: page` (L209): after the measure of 2026-10-12 (no row reached, about 570 k tokens per lot, 4.5 passes per journey lot), a lot declaring `screen: component` or `screen: journey` no longer goes through spec + mockup + accept; it follows the ordinary path and its budget is the ordinary one (no 1.3 M flat rate), in `orchestrate` and in the `--continue` draw. Both values stay accepted by `raf`, so no plan breaks. A lot already in the chain (its sheet or `acceptation-<lot>.json` exists) keeps its sheet and its lock; the `spec: true` step and the back part of a mixed lot are unchanged. The next measure covers 8 `page` lots.
+- Spec step threshold narrowed to `screen: page` (L209): after the measure of 2026-10-12 (no row reached, about 570 k tokens per lot, 4.5 passes per journey lot), a lot declaring `screen: component` or `screen: journey` no longer goes through spec + mockup + accept; it follows the ordinary path and its budget is the ordinary one (no 1.3 M flat rate), in `orchestrate` and in the `--continue` draw. Both values stay accepted by `raf`, so no plan breaks. A lot already in the chain (its sheet or `acceptation-<lot>.json` exists) keeps its sheet and its lock; the `spec: true` step and the back part of a mixed lot are unchanged. On a `component` or `journey` lot, `raf spec <id> off` is no longer refused and `raf spec <id> on` now sets `spec: true`, which makes it a back-spec lot (ordinary budget + 350 k); on a `page` lot, `on` answers that it already has `screen: page`. The next measure covers 8 `page` lots.
 
 ### Added
 

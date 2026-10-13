@@ -32,6 +32,18 @@ describe('docs/lead.md', () => {
     expect(md).toMatch(/`screen: component`|`component`/)
   })
 
+  it("légende de la figure : les étapes spec et accept ne concernent que screen: page (L209)", () => {
+    const md = read('docs/lead.md')
+    expect(md).toContain('the spec and accept steps run only for a `screen: page` lot')
+    expect(md).not.toContain('only for a lot with a screen')
+  })
+
+  it("CHANGELOG : l'entrée L209 dit ce que raf spec on|off fait sur component et journey", () => {
+    const entry = read('CHANGELOG.md').split('\n').find((l) => l.includes('(L209)')) ?? ''
+    expect(entry).toContain('raf spec <id> off')
+    expect(entry).toContain('raf spec <id> on')
+  })
+
   it("README, vue d'ensemble du lead : seul screen: page passe par spec, maquette et accept (L209)", () => {
     const readme = read('README.md')
     expect(readme).toContain('a lot with `screen: page` first goes through the [spec, mockup review and accept steps]')

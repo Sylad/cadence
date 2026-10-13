@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareBaseline, failedTests } from '../src/orchestrate/baseline.js';
+import { compareBaseline, failedTests, hasUnnamedFailure } from '../src/orchestrate/baseline.js';
 
 describe('failedTests : les tests en échec lus dans la sortie du lanceur', () => {
   it('vitest : une ligne FAIL par test, durées et couleurs écartées', () => {
@@ -27,5 +27,13 @@ describe('compareBaseline', () => {
   it('sépare les échecs nouveaux de ceux déjà présents au départ', () => {
     expect(compareBaseline(['a', 'b', 'c'], ['a', 'c', 'z'])).toEqual({ nouveaux: ['b'], existants: ['a', 'c'] });
     expect(compareBaseline(['a'], ['a'])).toEqual({ nouveaux: [], existants: ['a'] });
+  });
+});
+
+describe('hasUnnamedFailure : jest « Test suite failed to run »', () => {
+  it('un fichier de spec qui ne se charge plus est un échec sans nom, même si son FAIL existait au départ', () => {
+    const now = ' FAIL  src/db.spec.ts\n  ● Test suite failed to run\n\n    Cannot find module';
+    expect(hasUnnamedFailure(now)).toBe(true);
+    expect(hasUnnamedFailure(' FAIL  src/db.spec.ts (5.2 s)\n  ● Repo › reads timescale')).toBe(false);
   });
 });

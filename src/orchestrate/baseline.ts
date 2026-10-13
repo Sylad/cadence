@@ -37,9 +37,9 @@ export function compareBaseline(now: string[], base: string[]): { nouveaux: stri
 }
 
 /**
- * Un échec que la sortie ne rattache à aucun test : erreur non gérée (vitest « Unhandled Errors », promesse rejetée), seuil de
+ * Un échec que la sortie ne rattache à aucun test : erreur non gérée (vitest « Unhandled Errors », promesse rejetée), fichier de spec qui ne se charge plus (jest « Test suite failed to run », dont le FAIL de fichier existait peut-être au départ), seuil de
  * couverture non atteint. Comparer les seuls noms lus le masquerait derrière d'anciens échecs : l'appelant garde les tests pour rouges.
  */
 export function hasUnnamedFailure(output: string): boolean {
-  return /Unhandled (?:Errors?|Rejections?)|caught \d+ unhandled|coverage threshold|Coverage for \w+ \([\d.]+%\) does not meet/i.test(output.replace(ANSI, ''));
+  return /Unhandled (?:Errors?|Rejections?)|Test suite failed to run|caught \d+ unhandled|coverage threshold|Coverage for \w+ \([\d.]+%\) does not meet/i.test(output.replace(ANSI, ''));
 }

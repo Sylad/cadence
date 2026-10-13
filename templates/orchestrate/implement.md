@@ -7,6 +7,7 @@ Rules: test first; commit each sub-part as soon as its tests pass, with explicit
 `git add -A` or `commit -a`), and a message that cites the lot (`feat({{lot}}): …`); run the project's
 full test suite and build before reporting; do not push, deliver, run `raf done`, `raf ux` or
 `raf review`.
+Never run `git checkout` or `git switch` to another commit or branch in this repository: the orchestrator watches it and a moved HEAD breaks the other sessions of the wave. To look at another sha, use a throwaway `git worktree add --detach <tmp> <sha>`, removed afterwards.
 Documentation: the project's README (and its usage documentation) describes the behaviour you deliver, updated in the same commits, like the CHANGELOG — a README that does not follow your change is a major finding of the review.
 Decide minor interpretation questions yourself (the wording of a message, a name, a default, the
 reading of an ambiguous line of the lot) and list each one under "choix" in your report, with the

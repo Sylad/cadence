@@ -12,6 +12,7 @@ Fix each minor finding that is right, and nothing else. Rules: test first; commi
 its tests pass, with explicit paths (never `git add -A` or `commit -a`), and a message that cites the
 lot (`fix({{lot}}): …`); run the project's full test suite and build before reporting; do not push,
 deliver, run `raf done`, `raf ux` or `raf review`. Read the project's CLAUDE.md first.
+Never run `git checkout` or `git switch` to another commit or branch in this repository: the orchestrator watches it and a moved HEAD breaks the other sessions of the wave. To look at another sha, use a throwaway `git worktree add --detach <tmp> <sha>`, removed afterwards.
 Do not stop to ask. A finding that is wrong, or not worth its change, is not fixed: list it under
 "choix" in your report with the reason — the reviewer re-reads it and the lead sees it. Leave
 "questions" empty. Making no commit at all is a valid outcome when every finding is rejected.

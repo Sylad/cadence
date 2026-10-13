@@ -12,6 +12,7 @@ Rules: test first; commit each fix as soon as its tests pass, with explicit path
 `git add -A` or `commit -a`), and a message that cites the lot (`fix({{lot}}): …`); run the project's
 full test suite and build before reporting; do not push, deliver, run `raf done`, `raf ux` or
 `raf review`. Read the project's CLAUDE.md first.
+Never run `git checkout` or `git switch` to another commit or branch in this repository: the orchestrator watches it and a moved HEAD breaks the other sessions of the wave. To look at another sha, use a throwaway `git worktree add --detach <tmp> <sha>`, removed afterwards.
 If a finding is wrong, say so under "choix" with the reason. Ask (under "questions") only when a fix needs a decision that passes the rule below.
 A question is legitimate only if it names what it would change: the scope of the lot, the architecture, or a costly rollback (data, production, public API);
 otherwise it is a choice: decide, write the alternative you did not take, go on. Minor choices to settle yourself:

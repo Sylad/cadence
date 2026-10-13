@@ -51,6 +51,14 @@ describe('gabarits', () => {
     expect(agent).toContain('usage documentation');
   });
 
+  it('les briefs qui écrivent interdisent le git checkout / switch du dépôt, avec le worktree jetable en recours (L214)', () => {
+    for (const kind of ['implement', 'fix', 'fix-minors'] as const) {
+      const out = renderBrief(kind, vars);
+      expect(out).toContain('Never run `git checkout` or `git switch` to another commit or branch in this repository');
+      expect(out).toContain('`git worktree add --detach <tmp> <sha>`');
+    }
+  });
+
   it('implement.md est le brief du lead (§2) plus deux lignes, rendu sans accolades restantes', () => {
     const out = renderBrief('implement', vars);
     expect(out).toContain('Work in `/r/p` on lot `L9` — "Un titre" — of its plan');

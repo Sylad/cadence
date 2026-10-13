@@ -2355,11 +2355,12 @@ lots:
     finished: 2026-10-13
   - id: L211
     title: "Doc « Fonctionnement de cadence » versionnée : docs/fonctionnement.md + 4 figures SVG clair/sombre (vie d'un lot, lot dans une vague, boucle du lead, mise en service) tirées de la page validée par Sylvain le 13-10 ; SVG du lead remis à jour (plafond de sessions réglé, précontrôle, revue de fiche, 3e passe, lead.ux) ; liens depuis README et docs/lead.md"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-13
     notes:
       - { date: 2026-10-13, text: "Source : ~/projects/developpeur/tmp/cadence-mecanique.html (page HTML validée par Sylvain, publiée en artifact le 13-10). La reprendre en Markdown rendu par GitHub sur le modèle de docs/lead.md : <picture> clair/sombre, SVG autonomes sans CSS externe (couleurs en dur par thème, comme lead-workflow-*.svg), texte en anglais comme le reste de docs/ (lead.md est en anglais). Vérifier chaque fait contre README, CHANGELOG et le code avant de le reprendre ; corriger la page si un fait est faux et le dire. Mettre à jour lead-workflow-light/dark.svg : « At most two sessions » → plafond réglé (CADENCE_MAX_SESSIONS, 2 par défaut), étapes précontrôle, revue de fiche (spec: true), 3e passe de correction si la revue converge, verdict UX lead.ux. Pas de lot visible, pas de Nouveauté." }
+    started: 2026-10-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

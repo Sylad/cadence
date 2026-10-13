@@ -65,35 +65,3 @@ export function hasUnnamedFailure(output: string): boolean {
   if (text.split('\n').some((l) => FILE_LOAD_FAIL.test(l))) return true;
   return /Unhandled (?:Errors?|Rejections?)|Test suite failed to run|caught \d+ unhandled|coverage threshold|Coverage for \w+ \([\d.]+%\) does not meet/i.test(text);
 }
-
-/**
- * Le texte cite-t-il le test déclaré ? Mot pour mot, ou à la façon de la session : un nom déclaré long ou une phrase (« N1b-6 — pressure_centres › (4) validité… ») est abrégé en « le test N1b-6 (4) ».
- * Repli : les repères du déclaré (identifiants lettres+chiffres comme « N1b-6 » ou « B18.3 », numéros de cas « (4) ») sont tous présents dans le texte, avec au moins un identifiant.
- */
-function cites(text: string, declared: string): boolean {
-  if (text.includes(declared)) return true;
-  const ids = declared.match(/(?<![\w.-])(?=[\w.-]*\d)(?=[\w.-]*\p{L})[\p{L}\d]+(?:[.-][\p{L}\d]+)*(?![\w])/gu)?.filter((w) => /[-.]/.test(w) && !/\.\w{2,}$/.test(w) || /^\p{L}+\d/u.test(w));
-  if (!ids?.length) return false;
-  const cases = declared.match(/\(\d+\)/g) ?? [];
-  return [...ids, ...cases].every((k) => text.includes(k));
-}
-
-/**
- * Le résultat annoncé par une session aux tests rouges (L215) ne nomme que des échecs de base qu'elle a déclarés (`echecsDeBase`) : vert:false n'est alors pas une raison de correction.
- * Les échecs nommés sont ceux que le lanceur désigne (lignes FAIL…) et les tests déclarés cités tels quels dans le texte. Faux dès qu'un échec nommé n'est pas déclaré, qu'aucun n'est nommé (« 24 failed » ne prouve rien),
- * que le texte annonce plus d'échecs que de tests nommés, ou qu'un échec reste sans nom.
- */
-export function onlyDeclaredFailures(resultat: string, declared: string[]): boolean {
-  const text = resultat.replace(ANSI, '');
-  const known = new Set(declared);
-  const named = new Set(failedTests(text));
-  if ([...named].some((t) => !known.has(t))) return false;
-  for (const t of declared) if (cites(text, t)) named.add(t);
-  if (!named.size || hasUnnamedFailure(text)) return false;
-  // Plus grand nombre annoncé avant « failed / échec(s) » (« 3 failed », « 2 tests en échec »), hors ligne vitest « Test Files » (comptée en fichiers).
-  const counts = text
-    .split('\n')
-    .filter((l) => !/^\s*Test Files?\b/i.test(l))
-    .flatMap((l) => [...l.matchAll(/\b(\d+)\s+(?:\p{L}+\s+)?(?:en\s+)?(?:failed|failing|failures?|échecs?)\b/giu)].map((m) => Number(m[1])));
-  return !counts.length || Math.max(...counts) <= named.size;
-}

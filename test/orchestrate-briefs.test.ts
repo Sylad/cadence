@@ -372,6 +372,7 @@ describe('ligne de base des tests dans les briefs (L213)', () => {
       const text = readFileSync(join(TEMPLATES_DIR, `${name}.md`), 'utf8');
       expect(text).toContain('Tests already red before the lot');
       expect(text).toContain('echecsDeBase');
+      expect(text).toContain('nouveauxEchecs');
     }
   });
   it('le sha de départ du brief est celui du code : parent du plus ancien commit de travail, identique dans implement et fix', () => {

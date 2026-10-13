@@ -22,7 +22,7 @@ while a sub-task is open. A delivery is finished only when its effect checks pas
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="fonctionnement-wave-dark.svg">
-  <img alt="Each lot goes through a precheck, then by type through spec, mockup or sheet review and sealed acceptance tests, or straight to the implementation; then the UX pass if visible, the code review, corrections and an automatic raf review" src="fonctionnement-wave-light.svg">
+  <img alt="A lot without commits starts with a precheck (unless disabled), then by type through spec, mockup or sheet review and sealed acceptance tests, or straight to the implementation; then the UX pass if visible, the code review, corrections and an automatic raf review" src="fonctionnement-wave-light.svg">
 </picture>
 
 A lot without commits yet starts with the **precheck** (unless `orchestrate.precheck: false`; a lot that already has commits is never pre-checked): is the deliverable already there? « Yes » hands the lot back
@@ -43,6 +43,8 @@ app (`orchestrate.ux`); the **code review** (Opus, Sonnet for a lot of 0.25 day 
 **correction** in a fresh session if the review is not compliant, two passes at most, and a third
 only when the review converges (the count of blocking + major findings dropped and only one is
 left), each followed by a review. A compliant review makes the program record `raf review` itself.
+A small lot (estimate of 0.5 day or less, or `quickwin`) has a single `review-small` pass that covers
+code and usability, with no separate UX pass.
 
 ## 3. The lead drives the waves
 
@@ -79,13 +81,14 @@ The budget a wave gives a lot is derived from its estimate, measured on the runs
 |---|---|
 | up to 0.5 day | 450 k tokens |
 | 0.5 to 1 day | 750 k |
-| beyond | 570 k per day |
-| `screen: page` | 1.3 M |
+| beyond | 570 k per day, 750 k at least |
+| `screen: page` | 1.3 M at least, or the ordinary budget + 350 k if that is more |
 | `spec: true` | ordinary budget + 350 k |
 | final review | 65 k reserved |
 
-The final review is always played; the budget bounds the writing passes. `screen: component` and
-`screen: journey` lots take the ordinary budget.
+The final review is always played; the budget bounds the writing passes. A `screen: component` or
+`screen: journey` lot takes the ordinary budget, unless its sheet already exists: it then gets the
+`screen: page` budget.
 
 ## Permanent rules
 

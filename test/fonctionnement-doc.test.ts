@@ -62,6 +62,10 @@ describe('précontrôle conditionnel (L211)', () => {
   it('la doc et les figures le disent conditionnel : lot sans commit, sauf orchestrate.precheck: false', () => {
     expect(read('docs/fonctionnement.md')).toContain('orchestrate.precheck: false')
     expect(read('docs/fonctionnement.md')).not.toContain('Every lot starts with')
+    for (const f of ['docs/fonctionnement.md', 'docs/fonctionnement-wave-light.svg', 'docs/fonctionnement-wave-dark.svg']) expect(read(f), f).not.toContain('Each lot goes through a precheck')
+    expect(read('docs/fonctionnement.md')).toContain('1.3 M at least')
+    expect(read('docs/fonctionnement.md')).toContain('750 k at least')
+    for (const v of ['light', 'dark']) expect(read(`docs/fonctionnement-wave-${v}.svg`), v).toContain('unless it already has a sheet')
     for (const v of ['light', 'dark']) {
       expect(read(`docs/fonctionnement-wave-${v}.svg`), v).toMatch(/<rect x="20" y="140"[^>]*stroke-dasharray=/)
       expect(read(`docs/lead-workflow-${v}.svg`), v).toMatch(/<g id="precheck"><rect[^>]*stroke-dasharray=/)

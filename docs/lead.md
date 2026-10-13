@@ -21,11 +21,13 @@ picture, not its source.
    `priority:` list of the parent folder's `cadence.yaml`).
 2. **Wave.** The lead starts `cadence orchestrate <project>:<lot> … --wave <id>` in the background.
    For each lot the program runs, in fresh sessions and in this order: `precheck → spec → maquette →
-   accept → implement → ux → review`. The steps before the code exist only for a lot that declares
+   accept → implement → ux → review`. The **precheck** applies to any lot without a commit yet (unless
+   `orchestrate.precheck: false`). The spec steps exist only for a lot that declares
    a `screen:` of `page` (a visible lot that creates or changes a whole screen; `screen: component` and `screen: journey`
-   lots take the ordinary path, straight to the implementation, unless they already entered the chain) or `spec: true` (a lot without a screen
+   lots take the ordinary path, straight to the implementation, unless they already have a sheet) or `spec: true` (a lot without a screen
    that still has a behaviour to pin down: `precheck → spec → fiche → accept → implement → review`);
-   the other lots start at the implementation:
+   spec, sheet review and accept apply to `screen: page` and to `spec: true` alike; the other lots go
+   straight from the precheck (when it applies) to the implementation:
    - **spec**: the `spec-writer` agent draws a static mockup to the project's own style and writes the
      screen sheet (`fiche.yaml`: fields, states, numbered rules), rendered at 1440 and 390 px;
    - **fiche** (a lot with a back-end part: `spec: true`, or a screen lot whose sheet has a `sujet` block):

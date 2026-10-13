@@ -100,6 +100,13 @@ function git(repo: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
+/** Le message d'une commande git qui a échoué : sa sortie d'erreur (sur une ligne), à défaut le message de l'exception. */
+function gitFailure(e: unknown): string {
+  const err = (e as { stderr?: unknown }).stderr;
+  const text = typeof err === 'string' && err.trim() ? err : e instanceof Error ? e.message : String(e);
+  return text.trim().replace(/\s*\n\s*/g, ' ');
+}
+
 function save(c: LotCtx): void {
   c.wave.store.writeLot(c.lot);
 }
@@ -736,8 +743,16 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
     if (write && b.branch !== a.branch) {
       const was = `${a.branch ? `sur la branche ${a.branch}` : `en HEAD détaché (${(a.head ?? '').slice(0, 7)})`} au lieu de ${b.branch ?? 'HEAD détaché'}`;
       const why = b.branch ? headStranded(path, b, a) : 'le dépôt n\'était pas sur une branche au départ';
+      // La remise peut échouer (index.lock, fichier en conflit) : le lot est rendu, l'orchestrateur ne s'arrête pas (L214).
+      let failed: string | null = null;
       if (b.branch && why === null) {
-        git(path, 'checkout', '-q', b.branch);
+        try {
+          git(path, 'checkout', '-q', b.branch);
+        } catch (e) {
+          failed = `HEAD déplacé — remise de la branche ${b.branch} impossible : ${gitFailure(e)}`;
+        }
+      }
+      if (b.branch && why === null && failed === null) {
         Object.assign(a, await snapshot(path));
         if (path === l.repo) step.headAfter = a.head ?? undefined;
         const text = `${kind} : la session a fini${where} ${was} (arbre propre, rien hors de la branche) — branche ${b.branch} remise`;
@@ -749,10 +764,10 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
         w.log(`${lotKey(l.project, l.lot)} · ${text}`);
       } else {
         step.status = 'failed';
-        step.cause = `HEAD déplacé${where}`;
+        step.cause = failed ? `${failed}${where}` : `HEAD déplacé${where}`;
         (w.dirtyRepos ??= new Map()).set(path, lotKey(l.project, l.lot));
         (w.movedRepos ??= new Set()).add(path);
-        return stop(c, 'handed-back', `incident : HEAD déplacé${where} pendant ${lotKey(l.project, l.lot)} (${kind}) : la session a fini ${was} et ${why}`);
+        return stop(c, 'handed-back', `incident : HEAD déplacé${where} pendant ${lotKey(l.project, l.lot)} (${kind}) : la session a fini ${was} et ${failed ?? why}`);
       }
     }
     // Étape en lecture seule qui n'a laissé que des fichiers NON SUIVIS (captures d'un script en chemin relatif, L162) : déplacés dans le dossier du lot, avertissement, le verdict est gardé.

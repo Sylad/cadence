@@ -2638,21 +2638,48 @@ describe('session d\'écriture qui finit hors de sa branche (L214)', () => {
     expect(h.wave.incident).toMatch(/hook pre-push de garde a été supprimé/);
   });
 
-  it('commit fait hors de la branche : lot rendu « HEAD déplacé », file du dépôt retenue, autre dépôt libre', async () => {
+  it('commit fait hors de la branche : lot rendu « HEAD déplacé », file du dépôt retenue, lot d\'un autre dépôt libre', async () => {
     const wander: Handler = (call) => {
       git(call.opts.cwd, 'checkout', '-q', '--detach');
       const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
+      return claudeOut(workReport({ commits: [c] }));
+    };
+    const other = gitRepo();
+    commitFile(other, 'init.txt', 'chore: init');
+    const h = harness({ lots: [{ title: 'Un' }, { title: 'Deux' }, { title: 'Trois' }], script: { implement: [wander, impl('c.txt')], review: [ok] } });
+    const c1 = h.lot('L1');
+    const c2 = h.lot('L2');
+    const c3 = h.lot('L3', { repo: other });
+    await runPool([c1, c2, c3], 1);
+    expect(c1.lot.status).toBe('handed-back');
+    expect(c1.lot.outcome).toMatch(/HEAD déplacé/);
+    expect(h.wave.incident).toBeNull();
+    expect(c2.lot.status).toBe('suspended'); // même dépôt que L1 : file retenue
+    expect(c2.lot.outcome).toMatch(/HEAD déplacé/);
+    expect(c2.lot.steps).toHaveLength(0);
+    expect(c3.lot.status).toBe('ready'); // autre dépôt : libre
+    expect(c3.lot.steps.length).toBeGreaterThan(0);
+  });
+
+  it('la remise de la branche échoue (index.lock) : lot rendu avec la cause, file retenue, l\'orchestrateur ne plante pas (L214)', async () => {
+    const wander: Handler = (call) => {
+      const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
+      git(call.opts.cwd, 'checkout', '-q', '--detach');
+      writeFileSync(join(call.opts.cwd, '.git/index.lock'), ''); // la session laisse un verrou : git checkout <branche> échoue
       return claudeOut(workReport({ commits: [c] }));
     };
     const h = harness({ lots: [{ title: 'Un' }, { title: 'Deux' }], script: { implement: [wander, impl('b.txt')], review: [ok] } });
     const c1 = h.lot('L1');
     const c2 = h.lot('L2');
     await runPool([c1, c2], 1);
+    expect(h.wave.incident).toBeNull();
     expect(c1.lot.status).toBe('handed-back');
     expect(c1.lot.outcome).toMatch(/HEAD déplacé/);
-    expect(h.wave.incident).toBeNull();
+    expect(c1.lot.outcome).toMatch(/remise de la branche main impossible : .*index\.lock/);
+    expect(c1.lot.steps[0].cause).toMatch(/remise de la branche main impossible/);
+    expect(c1.lot.warnings.some((w) => /remise$/.test(w))).toBe(false);
+    expect(h.wave.movedRepos?.has(h.repo)).toBe(true);
     expect(c2.lot.status).toBe('suspended');
-    expect(c2.lot.outcome).toMatch(/HEAD déplacé/);
     expect(c2.lot.steps).toHaveLength(0);
   });
 

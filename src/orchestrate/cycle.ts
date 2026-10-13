@@ -14,7 +14,7 @@ import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
-import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
+import { compareBaseline, failedTests, hasUnnamedFailure, onlyDeclaredFailures } from './baseline.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, newsText, objective, renderBrief, reposText, TEMPLATES_DIR, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
@@ -1517,7 +1517,9 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   if (!rep.tests.vert) {
     if (c.config.test) deferred = true;
-    else red.push(claimed); // le brief demande de ne pas annoncer rouge pour les seuls échecs de base : rouge + base = de nouveaux échecs
+    // Sans orchestrate.test (L215) : le résultat annoncé ne nomme que des échecs de base déclarés → pas de correction (non vérifié, dit dans le lot) ; sinon rouge + base = de nouveaux échecs.
+    else if (declared.length && onlyDeclaredFailures(rep.tests.resultat, declared)) l.warnings.push(`tests annoncés rouges par la session pour les seuls échecs de base qu'elle déclare (${declared.length}) : pas de correction, non vérifié par le programme (orchestrate.test absent)`);
+    else red.push(claimed);
   }
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
   const runs: NonNullable<LotState['checks']>['runs'] = [];

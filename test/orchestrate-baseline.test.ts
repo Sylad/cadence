@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareBaseline, failedTests, hasUnnamedFailure } from '../src/orchestrate/baseline.js';
+import { compareBaseline, failedTests, hasUnnamedFailure, onlyDeclaredFailures } from '../src/orchestrate/baseline.js';
 
 describe('failedTests : les tests en échec lus dans la sortie du lanceur', () => {
   it('vitest : une ligne FAIL par test, durées et couleurs écartées', () => {
@@ -111,5 +111,27 @@ describe('hasUnnamedFailure : vitest, chemin entre crochets différent du nom du
   ])('ligne qui n\'est pas un fichier non chargé : %j', (line, names) => {
     expect(hasUnnamedFailure(line)).toBe(false);
     expect(failedTests(line)).toEqual(names);
+  });
+});
+
+describe('onlyDeclaredFailures : le résultat annoncé par la session ne nomme que des échecs de base déclarés', () => {
+  const base = ['autre-lot > cas ancien', 'test/b.test.ts > autre > cas trois'];
+  it('prose : le seul échec cité est un test déclaré', () => {
+    expect(onlyDeclaredFailures('1 failed : autre-lot > cas ancien', base)).toBe(true);
+  });
+  it('sortie de lanceur : toutes les lignes FAIL sont déclarées', () => {
+    expect(onlyDeclaredFailures(' FAIL  test/b.test.ts > autre > cas trois\n Tests 1 failed', base)).toBe(true);
+  });
+  it('un échec nommé hors de la liste déclarée : non', () => {
+    expect(onlyDeclaredFailures(' FAIL  lot > nouveau\n FAIL  autre-lot > cas ancien', base)).toBe(false);
+  });
+  it('rien de nommé (« 24 failed ») : non, rien ne prouve que ce sont ceux de la base', () => {
+    expect(onlyDeclaredFailures('24 failed', base)).toBe(false);
+  });
+  it('plus d\'échecs comptés que de tests nommés : non', () => {
+    expect(onlyDeclaredFailures('3 failed dont autre-lot > cas ancien', base)).toBe(false);
+  });
+  it('échec sans nom (erreur non gérée) : non', () => {
+    expect(onlyDeclaredFailures('1 failed : autre-lot > cas ancien ; Unhandled Errors', base)).toBe(false);
   });
 });

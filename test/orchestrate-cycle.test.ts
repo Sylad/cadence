@@ -2436,6 +2436,21 @@ describe('ligne de base des tests (L213)', () => {
     expect(c.lot.baseline?.failures).toEqual(['autre-lot > cas ancien']);
     expect(c.lot.warnings.join('\n')).toContain('non vérifié par le programme');
   });
+  it('sans orchestrate.test : vert:false dont le seul échec nommé est un test de echecsDeBase : pas de correction (L215)', async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: '1 failed : autre-lot > cas ancien', vert: false }, echecsDeBase: ['autre-lot > cas ancien'] })], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.pass).toBe(0);
+    expect(c.lot.baseline?.verified).toBe(false);
+    expect(c.lot.warnings.join('\n')).toContain('annoncés rouges par la session pour les seuls échecs de base');
+  });
+  it('sans orchestrate.test : vert:false qui nomme aussi un échec hors echecsDeBase : correction', async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: 'FAIL  lot > nouveau\nFAIL  autre-lot > cas ancien', vert: false }, echecsDeBase: ['autre-lot > cas ancien'] })], fix: [fix('b.txt')], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+  });
   it('sans orchestrate.test : la base annoncée par la session est dans le brief de revue', async () => {
     const h = harness({ script: { implement: [impl('a.txt', { echecsDeBase: ['autre-lot > cas ancien'] })], review: [ok] } });
     const c = h.lot('L1');

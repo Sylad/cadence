@@ -65,3 +65,19 @@ export function hasUnnamedFailure(output: string): boolean {
   if (text.split('\n').some((l) => FILE_LOAD_FAIL.test(l))) return true;
   return /Unhandled (?:Errors?|Rejections?)|Test suite failed to run|caught \d+ unhandled|coverage threshold|Coverage for \w+ \([\d.]+%\) does not meet/i.test(text);
 }
+
+/**
+ * Le résultat annoncé par une session aux tests rouges (L215) ne nomme que des échecs de base qu'elle a déclarés (`echecsDeBase`) : vert:false n'est alors pas une raison de correction.
+ * Les échecs nommés sont ceux que le lanceur désigne (lignes FAIL…) et les tests déclarés cités tels quels dans le texte. Faux dès qu'un échec nommé n'est pas déclaré, qu'aucun n'est nommé (« 24 failed » ne prouve rien),
+ * que le texte annonce plus d'échecs que de tests nommés, ou qu'un échec reste sans nom.
+ */
+export function onlyDeclaredFailures(resultat: string, declared: string[]): boolean {
+  const text = resultat.replace(ANSI, '');
+  const known = new Set(declared);
+  const named = new Set(failedTests(text));
+  if ([...named].some((t) => !known.has(t))) return false;
+  for (const t of declared) if (text.includes(t)) named.add(t);
+  if (!named.size || hasUnnamedFailure(text)) return false;
+  const counted = /\b(\d+)\s+(?:failed|failing|failures?|échecs?)\b/i.exec(text);
+  return !counted || Number(counted[1]) <= named.size;
+}

@@ -137,6 +137,62 @@ describe('sessions d\'un lot à dépôt voisin (L62)', () => {
     expect(c.lot.outcome).toMatch(/dépôt sale après implement : \.\.\/gitops: y\.yaml/);
   });
 
+  it('HEAD du voisin détaché par une session d\'écriture, arbre propre : sa branche est remise, avertissement nommant le voisin (L214)', async () => {
+    const { h, c, nb } = scenario((n) => ({
+      implement: [
+        (call) => {
+          const p = commitFile(call.opts.cwd, 'a.txt', 'feat(L1): côté projet');
+          git(n, 'checkout', '-q', '--detach');
+          return claudeOut(workReport({ commits: [p] }));
+        },
+      ],
+      review: [ok],
+    }));
+    await runLot(c);
+    expect(h.wave.incident).toBeNull();
+    expect(git(nb, 'symbolic-ref', '--short', 'HEAD')).toBe('main');
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.warnings.some((w) => /HEAD détaché/.test(w) && w.includes(`dans ${NB}`) && /remise/.test(w))).toBe(true);
+  });
+
+  it('commit fait hors de la branche du voisin : lot rendu « HEAD déplacé dans <voisin> », file du voisin retenue (L214)', async () => {
+    const { h, c, nb } = scenario((n) => ({
+      implement: [
+        (call) => {
+          const p = commitFile(call.opts.cwd, 'a.txt', 'feat(L1): côté projet');
+          git(n, 'checkout', '-q', '--detach');
+          commitFile(n, 'chart.yaml', 'feat(L1): côté voisin');
+          return claudeOut(workReport({ commits: [p] }));
+        },
+      ],
+    }));
+    await runLot(c);
+    expect(h.wave.incident).toBeNull();
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(new RegExp(`HEAD déplacé dans ${NB.replace(/\./g, '\\.')}`));
+    expect(git(nb, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('HEAD'); // pas touché
+    expect(h.wave.movedRepos?.has(nb)).toBe(true);
+    expect(h.wave.dirtyRepos?.has(nb)).toBe(true);
+  });
+
+  it('le dépôt du projet n\'était pas sur une branche au départ et finit sur une branche : avertissement, rien n\'est déplacé (L214)', async () => {
+    const { h, c } = scenario(() => ({
+      implement: [
+        (call) => {
+          const p = commitFile(call.opts.cwd, 'a.txt', 'feat(L1): côté projet');
+          git(call.opts.cwd, 'checkout', '-q', '-b', 'ailleurs');
+          return claudeOut(workReport({ commits: [p] }));
+        },
+      ],
+      review: [ok],
+    }));
+    git(h.repo, 'checkout', '-q', '--detach');
+    await runLot(c);
+    expect(h.wave.incident).toBeNull();
+    expect(git(h.repo, 'symbolic-ref', '--short', 'HEAD')).toBe('ailleurs');
+    expect(c.lot.warnings.some((w) => /pas sur une branche au départ/.test(w) && w.includes('ailleurs'))).toBe(true);
+  });
+
   it('un push depuis le voisin arrête la vague (incident), comme dans le dépôt du projet', async () => {
     const { h, c, nb } = scenario((n) => ({
       implement: [

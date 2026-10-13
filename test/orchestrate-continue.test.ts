@@ -90,6 +90,19 @@ describe('candidats', () => {
     expect(draw(800_000)).toEqual(['L2']);
     expect(draw(1_300_000)).toEqual(['L1', 'L2']);
   });
+  it("L209 : un lot screen: component ou journey se tire au budget ordinaire, seul page compte l'étape spec", () => {
+    const parent = tempDir();
+    const dir = join(parent, 'ol');
+    mkdirSync(dir);
+    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'ol', 'L', '2026-09-01');
+    plan.add('composant', '2026-10-01', { estimate: 0.5, visible: true, screen: 'component' });
+    plan.add('parcours', '2026-10-01', { estimate: 0.5, visible: true, screen: 'journey' });
+    plan.add('page', '2026-10-01', { estimate: 0.5, visible: true, screen: 'page' });
+    plan.save();
+    const draw = (remaining: number) => candidates(dir, { priority: [], exclude: new Set(), remaining }).map((c) => c.lot.id);
+    expect(draw(800_000)).toEqual(['L1', 'L2']);
+    expect(draw(1_300_000)).toEqual(['L1', 'L2', 'L3']);
+  });
   it('un dossier de projet : lui seul', () => {
     const parent = tempDir();
     const dir = project(parent, 'cadence', [{ title: 'a' }, { title: 'b' }]);

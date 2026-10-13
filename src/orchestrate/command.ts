@@ -16,7 +16,7 @@ import { readWaits, renderWaits } from './waits.js';
 import { acceptationFile, acceptText } from './accept.js';
 import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
-import { specText } from './spec.js';
+import { specScreen, specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
 import { Budget, DROPPED, MAX_PASSES, MAX_PASSES_CONVERGING, briefName, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
@@ -325,10 +325,11 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       continue;
     }
     const small = lot.estimate <= 0.5 || lot.quickwin;
-    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, ...(lot.screen ? { screen: lot.screen } : {}), ...(lot.spec && !lot.screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
+    const screen = specScreen(t.repo, env.config.spec.dir, lot);
+    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, ...(screen ? { screen } : {}), ...(lot.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.light = lot.estimate <= env.config.review.threshold;
-    state.budget = lotBudget(lot.estimate, lot.screen ? 'screen' : lot.spec ? 'spec' : undefined);
+    state.budget = lotBudget(lot.estimate, screen ? 'screen' : lot.spec ? 'spec' : undefined);
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
     if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };
     lots.push(state);

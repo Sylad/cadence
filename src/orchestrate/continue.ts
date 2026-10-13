@@ -6,7 +6,8 @@ import { planLoader } from '../config.js';
 import { gitRoot } from '../git.js';
 import { findProjects, isProject } from '../lead.js';
 import { RafError, type Lot } from '../plan.js';
-import { lotBudget } from './command.js';
+import { lotBudget, projectEnv } from './command.js';
+import { specScreen } from './spec.js';
 import { STOP_REQUESTED } from './cycle.js';
 
 /** `--until 18:00` : l'heure d'aujourd'hui (date de `now`) à partir de laquelle la vague ne tire plus de lot. */
@@ -83,8 +84,14 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
     } catch {
       continue;
     }
+    let specDir = 'docs/specs';
+    try {
+      specDir = projectEnv(dir).config.spec.dir;
+    } catch {
+      // configuration illisible : le dossier par défaut
+    }
     for (const lot of ready) {
-      if (o.exclude.has(`${project}:${lot.id}`) || decisionPending(lot) || lotBudget(lot.estimate, lot.screen ? 'screen' : lot.spec ? 'spec' : undefined) > o.remaining) continue;
+      if (o.exclude.has(`${project}:${lot.id}`) || decisionPending(lot) || lotBudget(lot.estimate, specScreen(dir, specDir, lot) ? 'screen' : lot.spec ? 'spec' : undefined) > o.remaining) continue;
       out.push({ project, dir, lot });
     }
   }

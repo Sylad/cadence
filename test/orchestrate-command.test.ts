@@ -1320,6 +1320,41 @@ describe('budget par lot (L78, recalibré L194)', () => {
     }
   });
 
+  it("--dry-run (L209) : un lot screen: component ou journey reprend le chemin ordinaire — ni spec, ni maquette, ni accept, budget ordinaire", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component' }, { title: 'un parcours', estimate: 0.5, screen: 'journey' }], b: [{ title: 'une page', estimate: 0.5, screen: 'page' }] });
+    const r = io(parent);
+    await orchestrate(['a:L1', 'a:L2', 'b:L1', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      const [, comp, journey, page] = text.split('étapes :');
+      expect(comp).not.toMatch(/spec \(|maquette \(|accept \(/);
+      expect(journey).not.toMatch(/spec \(|maquette \(|accept \(/);
+      expect(page).toMatch(/spec \(sonnet\) → maquette/);
+      expect(text.match(/budget du lot : 450000 tokens comptés \(base : plancher/g)).toHaveLength(2);
+      expect(text).toContain('budget du lot : 1300000');
+    } finally {
+      removeDryRunBriefs(text);
+    }
+  });
+
+  it("--dry-run (L209) : un lot component déjà entré dans la chaîne (fiche ou acceptation présentes) garde son étape spec et son budget d'écran", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component' }, { title: 'un autre', estimate: 0.5, screen: 'journey' }] });
+    mkdirSync(join(dirs.a, 'docs/specs/carte'), { recursive: true });
+    writeFileSync(join(dirs.a, 'docs/specs/carte/fiche.yaml'), 'ecran:\n  id: carte\n  lot: L1\n');
+    writeFileSync(join(dirs.a, 'docs/specs/carte/acceptation-L2.json'), '{}');
+    const r = io(parent);
+    await orchestrate(['a:L1', 'a:L2', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      const [, one, two] = text.split('étapes :');
+      expect(one).toMatch(/spec \(sonnet\)/);
+      expect(two).toMatch(/spec \(sonnet\)/);
+      expect(text.match(/budget du lot : 1300000/g)).toHaveLength(2);
+    } finally {
+      removeDryRunBriefs(text);
+    }
+  });
+
   it("--dry-run dit le budget de chaque lot et sa base", async () => {
     const { parent } = parentWith({ a: [{ title: 'un', estimate: 1 }], b: [{ title: 'gros', estimate: 2 }] });
     const r = io(parent);

@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
+import type { Screen } from '../plan.js';
+import { acceptationFile } from './accept.js';
 import { checkFiche, fichesDuDossier, LARGEURS } from '../spec.js';
 
 // Étape spec d'orchestrate (L171, spec etape-spec S3) : ce que le programme sait de la sortie de la session `spec`.
@@ -14,6 +16,21 @@ const list = (v: unknown): Obj[] => (Array.isArray(v) ? v.filter(isObj) : []);
 export function findFiche(repo: string, dir: string, lot: string): string | null {
   const hit = fichesDuDossier(repo, dir).find(({ doc }) => (isObj(doc.ecran) && doc.ecran.lot === lot) || (isObj(doc.sujet) && doc.sujet.lot === lot));
   return hit ? `${dir}/${hit.name}/fiche.yaml` : null;
+}
+
+/**
+ * L'écran qui fait entrer un lot dans la chaîne spec → maquette → accept (L209) : `page` seul. `component` et `journey` restent des valeurs
+ * valides du plan mais le lot suit le chemin ordinaire, sauf s'il est déjà entré dans la chaîne (sa fiche ou son `acceptation-<lot>.json`
+ * existent dans `dir`) : il garde alors sa fiche et son verrou.
+ */
+export function specScreen(repo: string, dir: string, lot: { id: string; screen?: Screen }): Screen | undefined {
+  if (!lot.screen || lot.screen === 'page') return lot.screen;
+  const fiche = findFiche(repo, dir, lot.id);
+  if (fiche) return lot.screen;
+  const acceptation = acceptationFile('fiche.yaml', lot.id);
+  const base = join(repo, dir);
+  const entered = existsSync(base) && readdirSync(base).some((name) => existsSync(join(base, name, acceptation)));
+  return entered ? lot.screen : undefined;
 }
 
 /** Texte sans accents ni majuscules, pour les mots-clés. */

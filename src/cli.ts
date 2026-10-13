@@ -42,7 +42,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf init [--project nom] [--prefix L] [--no-hook]
   raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--public "titre public"] [--every jours] [--after L2,L4] [--parent L3]
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
-  raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (l'étape spec d'orchestrate)
+  raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (seule la valeur page adopte l'étape spec d'orchestrate)
   raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf note <id> "texte"

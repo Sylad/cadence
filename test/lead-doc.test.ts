@@ -44,6 +44,19 @@ describe('docs/lead.md', () => {
     expect(entry).toContain('raf spec <id> on')
   })
 
+  it("aide de raf screen, ligne README et libellés des SVG : seule la valeur page adopte l'étape spec (L210)", () => {
+    expect(read('src/cli.ts')).toMatch(/raf screen <id>[^\n]*seule la valeur page adopte l'étape spec/)
+    const row = read('README.md').split('\n').find((l) => l.startsWith('| `raf screen <id>')) ?? ''
+    expect(row).toContain('only `page` adopts the [spec step]')
+    for (const [variant, f] of Object.entries(svgs)) {
+      const svg = read(f)
+      expect(svg, variant).toContain('lots with screen: page')
+      expect(svg, variant).toContain('Spec (screen: page)')
+      expect(svg, variant).not.toContain('lots with a screen')
+      expect(svg, variant).not.toContain('Spec (screen lots)')
+    }
+  })
+
   it("README, vue d'ensemble du lead : seul screen: page passe par spec, maquette et accept (L209)", () => {
     const readme = read('README.md')
     expect(readme).toContain('a lot with `screen: page` first goes through the [spec, mockup review and accept steps]')

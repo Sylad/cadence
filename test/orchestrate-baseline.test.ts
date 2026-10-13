@@ -85,3 +85,31 @@ describe('hasUnnamedFailure : vitest, fichier de test qui ne se charge pas', () 
     expect(hasUnnamedFailure(ok)).toBe(false);
   });
 });
+
+describe('hasUnnamedFailure : vitest, chemin entre crochets différent du nom du fichier', () => {
+  // vitest 2.1.9, espace de travail dont le projet a pour racine un sous-dossier : le fichier est relatif au projet, les crochets à la racine du lancement.
+  const workspace = ' FAIL  |pa|  src/a.test.ts [ packages/a/src/a.test.ts ]';
+
+  it('espace de travail : le fichier qui ne se charge pas est un échec sans nom, pas un test nommé', () => {
+    expect(hasUnnamedFailure(workspace)).toBe(true);
+    expect(failedTests(workspace)).toEqual([]);
+  });
+
+  it('chemin avec des espaces', () => {
+    const spaced = ' FAIL  my dir/a.test.ts [ my dir/a.test.ts ]';
+    expect(hasUnnamedFailure(spaced)).toBe(true);
+    expect(failedTests(spaced)).toEqual([]);
+  });
+
+  it.each([
+    [' FAIL  b.test.ts > suite > name', ['b.test.ts > suite > name']],
+    [' FAIL  b.test.ts > x [ b.test.ts ]', ['b.test.ts > x [ b.test.ts ]']],
+    [' FAIL  src/db.spec.ts (5.2 s)', ['src/db.spec.ts']],
+    ['FAIL\tgithub.com/x/y [build failed]', ['github.com/x/y [build failed]']],
+    ['FAILED tests/t.py::test_a[ x ] - assert 1', ['tests/t.py::test_a[ x ]']],
+    ['not ok 1 - a [ a ]', ['a [ a ]']],
+  ])('ligne qui n\'est pas un fichier non chargé : %j', (line, names) => {
+    expect(hasUnnamedFailure(line)).toBe(false);
+    expect(failedTests(line)).toEqual(names);
+  });
+});

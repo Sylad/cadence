@@ -18,8 +18,12 @@ function pytestId(s: string): string {
   return s;
 }
 
-/** vitest, fichier de test qui ne se charge pas : « FAIL  a.test.ts [ a.test.ts ] » (le nom du fichier répété entre crochets, avec « |projet| » en espace de travail). */
-const FILE_LOAD_FAIL = /^\s*FAIL\s+(?:\|[^|]*\|\s+)?(\S+)\s+\[\s*\1\s*\]\s*$/;
+/**
+ * vitest, fichier de test qui ne se charge pas : « FAIL  a.test.ts [ a.test.ts ] ». Seule une entrée de fichier porte le suffixe « [ chemin ] » (un test ou une suite contient toujours « > »).
+ * En espace de travail, le fichier est relatif à la racine du projet (précédé de « |projet| ») et les crochets à la racine du lancement : « FAIL  |pa|  src/a.test.ts [ packages/a/src/a.test.ts ] », donc pas de comparaison des deux.
+ * Le crochet doit finir par une extension : « FAIL\tgithub.com/x/y [build failed] » (go) n'est pas un fichier.
+ */
+const FILE_LOAD_FAIL = /^\s*FAIL\s+(?:\|[^|]*\|\s+)?[^>]+?\s+\[\s*[^\]]*\.\w+\s*\]\s*$/;
 
 const clean = (s: string): string =>
   pytestId(s)

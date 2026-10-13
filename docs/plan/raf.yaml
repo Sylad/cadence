@@ -2333,11 +2333,12 @@ lots:
     finished: 2026-10-12
   - id: L209
     title: "Étape spec : seuil resserré à screen: page — component et journey ne déclenchent plus spec + maquette + accept et reprennent le chemin ordinaire (mesure S8 du 12-10 : aucune ligne atteinte, ~570 k tokens/lot, parcours 4,5 passes/lot) ; spec, README, CHANGELOG, mesure suivante après 8 lots page"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-13
     notes:
       - { date: 2026-10-13, text: "Décision du lead 13-10 (Sylvain : « on suit tes recommandations »), application de la clause de la spec 2026-10-10-etape-spec-design.md « si le critère n'est pas atteint, le seuil est resserré avant d'abandonner ». Attendu : seule une valeur screen: page fait entrer un lot dans la chaîne spec → maquette → accept ; component et journey restent des valeurs acceptées par raf (aucun plan existant cassé), mais un lot qui les porte suit le chemin ordinaire et son budget redevient le budget ordinaire (sans le forfait de 1,3 M). Un lot déjà entré dans la chaîne (fiche ou acceptation-<lot>.json présents) garde sa fiche et son verrou. L'étape back (spec: true, B1–B5) et la partie back d'un lot mixte ne changent pas. Mettre à jour la spec (section Seuil + Mesure : la prochaine mesure porte sur 8 lots page), le README, le CHANGELOG, le brief si un texte cite les trois valeurs, et les tests." }
+    started: 2026-10-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

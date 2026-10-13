@@ -78,6 +78,10 @@ export function onlyDeclaredFailures(resultat: string, declared: string[]): bool
   if ([...named].some((t) => !known.has(t))) return false;
   for (const t of declared) if (text.includes(t)) named.add(t);
   if (!named.size || hasUnnamedFailure(text)) return false;
-  const counted = /\b(\d+)\s+(?:failed|failing|failures?|échecs?)\b/i.exec(text);
-  return !counted || Number(counted[1]) <= named.size;
+  // Plus grand nombre annoncé avant « failed / échec(s) » (« 3 failed », « 2 tests en échec »), hors ligne vitest « Test Files » (comptée en fichiers).
+  const counts = text
+    .split('\n')
+    .filter((l) => !/^\s*Test Files?\b/i.test(l))
+    .flatMap((l) => [...l.matchAll(/\b(\d+)\s+(?:\p{L}+\s+)?(?:en\s+)?(?:failed|failing|failures?|échecs?)\b/giu)].map((m) => Number(m[1])));
+  return !counts.length || Math.max(...counts) <= named.size;
 }

@@ -131,6 +131,15 @@ describe('onlyDeclaredFailures : le résultat annoncé par la session ne nomme q
   it('plus d\'échecs comptés que de tests nommés : non', () => {
     expect(onlyDeclaredFailures('3 failed dont autre-lot > cas ancien', base)).toBe(false);
   });
+  it('résumé vitest : la ligne « Test Files » ne masque pas le compte des tests : non', () => {
+    expect(onlyDeclaredFailures(' Test Files  1 failed | 5 passed (6)\n      Tests  3 failed | 100 passed (103)\nseul échec : autre-lot > cas ancien', base)).toBe(false);
+  });
+  it('« N tests en échec » avec plus d\'échecs que de tests nommés : non', () => {
+    expect(onlyDeclaredFailures('2 tests en échec : autre-lot > cas ancien et lot > nouveau', base)).toBe(false);
+  });
+  it('un compte cohérent avec les tests nommés : oui', () => {
+    expect(onlyDeclaredFailures(' Test Files  1 failed | 5 passed (6)\n      Tests  1 failed | 100 passed (101)\nautre-lot > cas ancien', base)).toBe(true);
+  });
   it('échec sans nom (erreur non gérée) : non', () => {
     expect(onlyDeclaredFailures('1 failed : autre-lot > cas ancien ; Unhandled Errors', base)).toBe(false);
   });

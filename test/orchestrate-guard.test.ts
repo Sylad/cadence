@@ -72,6 +72,43 @@ describe('snapshot et détection de push', () => {
     expect(pushed(before, await snapshot(dir))).toBe(true);
   });
 
+  it('un git checkout <sha> (HEAD détaché, origin immobile) n\'est pas un push (L214)', async () => {
+    const dir = repoWithRemote();
+    const first = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+    commit(dir, 'feat(L1): x');
+    git(dir, 'push', '-q');
+    const before = await snapshot(dir);
+    expect(before.upstream).not.toBeNull();
+    git(dir, 'checkout', '-q', '--detach', first);
+    const after = await snapshot(dir);
+    expect(after.head).toBe(first);
+    expect(pushed(before, after)).toBe(false); // le HEAD a bougé, pas origin
+    git(dir, 'checkout', '-q', 'main');
+    expect(pushed(after, await snapshot(dir))).toBe(false); // retour sur la branche : pas un push non plus
+  });
+
+  it('un push fait depuis un HEAD détaché reste détecté par le dépôt distant (L214)', async () => {
+    const dir = repoWithRemote();
+    const before = await snapshot(dir);
+    git(dir, 'checkout', '-q', '--detach');
+    commit(dir, 'feat(L1): x');
+    git(dir, 'push', '-q', 'origin', 'HEAD:main');
+    expect(pushed(before, await snapshot(dir))).toBe(true);
+  });
+
+  it('changer de branche suivie n\'est pas un push (L214)', async () => {
+    const dir = repoWithRemote();
+    git(dir, 'push', '-q', 'origin', 'main:autre');
+    git(dir, 'branch', '-q', '--track', 'autre', 'origin/autre');
+    git(dir, 'checkout', '-q', 'autre');
+    commit(dir, 'feat(L1): y');
+    git(dir, 'push', '-q'); // origin/autre avance, origin/main reste
+    git(dir, 'checkout', '-q', 'main');
+    const before = await snapshot(dir);
+    git(dir, 'checkout', '-q', 'autre');
+    expect(pushed(before, await snapshot(dir))).toBe(false);
+  });
+
   it('suivi modifié, non suivi, .cadence/ exclu', async () => {
     const dir = gitRepo();
     writeFileSync(join(dir, 'a.txt'), '1');

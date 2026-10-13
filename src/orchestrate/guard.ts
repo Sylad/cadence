@@ -256,16 +256,19 @@ export interface Snapshot {
   tracked: string[];
   untracked: string[];
   upstream: string | null;
+  /** Nom complet de la branche amont (`refs/remotes/origin/main`) : null en HEAD détaché ou sans amont. */
+  upstreamRef: string | null;
   remote: string | null;
   /** Le hook pre-push de la vague est en place (un hook exclu de git n'apparaît plus dans le statut). */
   guard: boolean;
 }
 
 export async function snapshot(repo: string, opts: { remote?: boolean } = {}): Promise<Snapshot> {
-  const [status, head, upstream, remote] = await Promise.all([
+  const [status, head, upstream, upstreamRef, remote] = await Promise.all([
     out(repo, ['status', '--porcelain', '--untracked-files=all']),
     out(repo, ['rev-parse', '--verify', '-q', 'HEAD']),
     out(repo, ['rev-parse', '-q', '--verify', '@{u}']),
+    out(repo, ['rev-parse', '-q', '--symbolic-full-name', '@{u}']),
     opts.remote === false ? Promise.resolve(null) : out(repo, ['ls-remote', '--heads']),
   ]);
   const lines = (status ?? '').split('\n').filter(Boolean);
@@ -276,13 +279,18 @@ export async function snapshot(repo: string, opts: { remote?: boolean } = {}): P
     tracked: lines.filter((l) => !l.startsWith('??') && keep(l)),
     untracked: lines.filter((l) => l.startsWith('??') && keep(l)).map((l) => l.slice(3)),
     upstream,
+    upstreamRef: upstreamRef?.trim() || null,
     guard: guardPresent(repo),
     remote,
   };
 }
 
-/** Écart de la référence amont ou du dépôt distant depuis `before` : un push est parti. */
+/**
+ * Écart de la référence amont ou du dépôt distant depuis `before` : un push est parti.
+ * La référence amont n'est comparée que si c'est la même branche amont des deux côtés : un `git checkout <sha>` (HEAD
+ * détaché, plus d'amont) ou un changement de branche déplace le HEAD, pas origin (L214) ; le dépôt distant reste juge.
+ */
 export function pushed(before: Snapshot, after: Snapshot): boolean {
-  if (before.upstream !== after.upstream) return true;
+  if (before.upstreamRef !== null && before.upstreamRef === after.upstreamRef && before.upstream !== after.upstream) return true;
   return before.remote !== null && after.remote !== null && before.remote !== after.remote;
 }

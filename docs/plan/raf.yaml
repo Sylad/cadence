@@ -2403,6 +2403,12 @@ lots:
       - { date: 2026-10-13, text: "13-10 rendu (2 corrections, 2 majeurs sur la lecture de la prose). Décision du lead : ne PAS deviner depuis le texte du rapport. Ajouter au schéma du rapport un champ structuré nouveauxEchecs (liste) ; sans orchestrate.test : vert:false + echecsDeBase non vide + nouveauxEchecs vide → pas de correction, le lot va en revue (base non vérifiée signalée au relecteur) ; nouveauxEchecs non vide → correction. Retirer les heuristiques de prose (comptes « failed/rouge », repères N1b-6/(4)) de 4870ad8/6e0b9f2. Briefs implement/fix : remplir nouveauxEchecs. README + CHANGELOG." }
     review: { date: 2026-10-13, verdict: "conforme (1 mineur en note) — orchestré (vague 2026-10-13-2135, 0 passe(s) de correction + passe des mineurs)", commit: c7b22c6d432ab87c362cbf81fe5b0679015c3071 }
     finished: 2026-10-13
+  - id: L216
+    title: "orchestrate : un HEAD déplacé rendu (cycle.ts ~l.745-752) sort de la boucle watched avant les contrôles de push et de hook de garde du dépôt et des voisins — un push ou un hook supprimé dans ../gitops n'arrête plus la vague (incident null, reproduit par la revue de L214) : contrôler push et hook dans tous les dépôts AVANT le bloc HEAD déplacé, avec test de la combinaison ; et briefs implement.md/fix.md + README : « any entry in nouveauxEchecs with vert: false » (mineur L215)"
+    status: todo
+    estimate: 0.5
+    after: [ L214 ]
+    created: 2026-10-14
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

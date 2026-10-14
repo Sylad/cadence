@@ -2405,12 +2405,15 @@ lots:
     finished: 2026-10-13
   - id: L216
     title: "orchestrate : un HEAD déplacé rendu (cycle.ts ~l.745-752) sort de la boucle watched avant les contrôles de push et de hook de garde du dépôt et des voisins — un push ou un hook supprimé dans ../gitops n'arrête plus la vague (incident null, reproduit par la revue de L214) : contrôler push et hook dans tous les dépôts AVANT le bloc HEAD déplacé, avec test de la combinaison ; et briefs implement.md/fix.md + README : « any entry in nouveauxEchecs with vert: false » (mineur L215)"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L214 ]
     created: 2026-10-14
     started: 2026-10-14
     review: { date: 2026-10-14, verdict: "conforme — orchestré (vague 2026-10-14-lead2, 0 passe(s) de correction + passe des mineurs)", commit: aa69f070ae1f751ef0b0f925f2e62e9da5173e81 }
+    notes:
+      - { date: 2026-10-14, text: "la partie push/hook avant HEAD déplacé était déjà corrigée par L214 (d074a94) : le lot n'a porté que l'alignement briefs/README/CHANGELOG sur vert:false" }
+    finished: 2026-10-14
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

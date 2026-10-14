@@ -375,6 +375,12 @@ describe('ligne de base des tests dans les briefs (L213)', () => {
       expect(text).toContain('nouveauxEchecs');
     }
   });
+  it('implement, fix et README précisent que seul nouveauxEchecs avec vert:false déclenche la correction (L216)', () => {
+    for (const name of ['implement', 'fix'] as const) {
+      expect(readFileSync(join(TEMPLATES_DIR, `${name}.md`), 'utf8')).toContain('any entry in "nouveauxEchecs" with `vert: false` triggers one');
+    }
+    expect(readFileSync(join(__dirname, '..', 'README.md'), 'utf8')).toContain('A non-empty `nouveauxEchecs` with `vert: false` triggers a correction pass');
+  });
   it('le sha de départ du brief est celui du code : parent du plus ancien commit de travail, identique dans implement et fix', () => {
     const line = (name: string) => readFileSync(join(TEMPLATES_DIR, `${name}.md`), 'utf8').split('\n').find((l) => l.startsWith('Tests already red before the lot'));
     expect(line('implement')).toBeDefined();

@@ -109,6 +109,19 @@ export function waveReadsControl(waveDir: string): boolean {
   }
 }
 
+/**
+ * L'instantané de la vague connaît-il `--budget projet:lot=+N` (L223) ? Un instantané plus ancien relit l'argument avec son `parseBudget` et le refuse
+ * comme budget invalide. Sans instantané : rien à relire, on suppose que oui.
+ */
+export function waveReadsLotBudget(waveDir: string): boolean {
+  if (!snapshotExists(waveDir)) return true;
+  try {
+    return readFileSync(join(toolDirOf(waveDir), 'dist', 'orchestrate', 'command.js'), 'utf8').includes('lotBudgets');
+  } catch {
+    return false;
+  }
+}
+
 /** Relance réelle : un processus node sur la copie, signaux transmis, code de sortie rendu. */
 export function spawnReexec(toolDir: string, argv: string[], env: NodeJS.ProcessEnv, sink: LineSink): Promise<number> {
   return new Promise((resolve, reject) => {

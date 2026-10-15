@@ -8,6 +8,7 @@ import { AGENTS_DIR } from '../src/skills.js';
 import { Plan } from '../src/plan.js';
 import { claudeOut, commitFile, git, kindOf, briefOf, reviewReport, workReport, precheckReport } from './orchestrate-harness.js';
 import { tempDir } from './helpers.js';
+import { toolDirOf } from '../src/orchestrate/snapshot.js';
 
 // L223 — reprise ciblée d'un lot rendu sur budget : --resume <vague> --budget projet:lot=+N.
 const fileHome = process.env.CADENCE_HOME;
@@ -487,5 +488,37 @@ describe('R12 — gardes du lot repris', () => {
     const r = await targeted();
     expect(await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+300k'], io(r.parent).io, r.f.deps)).toBe(0);
     expect(r.lot().status).toBe('ready');
+  });
+});
+
+describe('R1 — vague lancée avant L223 (instantané sans lotBudgets)', () => {
+  const withSnapshot = (r: { store: RunStore }, command: string) => {
+    const tool = toolDirOf(r.store.dir);
+    mkdirSync(join(tool, 'bin'), { recursive: true });
+    mkdirSync(join(tool, 'dist', 'orchestrate'), { recursive: true });
+    writeFileSync(join(tool, 'bin', 'cadence.js'), '');
+    writeFileSync(join(tool, 'dist', 'orchestrate', 'command.js'), command);
+    return tool;
+  };
+  it("R1 — l'instantané ne connaît pas l'option : la reprise tourne sur le dist/ courant, avec un avertissement, sans relance", async () => {
+    const r = await handedBack();
+    withSnapshot(r, 'parseBudget(v)');
+    const reexec: string[] = [];
+    const again = io(r.parent);
+    const deps = { ...r.f.deps, snapshot: { packageRoot: tempDir(), reexec: async (t: string) => (reexec.push(t), 9) } };
+    expect(await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+300k'], again.io, deps)).toBe(0);
+    expect(reexec).toEqual([]);
+    expect(again.err.join()).toContain('ne connaît pas --budget projet:lot=+N');
+    expect(r.lot().status).toBe('ready');
+  });
+  it("R1 — l'instantané connaît l'option, ou pas de lot visé : la reprise relance sur l'instantané", async () => {
+    const r = await handedBack();
+    const tool = withSnapshot(r, 'lotBudgets');
+    const reexec: string[] = [];
+    const deps = { ...r.f.deps, snapshot: { packageRoot: tempDir(), reexec: async (t: string) => (reexec.push(t), 0) } };
+    await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+300k'], io(r.parent).io, deps);
+    withSnapshot(r, 'parseBudget(v)');
+    await orchestrate(['--resume', WAVE, '--budget', '2M'], io(r.parent).io, deps);
+    expect(reexec).toEqual([tool, tool]);
   });
 });

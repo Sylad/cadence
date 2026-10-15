@@ -960,6 +960,8 @@ option it is still refused. The named lot undergoes the checks of a live lot (di
 Node). Refused with exit 2, before anything is written: a malformed `projet:lot=+N` or an option without `--resume`, an unknown or
 ambiguous lot (`projet:lot` is then asked), a lot that is not handed back for its budget with a write step to replay, a lot named twice
 (`p:L` then `L` counts) or also named by `--drop` or `--answer`.
+A wave runs on its own snapshot of the tool, but one launched before L223 would refuse `projet:lot=+N` as an invalid budget:
+for such a wave (B26.4's included) the resume that names a lot runs on the current `dist/` instead, with a warning on the error output.
 A wave runs on its own snapshot of the tool: one launched before L79 never reads `control.log`, so the request is written but the
 command warns `ne lit pas les demandes de contrôle` on the error output.
 

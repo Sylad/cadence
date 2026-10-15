@@ -29,7 +29,7 @@ import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
-import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, waveReadsControl, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
+import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, waveReadsControl, waveReadsLotBudget, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -977,8 +977,13 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   if (!store) throw new RafError(typeof args.resume === 'string' ? `vague inconnue : ${args.resume}` : 'aucune vague à reprendre dans ce dossier');
   if (deps.snapshot) {
     // La reprise tourne sur l'instantané de la vague, jamais sur le dist/ courant ; une vague d'avant L61 n'en a pas.
-    if (snapshotExists(store.dir)) return deps.snapshot.reexec(toolDirOf(store.dir), argv, io.env, io);
-    io.err(`orchestrate : vague ${store.id} sans instantané (antérieure à L61) : reprise avec le dist/ et les gabarits courants`);
+    if (snapshotExists(store.dir)) {
+      // Une vague d'avant L223 refuserait « projet:lot=+N » comme budget invalide : seul le lot visé justifie de la rejouer avec le dist/ courant.
+      if (!args.lotBudgets.length || waveReadsLotBudget(store.dir)) return deps.snapshot.reexec(toolDirOf(store.dir), argv, io.env, io);
+      io.err(`orchestrate : vague ${store.id} : son instantané ne connaît pas --budget projet:lot=+N (antérieur à L223) : reprise avec le dist/ et les gabarits courants`);
+    } else {
+      io.err(`orchestrate : vague ${store.id} sans instantané (antérieure à L61) : reprise avec le dist/ et les gabarits courants`);
+    }
   }
   const wave = store.readWave()!;
   const refusals: string[] = [];

@@ -2416,7 +2416,7 @@ lots:
     finished: 2026-10-14
   - id: L217
     title: "cadence spec reseal : refuse une fiche amendée dans le même lot après le dernier reseal (« fiche modifiée depuis le commit rouge »), alors que l'amendement est légitime et que le test suit la fiche courante — vécu 15-10 warhammer L120 : deux correctifs ont dû remettre temporairement la fiche à l'état du dernier reseal, lancer la commande, puis restaurer la fiche. Accepter une fiche modifiée par des commits DU lot (fiche courante commitée, citant le lot) : le reseal prend l'empreinte du test contre la fiche courante et note « fiche amendée en <sha> » dans resceaux ; tests de la combinaison fiche amendée + un seul test + aucun autre test touché"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-15
@@ -2428,6 +2428,8 @@ lots:
       - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/spec-reseal-fiche-amendee/fiche.yaml:52 — R3/R5 : l'ordre des gardes n'est pas fixé quand l'arbre de travail est identique au rouge mais que HEAD a une fiche amendée (modification non commitée qui ramène la fiche au rouge). Le critère R1 (git diff --quiet <rouge> -- fiche, arbre de travail compris, accept.ts:165) donne alors un écart vide, donc R5 « inchangée », alors que R3 vise « arbre ou index différent de HEAD ». Cas marginal sans perte de données, à trancher dans les tests de R3. Par ailleurs resealAcceptation (accept.ts:149) n'a pas de paramètre plan/refsOf : l'implémentation devra le faire passer depuis cli.ts pour réutiliser citedRefs (R8), ce que la fiche n'écrit pas." }
       - { date: 2026-10-15, text: "Hypothèses (fiche spec-reseal-fiche-amendee) — R5 : Fiche à écart net vide avec le rouge (y compris amendée puis ramenée à l'identique, quel que soit le lot des commits intermédiaires, aucune attribution n'est f… ; si faux : Seuls des textes de note et de commit changent ; aucune donnée en jeu" }
       - { date: 2026-10-15, text: "Hypothèses (fiche spec-reseal-fiche-amendee) — R8 : Un commit « cite le lot » au sens de citedRefs (src/link.ts:27, portée du sujet d'abord via scopeOf link.ts:18, le corps sinon) : l'implémentation réutilise ce… ; si faux : Si seul le porteur devait compter pour un lot livré, la règle d'acceptation se resserre (les commits citant le lot seul seraient refusés) ; si la citation doit…" }
+    review: { date: 2026-10-15, verdict: "conforme (3 revues Opus orchestrées, vague 2026-10-15-1120 ; dernier majeur = passage README du lot livré encore à « fiche inchangée », corrigé en e7e3242, docs seules, relu par le lead ; build, 2011 tests, raf check verts)", commit: e7e3242d672f7bb301847c31f46ba26eaa4d6154 }
+    finished: 2026-10-15
   - id: L218
     title: "orchestrate : lot rendu AVANT la passe de correction quand le budget restant < 65 k réservés à la revue (15-10 : warhammer L120 740 k / 800 k après chaîne spec 2 sessions + fiche + question ; maritime B26.1 406 k / 450 k après implement + revue Opus d'un lot S qui touche la base) — mesurer sur les journaux .cadence/runs le coût réel des chaînes spec et des lots S back, puis réserver une passe fix + revue courte (pas seulement la revue) dans le budget, ou relever l'allocation spec (350 k) et le plancher d'un lot qui déclare spec/base ; sans réserve suffisante, dire dans le tableau « correction non jouée (budget) » pour que le lead reprenne à la main"
     status: todo

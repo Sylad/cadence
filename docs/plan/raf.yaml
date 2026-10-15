@@ -2174,6 +2174,7 @@ lots:
   - id: L190
     title: Mesure de l'étape spec back après 8 lots avec fiche (spec etape-spec-back, B5)
     status: todo
+    gate: { count: 8, spec: true }
     estimate: 0.5
     after: [ L189 ]
     created: 2026-10-11
@@ -2450,7 +2451,7 @@ lots:
     finished: 2026-10-15
   - id: L219
     title: "Condition de tirage d'un lot : un champ (ex. « pas avant N lots spec: true done », ou N lots screen: page) que lead tour respecte dans « prochain prêt » (lot affiché « en attente de… ») et que orchestrate refuse avant d'agir — L190 tiré deux fois pour rien (13-10, 15-10), L209 même forme ; after: ne sait exprimer qu'une dépendance à un lot"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-15
@@ -2466,6 +2467,7 @@ lots:
       - { date: 2026-10-15, text: "Hypothèses (fiche condition-de-tirage) — R7 : Un gate mal formé (non objet, count absent ou non entier ≥ 1, critère absent, inconnu ou double) est consigné comme problème du lot, signalé par raf check, et… ; si faux : Si un gate invalide doit être ignoré, le lot devient tirable malgré la faute ; seule la branche d'erreur change (aucune donnée en jeu)" }
       - { date: 2026-10-15, text: "Hypothèses (fiche condition-de-tirage) — R9 : raf now affiche le lot en attente avec l'avancement : « <id> (<compte>/<N> lots <critère> faits) » dans la ligne « en attente de… » (le libellé « dépendances »… ; si faux : Seul le libellé change ; un test de format est à réécrire (aucune donnée en jeu)" }
     review: { date: 2026-10-15, verdict: "conforme — orchestré (vague 2026-10-15-1437, 0 passe(s) de correction + passe des mineurs)", commit: 7e9bcd81d4982fd40bb1a32e160ba24d0f383804 }
+    finished: 2026-10-15
   - id: L220
     title: "raf todo <id> : remettre en attente un lot démarré sans commit (doing → todo, started: retiré, note datée avec la raison), refusé s'il a des commits qui le citent — le 15-10 le lead a dû éditer status: à la main pour L190 après une vague rendue"
     status: done

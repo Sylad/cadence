@@ -196,6 +196,18 @@ describe('R9 — reprise d\'un état écrit avec l\'ancien aiguillage', () => {
     expect(kinds(h)).toEqual(['implement', 'review', 'ux']);
     expect(c.lot.status).toBe('ready');
   });
+
+  it('R9 — état repris avec next = ux et revue de code conforme mais HEAD déplacé : la revue de code repart avant ux', async () => {
+    const h = harness({ ...visible, script: { implement: [impl()], review: [ok, ok], ux: [uxOk] } });
+    const c = h.lot('L1', { visible: true }, withUx);
+    h.wave.budget.limit = 2200;
+    await runLot(c);
+    expect(c.lot.next).toBe('ux');
+    commitFile(h.repo, 'lead.txt', 'chore: commit du lead pendant la suspension');
+    h.wave.budget.limit = 1_000_000;
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'review', 'ux']);
+  });
 });
 
 describe('R11 — budgets', () => {

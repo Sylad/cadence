@@ -1677,8 +1677,8 @@ const appNote = (state: AppState, ux: { url?: string }): string =>
 
 /**
  * Avec `command` ET `url`, le programme lance l'application avant l'étape et la tue après (succès, erreur ou signal) :
- * port occupé ou application muette, la revue UX n'a pas lieu (note dans le lot, la revue de code suit) ; la passe
- * unique d'un petit lot, elle, a lieu sur le code seul.
+ * port occupé ou application muette, la revue UX n'a pas lieu (étape `skipped`, note dans le lot) et le lot conclut
+ * sur la dernière revue de code conforme (R6) ; la passe unique d'un petit lot, elle, a lieu sur le code seul.
  */
 async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promise<void> {
   const l = c.lot;
@@ -1686,6 +1686,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   // Un état repris, écrit avant L221, peut porter next = ux : l'UX ne part que sur une revue de code conforme du HEAD courant, sinon la revue de code passe d'abord (R9).
   if (kind === 'ux' && !(l.code?.conforme && l.code.head === git(l.repo, 'rev-parse', 'HEAD'))) {
     l.next = codeReview(l);
+    if (l.status === 'suspended') l.status = 'reviewing'; // reprise d'un lot suspendu : la boucle de runLot enchaîne sur la revue de code au lieu de rendre la main
     save(c);
     return;
   }
@@ -1748,7 +1749,8 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   }
   const minors = minorConstats(rep);
   // Revue conforme avec mineurs : une seule passe de correction des mineurs, avant de conclure (rien sous le tapis).
-  // Budget épuisé : la passe n'aurait aucune session pour la jouer, le lot conclut sur la revue conforme et rend les mineurs.
+  // Budget épuisé : la passe n'aurait aucune session pour la jouer, les mineurs sont rendus en propositions ; la revue conforme conclut le lot,
+  // sauf un lot visible avec orchestrate.ux, qui passe à next = 'ux' puis reste suspendu tant que le budget de la vague l'est.
   const wanted = summary.conforme && !l.minorPass && !l.light && minors.length > 0; // lot léger : les mineurs restent des notes (L108)
   const noBudget = wanted && (w.budget.exhausted || !fixAffordable(l)) && !w.incident && !w.quota.hit;
   const minorPass = wanted && !noBudget;

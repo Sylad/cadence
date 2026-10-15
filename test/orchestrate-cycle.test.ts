@@ -1090,7 +1090,7 @@ describe('budget et quota', () => {
 
   it("R4 — dépensé + 155000 égal au budget : le fix est refusé", async () => {
     const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
-    const c = h.lot('L1', { budget: REVIEW_RESERVE });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE + 3000 });
     await runLot(c);
     expect(kinds(h)).not.toContain('fix');
   });

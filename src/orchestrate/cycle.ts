@@ -1738,7 +1738,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   const wanted = summary.conforme && uxOk && !l.minorPass && !l.light && minors.length > 0; // lot léger : les mineurs restent des notes (L108)
   const noBudget = wanted && (w.budget.exhausted || !fixAffordable(l)) && !w.incident && !w.quota.hit;
   const minorPass = wanted && !noBudget;
-  if (noBudget) l.warnings.push(`${w.budget.exhausted ? 'budget atteint' : 'budget du lot trop juste pour payer la revue qui suivrait'} : la passe des mineurs n'a pas eu lieu, mineurs rendus en propositions`);
+  if (noBudget) l.warnings.push(`${w.budget.exhausted ? 'budget atteint' : 'budget du lot trop juste pour payer la correction et la revue courte qui la suivrait'} : la passe des mineurs n'a pas eu lieu, mineurs rendus en propositions`);
   // Les mineurs confiés à la passe ont pu être proposés par une revue non conforme antérieure : si la revue qui la suit est
   // conforme, ils sont traités et ne restent pas en propositions (ceux que cette revue signale encore sont ajoutés juste après).
   if (l.minorPass && !minorPass && summary.conforme && uxOk && l.minorLines?.length) {

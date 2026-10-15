@@ -1881,7 +1881,7 @@ describe('budget du lot atteint (L78)', () => {
     expect(h.wave.budget.exhausted).toBe(false);
     expect(c.lot.status).toBe('ready');
     expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
-    expect(c.lot.warnings.join('\n')).toContain("budget du lot trop juste pour payer la revue qui suivrait : la passe des mineurs n'a pas eu lieu");
+    expect(c.lot.warnings.join('\n')).toContain("budget du lot trop juste pour payer la correction et la revue courte qui la suivrait : la passe des mineurs n'a pas eu lieu");
   });
 
   it("L145 — budget entamé mais sous la réserve d'une revue : pas de passe des mineurs, avertissement « trop juste »", async () => {
@@ -1891,7 +1891,7 @@ describe('budget du lot atteint (L78)', () => {
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(c.lot.status).toBe('ready');
     expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
-    expect(c.lot.warnings.join('\n')).toContain('budget du lot trop juste pour payer la revue qui suivrait');
+    expect(c.lot.warnings.join('\n')).toContain('budget du lot trop juste pour payer la correction et la revue courte qui la suivrait');
   });
 
   it("L145 — revue UX : au-delà de son budget le lot joue quand même ses revues, l'application est lancée", async () => {

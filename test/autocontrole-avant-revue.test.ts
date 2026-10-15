@@ -99,7 +99,10 @@ describe('auto-contrôle avant revue (L222)', () => {
 
   it('R9 — le document de mesure borne l\'avant à la mise en service de la liste et calcule l\'après par différence', () => {
     const doc = read('../docs/mesures/autocontrole-avant-revue-2026-10-15.md');
-    expect(doc).toContain('--until 2026-10-15T17:19Z');
+    expect(doc).toContain('--until <borne>');
+    expect(doc).toContain('npm run service');
+    expect(doc).not.toMatch(/--until 2026-10-15T17:19Z/);
+    expect(doc).not.toMatch(/en service à partir du/);
     expect(doc).not.toContain('--until 2026-10-15T00:00Z');
     expect(doc).not.toMatch(/sans borne\)/);
     expect(doc).toMatch(/différence/);

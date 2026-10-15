@@ -307,6 +307,16 @@ describe('R6 / R7 / R11 — vague, verdict, reprise sans option', () => {
     await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+300k'], io(r.parent).io, r.f.deps);
     expect(Plan.load(file).lot('L1').notes.length).toBe(n);
   });
+  it('R7 — lot repris : le plan ne contient qu\'un seul verdict enregistré pour le lot après la reprise', async () => {
+    const r = await handedBack();
+    const file = join(r.dirs.a, 'docs/plan/raf.yaml');
+    const before = git(r.dirs.a, 'log', '--format=%s', '--grep=revue de code enregistrée').split('\n').filter(Boolean).length;
+    expect(before).toBe(0); // rendu sur budget : aucune revue conforme, donc aucun verdict avant la reprise
+    await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+300k'], io(r.parent).io, r.f.deps);
+    expect(git(r.dirs.a, 'log', '--format=%s', '--grep=revue de code enregistrée').split('\n').filter(Boolean)).toHaveLength(1);
+    expect(Plan.load(file).lot('L1').review?.verdict).toBeTruthy();
+    expect(git(r.dirs.a, 'status', '--porcelain', '--', 'docs/plan/raf.yaml')).toBe('');
+  });
   it('R7 — lot repris, revue non conforme : pas de verdict enregistré, le lot est rendu', async () => {
     const r = await handedBack();
     const f = fakeDeps({ review: costlyMajor, 'review-small': costlyMajor });

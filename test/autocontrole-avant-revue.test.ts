@@ -115,6 +115,10 @@ describe('auto-contrôle avant revue (L222)', () => {
     expect(doc).not.toMatch(/quelle que soit la date de création/);
     expect(doc).toMatch(/créées\*\* après la borne/);
     expect(doc).toContain('<vague>/tool/');
+    // la somme avant + après n'est le total que pour une borne posée hors vague : la procédure le dit, donne la preuve et le sens d'un écart
+    expect(doc).toContain('cadence orchestrate --status');
+    expect(doc).toMatch(/une vague à cheval/);
+    expect(doc).not.toMatch(/entier d'un seul côté/);
     expect(doc).not.toMatch(/--until 2026-10-15T17:19Z/);
     expect(doc).not.toContain('263 lots');
     expect(doc).toContain("dérive d'architecture");

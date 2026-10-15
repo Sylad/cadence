@@ -401,6 +401,39 @@ describe('cadence corrections', () => {
     expect(bornee.total).toEqual({ lots: 3, atLeast1: 3, atLeast2: 1, passes: 4 });
   });
 
+  it('R9 — une borne posée hors vague partage les journaux : --until + --since = sans borne champ par champ, et l\'écart d\'une vague à cheval est celui de ses passes terminées après la borne', async () => {
+    const parent = tempDir();
+    const runs = join(parent, '.cadence', 'runs');
+    const borne = '2026-10-10T18:00:00Z';
+    const e = (h: string) => `2026-10-10T${h}.000Z`;
+    // vagues d'avant toutes terminées à la borne (borne posée entre deux sessions), vagues d'après, visibles et non visibles, deux projets
+    lot(runs, 'w1', 'alpha', 'L1', [{ kind: 'implement', ended: e('11:00:00') }, { kind: 'review', constats: ['x'], ended: e('11:30:00') }, { kind: 'fix', ended: e('12:00:00') }, { kind: 'fix', ended: e('13:00:00') }], true);
+    lot(runs, 'w1', 'beta', 'L2', [{ kind: 'implement', ended: e('11:10:00') }, { kind: 'fix', ended: e('12:10:00') }]);
+    writeFileSync(join(runs, 'w1', 'wave.json'), JSON.stringify({ id: 'w1', created: e('10:00:00') }));
+    lot(runs, 'w3', 'alpha', 'L4', [{ kind: 'implement', ended: e('19:30:00') }, { kind: 'fix', ended: e('20:00:00') }, { kind: 'fix', ended: e('20:30:00') }]);
+    lot(runs, 'w3', 'beta', 'L5', [{ kind: 'implement', ended: e('19:40:00') }], true);
+    writeFileSync(join(runs, 'w3', 'wave.json'), JSON.stringify({ id: 'w3', created: e('19:00:00') }));
+    const lire = async (...opts: string[]) => JSON.parse((await cad(parent, 'corrections', parent, ...opts, '--json')).out);
+    const somme = (a: any, b: any) => ({ lots: a.lots + b.lots, atLeast1: a.atLeast1 + b.atLeast1, atLeast2: a.atLeast2 + b.atLeast2, passes: a.passes + b.passes });
+    const champs = (m: any) => ({ total: m.total, visible: m.byVisibility.visible, hidden: m.byVisibility.hidden, alpha: m.byProject.alpha, beta: m.byProject.beta });
+    const tout = champs(await lire());
+    const avant = champs(await lire('--until', borne));
+    const apres = champs(await lire('--since', borne));
+    for (const k of Object.keys(tout) as (keyof typeof tout)[]) expect(somme(avant[k], apres[k]), String(k)).toEqual(tout[k]);
+    expect(tout.total).toEqual({ lots: 4, atLeast1: 3, atLeast2: 2, passes: 5 });
+    // vague à cheval : créée avant la borne, une passe terminée après elle ; --until ne la lit pas (gel d'un relevé publié), --since non plus
+    lot(runs, 'w2', 'alpha', 'L3', [{ kind: 'implement', ended: e('17:30:00') }, { kind: 'fix', ended: e('17:50:00') }, { kind: 'fix', ended: e('19:00:00') }]);
+    writeFileSync(join(runs, 'w2', 'wave.json'), JSON.stringify({ id: 'w2', created: e('17:00:00') }));
+    const toutC = await lire();
+    const avantC = await lire('--until', borne);
+    const apresC = await lire('--since', borne);
+    expect(toutC.total.passes - (avantC.total.passes + apresC.total.passes)).toBe(1);
+    expect(toutC.total.lots).toBe(avantC.total.lots + apresC.total.lots);
+    const cles = (r: ReturnType<typeof readRuns>) => r.passes.map((p) => p.key);
+    const dehors = cles(readRuns(runs)).filter((k) => ![...cles(readRuns(runs, borne)), ...cles(readRuns(runs, undefined, borne))].includes(k));
+    expect(dehors).toEqual(['w2/alpha--L3/3']); // la passe de 19:00, la seule terminée après la borne dans une vague créée avant
+  });
+
   it('R9 — --since se règle sur la création de la vague, pas sur le début de l\'implement : une vague --continue créée avant la borne ne reçoit pas le brief d\'après', () => {
     const runs = tempDir();
     // vague créée à 17:00, lot dont l'implement commence à 19:00 : il a reçu le brief figé à 17:00, c'est de l'avant

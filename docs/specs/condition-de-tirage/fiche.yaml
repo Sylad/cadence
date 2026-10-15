@@ -169,5 +169,5 @@ donnees:
     objet: "docs/plan/raf.yaml, clé facultative gate par lot : { count: N, spec: true } ou { count: N, screen: page }"
     existant: true
     modification: ajout
-    decision: "Le lot demande « un champ » ; son nom (gate) et sa forme sont provisoires et soumis au lead (question Q1 du rapport) avant toute implémentation."
+    decision: "Réponse du lead (Sylvain, 15-10) : forme structurée gate: { count: 8, spec: true } ou gate: { count: 8, screen: page } ; le nom gate convient."
     note: "champ facultatif, absent des plans existants (R5) ; ajouté à FIELDS (src/plan.ts:82)"

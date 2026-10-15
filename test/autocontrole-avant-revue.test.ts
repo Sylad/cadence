@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { WORK_SCHEMA } from '../src/orchestrate/schemas.js';
 import { run } from '../src/cli.js';
-import { tempDir } from './helpers.js';
+import { tempDir, testPackage } from './helpers.js';
 
 const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8');
 const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: 'c1', reponse: '', constats: 'un constat', ux: '', choix: '', checks: '', news: '', captures: '', fiche: '', repos: '' };
@@ -119,7 +120,7 @@ describe('auto-contrôle avant revue (L222)', () => {
     expect(doc).toContain("dérive d'architecture");
   });
 
-  it('R9 — cadence corrections annonce --since dans son aide et son message d\'usage, et refuse une date invalide', async () => {
+  it('R9 — --since invalide est refusé, l\'aide et le message d\'usage de cadence corrections citent --since', async () => {
     const sortie: string[] = [];
     const cwd = tempDir();
     mkdirSync(join(cwd, '.cadence', 'runs'), { recursive: true });
@@ -127,6 +128,11 @@ describe('auto-contrôle avant revue (L222)', () => {
     expect(await run(['help'], io)).toBe(0);
     const aide = sortie.join('\n').split('\n').find((l) => /^\s*cadence corrections \[dossier\]/.test(l));
     expect(aide, 'ligne d\'aide trouvée').toContain('--since date');
+    // le binaire `cadence` garde sa propre aide (bin/cadence.js), celle de `cadence --help` et de `cadence help`
+    for (const arg of ['--help', 'help']) {
+      const binAide = execFileSync(process.execPath, [join(testPackage(), 'bin/cadence.js'), arg], { encoding: 'utf8' }).split('\n').find((l) => /^\s*cadence corrections \[dossier\]/.test(l));
+      expect(binAide, `ligne d'aide de bin/cadence.js ${arg}`).toContain('--since date');
+    }
     sortie.length = 0;
     expect(await run(['corrections', 'a', 'b'], io)).toBe(2);
     expect(sortie.join('\n')).toContain('usage : cadence corrections');

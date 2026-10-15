@@ -162,6 +162,7 @@ lots:
     quickwin: false
     visible: true        # user-facing: a news entry is expected when done
     after: [L0]
+    gate: { count: 8, spec: true }   # optional: not before 8 lots with `spec: true` are done (or `screen: page`)
     created: 2026-09-28
     started: 2026-09-29
     notes:
@@ -229,6 +230,7 @@ plan:
 - Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `screen`, `spec`, `public`, `every`, `last`, `after`, `created`, `started`,
   `finished`, `notes`, `repos`, `parent`; one left out is read under its own name. A timestamp counts for
   its day; a note written as plain text is one note.
+- `gate` (L219) is a drawing condition added to `after`: `gate: { count: N, spec: true }` or `gate: { count: N, screen: page }` (N an integer ≥ 1, one criterion). It is written by hand in the plan (no `raf add` option). The count is the number of `done` lots of the same plan that carry the criterion (`todo`, `doing`, `dropped` lots and sub-tasks do not count; recurring lots do). Until the count reaches N, a `todo` lot is *waiting*, never *ready*: `raf now` lists it on a line `en attente de condition de tirage : L190 (2/8 lots spec: true faits)` (the existing `en attente de dépendances : …` line stays for lots waiting on `after`), `cadence session start` adds an `En attente` section (nothing when no lot is gated) and leaves the lot out of `À suivre` and of the proposals, `cadence lead tour` skips it for `prochain` and adds `attend L190` to the project's line (and `waiting` to `--json`, only when a lot waits), `cadence orchestrate` refuses it before any action (`a:L190 : condition de tirage non remplie : 2/8 lots spec: true faits`) and `--continue` never draws it, and `raf show` prints `gate : 8 lots spec: true faits`. Once the count is reached the lot is ready like any other (the field stays in the plan); a lot already `doing` is not refused for its condition. A malformed `gate` is reported by `raf check` (`gate invalide : …`) and the lot is never drawable. A plan without `gate` behaves exactly as before; `after` read by the Gantt scheduling is unchanged.
 - `spec` is the exception to « a left-out field is read under its own name »: a read-only plan's `spec:` is often the path of a spec document, so it is read only when `plan.fields.spec` maps it, and then only `true` counts (any other value is neither an error nor a spec step). Natively, `spec:` stays `true` or `false` (L198).
 - `parent`: an entry `B33/t1-fusion` whose parent is `B33` becomes the sub-task `t1-fusion` of `B33`.
 - Ids need no prefix: a commit belongs to a lot when its message cites one of the plan's ids as a
@@ -612,12 +614,13 @@ beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second 
 | `en cours` | ids of the lots in progress; `(aucune activité)` when it has none at all, `(silencieux Nj)` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |
 | `dérive` | the gaps `raf check` reports (a lot whose commits leave a document behind, [`docs.sync`](#documentation-that-follows-the-code), included), counted and the first two shown |
 | `notes` | the notes left by the last `session close`, joined with ` / ` and cut at 120 characters |
-| `prochain` | the first ready lot (quick wins first) — id and title cut at 60 characters |
+| `prochain` | the first ready lot (quick wins first) — id and title cut at 60 characters; a lot whose [`gate`](#plan-file) is not met is not ready |
+| `attend` | only when a lot waits on its `gate`: `attend L190` |
 | `dépôt` | `non commité` (modified or untracked files), `non poussé` (commits ahead of the upstream), `livraison en cours` (live delivery lock); `propre` otherwise |
 
 When an orchestrated wave is live, one more line closes the tour (not part of `--json`): `vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2` — the lead reads the free slots there instead of computing them (L141). The `sur M` is the cap the human set (`CADENCE_MAX_SESSIONS`, 2 by default), not a fixed 2 (L208); an invalid value falls back to 2 in this display.
 
-`--json` prints the same content as an array of objects (`project`, `doing`, `drift`, `notes`,
+`--json` prints the same content as an array of objects (`project`, `doing`, `drift`, `notes`, `waiting` (only when a lot waits on its `gate`),
 `next`, `repo`, and `error` when the project could not be read), plus `progress` — `{ done, doing, todo, added7 }`,
 the lots done / in progress / to do (dropped and recurring lots left out) and those created in the last 7 days (L149), which
 [`cadence-hud`](plugins/cadence-hud/README.md) draws as one progress bar per project. Projects come in the order of the

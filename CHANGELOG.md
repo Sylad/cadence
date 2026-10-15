@@ -54,6 +54,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- `gate: { count: N, spec: true }` or `{ count: N, screen: page }` on a lot: a drawing condition added to `after` (L219). Until N `done` lots carry the criterion, `raf now`, `session start` (new `En attente` section) and `lead tour` (`attend <id>`) show the lot as waiting with its progress (`2/8 lots spec: true faits`), never as the next one; `cadence orchestrate` refuses it before any action and `--continue` never draws it; a malformed `gate` is reported by `raf check`. A plan without `gate` is unchanged.
 - `raf todo <id> [--reason text]` puts a started lot back to `todo` without editing the YAML by hand (L220): `started:` is removed and a dated note records the reason. Refused when work commits cite the lot (`raf drop` or leave it `doing`), when the lot is not `doing`, or on a sub-task.
 
 ## [1.4.0] - 2026-10-15

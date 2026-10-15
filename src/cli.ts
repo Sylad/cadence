@@ -62,7 +62,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--budget projet:lot=+300k] [--answer projet:lot "réponse"] [--drop projet:lot] ; --drop projet:lot [--wave vague] ; --stop-after-current [--wave vague] ; --waits [--since AAAA-MM-JJ]
   cadence lead tour [dossier] [--idle 3] [--depth n] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier seul s'il est lui-même un projet (en cours, dérive, notes de clôture, prochain lot prêt, dépôt)
-  cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--json]   mesure des passes de correction des journaux dossier/.cadence/runs : lots à ≥1 et ≥2 corrections, par projet, visibles ou non, passes par cause (classées par Ollama avec --classify, hors quota)
+  cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--since date] [--json]   mesure des passes de correction des journaux dossier/.cadence/runs : lots à ≥1 et ≥2 corrections, par projet, visibles ou non, passes par cause (classées par Ollama avec --classify, hors quota)
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -847,17 +847,18 @@ function spec(rest: string[], io: Io): number {
 }
 
 /** `cadence corrections` (L165) : la mesure de référence des passes de correction d'une vague, lue dans <dossier>/.cadence/runs. */
-async function corrections(rest: string[], values: { classify?: boolean; model?: string; cache?: string; sample?: string; until?: string; json?: boolean }, io: Io): Promise<number> {
-  if (rest.length > 1) throw new RafError('usage : cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--json]');
+async function corrections(rest: string[], values: { classify?: boolean; model?: string; cache?: string; sample?: string; until?: string; since?: string; json?: boolean }, io: Io): Promise<number> {
+  if (rest.length > 1) throw new RafError('usage : cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--since date] [--json]');
   const parent = resolve(io.cwd, rest[0] ?? '.');
   const runsDir = join(parent, '.cadence', 'runs');
   if (!existsSync(runsDir)) throw new RafError(`corrections : aucun journal de vague dans ${runsDir}`);
   const sample = values.sample === undefined ? undefined : Number(values.sample);
   if (sample !== undefined && !(Number.isInteger(sample) && sample > 0)) throw new RafError(`--sample invalide : ${values.sample}`);
   if (values.until !== undefined && Number.isNaN(Date.parse(values.until))) throw new RafError(`--until invalide : ${values.until} (une date ISO, ex. 2026-10-10T18:31Z)`);
+  if (values.since !== undefined && Number.isNaN(Date.parse(values.since))) throw new RafError(`--since invalide : ${values.since} (une date ISO, ex. 2026-10-10T18:31Z)`);
   const model = values.model ?? 'mistral-small3.2:24b';
   const cacheFile = resolve(io.cwd, values.cache ?? join(parent, '.cadence', 'corrections.json'));
-  const data = readRuns(runsDir, values.until);
+  const data = readRuns(runsDir, values.until, values.since);
   const cache = readCache(cacheFile);
   if (values.classify) {
     const classify = ollamaClassifier({ url: io.env.OLLAMA_HOST ?? 'http://localhost:11434', model });

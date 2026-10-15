@@ -57,6 +57,7 @@ interface RawStep {
   status: string;
   report?: string;
   commits?: string[];
+  started?: string;
   ended?: string;
 }
 
@@ -88,11 +89,12 @@ function findingsOf(report: any): string[] {
  * Lit les journaux de vague `<runs>/<vague>/<projet>--<lot>.json`. Un lot compte (dénominateur) dès qu'une session
  * d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là, pour une mesure que ni les vagues suivantes ni une vague encore en cours ne changent ; une vague ou une étape sans date lisible est écartée) ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
  */
-export function readRuns(runsDir: string, until?: string): Runs {
+export function readRuns(runsDir: string, until?: string, since?: string): Runs {
   const lots: LotRecord[] = [];
   const passes: FixPass[] = [];
   if (!existsSync(runsDir)) return { lots, passes };
   const limit = until === undefined ? Infinity : Date.parse(until);
+  const from = since === undefined ? undefined : Date.parse(since);
   // Sous `until`, une étape compte si elle est terminée avant la date ; sans date de fin lisible, elle est écartée.
   const inTime = (s: RawStep) => until === undefined || Date.parse(s.ended ?? '') <= limit;
   for (const wave of readdirSync(runsDir).sort()) {
@@ -109,7 +111,10 @@ export function readRuns(runsDir: string, until?: string): Runs {
       if (!rec || !Array.isArray(rec.steps)) continue;
       const steps = (rec.steps as RawStep[]).filter((s) => s && typeof s === 'object');
       const done = (s: RawStep) => s.status === 'ok' && inTime(s);
-      if (!steps.some((s) => s.kind === 'implement' && done(s))) continue;
+      const implement = steps.find((s) => s.kind === 'implement' && done(s));
+      if (!implement) continue;
+      // Le brief reçu est celui du début de l'implement : sous `since`, le lot entier est de l'après si elle a commencé après la date.
+      if (from !== undefined && !(Date.parse(implement.started ?? '') > from)) continue;
       const name = basename(file, '.json');
       const fixSteps = steps.filter((s) => s.kind === 'fix' && done(s));
       lots.push({ project: rec.project, lot: rec.lot, visible: !!rec.visible, fixes: fixSteps.length });

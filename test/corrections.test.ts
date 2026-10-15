@@ -7,7 +7,7 @@ import { run } from '../src/cli.js';
 import { CAUSES, classifyAll, measure, ollamaClassifier, parseCause, readCache, readRuns, renderReport, sampleKeys, type Classification } from '../src/corrections.js';
 import { tempDir } from './helpers.js';
 
-interface FakeStep { kind: string; status?: string; constats?: string[]; ended?: string }
+interface FakeStep { kind: string; status?: string; constats?: string[]; ended?: string; started?: string }
 
 /** Un enregistrement de lot dans <runs>/<vague>/<projet>--<lot>.json, avec le rapport de chaque revue. */
 function lot(runs: string, wave: string, project: string, id: string, steps: FakeStep[], visible = false) {
@@ -20,7 +20,7 @@ function lot(runs: string, wave: string, project: string, id: string, steps: Fak
       const structured = { bloquants: 0, majeurs: s.constats.length, mineurs: 0, constats: s.constats.map((texte) => ({ gravite: 'majeur', fichier: 'src/a.ts', ligne: 1, texte })) };
       writeFileSync(join(dir, `${project}--${id}`, report), JSON.stringify({ structured }));
     }
-    return { n, kind: s.kind, status: s.status ?? 'ok', ended: s.ended ?? '2026-10-10T08:00:00.000Z', report, commits: s.kind === 'fix' ? [`abc${n} fix(${id}): correctif ${n}`] : [] };
+    return { n, kind: s.kind, status: s.status ?? 'ok', ended: s.ended ?? '2026-10-10T08:00:00.000Z', ...(s.started ? { started: s.started } : {}), report, commits: s.kind === 'fix' ? [`abc${n} fix(${id}): correctif ${n}`] : [] };
   });
   writeFileSync(join(dir, `${project}--${id}.json`), JSON.stringify({ project, lot: id, visible, status: 'ready', steps: rec }));
   writeFileSync(join(dir, 'wave.json'), '{}');
@@ -364,6 +364,32 @@ describe('cadence corrections', () => {
     expect(r.lots.map((l) => `${l.lot}:${l.fixes}`)).toEqual(['L1:1']); // L2 écrit après la date, L3 sans date lisible
     expect(r.passes).toHaveLength(1);
     expect(readRuns(runs).lots.map((l) => `${l.lot}:${l.fixes}`)).toEqual(['L1:2', 'L2:1', 'L3:1']);
+  });
+
+  it('--since ne compte que les lots dont l\'implement a commencé après la date, avec toutes leurs passes : un lot à cheval sur la borne reste entier d\'un côté', async () => {
+    const parent = tempDir();
+    const runs = join(parent, '.cadence', 'runs');
+    // à cheval : implement avant la borne (18:00), second fix après ; entier dans l'avant sous --until, absent de l'après
+    lot(runs, 'w1', 'alpha', 'L1', [{ kind: 'implement', started: '2026-10-10T10:30:00.000Z', ended: '2026-10-10T11:00:00.000Z' }, { kind: 'review', constats: ['x'], ended: '2026-10-10T11:30:00.000Z' }, { kind: 'fix', ended: '2026-10-10T12:00:00.000Z' }, { kind: 'fix', ended: '2026-10-10T20:00:00.000Z' }]);
+    // après : implement lancé après la borne, deux passes
+    lot(runs, 'w1', 'alpha', 'L2', [{ kind: 'implement', started: '2026-10-10T19:00:00.000Z', ended: '2026-10-10T19:30:00.000Z' }, { kind: 'fix', ended: '2026-10-10T20:00:00.000Z' }, { kind: 'fix', ended: '2026-10-10T20:30:00.000Z' }]);
+    // sans `started` lisible : écarté sous --since
+    lot(runs, 'w1', 'alpha', 'L3', [{ kind: 'implement', ended: '2026-10-10T19:30:00.000Z' }, { kind: 'fix', ended: '2026-10-10T20:00:00.000Z' }]);
+    writeFileSync(join(runs, 'w1', 'wave.json'), JSON.stringify({ id: 'w1', created: '2026-10-10T10:00:00.000Z' }));
+    const borne = '2026-10-10T18:00:00Z';
+    const apres = readRuns(runs, undefined, borne);
+    expect(apres.lots.map((l) => `${l.lot}:${l.fixes}`)).toEqual(['L2:2']);
+    expect(apres.passes).toHaveLength(2);
+    const avant = readRuns(runs, borne);
+    expect(avant.lots.map((l) => `${l.lot}:${l.fixes}`)).toEqual(['L1:1']);
+    const m = JSON.parse((await cad(parent, 'corrections', parent, '--since', borne, '--json')).out);
+    expect(m.total).toEqual({ lots: 1, atLeast1: 1, atLeast2: 1, passes: 2 });
+    const bornee = JSON.parse((await cad(parent, 'corrections', parent, '--until', borne, '--json')).out);
+    expect(bornee.total.lots).toBe(1);
+    expect(bornee.total.passes).toBe(1);
+    const e = await cad(parent, 'corrections', parent, '--since', 'hier');
+    expect(e.code).not.toBe(0);
+    expect(e.err).toContain('--since invalide');
   });
 
   it('--until écarte une vague sans date lisible', () => {

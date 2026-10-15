@@ -1,0 +1,108 @@
+sujet:
+  id: spec-reseal-fiche-amendee
+  titre: "cadence spec reseal accepte une fiche amendée par des commits du lot"
+  lot: L217
+  perimetre:
+    modules: [src/orchestrate/accept.ts, src/cli.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le verrou lockViolations et l'exception L183 des lots livrés (inchangés)"
+      - "le rescellé de plusieurs tests à la fois"
+      - "un rescellé pendant une vague orchestrée (toujours refusé)"
+
+cas:
+  - id: C1
+    titre: Le lead rescelle un test dont la fiche a été amendée dans le même lot
+    acteur: le lead
+    declencheur: commande cadence spec reseal
+    preconditions:
+      - le lot est en cours (ou livré avec --porteur), son acceptation est scellée
+      - la fiche a changé depuis le commit rouge, par des commits qui citent le lot, et elle est commitée
+      - le test nommé a été corrigé dans l'arbre de travail, aucun autre test listé n'a bougé
+    nominal:
+      - La commande lit les commits qui ont touché la fiche depuis le commit rouge.
+      - Tous citent le lot (ou le porteur) ; la fiche de l'arbre de travail est celle du dernier de ces commits.
+      - Elle refait l'empreinte du seul test nommé, contre la fiche courante.
+      - Elle ajoute au journal resceaux l'entrée habituelle et la mention « fiche amendée en <sha> » (dernier commit qui a touché la fiche).
+      - Elle commite test + acceptation (nouveau commit rouge), puis la note du lot.
+    alternatives:
+      - { si: un commit qui a touché la fiche depuis le rouge ne cite pas le lot, alors: refus, rien n'est écrit, regles: [R2] }
+      - { si: la fiche a des modifications non commitées, alors: refus, regles: [R3] }
+      - { si: un autre test listé a changé ou le test nommé est inchangé, alors: refus comme avant, regles: [R4] }
+      - { si: la fiche n'a pas changé depuis le rouge, alors: comportement L200 inchangé, aucune mention d'amendement, regles: [R5] }
+      - { si: le commit du rescellé échoue, alors: retour atomique à l'état d'avant, regles: [R6] }
+    resultat: Le test est rescellé contre la fiche courante, le journal dit quel amendement de fiche a été accepté, sans remise temporaire de la fiche.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Quand la fiche a changé depuis le commit rouge et que tous les commits qui l'ont touchée citent le lot, le rescellé est accepté : l'empreinte du test est refaite contre la fiche courante (arbre de travail = dernier commit de la fiche) et l'entrée de resceaux porte la clé facultative ficheAmendee = sha court du dernier commit qui a touché la fiche."
+    statut: sourcee
+    source: "demande du lot L217 : « le reseal prend l'empreinte du test contre la fiche courante et note ‹fiche amendée en <sha>› dans resceaux » ; refus actuel : src/orchestrate/accept.ts:165"
+    tests: ["R1 — fiche amendée par un commit du lot : rescellé accepté, ficheAmendee = sha du commit de la fiche", "R1 — l'entrée de resceaux garde avant/apres du test et le journal précédent"]
+  - id: R2
+    cas: [C1]
+    enonce: "Si un seul commit qui a touché la fiche depuis le rouge ne cite pas le lot (ou le porteur pour un lot livré), le rescellé est refusé avec le message « la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite pas <lot> : <sha7 du commit> » ; ni acceptation.json ni le test ne sont modifiés."
+    statut: sourcee
+    source: "demande du lot L217 : « une fiche modifiée par des commits DU lot (fiche courante commitée, citant le lot) » ; garde de fond conservée de accept.ts:165 (une fiche qui évolue passe par le lot et sa revue)"
+    tests: ["R2 — commit de la fiche citant un autre lot : refus, message avec le sha fautif, fichiers intacts"]
+  - id: R3
+    cas: [C1]
+    enonce: "Une fiche avec des modifications non commitées (arbre de travail ou index différent de HEAD) est refusée avec « la fiche <fiche> a des modifications non commitées : la commiter (en citant <lot>) avant le rescellé »."
+    statut: sourcee
+    source: "demande du lot L217 : « fiche courante commitée »"
+    tests: ["R3 — fiche modifiée mais non commitée : refus, aucun rescellé"]
+  - id: R4
+    cas: [C1]
+    enonce: "Les gardes L200 sur les tests restent entières avec une fiche amendée : aucun autre test listé modifié ou absent depuis le rouge (message « autre(s) test(s) listé(s) modifié(s) depuis le commit rouge : … »), test nommé listé, scellé et réellement changé (« est inchangé depuis le scellé : rien à resceller »)."
+    statut: sourcee
+    source: "demande du lot L217 : « fiche amendée + un seul test + aucun autre test touché » ; src/orchestrate/accept.ts:166-168"
+    tests: ["R4 — fiche amendée et un second test listé modifié : refus", "R4 — fiche amendée mais test nommé inchangé : refus « rien à resceller »"]
+  - id: R5
+    cas: [C1]
+    enonce: "Fiche inchangée depuis le commit rouge : le rescellé se comporte exactement comme avant (aucune clé ficheAmendee, note du lot « fiche inchangée »). Avec une fiche amendée, la note du lot et le message de commit disent « fiche amendée en <sha> » à la place de « fiche inchangée »."
+    statut: hypothese
+    si_faux: "Seuls des textes de note et de commit changent ; aucune donnée en jeu."
+    tests: ["R5 — fiche inchangée : entrée de resceaux identique à L200, sans ficheAmendee", "R5 — fiche amendée : la note du lot mentionne « fiche amendée en <sha> »"]
+  - id: R6
+    cas: [C1]
+    enonce: "L'atomicité L200 vaut aussi fiche amendée : si le commit échoue, acceptation.json et le test reviennent à leur état d'avant et la fiche n'est jamais touchée par la commande."
+    statut: sourcee
+    source: "src/cli.ts:776-787 (retour atomique du rescellé) ; test/orchestrate-reseal.test.ts"
+    tests: ["R6 — hook pre-commit qui refuse, fiche amendée : journal et test restaurés, fiche intacte"]
+  - id: R7
+    cas: [C1]
+    enonce: "Après un rescellé avec fiche amendée, le nouveau commit rouge est le commit du rescellé : un second rescellé compare la fiche à ce commit (la fiche amendée n'est plus « modifiée depuis le rouge »), et le cycle adopte ce commit comme ancre (resceaux plus long, hors commits de session)."
+    statut: sourcee
+    source: "src/orchestrate/accept.ts:111-120 (resealedRouge) et redSha accept.ts:91-104"
+    tests: ["R7 — second rescellé après amendement : fiche inchangée depuis le nouveau rouge, pas de ficheAmendee", "R7 — resealedRouge adopte le commit d'un rescellé à fiche amendée"]
+  - id: R8
+    cas: [C1]
+    enonce: "Un commit « cite le lot » au sens de la détection de référence du plan (même lecture que raf commits : « feat(L217): … », « L217/t1 », liste comprise) ; pour un lot livré, c'est le porteur qui doit être cité."
+    statut: hypothese
+    si_faux: "Si la citation doit être plus stricte (sujet seul) ou plus large (corps), seule la fonction de détection change ; aucune donnée en jeu."
+    tests: ["R8 — commit « feat(L217/t1): fiche » reconnu comme citant L217", "R8 — lot livré : seule la citation du porteur compte"]
+  - id: R9
+    cas: [C1]
+    enonce: "La commande reste le seul chemin du lead : refus pendant une vague (CADENCE_ORCHESTRATED, verrou du dépôt), sans --reason, hors lot en cours ou livré, avec les messages L200 ; une fiche amendée ne les contourne pas."
+    statut: sourcee
+    source: "src/cli.ts:742-760"
+    tests: ["R9 — fiche amendée sous CADENCE_ORCHESTRATED : refus L200 inchangé"]
+
+contrats:
+  - id: A1
+    appel: commande spec reseal
+    entree: "cadence spec reseal <lot> <test> --reason texte [--porteur <lot en cours>] ; fiche éventuellement amendée par des commits du lot"
+    sortie: "code 0 ; commit test(<lot>): acceptation rescellée, <test> : <raison> ; resceaux gagne { test, raison, date, avant, apres, porteur?, ficheAmendee? } ; ligne « <lot> : <test> rescellé (<avant> → <apres>), commit <sha> … » avec « fiche amendée en <sha> » si amendée"
+    erreurs:
+      - { code: log error, message: "la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite pas <lot> : <sha7>" }
+      - { code: log error, message: "la fiche <fiche> a des modifications non commitées : la commiter (en citant <lot>) avant le rescellé" }
+      - { code: log error, message: "autre(s) test(s) listé(s) modifié(s) depuis le commit rouge : <fichiers> (le rescellé ne couvre que <test>, le verrou garde le reste)" }
+      - { code: log error, message: "<test> est inchangé depuis le scellé : rien à resceller" }
+      - { code: log error, message: "spec reseal : le commit du rescellé a échoué, <acceptation> et <test> sont revenus tels qu'avant la commande (rien n'est rescellé) — <détail>" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9]
+
+donnees:
+  - { id: D1, objet: "acceptation-<lot>.json, clé resceaux (journal des rescellés)", existant: true, modification: ajout, decision: "demandé par le lot L217 : « note ‹fiche amendée en <sha>› dans resceaux » ; clé facultative ficheAmendee sur l'entrée, comme porteur (accept.ts:25) ; les entrées existantes et leur lecture (accept.ts:74) restent valides, resealedRouge ne compte que la longueur", note: "clé facultative : une entrée sans elle se lit comme avant" }
+  - { id: D2, objet: "fiche du lot (docs/specs/<sujet>/fiche.yaml)", existant: true, modification: aucune, note: "lue via git (log, status), jamais écrite par la commande" }

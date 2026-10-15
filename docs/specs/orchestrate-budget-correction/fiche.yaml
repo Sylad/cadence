@@ -7,7 +7,7 @@ sujet:
     endpoints: []
     jobs: []
     hors_perimetre:
-      - "REVIEW_RESERVE (65 k, cycle.ts:550) et la règle fixAffordable (cycle.ts:553) : inchangés"
+      - "la forme de la règle fixAffordable (cycle.ts:553 : dépensé + réserve < budget) : inchangée, seule la valeur de la réserve change (R4)"
       - "un champ de plan qui déclarerait « touche la base » (schéma du plan publié : question posée au lead)"
       - "les plafonds de vague (--budget) et le plancher de 450 k d'un lot ordinaire (command.ts:69, mesure L194)"
 # Mesure (journaux .cadence/runs, 15-10) :
@@ -16,6 +16,8 @@ sujet:
 # revues Opus 86 à 92 k, fix 37 à 46 k). Lot S back : maritime B26.1 406 k / 450 k (implement 240 k, revue Opus 140 k).
 # Sur tous les journaux : fix Sonnet 497 passes, médiane 45 k, p90 65 k, max 124 k ; revue Opus 492, médiane 63 k, p90 106 k ;
 # revue courte Opus 272, médiane 45 k, p90 88 k ; revue Sonnet 87, p90 43 k ; revue courte Sonnet 39, p90 53 k.
+# Réserve : p90 fix 65 k + p90 revue courte Opus 88 k = 153 k, arrondi à 155 k (somme des p90 = majorant du p90 de la somme ;
+# la somme par lot n'a pas été recalculée, journaux non disponibles à cette session).
 # La chaîne avant implement de L120 (388 k) dépasse l'allocation de 350 k de 38 k.
 
 cas:
@@ -34,19 +36,19 @@ cas:
       - { si: "le lot n'a ni spec ni screen", alors: "budget inchangé", regles: [R3] }
     resultat: Un lot spec de 0,5 j dispose de 900 k au lieu de 800 k.
   - id: C2
-    titre: "La passe de correction n'a pas de quoi payer la revue qui la suivrait"
+    titre: "Le budget ne garantit pas la passe de correction ET la revue courte qui la suit"
     acteur: le planificateur de la vague
     declencheur: étape fix d'un lot (cycle.ts:598)
     preconditions:
       - la revue a rendu des constats bloquants ou majeurs
-      - dépensé + 65 k >= budget du lot, ou dépensé >= budget
+      - dépensé + 155 k >= budget du lot (réserve d'une passe fix et de la revue courte qui la suit), ou dépensé >= budget
     nominal:
       - "La session fix est refusée avant d'écrire (règle L145 inchangée)."
       - "Le lot est rendu au lead avec ses constats."
       - "La cause du tableau commence par « correction non jouée (budget) »."
     alternatives:
       - { si: "l'étape refusée est implement, spec ou accept", alors: "libellé actuel inchangé, sans « correction »", regles: [R5] }
-      - { si: "le budget du lot permet fix + 65 k", alors: "la passe est jouée", regles: [R4] }
+      - { si: "le budget du lot permet la réserve de 155 k", alors: "la passe est jouée, puis sa revue courte l'est aussi", regles: [R4] }
     resultat: Le lead voit dans le tableau que la correction n'a pas eu lieu faute de budget et la reprend à la main.
 
 regles:
@@ -70,13 +72,13 @@ regles:
     tests: ["R3 — lotBudget(0.5) vaut toujours 450000 sans étape spec"]
   - id: R4
     cas: [C2]
-    enonce: "La réserve de revue reste 65 000 : une passe fix est jouée seulement si dépensé + 65 000 < budget du lot."
+    enonce: "La réserve passe de 65 000 (revue seule) à 155 000, p90 mesuré d'une passe fix (65 k) plus d'une revue courte (88 k, Opus) arrondi : une passe fix est jouée seulement si dépensé + 155 000 < budget du lot, de sorte que la correction et la revue courte qui la suit soient payées. Sans budget de lot : toujours jouée (inchangé)."
     statut: sourcee
-    source: "src/orchestrate/cycle.ts:550-553 (L145, mesure du 09-10)"
-    tests: ["R4 — dépensé + 65000 juste sous le budget : le fix est joué", "R4 — dépensé + 65000 égal au budget : le fix est refusé"]
+    source: "réponse du lead à la question du lot : « la réserve doit garantir une passe de correction ET la revue courte qui la suit, dimensionnée sur le p90 mesuré d'une passe fix + revue courte dans les journaux » ; règle actuelle cycle.ts:550-553 (L145) dont seule la valeur change ; mesure 15-10 en tête de fiche"
+    tests: ["R4 — dépensé + 155000 juste sous le budget : le fix est joué", "R4 — dépensé + 155000 égal au budget : le fix est refusé", "R4 — lot sans budget : le fix est toujours joué"]
   - id: R5
     cas: [C2]
-    enonce: "Quand l'étape refusée est un fix (réserve non tenue ou budget atteint), l'outcome du lot commence par « correction non jouée (budget) : » ; le reste du texte actuel (budget du lot : x / y …, « étape « fix » non jouée », préfixe tests rouges) est conservé ; pour implement, spec et accept il n'y a pas ce préfixe."
+    enonce: "Quand l'étape refusée est un fix (réserve non tenue ou budget atteint), l'outcome du lot commence par « correction non jouée (budget) : » ; le reste du texte actuel (budget du lot : x / y …, « étape « fix » non jouée », préfixe tests rouges) est conservé, sauf le membre de la réserve reformulé en « il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (155000 réservés) » (formulation : hypothèse de rédaction, la valeur suit R4) ; pour implement, spec et accept il n'y a pas ce préfixe."
     statut: sourcee
     source: "demande du lot : « dire dans le tableau ‹correction non jouée (budget)› pour que le lead reprenne à la main » ; texte actuel cycle.ts:900-906"
     tests: ["R5 — fix refusé par la réserve : outcome commence par « correction non jouée (budget) : »", "R5 — fix refusé budget dépassé : même préfixe", "R5 — tests rouges après l'implémentation : préfixe puis « tests rouges après l'implémentation »", "R5 — implement refusé : pas de « correction non jouée »"]
@@ -97,8 +99,8 @@ contrats:
     regles: [R1, R2, R3]
   - id: A2
     appel: commande cadence orchestrate (vague)
-    entree: "un lot dont la revue vient de rendre des constats et dont le reste de budget est inférieur à 65 k"
-    sortie: "lot en statut handed-back, outcome « correction non jouée (budget) : budget du lot : x / y tokens comptés (…), il ne reste pas de quoi payer la revue qui suivrait la correction (65000 réservés) : étape « fix » non jouée, à décider par le lead »"
+    entree: "un lot dont la revue vient de rendre des constats et dont le reste de budget est inférieur à 155 k"
+    sortie: "lot en statut handed-back, outcome « correction non jouée (budget) : budget du lot : x / y tokens comptés (…), il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (155000 réservés) : étape « fix » non jouée, à décider par le lead »"
     erreurs: []
     sans_erreur: "l'absence de budget n'est pas une erreur de la commande mais un statut du lot ; elle ne produit ni code ni journal d'erreur"
     regles: [R4, R5, R6]

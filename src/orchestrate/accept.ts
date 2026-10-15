@@ -172,7 +172,7 @@ export function resealAcceptation(repo: string, path: string, test: string, reas
     const citant = new Set([a.lot, ...(porteur ? [porteur] : [])]);
     const commits = git(repo, 'log', '--format=%H%x1f%s%x1f%b%x1e', `${red}..HEAD`, '--', a.fiche).split('\x1e').map((r) => r.replace(/^\n/, '')).filter(Boolean).map((r) => { const [sha = '', subject = '', body = ''] = r.split('\x1f'); return { sha, day: '', subject, body: body.trim() }; });
     const fautif = commits.find((c) => !citedRefs(c, refsOf).some((r) => citant.has(r.lot)));
-    if (fautif) throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite pas ${a.lot}${porteur ? ` (ni le porteur ${porteur})` : ''} : ${fautif.sha.slice(0, 7)}`);
+    if (fautif) throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite pas ${a.lot} : ${fautif.sha.slice(0, 7)}`);
     ficheAmendee = commits[0]?.sha.slice(0, 7);
   }
   const touches = fichiers.filter((f) => f !== norm && (!gitOk(repo, 'diff', '--quiet', red, '--', f) || !existsSync(join(repo, f)) || a.empreintes?.[f] !== git(repo, 'hash-object', '--', f).trim()));

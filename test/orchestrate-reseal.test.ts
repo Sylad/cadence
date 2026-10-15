@@ -573,7 +573,7 @@ describe('cadence spec reseal avec une fiche amendée dans le lot (L217)', () =>
       corrige(repo, a.test);
       const fn = () => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-15', 'L2', refsL);
       if (attendu) expect(fn).not.toThrow();
-      else expect(fn).toThrow(/ne cite pas L1 \(ni le porteur L2\)/);
+      else expect(fn).toThrow(/ne cite pas L1 : [0-9a-f]{7}$/);
     }
   });
 

@@ -97,6 +97,7 @@ contrats:
     sortie: "code 0 ; commit test(<lot>): acceptation rescellée, <test> : <raison> ; resceaux gagne { test, raison, date, avant, apres, porteur?, ficheAmendee? } ; ligne « <lot> : <test> rescellé (<avant> → <apres>), commit <sha> … » avec « fiche amendée en <sha> » si amendée"
     erreurs:
       - { code: log error, message: "la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite pas <lot> : <sha7>" }
+      - { code: log error, message: "la fiche <fiche> a été supprimée ou renommée depuis le commit rouge <sha7> : le rescellé ne vaut que pour une fiche présente" }
       - { code: log error, message: "la fiche <fiche> a des modifications non commitées : la commiter (en citant <lot>) avant le rescellé" }
       - { code: log error, message: "autre(s) test(s) listé(s) modifié(s) depuis le commit rouge : <fichiers> (le rescellé ne couvre que <test>, le verrou garde le reste)" }
       - { code: log error, message: "<test> est inchangé depuis le scellé : rien à resceller" }

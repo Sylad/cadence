@@ -275,3 +275,16 @@ describe('renderTable : ligne de base (L213)', () => {
     expect(renderTable(wave, [l]).join('\n')).toContain('(abcdef1, annoncé par la session, non vérifié)');
   });
 });
+
+describe('renderTable : correction non jouée (L218)', () => {
+  it('R6 — tableau d\'un lot rendu sur un fix refusé : la ligne contient « correction non jouée (budget) » et les constats', () => {
+    const l = lot();
+    l.status = 'handed-back';
+    l.outcome = 'correction non jouée (budget) : budget du lot : 400000 / 540000 tokens comptés (dérivé de l\'estimate), il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (155000 réservés) : étape « fix » non jouée, à décider par le lead';
+    l.constats = [{ source: 'code', gravite: 'majeur', fichier: 'src/a.ts', ligne: 3, texte: 'un défaut' }];
+    const out = renderTable(wave, [l]);
+    const line = out.find((x) => x.startsWith('demo:L1 — '));
+    expect(line).toContain('correction non jouée (budget) : budget du lot : 400000 / 540000');
+    expect(out).toContain('    · [majeur] src/a.ts:3 — un défaut');
+  });
+});

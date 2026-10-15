@@ -62,6 +62,8 @@ export interface Lot {
   ux?: Verdict;
   /** Revue de code enregistrée par `raf review`. */
   review?: Verdict;
+  /** Condition de tirage (L219) : pas avant `count` lots done portant le critère. Absente sans champ `gate`. */
+  gate?: Gate;
   /** Champs écrits à la main illisibles (dates mal formées…), remontés par check. */
   problems: string[];
 }
@@ -75,11 +77,16 @@ export interface LotRepoDecl {
   cite?: string;
 }
 
+/** Condition de tirage d'un lot : `count` lots done portant `spec: true` ou `screen: page`. Mal formée (`invalid`), elle n'est jamais remplie. */
+export type Gate = { count: number; criterion: 'spec' | 'screen'; invalid?: undefined } | { invalid: true };
+
+export const GATE_INVALID = 'gate invalide : count: entier ≥ 1 et un critère spec: true ou screen: page attendus';
+
 export class RafError extends Error {}
 
 export type Ref = { lot: string; task?: string };
 
-export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'screen', 'spec', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent'] as const;
+export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'screen', 'spec', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent', 'gate'] as const;
 /** Nature de l'écran d'un lot visible : nouvelle page, nouveau composant, parcours modifié. */
 export const SCREENS = ['page', 'component', 'journey'] as const;
 export type Screen = (typeof SCREENS)[number];
@@ -667,6 +674,7 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
         finished: day('finished'),
         notes: typeof notes === 'string' ? [{ text: notes }] : notes,
         repos: pick('repos'),
+        gate: pick('gate'),
       },
       problems,
     );
@@ -685,6 +693,22 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
     }
   }
   return lots;
+}
+
+/** Lit `gate: { count: N, spec: true }` ou `{ count: N, screen: page }` ; toute autre forme est un problème du lot et une condition jamais remplie. */
+function readGate(raw: unknown, problems: string[]): Gate | undefined {
+  if (raw == null) return undefined;
+  const invalid = (): Gate => {
+    problems.push(GATE_INVALID);
+    return { invalid: true };
+  };
+  if (typeof raw !== 'object' || Array.isArray(raw)) return invalid();
+  const g = raw as Record<string, unknown>;
+  if (!Number.isInteger(g.count) || (g.count as number) < 1) return invalid();
+  const criteria = [...(g.spec === true ? ['spec' as const] : []), ...(g.screen === 'page' ? ['screen' as const] : [])];
+  const others = Object.keys(g).filter((k) => k !== 'count' && k !== 'spec' && k !== 'screen');
+  if (criteria.length !== 1 || others.length || ('spec' in g && g.spec !== true) || ('screen' in g && g.screen !== 'page')) return invalid();
+  return { count: g.count as number, criterion: criteria[0]! };
 }
 
 /** Un titre public vide ne dirait rien au public : refusé plutôt qu'écrit. */
@@ -716,6 +740,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     if (raw.spec === true) spec = true;
     else if (raw.spec !== false) problems.push(`spec : true ou false attendu (reçu « ${String(raw.spec)} »)`);
   }
+  const gate = readGate(raw.gate, problems);
   return {
     id: String(raw.id),
     title: String(raw.title ?? ''),
@@ -725,6 +750,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     visible: raw.visible === true,
     ...(screen ? { screen } : {}),
     ...(spec ? { spec } : {}),
+    ...(gate ? { gate } : {}),
     ...(typeof raw.public === 'string' && raw.public.trim() !== '' ? { public: raw.public.trim() } : {}),
     ...(Number.isInteger(raw.every) && (raw.every as number) > 0 ? { every: raw.every as number } : {}),
     ...(last ? { last } : {}),

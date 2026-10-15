@@ -296,6 +296,27 @@ export function reviewIssues(plan: Plan, root: string, byLot: Map<string, Commit
     }));
 }
 
+/** Avancement de la condition de tirage d'un lot (L219) ; `undefined` sans champ `gate`. Le compte porte sur tous les lots du plan, récurrents compris. */
+export interface GateProgress {
+  count: number;
+  n: number;
+  label: string;
+  met: boolean;
+}
+
+export function gateProgress(all: Lot[], lot: Lot): GateProgress | undefined {
+  const g = lot.gate;
+  if (!g) return undefined;
+  if (g.invalid) return { count: 0, n: 0, label: '', met: false };
+  const count = all.filter((l) => l.status === 'done' && (g.criterion === 'spec' ? l.spec === true : l.screen === 'page')).length;
+  return { count, n: g.count, label: g.criterion === 'spec' ? 'spec: true' : 'screen: page', met: count >= g.count };
+}
+
+/** « <compte>/<N> lots <critère> faits » ; un gate mal formé n'a pas d'avancement à dire. */
+export function gateText(p: GateProgress): string {
+  return p.n === 0 ? 'condition de tirage invalide' : `${p.count}/${p.n} lots ${p.label} faits`;
+}
+
 /** Ce qui vient ensuite : lots en cours, puis lots prêts (dépendances closes), gains rapides d'abord. */
 export function nextUp(all: Lot[]): { doing: Lot[]; ready: Lot[]; blocked: Lot[] } {
   // Les lots récurrents ont leur propre section (raf now) : ils ne sont ni « en cours » ni « à suivre ».
@@ -303,7 +324,7 @@ export function nextUp(all: Lot[]): { doing: Lot[]; ready: Lot[]; blocked: Lot[]
   const byId = new Map(lots.map((l) => [l.id, l]));
   const doing = lots.filter((l) => l.status === 'doing');
   const ready = lots
-    .filter((l) => l.status === 'todo' && l.after.every((d) => !byId.has(d) || !isOpen(byId.get(d)!.status)))
+    .filter((l) => l.status === 'todo' && l.after.every((d) => !byId.has(d) || !isOpen(byId.get(d)!.status)) && (gateProgress(all, l)?.met ?? true))
     .sort((a, b) => Number(b.quickwin) - Number(a.quickwin));
   const blocked = lots.filter((l) => l.status === 'todo' && !ready.includes(l));
   return { doing, ready, blocked };

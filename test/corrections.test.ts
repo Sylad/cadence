@@ -444,6 +444,25 @@ describe('cadence corrections', () => {
     expect(readRuns(runs, undefined, '2026-10-10T16:00:00Z').lots).toHaveLength(1);
   });
 
+  it('R9 — --since et --until ensemble lisent une fenêtre de dates de création : --since strict, --until inclusif, les vagues hors fenêtre sont écartées', () => {
+    const runs = tempDir();
+    const e = (h: string) => `2026-10-10T${h}.000Z`;
+    const vague = (id: string, created: string, lotId: string) => {
+      lot(runs, id, 'alpha', lotId, [{ kind: 'implement', ended: e('08:00:00') }, { kind: 'fix', ended: e('08:30:00') }]); // étapes closes avant toute borne : seule la création fait la fenêtre
+      writeFileSync(join(runs, id, 'wave.json'), JSON.stringify({ id, created }));
+    };
+    vague('w1', e('09:00:00'), 'L1'); // avant --since
+    vague('w2', e('10:00:00'), 'L2'); // pile à --since : strict, écartée
+    vague('w3', e('12:00:00'), 'L3'); // dans la fenêtre
+    vague('w4', e('18:00:00'), 'L4'); // pile à --until : inclusif, gardée
+    vague('w5', e('20:00:00'), 'L5'); // après --until
+    const fenetre = readRuns(runs, '2026-10-10T18:00:00Z', '2026-10-10T10:00:00Z');
+    expect(fenetre.lots.map((l) => l.lot)).toEqual(['L3', 'L4']);
+    expect(fenetre.passes.map((p) => p.key)).toEqual(['w3/alpha--L3/2', 'w4/alpha--L4/2']);
+    expect(readRuns(runs, '2026-10-10T18:00:00Z').lots).toHaveLength(4); // --until seul
+    expect(readRuns(runs, undefined, '2026-10-10T10:00:00Z').lots).toHaveLength(3); // --since seul
+  });
+
   it('--until écarte une vague sans date lisible', () => {
     const runs = tempDir();
     lot(runs, 'w1', 'alpha', 'L1', [{ kind: 'implement' }, { kind: 'fix' }]);

@@ -1007,15 +1007,18 @@ task « vague `<id>` : `<project>:<lot>`, … », starts the wave with `--wave <
 The Claude Code status band is the `cadence-hud` plugin.
 
 **Cycle of a lot**: preconditions (clean tracked files, lot `todo` or `doing`, dependencies met) →
-`raf start` (committed alone) → implementation → **UX review** if the lot is `visible` and the app is
-declared → **code review**, which always comes last (a UX fix changes code) → compliant (no blocking, no
-major finding) → `raf review` is recorded by the orchestrator with the sha the review read, then
-"ready to deliver". Not compliant → a correction in a new session, then a new review (the UX review of a
-visible lot is replayed too, the code having changed), **two passes at most** (a third when the review converges: the count of blocking + major findings dropped
+`raf start` (committed alone) → implementation → **code review** → compliant (no blocking, no
+major finding) → **UX review** if the lot is `visible` and the app is declared, **once**, on the code the review
+found compliant (L221) → `raf review` is recorded by the orchestrator with the sha the *code* review read (the UX
+verdict stays in the lot state, `uxVerdict`), then "ready to deliver". Not compliant → a correction in a new session,
+then a new code review, with no UX session in between; a UX review that finds a blocking or major point sends the lot
+to a correction (which receives the UX findings), then the code review, then the UX review again. **Two passes at most** (a third when the review converges: the count of blocking + major findings dropped
 since the previous review and exactly one is left; the lot budget still applies), then the lot goes back to
 you with the findings. A small lot (`estimate` ≤ 0.5 or `quickwin`) gets one single Opus pass for code and
 usability (code only when the lot is not `visible`). Failing tests (reported red, or red when
 `orchestrate.test` is run) go straight to a correction.
+
+**One UX review per lot (L221)**: the UX review of a `visible` lot used to run before the code review and again after every correction (finance L75 on 2026-10-15: three Opus UX sessions for one useful verdict). It now runs once, as the last step, on the code the review found compliant: after the single pass on minor findings and its short review when there is one. Without `orchestrate.ux`, or when the app does not start (port taken, silent app), no UX session is played: the lot concludes on the compliant code review and keeps its note (« UX à faire par le lead », « UX non vérifiée : … »). The lot budget bounds writing, never this review; an exhausted wave budget suspends it like any session. Every write step (implementation, correction) clears the lot's UX state (`ux`, `uxVerdict`, UX findings), so a stale UX verdict never sends a compliant code review back to a correction. A resumed wave whose state says `next = ux` (written before this change) replays the code review first unless the last compliant one read the current `HEAD`. The recorded `raf review` verdict and sha are the code review's; a commit made by someone else since that review hands the lot back, as before. A small lot and a lot with no screen keep their single review. The measure before/after is in [`docs/mesures/ux-une-fois-2026-10-15.md`](docs/mesures/ux-une-fois-2026-10-15.md).
 
 **Tests already red at the start (L213)**: a lot is no longer handed back « tests rouges » for failures that were there before it. When `orchestrate.test` fails (or the session reports red tests), the program reads the failing tests from the runner's output (vitest/jest `FAIL`/`●`, pytest `FAILED`, go `--- FAIL:`, TAP `not ok`), replays the same command at the sha the lot started from (the parent of the lot's oldest work commit, plan-only commits left out, else the `HEAD` before its first session) in a throwaway `git worktree` outside the repository, and compares: if every failing test was already red, it is not a defect of the lot — no correction pass, the code review takes place, the reviewer is told, and the final table lists them apart (`déjà rouge au départ (<sha>) : <test>`, 30 at most then a count). The worktree gets links to the repository's ignored folders at any depth, such as `.venv` and, in a monorepo, `packages/*/node_modules`, when their parent exists at that sha; build outputs such as `dist` or `coverage` are left out. Each `node_modules` is rebuilt entry by entry, every entry linked to the live one except the workspace links of npm, pnpm and yarn (`node_modules/@x/shared -> ../../packages/shared`, a link to code of the repository outside any `node_modules`), which are remade towards the worktree's own copy so that the start sha is tested against its own sources, not the lot's (a workspace package that does not exist at the start sha gets no link). Known limit: only `node_modules` links are remade; whatever points into the live repository by an absolute path, such as an editable Python install (`.venv` with a `.pth` file naming the live `src`, `pip install -e`) or an absolute symlink in another ignored folder, still runs the lot's code in the baseline. Likewise, a workspace package consumed through its build output (`main: dist/...`) cannot load in the baseline worktree: output dirs are not linked and nothing is built there, so such a monorepo keeps the pre-L213 « tests rouges » outcome. A lot resumed in a later wave keeps the same baseline: the sha is the parent of its oldest work commit, not the `HEAD` of the new wave, so a failure the lot itself introduced in an earlier wave is never excused. A test red now and not at the start stays a blocking finding, and only that one is given to the correction (the others are counted as « already red »). When the output names no test, or the baseline cannot be run, the tests stay red as before (no comparison is guessed). A failure the output does not tie to a test (unhandled error, a spec file that fails to load such as jest « Test suite failed to run » or vitest `FAIL  a.test.ts [ a.test.ts ]`, coverage threshold) keeps the tests red. Without `orchestrate.test` the program cannot replay anything: a session that reports green tests and lists under `echecsDeBase` the failures it saw at the start sha gets them listed apart, marked « non vérifié » in the table, and the review takes place; a session that reports the tests red stays red, the brief asking it not to report red for base failures alone — unless (L215) the report says so in a structured way: with `vert: false`, a non-empty `echecsDeBase` and an empty `nouveauxEchecs` (the list of tests red now that were not red at the start sha), `vert: false` is not a reason to correct, the lot carries a « non vérifié » warning, the reviewer is told that the baseline is unverified and the review takes place. A non-empty `nouveauxEchecs` with `vert: false` triggers a correction pass (the new failures are in the finding); an absent `nouveauxEchecs`, or an empty `echecsDeBase`, keeps the correction. The program never guesses from the text of the result (« 24 failed »). The `implement` and `fix` briefs ask for `echecsDeBase` and `nouveauxEchecs`.
 
@@ -1060,7 +1063,7 @@ lot that already has commits is never pre-checked (resuming it is legitimate). `
 ### The spec step of a lot with `screen:`
 
 A lot that declares `screen:` (`raf add … --visible --screen page|component|journey`, or `raf screen <id> page|component|journey` on a lot that already exists, see [raf](#raf)) gets, when it is `page`, one more session, `spec`, **after** the pre-check and **before**
-the first implementation: `precheck → spec → maquette → accept → implement → ux → review` (`maquette` unless `orchestrate.maquette: false`, see [The mockup review](#the-mockup-review-before-any-code); `accept` only when the project declares `orchestrate.accept`, see below). A lot without `screen:` or `spec: true` follows the usual path, unchanged (a lot with `spec: true` and no screen has its own chain, see [The spec step of a lot with `spec: true`](#the-spec-step-of-a-lot-with-spec-true)). `--dry-run` lists the step
+the first implementation: `precheck → spec → maquette → accept → implement → review → ux` (`maquette` unless `orchestrate.maquette: false`, see [The mockup review](#the-mockup-review-before-any-code); `accept` only when the project declares `orchestrate.accept`, see below). A lot without `screen:` or `spec: true` follows the usual path, unchanged (a lot with `spec: true` and no screen has its own chain, see [The spec step of a lot with `spec: true`](#the-spec-step-of-a-lot-with-spec-true)). `--dry-run` lists the step
 (`spec (sonnet)`), its command line and its brief `templates/orchestrate/spec.md`.
 
 - **Threshold** (L209): only `screen: page` enters this chain. The measure of 2026-10-12 (no row of the success table reached, about 570 k tokens per lot, 4.5 correction passes per journey lot) narrowed it: `component` and `journey` stay valid values of `screen:` (no existing plan breaks, `raf screen` still sets them) but a lot that carries one follows the ordinary path and gets the ordinary budget, without the 1.3 M flat rate. A lot already in the chain (its sheet, or its `acceptation-<lot>.json`, exists) keeps its sheet and its lock. The `spec: true` step and the back part of a mixed lot do not change. The next measure covers 8 `page` lots.
@@ -1105,7 +1108,7 @@ A lot that changes a behaviour but has no screen (`raf add … --spec`, or `raf 
 
 ### The mockup review: before any code
 
-After a valid spec, a lot with a sheet gets a UX review of its mockup, `maquette` (L172), unless `cadence.yaml` sets `orchestrate.maquette: false` (default `true`): `precheck → spec → maquette → accept → implement → ux → review`.
+After a valid spec, a lot with a sheet gets a UX review of its mockup, `maquette` (L172), unless `cadence.yaml` sets `orchestrate.maquette: false` (default `true`): `precheck → spec → maquette → accept → implement → review → ux`.
 `--dry-run` lists the step (`maquette (opus)`, the `review.full` model), its `ux-reviewer` command line and its brief `templates/orchestrate/maquette.md`.
 
 - **The session**: the `ux-reviewer` agent in **mockup mode**, read-only, Playwright loaded, a fresh session. It opens `maquette.html` as a local file (no application, no server), looks at the captures
@@ -1121,7 +1124,7 @@ After a valid spec, a lot with a sheet gets a UX review of its mockup, `maquette
 ### The accept step: red acceptance tests and their lock
 
 After a valid spec, and only when `cadence.yaml` declares `orchestrate.accept` (the project's **dedicated command**, or a list of them, which run *only* the acceptance tests of one lot), a lot with a sheet gets one more
-session, `accept` (L173): `precheck → spec → maquette → accept → implement → ux → review`. Without `orchestrate.accept` the step is skipped, with a warning on the lot (`étape accept ignorée …`), and the lot goes from `spec` to `implement` as before.
+session, `accept` (L173): `precheck → spec → maquette → accept → implement → review → ux`. Without `orchestrate.accept` the step is skipped, with a warning on the lot (`étape accept ignorée …`), and the lot goes from `spec` to `implement` as before.
 `--dry-run` lists the step (`accept (sonnet)`) and its brief `templates/orchestrate/accept.md`.
 
 - **The session**: Sonnet, the `acceptance-writer` agent, a session other than the implementer's. Its brief gives it the sheet, the mockup and how to run the project's tests (the dedicated command, and the runner template below) — not the lot's objective, notes or
@@ -1223,7 +1226,7 @@ correction passes stays the guard against a loop; with no commit on the lot it i
 **Compliant with minor findings**: the minors are not left for a follow-up lot. One **minors pass** runs
 before concluding: a new Sonnet session with its own brief (`fix-minors.md`) fixes the minors that are right
 and lists in `choix`, with the reason, the ones it rejects (it never stops to ask); it does not count among the
-two defect passes. A short code re-review follows (for a visible lot, after the UX review replayed), and
+two defect passes. A short code re-review follows (for a visible lot, the UX review comes after it), and
 concludes even when it finds new minors, which are returned to you as proposals (no second minors pass).
 When the pass makes no commit (every minor judged wrong) and HEAD has not moved since the compliant review,
 the lot concludes on that original review (if HEAD moved, e.g. a resume after a cut-off session that had
@@ -1355,7 +1358,7 @@ upstream ref and `git ls-remote` are compared with the "before" (a `git checkout
 **Budget**: the wave counts input + cache writes + output tokens (default 2 M); cache reads are kept and
 shown apart. Each lot also has its own budget, the 90th percentile of the *total* measured per lot on `.cadence/runs` (all the waves a lot went through, 250 lots) for its category (L194): an ordinary lot of up to 0.5 day gets 540 k (floor: a write pass, its review, one fix pass and the short review after it, 155 k being reserved for those last two; measured p90 374 k), 0.5 to 1 day 750 k (p90 732 k), then 570 k per day of estimate, 750 k staying the floor until that exceeds it, i.e. up to 1.3 day (p90 1.14 M for 2 days); a lot with `screen: page` gets 1.3 M whatever its estimate (`component` and `journey` keep the ordinary budget; p90 1.28 M: spec, mockup, accept, conformity UX and passes), or its ordinary budget plus 450 k beyond that; a lot with `spec: true` gets its ordinary budget plus 450 k (the back chain measured on L120: 388 k); shown by
 `--dry-run` with its basis): it bounds the *writing* passes, never the reviews. A lot that spent it gets no further implementation or
-fix and is handed back to the lead, but its review (and UX review) is played first; a fix pass starts only if
+fix and is handed back to the lead, but its review (and its single UX review, once the code review is compliant) is played first; a fix pass starts only if
 the remaining budget can also pay the fix and the short review that follows it (155 k tokens reserved: the p90 of a fix
 pass, 65 k over 497 passes, plus the p90 of a short Opus review, 88 k over 272; measured on 2026-10-15 in the wave journals
 `.cadence/runs`). A lot refused that fix is handed back with the cause `correction non jouée (budget) :` first, so the lead
@@ -1437,8 +1440,8 @@ orchestrate:
 **`orchestrate.ux`, who starts the app**: a string is a URL if it starts with `http://` or `https://`, a launch
 command otherwise; both forms behave as before (the `ux` brief gives the URL, or tells the session to start the app
 with the command and stop it). The object form `{ command, url, timeout? }` makes **the program** start the app, not
-the UX session. Before the `ux` step (and before the `review-small` single pass of a small `visible` lot, which follows
-the same rule) the orchestrator:
+the UX session. Before the `ux` step (played once, after the compliant code review, L221) and before the `review-small` single pass of a small `visible` lot, which follows
+the same rule, the orchestrator:
 
 0. takes a lock on the `host:port` of `url` (a file `cadence-ux-<host>-<port>.lock` in the OS temp folder, created
    exclusively, containing the pid of the orchestrator; a lock whose pid is dead is taken over). Another wave — in

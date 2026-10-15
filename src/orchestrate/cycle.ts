@@ -1486,6 +1486,12 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     badReport(c, done.step, e);
     return;
   }
+  // L'écriture a changé le code (L221) : le verdict et les constats de la revue UX d'avant ne valent plus, l'UX est rejouée après la prochaine revue de code conforme.
+  if (!l.small) {
+    l.ux = undefined;
+    l.uxVerdict = null;
+    l.constats = l.constats.filter((k) => k.source !== 'ux');
+  }
   const plan = c.loadPlan();
   const range = done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined;
   const commits: Commit[] = readCommits(l.repo, { range });
@@ -1626,21 +1632,18 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
 const codeReview = (l: LotState): StepKind => (l.minorPass ? 'review-small' : 'review');
 
 /**
- * Première étape après un travail d'écriture. Le code vient de changer : l'UX d'un lot visible est donc toujours rejouée
- * (une revue antérieure serait périmée), puis une revue de code clôt le cycle.
+ * Première étape après un travail d'écriture (L221) : la revue de code, jamais l'UX. La revue UX d'un lot visible est jouée une seule fois,
+ * après la dernière revue de code conforme (`uxAfterReview`), sur le code qui sera livré.
  */
 function firstReview(c: LotCtx): StepKind {
   const l = c.lot;
   if (l.small) return l.visible || l.minorPass ? 'review-small' : 'review'; // passe unique code + ergonomie ; sans écran, une revue de code
-  if (l.visible) {
-    if (!c.config.ux) {
-      l.uxNote = 'UX à faire par le lead (aucune application déclarée : cadence.yaml orchestrate.ux)';
-      return codeReview(l);
-    }
-    return 'ux';
-  }
+  if (l.visible && !c.config.ux) l.uxNote = 'UX à faire par le lead (aucune application déclarée : cadence.yaml orchestrate.ux)';
   return codeReview(l);
 }
+
+/** La revue de code conforme d'un lot visible non petit est-elle suivie de la revue UX ? Sans `orchestrate.ux`, le lot conclut (note « UX à faire par le lead »). */
+const uxAfterReview = (c: LotCtx): boolean => !c.lot.small && c.lot.visible && !!c.config.ux;
 
 /** Une passe de correction de plus, ou la main rendue au lead quand les deux sont faites. */
 function toFix(c: LotCtx, constats: Constat[], what: string): void {
@@ -1673,12 +1676,19 @@ const appNote = (state: AppState, ux: { url?: string }): string =>
 async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promise<void> {
   const l = c.lot;
   const ux = c.config.ux;
+  // Un état repris, écrit avant L221, peut porter next = ux : l'UX ne part que sur une revue de code conforme du HEAD courant, sinon la revue de code passe d'abord (R9).
+  if (kind === 'ux' && !(l.code?.conforme && l.code.head === git(l.repo, 'rev-parse', 'HEAD'))) {
+    l.next = codeReview(l);
+    save(c);
+    return;
+  }
   if (!ux?.command || !ux.url || !seesApp(l, kind)) return reviewStep(c, kind);
   const halt = halted(c.wave, l);
   if (halt) {
     suspend(c, halt); // la session n'aurait pas lieu : l'application ne se lance pas pour rien
     return;
   }
+  let skipped = false;
   c.wave.log(`${lotKey(l.project, l.lot)} · lancement de l'application (${ux.url})`);
   const app = await startApp({ command: ux.command, url: ux.url, cwd: l.repo, nodeBin: l.node?.link, log: join(c.wave.store.lotDir(l.project, l.lot), 'ux-app.log'), timeoutMs: (ux.timeout ?? APP_TIMEOUT_S) * 1000 });
   try {
@@ -1687,12 +1697,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
       l.uxNote = appNote(app.state, ux);
       c.wave.log(`${lotKey(l.project, l.lot)} · ${l.uxNote.split('\n')[0]}`);
       if (kind === 'ux') {
-        // Aucune session : une revue UX antérieure, périmée par le code qui a changé, ne pèse plus.
-        l.ux = undefined;
-        l.uxVerdict = null;
-        l.constats = l.constats.filter((k) => k.source !== 'ux');
-        l.next = codeReview(l);
-        save(c);
+        skipped = true; // aucune session : la revue de code conforme suffit, le lot conclut avec la note
         return;
       }
     } else if (l.uxNote?.startsWith('UX non vérifiée')) l.uxNote = undefined;
@@ -1700,6 +1705,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   } finally {
     c.app = undefined;
     await app.stop();
+    if (skipped && l.code) await conclude(c, l.code);
   }
 }
 
@@ -1720,8 +1726,10 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     addProposals(c, rep, 'ux');
     l.uxVerdict = summary.verdict;
     l.constats = blockingConstats(rep, 'ux');
-    l.next = codeReview(l); // la revue de code clôt toujours le cycle
     save(c);
+    // L'UX est la dernière étape (L221) : conforme, le lot conclut avec la revue de code ; sinon une correction (jamais une revue de code d'office), la revue de code et l'UX rejouée suivent.
+    if (summary.conforme) await conclude(c, l.code!);
+    else toFix(c, l.constats, 'UX non conforme');
     return;
   }
   l.code = summary;
@@ -1731,17 +1739,16 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     l.ux = summary;
     l.uxVerdict = summary.verdict;
   }
-  const uxOk = l.small || !l.ux || l.ux.conforme;
   const minors = minorConstats(rep);
   // Revue conforme avec mineurs : une seule passe de correction des mineurs, avant de conclure (rien sous le tapis).
   // Budget épuisé : la passe n'aurait aucune session pour la jouer, le lot conclut sur la revue conforme et rend les mineurs.
-  const wanted = summary.conforme && uxOk && !l.minorPass && !l.light && minors.length > 0; // lot léger : les mineurs restent des notes (L108)
+  const wanted = summary.conforme && !l.minorPass && !l.light && minors.length > 0; // lot léger : les mineurs restent des notes (L108)
   const noBudget = wanted && (w.budget.exhausted || !fixAffordable(l)) && !w.incident && !w.quota.hit;
   const minorPass = wanted && !noBudget;
   if (noBudget) l.warnings.push(`${w.budget.exhausted ? 'budget atteint' : 'budget du lot trop juste pour payer la correction et la revue courte qui la suivrait'} : la passe des mineurs n'a pas eu lieu, mineurs rendus en propositions`);
   // Les mineurs confiés à la passe ont pu être proposés par une revue non conforme antérieure : si la revue qui la suit est
   // conforme, ils sont traités et ne restent pas en propositions (ceux que cette revue signale encore sont ajoutés juste après).
-  if (l.minorPass && !minorPass && summary.conforme && uxOk && l.minorLines?.length) {
+  if (l.minorPass && !minorPass && summary.conforme && l.minorLines?.length) {
     // Chaque mineur confié retire UNE proposition : la même ligne d'abord, sinon une de même fichier et même texte (le correctif a pu décaler la ligne).
     // Un autre mineur de même fichier et même texte, à une autre ligne, reste donc proposé. Limite connue : un texte reformulé n'est pas reconnu et reste proposé.
     const left = [...l.proposals];
@@ -1756,7 +1763,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     l.minorLines = [];
   }
   addProposals(c, rep, 'code', !minorPass);
-  if (summary.conforme && uxOk) (l.reviewCounts ??= []).push(0); // une revue conforme compte pour 0 dans la comparaison de la convergence (L205)
+  if (summary.conforme) (l.reviewCounts ??= []).push(0); // une revue conforme compte pour 0 dans la comparaison de la convergence (L205)
   if (minorPass) {
     l.minorPass = true;
     l.minorPassAt = l.pass;
@@ -1767,18 +1774,16 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     save(c);
     return;
   }
-  if (summary.conforme && uxOk) {
-    await conclude(c, summary);
+  if (summary.conforme) {
+    if (uxAfterReview(c)) {
+      l.next = 'ux';
+      save(c);
+    } else await conclude(c, summary);
     return;
   }
-  const constats = [...blockingConstats(rep, 'code'), ...(!l.small && l.ux && !l.ux.conforme ? uxConstatsKept(c) : [])];
+  const constats = blockingConstats(rep, 'code');
   (l.reviewCounts ??= []).push(constats.length);
   toFix(c, constats, 'revue non conforme');
-}
-
-/** Constats UX de la dernière revue UX, gardés dans l'état par la revue elle-même (l.constats avant la revue de code). */
-function uxConstatsKept(c: LotCtx): Constat[] {
-  return c.lot.constats.filter((k) => k.source === 'ux');
 }
 
 /** Revue conforme : le verdict est enregistré avec le sha relu, puis le commit du plan. `raf done` reste au lead. */

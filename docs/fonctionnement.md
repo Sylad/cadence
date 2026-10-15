@@ -38,11 +38,13 @@ to the lead; « partial » passes what exists to the implementation. Then:
   declares `orchestrate.accept`.
 - every other lot goes straight to the **implementation**: test first, commits that cite the lot.
 
-After the implementation: the **UX pass** if the lot is `visible` and the project says how to see its
-app (`orchestrate.ux`); the **code review** (Opus, Sonnet for a lot of 0.25 day or less); a
+After the implementation: the **code review** (Opus, Sonnet for a lot of 0.25 day or less); a
 **correction** in a fresh session if the review is not compliant, two passes at most, and a third
 only when the review converges (the count of blocking + major findings dropped and only one is
-left), each followed by a review. A compliant review makes the program record `raf review` itself.
+left), each followed by a review. A compliant review makes the program record `raf review` itself;
+for a `visible` lot whose project says how to see its app (`orchestrate.ux`), the **UX pass** comes
+once, after the compliant code review (a blocking or major UX finding sends the lot to a correction,
+then the code review, then the UX pass again).
 A small lot (estimate of 0.5 day or less, or `quickwin`) has a single review pass, with no separate UX pass:
 `review-small` covering code and usability when the lot is `visible`, a code `review` otherwise.
 

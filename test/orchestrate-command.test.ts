@@ -186,6 +186,20 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it("R8 — dry-run d'un lot visible : la ligne étapes liste review avant ux (L221)", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un', visible: true }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  ux:\n    url: http://localhost:4200\n');
+    git(dirs.a, 'add', '--', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: config');
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      const line = r.out.join('\n').split('\n').find((x) => x.includes('étapes :'))!;
+      expect(line).toMatch(/étapes : implement \(\w+\) → review \(\w+\) → ux \(\w+\)/);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it('--dry-run dit, par étape, les serveurs MCP chargés (L74)', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un', visible: true }] });
     writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  ux:\n    url: http://localhost:4200\n');

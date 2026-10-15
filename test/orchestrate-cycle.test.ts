@@ -190,8 +190,8 @@ describe('choix faits', () => {
   });
 });
 
-describe('lot visible : UX puis code', () => {
-  it('UX d\'abord, revue de code en dernier ; correction issue de l\'UX suivie d\'une revue de code', async () => {
+describe('lot visible : code puis UX (L221)', () => {
+  it('revue de code d\'abord, UX en dernier ; correction issue de l\'UX suivie d\'une revue de code puis de l\'UX rejouée', async () => {
     const uxBad: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'ui.css', texte: 'contraste 2:1 (WCAG 1.4.3)' }], verdict: 'UX non conforme' }));
     const h = harness({
       lots: [{ title: 'Écran', visible: true }],
@@ -199,10 +199,10 @@ describe('lot visible : UX puis code', () => {
     });
     const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' } });
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'ux', 'review', 'fix', 'ux', 'review']);
-    expect(kinds(h).at(-1)).toBe('review');
-    expect(h.calls[1].args[h.calls[1].args.indexOf('--agent') + 1]).toBe('ux-reviewer');
-    expect(h.calls[1].brief).toContain('http://localhost:4200');
+    expect(kinds(h)).toEqual(['implement', 'review', 'ux', 'fix', 'review', 'ux']);
+    expect(kinds(h).at(-1)).toBe('ux');
+    expect(h.calls[2].args[h.calls[2].args.indexOf('--agent') + 1]).toBe('ux-reviewer');
+    expect(h.calls[2].brief).toContain('http://localhost:4200');
     expect(h.calls[3].brief).toContain('contraste 2:1 (WCAG 1.4.3)');
     expect(c.lot.status).toBe('ready');
     expect(c.lot.uxVerdict).toBe('conforme : rien à signaler');
@@ -215,7 +215,7 @@ describe('lot visible : UX puis code', () => {
     const hv = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
     await runLot(hv.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' } }));
     expect(hv.calls[0].brief).toContain('cadence news new L1');
-    expect(hv.calls[1].brief).not.toContain('news new'); // ux : pas de consigne d'écriture
+    expect(hv.calls[2].brief).not.toContain('news new'); // ux : pas de consigne d'écriture
     const hn = harness({ lots: [{ title: 'Sans écran' }], script: { implement: [impl()], review: [ok] } });
     await runLot(hn.lot('L1'));
     expect(hn.calls[0].brief).not.toContain('news new');
@@ -230,7 +230,7 @@ describe('lot visible : UX puis code', () => {
     expect(impl0.brief).toContain(`\`${dir}\``);
     const adds = impl0.args.flatMap((a, i) => (impl0.args[i - 1] === '--add-dir' ? [a] : []));
     expect(adds).toEqual(['/tmp/x', dir]);
-    expect(hv.calls[1]!.args).not.toContain(dir); // ux
+    expect(hv.calls[2]!.args).not.toContain(dir); // ux
     const hn = harness({ lots: [{ title: 'Sans écran' }], script: { implement: [impl()], review: [ok] } });
     await runLot(hn.lot('L1'));
     expect(hn.calls[0]!.args).not.toContain('--add-dir');
@@ -260,7 +260,7 @@ describe('lot visible : UX puis code', () => {
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
     const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' } });
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'ux', 'review']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'ux']);
     const lotDir = join(h.store.dir, 'demo--L1');
     for (const call of h.calls) {
       expect(call.args).toContain('--strict-mcp-config');
@@ -1629,42 +1629,42 @@ describe('lot visible et passe des mineurs (L38/t2)', () => {
   const uxOk: Handler = () => claudeOut(reviewReport({ verdict: 'ergonomie conforme (UX)' }));
   const withUx = { ux: { url: 'http://localhost:4200' } };
 
-  it('le verdict de l\'agent UX n\'est pas écrasé par la revue courte ; l\'UX est rejouée après la passe des mineurs', async () => {
+  it('le verdict de l\'agent UX n\'est pas écrasé par la revue courte ; l\'UX est jouée après la passe des mineurs et sa revue courte', async () => {
     const h = harness({
       lots: [{ title: 'Écran', visible: true }],
-      script: { implement: [impl()], ux: [uxOk, uxOk], review: [minorReview({ verdict: 'code conforme avec un mineur' })], fix: [fix('b.txt')], 'review-small': [() => claudeOut(reviewReport({ verdict: 'relecture courte conforme' }))] },
+      script: { implement: [impl()], ux: [uxOk], review: [minorReview({ verdict: 'code conforme avec un mineur' })], fix: [fix('b.txt')], 'review-small': [() => claudeOut(reviewReport({ verdict: 'relecture courte conforme' }))] },
     });
     const c = h.lot('L1', { visible: true }, withUx);
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'ux', 'review', 'fix', 'ux', 'review-small']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small', 'ux']);
     expect(c.lot.status).toBe('ready');
     expect(c.lot.uxVerdict).toBe('ergonomie conforme (UX)');
     expect(c.lot.ux?.verdict).toBe('ergonomie conforme (UX)');
     expect(c.lot.code?.verdict).toBe('relecture courte conforme');
-    expect(h.calls[5].brief).toContain('short re-review');
+    expect(h.calls[3].brief).toContain('short re-review');
   });
 
-  it('UX rejouée après une correction de défaut, même quand elle était conforme avant', async () => {
+  it('une seule UX après une correction de défaut : jouée sur le code que la revue conforme a relu', async () => {
     const h = harness({
       lots: [{ title: 'Écran', visible: true }],
-      script: { implement: [impl()], ux: [uxOk, uxOk], review: [major, ok], fix: [fix('b.txt')] },
+      script: { implement: [impl()], ux: [uxOk], review: [major, ok], fix: [fix('b.txt')] },
     });
     const c = h.lot('L1', { visible: true }, withUx);
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'ux', 'review', 'fix', 'ux', 'review']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'ux']);
     expect(c.lot.status).toBe('ready');
   });
 
-  it('une UX non conforme après la passe des mineurs mène à une correction de défaut, pas à un verdict', async () => {
+  it('une UX non conforme après la passe des mineurs mène à une correction de défaut, une revue courte, puis une UX rejouée, pas à un verdict', async () => {
     const uxBad: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'ui.css', texte: 'contraste 2:1 (WCAG 1.4.3)' }], verdict: 'UX non conforme' }));
     const h = harness({
       lots: [{ title: 'Écran', visible: true }],
-      script: { implement: [impl()], ux: [uxOk, uxBad, uxOk], review: [minorReview()], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok, ok] },
+      script: { implement: [impl()], ux: [uxBad, uxOk], review: [minorReview()], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok, ok] },
     });
     const c = h.lot('L1', { visible: true }, withUx);
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'ux', 'review', 'fix', 'ux', 'review-small', 'fix', 'ux', 'review-small']);
-    expect(h.calls[6].brief).toContain('contraste 2:1 (WCAG 1.4.3)');
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small', 'ux', 'fix', 'review-small', 'ux']);
+    expect(h.calls[5].brief).toContain('contraste 2:1 (WCAG 1.4.3)');
     expect(c.lot.pass).toBe(1);
     expect(c.lot.status).toBe('ready');
   });
@@ -1899,7 +1899,7 @@ describe('budget du lot atteint (L78)', () => {
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
     const c = h.lot('L1', { visible: true, budget: 1000 }, { ux: { command: app.command, url: app.url, timeout: 20 } });
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'ux', 'review']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'ux']);
     expect(c.lot.status).toBe('ready');
     expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false); // application tuée après l'étape
   });
@@ -2011,7 +2011,7 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     })(h.wave.claude);
     const c = h.lot('L1', { visible: true }, { ux: { command: app.command, url: app.url, timeout: 20 } });
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'ux', 'review']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'ux']);
     const brief = h.calls.find((x) => x.kind === 'ux')!.brief;
     expect(brief).toContain(`The running app is at ${app.url}`);
     expect(brief).not.toContain('Start the app');
@@ -2046,7 +2046,7 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     expect(alive(Number(readFileSync(join(app.dir, 'pid'), 'utf8')))).toBe(false);
   });
 
-  it('revue UX non conforme puis application muette : la revue périmée est effacée, ses constats ne repartent pas en correction, le lot conclut sur la revue de code', async () => {
+  it('revue UX non conforme, correction, puis application muette : la revue périmée est effacée, ses constats ne repartent pas en correction, le lot conclut sur la revue de code', async () => {
     const app = await fakeApp(0);
     const uxBad: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'ui.css', texte: 'contraste 2:1 (WCAG 1.4.3)' }], verdict: 'UX non conforme' }));
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [uxBad], review: [ok, ok], fix: [fix('b.txt')] } });
@@ -2060,7 +2060,7 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
       return r;
     }) as typeof fixing;
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'ux', 'review', 'fix', 'review']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'ux', 'fix', 'review']);
     expect(c.lot.uxNote).toMatch(/UX non vérifiée/);
     expect(c.lot.ux).toBeUndefined();
     expect(c.lot.uxVerdict).toBeNull();
@@ -2068,20 +2068,12 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
     expect(c.lot.status).toBe('ready');
   });
 
-  it('application muette à la 1re étape UX puis prête à la 2e : la note « UX non vérifiée » de la tentative précédente est effacée, seul le verdict UX reste', async () => {
+  it('une note « UX non vérifiée » restée d\'un état écrit avant L221 est effacée quand l\'application est prête : seul le verdict UX reste', async () => {
     const app = await fakeApp(0);
-    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [major, ok], fix: [fix('b.txt')] } });
-    const ux = { command: 'exit 1', url: app.url, timeout: 20 };
-    const c = h.lot('L1', { visible: true }, { ux });
-    // après la passe de correction, l'application démarre
-    const fixing = h.wave.claude;
-    h.wave.claude = (async (args: string[], o: Parameters<typeof fixing>[1]) => {
-      const r = await fixing(args, o);
-      if (h.calls.some((x) => x.kind === 'fix')) ux.command = app.command;
-      return r;
-    }) as typeof fixing;
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
+    const c = h.lot('L1', { visible: true, uxNote: 'UX non vérifiée : ancienne tentative' }, { ux: { command: app.command, url: app.url, timeout: 20 } });
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'ux', 'review']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'ux']);
     expect(c.lot.uxNote).toBeUndefined();
     expect(c.lot.uxVerdict).not.toBeNull();
     expect(c.lot.status).toBe('ready');
@@ -2130,7 +2122,7 @@ describe('le programme lance l\'application de la revue UX (L60)', () => {
 
   it('étape en erreur : l\'application est tuée quand même', async () => {
     const app = await fakeApp(0);
-    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [() => ({ code: 1, stdout: '', stderr: 'boum', timedOut: false })] } });
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], review: [ok], ux: [() => ({ code: 1, stdout: '', stderr: 'boum', timedOut: false })] } });
     const c = h.lot('L1', { visible: true }, { ux: { command: app.command, url: app.url, timeout: 20 } });
     await runLot(c);
     expect(c.lot.status).toBe('failed');

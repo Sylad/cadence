@@ -2526,10 +2526,11 @@ lots:
       - { date: 2026-10-15, text: "Hypothèses (fiche autocontrole-avant-revue) — R9 : La mesure avant/après est un document de docs/mesures/ rejouant cadence corrections (--until pour l'avant), les passes par lot comparées ; aucune option n'est… ; si faux : Si l'après doit se calculer à partir d'une date de début (--since), la commande cadence corrections change : un contrat public, donc un lot à part" }
   - id: L223
     title: "Reprise par le programme d'un lot rendu sur budget : cadence orchestrate --resume <vague> --budget <projet>:<lot>=+N rejoue l'étape non jouée (fix ou revue) avec le budget relevé, en session neuve, et garde l'enregistrement des verdicts ; le 15-10 maritime B26.4 (849 k / 750 k, fix non joué) a été repris à la main : brief fix.md rendu par le lead, 2 agents, raf note à la main"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-15
+    started: 2026-10-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

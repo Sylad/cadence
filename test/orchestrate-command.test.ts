@@ -1327,6 +1327,11 @@ describe('budget par lot (L78, recalibré L194)', () => {
     expect(lotBudgetBasis(0.5, 'spec')).toContain('plus 450000 pour les étapes spec');
   });
 
+  it("R3 — lotBudgetBasis d'un lot ≤ 0,5 j cite toujours le plancher", () => {
+    expect(lotBudgetBasis(0.5)).toContain("plancher d'un lot jusqu'à 0,5 j");
+    expect(lotBudgetBasis(0.1)).toContain("plancher d'un lot jusqu'à 0,5 j");
+  });
+
   it("--dry-run dit le budget d'un lot à écran et sa base mesurée", async () => {
     const { parent } = parentWith({ a: [{ title: 'un écran', estimate: 0.5, screen: 'page' }], b: [{ title: 'sans écran', estimate: 0.5 }] });
     const r = io(parent);

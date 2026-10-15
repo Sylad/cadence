@@ -2450,10 +2450,11 @@ lots:
     finished: 2026-10-15
   - id: L219
     title: "Condition de tirage d'un lot : un champ (ex. « pas avant N lots spec: true done », ou N lots screen: page) que lead tour respecte dans « prochain prêt » (lot affiché « en attente de… ») et que orchestrate refuse avant d'agir — L190 tiré deux fois pour rien (13-10, 15-10), L209 même forme ; after: ne sait exprimer qu'une dépendance à un lot"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-15
+    started: 2026-10-15
   - id: L220
     title: "raf todo <id> : remettre en attente un lot démarré sans commit (doing → todo, started: retiré, note datée avec la raison), refusé s'il a des commits qui le citent — le 15-10 le lead a dû éditer status: à la main pour L190 après une vague rendue"
     status: doing

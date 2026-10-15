@@ -2437,6 +2437,10 @@ lots:
     spec: true
     created: 2026-10-15
     started: 2026-10-15
+    notes:
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/orchestrate-budget-correction/fiche.yaml:14 — La mesure (p90 fix 65 k, revue courte Opus 88 k, 523 fichiers) n'est pas vérifiable : le dossier .cadence/runs n'existe pas dans le dépôt (ls : 0 entrée) et la fiche avoue que la somme par lot n'a pas été recalculée ; 155 k est un majorant de somme de p90, cohérent avec l'énoncé mais non mesuré sur la distribution de la somme." }
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/orchestrate-budget-correction/fiche.yaml:75 — R4 est « sourcee » par une réponse du lead citée, sans fichier ni note à ouvrir ; R5 déclare sourcee mais contient une « hypothèse de rédaction » (reformulation du membre de réserve). Aucune catégorie coûteuse en jeu, donc note seulement : sourcer la réponse du lead (note du plan) et passer la formulation en wording." }
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : README.md:1354 — La fiche ne cite aucune mise à jour de la documentation : README.md:1354 (« 65 k tokens reserved »), docs/fonctionnement.md:87 (« final review | 65 k reserved ») et le commentaire de REVIEW_RESERVE (cycle.ts:538-550) décrivent l'ancienne réserve ; tests existants à modifier : orchestrate-cycle.test.ts:1051 et 1103 (« 65000 réservés », regex ^tests rouges…) et orchestrate-command.test.ts:1302 (+ 350_000). À prévoir dans l'implémentation." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

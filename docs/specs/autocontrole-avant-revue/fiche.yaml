@@ -48,7 +48,7 @@ cas:
     preconditions:
       - des journaux .cadence/runs existent avant et après la mise en service de L222
     nominal:
-      - "Le lead rejoue la commande bornée par --until à l'heure de la mise en service (avant), puis la commande --since de la même borne (après : les lots dont l'implement a commencé après la borne, avec toutes leurs passes)."
+      - "Le lead rejoue la commande bornée par --until à l'heure de la mise en service (avant), puis la commande --since de la même borne (après : les lots des vagues créées après la borne, avec toutes leurs passes)."
       - "Il consigne les passes par lot dans docs/mesures/."
     alternatives: []
     sans_alternative: "la mesure est une lecture seule de cadence corrections ; ses échecs sont ceux de la commande (usage, date invalide)"
@@ -105,10 +105,10 @@ regles:
     tests: ["R8 — implement et fix se rendent sans accolade restante avec les variables existantes", "R8 — fix-minors, spec, spec-back, accept et review-small n'ont pas la liste"]
   - id: R9
     cas: [C3]
-    enonce: "La mesure avant/après est un document de docs/mesures/ qui rejoue cadence corrections : l'avant avec --until <borne>, l'après avec --since <borne>, les passes par lot comparées. --since ne garde que les lots dont la première session implement aboutie a commencé après la borne, avec toutes leurs passes ; un lot sans début lisible est écarté ; la sortie et --until sont inchangés."
+    enonce: "La mesure avant/après est un document de docs/mesures/ qui rejoue cadence corrections : l'avant avec --until <borne>, l'après avec --since <borne>, les passes par lot comparées. Une vague rend tous ses briefs depuis la copie de l'outil figée à sa création (<vague>/tool/) : --since ne garde donc que les lots des vagues créées strictement après la borne (created de wave.json), avec toutes leurs passes, quelle que soit la date de début de leur implement ; une vague sans created lisible est écartée ; --until est inchangé (vagues créées jusqu'à la borne incluse), si bien que les deux mesures ne se recouvrent jamais ; la sortie est inchangée."
     statut: sourcee
-    source: "constat de la revue du 15-10 (vague 2026-10-15-1915, troisième passe) : une différence sans borne − --until donne un après faux dès qu'une vague est à cheval sur la borne (--continue : cas courant, scripts/mise-en-service.mjs:141)"
-    tests: ["R9 — le README renvoie au document de mesure avant/après de L222", "R9 — le document de mesure rejoue l'avant avec --until et l'après avec --since, sans différence", "R9 — --since garde le lot entier dont l'implement a commencé après la borne et écarte le lot à cheval", "R9 — --since invalide est refusé, l'aide et le message d'usage de cadence corrections citent --since"]
+    source: "constats de la revue du 15-10 (vague 2026-10-15-1915) : une différence sans borne − --until donne un après faux dès qu'une vague est à cheval sur la borne (--continue : cas courant, scripts/mise-en-service.mjs:141) ; puis le début de l'implement donnait un après faux pour une vague --continue créée avant la borne (src/orchestrate/snapshot.ts:37, command.ts:785 : les gabarits sont lus une fois par vague)"
+    tests: ["R9 — le README renvoie au document de mesure avant/après de L222", "R9 — le document de mesure rejoue l'avant avec --until et l'après avec --since, sans différence", "R9 — --since garde les lots des vagues créées après la borne, --until ceux des vagues créées avant : la somme des deux est le total", "R9 — --since se règle sur la création de la vague, pas sur le début de l'implement : une vague --continue créée avant la borne ne reçoit pas le brief d'après", "R9 — --since invalide est refusé, l'aide et le message d'usage de cadence corrections citent --since"]
 
 contrats:
   - id: A1
@@ -128,7 +128,7 @@ contrats:
   - id: A3
     appel: commande cadence corrections
     entree: "[dossier] [--until date] [--since date] [--cache fichier] ; --since est la seule option ajoutée"
-    sortie: "les tables existantes, sur les lots dont l'implement a commencé après --since ; le lead consigne les passes par lot avant/après dans docs/mesures/"
+    sortie: "les tables existantes, sur les lots des vagues créées après --since ; le lead consigne les passes par lot avant/après dans docs/mesures/"
     erreurs:
       - { code: "exit 2", message: "--since invalide : <valeur> (une date ISO, ex. 2026-10-10T18:31Z)" }
     regles: [R9]

@@ -87,7 +87,7 @@ function findingsOf(report: any): string[] {
 
 /**
  * Lit les journaux de vague `<runs>/<vague>/<projet>--<lot>.json`. Un lot compte (dénominateur) dès qu'une session
- * d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là, pour une mesure que ni les vagues suivantes ni une vague encore en cours ne changent ; une vague ou une étape sans date lisible est écartée) ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
+ * d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là, pour une mesure que ni les vagues suivantes ni une vague encore en cours ne changent ; une vague ou une étape sans date lisible est écartée ; `since` : date ISO, ne garde que les lots des vagues créées strictement après, avec toutes leurs passes : une vague rend tous ses briefs depuis la copie de l'outil figée à sa création, c'est la date de la vague, non celle du début d'un lot, qui dit quel brief il a reçu) ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
  */
 export function readRuns(runsDir: string, until?: string, since?: string): Runs {
   const lots: LotRecord[] = [];
@@ -100,10 +100,12 @@ export function readRuns(runsDir: string, until?: string, since?: string): Runs 
   for (const wave of readdirSync(runsDir).sort()) {
     const waveDir = join(runsDir, wave);
     if (!statSync(waveDir).isDirectory()) continue;
-    if (until !== undefined) {
+    if (until !== undefined || from !== undefined) {
       // Les vagues nommées à la main (ol-gains-1) n'ont pas d'horodatage dans leur nom : on lit `created` dans wave.json.
       const created = Date.parse(readJson(join(waveDir, 'wave.json'))?.created);
-      if (!(created <= limit)) continue;
+      if (until !== undefined && !(created <= limit)) continue;
+      // `since` est strict : une vague créée pile à la borne reste dans l'avant de `until` (inclusif), les deux mesures ne se recouvrent jamais ; sans date de création lisible, la vague est dans aucune.
+      if (from !== undefined && !(created > from)) continue;
     }
     for (const file of readdirSync(waveDir).sort()) {
       if (!file.endsWith('.json') || file === 'wave.json') continue;
@@ -113,8 +115,6 @@ export function readRuns(runsDir: string, until?: string, since?: string): Runs 
       const done = (s: RawStep) => s.status === 'ok' && inTime(s);
       const implement = steps.find((s) => s.kind === 'implement' && done(s));
       if (!implement) continue;
-      // Le brief reçu est celui du début de l'implement : sous `since`, le lot entier est de l'après si elle a commencé après la date.
-      if (from !== undefined && !(Date.parse(implement.started ?? '') > from)) continue;
       const name = basename(file, '.json');
       const fixSteps = steps.filter((s) => s.kind === 'fix' && done(s));
       lots.push({ project: rec.project, lot: rec.lot, visible: !!rec.visible, fixes: fixSteps.length });

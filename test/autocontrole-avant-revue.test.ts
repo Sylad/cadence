@@ -109,8 +109,11 @@ describe('auto-contrôle avant revue (L222)', () => {
     const commandes = doc.split('\n').filter((l) => l.startsWith('cadence corrections '));
     expect(commandes).toHaveLength(2);
     for (const c of commandes) expect(c, c).toContain('--classify');
-    expect(doc).not.toMatch(/différence/);
-    expect(doc).not.toMatch(/par différence|sans borne −/);
+    expect(doc).not.toMatch(/différence|sans borne −/);
+    // l'après se règle sur la création de la vague (briefs figés avec la copie de l'outil), non sur le début de l'implement
+    expect(doc).not.toMatch(/quelle que soit la date de création/);
+    expect(doc).toMatch(/créées\*\* après la borne/);
+    expect(doc).toContain('<vague>/tool/');
     expect(doc).not.toMatch(/--until 2026-10-15T17:19Z/);
     expect(doc).not.toContain('263 lots');
     expect(doc).toContain("dérive d'architecture");

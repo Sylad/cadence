@@ -366,30 +366,49 @@ describe('cadence corrections', () => {
     expect(readRuns(runs).lots.map((l) => `${l.lot}:${l.fixes}`)).toEqual(['L1:2', 'L2:1', 'L3:1']);
   });
 
-  it('--since ne compte que les lots dont l\'implement a commencé après la date, avec toutes leurs passes : un lot à cheval sur la borne reste entier d\'un côté', async () => {
+  it('R9 — --since garde les lots des vagues créées après la borne, --until ceux des vagues créées avant : la somme des deux est le total', async () => {
     const parent = tempDir();
     const runs = join(parent, '.cadence', 'runs');
-    // à cheval : implement avant la borne (18:00), second fix après ; entier dans l'avant sous --until, absent de l'après
-    lot(runs, 'w1', 'alpha', 'L1', [{ kind: 'implement', started: '2026-10-10T10:30:00.000Z', ended: '2026-10-10T11:00:00.000Z' }, { kind: 'review', constats: ['x'], ended: '2026-10-10T11:30:00.000Z' }, { kind: 'fix', ended: '2026-10-10T12:00:00.000Z' }, { kind: 'fix', ended: '2026-10-10T20:00:00.000Z' }]);
-    // après : implement lancé après la borne, deux passes
-    lot(runs, 'w1', 'alpha', 'L2', [{ kind: 'implement', started: '2026-10-10T19:00:00.000Z', ended: '2026-10-10T19:30:00.000Z' }, { kind: 'fix', ended: '2026-10-10T20:00:00.000Z' }, { kind: 'fix', ended: '2026-10-10T20:30:00.000Z' }]);
-    // sans `started` lisible : écarté sous --since
-    lot(runs, 'w1', 'alpha', 'L3', [{ kind: 'implement', ended: '2026-10-10T19:30:00.000Z' }, { kind: 'fix', ended: '2026-10-10T20:00:00.000Z' }]);
-    writeFileSync(join(runs, 'w1', 'wave.json'), JSON.stringify({ id: 'w1', created: '2026-10-10T10:00:00.000Z' }));
     const borne = '2026-10-10T18:00:00Z';
-    const apres = readRuns(runs, undefined, borne);
-    expect(apres.lots.map((l) => `${l.lot}:${l.fixes}`)).toEqual(['L2:2']);
-    expect(apres.passes).toHaveLength(2);
+    const e = (h: string) => `2026-10-10T${h}.000Z`;
+    // avant : vague créée à 10:00, deux lots, trois passes en tout
+    lot(runs, 'w1', 'alpha', 'L1', [{ kind: 'implement', ended: e('11:00:00') }, { kind: 'review', constats: ['x'], ended: e('11:30:00') }, { kind: 'fix', ended: e('12:00:00') }, { kind: 'fix', ended: e('13:00:00') }]);
+    lot(runs, 'w1', 'alpha', 'L2', [{ kind: 'implement', ended: e('11:10:00') }, { kind: 'fix', ended: e('12:10:00') }]);
+    writeFileSync(join(runs, 'w1', 'wave.json'), JSON.stringify({ id: 'w1', created: e('10:00:00') }));
+    // avant aussi : une vague --continue créée à 17:00, dont le lot a commencé après la création mais avant la borne
+    lot(runs, 'w2', 'beta', 'L3', [{ kind: 'implement', started: e('17:10:00'), ended: e('17:30:00') }, { kind: 'fix', ended: e('17:50:00') }]);
+    writeFileSync(join(runs, 'w2', 'wave.json'), JSON.stringify({ id: 'w2', created: e('17:00:00') }));
+    // après : vague créée à 19:00, un lot à deux passes et un lot sans passe
+    lot(runs, 'w3', 'alpha', 'L4', [{ kind: 'implement', started: e('19:10:00'), ended: e('19:30:00') }, { kind: 'fix', ended: e('20:00:00') }, { kind: 'fix', ended: e('20:30:00') }]);
+    lot(runs, 'w3', 'beta', 'L5', [{ kind: 'implement', started: e('19:10:00'), ended: e('19:40:00') }]);
+    writeFileSync(join(runs, 'w3', 'wave.json'), JSON.stringify({ id: 'w3', created: e('19:00:00') }));
+    // sans date de création lisible : dans aucune des deux mesures (et le dit le README)
+    lot(runs, 'w4', 'alpha', 'L6', [{ kind: 'implement', started: e('21:00:00'), ended: e('21:10:00') }, { kind: 'fix', ended: e('21:20:00') }]);
+    writeFileSync(join(runs, 'w4', 'wave.json'), '{}');
+    const tag = (r: ReturnType<typeof readRuns>) => r.lots.map((l) => `${l.lot}:${l.fixes}`);
     const avant = readRuns(runs, borne);
-    expect(avant.lots.map((l) => `${l.lot}:${l.fixes}`)).toEqual(['L1:1']);
+    const apres = readRuns(runs, undefined, borne);
+    const tout = readRuns(runs);
+    expect(tag(avant)).toEqual(['L1:2', 'L2:1', 'L3:1']);
+    expect(tag(apres)).toEqual(['L4:2', 'L5:0']);
+    const sansDate = tout.lots.filter((l) => l.lot === 'L6');
+    expect(avant.lots.length + apres.lots.length).toBe(tout.lots.length - sansDate.length);
+    expect(avant.passes.length + apres.passes.length).toBe(tout.passes.length - sansDate.reduce((n, l) => n + l.fixes, 0));
+    expect(new Set([...avant.passes, ...apres.passes].map((p) => p.key)).size).toBe(avant.passes.length + apres.passes.length);
     const m = JSON.parse((await cad(parent, 'corrections', parent, '--since', borne, '--json')).out);
-    expect(m.total).toEqual({ lots: 1, atLeast1: 1, atLeast2: 1, passes: 2 });
+    expect(m.total).toEqual({ lots: 2, atLeast1: 1, atLeast2: 1, passes: 2 });
     const bornee = JSON.parse((await cad(parent, 'corrections', parent, '--until', borne, '--json')).out);
-    expect(bornee.total.lots).toBe(1);
-    expect(bornee.total.passes).toBe(1);
-    const e = await cad(parent, 'corrections', parent, '--since', 'hier');
-    expect(e.code).not.toBe(0);
-    expect(e.err).toContain('--since invalide');
+    expect(bornee.total).toEqual({ lots: 3, atLeast1: 3, atLeast2: 1, passes: 4 });
+  });
+
+  it('R9 — --since se règle sur la création de la vague, pas sur le début de l\'implement : une vague --continue créée avant la borne ne reçoit pas le brief d\'après', () => {
+    const runs = tempDir();
+    // vague créée à 17:00, lot dont l'implement commence à 19:00 : il a reçu le brief figé à 17:00, c'est de l'avant
+    lot(runs, 'w1', 'alpha', 'L1', [{ kind: 'implement', started: '2026-10-10T19:00:00.000Z', ended: '2026-10-10T19:30:00.000Z' }, { kind: 'fix', ended: '2026-10-10T20:00:00.000Z' }]);
+    writeFileSync(join(runs, 'w1', 'wave.json'), JSON.stringify({ id: 'w1', created: '2026-10-10T17:00:00.000Z' }));
+    expect(readRuns(runs, undefined, '2026-10-10T18:00:00Z').lots).toEqual([]);
+    expect(readRuns(runs, undefined, '2026-10-10T17:00:00Z').lots).toEqual([]); // créée à la borne : l'avant garde l'égalité (--until), l'après la strictement postérieure
+    expect(readRuns(runs, undefined, '2026-10-10T16:00:00Z').lots).toHaveLength(1);
   });
 
   it('--until écarte une vague sans date lisible', () => {

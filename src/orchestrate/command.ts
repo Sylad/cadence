@@ -1,3 +1,4 @@
+import { gateProgress, gateText } from '../audit.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -302,6 +303,12 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
     });
     if (open.length) {
       refusals.push(`${key} : dépendance(s) ni terminée(s) ni plus tôt dans la vague : ${open.join(', ')}`);
+      continue;
+    }
+    // Condition de tirage (L219) : seuls les lots done du plan la lèvent, jamais un lot de la même vague ; un lot déjà doing n'est pas refusé pour elle.
+    const gate = lot.status === 'todo' ? gateProgress(plan.lots(), lot) : undefined;
+    if (gate && !gate.met) {
+      refusals.push(`${key} : condition de tirage non remplie : ${gate.n === 0 ? 'gate invalide (raf check)' : gateText(gate)}`);
       continue;
     }
     // Dépôts voisins du lot (L62) : chacun doit exister et être un dépôt git, sinon refus avant d'agir comme pour le dépôt du projet.

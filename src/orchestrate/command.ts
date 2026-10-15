@@ -19,9 +19,9 @@ import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specScreen, specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { Budget, DROPPED, MAX_PASSES, MAX_PASSES_CONVERGING, briefName, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
+import { Budget, DROPPED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
-import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type StepModel } from './launch.js';
+import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { runPool } from './pool.js';
 import { schemaFor } from './schemas.js';
@@ -118,6 +118,8 @@ export interface Args {
   interval?: number;
   resume?: string | true;
   budget?: number;
+  /** `--budget projet:lot=+N` (L223) : relève le budget d'un lot rendu sur budget, avec `--resume` ; `text` est le N tel que donné. */
+  lotBudgets: { project?: string; lot: string; raise: number; text: string }[];
   maxSessions?: number;
   wave?: string;
   /** `--continue` (L147) : la vague tire elle-même le prochain lot prêt du plan quand ceux en cours sont finis. */
@@ -161,8 +163,25 @@ function lotArg(text: string): { project?: string; lot: string; model?: Model } 
   return { project: m[1], lot: m[2], model: m[3] as Model | undefined };
 }
 
+/** `projet:lot=+200k`, `lot=+0.3M` (L223) : le « = » distingue le relèvement d'un lot du budget de la vague. */
+function lotBudgetArg(text: string): Args['lotBudgets'][number] {
+  const bad = () => new RafError(`--budget invalide : ${text} (projet:lot=+500k)`);
+  const m = /^([^=]+)=\+(.+)$/.exec(text);
+  if (!m) throw bad();
+  let target: ReturnType<typeof lotArg>;
+  let raise: number;
+  try {
+    target = lotArg(m[1]);
+    raise = parseBudget(m[2]);
+  } catch {
+    throw bad();
+  }
+  if (target.model) throw bad();
+  return { project: target.project, lot: target.lot, raise, text: m[2] };
+}
+
 export function parseOrchestrateArgs(argv: string[]): Args {
-  const a: Args = { lots: [], dryRun: false, waits: false, watch: false, continue: false, answers: [], drop: [], stopAfterCurrent: false };
+  const a: Args = { lots: [], lotBudgets: [], dryRun: false, waits: false, watch: false, continue: false, answers: [], drop: [], stopAfterCurrent: false };
   const optional = (i: number) => (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) ? argv[i + 1] : undefined);
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
@@ -181,7 +200,11 @@ export function parseOrchestrateArgs(argv: string[]): Args {
       if (!isDay(a.since)) throw new RafError(`--since invalide : ${a.since} (AAAA-MM-JJ)`);
     } else if (t === '--watch') a.watch = true;
     else if (t === '--interval') a.interval = parseMaxSessions(value(t), '--interval');
-    else if (t === '--budget') a.budget = parseBudget(value(t));
+    else if (t === '--budget') {
+      const v = value(t);
+      if (v.includes('=')) a.lotBudgets.push(lotBudgetArg(v));
+      else a.budget = parseBudget(v);
+    }
     else if (t === '--max-sessions') a.maxSessions = parseMaxSessions(value(t));
     else if (t === '--wave') a.wave = value(t);
     else if (t === '--drop') a.drop.push(lotArg(value(t)));
@@ -496,6 +519,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   // --drop / --stop-after-current (L79) pilotent une vague VIVANTE : ni avec --status (rien à piloter), ni --stop-after-current avec --resume (il le contredit). --resume --drop retire le lot avant de rejouer la vague arrêtée.
   if (args.status !== undefined && (args.drop.length || args.stopAfterCurrent)) throw new RafError('--status ne se combine pas avec --drop / --stop-after-current');
   if (args.resume !== undefined && args.stopAfterCurrent) throw new RafError('--resume ne se combine pas avec --stop-after-current (il reprend la vague, il ne l\'arrête pas)');
+  if (args.lotBudgets.length && args.resume === undefined) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume");
   if (args.since !== undefined && !args.waits) throw new RafError('--since s\'utilise avec --waits');
   if (args.waits) {
     if (args.lots.length || args.status !== undefined || args.resume !== undefined || args.watch || args.drop.length || args.stopAfterCurrent || args.continue || args.dryRun) throw new RafError('--waits ne se combine avec aucune autre action');
@@ -962,7 +986,8 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   if (!info) refusals.push('claude introuvable (CADENCE_CLAUDE_BIN, ou claude dans le PATH)');
   const alive = liveWaves(cadenceHome()).find((w) => w.wave === wave.id && w.cwd === launch && w.pid !== process.pid);
   if (alive) refusals.push(`la vague ${alive.wave} tourne encore (pid ${alive.pid})`);
-  if (wave.status === 'done') refusals.push(`la vague ${wave.id} est terminée`);
+  // Une vague terminée ne se reprend que pour rejouer un lot visé par --budget projet:lot=+N (L223) ; ce lot est vérifié plus bas.
+  if (wave.status === 'done' && !args.lotBudgets.length) refusals.push(`la vague ${wave.id} est terminée`);
 
   const lots = store.lots();
   for (const a of args.answers) {
@@ -984,11 +1009,31 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     else if (lotFinished(matches[0])) refusals.push(`--drop ${lotKey(matches[0].project, matches[0].lot)} : le lot est déjà fini (${matches[0].status})`);
     else drops.push(lotKey(matches[0].project, matches[0].lot));
   }
+  // --resume --budget projet:lot=+N (L223) : un lot rendu sur budget est remis en jeu avec son budget relevé. Il subit ensuite les gardes d'un lot vivant.
+  const raised = new Map<LotState, { from: number; to: number; step: StepKind }>();
+  const answered = args.answers.map((a) => lots.filter((x) => x.lot === a.lot && (a.project ? x.project === a.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
+  const dropped = args.drop.map((d) => lots.filter((x) => x.lot === d.lot && (d.project ? x.project === d.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
+  for (const b of args.lotBudgets) {
+    const matches = lots.filter((x) => x.lot === b.lot && (b.project ? x.project === b.project : true));
+    const where = `${b.project ? `${b.project}:` : ''}${b.lot}`;
+    if (matches.length !== 1) {
+      refusals.push(matches.length ? `--budget ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--budget ${where} : lot inconnu dans la vague ${wave.id}`);
+      continue;
+    }
+    const l = matches[0];
+    const key = lotKey(l.project, l.lot);
+    if (raised.has(l)) refusals.push(`--budget ${key} : lot visé deux fois`);
+    else if (dropped.includes(l)) refusals.push(`--budget ${key} : lot aussi retiré par --drop`);
+    else if (answered.includes(l)) refusals.push(`--budget ${key} : lot aussi visé par --answer`);
+    else if (!budgetStep(l)) refusals.push(`--budget ${key} : le lot n'est pas rendu sur budget avec une étape d'écriture à rejouer (${l.status}${l.status === 'handed-back' ? `, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'}` : ''})`);
+    else if (budgetStep(l) === 'fix' && b.raise <= REVIEW_RESERVE) refusals.push(`--budget ${key}=+${b.text} : un fix ne part qu'au-dessus de ${REVIEW_RESERVE} tokens de réserve`);
+    else raised.set(l, { from: l.budget ?? lotSpent(l), to: lotSpent(l) + b.raise, step: budgetStep(l)! });
+  }
   // Un lot retiré ne jouera rien : il ne subit ni le verrou du dépôt, ni le .nvmrc, ni l'arbre sale — un refus pour LUI ne doit pas faire échouer la reprise des autres.
   const live: LotState[] = [];
   const removed: LotState[] = [];
   for (const l of lots) {
-    if (lotFinished(l)) continue;
+    if (lotFinished(l) && !raised.has(l)) continue;
     for (const s of l.steps) {
       if (s.status !== 'running') continue;
       if (s.pid && pidAlive(s.pid)) refusals.push(`${lotKey(l.project, l.lot)} : session encore en vie, pid ${s.pid}`);
@@ -1030,6 +1075,17 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   wave.consumed += recovered.consumed;
   wave.cacheRead += recovered.cacheRead;
   if (recovered.consumed || recovered.cacheRead) store.writeWave(wave);
+  for (const [l, r] of raised) {
+    const k = lotKey(l.project, l.lot);
+    const text = `budget relevé de ${r.from} à ${r.to} (--resume --budget)`;
+    l.budget = r.to;
+    l.status = 'suspended';
+    l.next = r.step;
+    l.outcome = null;
+    l.warnings.push(text);
+    store.journal(`${k} → suspended — ${text}`);
+    io.out(`${k} → suspended — ${text}`);
+  }
   for (const l of live) {
     if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';
     store.writeLot(l);

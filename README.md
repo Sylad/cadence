@@ -923,6 +923,7 @@ cadence orchestrate --waits [--since 2026-10-12]   # time spent waiting for a se
 cadence orchestrate --status [<wave>]        # the live waves and the repositories they hold, then the table (default: the last wave of this folder)
 cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running (with an explicit `<wave>`: when that wave is no longer running)
 cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
+cadence orchestrate --resume <wave> --budget maritime:B26.4=+300k   # replay a lot handed back for its budget, with the budget raised (below)
 cadence orchestrate --drop ccc:L29 [--wave <wave>]   # from another terminal: take a lot out of the running wave
 cadence orchestrate --stop-after-current [--wave <wave>]   # from another terminal: let the running sessions finish, start nothing else
 ```
@@ -943,6 +944,22 @@ handed back instead of being replayed (an unknown or finished lot is refused, ex
 this way is left out of the resume checks (repository lock, `.nvmrc` Node, dirty tree): only the lots that will be replayed can
 refuse the resume, and a refusal writes nothing to `control.log`.
 `--resume --stop-after-current` is refused (exit 2): resuming contradicts stopping.
+
+**`--resume --budget <project>:<lot>=+N` — replaying a lot handed back for its budget (L223)**: a lot handed back with
+`correction non jouée (budget)` or `budget du lot atteint` kept its findings but not its budget, and a plain `--resume` does not replay a
+finished lot. `--budget maritime:B26.4=+300k` (the project may be left out when only one project carries the lot; the option is
+repeatable for several lots, and `--budget 1M` still raises the wave's budget — the `=` tells them apart) puts the lot back in play:
+its budget becomes **what its sessions already counted plus N** (849 k spent of 750 k, `=+300k`: 1 149 000), its outcome is cleared,
+and the step that was not played (`fix`, `implement`, `spec` or `accept` — the only ones a lot budget bounds; a review is never handed
+back for it) runs in a **new session** (never `claude --resume` on the earlier one) with the findings the lot kept, then the normal cycle
+goes on: review, verdict recorded with the sha re-read and the plan committed. Nothing is recorded twice, since a lot handed back for
+its budget never had a compliant review. The reserve rule is unchanged: a `fix` leaves only if spent + 155 000 < the new budget,
+so N of at most 155 000 on a `fix` is refused, and a budget still too small hands the lot back again with the same text. The wave's own budget
+and quota still apply (exhausted: the lot stays suspended, exit 3). A wave that is `done` is resumed this way when a lot is named; without the
+option it is still refused. The named lot undergoes the checks of a live lot (dirty tree, repository held by another orchestration, `.nvmrc`
+Node). Refused with exit 2, before anything is written: a malformed `projet:lot=+N` or an option without `--resume`, an unknown or
+ambiguous lot (`projet:lot` is then asked), a lot that is not handed back for its budget with a write step to replay, a lot named twice
+(`p:L` then `L` counts) or also named by `--drop` or `--answer`.
 A wave runs on its own snapshot of the tool: one launched before L79 never reads `control.log`, so the request is written but the
 command warns `ne lit pas les demandes de contrôle` on the error output.
 

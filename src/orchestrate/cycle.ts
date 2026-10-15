@@ -549,6 +549,21 @@ const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) 
 export const REVIEW_RESERVE = 155_000;
 
 /** Le budget du lot paie-t-il la passe de correction et la revue courte qui la suit ? Sans budget de lot : toujours. */
+/** Étapes d'écriture : les seules que le budget du lot borne (`session`), donc les seules qu'il puisse laisser non jouées. */
+const WRITE_STEPS: readonly StepKind[] = ['implement', 'fix', 'spec', 'accept'];
+
+/**
+ * Étape d'écriture que le budget a laissée non jouée (L223), pour un lot rendu au lead sur budget ; null sinon. `stop` vide `next` : l'étape se lit
+ * dans l'outcome que `overBudget` écrit (« étape « fix » non jouée »), repli sur `next` s'il est resté. Reconnu par ce texte (aucun marqueur dans
+ * l'état) : « correction non jouée (budget) » ou « budget du lot atteint ».
+ */
+export function budgetStep(l: LotState): StepKind | null {
+  if (l.status !== 'handed-back' || !/correction non jouée \(budget\)|budget du lot atteint/.test(l.outcome ?? '')) return null;
+  const named = /étape « ([\w-]+) » non jouée/.exec(l.outcome ?? '')?.[1] as StepKind | undefined;
+  const step = named ?? l.next;
+  return step && WRITE_STEPS.includes(step) ? step : null;
+}
+
 const fixAffordable = (l: LotState): boolean => l.budget === undefined || lotSpent(l) + REVIEW_RESERVE < l.budget;
 
 /** Cause d'une suspension demandée par `--stop-after-current` (L79). */

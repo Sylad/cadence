@@ -1,0 +1,107 @@
+sujet:
+  id: orchestrate-budget-correction
+  titre: "orchestrate : allocation spec relevée et « correction non jouée (budget) » dans le tableau"
+  lot: L218
+  perimetre:
+    modules: [src/orchestrate/command.ts, src/orchestrate/cycle.ts, src/orchestrate/table.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "REVIEW_RESERVE (65 k, cycle.ts:550) et la règle fixAffordable (cycle.ts:553) : inchangés"
+      - "un champ de plan qui déclarerait « touche la base » (schéma du plan publié : question posée au lead)"
+      - "les plafonds de vague (--budget) et le plancher de 450 k d'un lot ordinaire (command.ts:69, mesure L194)"
+# Mesure (journaux .cadence/runs, 15-10) :
+# Journaux .cadence/runs (523 fichiers lot, 15-10). Lots à étape spec sans écran : warhammer L120 740 k / 800 k
+# (précontrôle→accept 388 k, implement 153 k, revue Opus 131 k, fix 69 k) ; cadence L217 652 k / 800 k (avant implement 176 k,
+# revues Opus 86 à 92 k, fix 37 à 46 k). Lot S back : maritime B26.1 406 k / 450 k (implement 240 k, revue Opus 140 k).
+# Sur tous les journaux : fix Sonnet 497 passes, médiane 45 k, p90 65 k, max 124 k ; revue Opus 492, médiane 63 k, p90 106 k ;
+# revue courte Opus 272, médiane 45 k, p90 88 k ; revue Sonnet 87, p90 43 k ; revue courte Sonnet 39, p90 53 k.
+# La chaîne avant implement de L120 (388 k) dépasse l'allocation de 350 k de 38 k.
+
+cas:
+  - id: C1
+    titre: "Le lead lance un lot à étape spec : son budget couvre la chaîne spec, une correction et sa revue"
+    acteur: le lead
+    declencheur: commande cadence orchestrate (dont --dry-run)
+    preconditions:
+      - le lot déclare spec (spec true) ou screen
+    nominal:
+      - Le programme dérive le budget de l'estimate (lotBudget, command.ts:98).
+      - "Il y ajoute l'allocation de l'étape spec, relevée à 450 k."
+      - "Il affiche « budget du lot : N tokens comptés (base : … plus 450000 pour les étapes spec … ) » (command.ts:371)."
+    alternatives:
+      - { si: "le lot est à screen", alors: "le total mesuré de 1,3 M reste le plancher, l'allocation ne joue qu'au-delà", regles: [R2] }
+      - { si: "le lot n'a ni spec ni screen", alors: "budget inchangé", regles: [R3] }
+    resultat: Un lot spec de 0,5 j dispose de 900 k au lieu de 800 k.
+  - id: C2
+    titre: "La passe de correction n'a pas de quoi payer la revue qui la suivrait"
+    acteur: le planificateur de la vague
+    declencheur: étape fix d'un lot (cycle.ts:598)
+    preconditions:
+      - la revue a rendu des constats bloquants ou majeurs
+      - dépensé + 65 k >= budget du lot, ou dépensé >= budget
+    nominal:
+      - "La session fix est refusée avant d'écrire (règle L145 inchangée)."
+      - "Le lot est rendu au lead avec ses constats."
+      - "La cause du tableau commence par « correction non jouée (budget) »."
+    alternatives:
+      - { si: "l'étape refusée est implement, spec ou accept", alors: "libellé actuel inchangé, sans « correction »", regles: [R5] }
+      - { si: "le budget du lot permet fix + 65 k", alors: "la passe est jouée", regles: [R4] }
+    resultat: Le lead voit dans le tableau que la correction n'a pas eu lieu faute de budget et la reprend à la main.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "SPEC_STAGE_ALLOCATION passe de 350 000 à 450 000 : lotBudget(e, 'spec') = budget ordinaire + 450 000 (0,5 j : 900 000 ; 1 j : 1 200 000)."
+    statut: hypothese
+    si_faux: "Seule la constante change (command.ts:84, tests de budget) ; aucune donnée en jeu. 450 k = chaîne mesurée la plus chère avant implement (388 k, L120) arrondie à +60 k ; L217 n'en a pris que 176 k, un lot de 0,5 j avec spec reste sous 900 k dans 2 cas sur 2 sans écran."
+    tests: ["R1 — lotBudget(0.5, 'spec') vaut 900000 et lotBudget(1, 'spec') 1200000", "R1 — lotBudgetBasis cite 450000 pour les étapes spec"]
+  - id: R2
+    cas: [C1]
+    enonce: "Pour un lot à screen, le budget reste max(1 300 000, ordinaire + 450 000) : inchangé pour une estimate jusqu'à 1,25 j (1,3 M), plus haut au-delà (2 j : 1 590 000)."
+    statut: sourcee
+    source: "src/orchestrate/command.ts:100 et test/orchestrate-command.test.ts:1294-1301 (le total mesuré L194 est le plancher d'un lot à écran)"
+    tests: ["R2 — lotBudget(0.5, 'screen') et lotBudget(1, 'screen') valent toujours 1300000", "R2 — lotBudget(2.5, 'screen') vaut 1425000 + 450000"]
+  - id: R3
+    cas: [C1]
+    enonce: "Un lot sans étape spec garde son budget (450 k jusqu'à 0,5 j) : le plancher d'un lot ordinaire ne bouge pas, faute de déclaration « base » dans le plan."
+    statut: sourcee
+    source: "src/orchestrate/command.ts:69 et test/orchestrate-command.test.ts:1275 (p90 374 k sur 152 lots, L194)"
+    tests: ["R3 — lotBudget(0.5) vaut toujours 450000 sans étape spec"]
+  - id: R4
+    cas: [C2]
+    enonce: "La réserve de revue reste 65 000 : une passe fix est jouée seulement si dépensé + 65 000 < budget du lot."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:550-553 (L145, mesure du 09-10)"
+    tests: ["R4 — dépensé + 65000 juste sous le budget : le fix est joué", "R4 — dépensé + 65000 égal au budget : le fix est refusé"]
+  - id: R5
+    cas: [C2]
+    enonce: "Quand l'étape refusée est un fix (réserve non tenue ou budget atteint), l'outcome du lot commence par « correction non jouée (budget) : » ; le reste du texte actuel (budget du lot : x / y …, « étape « fix » non jouée », préfixe tests rouges) est conservé ; pour implement, spec et accept il n'y a pas ce préfixe."
+    statut: sourcee
+    source: "demande du lot : « dire dans le tableau ‹correction non jouée (budget)› pour que le lead reprenne à la main » ; texte actuel cycle.ts:900-906"
+    tests: ["R5 — fix refusé par la réserve : outcome commence par « correction non jouée (budget) : »", "R5 — fix refusé budget dépassé : même préfixe", "R5 — tests rouges après l'implémentation : préfixe puis « tests rouges après l'implémentation »", "R5 — implement refusé : pas de « correction non jouée »"]
+  - id: R6
+    cas: [C2]
+    enonce: "La ligne du tableau d'un lot rendu affiche l'outcome tel quel (donc le préfixe), suivi des constats de la revue."
+    statut: sourcee
+    source: "src/orchestrate/table.ts:117-119"
+    tests: ["R6 — tableau d'un lot rendu sur un fix refusé : la ligne contient « correction non jouée (budget) » et les constats"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate --dry-run
+    entree: "un lot du plan à spec true, ou à screen, ou ordinaire"
+    sortie: "la ligne « budget du lot : N tokens comptés (base : …) » : 900 000 pour un lot spec de 0,5 j, 1 300 000 pour un lot à écran, 450 000 pour un lot ordinaire de 0,5 j"
+    erreurs: []
+    sans_erreur: "le calcul du budget est pur et n'a pas de cas d'échec : le lot inconnu est déjà refusé par la commande (hors lot)"
+    regles: [R1, R2, R3]
+  - id: A2
+    appel: commande cadence orchestrate (vague)
+    entree: "un lot dont la revue vient de rendre des constats et dont le reste de budget est inférieur à 65 k"
+    sortie: "lot en statut handed-back, outcome « correction non jouée (budget) : budget du lot : x / y tokens comptés (…), il ne reste pas de quoi payer la revue qui suivrait la correction (65000 réservés) : étape « fix » non jouée, à décider par le lead »"
+    erreurs: []
+    sans_erreur: "l'absence de budget n'est pas une erreur de la commande mais un statut du lot ; elle ne produit ni code ni journal d'erreur"
+    regles: [R4, R5, R6]
+
+donnees:
+  - { id: D1, objet: "wave.json et <projet>--<lot>.json : champs budget et outcome du lot", existant: true, modification: aucune, note: "même format ; seul le contenu de budget (spec) et le début du texte d'outcome changent" }

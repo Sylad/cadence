@@ -513,6 +513,25 @@ export class Plan {
     if (status === 'done' || status === 'dropped') node.set('finished', today);
   }
 
+  /**
+   * Remet en attente un lot démarré (doing → todo, `started` retiré, note datée) — `raf todo` (L220). Les refus passent dans
+   * l'ordre : plan modifiable, lot et non sous-tâche, lot connu, lot doing ; `commits` n'est lu qu'ensuite (il lit git) et un lot
+   * qui a du travail est refusé. Les sous-tâches et les autres clés du lot ne bougent pas.
+   */
+  putBack(ref: string, today: Day, reason: string, commits: () => number): void {
+    this.writable();
+    if (ref.includes('/')) throw new RafError(`raf todo se pose sur un lot, pas une sous-tâche : ${ref}`);
+    const lot = this.lot(ref);
+    if (lot.status === 'todo') throw new RafError(`${ref} est déjà todo`);
+    if (lot.status !== 'doing') throw new RafError(`${ref} est ${lot.status} ; le rouvrir à la main dans le YAML si c'est voulu`);
+    const n = commits();
+    if (n > 0) throw new RafError(`${ref} a ${n} commit(s) qui le citent : le remettre en attente perdrait leur lien — raf drop ou le laisser doing`);
+    const node = this.lotNode(ref);
+    node.set('status', 'todo');
+    node.delete('started');
+    this.note(ref, reason.trim() ? `remis en attente : ${reason.trim()}` : 'remis en attente', today);
+  }
+
   /** Pose, remplace (texte) ou efface (null) le titre public d'un lot ; la clé suit `title`. */
   setPublic(ref: string, text: string | null): void {
     this.writable();

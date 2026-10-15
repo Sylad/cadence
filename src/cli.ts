@@ -45,6 +45,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (seule la valeur page adopte l'étape spec d'orchestrate)
   raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
+  raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits
   raf note <id> "texte"
   raf did <id> ["texte"]   un lot récurrent (--every) a été refait : le « dû depuis N j » repart de aujourd'hui
   raf ux enable         revue UX obligatoire avant « done » pour les lots --visible
@@ -279,6 +280,14 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
           io.out(`${lot.id} est visible : écrire l'entrée : cadence news new ${lot.id}`);
         }
       }
+      return 0;
+    }
+    case 'todo': {
+      need(1, 'todo <id> [--reason texte]');
+      const plan = loadPlan();
+      plan.putBack(rest[0], today, values.reason ?? '', () => lotWork(plan, root, rest[0]).length);
+      plan.save();
+      io.out(`${rest[0]} → todo`);
       return 0;
     }
     case 'note': {

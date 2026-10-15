@@ -253,6 +253,13 @@ describe('a plan in another format', () => {
     expect(refs('B33/inconnue et B33/E-A2')).toEqual([{ lot: 'B33' }, { lot: 'B33' }, { lot: 'E-A2' }]);
   });
 
+  it('R5 — plan tenu par un autre outil : refus « plan en lecture seule » (raf todo)', () => {
+    const plan = foreign();
+    const before = readFileSync(plan.path, 'utf8');
+    expect(() => plan.putBack('E-A2', '2026-09-28', 'x', () => 0)).toThrow(/plan en lecture seule/);
+    expect(readFileSync(plan.path, 'utf8')).toBe(before);
+  });
+
   it('is read-only', () => {
     const plan = foreign();
     const before = readFileSync(plan.path, 'utf8');
@@ -260,6 +267,7 @@ describe('a plan in another format', () => {
       () => plan.add('x', '2026-09-28'),
       () => plan.addTask('B33', 'x'),
       () => plan.setStatus('E-A2', 'doing', '2026-09-28'),
+      () => plan.putBack('E-A2', '2026-09-28', '', () => 0),
       () => plan.note('B33', 'x', '2026-09-28'),
       () => plan.enableUx('2026-09-28'),
       () => plan.recordUx('B33', 'ok', '2026-09-28'),
@@ -319,7 +327,7 @@ describe('raf CLI with cadence.yaml', () => {
     // Aucun conseil vers une commande raf qui refuserait ; un cadence.yaml fautif n'empêche pas d'installer.
     commit(dir, 'feat(E-A2): décodeur', '2026-09-27T12:00:00');
     expect(raf(dir, 'check').out).toContain('✗ E-A2 a 1 commit(s) mais est encore todo\n');
-    for (const argv of [['start', 'E-A2'], ['note', 'B33', 'x'], ['add', 'x'], ['init']]) {
+    for (const argv of [['start', 'E-A2'], ['todo', 'E-A2'], ['note', 'B33', 'x'], ['add', 'x'], ['init']]) {
       const r = raf(dir, ...argv);
       expect(r.code).toBe(2);
       expect(r.err).toMatch(/lecture seule/);

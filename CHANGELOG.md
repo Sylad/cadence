@@ -52,6 +52,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `raf todo <id> [--reason text]` puts a started lot back to `todo` without editing the YAML by hand (L220): `started:` is removed and a dated note records the reason. Refused when work commits cite the lot (`raf drop` or leave it `doing`), when the lot is not `doing`, or on a sub-task.
+
 ## [1.4.0] - 2026-10-15
 
 ### Added

@@ -3,12 +3,12 @@ sujet:
   titre: "Auto-contrôle avant revue dans les briefs implement et fix"
   lot: L222
   perimetre:
-    modules: [templates/orchestrate/implement.md, templates/orchestrate/fix.md, src/orchestrate/briefs.ts]
+    modules: [templates/orchestrate/implement.md, templates/orchestrate/fix.md, src/orchestrate/briefs.ts, src/corrections.ts, src/cli.ts, README.md, CHANGELOG.md, docs/mesures]
     endpoints: []
     jobs: []
     hors_perimetre:
       - "le schéma du rapport de session (src/orchestrate/schemas.ts) : aucun champ ajouté, la vérification se dit dans la prose existante (R6)"
-      - "la commande cadence corrections et son format : inchangés, la mesure avant/après est un document de docs/mesures (R9)"
+      - "la commande cadence corrections : seule l'option --since s'ajoute (R9) ; son format de sortie et --until sont inchangés, la mesure avant/après est un document de docs/mesures"
       - "les briefs fix-minors, spec, spec-back, accept, accept-back, review* : inchangés (R8)"
       - "l'agent code-reviewer : ses constats majeurs existants ne changent pas"
 
@@ -44,14 +44,14 @@ cas:
   - id: C3
     titre: "Le lead mesure les passes de correction avant et après la liste"
     acteur: le lead
-    declencheur: commande cadence corrections <dossier> --until <date>
+    declencheur: commande cadence corrections <dossier> --until <borne> (avant) puis --since <borne> (après)
     preconditions:
       - des journaux .cadence/runs existent avant et après la mise en service de L222
     nominal:
-      - "Le lead rejoue la commande bornée à la veille de la mise en service (avant), puis la commande sans borne (après)."
+      - "Le lead rejoue la commande bornée par --until à l'heure de la mise en service (avant), puis la commande --since de la même borne (après : les lots dont l'implement a commencé après la borne, avec toutes leurs passes)."
       - "Il consigne les passes par lot dans docs/mesures/."
     alternatives: []
-    sans_alternative: "la mesure est une lecture seule de commandes existantes ; leurs échecs sont ceux de cadence corrections, hors du lot"
+    sans_alternative: "la mesure est une lecture seule de cadence corrections ; ses échecs sont ceux de la commande (usage, date invalide)"
     resultat: "Un document daté avec les passes de correction par lot avant et après."
 
 regles:
@@ -105,10 +105,10 @@ regles:
     tests: ["R8 — implement et fix se rendent sans accolade restante avec les variables existantes", "R8 — fix-minors, spec, spec-back, accept et review-small n'ont pas la liste"]
   - id: R9
     cas: [C3]
-    enonce: "La mesure avant/après est un document de docs/mesures/ rejouant cadence corrections (--until pour l'avant), les passes par lot comparées ; aucune option n'est ajoutée à la commande."
-    statut: hypothese
-    si_faux: "Si l'après doit se calculer à partir d'une date de début (--since), la commande cadence corrections change : un contrat public, donc un lot à part."
-    tests: ["R9 — le README renvoie au document de mesure avant/après de L222", "R9 — l'aide de cadence corrections (src/cli.ts:65) et son message d'usage (src/cli.ts:851) ne citent pas --since, la commande reste inchangée"]
+    enonce: "La mesure avant/après est un document de docs/mesures/ qui rejoue cadence corrections : l'avant avec --until <borne>, l'après avec --since <borne>, les passes par lot comparées. --since ne garde que les lots dont la première session implement aboutie a commencé après la borne, avec toutes leurs passes ; un lot sans début lisible est écarté ; la sortie et --until sont inchangés."
+    statut: sourcee
+    source: "constat de la revue du 15-10 (vague 2026-10-15-1915, troisième passe) : une différence sans borne − --until donne un après faux dès qu'une vague est à cheval sur la borne (--continue : cas courant, scripts/mise-en-service.mjs:141)"
+    tests: ["R9 — le README renvoie au document de mesure avant/après de L222", "R9 — le document de mesure rejoue l'avant avec --until et l'après avec --since, sans différence", "R9 — --since garde le lot entier dont l'implement a commencé après la borne et écarte le lot à cheval", "R9 — --since invalide est refusé, l'aide et le message d'usage de cadence corrections citent --since"]
 
 contrats:
   - id: A1
@@ -127,10 +127,10 @@ contrats:
     regles: [R7, R8]
   - id: A3
     appel: commande cadence corrections
-    entree: "[dossier] [--until date] [--cache fichier] (inchangée)"
-    sortie: "les tables existantes ; le lead consigne les passes par lot avant/après dans docs/mesures/"
-    erreurs: []
-    sans_erreur: "commande existante non modifiée ; ses erreurs (usage, --until invalide) restent celles de src/cli.ts:857"
+    entree: "[dossier] [--until date] [--since date] [--cache fichier] ; --since est la seule option ajoutée"
+    sortie: "les tables existantes, sur les lots dont l'implement a commencé après --since ; le lead consigne les passes par lot avant/après dans docs/mesures/"
+    erreurs:
+      - { code: "exit 2", message: "--since invalide : <valeur> (une date ISO, ex. 2026-10-10T18:31Z)" }
     regles: [R9]
 
 donnees:

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { WORK_SCHEMA } from '../src/orchestrate/schemas.js';
+import { run } from '../src/cli.js';
+import { tempDir } from './helpers.js';
 
 const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8');
 const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: 'c1', reponse: '', constats: 'un constat', ux: '', choix: '', checks: '', news: '', captures: '', fiche: '', repos: '' };
@@ -97,29 +100,36 @@ describe('auto-contrôle avant revue (L222)', () => {
     expect(existsSync(fileURLToPath(new URL(`../${doc}`, import.meta.url)))).toBe(true);
   });
 
-  it('R9 — le document de mesure borne l\'avant à la mise en service de la liste et calcule l\'après par différence', () => {
+  it('R9 — le document de mesure rejoue l\'avant avec --until et l\'après avec --since, sans différence', () => {
     const doc = read('../docs/mesures/autocontrole-avant-revue-2026-10-15.md');
     expect(doc).toContain('--until <borne>');
+    expect(doc).toContain('--since <borne>');
     expect(doc).toContain('npm run service');
+    // chaque commande de la mesure classe les passes (sans --classify, toute passe hors cache est « non classé »)
+    const commandes = doc.split('\n').filter((l) => l.startsWith('cadence corrections '));
+    expect(commandes).toHaveLength(2);
+    for (const c of commandes) expect(c, c).toContain('--classify');
+    expect(doc).not.toMatch(/différence/);
+    expect(doc).not.toMatch(/par différence|sans borne −/);
     expect(doc).not.toMatch(/--until 2026-10-15T17:19Z/);
-    expect(doc).not.toMatch(/en service à partir du/);
-    expect(doc).not.toContain('--until 2026-10-15T00:00Z');
-    expect(doc).not.toMatch(/sans borne\)/);
-    expect(doc).toMatch(/différence/);
-    expect(doc).not.toMatch(/lot par lot/);
-    expect(doc).not.toMatch(/« doc »/);
-    expect(doc).toContain("dérive d'architecture");
     expect(doc).not.toContain('263 lots');
+    expect(doc).toContain("dérive d'architecture");
   });
 
-  it('R9 — l\'aide de cadence corrections (src/cli.ts:65) et son message d\'usage (src/cli.ts:851) ne citent pas --since, la commande reste inchangée', () => {
-    const cli = read('../src/cli.ts').split('\n');
-    const aide = cli.find((l) => /^\s*cadence corrections \[dossier\]/.test(l));
-    const usage = cli.find((l) => l.includes("'usage : cadence corrections"));
-    expect(aide, 'ligne d\'aide trouvée').toBeDefined();
-    expect(usage, 'message d\'usage trouvé').toBeDefined();
-    expect(aide).not.toContain('--since');
-    expect(usage).not.toContain('--since');
-    expect(aide).toContain('--until date');
+  it('R9 — cadence corrections annonce --since dans son aide et son message d\'usage, et refuse une date invalide', async () => {
+    const sortie: string[] = [];
+    const cwd = tempDir();
+    mkdirSync(join(cwd, '.cadence', 'runs'), { recursive: true });
+    const io = { cwd, env: {}, out: (l: string) => sortie.push(l), err: (l: string) => sortie.push(l), now: () => new Date() };
+    expect(await run(['help'], io)).toBe(0);
+    const aide = sortie.join('\n').split('\n').find((l) => /^\s*cadence corrections \[dossier\]/.test(l));
+    expect(aide, 'ligne d\'aide trouvée').toContain('--since date');
+    sortie.length = 0;
+    expect(await run(['corrections', 'a', 'b'], io)).toBe(2);
+    expect(sortie.join('\n')).toContain('usage : cadence corrections');
+    expect(sortie.join('\n')).toContain('--since date');
+    sortie.length = 0;
+    expect(await run(['corrections', '.', '--since', 'hier'], io)).toBe(2);
+    expect(sortie.join('\n')).toContain('--since invalide');
   });
 });

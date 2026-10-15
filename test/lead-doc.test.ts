@@ -85,6 +85,13 @@ describe('docs/lead.md', () => {
     expect(read('README.md')).toContain('verdict UX : lead')
   })
 
+  it("décrit le rescellé avec une fiche amendée par des commits du lot (L217, R1/R3)", () => {
+    const row = read('docs/lead.md').split('\n').find((l) => l.includes('cadence spec reseal'))!
+    expect(row).not.toContain('sheet unchanged')
+    expect(row).toContain('amended sheet')
+    expect(row).toMatch(/committed.*cit/)
+  })
+
   it('décrit les règles permanentes et les codes de sortie', () => {
     const md = read('docs/lead.md')
     expect(md).toMatch(/^## .*[Rr]ules/m)

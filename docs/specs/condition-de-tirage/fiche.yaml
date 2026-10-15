@@ -1,0 +1,173 @@
+sujet:
+  id: condition-de-tirage
+  titre: "Condition de tirage d'un lot : un champ que lead tour et orchestrate respectent"
+  lot: L219
+  perimetre:
+    modules: [src/plan.ts, src/audit.ts, src/cli.ts, src/lead.ts, src/session.ts, src/orchestrate/command.ts, src/orchestrate/continue.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "poser la condition par une option de raf add (le champ s'écrit à la main dans le plan, comme repos)"
+      - "renseigner le champ sur L190 (édition du plan par le lead, hors lot)"
+      - "toute autre forme de condition que « N lots faits portant spec: true » ou « N lots faits portant screen: page »"
+      - "la dépendance after (inchangée)"
+
+cas:
+  - id: C1
+    titre: Le lead lit le plan alors qu'un lot porte une condition de tirage non remplie
+    acteur: le lead ou une session de projet
+    declencheur: commande raf now (idem cadence session start, cadence lead tour)
+    preconditions:
+      - un lot todo porte le champ gate (condition de tirage)
+      - le nombre de lots done qui satisfont le critère est inférieur à N
+    nominal:
+      - "nextUp (src/audit.ts:300) écarte le lot de « prêts » et le range dans « en attente »."
+      - "raf now et session start l'affichent dans « en attente de… » avec l'avancement (ex. 2/8)."
+      - "lead tour ne le propose pas comme « prochain » ; la ligne du projet signale qu'il attend."
+    alternatives:
+      - { si: la condition est remplie (compte ≥ N), alors: le lot est prêt comme un lot sans condition, regles: [R3] }
+      - { si: le lot porte aussi after, alors: les deux conditions doivent être levées, regles: [R4] }
+      - { si: le lot n'a pas de champ gate, alors: comportement strictement inchangé, regles: [R5] }
+    resultat: Un lot à condition non remplie n'est jamais présenté comme le prochain à tirer.
+  - id: C2
+    titre: Le lead lance orchestrate sur un lot dont la condition n'est pas remplie
+    acteur: le lead
+    declencheur: commande cadence orchestrate <projet>:<lot>
+    preconditions:
+      - le lot est todo avec une condition de tirage non remplie
+    nominal:
+      - "La résolution des cibles (src/orchestrate/command.ts:285-306) calcule le compte du critère dans le plan du projet."
+      - "Le lot est refusé avec le compte courant, avant tout contrôle de dépôt, tout démarrage de lot et toute session."
+      - "La commande sort en échec avec les refus, la vague n'est pas créée."
+    alternatives:
+      - { si: la condition est remplie, alors: le lot est accepté (les autres contrôles s'appliquent), regles: [R3] }
+      - { si: le lot est doing (déjà démarré), alors: la condition ne s'applique pas, regles: [R6] }
+      - { si: --continue tire des candidats, alors: ils viennent de nextUp et excluent le lot, regles: [R2] }
+    resultat: L190 ou L209 ne sont plus tirés pour rien ; aucun budget consommé.
+  - id: C3
+    titre: Le plan porte une condition de tirage mal formée
+    acteur: le lead
+    declencheur: commande raf check
+    preconditions:
+      - un lot porte gate avec une forme invalide (N absent ou non entier positif, critère inconnu ou absent)
+    nominal:
+      - "Le plan est lu (normalizeLot, src/plan.ts:695) et le problème est consigné sur le lot."
+      - "raf check le signale comme champ invalide (bad-field, src/check.ts)."
+      - "Le lot n'est pas tirable tant que la condition n'est pas corrigée."
+    alternatives: []
+    sans_alternative: "la seule branche est l'erreur de forme (R7) ; une forme valide est le cas C1/C2"
+    resultat: Une faute de frappe dans le champ ne rend pas le lot tirable par erreur.
+
+regles:
+  - id: R1
+    cas: [C1, C2, C3]
+    enonce: "Un lot peut porter un champ gate : { count: N, spec: true } ou { count: N, screen: page } (N entier ≥ 1, un seul critère). Le compte est le nombre de lots du même plan au statut done dont le critère est vrai (spec: true, ou screen: page). Les lots todo, doing et dropped ne comptent pas, ni la tranche des sous-tâches."
+    statut: sourcee
+    source: "demande du lot L219 : « un champ (ex. « pas avant N lots spec: true done », ou N lots screen: page) » ; L190 (docs/plan/raf.yaml:2174-2182) ; src/plan.ts:706-731 pour le critère spec/screen déjà modélisé"
+    tests:
+      - "R1 — 2 lots done spec: true sur 8 : compte 2, condition non remplie"
+      - "R1 — un lot spec: true doing ou dropped ne compte pas"
+      - "R1 — critère screen: page ne compte pas un lot screen: component done"
+  - id: R2
+    cas: [C1, C2]
+    enonce: "nextUp range un lot todo dont la condition n'est pas remplie dans « en attente » (blocked), jamais dans « prêts » ; lead tour (prochain), session start, raf now et les candidats de orchestrate --continue (continue.ts:83) en héritent sans autre code."
+    statut: sourcee
+    source: "demande du lot : « que lead tour respecte dans « prochain prêt » » ; src/audit.ts:300-309, src/lead.ts:140, src/orchestrate/continue.ts:83"
+    tests:
+      - "R2 — lead tour : le lot à condition non remplie n'est pas le prochain, le suivant l'est"
+      - "R2 — --continue ne tire pas le lot à condition non remplie"
+      - "R2 — nextUp : le lot est dans blocked et absent de ready"
+  - id: R3
+    cas: [C1, C2]
+    enonce: "Quand le compte atteint N, le lot est prêt comme un lot sans condition ; le champ gate reste écrit dans le plan (rien ne le retire)."
+    statut: hypothese
+    si_faux: "Si le champ doit être retiré une fois rempli, une étape d'écriture du plan s'ajoute ; la lecture est inchangée."
+    tests:
+      - "R3 — compte 8 sur 8 : le lot est prêt et orchestrate l'accepte"
+      - "R3 — le plan n'est pas réécrit par raf now"
+  - id: R4
+    cas: [C1, C2]
+    enonce: "La condition de tirage s'ajoute à after : un lot n'est prêt que si toutes ses dépendances sont levées ET sa condition remplie."
+    statut: sourcee
+    source: "demande du lot : « after: ne sait exprimer qu'une dépendance à un lot » (le champ complète after, ne le remplace pas) ; src/audit.ts:306"
+    tests:
+      - "R4 — after levé mais condition non remplie : lot en attente"
+      - "R4 — condition remplie mais after ouvert : lot en attente"
+  - id: R5
+    cas: [C1]
+    enonce: "Un plan sans aucun champ gate donne exactement les mêmes sorties qu'avant (nextUp, raf now, session start, lead tour, orchestrate, raf check)."
+    statut: sourcee
+    source: "src/audit.ts:306 et tests existants test/lead-tour.test.ts, test/orchestrate-command.test.ts (champ facultatif ajouté, aucun plan existant ne change)"
+    tests:
+      - "R5 — plan sans gate : nextUp identique à la sortie d'avant"
+      - "R5 — plan sans gate : raf check sans nouveau problème"
+  - id: R6
+    cas: [C2]
+    enonce: "orchestrate refuse la condition non remplie seulement pour un lot todo ; un lot déjà doing (vague reprise, lot démarré à la main) n'est pas refusé pour sa condition."
+    statut: hypothese
+    si_faux: "Si un lot doing doit aussi être refusé, le refus s'étend à la reprise d'une vague ; le lead devrait alors le remettre en attente avec raf todo (L220)."
+    tests:
+      - "R6 — lot doing à condition non remplie : non refusé pour ce motif"
+  - id: R7
+    cas: [C3]
+    enonce: "Un gate mal formé (non objet, count absent ou non entier ≥ 1, critère absent, inconnu ou double) est consigné comme problème du lot, signalé par raf check, et le lot est traité comme condition non remplie (jamais tirable)."
+    statut: hypothese
+    si_faux: "Si un gate invalide doit être ignoré, le lot devient tirable malgré la faute ; seule la branche d'erreur change (aucune donnée en jeu)."
+    tests:
+      - "R7 — count: 0 ou « huit » : problème signalé par raf check"
+      - "R7 — critère inconnu (spec: false, screen: component) : lot non tirable"
+  - id: R8
+    cas: [C2]
+    enonce: "Le refus d'orchestrate a lieu dans la résolution des cibles, avant les contrôles de dépôt, tout démarrage de lot et toute session ; le lot compte pour ce refus uniquement par les lots done du plan (un lot de la même vague ne le lève pas, contrairement à after)."
+    statut: sourcee
+    source: "demande du lot : « que orchestrate refuse avant d'agir » ; src/orchestrate/command.ts:299-306 (refus par dépendance, avant le contrôle des dépôts)"
+    tests:
+      - "R8 — refus avant l'arbre sale et avant tout lancement de session"
+      - "R8 — un lot spec: true placé plus tôt dans la même vague ne lève pas la condition"
+  - id: R9
+    cas: [C1]
+    enonce: "raf now et session start affichent le lot en attente avec l'avancement : « <id> (<compte>/<N> lots <critère> faits) » dans la ligne « en attente de… » ; lead tour ajoute un segment « attend <id> » à la ligne du projet seulement s'il existe un lot à condition non remplie. raf show affiche « gate : <N> lots <critère> faits ». Le libellé exact est un choix de rédaction."
+    statut: hypothese
+    si_faux: "Seul le libellé change ; un test de format est à réécrire (aucune donnée en jeu)."
+    tests:
+      - "R9 — raf now : la ligne en attente donne 2/8 lots spec: true faits"
+      - "R9 — lead tour : sans lot à condition, la ligne est identique à celle d'avant"
+      - "R9 — raf show affiche le gate"
+
+contrats:
+  - id: A1
+    appel: commande raf now
+    entree: "le plan du projet (lots avec ou sans gate)"
+    sortie: "sections En cours / À suivre ; un lot à condition non remplie y figure en « en attente » avec son avancement"
+    erreurs: []
+    sans_erreur: "lecture seule ; une condition mal formée n'échoue pas la commande, raf check la signale (A4)"
+    regles: [R1, R2, R4, R5, R9]
+  - id: A2
+    appel: commande cadence lead tour
+    entree: "[dossier] [--idle n] [--depth n] [--json]"
+    sortie: "une ligne par projet ; « prochain » ignore les lots à condition non remplie ; champ JSON next inchangé de forme"
+    erreurs: []
+    sans_erreur: "lecture seule ; un plan illisible garde le traitement existant (src/lead.ts:143-145)"
+    regles: [R2, R5, R9]
+  - id: A3
+    appel: commande cadence orchestrate
+    entree: "<projet>:<lot>… ou --continue"
+    sortie: "la vague démarre, ou le lot est refusé avant toute action"
+    erreurs:
+      - { code: log error, message: "<projet>:<lot> : condition de tirage non remplie : <compte>/<N> lots <critère> faits" }
+    regles: [R2, R3, R4, R6, R8]
+  - id: A4
+    appel: commande raf check
+    entree: aucune
+    sortie: "les problèmes du plan, dont un gate mal formé"
+    erreurs:
+      - { code: log error, message: "<id> : gate invalide : <count: entier ≥ 1 et un critère spec: true ou screen: page attendus>" }
+    regles: [R7]
+
+donnees:
+  - id: D1
+    objet: "docs/plan/raf.yaml, clé facultative gate par lot : { count: N, spec: true } ou { count: N, screen: page }"
+    existant: true
+    modification: ajout
+    decision: "Le lot demande « un champ » ; son nom (gate) et sa forme sont provisoires et soumis au lead (question Q1 du rapport) avant toute implémentation."
+    note: "champ facultatif, absent des plans existants (R5) ; ajouté à FIELDS (src/plan.ts:82)"

@@ -2486,6 +2486,24 @@ lots:
       - { date: 2026-10-15, text: "Hypothèses (fiche raf-todo-remise-en-attente) — R8 : Les commits comptés sont les commits de travail du lot (lotWork : ni commits du plan seul, ni versions, ni antérieurs à l'adoption du plan) ; les commits de pl… ; si faux : Si tout commit citant le lot doit bloquer (lotCommits), un « chore(plan) » sur le lot forcerait à nouveau l'édition à la main ; le comptage seul change" }
     review: { date: 2026-10-15, verdict: "compliant : 0 bloquant, 0 majeur, 1 mineur (dépôts voisins non comptés, à noter dans la fiche) — orchestré (vague 2026-10-15-1437, 0 passe(s) de correction)", commit: 92ccab52b92bd375d0208c6bfdedf258271e0452 }
     finished: 2026-10-15
+  - id: L221
+    title: "Revue UX de conformité une seule fois, après la revue de code conforme (plus après chaque passe de correction) : finance L75 le 15-10 a eu 3 passes UX Opus (sessions 7, 10, 13) pour un seul verdict utile ; la passe finale reste obligatoire pour un lot visible, les intermédiaires sont supprimées ; mesure avant/après sur les journaux"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-15
+  - id: L222
+    title: "Auto-contrôle avant revue dans le brief implement (et fix) : liste des constats récurrents des revues du 15-10 — doc d'usage (README, architecture) à jour dans le même lot, un test nommé par règle de la fiche, pas de code mort ni de test qui ne peut pas échouer, capture due pour un écran modifié, pas de commentaire faux ; la session vérifie la liste avant de rendre ; mesure : passes de correction par lot avant/après (cadence corrections)"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-15
+  - id: L223
+    title: "Reprise par le programme d'un lot rendu sur budget : cadence orchestrate --resume <vague> --budget <projet>:<lot>=+N rejoue l'étape non jouée (fix ou revue) avec le budget relevé, en session neuve, et garde l'enregistrement des verdicts ; le 15-10 maritime B26.4 (849 k / 750 k, fix non joué) a été repris à la main : brief fix.md rendu par le lead, 2 agents, raf note à la main"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

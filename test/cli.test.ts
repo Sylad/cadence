@@ -353,6 +353,12 @@ describe('raf show', () => {
     expect(readFileSync(join(__dirname, '..', 'README.md'), 'utf8')).not.toMatch(/raf show[^\n]*in full/);
   });
 
+  it('README — la liste des champs renommables de plan.fields cite gate et dit que spec: true d\'un gate demande plan.fields.spec', () => {
+    const readme = readFileSync(join(__dirname, '..', 'README.md'), 'utf8');
+    expect(readme).toMatch(/`parent`, `gate`; one left out/);
+    expect(readme).toMatch(/gate: \{ count: N, spec: true \}[^\n]*read-only plan[^\n]*plan\.fields\.spec/);
+  });
+
   it('--notes n\'affiche que les notes, une par ligne', () => {
     const dir = planAvecLot();
     const r = raf(dir, 'show', 'L2', '--notes');

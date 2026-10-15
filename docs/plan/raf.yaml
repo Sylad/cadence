@@ -2531,6 +2531,9 @@ lots:
     spec: true
     created: 2026-10-15
     started: 2026-10-15
+    notes:
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/orchestrate-reprise-lot-budget/fiche.yaml:65 — Forme de l'argument ambiguë. R8 refuse « l'argument n'a pas la forme projet:lot=+N », mais R9 et A1 prévoient « précisez projet:lot » quand plusieurs projets portent le lot. Cela suppose que `B26.4=+200k` (sans projet) est accepté, comme lotArg l'accepte pour --drop (command.ts:~155-161). La fiche doit dire si le projet est optionnel et ajouter un test « lot seul accepté si non ambigu »." }
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/orchestrate-reprise-lot-budget/fiche.yaml:86 — R7 : le test « aucune note de mineur posée en double » et la phrase « un verdict déjà enregistré n'est pas dupliqué » ne disent pas comment l'absence de doublon est vérifiée. Aucune source citée ne décrit un contrôle d'idempotence à cycle.ts:1798-1840 ou :1237-1283. Les deux sont à fournir (nom du compteur de notes ou du plan simulé), sinon le test peut passer sans rien exercer." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

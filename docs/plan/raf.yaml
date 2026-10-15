@@ -2488,7 +2488,7 @@ lots:
     finished: 2026-10-15
   - id: L221
     title: "Revue UX de conformité une seule fois, après la revue de code conforme (plus après chaque passe de correction) : finance L75 le 15-10 a eu 3 passes UX Opus (sessions 7, 10, 13) pour un seul verdict utile ; la passe finale reste obligatoire pour un lot visible, les intermédiaires sont supprimées ; mesure avant/après sur les journaux"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-15
@@ -2507,6 +2507,7 @@ lots:
       - { date: 2026-10-15, text: "Hypothèses (fiche ux-une-fois-apres-revue-conforme) — R12 : Dès qu'une étape d'écriture (implement ou fix) rend, l'état UX du lot (l.ux, l.uxVerdict et les constats de source ux) est effacé, et la décision de passer à u… ; si faux : Si l'état UX périmé devait être gardé (trace du verdict précédent), l'ordre des étapes serait inchangé mais uxVerdict garderait l'ancienne valeur jusqu'à la no…" }
       - { date: 2026-10-15, text: "Hypothèses (fiche ux-une-fois-apres-revue-conforme) — R13 : Quand la session ux conclut, le lot est enregistré avec le ReviewSummary de la dernière revue de code (l.code) : verdict et sha relu sont ceux de la revue de c… ; si faux : Si le plan devait porter aussi le verdict UX, le texte du verdict enregistré changerait (une phrase de plus), sans changement de format ni de champ" }
     review: { date: 2026-10-15, verdict: "conforme — orchestré (vague 2026-10-15-1915, 2 passe(s) de correction + passe des mineurs)", commit: 0fc537fb4f38b09c4b727d2e1f7966559a14998f }
+    finished: 2026-10-15
   - id: L222
     title: "Auto-contrôle avant revue dans le brief implement (et fix) : liste des constats récurrents des revues du 15-10 — doc d'usage (README, architecture) à jour dans le même lot, un test nommé par règle de la fiche, pas de code mort ni de test qui ne peut pas échouer, capture due pour un écran modifié, pas de commentaire faux ; la session vérifie la liste avant de rendre ; mesure : passes de correction par lot avant/après (cadence corrections)"
     status: doing

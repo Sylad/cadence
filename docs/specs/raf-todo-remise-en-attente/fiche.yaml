@@ -1,0 +1,101 @@
+sujet:
+  id: raf-todo-remise-en-attente
+  titre: "raf todo <id> remet en attente un lot démarré sans commit"
+  lot: L220
+  perimetre:
+    modules: [src/cli.ts, src/plan.ts, src/audit.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le rouvrir d'un lot done ou dropped (reste à la main dans le YAML, plan.ts:493)"
+      - "la remise en attente d'une sous-tâche (L1/t1)"
+      - "le choix de lots d'une vague orchestrée et le hook autostart (inchangés)"
+
+cas:
+  - id: C1
+    titre: Le lead remet en attente un lot démarré qui n'a aucun commit
+    acteur: le lead
+    declencheur: commande raf todo <id> [--reason texte]
+    preconditions:
+      - le lot est doing et le plan est modifiable
+      - aucun commit de travail ne cite le lot
+    nominal:
+      - "La commande lit le lot et compte ses commits de travail (lotWork, audit.ts:215)."
+      - "Le statut repasse de doing à todo et la clé started est retirée."
+      - "Une note datée est ajoutée au lot avec la raison, puis le plan est enregistré."
+      - "La commande affiche « <id> → todo »."
+    alternatives:
+      - { si: un commit de travail cite le lot, alors: refus, le plan est inchangé, regles: [R2] }
+      - { si: le lot n'est pas doing (todo, done, dropped), alors: refus, regles: [R3] }
+      - { si: l'id est une sous-tâche (L1/t1) ou un lot inconnu, alors: refus, regles: [R4] }
+      - { si: le plan est tenu par un autre outil (lecture seule), alors: refus, regles: [R5] }
+      - { si: --reason est absent ou vide, alors: la note porte le texte par défaut, regles: [R6] }
+      - { si: le lot a des sous-tâches, alors: elles ne changent pas, regles: [R7] }
+    resultat: Le lot est todo, sans started, avec une note datée, sans édition manuelle du YAML.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "raf todo <id> sur un lot doing sans commit de travail le passe à todo, retire sa clé started et ajoute une note « remis en attente : <raison> » datée du jour ; les autres clés du lot (review, ux, estimate…) sont intactes."
+    statut: sourcee
+    source: "demande du lot L220 : « doing → todo, started: retiré, note datée avec la raison »"
+    tests: ["R1 — lot doing sans commit : status todo, started absent, note datée avec la raison", "R1 — les autres clés du lot et les autres lots sont inchangés"]
+  - id: R2
+    cas: [C1]
+    enonce: "Si au moins un commit de travail cite le lot, la commande est refusée avec « <id> a <n> commit(s) qui le citent : le remettre en attente perdrait leur lien — raf drop ou le laisser doing », et plan.yaml n'est pas modifié."
+    statut: sourcee
+    source: "demande du lot L220 : « refusé s'il a des commits qui le citent »"
+    tests: ["R2 — un commit feat(Lx) existe : refus avec le nombre de commits, plan intact", "R2 — un commit de plan seul (isPlanOnly) qui cite le lot ne bloque pas"]
+  - id: R3
+    cas: [C1]
+    enonce: "Un lot qui n'est pas doing est refusé : todo → « <id> est déjà todo » (même texte que plan.ts:491) ; done ou dropped → « <id> est <statut> ; le rouvrir à la main dans le YAML si c'est voulu » (plan.ts:493)."
+    statut: sourcee
+    source: "src/plan.ts:491 et src/plan.ts:493 (messages de setStatus, repris à l'identique)"
+    tests: ["R3 — lot todo : « est déjà todo »", "R3 — lot done et lot dropped : refus, plan intact"]
+  - id: R4
+    cas: [C1]
+    enonce: "Une sous-tâche (id avec /) est refusée avec « raf todo se pose sur un lot, pas une sous-tâche : <ref> » ; un lot inconnu avec « lot inconnu : <id> » (plan.ts:400) ; l'absence d'id affiche l'usage « todo <id> »."
+    statut: hypothese
+    si_faux: "Si la sous-tâche doit être remise à todo, il faut une branche de plus dans setStatus (le statut d'une sous-tâche est déjà écrit sans started) ; aucune donnée en jeu."
+    tests: ["R4 — L1/t1 : refus avec le message", "R4 — lot inconnu : « lot inconnu : L99 »", "R4 — sans id : usage"]
+  - id: R5
+    cas: [C1]
+    enonce: "Sur un plan en lecture seule, la commande est refusée avec le message existant de plan.ts:188 et n'écrit rien."
+    statut: sourcee
+    source: "src/plan.ts:188 (writable)"
+    tests: ["R5 — plan tenu par un autre outil : refus « plan en lecture seule »"]
+  - id: R6
+    cas: [C1]
+    enonce: "--reason est facultatif, comme pour drop ; sans raison (ou vide), la note vaut « remis en attente »."
+    statut: hypothese
+    si_faux: "Si la raison doit être obligatoire, la commande refuse sans --reason avec un usage ; seul le message d'erreur change."
+    tests: ["R6 — sans --reason : note « remis en attente »", "R6 — --reason « vague rendue » : note « remis en attente : vague rendue »"]
+  - id: R7
+    cas: [C1]
+    enonce: "Les sous-tâches du lot (done comprises) ne sont pas modifiées par la remise en attente."
+    statut: hypothese
+    si_faux: "Si les sous-tâches done doivent repasser à todo, la commande les touche aussi ; pas de perte de données, le YAML se corrige à la main."
+    tests: ["R7 — un lot doing avec une sous-tâche done : elle reste done"]
+  - id: R8
+    cas: [C1]
+    enonce: "Les commits comptés sont les commits de travail du lot (lotWork : ni commits du plan seul, ni versions, ni antérieurs à l'adoption du plan) ; les commits de plan seul qui citent le lot ne bloquent pas."
+    statut: hypothese
+    si_faux: "Si tout commit citant le lot doit bloquer (lotCommits), un « chore(plan) » sur le lot forcerait à nouveau l'édition à la main ; le comptage seul change."
+    tests: ["R8 — commit de plan seul citant le lot : la remise en attente passe", "R8 — commit de version citant le lot : passe"]
+
+contrats:
+  - id: A1
+    appel: commande raf todo
+    entree: "<id> [--reason texte]"
+    sortie: "« <id> → todo » sur la sortie standard, code 0 ; plan.yaml écrit (status todo, started retiré, note datée)"
+    erreurs:
+      - { code: log error, message: "<id> a <n> commit(s) qui le citent : le remettre en attente perdrait leur lien — raf drop ou le laisser doing" }
+      - { code: log error, message: "<id> est déjà todo" }
+      - { code: log error, message: "<id> est <statut> ; le rouvrir à la main dans le YAML si c'est voulu" }
+      - { code: log error, message: "raf todo se pose sur un lot, pas une sous-tâche : <ref>" }
+      - { code: log error, message: "lot inconnu : <id>" }
+      - { code: log error, message: "plan en lecture seule : <plan> est tenu par un autre outil (cadence.yaml : plan) — le modifier avec l'outil du projet" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8]
+
+donnees:
+  - { id: D1, objet: "docs/plan/raf.yaml, lot : status, started, notes", existant: true, modification: aucune, note: "mêmes clés, mêmes formats : status repasse à une valeur existante, started est retiré (un lot todo n en a pas), la note reprend le format de raf note" }

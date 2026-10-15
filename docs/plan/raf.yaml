@@ -2494,10 +2494,11 @@ lots:
     created: 2026-10-15
   - id: L222
     title: "Auto-contrôle avant revue dans le brief implement (et fix) : liste des constats récurrents des revues du 15-10 — doc d'usage (README, architecture) à jour dans le même lot, un test nommé par règle de la fiche, pas de code mort ni de test qui ne peut pas échouer, capture due pour un écran modifié, pas de commentaire faux ; la session vérifie la liste avant de rendre ; mesure : passes de correction par lot avant/après (cadence corrections)"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-15
+    started: 2026-10-15
   - id: L223
     title: "Reprise par le programme d'un lot rendu sur budget : cadence orchestrate --resume <vague> --budget <projet>:<lot>=+N rejoue l'étape non jouée (fix ou revue) avec le budget relevé, en session neuve, et garde l'enregistrement des verdicts ; le 15-10 maritime B26.4 (849 k / 750 k, fix non joué) a été repris à la main : brief fix.md rendu par le lead, 2 agents, raf note à la main"
     status: todo

@@ -1231,8 +1231,11 @@ concludes even when it finds new minors, which are returned to you as proposals 
 When the pass makes no commit (every minor judged wrong) and HEAD has not moved since the compliant review,
 the lot concludes on that original review (if HEAD moved, e.g. a resume after a cut-off session that had
 committed, a short re-review of that commit runs instead): `ready`, verdict recorded with the sha that review read (`… + passe des mineurs sans commit`),
-the untreated minors returned as proposals. Same when the budget is exhausted right after a compliant
-review with minors: it concludes on that review instead of staying suspended.
+the untreated minors returned as proposals. For a visible, non-small lot with `orchestrate.ux` declared, the
+final UX review plays first and the lot concludes on that same original review once the UX is compliant. Same when the
+budget is exhausted right after a compliant review with minors: it concludes on that review instead of staying
+suspended, except for such a visible lot, where the UX session needs budget and the wave stays `suspended`
+(budget reached) like any other session.
 
 **Sub-tasks covered by commits (L82)**: when the review concludes compliant, the open sub-tasks of the lot that a work commit of the lot cites (`feat(L3/t2): …`, in the project or in one of the lot's neighbouring repositories; a commit that cites only the lot covers none) are closed in the same plan commit as the verdict, with the warning `sous-tâches closes : L3/t2 (sha)`, so `raf done` does not refuse the lot over finished work. A read-only plan is never written: each such sub-task is returned as a proposal `[sous-tâche clore] L3/t2 — couverte par <sha>`, for you to close with the project's tool. On a plan in a foreign format (read-only, `cadence.yaml` `plan:`), sub-task ids are read as the plan reads them: `B53/t4-ux1` covers `t4-ux1` only, not `t4`, and a list such as `feat(B53/t4-ux1,t5)` covers each of its sub-tasks. The lot id is not read inside another id (`fix(E-A2/t3,t4, A2/t1)` covers `A2/t1` only for lot `A2`), and a list may repeat the lot id (`fix(L1/t1, L1/t2,t3)` covers `t1`, `t2` and `t3`). A non-compliant review closes nothing.
 

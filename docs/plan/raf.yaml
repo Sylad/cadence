@@ -2529,7 +2529,7 @@ lots:
     finished: 2026-10-15
   - id: L223
     title: "Reprise par le programme d'un lot rendu sur budget : cadence orchestrate --resume <vague> --budget <projet>:<lot>=+N rejoue l'étape non jouée (fix ou revue) avec le budget relevé, en session neuve, et garde l'enregistrement des verdicts ; le 15-10 maritime B26.4 (849 k / 750 k, fix non joué) a été repris à la main : brief fix.md rendu par le lead, 2 agents, raf note à la main"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-15
@@ -2544,6 +2544,9 @@ lots:
       - { date: 2026-10-15, text: "Hypothèses (fiche orchestrate-reprise-lot-budget) — R6 : Le relèvement du lot ne contourne ni le budget ni le quota de la vague : si la vague est épuisée, le lot reste suspendu et la vague passe en suspended-budget (… ; si faux : Si une vague terminée devait rester non reprenable même ainsi, le lead n'aurait pas d'autre moyen que la main pour B26.4 : seule la condition du refus (command…" }
       - { date: 2026-10-15, text: "Hypothèses (fiche orchestrate-reprise-lot-budget) — R10 : Quand l'étape à rejouer est un fix (next fix), un N inférieur ou égal à la réserve (155 000) est refusé : le fix serait refusé aussitôt par fixAffordable et la… ; si faux : Si le refus devait être un simple avertissement, le lot serait rendu de nouveau avec le texte de R5 : seul le niveau (refus ou avertissement) change, aucune do…" }
       - { date: 2026-10-15, text: "Hypothèses (fiche orchestrate-reprise-lot-budget) — R13 : Entrées dupliquées ou combinées, refus code 2 avant écriture : (a) le même lot visé deux fois, que ce soit par p:L deux fois ou par p:L puis L : « --budget <pr… ; si faux : Si le dernier --budget devait l'emporter, ou --drop le gagner, seul l'ordre de résolution des options change ; refuser est le choix prudent, aucune donnée en j…" }
+      - { date: 2026-10-15, text: "mineurs laissés en note (revue Opus 15-10) : test R12 « lot visé sain » sans .nvmrc (node non exercé) ; tests R3 spec/accept, R10 implement et R1 500k faibles ; --resume sans id de vague avec --budget projet:lot=+N sur une vague done répond « aucune vague à reprendre » au lieu de nommer la vague ; résolution de lot copiée 4 fois dans command.ts:999-1022 ; clause PATH de R14 sans test" }
+    review: { date: 2026-10-15, verdict: "conforme (Opus, re-vérification après correction, re-vérifié par le lead) : --resume --budget projet:lot=+N rejoue l'étape d'écriture d'un lot rendu sur budget, refus R8–R13 aux textes exacts, repli sur le dist/ courant pour un instantané d'avant L223 (R14), 48 tests nommés comme la fiche, 2169 tests verts ; non vérifié : reprise réelle de B26.4 (après mise en service)", commit: a69fc9e73ad9b73f5c23159ac8f1e8a7557ef3fe }
+    finished: 2026-10-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

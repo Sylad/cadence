@@ -10,7 +10,8 @@ sujet:
       - "poser la condition par une option de raf add (le champ s'écrit à la main dans le plan, comme repos)"
       - "renseigner le champ sur L190 (édition du plan par le lead, hors lot)"
       - "toute autre forme de condition que « N lots faits portant spec: true » ou « N lots faits portant screen: page »"
-      - "la dépendance after (inchangée)"
+      - "la dépendance after (inchangée), y compris sa lecture sans condition par src/schedule.ts:51 et le gantt"
+      - "le compte du critère se fait sur tous les lots du plan du projet (un seul plan, pas d'agrégat entre projets)"
 
 cas:
   - id: C1
@@ -22,7 +23,7 @@ cas:
       - le nombre de lots done qui satisfont le critère est inférieur à N
     nominal:
       - "nextUp (src/audit.ts:300) écarte le lot de « prêts » et le range dans « en attente »."
-      - "raf now et session start l'affichent dans « en attente de… » avec l'avancement (ex. 2/8)."
+      - "raf now l'affiche dans « en attente de… » avec l'avancement (ex. 2/8) (src/cli.ts:552-563) ; session start, qui ne lit aujourd'hui que doing et ready (src/session.ts:132), reçoit une section « En attente » limitée aux lots à condition non remplie."
       - "lead tour ne le propose pas comme « prochain » ; la ligne du projet signale qu'il attend."
     alternatives:
       - { si: la condition est remplie (compte ≥ N), alors: le lot est prêt comme un lot sans condition, regles: [R3] }
@@ -70,7 +71,7 @@ regles:
       - "R1 — critère screen: page ne compte pas un lot screen: component done"
   - id: R2
     cas: [C1, C2]
-    enonce: "nextUp range un lot todo dont la condition n'est pas remplie dans « en attente » (blocked), jamais dans « prêts » ; lead tour (prochain), session start, raf now et les candidats de orchestrate --continue (continue.ts:83) en héritent sans autre code."
+    enonce: "nextUp range un lot todo dont la condition n'est pas remplie dans « en attente » (blocked), jamais dans « prêts » ; lead tour (prochain), session start (« À suivre » et Propositions), raf now et les candidats de orchestrate --continue (continue.ts:83) en héritent pour le tri ; l'affichage de l'attente est traité par R9."
     statut: sourcee
     source: "demande du lot : « que lead tour respecte dans « prochain prêt » » ; src/audit.ts:300-309, src/lead.ts:140, src/orchestrate/continue.ts:83"
     tests:
@@ -126,11 +127,14 @@ regles:
       - "R8 — un lot spec: true placé plus tôt dans la même vague ne lève pas la condition"
   - id: R9
     cas: [C1]
-    enonce: "raf now et session start affichent le lot en attente avec l'avancement : « <id> (<compte>/<N> lots <critère> faits) » dans la ligne « en attente de… » ; lead tour ajoute un segment « attend <id> » à la ligne du projet seulement s'il existe un lot à condition non remplie. raf show affiche « gate : <N> lots <critère> faits ». Le libellé exact est un choix de rédaction."
+    enonce: "raf now affiche le lot en attente avec l'avancement : « <id> (<compte>/<N> lots <critère> faits) » dans la ligne « en attente de… » (le libellé « dépendances » de src/cli.ts:563 est adapté pour un lot à gate, inchangé sinon). session start ajoute (src/session.ts, après En cours) une section « En attente » listant uniquement les lots à condition non remplie, sous la même forme, et rien si aucun ; lead tour ajoute un segment « attend <id> » à la ligne du projet seulement s'il existe un lot à condition non remplie. raf show affiche « gate : <N> lots <critère> faits ». Le libellé exact est un choix de rédaction."
     statut: hypothese
     si_faux: "Seul le libellé change ; un test de format est à réécrire (aucune donnée en jeu)."
     tests:
       - "R9 — raf now : la ligne en attente donne 2/8 lots spec: true faits"
+      - "R9 — session start : la section En attente donne 2/8 lots spec: true faits"
+      - "R9 — session start : sans lot à condition, aucune section En attente (sortie identique à celle d'avant)"
+      - "R9 — raf now : un lot en attente de dépendances sans gate garde la ligne « en attente de dépendances : <ids> » existante"
       - "R9 — lead tour : sans lot à condition, la ligne est identique à celle d'avant"
       - "R9 — raf show affiche le gate"
 
@@ -163,6 +167,13 @@ contrats:
     erreurs:
       - { code: log error, message: "<id> : gate invalide : <count: entier ≥ 1 et un critère spec: true ou screen: page attendus>" }
     regles: [R7]
+  - id: A5
+    appel: commande cadence session start
+    entree: "[--since] [--idle n]"
+    sortie: "rapport de reprise ; « À suivre » et Propositions excluent le lot à condition non remplie, une section « En attente » le liste avec son avancement"
+    erreurs: []
+    sans_erreur: "lecture seule ; une condition mal formée n'échoue pas la commande, raf check la signale (A4)"
+    regles: [R2, R5, R9]
 
 donnees:
   - id: D1

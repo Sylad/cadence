@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative, sep } from 'node:path';
-import { audit, nextUp, planCommits } from './audit.js';
+import { audit, gateWaiting, nextUp, planCommits } from './audit.js';
 import { planLoader, readPlanConfig } from './config.js';
 import { diffDays, type Day } from './dates.js';
 import { gitRoot, repoStatus } from './git.js';
@@ -69,6 +69,8 @@ export interface TourRow {
   drift: string[];
   notes: string[];
   next: { id: string; title: string } | null;
+  /** Lots en attente d'une condition de tirage (L219) ; absent quand aucun lot n'en porte. */
+  waiting?: string[];
   progress: TourProgress;
   /** « non commité », « non poussé », « livraison en cours » ; vide quand le dépôt est propre. */
   repo: string[];
@@ -120,7 +122,7 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     const plan = planLoader(root)();
     const lots = plan.lots();
     const all = linkCommits(lots, planCommits(plan, root), plan.refs);
-    const { doing, ready } = nextUp(lots);
+    const { doing, ready, blocked } = nextUp(lots);
 
     row.doing = doing.map((l) => {
       const last = lastActivity(l, all.byLot.get(l.id) ?? []);
@@ -137,6 +139,8 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
       todo: counted.filter((l) => l.status === 'todo').length,
       added7: counted.filter((l) => l.created !== undefined && diffDays(l.created, today) >= 0 && diffDays(l.created, today) < ADDED_DAYS).length,
     };
+    const waiting = gateWaiting(lots, blocked).map((g) => g.lot.id);
+    if (waiting.length) row.waiting = waiting;
     row.next = ready[0] ? { id: ready[0].id, title: ready[0].title } : null;
 
     const s = repoStatus(root);
@@ -187,5 +191,5 @@ export function tourLine(r: TourRow): string {
     : 'aucune';
   const notes = r.notes.length ? truncate(r.notes.join(' / '), NOTES_MAX) : 'aucune';
   const next = r.next ? `${r.next.id} ${truncate(r.next.title, TITLE_MAX)}` : 'aucun';
-  return [r.project, `en cours ${doing}`, `dérive ${drift}`, `notes : ${notes}`, `prochain ${next}`, `dépôt ${r.repo.length ? r.repo.join(', ') : 'propre'}`].join(' · ');
+  return [r.project, `en cours ${doing}`, `dérive ${drift}`, `notes : ${notes}`, `prochain ${next}`, ...(r.waiting?.length ? [`attend ${r.waiting.join(', ')}`] : []), `dépôt ${r.repo.length ? r.repo.join(', ') : 'propre'}`].join(' · ');
 }

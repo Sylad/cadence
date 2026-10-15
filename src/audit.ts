@@ -317,6 +317,14 @@ export function gateText(p: GateProgress): string {
   return p.n === 0 ? 'condition de tirage invalide' : `${p.count}/${p.n} lots ${p.label} faits`;
 }
 
+/** Les lots en attente d'une condition de tirage non remplie (ou mal formée), avec leur avancement, parmi `blocked` de nextUp. */
+export function gateWaiting(all: Lot[], blocked: Lot[]): { lot: Lot; text: string }[] {
+  return blocked.flatMap((lot) => {
+    const p = gateProgress(all, lot);
+    return p && !p.met ? [{ lot, text: gateText(p) }] : [];
+  });
+}
+
 /** Ce qui vient ensuite : lots en cours, puis lots prêts (dépendances closes), gains rapides d'abord. */
 export function nextUp(all: Lot[]): { doing: Lot[]; ready: Lot[]; blocked: Lot[] } {
   // Les lots récurrents ont leur propre section (raf now) : ils ne sont ni « en cours » ni « à suivre ».

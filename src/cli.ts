@@ -4,7 +4,7 @@ import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPlanConfig, readSessionConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
-import { audit, exemptPlanOnly, hypothesesOf, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
+import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
@@ -363,6 +363,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (lot.public) io.out(`public : ${lot.public}`);
       if (lot.screen) io.out(`screen : ${lot.screen}`);
       if (lot.spec) io.out('spec : true');
+      const gate = gateProgress(plan.lots(), lot);
+      if (lot.gate && gate) io.out(lot.gate.invalid ? `gate : ${gateText(gate)}` : `gate : ${gate.n} lots ${gate.label} faits`);
       if (notes.length) {
         io.out('notes :');
         // Les lignes suivantes d'une note multiligne s'alignent sous son texte, pas en colonne 0.
@@ -560,7 +562,10 @@ function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): num
   if (ready.length === 0) io.out('  (rien de prêt)');
   for (const l of ready.slice(0, 5)) io.out(`  ${describe(l, count(l.id))}`);
   if (ready.length > 5) io.out(`  … et ${ready.length - 5} autre(s)`);
-  if (blocked.length) io.out(`  en attente de dépendances : ${blocked.map((l) => l.id).join(', ')}`);
+  const gated = gateWaiting(lots, blocked);
+  const byDeps = blocked.filter((l) => !gated.some((g) => g.lot === l));
+  if (byDeps.length) io.out(`  en attente de dépendances : ${byDeps.map((l) => l.id).join(', ')}`);
+  if (gated.length) io.out(`  en attente de condition de tirage : ${gated.map((g) => `${g.lot.id} (${g.text})`).join(', ')}`);
 
   const recurring = recurringByDue(lots, today);
   if (recurring.length) {

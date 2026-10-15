@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gateProgress, nextUp } from '../src/audit.js';
 import { audit } from '../src/audit.js';
 import { Plan } from '../src/plan.js';
-import { tempDir } from './helpers.js';
+import { run } from '../src/cli.js';
+import { gitRepo, tempDir } from './helpers.js';
 
 type L = { id: string; status?: string; spec?: boolean; screen?: string; visible?: boolean; after?: string[]; gate?: unknown; every?: number };
 
@@ -114,5 +115,95 @@ describe('condition de tirage — gate mal formé (L219)', () => {
   it('R5 — plan sans gate : raf check sans nouveau problème', () => {
     const plan = planOf([{ id: 'A' }, { id: 'B', status: 'done', spec: true }]);
     expect(audit(plan, tempDir(), tempDir(), '2026-10-15').filter((i) => i.message.includes('gate'))).toEqual([]);
+  });
+});
+
+describe('condition de tirage — affichage (L219)', () => {
+  /** Dépôt git avec un plan à la main : 2 lots spec: true done sur 8 demandés, un lot G à gate, un lot N libre. */
+  async function repoWith(extra = ''): Promise<string> {
+    const dir = gitRepo();
+    writeFileSync(
+      join(dir, 'cadence.yaml'),
+      'plan:\n  path: docs/plan/raf.yaml\n',
+    );
+    mkdirSync(join(dir, 'docs/plan'), { recursive: true });
+    writeFileSync(
+      join(dir, 'docs/plan/raf.yaml'),
+      `project: demo\nprefix: L\nlots:\n  - { id: S1, title: Spec un, status: done, spec: true, finished: 2026-09-20 }\n  - { id: S2, title: Spec deux, status: done, spec: true, finished: 2026-09-21 }\n  - { id: G, title: Lot à gate, status: todo, gate: { count: 8, spec: true } }\n  - { id: N, title: Lot libre, status: todo }\n${extra}`,
+    );
+    return dir;
+  }
+  const cad = async (dir: string, ...argv: string[]) => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-09-28' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-09-28T09:30:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  };
+
+  it('R9 — raf now : la ligne en attente donne 2/8 lots spec: true faits', async () => {
+    const dir = await repoWith();
+    const { out } = await cad(dir, 'now');
+    expect(out).toContain('en attente de condition de tirage : G (2/8 lots spec: true faits)');
+    expect(out).not.toContain('en attente de dépendances');
+    expect(out).toMatch(/À suivre\n {2}N /);
+  });
+
+  it('R9 — raf now : un lot en attente de dépendances sans gate garde la ligne « en attente de dépendances : <ids> » existante', async () => {
+    const dir = await repoWith('  - { id: D, title: Dépend, status: todo, after: [N] }\n');
+    const { out } = await cad(dir, 'now');
+    expect(out).toContain('en attente de dépendances : D');
+    expect(out).toContain('en attente de condition de tirage : G (2/8 lots spec: true faits)');
+  });
+
+  it('R3 — le plan n\'est pas réécrit par raf now', async () => {
+    const dir = await repoWith();
+    const before = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    await cad(dir, 'now');
+    await cad(dir, 'session', 'start');
+    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(before);
+  });
+
+  it('R9 — raf show affiche le gate', async () => {
+    const dir = await repoWith();
+    expect((await cad(dir, 'show', 'G')).out).toContain('gate : 8 lots spec: true faits');
+    expect((await cad(dir, 'show', 'N')).out).not.toContain('gate');
+  });
+
+  it('R7 — raf check signale le gate invalide (A4)', async () => {
+    const dir = await repoWith('  - { id: B, title: Mal formé, status: todo, gate: { count: 0, spec: true } }\n');
+    const { out, err } = await cad(dir, 'check');
+    expect(out + err).toContain('B : gate invalide : count: entier ≥ 1 et un critère spec: true ou screen: page attendus');
+  });
+
+  it('R9 — session start : la section En attente donne 2/8 lots spec: true faits', async () => {
+    const dir = await repoWith();
+    const { out } = await cad(dir, 'session', 'start');
+    expect(out).toMatch(/En attente\n {2}G {2}Lot à gate {2}\(2\/8 lots spec: true faits\)/);
+    expect(out).not.toMatch(/Propositions[\s\S]*G {2}Lot à gate/);
+  });
+
+  it('R9 — session start : sans lot à condition, aucune section En attente (sortie identique à celle d\'avant)', async () => {
+    const dir = await repoWith();
+    writeFileSync(join(dir, 'docs/plan/raf.yaml'), readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8').replace(', gate: { count: 8, spec: true }', ''));
+    const { out } = await cad(dir, 'session', 'start');
+    expect(out).not.toContain('En attente');
+  });
+
+  it('R2 — lead tour : le lot à condition non remplie n\'est pas le prochain, le suivant l\'est ; R9 — segment « attend G »', async () => {
+    const dir = await repoWith();
+    // G avant N dans le plan : sans la condition, G serait le prochain
+    const { out } = await cad(dir, 'lead', 'tour');
+    expect(out).toContain('prochain N');
+    expect(out).toContain('attend G');
+    const json = JSON.parse((await cad(dir, 'lead', 'tour', '--json')).out);
+    expect(json[0].next.id).toBe('N');
+  });
+
+  it('R9 — lead tour : sans lot à condition, la ligne est identique à celle d\'avant', async () => {
+    const dir = await repoWith();
+    writeFileSync(join(dir, 'docs/plan/raf.yaml'), readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8').replace(', gate: { count: 8, spec: true }', ''));
+    const { out } = await cad(dir, 'lead', 'tour');
+    expect(out).not.toContain('attend');
+    expect(JSON.parse((await cad(dir, 'lead', 'tour', '--json')).out)[0]).not.toHaveProperty('waiting');
   });
 });

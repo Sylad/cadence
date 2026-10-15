@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { CLEAN_DAYS, scanStale } from './clean.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
-import { audit, exemptPlanOnly, nextUp, planCommits } from './audit.js';
+import { audit, exemptPlanOnly, gateWaiting, nextUp, planCommits } from './audit.js';
 import { diffDays, maxDay, type Day } from './dates.js';
 import { repoStatus, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
@@ -129,7 +129,7 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   const lock = lockStatus(ctx.shared);
   if (lock) out(`\n${lock.line}`);
 
-  const { doing, ready } = nextUp(lots);
+  const { doing, ready, blocked } = nextUp(lots);
   out('\nEn cours');
   if (doing.length === 0) out('  (rien)');
   for (const l of doing) {
@@ -138,6 +138,8 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
     const state = last ? `dernière activité ${last}${idle > opts.idle ? `, silencieux depuis ${idle} j` : ''}` : 'aucune activité';
     out(`  ${l.id}  ${l.title}  (${state})`);
   }
+
+  section(out, 'En attente', gateWaiting(lots, blocked).map(({ lot, text }) => `${lot.id}  ${lot.title}  (${text})`));
 
   const recent = period(ctx, opts.since);
   const done = byLotLines(recent);

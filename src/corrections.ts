@@ -57,7 +57,6 @@ interface RawStep {
   status: string;
   report?: string;
   commits?: string[];
-  started?: string;
   ended?: string;
 }
 
@@ -87,7 +86,7 @@ function findingsOf(report: any): string[] {
 
 /**
  * Lit les journaux de vague `<runs>/<vague>/<projet>--<lot>.json`. Un lot compte (dénominateur) dès qu'une session
- * d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là, pour une mesure que ni les vagues suivantes ni une vague encore en cours ne changent ; une vague ou une étape sans date lisible est écartée ; `since` : date ISO, ne garde que les lots des vagues créées strictement après, avec toutes leurs passes : une vague rend tous ses briefs depuis la copie de l'outil figée à sa création, c'est la date de la vague, non celle du début d'un lot, qui dit quel brief il a reçu) ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
+ * d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là, pour une mesure que ni les vagues suivantes ni une vague encore en cours ne changent ; une vague ou une étape sans date lisible est écartée ; `since` : date ISO, ne garde que les lots des vagues créées strictement après, avec toutes leurs passes : une vague rend tous ses briefs depuis la copie de l'outil figée à sa création, c'est la date de la vague, non celle du début d'un lot, qui dit quel brief il a reçu, sauf pour une vague reprise sans instantané ou, avec `--budget projet:lot=+N`, depuis un instantané d'avant L223 : elle tourne alors avec le dist/ et les gabarits courants ; `--until` plus `--since` ne font le total sans borne que si aucune vague créée avant la borne n'est encore reprenable) ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
  */
 export function readRuns(runsDir: string, until?: string, since?: string): Runs {
   const lots: LotRecord[] = [];
@@ -113,8 +112,7 @@ export function readRuns(runsDir: string, until?: string, since?: string): Runs 
       if (!rec || !Array.isArray(rec.steps)) continue;
       const steps = (rec.steps as RawStep[]).filter((s) => s && typeof s === 'object');
       const done = (s: RawStep) => s.status === 'ok' && inTime(s);
-      const implement = steps.find((s) => s.kind === 'implement' && done(s));
-      if (!implement) continue;
+      if (!steps.some((s) => s.kind === 'implement' && done(s))) continue;
       const name = basename(file, '.json');
       const fixSteps = steps.filter((s) => s.kind === 'fix' && done(s));
       lots.push({ project: rec.project, lot: rec.lot, visible: !!rec.visible, fixes: fixSteps.length });

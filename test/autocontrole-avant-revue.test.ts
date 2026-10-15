@@ -118,6 +118,10 @@ describe('auto-contrôle avant revue (L222)', () => {
     // la somme avant + après n'est le total que pour une borne posée hors vague : la procédure le dit, donne la preuve et le sens d'un écart
     expect(doc).toContain('cadence orchestrate --status');
     expect(doc).toMatch(/une vague à cheval/);
+    // --status ne montre que les vagues vivantes : une vague reprenable (interrompue, suspendue) rejouerait des passes après la borne
+    expect(doc).toContain('.cadence/runs/*/wave.json');
+    expect(doc).toMatch(/reprenable/);
+    expect(doc).not.toMatch(/ne donne jamais la liste/);
     expect(doc).not.toMatch(/entier d'un seul côté/);
     expect(doc).not.toMatch(/--until 2026-10-15T17:19Z/);
     expect(doc).not.toContain('263 lots');

@@ -2421,6 +2421,10 @@ lots:
     spec: true
     created: 2026-10-15
     started: 2026-10-15
+    notes:
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : test/orchestrate-reseal.test.ts:77 — Le test existant « refuse si la fiche a changé depuis le commit rouge » modifie la fiche dans l'arbre de travail sans la commiter et attend /fiche .* a changé/. Avec R3 le message devient « a des modifications non commitées » : ce test doit être mis à jour. La fiche ne le dit pas, et le sort de ce test n'est pas prévu parmi les tests de R3." }
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/spec-reseal-fiche-amendee/fiche.yaml:95 — R9 : la règle énumère plusieurs refus (verrou du dépôt, sans --reason, hors lot en cours, --porteur) mais ne prévoit qu'un test (CADENCE_ORCHESTRATED). Les autres ne sont pas couverts avec une fiche amendée. Ils sont déjà gardés avant la lecture de la fiche (cli.ts:742-760), donc le risque est faible." }
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/spec-reseal-fiche-amendee/fiche.yaml:78 — R8 : « même lecture que raf commits » n'est pas reliée à une fonction. Le code a `citedRefs`/`scopeOf` (src/link.ts:27) : portée du sujet d'abord, corps sinon. Un commit « chore: fiche (L217 évoquée en passant) » citerait le lot par le corps. Il faut nommer la fonction réutilisée (ou `lotCommits` d'audit.ts) pour que l'implémentation ne réécrive pas une détection parallèle." }
   - id: L218
     title: "orchestrate : lot rendu AVANT la passe de correction quand le budget restant < 65 k réservés à la revue (15-10 : warhammer L120 740 k / 800 k après chaîne spec 2 sessions + fiche + question ; maritime B26.1 406 k / 450 k après implement + revue Opus d'un lot S qui touche la base) — mesurer sur les journaux .cadence/runs le coût réel des chaînes spec et des lots S back, puis réserver une passe fix + revue courte (pas seulement la revue) dans le budget, ou relever l'allocation spec (350 k) et le plancher d'un lot qui déclare spec/base ; sans réserve suffisante, dire dans le tableau « correction non jouée (budget) » pour que le lead reprenne à la main"
     status: todo

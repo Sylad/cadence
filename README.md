@@ -1457,7 +1457,7 @@ the same rule, the orchestrator:
 3. probes `url` until an HTTP status below 500, for `timeout` seconds (default 300); the answer only counts while
    the process group it started is still alive. A command that exits early, or
    no answer in time, means « UX not verified » with the end of the log in the note: the UX session is skipped,
-   the lot goes on to the code review — it is never a failure of the wave (the single pass of a small lot still runs,
+   the code review being already compliant the lot concludes with its note — it is never a failure of the wave (the single pass of a small lot still runs,
    on the code alone, its brief saying the app could not be verified);
 4. gives the session « The running app is at `<url>` », with no instruction to start anything;
 5. at the end of the step — success, error or SIGTERM of the wave — kills the group: SIGTERM, then SIGKILL after 10 s.

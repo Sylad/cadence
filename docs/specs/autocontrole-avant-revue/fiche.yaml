@@ -1,0 +1,138 @@
+sujet:
+  id: autocontrole-avant-revue
+  titre: "Auto-contrôle avant revue dans les briefs implement et fix"
+  lot: L222
+  perimetre:
+    modules: [templates/orchestrate/implement.md, templates/orchestrate/fix.md, src/orchestrate/briefs.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le schéma du rapport de session (src/orchestrate/schemas.ts) : aucun champ ajouté, la vérification se dit dans la prose existante (R6)"
+      - "la commande cadence corrections et son format : inchangés, la mesure avant/après est un document de docs/mesures (R9)"
+      - "les briefs fix-minors, spec, spec-back, accept, accept-back, review* : inchangés (R8)"
+      - "l'agent code-reviewer : ses constats majeurs existants ne changent pas"
+
+cas:
+  - id: C1
+    titre: "Une session d'implémentation reçoit la liste d'auto-contrôle et la vérifie avant de rendre"
+    acteur: le programme (orchestrate) puis la session implement
+    declencheur: commande cadence orchestrate (étape implement, rendu par renderBrief('implement'))
+    preconditions:
+      - le lot est dans une vague
+    nominal:
+      - "Le programme rend implement.md : le brief contient la liste des constats récurrents des revues du 15-10."
+      - "La session code et commite ses sous-parties comme avant."
+      - "Avant de rendre son rapport, elle relit la liste, point par point, sur ses propres commits et corrige ce qui manque."
+      - "Son rapport dit, dans la prose existante (choix ou nonVerifie), les points qu'elle n'a pas pu tenir."
+    alternatives:
+      - { si: "le lot n'a pas de fiche ({{fiche}} vide)", alors: "le point « un test par règle » se lit « une règle du lot, un test nommé »", regles: [R2] }
+      - { si: "le lot ne modifie aucun écran", alors: "le point capture est sans objet et la session le dit", regles: [R4] }
+      - { si: "un point de la liste ne peut pas être tenu", alors: "elle le déclare au lieu de le taire", regles: [R6] }
+    resultat: "Un brief implement qui porte la liste, sans changer le reste de ses consignes."
+  - id: C2
+    titre: "Une session de correction reçoit la même liste"
+    acteur: le programme puis la session fix
+    declencheur: commande cadence orchestrate (étape fix, renderBrief('fix'))
+    preconditions:
+      - une revue a rendu des constats à corriger
+    nominal:
+      - "Le programme rend fix.md avec la liste."
+      - "La session corrige les constats, puis relit la liste sur ce qu'elle a modifié avant de rendre."
+    alternatives:
+      - { si: "la liste touche à autre chose que les constats", alors: "la session ne corrige que les constats : la liste ne vaut que pour ce qu'elle a changé", regles: [R7] }
+    resultat: "Un brief fix qui porte la liste, avec « fix them, and nothing else » inchangé."
+  - id: C3
+    titre: "Le lead mesure les passes de correction avant et après la liste"
+    acteur: le lead
+    declencheur: commande cadence corrections <dossier> --until <date>
+    preconditions:
+      - des journaux .cadence/runs existent avant et après la mise en service de L222
+    nominal:
+      - "Le lead rejoue la commande bornée à la veille de la mise en service (avant), puis la commande sans borne (après)."
+      - "Il consigne les passes par lot dans docs/mesures/."
+    alternatives: []
+    sans_alternative: "la mesure est une lecture seule de commandes existantes ; leurs échecs sont ceux de cadence corrections, hors du lot"
+    resultat: "Un document daté avec les passes de correction par lot avant et après."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Le brief implement contient une liste d'auto-contrôle qui demande la documentation d'usage (README et documentation d'architecture) à jour dans les mêmes commits que le comportement."
+    statut: sourcee
+    source: "titre du lot L222 : « doc d'usage (README, architecture) à jour dans le même lot » ; consigne existante templates/orchestrate/implement.md:12 (README), test/orchestrate-briefs.test.ts:43"
+    tests: ["R1 — le brief implement cite README et la documentation d'architecture dans la liste d'auto-contrôle"]
+  - id: R2
+    cas: [C1]
+    enonce: "La liste demande un test nommé « Rn — … » par règle de la fiche ; sans fiche, un test nommé par règle de gestion du lot."
+    statut: sourcee
+    source: "titre du lot L222 : « un test nommé par règle de la fiche » ; convention README « The downstream briefs » (tests cités « Rn — »)"
+    tests: ["R2 — le brief implement demande un test nommé Rn par règle de la fiche"]
+  - id: R3
+    cas: [C1]
+    enonce: "La liste interdit le code mort et le test qui ne peut pas échouer (un test dont l'assertion est toujours vraie ou qui n'exerce pas la règle)."
+    statut: sourcee
+    source: "titre du lot L222 : « pas de code mort ni de test qui ne peut pas échouer » ; docs/mesures/corrections-2026-10-10.md (test manquant : un test qui ne peut pas échouer)"
+    tests: ["R3 — le brief implement interdit le code mort et le test qui ne peut pas échouer"]
+  - id: R4
+    cas: [C1]
+    enonce: "La liste demande, pour un écran modifié, la capture due de chaque état (1440 et 390 px, nom de fichier relatif) ; un lot sans écran modifié n'en doit pas."
+    statut: sourcee
+    source: "titre du lot L222 : « capture due pour un écran modifié » ; consigne Playwright existante de implement.md (nom relatif seul)"
+    tests: ["R4 — le brief implement demande la capture d'un écran modifié, nom de fichier relatif"]
+  - id: R5
+    cas: [C1]
+    enonce: "La liste interdit un commentaire faux : un commentaire, une docstring ou un message qui décrit un comportement que le code n'a plus ou n'a pas."
+    statut: sourcee
+    source: "titre du lot L222 : « pas de commentaire faux »"
+    tests: ["R5 — le brief implement interdit le commentaire faux"]
+  - id: R6
+    cas: [C1]
+    enonce: "La session vérifie la liste avant de rendre ; un point qu'elle ne tient pas est écrit sous choix ou nonVerifie de son rapport, sans nouveau champ de rapport."
+    statut: hypothese
+    si_faux: "Si le programme doit lire la vérification, un champ du rapport (schemas.ts) serait ajouté : un autre lot, avec une question sur le contrat du rapport."
+    tests: ["R6 — le brief implement demande de vérifier la liste avant de rendre et d'écrire les points non tenus", "R6 — le schéma du rapport implement n'a pas de nouveau champ"]
+  - id: R7
+    cas: [C2]
+    enonce: "Le brief fix porte la même liste, limitée à ce que la session a modifié, et garde « fix them, and nothing else »."
+    statut: sourcee
+    source: "titre du lot L222 : « dans le brief implement (et fix) » ; templates/orchestrate/fix.md:2-3 (« and nothing else »)"
+    tests: ["R7 — le brief fix porte la liste d'auto-contrôle et garde « nothing else »"]
+  - id: R8
+    cas: [C1, C2]
+    enonce: "Le reste des briefs est inchangé : la liste est du texte fixe, sans nouveau marqueur {{…}} ni nouvelle variable de BriefVars, et le rendu ne laisse aucune accolade."
+    statut: hypothese
+    si_faux: "Si la liste devait varier selon le lot (capture seulement pour un lot visible), il faudrait un marqueur et une variable de plus dans briefs.ts ; les tests de rendu changeraient."
+    tests: ["R8 — implement et fix se rendent sans accolade restante avec les variables existantes", "R8 — fix-minors, spec, spec-back, accept et review-small n'ont pas la liste"]
+  - id: R9
+    cas: [C3]
+    enonce: "La mesure avant/après est un document de docs/mesures/ rejouant cadence corrections (--until pour l'avant), les passes par lot comparées ; aucune option n'est ajoutée à la commande."
+    statut: hypothese
+    si_faux: "Si l'après doit se calculer à partir d'une date de début (--since), la commande cadence corrections change : un contrat public, donc un lot à part."
+    tests: ["R9 — le README renvoie au document de mesure avant/après de L222", "R9 — cadence corrections n'accepte pas d'option --since"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate (brief implement.md)
+    entree: "BriefVars existantes (chemin, lot, titre, objectif, repos, fiche, news, commits, reponse…)"
+    sortie: "le brief texte avec la liste d'auto-contrôle (R1 à R6), consignes existantes conservées"
+    erreurs:
+      - { code: log error, message: "gabarit implement.md : valeur manquante pour {{chemin}}" }
+    regles: [R1, R2, R3, R4, R5, R6, R8]
+  - id: A2
+    appel: commande cadence orchestrate (brief fix.md)
+    entree: "BriefVars existantes (constats, commits, captures…)"
+    sortie: "le brief texte avec la liste d'auto-contrôle, limitée à ce qui est modifié"
+    erreurs:
+      - { code: log error, message: "gabarit fix.md : valeur manquante pour {{constats}}" }
+    regles: [R7, R8]
+  - id: A3
+    appel: commande cadence corrections
+    entree: "[dossier] [--until date] [--cache fichier] (inchangée)"
+    sortie: "les tables existantes ; le lead consigne les passes par lot avant/après dans docs/mesures/"
+    erreurs: []
+    sans_erreur: "commande existante non modifiée ; ses erreurs (usage, --until invalide) restent celles de src/cli.ts:857"
+    regles: [R9]
+
+donnees:
+  - { id: D1, objet: "templates/orchestrate/implement.md et fix.md (texte des briefs)", existant: true, modification: changement, note: "texte de consigne relu à chaque rendu, aucun format stocké", decision: "texte de consigne rendu à chaque vague, pas un format stocké ; réversible par un commit : écrit en règles R1 à R8, aucune question au lead" }
+  - { id: D2, objet: "docs/mesures/ (document avant/après)", existant: false, modification: aucune, note: "nouveau document daté, aucune donnée lue ou écrite hors .cadence/corrections.json de la commande existante" }

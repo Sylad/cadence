@@ -151,8 +151,8 @@ contrats:
     entree: "<vague> [--budget <projet>:<lot>=+N]… [--budget N] [--drop …] [--answer …] [--max-sessions n]"
     sortie: "tableau de fin de vague ; lot visé rejoué (ready, ou rendu de nouveau avec ses constats) ; journal « <projet>:<lot> → suspended — budget relevé de X à Y (--resume --budget) » ; code 0 prêts, 1 rendus, 3 suspendue"
     erreurs:
-      - { code: log error, message: "orchestrate : --budget invalide : <texte> (projet:lot=+500k)" }
-      - { code: log error, message: "orchestrate : --budget <projet>:<lot>=+N ne vaut qu'avec --resume" }
+      - { code: log error, message: "raf: --budget invalide : <texte> (projet:lot=+500k)" }
+      - { code: log error, message: "raf: --budget <projet>:<lot>=+N ne vaut qu'avec --resume" }
       - { code: log error, message: "orchestrate : --budget <projet>:<lot> : lot inconnu dans la vague <vague>" }
       - { code: log error, message: "orchestrate : --budget <projet>:<lot> : plusieurs projets portent ce lot, précisez projet:lot" }
       - { code: log error, message: "orchestrate : --budget <projet>:<lot> : le lot n'est pas rendu sur budget avec une étape d'écriture à rejouer (<statut>)" }

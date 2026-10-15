@@ -2432,7 +2432,7 @@ lots:
     finished: 2026-10-15
   - id: L218
     title: "orchestrate : lot rendu AVANT la passe de correction quand le budget restant < 65 k réservés à la revue (15-10 : warhammer L120 740 k / 800 k après chaîne spec 2 sessions + fiche + question ; maritime B26.1 406 k / 450 k après implement + revue Opus d'un lot S qui touche la base) — mesurer sur les journaux .cadence/runs le coût réel des chaînes spec et des lots S back, puis réserver une passe fix + revue courte (pas seulement la revue) dans le budget, ou relever l'allocation spec (350 k) et le plancher d'un lot qui déclare spec/base ; sans réserve suffisante, dire dans le tableau « correction non jouée (budget) » pour que le lead reprenne à la main"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-15
@@ -2446,6 +2446,7 @@ lots:
       - { date: 2026-10-15, text: "Hypothèses (fiche orchestrate-budget-correction) — R1 : SPEC_STAGE_ALLOCATION passe de 350 000 à 450 000 : lotBudget(e, 'spec') = budget ordinaire + 450 000 (0,5 j : 990 000 avec le plancher relevé de R3 ; 1 j : 1 2… ; si faux : Seule la constante change (command.ts:84, tests de budget) ; aucune donnée en jeu" }
       - { date: 2026-10-15, text: "Hypothèses (fiche orchestrate-budget-correction) — R3 : Le plancher d'un lot ordinaire jusqu'à 0,5 j passe de 450 000 à 540 000 (LOT_BUDGET_FLOOR), pour que la réserve de 155 000 (R4) laisse la même marge qu'avant :… ; si faux : Seule la constante change (command.ts:69, tests de budget), aucune donnée en jeu" }
     review: { date: 2026-10-15, verdict: "conforme — orchestré (vague 2026-10-15-1210, 2 passe(s) de correction + passe des mineurs)", commit: 1c42523065e107fdddf5342c2c68073ec62e9c06 }
+    finished: 2026-10-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

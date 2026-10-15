@@ -2448,6 +2448,19 @@ lots:
       - { date: 2026-10-15, text: "Hypothèses (fiche orchestrate-budget-correction) — R3 : Le plancher d'un lot ordinaire jusqu'à 0,5 j passe de 450 000 à 540 000 (LOT_BUDGET_FLOOR), pour que la réserve de 155 000 (R4) laisse la même marge qu'avant :… ; si faux : Seule la constante change (command.ts:69, tests de budget), aucune donnée en jeu" }
     review: { date: 2026-10-15, verdict: "conforme — orchestré (vague 2026-10-15-1210, 2 passe(s) de correction + passe des mineurs)", commit: 1c42523065e107fdddf5342c2c68073ec62e9c06 }
     finished: 2026-10-15
+  - id: L219
+    title: "Condition de tirage d'un lot : un champ (ex. « pas avant N lots spec: true done », ou N lots screen: page) que lead tour respecte dans « prochain prêt » (lot affiché « en attente de… ») et que orchestrate refuse avant d'agir — L190 tiré deux fois pour rien (13-10, 15-10), L209 même forme ; after: ne sait exprimer qu'une dépendance à un lot"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-15
+  - id: L220
+    title: "raf todo <id> : remettre en attente un lot démarré sans commit (doing → todo, started: retiré, note datée avec la raison), refusé s'il a des commits qui le citent — le 15-10 le lead a dû éditer status: à la main pour L190 après une vague rendue"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    spec: true
+    created: 2026-10-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

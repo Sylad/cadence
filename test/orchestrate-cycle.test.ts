@@ -1068,9 +1068,17 @@ describe('budget et quota', () => {
 
   it("R5 — implement refusé : pas de « correction non jouée »", async () => {
     const h = harness({ script: { implement: [impl()] } });
-    const c = h.lot('L1', { budget: 1 });
+    const c = h.lot('L1', { budget: 1000 });
+    // reprise après coupure : budget déjà dépensé, la prochaine étape est l'implémentation
+    c.lot.next = 'implement';
+    c.lot.status = 'suspended';
+    c.lot.steps.push({ n: 1, kind: 'implement', model: 'sonnet', status: 'interrupted', started: 'x', tokens: { input: 0, cacheWrite: 0, cacheRead: 0, output: 0, counted: 1000 } });
     await runLot(c);
-    expect(c.lot.outcome ?? '').not.toContain('correction non jouée');
+    expect(kinds(h)).not.toContain('implement');
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/^budget du lot atteint/);
+    expect(c.lot.outcome).toContain('étape « implement » non jouée');
+    expect(c.lot.outcome).not.toContain('correction non jouée');
   });
 
   it("R4 — dépensé + 155000 juste sous le budget : le fix est joué", async () => {

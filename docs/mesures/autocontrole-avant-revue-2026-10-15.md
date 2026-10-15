@@ -1,28 +1,31 @@
 # Mesure avant/après de l'auto-contrôle avant revue (L222)
 
-La liste d'auto-contrôle des briefs `implement` et `fix` est en service à partir du 2026-10-15. Ce document consigne la mesure des passes de correction par lot, avant et après. Aucune option n'est ajoutée à `cadence corrections` : l'avant est la commande bornée par `--until`, l'après est la même commande sans borne.
+La liste d'auto-contrôle des briefs `implement` et `fix` est en service à partir du 2026-10-15T17:19Z (commit cf981af). Ce document consigne la mesure des passes de correction par lot, avant et après. Aucune option n'est ajoutée à `cadence corrections` : l'avant est la commande bornée par `--until` à l'heure de mise en service ; sans borne, la commande lit tous les journaux, donc son résultat contient l'avant. L'après se calcule par différence des deux sorties.
 
-## Avant (référence)
-
-Relevé de [corrections-2026-10-10.md](corrections-2026-10-10.md) : 253 passes de correction sur 263 lots, 61 % des lots à au moins une correction, 29 % à au moins deux.
+## Avant
 
 ```
-cadence corrections <dossier-des-projets> --cache docs/mesures/corrections-classement.json --until 2026-10-15T00:00Z
+cadence corrections <dossier-des-projets> --cache docs/mesures/corrections-classement.json --until 2026-10-15T17:19Z --json
 ```
 
-## Après
+Relevé du 2026-10-15 : 492 lots, 514 passes de correction, 303 lots à au moins une correction, 174 à au moins deux.
 
-À relever par le lead une fois des vagues terminées avec la liste en service (aucune n'existe au 2026-10-15) :
+## Tout, sans borne
 
 ```
-cadence corrections <dossier-des-projets> --cache docs/mesures/corrections-classement.json
+cadence corrections <dossier-des-projets> --cache docs/mesures/corrections-classement.json --json
 ```
 
-Comparer, lot par lot, le nombre de passes `fix` (colonne « passes ») et la part de la cause « test manquant » et « doc » avant et après.
+À relever par le lead une fois des vagues terminées avec la liste en service (aucune au 2026-10-15 : sans borne, 493 lots et 514 passes, soit le même résultat que l'avant à un lot près).
 
-| | Lots | Passes de correction | Passes par lot | Lots à ≥ 1 correction |
-|---|---|---|---|---|
-| Avant (`--until 2026-10-15T00:00Z`) | à relever | à relever | à relever | à relever |
-| Après (sans borne) | à relever | à relever | à relever | à relever |
+## Après (par différence)
 
-Limite : tant qu'aucune vague n'a tourné avec la liste, la colonne « après » reste vide ; ce document est à compléter, il n'affirme aucun gain.
+Après = sortie sans borne − sortie `--until 2026-10-15T17:19Z`, champ par champ (`total.lots`, `total.passes`, `total.atLeast1`, `total.atLeast2`). Les tables n'ont pas de détail par lot : la comparaison porte sur ces agrégats, par projet, par cause et par visibilité. Comparer aussi la part des causes « test manquant » et « dérive d'architecture » dans les passes avant et après.
+
+| | Lots | Passes de correction | Passes par lot | Lots à ≥ 1 correction | Lots à ≥ 2 corrections |
+|---|---|---|---|---|---|
+| Avant (`--until 2026-10-15T17:19Z`) | 492 | 514 | 1,04 | 303 | 174 |
+| Sans borne | à relever | à relever | à relever | à relever | à relever |
+| Après (sans borne − avant) | à relever | à relever | à relever | à relever | à relever |
+
+Limite : tant qu'aucune vague n'a tourné avec la liste, la ligne « après » reste vide ; ce document est à compléter, il n'affirme aucun gain.

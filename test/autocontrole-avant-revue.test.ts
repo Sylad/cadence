@@ -97,6 +97,18 @@ describe('auto-contrôle avant revue (L222)', () => {
     expect(existsSync(fileURLToPath(new URL(`../${doc}`, import.meta.url)))).toBe(true);
   });
 
+  it('R9 — le document de mesure borne l\'avant à la mise en service de la liste et calcule l\'après par différence', () => {
+    const doc = read('../docs/mesures/autocontrole-avant-revue-2026-10-15.md');
+    expect(doc).toContain('--until 2026-10-15T17:19Z');
+    expect(doc).not.toContain('--until 2026-10-15T00:00Z');
+    expect(doc).not.toMatch(/sans borne\)/);
+    expect(doc).toMatch(/différence/);
+    expect(doc).not.toMatch(/lot par lot/);
+    expect(doc).not.toMatch(/« doc »/);
+    expect(doc).toContain("dérive d'architecture");
+    expect(doc).not.toContain('263 lots');
+  });
+
   it('R9 — l\'aide de cadence corrections (src/cli.ts:65) et son message d\'usage (src/cli.ts:851) ne citent pas --since, la commande reste inchangée', () => {
     const cli = read('../src/cli.ts').split('\n');
     const aide = cli.find((l) => /^\s*cadence corrections \[dossier\]/.test(l));

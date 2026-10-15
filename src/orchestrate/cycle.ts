@@ -1556,7 +1556,11 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     for (const k of l.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine('code', k));
     l.constats = [];
     l.warnings.push('passe des mineurs sans commit : le lot conclut sur la revue conforme d\'origine, mineurs rendus en propositions');
-    if (l.code) await conclude(c, l.code, ' sans commit');
+    if (l.code && uxAfterReview(c)) {
+      // L221 : l'UX finale suit la dernière revue de code conforme, y compris quand la passe des mineurs n'a rien commité.
+      l.next = 'ux';
+      save(c);
+    } else if (l.code) await conclude(c, l.code, ' sans commit');
     else stop(c, 'handed-back', 'passe des mineurs sans commit, mais aucune revue conforme gardée');
     return;
   }
@@ -1627,6 +1631,9 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   l.next = firstReview(c);
   save(c);
 }
+
+/** Mention « sans commit » du verdict quand la passe des mineurs n'a rien commité (l'UX finale conclut alors à la place de la passe). */
+const noCommitNote = (l: LotState): string => (l.warnings.some((w) => w.startsWith('passe des mineurs sans commit')) ? ' sans commit' : '');
 
 /** Revue de code qui clôt le cycle : complète, ou courte une fois la passe des mineurs jouée. */
 const codeReview = (l: LotState): StepKind => (l.minorPass ? 'review-small' : 'review');
@@ -1705,7 +1712,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   } finally {
     c.app = undefined;
     await app.stop();
-    if (skipped && l.code) await conclude(c, l.code);
+    if (skipped && l.code) await conclude(c, l.code, noCommitNote(l));
   }
 }
 
@@ -1728,7 +1735,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     l.constats = blockingConstats(rep, 'ux');
     save(c);
     // L'UX est la dernière étape (L221) : conforme, le lot conclut avec la revue de code ; sinon une correction (jamais une revue de code d'office), la revue de code et l'UX rejouée suivent.
-    if (summary.conforme) await conclude(c, l.code!);
+    if (summary.conforme) await conclude(c, l.code!, noCommitNote(l));
     else toFix(c, l.constats, 'UX non conforme');
     return;
   }

@@ -82,6 +82,19 @@ describe('R4 — les mineurs avant l\'UX', () => {
   });
 });
 
+describe('R2 — passe des mineurs sans commit', () => {
+  it('R2 — passe des mineurs sans commit sur un lot visible : ux puis conclusion', async () => {
+    const rejected: Handler = () => claudeOut(workReport({ choix: ['mineur « nommage » refusé : le nom suit la convention du module'] }));
+    const h = harness({ ...visible, script: { implement: [impl()], review: [minorReview], fix: [rejected], ux: [uxOk] } });
+    const c = h.lot('L1', { visible: true }, withUx);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'ux']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.uxVerdict).toBe('ergonomie conforme (UX)');
+    expect(h.plan().lot('L1').review?.verdict).toContain('passe des mineurs sans commit');
+  });
+});
+
 describe('R5 — UX non conforme', () => {
   it('R5 — UX non conforme : passe de correction avec les constats UX, revue de code, puis nouvelle étape ux', async () => {
     const h = harness({ ...visible, script: { implement: [impl()], review: [ok, ok], ux: [uxBad, uxOk], fix: [fix('b.txt')] } });

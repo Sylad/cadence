@@ -2499,6 +2499,10 @@ lots:
     spec: true
     created: 2026-10-15
     started: 2026-10-15
+    notes:
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/autocontrole-avant-revue/fiche.yaml — Le périmètre (modules) omet README.md et CHANGELOG.md alors que R9 (test « le README renvoie au document de mesure ») exige une modification du README, et que le brief implement impose lui-même le README et le CHANGELOG à jour (templates/orchestrate/implement.md:11-12). Le README a une section « The downstream briefs » (README.md:1162) qui décrit ces briefs. Ajouter README, CHANGELOG et docs/mesures au périmètre." }
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/autocontrole-avant-revue/fiche.yaml — R4 : la source « consigne Playwright existante de implement.md » ne dit pas « 1440 et 390 px ». implement.md:33 ne parle que du nom relatif. Les largeurs viennent de src/orchestrate/cycle.ts:345 (SHOTS_TEXT) et de templates/fiche.yaml:9. « Capture due de chaque état » n'est pas défini : capture Playwright de la session, ou captures:/nocapture de l'entrée de news ({{news}}) ? Un lot « sans écran modifié n'en doit pas » n'a aucun test. Citer les bonnes sources et préciser de quelle capture il s'agit." }
+      - { date: 2026-10-15, text: "Revue de la fiche — mineur : docs/specs/autocontrole-avant-revue/fiche.yaml — Le test « R6 — le schéma du rapport implement n'a pas de nouveau champ » ne peut pas échouer en pratique, sauf s'il compare à une liste figée de champs. Or R3 interdit justement ce genre de test. Dire dans le test qu'il compare la liste des champs de schemas.ts à celle d'avant le lot." }
   - id: L223
     title: "Reprise par le programme d'un lot rendu sur budget : cadence orchestrate --resume <vague> --budget <projet>:<lot>=+N rejoue l'étape non jouée (fix ou revue) avec le budget relevé, en session neuve, et garde l'enregistrement des verdicts ; le 15-10 maritime B26.4 (849 k / 750 k, fix non joué) a été repris à la main : brief fix.md rendu par le lead, 2 agents, raf note à la main"
     status: todo

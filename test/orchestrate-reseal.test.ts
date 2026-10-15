@@ -74,11 +74,11 @@ describe('resealAcceptation : refaire l’empreinte d’un seul test, la fiche i
     expect(() => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-12')).toThrow(/inchangé/);
   });
 
-  it('refuse si la fiche a changé depuis le commit rouge (le chemin est celui de la fiche inchangée)', () => {
+  it('R3 — le test existant (L200) est mis à jour : une fiche modifiée et non commitée est refusée, « modifications non commitées » au lieu de « a changé »', () => {
     const { repo, a } = lotScelle();
     writeFileSync(join(repo, a.test), 'autre\n');
     writeFileSync(join(repo, a.fiche), `${readFileSync(join(repo, a.fiche), 'utf8')}# modifiée\n`);
-    expect(() => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-12')).toThrow(/fiche .* a changé/);
+    expect(() => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-12')).toThrow(/fiche .* a des modifications non commitées/);
   });
 
   it('refuse si un autre test listé a été touché : le rescellé ne couvre que le test nommé', () => {
@@ -354,5 +354,253 @@ describe('rescellé atomique et interdit aux sessions', () => {
 describe('aide de cadence', () => {
   it('liste cadence spec reseal, le seul chemin de correction d’un test scellé faux', () => {
     expect(readFileSync(join(__dirname, '..', 'bin', 'cadence.js'), 'utf8')).toContain('cadence spec reseal <lot> <test> --reason');
+  });
+});
+
+// L217 : une fiche amendée par des commits du lot (commitée, citant le lot) ne bloque plus le rescellé.
+const refsL = (t: string) => [...t.matchAll(/\bL\d+(?:\/\w+)?/g)].map((m) => { const [lot, task] = m[0].split('/'); return task ? { lot: lot!, task } : { lot: lot! }; });
+
+describe('cadence spec reseal avec une fiche amendée dans le lot (L217)', () => {
+  function cli(repo: string, env: Record<string, string>, ...argv: string[]) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = run(argv, { cwd: repo, env: { RAF_TODAY: '2026-10-15', ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-15T10:00:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  }
+  /** L1 en cours, acceptation scellée ; `livre` : L1 livré (vert) et L2 en cours. */
+  function lot(livre = false) {
+    const s = lotScelle({ vert: livre });
+    cli(s.repo, {}, 'init', '--project', 'demo');
+    cli(s.repo, {}, 'add', 'Lot un');
+    cli(s.repo, {}, 'add', 'Lot deux');
+    cli(s.repo, {}, 'start', 'L1');
+    if (livre) {
+      cli(s.repo, {}, 'done', 'L1', '--force');
+      cli(s.repo, {}, 'start', 'L2');
+    }
+    commitPaths(s.repo, 'plan: lots', 'docs/plan/raf.yaml', '.gitignore');
+    return s;
+  }
+  const amende = (repo: string, fiche: string, message: string, ajout = '# amendée\n') => {
+    writeFileSync(join(repo, fiche), `${readFileSync(join(repo, fiche), 'utf8')}${ajout}`);
+    commitPaths(repo, message, fiche);
+    return git(repo, 'rev-parse', '--short', 'HEAD').trim();
+  };
+  const corrige = (repo: string, test: string) => writeFileSync(join(repo, test), `${readFileSync(join(repo, test), 'utf8')}// corrigé ${Math.random()}\n`);
+  const journal = (repo: string, json: string) => JSON.parse(readFileSync(join(repo, json), 'utf8')).resceaux as Record<string, string>[];
+
+  it('R1 — fiche amendée par un commit du lot : rescellé accepté, ficheAmendee = sha du commit de la fiche', () => {
+    const { repo, a } = lot();
+    amende(repo, a.fiche, 'feat(L1): fiche, règle précisée');
+    const sha = amende(repo, a.fiche, 'feat(L1): fiche, deuxième précision', '# encore\n');
+    corrige(repo, a.test);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'le test suit la fiche');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(journal(repo, a.json)[0]!.ficheAmendee).toBe(sha);
+    expect(r.out).toContain(`fiche amendée en ${sha}`);
+    expect(git(repo, 'status', '--porcelain').trim()).toBe('');
+    expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
+  });
+
+  it('R1 — l’entrée de resceaux garde avant/apres du test et le journal précédent', () => {
+    const { repo, a } = lot();
+    corrige(repo, a.test);
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'premier').code).toBe(0);
+    const premier = journal(repo, a.json)[0]!;
+    const sha = amende(repo, a.fiche, 'feat(L1): fiche amendée');
+    corrige(repo, a.test);
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'second').code).toBe(0);
+    const j = journal(repo, a.json);
+    expect(j).toHaveLength(2);
+    expect(j[0]).toEqual(premier);
+    expect(j[1]).toMatchObject({ test: a.test, raison: 'second', avant: premier.apres, apres: git(repo, 'hash-object', a.test).trim(), ficheAmendee: sha });
+  });
+
+  it('R2 — commit de la fiche citant un autre lot : refus, message avec le sha fautif, fichiers intacts', () => {
+    const { repo, a } = lot();
+    amende(repo, a.fiche, 'feat(L1): fiche');
+    const faute = amende(repo, a.fiche, 'docs(L2): fiche autre lot', '# autre\n');
+    corrige(repo, a.test);
+    const jsonAvant = readFileSync(join(repo, a.json), 'utf8');
+    const testAvant = readFileSync(join(repo, a.test), 'utf8');
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(new RegExp(`la fiche .* a été modifiée depuis le commit rouge [0-9a-f]{7} par un commit qui ne cite pas L1 : ${faute}`));
+    expect(readFileSync(join(repo, a.json), 'utf8')).toBe(jsonAvant);
+    expect(readFileSync(join(repo, a.test), 'utf8')).toBe(testAvant);
+  });
+
+  it('R2 — lot livré : commit de la fiche citant le lot lui-même (sans le porteur) : accepté', () => {
+    const { repo, a } = lot(true);
+    const sha = amende(repo, a.fiche, 'feat(L1): fiche du lot livré');
+    corrige(repo, a.test);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L2');
+    expect(r.err).toBe('');
+    expect(journal(repo, a.json)[0]).toMatchObject({ porteur: 'L2', ficheAmendee: sha });
+  });
+
+  it('R2 — fiche supprimée ou renommée depuis le rouge : refus, pas de ficheAmendee', () => {
+    const { repo, a } = lot();
+    git(repo, 'mv', a.fiche, `${a.fiche}.old`);
+    git(repo, 'commit', '-q', '-m', 'feat(L1): fiche renommée');
+    corrige(repo, a.test);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/fiche .* (supprimée|renommée|absente)/);
+    expect(readFileSync(join(repo, a.json), 'utf8')).not.toContain('ficheAmendee');
+  });
+
+  it('R3 — fiche modifiée mais non commitée : refus, aucun rescellé', () => {
+    const { repo, a } = lot();
+    amende(repo, a.fiche, 'feat(L1): fiche');
+    writeFileSync(join(repo, a.fiche), `${readFileSync(join(repo, a.fiche), 'utf8')}# pas commitée\n`);
+    corrige(repo, a.test);
+    const head = git(repo, 'rev-parse', 'HEAD').trim();
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/a des modifications non commitées : la commiter \(en citant L1\) avant le rescellé/);
+    expect(git(repo, 'rev-parse', 'HEAD').trim()).toBe(head);
+    git(repo, 'add', '--', a.fiche); // indexée mais non commitée : refusée aussi
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x').err).toMatch(/modifications non commitées/);
+  });
+
+  it('R4 — fiche amendée et un second test listé modifié : refus', () => {
+    const { repo, a, second } = lot();
+    amende(repo, a.fiche, 'feat(L1): fiche');
+    corrige(repo, a.test);
+    writeFileSync(join(repo, second), 'touché\n');
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.err).toContain('autre(s) test(s) listé(s) modifié(s) depuis le commit rouge');
+    expect(r.err).toContain(second);
+  });
+
+  it('R4 — fiche amendée mais test nommé inchangé : refus « rien à resceller »', () => {
+    const { repo, a } = lot();
+    amende(repo, a.fiche, 'feat(L1): fiche');
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.err).toMatch(/est inchangé depuis le scellé : rien à resceller/);
+  });
+
+  it('R5 — fiche amendée puis ramenée à l’identique par un commit d’un autre lot : traitée comme inchangée, sans refus', () => {
+    const { repo, a } = lot();
+    const orig = readFileSync(join(repo, a.fiche), 'utf8');
+    amende(repo, a.fiche, 'docs(L2): fiche');
+    writeFileSync(join(repo, a.fiche), orig);
+    commitPaths(repo, 'docs(L2): fiche remise', a.fiche);
+    corrige(repo, a.test);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(readFileSync(join(repo, a.json), 'utf8')).not.toContain('ficheAmendee');
+  });
+
+  it('R5 — fiche inchangée : entrée de resceaux identique à L200, sans ficheAmendee ; note « fiche inchangée »', () => {
+    const { repo, a } = lot();
+    corrige(repo, a.test);
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x').code).toBe(0);
+    expect(Object.keys(journal(repo, a.json)[0]!).sort()).toEqual(['apres', 'avant', 'date', 'raison', 'test']);
+    expect(readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')).toContain('fiche inchangée');
+  });
+
+  it('R5 — fiche amendée : la note du lot et le commit mentionnent « fiche amendée en <sha> »', () => {
+    const { repo, a } = lot();
+    const sha = amende(repo, a.fiche, 'feat(L1): fiche');
+    corrige(repo, a.test);
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x').code).toBe(0);
+    const plan = readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8');
+    expect(plan).toContain(`fiche amendée en ${sha}`);
+    expect(plan).not.toContain('fiche inchangée');
+    expect(git(repo, 'log', '-2', '--format=%s').split('\n')[1]).toContain(`fiche amendée en ${sha}`);
+  });
+
+  it('R6 — hook pre-commit qui refuse, fiche amendée : journal et test restaurés, fiche intacte', () => {
+    const { repo, a } = lot();
+    amende(repo, a.fiche, 'feat(L1): fiche');
+    corrige(repo, a.test);
+    const jsonAvant = readFileSync(join(repo, a.json), 'utf8');
+    const testAvant = readFileSync(join(repo, a.test), 'utf8');
+    const ficheAvant = readFileSync(join(repo, a.fiche), 'utf8');
+    const head = git(repo, 'rev-parse', 'HEAD').trim();
+    const hook = join(repo, '.git', 'hooks', 'pre-commit');
+    writeFileSync(hook, '#!/bin/sh\necho "refusé par le hook" >&2\nexit 1\n');
+    chmodSync(hook, 0o755);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.err).toMatch(/commit du rescellé a échoué.*rien n'est rescellé/);
+    expect(readFileSync(join(repo, a.json), 'utf8')).toBe(jsonAvant);
+    expect(readFileSync(join(repo, a.test), 'utf8')).toBe(testAvant);
+    expect(readFileSync(join(repo, a.fiche), 'utf8')).toBe(ficheAvant);
+    expect(git(repo, 'rev-parse', 'HEAD').trim()).toBe(head);
+    expect(git(repo, 'status', '--porcelain', '--', a.fiche).trim()).toBe('');
+  });
+
+  it('R7 — second rescellé après amendement : fiche inchangée depuis le nouveau rouge, pas de ficheAmendee', () => {
+    const { repo, a } = lot();
+    amende(repo, a.fiche, 'feat(L1): fiche');
+    corrige(repo, a.test);
+    expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'un').code).toBe(0);
+    corrige(repo, a.test);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'deux');
+    expect(r.err).toBe('');
+    const j = journal(repo, a.json);
+    expect(j[0]!.ficheAmendee).toBeTruthy();
+    expect(j[1]!.ficheAmendee).toBeUndefined();
+  });
+
+  it('R7 — resealedRouge adopte le commit d’un rescellé à fiche amendée', () => {
+    const { repo, a } = lot();
+    const ancre = redSha(repo, a.json)!;
+    amende(repo, a.fiche, 'feat(L1): fiche');
+    corrige(repo, a.test);
+    cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    const rescelle = redSha(repo, a.json)!;
+    expect(rescelle).not.toBe(ancre);
+    expect(resealedRouge(repo, a.json, ancre)).toBe(rescelle);
+  });
+
+  it('R8 — commit « feat(L1/t1): fiche » reconnu comme citant L1', () => {
+    const { repo, a } = lot();
+    amende(repo, a.fiche, 'feat(L1/t1): fiche');
+    corrige(repo, a.test);
+    const r = resealAcceptation(repo, a.json, a.test, 'x', '2026-10-15', undefined, refsL);
+    expect(r.ficheAmendee).toBeTruthy();
+  });
+
+  it('R8 — lot livré : la citation du lot ou celle du porteur est acceptée, un autre lot refusé', () => {
+    for (const [message, attendu] of [['feat(L1): fiche', true], ['feat(L2): fiche', true], ['feat(L3): fiche', false]] as const) {
+      const { repo, a } = lot(true);
+      amende(repo, a.fiche, message);
+      corrige(repo, a.test);
+      const fn = () => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-15', 'L2', refsL);
+      if (attendu) expect(fn).not.toThrow();
+      else expect(fn).toThrow(/ne cite pas L1 \(ni le porteur L2\)/);
+    }
+  });
+
+  it('R8 — lot en cours : commit dont seul le corps évoque le lot en passant, lu comme citedRefs', () => {
+    const corpsSeul = lot();
+    amende(corpsSeul.repo, corpsSeul.a.fiche, 'docs: fiche\n\nvu avec L1');
+    corrige(corpsSeul.repo, corpsSeul.a.test);
+    expect(() => resealAcceptation(corpsSeul.repo, corpsSeul.a.json, corpsSeul.a.test, 'x', '2026-10-15', undefined, refsL)).not.toThrow();
+    const autrePortee = lot();
+    amende(autrePortee.repo, autrePortee.a.fiche, 'docs(L2): fiche\n\nvu avec L1');
+    corrige(autrePortee.repo, autrePortee.a.test);
+    expect(() => resealAcceptation(autrePortee.repo, autrePortee.a.json, autrePortee.a.test, 'x', '2026-10-15', undefined, refsL)).toThrow(/ne cite pas L1/);
+  });
+
+  it('R9 — fiche amendée sous CADENCE_ORCHESTRATED : refus L200 inchangé', () => {
+    const { repo, a } = lot();
+    amende(repo, a.fiche, 'feat(L1): fiche');
+    corrige(repo, a.test);
+    expect(cli(repo, { CADENCE_ORCHESTRATED: 'w1' }, 'spec', 'reseal', 'L1', a.test, '--reason', 'x').err).toMatch(/vague orchestrée/);
+  });
+
+  it('R9 — fiche amendée sans --reason : refus L200 inchangé', () => {
+    const { repo, a } = lot();
+    amende(repo, a.fiche, 'feat(L1): fiche');
+    corrige(repo, a.test);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/--reason/);
   });
 });

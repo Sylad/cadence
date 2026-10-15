@@ -733,7 +733,7 @@ function waveHolding(root: string): { wave: string; pid: number } | null {
 
 /**
  * `cadence spec reseal <lot> <test> --reason texte` (L200) : le chemin du lead quand un test d'acceptation scellé du lot EN COURS contredit la fiche.
- * Le test est corrigé dans l'arbre de travail (fiche inchangée) ; la commande refait l'empreinte de ce seul test, journalise la raison dans
+ * Le test est corrigé dans l'arbre de travail (fiche inchangée, ou amendée et commitée par des commits du lot, L217) ; la commande refait l'empreinte de ce seul test, journalise la raison dans
  * acceptation.json, commite test + acceptation (le nouveau commit rouge), et note la raison au lot. Le verrou garde tout le reste.
  */
 const git = (cwd: string, args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -763,16 +763,16 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   const cite = livre ? (porteur as string) : lotId;
   if (!json) throw new RafError(`${lotId} : aucune acceptation sous ${dir} (le lot n'a pas passé l'étape accept)`);
   const before = { json: readFileSync(join(repo, json), 'utf8'), test: existsSync(join(repo, test)) ? readFileSync(join(repo, test), 'utf8') : '' };
-  let r: { avant: string; apres: string };
+  let r: { avant: string; apres: string; ficheAmendee?: string };
   try {
-    r = resealAcceptation(repo, json, test, reason, ctx.today, livre ? porteur : undefined);
+    r = resealAcceptation(repo, json, test, reason, ctx.today, livre ? porteur : undefined, plan.refs);
   } catch (e) {
     throw new RafError((e as Error).message);
   }
   const norm = posix.normalize(test);
   try {
     git(repo, ['add', '--', json, norm]);
-    git(repo, ['commit', '-q', '-m', `test(${cite}): acceptation rescellée${livre ? ` du lot livré ${lotId}` : ''}, ${norm} : ${reason.trim()}`, '--', json, norm]);
+    git(repo, ['commit', '-q', '-m', `test(${cite}): acceptation rescellée${livre ? ` du lot livré ${lotId}` : ''}, ${norm} : ${reason.trim()}${r.ficheAmendee ? ` (fiche amendée en ${r.ficheAmendee})` : ''}`, '--', json, norm]);
   } catch (e) {
     // Atomique : un commit refusé (hook pre-commit, ...) ne laisse ni empreinte refaite ni index à moitié prêt ; le test retrouve le texte du lead.
     writeFileSync(join(repo, json), before.json);
@@ -788,10 +788,10 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   const sha = git(repo, ['rev-parse', '--short', 'HEAD']).trim();
   // Un plan tenu par un autre outil ne se modifie pas d'ici : la raison est déjà dans acceptation.json et dans le commit, la note reste à la main du lead.
   if (plan.readonly) {
-    io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et dans le commit — note à ajouter au lot ${cite} avec l'outil du projet (plan en lecture seule)`);
+    io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha}${r.ficheAmendee ? `, fiche amendée en ${r.ficheAmendee}` : ''} ; raison dans ${json} et dans le commit — note à ajouter au lot ${cite} avec l'outil du projet (plan en lecture seule)`);
     return 0;
   }
-  plan.note(cite, `test d'acceptation rescellé${livre ? ` (lot livré ${lotId}, ` : ' ('}${norm}, fiche inchangée) : ${reason.trim()}`, ctx.today);
+  plan.note(cite, `test d'acceptation rescellé${livre ? ` (lot livré ${lotId}, ` : ' ('}${norm}, ${r.ficheAmendee ? `fiche amendée en ${r.ficheAmendee}` : 'fiche inchangée'}) : ${reason.trim()}`, ctx.today);
   plan.save();
   // La note du lot rejoint le dépôt dans la foulée (un dépôt sale arrêterait la vague suivante) ; un plan hors du dépôt ou non suivi reste à la main du lead.
   const planRel = relative(repo, plan.path);
@@ -806,7 +806,7 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
       throw new RafError(`spec reseal : le rescellé a eu lieu (commit ${sha}) mais le commit de la note du lot a échoué — la note est écrite dans ${planRel}, à commiter à la main (un plan sale arrêterait la vague suivante) — ${(out.stderr || out.stdout || out.message).trim().split('\n').slice(-5).join(' | ')}`);
     }
   }
-  io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha} ; raison dans ${json} et en note du lot ${cite}${tracked ? '' : ' (plan à commiter)'}`);
+  io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha}${r.ficheAmendee ? `, fiche amendée en ${r.ficheAmendee}` : ''} ; raison dans ${json} et en note du lot ${cite}${tracked ? '' : ' (plan à commiter)'}`);
   return 0;
 }
 

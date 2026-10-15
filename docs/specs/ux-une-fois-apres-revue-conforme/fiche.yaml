@@ -1,0 +1,184 @@
+sujet:
+  id: ux-une-fois-apres-revue-conforme
+  titre: "Revue UX de conformité une seule fois, après la revue de code conforme"
+  lot: L221
+  perimetre:
+    modules: [src/orchestrate/cycle.ts, src/orchestrate/command.ts, README.md, CHANGELOG.md, docs/mesures]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "la revue UX d'un petit lot visible : sa passe unique code + ergonomie (review-small) ne change pas"
+      - "la revue UX de la maquette (étape maquette) et la commande cadence corrections : inchangées"
+      - "le schéma de l'état d'un lot (src/orchestrate/state.ts) et celui des journaux : aucun champ ajouté"
+
+cas:
+  - id: C1
+    titre: "Un lot visible converge : l'UX ne passe qu'une fois, après la revue de code conforme"
+    acteur: le programme (orchestrate)
+    declencheur: commande cadence orchestrate (lot visible, non petit, orchestrate.ux déclaré)
+    preconditions:
+      - le lot est visible et n'est pas un petit lot
+      - "cadence.yaml déclare orchestrate.ux"
+    nominal:
+      - "La session implement rend ; les contrôles du dépôt passent."
+      - "Le programme joue la revue de code (pas l'UX)."
+      - "La revue de code est non conforme : une passe de correction, puis une revue de code ; aucune session UX n'est jouée entre-temps."
+      - "La revue de code est conforme : le programme joue la revue UX, une fois, sur le code final."
+      - "La revue UX est conforme : le lot conclut, avec le verdict de code et le verdict UX."
+    alternatives:
+      - { si: "la revue de code est non conforme", alors: "passe de correction puis revue de code, sans session UX", regles: [R1, R3] }
+      - { si: "la revue de code est conforme avec des mineurs", alors: "la passe des mineurs et sa revue courte passent avant l'UX", regles: [R4] }
+      - { si: "la revue UX rend un constat bloquant ou majeur", alors: "passe de correction, revue de code, puis UX rejouée sur le code corrigé", regles: [R5] }
+      - { si: "l'application ne peut pas être lancée, ou orchestrate.ux est absent", alors: "aucune session UX, une note, le lot conclut sur la revue de code", regles: [R6] }
+    resultat: "Un lot visible qui a une seule session UX dans le cas courant, jouée sur le code que la revue de code a déclaré conforme."
+  - id: C2
+    titre: "Les lots hors du parcours UX séparé ne changent pas"
+    acteur: le programme (orchestrate)
+    declencheur: commande cadence orchestrate (petit lot, lot non visible)
+    preconditions:
+      - le lot est un petit lot, ou n'est pas visible
+    nominal:
+      - "Après l'écriture, le programme joue la revue (review-small pour un petit lot visible, review sinon), comme avant."
+      - "Le lot conclut sur cette revue."
+    alternatives: []
+    sans_alternative: "ce cas n'a pas de branche propre : il atteste que le parcours est inchangé (R7) ; les échecs de revue sont ceux de C1"
+    resultat: "Même enchaînement qu'avant le lot."
+  - id: C3
+    titre: "Le lead voit l'ordre des étapes en dry-run et le programme reprend une vague"
+    acteur: le lead
+    declencheur: commande cadence orchestrate --dry-run
+    preconditions:
+      - un lot visible, non petit, avec orchestrate.ux
+    nominal:
+      - "Le dry-run écrit la ligne « étapes : … » dans l'ordre où elles se jouent."
+      - "Une vague reprise dont l'état porte next = ux écrit avant le lot rejoue cette étape puis la revue de code, comme avant."
+    alternatives:
+      - { si: "l'état repris porte next = ux", alors: "ancien ordre pour cette étape, puis nouvel ordre", regles: [R9] }
+    resultat: "Le dry-run annonce implement → review → ux."
+  - id: C4
+    titre: "Le lead mesure les sessions UX par lot visible avant et après"
+    acteur: le lead
+    declencheur: lecture des journaux .cadence/runs (étapes de kind ux par lot)
+    preconditions:
+      - des journaux existent avant et après la mise en service de L221
+    nominal:
+      - "Le lead compte, par lot visible non petit, les étapes ux terminées dans les journaux de vague, avant la mise en service puis après."
+      - "Il consigne les deux comptes dans docs/mesures/."
+    alternatives: []
+    sans_alternative: "lecture seule des journaux existants ; les échecs de lecture sont ceux des outils de lecture, hors du lot"
+    resultat: "Un document daté : sessions UX par lot visible, avant et après."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Après une étape d'écriture (implement ou fix) d'un lot visible non petit, l'étape suivante est la revue de code (review, ou review-small une fois la passe des mineurs jouée), jamais ux."
+    statut: sourcee
+    source: "demande du lot : « plus après chaque passe de correction » ; état actuel src/orchestrate/cycle.ts:1636-1641 (firstReview rend 'ux' pour un lot visible)"
+    tests:
+      - "R1 — lot visible : après implement, la première étape jouée est review, pas ux"
+      - "R1 — lot visible après une passe de correction : l'étape suivante est review, aucune session ux"
+  - id: R2
+    cas: [C1]
+    enonce: "Quand la revue de code d'un lot visible non petit, avec orchestrate.ux déclaré, est conforme et qu'il ne reste aucune passe des mineurs à jouer, le programme joue une revue UX (agent ux-reviewer) avant de conclure ; le lot ne conclut qu'avec le verdict UX conforme."
+    statut: sourcee
+    source: "demande du lot : « une seule fois, après la revue de code conforme » ; « la passe finale reste obligatoire pour un lot visible » ; conclusion actuelle src/orchestrate/cycle.ts:1763 (conclude)"
+    tests:
+      - "R2 — revue de code conforme d'un lot visible : une session ux part avant conclude"
+      - "R2 — revue de code conforme et UX conforme : le lot conclut, uxVerdict est enregistré"
+  - id: R3
+    cas: [C1]
+    enonce: "Une revue de code non conforme d'un lot visible renvoie à une passe de correction sans session UX ; dans le cas courant (une correction, puis conforme) le journal du lot contient exactement une étape ux."
+    statut: sourcee
+    source: "demande du lot : « finance L75 le 15-10 a eu 3 passes UX Opus pour un seul verdict utile » ; toFix src/orchestrate/cycle.ts:1647"
+    tests:
+      - "R3 — revue non conforme puis conforme sur un lot visible : une seule étape ux dans le journal"
+      - "R3 — deux passes de correction sur un lot visible : zéro session ux avant la revue conforme"
+  - id: R4
+    cas: [C1]
+    enonce: "La passe des mineurs et sa revue courte passent avant l'UX : l'UX est jouée après la dernière revue de code conforme, donc sur le code qui sera livré."
+    statut: hypothese
+    si_faux: "Si l'UX devait précéder la passe des mineurs, elle relirait un code que la passe change ensuite : il faudrait la rejouer, ou accepter un verdict UX sur un sha périmé ; seul l'ordre d'étapes change (aucune donnée)."
+    tests:
+      - "R4 — revue conforme avec mineurs sur un lot visible : fix des mineurs, review-small conforme, puis ux, dans cet ordre"
+  - id: R5
+    cas: [C1]
+    enonce: "Une revue UX non conforme (constat bloquant ou majeur) renvoie à une passe de correction qui reçoit les constats UX, puis la revue de code, puis une revue UX rejouée ; la boucle reste bornée par les passes de correction existantes (MAX_PASSES)."
+    statut: hypothese
+    si_faux: "Si le lot devait être rendu au lead sans nouvelle UX après la correction, la dernière passe UX ne porterait plus sur le code final ; seul le retour d'étape change (aucune donnée), et le plafond de passes ne bouge pas."
+    tests:
+      - "R5 — UX non conforme : passe de correction avec les constats UX, revue de code, puis nouvelle étape ux"
+      - "R5 — UX non conforme après le plafond de passes : le lot est rendu au lead avec les constats"
+  - id: R6
+    cas: [C1]
+    enonce: "Sans orchestrate.ux, ou si l'application ne démarre pas (port occupé, application muette), aucune session UX n'est jouée : le lot conclut sur la revue de code conforme et la note « UX à faire par le lead » ou « UX non vérifiée : … » reste dans le lot."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:1639 (uxNote sans application déclarée) et src/orchestrate/cycle.ts:1685-1698 (appNote, aucune session)"
+    tests:
+      - "R6 — orchestrate.ux absent : revue de code conforme, aucune session ux, uxNote posée, le lot conclut"
+      - "R6 — port occupé : aucune session ux, note « UX non vérifiée », le lot conclut"
+  - id: R7
+    cas: [C2]
+    enonce: "Un petit lot (visible ou non) et un lot non visible gardent leur parcours : review-small pour un petit lot visible, review pour les autres, aucune étape ux."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:1632 (firstReview : petit lot) et :1643 (lot non visible)"
+    tests:
+      - "R7 — petit lot visible : review-small seule, aucune session ux"
+      - "R7 — lot non visible : review seule, aucune session ux"
+  - id: R8
+    cas: [C3]
+    enonce: "Le dry-run annonce l'ordre réel : pour un lot visible non petit avec orchestrate.ux, « implement → review → ux » (la revue de code avant l'UX)."
+    statut: sourcee
+    source: "src/orchestrate/command.ts:396-399 (ordre actuel ux → review) ; demande du lot"
+    tests:
+      - "R8 — dry-run d'un lot visible : la ligne étapes liste review avant ux"
+  - id: R9
+    cas: [C3]
+    enonce: "Une vague reprise dont un lot porte next = ux, écrit avant la mise en service du lot, rejoue cette étape ux puis la revue de code, avant de suivre le nouvel ordre."
+    statut: hypothese
+    si_faux: "Si l'état ancien devait être converti, la reprise ignorerait ux et irait à review ; seul le premier pas d'une vague en cours change (aucun format d'état touché)."
+    tests:
+      - "R9 — état repris avec next = ux : la session ux part, puis la revue de code"
+  - id: R10
+    cas: [C4]
+    enonce: "La mesure avant/après est un document de docs/mesures/ qui compte, par lot visible non petit des journaux, les étapes ux terminées, avant et après la mise en service (avant : finance L75 du 2026-10-15, 3 sessions ux pour un verdict utile) ; aucune option n'est ajoutée à cadence corrections."
+    statut: hypothese
+    si_faux: "Si la mesure devait sortir d'une commande, une option ou un champ de cadence corrections serait ajouté : un contrat public, donc un lot à part avec une question."
+    tests:
+      - "R10 — le document de mesure existe, nomme L221 et donne les sessions ux par lot visible avant et après"
+      - "R10 — le README renvoie au document de mesure"
+  - id: R11
+    cas: [C1]
+    enonce: "Le budget ne change pas : la réserve REVIEW_RESERVE (une passe fix et une revue courte) est inchangée, et l'UX, comme toute revue, est jouée même si le budget du lot est dépassé."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:536-548 (REVIEW_RESERVE) et :561 (« le budget du lot borne l'écriture, jamais la revue »)"
+    tests:
+      - "R11 — budget du lot dépassé après la revue de code conforme : la session ux part quand même"
+      - "R11 — REVIEW_RESERVE vaut toujours 155000"
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate
+    entree: "un lot visible non petit, orchestrate.ux déclaré ou non (arguments inchangés)"
+    sortie: "étapes jouées dans l'ordre implement, [fix, review]*, [fix des mineurs, review-small], ux, conclusion ; état et journal du lot inchangés dans leur format"
+    erreurs: []
+    sans_erreur: "aucun code d'erreur nouveau : l'absence d'UX est une note du lot (uxNote), les échecs de session et de budget sont ceux déjà codés (cycle.ts:561, 1647)"
+    regles: [R1, R2, R3, R4, R5, R6, R7, R11, R9]
+  - id: A2
+    appel: commande cadence orchestrate --dry-run
+    entree: "un lot visible non petit, orchestrate.ux déclaré"
+    sortie: "la ligne « étapes : implement (…) → review (…) → ux (…) »"
+    erreurs: []
+    sans_erreur: "affichage en lecture seule ; les erreurs de plan ou de configuration sont celles déjà codées, hors du lot"
+    regles: [R8]
+  - id: A3
+    appel: commande lecture des journaux .cadence/runs pour la mesure des étapes ux
+    entree: "les journaux de vague <vague>/<projet>--<lot>.json"
+    sortie: "un document docs/mesures/ux-une-fois-<date>.md avec les sessions ux par lot visible, avant et après"
+    erreurs: []
+    sans_erreur: "document écrit à la main par le lead d'après les journaux existants ; aucune commande ni option nouvelle"
+    regles: [R10]
+
+donnees:
+  - { id: D1, objet: "état d'un lot (l.next, l.uxVerdict, l.constats, l.reviewCounts) dans .cadence/runs", existant: true, modification: aucune, note: "mêmes champs et mêmes valeurs ('ux' est déjà une valeur de next) ; seul l'ordre dans lequel elles sont posées change" }
+  - { id: D2, objet: "journaux de vague .cadence/runs/<vague>/<projet>--<lot>.json (étapes de kind ux)", existant: true, modification: aucune, note: "lus pour la mesure ; format inchangé" }
+  - { id: D3, objet: "docs/mesures/ux-une-fois-<date>.md", existant: false, modification: aucune, note: "nouveau document de mesure avant/après" }

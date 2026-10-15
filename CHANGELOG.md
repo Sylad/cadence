@@ -49,8 +49,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence orchestrate --waits [--since date]`: time waves spent waiting for a session slot | [1.3.0](#130---2026-10-13) |
 | `"e2e": true` acceptation files kept out of the unit runner, `acceptationE2e()` for the e2e suite | [1.3.0](#130---2026-10-13) |
 | `cadence spec reseal <lot> <test>` accepts a sheet amended by commits of the lot (`ficheAmendee`), lot in progress or delivered | [1.4.0](#140---2026-10-15) |
+| `gate: { count: N, spec: true \| screen: page }` on a lot: a drawing condition shown as waiting by `raf now`, `session start` and `lead tour`, refused by `orchestrate` | [1.5.0](#150---2026-10-15) |
+| `raf todo <id> [--reason text]`: a started lot without work commits goes back to `todo`, with a dated note | [1.5.0](#150---2026-10-15) |
 
-## [Unreleased]
+## [1.5.0] - 2026-10-15
 
 ### Added
 

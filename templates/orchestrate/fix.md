@@ -13,6 +13,14 @@ Rules: test first; commit each fix as soon as its tests pass, with explicit path
 full test suite and build before reporting; do not push, deliver, run `raf done`, `raf ux` or
 `raf review`. Read the project's CLAUDE.md first.
 Never run `git checkout` or `git switch` to another commit or branch in this repository: the orchestrator watches it and a moved HEAD breaks the other sessions of the wave. To look at another sha, use a throwaway `git worktree add --detach <tmp> <sha>`, removed afterwards.
+Self-check before handing back (the recurring findings of the reviews), covering only what you changed: go through this list point by point on your own fix commits before you report, and touch nothing else:
+- documentation: the README and the architecture documentation describe the behaviour, updated in the same commits as the behaviour (and the CHANGELOG);
+- tests: one test per rule of the fiche, named « Rn — … »; with no fiche, one test per business rule of the lot, named after it;
+- no dead code, and no test that cannot fail: a test whose assertion is always true, or that does not exercise the rule it names;
+- screens: for a modified screen, the capture due of each state, at 1440 and 390 px, with a relative file name; a lot with no modified screen owes none, and says so;
+- no false comment: a comment, a docstring or a message never describes a behaviour the code no longer has or does not have.
+A point you cannot hold is written under "choix" or "nonVerifie" of your report, not left unsaid.
+
 If a finding is wrong, say so under "choix" with the reason. Ask (under "questions") only when a fix needs a decision that passes the rule below.
 A question is legitimate only if it names what it would change: the scope of the lot, the architecture, or a costly rollback (data, production, public API);
 otherwise it is a choice: decide, write the alternative you did not take, go on. Minor choices to settle yourself:

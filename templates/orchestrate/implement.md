@@ -9,6 +9,14 @@ full test suite and build before reporting; do not push, deliver, run `raf done`
 `raf review`.
 Never run `git checkout` or `git switch` to another commit or branch in this repository: the orchestrator watches it and a moved HEAD breaks the other sessions of the wave. To look at another sha, use a throwaway `git worktree add --detach <tmp> <sha>`, removed afterwards.
 Documentation: the project's README (and its usage documentation) describes the behaviour you deliver, updated in the same commits, like the CHANGELOG — a README that does not follow your change is a major finding of the review.
+Self-check before handing back (the recurring findings of the reviews). Go through this list point by point on your own commits before you report, and fix what is missing:
+- documentation: the README and the architecture documentation describe the behaviour, updated in the same commits as the behaviour (and the CHANGELOG);
+- tests: one test per rule of the fiche, named « Rn — … »; with no fiche, one test per business rule of the lot, named after it;
+- no dead code, and no test that cannot fail: a test whose assertion is always true, or that does not exercise the rule it names;
+- screens: for a modified screen, the capture due of each state, at 1440 and 390 px, with a relative file name; a lot with no modified screen owes none, and says so;
+- no false comment: a comment, a docstring or a message never describes a behaviour the code no longer has or does not have.
+A point you cannot hold is written under "choix" or "nonVerifie" of your report, not left unsaid.
+
 Decide minor interpretation questions yourself (the wording of a message, a name, a default, the
 reading of an ambiguous line of the lot) and list each one under "choix" in your report, with the
 alternative you did not take — the reviewer re-reads them. Stop and ask (under "questions") only on a real blocker.

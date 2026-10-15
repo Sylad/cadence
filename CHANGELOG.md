@@ -52,6 +52,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `gate: { count: N, spec: true \| screen: page }` on a lot: a drawing condition shown as waiting by `raf now`, `session start` and `lead tour`, refused by `orchestrate` | [1.5.0](#150---2026-10-15) |
 | `raf todo <id> [--reason text]`: a started lot without work commits goes back to `todo`, with a dated note | [1.5.0](#150---2026-10-15) |
 
+## [Unreleased]
+
+### Added
+
+- A self-check list in the `implement` and `fix` briefs (L222): usage documentation updated in the same commits, one `Rn — …` test per rule, no dead code nor test that cannot fail, the capture due of a modified screen, no false comment; the session checks it before handing back and writes the points it cannot hold under `choix` or `nonVerifie`. No new report field; the measure (correction passes per lot, before/after) is in `docs/mesures/autocontrole-avant-revue-2026-10-15.md`.
+
 ## [1.5.0] - 2026-10-15
 
 ### Added

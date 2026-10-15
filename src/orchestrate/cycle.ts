@@ -537,19 +537,18 @@ export const lotSpent = (l: LotState): number => l.steps.reduce((n, s) => n + (s
 const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) >= l.budget;
 
 /**
- * Coût réservé à la revue qui suit une passe de correction (L145). Réserve fixe de 65 k tokens comptés, proche du p90 des
- * revues complètes. Mesure faite le 2026-10-09 sur les journaux `.cadence/runs/*` (67 dossiers de vague du 04 au 09-10,
- * `tokens.counted` des `N-review.json`, `N-review-small.json`, `N-ux.json` ; aucun journal `ux` conservé, 2 `review-small`
- * sans `tokens.counted` écartés ; p90 par interpolation linéaire) : 187 revues, médiane 43,4 k, p90 62,7 k, max 105,9 k ;
- * 114 revues courtes (review-small, après la passe des mineurs), médiane 37,4 k, p90 67,6 k, max 82,7 k ; ensemble des
- * 301 revues, médiane 42,3 k, p90 67,0 k, max 105,9 k. La revue courte a donc un p90 plus haut que la revue complète : 65 k
- * couvre 170 revues sur 187 (90,9 %) mais 99 revues courtes sur 114 (86,8 %). Une passe fix ne part que s'il reste de quoi payer cette revue.
+ * Coût réservé à une passe de correction et à la revue courte qui la suit (L145, étendu L218). Réserve fixe de 155 k tokens comptés :
+ * p90 d'une passe fix (65 k) plus p90 d'une revue courte Opus (88 k), arrondi. Mesure faite le 2026-10-15 sur les journaux
+ * `.cadence/runs` (523 fichiers de lot) : 497 passes fix Sonnet, médiane 45 k, p90 65 k, max 124 k ; 272 revues courtes Opus,
+ * médiane 45 k, p90 88 k ; la somme des p90 majore le p90 de la somme, elle n'a pas été recalculée par lot. La réserve de L145 (65 k, revue
+ * seule) laissait un lot rendu avant la correction à 740 k / 800 k (warhammer L120) ou 406 k / 450 k (maritime B26.1). Une passe fix ne part
+ * que s'il reste de quoi payer la correction ET sa revue ; sinon le lot est rendu avec « correction non jouée (budget) ».
  * Seule exception : des tests rouges après une écriture (work() appelle toFix() sans revue) — la passe fix suivante peut
  * alors être refusée et le lot revient au lead sans revue, avec ses constats.
  */
-export const REVIEW_RESERVE = 65_000;
+export const REVIEW_RESERVE = 155_000;
 
-/** Une passe de correction laisse-t-elle de quoi rejouer la revue dans le budget du lot ? Sans budget de lot : toujours. */
+/** Le budget du lot paie-t-il la passe de correction et la revue courte qui la suit ? Sans budget de lot : toujours. */
 const fixAffordable = (l: LotState): boolean => l.budget === undefined || lotSpent(l) + REVIEW_RESERVE < l.budget;
 
 /** Cause d'une suspension demandée par `--stop-after-current` (L79). */
@@ -897,13 +896,14 @@ function overBudget(c: LotCtx, reserve = false): null {
   // Une réponse du lead encore en attente n'a pas été consommée : elle ne doit pas se perdre sans qu'on le dise.
   const answer = l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '';
   const basis = hasSpecStage(l) ? 'estimate et étape spec' : "dérivé de l'estimate";
-  const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (${basis}), il ne reste pas de quoi payer la revue qui suivrait la correction (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, ${basis})`;
+  const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (${basis}), il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, ${basis})`;
   // Tests rouges après une écriture : la passe fix refusée aurait suivi, le lot revient sans revue (L145) — la cause le dit.
   const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
   // Passe d'écriture qui vient d'être jouée, nommée d'après le compteur : l.pass - 1 passes de correction l'ont précédée (minorPass reste vrai après la passe des mineurs).
   const played = l.pass - 1;
   const after = l.minorPass && played === (l.minorPassAt ?? 0) ? 'la passe des mineurs' : played > 0 ? `la passe fix ${played}` : "l'implémentation";
-  const prefix = red ? `tests rouges après ${after}, correction suivante non abordable : ` : '';
+  const notPlayed = l.next === 'fix' ? 'correction non jouée (budget) : ' : '';
+  const prefix = notPlayed + (red ? `tests rouges après ${after}, correction suivante non abordable : ` : '');
   const unreviewed = red ? ' ; le lot revient sans revue, avec ses constats' : '';
   return stop(c, 'handed-back', `${prefix}${why} : étape « ${l.next ?? '?'} » non jouée${answer}${unreviewed}, à décider par le lead`);
 }

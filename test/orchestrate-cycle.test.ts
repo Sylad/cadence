@@ -1048,11 +1048,54 @@ describe('budget et quota', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(c.lot.status).toBe('handed-back');
-    expect(c.lot.outcome).toMatch(/pas de quoi payer la revue.*65000 réservés/);
+    expect(c.lot.outcome).toMatch(/pas de quoi payer la correction et la revue courte qui la suivrait.*155000 réservés/);
   });
 
-  // Une passe d'écriture facturée ~70 k (cacheWrite 69 000 + 100 + 400) : avec ce budget, elle part (3 k + 65 k < 71 k) puis fait dépasser le budget du lot.
-  const costly = (file: string): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, file, `fix(L1): ${file}`)] }), { cacheWrite: 69_000 });
+  it("R5 — fix refusé par la réserve : outcome commence par « correction non jouée (budget) : »", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE });
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/^correction non jouée \(budget\) : budget du lot : \d+ \/ 155000 tokens comptés .*155000 réservés\) : étape « fix » non jouée/);
+  });
+
+  it("R5 — fix refusé budget dépassé : même préfixe", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: 1000 });
+    await runLot(c);
+    expect(c.lot.outcome).toMatch(/^correction non jouée \(budget\) : budget du lot atteint/);
+  });
+
+  it("R5 — implement refusé : pas de « correction non jouée »", async () => {
+    const h = harness({ script: { implement: [impl()] } });
+    const c = h.lot('L1', { budget: 1 });
+    await runLot(c);
+    expect(c.lot.outcome ?? '').not.toContain('correction non jouée');
+  });
+
+  it("R4 — dépensé + 155000 juste sous le budget : le fix est joué", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE + 6000 });
+    await runLot(c);
+    expect(kinds(h)).toContain('fix');
+  });
+
+  it("R4 — dépensé + 155000 égal au budget : le fix est refusé", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE });
+    await runLot(c);
+    expect(kinds(h)).not.toContain('fix');
+  });
+
+  it("R4 — lot sans budget : le fix est toujours joué", async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [fix('b.txt')] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toContain('fix');
+  });
+
+  // Une passe d’écriture facturée ~200 k (cacheWrite 200 000 + 100 + 400) : avec ce budget, elle part (3 k + 155 k < 161 k) puis fait dépasser le budget du lot.
+  const costly = (file: string): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, file, `fix(L1): ${file}`)] }), { cacheWrite: 200_000 });
 
   it("L145 — avec de quoi payer la revue, la passe fix a lieu puis la revue est rejouée même si la passe fix a fait dépasser le budget du lot", async () => {
     const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [costly('b.txt')] } });
@@ -1073,34 +1116,34 @@ describe('budget et quota', () => {
   });
 
   it("L145 — tests rouges après la passe fix 1, correction suivante non abordable : le lot revient sans revue et la cause nomme les tests rouges", async () => {
-    const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.txt', 'fix(L1): b.txt')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }), { cacheWrite: 69_000 });
+    const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.txt', 'fix(L1): b.txt')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }), { cacheWrite: 200_000 });
     const h = harness({ script: { implement: [impl()], review: [major], fix: [redFix, fix('c.txt')] } });
     const c = h.lot('L1', { budget: REVIEW_RESERVE + 6000 });
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review', 'fix']); // pas de revue du correctif, pas de seconde passe fix
     expect(c.lot.status).toBe('handed-back');
-    expect(c.lot.outcome).toMatch(/^tests rouges après la passe fix 1, correction suivante non abordable : /);
+    expect(c.lot.outcome).toMatch(/^correction non jouée \(budget\) : tests rouges après la passe fix 1, correction suivante non abordable : /);
     expect(c.lot.outcome).toContain('le lot revient sans revue, avec ses constats');
     expect(c.lot.constats.some((k) => k.source === 'tests')).toBe(true);
   });
 
   it("L151 — passe des mineurs, review-small majeur, passe fix rouge refusée : la cause dit la passe fix 1, pas la passe des mineurs", async () => {
-    const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'c.txt', 'fix(L1): c.txt')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }), { cacheWrite: 69_000 });
+    const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'c.txt', 'fix(L1): c.txt')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }), { cacheWrite: 200_000 });
     const h = harness({ script: { implement: [impl()], review: [minorReview()], fix: [fix('b.txt'), redFix, fix('d.txt')], 'review-small': [major] } });
     const c = h.lot('L1', { budget: REVIEW_RESERVE + 20000 });
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small', 'fix']);
     expect(c.lot.status).toBe('handed-back');
-    expect(c.lot.outcome).toMatch(/^tests rouges après la passe fix 1, correction suivante non abordable : /);
+    expect(c.lot.outcome).toMatch(/^correction non jouée \(budget\) : tests rouges après la passe fix 1, correction suivante non abordable : /);
   });
 
-  it("L145 — tests rouges après l'implémentation, budget sans réserve pour la revue : cause nommée, réserve citée", async () => {
+  it("R5 — tests rouges après l'implémentation : préfixe puis « tests rouges après l'implémentation » (budget sans réserve pour la revue, réserve citée)", async () => {
     const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: '2 failed', vert: false } })], fix: [fix('b.txt')] } });
     const c = h.lot('L1', { budget: REVIEW_RESERVE });
     await runLot(c);
     expect(kinds(h)).toEqual(['implement']);
     expect(c.lot.status).toBe('handed-back');
-    expect(c.lot.outcome).toMatch(/^tests rouges après l'implémentation, correction suivante non abordable : .*65000 réservés/);
+    expect(c.lot.outcome).toMatch(/^correction non jouée \(budget\) : tests rouges après l'implémentation, correction suivante non abordable : .*155000 réservés/);
   });
 
   it("L145 — passe fix refusée sans tests rouges : la cause ne parle pas de tests rouges", async () => {

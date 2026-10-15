@@ -65,8 +65,9 @@ export const DEFAULT_BUDGET = 2_000_000;
  * où il est passé, 250 lots, 11-10), rangé par estimate : jusqu'à 0,5 j p90 374 k (152 lots), de 0,5 à 1 j p90 732 k (88 lots, max
  * 1,09 M), au-delà d'un jour p90 1,14 M pour les 10 lots de 1,25 à 2 j (570 k par jour d'estimate), max 1,7 M (L188). Le plafond
  * de L78 (400 k par jour) rendait au lead, au deuxième tour, un lot de 1 j (L188 : 483 k puis 495 k).
+ * Plancher relevé de 450 k à 540 k (L218) avec la réserve de la passe fix (155 k) : 14 k + 282 k + 80 k + 155 k = 531 k arrondis, la marge avant refus du fix reste 385 k.
  */
-const LOT_BUDGET_FLOOR = 450_000;
+const LOT_BUDGET_FLOOR = 540_000;
 /** Lot de plus de 0,5 j et d'au plus 1 j : p90 mesuré du total, 732 k arrondis à 750 k. */
 const LOT_BUDGET_ONE_DAY = 750_000;
 /** Tokens par jour d'estimate au-delà d'un jour : p90 1,14 M pour 2 j. */
@@ -79,9 +80,10 @@ const LOT_BUDGET_PER_DAY = 570_000;
 const SCREEN_LOT_BUDGET = 1_300_000;
 /**
  * Allocation d'un lot à fiche `spec: true` (L188/L191), en plus du budget dérivé de l'estimate : sessions spec, fiche et accept hors de
- * l'estimate d'écriture. Aucun lot `spec:` seul n'a encore été mesuré ; 350 k est le pire cas mesuré des étapes d'un lot à écran (ol L113 : 349 k).
+ * l'estimate d'écriture. Relevée de 350 k à 450 k (L218) : la chaîne avant implement du lot spec warhammer L120 a coûté 388 k (350 k : pire cas
+ * mesuré des étapes d'un lot à écran, ol L113 : 349 k) ; cadence L217 n'en a pris que 176 k.
  */
-export const SPEC_STAGE_ALLOCATION = 350_000;
+export const SPEC_STAGE_ALLOCATION = 450_000;
 
 export type SpecStage = 'screen' | 'spec';
 

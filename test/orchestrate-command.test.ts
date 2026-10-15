@@ -229,7 +229,7 @@ describe('refus avant d\'agir (code 2)', () => {
     try {
       const out = r.out.join('\n');
       expect(out).toMatch(/étapes : spec \(sonnet\) → fiche \(sonnet\) → implement/);
-      expect(out).toContain('plus 350000 pour les étapes spec, fiche et accept');
+      expect(out).toContain('plus 450000 pour les étapes spec, fiche et accept');
       const spec = out.slice(out.indexOf('  spec :'), out.indexOf('  fiche :'));
       expect(spec).toContain('--agent spec-writer');
       expect(spec).toMatch(/mcp : aucun/);
@@ -1271,9 +1271,12 @@ describe('budget par lot (L78, recalibré L194)', () => {
     expect(lotBudgetBasis(2)).toContain('570000 par jour');
     expect(lotBudgetBasis(1.25, 'spec')).toContain('plancher de 750000');
   });
-  it("lot ordinaire : plancher 450 k jusqu'à 0,5 j, 750 k jusqu'à 1 j (p90 mesuré 732 k), 570 k par jour au-delà (p90 mesuré 1,14 M pour 2 j)", () => {
-    expect(lotBudget(0.1)).toBe(450_000);
-    expect(lotBudget(0.5)).toBe(450_000);
+  it("R3 — lotBudget(0.1) et lotBudget(0.5) valent 540000 sans étape spec", () => {
+    expect(lotBudget(0.1)).toBe(540_000);
+    expect(lotBudget(0.5)).toBe(540_000);
+  });
+
+  it("R3 — lotBudget(0.75) vaut toujours 750000 et lotBudget(2) 1140000 (750 k jusqu'à 1 j, 570 k par jour au-delà)", () => {
     expect(lotBudget(0.75)).toBe(750_000);
     expect(lotBudget(1)).toBe(750_000);
     expect(lotBudget(1.25)).toBe(750_000);
@@ -1281,8 +1284,8 @@ describe('budget par lot (L78, recalibré L194)', () => {
     expect(lotBudget(2.5)).toBe(1_425_000);
   });
 
-  it('le plancher couvre le pire cas mesuré (L62 : contrôle 14 k, écriture 282 k, revue 80 k) plus la réserve de 65 k pour une correction et sa revue', () => {
-    expect(lotBudget(0.1)).toBeGreaterThanOrEqual(14_000 + 282_000 + 80_000 + 65_000);
+  it('R3 — le plancher couvre 14 k + 282 k + 80 k + 155 k (la réserve de R4)', () => {
+    expect(lotBudget(0.1)).toBeGreaterThanOrEqual(14_000 + 282_000 + 80_000 + 155_000);
   });
 
   it("un lot de 1 j couvre ce que L188 a coûté en deux vagues (483 k puis 495 k) et le p90 des lots de 1 j (732 k)", () => {
@@ -1291,20 +1294,37 @@ describe('budget par lot (L78, recalibré L194)', () => {
   });
 
   it("lot à écran (L194) : le budget est le total mesuré, p90 1,28 M (L113 1,12 M ; L25 1,28 M ; L50 877 k), sans ajout de l'allocation de L191", () => {
-    expect(lotBudget(0.5, 'screen')).toBe(1_300_000);
+    expect(lotBudget(0.5, 'screen')).toBe(1_300_000); // R2
     expect(lotBudget(1, 'screen')).toBe(1_300_000);
     expect(lotBudget(1, 'screen')).toBeGreaterThanOrEqual(1_279_215);
-    expect(lotBudget(0.5, undefined)).toBe(450_000);
+    expect(lotBudget(0.5, undefined)).toBe(540_000);
+  });
+
+  it("R2 — lotBudget(0.5, 'screen') et lotBudget(1, 'screen') valent toujours 1300000", () => {
+    expect(lotBudget(0.5, 'screen')).toBe(1_300_000);
+    expect(lotBudget(1, 'screen')).toBe(1_300_000);
+  });
+
+  it("R2 — lotBudget(2.5, 'screen') vaut 1425000 + 450000", () => {
+    expect(lotBudget(2.5, 'screen')).toBe(1_425_000 + 450_000);
   });
 
   it("lot à écran au-delà du total mesuré : le budget ordinaire plus l'allocation de l'étape spec, jamais moins que le total mesuré", () => {
-    expect(lotBudget(2.5, 'screen')).toBe(1_425_000 + 350_000);
     expect(lotBudget(2.5, 'screen')).toBeGreaterThan(lotBudget(2.5));
   });
 
   it("lot à fiche spec (L188) : budget ordinaire plus l'allocation de l'étape (aucun lot spec: true mesuré à ce jour)", () => {
-    expect(lotBudget(0.5, 'spec')).toBe(450_000 + 350_000);
-    expect(lotBudget(1, 'spec')).toBe(750_000 + 350_000);
+    expect(lotBudget(0.5, 'spec')).toBe(540_000 + 450_000);
+    expect(lotBudget(1, 'spec')).toBe(750_000 + 450_000);
+  });
+
+  it("R1 — lotBudget(0.5, 'spec') vaut 990000 et lotBudget(1, 'spec') 1200000", () => {
+    expect(lotBudget(0.5, 'spec')).toBe(990_000);
+    expect(lotBudget(1, 'spec')).toBe(1_200_000);
+  });
+
+  it("R1 — lotBudgetBasis cite 450000 pour les étapes spec", () => {
+    expect(lotBudgetBasis(0.5, 'spec')).toContain('plus 450000 pour les étapes spec');
   });
 
   it("--dry-run dit le budget d'un lot à écran et sa base mesurée", async () => {
@@ -1314,7 +1334,7 @@ describe('budget par lot (L78, recalibré L194)', () => {
     const text = r.out.join('\n');
     try {
       expect(text).toContain("budget du lot : 1300000 tokens comptés (base : p90 mesuré du total d'un lot à écran, étapes spec, maquette et accept comprises)");
-      expect(text).toContain("budget du lot : 450000 tokens comptés (base : plancher d'un lot jusqu'à 0,5 j)");
+      expect(text).toContain("budget du lot : 540000 tokens comptés (base : plancher d'un lot jusqu'à 0,5 j)");
     } finally {
       removeDryRunBriefs(text);
     }
@@ -1330,14 +1350,14 @@ describe('budget par lot (L78, recalibré L194)', () => {
       expect(comp).not.toMatch(/spec \(|maquette \(|accept \(/);
       expect(journey).not.toMatch(/spec \(|maquette \(|accept \(/);
       expect(page).toMatch(/spec \(sonnet\) → maquette/);
-      expect(text.match(/budget du lot : 450000 tokens comptés \(base : plancher/g)).toHaveLength(2);
+      expect(text.match(/budget du lot : 540000 tokens comptés \(base : plancher/g)).toHaveLength(2);
       expect(text).toContain('budget du lot : 1300000');
     } finally {
       removeDryRunBriefs(text);
     }
   });
 
-  it("--dry-run (L209) : un lot screen: component ou journey avec spec: true et sans fiche à écran reste un lot de spec back — spec → fiche, budget ordinaire plus 350000, pas la chaîne écran", async () => {
+  it("--dry-run (L209) : un lot screen: component ou journey avec spec: true et sans fiche à écran reste un lot de spec back — spec → fiche, budget ordinaire plus 450000, pas la chaîne écran", async () => {
     const { parent } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component', spec: true }, { title: 'un parcours', estimate: 0.5, screen: 'journey', spec: true }] });
     const r = io(parent);
     await orchestrate(['a:L1', 'a:L2', '--dry-run'], r.io, fakeDeps().deps);
@@ -1348,7 +1368,7 @@ describe('budget par lot (L78, recalibré L194)', () => {
         expect(part).toMatch(/^\s*spec \(sonnet\) → fiche \(sonnet\) → implement/);
         expect(part).not.toMatch(/maquette/);
       }
-      expect(text.match(/plus 350000 pour les étapes spec, fiche et accept/g)).toHaveLength(2);
+      expect(text.match(/plus 450000 pour les étapes spec, fiche et accept/g)).toHaveLength(2);
       expect(text).not.toContain('budget du lot : 1300000');
     } finally {
       removeDryRunBriefs(text);
@@ -1480,7 +1500,7 @@ describe('--continue (L147)', () => {
     const { parent } = parentWith({ a: [{ title: 'gros', estimate: 3 }, { title: 'petit', estimate: 0.5 }] });
     const f = fakeDeps();
     const o = io(parent);
-    await orchestrate(['--continue', '--budget', '500k'], o.io, f.deps);
+    await orchestrate(['--continue', '--budget', '600k'], o.io, f.deps);
     expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L2']);
   });
 

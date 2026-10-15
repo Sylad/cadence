@@ -79,12 +79,12 @@ The budget a wave gives a lot is derived from its estimate, measured on the runs
 
 | Lot | Budget |
 |---|---|
-| up to 0.5 day | 450 k tokens |
+| up to 0.5 day | 540 k tokens |
 | 0.5 to 1 day | 750 k |
 | beyond | 570 k per day, 750 k at least |
-| `screen: page` | 1.3 M at least, or the ordinary budget + 350 k if that is more |
-| `spec: true` | ordinary budget + 350 k |
-| final review | 65 k reserved |
+| `screen: page` | 1.3 M at least, or the ordinary budget + 450 k if that is more |
+| `spec: true` | ordinary budget + 450 k |
+| fix pass and short review | 155 k reserved |
 
 The final review is always played; the budget bounds the writing passes. A `screen: component` or
 `screen: journey` lot takes the ordinary budget, unless its sheet already exists: it then gets the

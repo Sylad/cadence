@@ -21,8 +21,8 @@ cas:
       - la fiche a changé depuis le commit rouge, par des commits qui citent le lot, et elle est commitée
       - le test nommé a été corrigé dans l'arbre de travail, aucun autre test listé n'a bougé
     nominal:
-      - La commande lit les commits qui ont touché la fiche depuis le commit rouge.
-      - Tous citent le lot (ou le porteur) ; la fiche de l'arbre de travail est celle du dernier de ces commits.
+      - "La commande compare la fiche au commit rouge par l'écart net (git diff --quiet, comme accept.ts:165) ; s'il est non vide, elle lit git log des commits qui ont touché la fiche depuis le rouge pour les attribuer."
+      - "Tous citent le lot (lot livré : le lot ou le porteur) ; la fiche de l'arbre de travail est celle du dernier de ces commits."
       - Elle refait l'empreinte du seul test nommé, contre la fiche courante.
       - Elle ajoute au journal resceaux l'entrée habituelle et la mention « fiche amendée en <sha> » (dernier commit qui a touché la fiche).
       - Elle commite test + acceptation (nouveau commit rouge), puis la note du lot.
@@ -30,29 +30,29 @@ cas:
       - { si: un commit qui a touché la fiche depuis le rouge ne cite pas le lot, alors: refus, rien n'est écrit, regles: [R2] }
       - { si: la fiche a des modifications non commitées, alors: refus, regles: [R3] }
       - { si: un autre test listé a changé ou le test nommé est inchangé, alors: refus comme avant, regles: [R4] }
-      - { si: la fiche n'a pas changé depuis le rouge, alors: comportement L200 inchangé, aucune mention d'amendement, regles: [R5] }
+      - { si: l'écart net de la fiche avec le rouge est vide (même si des commits l'ont touchée puis ramenée à l'identique), alors: comportement L200 inchangé, aucune mention d'amendement, regles: [R5] }
       - { si: le commit du rescellé échoue, alors: retour atomique à l'état d'avant, regles: [R6] }
     resultat: Le test est rescellé contre la fiche courante, le journal dit quel amendement de fiche a été accepté, sans remise temporaire de la fiche.
 
 regles:
   - id: R1
     cas: [C1]
-    enonce: "Quand la fiche a changé depuis le commit rouge et que tous les commits qui l'ont touchée citent le lot, le rescellé est accepté : l'empreinte du test est refaite contre la fiche courante (arbre de travail = dernier commit de la fiche) et l'entrée de resceaux porte la clé facultative ficheAmendee = sha court du dernier commit qui a touché la fiche."
+    enonce: "Critère unique de « fiche changée depuis le rouge » : l'écart net, git diff --quiet <rouge> -- <fiche> (comportement L200 conservé). Quand cet écart est non vide et que tous les commits qui l'ont touchée citent le lot, le rescellé est accepté : l'empreinte du test est refaite contre la fiche courante (arbre de travail = dernier commit de la fiche) et l'entrée de resceaux porte la clé facultative ficheAmendee = sha court du dernier commit qui a touché la fiche."
     statut: sourcee
     source: "demande du lot L217 : « le reseal prend l'empreinte du test contre la fiche courante et note ‹fiche amendée en <sha>› dans resceaux » ; refus actuel : src/orchestrate/accept.ts:165"
     tests: ["R1 — fiche amendée par un commit du lot : rescellé accepté, ficheAmendee = sha du commit de la fiche", "R1 — l'entrée de resceaux garde avant/apres du test et le journal précédent"]
   - id: R2
     cas: [C1]
-    enonce: "Si un seul commit qui a touché la fiche depuis le rouge ne cite pas le lot (ou le porteur pour un lot livré), le rescellé est refusé avec le message « la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite pas <lot> : <sha7 du commit> » ; ni acceptation.json ni le test ne sont modifiés."
+    enonce: "Quand l'écart net est non vide, si un seul commit de git log <rouge>..HEAD -- <fiche> ne cite ni le lot (lot livré : ni le lot ni le porteur), le rescellé est refusé avec le message « la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite pas <lot> : <sha7 du commit> » ; ni acceptation.json ni le test ne sont modifiés."
     statut: sourcee
     source: "demande du lot L217 : « une fiche modifiée par des commits DU lot (fiche courante commitée, citant le lot) » ; garde de fond conservée de accept.ts:165 (une fiche qui évolue passe par le lot et sa revue)"
-    tests: ["R2 — commit de la fiche citant un autre lot : refus, message avec le sha fautif, fichiers intacts"]
+    tests: ["R2 — commit de la fiche citant un autre lot : refus, message avec le sha fautif, fichiers intacts", "R2 — lot livré : commit de la fiche citant le lot lui-même (sans le porteur) : accepté", "R2 — fiche supprimée ou renommée depuis le rouge : refus, pas de ficheAmendee"]
   - id: R3
     cas: [C1]
     enonce: "Une fiche avec des modifications non commitées (arbre de travail ou index différent de HEAD) est refusée avec « la fiche <fiche> a des modifications non commitées : la commiter (en citant <lot>) avant le rescellé »."
     statut: sourcee
     source: "demande du lot L217 : « fiche courante commitée »"
-    tests: ["R3 — fiche modifiée mais non commitée : refus, aucun rescellé"]
+    tests: ["R3 — fiche modifiée mais non commitée : refus, aucun rescellé", "R3 — le test existant de test/orchestrate-reseal.test.ts:77 est mis à jour : message « modifications non commitées » au lieu de « a changé »"]
   - id: R4
     cas: [C1]
     enonce: "Les gardes L200 sur les tests restent entières avec une fiche amendée : aucun autre test listé modifié ou absent depuis le rouge (message « autre(s) test(s) listé(s) modifié(s) depuis le commit rouge : … »), test nommé listé, scellé et réellement changé (« est inchangé depuis le scellé : rien à resceller »)."
@@ -61,10 +61,10 @@ regles:
     tests: ["R4 — fiche amendée et un second test listé modifié : refus", "R4 — fiche amendée mais test nommé inchangé : refus « rien à resceller »"]
   - id: R5
     cas: [C1]
-    enonce: "Fiche inchangée depuis le commit rouge : le rescellé se comporte exactement comme avant (aucune clé ficheAmendee, note du lot « fiche inchangée »). Avec une fiche amendée, la note du lot et le message de commit disent « fiche amendée en <sha> » à la place de « fiche inchangée »."
+    enonce: "Fiche à écart net vide avec le rouge (y compris amendée puis ramenée à l'identique, quel que soit le lot des commits intermédiaires, aucune attribution n'est faite) : le rescellé se comporte exactement comme avant (aucune clé ficheAmendee, note du lot « fiche inchangée »). Avec une fiche amendée, la note du lot et le message de commit disent « fiche amendée en <sha> » à la place de « fiche inchangée »."
     statut: hypothese
     si_faux: "Seuls des textes de note et de commit changent ; aucune donnée en jeu."
-    tests: ["R5 — fiche inchangée : entrée de resceaux identique à L200, sans ficheAmendee", "R5 — fiche amendée : la note du lot mentionne « fiche amendée en <sha> »"]
+    tests: ["R5 — fiche amendée puis ramenée à l'identique par un commit d'un autre lot : traitée comme inchangée, sans refus", "R5 — fiche inchangée : entrée de resceaux identique à L200, sans ficheAmendee", "R5 — fiche amendée : la note du lot mentionne « fiche amendée en <sha> »"]
   - id: R6
     cas: [C1]
     enonce: "L'atomicité L200 vaut aussi fiche amendée : si le commit échoue, acceptation.json et le test reviennent à leur état d'avant et la fiche n'est jamais touchée par la commande."
@@ -79,16 +79,16 @@ regles:
     tests: ["R7 — second rescellé après amendement : fiche inchangée depuis le nouveau rouge, pas de ficheAmendee", "R7 — resealedRouge adopte le commit d'un rescellé à fiche amendée"]
   - id: R8
     cas: [C1]
-    enonce: "Un commit « cite le lot » au sens de la détection de référence du plan (même lecture que raf commits : « feat(L217): … », « L217/t1 », liste comprise) ; pour un lot livré, c'est le porteur qui doit être cité."
+    enonce: "Un commit « cite le lot » au sens de citedRefs (src/link.ts:27, portée du sujet d'abord via scopeOf link.ts:18, le corps sinon) : l'implémentation réutilise cette fonction, sans détection parallèle. Lot en cours : le lot doit être cité. Lot livré (--porteur) : le lot OU le porteur, la fiche d'un lot livré ayant pu être amendée par des commits du lot lui-même (cohérent avec l'exception L183, accept.ts:258, qui prend les lotCommits du lot)."
     statut: hypothese
-    si_faux: "Si la citation doit être plus stricte (sujet seul) ou plus large (corps), seule la fonction de détection change ; aucune donnée en jeu."
-    tests: ["R8 — commit « feat(L217/t1): fiche » reconnu comme citant L217", "R8 — lot livré : seule la citation du porteur compte"]
+    si_faux: "Si seul le porteur devait compter pour un lot livré, la règle d'acceptation se resserre (les commits citant le lot seul seraient refusés) ; si la citation doit être plus stricte (sujet seul) ou plus large, la détection change ; aucune donnée en jeu."
+    tests: ["R8 — commit « feat(L217/t1): fiche » reconnu comme citant L217", "R8 — lot livré : la citation du lot ou celle du porteur est acceptée, un autre lot refusé", "R8 — lot en cours : commit dont seul le corps évoque le lot en passant, lu comme citedRefs"]
   - id: R9
     cas: [C1]
     enonce: "La commande reste le seul chemin du lead : refus pendant une vague (CADENCE_ORCHESTRATED, verrou du dépôt), sans --reason, hors lot en cours ou livré, avec les messages L200 ; une fiche amendée ne les contourne pas."
     statut: sourcee
     source: "src/cli.ts:742-760"
-    tests: ["R9 — fiche amendée sous CADENCE_ORCHESTRATED : refus L200 inchangé"]
+    tests: ["R9 — fiche amendée sous CADENCE_ORCHESTRATED : refus L200 inchangé", "R9 — fiche amendée sans --reason : refus L200 inchangé"]
 
 contrats:
   - id: A1

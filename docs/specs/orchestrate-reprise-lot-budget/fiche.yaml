@@ -19,12 +19,12 @@ cas:
     declencheur: commande cadence orchestrate --resume <vague> --budget <projet>:<lot>=+N
     preconditions:
       - "la vague existe, aucun processus ne la fait tourner"
-      - "le lot est handed-back, son étape suivante (next) est une étape d'écriture (fix, implement, spec ou accept), son outcome dit un budget de lot (« correction non jouée (budget) » ou « budget du lot atteint »)"
+      - "le lot est handed-back, son outcome dit un budget de lot (« correction non jouée (budget) » ou « budget du lot atteint ») et l'étape non jouée, lue dans cet outcome (`stop` vide next d'un lot rendu), est une étape d'écriture (fix, implement, spec ou accept)"
       - "le lot repris subit les gardes d'un lot vivant : dépôt sans fichier suivi modifié, non tenu par une autre orchestration, Node résolu ; claude est disponible"
     nominal:
       - "Le programme lit l'argument, retrouve le lot dans la vague (même résolution que --drop) et vérifie qu'il est reprenable."
       - "Le budget du lot devient les tokens déjà comptés par ses sessions plus N (même sens que « --resume --budget N » pour la vague)."
-      - "Le lot repasse de handed-back à suspended, son outcome est vidé, son next (fix ou revue) est gardé ; la vague, même terminée (done), repasse à running."
+      - "Le lot repasse de handed-back à suspended, son outcome est vidé, son next est posé sur l'étape non jouée lue dans l'outcome du lot rendu (le cycle normal enchaîne ensuite la revue) ; la vague, même terminée (done), repasse à running."
       - "Une ligne de journal et un avertissement du lot disent l'ancien et le nouveau budget."
       - "Le lot rejoue l'étape non jouée dans une SESSION NEUVE (nouvel identifiant, jamais claude --resume), puis enchaîne le cycle normal (revue, passes suivantes)."
       - "Sur revue conforme, le verdict est enregistré avec le sha relu et le plan commité, comme pour un lot jamais rendu ; le lot est ready, les autres lots finis ne sont pas touchés."
@@ -35,6 +35,7 @@ cas:
       - { si: "le dépôt est sale, tenu par une autre orchestration, ou le Node introuvable", alors: "refus code 2 comme pour un lot vivant", regles: [R12] }
       - { si: "le budget de la vague est épuisé", alors: "le lot est suspendu avec la vague en suspended-budget (code 3) ; le lead relève la vague par « --budget N » seul", regles: [R6] }
       - { si: "la revue rejouée est conforme", alors: "le verdict est enregistré par le chemin existant, rien de manuel", regles: [R7] }
+      - { si: "la vague a été lancée avant L223 (son instantané ne connaît pas --budget projet:lot=+N)", alors: "la reprise qui vise un lot tourne sur le dist/ courant, avec un avertissement ; sans lot visé elle relance l'instantané", regles: [R14] }
     resultat: "Le lot B26.4 (849 k / 750 k, fix non joué) se rejoue par le programme : fix en session neuve, revue, verdict enregistré, sans brief fix.md rendu à la main ni raf note manuel."
   - id: C2
     titre: "Le programme refuse la reprise ciblée avant d'écrire quoi que ce soit"
@@ -80,9 +81,9 @@ regles:
     tests: ["R2 — lot à 849000 dépensés pour 750000, =+300k : budget 1149000", "R2 — le budget d'un lot non visé n'est pas modifié"]
   - id: R3
     cas: [C1]
-    enonce: "Un lot est reprenable quand il est handed-back, que son next est une étape d'écriture (fix, implement, spec ou accept : les seules que le budget du lot borne, overBudget n'étant appelé que pour elles), et que son outcome dit un budget de lot (« correction non jouée (budget) » ou « budget du lot atteint ») ; il est alors remis suspended, outcome vidé, next gardé, puis rejoué par le cycle normal. Une revue (review, review-small, ux) n'est jamais rendue sur budget (« le budget du lot borne l'écriture, jamais la revue », cycle.ts:596) : un next de revue ou un next absent n'est pas reprenable. Le « fix ou revue » de la demande se lit : le fix non jouée, puis la revue qui le suit dans le cycle normal."
+    enonce: "Un lot est reprenable quand il est handed-back, que son outcome dit un budget de lot (« correction non jouée (budget) » ou « budget du lot atteint ») et que l'étape non jouée est une étape d'écriture (fix, implement, spec ou accept : les seules que le budget du lot borne, overBudget n'étant appelé que pour elles). `stop` met next à null sur un lot rendu : l'étape se lit dans l'outcome du lot rendu (« étape « fix » non jouée », budgetStep, cycle.ts:560-565), repli sur next s'il est resté ; le lot est alors remis suspended, outcome vidé, next posé sur cette étape, puis rejoué par le cycle normal. Une revue (review, review-small, ux) n'est jamais rendue sur budget (« le budget du lot borne l'écriture, jamais la revue », cycle.ts:596) : un outcome sans étape d'écriture (étape de revue, étape absente) n'est pas reprenable. Le « fix ou revue » de la demande se lit : le fix non joué, puis la revue qui le suit dans le cycle normal."
     statut: sourcee
-    source: "demande du lot : « rejoue l'étape non jouée (fix ou revue) avec le budget relevé » ; cycle.ts:595-597 (write seul sous overBudget) et :891-908 (next gardé, statut handed-back, outcome « budget du lot atteint » ou « correction non jouée (budget) ») ; reprise des lots suspendus (command.ts:1034)"
+    source: "demande du lot : « rejoue l'étape non jouée (fix ou revue) avec le budget relevé » ; cycle.ts:595-597 (write seul sous overBudget) et :891-908 (statut handed-back, outcome « budget du lot atteint » ou « correction non jouée (budget) » avec l'étape nommée) ; cycle.ts:122 (stop met next à null) et :560-565 (budgetStep lit l'étape dans l'outcome) ; reprise des lots suspendus (command.ts:1034)"
     tests: ["R3 — lot rendu « correction non jouée (budget) » avec next fix : repris, fix joué", "R3 — lot rendu « budget du lot atteint » avec next implement : repris, implémentation jouée", "R3 — lot avec next spec ou accept rendu sur budget : repris", "R3 — lot handed-back avec next review : refusé (une revue n'est pas rendue sur budget)", "R3 — l'outcome du lot repris est vidé et son statut n'est plus handed-back pendant la reprise", "R3 — lot rendu non conforme après 2 passes (next null) : refusé"]
   - id: R4
     cas: [C1]
@@ -101,13 +102,13 @@ regles:
     enonce: "Le relèvement du lot ne contourne ni le budget ni le quota de la vague : si la vague est épuisée, le lot reste suspendu et la vague passe en suspended-budget (code 3). Une vague done (tous lots finis) est reprise quand au moins un lot est visé et reprenable : elle repasse à running ; sans lot visé, elle reste refusée (« la vague … est terminée »)."
     statut: hypothese
     si_faux: "Si une vague terminée devait rester non reprenable même ainsi, le lead n'aurait pas d'autre moyen que la main pour B26.4 : seule la condition du refus (command.ts:965) change ; le statut de la vague dans wave.json prend une valeur déjà existante (running), format inchangé."
-    tests: ["R6 — vague done, lot visé reprenable : la reprise a lieu et la vague finit done ou handed-back selon le lot", "R6 — vague done sans option de lot : toujours refusée « est terminée »", "R6 — vague épuisée : lot suspendu, code 3"]
+    tests: ["R6 — vague done, lot visé reprenable : la reprise a lieu et la vague finit done", "R6 — vague done sans option de lot : toujours refusée « est terminée »", "R6 — vague épuisée : lot suspendu, code 3"]
   - id: R7
     cas: [C1]
     enonce: "L'enregistrement des verdicts est gardé : la revue conforme d'un lot repris enregistre le verdict avec le sha relu et commite le plan (recordReview), les mineurs et hypothèses vont en notes par les chemins existants ; aucun verdict ni note n'est posé avant cette revue. Pas de doublon : un lot rendu sur budget n'a jamais eu de revue conforme, donc pas de verdict (conclude, cycle.ts:1799, n'est appelé qu'à la revue conforme, une fois), et les notes sont filtrées contre celles déjà dans le plan (ensemble have des textes de plan.lot().notes, cycle.ts:1254-1256 et :1280-1282 : seuls les textes absents sont posés)."
     statut: sourcee
     source: "src/orchestrate/cycle.ts:1799-1830 (conclude : recordReview à la revue conforme) et :1237-1283 (noteHypotheses, noteMinors : filtre des textes déjà notés) ; demande du lot : « garde l'enregistrement des verdicts »"
-    tests: ["R7 — lot repris puis revue conforme : verdict enregistré avec le sha relu", "R7 — lot repris, mineur déjà noté : le nombre de notes du lot dans le plan (plan.lot(lot).notes) est inchangé après la revue rejouée", "R7 — lot repris : le plan ne contient qu'un seul verdict enregistré pour le lot après la reprise", "R7 — lot repris, revue non conforme : pas de verdict enregistré, le lot est rendu"]
+    tests: ["R7 — lot repris puis revue conforme : verdict enregistré avec le sha relu", "R7 — lot repris, mineur déjà noté : le nombre de notes « Revue de la fiche » du lot dans le plan (plan.lot(lot).notes) est inchangé après la revue rejouée", "R7 — lot repris : le plan ne contient qu'un seul verdict enregistré pour le lot après la reprise", "R7 — lot repris, revue non conforme : pas de verdict enregistré, le lot est rendu"]
   - id: R8
     cas: [C2]
     enonce: "Refus d'usage (sortie d'erreur, code de sortie 2) : forme invalide (« --budget invalide : X (projet:lot=+500k) »), ou option sans --resume (« --budget projet:lot=+N ne vaut qu'avec --resume »)."
@@ -116,7 +117,7 @@ regles:
     tests: ["R8 — projet:lot=+abc refusé avec le texte exact", "R8 — projet:lot=+0 refusé", "R8 — option sans --resume refusée avec le texte exact", "R8 — aucune écriture de l'état de la vague après un refus"]
   - id: R9
     cas: [C2]
-    enonce: "Refus (code 2) nommant le lot : inconnu dans la vague, plusieurs projets le portent (projet:lot demandé), ou non reprenable (statut autre que handed-back, next sans étape de fix ou de revue, cause autre que le budget) ; le texte donne le statut ou l'outcome vu."
+    enonce: "Refus (code 2) nommant le lot : inconnu dans la vague, plusieurs projets le portent (projet:lot demandé), ou non reprenable (statut autre que handed-back, étape non jouée absente ou qui n'est pas une étape d'écriture, cause autre que le budget) ; le texte donne le statut ou l'outcome vu."
     statut: sourcee
     source: "même résolution et mêmes textes que --drop (command.ts:983-984) ; le lead ne reprend pas un lot rendu pour une autre cause (demande du lot : « lot rendu sur budget »)"
     tests: ["R9 — lot inconnu : refus « lot inconnu dans la vague »", "R9 — lot ambigu entre deux projets : refus « précisez projet:lot »", "R9 — lot ready : refus", "R9 — lot handed-back pour spec non conforme : refus"]
@@ -144,6 +145,12 @@ regles:
     statut: hypothese
     si_faux: "Si le dernier --budget devait l'emporter, ou --drop le gagner, seul l'ordre de résolution des options change ; refuser est le choix prudent, aucune donnée en jeu."
     tests: ["R13 — --budget p:L=+200k --budget p:L=+300k : refusé « lot visé deux fois »", "R13 — --budget p:L=+200k --budget L=+300k : refusé de même après résolution", "R13 — lot visé par --budget et --drop : refusé", "R13 — lot visé par --budget et --answer : refusé", "R13 — aucune écriture de l'état de la vague après ces refus"]
+  - id: R14
+    cas: [C1]
+    enonce: "Une vague lancée avant L223 tourne sur un instantané de l'outil (L61) qui lirait « projet:lot=+N » comme un budget invalide. La reprise qui nomme un lot (--budget projet:lot=+N) d'une telle vague, détectée par l'absence de `lotBudgets` dans le dist/orchestrate/command.js de son instantané, tourne donc sur le dist/ et les gabarits courants au lieu de relancer l'instantané, avec l'avertissement « son instantané ne connaît pas --budget projet:lot=+N (antérieur à L223) » sur la sortie d'erreur. Sans lot nommé, ou avec un instantané qui connaît l'option, la reprise relance l'instantané comme avant. Même dans ce repli, les sessions gardent `<vague>/tool/bin` en tête de leur PATH (snapshot.ts:55) : le `raf` et le `cadence` qu'elles appellent sont ceux de l'instantané."
+    statut: sourcee
+    source: "revue de L223 (majeur : repli codé sans règle de la fiche) ; src/orchestrate/command.ts:980-984 (repli sur le dist/ courant) ; src/orchestrate/snapshot.ts:112-123 (waveReadsLotBudget) et :55 (toolBinOf : PATH des sessions)"
+    tests: ["R14 — l'instantané ne connaît pas l'option : la reprise tourne sur le dist/ courant, avec un avertissement, sans relance", "R14 — l'instantané connaît l'option, ou pas de lot visé : la reprise relance sur l'instantané"]
 
 contrats:
   - id: A1
@@ -163,7 +170,8 @@ contrats:
       - { code: log error, message: "orchestrate : <dépôt> : arbre sale, <n> fichier(s) suivi(s) modifié(s) : <fichiers>" }
       - { code: log error, message: "orchestrate : <dépôt> : une orchestration y est déjà en cours (<vague>, pid <pid>)" }
       - { code: log error, message: "orchestrate : la vague <vague> est terminée" }
-    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13]
+      - { code: warning, message: "orchestrate : vague <vague> : son instantané ne connaît pas --budget projet:lot=+N (antérieur à L223) : reprise avec le dist/ et les gabarits courants" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14]
 
 donnees:
   - { id: D1, objet: "<vague>/<projet>--<lot>.json : champs budget, status, outcome, warnings du lot", existant: true, modification: aucune, note: "même format ; seules les valeurs changent (budget relevé, statut handed-back → suspended, outcome vidé, avertissement ajouté)" }

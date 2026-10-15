@@ -1266,8 +1266,11 @@ is linked, not copied) into `.cadence/runs/<wave>/tool/` and relaunches the orch
 parent process waits, relays the signals and exits with the same code or signal). Code, brief templates and agents
 therefore come from the snapshot: a wave can orchestrate cadence itself, and a session of the wave may edit
 `templates/` or rebuild `dist/` without touching the wave running. `--resume` relaunches from the snapshot of the
-resumed wave, never from the current `dist/`; a wave without a snapshot (started before L61) resumes with the current
-package and a warning. The copy is removed with the wave folder. The wave's pid in `--status` is the relaunched process.
+resumed wave, not from the current `dist/`; a wave without a snapshot (started before L61) resumes with the current
+package and a warning. One more exception (L223): a wave whose snapshot predates L223 (its `dist/orchestrate/command.js`
+has no `lotBudgets`) resumed with `--budget <project>:<lot>=+N` runs on the current `dist/` and templates, with a warning
+on the error output, because that snapshot would refuse the option as an invalid budget; the sessions of such a resume still
+get `<wave>/tool/bin` first in their `PATH` (see below), so the `raf` and `cadence` they call are the snapshot's. The copy is removed with the wave folder. The wave's pid in `--status` is the relaunched process.
 The sessions of the wave also get `.cadence/runs/<wave>/tool/bin` (the `raf` and `cadence` entries of the snapshot) **first in their
 `PATH`**, ahead of the per-project Node below and of the usual `PATH`: the `raf` a reviewer runs (`raf commits`…) is the
 snapshot's, not the installed one. A wave without a snapshot leaves the `PATH` as it is.

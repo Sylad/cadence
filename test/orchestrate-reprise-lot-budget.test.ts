@@ -6,7 +6,8 @@ import type { ClaudeFn, LaunchOutcome } from '../src/orchestrate/launch.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { Plan } from '../src/plan.js';
-import { claudeOut, commitFile, git, kindOf, briefOf, reviewReport, workReport, precheckReport } from './orchestrate-harness.js';
+import { claudeOut, commitFile, git, kindOf, briefOf, reviewReport, specReport, workReport, precheckReport } from './orchestrate-harness.js';
+import { ecritBack } from './spec-helpers.js';
 import { tempDir } from './helpers.js';
 import { toolDirOf } from '../src/orchestrate/snapshot.js';
 
@@ -20,9 +21,9 @@ afterEach(() => {
 });
 
 const WAVE = '2026-10-04-1412';
-type Over = Partial<Record<'implement' | 'review' | 'fix' | 'review-small', (cwd: string, brief: string, args: string[]) => LaunchOutcome>>;
+type Over = Partial<Record<'implement' | 'review' | 'fix' | 'review-small' | 'spec' | 'fiche', (cwd: string, brief: string, args: string[]) => LaunchOutcome>>;
 
-function parentWith(projects: Record<string, { title: string; estimate?: number }[]>) {
+function parentWith(projects: Record<string, { title: string; estimate?: number; spec?: boolean }[]>) {
   const parent = tempDir();
   const dirs: Record<string, string> = {};
   for (const [name, lots] of Object.entries(projects)) {
@@ -33,7 +34,7 @@ function parentWith(projects: Record<string, { title: string; estimate?: number 
     git(dir, 'config', 'user.name', 'T');
     git(dir, 'config', 'commit.gpgsign', 'false');
     const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
-    for (const l of lots) plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 0.5 });
+    for (const l of lots) plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 0.5, spec: l.spec });
     plan.save();
     writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
     git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
@@ -297,16 +298,37 @@ describe('R6 / R7 / R11 — vague, verdict, reprise sans option', () => {
     expect(plan.lot('L1').review?.commit).toBe(git(r.dirs.a, 'log', '--grep=^fix(L1)', '-1', '--format=%H'));
     expect(git(r.dirs.a, 'log', '--format=%s', '-3')).toContain('revue de code enregistrée');
   });
-  it('R7 — lot repris, notes déjà posées : le nombre de notes du lot est inchangé après la revue rejouée', async () => {
-    const r = await handedBack();
-    const file = join(r.dirs.a, 'docs/plan/raf.yaml');
+  it('R7 — lot repris, mineur déjà noté : le nombre de notes « Revue de la fiche » du lot dans le plan (plan.lot(lot).notes) est inchangé après la revue rejouée', async () => {
+    // lot à fiche rendu sur budget avant la spec ; sa revue de fiche, rejouée à la reprise, rend un mineur déjà noté
+    const w = parentWith({ a: [{ title: 'un', spec: true }] });
+    // la vague d'origine ne sert qu'à créer l'état du lot ; il est ramené à « rendu avant la spec, budget du lot atteint »
+    await orchestrate(['a:L1', '--budget', '1'], io(w.parent).io, fakeDeps().deps);
+    const store = read(w.parent);
+    const lot = store.readLot('a', 'L1')!;
+    expect(lot.specLot).toBe(true);
+    lot.status = 'handed-back';
+    lot.next = 'spec';
+    lot.budget = 1000;
+    lot.spec = undefined;
+    lot.steps = [];
+    lot.steps.push({ n: 1, kind: 'precheck', model: 'sonnet', status: 'ok', started: 'x', tokens: { input: 0, cacheWrite: 0, cacheRead: 0, output: 0, counted: 1000 } });
+    lot.outcome = "budget du lot atteint (1000 / 1000 tokens comptés, dérivé de l'estimate) : étape « spec » non jouée, à décider par le lead";
+    store.writeLot(lot);
+    store.writeWave({ ...store.readWave()!, status: 'done' });
+    const file = join(w.dirs.a, 'docs/plan/raf.yaml');
     const plan = Plan.load(file);
-    plan.note('L1', 'Revue de la fiche — mineur : déjà noté', '2026-10-04');
+    plan.note('L1', 'Revue de la fiche — mineur : nom vague', '2026-10-04');
     plan.save();
-    git(r.dirs.a, 'commit', '-qam', 'plan: note');
-    const n = Plan.load(file).lot('L1').notes.length;
-    await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+300k'], io(r.parent).io, r.f.deps);
-    expect(Plan.load(file).lot('L1').notes.length).toBe(n);
+    git(w.dirs.a, 'commit', '-q', '-m', 'plan: note', '--', 'docs/plan/raf.yaml');
+    const revue = () => Plan.load(file).lot('L1').notes.filter((n) => n.text.startsWith('Revue de la fiche'));
+    expect(revue()).toHaveLength(1);
+    const g = fakeDeps({
+      spec: (cwd) => claudeOut(specReport({ fiche: ecritBack(cwd) })),
+      fiche: () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', texte: 'nom vague' }] })),
+    });
+    expect(await orchestrate(['--resume', WAVE, '--budget', '1M', '--budget', 'a:L1=+300k'], io(w.parent).io, g.deps)).toBe(0);
+    expect(g.calls.map((c) => c.kind).slice(0, 2)).toEqual(['spec', 'fiche']);
+    expect(revue().map((n) => n.text)).toEqual(['Revue de la fiche — mineur : nom vague']);
   });
   it('R7 — lot repris : le plan ne contient qu\'un seul verdict enregistré pour le lot après la reprise', async () => {
     const r = await handedBack();
@@ -336,6 +358,14 @@ describe('R6 / R7 / R11 — vague, verdict, reprise sans option', () => {
     await orchestrate(['--resume', '--budget', '3M'], io(w.parent).io, f.deps);
     expect(read(w.parent).readLot('a', 'L1')!.status).toBe('handed-back');
     expect(f.calls.slice(calls).every((c) => c.cwd === w.dirs.a)).toBe(true);
+  });
+  it('R11 — vague done sans option : refusée', async () => {
+    const r = await handedBack();
+    expect(read(r.parent).readWave()!.status).toBe('done');
+    const again = io(r.parent);
+    expect(await orchestrate(['--resume', WAVE], again.io, r.f.deps)).toBe(2);
+    expect(again.err.join()).toContain(`la vague ${WAVE} est terminée`);
+    expect(r.lot().status).toBe('handed-back');
   });
   it('R11 — --budget 500k relève le budget de vague de 500 k au-dessus du consommé', async () => {
     const w = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
@@ -367,9 +397,12 @@ describe('R8 / R9 / R10 / R13 — refus avant écriture', () => {
   });
   it("R8 — aucune écriture de l'état de la vague après un refus", async () => {
     const r = await handedBack();
-    const x = await resumeErr(r, '--budget', 'a:L1=+155k');
-    expect(x.code).toBe(2);
-    expect(x.unchanged).toBe(true);
+    const state = () => JSON.stringify([read(r.parent).readWave(), r.lot()]);
+    const before = state();
+    // refus d'usage levés à la lecture des arguments (forme invalide, option sans --resume), avant toute lecture de l'état de la vague
+    await expect(orchestrate(['--resume', WAVE, '--budget', 'a:L1=+abc'], io(r.parent).io, r.f.deps)).rejects.toThrow('--budget invalide : a:L1=+abc (projet:lot=+500k)');
+    await expect(orchestrate([WAVE, '--budget', 'a:L1=+300k'], io(r.parent).io, r.f.deps)).rejects.toThrow("--budget projet:lot=+N ne vaut qu'avec --resume");
+    expect(state()).toBe(before);
   });
   it('R9 — lot inconnu : refus « lot inconnu dans la vague »', async () => {
     const r = await handedBack();
@@ -451,6 +484,17 @@ describe('R8 / R9 / R10 / R13 — refus avant écriture', () => {
     expect(x.err).toContain('orchestrate : --budget a:L1 : lot aussi visé par --answer');
     expect(x.unchanged).toBe(true);
   });
+  it("R13 — aucune écriture de l'état de la vague après ces refus", async () => {
+    const r = await handedBack();
+    const state = () => JSON.stringify([read(r.parent).readWave(), r.lot()]);
+    const before = state();
+    for (const extra of [['--budget', 'a:L1=+200k', '--budget', 'a:L1=+300k'], ['--budget', 'a:L1=+200k', '--budget', 'L1=+300k'], ['--budget', 'a:L1=+300k', '--drop', 'a:L1'], ['--budget', 'a:L1=+300k', '--answer', 'a:L1', 'oui']]) {
+      const out = io(r.parent);
+      expect(await orchestrate(['--resume', WAVE, ...extra], out.io, r.f.deps)).toBe(2);
+      expect(out.err.join('\n')).toMatch(/--budget a:L1 : lot (visé deux fois|aussi retiré par --drop|aussi visé par --answer)/);
+      expect(state()).toBe(before);
+    }
+  });
 });
 
 describe('R12 — gardes du lot repris', () => {
@@ -491,7 +535,7 @@ describe('R12 — gardes du lot repris', () => {
   });
 });
 
-describe('R1 — vague lancée avant L223 (instantané sans lotBudgets)', () => {
+describe('R14 — vague lancée avant L223 (instantané sans lotBudgets)', () => {
   const withSnapshot = (r: { store: RunStore }, command: string) => {
     const tool = toolDirOf(r.store.dir);
     mkdirSync(join(tool, 'bin'), { recursive: true });
@@ -500,7 +544,7 @@ describe('R1 — vague lancée avant L223 (instantané sans lotBudgets)', () => 
     writeFileSync(join(tool, 'dist', 'orchestrate', 'command.js'), command);
     return tool;
   };
-  it("R1 — l'instantané ne connaît pas l'option : la reprise tourne sur le dist/ courant, avec un avertissement, sans relance", async () => {
+  it("R14 — l'instantané ne connaît pas l'option : la reprise tourne sur le dist/ courant, avec un avertissement, sans relance", async () => {
     const r = await handedBack();
     withSnapshot(r, 'parseBudget(v)');
     const reexec: string[] = [];
@@ -511,7 +555,7 @@ describe('R1 — vague lancée avant L223 (instantané sans lotBudgets)', () => 
     expect(again.err.join()).toContain('ne connaît pas --budget projet:lot=+N');
     expect(r.lot().status).toBe('ready');
   });
-  it("R1 — l'instantané connaît l'option, ou pas de lot visé : la reprise relance sur l'instantané", async () => {
+  it("R14 — l'instantané connaît l'option, ou pas de lot visé : la reprise relance sur l'instantané", async () => {
     const r = await handedBack();
     const tool = withSnapshot(r, 'lotBudgets');
     const reexec: string[] = [];

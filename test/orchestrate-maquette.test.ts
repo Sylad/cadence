@@ -112,6 +112,23 @@ describe('revue de la maquette : où elle s’insère', () => {
     expect(kinds(h)).toEqual(['implement', 'review']);
   });
 
+  it('L233 — une acceptation verte et scellée dont un test a été modifié après le scellé (empreinte qui ne tient plus) prouve encore la revue : ni maquette ni accept', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecrit(h.repo);
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, a.json);
+    commite(h.repo, a.json, 'test(L1): acceptation scellée');
+    setVert(h.repo, a.json);
+    commite(h.repo, a.json, 'chore(L1): acceptation verte');
+    writeFileSync(join(h.repo, a.test), `${readFileSync(join(h.repo, a.test), 'utf8')}// modifié après le scellé\n`);
+    commite(h.repo, a.test, 'test(L1): test modifié après le scellé');
+    await runLot(h.lot('L1', screen, { ...config, accept: 'true', test: 'true' }));
+    // Le verrou rend ensuite le lot (le test de son propre lot a bougé) : seul compte ici que ni la maquette ni accept ne soient rejoués avant implement.
+    expect(kinds(h)[0]).toBe('implement');
+    expect(kinds(h)).not.toContain('maquette');
+    expect(kinds(h)).not.toContain('accept');
+  });
+
   it('une acceptation aux empreintes vides ou fausses ne prouve rien : la maquette est relue', async () => {
     const h = harness({ lots, script: { maquette: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
     ecrit(h.repo);

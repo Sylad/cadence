@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { ecritAcceptation } from './accept-helpers.js';
@@ -583,6 +583,23 @@ describe('étape spec back : reprise d\'un lot dont la fiche est déjà commité
     commite(h.repo, a.json, 'chore(L1): acceptation verte');
     await runLot(h.lot('L1', back, { ...config, accept: 'true', test: 'true' }));
     expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('L233 — une acceptation verte et scellée dont un test a été modifié après le scellé (empreinte qui ne tient plus) prouve encore la revue : pas de revue de fiche', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    const a = ecritAcceptation(h.repo, { sansFiche: true, ecran: 'cache-de-secours-365scores', exemple: EXEMPLE_BACK });
+    sealAcceptation(h.repo, a.json);
+    commite(h.repo, a.json, 'test(L1): acceptation scellée');
+    setVert(h.repo, a.json);
+    commite(h.repo, a.json, 'chore(L1): acceptation verte');
+    writeFileSync(join(h.repo, a.test), `${readFileSync(join(h.repo, a.test), 'utf8')}// modifié après le scellé\n`);
+    commite(h.repo, a.test, 'test(L1): test modifié après le scellé');
+    await runLot(h.lot('L1', back, { ...config, accept: 'true', test: 'true' }));
+    // Le verrou rend ensuite le lot (le test de son propre lot a bougé) : seul compte ici que ni la revue de fiche ni accept ne soient rejouées avant implement.
+    expect(kinds(h)[0]).toBe('implement');
+    expect(kinds(h)).not.toContain('fiche');
+    expect(kinds(h)).not.toContain('accept');
   });
 
   it('une acceptation non scellée ne prouve rien : la fiche est relue', async () => {

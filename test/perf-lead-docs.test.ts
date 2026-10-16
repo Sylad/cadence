@@ -37,10 +37,10 @@ describe('skill lead — l\'en-tête perf (L227)', () => {
 
 describe('documentation — livraisons rouges et en-tête perf (L227)', () => {
   it('R12 — CHANGELOG.md contient une entrée citant L227', () => {
-    // first section of the changelog: [Unreleased], or the version a release has just renamed it to
-    const first = read('CHANGELOG.md').split(/^## \[/m)[1];
-    expect(first).toMatch(/\(L227[,)]/);
-    expect(first.indexOf("(L227")).toBeLessThan(first.indexOf('(L225'));
+    // whole changelog: the entry stays found after a release renames [Unreleased] and later lots open new sections
+    const changelog = read('CHANGELOG.md');
+    expect(changelog).toMatch(/\(L227[,)]/);
+    expect(changelog.indexOf('(L227')).toBeLessThan(changelog.indexOf('(L225'));
   });
 
   it('R12 — le README cite les livraisons rouges et l\'en-tête perf du tour', () => {

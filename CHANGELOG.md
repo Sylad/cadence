@@ -57,6 +57,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
 
+## [Unreleased]
+
+### Added
+
+- Measure of the back-end spec step (L190, `docs/mesures/etape-spec-back-2026-10-16.md`): on 10 back-end lots with a sheet (cadence L217 to L231), neither row of the success table is reached (90 % of lots with a correction against ≤ 40 %, 60 % with two or more against ≤ 15 %), and the spec and sheet review cost about 177 k tokens per lot, 4 times what the passes they would avoid cost. The threshold is to be narrowed before the step is abandoned: the lead's decision.
+
 ## [1.7.0] - 2026-10-16
 
 ### Changed

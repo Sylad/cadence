@@ -2549,9 +2549,10 @@ lots:
     finished: 2026-10-15
   - id: L224
     title: "Publish 1.5.0 rouge sur le runner GitHub (run 38774759325, 2 fois) : test/session-all.test.ts:138 « un sous-dossier sans .git dans un dépôt est signalé » attend « ✗ … dépôt » sous ## pkg-a et reçoit « pkg-a — reprise du 2026-09-28 » ; vert en local (2169) ; trouver la différence d'environnement (git 2.55 safe.directory, tmp sous le workspace, détection du dépôt parent par session --all), corriger, puis republier 1.5.0 (retag ou 1.5.1)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-15
+    started: 2026-10-16
   - id: L225
     title: "cadence perf [--since date] [--json] : tableau de bord permanent du workflow, sans modèle, lu dans .cadence/runs/*/wave.json et les plans raf des projets du dossier ; deux fenêtres (7 derniers jours contre les 7 précédents) et ⚠ sur une dégradation de plus de 25 % ; indicateurs 1 débit (lots prêts, livrés, rendus par jour, part des rendus sur budget), 2 passes de correction par lot (médiane, part ≥ 2, causes dominantes du cache de corrections), 5 interventions du lead (lots rendus par une vague puis terminés hors vague, sessions ux par lot visible) ; demande de Sylvain 16-10 : surveiller et s'améliorer sans micro-optimisation"
     status: todo

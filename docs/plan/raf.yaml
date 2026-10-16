@@ -2639,6 +2639,11 @@ lots:
       - { date: 2026-10-16, text: "16-10 hypothèse R9 retenue par le lead : contrôle des empreintes des tests scellés des lots livrés à la fin de chaque session implement/fix (pas au premier commit pendant la session) ; si un lot touche encore un test scellé d'un autre lot après ça, revoir" }
     review: { date: 2026-10-16, verdict: "conforme — orchestré (vague 2026-10-16-1150, 0 passe(s) de correction + passe des mineurs)", commit: 1ddf32cb41cf27afa2b6d1741430aca9037343d0 }
     finished: 2026-10-16
+  - id: L232
+    title: "README de cadence illisible pour un humain (remarque de Sylvain 16-10) : 202 ko dans le paquet npm, « What's new » en pavés ; le README devient une page d'accueil courte et visuelle — ce que fait l'outil en 5 lignes, un schéma du cycle d'une vague (spec → maquette → accept → implement → review → ux → deliver) et du rôle du lead, les trois commandes de départ, un sommaire vers des pages docs/ (raf, orchestrate, deliver, spec, lead, stabilité) où part le contenu actuel sans rien perdre ; « What's new » = deux lignes par version avec renvoi au CHANGELOG ; sections longues repliables ; mesure : taille du README avant/après, aucun lien cassé (contrôle dans la CI tests.yml)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

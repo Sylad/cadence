@@ -21,7 +21,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
-import { acceptationFile, acceptCommands, isAcceptList, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
+import { type Acceptation, acceptationFile, acceptCommands, isAcceptList, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
 import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
@@ -1421,6 +1421,30 @@ async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore
 }
 
 /**
+ * Écart de l'acceptation verte et scellée `json` par rapport à ce qu'elle était à `first` (tête d'avant la première session accept du lot), ou null.
+ * Admis : le même contenu, ou un rescellé du lead (`cadence spec reseal`, L200) : `vert` et `empreintes` toujours posés, journal `resceaux` allongé, aucun commit
+ * du fichier dans une session de la vague, fichier propre. Tout le reste (vert: false, journal effacé, réécriture commitée par la session) est rendu au lead (L233).
+ */
+function greenDrift(c: LotCtx, json: string, first: string, before: string, was: Acceptation): string | null {
+  const l = c.lot;
+  if (!listed(c, json)) return 'acceptation.json supprimé depuis la première session accept (verrou des tests d\'acceptation)';
+  const text = readFileSync(join(l.repo, json), 'utf8');
+  if (text === before) return null;
+  const now = parseAcceptation(text);
+  const dirty = git(l.repo, 'status', '--porcelain', '--', json).trim() !== '';
+  let bySession = false;
+  try {
+    const mine = waveCommits(c, l.repo);
+    bySession = git(l.repo, 'log', '--format=%H', `${first}..HEAD`, '--', json).split('\n').some((sha) => sha && mine(sha));
+  } catch {
+    bySession = true;
+  }
+  const journal = (a: Acceptation): number => a.resceaux?.length ?? 0;
+  if (typeof now !== 'string' && now.vert && now.empreintes && journal(now) > journal(was) && !bySession && !dirty) return null;
+  return 'acceptation verte réécrite depuis la première session accept (vert, empreintes ou resceaux changés ; seul un rescellé du lead, `cadence spec reseal`, est admis) : remettre le fichier comme avant la session, par exemple `git checkout <commit vert> -- <fichier>` puis `--resume`';
+}
+
+/**
  * Étape accept (L173, spec etape-spec S5) : une session distincte de l'implémenteur écrit, depuis la fiche et la maquette seules, les tests
  * d'acceptation rouges. Le programme vérifie (acceptation.json conforme, autres lots intacts, commande dédiée rouge, config.test verte),
  * accorde une seconde passe, puis SCELLE le fichier (empreintes) dans un commit du cycle : c'est le commit rouge du verrou.
@@ -1445,6 +1469,13 @@ async function acceptStep(c: LotCtx): Promise<void> {
   }
   const doc = text === null ? null : parseAcceptation(text);
   if (doc && typeof doc !== 'string' && doc.vert && doc.empreintes) {
+    // Le fichier actuel doit être celui de `first` : une session accept qui a réécrit puis commité l'oracle avant de poser sa question (le verrou ne s'applique pas à l'étape accept, `skip`)
+    // ne se fait pas adopter comme nouveau commit rouge. Seul un rescellé du lead (journal `resceaux` allongé, commit hors de toute session, fichier propre) est une différence admise.
+    const drift = first ? greenDrift(c, json, first, text as string, doc) : null;
+    if (drift) {
+      stop(c, 'handed-back', `verrou des tests d'acceptation : ${json} : ${drift}`);
+      return;
+    }
     l.accept = { acceptation: json, rouge: redSha(l.repo, json) ?? '' };
     l.next = 'implement';
     // Un lot en question n'a plus rien à demander : la réponse du lead (« ne réécris rien ») est prise en compte par ce choix, elle ne repart pas dans le brief d'implement.

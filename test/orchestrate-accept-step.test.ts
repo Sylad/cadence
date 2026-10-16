@@ -151,6 +151,68 @@ describe('étape accept : où elle s’insère', () => {
     expect(c.lot.accept?.acceptation).toBe(a.json);
   });
 
+  /** Un lot vert et scellé, rescellé une fois (journal `resceaux`), puis une étape accept déjà jouée dont la session pose une question : l'état d'un lot de L161 repris avec `--answer`. */
+  const verteEnQuestion = () => {
+    const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, a.json);
+    writeFileSync(join(h.repo, a.test), `${readFileSync(join(h.repo, a.test), 'utf8')}// corrigé par le lead\n`);
+    resealAcceptation(h.repo, a.json, a.test, 'contredit la fiche', '2026-10-12');
+    setVert(h.repo, a.json);
+    git(h.repo, 'add', '--', a.json, a.test);
+    git(h.repo, 'commit', '-q', '-m', 'chore(L1): acceptation verte', '--', a.json, a.test);
+    const vert = git(h.repo, 'rev-parse', 'HEAD').trim();
+    const c = h.lot('L1', screen, config);
+    return { h, a, c, vert };
+  };
+  /** La session accept déjà jouée : `headBefore` = le commit vert, `headAfter` = la tête après ses commits ; le lot attend la réponse du lead. */
+  const questionPosee = (c: ReturnType<typeof verteEnQuestion>['c'], h: ReturnType<typeof harness>, vert: string) => {
+    c.lot.steps.push({ n: 1, kind: 'accept', model: 'sonnet', status: 'done', started: new Date().toISOString(), headBefore: vert, headAfter: git(h.repo, 'rev-parse', 'HEAD').trim() } as never);
+    c.lot.status = 'question';
+    c.lot.next = 'accept';
+    c.lot.questions = ['l’oracle est vert, que faire ?'];
+    c.lot.pendingAnswer = 'ne réécris rien';
+    c.lot.answers.push('ne réécris rien');
+  };
+
+  it('L233 — une session accept qui a réécrit puis commité l’oracle vert avant sa question : le lot est rendu, la réécriture n’est jamais adoptée comme commit rouge', async () => {
+    const { h, a, c, vert } = verteEnQuestion();
+    const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
+    expect(doc.resceaux).toHaveLength(1);
+    const { empreintes: _e, resceaux: _r, ...reste } = doc;
+    writeFileSync(join(h.repo, a.json), JSON.stringify({ ...reste, vert: false }, null, 2));
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation réécrite par la session', '--', a.json);
+    questionPosee(c, h, vert);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/verrou des tests d'acceptation[^]*acceptation verte réécrite/);
+    expect(kinds(h)).toEqual([]);
+    expect(c.lot.accept).toBeUndefined();
+  });
+
+  it('L233 — la même réécriture laissée non commitée dans l’arbre est rendue aussi', async () => {
+    const { h, a, c, vert } = verteEnQuestion();
+    const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
+    writeFileSync(join(h.repo, a.json), JSON.stringify({ ...doc, vert: false }, null, 2));
+    questionPosee(c, h, vert);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(kinds(h)).toEqual([]);
+  });
+
+  it('L233 — un rescellé du lead pendant la question (journal allongé, commit hors session) reste admis : le lot repart à implement', async () => {
+    const { h, a, c, vert } = verteEnQuestion();
+    questionPosee(c, h, vert);
+    writeFileSync(join(h.repo, a.test), `${readFileSync(join(h.repo, a.test), 'utf8')}// encore corrigé par le lead\n`);
+    resealAcceptation(h.repo, a.json, a.test, 'seconde correction', '2026-10-13');
+    git(h.repo, 'add', '--', a.json, a.test);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation rescellée', '--', a.json, a.test);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+  });
+
   it('L233 — le brief accept interdit de réécrire une acceptation verte et rend la main', async () => {
     const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
     await runLot(h.lot('L1', screen, config));

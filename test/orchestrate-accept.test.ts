@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { acceptationFile, checkAcceptation, isAcceptationFile, findAcceptation, lockViolations, lotStartHead, redSha, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { gitRepo } from './helpers.js';
 import { git } from './orchestrate-harness.js';
 import { DIR, ecritAcceptation } from './accept-helpers.js';
+import { EXEMPLE } from './spec-helpers.js';
 
 // L173 (spec etape-spec, S5) : ce que le programme sait de l'étape accept — le fichier acceptation.json et le verrou des tests rouges.
 
@@ -172,31 +173,32 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
       expect(lockViolations(repo, DIR, head).join('\n')).toContain(a.test);
     });
 
-    it('tests ET fiche modifiés dans les commits du même lot : admis', () => {
+    it('R10 — fiche et test scellé modifiés dans le même commit citant le lot en cours : modification admise', () => {
       const { repo, a, head } = livre();
       writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
       changeFiche(repo, a.fiche);
       commitPaths(repo, 'feat(L9): R7 révisée', a.test, a.fiche);
-      expect(lockViolations(repo, DIR, head)).toEqual([]);
+      const commit = git(repo, 'rev-parse', 'HEAD');
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotCommits: [commit] })).toEqual([]);
     });
 
-    it('la fiche changée dans un commit antérieur du lot (lotBase) admet les tests modifiés par une session suivante', () => {
+    it('R8 — test de L183 mis à jour (« la fiche changée dans un commit antérieur du lot (lotBase) ») : les commits du lot sont passés à lockViolations (lotCommits) et le commit de fiche cite le lot', () => {
       const { repo, a, head } = livre();
       changeFiche(repo, a.fiche);
       commitPaths(repo, 'feat(L9): fiche', a.fiche);
-      const session = git(repo, 'rev-parse', 'HEAD');
+      const fiche = git(repo, 'rev-parse', 'HEAD');
       writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
       commitPaths(repo, 'feat(L9): tests', a.test);
-      expect(lockViolations(repo, DIR, session).join('\n')).toContain(a.test);
-      expect(lockViolations(repo, DIR, session, { lotBase: head })).toEqual([]);
+      expect(lockViolations(repo, DIR, fiche, { lotBase: head }).join('\n')).toContain(a.test);
+      expect(lockViolations(repo, DIR, fiche, { lotBase: head, lot: 'L9', lotCommits: [fiche] })).toEqual([]);
     });
 
-    it("le lot SUIVANT une évolution admise ne voit aucun écart : les tests sont comparés à la tête d'avant le lot, plus au commit rouge", () => {
+    it("R11 — évolution admise (commit de fiche et de tests citant le lot, lotCommits) : le lot suivant ne voit aucun écart (depuis=ref conservé)", () => {
       const { repo, a, head } = livre();
       writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
       changeFiche(repo, a.fiche);
       commitPaths(repo, 'feat(L9): R7 révisée', a.test, a.fiche);
-      expect(lockViolations(repo, DIR, head)).toEqual([]);
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotCommits: [git(repo, 'rev-parse', 'HEAD')] })).toEqual([]);
       writeFileSync(join(repo, 'autre.txt'), 'x\n');
       commitPaths(repo, 'feat(L10): sans lien', 'autre.txt');
       const avant = git(repo, 'rev-parse', 'HEAD');
@@ -293,20 +295,21 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
       expect(lotStartHead(repo, [git(repo, 'rev-list', '--max-parents=0', 'HEAD').trim().split('\n')[0]])).toBeUndefined();
     });
 
-    it('la fiche changée mais non commitée (arbre de travail) compte aussi', () => {
+    it('R10 — arbre de travail seul modifié (fiche non commitée) : écart, plus de git diff depuis lotBase', () => {
       const { repo, a, head } = livre();
       writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
       changeFiche(repo, a.fiche);
-      expect(lockViolations(repo, DIR, head)).toEqual([]);
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotBase: head, lotCommits: [] }).join('\n')).toContain(a.test);
     });
 
-    it("l'acceptation du lot en cours (opts.lot) garde le verrou entier, même fiche changée dans le lot", () => {
+    it("R10 — lot courant portant l'identifiant du lot livré : verrou entier, aucune exception", () => {
       const { repo, a, head } = livre();
       changeFiche(repo, a.fiche);
       writeFileSync(join(repo, a.test), "it('triche', () => {});\n");
       commitPaths(repo, 'fix(L1): triche', a.test, a.fiche);
-      expect(lockViolations(repo, DIR, head, { lotBase: head, lot: 'L1' }).join('\n')).toContain(a.test);
-      expect(lockViolations(repo, DIR, head, { lotBase: head, lot: 'L9' })).toEqual([]);
+      const commit = git(repo, 'rev-parse', 'HEAD');
+      expect(lockViolations(repo, DIR, head, { lotBase: head, lot: 'L1', lotCommits: [commit] }).join('\n')).toContain(a.test);
+      expect(lockViolations(repo, DIR, head, { lotBase: head, lot: 'L9', lotCommits: [commit] })).toEqual([]);
     });
 
     it("un test réécrit hors vague, fiche inchangée, reste un écart contre le commit rouge même avec lotBase", () => {
@@ -315,6 +318,193 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
       commitPaths(repo, 'chore: hors vague', a.test);
       const avant = git(repo, 'rev-parse', 'HEAD');
       expect(lockViolations(repo, DIR, avant, { lotBase: avant }).join('\n')).toContain(a.test);
+    });
+
+    const sha = (repo: string) => git(repo, 'rev-parse', 'HEAD');
+
+    it('R8 — fiche d\'un lot livré amendée par un commit d\'un AUTRE lot : modifier ses tests scellés est un écart', () => {
+      const { repo, a, head } = livre();
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L8): fiche', a.fiche);
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      // lotCommits ne porte que les commits qui citent L9 : le commit de fiche de L8 n'en est pas
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotCommits: [sha(repo)] }).join('\n')).toContain(a.test);
+    });
+
+    it('R8 — fiche amendée par un commit qui ne cite aucun lot : modifier ses tests scellés est un écart', () => {
+      const { repo, a, head } = livre();
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'docs: fiche sans lot', a.fiche);
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotCommits: [sha(repo)] }).join('\n')).toContain(a.test);
+    });
+
+    it('R8 — fiche amendée mais non commitée : modifier les tests scellés est un écart', () => {
+      const { repo, a, head } = livre();
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      changeFiche(repo, a.fiche);
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotCommits: [sha(repo)] }).join('\n')).toContain(a.test);
+    });
+
+    it('R8 — fiche amendée par un commit qui cite le lot en cours : modification des tests admise', () => {
+      const { repo, a, head } = livre();
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'docs(L9): fiche R7', a.fiche);
+      const fiche = sha(repo);
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotCommits: [fiche, sha(repo)] })).toEqual([]);
+    });
+
+    it("R10 — commit de fiche antérieur au commit rouge qui cite le lot en cours : l'exception ne s'ouvre pas", () => {
+      const repo = gitRepo();
+      const fiche = `${DIR}/prochain-match/fiche.yaml`;
+      mkdirSync(join(repo, DIR, 'prochain-match'), { recursive: true });
+      writeFileSync(join(repo, fiche), readFileSync(EXEMPLE, 'utf8'));
+      commitPaths(repo, 'docs(L9): fiche v1', fiche);
+      changeFiche(repo, fiche);
+      commitPaths(repo, 'docs(L9): fiche v2', fiche);
+      const avantRouge = sha(repo);
+      const a = ecritAcceptation(repo, { sansFiche: true });
+      setVert(repo, a.json);
+      commitPaths(repo, 'chore(L1): vert', a.json);
+      const head = sha(repo);
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotCommits: [avantRouge, sha(repo)] }).join('\n')).toContain(a.test);
+    });
+
+    it("R10 — commit égal au commit rouge qui cite le lot en cours et touche la fiche : l'exception ne s'ouvre pas", () => {
+      const repo = gitRepo();
+      const a = ecritAcceptation(repo); // le commit rouge pose aussi la fiche
+      setVert(repo, a.json);
+      commitPaths(repo, 'chore(L1): vert', a.json);
+      const head = sha(repo);
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotCommits: [a.sha, sha(repo)] }).join('\n')).toContain(a.test);
+    });
+
+    it("R10 — commit de fiche postérieur au rouge qui cite le lot en cours, absent de lotBase..HEAD (posé avant la vague) : l'exception s'ouvre", () => {
+      const { repo, a } = livre();
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'docs(L9): fiche posée par le lead', a.fiche);
+      const fiche = sha(repo);
+      const avantVague = sha(repo); // lotBase = headBefore : le commit de fiche le précède
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      expect(lockViolations(repo, DIR, avantVague, { lot: 'L9', lotBase: avantVague, lotCommits: [fiche, sha(repo)] })).toEqual([]);
+    });
+
+    it('R10 — test scellé modifié par un commit ultérieur à celui de la fiche (session fix après implement) : modification admise', () => {
+      const { repo, a, head } = livre();
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L9): fiche', a.fiche);
+      const fiche = sha(repo);
+      writeFileSync(join(repo, 'x.txt'), '1\n');
+      commitPaths(repo, 'feat(L9): code', 'x.txt');
+      const apresImplement = sha(repo);
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'fix(L9): tests adaptés', a.test);
+      expect(lockViolations(repo, DIR, apresImplement, { lot: 'L9', lotBase: head, lotCommits: [fiche, apresImplement, sha(repo)] })).toEqual([]);
+    });
+
+    it("R11 — depuis=ref ne rouvre pas l'exception : après une évolution admise, un test modifié par un commit du lot en cours, sans commit de fiche qui le cite, reste un écart", () => {
+      const { repo, a } = livre();
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L8): R7 révisée', a.test, a.fiche);
+      const avant = sha(repo); // la fiche a évolué entre le rouge et lotBase : depuis=ref
+      writeFileSync(join(repo, a.test), "it('triche', () => {});\n");
+      commitPaths(repo, 'feat(L9): triche', a.test);
+      expect(lockViolations(repo, DIR, avant, { lot: 'L9', lotBase: avant, lotCommits: [sha(repo)] }).join('\n')).toContain(a.test);
+    });
+
+    it("R11 — depuis=ref : un test modifié dans l'arbre de travail après lotBase reste un écart", () => {
+      const { repo, a } = livre();
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'feat(L8): R7 révisée', a.test, a.fiche);
+      const avant = sha(repo);
+      writeFileSync(join(repo, a.test), "it('non commité', () => {});\n");
+      expect(lockViolations(repo, DIR, avant, { lot: 'L9', lotBase: avant, lotCommits: [] }).join('\n')).toContain(a.test);
+    });
+
+    describe('R3 — le message nomme le premier commit fautif', () => {
+      const court = (repo: string, ref = 'HEAD') => git(repo, 'rev-parse', '--short=7', ref);
+
+      it('R3 — deux commits touchent le test scellé : le message nomme le plus ancien (sha court et sujet)', () => {
+        const { repo, a, head } = livre();
+        writeFileSync(join(repo, a.test), "it('un', () => {});\n");
+        commitPaths(repo, 'feat(L9): premier', a.test);
+        const premier = court(repo);
+        writeFileSync(join(repo, a.test), "it('deux', () => {});\n");
+        commitPaths(repo, 'feat(L9): second', a.test);
+        const out = lockViolations(repo, DIR, head).join('\n');
+        expect(out).toContain(`premier commit fautif : ${premier} feat(L9): premier`);
+        expect(out).not.toContain('feat(L9): second');
+      });
+
+      it('R3 — modification non commitée : message du verrou sans nom de commit', () => {
+        const { repo, a, head } = livre();
+        writeFileSync(join(repo, a.test), "it('un', () => {});\n");
+        const out = lockViolations(repo, DIR, head);
+        expect(out.join('\n')).toContain(a.test);
+        expect(out.join('\n')).not.toContain('premier commit fautif');
+      });
+
+      it('R3 — deux tests scellés modifiés par deux commits : chaque ligne nomme son propre premier commit', () => {
+        const repo = gitRepo();
+        const a = ecritAcceptation(repo, { sansFiche: true, extra: ['test/autre.acceptation.test.ts'] });
+        setVert(repo, a.json);
+        commitPaths(repo, 'chore(L1): vert', a.json);
+        const head = sha(repo);
+        writeFileSync(join(repo, a.test), "it('un', () => {});\n");
+        commitPaths(repo, 'feat(L9): touche le premier test', a.test);
+        const c1 = court(repo);
+        writeFileSync(join(repo, 'test/autre.acceptation.test.ts'), '// autre\n');
+        commitPaths(repo, 'feat(L9): touche le second test', 'test/autre.acceptation.test.ts');
+        const c2 = court(repo);
+        const out = lockViolations(repo, DIR, head);
+        expect(out.find((l) => l.startsWith(`${a.test} :`))).toContain(`premier commit fautif : ${c1} feat(L9): touche le premier test`);
+        expect(out.find((l) => l.startsWith('test/autre.acceptation.test.ts :'))).toContain(`premier commit fautif : ${c2} feat(L9): touche le second test`);
+      });
+
+      it('R3 — test scellé supprimé par un commit : le message nomme ce commit', () => {
+        const { repo, a, head } = livre();
+        git(repo, 'rm', '-q', '--', a.test);
+        git(repo, 'commit', '-q', '-m', 'feat(L9): supprime le test', '--', a.test);
+        expect(lockViolations(repo, DIR, head).join('\n')).toContain(`premier commit fautif : ${court(repo)} feat(L9): supprime le test`);
+      });
+
+      it('R3 — test scellé renommé par un commit : le message nomme le commit du renommage', () => {
+        const { repo, a, head } = livre();
+        git(repo, 'mv', a.test, 'test/renomme.acceptation.test.ts');
+        git(repo, 'commit', '-q', '-m', 'feat(L9): renomme le test', '--', a.test, 'test/renomme.acceptation.test.ts');
+        expect(lockViolations(repo, DIR, head).join('\n')).toContain(`premier commit fautif : ${court(repo)} feat(L9): renomme le test`);
+      });
+
+      it('R3 — test scellé supprimé dans l\'arbre de travail, sans commit : message sans nom de commit', () => {
+        const { repo, a, head } = livre();
+        rmSync(join(repo, a.test));
+        const out = lockViolations(repo, DIR, head).join('\n');
+        expect(out).toContain(a.test);
+        expect(out).not.toContain('premier commit fautif');
+      });
+
+      it('R4 — test revenu à son contenu d\'avant le lot : aucun écart, aucun nom de commit', () => {
+        const { repo, a, head } = livre();
+        writeFileSync(join(repo, a.test), "it('ajout', () => {});\n");
+        commitPaths(repo, 'feat(L9): ajout', a.test);
+        const premier = sha(repo);
+        git(repo, 'checkout', '-q', head, '--', a.test);
+        commitPaths(repo, 'fix(L9): retire son ajout', a.test);
+        const out = lockViolations(repo, DIR, premier, { lot: 'L9', lotBase: premier, lotStart: head });
+        expect(out).toEqual([]);
+      });
     });
 
     it('vert: false : verrou entier, même si la fiche change', () => {

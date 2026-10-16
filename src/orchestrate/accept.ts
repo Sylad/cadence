@@ -251,14 +251,22 @@ export function lotStartHead(repo: string, work: string[]): string | undefined {
   return git(repo, 'rev-parse', `${oldest.sha}^`).trim();
 }
 
-/** La fiche a changé depuis `since` (commits et arbre de travail), ou dans l'un des commits `cites` (ceux qui citent le lot). Illisible pour git : non (le verrou reste entier). */
-function ficheChanged(repo: string, since: string, fiche: string, cites: string[] = []): boolean {
+/**
+ * La fiche a été amendée par l'un des commits `cites` (ceux qui citent le lot en cours) postérieur au commit rouge `red` (descendant strict) : seule voie d'ouverture de
+ * l'exception L183 (L231). Un diff d'arbre de travail, un commit d'un autre lot ou un commit antérieur ou égal au rouge n'ouvre rien. Illisible pour git : non (le verrou reste entier).
+ */
+function ficheAmended(repo: string, red: string, fiche: string, cites: string[] = []): boolean {
+  return cites.some((sha) => sha !== red && gitOk(repo, 'merge-base', '--is-ancestor', red, sha) && gitOk(repo, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha, '--', fiche) && git(repo, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha, '--', fiche).trim() !== '');
+}
+
+/** Le premier commit fautif (L231) : le plus ancien commit après `since` qui a touché le chemin `file` (modification, suppression ou renommage, sans suivre les renommages), « <sha7> <sujet> » ; vide si aucun commit ne l'a touché (écart de l'arbre de travail). */
+function firstCommitTouching(repo: string, since: string, file: string): string {
   try {
-    if (git(repo, 'diff', '--name-only', since, '--', fiche).trim() !== '') return true;
+    const first = git(repo, 'log', '--reverse', '--format=%H %s', `${since}..HEAD`, '--', file).split('\n').find(Boolean);
+    return first ? `${first.slice(0, 7)}${first.slice(40)}` : '';
   } catch {
-    return false;
+    return '';
   }
-  return cites.some((sha) => gitOk(repo, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha, '--', fiche) && git(repo, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', sha, '--', fiche).trim() !== '');
 }
 
 /**
@@ -268,9 +276,10 @@ function ficheChanged(repo: string, since: string, fiche: string, cites: string[
  * Un fichier neuf est un écart, sauf `skip` : le fichier du lot que l'étape accept est en train d'écrire, pas encore scellé (les autres lots restent
  * verrouillés, y compris contre un fichier d'un autre lot créé au passage). `rouge` : le commit rouge rangé dans l'état du cycle pour un fichier ; si
  * le dernier commit qui l'a réécrit n'est plus celui-là, une session précédente (interrompue, donc jamais comparée) l'a réécrit.
- * Exception (L183) : une acceptation à `vert: true` (lot livré) laisse modifier ses tests listés si la fiche de l'écran a changé depuis `lotBase` (la
- * tête d'avant le premier travail du lot, par défaut `headBefore`), arbre de travail compris, ou dans un commit de `lotCommits` (ceux qui citent le lot,
- * posés avant la vague) : la fiche fait évoluer les règles. L'acceptation du lot en cours garde le verrou entier de l'exception L183.
+ * Exception (L183, resserrée par L231) : une acceptation à `vert: true` (lot livré) laisse modifier ses tests listés si sa fiche a été amendée par un commit de `lotCommits`
+ * (ceux qui citent le lot en cours) postérieur à son commit rouge (descendant strict) : le lot en cours fait évoluer les règles. Une fois ouverte, l'exception couvre toute
+ * l'acceptation (même commit que la fiche, commit ultérieur, session suivante). Un amendement par un autre lot, ou non commité (arbre de travail), n'ouvre rien. L'acceptation
+ * du lot en cours garde le verrou entier. Le message d'un test modifié nomme le premier commit fautif (`firstCommitTouching`), absent quand aucun commit ne l'a touché.
  * Une fois livrée, une acceptation n'est plus comparée à son commit rouge (une évolution admise l'a dépassé et rien ne le rescelle) mais à `lotBase` :
  * un test changé avant ce point l'a été par un lot qui avait la fiche pour lui, et ses empreintes scellées ne valent plus.
  * Une seule exemption en plus (L184) : un fichier listé dont le contenu est identique à celui qu'il avait à `lotStart` (la tête d'avant le premier commit de
@@ -311,7 +320,7 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
     if (cur.vert === true && typeof base.fiche === 'string' && base.lot !== opts.lot) {
       // L'acceptation du lot en cours (vert posé dès l'implement) garde le verrou entier : l'exception ne vaut que pour un lot suivant.
       const ref = opts.lotBase ?? headBefore;
-      if (ficheChanged(repo, ref, base.fiche, opts.lotCommits)) continue;
+      if (ficheAmended(repo, red, base.fiche, opts.lotCommits)) continue;
       // La référence ne quitte le commit rouge que si la fiche a évolué entre le rouge et `ref` : sinon tout test changé depuis le rouge reste un écart.
       if (gitOk(repo, 'diff', '--name-only', red, ref, '--', base.fiche) && git(repo, 'diff', '--name-only', red, ref, '--', base.fiche).trim() !== '') {
         depuis = ref;
@@ -341,7 +350,10 @@ export function lockViolations(repo: string, dir: string, headBefore: string, op
       const have = existsSync(join(repo, norm)) ? git(repo, 'hash-object', '--', norm).trim() : null;
       if (have !== want) out.push(`${f} : empreinte différente de celle du scellé de ${p} (test d'acceptation de ${lot})`);
     }
-    for (const f of changed) out.push(`${f} : test d'acceptation de ${lot} : empreinte modifiée depuis ${depuis === red ? 'le commit rouge' : 'la tête d\'avant le lot'} ${depuis.slice(0, 7)} (verrou ${p})`);
+    for (const f of changed) {
+      const culprit = firstCommitTouching(repo, depuis, f);
+      out.push(`${f} : test d'acceptation de ${lot} : empreinte modifiée depuis ${depuis === red ? 'le commit rouge' : 'la tête d\'avant le lot'} ${depuis.slice(0, 7)} (verrou ${p})${culprit ? ` ; premier commit fautif : ${culprit}` : ''}`);
+    }
   }
   return out;
 }

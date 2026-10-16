@@ -435,10 +435,10 @@ describe("acceptation d'un lot livré : la fiche évolue dans un lot suivant (L1
     expect(c2.lot.status).toBe('ready');
   });
 
-  it("la fiche changée par l'implement et les tests adaptés par le fix du même lot : la tête d'avant le lot (pas celle du fix) fait foi", async () => {
+  it("R8 — cycle : la fiche changée par l'implement et les tests adaptés par le fix du même lot : admis (le commit de fiche cite le lot)", async () => {
     const fiche: Handler = (call) => {
-      touch(call.opts.cwd, FICHE, '# R7 révisée\n', 'feat: fiche R7');
-      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'feat: fiche R7' }] }));
+      touch(call.opts.cwd, FICHE, '# R7 révisée\n', 'feat(L2): fiche R7');
+      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'feat(L2): fiche R7' }] }));
     };
     const tests: Handler = (call) => {
       touch(call.opts.cwd, TEST, '// R7 nouvelle\n', 'fix(L2): tests R7');
@@ -452,7 +452,7 @@ describe("acceptation d'un lot livré : la fiche évolue dans un lot suivant (L1
     expect(c2.lot.status).toBe('ready');
   });
 
-  it("une fiche posée et commitée par le lead AVANT la vague (commit qui cite le lot) admet l'implement qui adapte les tests", async () => {
+  it("R8 — cycle : fiche posée par le lead avant la vague dans un commit qui cite le lot : implement admis, comme avant", async () => {
     const adapte: Handler = (call) => {
       touch(call.opts.cwd, TEST, '// R7 nouvelle\n', 'feat(L2): tests R7');
       return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'feat(L2): tests R7' }] }));
@@ -491,5 +491,68 @@ describe("acceptation d'un lot livré : la fiche évolue dans un lot suivant (L1
     await runLot(vague2);
     expect(vague2.lot.outcome ?? '').not.toMatch(/verrou/);
     expect(vague2.lot.status).toBe('ready');
+  });
+});
+
+describe("verrou des tests scellés d'un autre lot : rendu avant la revue, premier commit fautif nommé (L231)", () => {
+  const TEST = 'test/prochain-match.acceptation.test.ts';
+  const lotsDeux = [{ title: 'Un écran', screen: 'page' as const }, { title: 'Suite' }];
+  /** Une session de L2 qui réécrit le test scellé de L1 dans un commit ; `questions` pour qu'elle pose une question après. */
+  const modifie = (sujet: string, questions: string[] = []): Handler => (call) => {
+    writeFileSync(join(call.opts.cwd, TEST), "it('R1', () => {});\n");
+    git(call.opts.cwd, 'add', '--', TEST);
+    git(call.opts.cwd, 'commit', '-q', '-m', sujet, '--', TEST);
+    return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet }], questions }));
+  };
+  const major: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 1, texte: 'bug nommé' }], verdict: 'non conforme' }));
+  const court = (repo: string) => git(repo, 'rev-parse', '--short=7', 'HEAD');
+
+  it("R2 — fix qui modifie le test scellé d'un lot livré : lot rendu, aucune revue lancée", async () => {
+    const h = prepared({ accept: [accept()], implement: [green, notGreen], review: [ok, major], fix: [modifie('fix(L2): au passage')] }, lotsDeux);
+    await runLot(h.lot('L1', screen, config));
+    const c2 = h.lot('L2', {}, config);
+    await runLot(c2);
+    expect(kinds(h)).toEqual(['accept', 'implement', 'review', 'implement', 'review', 'fix']);
+    expect(c2.lot.status).toBe('handed-back');
+    expect(c2.lot.outcome).toMatch(/verrou des tests d'acceptation.*prochain-match\.acceptation\.test\.ts/);
+  });
+
+  it('R2 — implement qui modifie le test scellé d\'un lot non livré (vert false) : lot rendu, aucune revue lancée', async () => {
+    const h = prepared({ implement: [modifie('feat(L2): au passage')] }, lotsDeux);
+    ecritAcceptation(h.repo, { lot: 'L1', sansFiche: true });
+    const c2 = h.lot('L2', {}, config);
+    await runLot(c2);
+    expect(kinds(h)).toEqual(['implement']);
+    expect(c2.lot.status).toBe('handed-back');
+    expect(c2.lot.outcome).toMatch(/verrou des tests d'acceptation/);
+  });
+
+  it('R5 — session qui modifie un test d\'un autre lot puis pose une question : lot rendu avec le verrou, pas mis en question', async () => {
+    const h = prepared({ implement: [modifie('feat(L2): au passage', ['le test de L1 est-il faux ?'])] }, lotsDeux);
+    ecritAcceptation(h.repo, { lot: 'L1', sansFiche: true });
+    const c2 = h.lot('L2', {}, config);
+    await runLot(c2);
+    expect(c2.lot.status).toBe('handed-back');
+    expect(c2.lot.outcome).toMatch(/verrou des tests d'acceptation/);
+    expect(kinds(h)).toEqual(['implement']);
+  });
+
+  it('R9 — session implement qui modifie un test scellé d\'un lot livré puis rend son rapport : lot rendu à la fin de cette session, avant toute revue', async () => {
+    const h = prepared({ accept: [accept()], implement: [green, modifie('feat(L2): au passage')], review: [ok] }, lotsDeux);
+    await runLot(h.lot('L1', screen, config));
+    const c2 = h.lot('L2', {}, config);
+    await runLot(c2);
+    expect(kinds(h)).toEqual(['accept', 'implement', 'review', 'implement']);
+    expect(c2.lot.status).toBe('handed-back');
+    expect(c2.lot.outcome).toContain(`premier commit fautif : ${court(h.repo)} feat(L2): au passage`);
+  });
+
+  it('R9 — session fix : même contrôle, message avec le premier commit fautif', async () => {
+    const h = prepared({ accept: [accept()], implement: [green, notGreen], review: [ok, major], fix: [modifie('fix(L2): au passage')] }, lotsDeux);
+    await runLot(h.lot('L1', screen, config));
+    const c2 = h.lot('L2', {}, config);
+    await runLot(c2);
+    expect(c2.lot.status).toBe('handed-back');
+    expect(c2.lot.outcome).toContain(`premier commit fautif : ${court(h.repo)} fix(L2): au passage`);
   });
 });

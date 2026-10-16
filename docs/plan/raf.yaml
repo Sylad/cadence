@@ -2644,9 +2644,10 @@ lots:
     finished: 2026-10-16
   - id: L232
     title: "README de cadence illisible pour un humain (remarque de Sylvain 16-10) : 202 ko dans le paquet npm, « What's new » en pavés ; le README devient une page d'accueil courte et visuelle — ce que fait l'outil en 5 lignes, un schéma du cycle d'une vague (spec → maquette → accept → implement → review → ux → deliver) et du rôle du lead, les trois commandes de départ, un sommaire vers des pages docs/ (raf, orchestrate, deliver, spec, lead, stabilité) où part le contenu actuel sans rien perdre ; « What's new » = deux lignes par version avec renvoi au CHANGELOG ; sections longues repliables ; mesure : taille du README avant/après, aucun lien cassé (contrôle dans la CI tests.yml)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-16
+    started: 2026-10-16
   - id: L233
     title: "orchestrate rejoue l'étape accept d'un lot déjà vert (vert: true) après un cadence spec reseal et exige des tests rouges (« des tests verts avant le code ne prouvent rien ») : ol-companion L161, vague 2026-10-16-1415, lot codé (27cef0d → 977a6f1), revue en cours ; la session accept a réécrit acceptation-L161.json (vert: false, resceaux effacés, fichier e2e + playwright.config ajoutés) malgré la réponse du lead « ne réécris ni l'acceptation ni la fiche », commit 4f3d6d7 annulé par reset ; attendu : un lot vert: true part à implement ou review, jamais à accept ; une session accept ne touche jamais resceaux ni vert sur un lot vert ; le brief accept refuse de réécrire un oracle vert et rend la main"
     status: doing

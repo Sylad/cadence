@@ -37,9 +37,10 @@ describe('skill lead — l\'en-tête perf (L227)', () => {
 
 describe('documentation — livraisons rouges et en-tête perf (L227)', () => {
   it('R12 — CHANGELOG.md contient une entrée citant L227', () => {
-    const unreleased = read('CHANGELOG.md').split(/^## \[/m).find((s) => s.startsWith('Unreleased]'))!;
-    expect(unreleased).toMatch(/\(L227[,)]/);
-    expect(unreleased.indexOf("(L227")).toBeLessThan(unreleased.indexOf('(L225'));
+    // first section of the changelog: [Unreleased], or the version a release has just renamed it to
+    const first = read('CHANGELOG.md').split(/^## \[/m)[1];
+    expect(first).toMatch(/\(L227[,)]/);
+    expect(first.indexOf("(L227")).toBeLessThan(first.indexOf('(L225'));
   });
 
   it('R12 — le README cite les livraisons rouges et l\'en-tête perf du tour', () => {

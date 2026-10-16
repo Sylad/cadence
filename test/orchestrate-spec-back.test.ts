@@ -573,6 +573,18 @@ describe('étape spec back : reprise d\'un lot dont la fiche est déjà commité
     expect(kinds(h)).toEqual(['implement', 'review']);
   });
 
+  it('L233 — une acceptation verte et scellée dont le scellé ne tient plus (le test ne porte plus le nom prévu par la fiche) prouve encore la revue : pas de revue de fiche', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecritBack(h.repo);
+    const a = ecritAcceptation(h.repo, { sansFiche: true, ecran: 'cache-de-secours-365scores', exemple: EXEMPLE_BACK, tests: "it('autre', () => { throw new Error('rouge'); });" });
+    sealAcceptation(h.repo, a.json);
+    commite(h.repo, a.json, 'test(L1): acceptation scellée');
+    setVert(h.repo, a.json);
+    commite(h.repo, a.json, 'chore(L1): acceptation verte');
+    await runLot(h.lot('L1', back, { ...config, accept: 'true', test: 'true' }));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
   it('une acceptation non scellée ne prouve rien : la fiche est relue', async () => {
     const h = harness({ lots, script: { fiche: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
     ecritBack(h.repo);

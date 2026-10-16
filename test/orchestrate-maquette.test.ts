@@ -100,6 +100,18 @@ describe('revue de la maquette : où elle s’insère', () => {
     expect(kinds(h)).toEqual(['implement', 'review']);
   });
 
+  it('L233 — une acceptation verte et scellée dont le scellé ne tient plus (le test ne porte plus le nom prévu par la fiche) prouve encore la revue : ni maquette ni accept', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecrit(h.repo);
+    const a = ecritAcceptation(h.repo, { sansFiche: true, tests: "it('autre', () => { throw new Error('rouge'); });" });
+    sealAcceptation(h.repo, a.json);
+    commite(h.repo, a.json, 'test(L1): acceptation scellée');
+    setVert(h.repo, a.json);
+    commite(h.repo, a.json, 'chore(L1): acceptation verte');
+    await runLot(h.lot('L1', screen, { ...config, accept: 'true', test: 'true' }));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
   it('une acceptation aux empreintes vides ou fausses ne prouve rien : la maquette est relue', async () => {
     const h = harness({ lots, script: { maquette: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
     ecrit(h.repo);

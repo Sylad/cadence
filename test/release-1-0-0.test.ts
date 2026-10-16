@@ -36,4 +36,11 @@ describe('release 1.0.0 (L164)', () => {
       'cadence-hud', '.cadence/runs', 'schema version', 'precheck-reader', 'unknown fields']) expect(section).toContain(word)
     expect(section).toMatch(/not guaranteed/i)
   })
+
+  it('la page Stability renvoie aux pages docs/ qui documentent les options, pas au README', () => {
+    const stab = read('docs/stabilite.md')
+    expect(stab).not.toMatch(/this README documents/)
+    expect(stab).toMatch(/their options and exit codes as (the|these) .*pages? .*documents?/i)
+    for (const page of ['raf', 'orchestrate', 'deliver', 'spec']) expect(stab).toContain(`${page}.md`)
+  })
 })

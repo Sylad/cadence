@@ -763,13 +763,13 @@ describe('cadence perf — sortie, erreurs, lecture seule', () => {
     expect((await cad(c.root)).text).not.toMatch(/commit|lignes? de code|total/i);
   });
 
-  it('R20 — --json imprime un seul objet JSON parsable avec les clés windows, throughput, corrections, interventions, warnings', async () => {
+  it('R20 — --json imprime un seul objet JSON parsable avec les clés windows, throughput, corrections, interventions, quality, warnings', async () => {
     const c = ctx();
     journal(c, CUR);
     const r = await cad(c.root, '--json');
     expect(r.out).toHaveLength(1);
     const data = JSON.parse(r.out[0]!);
-    expect(Object.keys(data)).toEqual(['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'tokens', 'delays', 'durations', 'cost', 'orphans', 'warnings']);
+    expect(Object.keys(data)).toEqual(['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'tokens', 'delays', 'durations', 'cost', 'quality', 'orphans', 'warnings']);
     expect(data.today).toBe(TODAY);
   });
 

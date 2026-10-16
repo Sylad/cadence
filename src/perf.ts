@@ -5,7 +5,7 @@ import { addDays, diffDays, isDay, toDay, type Day } from './dates.js';
 import { gitCommonDir } from './git.js';
 import { findProjects } from './lead.js';
 import type { Lot } from './plan.js';
-import { readDeliveries } from './state.js';
+import { readDeliveries, readFailedDeliveries } from './state.js';
 
 /** Le lot d'un plan tel que `cadence perf` le lit. */
 export type PlanLot = Pick<Lot, 'id' | 'status' | 'created' | 'finished' | 'estimate' | 'notes'>;
@@ -111,6 +111,8 @@ export interface PerfResult {
   /** Médiane de la durée de mur en minutes, par sorte d'étape ; `lots` = étapes. */
   durations: Record<string, Indicator>;
   cost: CostBlock;
+  /** La qualité de livraison (L227) : livraisons rouges (jumeau de « livrés ») et constats QA bloquants (jumeau des défauts échappés). */
+  quality: { redDeliveries: Indicator; qaBlocking: Indicator };
   /** Lots de journal rendus dans les deux fenêtres qui n'ont pas de lot dans les plans du dossier (R15). */
   orphans: number;
   warnings: string[];
@@ -123,6 +125,8 @@ export interface PerfInput {
   cache: Map<string, Classification>;
   /** Jours de deliveries.log par projet ; un projet absent (pas un dépôt git, pas de journal de livraison) donne un délai de livraison n/d (R5). */
   deliveries?: Map<string, Day[]>;
+  /** Jours de deliveries-failed.log par projet (L227) ; un projet absent compte 0 livraison rouge. */
+  failedDeliveries?: Map<string, Day[]>;
   /** La grille de prix de cadence.yaml ; absente : coût n/d (R7). */
   prices?: PriceGrid | null;
   windows: Windows;
@@ -189,6 +193,13 @@ export function isQaDefectNote(text: string): boolean {
   return body.startsWith('QA') && QA_DEFECT.test(body);
 }
 
+const QA_BLOCKING = /(?<!\b0\s)(?<!\baucun\s)\bbloquant/i;
+/** Une note « QA … bloquant » (L227) : commence par QA et contient bloquant non précédé de « 0 » ou « aucun » ; « majeur » seul ne compte pas. */
+export function isQaBlockingNote(text: string): boolean {
+  const body = text.replace(NOTE_PREFIX, '');
+  return body.startsWith('QA') && QA_BLOCKING.test(body);
+}
+
 type Direction = 'down' | 'up';
 
 /** Les décisions que chaque indicateur éclaire (commentaire de la fiche), dites au bout d'une ligne ⚠. */
@@ -207,6 +218,8 @@ const DECISIONS = {
   createdToDone: 'la file de lots s\'allonge : chercher le goulot de priorisation avant d\'ajouter des lots',
   doneToDelivered: 'on livre trop rarement : livrer par lots plus petits',
   cost: 'le modèle ou l\'effort d\'une étape est-il juste ? changer le modèle de cette étape',
+  redDeliveries: 'la livraison casse : corriger CI, déploiement ou vérification avant d\'ajouter des lots',
+  qaBlocking: 'la revue laisse passer des défauts graves : durcir la revue avant de livrer davantage',
   duration: 'cette étape est lente : revoir ses timeouts, son effort ou son modèle',
 } as const;
 export type DecisionKey = keyof typeof DECISIONS;
@@ -455,7 +468,21 @@ export function computePerf(input: PerfInput): PerfResult {
     withoutPrice,
     withoutJournal: { current: costs.current.withoutJournal, previous: costs.previous.withoutJournal },
   };
-  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, tokens, delays, durations, cost, orphans, warnings: [] };
+
+  // Qualité de livraison (L227) : livraisons rouges (l'échantillon est celui des livraisons, vertes + rouges) et notes QA bloquantes
+  const daysIn = (byProject: Map<string, Day[]> | undefined, w: Window) => [...(byProject?.values() ?? [])].flat().filter((d) => inWindow(d, w)).length;
+  const reds = both(windows, (w) => daysIn(input.failedDeliveries, w));
+  const deliveriesOf = both(windows, (w) => daysIn(input.deliveries, w) + daysIn(input.failedDeliveries, w));
+  const blockingRecognised = [...plans.values()].some((lots) => lots.some((l) => l.notes.some((n) => isQaBlockingNote(n.text))));
+  const blockingOf = (w: Window): number | null => {
+    if (!blockingRecognised || w.days === 0) return null;
+    return [...plans.values()].flat().filter((l) => l.status === 'done' && l.finished !== undefined).reduce((sum, l) => sum + l.notes.filter((n) => isDay(n.date) && inWindow(n.date, w) && l.finished! <= n.date && isQaBlockingNote(n.text)).length, 0);
+  };
+  const quality = {
+    redDeliveries: mk(reds, deliveriesOf, 'up', 'throughput.delivered'),
+    qaBlocking: mk(both(windows, blockingOf), both(windows, deliveredCount), 'up', twinEscaped, escapedNote),
+  };
+  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, tokens, delays, durations, cost, quality, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
   for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${DECISIONS[key.decision]}`);
   if (bottleneck) result.warnings.push(bottleneck);
@@ -479,8 +506,8 @@ const LABELS: Record<Cause, string> = {
   'faux-constat': 'faux constat de revue',
 };
 
-/** Les dix premières lignes de `indicatorLines` sont celles de L225. */
-const LEGACY_LINES = 10;
+/** Les douze premières lignes de `indicatorLines` sont celles de L225 et les deux de qualité de livraison de L227 ; les suivantes sont celles de L226. */
+const LEGACY_LINES = 12;
 
 type Kind = 'count' | 'rate' | 'share' | 'num' | 'tokens' | 'days' | 'min' | 'eur';
 interface Line {
@@ -510,6 +537,8 @@ function indicatorLines(r: PerfResult): [Line, Indicator][] {
     [{ label: 'sessions ux par lot visible', kind: 'num', decision: 'ux' }, r.interventions.ux],
     [{ label: 'part conforme du premier coup', kind: 'share', decision: 'firstTime' }, r.corrections.firstTime],
     [{ label: 'défauts échappés', kind: 'count', decision: 'escaped' }, r.throughput.escaped],
+    [{ label: 'livraisons rouges', kind: 'count', decision: 'redDeliveries' }, r.quality.redDeliveries],
+    [{ label: 'constats QA bloquants', kind: 'count', decision: 'qaBlocking' }, r.quality.qaBlocking],
     ...speed,
   ];
 }
@@ -539,15 +568,23 @@ export function renderPerf(r: PerfResult): string[] {
     ['throughput.escaped', lines.find(([l]) => l.label === 'défauts échappés')!],
     ['corrections.firstTime', lines.find(([l]) => l.label === 'part conforme du premier coup')!],
   ]);
+  // Second jumeau d'affichage (L227) : la ligne « livrés » dit aussi les livraisons rouges, celle des défauts échappés les constats QA bloquants.
+  const quality = new Map<string, [Line, Indicator]>([
+    ['livrés', lines.find(([l]) => l.label === 'livraisons rouges')!],
+    ['défauts échappés', lines.find(([l]) => l.label === 'constats QA bloquants')!],
+  ]);
   const w = r.windows;
   const win = (x: Window) => `${x.from} → ${x.to} (${x.days} j${x.truncated ? ', tronquée par --since' : ''})`;
   const out = [`cadence perf · aujourd'hui ${r.today}${r.since ? ` · depuis ${r.since}` : ''}`, `fenêtre courante : ${win(w.current)}`, `fenêtre précédente : ${win(w.previous)}`];
   const row = ([line, ind]: [Line, Indicator]): string => {
     const twin = ind.twin ? byPath.get(ind.twin)! : null;
-    const parts = [`${ind.warn ? '⚠' : ' '} ${line.label} : ${describe(ind, line.kind)}`];
+    const extra = quality.get(line.label);
+    const parts = [`${ind.warn || extra?.[1].warn ? '⚠' : ' '} ${line.label} : ${describe(ind, line.kind)}`];
     if (twin) parts.push(`${twin[0].label} : ${describe(twin[1], twin[0].kind)}${twin[1].note && twin[1].current === null ? ` — ${twin[1].note}` : ''}`);
+    if (extra) parts.push(`${extra[0].label} : ${describe(extra[1], extra[0].kind)}${extra[1].note ? ` — ${extra[1].note}` : ''}`);
     if (ind.note) parts.push(ind.note);
     if (ind.warn) parts.push(`→ ${DECISIONS[line.decision]}`);
+    if (extra?.[1].warn) parts.push(`→ ${DECISIONS[extra[0].decision]}`);
     return parts.join(' · ');
   };
   const section = (title: string, labels: string[]) => {
@@ -597,4 +634,17 @@ export function readProjectDeliveries(parent: string, projects: string[]): Map<s
     }
   }
   return deliveries;
+}
+
+/** Les jours de livraison rouge de chaque projet du dossier, lus dans `<gitCommonDir>/cadence/deliveries-failed.log` (L227). Un projet sans journal compte 0 rouge ; un projet qui n'est pas un dépôt git est absent de la carte ; rien n'est créé. */
+export function readProjectFailedDeliveries(parent: string, projects: string[]): Map<string, Day[]> {
+  const failed = new Map<string, Day[]>();
+  for (const name of projects) {
+    try {
+      failed.set(name, readFailedDeliveries(join(gitCommonDir(join(parent, name)), 'cadence')));
+    } catch {
+      // pas un dépôt git : aucune livraison rouge pour ce projet
+    }
+  }
+  return failed;
 }

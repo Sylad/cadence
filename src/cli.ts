@@ -23,7 +23,7 @@ import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './or
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
-import { computePerf, perfWindows, readPlans, readProjectDeliveries, renderPerf } from './perf.js';
+import { computePerf, perfWindows, readPlans, readProjectDeliveries, readProjectFailedDeliveries, renderPerf } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
@@ -906,7 +906,7 @@ function perf(rest: string[], values: { since?: string; json?: boolean }, today:
     const plans = readPlans(parent, (l) => warnings.push(l));
     if (plans.size === 0 && warnings.length === 0) warnings.push(`perf : aucun plan sous ${parent}, indicateurs du plan n/d`);
     const deliveries = readProjectDeliveries(parent, [...plans.keys()]);
-    const result = computePerf({ journals, plans, cache, deliveries, prices, windows: perfWindows(today, values.since), today, since: values.since });
+    const result = computePerf({ journals, plans, cache, deliveries, failedDeliveries: readProjectFailedDeliveries(parent, [...plans.keys()]), prices, windows: perfWindows(today, values.since), today, since: values.since });
     if (!prices) warnings.push('perf : aucune grille de prix (cadence.yaml perf.prices), coût en euros n/d');
     for (const [model, lots] of Object.entries(result.cost.withoutPrice)) warnings.push(`perf : modèle sans prix dans perf.prices : ${model}, coût n/d pour ${lots} lot(s)`);
     for (const w of warnings) io.err(w);

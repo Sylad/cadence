@@ -2181,6 +2181,7 @@ lots:
     notes:
       - { date: 2026-10-13, text: "13-10 : condition non remplie — 0 lot spec: true et 0 fiche back (bloc sujet) dans les projets ; ne pas tirer avant 8 lots back faits avec fiche." }
       - { date: 2026-10-15, text: "15-10 : vague 2026-10-15-1330 rendue, condition toujours non remplie — 2 lots back faits avec fiche (L217, L218) sur 8 ; remis en todo par le lead, ne pas tirer avant 8 (L209 vise aussi 8 lots screen: page)" }
+      - { date: 2026-10-16, text: "décision Sylvain 16-10 23 h : reco du lead suivie — l'étape spec back n'est pas généralisée, spec: true reste au choix du lead pour les lots qui changent un contrat (API, données) ; le seuil « tout lot qui change un comportement » n'est pas adopté ; pas de lot d'amélioration sur le premier relevé cadence perf (une seule fenêtre)" }
     started: 2026-10-16
     review: { date: 2026-10-16, verdict: "conforme (1 note mineure : l'assertion /40 %/ du test de la note de mesure est vraie dès qu'il y a le seuil « ≤ 40 % » et ne peut pas échouer) — orchestré (vague 2026-10-16-2115, 0 passe(s) de correction + passe des mineurs)", commit: ee70ff928eff290bb943200b7ba77268c648e582 }
     finished: 2026-10-16

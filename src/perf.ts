@@ -206,15 +206,19 @@ function causeWindow(passes: { pass: JournalPass; day: Day }[], w: Window, cache
 export function computePerf(input: PerfInput): PerfResult {
   const { plans, cache, windows, today } = input;
   const hasPlans = plans.size > 0;
-  const all = input.journals.filter((j) => j.waveReadable).map(dated).filter((d): d is Dated => d !== null);
+  // --since (R3) : une vague créée avant ce jour n'est pas lue, même si ses lots finissent après.
+  const sinceDay = input.since === undefined ? undefined : isDay(input.since) ? input.since : toDay(new Date(input.since));
+  const readable = (j: Journal) => j.waveReadable && (sinceDay === undefined || (j.waveCreated !== undefined && toDay(new Date(j.waveCreated)) >= sinceDay));
+  const all = input.journals.filter(readable).map(dated).filter((d): d is Dated => d !== null);
   const rendered = (w: Window) => all.filter((d) => finished(d.j) && inWindow(d.day, w));
   const twinEscaped = 'throughput.escaped';
 
   // Débit (R4, R5, R9)
   const rendus = both(windows, rendered);
-  const ready = both(windows, (w) => rendered(w).filter((d) => d.j.status === 'ready').length);
+  const ready = both(windows, (w) => (rendered(w).length === 0 ? null : rendered(w).filter((d) => d.j.status === 'ready').length));
   const perDay = (w: Window) => (w.days === 0 || rendered(w).length === 0 ? null : rendered(w).length / w.days);
-  const delivered = both(windows, (w) => (hasPlans ? [...plans.values()].flat().filter((l) => l.status === 'done' && l.finished !== undefined && inWindow(l.finished, w)).length : null));
+  const deliveredCount = (w: Window) => [...plans.values()].flat().filter((l) => l.status === 'done' && l.finished !== undefined && inWindow(l.finished, w)).length;
+  const delivered = both(windows, (w) => (hasPlans && deliveredCount(w) > 0 ? deliveredCount(w) : null));
   const withBudget = (w: Window) => rendered(w).filter((d) => d.j.budget !== undefined);
   const onBudget = both(windows, (w) => {
     const set = withBudget(w);
@@ -283,7 +287,7 @@ export function computePerf(input: PerfInput): PerfResult {
   const throughput = {
     ready: mk(ready, lotsOf, null, twinEscaped),
     rendered: mk(both(windows, perDay), lotsOf, 'down', twinEscaped),
-    delivered: mk(delivered, delivered.current === null ? { current: 0, previous: 0 } : { current: delivered.current, previous: delivered.previous! }, 'down', twinEscaped, planNote),
+    delivered: mk(delivered, both(windows, deliveredCount), 'down', twinEscaped, planNote),
     onBudget: mk(onBudget, budgetCounts, 'down', twinEscaped),
     escaped: mk(both(windows, escapedOf), lotsOf, 'up', null, escapedNote),
   };

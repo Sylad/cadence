@@ -20,7 +20,7 @@ one (the 7 days before). Every speed indicator is printed on the same line as it
 A line starts with `⚠` and ends with the decision it informs when its value is **worse than the previous window by more than 25 %**
 (a drop for the throughput and the share right the first time; a rise for passes, interventions and escaped defects). No `⚠`, and the line says
 why, when one window holds fewer than 5 lots for the indicator, when the previous value is zero, or when `--since` truncates a window.
-A window with no lot gives `n/d` (`null` in JSON), never `0`. A **clear bottleneck** (one cause weighing at least half of the classified passes of the
+A window with no lot for an indicator (no rendered lot for ready lots, no delivered lot for delivered, none at all for a window entirely before `--since`) gives `n/d` (`null` in JSON), never `0`. A **clear bottleneck** (one cause weighing at least half of the classified passes of the
 current window, with at least 10 classified passes) is flagged by a `⚠` even without a trend.
 
 - **Dating.** A journal is dated by the end of its last step (else by the creation of its wave); a journal without a readable date is left out. A correction pass is dated
@@ -30,8 +30,8 @@ current window, with at least 10 classified passes) is flagged by a `⚠` even w
   contains `bloquant` or `majeur` not preceded by `0` or `aucun`. Until a plan holds such a note the value is `n/d` ("aucune note QA reconnue : convention à fixer (L227)"). Reopened lots are not counted: the plan does not date a reopening.
 - **Lead interventions.** A lot counts when its last journal (all waves of the folder) is `handed-back` or `failed` and its plan lot is `done` with `finished` on or after the day it was handed back.
   A journal joins its plan by the project name (the path of the project relative to the folder) and the `lot` field of the journal; an id `Q4/accueil-4-ux12` joins the plan lot `Q4`. Journals with no plan lot are counted aside (`N lot(s) de journal sans plan`) and never counted as finished outside the wave.
-  An unreadable plan skips its project with a warning on the error output, and the indicators that read the plans are `n/d`.
-- **`--since date`** is an ISO date that ignores everything before that day in both windows; a window starting before it is *truncated* (its per-day rates divide by the days covered, no `⚠`).
+  An unreadable plan skips its project with a warning on the error output and the other projects are read; the indicators that read the plans are `n/d` only when no plan is readable.
+- **`--since date`** is an ISO date that ignores everything before that day in both windows (a wave created before that day is not read, even if its lots end after it); a window starting before it is *truncated* (its per-day rates divide by the days covered, no `⚠`).
   It is **not** the instant of `cadence corrections --since` (waves created strictly after).
 - **`--json`** prints one object `{ since, today, windows: { current, previous }, throughput, corrections, interventions, orphans, warnings }`; every indicator carries
   `{ current, previous, change, warn, twin, lots, note }` (`twin`: the path of its quality twin, e.g. `throughput.escaped`). Same values as the text.

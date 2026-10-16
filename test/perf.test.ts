@@ -93,15 +93,37 @@ describe('cadence perf — fenêtres et débit', () => {
 
   it('R3 — --since au milieu de la précédente : les lots avant la date sont ignorés et la précédente est dite tronquée', async () => {
     const c = ctx();
+    writeWave(c.runs, 'w2', at('2026-10-06', '08:00:00'));
     journal(c, '2026-10-04');
-    journal(c, '2026-10-07');
-    journal(c, '2026-10-08');
+    journal(c, '2026-10-07', { wave: 'w2' });
+    journal(c, '2026-10-08', { wave: 'w2' });
     const { data, code } = await json(c.root, '--since', '2026-10-06');
     expect(code).toBe(0);
     expect(data.windows.previous).toMatchObject({ from: '2026-10-06', to: '2026-10-09', days: 4, truncated: true });
     expect(data.windows.current.truncated).toBe(false);
     expect(data.throughput.rendered.previous).toBeCloseTo(2 / 4);
     expect((await cad(c.root, '--since', '2026-10-06')).text).toContain('tronquée par --since');
+  });
+
+  it('R3 — --since ignore une vague créée avant la date, même quand ses lots finissent après', async () => {
+    const c = ctx();
+    writeWave(c.runs, 'w2', at('2026-10-14', '08:00:00'));
+    journal(c, '2026-10-15');
+    journal(c, '2026-10-15', { wave: 'w2' });
+    const { data } = await json(c.root, '--since', '2026-10-14');
+    expect(data.throughput.rendered.lots.current).toBe(1);
+    expect(data.throughput.ready.current).toBe(1);
+  });
+
+  it('R14 — une fenêtre sans lot rendu donne n/d pour prêts et livrés, jamais 0', async () => {
+    const c = ctx();
+    journal(c, CUR);
+    plan(c.root, 'alpha', [{ id: 'P1', finished: CUR }]);
+    const { data } = await json(c.root);
+    expect(data.throughput.ready).toMatchObject({ current: 1, previous: null });
+    expect(data.throughput.delivered).toMatchObject({ current: 1, previous: null });
+    const early = (await json(c.root, '--since', '2026-10-12')).data;
+    expect([early.throughput.ready.previous, early.throughput.delivered.previous]).toEqual([null, null]);
   });
 
   it('R3 — --since antérieur aux deux fenêtres : résultat identique au lancement sans option', async () => {
@@ -479,8 +501,9 @@ describe('cadence perf — jumeaux et ⚠', () => {
 
   it('R13 — fenêtre tronquée par --since : pas de ⚠ et mention', async () => {
     const c = ctx();
-    lots(c, '2026-10-08', 7);
-    lots(c, CUR, 5);
+    writeWave(c.runs, 'w2', at('2026-10-08', '08:00:00'));
+    lots(c, '2026-10-08', 7, () => ({ wave: 'w2' }));
+    lots(c, CUR, 5, () => ({ wave: 'w2' }));
     const r = await cad(c.root, '--since', '2026-10-08');
     const line = r.out.find((l) => l.includes('rendus par jour'))!;
     expect(line).not.toContain('⚠');

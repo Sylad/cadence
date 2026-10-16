@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -29,8 +29,27 @@ export function gitRepo(): string {
   return dir;
 }
 
+/**
+ * Pas de tâche de fond de git dans les dépôts jetables (L224). Après un commit, git 2.55 peut lancer en arrière-plan
+ * `maintenance run --auto --detach` (ou `gc --auto`) : un processus détaché qui écrit dans `.git` pendant que le test le supprime.
+ * Sur le runner GitHub (Node 24, git 2.55), un `.git` supprimé par `rmSync` était encore là. À placer avant la commande git.
+ */
+export const NO_BACKGROUND_GIT = ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false'];
+
+/**
+ * Supprime un dossier ET vérifie qu'il a disparu : `rmSync(…, { force: true })` rend la main sans erreur alors que le dossier
+ * est encore là (vécu sur le runner GitHub, L224). Réessaie quelques fois, puis échoue en disant ce qui reste.
+ */
+export function removeDirSync(path: string): void {
+  for (let attempt = 0; attempt < 10 && existsSync(path); attempt++) {
+    if (attempt > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    rmSync(path, { recursive: true, force: true });
+  }
+  if (existsSync(path)) throw new Error(`${path} est encore là après 10 suppressions : ${readdirSync(path).join(',')}`);
+}
+
 export function commit(dir: string, message: string, date = '2026-09-28T10:00:00'): void {
-  execFileSync('git', ['commit', '-q', '--allow-empty', '-m', message], {
+  execFileSync('git', [...NO_BACKGROUND_GIT, 'commit', '-q', '--allow-empty', '-m', message], {
     cwd: dir,
     stdio: 'ignore',
     env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },

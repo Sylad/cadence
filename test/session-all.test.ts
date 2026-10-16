@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { findProjects } from '../src/lead.js';
-import { commit, tempDir } from './helpers.js';
+import { NO_BACKGROUND_GIT, commit, removeDirSync, tempDir } from './helpers.js';
 
 async function cad(dir: string, ...argv: string[]) {
   return cadOn('2026-09-28', dir, ...argv);
@@ -18,7 +17,7 @@ async function cadOn(today: string, dir: string, ...argv: string[]) {
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
-const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
+const git = (cwd: string, ...args: string[]) => execFileSync('git', [...NO_BACKGROUND_GIT, ...args], { cwd, stdio: 'ignore' });
 
 /** Un projet raf dans `dir` (créé au besoin) : un lot L1 en cours, un commit du jour. */
 async function project(dir: string, name: string) {
@@ -132,22 +131,13 @@ describe('cadence session start|close --all', () => {
     const mono = join(root, 'mono');
     await project(mono, 'mono');
     await project(join(mono, 'pkg-a'), 'pkg-a');
-    // Vert en local (Node 22), rouge sur le runner GitHub (Node 24, git 2.55, L224), cause non établie : l'environnement et l'état vu par git accompagnent l'échec.
-    let rm = 'rmSync ok';
-    try { rmSync(join(mono, 'pkg-a', '.git'), { recursive: true, force: true }); } catch (e) { rm = `rmSync a échoué : ${(e as Error).message}`; }
+    // Rouge sur le runner GitHub (Node 24, git 2.55, L224) quand rmSync laissait le .git en place : l'état vu par git accompagne l'échec.
+    removeDirSync(join(mono, 'pkg-a', '.git'));
     const { code, out } = await cad(mono, 'session', 'start', '--all');
     const lines = out.split('\n');
     expect(lines).toContain('## pkg-a');
     const seen = (...args: string[]) => { const r = spawnSync('git', args, { cwd: join(mono, 'pkg-a'), encoding: 'utf8' }); return `${r.stdout.trim()} [code ${r.status ?? r.error?.message}, stderr : ${r.stderr.trim()}]`; };
-    const state = [
-      `node ${process.version} sur ${process.platform}`,
-      `TMPDIR : ${process.env.TMPDIR} ; tmpdir() : ${tmpdir()} ; INIT_CWD : ${process.env.INIT_CWD} ; dossier du test : ${mono}`,
-      `git ${seen('--version')}`,
-      `toplevel de pkg-a : ${seen('rev-parse', '--show-toplevel')}`,
-      rm,
-      `entrées de pkg-a : ${readdirSync(join(mono, 'pkg-a')).join(',')}`,
-      `GIT_* : ${Object.keys(process.env).filter((k) => k.startsWith('GIT_')).join(',')}`,
-    ].join(' ; ');
+    const state = `node ${process.version} ; git ${seen('--version')} ; toplevel de pkg-a : ${seen('rev-parse', '--show-toplevel')} ; entrées de pkg-a : ${readdirSync(join(mono, 'pkg-a')).join(',')}`;
     expect(lines[lines.indexOf('## pkg-a') + 1], state).toMatch(/^✗ .*dépôt/);
     expect(out).not.toContain('Travail mono');
     expect(code).toBe(2);
@@ -158,7 +148,7 @@ describe('cadence session start|close --all', () => {
     const mono = join(root, 'mono');
     await project(mono, 'mono');
     await project(join(mono, 'pkg-a'), 'pkg-a');
-    rmSync(join(mono, 'pkg-a', '.git'), { recursive: true, force: true });
+    removeDirSync(join(mono, 'pkg-a', '.git'));
     const before = process.env.GIT_CEILING_DIRECTORIES;
     process.env.GIT_CEILING_DIRECTORIES = join(mono, 'pkg-a'); // git ne remonte plus de pkg-a vers mono : rev-parse échoue dans pkg-a
     try {

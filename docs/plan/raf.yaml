@@ -2612,7 +2612,7 @@ lots:
     finished: 2026-10-16
   - id: L227
     title: "cadence perf, indicateur 6 livraisons rouges et constats QA bloquants (journal de cadence deliver, notes raf « QA » des lots) ; intégration : cadence lead tour imprime l'en-tête perf (une ligne par ⚠, rien si tout est stable), le skill lead le lit avant de proposer les trois lots et ne propose un lot d'amélioration que sur une tendance confirmée sur deux fenêtres ou un goulot net ; README et CHANGELOG"
-    status: doing
+    status: done
     estimate: 0.25
     spec: true
     created: 2026-10-16
@@ -2631,8 +2631,10 @@ lots:
       - { date: 2026-10-16, text: "Hypothèses (fiche perf-livraisons-rouges-entete-tour) — R5 : Avec --json, la sortie de cadence perf reçoit un bloc quality { redDeliveries, qaBlocking }, chacun au format Indicator de src/perf.ts:49 (current, previous, c… ; si faux : Si le texte devait se passer du second jumeau sur la ligne « livrés », seule la ligne texte change" }
       - { date: 2026-10-16, text: "Hypothèses (fiche perf-livraisons-rouges-entete-tour) — R7 : Quand cadence perf ne peut pas lire le dossier (pas de .cadence/runs, grille cadence.yaml perf.prices mal formée, journaux ou plans illisibles), le tour n'impr… ; si faux : Si le tour devait signaler l'échec de perf, une ligne « perf · ✗ erreur » s'ajouterait ; le tour ne change pas de code de sortie" }
       - { date: 2026-10-16, text: "Hypothèses (fiche perf-livraisons-rouges-entete-tour) — R9 : Aucun appel de modèle ni de réseau et aucune écriture dans le tour et dans perf (lecture seule, src/cli.ts:891) ; si faux : Si l'échec d'écriture devait faire échouer deliver autrement, le code de sortie changerait ; il vaut déjà 1 sur une livraison rouge, donc rien d'observable ne…" }
+      - { date: 2026-10-16, text: "mineurs en note 16-10 (revue) : (1) perfHeader() reconstruit les lignes ⚠ au lieu de lire result.warnings (src/perf.ts:564) ; (2) test R9 « modèle injoignable » ne pose pas OLLAMA_HOST ; (3) qaBlocking reprend escapedNote (recognised) au lieu de blockingRecognised (src/perf.ts:484) ; (4) contrat A1 annonce une section « Livraison », le code imprime les jumeaux dans « Débit » ; (5) aucun texte ne dit d'écrire les notes QA sous la forme « QA … bloquant » lue par l'indicateur (skill lead) ; (6) perfHeader n'ajoute pas le jumeau livraisons rouges au ⚠ livrés (src/perf.ts:584)" }
     started: 2026-10-16
     review: { date: 2026-10-16, verdict: "conforme : 0 bloquant, 0 majeur, 4 mineurs (note n/d de qaBlocking périmée, A1 « section Livraison » contredit R5, aucune instruction n'écrit les notes « QA … bloquant », en-tête « livrés » sans les rouges) — orchestré (vague 2026-10-16-2200, 1 passe(s) de correction)", commit: 7a5552159df5a8a43df5aa0e50599af427a55c65 }
+    finished: 2026-10-16
   - id: L228
     title: "cadence orchestrate --resume <vague> --budget projet:lot=+N --dry-run n'est pas une simulation : le 16-10 la commande a réellement relevé le budget de la vague 2026-10-15-0831 (540 000 → 727 912) et relancé la session fix de finance-tracker:L78 ; --dry-run doit être honoré par --resume comme par un lancement (afficher ce qui serait rejoué, ne rien écrire dans wave.json ni journal.log), ou refusé explicitement"
     status: done

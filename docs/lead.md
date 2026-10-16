@@ -104,8 +104,8 @@ the folder without `$CLAUDE_CODE_SESSION_ID`, figure older than two minutes): th
 as being at the threshold.
 
 The mechanics around it (the life of a lot in the plan, a lot inside a wave, putting cadence in service, the budgets) are drawn in
-[fonctionnement.md](fonctionnement.md). See also the README's [lead tour](lead.md#lead-tour) and [orchestrate](orchestrate.md#orchestrate)
-sections.
+[fonctionnement.md](fonctionnement.md). See also the [lead tour](lead.md#lead-tour) section below and the [orchestrate](orchestrate.md#orchestrate)
+page.
 
 ## lead tour
 

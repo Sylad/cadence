@@ -213,6 +213,68 @@ describe('étape accept : où elle s’insère', () => {
     expect(c.lot.status).toBe('ready');
   });
 
+  it('L233 — un fichier jamais touché avec une étape accept enregistrée (octet pour octet celui du commit vert) : le lot repart à implement, il n’est pas rendu', async () => {
+    const { h, c, vert } = verteEnQuestion();
+    questionPosee(c, h, vert);
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('L233 — réécriture commitée par la session, puis `git reset --hard <vert>` du lead (séquence L161) : le fichier est celui du vert, le lot repart à implement', async () => {
+    const { h, a, c, vert } = verteEnQuestion();
+    const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
+    writeFileSync(join(h.repo, a.json), JSON.stringify({ ...doc, vert: false }, null, 2));
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation réécrite par la session', '--', a.json);
+    questionPosee(c, h, vert);
+    git(h.repo, 'reset', '-q', '--hard', vert);
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  /** Le rescellé que ferait le lead (journal +1, vert et empreintes gardés), écrit dans l'arbre sans le commiter. */
+  const rescelle = (h: ReturnType<typeof harness>, a: ReturnType<typeof ecritAcceptation>) => {
+    writeFileSync(join(h.repo, a.test), `${readFileSync(join(h.repo, a.test), 'utf8')}// rescellé\n`);
+    resealAcceptation(h.repo, a.json, a.test, 'seconde correction', '2026-10-13');
+  };
+
+  it('L233 — un rescellé forgé par la session (journal allongé, commit dans sa plage headBefore..headAfter) est rendu au lead', async () => {
+    const { h, a, c, vert } = verteEnQuestion();
+    rescelle(h, a);
+    git(h.repo, 'add', '--', a.json, a.test);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): rescellé par la session', '--', a.json, a.test);
+    questionPosee(c, h, vert);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/acceptation verte réécrite/);
+    expect(kinds(h)).toEqual([]);
+  });
+
+  it('L233 — un rescellé du lead pas encore commité (fichier sale) n’est pas admis : le lot est rendu', async () => {
+    const { h, a, c, vert } = verteEnQuestion();
+    questionPosee(c, h, vert);
+    rescelle(h, a);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/acceptation verte réécrite/);
+    expect(kinds(h)).toEqual([]);
+  });
+
+  it('L233 — un commit du lead qui change le fichier sans allonger le journal resceaux n’est pas un rescellé : le lot est rendu', async () => {
+    const { h, a, c, vert } = verteEnQuestion();
+    questionPosee(c, h, vert);
+    const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
+    writeFileSync(join(h.repo, a.json), JSON.stringify({ ...doc, empreintes: { ...doc.empreintes, [a.test]: '0'.repeat(40) } }, null, 2));
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'chore(L1): empreinte modifiée à la main', '--', a.json);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/acceptation verte réécrite/);
+    expect(kinds(h)).toEqual([]);
+  });
+
   it('L233 — le brief accept interdit de réécrire une acceptation verte et rend la main', async () => {
     const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
     await runLot(h.lot('L1', screen, config));

@@ -1429,7 +1429,8 @@ function greenDrift(c: LotCtx, json: string, first: string, before: string, was:
   const l = c.lot;
   if (!listed(c, json)) return 'acceptation.json supprimé depuis la première session accept (verrou des tests d\'acceptation)';
   const text = readFileSync(join(l.repo, json), 'utf8');
-  if (text === before) return null;
+  // `before` vient de git() qui rogne les blancs de fin, le fichier écrit par le programme finit par un saut de ligne : les deux se comparent rognés.
+  if (text.trim() === before.trim()) return null;
   const now = parseAcceptation(text);
   const dirty = git(l.repo, 'status', '--porcelain', '--', json).trim() !== '';
   let bySession = false;

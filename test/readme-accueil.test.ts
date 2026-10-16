@@ -11,6 +11,13 @@ const readme = read('README.md');
 
 const PAGES = ['raf', 'orchestrate', 'deliver', 'spec', 'lead', 'stabilite'];
 
+/** Lignes de texte de l’introduction : du début du README (le titre `# cadence` est à l’offset 0) à la première section `## `, hors titre, lignes vides, balises (`<picture>`, `<source>`, `<img>`, indentées ou non), images et citations. */
+const lignesIntro = (texte: string): string[] => {
+  const fin = texte.indexOf('\n## ');
+  const intro = texte.slice(0, fin === -1 ? undefined : fin);
+  return intro.split('\n').slice(1).map((l) => l.trim()).filter((l) => l && !l.startsWith('<') && !l.startsWith('!') && !l.startsWith('>'));
+};
+
 describe('README en page d’accueil (L232)', () => {
   it('R1 — le README tient en moins de 12 ko (il en pesait 208 101) et la mesure avant/après est écrite', () => {
     expect(statSync(join(root, 'README.md')).size).toBeLessThan(12 * 1024);
@@ -19,14 +26,22 @@ describe('README en page d’accueil (L232)', () => {
   });
 
   it('R2 — l’accueil dit ce que fait l’outil en 5 lignes au plus, puis montre le cycle d’une vague et le rôle du lead', () => {
-    const intro = readme.slice(readme.indexOf('\n# cadence'), readme.indexOf('\n## ', readme.indexOf('\n# cadence')));
-    const lignes = intro.split('\n').slice(1).filter((l) => l.trim() && !l.startsWith('<') && !l.startsWith('!') && !l.startsWith('>'));
-    expect(lignes.length).toBeLessThanOrEqual(5);
+    const lignes = lignesIntro(readme);
+    expect(lignes.length, lignes.join('\n')).toBeGreaterThan(0);
+    expect(lignes.length, lignes.join('\n')).toBeLessThanOrEqual(5);
     for (const v of ['light', 'dark']) {
       expect(readme).toContain(`docs/cycle-vague-${v}.svg`);
       const svg = read(`docs/cycle-vague-${v}.svg`);
       for (const mot of ['spec', 'mockup', 'accept', 'implement', 'review', 'ux', 'deliver', 'lead']) expect(svg.toLowerCase(), mot).toContain(mot);
     }
+  });
+
+  it('R2 — le compte des lignes d’introduction rougit quand l’introduction dépasse 5 lignes (mutation d’une copie du README)', () => {
+    const base = lignesIntro(readme).length;
+    const mute = readme.replace('\n<picture>', '\n' + Array.from({ length: 6 }, (_, i) => `Une ligne de plus, numéro ${i}.`).join('\n') + '\n\n<picture>');
+    expect(mute).not.toBe(readme);
+    expect(lignesIntro(mute).length).toBe(base + 6);
+    expect(lignesIntro(mute).length).toBeGreaterThan(5);
   });
 
   it('R3 — les trois commandes de départ sont dans un bloc de code de l’accueil', () => {

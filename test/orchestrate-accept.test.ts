@@ -306,7 +306,7 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
       const { repo, a, head } = livre();
       changeFiche(repo, a.fiche);
       writeFileSync(join(repo, a.test), "it('triche', () => {});\n");
-      commitPaths(repo, 'fix(L1): triche', a.test, a.fiche);
+      commitPaths(repo, 'fix(L1,L9): triche', a.test, a.fiche);
       const commit = git(repo, 'rev-parse', 'HEAD');
       expect(lockViolations(repo, DIR, head, { lotBase: head, lot: 'L1', lotCommits: [commit] }).join('\n')).toContain(a.test);
       expect(lockViolations(repo, DIR, head, { lotBase: head, lot: 'L9', lotCommits: [commit] })).toEqual([]);
@@ -350,6 +350,15 @@ describe('verrou des tests d’acceptation (toutes les sessions du dépôt)', ()
     });
 
     it('R8 — fiche amendée par un commit qui cite le lot en cours : modification des tests admise', () => {
+      const { repo, a, head } = livre();
+      changeFiche(repo, a.fiche);
+      commitPaths(repo, 'docs(L9): fiche R7', a.fiche);
+      const fiche = sha(repo);
+      writeFileSync(join(repo, a.test), "it('R7 nouvelle', () => {});\n");
+      commitPaths(repo, 'feat(L9): tests', a.test);
+      expect(lockViolations(repo, DIR, head, { lot: 'L9', lotCommits: [fiche, sha(repo)] })).toEqual([]);
+    });
+    it('R4 — lot livré dont la fiche a été amendée par un commit qui cite le lot en cours : modification admise, comme avant', () => {
       const { repo, a, head } = livre();
       changeFiche(repo, a.fiche);
       commitPaths(repo, 'docs(L9): fiche R7', a.fiche);

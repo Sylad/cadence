@@ -28,7 +28,7 @@ cas:
       - Elle compte, par fenêtre, les notes de plan « QA … bloquant » sur des lots déjà terminés.
       - Elle imprime une section « Livraison » où les livraisons rouges sont sur la même ligne que le nombre de livrés (vitesse ↔ qualité).
     alternatives:
-      - { si: "aucun projet n'a de journal de livraisons rouges", alors: "livraisons rouges n/d avec une mention, aucun ⚠, jamais 0", regles: [R2] }
+      - { si: "un projet n'a pas de deliveries-failed.log", alors: "il compte 0 livraison rouge (pas n/d)", regles: [R2] }
       - { si: "une fenêtre porte moins de 5 livraisons, ou la valeur précédente est nulle, ou --since tronque une fenêtre", alors: "pas de ⚠ sur tendance, la ligne dit pourquoi", regles: [R3] }
       - { si: "les livraisons rouges montent de plus de 25 % d'une fenêtre à l'autre", alors: "⚠ sur la ligne avec sa décision", regles: [R3] }
       - { si: "aucune note de plan ne ressemble à « QA … bloquant »", alors: "constats QA bloquants n/d, pas 0", regles: [R4] }
@@ -82,19 +82,19 @@ cas:
 regles:
   - id: R1
     cas: [C1, C4]
-    enonce: "Une livraison rouge est un échec de cadence deliver survenu après la prise du verrou (script, CI, déploiement ou vérification, src/deliver.ts:332-361) ; chaque échec ajoute une entrée datée au journal des livraisons rouges du projet (emplacement et format : question Q1). Une livraison verte et un refus avant le verrou n'y écrivent rien, et deliveries.log (une ligne « jour sha » par livraison verte, src/state.ts:177-179) reste écrit et lu comme avant."
+    enonce: "Une livraison rouge est un échec de cadence deliver survenu après la prise du verrou (script, CI, déploiement ou vérification, src/deliver.ts:332-361) ; chaque échec ajoute une entrée datée au journal des livraisons rouges du projet (<gitCommonDir>/cadence/deliveries-failed.log, une ligne « jour sha raison » par livraison rouge ; raison = première ligne du message d'échec, sans retour à la ligne). Une livraison verte et un refus avant le verrou n'y écrivent rien, et deliveries.log (une ligne « jour sha » par livraison verte, src/state.ts:177-179) reste écrit et lu comme avant."
     statut: sourcee
-    source: "titre du lot : « livraisons rouges … (journal de cadence deliver) » ; src/state.ts:177-193 : deliveries.log ne note que les livraisons vertes, il ne peut donc pas compter les rouges ; src/deliver.ts:332-361 pour les points d'échec"
-    tests: ["R1 — échec de CI après le verrou : une entrée rouge du jour, deliveries.log inchangé", "R1 — échec du script, du déploiement, de la vérification : une entrée chacun", "R1 — livraison verte : aucune entrée rouge, deliveries.log reçoit sa ligne", "R1 — refus avant le verrou (autre livraison en cours) : aucune entrée rouge"]
+    source: "décision du lead (réponse à la question Q1) : nouveau fichier <gitCommonDir>/cadence/deliveries-failed.log, format « jour sha raison », deliveries.log intact ; titre du lot : « livraisons rouges … (journal de cadence deliver) » ; src/state.ts:177-193 : deliveries.log ne note que les livraisons vertes, il ne peut donc pas compter les rouges ; src/deliver.ts:332-361 pour les points d'échec"
+    tests: ["R1 — échec de CI après le verrou : une entrée rouge du jour, deliveries.log inchangé", "R1 — échec du script, du déploiement, de la vérification : une entrée chacun", "R1 — la ligne rouge est « jour sha raison » avec la raison sur une seule ligne (message d'échec multiligne tronqué à la première ligne)", "R1 — livraison verte : aucune entrée rouge, deliveries.log reçoit sa ligne", "R1 — refus avant le verrou (autre livraison en cours) : aucune entrée rouge"]
   - id: R2
     cas: [C1]
-    enonce: "Livraisons rouges d'une fenêtre = nombre d'entrées du journal rouge de tous les projets du dossier datées dans la fenêtre. Sans aucun journal rouge lisible (projets livrés avant L227 comme projets non git), la valeur est n/d (null en JSON) avec la mention « aucun journal de livraisons rouges », jamais 0, et elle ne porte aucun ⚠ ; un journal présent mais sans entrée dans la fenêtre donne 0."
-    statut: hypothese
-    si_faux: "Si une absence de journal devait valoir 0, un projet jamais instrumenté afficherait 0 rouge comme une réussite ; seul l'affichage de la valeur change, aucune donnée n'est écrite."
-    tests: ["R2 — aucun journal rouge : n/d, mention, pas de ⚠", "R2 — journal présent sans entrée dans la fenêtre : 0", "R2 — trois entrées dans la fenêtre courante, deux dans la précédente : 3 et 2", "R2 — une ligne illisible du journal est ignorée sans erreur"]
+    enonce: "Livraisons rouges d'une fenêtre = nombre de lignes de deliveries-failed.log de tous les projets du dossier datées dans la fenêtre. Un dépôt sans deliveries-failed.log compte 0 rouge, pas n/d ; une ligne illisible est ignorée sans erreur. perf lit deliveries-failed.log et deliveries.log (les livrés restent lus par readDeliveries, src/state.ts:187)."
+    statut: sourcee
+    source: "décision du lead (réponse à la question Q1) : « perf lit les deux fichiers ; un dépôt sans deliveries-failed.log compte 0 rouge, pas n/d »"
+    tests: ["R2 — aucun deliveries-failed.log : 0 rouge, pas n/d", "R2 — fichier présent sans ligne dans la fenêtre : 0", "R2 — trois lignes dans la fenêtre courante, deux dans la précédente : 3 et 2", "R2 — une ligne illisible du fichier est ignorée sans erreur", "R2 — deliveries.log toujours lu pour les livrés"]
   - id: R3
     cas: [C1]
-    enonce: "Les livraisons rouges se jugent comme les indicateurs de L225 : une hausse de plus de 25 % de la fenêtre courante sur la précédente porte un ⚠ ; pas de ⚠ si l'une des deux fenêtres a moins de 5 livraisons (vertes + rouges), si la valeur précédente est nulle ou n/d, ou si --since tronque une fenêtre. L'indicateur est le jumeau de qualité de « livrés » (throughput.delivered) et s'imprime sur sa ligne ; le ⚠ finit par sa décision : « la livraison casse : corriger CI, déploiement ou vérification avant d'ajouter des lots »."
+    enonce: "Les livraisons rouges se jugent comme les indicateurs de L225 : une hausse de plus de 25 % de la fenêtre courante sur la précédente porte un ⚠ ; pas de ⚠ si l'une des deux fenêtres a moins de 5 livraisons (vertes + rouges), si la valeur précédente est nulle, ou si --since tronque une fenêtre. L'indicateur est le jumeau de qualité de « livrés » (throughput.delivered) et s'imprime sur sa ligne ; le ⚠ finit par sa décision : « la livraison casse : corriger CI, déploiement ou vérification avant d'ajouter des lots »."
     statut: sourcee
     source: "src/perf.ts:29-31 (DEGRADATION 25 %, MIN_SAMPLE 5) et docs/specs/perf-tableau-de-bord/fiche.yaml R8, R12, R13 ; note du lot 16-10 (VITE ET BIEN). Le texte de la décision est une lecture du lead (hypothèse de libellé)."
     tests: ["R3 — rouges 2 → 4 sur 10 livraisons par fenêtre : ⚠", "R3 — 2 → 2,4 (20 %) : pas de ⚠", "R3 — moins de 5 livraisons dans une fenêtre : pas de ⚠, la ligne dit l'échantillon", "R3 — précédente à 0 : pas de ⚠", "R3 — la ligne « livrés » contient la valeur des livraisons rouges", "R3 — --since qui tronque : pas de ⚠"]
@@ -159,7 +159,7 @@ contrats:
     entree: "[dossier] [--since date] [--json] — inchangée"
     sortie: "texte avec la section Livraison (livrés ↔ livraisons rouges, défauts échappés ↔ constats QA bloquants), ou JSON avec le bloc quality en plus (code 0)"
     erreurs: []
-    sans_erreur: "les erreurs de saisie et de lecture de perf (usage, --since invalide, aucun journal de vague) sont celles de L225, inchangées ; un journal rouge absent n'est pas une erreur, c'est un n/d (R2)"
+    sans_erreur: "les erreurs de saisie et de lecture de perf (usage, --since invalide, aucun journal de vague) sont celles de L225, inchangées ; un deliveries-failed.log absent n'est pas une erreur, c'est 0 rouge (R2)"
     regles: [R2, R3, R4, R5, R9]
   - id: A2
     appel: commande cadence lead tour
@@ -178,5 +178,5 @@ contrats:
 
 donnees:
   - { id: D1, objet: "deliveries.log (une ligne « jour sha » par livraison verte)", existant: true, modification: aucune, note: "écrit et lu comme avant (src/state.ts:177-193) ; les rouges n'y entrent pas" }
-  - { id: D2, objet: "journal des livraisons rouges du projet (emplacement et format à fixer : question Q1)", existant: false, modification: ajout, note: "nouveau fichier, écrit par cadence deliver à chaque échec après le verrou, lu par perf" }
+  - { id: D2, objet: "<gitCommonDir>/cadence/deliveries-failed.log (une ligne « jour sha raison » par livraison rouge)", existant: false, modification: ajout, decision: "réponse du lead à Q1 : nouveau fichier deliveries-failed.log, format « jour sha raison », deliveries.log intact", note: "nouveau fichier, écrit par cadence deliver à chaque échec après le verrou, lu par perf" }
   - { id: D3, objet: "notes de plan des lots (docs/plan/raf.yaml, champ notes)", existant: true, modification: aucune, note: "lues seules pour les constats QA bloquants, convention de src/perf.ts:187" }

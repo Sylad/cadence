@@ -1,0 +1,46 @@
+# Diagnostic de la suite sur le runner GitHub, sans rien publier : même image, même Node 24, même identité git
+# et même npm ci que le job de publish.yml. Lancement à la main (workflow_dispatch) ou par un push sur une branche diag/**.
+name: tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['diag/**']
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Comme publish.yml, pour que npm soit le même.
+      - run: npm install -g npm@^11.5.1
+
+      # Les tests créent des dépôts git jetables : il leur faut une identité (comme publish.yml).
+      - run: |
+          git config --global user.name "cadence-ci"
+          git config --global user.email "cadence-ci@users.noreply.github.com"
+
+      - run: npm ci
+
+      - name: Environnement vu par la suite
+        run: |
+          git --version
+          node --version
+          npm --version
+          git config --global --list || true
+          env | grep '^GIT_' || echo "aucune variable GIT_*"
+
+      # prepublishOnly de publish.yml : typecheck puis tests.
+      - run: npm run typecheck
+      - run: npm test

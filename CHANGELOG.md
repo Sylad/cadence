@@ -57,6 +57,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
 
+## [Unreleased]
+
+### Fixed
+
+- `cadence orchestrate --resume … --dry-run` is now refused (exit 2) before anything is written: it used to resume the wave for real — raising the lot budget in `wave.json` and relaunching the session — although `--dry-run` promises nothing runs (L228).
+
 ## [1.6.0] - 2026-10-16
 
 ### Added

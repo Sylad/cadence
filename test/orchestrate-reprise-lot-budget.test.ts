@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { orchestrate, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import type { ClaudeFn, LaunchOutcome } from '../src/orchestrate/launch.js';
@@ -564,5 +564,24 @@ describe('R14 — vague lancée avant L223 (instantané sans lotBudgets)', () =>
     withSnapshot(r, 'parseBudget(v)');
     await orchestrate(['--resume', WAVE, '--budget', '2M'], io(r.parent).io, deps);
     expect(reexec).toEqual([tool, tool]);
+  });
+});
+
+describe('L228 — --resume ne se combine pas avec --dry-run', () => {
+  it('L228 — --resume <vague> --budget projet:lot=+N --dry-run est refusé et ne touche ni wave.json ni journal.log', async () => {
+    const r = await handedBack();
+    const wavePath = join(r.store.dir, 'wave.json');
+    const logPath = join(r.store.dir, 'journal.log');
+    const before = [readFileSync(wavePath, 'utf8'), existsSync(logPath) ? readFileSync(logPath, 'utf8') : ''];
+    const again = io(r.parent);
+    await expect(orchestrate(['--resume', WAVE, '--budget', 'L1=+300k', '--dry-run'], again.io, r.f.deps)).rejects.toThrow("--resume ne se combine pas avec --dry-run");
+    expect(readFileSync(wavePath, 'utf8')).toBe(before[0]);
+    expect(existsSync(logPath) ? readFileSync(logPath, 'utf8') : '').toBe(before[1]);
+    expect(r.lot().status).toBe('handed-back');
+    expect(r.f.calls).toEqual([]);
+  });
+  it('L228 — --resume --dry-run seul est refusé de même', async () => {
+    const r = await handedBack();
+    await expect(orchestrate(['--resume', '--dry-run'], io(r.parent).io, r.f.deps)).rejects.toThrow("--resume ne se combine pas avec --dry-run");
   });
 });

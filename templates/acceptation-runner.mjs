@@ -1,5 +1,5 @@
 // Gabarit de l'étape accept d'orchestrate (L173) : à copier dans le projet (ex. tests/acceptation-runner.mjs) et à importer
-// depuis la config du lanceur de tests, PARTAGÉE par `orchestrate.test` et la CI. Voir « Étape accept » dans le README de cadence.
+// depuis la config du lanceur de tests, PARTAGÉE par `orchestrate.test` et la CI. Voir « The accept step » dans docs/orchestrate.md du paquet @sylad/cadence (lié depuis son README).
 //
 //   vitest.config.ts          test: { exclude: [...configDefaults.exclude, ...acceptationIgnored()] }
 //   jest.config.js            testPathIgnorePatterns: ['/node_modules/', ...acceptationIgnored(process.cwd(), 'docs/specs', 'regex')]

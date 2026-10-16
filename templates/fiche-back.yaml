@@ -1,6 +1,6 @@
 # Gabarit de fiche back (lot sans écran, étape spec back d'orchestrate, L187). Copier dans docs/specs/<sujet>/fiche.yaml,
 # remplacer les valeurs, puis `cadence spec check docs/specs/<sujet>/fiche.yaml`.
-# Chaque clé et les invariants vérifiés sont décrits dans la section « spec » du README de cadence.
+# Chaque clé et les invariants vérifiés sont décrits dans la section « spec » de docs/spec.md du paquet @sylad/cadence (lié depuis son README).
 # Un lot qui a aussi un écran (screen:) ajoute à ce fichier la partie écran du gabarit templates/fiche.yaml
 # (ecran, etats, champs, actions) : sujet.id et ecran.id sont alors le nom du dossier.
 sujet:

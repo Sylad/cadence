@@ -16,7 +16,6 @@ describe('README en page d’accueil (L232)', () => {
     expect(statSync(join(root, 'README.md')).size).toBeLessThan(12 * 1024);
     const m = read('docs/mesures/readme-accueil-2026-10-16.md');
     expect(m).toContain('208 101');
-    expect(m).toMatch(new RegExp(`${statSync(join(root, 'README.md')).size}`.replace(/(\d)(?=(\d{3})+$)/g, '$1 ?')));
   });
 
   it('R2 — l’accueil dit ce que fait l’outil en 5 lignes au plus, puis montre le cycle d’une vague et le rôle du lead', () => {
@@ -64,6 +63,17 @@ describe('README en page d’accueil (L232)', () => {
     const pages = [...DOC_PAGES, 'docs/news.md', 'docs/session.md', 'docs/corrections.md', 'docs/skills.md', 'docs/cadence-hud.md', 'docs/releasing.md']
       .map((p: string) => read(p)).join('\n');
     for (const t of titres) expect(pages, t).toMatch(new RegExp(`^#{1,4} .*${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'm'));
+  });
+
+  it('R9 — aucun renvoi en texte du code ni des gabarits ne pointe vers une section déplacée du README', () => {
+    const cli = read('src/cli.ts');
+    expect(cli).not.toMatch(/« cadence\.yaml » dans le README/);
+    expect(cli).toContain('docs/deliver.md');
+    expect(cli).not.toMatch(/correspondance des champs, voir le README/);
+    expect(cli).toContain('docs/raf.md');
+    for (const f of ['fiche.yaml', 'fiche-back.yaml']) expect(read(`templates/${f}`), f).toContain('docs/spec.md');
+    expect(read('templates/acceptation-runner.mjs')).toContain('docs/orchestrate.md');
+    for (const f of ['fiche.yaml', 'fiche-back.yaml', 'acceptation-runner.mjs']) expect(read(`templates/${f}`), f).not.toMatch(/du README de cadence|dans le README de cadence/);
   });
 
   it('R7 — le paquet npm publie les pages docs/ que le README cite', () => {

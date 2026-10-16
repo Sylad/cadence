@@ -174,7 +174,7 @@ export function resealAcceptation(repo: string, path: string, test: string, reas
     const fautif = commits.find((c) => !citedRefs(c, refsOf).some((r) => citant.has(r.lot)));
     if (fautif && porteur) {
       const cites = [...new Set(citedRefs(fautif, refsOf).map((r) => r.lot))];
-      throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite ni ${a.lot}, ni le porteur ${porteur}, ni un lot livré : ${fautif.sha.slice(0, 7)} (cite : ${cites.length ? cites.join(', ') : 'aucun lot'}) — le commit doit citer le porteur ou un lot livré, ou la fiche être amendée par un commit du porteur`);
+      throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite ni ${a.lot}, ni le porteur ${porteur}, ni un lot livré : ${fautif.sha.slice(0, 7)} (cite : ${cites.length ? cites.join(', ') : 'aucun lot'}) — faire citer le porteur ou un lot livré par ce commit (le réécrire avant qu'il soit poussé) ou, sinon, rescelle à la main avec le lead`);
     }
     if (fautif) throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite pas ${a.lot} : ${fautif.sha.slice(0, 7)}`);
     ficheAmendee = commits[0]?.sha.slice(0, 7);

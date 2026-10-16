@@ -711,7 +711,7 @@ describe('cadence spec reseal d’un lot livré, fiche amendée par un autre lot
     const faute = amende(repo, a.fiche, 'docs(L4): fiche');
     corrige(repo, a.test);
     const r = reseal(repo, a.test);
-    expect(r.err).toMatch(new RegExp(`a été modifiée depuis le commit rouge [0-9a-f]{7} par un commit qui ne cite ni L1, ni le porteur L2, ni un lot livré : ${faute} \\(cite : L4\\) — le commit doit citer le porteur ou un lot livré, ou la fiche être amendée par un commit du porteur`));
+    expect(r.err).toMatch(new RegExp(`a été modifiée depuis le commit rouge [0-9a-f]{7} par un commit qui ne cite ni L1, ni le porteur L2, ni un lot livré : ${faute} \\(cite : L4\\) — faire citer le porteur ou un lot livré par ce commit \\(le réécrire avant qu'il soit poussé\\) ou, sinon, rescelle à la main avec le lead`));
   });
 
   it('R3 — refus d’un lot en cours : message L217 inchangé', () => {

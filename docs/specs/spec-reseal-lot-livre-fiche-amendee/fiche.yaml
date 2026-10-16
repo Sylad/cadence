@@ -76,7 +76,7 @@ contrats:
     entree: "cadence spec reseal <lot livré> <test> --reason texte --porteur <lot en cours> ; fiche amendée, entre autres, par des commits citant d'autres lots livrés"
     sortie: "code 0 ; sortie et journal resceaux inchangés (porteur, ficheAmendee = dernier commit de la fiche, y compris celui d'un autre lot livré)"
     erreurs:
-      - { code: log error, message: "la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite ni <lot>, ni le porteur <porteur>, ni un lot livré : <sha7> (cite : <lots ou aucun lot>) — le commit doit citer le porteur ou un lot livré, ou la fiche être amendée par un commit du porteur" }
+      - { code: log error, message: "la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite ni <lot>, ni le porteur <porteur>, ni un lot livré : <sha7> (cite : <lots ou aucun lot>) — faire citer le porteur ou un lot livré par ce commit (le réécrire avant qu'il soit poussé) ou, sinon, rescelle à la main avec le lead" }
       - { code: log error, message: "la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite pas <lot> : <sha7>" }
     regles: [R1, R2, R3, R4, R5, R6]
 

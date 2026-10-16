@@ -16,7 +16,8 @@ sujet:
     jobs: []
     hors_perimetre:
       - "le refus de cadence spec reseal --porteur d'un lot livré dont la fiche a été amendée par un lot ultérieur (L229)"
-      - "l'exception L183 du verrou (fiche changée = tests d'un lot livré modifiables), inchangée ici : voir la question au lead"
+      - "le mécanisme de lockViolations hors L183 : exemption du bilan nul (L184), comparaison au commit rouge, contrôle à chaque fin de session restent tels quels ; seule la condition d'ouverture de l'exception L183 se resserre (R8)"
+      - "l'installation d'un hook git post-commit dans les dépôts des projets : non retenue (voir « choix » du rapport), le contrôle reste celui de la fin de chaque session (R9)"
       - "toute vérification par le programme du contenu des assertions d'un test (il ne lit pas la sémantique d'un test)"
       - "la revue de maquette (agents/ux-reviewer.md, templates/orchestrate/maquette.md) : elle précède l'écriture des tests rouges et ne peut pas les relire"
 
@@ -44,12 +45,15 @@ cas:
     nominal:
       - Le cycle compare, pour chaque acceptation, l'empreinte de chaque test listé à celle du scellé (lockViolations, déjà appelé à chaque fin de session).
       - Aucun écart que l'exception L183 n'excuse n'est trouvé.
+      - "Le contrôle a lieu à la fin de chaque session du lot, pas seulement avant la revue (R9) : la fuite L43 R8 du 16-10 a été rendue au lead APRÈS toute la session implement."
       - La revue est lancée.
     alternatives:
       - { si: un test scellé d'un autre lot a été modifié par un commit du lot, alors: le lot est rendu (handed-back), le message nomme le premier commit fautif, regles: [R2, R3] }
       - { si: l'écart n'est dû à aucun commit (modification non commitée), alors: le lot est rendu sans nom de commit, regles: [R3] }
       - { si: le test est revenu à son contenu d'avant le lot (bilan nul L184), alors: aucun écart, la revue est lancée, regles: [R4] }
       - { si: la session a posé une question au lieu de rendre le rapport, alors: le contrôle a lieu quand même avant la question, regles: [R5] }
+      - { si: la fiche du lot livré a été amendée par le lot courant (commit qui le cite), alors: les tests scellés du lot livré sont modifiables, comme avant, regles: [R4, R8] }
+      - { si: la fiche du lot livré a été changée par un AUTRE lot, ou seulement dans l'arbre de travail (non commitée), alors: l'exception ne s'ouvre pas, la modification d'un test scellé de ce lot livré est un écart, regles: [R8] }
     resultat: Aucune revue ne porte sur un lot qui a touché le test scellé d'un autre lot.
   - id: C3
     titre: Le rédacteur de tests ne cite que ce que la fiche dit
@@ -99,10 +103,10 @@ regles:
     tests: ["R3 — deux commits touchent le test scellé : le message nomme le plus ancien (sha court et sujet)", "R3 — modification non commitée : message du verrou sans nom de commit", "R3 — deux tests scellés modifiés par deux commits : chaque ligne nomme son propre premier commit"]
   - id: R4
     cas: [C2]
-    enonce: "Les exemptions déjà codées restent entières : un test revenu à son contenu d'avant le lot (bilan nul, L184) et un test d'un lot livré que l'exception L183 admet ne sont pas des écarts, et le nom du commit fautif ne s'ajoute qu'à un écart déjà trouvé."
+    enonce: "Les exemptions déjà codées restent entières : un test revenu à son contenu d'avant le lot (bilan nul, L184) et un test d'un lot livré que l'exception L183 admet (dans les conditions resserrées de R8) ne sont pas des écarts, et le nom du commit fautif ne s'ajoute qu'à un écart déjà trouvé."
     statut: sourcee
     source: "src/orchestrate/accept.ts:311-324 (exception L183, vert true) et accept.ts:329-336 (bilan nul L184) ; tests existants test/orchestrate-accept.test.ts (lockViolations)"
-    tests: ["R4 — test revenu à son contenu d'avant le lot : aucun écart, aucun nom de commit", "R4 — lot livré dont la fiche a changé dans un commit qui cite le lot : modification admise, comme avant"]
+    tests: ["R4 — test revenu à son contenu d'avant le lot : aucun écart, aucun nom de commit", "R4 — lot livré dont la fiche a été amendée par un commit qui cite le lot en cours : modification admise, comme avant"]
   - id: R5
     cas: [C2]
     enonce: "Le contrôle a lieu à la fin de toute session implement ou fix, une session qui pose une question comprise : un test scellé remplacé suivi d'une question rend le lot, il n'attend pas la reprise."
@@ -121,6 +125,18 @@ regles:
     statut: hypothese
     si_faux: "Si la revue de maquette devait relire ces tests, la consigne se déplacerait dans maquette.md ; or l'ordre du cycle (maquette, puis accept, afterMaquette dans cycle.ts) fait passer la revue de maquette avant l'écriture des tests rouges, donc la relecture tombe sur la revue de code. Texte de consigne seul en jeu."
     tests: ["R7 — brief review d'un lot à acceptation scellée : relecture des assertions contre la fiche demandée", "R7 — agents/code-reviewer.md : assertion qui dépasse la fiche = constat majeur"]
+  - id: R8
+    cas: [C2]
+    enonce: "L'exception L183 se resserre : un lot livré (vert: true) ne laisse modifier ses tests scellés que si sa fiche a été amendée depuis lotBase par des commits qui citent le lot EN COURS (le porteur) ; un amendement de la fiche par un autre lot, ou non commité (arbre de travail), n'ouvre pas le verrou."
+    statut: sourcee
+    source: "décision du lead, 16-10 (réponse à la question de ce lot) : « l'esprit de L183 est : le lot en cours amende légitimement fiche et tests d'un lot livré, pas : n'importe quel changement de fiche ouvre le verrou » ; code actuel qui sera changé : src/orchestrate/accept.ts:255-262 (ficheChanged, qui admet tout diff de la fiche depuis lotBase, arbre de travail compris) et accept.ts:317-318"
+    tests: ["R8 — fiche d'un lot livré amendée par un commit d'un AUTRE lot : modifier ses tests scellés est un écart", "R8 — fiche amendée mais non commitée : modifier les tests scellés est un écart", "R8 — fiche amendée par un commit qui cite le lot en cours : modification des tests admise", "R8 — test de L183 mis à jour (« la fiche changée dans un commit antérieur du lot (lotBase) ») : les commits du lot sont passés à lockViolations (lotCommits) et le commit de fiche cite le lot", "R8 — cycle : fiche posée par le lead avant la vague dans un commit qui cite le lot : implement admis, comme avant"]
+  - id: R9
+    cas: [C2]
+    enonce: "La vérification des empreintes des tests scellés des lots livrés a lieu à la fin de chaque session implement ou fix du lot (jamais reportée à la revue), et son message nomme le premier commit fautif (R3), pour que le lead voie la fuite à son origine."
+    statut: hypothese
+    si_faux: "Si le lead exige l'arrêt au premier commit, pendant la session, il faut un hook git post-commit installé dans le dépôt du projet (écriture dans .git/hooks de chaque dépôt, changement de comportement hors de la fiche) : ce serait une question de périmètre, pas un texte ; ici le contrôle reste celui de la fin de session déjà codé (cycle.ts:1539-1543), qui rend le lot sans attendre la revue."
+    tests: ["R9 — session implement qui modifie un test scellé d'un lot livré puis rend son rapport : lot rendu à la fin de cette session, avant toute revue", "R9 — session fix : même contrôle, message avec le premier commit fautif"]
 
 contrats:
   - id: A1
@@ -137,7 +153,7 @@ contrats:
     erreurs:
       - { code: log error, message: "verrou des tests d'acceptation : <fichier> : test d'acceptation de <lot> : empreinte modifiée depuis le commit rouge <sha7> (verrou <chemin>) ; premier commit fautif : <sha7> <sujet>" }
       - { code: log error, message: "verrou des tests d'acceptation : <fichier> : empreinte différente de celle du scellé de <chemin> (test d'acceptation de <lot>)" }
-    regles: [R2, R3, R4, R5]
+    regles: [R2, R3, R4, R5, R8, R9]
   - id: A3
     appel: commande cadence orchestrate (briefs accept.md et accept-back.md, agent acceptance-writer)
     entree: "BriefVars existantes ; fiche conforme"
@@ -155,4 +171,4 @@ contrats:
 
 donnees:
   - { id: D1, objet: "templates/orchestrate/implement.md, fix.md, accept.md, accept-back.md, agents/acceptance-writer.md, agents/code-reviewer.md (texte des briefs)", existant: true, modification: changement, note: "texte de consigne rendu à chaque vague, aucun format stocké", decision: "texte de consigne réversible par un commit ; écrit en règles R1, R6, R7, aucune question au lead" }
-  - { id: D2, objet: "acceptation-<lot>.json (lot, fiche, fichiers, vert, empreintes, resceaux)", existant: true, modification: aucune, note: "lu par lockViolations, format et écriture inchangés ; le nom du commit fautif est calculé par git log, jamais stocké" }
+  - { id: D2, objet: "acceptation-<lot>.json (lot, fiche, fichiers, vert, empreintes, resceaux)", existant: true, modification: aucune, note: "lu par lockViolations, format et écriture inchangés ; le nom du commit fautif est calculé par git log, jamais stocké ; R8 ne change que la condition de lecture (quels commits ouvrent l'exception), pas le fichier" }

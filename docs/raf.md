@@ -1,0 +1,192 @@
+[← cadence](../README.md)
+
+# raf
+
+- The plan is a YAML file in the repo (`docs/plan/raf.yaml`), edited by the CLI.
+  Your comments and hand edits are preserved.
+- A commit belongs to a lot when its message cites the id: `feat(L3): …`,
+  `fix: L3/t1 …`. The link is **computed from `git log`**, never stored, so
+  committing never dirties the plan. The id is read as a whole word: `XL3`,
+  `L3x` and `L3.4` do not cite `L3`, while `L3.` at the end of a sentence does.
+  When the subject has a scope that cites lots (`feat(L3): …`,
+  `chore(L31,L32): …`), **the scope alone decides**: a passing mention
+  (`page équipe (L27)`), a range (`L28–L31`, `L45 à L48`) or the body does not
+  count. Without a scope citing a lot, the whole message is read as before.
+- `raf check` audits drift between the plan and the history.
+- Plan upkeep needs no lot. A commit is plan upkeep when **every file it
+  touches is a plan file**: the plan itself, its Gantt page (only at its default place, `gantt.html` next to the plan — written elsewhere with `raf gantt -o`, declare it under `plan.files`), the `plan:` key of the config file in use (`cadence.yaml`, or
+  the `--config` file; a change to `deliver:`/`session:` is work), or a file the
+  project lists under `plan.files` in `cadence.yaml` (a page it generates from
+  the plan, a journal), or the QA expectations file (`docs/qa/expectations.md`,
+  or the file named by `qa.expectations`; the lead commits the `qa-reviewer`'s draft of it). Such a commit is never a "commit without a lot", and it
+  does not count as work on the lots it cites: it is absent from `raf commits`,
+  does not start a `todo` lot, does not make a code review stale, and
+  `cadence deliver` does not announce the lots it cites as delivered. The files
+  decide, never the subject: a `chore(plan): …` commit that touches a source
+  file is a commit like any other.
+- `raf gantt` writes a single self-contained HTML page (no server, no CDN).
+
+```sh
+npm install -g @sylad/cadence    # or: npx -p @sylad/cadence raf …
+
+raf init                          # docs/plan/raf.yaml + post-commit hook + .playwright-mcp/ in .gitignore
+raf add "Monthly dedup on merge" --estimate 2
+raf add "Typo in footer" --quickwin
+raf add "Loan cache" --after L1
+raf add "write the migration" --parent L1     # → L1/t1
+raf start L1
+git commit -m "feat(L1): dedup by calendar month"
+raf now                           # in progress, next up (quickwins first), recently done
+raf done L1/t1 && raf done L1
+raf check                         # exit 1 on drift
+raf gantt                         # docs/plan/gantt.html
+```
+
+## Commands
+
+| Command | Effect |
+|---|---|
+| `raf init [--project name] [--prefix L] [--no-hook]` | create the plan, install the hook, add `.playwright-mcp/` to `.gitignore` |
+| `raf add "title" [--estimate d] [--quickwin] [--visible [--screen page\|component\|journey]] [--spec] [--public "title"] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id (`--public`: the lot's title in the public's words, written as `public:` right after `title:`; `--screen`: the screen a visible lot creates or changes — a new `page`, a new `component` or a modified `journey` — written as `screen:` right after `visible:`, shown by `raf show`; it requires `--visible`, and `raf check` reports a `screen:` without `visible:` or with another value as an error. Only `page` triggers the spec step of `orchestrate` (L209), never inferred from the title; `--spec`: the lot changes a behaviour (something a user, an API client or another service can observe), written as `spec: true` right after `screen:`, `visible:`, `quickwin:` or `estimate:` (whichever comes last), shown by `raf show`, refused on a sub-task. Also set by the lead at planning time, never inferred from the title) |
+| `raf add "title" --every <days>` · `raf did <id> ["text"]` | recurring lot: `every` (days) and `last` (last time done) fields; the lot stays `todo`, `raf now` and `session start` list it under « Récurrent » with « dû depuis N j » / « prochain dans N j »; `raf did` resets the count (spec: `docs/superpowers/specs/2026-10-04-L11-tache-recurrente.md`) |
+| `raf screen <id> page\|component\|journey\|none` | set, replace or remove `screen:` on an existing lot, to adopt the [spec step](orchestrate.md#the-spec-step-of-a-lot-with-screen) on a plan already written (only `page` adopts the [spec step](orchestrate.md#the-spec-step-of-a-lot-with-screen); `component` and `journey` do not); refused on a lot without `visible:` (like `raf add --screen`) and on a sub-task; `none` removes the key and leaves `visible:` alone |
+| `raf spec <id> on\|off` | set or remove `spec:` on an existing lot (a lot that changes a behaviour, for the back-end spec step of `cadence orchestrate`, see [The spec step of a lot with `spec: true`](orchestrate.md#the-spec-step-of-a-lot-with-spec-true)); refused on a sub-task; `off` is refused on a lot that has `screen: page` (the page implies the spec: remove `screen:` first) and `on` there only says so and changes nothing; on `component` and `journey` (ordinary path since L209) both work and set or remove the back-end `spec:`. `raf spec` only takes `on`/`off`: `cadence spec check\|qa <fiche.yaml>` keeps its own subcommands. `raf check` reports a `spec:` that is neither `true` nor `false` (`spec : true ou false attendu`) |
+| `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
+| `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
+| `raf todo <id> [--reason text]` | put a started lot back to `todo` (`doing` → `todo`, `started:` removed, dated note « remis en attente : reason »): refused when work commits cite the lot (plan-only and version commits do not count, as `raf commits`), when the lot is not `doing` (a `done` or `dropped` lot is reopened by hand), or on a sub-task; sub-tasks and other keys are left as they are |
+| `raf note <id> "text"` | dated note — keep decisions next to the work |
+| `raf show <id> [--notes]` | one lot: status, dates, `after`, public title, dated notes in order, then the counted commits (as `raf commits`, neighbouring repositories included); `--notes` prints the notes alone |
+| `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first; a lot that declares `repos:` ([neighbouring repositories](orchestrate.md#a-lot-whose-work-is-in-a-neighbouring-repository)) gets, after them, one `dépôt <path> :` section per neighbour with the commits there that cite the lot and fall within the lot's period (`started` to `finished`) and, when the lot declares a `cite:` for that neighbour, contain that string (`aucun commit du lot`, or `introuvable` for a path that is not there) |
+| `raf now` | what to do next |
+| `raf list [--status s]` | flat list |
+| `raf ignore <sha> \| "exact subject" [--reason text]` | acknowledge a commit without a lot (tooling chore, a plan commit citing an unknown id) without rewriting history: a dated, reasoned line in the plan's `acknowledged:` section; a sha is exact, a subject covers every commit carrying it |
+| `raf check --ignored` | list the acknowledged commits with their date and reason |
+| `raf check [--since date] [--idle 7]` | since the plan's adoption date by default (a visible lot without a public title is only a `⚠` warning: it never changes the exit code): commits without a lot (commits touching only plan files, or only version fields, `CHANGELOG.md` and the README's « What's new » section, are exempt), unknown ids, `todo` lots that already have commits, idle lots, `done` lots with open sub-tasks, bad or circular dependencies |
+| `raf gantt [-o file]` | standalone Gantt page |
+| `raf hook install` | add the post-commit hook (read-only, never blocks) and the pre-commit hook (does nothing unless `hook.autostart` says so, see below) |
+
+### A commit on a lot that is still `todo`
+
+By default the post-commit hook only warns (`L1 est encore todo — raf start L1`). The `hook.autostart`
+key of `cadence.yaml` changes what the **pre-commit** hook does when the message cites a `todo` lot
+(a recurring lot, a lot already `doing`, a commit without a lot and a plan-upkeep commit are never concerned):
+
+```yaml
+hook:
+  autostart: refuse   # warn (default) | refuse | start
+```
+
+- `warn`: today's behaviour, the commit goes through, the post-commit hook warns.
+- `refuse`: the commit fails, loudly, with `raf start <id>` in the message (`--no-verify` still bypasses it).
+- `start`: the hook runs `raf start <id>` and stages the plan, so the plan change is **in the same commit** —
+  no amend afterwards, no dirty plan left behind. Only when `docs/plan/raf.yaml` is identical to `HEAD` (no
+  uncommitted change to the plan, staged or not): otherwise nothing is started, the hook says why
+  (`plan modifié non commité : démarrage automatique sauté, raf start <id> à la main`) and behaves like `warn`.
+
+The pre-commit hook reads the message from the command line of the `git commit` that runs it (`-m`, `-am`,
+`--message`, `-F`; Linux, through `/proc`) or from `CADENCE_COMMIT_MESSAGE`. When the message is not known yet
+(editor, `--amend`) it does nothing and the post-commit warning stays. Run `raf hook install` again to add the
+pre-commit block to an existing repository. A read-only plan is never started by the hook. Only a refusal (exit code 3 of `raf hook pre-commit`) stops a commit: an older or broken `raf` lets it through.
+
+Global options: `--file path` or `RAF_FILE`; `RAF_TODAY=YYYY-MM-DD` to freeze
+the date. `cadence raf …` is the same as `raf …`.
+
+## Plan file
+
+```yaml
+version: 1
+project: my-app
+prefix: L
+since: 2026-09-28     # commits before this date are not audited
+ignore: ['^chore\(batch\):']   # optional: subjects of automated commits, neither audited nor counted for a lot
+lots:
+  - id: L1
+    title: Monthly dedup on merge
+    status: doing        # todo | doing | done | dropped
+    estimate: 2          # working days
+    quickwin: false
+    visible: true        # user-facing: a news entry is expected when done
+    after: [L0]
+    gate: { count: 8, spec: true }   # optional: not before 8 lots with `spec: true` are done (or `screen: page`)
+    created: 2026-09-28
+    started: 2026-09-29
+    notes:
+      - { date: 2026-09-29, text: "keep the bank line when both sources exist" }
+    tasks:
+      - { id: t1, title: write the migration, status: done }
+```
+
+## A plan elsewhere, or in another format
+
+`cadence.yaml`, at the repository root, can say where the plan is. The short form keeps raf's own
+format, and the plan stays writable:
+
+```yaml
+plan: planning/todo.yaml
+```
+
+A project that publishes its plan (a JSON generated from it and committed with it)
+declares that file, so a commit touching only the plan and its published copy is
+plan upkeep; the plan keeps raf's format and stays writable:
+
+```yaml
+plan:
+  files: [frontend/public/plan-data/plan.json]
+```
+
+Until the file is declared, such a commit is reported as a "commit without a
+lot" when it cites none, and counts as work on the lots it cites.
+
+A project that already keeps its plan with its own tool is read **without migrating it**: describe
+the file, and `raf now`, `raf list`, `raf commits`, `raf check`, `raf gantt` and
+`cadence session start|close` work on it. Such a plan is **read-only** —
+`raf add|start|done|note|ux|review` refuse and leave the file to the project's tool, and the two
+review gates do not apply to it (a `uxSince` or `reviewSince` written in it is ignored).
+
+```yaml
+plan:
+  path: docs/plan/taches.yaml
+  project: my-app               # what the file does not say itself: project, since, ignore
+  since: 2026-10-02
+  ignore: ['^plan: ']
+  files: [docs/plan/journal.ndjson]   # kept with the plan: a commit touching only these is a plan commit
+  lots: taches                  # root key holding the list (default: lots)
+  fields:                       # raf field: key in the file (a list = first one present)
+    title: titre
+    public: titre_public        # the lot's title for the public; read when it is text, else ignored
+    screen: ecran               # page, component or journey; only on a visible lot (only `page` enters the spec step)
+    spec: fiche                 # true or false: the lot changes a behaviour
+    status: etat
+    estimate: effort
+    created: cree_le
+    started: demarre_le
+    finished: [livre_le, ferme_le]
+    notes: note
+    repos: depots               # the lot's neighbouring repositories (a list of paths and/or { path, cite }, or one of them)
+    parent: parent
+  statuses:                     # raf status: their states
+    todo: [prevu, specifie]
+    doing: [en_cours, teste]
+    done: [deploye, valide]
+    dropped: caduc
+  estimates: { S: 0.5, M: 1, L: 3 }   # their effort labels, in working days
+```
+
+- Fields: `id`, `title`, `status`, `estimate`, `quickwin`, `visible`, `screen`, `spec`, `public`, `every`, `last`, `after`, `created`, `started`,
+  `finished`, `notes`, `repos`, `parent`, `gate`; one left out is read under its own name. A timestamp counts for
+  its day; a note written as plain text is one note.
+- `gate` (L219) is a drawing condition added to `after`: `gate: { count: N, spec: true }` or `gate: { count: N, screen: page }` (N an integer ≥ 1, one criterion). It is written by hand in the plan (no `raf add` option). The count is the number of `done` lots of the same plan that carry the criterion (`todo`, `doing`, `dropped` lots and sub-tasks do not count; recurring lots do). Until the count reaches N, a `todo` lot is *waiting*, never *ready*: `raf now` lists it on a line `en attente de condition de tirage : L190 (2/8 lots spec: true faits)` (the existing `en attente de dépendances : …` line stays for lots waiting on `after`), `cadence session start` adds an `En attente` section (nothing when no lot is gated) and leaves the lot out of `À suivre` and of the proposals, `cadence lead tour` skips it for `prochain` and adds `attend L190` to the project's line (and `waiting` to `--json`, only when a lot waits), `cadence orchestrate` refuses it before any action (`a:L190 : condition de tirage non remplie : 2/8 lots spec: true faits`) and `--continue` never draws it, and `raf show` prints `gate : 8 lots spec: true faits`. Once the count is reached the lot is ready like any other (the field stays in the plan); a lot already `doing` is not refused for its condition. A malformed `gate` is reported by `raf check` (`gate invalide : …`) and the lot is never drawable. A plan without `gate` behaves exactly as before; `after` read by the Gantt scheduling is unchanged.
+- `spec` is the exception to « a left-out field is read under its own name »: a read-only plan's `spec:` is often the path of a spec document, so it is read only when `plan.fields.spec` maps it, and then only `true` counts (any other value is neither an error nor a spec step). Natively, `spec:` stays `true` or `false` (L198). Consequence for a `gate: { count: N, spec: true }` in a read-only plan: it counts only lots whose `spec` is mapped by `plan.fields.spec`; without that mapping the count stays 0 and the lot waits for good, with no `raf check` problem. `gate: { count: N, screen: page }` has no such condition.
+- `parent`: an entry `B33/t1-fusion` whose parent is `B33` becomes the sub-task `t1-fusion` of `B33`.
+- Ids need no prefix: a commit belongs to a lot when its message cites one of the plan's ids as a
+  whole word (`E-A2`, `NC2.4`, `B33/t1-fusion`).
+  An id that is not in the plan cannot be told from ordinary text: such a commit counts as
+  "without a lot", never as an unknown reference.
+- A state missing from `statuses`, or an effort label missing from `estimates`, is reported by
+  `raf check`.
+
+## Gantt scheduling
+
+One lane of work. Finished lots use their real dates (or their commits' dates);
+lots in progress run until `max(start + estimate, today)`; lots to do follow in
+file order, after their dependencies, on working days.

@@ -1,7 +1,7 @@
 # Documentation qui suit le code (docs.sync, L143) : un lot dont les commits touchent le code,
-# les gabarits, les agents ou les skills doit aussi toucher le README.
+# les gabarits, les agents ou les skills doit aussi toucher le README ou une page docs/ (le contenu du README y est parti, L232).
 docs:
   sync:
     - paths: [src/**, bin/*.js, templates/**, agents/**, skills/**, '!**/*.test.ts']
-      docs: [README.md]
+      docs: [README.md, 'docs/*.md']
   since: 2026-10-09

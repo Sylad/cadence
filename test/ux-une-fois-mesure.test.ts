@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { docText } from './docs-text.js';
 
 // L221 — le document de la mesure avant/après de la revue UX jouée une seule fois.
 const root = join(import.meta.dirname, '..');
@@ -29,6 +30,6 @@ describe('mesure avant/après de la revue UX (L221)', () => {
   })
 
   it('R10 — le README renvoie au document de mesure', () => {
-    expect(readFileSync(join(root, 'README.md'), 'utf8')).toContain('docs/mesures/ux-une-fois-2026-10-15.md');
+    expect(docText()).toContain('docs/mesures/ux-une-fois-2026-10-15.md');
   })
 })

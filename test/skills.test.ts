@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { AGENTS_DIR, installSkills, SKILLS_DIR } from '../src/skills.js';
 import { gitRepo, tempDir } from './helpers.js';
+import { docText } from './docs-text.js';
 
 const flat = (text: string): string => text.replace(/\s+/g, ' ');
 /** Le contrat de l'agent QA, en-tête et corps séparés : une clause du corps ne peut pas être tenue par la seule description. */
@@ -40,7 +41,7 @@ const MINOR_RULE = 'A minor finding becomes a lot of its own only if it describe
 const skillText = (name: string): string => flat(readFileSync(join(SKILLS_DIR, name, 'SKILL.md'), 'utf8'));
 /** La section « QA review » du README, jusqu'au titre suivant. */
 const readmeQa = (): string => {
-  const readme = readFileSync(join(AGENTS_DIR, '..', 'README.md'), 'utf8');
+  const readme = docText();
   return readme.slice(readme.indexOf('### QA review'), readme.indexOf('## session'));
 };
 
@@ -273,7 +274,7 @@ describe('skills install', () => {
     expect(step1).toContain('Read the open lots of the plan (status `todo` or `doing`) with `raf list --status todo` and `raf list --status doing`, or the project\'s own tool when the plan is read-only');
     expect(step6).toContain('a finding already planned by an open lot is returned in one line — the lot id and its title — not as a new finding and not as a follow-up;');
     // README : « déjà planifié » est une quatrième sorte de constat, avant le hors-périmètre.
-    const readme = readFileSync(join(AGENTS_DIR, '../README.md'), 'utf8').replace(/\s+/g, ' ');
+    const readme = docText().replace(/\s+/g, ' ');
     expect(readme).toContain('visible effect, ranked minor) or already planned (an open lot covers it: returned in one line, the lot id and its title)');
     expect(step6.indexOf('*already planned*')).toBeGreaterThan(step6.indexOf('*noise*'));
     expect(step6.indexOf('*already planned*')).toBeLessThan(step6.indexOf('*out of scope*'));
@@ -310,7 +311,7 @@ describe('skills install', () => {
   });
 
   it('docs : README, lead et deliver suivent le repli et les services consommés du qa-reviewer (L123)', () => {
-    const readme = readFileSync(join(__dirname, '..', 'README.md'), 'utf8');
+    const readme = docText();
     const i = readme.indexOf('- **qa-reviewer** (agent)');
     const entry = readme.slice(i, readme.indexOf('\n- **', i + 10));
     expect(entry).toContain('the pages that consume the services the lot changed');
@@ -395,7 +396,7 @@ describe('skills install', () => {
     expect(lead).not.toContain('handed back, final table');
     expect(lead).toContain('The final table is not in the journal');
     expect(lead).toContain('stop the follow-up');
-    const readme = flat(readFileSync(join(AGENTS_DIR, '..', 'README.md'), 'utf8'));
+    const readme = flat(docText());
     expect(readme).toContain('--status [<wave>] --watch [--interval 10]');
     expect(readme).toContain('.cadence/runs/<id>/journal.log');
   });
@@ -434,10 +435,10 @@ describe('skills install', () => {
 
   it('README : section QA review — le format des attentes est celui que lit l’agent, la clé qa.expectations est documentée', () => {
     const root = join(AGENTS_DIR, '..');
-    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    const readme = readFileSync(join(root, 'docs/news.md'), 'utf8');
     const agent = readFileSync(join(AGENTS_DIR, 'qa-reviewer.md'), 'utf8');
-    const section = readme.slice(readme.indexOf('### QA review'), readme.indexOf('## session'));
-    expect(readme.indexOf('### Code review')).toBeLessThan(readme.indexOf('### QA review'));
+    const section = readme.slice(readme.indexOf('## QA review'));
+    expect(readme.indexOf('## Code review')).toBeLessThan(readme.indexOf('## QA review'));
     expect(section).toContain('`docs/qa/expectations.md`');
     expect(section).toContain('qa:\n  expectations: ');
     // Les trois sortes de lignes d'une page : mêmes mots dans l'exemple du README et dans le contrat de l'agent.
@@ -451,7 +452,7 @@ describe('skills install', () => {
     expect(text).toContain('No gate and no command here: the QA review comes **after** a delivery, and `raf done` does not wait for it.');
     expect(text).toContain(`It follows any delivery that ${QA_TRIGGER}:`);
     expect(text).toContain('a backend-only lot can empty a page without touching a screen, and the agent then walks the pages that call the changed endpoints.');
-    const skills = flat(readme.slice(readme.indexOf('## Claude Code skills'), readme.indexOf('## Releasing')));
+    const skills = flat(readFileSync(join(root, 'docs/skills.md'), 'utf8'));
     expect(skills).toContain('after a green delivery that changes what a page shows or what it is served, the `qa-reviewer` agent walks the delivered app.');
     expect(skills).toContain('a delivery that changes what a page shows or what it is served is then checked in the running app by the `qa-reviewer` agent, whose blocking findings come back to you.');
     expect(skills).toContain('optionally a lot id, to walk only the pages it touched — those that call the changed endpoints, those of the screens it changed, the pages that consume the services the lot changed, and the home page; a backend-only lot stays in scope, and when the lot changes no route and no screen, or the endpoints cannot be mapped to pages, every page is walked');
@@ -491,8 +492,8 @@ describe('skills install', () => {
     // Sans fichier : mêmes règles que dans le contrat de l'agent.
     expect(text).toContain('Without an expectations file the agent walks the routes it discovers and still runs its universal checks: an error shown, a failed API call whose content is missing on screen, a broken or missing content image are defects with or without a file; an empty 2xx body, like whatever else would need an expectation to judge, is suspect at most (it may be a normal absence).');
     expect(text).toContain('The agent reads that key, and so does `raf check`: a commit touching only that file is plan upkeep (no lot to cite, see above).');
-    expect(readme).toContain('`ux-reviewer`, `code-reviewer` and `qa-reviewer` agents');
-    expect(readme).toContain('- **qa-reviewer** (agent)');
+    expect(docText()).toContain('`ux-reviewer`, `code-reviewer` and `qa-reviewer` agents');
+    expect(docText()).toContain('- **qa-reviewer** (agent)');
   });
 
   it('un mineur ne devient un lot que s’il décrit un bug observable ; sinon il reste une note du lot d’origine (L109)', () => {

@@ -11,6 +11,7 @@ import { AGENTS_DIR } from '../src/skills.js';
 import { ecritAcceptation } from './accept-helpers.js';
 import { acceptReport, claudeOut, commitFile, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 import { ecrit, EXEMPLE } from './spec-helpers.js';
+import { docText } from './docs-text.js';
 
 // L174 (spec etape-spec, S6) : les briefs en aval de la fiche — implement/fix, revue de code (règle → test → vert), conformité UX légère.
 const FICHE = 'docs/specs/prochain-match/fiche.yaml';
@@ -199,7 +200,7 @@ describe('agents', () => {
 
 describe('docs', () => {
   it('le README décrit les briefs aval et la section Hypothèses', () => {
-    const readme = readFileSync(join(__dirname, '..', 'README.md'), 'utf8');
+    const readme = docText();
     expect(readme).toContain('règle → test → vert');
     expect(readme).toContain('## Hypothèses');
   });

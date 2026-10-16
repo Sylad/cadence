@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { Plan } from '../src/plan.js';
 import { gitRepo, tempDir } from './helpers.js';
+import { docText } from './docs-text.js';
 
 const T = '2026-10-11';
 
@@ -153,7 +154,7 @@ describe('champ spec des lots (L186, spec etape-spec-back B1)', () => {
   });
 
   it('README : Stability liste raf screen et raf spec ; --spec dit où va la clé', () => {
-    const readme = readFileSync(join(__dirname, '..', 'README.md'), 'utf8');
+    const readme = docText();
     const guaranteed = readme.slice(readme.indexOf('**Guaranteed**'), readme.indexOf('**The keys of'));
     expect(guaranteed).toMatch(/`screen`, `spec`/);
     expect(guaranteed).toContain('`cadence spec <lot> on|off`');

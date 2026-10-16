@@ -41,6 +41,10 @@ jobs:
           git config --global --list || true
           env | grep '^GIT_' || echo "aucune variable GIT_*"
 
+      # Le README est une page d'accueil (L232) : aucun lien relatif ni ancre cassé dans lui et dans les pages docs/.
+      - name: Liens du README et des pages docs/
+        run: node scripts/check-links.mjs
+
       # prepublishOnly de publish.yml : typecheck puis tests.
       - run: npm run typecheck
       - run: npm test

@@ -5,6 +5,7 @@ import { run } from '../src/cli.js';
 import { readOrchestrateConfig } from '../src/config.js';
 import { Plan } from '../src/plan.js';
 import { gitRepo, tempDir } from './helpers.js';
+import { docText } from './docs-text.js';
 
 const T = '2026-10-10';
 
@@ -124,7 +125,7 @@ describe('orchestrate.spec (L169, spec etape-spec S1)', () => {
 });
 
 describe('README (L169)', () => {
-  const readme = readFileSync(join(import.meta.dirname, '../README.md'), 'utf8');
+  const readme = docText();
   it('documente --screen et orchestrate.spec', () => {
     expect(readme).toMatch(/\[--visible \[--screen page\\\|component\\\|journey\]\]/);
     expect(readme).toMatch(/^\s+spec: \{ dir: docs\/specs/m);

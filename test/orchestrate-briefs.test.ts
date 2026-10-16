@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { TEMPLATES_DIR, loadTemplates, newsText, objective, renderBrief } from '../src/orchestrate/briefs.js';
 import { WORK_SCHEMA, REVIEW_SCHEMA, checkShape } from '../src/orchestrate/schemas.js';
 import type { Lot } from '../src/plan.js';
+import { docText } from './docs-text.js';
 
 const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8');
 const lot = (extra: Partial<Lot> = {}): Lot => ({
@@ -384,7 +385,7 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
   });
 
   it("README : les briefs Nouveautés hors vague (dry-run, délégation à la main) n'ont pas de dossier de vague ; fix et fix-minors d'un lot visible l'ont aussi, avec --add-dir (L91)", () => {
-    const readme = read('../README.md');
+    const readme = docText();
     expect(readme).toContain('A `--dry-run` brief of a `visible` lot has no wave folder');
     expect(readme).toContain('OS temp directory');
     expect(readme).toContain('the `fix` and `fix-minors` briefs of a `visible` lot');
@@ -433,7 +434,7 @@ describe('ligne de base des tests dans les briefs (L213)', () => {
     for (const name of ['implement', 'fix'] as const) {
       expect(readFileSync(join(TEMPLATES_DIR, `${name}.md`), 'utf8')).toContain('any entry in "nouveauxEchecs" with `vert: false` triggers one');
     }
-    expect(readFileSync(join(__dirname, '..', 'README.md'), 'utf8')).toContain('A non-empty `nouveauxEchecs` with `vert: false` triggers a correction pass');
+    expect(docText()).toContain('A non-empty `nouveauxEchecs` with `vert: false` triggers a correction pass');
   });
   it('le sha de départ du brief est celui du code : parent du plus ancien commit de travail, identique dans implement et fix', () => {
     const line = (name: string) => readFileSync(join(TEMPLATES_DIR, `${name}.md`), 'utf8').split('\n').find((l) => l.startsWith('Tests already red before the lot'));

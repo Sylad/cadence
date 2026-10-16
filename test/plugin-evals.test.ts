@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
+import { docText } from './docs-text.js';
 
 // L139 : la suite `claude plugin eval` (evals/) est facturée à chaque run, on ne la lance pas ici ; on vérifie
 // seulement qu'elle est lisible par `claude plugin eval` (clés, types de graders) et qu'elle couvre les pièges.
@@ -140,14 +141,15 @@ describe('lancement de la suite', () => {
   });
 
   it('est décrite dans le README (billed, à la release, baseline)', () => {
-    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    const readme = docText();
     expect(readme).toMatch(/npm run eval:plugin/);
     expect(readme).toMatch(/claude plugin eval/);
     expect(readme).toMatch(/billed/i);
     expect(readme).not.toMatch(/replaces the real trial/);
     expect(readme).toMatch(/--no-publish/);
     // l'évaluation est une étape ordonnée de « Releasing », entre le commit de version et le tag
-    const rel = readme.slice(readme.indexOf('## Releasing'), readme.indexOf('### Evaluating the plugin'));
+    const releasing = readFileSync(join(root, 'docs/releasing.md'), 'utf8');
+    const rel = releasing.slice(releasing.indexOf('# Releasing'), releasing.indexOf('## Evaluating the plugin'));
     expect(rel.indexOf('npm run eval:plugin')).toBeGreaterThan(rel.indexOf('Bump `version`'));
     expect(rel.indexOf('npm run eval:plugin')).toBeLessThan(rel.indexOf('git tag v<version>'));
     expect(readme).toMatch(/claude plugin eval \. --case deliver-sha[^\n]*--no-publish[^\n]*--max-cost-usd/);

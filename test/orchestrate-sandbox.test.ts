@@ -4,6 +4,7 @@ import { delimiter, join } from 'node:path';
 import { sandboxEnv, PROD_VARS } from '../src/orchestrate/sandbox.js';
 import { realClaude, runSession, type StepSpec } from '../src/orchestrate/launch.js';
 import { tempDir } from './helpers.js';
+import { docText } from './docs-text.js';
 
 const spec: StepSpec = { kind: 'implement', sessionId: 's', brief: 'b', model: 'sonnet', schema: {}, cwd: '/tmp', wave: 'w', permissionMode: 'auto', addDirs: [], timeoutMs: 5_000 };
 
@@ -70,7 +71,7 @@ describe('une session de vague ne voit pas le cluster (L168)', () => {
 
 describe('README (L168)', () => {
   it('nomme chaque variable retirée, sans promettre un préfixe entier', () => {
-    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    const readme = docText();
     for (const v of PROD_VARS) expect(readme, v).toContain(v);
     expect(readme).not.toMatch(/`AWS_\*`|`ARGOCD_\*`|`CLOUDFLARE_\*`|`CF_API_\*`/);
   });

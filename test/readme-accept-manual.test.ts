@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { docText } from './docs-text.js';
 
 // L182 : le README dit comment lancer à la main la commande orchestrate.accept (hors vague).
 describe('README, étape accept lancée à la main', () => {
-  const text = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
+  const text = docText()
   const start = text.indexOf('Out of the ordinary test run and the CI')
   const section = text.slice(start, text.indexOf('**What the program checks**', start))
 

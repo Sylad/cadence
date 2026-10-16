@@ -102,5 +102,5 @@ The final review is always played; the budget bounds the writing passes. A `scre
   `cadence spec reseal <lot> <test> --reason "…"`, never by editing `acceptation.json`.
 - Deliveries and the `raf ux` / `raf review` verdicts belong to the lead, one project at a time.
 
-See also the README's [orchestrate](../README.md#orchestrate) section and
-[lead tour](../README.md#lead-tour).
+See also the README's [orchestrate](orchestrate.md#orchestrate) section and
+[lead tour](lead.md#lead-tour).

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { measure, readCache, readRuns, renderReport, sampleKeys } from '../src/corrections.js';
+import { docText } from './docs-text.js';
 
 const root = resolve(import.meta.dirname, '..');
 const runs = join(root, '..', '.cadence', 'runs');
@@ -43,7 +44,7 @@ describe('relevé de référence des corrections (L165)', () => {
     const h = part(m.byVisibilityCause.hidden, m.byVisibility.hidden.passes);
     const all = part(m.byCause, m.total.passes);
     expect(doc).toContain(`de ${v.pct} % (${v.n} sur ${v.passes}) pour les lots visibles et de ${h.pct} % (${h.n} sur ${h.passes}) pour les autres, soit ${all.pct} % tous lots`);
-    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    const readme = docText();
     expect(readme).toContain(`${v.pct} % of ${v.passes} passes against ${all.pct} % overall`);
     const spec = readFileSync(join(root, 'docs', 'superpowers', 'specs', '2026-10-10-etape-spec-design.md'), 'utf8');
     expect(spec).toContain(`| ${v.pct} % (${v.n} sur ${v.passes}, lots visibles) |`);
@@ -53,7 +54,7 @@ describe('relevé de référence des corrections (L165)', () => {
     const lots = /\*\*(\d+) lots\*\*/.exec(doc)?.[1];
     const un = /(\d+) % des lots ont eu/.exec(doc)?.[1];
     const deux = /(\d+) % au moins deux/.exec(doc)?.[1];
-    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    const readme = docText();
     expect(readme).toContain(`\`${un} %\` and \`${deux} %\` of ${lots} lots in the 10-10 baseline`);
   });
 });

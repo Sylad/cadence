@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { docText } from './docs-text.js';
 
 // L167 : docs/lead.md — le schéma du workflow du skill lead, générique, clair/sombre.
 const root = join(import.meta.dirname, '..')
@@ -50,7 +51,7 @@ describe('docs/lead.md', () => {
 
   it("aide de raf screen, ligne README et libellés des SVG : seule la valeur page adopte l'étape spec (L210)", () => {
     expect(read('src/cli.ts')).toMatch(/raf screen <id>[^\n]*seule la valeur page adopte l'étape spec/)
-    const row = read('README.md').split('\n').find((l) => l.startsWith('| `raf screen <id>')) ?? ''
+    const row = docText().split('\n').find((l) => l.startsWith('| `raf screen <id>')) ?? ''
     expect(row).toContain('only `page` adopts the [spec step]')
     for (const [variant, f] of Object.entries(svgs)) {
       const svg = read(f)
@@ -62,7 +63,7 @@ describe('docs/lead.md', () => {
   })
 
   it("README, vue d'ensemble du lead : seul screen: page passe par spec, maquette et accept (L209)", () => {
-    const readme = read('README.md')
+    const readme = docText()
     expect(readme).toContain('a lot with `screen: page` first goes through the [spec, mockup review and accept steps]')
     expect(readme).not.toContain('a lot with a `screen:` first goes through')
   })
@@ -76,13 +77,13 @@ describe('docs/lead.md', () => {
   it('décrit le réglage lead.ux : le lead peut poser le verdict UX, l\'humain consulté en cas de doute (L197)', () => {
     const md = read('docs/lead.md')
     const skill = read('skills/lead/SKILL.md')
-    for (const [name, text] of [['docs/lead.md', md], ['skill', skill], ['README', read('README.md')]] as const) {
+    for (const [name, text] of [['docs/lead.md', md], ['skill', skill], ['README', docText()]] as const) {
       expect(text, name).toContain('lead.ux')
       expect(text, name).toMatch(/lead\.ux: lead/)
       expect(text, name).toMatch(/doubt|doute/)
     }
     expect(skill).toMatch(/lead\.ux.*human/s)
-    expect(read('README.md')).toContain('verdict UX : lead')
+    expect(docText()).toContain('verdict UX : lead')
   })
 
   it("décrit le rescellé avec une fiche amendée par des commits du lot (L217, R1/R3)", () => {
@@ -156,14 +157,14 @@ it('les variantes clair et sombre diffèrent par les couleurs seulement', () => 
 
 describe('cadence spec reseal : le chemin du lead pour un test scellé faux (L200)', () => {
   it('est décrit par le README, le skill lead et docs/lead.md', () => {
-    for (const [name, text] of [['README', read('README.md')], ['skill', read('skills/lead/SKILL.md')], ['docs/lead.md', read('docs/lead.md')]] as const) {
+    for (const [name, text] of [['README', docText()], ['skill', read('skills/lead/SKILL.md')], ['docs/lead.md', read('docs/lead.md')]] as const) {
       expect(text, name).toContain('cadence spec reseal')
       expect(text, name).toContain('--reason')
     }
-    expect(read('README.md')).toContain('resceaux')
+    expect(docText()).toContain('resceaux')
   })
 
   it('L212 : le rescellé d’un lot livré (--porteur) est décrit par le README, le CHANGELOG, le skill lead et docs/lead.md', () => {
-    for (const [name, text] of [['README', read('README.md')], ['CHANGELOG', read('CHANGELOG.md')], ['skill', read('skills/lead/SKILL.md')], ['docs/lead.md', read('docs/lead.md')]] as const) expect(text, name).toContain('--porteur')
+    for (const [name, text] of [['README', docText()], ['CHANGELOG', read('CHANGELOG.md')], ['skill', read('skills/lead/SKILL.md')], ['docs/lead.md', read('docs/lead.md')]] as const) expect(text, name).toContain('--porteur')
   })
 })

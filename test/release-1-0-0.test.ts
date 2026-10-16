@@ -21,17 +21,17 @@ describe('release 1.0.0 (L164)', () => {
     expect(first).toMatch(/semantic versioning|semver/i)
   })
 
-  it('le README garde le paragraphe 1.0.0 dans « What’s new »', () => {
+  it('le README garde la ligne 1.0.0 dans « What’s new » et la page docs/whats-new.md son paragraphe', () => {
     const readme = read('README.md')
-    const news = readme.slice(readme.indexOf("## What's new"))
-    expect(news).toMatch(/\*\*1\.0\.0\*\*: the first major release/)
+    expect(readme.slice(readme.indexOf("## What's new"))).toMatch(/\*\*1\.0\.0\*\*: the first major release/)
+    expect(read('docs/whats-new.md')).toMatch(/\*\*1\.0\.0\*\*: the first major release/)
   })
 
   it('le README liste la surface garantie et celle qui ne l’est pas', () => {
-    const readme = read('README.md')
-    const start = readme.indexOf('\n## Stability')
+    const readme = read('docs/stabilite.md')
+    const start = readme.indexOf('\n# Stability')
     expect(start).toBeGreaterThan(-1)
-    const section = readme.slice(start, readme.indexOf('\n## ', start + 5))
+    const section = readme.slice(start)
     for (const word of ['raf', 'cadence orchestrate', 'cadence.yaml', 'raf.yaml', 'session-start', 'qa-reviewer',
       'cadence-hud', '.cadence/runs', 'schema version', 'precheck-reader', 'unknown fields']) expect(section).toContain(word)
     expect(section).toMatch(/not guaranteed/i)

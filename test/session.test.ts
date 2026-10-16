@@ -6,6 +6,7 @@ import { SKILLS_DIR } from '../src/skills.js';
 import { run } from '../src/cli.js';
 import { readNext, sharedStateDir, stateDir, writeLock } from '../src/state.js';
 import { CLEAN_TODAY, cleanAt, commit, gitRepo, tempDir } from './helpers.js';
+import { docText } from './docs-text.js';
 
 async function cad(dir: string, ...argv: string[]) {
   const out: string[] = [];
@@ -508,7 +509,7 @@ describe('nettoyage en routine de clôture (L4)', () => {
   it('README et routine session-close disent exactement ce qui n’est jamais proposé (L4/t10)', () => {
     const flat = (t: string) => t.replace(/\s+/g, ' ');
     const skill = flat(readFileSync(join(SKILLS_DIR, 'session-close', 'SKILL.md'), 'utf8'));
-    const readme = flat(readFileSync(join(SKILLS_DIR, '..', 'README.md'), 'utf8'));
+    const readme = flat(docText());
     const rule = 'An entry is proposed only if it could be measured entirely.';
     expect(readme).toContain(rule);
     expect(skill).toContain(rule);

@@ -7,6 +7,7 @@ import { renderBrief } from '../src/orchestrate/briefs.js';
 import { WORK_SCHEMA } from '../src/orchestrate/schemas.js';
 import { run } from '../src/cli.js';
 import { tempDir, testPackage } from './helpers.js';
+import { docText } from './docs-text.js';
 
 const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8');
 const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: 'c1', reponse: '', constats: 'un constat', ux: '', choix: '', checks: '', news: '', captures: '', fiche: '', repos: '' };
@@ -97,7 +98,7 @@ describe('auto-contrôle avant revue (L222)', () => {
 
   it('R9 — le README renvoie au document de mesure avant/après de L222', () => {
     const doc = 'docs/mesures/autocontrole-avant-revue-2026-10-15.md';
-    expect(read('../README.md')).toContain(doc);
+    expect(docText()).toContain(doc);
     expect(existsSync(fileURLToPath(new URL(`../${doc}`, import.meta.url)))).toBe(true);
   });
 

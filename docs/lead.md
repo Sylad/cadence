@@ -104,5 +104,44 @@ the folder without `$CLAUDE_CODE_SESSION_ID`, figure older than two minutes): th
 as being at the threshold.
 
 The mechanics around it (the life of a lot in the plan, a lot inside a wave, putting cadence in service, the budgets) are drawn in
-[fonctionnement.md](fonctionnement.md). See also the README's [lead tour](../README.md#lead-tour) and [orchestrate](../README.md#orchestrate)
+[fonctionnement.md](fonctionnement.md). See also the README's [lead tour](lead.md#lead-tour) and [orchestrate](orchestrate.md#orchestrate)
 sections.
+
+## lead tour
+
+`cadence lead tour [folder] [--idle 3] [--depth n] [--json]` is the lead's morning table, with no model in
+the loop. From a parent folder (default: the current one) it takes every direct sub-folder that
+holds `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key (a plan kept by another tool
+included), and for each one reads the same facts as `cadence session start` — in-process, no
+sub-process, no call to `claude` — then prints **one line per project**:
+
+```
+alpha · en cours L1 (silencieux 4j) · dérive 1 (✗ L2 a 1 commit(s) mais est encore todo) · notes : finir L1 puis livrer · prochain L3 Typo · dépôt non commité, non poussé
+beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second · dépôt propre
+```
+
+| Column | Content |
+|---|---|
+| `en cours` | ids of the lots in progress; `(aucune activité)` when it has none at all, `(silencieux Nj)` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |
+| `dérive` | the gaps `raf check` reports (a lot whose commits leave a document behind, [`docs.sync`](news.md#documentation-that-follows-the-code), included), counted and the first two shown |
+| `notes` | the notes left by the last `session close`, joined with ` / ` and cut at 120 characters |
+| `prochain` | the first ready lot (quick wins first) — id and title cut at 60 characters; a lot whose [`gate`](raf.md#plan-file) is not met is not ready |
+| `attend` | only when a lot waits on its `gate`: `attend L190` |
+| `dépôt` | `non commité` (modified or untracked files), `non poussé` (commits ahead of the upstream), `livraison en cours` (live delivery lock); `propre` otherwise |
+
+When an orchestrated wave is live, one more line closes the tour (not part of `--json`): `vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2` — the lead reads the free slots there instead of computing them (L141). The `sur M` is the cap the human set (`CADENCE_MAX_SESSIONS`, 2 by default), not a fixed 2 (L208); an invalid value falls back to 2 in this display.
+
+`--json` prints the same content as an array of objects (`project`, `doing`, `drift`, `notes`, `waiting` (only when a lot waits on its `gate`),
+`next`, `repo`, and `error` when the project could not be read), plus `progress` — `{ done, doing, todo, added7 }`,
+the lots done / in progress / to do (dropped and recurring lots left out) and those created in the last 7 days (L149), which
+[`cadence-hud`](../plugins/cadence-hud/README.md) draws as one progress bar per project. Projects come in the order of the
+`priority:` key of the folder's `cadence.yaml` (the one `orchestrate --continue` reads), the others after, alphabetically; an unreadable `cadence.yaml` or
+a `priority:` that is not a list of names (`priority: ol`, `priority: []`) keeps the alphabetical order and adds a first row `cadence.yaml · ✗ erreur : <cause>` (`project: "cadence.yaml"` with `error` in `--json`).
+Sub-projects are looked for one level down by default. `--depth n` goes `n` levels down (same meaning as in `cadence session start --all --depth n`:
+a folder that is a project is not entered; an integer ≥ 1, otherwise refused), and the `depth:` key of the folder's `cadence.yaml`, next to `priority:`, sets it once for all
+(`depth: 2`); `--depth` wins over the key, and a `depth:` that is not an integer ≥ 1 adds the same first row `cadence.yaml · ✗ erreur : …` and leaves one level read.
+`cadence-hud` asks the tour from the folder of the session, so it follows the key with no change. A project is named by its folder's name; one found below the first level is named by its path from the folder (`groupe/gamma`), unique and ready for `cadence orchestrate groupe/gamma:L1` run from there, while `priority:` and the alphabetical order read the folder's own name.
+"Created in the last 7 days" means today and the six days before. When the folder has no sub-project but is itself a project, the tour is that project's single line
+(this is what `cadence-hud` asks from a session opened inside a project). The tour is read-only: it changes
+no plan. It exits 0 even when a project is in error — that project's line reads
+`beta · ✗ erreur : <cause>`. The `lead` skill runs it instead of one subagent per project.

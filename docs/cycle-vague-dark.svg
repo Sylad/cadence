@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 250" width="1100" height="250" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#e6edf3">
+<title>Cycle of a wave and role of the lead</title>
+<desc>A lot goes through spec, mockup, accept, implement, review, ux and deliver; the lead picks the lots, answers the questions, re-verifies and delivers.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker></defs>
+<rect width="1100" height="250" fill="#0d1117"/>
+<rect x="20" y="16" width="1060" height="52" rx="6" fill="#0c2d6b" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="40" y="38" font-weight="600" font-size="13.5">The lead (you, or the lead skill)</text>
+<text x="40" y="57" font-size="12" fill="#8b949e">picks the lots · answers the questions · re-verifies each lot · delivers one project at a time</text>
+<rect x="20" y="130" width="122" height="62" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="81" y="157" text-anchor="middle" font-weight="600" font-size="14" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">spec</text>
+<text x="81" y="176" text-anchor="middle" font-size="11.5" fill="#8b949e">sheet + rules</text>
+<line x1="144" y1="161" x2="167" y2="161" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="170" y="130" width="122" height="62" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="231" y="157" text-anchor="middle" font-weight="600" font-size="14" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">mockup</text>
+<text x="231" y="176" text-anchor="middle" font-size="11.5" fill="#8b949e">page review</text>
+<line x1="294" y1="161" x2="317" y2="161" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="320" y="130" width="122" height="62" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="381" y="157" text-anchor="middle" font-weight="600" font-size="14" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">accept</text>
+<text x="381" y="176" text-anchor="middle" font-size="11.5" fill="#8b949e">red tests, sealed</text>
+<line x1="444" y1="161" x2="467" y2="161" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="470" y="130" width="122" height="62" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="531" y="157" text-anchor="middle" font-weight="600" font-size="14" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">implement</text>
+<text x="531" y="176" text-anchor="middle" font-size="11.5" fill="#8b949e">test first</text>
+<line x1="594" y1="161" x2="617" y2="161" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="620" y="130" width="122" height="62" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="681" y="157" text-anchor="middle" font-weight="600" font-size="14" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">review</text>
+<text x="681" y="176" text-anchor="middle" font-size="11.5" fill="#8b949e">code review</text>
+<line x1="744" y1="161" x2="767" y2="161" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="770" y="130" width="122" height="62" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="831" y="157" text-anchor="middle" font-weight="600" font-size="14" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">ux</text>
+<text x="831" y="176" text-anchor="middle" font-size="11.5" fill="#8b949e">usability, once</text>
+<line x1="894" y1="161" x2="917" y2="161" stroke="#8b949e" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="920" y="130" width="122" height="62" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="981" y="157" text-anchor="middle" font-weight="600" font-size="14" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">deliver</text>
+<text x="981" y="176" text-anchor="middle" font-size="11.5" fill="#8b949e">CI + proof</text>
+<line x1="831" y1="68" x2="831" y2="127" stroke="#58a6ff" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a)"/>
+<line x1="81" y1="68" x2="81" y2="127" stroke="#58a6ff" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a)"/>
+<line x1="981" y1="127" x2="981" y2="68" stroke="#58a6ff" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a)"/>
+<text x="73" y="216" font-size="11.5" fill="#8b949e">dashed: only for a lot with a page or a behaviour to pin down (screen: page, spec: true)</text>
+<text x="661" y="216" font-size="11.5" fill="#8b949e">each step in a fresh session, driven by cadence orchestrate</text>
+<text x="20" y="236" font-size="11.5" fill="#8b949e">Every verdict is written to the plan (docs/plan/raf.yaml); a delivery counts only when its checks pass.</text>
+</svg>

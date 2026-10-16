@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { ensureGitignore, run } from '../src/cli.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 import { projectEnv } from '../src/orchestrate/command.js';
+import { docText } from './docs-text.js';
 
 function raf(dir: string, ...argv: string[]) {
   const out: string[] = [];
@@ -350,11 +351,11 @@ describe('raf show', () => {
   it('l\'aide et le README ne promettent pas « en entier » : ils listent ce que show affiche', () => {
     const aide = raf(gitRepo(), '--help').out;
     expect(aide).not.toContain('en entier');
-    expect(readFileSync(join(__dirname, '..', 'README.md'), 'utf8')).not.toMatch(/raf show[^\n]*in full/);
+    expect(docText()).not.toMatch(/raf show[^\n]*in full/);
   });
 
   it('README — la liste des champs renommables de plan.fields cite gate et dit que spec: true d\'un gate demande plan.fields.spec', () => {
-    const readme = readFileSync(join(__dirname, '..', 'README.md'), 'utf8');
+    const readme = docText();
     expect(readme).toMatch(/`parent`, `gate`; one left out/);
     expect(readme).toMatch(/gate: \{ count: N, spec: true \}[^\n]*read-only plan[^\n]*plan\.fields\.spec/);
   });

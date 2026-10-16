@@ -150,7 +150,7 @@ describe('cadence session start|close --all', () => {
     await project(join(mono, 'pkg-a'), 'pkg-a');
     removeDirSync(join(mono, 'pkg-a', '.git'));
     const before = process.env.GIT_CEILING_DIRECTORIES;
-    process.env.GIT_CEILING_DIRECTORIES = join(mono, 'pkg-a'); // git ne remonte plus de pkg-a vers mono : rev-parse échoue dans pkg-a
+    process.env.GIT_CEILING_DIRECTORIES = mono; // git ne monte plus jusqu'à mono (le plafond interdit d'y entrer) : rev-parse échoue dans pkg-a, la section dit « à lancer dans un dépôt git »
     try {
       const { code, out } = await cad(mono, 'session', 'start', '--all');
       const lines = out.split('\n');

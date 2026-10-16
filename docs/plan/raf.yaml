@@ -2594,10 +2594,11 @@ lots:
     finished: 2026-10-16
   - id: L226
     title: "cadence perf, indicateurs 3 tokens par lot selon l'estimate et part des tokens de revue, 4 délai création → done → livraison par lot (plans raf) et durée de mur par étape (journaux), 7 coût en euros par lot livré : tokens par modèle et par étape des journaux × grille de prix déclarée dans cadence.yaml (perf.prices, par modèle, entrée / sortie / lecture de cache), hypothèses de répartition entrée/sortie écrites dans la fiche ; mêmes fenêtres et ⚠ que le lot précédent"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-16
+    started: 2026-10-16
   - id: L227
     title: "cadence perf, indicateur 6 livraisons rouges et constats QA bloquants (journal de cadence deliver, notes raf « QA » des lots) ; intégration : cadence lead tour imprime l'en-tête perf (une ligne par ⚠, rien si tout est stable), le skill lead le lit avant de proposer les trois lots et ne propose un lot d'amélioration que sur une tendance confirmée sur deux fenêtres ou un goulot net ; README et CHANGELOG"
     status: todo

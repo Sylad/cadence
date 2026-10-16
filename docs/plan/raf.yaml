@@ -2740,12 +2740,13 @@ lots:
       - { date: 2026-10-16, text: "abandonné : doublon : le message de refus et les règles R3/A1 de la fiche étaient déjà corrigés par le commit c5c808d avant la création du lot (constat du pré-contrôle de la vague du 16-10)" }
   - id: L235
     title: "Release impossible : le test R12 de perf-lead-docs.test.ts (et tout test du même genre, à chercher : split sur « Unreleased] ») exige une entrée CHANGELOG sous [Unreleased] — rouge dès que la release renomme la section, et prepublishOnly bloque npm publish (vu 16-10 soir en préparant 1.8.0) ; lire la première section du CHANGELOG (Unreleased ou dernière version), puis publier 1.8.0 (L225–L227, L190 ; bump préparé et annulé : manifestes, CHANGELOG, What's new, ligne Available since « cadence perf »)"
-    status: doing
+    status: done
     estimate: 0.1
     quickwin: true
     created: 2026-10-16
     started: 2026-10-16
     review: { date: 2026-10-16, verdict: "conforme (1 mineur noté), publication de 1.8.0 (évaluation du plugin, tag, push) laissée au lead — orchestré (vague 2026-10-16-2245, 1 passe(s) de correction)", commit: 353d838ba314c6d79545d0a5a4369806d2c5c037 }
+    finished: 2026-10-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

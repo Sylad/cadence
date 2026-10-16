@@ -2594,7 +2594,7 @@ lots:
     finished: 2026-10-16
   - id: L226
     title: "cadence perf, indicateurs 3 tokens par lot selon l'estimate et part des tokens de revue, 4 délai création → done → livraison par lot (plans raf) et durée de mur par étape (journaux), 7 coût en euros par lot livré : tokens par modèle et par étape des journaux × grille de prix déclarée dans cadence.yaml (perf.prices, par modèle, entrée / sortie / lecture de cache), hypothèses de répartition entrée/sortie écrites dans la fiche ; mêmes fenêtres et ⚠ que le lot précédent"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-16
@@ -2609,6 +2609,7 @@ lots:
       - { date: 2026-10-16, text: "Hypothèses (fiche perf-tokens-delais-cout) — R12 : Sens pire et décision de chaque nouvel indicateur : la hausse est pire pour les tokens par lot d'une classe d'estimate, la part de revue, les deux délais, la d… ; si faux : Si une baisse d'un délai devait aussi alerter, seul le sens de comparaison de cet indicateur change ; aucune donnée en jeu" }
       - { date: 2026-10-16, text: "Hypothèses (fiche perf-tokens-delais-cout) — R14 : Le JSON de L225 reçoit quatre clés de plus, tokens { byEstimate: { \"<estimate>\": indicateur + lots }, reviewShare }, delays { createdToDone, doneToDelivered },… ; si faux : Si le skill lead (L227) attend d'autres noms de clé, seules les clés des nouveaux blocs changent avant qu'il ne les lise ; les clés de L225 sont intactes (test…" }
     review: { date: 2026-10-16, verdict: "conforme : constat 1 corrigé, 2 notes mineures maintenues par choix (fiche R17 et contrat A1) — orchestré (vague 2026-10-16-2130, 0 passe(s) de correction + passe des mineurs)", commit: c0a5245a8ed40c09ca77044454560905e200880e }
+    finished: 2026-10-16
   - id: L227
     title: "cadence perf, indicateur 6 livraisons rouges et constats QA bloquants (journal de cadence deliver, notes raf « QA » des lots) ; intégration : cadence lead tour imprime l'en-tête perf (une ligne par ⚠, rien si tout est stable), le skill lead le lit avant de proposer les trois lots et ne propose un lot d'amélioration que sur une tendance confirmée sur deux fenêtres ou un goulot net ; README et CHANGELOG"
     status: todo

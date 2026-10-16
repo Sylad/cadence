@@ -22,7 +22,8 @@ import { findProjects, leadTour, readLeadUx, tourLine } from './lead.js';
 import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
-import { classifyAll, measure, ollamaClassifier, readCache, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
+import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
+import { computePerf, perfWindows, readPlans, renderPerf } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
@@ -63,6 +64,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--budget projet:lot=+300k] [--answer projet:lot "réponse"] [--drop projet:lot] ; --drop projet:lot [--wave vague] ; --stop-after-current [--wave vague] ; --waits [--since AAAA-MM-JJ]
   cadence lead tour [dossier] [--idle 3] [--depth n] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier seul s'il est lui-même un projet (en cours, dérive, notes de clôture, prochain lot prêt, dépôt)
   cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--since date] [--json]   mesure des passes de correction des journaux dossier/.cadence/runs : lots à ≥1 et ≥2 corrections, par projet, visibles ou non, passes par cause (classées par Ollama avec --classify, hors quota)
+  cadence perf [dossier] [--since date] [--json]   tableau de bord du workflow, sans modèle : deux fenêtres (7 derniers jours contre les 7 précédents) lues dans dossier/.cadence/runs et les plans, chaque vitesse à côté de sa qualité, ⚠ au-delà de 25 % de dégradation ; --since est un jour qui tronque les fenêtres
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -196,6 +198,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     return 0;
   }
   if (command === 'corrections') return corrections(rest, values, io);
+  if (command === 'perf') return perf(rest, values, today, io);
   // `spec` est aussi un verbe de raf (raf spec <lot> on|off, L186) : seuls check et qa vont à la fiche.
   if (command === 'spec' && (rest[0] === 'check' || rest[0] === 'qa')) return spec(rest, io);
   const reseal = command === 'spec' && rest[0] === 'reseal';
@@ -882,6 +885,34 @@ async function corrections(rest: string[], values: { classify?: boolean; model?:
   const m = measure(data, cache);
   io.out(values.json ? JSON.stringify(m, null, 2) : renderReport(m));
   return 0;
+}
+
+/**
+ * `cadence perf` (L225) : le tableau de bord du workflow, sans modèle ni écriture, lu dans <dossier>/.cadence/runs et les plans des projets du dossier.
+ * Une erreur de saisie ou de lecture sort avec le code 1 (un ⚠ imprimé, 0). `--since` y est un jour qui tronque les fenêtres, non l'instant de `corrections --since`.
+ */
+function perf(rest: string[], values: { since?: string; json?: boolean }, today: Day, io: Io): number {
+  try {
+    if (rest.length > 1) throw new RafError('usage : cadence perf [dossier] [--since date] [--json]');
+    if (values.since !== undefined && Number.isNaN(Date.parse(values.since))) throw new RafError(`--since invalide : ${values.since} (une date ISO, ex. 2026-10-10T18:31Z)`);
+    const parent = resolve(io.cwd, rest[0] ?? '.');
+    const runsDir = join(parent, '.cadence', 'runs');
+    if (!existsSync(runsDir)) throw new RafError(`perf : aucun journal de vague dans ${runsDir}`);
+    const cache = readCache(join(parent, '.cadence', 'corrections.json'));
+    const journals = readJournals(runsDir);
+    const warnings: string[] = [];
+    const plans = readPlans(parent, (l) => warnings.push(l));
+    if (plans.size === 0 && warnings.length === 0) warnings.push(`perf : aucun plan sous ${parent}, indicateurs du plan n/d`);
+    const result = computePerf({ journals, plans, cache, windows: perfWindows(today, values.since), today, since: values.since });
+    for (const w of warnings) io.err(w);
+    if (values.json) io.out(JSON.stringify(result, null, 2));
+    else for (const l of renderPerf(result)) io.out(l);
+    return 0;
+  } catch (e) {
+    if (!(e instanceof RafError)) throw e;
+    io.err(`raf: ${e.message}`);
+    return 1;
+  }
 }
 
 /** `session start|close --all [--depth n]` : la commande jouée dans chaque projet sous le dossier courant, une section par projet. */

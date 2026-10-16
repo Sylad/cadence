@@ -13,7 +13,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'spec'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -47,6 +47,9 @@ if (tool === 'raf') {
   cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--since date] [--json]
                     la mesure des passes de correction des vagues (dossier/.cadence/runs) : lots à ≥1 et ≥2 corrections,
                     par projet, visibles ou non, passes par cause ; --classify les classe par Ollama (hors quota)
+  cadence perf [dossier] [--since date] [--json]
+                    tableau de bord du workflow, sans modèle ni écriture : 7 derniers jours contre les 7 précédents, chaque vitesse
+                    à côté de sa qualité, ⚠ au-delà de 25 % de dégradation ; --since est un jour qui tronque les fenêtres
   cadence spec check <fiche.yaml>
                     les invariants d'une fiche d'écran, back ou mixte (étape spec ; gabarits templates/fiche.yaml, fiche-back.yaml) ; code 1 si un écart, 2 si illisible
   cadence spec qa <fiche.yaml>

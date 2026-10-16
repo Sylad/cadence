@@ -52,8 +52,8 @@ cas:
       - { si: l'écart n'est dû à aucun commit (modification non commitée), alors: le lot est rendu sans nom de commit, regles: [R3] }
       - { si: le test est revenu à son contenu d'avant le lot (bilan nul L184), alors: aucun écart, la revue est lancée, regles: [R4] }
       - { si: la session a posé une question au lieu de rendre le rapport, alors: le contrôle a lieu quand même avant la question, regles: [R5] }
-      - { si: la fiche du lot livré a été amendée par le lot courant (commit qui le cite), alors: les tests scellés du lot livré sont modifiables, comme avant, regles: [R4, R8] }
-      - { si: la fiche du lot livré a été changée par un AUTRE lot, ou seulement dans l'arbre de travail (non commitée), alors: l'exception ne s'ouvre pas, la modification d'un test scellé de ce lot livré est un écart, regles: [R8] }
+      - { si: la fiche du lot livré a été amendée par le lot courant (commit qui le cite), alors: les tests scellés du lot livré sont modifiables, comme avant, regles: [R4, R8, R10] }
+      - { si: la fiche du lot livré a été changée par un AUTRE lot, ou seulement dans l'arbre de travail (non commitée), alors: l'exception ne s'ouvre pas, la modification d'un test scellé de ce lot livré est un écart, regles: [R8, R10] }
     resultat: Aucune revue ne porte sur un lot qui a touché le test scellé d'un autre lot.
   - id: C3
     titre: Le rédacteur de tests ne cite que ce que la fiche dit
@@ -137,6 +137,12 @@ regles:
     statut: hypothese
     si_faux: "Si le lead exige l'arrêt au premier commit, pendant la session, il faut un hook git post-commit installé dans le dépôt du projet (écriture dans .git/hooks de chaque dépôt, changement de comportement hors de la fiche) : ce serait une question de périmètre, pas un texte ; ici le contrôle reste celui de la fin de session déjà codé (cycle.ts:1539-1543), qui rend le lot sans attendre la revue."
     tests: ["R9 — session implement qui modifie un test scellé d'un lot livré puis rend son rapport : lot rendu à la fin de cette session, avant toute revue", "R9 — session fix : même contrôle, message avec le premier commit fautif"]
+  - id: R10
+    cas: [C2]
+    enonce: "Bornes de R8 : le contrôle « git diff depuis lotBase » (arbre de travail compris) disparaît comme condition d'ouverture ; seul ouvre l'exception un commit qui cite le lot en cours, touche la fiche du lot livré et est POSTÉRIEUR au commit rouge de l'acceptation scellée (descendant strict, git merge-base --is-ancestor). Un commit antérieur ou égal au commit rouge qui cite le même identifiant n'ouvre rien. Le commit qui touche à la fois la fiche et un test scellé ouvre l'exception pour ses propres modifications (le lot amende fiche et tests ensemble). Un lot courant qui porte le même identifiant que le lot livré n'ouvre jamais l'exception (le verrou entier de l'acceptation du lot en cours reste, accept.ts:316)."
+    statut: hypothese
+    si_faux: "Si la borne devait être la livraison (passage à vert) ou lotBase plutôt que le commit rouge, la fenêtre de commits admis se réduirait ou s'élargirait d'un intervalle de commits ; aucune donnée stockée en jeu, seule la comparaison faite par ficheChanged change. Si un commit de fiche + test devait être refusé, la fiche et les tests devraient être commités séparément."
+    tests: ["R10 — commit de fiche antérieur au commit rouge qui cite le lot en cours : l'exception ne s'ouvre pas", "R10 — commit de fiche postérieur au rouge qui cite le lot en cours, absent de lotBase..HEAD (posé avant la vague) : l'exception s'ouvre", "R10 — fiche et test scellé modifiés dans le même commit citant le lot en cours : modification admise", "R10 — lot courant portant l'identifiant du lot livré : verrou entier, aucune exception", "R10 — arbre de travail seul modifié (fiche non commitée) : écart, plus de git diff depuis lotBase"]
 
 contrats:
   - id: A1
@@ -153,7 +159,7 @@ contrats:
     erreurs:
       - { code: log error, message: "verrou des tests d'acceptation : <fichier> : test d'acceptation de <lot> : empreinte modifiée depuis le commit rouge <sha7> (verrou <chemin>) ; premier commit fautif : <sha7> <sujet>" }
       - { code: log error, message: "verrou des tests d'acceptation : <fichier> : empreinte différente de celle du scellé de <chemin> (test d'acceptation de <lot>)" }
-    regles: [R2, R3, R4, R5, R8, R9]
+    regles: [R2, R3, R4, R5, R8, R9, R10]
   - id: A3
     appel: commande cadence orchestrate (briefs accept.md et accept-back.md, agent acceptance-writer)
     entree: "BriefVars existantes ; fiche conforme"

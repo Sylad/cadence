@@ -11,7 +11,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
   `note`, `did`, `public`, `screen`, `spec`, `ux`, `review`, `commits`, `show`, `list`, `now`, `ignore`, `check`, `gantt`, `hook`;
   `cadence news`, `session` (`start`, `close`, `next`, `context`), `lead tour`, `corrections`, `deliver`, `verify`, `orchestrate`,
   `skills`, `spec` (`cadence spec <lot> on|off` is `raf spec`; `check`, `qa`: exit **0** when the sheet is valid and the section is printed, **1** with violations, **2** on a missing or unreadable file or a wrong usage);
-  their options and exit codes as the pages [raf](raf.md), [orchestrate](orchestrate.md), [deliver](deliver.md) and [spec](spec.md) document them. A new command or option is a minor change.
+  their options and exit codes as the pages [raf](raf.md), [orchestrate](orchestrate.md), [deliver](deliver.md), [spec](spec.md), [news](news.md), [session](session.md), [lead](lead.md), [corrections](corrections.md) and [skills](skills.md) document them. A new command or option is a minor change.
 - **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`, `depth`, `lead` (`lead.ux`)
   and the keys each of them takes. A key is not renamed nor removed, nor does its meaning change; a new key is a minor change.
 - **The plan file** (`docs/plan/raf.yaml`): `project`, `prefix`, `since`, `ignore`, `lots` (with their

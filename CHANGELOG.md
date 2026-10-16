@@ -62,6 +62,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Changed
 
 - The README is now a short home page (about 5 kB instead of 208 kB in the npm package): what the tool does, a figure of the cycle of a wave and the lead's role, the three starting commands, a table of contents, and « What's new » reduced to a line per version. The rest moved unchanged to `docs/` pages (`raf`, `orchestrate`, `deliver`, `spec`, `lead`, `stabilite`, `news`, `session`, `corrections`, `skills`, `cadence-hud`, `releasing`, `overview`, `whats-new`), published with the package; `node scripts/check-links.mjs` (run by `tests.yml`) fails on a broken relative link or anchor (L232).
+- `raf check` and `raf done` now treat `docs/whats-new.md`, the long form of « What's new », like the README's « What's new » section: a commit that touches only version fields, `CHANGELOG.md`, that section and/or `docs/whats-new.md` is a version commit, exempt from « commit without a lot » and from a fresh code review (see `docs/raf.md` and `docs/releasing.md`) (L232).
 
 ### Fixed
 

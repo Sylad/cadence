@@ -41,6 +41,7 @@ describe('release 1.0.0 (L164)', () => {
     const stab = read('docs/stabilite.md')
     expect(stab).not.toMatch(/this README documents/)
     expect(stab).toMatch(/their options and exit codes as (the|these) .*pages? .*documents?/i)
-    for (const page of ['raf', 'orchestrate', 'deliver', 'spec']) expect(stab).toContain(`${page}.md`)
+    // toutes les commandes garanties ont leur page nommée (L232 : la garantie couvre news, session, lead tour, corrections et skills, pas seulement 4 pages)
+    for (const page of ['raf', 'orchestrate', 'deliver', 'spec', 'news', 'session', 'lead', 'corrections', 'skills']) expect(stab).toContain(`${page}.md`)
   })
 })

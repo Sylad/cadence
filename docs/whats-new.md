@@ -18,7 +18,7 @@ The long form of the README's « What's new » (the README keeps two lines per v
 
 **1.1.0**: the spec step of `cadence orchestrate`: a lot that declares `screen:` gets a machine-readable screen sheet (`cadence spec check|qa`), a mockup reviewed against it, acceptance tests committed red and locked before the implementation, and briefs that carry the sheet and rule → test → green to `implement`, `fix` and the code review; the news entry gains a *Hypothèses* section (L166, L169–L174, L177–L184).
 
-**1.0.0**: the first major release, a stable contract: the commands and options, the keys of `cadence.yaml`, the plan file and the names of the skills and agents follow semantic versioning, and the README's *Stability* section lists what is guaranteed and what is not (L164).
+**1.0.0**: the first major release, a stable contract: the commands and options, the keys of `cadence.yaml`, the plan file and the names of the skills and agents follow semantic versioning, and the [stability page](stabilite.md) lists what is guaranteed and what is not (L164).
 
 **0.28.0**: `orchestrate.precheck: local` runs the « deliverable already present? » pre-check of `cadence orchestrate` on the local model (`claude-local`, Ollama), off the Anthropic quota, Sonnet staying the default and the fallback (L146); the `qa-reviewer` agent walks only the pages a lot touched, with a **Scope** line in its report (L123); the sub-tasks a review closes are also read in a lot's neighbouring repositories (L156) and a commit's sub-task list is read with the plan's left guard (L155); an unstable test is fixed (L90).
 

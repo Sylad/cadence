@@ -166,6 +166,49 @@ export function readHookConfig(file: string): HookConfig {
   return { autostart: a as HookConfig['autostart'] };
 }
 
+/** Prix d'un modèle, en euros par million de tokens (R7 de L226). */
+export interface ModelPrice {
+  input: number;
+  output: number;
+  cacheRead: number;
+}
+export type PriceGrid = Partial<Record<'sonnet' | 'opus' | 'haiku', ModelPrice>>;
+
+const PRICED_MODELS = ['sonnet', 'opus', 'haiku'];
+const PRICE_KEYS = ['input', 'output', 'cacheRead'] as const;
+
+/** Clé `perf.prices` de cadence.yaml : la grille de prix du coût par lot livré ; null sans grille (clé absente ou vide). */
+export function readPerfConfig(file: string): PriceGrid | null {
+  if (!existsSync(file)) return null;
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const perf = (raw as { perf?: unknown } | null)?.perf;
+  if (perf == null) return null;
+  if (!isObject(perf)) throw new RafError(`${file} : perf doit être un objet { prices }`);
+  for (const k of Object.keys(perf)) if (k !== 'prices') throw new RafError(`${file} : perf.${k} inconnu (attendu : prices)`);
+  const prices = perf.prices;
+  if (prices == null) return null;
+  if (!isObject(prices)) throw new RafError(`${file} : perf.prices doit être un objet { ${PRICED_MODELS.join(', ')} }`);
+  const grid: PriceGrid = {};
+  for (const [model, price] of Object.entries(prices)) {
+    if (!PRICED_MODELS.includes(model)) throw new RafError(`${file} : perf.prices.${model} inconnu (attendu : ${PRICED_MODELS.join(', ')})`);
+    if (!isObject(price)) throw new RafError(`${file} : perf.prices.${model} doit être un objet { ${PRICE_KEYS.join(', ')} }`);
+    for (const k of Object.keys(price)) if (!(PRICE_KEYS as readonly string[]).includes(k)) throw new RafError(`${file} : perf.prices.${model}.${k} inconnu (attendu : ${PRICE_KEYS.join(', ')})`);
+    const entry = {} as ModelPrice;
+    for (const k of PRICE_KEYS) {
+      const v = price[k];
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) throw new RafError(`${file} : perf.prices.${model}.${k} : nombre ≥ 0 attendu (€ par million de tokens)`);
+      entry[k] = v;
+    }
+    grid[model as keyof PriceGrid] = entry;
+  }
+  return Object.keys(grid).length === 0 ? null : grid;
+}
+
 export interface SessionConfig {
   /** Commande sh, à la racine du dépôt, dont la sortie complète « cadence session start ». */
   start?: string;

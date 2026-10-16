@@ -33,7 +33,39 @@ current window, with at least 10 classified passes) is flagged by a `⚠` even w
   An unreadable plan skips its project with a warning on the error output and the other projects are read; the indicators that read the plans are `n/d` only when no plan is readable.
 - **`--since date`** is an ISO date that ignores everything before that day in both windows (a wave created before that day is not read, even if its lots end after it); a window starting before it is *truncated* (its per-day rates divide by the days covered, no `⚠`).
   It is **not** the instant of `cadence corrections --since` (waves created strictly after).
-- **`--json`** prints one object `{ since, today, windows: { current, previous }, throughput, corrections, interventions, orphans, warnings }`; every indicator carries
+- **`--json`** prints one object `{ since, today, windows: { current, previous }, throughput, corrections, interventions, tokens, delays, durations, cost, orphans, warnings }`; every indicator carries
   `{ current, previous, change, warn, twin, lots, note }` (`twin`: the path of its quality twin, e.g. `throughput.escaped`). Same values as the text.
 
-No indicator of produced volume (lines of code, commits, tokens consumed) is printed or exposed: tokens only relate a lot to its budget.
+## Tokens, delays, wall time and cost (L226)
+
+The same two windows, the same `⚠` (more than 25 % worse, at least 5 lots or steps in each window, previous value not zero, no truncated window) and the same
+quality twin (the share of lots right the first time) on the same line. A rise is the worse direction for each of them.
+
+| Indicator | Reading | Decision it informs |
+|---|---|---|
+| tokens per lot, by estimate | median of the counted tokens (sum of `tokens.counted` of every step) of the rendered journals of the window whose lot joins the plan, one class per exact estimate (`0.5`, `1`, `2`…); a failed lot counts, a journal with no readable tokens or without plan lot does not | is the estimate calibrated? redo the split or the budgets |
+| share of review tokens | counted tokens of the steps whose kind starts with `review` or is `ux`, over the counted tokens of all steps of the rendered journals; a ratio, `n/d` without journal | does the review weigh too much against the writing? lighten it (`orchestrate.review.threshold`) |
+| delay created → done | median of `finished − created` (calendar days) of the plan lots `done` with `finished` in the window and both dates readable | is the queue growing? |
+| delay done → delivery | median of the days between `finished` and the first line of the repository's `deliveries.log` on or after it (`<git common dir>/cadence/`, one repository per project, worktrees included; read without creating anything); `n/d` for a project that is not a git repository, has no log or no later line | deliver in smaller batches? |
+| wall time per step kind | median of `ended − started` in minutes of the `ok` steps with both bounds readable, ranked in the window by the local day of `ended`; one line per kind seen | which step is slow? timeouts, effort or model |
+| cost per delivered lot | median in euros of the sum, over every step of every journal of the lot (all waves), of the step cost; lots `done` in the window with at least one journal | is the model chosen for each step right? |
+
+**Price grid.** Declared in the `cadence.yaml` of the folder, euros per million tokens, the three prices mandatory for a declared model:
+
+```yaml
+perf:
+  prices:
+    sonnet: { input: 3, output: 15, cacheRead: 0.3 }
+    opus: { input: 15, output: 75, cacheRead: 1.5 }
+    haiku: { input: 1, output: 5, cacheRead: 0.1 }
+```
+
+An unknown key (under `perf`, under a model, or a model other than `sonnet`, `opus`, `haiku`), a negative or non-numeric price, or an unreadable file refuses the command before any journal is read (`raf: …`, exit 1, no output).
+Without `perf.prices` (absent or empty) the cost is `n/d` and a warning says where to declare it; the other indicators are served.
+
+**Cost of a step** = (`input` + `cacheWrite`) × input price + `output` × output price + `cacheRead` × cacheRead price, per million tokens, at the price of the step's own model. Assumptions written in the sheet (`docs/specs/perf-tokens-delais-cout/fiche.yaml`, R8):
+cache writes are billed at the input price (the grid has no write price, so the cost is slightly underestimated if they are billed more); a step that only carries `counted` (an old journal) is split 90 % input, 10 % output, no cache read;
+a step without any readable token costs 0 € (the lot stays in the population); a `local` step costs 0 € whatever its counters (outside quota and budget) and needs no price.
+A lot with a step of a model that has no price in the grid (or no readable `model`, named `inconnu`) is left out of the cost and a warning on the error output names the model and the number of lots; delivered lots without any journal are counted aside (`N lot(s) livré(s) sans journal`). No `⚠` on a cost that is `n/d`.
+
+No indicator of produced volume (lines of code, commits, total tokens or euros of a window) is printed or exposed: only per-lot medians, median durations and shares come out. Tokens and euros compare lots of the same size; they never set a spending target.

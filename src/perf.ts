@@ -1,6 +1,6 @@
 import { join, relative, sep } from 'node:path';
-import { planLoader } from './config.js';
-import { CAUSES, isReview as isReviewKind, type Cause, type Classification, type Journal, type JournalPass } from './corrections.js';
+import { planLoader, type ModelPrice, type PriceGrid } from './config.js';
+import { CAUSES, isReview as isReviewKind, type Cause, type Classification, type Journal, type JournalPass, type JournalStep } from './corrections.js';
 import { addDays, diffDays, isDay, toDay, type Day } from './dates.js';
 import { gitCommonDir } from './git.js';
 import { findProjects } from './lead.js';
@@ -90,6 +90,15 @@ export interface DelaysBlock {
   doneToDelivered: Indicator;
 }
 
+export interface CostBlock {
+  /** Médiane du coût en euros des lots livrés de la fenêtre, étapes de tous leurs journaux ; `lots` = lots calculés. */
+  perDelivered: Indicator;
+  /** Modèle sans prix dans la grille (ou « inconnu ») → nombre de lots livrés écartés du coût, les deux fenêtres ensemble. */
+  withoutPrice: Record<string, number>;
+  /** Lots livrés sans aucun journal, écartés du coût. */
+  withoutJournal: { current: number; previous: number };
+}
+
 export interface PerfResult {
   since: string | null;
   today: Day;
@@ -101,6 +110,7 @@ export interface PerfResult {
   delays: DelaysBlock;
   /** Médiane de la durée de mur en minutes, par sorte d'étape ; `lots` = étapes. */
   durations: Record<string, Indicator>;
+  cost: CostBlock;
   /** Lots de journal rendus dans les deux fenêtres qui n'ont pas de lot dans les plans du dossier (R15). */
   orphans: number;
   warnings: string[];
@@ -113,6 +123,8 @@ export interface PerfInput {
   cache: Map<string, Classification>;
   /** Jours de deliveries.log par projet ; un projet absent (pas un dépôt git, pas de journal de livraison) donne un délai de livraison n/d (R5). */
   deliveries?: Map<string, Day[]>;
+  /** La grille de prix de cadence.yaml ; absente : coût n/d (R7). */
+  prices?: PriceGrid | null;
   windows: Windows;
   today: Day;
   since?: string;
@@ -148,6 +160,19 @@ function planLot(plans: Plans, project: string, lot: string): PlanLot | undefine
 const KIND_ORDER = ['spec', 'maquette', 'fiche', 'precheck', 'implement', 'review', 'review-small', 'ux', 'fix', 'accept'];
 const kindRank = (kind: string) => (KIND_ORDER.includes(kind) ? KIND_ORDER.indexOf(kind) : KIND_ORDER.length);
 
+/** Part de `counted` rangée en entrée quand une étape ne porte que ce compteur (journal ancien) : le reste est en sortie (R8 b). */
+const COUNTED_INPUT_SHARE = 0.9;
+
+/** Coût en euros d'une étape (R8) ; le nom du modèle sans prix quand il en faudrait un. */
+function stepEuros(step: JournalStep, prices: PriceGrid): number | { missing: string } {
+  if (step.model === 'local') return 0;
+  const usage = step.usage ?? (step.counted === undefined ? null : { input: COUNTED_INPUT_SHARE * step.counted, cacheWrite: 0, cacheRead: 0, output: (1 - COUNTED_INPUT_SHARE) * step.counted });
+  if (!usage) return 0;
+  const price: ModelPrice | undefined = step.model === 'sonnet' || step.model === 'opus' || step.model === 'haiku' ? prices[step.model] : undefined;
+  if (!price) return { missing: step.model === 'sonnet' || step.model === 'opus' || step.model === 'haiku' ? step.model : 'inconnu' };
+  return ((usage.input + usage.cacheWrite) * price.input + usage.output * price.output + usage.cacheRead * price.cacheRead) / 1_000_000;
+}
+
 const median = (xs: number[]): number | null => {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b);
@@ -181,6 +206,7 @@ const DECISIONS = {
   reviewShare: 'la revue pèse trop face à l\'écriture : alléger (seuil du lot léger, orchestrate.review.threshold)',
   createdToDone: 'la file de lots s\'allonge : chercher le goulot de priorisation avant d\'ajouter des lots',
   doneToDelivered: 'on livre trop rarement : livrer par lots plus petits',
+  cost: 'le modèle ou l\'effort d\'une étape est-il juste ? changer le modèle de cette étape',
   duration: 'cette étape est lente : revoir ses timeouts, son effort ou son modèle',
 } as const;
 export type DecisionKey = keyof typeof DECISIONS;
@@ -366,6 +392,40 @@ export function computePerf(input: PerfInput): PerfResult {
     durations[kind] = mk({ current: median(v.current), previous: median(v.previous) }, sizes(v), 'up', twinFirstTime);
   }
 
+  // Coût par lot livré (R8 à R10)
+  const prices = input.prices ?? null;
+  const journalsOf = new Map<string, Dated[]>();
+  for (const d of all) {
+    const p = planLot(plans, d.j.project, d.j.lot);
+    if (p) journalsOf.set(`${d.j.project}\0${p.id}`, [...(journalsOf.get(`${d.j.project}\0${p.id}`) ?? []), d]);
+  }
+  const costOf = (w: Window) => {
+    const euros: number[] = [];
+    const missing = new Map<string, number>();
+    let withoutJournal = 0;
+    for (const { project, lot } of doneIn(w)) {
+      const journals = journalsOf.get(`${project}\0${lot.id}`);
+      if (!journals) {
+        withoutJournal++;
+        continue;
+      }
+      if (!prices) continue;
+      let sum = 0;
+      const lacking = new Set<string>();
+      for (const step of journals.flatMap((d) => d.j.steps)) {
+        const e = stepEuros(step, prices);
+        if (typeof e === 'number') sum += e;
+        else lacking.add(e.missing);
+      }
+      for (const m of lacking) missing.set(m, (missing.get(m) ?? 0) + 1);
+      if (lacking.size === 0) euros.push(sum);
+    }
+    return { euros, missing, withoutJournal };
+  };
+  const costs = both(windows, costOf);
+  const withoutPrice: Record<string, number> = {};
+  for (const m of [...costs.current.missing.keys(), ...costs.previous.missing.keys()]) withoutPrice[m] = (costs.current.missing.get(m) ?? 0) + (costs.previous.missing.get(m) ?? 0);
+
   const orphans = [...rendus.current, ...rendus.previous].filter((d) => planLot(plans, d.j.project, d.j.lot) === undefined).length;
 
   const throughput = {
@@ -390,7 +450,12 @@ export function computePerf(input: PerfInput): PerfResult {
     createdToDone: mk({ current: median(createdToDone.current), previous: median(createdToDone.previous) }, sizes(createdToDone), 'up', twinFirstTime, planNote),
     doneToDelivered: mk({ current: median(doneToDelivered.current), previous: median(doneToDelivered.previous) }, sizes(doneToDelivered), 'up', twinFirstTime, planNote),
   };
-  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, tokens, delays, durations, orphans, warnings: [] };
+  const cost: CostBlock = {
+    perDelivered: mk({ current: median(costs.current.euros), previous: median(costs.previous.euros) }, { current: costs.current.euros.length, previous: costs.previous.euros.length }, 'up', twinFirstTime, prices ? planNote : 'aucune grille de prix'),
+    withoutPrice,
+    withoutJournal: { current: costs.current.withoutJournal, previous: costs.previous.withoutJournal },
+  };
+  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, tokens, delays, durations, cost, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
   for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${DECISIONS[key.decision]}`);
   if (bottleneck) result.warnings.push(bottleneck);
@@ -417,7 +482,7 @@ const LABELS: Record<Cause, string> = {
 /** Les dix premières lignes de `indicatorLines` sont celles de L225. */
 const LEGACY_LINES = 10;
 
-type Kind = 'count' | 'rate' | 'share' | 'num' | 'tokens' | 'days' | 'min';
+type Kind = 'count' | 'rate' | 'share' | 'num' | 'tokens' | 'days' | 'min' | 'eur';
 interface Line {
   label: string;
   kind: Kind;
@@ -432,6 +497,7 @@ function indicatorLines(r: PerfResult): [Line, Indicator][] {
     [{ label: 'délai création → done', kind: 'days', decision: 'createdToDone' }, r.delays.createdToDone],
     [{ label: 'délai done → livraison', kind: 'days', decision: 'doneToDelivered' }, r.delays.doneToDelivered],
     ...Object.entries(r.durations).map(([k, ind]): [Line, Indicator] => [{ label: `durée de mur ${k}`, kind: 'min', decision: 'duration' }, ind]),
+    [{ label: 'coût par lot livré', kind: 'eur', decision: 'cost' }, r.cost.perDelivered],
   ];
   return [
     [{ label: 'prêts', kind: 'count', decision: 'rendered' }, r.throughput.ready],
@@ -456,6 +522,7 @@ function value(v: number | null, kind: Kind): string {
   if (kind === 'tokens') return `${num(v / 1000)} k`;
   if (kind === 'days') return `${num(v)} j`;
   if (kind === 'min') return `${num(v)} min`;
+  if (kind === 'eur') return `${v.toFixed(2).replace('.', ',')} €`;
   return num(v);
 }
 const signed = (c: number) => `${c >= 0 ? '+' : '−'}${Math.round(100 * Math.abs(c))} %`;
@@ -498,6 +565,8 @@ export function renderPerf(r: PerfResult): string[] {
   out.push('', 'Tokens, délais et durées (médianes par lot ou par étape)');
   for (const l of lines.slice(LEGACY_LINES)) out.push(row(l));
   for (const wr of r.warnings.filter((x) => x.startsWith('⚠ goulot'))) out.push('', wr);
+  const noJournal = r.cost.withoutJournal.current + r.cost.withoutJournal.previous;
+  if (noJournal > 0) out.push('', `${noJournal} lot(s) livré(s) sans journal`);
   if (r.orphans > 0) out.push('', `${r.orphans} lot(s) de journal sans plan`);
   return out;
 }

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { run } from '../src/cli.js';
-import { planLoader } from '../src/config.js';
+import { planLoader, readPerfConfig } from '../src/config.js';
 import { measure, readCache, readJournals, readRuns, type Classification } from '../src/corrections.js';
 import { computePerf, isQaDefectNote, perfWindows, readPlans } from '../src/perf.js';
 import { tempDir } from './helpers.js';
@@ -769,7 +769,7 @@ describe('cadence perf — sortie, erreurs, lecture seule', () => {
     const r = await cad(c.root, '--json');
     expect(r.out).toHaveLength(1);
     const data = JSON.parse(r.out[0]!);
-    expect(Object.keys(data)).toEqual(['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'tokens', 'delays', 'durations', 'orphans', 'warnings']);
+    expect(Object.keys(data)).toEqual(['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'tokens', 'delays', 'durations', 'cost', 'orphans', 'warnings']);
     expect(data.today).toBe(TODAY);
   });
 
@@ -1004,7 +1004,7 @@ describe('cadence perf — délais création → done et done → livraison (R4,
     initRepo(join(c.root, 'alpha'));
     const r = await json(c.root);
     expect(r.code).toBe(0);
-    expect(r.err).toEqual([]);
+    expect(r.err.filter((l) => !l.includes('grille de prix'))).toEqual([]);
     expect(r.data.delays.doneToDelivered).toMatchObject({ current: null, warn: false });
   });
 
@@ -1013,7 +1013,7 @@ describe('cadence perf — délais création → done et done → livraison (R4,
     plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-01', finished: '2026-10-12' }]);
     const r = await json(c.root);
     expect(r.code).toBe(0);
-    expect(r.err).toEqual([]);
+    expect(r.err.filter((l) => !l.includes('grille de prix'))).toEqual([]);
     expect(r.data.delays.doneToDelivered.current).toBeNull();
   });
 
@@ -1219,7 +1219,7 @@ describe('cadence perf — jumeau de qualité, volume et JSON (R11, R13, R14, R1
 
   it('R14 — le JSON porte tokens, delays, durations et cost en plus des clés de L225', async () => {
     const { data } = await json(full().root);
-    for (const k of ['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'orphans', 'warnings', 'tokens', 'delays', 'durations']) expect(data).toHaveProperty(k);
+    for (const k of ['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'orphans', 'warnings', 'tokens', 'delays', 'durations', 'cost']) expect(data).toHaveProperty(k);
     expect(Object.keys(data.tokens).sort()).toEqual(['byEstimate', 'reviewShare']);
     expect(Object.keys(data.delays).sort()).toEqual(['createdToDone', 'doneToDelivered']);
   });
@@ -1310,5 +1310,250 @@ describe('cadence perf — lecture seule des nouveaux indicateurs (R15)', () => 
     initRepo(join(c.root, 'alpha'));
     await cad(c.root);
     expect(existsSync(join(c.root, 'alpha', '.git', 'cadence'))).toBe(false);
+  });
+});
+
+// ── L226 : grille de prix et coût par lot livré (R7 à R10) ──────────────────────────────────────
+
+const GRID = 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n    opus: { input: 15, output: 75, cacheRead: 1.5 }\n    haiku: { input: 1, output: 5, cacheRead: 0.1 }\n';
+const M = 1_000_000;
+const usage = (input: number, output = 0, cacheRead = 0, cacheWrite = 0) => ({ input, cacheWrite, cacheRead, output, counted: input + cacheWrite + output });
+
+describe('cadence perf — grille de prix (R7)', () => {
+  const withGrid = (yaml: string | null): Ctx => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: CUR }]);
+    if (yaml !== null) writeFileSync(join(c.root, 'cadence.yaml'), yaml);
+    return c;
+  };
+
+  it('R7 — grille complète lue : prix de sonnet, opus et haiku', () => {
+    const c = withGrid(GRID);
+    expect(readPerfConfig(join(c.root, 'cadence.yaml'))).toEqual({ sonnet: { input: 3, output: 15, cacheRead: 0.3 }, opus: { input: 15, output: 75, cacheRead: 1.5 }, haiku: { input: 1, output: 5, cacheRead: 0.1 } });
+  });
+
+  it('R7 — perf absent : pas de grille, pas d\'erreur', async () => {
+    const c = withGrid('docs:\n  since: 2026-10-09\n');
+    expect(readPerfConfig(join(c.root, 'cadence.yaml'))).toBeNull();
+    expect(readPerfConfig(join(c.root, 'absent.yaml'))).toBeNull();
+    const r = await cad(c.root);
+    expect(r.code).toBe(0);
+  });
+
+  it('R7 — perf.prices vide : comme une grille absente', () => {
+    const c = withGrid('perf:\n  prices: {}\n');
+    expect(readPerfConfig(join(c.root, 'cadence.yaml'))).toBeNull();
+  });
+
+  async function refused(yaml: string, message: RegExp) {
+    const c = withGrid(yaml);
+    const r = await cad(c.root);
+    expect(r.code).toBe(1);
+    expect(r.out).toEqual([]);
+    expect(r.err).toHaveLength(1);
+    expect(r.err[0]).toMatch(message);
+  }
+
+  it('R7 — modèle hors sonnet/opus/haiku : refus nommé, code 1', () => refused('perf:\n  prices:\n    gpt: { input: 1, output: 1, cacheRead: 1 }\n', /^raf: .*cadence\.yaml : perf\.prices\.gpt inconnu \(attendu : sonnet, opus, haiku\)$/));
+  it('R7 — prix négatif ou texte : refus nommé', async () => {
+    await refused('perf:\n  prices:\n    sonnet: { input: -1, output: 1, cacheRead: 1 }\n', /perf\.prices\.sonnet\.input : nombre ≥ 0 attendu \(€ par million de tokens\)$/);
+    await refused('perf:\n  prices:\n    sonnet: { input: 1, output: "cher", cacheRead: 1 }\n', /perf\.prices\.sonnet\.output : nombre ≥ 0 attendu/);
+  });
+  it('R7 — modèle sans cacheRead : refus nommé', () => refused('perf:\n  prices:\n    opus: { input: 1, output: 1 }\n', /perf\.prices\.opus\.cacheRead : nombre ≥ 0 attendu/));
+  it('R7 — clé inconnue sous un modèle : refus nommé', () => refused('perf:\n  prices:\n    opus: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 }\n', /perf\.prices\.opus\.cacheWrite inconnu \(attendu : input, output, cacheRead\)$/));
+  it('R7 — clé perf.xxx inconnue : refus nommé', () => refused('perf:\n  xxx: 1\n', /perf\.xxx inconnu \(attendu : prices\)$/));
+  it('R7 — cadence.yaml illisible : refus avec l\'erreur du fichier, aucune sortie', () => refused('perf: [pas du yaml', /^raf: .*cadence\.yaml illisible : /));
+
+  it('R15 — une grille mal formée : « raf: … » sur la sortie d\'erreur, code 1', () => refused('perf:\n  prices: 5\n', /^raf: .*cadence\.yaml : perf\.prices doit être un objet/));
+
+  it('R7 — la grille mal formée refuse avant toute lecture de journal (aucun dossier de journaux requis)', async () => {
+    const root = tempDir();
+    writeFileSync(join(root, 'cadence.yaml'), 'perf:\n  xxx: 1\n');
+    const r = await cad(root);
+    expect(r.err[0]).toMatch(/perf\.xxx inconnu/);
+    expect(r.err[0]).not.toMatch(/aucun journal de vague/);
+  });
+});
+
+describe('cadence perf — coût par lot livré (R8, R9, R10, R12)', () => {
+  /** Des lots done dans la courante, chacun avec les étapes données ; la grille GRID (null : pas de cadence.yaml). */
+  async function cost(lots: Record<string, PStep[]>, grid: string | null = GRID, extra: PLot[] = []) {
+    const c = ctx();
+    writeWave(c.runs, 'w2', at('2026-10-02', '08:00:00'));
+    plan(c.root, 'alpha', [...Object.keys(lots).map((id) => ({ id, created: '2026-10-05', finished: CUR })), ...extra]);
+    for (const [id, steps] of Object.entries(lots)) lotJournal(c, CUR, id, { steps: steps.map((s) => ({ ended: at(CUR, '09:00:00'), ...s })) });
+    if (grid !== null) writeFileSync(join(c.root, 'cadence.yaml'), grid);
+    return { c, ...(await json(c.root)), plain: (await cad(c.root)).text };
+  }
+  const impl = (tokens: Record<string, number> | null, model = 'sonnet', extra: Partial<PStep> = {}): PStep => ({ kind: 'implement', model, tokens, ...extra });
+
+  it('R8 — 1 M en entrée à 3 €, 100 k en sortie à 15 € : 3 + 1,5 = 4,5 €', async () => {
+    const { data, plain: text } = await cost({ A0: [impl(usage(M, 100_000))] });
+    expect(data.cost.perDelivered.current).toBeCloseTo(4.5, 9);
+    expect(text).toContain('coût par lot livré : 4,50 €');
+  });
+
+  it('R8 — cacheWrite facturé au prix input', async () => {
+    const { data } = await cost({ A0: [impl(usage(0, 0, 0, M))] });
+    expect(data.cost.perDelivered.current).toBeCloseTo(3, 9);
+  });
+
+  it('R8 — cacheRead 2 M à 0,3 € : 0,6 €', async () => {
+    const { data } = await cost({ A0: [impl(usage(0, 0, 2 * M))] });
+    expect(data.cost.perDelivered.current).toBeCloseTo(0.6, 9);
+  });
+
+  it('R8 — étape avec counted seul à 1 M : 0,9 M entrée et 0,1 M sortie, cacheRead 0', async () => {
+    const { data } = await cost({ A0: [impl({ counted: M })] });
+    expect(data.cost.perDelivered.current).toBeCloseTo(0.9 * 3 + 0.1 * 15, 9);
+  });
+
+  it('R8 — étape aux quatre compteurs : le compteur counted n\'est pas réparti', async () => {
+    const { data } = await cost({ A0: [impl({ input: M, cacheWrite: 0, cacheRead: 0, output: 0, counted: 5 * M })] });
+    expect(data.cost.perDelivered.current).toBeCloseTo(3, 9);
+  });
+
+  it('R8 — étape sans tokens (interrompue) : 0 €, le lot reste calculé, aucun avertissement', async () => {
+    const { data, err } = await cost({ A0: [impl(null, 'sonnet', { status: 'interrupted' })] });
+    expect(data.cost.perDelivered.current).toBe(0);
+    expect(data.cost.perDelivered.lots.current).toBe(1);
+    expect(err).toEqual([]);
+  });
+
+  it('R8 — étape local aux quatre compteurs non nuls (1 M, 1 M, 1 M, 1 M) : 0 €, sans avertissement « modèle sans prix » même sans prix local', async () => {
+    const { data, err } = await cost({ A0: [impl({ input: M, cacheWrite: M, cacheRead: M, output: M, counted: 0 }, 'local')] });
+    expect(data.cost.perDelivered.current).toBe(0);
+    expect(err.join('\n')).not.toContain('modèle sans prix');
+  });
+
+  it('R9 — un lot à deux journaux (vague 1 et rejeu) : coûts additionnés', async () => {
+    const c = ctx();
+    writeWave(c.runs, 'w2', at('2026-10-02', '08:00:00'));
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: CUR }]);
+    lotJournal(c, CUR, 'A0', { steps: [{ ...impl(usage(M)), ended: at(CUR) }], status: 'handed-back' });
+    lotJournal(c, CUR, 'A0', { steps: [{ ...impl(usage(M)), ended: at(CUR) }], wave: 'w2' });
+    writeFileSync(join(c.root, 'cadence.yaml'), GRID);
+    expect((await json(c.root)).data.cost.perDelivered.current).toBeCloseTo(6, 9);
+  });
+
+  it('R9 — un lot dont une session interrompue n\'a pas de jetons reste dans la population du coût, valorisé sur ses autres étapes', async () => {
+    const { data } = await cost({ A0: [impl(usage(M)), { kind: 'review', model: 'opus', status: 'interrupted', tokens: null }] });
+    expect(data.cost.perDelivered.current).toBeCloseTo(3, 9);
+  });
+
+  it('R9 — médiane de 2, 3, 10 € = 3 €', async () => {
+    const eur = (e: number) => [impl({ input: (e / 3) * M, cacheWrite: 0, cacheRead: 0, output: 0, counted: 0 })];
+    const { data } = await cost({ A0: eur(2), A1: eur(3), A2: eur(10) });
+    expect(data.cost.perDelivered.current).toBeCloseTo(3, 9);
+    expect(data.cost.perDelivered.lots.current).toBe(3);
+  });
+
+  it('R9 — un lot done sans journal est écarté et compté à part', async () => {
+    const { data, plain: text } = await cost({ A0: [impl(usage(M))] }, GRID, [{ id: 'B0', created: '2026-10-05', finished: CUR }]);
+    expect(data.cost.perDelivered.current).toBeCloseTo(3, 9);
+    expect(data.cost.withoutJournal).toEqual({ current: 1, previous: 0 });
+    expect(text).toContain('1 lot(s) livré(s) sans journal');
+  });
+
+  it('R9 — un journal d\'un lot non done n\'entre pas', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: CUR }, { id: 'B0', status: 'doing' }]);
+    lotJournal(c, CUR, 'A0', { steps: [{ ...impl(usage(M)), ended: at(CUR) }] });
+    lotJournal(c, CUR, 'B0', { steps: [{ ...impl(usage(10 * M)), ended: at(CUR) }] });
+    writeFileSync(join(c.root, 'cadence.yaml'), GRID);
+    const { data } = await json(c.root);
+    expect(data.cost.perDelivered.current).toBeCloseTo(3, 9);
+    expect(data.cost.perDelivered.lots.current).toBe(1);
+  });
+
+  it('R9 — chaque étape est valorisée au prix du modèle de SON étape (implement sonnet, review opus)', async () => {
+    const { data } = await cost({ A0: [impl(usage(M)), { kind: 'review', model: 'opus', tokens: usage(M) }] });
+    expect(data.cost.perDelivered.current).toBeCloseTo(3 + 15, 9);
+  });
+
+  it('R10 — sans grille : coût n/d, avertissement, autres indicateurs servis', async () => {
+    const { data, err } = await cost({ A0: [impl(usage(M))] }, null);
+    expect(data.cost.perDelivered.current).toBeNull();
+    expect(err).toContain('perf : aucune grille de prix (cadence.yaml perf.prices), coût en euros n/d');
+    expect(data.tokens.byEstimate['1'].current).toBe(M);
+  });
+
+  it('R10 — une étape opus sans prix opus : lot écarté, avertissement nommant opus', async () => {
+    const grid = 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n';
+    const { data, err } = await cost({ A0: [impl(usage(M)), { kind: 'review', model: 'opus', tokens: usage(M) }], A1: [impl(usage(M))] }, grid);
+    expect(data.cost.perDelivered.current).toBeCloseTo(3, 9);
+    expect(data.cost.perDelivered.lots.current).toBe(1);
+    expect(data.cost.withoutPrice).toEqual({ opus: 1 });
+    expect(err).toContain('perf : modèle sans prix dans perf.prices : opus, coût n/d pour 1 lot(s)');
+  });
+
+  it('R10 — étape sans champ model : lot écarté, avertissement nommant « inconnu »', async () => {
+    const { data, err } = await cost({ A0: [{ ...impl(usage(M)), noModel: true }] });
+    expect(data.cost.perDelivered.current).toBeNull();
+    expect(err).toContain('perf : modèle sans prix dans perf.prices : inconnu, coût n/d pour 1 lot(s)');
+  });
+
+  it('R10 — coût n/d : pas de ⚠', async () => {
+    const c = ctx();
+    const grid = 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n';
+    plan(c.root, 'alpha', [...many(5, (i) => ({ id: `P${i}`, created: '2026-10-01', finished: PREV })), ...many(5, (i) => ({ id: `C${i}`, created: '2026-10-01', finished: CUR }))]);
+    for (let i = 0; i < 5; i++) {
+      lotJournal(c, PREV, `P${i}`, { steps: [{ ...impl(usage(M)), ended: at(PREV) }] });
+      lotJournal(c, CUR, `C${i}`, { steps: [{ ...impl(usage(M), 'opus'), ended: at(CUR) }] });
+    }
+    writeFileSync(join(c.root, 'cadence.yaml'), grid);
+    const { data } = await json(c.root);
+    expect(data.cost.perDelivered).toMatchObject({ current: null, warn: false });
+    expect(data.warnings.filter((w: string) => w.includes('coût'))).toEqual([]);
+  });
+
+  const fiveAndFive = async (prev: number, cur: number) => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...many(5, (i) => ({ id: `P${i}`, created: '2026-10-01', finished: PREV })), ...many(5, (i) => ({ id: `C${i}`, created: '2026-10-01', finished: CUR }))]);
+    for (let i = 0; i < 5; i++) {
+      lotJournal(c, PREV, `P${i}`, { steps: [{ ...impl(usage((prev / 3) * M)), ended: at(PREV) }] });
+      lotJournal(c, CUR, `C${i}`, { steps: [{ ...impl(usage((cur / 3) * M)), ended: at(CUR) }] });
+    }
+    writeFileSync(join(c.root, 'cadence.yaml'), GRID);
+    return { c, ...(await json(c.root)) };
+  };
+
+  it('R12 — une baisse du coût ne donne pas de ⚠', async () => {
+    const { data } = await fiveAndFive(6, 3);
+    expect(data.cost.perDelivered).toMatchObject({ warn: false, change: -0.5 });
+  });
+
+  it('R12 — la ligne ⚠ du coût finit par sa décision', async () => {
+    const { c, data } = await fiveAndFive(3, 6);
+    expect(data.cost.perDelivered.warn).toBe(true);
+    const line = (await cad(c.root)).out.find((l) => l.startsWith('⚠ coût par lot livré'))!;
+    expect(line).toMatch(/6,00 € \(précédente 3,00 €, \+100 %\)/);
+    expect(line).toMatch(/→ le modèle ou l'effort d'une étape est-il juste \? changer le modèle de cette étape$/);
+  });
+
+  it('R14 — le JSON porte cost { perDelivered, withoutPrice, withoutJournal } avec le jumeau corrections.firstTime', async () => {
+    const { data } = await cost({ A0: [impl(usage(M))] });
+    expect(Object.keys(data.cost).sort()).toEqual(['perDelivered', 'withoutJournal', 'withoutPrice']);
+    expect(data.cost.perDelivered.twin).toBe('corrections.firstTime');
+  });
+
+  it('R13 — ni le texte ni le JSON n\'exposent de total en euros', async () => {
+    const { data, plain: text } = await cost({ A0: [impl(usage(M))], A1: [impl(usage(M))] });
+    expect(text).not.toMatch(/6,00 €/);
+    expect(JSON.stringify(data)).not.toMatch(/total/i);
+  });
+
+  it('R17 — plan illisible : coût n/d', async () => {
+    const { c } = await cost({ A0: [impl(usage(M))] });
+    writeFileSync(join(c.root, 'alpha', 'docs', 'plan', 'raf.yaml'), 'version: [pas du yaml');
+    const r = await json(c.root);
+    expect(r.data.cost.perDelivered.current).toBeNull();
+  });
+
+  it('R15 — le coût ne modifie ni cadence.yaml ni le dossier', async () => {
+    const { c } = await cost({ A0: [impl(usage(M))] });
+    const before = tree(c.root);
+    await cad(c.root);
+    expect(tree(c.root)).toEqual(before);
   });
 });

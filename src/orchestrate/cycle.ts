@@ -478,13 +478,14 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     const reviewed = [...(l.ficheConstats ?? []), ...(l.maquetteConstats ?? [])];
     const written = ficheOf(c);
     const back = partsOf(l, written).back;
+    const session = { run: (l.specRuns ?? 0) + 1, max: specBudget(c) };
     vars.spec = specText({
       dir: c.config.spec.dir,
       render: c.config.spec.render,
       screen: l.screen,
       back,
       problems: l.specProblems,
-      review: !reviewed.length ? undefined : back ? reviewedSheetText(reviewed, !!l.screen) : reviewedText(reviewed, { run: (l.specRuns ?? 0) + 1, max: specBudget(c) }),
+      review: !reviewed.length ? undefined : back ? reviewedSheetText(reviewed, !!l.screen, session) : reviewedText(reviewed, session),
       template: l.screen ? ficheTemplate() : undefined,
       templateBack: back || l.screen ? ficheBackTemplate() : undefined,
     });

@@ -244,6 +244,15 @@ describe('R9 — brief des revues de rang 2 ou plus', () => {
     const { mq } = await briefs();
     expect(mq[2]).toContain('This is review 3 of 3, the last review');
   });
+  it('R9 — lot mixte : la consigne à la session spec renvoyée après la revue de la fiche parle des passes restantes, pas de « one more pass only »', async () => {
+    const mixte: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { mixte: true }) }));
+    const fiche = (): Handler => () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', texte: 'R5 : sans source' }], verdict: 'non conforme' }));
+    const h = harness({ lots: [{ title: 'Un écran et son API', screen: 'page' as const }], script: { spec: [mixte, mixte], fiche: [fiche(), ok], maquette: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', { ...screen, specRuns: 1 }, { fiche: true, ...cfg(3) }));
+    const renvoi = h.calls.filter((x) => x.kind === 'spec')[1].brief;
+    expect(renvoi).toContain('spec session 3 of 3');
+    expect(renvoi).not.toContain('one more pass only');
+  });
   it('R9 — brief de la revue 2 : la consigne de marquage inchange est présente', async () => {
     const { mq, specs } = await briefs();
     expect(mq[1]).toContain('`inchange: true`');

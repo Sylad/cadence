@@ -16,10 +16,10 @@ export function ficheReviewText(o: { fiche: string; passes: number; previous?: C
   return lines.join('\n');
 }
 
-/** Consigne de la seconde passe `spec` : les constats bloquants et majeurs des revues de la fiche (et de la maquette d'un lot mixte), ensemble. */
-export function reviewedSheetText(constats: Constat[], mockup: boolean): string {
+/** Consigne de la passe `spec` qui suit une revue : les constats bloquants et majeurs des revues de la fiche (et de la maquette d'un lot mixte), ensemble, la session `run` sur `max`. */
+export function reviewedSheetText(constats: Constat[], mockup: boolean, o: { run: number; max: number }): string {
   return [
-    `The review of your ${mockup ? 'sheet and mockup' : 'sheet'} found the blocking and major points below. Fix exactly these in the sheet${mockup ? ', the mockup and the captures' : ''} (one more pass only: it is reviewed again, and what remains goes back to the lead). Keep the sheet consistent: every rule sourced or a hypothesis with its \`si_faux\`, every rule attached to a case and tested, every contract with its errors:`,
+    `The review of your ${mockup ? 'sheet and mockup' : 'sheet'} found the blocking and major points below. Fix exactly these in the sheet${mockup ? ', the mockup and the captures' : ''} (spec session ${o.run} of ${o.max}: it is reviewed again, and what remains once the sessions are used goes back to the lead). Keep the sheet consistent: every rule sourced or a hypothesis with its \`si_faux\`, every rule attached to a case and tested, every contract with its errors:`,
     ...bulletLines(constats),
   ].join('\n');
 }

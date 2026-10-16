@@ -15,7 +15,7 @@ sujet:
     endpoints: []
     jobs: ["étape maquette d'orchestrate (revue de la maquette par ux-reviewer, mode maquette)"]
     hors_perimetre:
-      - "la revue de la fiche back (étape fiche, code-reviewer) : elle garde ses 2 revues et son budget de 2 sessions spec"
+      - "la revue de la fiche back (étape fiche, code-reviewer) : elle garde ses 2 revues (le plafond de sessions spec, commun au lot, est celui de R5)"
       - "la revue de conformité UX après le code (mode conformité, étape ux) : inchangée"
       - "le schéma de l'état d'un lot (src/orchestrate/state.ts) : aucun champ ajouté, le défaut de revue ne va qu'au journal"
       - "le contrôle par le programme que la liste à cocher est complète : il reste à la consigne de l'agent"
@@ -59,9 +59,9 @@ cas:
       - "Une revue conforme mène à accept ou implement."
     alternatives:
       - { si: "la dernière revue permise est encore non conforme", alors: "le lot est rendu au lead avec ce qui reste", regles: [R4] }
-      - { si: "le budget de sessions spec est épuisé avant la dernière revue", alors: "le lot est rendu au lead", regles: [R5] }
+      - { si: "le budget de sessions spec est épuisé avant la dernière revue, ou la spec reste non conforme au contrôle du programme au plafond", alors: "le lot est rendu au lead", regles: [R5] }
       - { si: "orchestrate.maquetteReviews vaut 1", alors: "la première revue non conforme rend le lot", regles: [R4] }
-      - { si: "la revue de la fiche d'un lot mixte rend des constats", alors: "elle garde ses 2 revues et son budget de 2 sessions", regles: [R6] }
+      - { si: "la revue de la fiche d'un lot mixte rend des constats", alors: "elle garde ses 2 revues et partage avec la maquette le compteur et le plafond de sessions spec du lot", regles: [R6] }
     resultat: "Jusqu'à 3 revues de maquette par défaut, puis un rendu au lead."
   - id: C4
     titre: "Un majeur apparu en revue 2 sur un point inchangé est un défaut de revue"
@@ -83,7 +83,7 @@ regles:
     cas: [C1]
     enonce: "orchestrate.maquetteReviews vaut 3 quand la clé est absente de cadence.yaml, et la valeur déclarée sinon."
     statut: sourcee
-    source: "demande du lot : « l'étape maquette autorise 3 revues par vague au lieu de 2 (orchestrate.maquetteReviews, défaut 3) » ; défaut actuel de 2 : src/orchestrate/cycle.ts:1355"
+    source: "demande du lot : « l'étape maquette autorise 3 revues par vague au lieu de 2 (orchestrate.maquetteReviews, défaut 3) » ; défaut actuel de 2 : src/orchestrate/cycle.ts:1356"
     tests:
       - "R1 — cadence.yaml sans maquetteReviews : le plafond lu est 3"
       - "R1 — maquetteReviews: 4 : le plafond lu est 4"
@@ -108,7 +108,7 @@ regles:
     cas: [C2, C3]
     enonce: "Le brief de la première revue exige TOUS les majeurs et bloquants dans ce premier rapport, sans en garder pour une revue suivante ; et la revue de la maquette se joue au plus maquetteReviews fois : une revue non conforme de rang maquetteReviews rend le lot avec « maquette non conforme après <n> revues : <verdict> » (n = maquetteReviews)."
     statut: sourcee
-    source: "demande du lot : « TOUS les majeurs dans la première revue » et « 3 revues par vague au lieu de 2 » ; code actuel src/orchestrate/cycle.ts:1355-1358 (passes >= 2, message « après 2 revues »)"
+    source: "demande du lot : « TOUS les majeurs dans la première revue » et « 3 revues par vague au lieu de 2 » ; code actuel src/orchestrate/cycle.ts:1356-1359 (passes >= 2, message « après 2 revues »)"
     tests:
       - "R4 — brief de la revue 1 : la consigne « tous les majeurs » est présente"
       - "R4 — maquetteReviews 3, trois revues non conformes : lot rendu, message « après 3 revues »"
@@ -116,28 +116,35 @@ regles:
       - "R4 — maquetteReviews 1 : première revue non conforme, lot rendu « après 1 revues »"
   - id: R5
     cas: [C3]
-    enonce: "Pour une maquette, le plafond de sessions spec (aujourd'hui 2) vaut maquetteReviews, dans le renvoi après revue et dans le contrôle du programme après une passe spec ; atteint, le lot est rendu avec « maquette non conforme et la spec a déjà joué <n> sessions : <verdict> » ; une réponse du lead rouvre un budget neuf."
+    enonce: "Le plafond de sessions spec d'un lot est unique et se calcule ainsi : maquetteReviews pour un lot à écran dont orchestrate.maquette n'est pas false (lot à écran seul ou lot mixte), 2 pour tout autre lot (lot back sans écran, maquette désactivée). Ce plafond est appliqué aux trois endroits qui lisent l.specRuns : le contrôle du programme après une passe spec (specStep, cycle.ts:1198), le renvoi après revue (reviewSpecStep, cycle.ts:1361) et le message de rendu. Atteint, le lot est rendu avec « <revue> non conforme et la spec a déjà joué <n> sessions : <verdict> » (n = le plafond) ou, au contrôle du programme, « spec non conforme après <n> passes : <problèmes> » ; une réponse du lead remet l.specRuns à zéro (cycle.ts:1167 et 1214, inchangé) et rouvre un budget neuf."
     statut: hypothese
-    si_faux: "Si le plafond des sessions spec devait rester 2, la 3ᵉ revue n'aurait jamais de correction à relire : le plafond de revues serait sans effet ; seul un compteur change (l.specRuns, format inchangé)."
+    si_faux: "Si le plafond devait rester 2 pour la spec, la 3ᵉ revue n'aurait jamais de correction à relire et maquetteReviews serait sans effet ; si le lot mixte devait avoir deux budgets distincts (fiche 2, maquette 3), il faudrait un second compteur dans l'état du lot (state.ts), donc un modèle stocké : choix noté au lead, non retenu ici. Aucune donnée n'est modifiée (l.specRuns garde son format)."
     tests:
-      - "R5 — maquetteReviews 3 : trois sessions spec permises, la quatrième refusée"
-      - "R5 — spec non conforme au contrôle programme à la 2ᵉ passe : encore une passe permise quand maquetteReviews vaut 3"
+      - "R5 — lot à écran, maquetteReviews 3 : trois sessions spec permises, la quatrième refusée"
+      - "R5 — specStep, lot à écran, maquetteReviews 3, spec non conforme après la 2ᵉ passe : une 3ᵉ passe est encore permise"
+      - "R5 — specStep, lot à écran, spec non conforme après la 3ᵉ passe : lot rendu « spec non conforme après 3 passes »"
+      - "R5 — specStep, lot back sans écran, maquetteReviews 3 : plafond 2, lot rendu « spec non conforme après 2 passes » à la 2ᵉ passe non conforme"
+      - "R5 — lot à écran avec orchestrate.maquette false : plafond de sessions 2"
       - "R5 — plafond atteint avant la dernière revue : message « la spec a déjà joué 3 sessions »"
+      - "R5 — réponse du lead : l.specRuns remis à zéro, trois sessions de nouveau permises"
   - id: R6
     cas: [C3]
-    enonce: "La revue de la fiche (étape fiche) garde 2 revues et son budget de 2 sessions spec ; maquetteReviews ne s'applique qu'à la revue de maquette."
-    statut: sourcee
-    source: "src/orchestrate/cycle.ts:1355 (passes >= 2 commun aux deux revues) ; demande du lot : « l'étape maquette autorise 3 revues »"
+    enonce: "La revue de la fiche (étape fiche) garde 2 revues ; maquetteReviews ne s'applique qu'au nombre de revues de maquette. Sur un lot mixte, la fiche et la maquette partagent le compteur l.specRuns et le plafond de R5 : les constats de la fiche, retenus par afterFiche (cycle.ts:1048-1063) jusqu'à la revue de la maquette, repartent avec ceux de la maquette vers une seule session spec, qui compte pour 1. La revue de la fiche suivante lit donc le même compteur : avec maquetteReviews 3, elle renvoie à la spec tant que l.specRuns < 3 et rend le lot au-delà, avec le message de R5."
+    statut: hypothese
+    si_faux: "Si la fiche devait garder un budget propre de 2 sessions sur un lot mixte, il faudrait un compteur par étape dans l'état du lot (state.ts) : modèle stocké, choix noté au lead. Comportement des lots sans écran inchangé."
     tests:
       - "R6 — fiche non conforme à la 2ᵉ revue avec maquetteReviews 3 : lot rendu « fiche non conforme après 2 revues »"
+      - "R6 — lot mixte, 2 sessions spec déjà jouées (maquette), maquetteReviews 3 : la revue de la fiche renvoie encore à la spec (3ᵉ session)"
+      - "R6 — lot mixte, 3 sessions spec déjà jouées : la revue de la fiche rend le lot « la spec a déjà joué 3 sessions »"
+      - "R6 — lot back sans écran, maquetteReviews 3 : la revue de la fiche rend le lot dès 2 sessions"
   - id: R7
     cas: [C4]
-    enonce: "Quand une revue de maquette de rang 2 ou plus rend un constat bloquant ou majeur marqué inchange: true, le programme écrit dans le journal de la vague une ligne « <projet>:<lot> — défaut de revue : maquette, revue <n>, majeur sur un point inchangé absent de la revue <n-1> — <texte> » ; rien n'est écrit en revue 1, pour un mineur ou un constat non marqué ; le verdict, l'état du lot et la boucle sont inchangés."
+    enonce: "Quand une revue de maquette de rang 2 ou plus rend un constat bloquant ou majeur marqué inchange: true, le programme écrit dans le journal de la vague, par c.wave.log (LotCtx.wave.log, cycle.ts:82, qui ajoute la ligne à .cadence/runs/<vague>/journal.log préfixée de l'horodatage ISO, state.ts:318), une ligne « <projet>:<lot> · défaut de revue : maquette, revue <n>, majeur sur un point inchangé absent de la revue <n-1> : <texte> » (lotKey(projet, lot) de state.ts:189, séparateur « · » comme les lignes de cycle.ts:625 et 774) ; la ligne n'est pas ajoutée à l.warnings ; rien n'est écrit en revue 1, pour un mineur ou un constat non marqué ; le verdict, l'état du lot et la boucle sont inchangés."
     statut: sourcee
     source: "demande du lot : « une revue 2 qui trouve un majeur absent de la revue 1 sur un point inchangé est comptée comme défaut de revue (journal) »"
     tests:
-      - "R7 — revue 2 : majeur marqué inchange : une ligne « défaut de revue » dans le journal"
-      - "R7 — revue 1 avec inchange: true : aucune ligne"
+      - "R7 — revue 2 : majeur marqué inchange : c.wave.log reçoit exactement une ligne « <projet>:<lot> · défaut de revue : maquette, revue 2, … » (et l.warnings est inchangé)"
+      - "R7 — revue 1 avec inchange: true : c.wave.log ne reçoit aucune ligne « défaut de revue »"
       - "R7 — revue 2 : mineur marqué inchange, ou majeur non marqué : aucune ligne"
       - "R7 — l'état du lot après la ligne est identique à celui sans marque"
   - id: R8
@@ -146,6 +153,7 @@ regles:
     statut: sourcee
     source: "réponse du lead : le point inchangé est déclaré par l'agent ux-reviewer dans un champ facultatif inchange de chaque constat (schéma de rapport étendu, facultatif) ; le programme n'en fait qu'une ligne de journal pour les bloquants et majeurs à partir de la revue 2 ; aucune détection par comparaison de textes ou de fichiers, aucun état par constat dans state.ts"
     tests:
+      - "R8 — inchange non booléen (texte, null) : rapport refusé par checkShape comme tout champ mal typé"
       - "R8 — rapport de revue sans inchange : accepté, constats identiques"
       - "R8 — rapport avec inchange: true : accepté"
   - id: R9
@@ -180,9 +188,10 @@ contrats:
     erreurs:
       - { code: log error, message: "maquette non conforme après <n> revues : <verdict>" }
       - { code: log error, message: "maquette non conforme et la spec a déjà joué <n> sessions : <verdict>" }
+      - { code: log error, message: "spec non conforme après <n> passes : <problèmes>" }
     regles: [R3, R4, R5, R6, R7, R8, R9, R10]
 
 donnees:
   - { id: D1, objet: "cadence.yaml, clé orchestrate.maquetteReviews", existant: false, modification: aucune, note: "nouvelle clé facultative ; sans elle, 3" }
   - { id: D2, objet: "REVIEW_SCHEMA, constats[].inchange (booléen facultatif)", existant: true, modification: aucune, note: "rapport interne agent → programme ; un rapport sans le champ reste valide (R8)" }
-  - { id: D3, objet: "journal de la vague (ligne « défaut de revue »)", existant: true, modification: aucune, note: "une ligne de texte de plus, format du journal inchangé" }
+  - { id: D3, objet: "journal.log de .cadence/runs/<vague>/ (ligne « défaut de revue », écrite par c.wave.log)", existant: true, modification: aucune, note: "une ligne de texte de plus ; horodatage et écriture de state.ts:318 inchangés" }

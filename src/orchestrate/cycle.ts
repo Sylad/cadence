@@ -1104,7 +1104,7 @@ const lotAcceptation = (c: LotCtx, fiche: string): string => findAcceptation(c.l
 const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo, json));
 
 /**
- * Une acceptation conforme et SCELLÉE par le programme (empreintes posées), rouge ou verte (`vert: true`, lot relancé dans une nouvelle vague ; une verte vaut
+ * Une acceptation conforme et SCELLÉE par le programme (empreintes posées), rouge ou verte (`vert: true`, lot relancé dans une nouvelle vague ; une verte et scellée vaut
  * preuve même si son scellé ne tient plus, L233) : elle n'a pu être écrite qu'après la revue de la maquette et les tests rouges, qui ne sont donc pas rejoués. Sans `orchestrate.accept`, aucune preuve.
  */
 function acceptationProof(c: LotCtx, fiche: string): boolean {
@@ -1115,8 +1115,8 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
   if (typeof doc === 'string') return false;
   // Un lot déjà vert (L233) n'a plus d'oracle à écrire : le cycle seul a pu poser `vert: true`, après le scellé et les tests rouges. Même une preuve qui ne tient plus
   // (test rescellé ou corrigé depuis, fiche amendée) ne renvoie jamais à accept, qui réécrirait un oracle vert et exigerait des tests rouges : le lot part à implement ou à la revue.
-  if (doc.vert) return true;
   if (!doc.empreintes) return false;
+  if (doc.vert) return true;
   // Le scellé n'est posé que par le programme : chaque fichier listé doit porter l'empreinte git de son contenu actuel (une clé `empreintes` vide ou copiée d'un autre lot ne prouve rien).
   const emp = doc.empreintes;
   const sealed = doc.fichiers.every((f) => {
@@ -1434,7 +1434,7 @@ async function acceptStep(c: LotCtx): Promise<void> {
     return;
   }
   const json = lotAcceptation(c, fiche);
-  // Un lot déjà vert (L233) n'a plus d'oracle à écrire, même quand `next` vaut encore accept (question posée pendant accept, puis réponse du lead) : jamais de session accept.
+  // Un lot déjà vert et scellé (L233) n'a plus d'oracle à écrire, même quand `next` vaut encore accept (question posée pendant accept, puis réponse du lead) : jamais de session accept.
   // Le fichier est lu tel qu'il était avant la première session accept du lot : la seconde passe voit le fichier écrit par la session, qui ne doit pas être vert (checkAcceptation).
   const first = l.steps.find((s) => s.kind === 'accept')?.headBefore;
   let text: string | null = null;
@@ -1444,7 +1444,7 @@ async function acceptStep(c: LotCtx): Promise<void> {
     text = null;
   }
   const doc = text === null ? null : parseAcceptation(text);
-  if (doc && typeof doc !== 'string' && doc.vert) {
+  if (doc && typeof doc !== 'string' && doc.vert && doc.empreintes) {
     l.accept = { acceptation: json, rouge: redSha(l.repo, json) ?? '' };
     l.next = 'implement';
     // Un lot en question n'a plus rien à demander : la réponse du lead (« ne réécris rien ») est prise en compte par ce choix, elle ne repart pas dans le brief d'implement.

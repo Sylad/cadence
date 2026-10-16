@@ -121,6 +121,17 @@ describe('étape accept : où elle s’insère', () => {
     }
   });
 
+  it('L233 — une acceptation vert: true jamais scellée ne prouve rien : accept est rejoué', async () => {
+    const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    setVert(h.repo, a.json); // posé sans scellé : le cycle seul pose vert, et après le scellé
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation verte sans scellé', '--', a.json);
+    const c = h.lot('L1', screen, config);
+    await runLot(c);
+    expect(kinds(h)[0]).toBe('accept');
+  });
+
   it('L233 — un lot vert en question à accept (réponse du lead reçue) repart à implement, pas à une session accept qui réécrirait l’oracle', async () => {
     const h = prepared({ accept: [accept(), accept()], implement: [green], review: [ok] });
     const a = ecritAcceptation(h.repo, { sansFiche: true });

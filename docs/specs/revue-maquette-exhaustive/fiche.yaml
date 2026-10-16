@@ -143,8 +143,8 @@ regles:
   - id: R8
     cas: [C4]
     enonce: "Le constat du rapport de revue accepte un champ facultatif inchange (booléen) ; un rapport sans ce champ reste valide et se traite comme avant."
-    statut: hypothese
-    si_faux: "Si le programme devait détecter seul le point inchangé (comparaison de textes ou de fichiers), il faudrait un état par constat (state.ts) : c'est un choix de stockage à reprendre avec le lead ; avec le champ, seul le schéma de rapport, facultatif, change."
+    statut: sourcee
+    source: "réponse du lead : le point inchangé est déclaré par l'agent ux-reviewer dans un champ facultatif inchange de chaque constat (schéma de rapport étendu, facultatif) ; le programme n'en fait qu'une ligne de journal pour les bloquants et majeurs à partir de la revue 2 ; aucune détection par comparaison de textes ou de fichiers, aucun état par constat dans state.ts"
     tests:
       - "R8 — rapport de revue sans inchange : accepté, constats identiques"
       - "R8 — rapport avec inchange: true : accepté"

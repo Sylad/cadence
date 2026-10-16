@@ -2562,7 +2562,7 @@ lots:
     finished: 2026-10-16
   - id: L225
     title: "cadence perf [--since date] [--json] : tableau de bord permanent du workflow, sans modèle, lu dans .cadence/runs/*/wave.json et les plans raf des projets du dossier ; deux fenêtres (7 derniers jours contre les 7 précédents) et ⚠ sur une dégradation de plus de 25 % ; indicateurs 1 débit (lots prêts, livrés, rendus par jour, part des rendus sur budget), 2 passes de correction par lot (médiane, part ≥ 2, causes dominantes du cache de corrections), 5 interventions du lead (lots rendus par une vague puis terminés hors vague, sessions ux par lot visible) ; demande de Sylvain 16-10 : surveiller et s'améliorer sans micro-optimisation"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-16
@@ -2591,6 +2591,7 @@ lots:
       - { date: 2026-10-16, text: "Hypothèses (fiche perf-tableau-de-bord) — R23 : perf réutilise la lecture de cadence corrections, jamais un lecteur de rapports à lui : les passes et leur classification mécanique viennent des mêmes fonction… ; si faux : Si perf devait avoir son propre lecteur de rapports, sa classification mécanique pourrait diverger de celle de cadence corrections (une passe sans constat rang…" }
     started: 2026-10-16
     review: { date: 2026-10-16, verdict: "conforme : 0 bloquant, 0 majeur, 2 mineurs à trancher par le lead (R9 compte « non bloquant », R22 lit les copies de tmp/ et produit un faux ⚠ livrés sur le dossier réel) — orchestré (vague 2026-10-16-2105, 1 passe(s) de correction + passe des mineurs sans commit)", commit: ab16f3f4364fa8f110812c3f9c886b6ec3061cde }
+    finished: 2026-10-16
   - id: L226
     title: "cadence perf, indicateurs 3 tokens par lot selon l'estimate et part des tokens de revue, 4 délai création → done → livraison par lot (plans raf) et durée de mur par étape (journaux), 7 coût en euros par lot livré : tokens par modèle et par étape des journaux × grille de prix déclarée dans cadence.yaml (perf.prices, par modèle, entrée / sortie / lecture de cache), hypothèses de répartition entrée/sortie écrites dans la fiche ; mêmes fenêtres et ⚠ que le lot précédent"
     status: todo

@@ -58,7 +58,7 @@ export function reposText(role: 'write' | 'read', lot: string, repos: { rel: str
   ].join('\n');
 }
 
-/** Consigne d'implémentation d'un lot `visible` : son entrée Nouveautés (convention de `cadence news`, voir le README). */
+/** Consigne d'implémentation d'un lot `visible` : son entrée Nouveautés (convention de `cadence news`, voir docs/news.md du paquet @sylad/cadence). */
 export function newsText(lot: string, captureDir?: string): string {
   return [
     `This lot is visible: write its News entry. Run \`cadence news new ${lot}\` (it creates \`docs/nouveautes/<date>-<slug>.md\`), then write the text in terms of what changes for the user, factual (what the user sees or can now do, no implementation detail, no promise).`,

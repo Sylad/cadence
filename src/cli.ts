@@ -75,7 +75,7 @@ publié par exemple, ainsi que le fichier d'attendus QA : docs/qa/expectations.m
 Un lot --visible attend une entrée Nouveautés (docs/nouveautes/, --dir) avec capture ; raf check le vérifie.
 Un texte qui commence par « - » se passe après « -- » : raf note L1 -- "-5 %".
 Le plan est docs/plan/raf.yaml, ou celui que nomme « plan: » dans cadence.yaml ; un plan tenu par un
-autre outil se lit sans migration (correspondance des champs, voir docs/raf.md) et reste en lecture seule.
+autre outil se lit sans migration (correspondance des champs, voir docs/raf.md du paquet @sylad/cadence) et reste en lecture seule.
 Options communes : --file chemin (ou RAF_FILE), RAF_TODAY=AAAA-MM-JJ pour figer la date.`;
 
 /** Ajoute `line` au .gitignore de `root` s'il n'y est pas déjà (avec ou sans `/` initial ou final). Rend vrai si écrit. */
@@ -462,7 +462,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
       const orchestrating = waveHolding(root);
       if (orchestrating) throw new RafError(`deliver : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — livrer une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
-      if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans docs/deliver.md)`);
+      if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans docs/deliver.md du paquet @sylad/cadence)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const plan = existsSync(planPath) ? loadPlan() : null;
       const articles = readDocsConfig(configPath).articles;
@@ -473,7 +473,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'verify': {
       if (!gitRoot(io.cwd)) throw new RafError('verify : à lancer dans un dépôt git');
-      if (!existsSync(configPath)) throw new RafError(`pas de configuration : ${configPath} (voir « cadence.yaml » dans docs/deliver.md)`);
+      if (!existsSync(configPath)) throw new RafError(`pas de configuration : ${configPath} (voir « cadence.yaml » dans docs/deliver.md du paquet @sylad/cadence)`);
       const retry = values.retry === undefined ? 0 : Number(values.retry);
       if (!Number.isFinite(retry) || retry < 0) throw new RafError(`--retry invalide : ${values.retry} (secondes, 0 ou plus)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);

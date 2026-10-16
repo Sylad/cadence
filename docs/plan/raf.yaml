@@ -2558,6 +2558,8 @@ lots:
     estimate: 0.5
     spec: true
     created: 2026-10-16
+    notes:
+      - { date: 2026-10-16, text: "16-10 principes de Sylvain pour toute la famille perf (L225–L227) : (1) VITE ET BIEN — chaque indicateur de vitesse est affiché à côté de son indicateur de qualité jumeau, jamais seul : débit ↔ défauts échappés (constats QA bloquants ou majeurs après livraison, lots rouverts), passes de correction ↔ qualité au premier coup (part des lots conformes à la première revue), tokens/coût ↔ part des hypothèses de fiche contredites en revue ; (2) AUCUN indicateur de volume produit (lignes de code, nombre de commits, tokens consommés comme objectif) : ils sont contre-productifs ; (3) un ⚠ ne vaut que sur une tendance (deux fenêtres) ou un goulot net, pas sur une variation d'une semaine ; (4) le choix et la pondération des indicateurs sont délégués au lead par Sylvain, la fiche doit justifier chaque indicateur par la décision qu'il permet de prendre" }
   - id: L226
     title: "cadence perf, indicateurs 3 tokens par lot selon l'estimate et part des tokens de revue, 4 délai création → done → livraison par lot (plans raf) et durée de mur par étape (journaux), 7 coût en euros par lot livré : tokens par modèle et par étape des journaux × grille de prix déclarée dans cadence.yaml (perf.prices, par modèle, entrée / sortie / lecture de cache), hypothèses de répartition entrée/sortie écrites dans la fiche ; mêmes fenêtres et ⚠ que le lot précédent"
     status: todo
@@ -2570,6 +2572,8 @@ lots:
     estimate: 0.25
     spec: true
     created: 2026-10-16
+    notes:
+      - { date: 2026-10-16, text: "16-10 : l'en-tête perf du tour montre vitesse et qualité côte à côte (règle VITE ET BIEN de L225) ; le skill lead relaie un ⚠ en une ligne et n'ouvre un lot d'amélioration que sur tendance confirmée ou goulot net ; jamais de lot pour une micro-optimisation" }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -57,7 +57,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
 
-## [Unreleased]
+## [1.7.0] - 2026-10-16
 
 ### Changed
 

@@ -101,6 +101,35 @@ describe('étape accept : où elle s’insère', () => {
     expect(c.lot.accept?.acceptation).toBe(a.json);
   });
 
+  it('L233 — un lot vert dont la preuve ne tient plus (test non rescellé, nom de la fiche absent) part à implement, jamais à accept', async () => {
+    for (const abime of ['empreinte', 'nom']) {
+      const h = prepared({ implement: [green], review: [ok] });
+      const a = ecritAcceptation(h.repo, { sansFiche: true, ...(abime === 'nom' ? { tests: "it('autre', () => { throw new Error('rouge'); });" } : {}) });
+      sealAcceptation(h.repo, a.json);
+      setVert(h.repo, a.json);
+      git(h.repo, 'add', '--', a.json);
+      git(h.repo, 'commit', '-q', '-m', 'chore(L1): acceptation verte', '--', a.json);
+      if (abime === 'empreinte') {
+        writeFileSync(join(h.repo, a.test), `${readFileSync(join(h.repo, a.test), 'utf8')}// modifié après le scellé\n`);
+        git(h.repo, 'commit', '-q', '-am', 'test(L1): test modifié');
+      }
+      const c = h.lot('L1', screen, config);
+      await runLot(c);
+      expect(kinds(h), abime).not.toContain('accept');
+      expect(kinds(h)[0], abime).toBe('implement');
+      expect(JSON.parse(readFileSync(join(h.repo, a.json), 'utf8')).vert, abime).toBe(true);
+    }
+  });
+
+  it('L233 — le brief accept interdit de réécrire une acceptation verte et rend la main', async () => {
+    const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
+    await runLot(h.lot('L1', screen, config));
+    expect(h.calls[0].brief).toMatch(/vert: true[^.]*(never rewrite|do not rewrite)/i);
+    expect(h.calls[0].brief).toMatch(/resceaux/);
+    expect(h.calls[0].brief).toMatch(/hand (the lot )?back/i);
+    expect(readAgents(AGENTS_DIR)['acceptance-writer'].prompt).toMatch(/vert: true[^.]*never rewrite/i);
+  });
+
   it('un second lot sur le même écran a son propre fichier : le verrou et les tests du premier restent intacts', async () => {
     const h = prepared({ accept: [accept({ lot: 'L2' })], implement: [green, green], review: [ok, ok] }, [{ title: 'Un écran', screen: 'page' }, { title: 'Le même écran', screen: 'page' }]);
     const premier = ecritAcceptation(h.repo, { sansFiche: true });

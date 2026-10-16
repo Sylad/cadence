@@ -1104,15 +1104,19 @@ const lotAcceptation = (c: LotCtx, fiche: string): string => findAcceptation(c.l
 const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo, json));
 
 /**
- * Une acceptation conforme et SCELLÉE par le programme (empreintes posées), rouge ou verte (`vert: true`, lot relancé dans une nouvelle vague) :
- * elle n'a pu être écrite qu'après la revue de la maquette et les tests rouges, qui ne sont donc pas rejoués. Sans `orchestrate.accept`, aucune preuve.
+ * Une acceptation conforme et SCELLÉE par le programme (empreintes posées), rouge ou verte (`vert: true`, lot relancé dans une nouvelle vague ; une verte vaut
+ * preuve même si son scellé ne tient plus, L233) : elle n'a pu être écrite qu'après la revue de la maquette et les tests rouges, qui ne sont donc pas rejoués. Sans `orchestrate.accept`, aucune preuve.
  */
 function acceptationProof(c: LotCtx, fiche: string): boolean {
   const l = c.lot;
   const json = lotAcceptation(c, fiche);
   if (!c.config.accept || !listed(c, json)) return false;
   const doc = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
-  if (typeof doc === 'string' || !doc.empreintes) return false;
+  if (typeof doc === 'string') return false;
+  // Un lot déjà vert (L233) n'a plus d'oracle à écrire : le cycle seul a pu poser `vert: true`, après le scellé et les tests rouges. Même une preuve qui ne tient plus
+  // (test rescellé ou corrigé depuis, fiche amendée) ne renvoie jamais à accept, qui réécrirait un oracle vert et exigerait des tests rouges : le lot part à implement ou à la revue.
+  if (doc.vert) return true;
+  if (!doc.empreintes) return false;
   // Le scellé n'est posé que par le programme : chaque fichier listé doit porter l'empreinte git de son contenu actuel (une clé `empreintes` vide ou copiée d'un autre lot ne prouve rien).
   const emp = doc.empreintes;
   const sealed = doc.fichiers.every((f) => {
@@ -1120,8 +1124,7 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
     return existsSync(join(l.repo, norm)) && emp[norm] === git(l.repo, 'hash-object', '--', norm).trim();
   });
   if (!sealed) return false;
-  const vertMsg = checkAcceptation(l.repo, json, l.lot, fiche).filter((p) => !(doc.vert && p.includes('vert: true à l\'écriture')));
-  return vertMsg.length === 0;
+  return checkAcceptation(l.repo, json, l.lot, fiche).length === 0;
 }
 
 /** Chemins salis par une session : suivis modifiés, nouveaux fichiers non suivis, et ceux des dépôts voisins. */

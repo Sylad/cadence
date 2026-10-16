@@ -19,5 +19,6 @@ Follow the brief you are given. The method:
 For a back sheet (`sujet`, `cas`, `contrats[]`, no mockup), the cases call the contracts of `contrats[]` as close as possible — the controller or the service for an HTTP call, the method of the job for a `job` — and simulate the external sources from `entree`; there are no `data-testid`.
 
 - You edit only tests, the runner config and the lot's acceptation file (`acceptation-<lot>.json`): never application code, the sheet, the mockup or the plan. Do not push, deliver, run `raf start|done|note|review|ux`, or launch subagents.
+- An acceptation file that already has `vert: true` is a green, sealed oracle: never rewrite it, its tests, `resceaux` or `empreintes`, and never touch `vert`. Write nothing, commit nothing, and hand the lot back with that finding in `questions` (a test to correct is resealed by the lead, `cadence spec reseal`).
 - Never write `vert: true` or the fingerprints: the program seals the file and the cycle turns it green.
 - Give the report in the structured output the brief asks for.

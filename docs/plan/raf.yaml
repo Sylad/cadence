@@ -2592,7 +2592,7 @@ lots:
     created: 2026-10-16
   - id: L230
     title: "Revue de maquette exhaustive au premier passage : le brief maquette.md de l'agent ux-reviewer exige un balayage complet états × règles de la fiche (liste à cocher rendue dans le rapport : chaque état à 1440 et 390, chaque règle, contraste, enveloppe réelle de l'app, gouttières, panneaux vides, trous) et TOUS les majeurs dans la première revue ; une revue 2 qui trouve un majeur absent de la revue 1 sur un point inchangé est comptée comme défaut de revue (journal) ; l'étape maquette autorise 3 revues par vague au lieu de 2 (orchestrate.maquetteReviews, défaut 3) ; mesure : ol-companion L160 le 16-10 = 6 revues de maquette sur 4 vagues, un majeur nouveau à chaque fois (contraste, panneaux étirés, trou central, gouttière + barre latérale)"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-16
@@ -2612,9 +2612,10 @@ lots:
       - { date: 2026-10-16, text: "Hypothèses (fiche revue-maquette-exhaustive) — R9 : Le brief des revues de rang 2 ou plus dit le rang et le plafond (« revue <n> sur <maquetteReviews> »), rappelle les points de la revue précédente à vérifier d'… ; si faux : Si le brief devait rester celui de la « seconde et dernière revue », la revue 3 recevrait une consigne fausse ; seul le texte du brief change (aucune donnée)" }
       - { date: 2026-10-16, text: "Hypothèses (fiche revue-maquette-exhaustive) — R10 : La liste à cocher est rendue dans le texte du rapport de la session ; les points non vérifiés vont dans nonVerifie ; si faux : Si la liste devait être structurée dans REVIEW_SCHEMA (un champ par point), le schéma de rapport changerait de façon non facultative : décision de contrat à pr…" }
     review: { date: 2026-10-16, verdict: "conforme : les mineurs traités sont corrigés, 1 nouveau mineur (consigne « one more pass only » de spec.ts:208 pour un lot à écran) — orchestré (vague 2026-10-16-1150, 1 passe(s) de correction + passe des mineurs)", commit: beeb6d563ba40f6c9e018a0091c7107f2c6249e9 }
+    finished: 2026-10-16
   - id: L231
     title: "Verrou des tests d'acceptation, deux fuites vues sur ol-companion L160 le 16-10 : (1) la session implement a MODIFIÉ le test scellé d'un autre lot livré (L43 R8) pour satisfaire son propre test scellé au lieu de s'arrêter — le brief implement/fix dit : un conflit avec un test scellé d'un AUTRE lot = question au lead nommant les deux tests, jamais une modification ni un choix ; le programme vérifie l'empreinte des tests scellés des lots livrés AVANT la revue et rend le lot au premier commit fautif ; (2) le test scellé de L160 affirmait plus que sa fiche (« aucun ResizeObserver construit » quand R4 n'interdit que BalancedColumns) : l'acceptance-writer cite pour chaque assertion la phrase de la règle qu'elle vérifie et n'affirme rien au-delà (auto-contrôle dans le brief), la revue de maquette relit les tests rouges contre la fiche ; L229 couvre le refus de reseal --porteur"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-16
@@ -2635,7 +2636,9 @@ lots:
       - { date: 2026-10-16, text: "Hypothèses (fiche verrou-tests-acceptation-fuites) — R7 : Les briefs de revue de code (review.md et review-small.md) d'un lot à acceptation scellée demandent de relire chaque assertion contre la phrase de règle qu'ell… ; si faux : ÉCART À LA DEMANDE LITTÉRALE du lot (« la revue de maquette relit les tests rouges contre la fiche »), signalé au lead : la consigne est placée à la revue de c…" }
       - { date: 2026-10-16, text: "Hypothèses (fiche verrou-tests-acceptation-fuites) — R9 : La vérification des empreintes des tests scellés des lots livrés a lieu à la fin de chaque session implement ou fix du lot (jamais reportée à la revue), et son… ; si faux : Si le lead exige l'arrêt au premier commit, pendant la session, il faut un hook git post-commit installé dans le dépôt du projet (écriture dans .git/hooks de c…" }
       - { date: 2026-10-16, text: "Hypothèses (fiche verrou-tests-acceptation-fuites) — R10 : Bornes de R8 : le contrôle « git diff depuis lotBase » (arbre de travail compris) disparaît comme condition d'ouverture ; seul ouvre l'exception un commit qui… ; si faux : Si la borne devait être la livraison (passage à vert) ou lotBase plutôt que le commit rouge, la fenêtre de commits admis se réduirait ou s'élargirait d'un inte…" }
+      - { date: 2026-10-16, text: "16-10 hypothèse R9 retenue par le lead : contrôle des empreintes des tests scellés des lots livrés à la fin de chaque session implement/fix (pas au premier commit pendant la session) ; si un lot touche encore un test scellé d'un autre lot après ça, revoir" }
     review: { date: 2026-10-16, verdict: "conforme — orchestré (vague 2026-10-16-1150, 0 passe(s) de correction + passe des mineurs)", commit: 1ddf32cb41cf27afa2b6d1741430aca9037343d0 }
+    finished: 2026-10-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

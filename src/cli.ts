@@ -779,7 +779,7 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   const before = { json: readFileSync(join(repo, json), 'utf8'), test: existsSync(join(repo, test)) ? readFileSync(join(repo, test), 'utf8') : '' };
   let r: { avant: string; apres: string; ficheAmendee?: string };
   try {
-    r = resealAcceptation(repo, json, test, reason, ctx.today, livre ? porteur : undefined, plan.refs);
+    r = resealAcceptation(repo, json, test, reason, ctx.today, livre ? porteur : undefined, plan.refs, plan.lots().filter((l) => l.status === 'done').map((l) => l.id));
   } catch (e) {
     throw new RafError((e as Error).message);
   }

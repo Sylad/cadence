@@ -573,7 +573,7 @@ describe('cadence spec reseal avec une fiche amendée dans le lot (L217)', () =>
       corrige(repo, a.test);
       const fn = () => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-15', 'L2', refsL);
       if (attendu) expect(fn).not.toThrow();
-      else expect(fn).toThrow(/ne cite pas L1 : [0-9a-f]{7}$/);
+      else expect(fn).toThrow(/ne cite ni L1, ni le porteur L2, ni un lot livré : [0-9a-f]{7} \(cite : L3\)/);
     }
   });
 
@@ -602,5 +602,209 @@ describe('cadence spec reseal avec une fiche amendée dans le lot (L217)', () =>
     const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test);
     expect(r.code).not.toBe(0);
     expect(r.err).toMatch(/--reason/);
+  });
+});
+
+// L229 : un lot livré accepte une fiche amendée par un commit qui cite un autre lot livré (la fiche vivante est la référence).
+describe('cadence spec reseal d’un lot livré, fiche amendée par un autre lot livré (L229)', () => {
+  function cli(repo: string, env: Record<string, string>, ...argv: string[]) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = run(argv, { cwd: repo, env: { RAF_TODAY: '2026-10-16', ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-16T10:00:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  }
+  /** L1 livré (acceptation verte), L2 en cours (le porteur), L3 livré (l'autre lot livré), L4 en cours, L5 à faire. */
+  function lots() {
+    const s = lotScelle({ vert: true });
+    cli(s.repo, {}, 'init', '--project', 'demo');
+    for (const t of ['un', 'deux', 'trois', 'quatre', 'cinq']) cli(s.repo, {}, 'add', `Lot ${t}`);
+    for (const id of ['L1', 'L3']) {
+      cli(s.repo, {}, 'start', id);
+      cli(s.repo, {}, 'done', id, '--force');
+    }
+    cli(s.repo, {}, 'start', 'L2');
+    cli(s.repo, {}, 'start', 'L4');
+    commitPaths(s.repo, 'plan: lots', 'docs/plan/raf.yaml', '.gitignore');
+    return s;
+  }
+  const amende = (repo: string, fiche: string, message: string, ajout = `# amendée ${Math.random()}\n`) => {
+    writeFileSync(join(repo, fiche), `${readFileSync(join(repo, fiche), 'utf8')}${ajout}`);
+    commitPaths(repo, message, fiche);
+    return git(repo, 'rev-parse', '--short', 'HEAD').trim();
+  };
+  const corrige = (repo: string, test: string) => writeFileSync(join(repo, test), `${readFileSync(join(repo, test), 'utf8')}// corrigé ${Math.random()}\n`);
+  const journal = (repo: string, json: string) => JSON.parse(readFileSync(join(repo, json), 'utf8')).resceaux as Record<string, string>[];
+  const reseal = (repo: string, test: string) => cli(repo, {}, 'spec', 'reseal', 'L1', test, '--reason', 'x', '--porteur', 'L2');
+
+  it('R1 — lot livré : commit de la fiche citant un autre lot livré : rescellé accepté, ficheAmendee = ce commit', () => {
+    const { repo, a } = lots();
+    const sha = amende(repo, a.fiche, 'fix(L3): fiche amendée par un autre lot livré');
+    corrige(repo, a.test);
+    const r = reseal(repo, a.test);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(journal(repo, a.json)[0]).toMatchObject({ porteur: 'L2', ficheAmendee: sha });
+    expect(r.out).toContain(`fiche amendée en ${sha}`);
+  });
+
+  it('R1 — lot livré : commits mêlés (lot, porteur, autre lot livré) : accepté', () => {
+    const { repo, a } = lots();
+    amende(repo, a.fiche, 'feat(L1): fiche du lot');
+    amende(repo, a.fiche, 'fix(L2): fiche du porteur');
+    const dernier = amende(repo, a.fiche, 'fix(L3): fiche d’un autre livré');
+    corrige(repo, a.test);
+    const r = reseal(repo, a.test);
+    expect(r.err).toBe('');
+    expect(journal(repo, a.json)[0]!.ficheAmendee).toBe(dernier);
+  });
+
+  it('R1 — lot livré : commit citant un lot livré et un lot en cours (fix(L3,L4)) : admis, au moins un lot cité suffit', () => {
+    const { repo, a } = lots();
+    amende(repo, a.fiche, 'fix(L3,L4): fiche');
+    corrige(repo, a.test);
+    expect(reseal(repo, a.test).err).toBe('');
+  });
+
+  it('R2 — lot livré : commit de la fiche citant un autre lot en cours : refus, fichiers intacts', () => {
+    const { repo, a } = lots();
+    amende(repo, a.fiche, 'fix(L3): fiche');
+    const faute = amende(repo, a.fiche, 'docs(L4): fiche d’un lot en cours');
+    corrige(repo, a.test);
+    const jsonAvant = readFileSync(join(repo, a.json), 'utf8');
+    const testAvant = readFileSync(join(repo, a.test), 'utf8');
+    const r = reseal(repo, a.test);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain(faute);
+    expect(readFileSync(join(repo, a.json), 'utf8')).toBe(jsonAvant);
+    expect(readFileSync(join(repo, a.test), 'utf8')).toBe(testAvant);
+  });
+
+  it('R2 — lot livré : commit de la fiche citant un lot à faire : refus', () => {
+    const { repo, a } = lots();
+    const faute = amende(repo, a.fiche, 'docs(L5): fiche d’un lot à faire');
+    corrige(repo, a.test);
+    const r = reseal(repo, a.test);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain(faute);
+  });
+
+  it('R2 — lot livré : commit de la fiche sans citation de lot : refus', () => {
+    const { repo, a } = lots();
+    const faute = amende(repo, a.fiche, 'docs: fiche sans lot');
+    corrige(repo, a.test);
+    const r = reseal(repo, a.test);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain(`${faute} (cite : aucun lot)`);
+  });
+
+  it('R2 — lot livré : commit citant un lot absent du plan : refus', () => {
+    const { repo, a } = lots();
+    const faute = amende(repo, a.fiche, 'docs(L99): fiche d’un lot inconnu');
+    corrige(repo, a.test);
+    const r = reseal(repo, a.test);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain(`${faute} (cite : L99)`);
+  });
+
+  it('R3 — refus d’un lot livré : le message nomme le sha fautif, le lot cité, et la voie à suivre (--porteur / commit à citer)', () => {
+    const { repo, a } = lots();
+    const faute = amende(repo, a.fiche, 'docs(L4): fiche');
+    corrige(repo, a.test);
+    const r = reseal(repo, a.test);
+    expect(r.err).toMatch(new RegExp(`a été modifiée depuis le commit rouge [0-9a-f]{7} par un commit qui ne cite ni L1, ni le porteur L2, ni un lot livré : ${faute} \\(cite : L4\\) — le commit doit citer le porteur ou un lot livré, ou la fiche être amendée par un commit du porteur`));
+  });
+
+  it('R3 — refus d’un lot en cours : message L217 inchangé', () => {
+    const s = lotScelle();
+    cli(s.repo, {}, 'init', '--project', 'demo');
+    cli(s.repo, {}, 'add', 'Lot un');
+    cli(s.repo, {}, 'add', 'Lot deux');
+    cli(s.repo, {}, 'start', 'L1');
+    commitPaths(s.repo, 'plan: lots', 'docs/plan/raf.yaml', '.gitignore');
+    const faute = amende(s.repo, s.a.fiche, 'docs(L2): fiche');
+    corrige(s.repo, s.a.test);
+    const r = cli(s.repo, {}, 'spec', 'reseal', 'L1', s.a.test, '--reason', 'x');
+    expect(r.err).toMatch(new RegExp(`par un commit qui ne cite pas L1 : ${faute}$`));
+  });
+
+  it('R4 — lot livré : commit citant le lot ou le porteur : accepté comme avant', () => {
+    for (const message of ['feat(L1): fiche', 'feat(L2): fiche']) {
+      const { repo, a } = lots();
+      const sha = amende(repo, a.fiche, message);
+      corrige(repo, a.test);
+      const r = reseal(repo, a.test);
+      expect(r.err).toBe('');
+      expect(journal(repo, a.json)[0]).toMatchObject({ porteur: 'L2', ficheAmendee: sha });
+    }
+  });
+
+  it('R4 — lot en cours : commit de la fiche citant un lot livré : refus, comme avant', () => {
+    const s = lotScelle();
+    cli(s.repo, {}, 'init', '--project', 'demo');
+    cli(s.repo, {}, 'add', 'Lot un');
+    cli(s.repo, {}, 'add', 'Lot deux');
+    cli(s.repo, {}, 'start', 'L2');
+    cli(s.repo, {}, 'done', 'L2', '--force');
+    cli(s.repo, {}, 'start', 'L1');
+    commitPaths(s.repo, 'plan: lots', 'docs/plan/raf.yaml', '.gitignore');
+    const faute = amende(s.repo, s.a.fiche, 'fix(L2): fiche d’un lot livré');
+    corrige(s.repo, s.a.test);
+    const r = cli(s.repo, {}, 'spec', 'reseal', 'L1', s.a.test, '--reason', 'x');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(new RegExp(`ne cite pas L1 : ${faute}$`));
+  });
+
+  it('R4 — écart net vide : pas de ficheAmendee', () => {
+    const { repo, a } = lots();
+    const orig = readFileSync(join(repo, a.fiche), 'utf8');
+    amende(repo, a.fiche, 'docs(L4): fiche');
+    writeFileSync(join(repo, a.fiche), orig);
+    commitPaths(repo, 'docs(L4): fiche remise', a.fiche);
+    corrige(repo, a.test);
+    const r = reseal(repo, a.test);
+    expect(r.err).toBe('');
+    expect(r.out).not.toContain('fiche amendée');
+    expect(journal(repo, a.json)[0]).not.toHaveProperty('ficheAmendee');
+  });
+
+  it('R5 — amendement par un lot livré et fiche non commitée : refus', () => {
+    const { repo, a } = lots();
+    amende(repo, a.fiche, 'fix(L3): fiche');
+    writeFileSync(join(repo, a.fiche), `${readFileSync(join(repo, a.fiche), 'utf8')}# pas commitée\n`);
+    corrige(repo, a.test);
+    expect(reseal(repo, a.test).err).toMatch(/a des modifications non commitées/);
+  });
+
+  it('R5 — amendement par un lot livré et un second test modifié : refus', () => {
+    const { repo, a, second } = lots();
+    amende(repo, a.fiche, 'fix(L3): fiche');
+    corrige(repo, a.test);
+    writeFileSync(join(repo, second), 'touché\n');
+    const r = reseal(repo, a.test);
+    expect(r.err).toContain('autre(s) test(s) listé(s) modifié(s) depuis le commit rouge');
+  });
+
+  it('R5 — amendement par un lot livré sous CADENCE_ORCHESTRATED : refus inchangé', () => {
+    const { repo, a } = lots();
+    amende(repo, a.fiche, 'fix(L3): fiche');
+    corrige(repo, a.test);
+    expect(cli(repo, { CADENCE_ORCHESTRATED: 'w1' }, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L2').err).toMatch(/vague orchestrée/);
+  });
+
+  it('R6 — resealAcceptation sans liste de lots livrés : comportement L217', () => {
+    const { repo, a } = lots();
+    amende(repo, a.fiche, 'fix(L3): fiche');
+    corrige(repo, a.test);
+    expect(() => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-16', 'L2', refsL)).toThrow(/ne cite ni L1, ni le porteur L2, ni un lot livré/);
+  });
+
+  it('R6 — un lot au statut todo ou doing n’est pas admis comme livré', () => {
+    const { repo, a } = lots();
+    amende(repo, a.fiche, 'fix(L5): fiche');
+    corrige(repo, a.test);
+    expect(() => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-16', 'L2', refsL, [])).toThrow(/ne cite ni L1/);
+    const r = reseal(repo, a.test);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('ne cite ni L1');
   });
 });

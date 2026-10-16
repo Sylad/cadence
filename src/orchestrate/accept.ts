@@ -148,9 +148,9 @@ export function sealAcceptation(repo: string, path: string): void {
  * ne laisse aucun chemin de correction. Seule l'empreinte du test nommé est refaite (les autres fichiers listés restent inchangés), la raison et les deux
  * empreintes vont dans `resceaux`. Le commit (test + acceptation) est à faire : il devient le commit rouge.
  * La fiche est celle du commit rouge, ou (L217) une fiche amendée par des commits qui citent tous le lot (`refsOf` : `plan.refs`, lu comme `citedRefs` ;
- * lot livré : le lot ou son `porteur`) et commitée : l'entrée porte alors `ficheAmendee`, le sha court du dernier commit qui l'a touchée.
+ * lot livré : le lot, son `porteur` ou, L229, l'un des `livres`, les lots done du plan — la fiche vivante fait foi) et commitée : l'entrée porte alors `ficheAmendee`, le sha court du dernier commit qui l'a touchée.
  */
-export function resealAcceptation(repo: string, path: string, test: string, reason: string, today: string, porteur?: string, refsOf: (text: string) => Ref[] = () => []): { avant: string; apres: string; lot: string; ficheAmendee?: string } {
+export function resealAcceptation(repo: string, path: string, test: string, reason: string, today: string, porteur?: string, refsOf: (text: string) => Ref[] = () => [], livres: string[] = []): { avant: string; apres: string; lot: string; ficheAmendee?: string } {
   const file = join(repo, path);
   const a = parseAcceptation(readFileSync(file, 'utf8'));
   if (typeof a === 'string') throw new Error(`${path} : ${a}`);
@@ -169,9 +169,13 @@ export function resealAcceptation(repo: string, path: string, test: string, reas
   let ficheAmendee: string | undefined;
   if (!gitOk(repo, 'diff', '--quiet', red, '--', a.fiche)) {
     if (!existsSync(join(repo, a.fiche))) throw new Error(`la fiche ${a.fiche} a été supprimée ou renommée depuis le commit rouge ${red.slice(0, 7)} : le rescellé ne vaut que pour une fiche présente`);
-    const citant = new Set([a.lot, ...(porteur ? [porteur] : [])]);
+    const citant = new Set([a.lot, ...(porteur ? [porteur, ...livres] : [])]);
     const commits = git(repo, 'log', '--format=%H%x1f%s%x1f%b%x1e', `${red}..HEAD`, '--', a.fiche).split('\x1e').map((r) => r.replace(/^\n/, '')).filter(Boolean).map((r) => { const [sha = '', subject = '', body = ''] = r.split('\x1f'); return { sha, day: '', subject, body: body.trim() }; });
     const fautif = commits.find((c) => !citedRefs(c, refsOf).some((r) => citant.has(r.lot)));
+    if (fautif && porteur) {
+      const cites = [...new Set(citedRefs(fautif, refsOf).map((r) => r.lot))];
+      throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite ni ${a.lot}, ni le porteur ${porteur}, ni un lot livré : ${fautif.sha.slice(0, 7)} (cite : ${cites.length ? cites.join(', ') : 'aucun lot'}) — le commit doit citer le porteur ou un lot livré, ou la fiche être amendée par un commit du porteur`);
+    }
     if (fautif) throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite pas ${a.lot} : ${fautif.sha.slice(0, 7)}`);
     ficheAmendee = commits[0]?.sha.slice(0, 7);
   }

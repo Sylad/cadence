@@ -26,7 +26,7 @@
 
 `cadence spec check` prints the same summary line for each kind (`N cas, N règles (N hypothèses), N contrats, N données` for a back-end sheet) and keeps its exit codes: 0 valid, 1 violations, 2 usage.
 
-`cadence spec reseal <lot> <test> --reason texte` is the lead's way to correct one sealed acceptance test of the lot in progress that contradicts its sheet (unchanged, or amended by commits of the lot, L217) (of a delivered lot: add `--porteur <lot in progress>`), see [The accept step](orchestrate.md#the-accept-step-red-acceptance-tests-and-their-lock).
+`cadence spec reseal <lot> <test> --reason texte` is the lead's way to correct one sealed acceptance test of the lot in progress that contradicts its sheet (unchanged, or amended by commits of the lot, L217; of a delivered lot, also by commits of another delivered lot, L229) (of a delivered lot: add `--porteur <lot in progress>`), see [The accept step](orchestrate.md#the-accept-step-red-acceptance-tests-and-their-lock).
 
 `cadence spec qa <fiche.yaml>` derives from a valid sheet the section of `docs/qa/expectations.md` for its screen and prints it on the standard output
 (it never writes the file: you paste the section, and the lead commits it like the rest of the plan files). A sheet with violations prints them on the

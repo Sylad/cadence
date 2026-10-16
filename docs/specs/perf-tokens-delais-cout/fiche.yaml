@@ -1,0 +1,207 @@
+sujet:
+  id: perf-tokens-delais-cout
+  titre: "cadence perf : tokens par lot selon l'estimate et part de la revue, délais création → done → livraison et durée de mur par étape, coût en euros par lot livré"
+  lot: L226
+  perimetre:
+    modules: [src/perf.ts, src/corrections.ts, src/config.ts, src/cli.ts, src/state.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "livraisons rouges, constats QA bloquants et en-tête perf de cadence lead tour (L227)"
+      - "les indicateurs de L225 (débit, passes de correction, interventions) : inchangés, leurs règles restent celles de docs/specs/perf-tableau-de-bord/fiche.yaml"
+      - "toute écriture : la commande ne modifie ni journal, ni plan, ni cache, ni cadence.yaml"
+      - "la part des hypothèses de fiche contredites en revue (jumeau cité par la note du 16-10) : aucun champ ne la porte aujourd'hui, voir R11"
+# Décision que permet chaque indicateur (note L225 du 16-10 : « justifier chaque indicateur par la décision qu'il permet de prendre »).
+# Tokens par lot selon l'estimate : l'estimate est-elle calibrée ? (un lot de 0,5 qui coûte comme un lot de 1 : redécouper ou recaler l'estimate, donc les budgets de L78).
+# Part des tokens de revue : la revue pèse-t-elle trop face à l'écriture ? (alors alléger : seuil du lot léger, orchestrate.review.threshold).
+# Délai création → done : la file de lots s'allonge-t-elle ? (alors goulot de priorisation avant d'ajouter des lots).
+# Délai done → livraison : livre-t-on assez souvent ? (alors livrer par lots plus petits).
+# Durée de mur par étape : quelle étape est lente ? (alors timeouts, effort demandé ou modèle de cette étape).
+# Coût par lot livré : le modèle et l'effort choisis par étape sont-ils justes ? (alors changer le modèle d'une étape).
+# Jumeau qualité de chacun : la part conforme du premier coup de L225 (voir R11). Aucun total de tokens ni d'euros : voir R13.
+
+cas:
+  - id: C1
+    titre: Le lead lit les tokens, les délais et les durées de ses lots
+    acteur: le lead
+    declencheur: commande cadence perf
+    preconditions:
+      - "les mêmes que le cas C1 de perf-tableau-de-bord : <dossier>/.cadence/runs et des projets à plan raf"
+    nominal:
+      - "La commande lit, par le lecteur partagé de journaux (R16), les étapes de chaque journal avec leur modèle, leurs bornes started et ended et leurs quatre compteurs."
+      - "Elle range les lots rendus de la fenêtre par estimate du plan et calcule les tokens comptés médians par lot et la part des tokens de revue (R2, R3)."
+      - "Elle calcule les délais création → done et done → livraison des lots livrés de la fenêtre (R4, R5) et la durée de mur médiane de chaque sorte d'étape (R6)."
+      - "Elle imprime ces lignes dans les mêmes deux fenêtres que L225, chacune avec son jumeau de qualité et son ⚠ éventuel (R1, R11, R12)."
+    alternatives:
+      - { si: "une fenêtre n'a aucune donnée pour l'indicateur", alors: "n/d, aucun ⚠", regles: [R17] }
+      - { si: "le lot du journal n'a pas de lot dans les plans", alors: "il est écarté des tokens par estimate et du coût, et compté dans les orphelins de L225", regles: [R2, R9] }
+      - { si: "aucune ligne deliveries.log du projet ne suit le done du lot", alors: "délai done → livraison n/d pour ce lot", regles: [R5] }
+    resultat: "Des lignes de plus dans le tableau de L225, sans total de tokens ni d'euros."
+  - id: C2
+    titre: Le lead lit le coût en euros par lot livré
+    acteur: le lead
+    declencheur: commande cadence perf
+    preconditions:
+      - "cadence.yaml du dossier déclare perf.prices pour les modèles employés"
+      - "des lots du plan sont done dans la fenêtre et ont des journaux"
+    nominal:
+      - "La commande lit la grille de prix (R7)."
+      - "Pour chaque lot livré de la fenêtre, elle additionne le coût de toutes les étapes de tous ses journaux (R8, R9)."
+      - "Elle imprime le coût médian par lot livré de chaque fenêtre, avec son jumeau et son ⚠ (R9, R11, R12)."
+    alternatives:
+      - { si: "un modèle employé n'a pas de prix dans la grille", alors: "le coût de ce lot n'est pas calculé, un avertissement le dit, le nombre de lots écartés est affiché", regles: [R10] }
+      - { si: "une étape est du modèle local", alors: "elle coûte 0 € (hors quota, hors budget)", regles: [R10] }
+      - { si: "une étape n'a que le compteur counted (journal ancien)", alors: "la répartition entrée/sortie par hypothèse s'applique", regles: [R8] }
+    resultat: "Un coût médian en euros par lot livré, honnête sur ce qui n'est pas calculé."
+  - id: C3
+    titre: La grille de prix manque ou est mal écrite
+    acteur: le lead
+    declencheur: commande cadence perf
+    preconditions:
+      - "cadence.yaml absent, sans clé perf, ou avec une grille mal formée"
+    nominal:
+      - "Sans grille, la commande sert tous les autres indicateurs, le coût est n/d et un avertissement dit où déclarer la grille."
+      - "Avec une grille mal formée, la commande refuse avant de lire les journaux, écrit l'erreur nommée et sort avec le code 1."
+    alternatives:
+      - { si: "perf.prices est vide ({})", alors: "comme une grille absente", regles: [R7] }
+      - { si: "cadence.yaml est illisible", alors: "refus avec l'erreur du fichier, code 1", regles: [R7] }
+    resultat: "Aucun euro n'est affiché sans prix déclaré."
+  - id: C4
+    titre: Un script lit les nouveaux indicateurs en données
+    acteur: le lead ou un script (le skill lead, L227)
+    declencheur: commande cadence perf --json
+    preconditions:
+      - "les mêmes que C1"
+    nominal:
+      - "La commande imprime l'objet JSON de L225 avec les clés tokens, delays, durations et cost en plus."
+    alternatives: []
+    sans_alternative: "la sortie JSON ne se distingue du texte que par sa forme ; ses cas limites (n/d, ⚠, grille absente) sont ceux de C1 à C3 (R17, R12, R10)"
+    resultat: "Les mêmes nombres et les mêmes ⚠ sous forme de données, les clés de L225 inchangées."
+
+regles:
+  - id: R1
+    cas: [C1, C2]
+    enonce: "Les nouveaux indicateurs se calculent dans les mêmes deux fenêtres de 7 jours que L225 (mêmes bornes, même --since, même troncature) et suivent le même ⚠ : dégradation relative de plus de 25 % de la courante sur la précédente, au moins 5 lots (ou 5 étapes pour la durée par étape) dans chaque fenêtre, valeur précédente non nulle, aucune fenêtre tronquée, n/d sans ⚠."
+    statut: sourcee
+    source: "titre du lot L226 : « mêmes fenêtres et ⚠ que le lot précédent » ; src/perf.ts:27 (DEGRADATION = 0,25), src/perf.ts:29 (MIN_SAMPLE = 5), perf.ts perfWindows"
+    tests: ["R1 — délai création → done 4 j → 6 j sur 5 lots par fenêtre : ⚠ ; 4 j → 5 j : pas de ⚠", "R1 — 4 lots dans la courante : pas de ⚠ et la ligne dit « pas de tendance : échantillon »", "R1 — fenêtre tronquée par --since : pas de ⚠ sur les nouvelles lignes", "R1 — les fonctions de fenêtre et de ⚠ sont celles de L225 (un lot rendu au 8e jour passé est dans la précédente)"]
+  - id: R2
+    cas: [C1]
+    enonce: "Tokens par lot selon l'estimate : parmi les journaux rendus de la fenêtre (statut ready, handed-back ou failed, daté comme R4 de L225) dont le lot se joint au plan (clé de R10 de L225), les tokens comptés d'un journal sont la somme des tokens.counted de toutes ses étapes ; ils sont rangés par la valeur exacte de l'estimate du lot du plan (0.25, 0.5, 1, 2…), et chaque classe donne la médiane des tokens par lot et le nombre de lots. Un journal dont aucune étape n'a de jetons lisibles est écarté de cet indicateur. Un lot sans lot du plan (orphelin) en est écarté."
+    statut: sourcee
+    source: "titre du lot L226 : « tokens par lot selon l'estimate » ; compteur counted : src/orchestrate/result.ts:4-10 et budget de lot src/orchestrate/cycle.ts:535 (lotSpent). Le journal comme unité (non le lot cumulé sur ses vagues) et la médiane sont des lectures du lead."
+    tests: ["R2 — trois lots d'estimate 0.5 à 100 k, 200 k, 300 k : médiane 200 k pour la classe 0.5", "R2 — deux estimates (0.5 et 1) donnent deux classes séparées", "R2 — un orphelin et un journal sans jetons lisibles n'entrent pas", "R2 — un lot failed compte (il a dépensé)"]
+  - id: R3
+    cas: [C1]
+    enonce: "Part des tokens de revue d'une fenêtre = somme des tokens comptés des étapes de revue sur la somme des tokens comptés de toutes les étapes, pour l'ensemble des journaux rendus de la fenêtre ; une étape est de revue quand son kind commence par « review » ou vaut « ux » (review, review-small, ux). Les étapes spec, maquette, fiche, accept, precheck, implement et fix sont hors revue. Cette part est un rapport : aucun total en tokens n'est exposé (R13)."
+    statut: sourcee
+    source: "titre du lot : « part des tokens de revue » ; définition d'une étape de revue : src/corrections.ts:64 (isReview). Le rangement de maquette et fiche hors revue est un choix du lead (ce sont des étapes d'écriture de la spec)."
+    tests: ["R3 — 300 k en implement, 100 k en review, 100 k en ux : part 40 %", "R3 — une étape review-small compte, une étape fiche ne compte pas dans la revue", "R3 — aucun journal rendu : n/d, pas 0 %"]
+  - id: R4
+    cas: [C1]
+    enonce: "Délai création → done d'un lot = finished − created du plan, en jours calendaires ; population : les lots du plan au statut done dont finished tombe dans la fenêtre et dont created et finished sont lisibles et finished ≥ created. Valeur d'une fenêtre : la médiane en jours ; le jour d'un plan est pris tel quel (comme L225 R2)."
+    statut: sourcee
+    source: "titre du lot : « délai création → done → livraison par lot (plans raf) » ; champs created et finished : src/plan.ts:54-56, posés par raf (src/plan.ts:449, 520)"
+    tests: ["R4 — created 05-10, finished 09-10 : 4 jours", "R4 — médiane de 1, 2, 10 jours = 2", "R4 — un lot sans created lisible est écarté, sans erreur", "R4 — un lot done daté hors fenêtre n'entre pas"]
+  - id: R5
+    cas: [C1]
+    enonce: "Délai done → livraison d'un lot = jour de la première ligne de deliveries.log du projet (état partagé du dépôt, src/state.ts:178-186, une ligne « jour sha » par livraison verte) dont le jour est ≥ finished du lot, moins finished ; même population que R4 (lots done de la fenêtre) ; sans ligne qui suive, ou deliveries.log absent ou illisible, le lot est écarté de l'indicateur (n/d), jamais compté 0. Valeur d'une fenêtre : la médiane en jours."
+    statut: hypothese
+    si_faux: "Le plan ne date pas la livraison d'un lot. Si la livraison d'un lot devait se lire dans les commits livrés (deliveredIds, src/deliver.ts:484, qui rapproche les commits citant le lot de l'intervalle entre deux livraisons), seul le calcul de cet indicateur change (lecture git) ; la commande reste en lecture seule et aucun contrat n'est en jeu."
+    tests: ["R5 — done le 10-10, livraisons les 09-10 et 12-10 : 2 jours", "R5 — livraison le jour même du done : 0 jour (et non n/d)", "R5 — aucune livraison après le done : lot écarté, valeur n/d si aucun autre", "R5 — deliveries.log absent : n/d sans erreur ni ⚠"]
+  - id: R6
+    cas: [C1]
+    enonce: "Durée de mur par étape : pour chaque sorte d'étape (kind) des journaux rendus de la fenêtre, la médiane de ended − started, en minutes, sur les étapes de statut ok dont les deux bornes sont lisibles et ended ≥ started ; une étape est rangée dans la fenêtre par le jour (local) de son ended. Une étape en cours, échouée, interrompue ou sans borne lisible est écartée. Les sortes sont celles que portent les journaux (implement, fix, review, review-small, ux, spec, accept, precheck, maquette, fiche), seules celles qui ont au moins une étape dans l'une des fenêtres sont imprimées."
+    statut: sourcee
+    source: "titre du lot : « durée de mur par étape (journaux) » ; champs started, ended, status, kind : src/orchestrate/state.ts:44-60 (StepState). La médiane et l'écart des étapes non abouties sont des lectures du lead."
+    tests: ["R6 — implement du 16-10 10:00 à 10:30 : 30 minutes", "R6 — médiane de 10, 20, 90 minutes = 20", "R6 — une étape failed ou running est écartée", "R6 — une étape sans started lisible est écartée sans erreur", "R6 — une étape terminée à 23:50 le jour J−6 est dans la courante, à 23:50 le jour J−7 dans la précédente"]
+  - id: R7
+    cas: [C2, C3]
+    enonce: "La grille de prix se déclare dans cadence.yaml du dossier de perf, sous perf.prices : par modèle (sonnet, opus, haiku) trois nombres ≥ 0 en euros par million de tokens, input, output et cacheRead, tous trois obligatoires pour un modèle déclaré. Clé perf ou perf.prices absente ou vide : pas de grille (coût n/d, un avertissement). Une clé inconnue (sous perf, sous un modèle, un modèle hors sonnet/opus/haiku), un prix non numérique ou négatif, ou un fichier illisible refuse la commande avant toute lecture de journal, code 1, sans sortie partielle."
+    statut: sourcee
+    source: "titre du lot : « grille de prix déclarée dans cadence.yaml (perf.prices, par modèle, entrée / sortie / lecture de cache) » ; modèles : src/orchestrate/launch.ts:13-15 (Model, StepModel) ; usage des lecteurs de clé de cadence.yaml : src/config.ts:150-170 (readHookConfig) et :395-415 (clés inconnues refusées). Le chemin du fichier (<dossier>/cadence.yaml) et le refus d'un prix incomplet sont des choix du lead."
+    tests: ["R7 — grille complète lue : prix de sonnet, opus et haiku", "R7 — perf absent : pas de grille, pas d'erreur", "R7 — modèle hors sonnet/opus/haiku : refus nommé, code 1", "R7 — prix négatif ou texte : refus nommé", "R7 — modèle sans cacheRead : refus nommé", "R7 — clé perf.xxx inconnue : refus nommé", "R7 — cadence.yaml illisible : refus avec l'erreur du fichier, aucune sortie"]
+  - id: R8
+    cas: [C2]
+    enonce: "Coût d'une étape en euros = (input × p.input + cacheWrite × p.input + output × p.output + cacheRead × p.cacheRead) ÷ 1 000 000, avec p le prix du modèle de l'étape. Hypothèses de répartition : (a) l'écriture de cache est facturée au prix input, la grille n'ayant pas de prix d'écriture ; (b) quand une étape ne porte que le compteur counted (journal ancien, quatre compteurs absents), counted se répartit 90 % en entrée et 10 % en sortie, sans lecture de cache (cacheRead = 0) ; (c) une étape sans aucun jeton lisible coûte 0 et rend le coût de son lot non calculé (R10). Quand les quatre compteurs sont lus, aucune répartition n'est supposée."
+    statut: hypothese
+    si_faux: "Si l'écriture de cache est facturée à part (≈ 1,25 fois l'entrée), le coût est sous-estimé d'environ 25 % de la part d'écriture : on ajoute un prix cacheWrite facultatif à la grille. Si la répartition 90/10 est fausse, seuls les journaux anciens sans quatre compteurs bougent, par ±30 % au plus selon l'écart des prix entrée/sortie. Aucune donnée écrite, aucun contrat publié (clé de cadence.yaml neuve)."
+    tests: ["R8 — 1 M en entrée à 3 €, 100 k en sortie à 15 € : 3 + 1,5 = 4,5 €", "R8 — cacheWrite facturé au prix input", "R8 — cacheRead 2 M à 0,3 € : 0,6 €", "R8 — étape avec counted seul à 1 M : 0,9 M entrée et 0,1 M sortie, cacheRead 0", "R8 — étape aux quatre compteurs : le compteur counted n'est pas réparti"]
+  - id: R9
+    cas: [C1, C2]
+    enonce: "Coût par lot livré = somme des coûts (R8) de toutes les étapes de tous les journaux du lot (tous les journaux du même projet et lot, toutes vagues, étape terminée ou non), pour les lots du plan au statut done dont finished tombe dans la fenêtre (population de L225 « livrés ») et qui ont au moins un journal. Valeur d'une fenêtre : la médiane en euros ; elle est n/d sans lot calculable, jamais 0. Un lot done sans journal est écarté (compté dans « N lot(s) livré(s) sans journal »)."
+    statut: sourcee
+    source: "titre du lot : « coût en euros par lot livré : tokens par modèle et par étape des journaux × grille de prix » ; population des livrés : docs/specs/perf-tableau-de-bord/fiche.yaml R4 (src/perf.ts, deliveredCount). Le cumul sur toutes les vagues et la médiane sont des lectures du lead."
+    tests: ["R9 — un lot à deux journaux (vague 1 et rejeu) : coûts additionnés", "R9 — médiane de 2, 3, 10 € = 3 €", "R9 — un lot done sans journal est écarté et compté à part", "R9 — un journal d'un lot non done n'entre pas", "R9 — chaque étape est valorisée au prix du modèle de SON étape (implement sonnet, review opus)"]
+  - id: R10
+    cas: [C2, C3, C4]
+    enonce: "Coût non calculé, jamais faux : (a) sans grille (R7), l'indicateur est n/d et un avertissement dit « perf : aucune grille de prix (cadence.yaml perf.prices), coût en euros n/d » ; (b) un lot dont une étape emploie un modèle sans prix dans la grille est écarté du coût, et un avertissement « perf : modèle sans prix dans perf.prices : <modèle>, coût n/d pour N lot(s) » nomme le modèle ; (c) une étape du modèle local coûte 0 € (hors quota, hors budget, src/orchestrate/cycle.ts:724) et n'a pas besoin de prix ; (d) aucun ⚠ sur un coût n/d. Ces avertissements vont sur la sortie d'erreur, jamais dans la valeur."
+    statut: sourcee
+    source: "titre du lot (coût « par modèle ») ; modèle local : src/orchestrate/launch.ts:15 (StepModel inclut local) et src/orchestrate/cycle.ts:724 (counted forcé à 0). Le refus de valoriser un lot dont un prix manque est un choix du lead."
+    tests: ["R10 — sans grille : coût n/d, avertissement, autres indicateurs servis", "R10 — une étape opus sans prix opus : lot écarté, avertissement nommant opus", "R10 — étape local : 0 €, aucun avertissement", "R10 — coût n/d : pas de ⚠"]
+  - id: R11
+    cas: [C1, C2]
+    enonce: "Jumeau de qualité : chaque ligne de vitesse ou de coût nouvelle (tokens par lot selon l'estimate, part des tokens de revue, délais, durée par étape, coût par lot livré) est imprimée avec la part des lots conformes du premier coup de L225 (corrections.firstTime), sur la même ligne ; la part des hypothèses de fiche contredites en revue, jumeau cité par la note du 16-10 pour tokens et coût, n'est pas calculée : aucun champ du journal ni du plan ne dit qu'une hypothèse a été contredite."
+    statut: hypothese
+    si_faux: "Si le lead veut le jumeau « hypothèses contredites », il faut d'abord un champ qui le porte (un autre lot, qui changerait le format du journal ou des notes) ; ici seul le choix du jumeau change, aucune donnée en jeu. Le jumeau de L225 reste lu."
+    tests: ["R11 — chaque nouvelle ligne contient la part conforme du premier coup", "R11 — le JSON lie chaque nouvel indicateur à corrections.firstTime par le champ twin", "R11 — part conforme du premier coup n/d : la ligne l'écrit n/d, sans ⚠ de ce chef"]
+  - id: R12
+    cas: [C1, C2, C4]
+    enonce: "Sens pire et décision de chaque nouvel indicateur : la hausse est pire pour les tokens par lot d'une classe d'estimate, la part de revue, les deux délais, la durée par étape et le coût par lot livré. La ligne ⚠ finit par la décision que l'indicateur éclaire (commentaire de cette fiche). Chaque classe d'estimate, chaque sorte d'étape a son propre ⚠, avec son propre échantillon (R1)."
+    statut: hypothese
+    si_faux: "Si une baisse d'un délai devait aussi alerter, seul le sens de comparaison de cet indicateur change ; aucune donnée en jeu. Principe sourcé : un ⚠ ne vaut que sur deux fenêtres (note L225 du 16-10, principe 3)."
+    tests: ["R12 — tokens médians 100 k → 140 k sur 5 lots par fenêtre : ⚠ ; 100 k → 120 k : pas de ⚠", "R12 — pile 25 % : pas de ⚠", "R12 — une baisse du coût ne donne pas de ⚠", "R12 — la ligne ⚠ finit par la décision de l'indicateur", "R12 — ⚠ sur la classe 0.5 sans ⚠ sur la classe 1"]
+  - id: R13
+    cas: [C1, C2, C4]
+    enonce: "Aucun indicateur de volume : ni la sortie texte ni le JSON n'exposent de total de tokens ni de total d'euros d'une fenêtre, de nombre de commits ou de lignes ; seuls des médianes par lot (R2, R9), des durées médianes (R4 à R6) et des parts (R3) sortent. Les tokens et les euros servent à comparer des lots de même taille, jamais à fixer un objectif de dépense. Cette règle précise R11 de perf-tableau-de-bord (qui ne tolérait les tokens que rapportés à un budget) pour les médianes par lot demandées par L226 ; elle ne la contredit pas, le principe visé étant celui d'objectif de volume."
+    statut: sourcee
+    source: "note du lot L225 du 16-10, principe (2) : « aucun indicateur de volume produit (lignes, commits, tokens consommés comme objectif) » ; docs/specs/perf-tableau-de-bord/fiche.yaml R11 ; titre du lot L226 pour les médianes par lot"
+    tests: ["R13 — la sortie JSON n'a aucune clé de total de tokens ni d'euros d'une fenêtre", "R13 — le texte n'imprime aucun total en tokens ni en euros d'une fenêtre, seulement des médianes par lot", "R13 — aucun nombre de commits ni de lignes"]
+  - id: R14
+    cas: [C4]
+    enonce: "Le JSON de L225 reçoit quatre clés de plus, tokens { byEstimate: { \"<estimate>\": indicateur + lots }, reviewShare }, delays { createdToDone, doneToDelivered }, durations { \"<kind>\": indicateur + étapes }, cost { perDelivered, withoutPrice, withoutJournal } ; chaque indicateur garde la forme { current, previous, change, warn, twin } de L225 R20, n/d = null ; toutes les clés de L225 sont inchangées (même nom, même valeur) quand les journaux ne changent pas."
+    statut: hypothese
+    si_faux: "Si le skill lead (L227) attend d'autres noms de clé, seules les clés des nouveaux blocs changent avant qu'il ne les lise ; les clés de L225 sont intactes (test) donc aucun lecteur existant ne casse."
+    tests: ["R14 — le JSON porte tokens, delays, durations et cost en plus des clés de L225", "R14 — sur les mêmes journaux, les clés de L225 sont identiques avant et après le lot", "R14 — chaque nouvel indicateur porte current, previous, change, warn, twin", "R14 — les nombres du JSON égalent ceux du texte"]
+  - id: R15
+    cas: [C1, C2, C3, C4]
+    enonce: "La commande reste sans modèle et en lecture seule : elle n'écrit ni journal, ni plan, ni cache, ni cadence.yaml, ni deliveries.log, n'appelle aucun service, sort avec 0 même quand un ⚠ est imprimé, et avec 1 sur une erreur de saisie ou de lecture (RafError), message précédé de « raf: » comme les autres erreurs de la commande."
+    statut: sourcee
+    source: "src/cli.ts:894-916 (perf : RafError → io.err('raf: …'), code 1, sinon 0) ; docs/specs/perf-tableau-de-bord/fiche.yaml R18"
+    tests: ["R15 — l'arbre du dossier est inchangé après la commande", "R15 — un ⚠ imprimé et le code de sortie vaut 0", "R15 — aucun appel à fetch", "R15 — une grille mal formée : « raf: … » sur la sortie d'erreur, code 1"]
+  - id: R16
+    cas: [C1, C2]
+    enonce: "Le lecteur partagé de journaux (readJournals, src/corrections.ts:123) rend en plus, par étape, son modèle, sa borne started et les compteurs input, cacheWrite, cacheRead, output quand ces quatre sont des nombres (à défaut seulement counted, comme aujourd'hui), sans changer ce que rend readRuns ni la sortie de cadence corrections ni les indicateurs de L225. La sortie de readRuns sur des journaux donnés est identique avant et après le lot. L'état partagé deliveries.log est lu par perf, jamais écrit."
+    statut: sourcee
+    source: "src/corrections.ts:88-96 (JournalStep : n, kind, status, ended, counted), :123 (readJournals partagé entre readRuns et perf) ; contrainte « sortie de readRuns inchangée » : docs/specs/perf-tableau-de-bord/fiche.yaml R23"
+    tests: ["R16 — une étape rend model, started et les quatre compteurs", "R16 — une étape sans compteurs input/output rend counted seul", "R16 — readRuns et cadence corrections donnent la même sortie qu'avant sur les mêmes journaux", "R16 — les indicateurs de L225 sont inchangés sur les mêmes journaux"]
+  - id: R17
+    cas: [C1, C4]
+    enonce: "Une fenêtre sans donnée pour un nouvel indicateur donne n/d (null en JSON), jamais 0, et n/d ne porte aucun ⚠ ; un journal sans date lisible, une vague sans wave.json lisible ou un plan illisible sont traités comme en L225 (écartés, avertissement), sans erreur."
+    statut: sourcee
+    source: "docs/specs/perf-tableau-de-bord/fiche.yaml R14, R16, R17 (règles de L225, mêmes populations)"
+    tests: ["R17 — fenêtre précédente vide : n/d et pas de ⚠ sur chaque nouvel indicateur", "R17 — médiane de durée sans étape = null, jamais 0", "R17 — plan illisible : délais et coût n/d, tokens par estimate n/d, durées par étape servies"]
+
+contrats:
+  - id: A1
+    appel: commande perf
+    entree: "cadence perf [dossier] [--since date ISO] [--json] ; grille lue dans <dossier>/cadence.yaml (perf.prices : { sonnet|opus|haiku: { input, output, cacheRead } } en € par million de tokens)"
+    sortie: "texte : les lignes de L225 plus tokens par lot selon l'estimate, part des tokens de revue, délais création → done et done → livraison, durée de mur par étape, coût par lot livré, chacune avec valeur courante, précédente, variation, jumeau, ⚠ et décision ; --json : l'objet de L225 plus tokens, delays, durations, cost (R14) ; code de sortie 0"
+    erreurs:
+      - { code: log error, message: "raf: usage : cadence perf [dossier] [--since date] [--json]" }
+      - { code: log error, message: "raf: --since invalide : <valeur> (une date ISO, ex. 2026-10-10T18:31Z)" }
+      - { code: log error, message: "raf: perf : aucun journal de vague dans <dossier>/.cadence/runs" }
+      - { code: log error, message: "raf: <fichier> illisible : <cause>" }
+      - { code: log error, message: "raf: <fichier> : perf.<clé> inconnu (attendu : prices)" }
+      - { code: log error, message: "raf: <fichier> : perf.prices.<modèle> inconnu (attendu : sonnet, opus, haiku)" }
+      - { code: log error, message: "raf: <fichier> : perf.prices.<modèle>.<clé> : nombre ≥ 0 attendu (€ par million de tokens)" }
+      - { code: log warn, message: "perf : aucune grille de prix (cadence.yaml perf.prices), coût en euros n/d" }
+      - { code: log warn, message: "perf : modèle sans prix dans perf.prices : <modèle>, coût n/d pour <N> lot(s)" }
+      - { code: log warn, message: "perf : plan illisible, projet <projet> sauté" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17]
+
+donnees:
+  - { id: D1, objet: ".cadence/runs/<vague>/<projet>--<lot>.json (steps[kind, status, model, started, ended, tokens{input, cacheWrite, cacheRead, output, counted}])", existant: true, modification: aucune, note: "lu seul ; les champs model, started et tokens existent déjà dans StepState (src/orchestrate/state.ts:44-60), le format est inchangé" }
+  - { id: D2, objet: "plans raf des projets du dossier (status, estimate, created, finished)", existant: true, modification: aucune, note: "lu seul, via le chargeur de plan" }
+  - { id: D3, objet: "deliveries.log de l'état partagé du dépôt (ligne « jour sha »)", existant: true, modification: aucune, note: "lu seul (src/state.ts:178-186), jamais écrit" }
+  - { id: D4, objet: "cadence.yaml du dossier, clé perf.prices (par modèle : input, output, cacheRead en € par million de tokens)", existant: false, modification: ajout, note: "clé nouvelle de configuration, facultative ; sans elle le coût est n/d et rien d'autre ne change" }

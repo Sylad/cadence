@@ -62,7 +62,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - `cadence orchestrate --resume … --dry-run` is now refused (exit 2) before anything is written: it used to resume the wave for real — raising the lot budget in `wave.json` and relaunching the session — although `--dry-run` promises nothing runs (L228).
-- `cadence orchestrate` no longer replays the `accept` step of a lot whose acceptation is already green (`vert: true`), e.g. after a `cadence spec reseal`: the lot goes to `implement` or the review. The `accept` brief and the `acceptance-writer` agent now forbid rewriting a green oracle (`resceaux`, `empreintes`, `vert`) and hand the lot back (L233).
+- `cadence orchestrate` no longer replays the `accept` step of a lot whose acceptation is already green (`vert: true`), e.g. after a `cadence spec reseal`: the lot goes to `implement` or the review, including when it was waiting on an answer with `next` = `accept`. The `accept` brief and the `acceptance-writer` agent now forbid rewriting a green oracle (`resceaux`, `empreintes`, `vert`) and hand the lot back (L233).
 
 ## [1.6.0] - 2026-10-16
 

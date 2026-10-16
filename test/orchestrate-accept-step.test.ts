@@ -121,6 +121,25 @@ describe('étape accept : où elle s’insère', () => {
     }
   });
 
+  it('L233 — un lot vert en question à accept (réponse du lead reçue) repart à implement, pas à une session accept qui réécrirait l’oracle', async () => {
+    const h = prepared({ accept: [accept(), accept()], implement: [green], review: [ok] });
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, a.json);
+    setVert(h.repo, a.json);
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'chore(L1): acceptation verte', '--', a.json);
+    const c = h.lot('L1', screen, config);
+    c.lot.status = 'question';
+    c.lot.next = 'accept';
+    c.lot.questions = ['l’oracle est vert, que faire ?'];
+    c.lot.pendingAnswer = 'ne réécris ni l’acceptation ni la fiche';
+    c.lot.answers.push('ne réécris ni l’acceptation ni la fiche');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.accept?.acceptation).toBe(a.json);
+  });
+
   it('L233 — le brief accept interdit de réécrire une acceptation verte et rend la main', async () => {
     const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
     await runLot(h.lot('L1', screen, config));

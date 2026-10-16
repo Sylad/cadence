@@ -1434,6 +1434,24 @@ async function acceptStep(c: LotCtx): Promise<void> {
     return;
   }
   const json = lotAcceptation(c, fiche);
+  // Un lot déjà vert (L233) n'a plus d'oracle à écrire, même quand `next` vaut encore accept (question posée pendant accept, puis réponse du lead) : jamais de session accept.
+  // Le fichier est lu tel qu'il était avant la première session accept du lot : la seconde passe voit le fichier écrit par la session, qui ne doit pas être vert (checkAcceptation).
+  const first = l.steps.find((s) => s.kind === 'accept')?.headBefore;
+  let text: string | null = null;
+  try {
+    text = first ? git(l.repo, 'show', `${first}:${json}`) : listed(c, json) ? readFileSync(join(l.repo, json), 'utf8') : null;
+  } catch {
+    text = null;
+  }
+  const doc = text === null ? null : parseAcceptation(text);
+  if (doc && typeof doc !== 'string' && doc.vert) {
+    l.accept = { acceptation: json, rouge: redSha(l.repo, json) ?? '' };
+    l.next = 'implement';
+    // Un lot en question n'a plus rien à demander : la réponse du lead (« ne réécris rien ») est prise en compte par ce choix, elle ne repart pas dans le brief d'implement.
+    l.pendingAnswer = null;
+    transition(c, 'implementing', 'acceptation déjà verte : accept ignoré');
+    return;
+  }
   const done = await session(c, 'accept');
   if (!done) return;
   let rep: AcceptReport;

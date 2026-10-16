@@ -51,6 +51,7 @@ Reviews are opt-in gates: `ux-reviewer` (no user-facing change is done before it
 
 Two lines per version; the long form is in [docs/whats-new.md](docs/whats-new.md) and the full history, with dates, in [CHANGELOG.md](CHANGELOG.md).
 
+- **1.8.0**: `cadence perf` shows the speed of the workflow next to its quality (cost in euros per delivered lot, red deliveries, blocking QA findings), and `cadence lead tour` opens with a perf header.
 - **1.7.0**: `cadence orchestrate` no longer replays `accept` on a green sealed acceptation and refuses `--resume --dry-run`; `spec reseal --porteur` accepts a sheet amended by a delivered lot; the README becomes a short home page.
 - **1.6.0**: the mockup review sweeps everything in its first report and runs up to `orchestrate.maquetteReviews` times (3 by default); the acceptance lock names the first offending commit.
 - **1.5.1**: publishes 1.5.0 (tagged, never published): one UX review per lot, replay of a lot handed back for its budget, a self-check list in the briefs, a `tests.yml` workflow.

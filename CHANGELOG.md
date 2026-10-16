@@ -54,10 +54,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence orchestrate --resume <wave> --budget <project>:<lot>=+N`: replays a lot handed back for its budget | [1.5.1](#151---2026-10-16) |
 | `cadence corrections --since <date>`: only the lots of the waves created after the date | [1.5.1](#151---2026-10-16) |
 | `orchestrate.maquetteReviews`: how many times the mockup of a lot with a screen is reviewed (default 3) | [1.6.0](#160---2026-10-16) |
+| `cadence perf`: the workflow dashboard (speed next to quality, cost in euros, red deliveries), and the perf header of `cadence lead tour` | [1.8.0](#180---2026-10-16) |
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
 
-## [Unreleased]
+## [1.8.0] - 2026-10-16
 
 ### Added
 

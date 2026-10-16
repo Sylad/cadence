@@ -63,6 +63,7 @@ export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
 const VERSION_JSON = /(^|\/)(package\.json|package-lock\.json|\.claude-plugin\/(plugin|marketplace)\.json)$/;
 const CHANGELOG = /(^|\/)CHANGELOG\.md$/;
 const README = /^README\.md$/;
+const WHATS_NEW = /^docs\/whats-new\.md$/;
 
 /** Le README sans sa section « What's new », rangée par version et donc réécrite à la release. */
 function withoutWhatsNew(text: string | null): string {
@@ -85,17 +86,17 @@ function withoutVersion(text: string | null): string | null {
 
 /**
  * Commit de version (L72) : TOUS ses fichiers sont des fichiers de version — package.json, package-lock.json,
- * .claude-plugin/plugin.json et marketplace.json, où seule la `version` change, et CHANGELOG.md, plus la section « What's new » du README (seule). Il clôt le lot
+ * .claude-plugin/plugin.json et marketplace.json, où seule la `version` change, et CHANGELOG.md, plus la section « What's new » du README (seule) et docs/whats-new.md, sa forme longue (L232). Il clôt le lot
  * après sa revue : l'exiger relu rouvrirait la porte à chaque release. Les fichiers décident, jamais le sujet.
  */
 export function isReleaseOnly(sha: string, root: string): boolean {
   const files = changedFiles(root, sha);
   // Les noms d'abord : un fichier hors version refuse le commit sans qu'aucun contenu ne soit lu.
-  if (!files.length || !files.every((f) => CHANGELOG.test(f) || README.test(f) || VERSION_JSON.test(f))) return false;
+  if (!files.length || !files.every((f) => CHANGELOG.test(f) || WHATS_NEW.test(f) || README.test(f) || VERSION_JSON.test(f))) return false;
   return (
     files.length > 0 &&
     files.every((f) => {
-      if (CHANGELOG.test(f)) return true;
+      if (CHANGELOG.test(f) || WHATS_NEW.test(f)) return true;
       if (README.test(f)) return withoutWhatsNew(fileAt(root, `${sha}^`, f)) === withoutWhatsNew(fileAt(root, sha, f));
       if (!VERSION_JSON.test(f)) return false;
       const before = withoutVersion(fileAt(root, `${sha}^`, f));

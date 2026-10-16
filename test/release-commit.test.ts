@@ -118,6 +118,19 @@ describe('(L72) commit de version et porte de revue', () => {
     expect((await raf(dir, 'check')).out).toBe('✓ plan et historique cohérents');
   });
 
+  it('(L232) docs/whats-new.md, forme longue du « What\'s new », se réécrit dans le commit de version', async () => {
+    const dir = await reviewedLot();
+    commitFiles(dir, 'docs(L1): news', { 'docs/whats-new.md': '**0.1.0**: a\n' });
+    await raf(dir, 'review', 'L1', 'conforme');
+    commitFiles(dir, 'release: 0.2.0 (L1)', {
+      'package.json': pkg('0.2.0'),
+      'CHANGELOG.md': '## [0.2.0]\n',
+      'docs/whats-new.md': '**0.2.0**: b (L1)\n\n**0.1.0**: a\n',
+    });
+    expect((await rafOn('2026-09-29', dir, 'done', 'L1')).code).toBe(0);
+    expect((await raf(dir, 'check')).out).toBe('✓ plan et historique cohérents');
+  });
+
   it('un autre passage du README dans le commit de version reste du travail', async () => {
     const dir = await reviewedLot();
     commitFiles(dir, 'docs(L1): readme', { 'README.md': README('**0.1.0**: a') });

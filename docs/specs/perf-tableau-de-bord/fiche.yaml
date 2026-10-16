@@ -29,7 +29,7 @@ cas:
       - "le dossier contient .cadence/runs avec au moins une vague"
       - "le dossier contient des projets à plan raf (lead.ts:100 findProjects)"
     nominal:
-      - "La commande lit les wave.json et les journaux <vague>/<projet>--<lot>.json (un lecteur propre à perf, R23) et le plan de chaque projet du dossier."
+      - "La commande lit les wave.json et les journaux <vague>/<projet>--<lot>.json (lecture des journaux de perf et classification des passes partagée avec cadence corrections, R23) et le plan de chaque projet du dossier."
       - "Elle découpe en deux fenêtres de 7 jours : les 7 derniers jours (aujourd'hui compris) et les 7 précédents."
       - "Elle calcule les trois familles d'indicateurs sur chaque fenêtre."
       - "Elle imprime chaque indicateur de vitesse sur la même ligne que son jumeau de qualité, valeur courante, valeur précédente et variation."
@@ -103,7 +103,7 @@ regles:
     tests: ["R3 — --since au milieu de la précédente : les lots avant la date sont ignorés et la précédente est dite tronquée", "R3 — --since antérieur aux deux fenêtres : résultat identique au lancement sans option"]
   - id: R4
     cas: [C1]
-    enonce: "Débit : lots prêts = journaux au statut ready, lots rendus = journaux ready, handed-back ou failed (orchestrate/state.ts:181 lotFinished), rendus par jour = rendus de la fenêtre ÷ ses jours, livrés = lots des plans au statut done dont finished tombe dans la fenêtre. Un journal est daté par la fin de sa dernière étape (le plus grand ended), à défaut par le champ created de son wave.json ; un journal sans date lisible est écarté. Les champs status, budget, tokens.counted et ended viennent du journal lu par le lecteur de perf (R23)."
+    enonce: "Débit : lots prêts = journaux au statut ready, lots rendus = journaux ready, handed-back ou failed (orchestrate/state.ts:181 lotFinished), rendus par jour = rendus de la fenêtre ÷ ses jours, livrés = lots des plans au statut done dont finished tombe dans la fenêtre. Un journal est daté par la fin de sa dernière étape (le plus grand ended), à défaut par le champ created de son wave.json ; un journal sans date lisible est écarté. Les champs status, budget, tokens.counted et ended viennent du journal lu par le lecteur de journaux de perf (R23)."
     statut: hypothese
     si_faux: "Si « prêts » devait désigner le stock de lots à prendre dans le plan (todo débloqués), seul le calcul de cet indicateur change (lecture de lead.ts nextUp) ; aucun contrat en jeu."
     tests: ["R4 — rendus par jour : 7 lots ready+handed-back+failed sur 7 jours = 1/jour", "R4 — livrés compte le plan done daté dans la fenêtre, pas les journaux", "R4 — un journal sans ended utilise la création de la vague, sans date : écarté"]
@@ -115,16 +115,16 @@ regles:
     tests: ["R5 — un lot à 450 k de budget et 460 k comptés n'est pas sur budget", "R5 — un journal sans budget n'entre pas au dénominateur"]
   - id: R6
     cas: [C1]
-    enonce: "Passes de correction par lot : sur les lots dont une session implement a abouti et dont le cycle est fini (statut ready, handed-back ou failed, R4) et dont la date de rendu (R4) tombe dans la fenêtre, la médiane du nombre de passes fix abouties (étapes kind fix, status ok) et la part des lots à au moins 2 passes. Définition de la passe identique à cadence corrections (corrections.ts:111-120), mais lecture propre à perf (R23) : readRuns ne garde ni statut, ni dates, ni budget et ne sert pas ici."
+    enonce: "Passes de correction par lot : sur les lots dont une session implement a abouti et dont le cycle est fini (statut ready, handed-back ou failed, R4) et dont la date de rendu (R4) tombe dans la fenêtre, la médiane du nombre de passes fix abouties (étapes kind fix, status ok) et la part des lots à au moins 2 passes. Définition de la passe identique à cadence corrections (corrections.ts:111-120) : perf n'en a pas d'autre, la passe vient de la lecture partagée avec corrections (R23). Les bornes des deux fenêtres (R1, R2) sont des paramètres de la fonction de calcul, la commande les dérive d'aujourd'hui et de --since ; un appel peut donc poser les deux fenêtres où il veut."
     statut: sourcee
     source: "titre du lot (« passes de correction par lot (médiane, part ≥ 2…) ») ; définition de la passe : src/corrections.ts:111-120 (pas fix abouti), docs/corrections.md"
-    tests: ["R6 — médiane de 0,0,1,3 passes = 0,5 et part ≥ 2 = 50 %", "R6 — un lot sans implement abouti n'entre pas", "R6 — sur des journaux tous finis, sans --since et sans borne de fenêtre, le total de passes égale celui de cadence corrections ; un lot non fini ou une passe hors fenêtre fait la différence et n'est compté que par corrections"]
+    tests: ["R6 — médiane de 0,0,1,3 passes = 0,5 et part ≥ 2 = 50 %", "R6 — un lot sans implement abouti n'entre pas", "R6 — la fonction de calcul reçoit les bornes en paramètre : posées sur toute l'étendue des journaux (fenêtre courante de la création de la première vague à maintenant, précédente vide placée avant), sur des journaux tous finis, le total de passes égale celui de cadence corrections sans borne ; un lot non fini ou une passe hors des bornes posées fait la différence et n'est compté que par corrections"]
   - id: R7
     cas: [C1]
-    enonce: "Causes dominantes : les passes des lots comptés en R6 (une passe est datée par la fin de son étape fix, à défaut comme son lot) sont classées avec le cache de corrections <dossier>/.cadence/corrections.json (corrections.ts:250 readCache ; cause manuelle prioritaire, passe sans constat comptée à part « sans-constat », passe absente du cache « non-classe »). La commande affiche les 3 premières causes avec leur part des passes classées et la part non classée, sans appeler aucun modèle."
+    enonce: "Causes dominantes : les passes des lots finis (implement abouti, cycle fini, R6) sont rangées dans une fenêtre par la date de FIN de leur étape fix (à défaut, par la date de rendu de leur lot, R4), indépendamment de la date de rendu de leur lot : un lot rendu dans la fenêtre courante dont une passe fix date de la veille de la fenêtre compte dans R6 (par lot) de la courante et sa passe compte dans la précédente de R7. La classification mécanique de chaque passe est celle de cadence corrections (R23) : passe sans constat (aucun constat dans la revue précédente, ou constats déjà traités par une passe intermédiaire) comptée à part « sans-constat » ; passe à constats classée avec le cache de corrections <dossier>/.cadence/corrections.json (corrections.ts:250 readCache ; cause manuelle prioritaire), « non-classe » quand elle est absente du cache. La commande affiche les 3 premières causes avec leur part des passes classées et la part non classée, sans appeler aucun modèle."
     statut: sourcee
-    source: "titre du lot : « causes dominantes du cache de corrections », « sans modèle » ; src/corrections.ts:60-86 (clé de passe, priorité de manual)"
-    tests: ["R7 — trois causes en tête avec leur part, la part non classée affichée à part", "R7 — aucun appel réseau : la commande tourne avec OLLAMA_HOST injoignable", "R7 — le cache absent donne 100 % non classé sans erreur"]
+    source: "titre du lot : « causes dominantes du cache de corrections », « sans modèle » ; src/corrections.ts:60-86 (clé de passe, priorité de manual), :165 (sans-constat quand p.findings est vide). La date de rangement de la passe en fenêtre est une lecture du lead."
+    tests: ["R7 — trois causes en tête avec leur part, la part non classée affichée à part", "R7 — un lot rendu dans la fenêtre courante dont une passe fix date de la veille de la fenêtre : le lot compte dans R6 de la courante, la passe compte dans les passes de la précédente (date de fin de l'étape fix, non date de rendu du lot)", "R7 — aucun appel réseau : la commande tourne avec OLLAMA_HOST injoignable", "R7 — le cache absent donne 100 % non classé sans erreur"]
   - id: R8
     cas: [C1, C2]
     enonce: "Chaque indicateur de vitesse est imprimé sur la même ligne que son jumeau de qualité, jamais seul : débit (prêts, livrés, rendus par jour, part sur budget) ↔ défauts échappés ; passes de correction ↔ part des lots conformes du premier coup (lots rendus sans aucune passe fix, corrections.ts:111) ; interventions du lead ↔ défauts échappés. Un ⚠ peut aussi porter sur le jumeau."
@@ -193,10 +193,10 @@ regles:
     tests: ["R18 — après la commande, l'arbre du dossier est inchangé (aucun fichier créé ni modifié)", "R18 — un ⚠ imprimé et le code de sortie vaut 0", "R18 — aucun appel à fetch"]
   - id: R19
     cas: [C2]
-    enonce: "Goulot net : une cause qui pèse au moins la moitié des passes classées de la fenêtre courante, avec au moins 10 passes classées, est signalée par un ⚠ même sans tendance, avec la décision « quel maillon corriger »."
+    enonce: "Goulot net : une cause qui pèse au moins la moitié des passes classées de la fenêtre courante (passes rangées selon R7, classification mécanique de R23 : une passe sans-constat n'est pas classée, une passe à constats absente du cache non plus), avec au moins 10 passes classées, est signalée par un ⚠ même sans tendance, avec la décision « quel maillon corriger »."
     statut: hypothese
     si_faux: "Si le seuil (50 %, 10 passes) était autre, seules ces deux constantes changent ; sans goulot net, L227 ne proposerait un lot que sur tendance."
-    tests: ["R19 — 6 passes de bug-code sur 10 classées : ⚠ goulot", "R19 — 5 sur 9 classées : pas de ⚠ (moins de 10)", "R19 — 4 sur 10 : pas de ⚠"]
+    tests: ["R19 — 6 passes de bug-code sur 10 classées : ⚠ goulot", "R19 — 5 sur 9 classées : pas de ⚠ (moins de 10)", "R19 — 4 sur 10 : pas de ⚠", "R19 — fenêtre de 10 passes dont 5 tests rouges sans cache et 5 à constats classées bug-code au cache : les 5 tests rouges sont sans-constat (comme chez cadence corrections), 5 passes classées seulement : pas de ⚠ goulot"]
   - id: R20
     cas: [C3]
     enonce: "Avec --json la sortie est un objet unique { since, today, windows: { current: { from, to, days }, previous: { … } }, throughput, corrections, interventions, warnings }, où chaque indicateur porte { current, previous, change, warn, twin }, n/d = null ; mêmes valeurs que le texte."
@@ -218,10 +218,10 @@ regles:
 
   - id: R23
     cas: [C1, C3]
-    enonce: "perf a son propre lecteur de journaux (exporté à côté de readRuns dans src/corrections.ts, readRuns inchangé) : par journal il garde project, lot, visible, status, budget, tokens.counted de chaque étape, la date de création de la vague (wave.json), ended de chaque étape et, par étape, kind, status, n, commits ; il ne lit pas les rapports de revue (le cache de corrections les classe, R7). Il applique les mêmes écarts que readRuns (wave.json illisible, journal sans steps, R17). cadence corrections ne change ni de sortie ni de test."
+    enonce: "perf réutilise la lecture de cadence corrections, jamais un lecteur de rapports à lui : les passes et leur classification mécanique viennent des mêmes fonctions du module src/corrections.ts que cadence corrections (lecture des journaux, findingsOf sur le rapport de la revue précédente, règle handled, règle sans-constat quand la passe n'a aucun constat, corrections.ts:111-122 et :165). La lecture partagée est exportée et appelée par readRuns et par perf, avec la sortie de readRuns inchangée ; elle rend en plus, par passe, la date de fin de son étape fix, et par journal ce dont perf a besoin (project, lot, visible, status, budget, tokens.counted de chaque étape, date de création de la vague, ended de chaque étape, kind, status, n, commits), avec les mêmes écarts que readRuns (wave.json illisible, journal sans steps, R17). Résultat : pour une même passe, perf et cadence corrections rendent la même classification mécanique (sans-constat, ou à constats) ; le cache ne porte que la cause par modèle (--classify) des passes à constats, une passe à constats absente du cache est non-classe chez les deux. cadence corrections ne change ni de sortie ni de test."
     statut: hypothese
-    si_faux: "Si readRuns devait être étendu plutôt qu'accompagné, le résultat de perf ne change pas ; le risque est de toucher la sortie de cadence corrections, d'où le lecteur séparé."
-    tests: ["R23 — le lecteur de perf rend status, budget, tokens.counted et ended d'un journal", "R23 — readRuns et cadence corrections donnent la même sortie qu'avant sur les mêmes journaux"]
+    si_faux: "Si perf devait avoir son propre lecteur de rapports, sa classification mécanique pourrait diverger de celle de cadence corrections (une passe sans constat rangée non-classe) et fausser R7 et R19 ; le risque inverse est de toucher la sortie de cadence corrections en partageant le code, d'où la sortie de readRuns figée par test."
+    tests: ["R23 — le lecteur partagé rend status, budget, tokens.counted et ended d'un journal, et la date de fin de l'étape fix d'une passe", "R23 — readRuns et cadence corrections donnent la même sortie qu'avant sur les mêmes journaux", "R23 — une passe de tests rouges (fix juste après une autre passe fix, sans cache) est sans-constat pour perf comme pour cadence corrections", "R23 — une passe à constats absente du cache est non-classe pour perf comme pour cadence corrections", "R23 — une passe sans revue précédente lisible est sans-constat pour perf comme pour cadence corrections"]
 
 contrats:
   - id: A1

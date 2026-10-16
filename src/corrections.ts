@@ -58,6 +58,7 @@ interface RawStep {
   report?: string;
   commits?: string[];
   ended?: string;
+  tokens?: { counted?: unknown };
 }
 
 const isReview = (kind: string) => kind.startsWith('review') || kind === 'ux';
@@ -84,14 +85,45 @@ function findingsOf(report: any): string[] {
   return list.map((c: any) => (typeof c === 'string' ? c : c?.texte)).filter((t: unknown): t is string => typeof t === 'string' && t.length > 0);
 }
 
+/** Une étape d'un journal, telle que le lecteur partagé la rend (`tokens.counted` : le compte du budget, absent sans jetons lisibles). */
+export interface JournalStep {
+  n: number;
+  kind: string;
+  status: string;
+  ended?: string;
+  counted?: number;
+}
+
+/** Une passe de correction et la date de fin de son étape fix (absente sans date lisible). */
+export interface JournalPass extends FixPass {
+  fixEnded?: string;
+}
+
+/** Un journal `<vague>/<projet>--<lot>.json` lu, avec ce que `readRuns` et `cadence perf` en tirent. */
+export interface Journal {
+  wave: string;
+  /** `created` du wave.json de la vague (absent sans date lisible). */
+  waveCreated?: string;
+  /** Faux quand le wave.json de la vague est absent ou illisible : `cadence perf` écarte alors la vague (R17), `readRuns` la lit comme avant. */
+  waveReadable: boolean;
+  project: string;
+  lot: string;
+  visible: boolean;
+  status: string;
+  budget?: number;
+  steps: JournalStep[];
+  /** Une session implement a abouti (sous la borne `until` éventuelle). */
+  implemented: boolean;
+  passes: JournalPass[];
+}
+
 /**
- * Lit les journaux de vague `<runs>/<vague>/<projet>--<lot>.json`. Un lot compte (dénominateur) dès qu'une session
- * d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là, pour une mesure que ni les vagues suivantes ni une vague encore en cours ne changent ; une vague ou une étape sans date lisible est écartée ; `since` : date ISO, ne garde que les lots des vagues créées strictement après, avec toutes leurs passes : une vague rend tous ses briefs depuis la copie de l'outil figée à sa création, c'est la date de la vague, non celle du début d'un lot, qui dit quel brief il a reçu, sauf pour une vague reprise sans instantané ou, avec `--budget projet:lot=+N`, depuis un instantané d'avant L223 : elle tourne alors avec le dist/ et les gabarits courants ; `--until` plus `--since` ne font le total sans borne que si aucune vague créée avant la borne n'est encore reprenable) ; chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
+ * Lit TOUS les journaux de vague `<runs>/<vague>/<projet>--<lot>.json` lisibles (seuls un journal sans `steps` lisible ou, sous `until` ou `since`, une vague sans date de création lisible sont écartés) : c'est la lecture que partagent `readRuns` et `cadence perf` (L225), le filtre « session implement aboutie » n'est pas ici mais dans leurs prédicats (`implemented`). Chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
+ * `until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là ; une vague ou une étape sans date lisible est écartée. `since` : date ISO, ne garde que les vagues créées strictement après.
  */
-export function readRuns(runsDir: string, until?: string, since?: string): Runs {
-  const lots: LotRecord[] = [];
-  const passes: FixPass[] = [];
-  if (!existsSync(runsDir)) return { lots, passes };
+export function readJournals(runsDir: string, until?: string, since?: string): Journal[] {
+  const journals: Journal[] = [];
+  if (!existsSync(runsDir)) return journals;
   const limit = until === undefined ? Infinity : Date.parse(until);
   const from = since === undefined ? undefined : Date.parse(since);
   // Sous `until`, une étape compte si elle est terminée avant la date ; sans date de fin lisible, elle est écartée.
@@ -99,31 +131,57 @@ export function readRuns(runsDir: string, until?: string, since?: string): Runs 
   for (const wave of readdirSync(runsDir).sort()) {
     const waveDir = join(runsDir, wave);
     if (!statSync(waveDir).isDirectory()) continue;
-    if (until !== undefined || from !== undefined) {
-      // Les vagues nommées à la main (ol-gains-1) n'ont pas d'horodatage dans leur nom : on lit `created` dans wave.json.
-      const created = Date.parse(readJson(join(waveDir, 'wave.json'))?.created);
-      if (until !== undefined && !(created <= limit)) continue;
-      // `since` est strict : une vague créée pile à la borne reste dans l'avant de `until` (inclusif), les deux mesures ne se recouvrent jamais ; sans date de création lisible, la vague est dans aucune.
-      if (from !== undefined && !(created > from)) continue;
-    }
+    const waveJson = readJson(join(waveDir, 'wave.json'));
+    // Les vagues nommées à la main (ol-gains-1) n'ont pas d'horodatage dans leur nom : on lit `created` dans wave.json.
+    const created = Date.parse(waveJson?.created);
+    if (until !== undefined && !(created <= limit)) continue;
+    // `since` est strict : une vague créée pile à la borne reste dans l'avant de `until` (inclusif), les deux mesures ne se recouvrent jamais ; sans date de création lisible, la vague est dans aucune.
+    if (from !== undefined && !(created > from)) continue;
+    const waveReadable = waveJson !== null && typeof waveJson === 'object';
+    const waveCreated = Number.isNaN(created) ? undefined : (waveJson.created as string);
     for (const file of readdirSync(waveDir).sort()) {
       if (!file.endsWith('.json') || file === 'wave.json') continue;
       const rec = readJson(join(waveDir, file));
       if (!rec || !Array.isArray(rec.steps)) continue;
       const steps = (rec.steps as RawStep[]).filter((s) => s && typeof s === 'object');
       const done = (s: RawStep) => s.status === 'ok' && inTime(s);
-      if (!steps.some((s) => s.kind === 'implement' && done(s))) continue;
       const name = basename(file, '.json');
       const fixSteps = steps.filter((s) => s.kind === 'fix' && done(s));
-      lots.push({ project: rec.project, lot: rec.lot, visible: !!rec.visible, fixes: fixSteps.length });
-      for (const fix of fixSteps) {
+      const passes = fixSteps.map((fix): JournalPass => {
         const review = [...steps].reverse().find((s) => s.n < fix.n && isReview(s.kind) && s.report);
         // Une passe fix entre la revue et celle-ci a déjà traité ces constats : cette passe-ci (tests rouges) n'en a pas.
         const handled = review ? fixSteps.some((f) => f.n > review.n && f.n < fix.n) : false;
         const findings = review?.report && !handled ? findingsOf(readJson(join(waveDir, name, review.report))) : [];
-        passes.push({ key: `${wave}/${name}/${fix.n}`, project: rec.project, lot: rec.lot, visible: !!rec.visible, findings, commits: fix.commits ?? [] });
-      }
+        return { key: `${wave}/${name}/${fix.n}`, project: rec.project, lot: rec.lot, visible: !!rec.visible, findings, commits: fix.commits ?? [], ...(fix.ended ? { fixEnded: fix.ended } : {}) };
+      });
+      journals.push({
+        wave,
+        ...(waveCreated ? { waveCreated } : {}),
+        waveReadable,
+        project: rec.project,
+        lot: rec.lot,
+        visible: !!rec.visible,
+        status: String(rec.status),
+        ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
+        steps: steps.map((s) => ({ n: s.n, kind: s.kind, status: s.status, ...(s.ended ? { ended: s.ended } : {}), ...(typeof s.tokens?.counted === 'number' ? { counted: s.tokens.counted } : {}) })),
+        implemented: steps.some((s) => s.kind === 'implement' && done(s)),
+        passes,
+      });
     }
+  }
+  return journals;
+}
+
+/**
+ * Les lots et passes de correction des journaux de `<runs>`. Un lot compte (dénominateur) dès qu'une session d'écriture a abouti (`until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là, pour une mesure que ni les vagues suivantes ni une vague encore en cours ne changent ; `since` : date ISO, ne garde que les lots des vagues créées strictement après, avec toutes leurs passes : une vague rend tous ses briefs depuis la copie de l'outil figée à sa création, c'est la date de la vague, non celle du début d'un lot, qui dit quel brief il a reçu, sauf pour une vague reprise sans instantané ou, avec `--budget projet:lot=+N`, depuis un instantané d'avant L223 : elle tourne alors avec le dist/ et les gabarits courants ; `--until` plus `--since` ne font le total sans borne que si aucune vague créée avant la borne n'est encore reprenable).
+ */
+export function readRuns(runsDir: string, until?: string, since?: string): Runs {
+  const lots: LotRecord[] = [];
+  const passes: FixPass[] = [];
+  for (const j of readJournals(runsDir, until, since)) {
+    if (!j.implemented) continue;
+    lots.push({ project: j.project, lot: j.lot, visible: j.visible, fixes: j.passes.length });
+    for (const { fixEnded: _ended, ...pass } of j.passes) passes.push(pass);
   }
   return { lots, passes };
 }

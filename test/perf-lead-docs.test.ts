@@ -52,7 +52,7 @@ describe('documentation — livraisons rouges et en-tête perf (L227)', () => {
 
   it('R12 — l\'aide de lead tour cite l\'en-tête perf', async () => {
     const out: string[] = [];
-    await run(['--help'], { cwd: root, env: {}, out: (l) => out.push(l), err: () => {} });
+    await run(['--help'], { cwd: root, env: {}, out: (l) => out.push(l), err: () => {}, now: () => new Date() });
     expect(out.join('\n').split('\n').find((l) => l.includes('cadence lead tour'))).toContain('en-tête perf');
   });
 });

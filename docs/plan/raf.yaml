@@ -2675,10 +2675,13 @@ lots:
     finished: 2026-10-16
   - id: L234
     title: "spec reseal d'un lot livré : le message de refus propose « ou la fiche être amendée par un commit du porteur », mais un commit du porteur ajouté sur la fiche ne lève pas le refus (tous les commits de <rouge>..HEAD sont vérifiés) ; corriger A1/R3 de la fiche spec-reseal-lot-livre-fiche-amendee puis le message : réécrire le commit fautif s'il n'est pas poussé, sinon dire la voie réelle (revue L229 16-10)"
-    status: doing
+    status: dropped
     estimate: 0.25
     created: 2026-10-16
     started: 2026-10-16
+    finished: 2026-10-16
+    notes:
+      - { date: 2026-10-16, text: "abandonné : doublon : le message de refus et les règles R3/A1 de la fiche étaient déjà corrigés par le commit c5c808d avant la création du lot (constat du pré-contrôle de la vague du 16-10)" }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

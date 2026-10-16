@@ -51,6 +51,60 @@ describe('gabarits', () => {
     expect(agent).toContain('usage documentation');
   });
 
+  it("R1 — brief implement : un conflit avec le test scellé d'un autre lot est une question nommant les deux tests", () => {
+    const out = renderBrief('implement', vars);
+    expect(out).toContain('Sealed test of ANOTHER lot');
+    expect(out).toContain('naming both tests');
+    expect(out).toContain('never modify, rewrite or reseal it and never pick a side');
+  });
+
+  it("R1 — brief fix : même consigne que l'implement", () => {
+    const out = renderBrief('fix', vars);
+    expect(out).toContain('Sealed test of ANOTHER lot');
+    expect(out).toContain('naming both tests');
+    expect(out).toContain('never modify, rewrite or reseal it and never pick a side');
+  });
+
+  it('R6 — brief accept : chaque assertion cite la phrase de la règle, rien au-delà', () => {
+    const out = renderBrief('accept', vars);
+    expect(out).toContain('cites the rule and the sentence of its statement');
+    expect(out).toContain('assert nothing beyond that sentence');
+    expect(out).toContain('Self-check before the commit');
+  });
+
+  it('R6 — brief accept-back : même consigne', () => {
+    const out = renderBrief('accept-back', vars);
+    expect(out).toContain('cites the rule and the sentence of its statement');
+    expect(out).toContain('assert nothing beyond that sentence');
+    expect(out).toContain('Self-check before the commit');
+  });
+
+  it('R6 — agents/acceptance-writer.md porte la même consigne', () => {
+    const agent = read('../agents/acceptance-writer.md');
+    expect(agent).toContain('cites the rule and the sentence of its statement');
+    expect(agent).toContain('assert nothing beyond that sentence');
+  });
+
+  it("R7 — brief review d'un lot à acceptation scellée : relecture des assertions contre la fiche demandée", () => {
+    const out = renderBrief('review', vars);
+    expect(out).toContain('sealed acceptation');
+    expect(out).toContain('against the sentence of the rule it cites');
+    expect(out).toContain('`cadence spec reseal`');
+  });
+
+  it('R7 — brief review-small : même consigne', () => {
+    const out = renderBrief('review-small', vars);
+    expect(out).toContain('sealed acceptation');
+    expect(out).toContain('against the sentence of the rule it cites');
+    expect(out).toContain('`cadence spec reseal`');
+  });
+
+  it('R7 — agents/code-reviewer.md : assertion qui dépasse la fiche = constat majeur', () => {
+    const agent = read('../agents/code-reviewer.md');
+    expect(agent).toContain('sealed test stronger than the sheet');
+    expect(agent).toMatch(/\*major\*[^\n]*asserts more than the sentence/);
+  });
+
   it('les briefs qui écrivent interdisent le git checkout / switch du dépôt, avec le worktree jetable en recours (L214)', () => {
     for (const kind of ['implement', 'fix', 'fix-minors', 'spec', 'spec-back', 'accept', 'accept-back'] as const) {
       const out = renderBrief(kind, vars);

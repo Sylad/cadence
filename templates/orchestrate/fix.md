@@ -12,6 +12,7 @@ Rules: test first; commit each fix as soon as its tests pass, with explicit path
 `git add -A` or `commit -a`), and a message that cites the lot (`fix({{lot}}): …`); run the project's
 full test suite and build before reporting; do not push, deliver, run `raf done`, `raf ux` or
 `raf review`. Read the project's CLAUDE.md first.
+Sealed test of ANOTHER lot: if what your own sealed tests require contradicts a sealed acceptance test of another lot (an `acceptation-<lot>.json` that is not yours), it is a question to the lead naming both tests (file and `Rn — …` name of each): never modify, rewrite or reseal it and never pick a side. Stop there and put the question in your report. The program compares the fingerprints of the sealed tests of every other lot at the end of each session and hands your lot back, naming the first offending commit, before any review.
 Never run `git checkout` or `git switch` to another commit or branch in this repository: the orchestrator watches it and a moved HEAD breaks the other sessions of the wave. To look at another sha, use a throwaway `git worktree add --detach <tmp> <sha>`, removed afterwards.
 Self-check before handing back (the recurring findings of the reviews), covering only what you changed: go through this list point by point on your own fix commits before you report, and touch nothing else:
 - documentation: the README and the architecture documentation describe the behaviour, updated in the same commits as the behaviour (and the CHANGELOG);

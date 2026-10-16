@@ -29,7 +29,7 @@ cas:
       - "le dossier contient .cadence/runs avec au moins une vague"
       - "le dossier contient des projets à plan raf (lead.ts:100 findProjects)"
     nominal:
-      - "La commande lit les wave.json et les journaux <vague>/<projet>--<lot>.json (corrections.ts:91 readRuns, même lecture) et le plan de chaque projet du dossier."
+      - "La commande lit les wave.json et les journaux <vague>/<projet>--<lot>.json (un lecteur propre à perf, R23) et le plan de chaque projet du dossier."
       - "Elle découpe en deux fenêtres de 7 jours : les 7 derniers jours (aujourd'hui compris) et les 7 précédents."
       - "Elle calcule les trois familles d'indicateurs sur chaque fenêtre."
       - "Elle imprime chaque indicateur de vitesse sur la même ligne que son jumeau de qualité, valeur courante, valeur précédente et variation."
@@ -103,7 +103,7 @@ regles:
     tests: ["R3 — --since au milieu de la précédente : les lots avant la date sont ignorés et la précédente est dite tronquée", "R3 — --since antérieur aux deux fenêtres : résultat identique au lancement sans option"]
   - id: R4
     cas: [C1]
-    enonce: "Débit : lots prêts = journaux au statut ready, lots rendus = journaux ready, handed-back ou failed (orchestrate/state.ts:181 lotFinished), rendus par jour = rendus de la fenêtre ÷ ses jours, livrés = lots des plans au statut done dont finished tombe dans la fenêtre. Un lot est daté par la fin de sa dernière étape (ended), à défaut par la création de sa vague ; un journal sans date lisible est écarté."
+    enonce: "Débit : lots prêts = journaux au statut ready, lots rendus = journaux ready, handed-back ou failed (orchestrate/state.ts:181 lotFinished), rendus par jour = rendus de la fenêtre ÷ ses jours, livrés = lots des plans au statut done dont finished tombe dans la fenêtre. Un journal est daté par la fin de sa dernière étape (le plus grand ended), à défaut par le champ created de son wave.json ; un journal sans date lisible est écarté. Les champs status, budget, tokens.counted et ended viennent du journal lu par le lecteur de perf (R23)."
     statut: hypothese
     si_faux: "Si « prêts » devait désigner le stock de lots à prendre dans le plan (todo débloqués), seul le calcul de cet indicateur change (lecture de lead.ts nextUp) ; aucun contrat en jeu."
     tests: ["R4 — rendus par jour : 7 lots ready+handed-back+failed sur 7 jours = 1/jour", "R4 — livrés compte le plan done daté dans la fenêtre, pas les journaux", "R4 — un journal sans ended utilise la création de la vague, sans date : écarté"]
@@ -115,13 +115,13 @@ regles:
     tests: ["R5 — un lot à 450 k de budget et 460 k comptés n'est pas sur budget", "R5 — un journal sans budget n'entre pas au dénominateur"]
   - id: R6
     cas: [C1]
-    enonce: "Passes de correction par lot : sur les lots dont une session implement a abouti et dont le cycle est fini (rendu, R4), la médiane du nombre de passes fix abouties et la part des lots à au moins 2 passes ; mêmes lots et mêmes passes que cadence corrections (corrections.ts:91 readRuns, corrections.ts:63) ; un lot est daté comme en R4."
+    enonce: "Passes de correction par lot : sur les lots dont une session implement a abouti et dont le cycle est fini (statut ready, handed-back ou failed, R4) et dont la date de rendu (R4) tombe dans la fenêtre, la médiane du nombre de passes fix abouties (étapes kind fix, status ok) et la part des lots à au moins 2 passes. Définition de la passe identique à cadence corrections (corrections.ts:111-120), mais lecture propre à perf (R23) : readRuns ne garde ni statut, ni dates, ni budget et ne sert pas ici."
     statut: sourcee
     source: "titre du lot (« passes de correction par lot (médiane, part ≥ 2…) ») ; définition de la passe : src/corrections.ts:111-120 (pas fix abouti), docs/corrections.md"
-    tests: ["R6 — médiane de 0,0,1,3 passes = 0,5 et part ≥ 2 = 50 %", "R6 — un lot sans implement abouti n'entre pas", "R6 — le total de passes égale celui de cadence corrections sur les mêmes journaux"]
+    tests: ["R6 — médiane de 0,0,1,3 passes = 0,5 et part ≥ 2 = 50 %", "R6 — un lot sans implement abouti n'entre pas", "R6 — sur des journaux tous finis, sans --since et sans borne de fenêtre, le total de passes égale celui de cadence corrections ; un lot non fini ou une passe hors fenêtre fait la différence et n'est compté que par corrections"]
   - id: R7
     cas: [C1]
-    enonce: "Causes dominantes : les passes de la fenêtre (datées par la fin de leur étape fix) sont classées avec le cache de corrections <dossier>/.cadence/corrections.json (corrections.ts:250 readCache ; cause manuelle prioritaire, passe sans constat comptée à part « sans-constat », passe absente du cache « non-classe »). La commande affiche les 3 premières causes avec leur part des passes classées et la part non classée, sans appeler aucun modèle."
+    enonce: "Causes dominantes : les passes des lots comptés en R6 (une passe est datée par la fin de son étape fix, à défaut comme son lot) sont classées avec le cache de corrections <dossier>/.cadence/corrections.json (corrections.ts:250 readCache ; cause manuelle prioritaire, passe sans constat comptée à part « sans-constat », passe absente du cache « non-classe »). La commande affiche les 3 premières causes avec leur part des passes classées et la part non classée, sans appeler aucun modèle."
     statut: sourcee
     source: "titre du lot : « causes dominantes du cache de corrections », « sans modèle » ; src/corrections.ts:60-86 (clé de passe, priorité de manual)"
     tests: ["R7 — trois causes en tête avec leur part, la part non classée affichée à part", "R7 — aucun appel réseau : la commande tourne avec OLLAMA_HOST injoignable", "R7 — le cache absent donne 100 % non classé sans erreur"]
@@ -133,16 +133,16 @@ regles:
     tests: ["R8 — la ligne de débit contient la valeur de défauts échappés", "R8 — la ligne des passes contient la part conforme du premier coup", "R8 — la sortie --json lie chaque indicateur de vitesse à son jumeau"]
   - id: R9
     cas: [C1]
-    enonce: "Défauts échappés d'une fenêtre = nombre de lots distincts ayant, dans la fenêtre, une note de plan datée dans la fenêtre commençant par « QA » et citant « bloquant » ou « majeur » (sauf précédé de « 0 » ou « aucun »), lot déjà terminé à la date de la note (finished ≤ date de la note). Les lots rouverts ne sont pas comptés : le plan ne date pas la réouverture."
+    enonce: "Défauts échappés d'une fenêtre = nombre de lots distincts (clé de R10) ayant, dans la fenêtre, une note de plan dont la date est dans la fenêtre, dont le texte (hors préfixe de date « JJ-MM », « JJ-MM hh:mm » et séparateur « : ») commence par « QA » et contient « bloquant » ou « majeur » non précédé de « 0 » ou « aucun », sur un lot déjà terminé à la date de la note (finished ≤ date de la note). Les notes réelles du plan commencent par la date (docs/plan/raf.yaml:2570, 2585) et aucune n'a encore la forme « QA … bloquant/majeur » : tant qu'aucune note des plans lus ne correspond, sur toute leur histoire, l'indicateur est n/d avec la mention « aucune note QA reconnue : convention à fixer (L227) », jamais 0, et ne porte aucun ⚠ (R14). Les lots rouverts ne sont pas comptés : le plan ne date pas la réouverture."
     statut: hypothese
-    si_faux: "Si les notes QA devaient porter la gravité dans un champ lisible, la reconnaissance du texte change (L227 précise le constat QA) ; seul le compteur varie, aucune donnée n'est écrite."
-    tests: ["R9 — une note « QA 16-10 : … bloquant » datée dans la fenêtre sur un lot terminé compte un défaut", "R9 — « 0 défaut » et « aucun bloquant » ne comptent pas", "R9 — une note QA datée avant finished ne compte pas"]
+    si_faux: "Si les notes QA devaient porter la gravité dans un champ lisible ou une autre formule, seule la reconnaissance du texte change (L227 fixe la convention du constat QA) ; l'indicateur reste n/d d'ici là au lieu d'afficher un 0 trompeur ; aucune donnée n'est écrite."
+    tests: ["R9 — une note « 16-10 : QA … 1 bloquant » datée dans la fenêtre sur un lot terminé compte un défaut", "R9 — « 0 défaut » et « aucun bloquant » ne comptent pas", "R9 — une note QA datée avant finished ne compte pas", "R9 — plans sans aucune note reconnue : valeur n/d (null) avec la mention, pas 0 et pas de ⚠", "R9 — sur docs/plan/raf.yaml réel du dépôt, le décompte égale celui d'une expression indépendante sur le texte des notes (n/d si zéro)"]
   - id: R10
     cas: [C1]
-    enonce: "Interventions du lead : (a) lots rendus par une vague (journal handed-back ou failed) puis terminés hors vague = le lot du plan est done avec finished ≥ le jour du rendu ; affichés en nombre et en part des lots rendus de la fenêtre ; (b) sessions ux par lot visible = étapes ux abouties des journaux visible sur le nombre de lots rendus visibles de la fenêtre."
+    enonce: "Interventions du lead : (a) lot rendu par une vague puis terminé hors vague = journal handed-back ou failed qui est le DERNIER journal du lot (par date de rendu, R4) parmi tous ceux du dossier, dont le lot du plan (clé ci-dessous) est done avec finished ≥ le jour du rendu ; un lot rejoué (R17) dont un journal plus récent est ready, ou encore en cours, n'est pas une intervention. Affiché en nombre et en part des lots rendus de la fenêtre (journaux de rendu daté dans la fenêtre). Clé de jointure journal ↔ plan : le projet du journal (champ project, nom du projet, state.ts:74 et lotKey) égale le chemin du dossier du projet relatif au dossier de perf, séparateurs « / » (le basename pour un projet direct, « groupe/gamma » pour un projet imbriqué, comme continue.ts:79 et lotSlug state.ts:190) ; l'id du lot se lit dans le champ lot du journal, jamais dans le nom de fichier (le slug remplace « / » par « __ ») ; il égale l'id d'un lot du plan, à défaut, pour un id « <lot>/<sous-tâche> », l'id de son lot parent (la partie avant le premier « / »). Un journal sans correspondance est orphelin (R15). (b) sessions ux par lot visible = étapes ux abouties (kind ux, status ok) des journaux visible, sur le nombre de lots rendus visibles de la fenêtre."
     statut: sourcee
-    source: "titre du lot : « lots rendus par une vague puis terminés hors vague, sessions ux par lot visible » ; statuts : orchestrate/state.ts:181, table.ts:17"
-    tests: ["R10 — handed-back dont le plan est done après le rendu = 1 intervention", "R10 — handed-back encore doing n'est pas compté comme terminé", "R10 — 3 sessions ux sur 2 lots visibles = 1,5", "R10 — un lot ready terminé par la vague n'est pas une intervention"]
+    source: "titre du lot : « lots rendus par une vague puis terminés hors vague, sessions ux par lot visible » ; statuts : orchestrate/state.ts:181 (lotFinished), table.ts:17 ; clés : orchestrate/state.ts:74, 188-190, orchestrate/continue.ts:79. Le choix du dernier journal et du repli sur le lot parent est une lecture du lead pour lever les cas non prévus."
+    tests: ["R10 — handed-back dont le plan est done après le rendu = 1 intervention", "R10 — handed-back encore doing n'est pas compté comme terminé", "R10 — 3 sessions ux sur 2 lots visibles = 1,5", "R10 — un lot ready terminé par la vague n'est pas une intervention", "R10 — lot rejoué : handed-back en vague 1 puis ready en vague 2, plan done : aucune intervention", "R10 — un projet imbriqué « groupe/gamma » se joint à son plan ; un projet direct se joint par son nom", "R10 — un lot « Q4/accueil-4-ux12 » du journal se joint au lot Q4 du plan, l'id lu dans le champ lot et non dans le nom de fichier"]
   - id: R11
     cas: [C1, C3]
     enonce: "Aucun indicateur de volume produit (lignes de code, nombre de commits, tokens consommés comme objectif) n'est imprimé ni exposé en JSON ; les tokens ne servent qu'à rapporter un lot à son budget (R5)."
@@ -169,7 +169,7 @@ regles:
     tests: ["R14 — fenêtre précédente vide : n/d et pas de ⚠", "R14 — médiane de passes sans lot = null en JSON, jamais 0"]
   - id: R15
     cas: [C1, C3]
-    enonce: "Un lot de journal sans lot correspondant dans les plans du dossier (projet absent du dossier, lot inconnu) compte pour les indicateurs de journal, ne compte jamais comme terminé hors vague (R10) ni comme livré ; leur nombre est affiché (« N lot(s) de journal sans plan »)."
+    enonce: "Un lot de journal sans lot correspondant dans les plans du dossier (projet absent du dossier, lot inconnu, clé de R10 sans correspondance) compte pour les indicateurs de journal, ne compte jamais comme terminé hors vague (R10) ni comme livré ; leur nombre est affiché (« N lot(s) de journal sans plan »)."
     statut: hypothese
     si_faux: "Si un orphelin devait être écarté de tout, seuls les dénominateurs changent ; aucune donnée en jeu."
     tests: ["R15 — un journal d'un projet absent du dossier est compté orphelin, hors terminé hors vague", "R15 — le compte d'orphelins est imprimé"]
@@ -181,7 +181,7 @@ regles:
     tests: ["R16 — un plan illisible : avertissement, autres projets lus", "R16 — aucun plan : indicateurs de journal servis, ceux du plan n/d"]
   - id: R17
     cas: [C1]
-    enonce: "Chaque fichier journal <vague>/<projet>--<lot>.json compte une fois ; un lot rejoué dans une autre vague compte autant de fois qu'il a de journaux, dans la fenêtre de sa fin de cycle. Une vague sans wave.json lisible, un journal sans steps lisible ou sans session implement aboutie sont écartés des indicateurs de passes (comme corrections.ts:100-120)."
+    enonce: "Chaque fichier journal <vague>/<projet>--<lot>.json compte une fois ; un lot rejoué dans une autre vague compte autant de fois qu'il a de journaux, dans la fenêtre de sa fin de cycle. Une vague sans wave.json lisible est écartée de tous les indicateurs (sa date de création manque) ; un journal sans steps lisible ou sans session implement aboutie est écarté des indicateurs de passes (comme corrections.ts:100-120)."
     statut: sourcee
     source: "src/corrections.ts:100-120 (readRuns : un journal = un lot compté, wave.json illisible écarté)"
     tests: ["R17 — un lot rejoué dans deux vagues est compté deux fois", "R17 — un wave.json illisible écarte la vague sans échec", "R17 — un journal sans steps est ignoré"]
@@ -211,10 +211,17 @@ regles:
     tests: ["R21 — deux dossiers : usage", "R21 — --since pas-une-date : message d'invalidité", "R21 — dossier sans .cadence/runs : « perf : aucun journal de vague dans … »", "R21 — corrections.json illisible : l'erreur de readCache, rien sur la sortie"]
   - id: R22
     cas: [C1]
-    enonce: "Le dossier se donne en argument facultatif (cadence perf [dossier], défaut le dossier courant) comme cadence corrections ; les projets lus sont ceux de findProjects(dossier) ; l'aide de cadence liste la commande."
+    enonce: "Le dossier se donne en argument facultatif (cadence perf [dossier], défaut le dossier courant) comme cadence corrections ; les projets lus sont ceux de findProjects(dossier, 2) (un niveau d'imbrication, pour les projets « groupe/gamma ») ; l'aide de cadence liste la commande."
     statut: hypothese
     si_faux: "Si la commande ne devait lire que le dossier courant, l'argument disparaît ; aucune donnée en jeu."
-    tests: ["R22 — cadence perf <dossier> lit les journaux de ce dossier", "R22 — l'aide liste « cadence perf [dossier] [--since date] [--json] »"]
+    tests: ["R22 — cadence perf <dossier> lit les journaux de ce dossier", "R22 — un projet à un niveau d'imbrication est lu", "R22 — l'aide liste « cadence perf [dossier] [--since date] [--json] »"]
+
+  - id: R23
+    cas: [C1, C3]
+    enonce: "perf a son propre lecteur de journaux (exporté à côté de readRuns dans src/corrections.ts, readRuns inchangé) : par journal il garde project, lot, visible, status, budget, tokens.counted de chaque étape, la date de création de la vague (wave.json), ended de chaque étape et, par étape, kind, status, n, commits ; il ne lit pas les rapports de revue (le cache de corrections les classe, R7). Il applique les mêmes écarts que readRuns (wave.json illisible, journal sans steps, R17). cadence corrections ne change ni de sortie ni de test."
+    statut: hypothese
+    si_faux: "Si readRuns devait être étendu plutôt qu'accompagné, le résultat de perf ne change pas ; le risque est de toucher la sortie de cadence corrections, d'où le lecteur séparé."
+    tests: ["R23 — le lecteur de perf rend status, budget, tokens.counted et ended d'un journal", "R23 — readRuns et cadence corrections donnent la même sortie qu'avant sur les mêmes journaux"]
 
 contrats:
   - id: A1
@@ -227,9 +234,9 @@ contrats:
       - { code: log error, message: "perf : aucun journal de vague dans <dossier>/.cadence/runs" }
       - { code: log error, message: "<fichier> : JSON illisible (un objet clé → classement est attendu), corrigez ou supprimez le fichier" }
       - { code: log warn, message: "perf : plan illisible, projet <projet> sauté" }
-    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, R22]
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, R22, R23]
 
 donnees:
-  - { id: D1, objet: ".cadence/runs/<vague>/wave.json et <projet>--<lot>.json (created, steps, status, budget, visible, tokens.counted, ended)", existant: true, modification: aucune, note: "lus en lecture seule, format inchangé (orchestrate/state.ts)" }
+  - { id: D1, objet: ".cadence/runs/<vague>/wave.json et <projet>--<lot>.json (wave.json created ; journal : project, lot, visible, status, budget, steps[kind, status, n, ended, tokens.counted])", existant: true, modification: aucune, note: "lus en lecture seule, format inchangé (orchestrate/state.ts)" }
   - { id: D2, objet: "plans raf des projets du dossier (status, finished, notes)", existant: true, modification: aucune, note: "lus en lecture seule via le chargeur de plan" }
   - { id: D3, objet: ".cadence/corrections.json (cache des causes de passes)", existant: true, modification: aucune, note: "lu seul, jamais réécrit (la classification reste l'affaire de cadence corrections --classify)" }

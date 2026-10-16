@@ -2585,6 +2585,7 @@ lots:
     estimate: 0.25
     created: 2026-10-16
     started: 2026-10-16
+    review: { date: 2026-10-16, verdict: "compliant — orchestré (vague 2026-10-16-1405, 0 passe(s) de correction)", commit: d1856f3a8a02bfa0e3f2cb9106b0a989a4b5ec9f }
   - id: L229
     title: "cadence spec reseal <lot livré> <test> --porteur <lot en cours> refuse un lot livré dont la fiche a été amendée par un lot ultérieur (ol-companion 16-10 : reseal L43 porté par L160 refusé car fix(L130) a58a129 a amendé docs/specs/composition-match/fiche.yaml le 12-10 sans citer L43) ; pour un lot livré, accepter une fiche amendée par des commits qui citent un lot livré ou le porteur (la fiche vivante est la référence), ou offrir une voie explicite ; message d'erreur qui dit quoi faire"
     status: todo

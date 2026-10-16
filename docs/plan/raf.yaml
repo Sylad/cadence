@@ -2173,7 +2173,7 @@ lots:
     finished: 2026-10-12
   - id: L190
     title: Mesure de l'étape spec back après 8 lots avec fiche (spec etape-spec-back, B5)
-    status: doing
+    status: done
     gate: { count: 8, spec: true }
     estimate: 0.5
     after: [ L189 ]
@@ -2183,6 +2183,7 @@ lots:
       - { date: 2026-10-15, text: "15-10 : vague 2026-10-15-1330 rendue, condition toujours non remplie — 2 lots back faits avec fiche (L217, L218) sur 8 ; remis en todo par le lead, ne pas tirer avant 8 (L209 vise aussi 8 lots screen: page)" }
     started: 2026-10-16
     review: { date: 2026-10-16, verdict: "conforme (1 note mineure : l'assertion /40 %/ du test de la note de mesure est vraie dès qu'il y a le seuil « ≤ 40 % » et ne peut pas échouer) — orchestré (vague 2026-10-16-2115, 0 passe(s) de correction + passe des mineurs)", commit: ee70ff928eff290bb943200b7ba77268c648e582 }
+    finished: 2026-10-16
   - id: L191
     title: "Budget d'un lot à étape spec : lotBudget (src/orchestrate/command.ts:73) ne compte que l'estimate, pas les sessions spec, maquette (≤ 2 passes) et accept — ol L25 rendu au lead le 11-10 à 503 k / 450 k avant sa passe fix (spec+maquette+accept ≈ 200 k) ; ajouter une allocation mesurée sur les journaux (L113, L25) pour un lot screen: ou spec:, montrée par --dry-run, test"
     status: done

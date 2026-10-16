@@ -2592,10 +2592,11 @@ lots:
     created: 2026-10-16
   - id: L230
     title: "Revue de maquette exhaustive au premier passage : le brief maquette.md de l'agent ux-reviewer exige un balayage complet états × règles de la fiche (liste à cocher rendue dans le rapport : chaque état à 1440 et 390, chaque règle, contraste, enveloppe réelle de l'app, gouttières, panneaux vides, trous) et TOUS les majeurs dans la première revue ; une revue 2 qui trouve un majeur absent de la revue 1 sur un point inchangé est comptée comme défaut de revue (journal) ; l'étape maquette autorise 3 revues par vague au lieu de 2 (orchestrate.maquetteReviews, défaut 3) ; mesure : ol-companion L160 le 16-10 = 6 revues de maquette sur 4 vagues, un majeur nouveau à chaque fois (contraste, panneaux étirés, trou central, gouttière + barre latérale)"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-16
+    started: 2026-10-16
   - id: L231
     title: "Verrou des tests d'acceptation, deux fuites vues sur ol-companion L160 le 16-10 : (1) la session implement a MODIFIÉ le test scellé d'un autre lot livré (L43 R8) pour satisfaire son propre test scellé au lieu de s'arrêter — le brief implement/fix dit : un conflit avec un test scellé d'un AUTRE lot = question au lead nommant les deux tests, jamais une modification ni un choix ; le programme vérifie l'empreinte des tests scellés des lots livrés AVANT la revue et rend le lot au premier commit fautif ; (2) le test scellé de L160 affirmait plus que sa fiche (« aucun ResizeObserver construit » quand R4 n'interdit que BalancedColumns) : l'acceptance-writer cite pour chaque assertion la phrase de la règle qu'elle vérifie et n'affirme rien au-delà (auto-contrôle dans le brief), la revue de maquette relit les tests rouges contre la fiche ; L229 couvre le refus de reseal --porteur"
     status: todo

@@ -233,9 +233,9 @@ describe('étape accept : où elle s’insère', () => {
   });
 
   /** Une « verte » que le programme n'a jamais scellée : `vert: true` avec des empreintes vides, ou celles d'un autre fichier que les tests listés (L233). */
-  const verteForgee = (empreintes: (h: ReturnType<typeof harness>, test: string) => Record<string, string>) => {
+  const verteForgee = (empreintes: (h: ReturnType<typeof harness>, test: string) => Record<string, string>, extra?: string[]) => {
     const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
-    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    const a = ecritAcceptation(h.repo, { sansFiche: true, extra });
     const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
     writeFileSync(join(h.repo, a.json), JSON.stringify({ ...doc, vert: true, empreintes: empreintes(h, a.test) }, null, 2));
     git(h.repo, 'add', '--', a.json);
@@ -257,6 +257,12 @@ describe('étape accept : où elle s’insère', () => {
 
   it('L233 — vert: true avec l’empreinte d’un autre fichier que les tests listés ne scelle rien : une question d’accept rejoue une session accept', async () => {
     const { h, c } = verteForgee((h, test) => ({ 'autre.test.ts': git(h.repo, 'hash-object', '--', test).trim() }));
+    await runLot(c);
+    expect(kinds(h)[0]).toBe('accept');
+  });
+
+  it('L233 — vert: true listant deux fichiers dont un seul porte son empreinte ne scelle rien (every, pas some) : une question d’accept rejoue une session accept', async () => {
+    const { h, c } = verteForgee((h, test) => ({ [test]: git(h.repo, 'hash-object', '--', test).trim() }), ['test/second.acceptation.test.ts']);
     await runLot(c);
     expect(kinds(h)[0]).toBe('accept');
   });

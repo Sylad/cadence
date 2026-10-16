@@ -4,6 +4,7 @@ import { tempDir } from './helpers.js';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TEMPLATES_DIR, loadTemplates, newsText, objective, renderBrief } from '../src/orchestrate/briefs.js';
+import { acceptText } from '../src/orchestrate/accept.js';
 import { WORK_SCHEMA, REVIEW_SCHEMA, checkShape } from '../src/orchestrate/schemas.js';
 import type { Lot } from '../src/plan.js';
 import { docText } from './docs-text.js';
@@ -84,6 +85,15 @@ describe('gabarits', () => {
     const agent = read('../agents/acceptance-writer.md');
     expect(agent).toContain('cites the rule and the sentence of its statement');
     expect(agent).toContain('assert nothing beyond that sentence');
+  });
+
+  it('L233 — l\'agent acceptance-writer et le brief accept disent la même clause d\'une verte : une empreinte par fichier listé, sinon jamais scellée', () => {
+    const agent = read('../agents/acceptance-writer.md');
+    const out = acceptText({ fiche: 'docs/specs/x/fiche.yaml', maquette: 'docs/specs/x/maquette.html', acceptation: 'docs/specs/x/acceptation-L9.json', command: 'npm run accept' });
+    for (const text of [agent, out]) {
+      expect(text).toContain('`empreintes` lack one of the listed test files');
+      expect(text).toContain('was never sealed by the program (only the cycle sets `vert`, after the seal)');
+    }
   });
 
   it("R7 — brief review d'un lot à acceptation scellée : relecture des assertions contre la fiche demandée", () => {

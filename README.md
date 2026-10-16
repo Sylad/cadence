@@ -40,7 +40,8 @@ Also: [news](docs/news.md) (changelog, UX, code and QA reviews, documentation th
 - **raf** (French *reste à faire*, "what is left to do"): the plan, linked to your commits by the lot id in the message, computed from `git log` and never stored.
 - **news**: a user-facing changelog with screenshots, tied to the plan; a lot is not done until its entry is written.
 - **session**: `session start` and `session close` gather the facts of a work session.
-- **deliver**: wait for the CI of the pushed commit, run the deploy commands, then **verify the effect**; a delivery is done only when its checks pass.
+- **deliver**: wait for the CI of the pushed commit, run the deploy commands, then **verify the effect**; a delivery is done only when its checks pass. A failed delivery is logged as a *red delivery*.
+- **perf**: `cadence perf` is the dashboard of the workflow (speed next to quality, `⚠` on a trend), including the red deliveries and the blocking QA findings; `cadence lead tour` opens with its *perf header*, one line per `⚠`, nothing when stable ([docs/perf.md](docs/perf.md)).
 
 Reviews are opt-in gates: `ux-reviewer` (no user-facing change is done before its usability review), `code-reviewer` (no lot with commits is done before its code review) and `qa-reviewer`, which walks the delivered app in a real browser.
 

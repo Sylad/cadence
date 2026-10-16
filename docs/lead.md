@@ -129,6 +129,8 @@ beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second 
 | `attend` | only when a lot waits on its `gate`: `attend L190` |
 | `dépôt` | `non commité` (modified or untracked files), `non poussé` (commits ahead of the upstream), `livraison en cours` (live delivery lock); `propre` otherwise |
 
+Before the project lines the tour prints the **perf header** (L227): one line per `⚠` of `cadence perf` for the folder, in the order of `perf`, each ending with its decision and, for a trend, the value of its quality twin (speed and quality side by side); the net-bottleneck `⚠ goulot` line is relayed as is. Nothing is printed when no `⚠` stands, and the output is then the one of a tour without header. The header is read with `perf`'s own reading of the folder (projects up to two levels, whatever `--depth`) and only in the text output: `--json` is unchanged. When `perf` cannot read the folder (no `.cadence/runs`, malformed price grid, unreadable journals or plans) the tour prints no header, reports no perf error and exits 0. The [lead skill](skills.md) reads the header before proposing the three lots and opens an improvement lot only on a trend confirmed on two windows or a net bottleneck.
+
 When an orchestrated wave is live, one more line closes the tour (not part of `--json`): `vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2` — the lead reads the free slots there instead of computing them (L141). The `sur M` is the cap the human set (`CADENCE_MAX_SESSIONS`, 2 by default), not a fixed 2 (L208); an invalid value falls back to 2 in this display.
 
 `--json` prints the same content as an array of objects (`project`, `doing`, `drift`, `notes`, `waiting` (only when a lot waits on its `gate`),

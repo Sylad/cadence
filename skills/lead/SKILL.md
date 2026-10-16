@@ -40,6 +40,13 @@ repository state — and exits 0 even when a project is in error (its line says 
 content. Read the lines yourself; open a project's own `cadence session start` only for the one you need to
 look at closer.
 
+The tour opens with the **perf header**: one line per `⚠` of `cadence perf` (speed and quality side by side), nothing
+when everything is stable. Read it **before proposing the three items** and relay each `⚠` in one line in your report.
+Open an **improvement lot** only on a trend confirmed on two windows (a `⚠` of trend: two windows compared, enough lots, window
+not truncated) or on a net bottleneck (`⚠ goulot`): at most one improvement lot per tour, in addition to the three, never in
+their place, and the human decides. Never open a lot for a micro-optimisation or for the variation of a single window.
+Without a `⚠`, the header is empty and you say nothing about perf.
+
 Then report to the human in a compact table — one row per project — and propose **three** items
 across projects, each with project, lot id and one sentence of justification: finish what is in
 progress, then drift that blocks a delivery, then ready quick wins. **Stop and wait for the priority.**

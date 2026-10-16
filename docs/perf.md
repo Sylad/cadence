@@ -69,3 +69,16 @@ a step without any readable token costs 0 € (the lot stays in the population);
 A lot with a step of a model that has no price in the grid (or no readable `model`, named `inconnu`) is left out of the cost and a warning on the error output names the model and the number of lots; delivered lots without any journal are counted aside (`N lot(s) livré(s) sans journal`). No `⚠` on a cost that is `n/d`.
 
 No indicator of produced volume (lines of code, commits, total tokens or euros of a window) is printed or exposed: only per-lot medians, median durations and shares come out. Tokens and euros compare lots of the same size; they never set a spending target.
+
+## Delivery quality and the tour header (L227)
+
+`cadence deliver` appends one line `day sha reason` to `<git common dir>/cadence/deliveries-failed.log` for every failure after the lock is taken (script, CI, deploy or check; the reason is the first line of the failure message). A green delivery or a refusal before the lock writes nothing there; `deliveries.log` is unchanged. A failed write of that log leaves the exit code and the failure message of the delivery as they are and adds the warning `deliver : journal des livraisons rouges non écrit : <cause>` on the error output. An exception or a crash of `deliver` writes no line.
+
+| Indicator | Reading | Twin | Decision it informs |
+|---|---|---|---|
+| red deliveries | lines of every project's `deliveries-failed.log` dated in the window; a repository without the file counts `0` (not `n/d`), an unreadable line, or an unreadable file, counts nothing; printed on the « livrés » line | delivered lots | the delivery breaks: fix CI, deploy or checks before adding lots |
+| blocking QA findings | plan notes dated in the window, on a lot already `done` at the note's date, that start with `QA` and contain `bloquant` not preceded by `0` or `aucun` (`majeur` alone does not count); counted note by note, unlike the escaped defects; `n/d` until a note is recognised; printed on the escaped-defects line | escaped defects | the review lets serious defects through: harden the review before delivering more |
+
+Both are judged like the other indicators (`⚠` above +25 %). For red deliveries the sample is the deliveries of the window, green and red (at least 5 per window); for blocking QA findings it is the plan lots `done` in the window (at least 5 per window). `--json` adds `quality: { redDeliveries, qaBlocking }` (Indicator format, `twin` `throughput.delivered` and `throughput.escaped`); every other key is unchanged, and `throughput.delivered.twin` stays `throughput.escaped`.
+
+`cadence lead tour` prints the `⚠` lines of `perf` as its **perf header** (see [lead tour](lead.md#lead-tour)).

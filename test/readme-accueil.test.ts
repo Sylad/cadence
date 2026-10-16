@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -71,13 +71,16 @@ describe('README en page d’accueil (L232)', () => {
 
   it('R6 — les sections longues sont repliables (<details>) et le contenu d’avant n’est pas perdu', () => {
     expect(readme).toContain('<details>');
-    // titres de l’ancien README, chacun retrouvé dans une page de docs/
-    const titres = ['Gantt scheduling', 'UX review', 'Code review', 'QA review', 'lead tour', 'corrections',
-      'verify: replay the effect checks', 'The accept step', 'The mockup review', 'A lot whose work is in a neighbouring repository',
-      'Claude Code skills', 'cadence-hud', 'Releasing', 'Evaluating the plugin', 'Stability', 'Spec step (design, first steps delivered)'];
-    const pages = [...DOC_PAGES, 'docs/news.md', 'docs/session.md', 'docs/corrections.md', 'docs/skills.md', 'docs/cadence-hud.md', 'docs/releasing.md']
-      .map((p: string) => read(p)).join('\n');
-    for (const t of titres) expect(pages, t).toMatch(new RegExp(`^#{1,4} .*${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'm'));
+    // README d’avant L232, figé (test/fixtures/readme-avant-L232.json) : chaque titre et chaque phrase-clé se retrouve dans README + docs/*.md
+    const avant: { titres: string[]; phrases: string[] } = JSON.parse(read('test/fixtures/readme-avant-L232.json'));
+    expect(avant.titres.length).toBeGreaterThanOrEqual(30);
+    expect(avant.phrases.length).toBeGreaterThanOrEqual(15);
+    const sources = ['README.md', ...readdirSync(join(root, 'docs')).filter((f: string) => f.endsWith('.md')).map((f: string) => `docs/${f}`)];
+    const texte = sources.map((p: string) => read(p)).join('\n');
+    const titres = new Set([...texte.matchAll(/^#{1,6} (.*)$/gm)].map((m) => m[1].trim()));
+    for (const t of avant.titres) expect(titres.has(t), `titre perdu : ${t}`).toBe(true);
+    const plat = texte.replace(/\s+/g, ' ');
+    for (const f of avant.phrases) expect(plat.includes(f.replace(/\s+/g, ' ')), `phrase perdue : ${f.slice(0, 60)}`).toBe(true);
   });
 
   it('R9 — aucun renvoi en texte du code ni des gabarits ne pointe vers une section déplacée du README', () => {
@@ -93,7 +96,11 @@ describe('README en page d’accueil (L232)', () => {
 
   it('R7 — le paquet npm publie les pages docs/ que le README cite', () => {
     const files: string[] = JSON.parse(read('package.json')).files;
-    for (const f of ['docs/cycle-vague-light.svg', 'docs/cycle-vague-dark.svg', 'docs/raf.md', 'docs/stabilite.md', 'docs/orchestrate.md']) expect(files, f).toContain(f);
+    // tout fichier docs/ visé par un lien, une image ou un srcset du README (ancre retirée)
+    const cites = new Set([...readme.matchAll(/(docs\/[\w./-]+?\.(?:md|svg))/g)].map((m) => m[1]));
+    expect(cites.size).toBeGreaterThanOrEqual(10);
+    for (const f of cites) expect(files, f).toContain(f);
+    for (const f of ['docs/cycle-vague-light.svg', 'docs/cycle-vague-dark.svg', 'docs/raf.md', 'docs/stabilite.md', 'docs/orchestrate.md']) expect(cites.has(f), f).toBe(true);
   });
 
   it('R8 — aucun lien relatif ni ancre cassé dans le README et les pages docs/', () => {

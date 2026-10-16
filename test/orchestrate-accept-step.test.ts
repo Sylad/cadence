@@ -221,6 +221,46 @@ describe('étape accept : où elle s’insère', () => {
     expect(kinds(h)).toEqual(['implement', 'review']);
   });
 
+  it('L233 — la réponse du lead à une question d’accept (« ne réécris rien ») n’est pas reportée dans le brief d’implement', async () => {
+    const { h, c, vert } = verteEnQuestion();
+    questionPosee(c, h, vert);
+    expect(c.lot.pendingAnswer).toBe('ne réécris rien');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(h.calls[0].brief).not.toContain('ne réécris rien');
+    expect(h.calls[0].brief).not.toContain('Answer from the human');
+    expect(c.lot.pendingAnswer).toBeNull();
+  });
+
+  /** Une « verte » que le programme n'a jamais scellée : `vert: true` avec des empreintes vides, ou celles d'un autre fichier que les tests listés (L233). */
+  const verteForgee = (empreintes: (h: ReturnType<typeof harness>, test: string) => Record<string, string>) => {
+    const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
+    writeFileSync(join(h.repo, a.json), JSON.stringify({ ...doc, vert: true, empreintes: empreintes(h, a.test) }, null, 2));
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation verte forgée', '--', a.json);
+    const c = h.lot('L1', screen, config);
+    c.lot.status = 'question';
+    c.lot.next = 'accept';
+    c.lot.questions = ['que faire ?'];
+    c.lot.pendingAnswer = 'continue';
+    c.lot.answers.push('continue');
+    return { h, c };
+  };
+
+  it('L233 — vert: true avec empreintes: {} (objet vide) ne scelle rien : une question d’accept rejoue une session accept', async () => {
+    const { h, c } = verteForgee(() => ({}));
+    await runLot(c);
+    expect(kinds(h)[0]).toBe('accept');
+  });
+
+  it('L233 — vert: true avec l’empreinte d’un autre fichier que les tests listés ne scelle rien : une question d’accept rejoue une session accept', async () => {
+    const { h, c } = verteForgee((h, test) => ({ 'autre.test.ts': git(h.repo, 'hash-object', '--', test).trim() }));
+    await runLot(c);
+    expect(kinds(h)[0]).toBe('accept');
+  });
+
   it('L233 — réécriture commitée par la session, puis `git reset --hard <vert>` du lead (séquence L161) : le fichier est celui du vert, le lot repart à implement', async () => {
     const { h, a, c, vert } = verteEnQuestion();
     const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));

@@ -140,6 +140,21 @@ describe('revue de la maquette : où elle s’insère', () => {
     expect(kinds(h)[0]).toBe('maquette');
   });
 
+  it('L233 — une acceptation vert: true aux empreintes vides ({}) ou d’un autre fichier ne prouve rien : la maquette est relue, accept rejoué', async () => {
+    for (const forge of ['vide', 'autre']) {
+      const h = harness({ lots, script: { maquette: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
+      ecrit(h.repo);
+      const a = ecritAcceptation(h.repo, { sansFiche: true });
+      const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
+      const empreintes = forge === 'vide' ? {} : { 'autre.test.ts': git(h.repo, 'hash-object', '--', a.test).trim() };
+      writeFileSync(join(h.repo, a.json), JSON.stringify({ ...doc, vert: true, empreintes }, null, 2));
+      commite(h.repo, a.json, 'test(L1): acceptation verte forgée');
+      await runLot(h.lot('L1', screen, { ...config, accept: 'true', test: 'true' }));
+      expect(kinds(h)[0], forge).toBe('maquette');
+      expect(kinds(h), forge).toContain('accept');
+    }
+  });
+
   it('une acceptation non scellée (sans empreintes) ne prouve rien : la maquette est relue', async () => {
     const h = harness({ lots, script: { maquette: [ok], accept: [() => claudeOut(acceptReport())], implement: [impl], review: [ok] } });
     ecrit(h.repo);

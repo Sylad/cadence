@@ -1103,6 +1103,9 @@ const lotAcceptation = (c: LotCtx, fiche: string): string => findAcceptation(c.l
 
 const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo, json));
 
+/** Une acceptation porte-t-elle une empreinte par fichier listé ? Le contenu n'est pas comparé (L233) : `empreintes: {}` ou celles d'un autre fichier ne scellent rien. */
+const hasSeals = (doc: Acceptation): boolean => !!doc.empreintes && doc.fichiers.every((f) => !!(doc.empreintes as Record<string, string>)[posix.normalize(f)]);
+
 /**
  * Une acceptation conforme et SCELLÉE par le programme (empreintes posées), rouge ou verte (`vert: true`, lot relancé dans une nouvelle vague ; une verte et scellée vaut
  * preuve même si son scellé ne tient plus, L233) : elle n'a pu être écrite qu'après la revue de la maquette et les tests rouges, qui ne sont donc pas rejoués. Sans `orchestrate.accept`, aucune preuve.
@@ -1115,10 +1118,11 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
   if (typeof doc === 'string') return false;
   // Un lot déjà vert (L233) n'a plus d'oracle à écrire : le cycle seul a pu poser `vert: true`, après le scellé et les tests rouges. Même une preuve qui ne tient plus
   // (test rescellé ou corrigé depuis, fiche amendée) ne renvoie jamais à accept, qui réécrirait un oracle vert et exigerait des tests rouges : le lot part à implement ou à la revue.
-  if (!doc.empreintes) return false;
+  // Une verte porte une empreinte par fichier listé, sinon elle n'a jamais été scellée (`empreintes: {}` ou celles d'un autre fichier ne prouvent rien).
+  if (!hasSeals(doc)) return false;
   if (doc.vert) return true;
   // Le scellé n'est posé que par le programme : chaque fichier listé doit porter l'empreinte git de son contenu actuel (une clé `empreintes` vide ou copiée d'un autre lot ne prouve rien).
-  const emp = doc.empreintes;
+  const emp = doc.empreintes ?? {};
   const sealed = doc.fichiers.every((f) => {
     const norm = posix.normalize(f);
     return existsSync(join(l.repo, norm)) && emp[norm] === git(l.repo, 'hash-object', '--', norm).trim();
@@ -1469,7 +1473,7 @@ async function acceptStep(c: LotCtx): Promise<void> {
     text = null;
   }
   const doc = text === null ? null : parseAcceptation(text);
-  if (doc && typeof doc !== 'string' && doc.vert && doc.empreintes) {
+  if (doc && typeof doc !== 'string' && doc.vert && hasSeals(doc)) {
     // Le fichier actuel doit être celui de `first` : une session accept qui a réécrit puis commité l'oracle avant de poser sa question (le verrou ne s'applique pas à l'étape accept, `skip`)
     // ne se fait pas adopter comme nouveau commit rouge. Seul un rescellé du lead (journal `resceaux` allongé, commit hors de toute session, fichier propre) est une différence admise.
     const drift = first ? greenDrift(c, json, first, text as string, doc) : null;

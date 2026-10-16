@@ -142,8 +142,8 @@ regles:
   - id: R11
     cas: [C1, C2]
     enonce: "Jumeau de qualité : chaque ligne de vitesse ou de coût nouvelle (tokens par lot selon l'estimate, part des tokens de revue, délais, durée par étape, coût par lot livré) est imprimée avec la part des lots conformes du premier coup de L225 (corrections.firstTime), sur la même ligne ; la part des hypothèses de fiche contredites en revue, jumeau cité par la note du 16-10 pour tokens et coût, n'est pas calculée : aucun champ du journal ni du plan ne dit qu'une hypothèse a été contredite."
-    statut: hypothese
-    si_faux: "Si le lead veut le jumeau « hypothèses contredites », il faut d'abord un champ qui le porte (un autre lot, qui changerait le format du journal ou des notes) ; ici seul le choix du jumeau change, aucune donnée en jeu. Le jumeau de L225 reste lu."
+    statut: sourcee
+    source: "réponse du lead : le jumeau de L225 (corrections.firstTime) reste lu tel quel, sans nouveau champ ni changement de format du journal ou des notes dans ce lot ; un jumeau « hypothèses contredites » sera, s'il est voulu, un lot à part qui portera d'abord le champ."
     tests: ["R11 — chaque nouvelle ligne contient la part conforme du premier coup", "R11 — le JSON lie chaque nouvel indicateur à corrections.firstTime par le champ twin", "R11 — part conforme du premier coup n/d : la ligne l'écrit n/d, sans ⚠ de ce chef"]
   - id: R12
     cas: [C1, C2, C4]

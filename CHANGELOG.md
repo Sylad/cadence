@@ -54,10 +54,6 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
-### Fixed
-
-- `session start|close --all` no longer reads a sub-folder without its own `.git` as a project when git still reports it as a repository root (`GIT_DIR` + `GIT_WORK_TREE` in the environment): the section gets the `✗` line instead of the plan of another repository (L224).
-
 ### Changed
 
 - The UX review of a `visible` lot is played once, after the compliant code review, instead of before it and again after every correction (L221). A UX review that finds a blocking or major point sends the lot to a correction, then the code review, then the UX review again; without `orchestrate.ux`, or when the app does not start, the lot concludes on the code review with its note. The recorded verdict and sha are the code review's; `--dry-run` lists `implement → review → ux`. Small lots and lots with no screen are unchanged. Measure before/after: `docs/mesures/ux-une-fois-2026-10-15.md`.

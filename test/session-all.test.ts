@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
@@ -131,13 +131,21 @@ describe('cadence session start|close --all', () => {
     const mono = join(root, 'mono');
     await project(mono, 'mono');
     await project(join(mono, 'pkg-a'), 'pkg-a');
-    rmSync(join(mono, 'pkg-a', '.git'), { recursive: true, force: true });
+    // Vert en local (Node 22), rouge sur le runner GitHub (Node 24, git 2.55, L224), cause non établie : l'environnement et l'état vu par git accompagnent l'échec.
+    let rm = 'rmSync ok';
+    try { rmSync(join(mono, 'pkg-a', '.git'), { recursive: true, force: true }); } catch (e) { rm = `rmSync a échoué : ${(e as Error).message}`; }
     const { code, out } = await cad(mono, 'session', 'start', '--all');
     const lines = out.split('\n');
     expect(lines).toContain('## pkg-a');
-    // Correctif L224 posé (GIT_DIR/GIT_WORK_TREE), cause du runner à confirmer : l'état vu par git accompagne l'échec.
-    const seen = (...args: string[]) => { try { return execFileSync('git', args, { cwd: join(mono, 'pkg-a'), encoding: 'utf8', stdio: 'pipe' }).trim(); } catch (e) { return `échec : ${(e as Error).message.split('\n')[0]}`; } };
-    const state = `git ${seen('--version')} ; toplevel de pkg-a : ${seen('rev-parse', '--show-toplevel')} ; entrées de pkg-a : ${readdirSync(join(mono, 'pkg-a')).join(',')} ; GIT_* : ${Object.keys(process.env).filter((k) => k.startsWith('GIT_')).join(',')}`;
+    const seen = (...args: string[]) => { const r = spawnSync('git', args, { cwd: join(mono, 'pkg-a'), encoding: 'utf8' }); return `${r.stdout.trim()} [code ${r.status ?? r.error?.message}, stderr : ${r.stderr.trim()}]`; };
+    const state = [
+      `node ${process.version} sur ${process.platform}`,
+      `git ${seen('--version')}`,
+      `toplevel de pkg-a : ${seen('rev-parse', '--show-toplevel')}`,
+      rm,
+      `entrées de pkg-a : ${readdirSync(join(mono, 'pkg-a')).join(',')}`,
+      `GIT_* : ${Object.keys(process.env).filter((k) => k.startsWith('GIT_')).join(',')}`,
+    ].join(' ; ');
     expect(lines[lines.indexOf('## pkg-a') + 1], state).toMatch(/^✗ .*dépôt/);
     expect(out).not.toContain('Travail mono');
     expect(code).toBe(2);
@@ -160,28 +168,6 @@ describe('cadence session start|close --all', () => {
     } finally {
       if (before === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
       else process.env.GIT_CEILING_DIRECTORIES = before;
-    }
-  });
-
-  it("L224 — un sous-dossier sans .git est signalé même quand git le donne pour racine d'un dépôt (GIT_DIR + GIT_WORK_TREE)", async () => {
-    const root = tempDir();
-    const mono = join(root, 'mono');
-    await project(mono, 'mono');
-    await project(join(mono, 'pkg-a'), 'pkg-a');
-    rmSync(join(mono, 'pkg-a', '.git'), { recursive: true, force: true });
-    const before = { dir: process.env.GIT_DIR, tree: process.env.GIT_WORK_TREE };
-    process.env.GIT_DIR = join(mono, '.git');
-    process.env.GIT_WORK_TREE = join(mono, 'pkg-a'); // git rend pkg-a comme racine : le contrôle « racine = dossier » seul est trompé
-    try {
-      const { out } = await cad(mono, 'session', 'start', '--all');
-      const lines = out.split('\n');
-      expect(lines[lines.indexOf('## pkg-a') + 1]).toMatch(/^✗ .*dépôt/);
-      expect(out).not.toContain('reprise du');
-    } finally {
-      for (const [k, v] of [['GIT_DIR', before.dir], ['GIT_WORK_TREE', before.tree]] as const) {
-        if (v === undefined) delete process.env[k];
-        else process.env[k] = v;
-      }
     }
   });
 

@@ -906,11 +906,9 @@ async function sessionAll(rest: string[], values: { all?: boolean; depth?: strin
     io.out(`${dir === projects[0] ? '' : '\n'}## ${relative(io.cwd, dir)}`);
     let code: number;
     const top = gitRoot(dir);
-    // Un projet a son propre .git (dossier, ou fichier d'un worktree ou d'un submodule) : « git dit que la racine est ce dossier »
-    // ne suffit pas, une racine donnée par l'environnement (GIT_DIR, GIT_WORK_TREE) le dirait d'un dossier sans dépôt.
-    if (top && (!existsSync(join(dir, '.git')) || realpathSync(top) !== realpathSync(dir))) {
-      // run() lirait le plan d'un autre dépôt : mieux vaut le dire que montrer le plan d'un autre projet.
-      io.out(`✗ ${relative(io.cwd, dir)} n'a pas son propre dépôt git (git voit : ${top}) — lancer cadence dans ce dossier`);
+    if (top && realpathSync(top) !== realpathSync(dir)) {
+      // run() lirait le plan du dépôt parent : mieux vaut le dire que montrer le plan d'un autre projet.
+      io.out(`✗ ${relative(io.cwd, dir)} n'a pas son propre dépôt git (dépôt parent : ${top}) — lancer cadence dans ce dossier`);
       worst = 2;
       continue;
     }

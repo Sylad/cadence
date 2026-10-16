@@ -1,0 +1,158 @@
+sujet:
+  id: verrou-tests-acceptation-fuites
+  titre: "Verrou des tests d'acceptation : deux fuites vues sur ol-companion L160"
+  lot: L231
+  perimetre:
+    modules:
+      - src/orchestrate/accept.ts
+      - src/orchestrate/cycle.ts
+      - templates/orchestrate/implement.md
+      - templates/orchestrate/fix.md
+      - templates/orchestrate/accept.md
+      - templates/orchestrate/accept-back.md
+      - agents/acceptance-writer.md
+      - agents/code-reviewer.md
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le refus de cadence spec reseal --porteur d'un lot livré dont la fiche a été amendée par un lot ultérieur (L229)"
+      - "l'exception L183 du verrou (fiche changée = tests d'un lot livré modifiables), inchangée ici : voir la question au lead"
+      - "toute vérification par le programme du contenu des assertions d'un test (il ne lit pas la sémantique d'un test)"
+      - "la revue de maquette (agents/ux-reviewer.md, templates/orchestrate/maquette.md) : elle précède l'écriture des tests rouges et ne peut pas les relire"
+
+cas:
+  - id: C1
+    titre: Une session implement ou fix entre en conflit avec le test scellé d'un AUTRE lot
+    acteur: la session implement ou fix du lot
+    declencheur: commande cadence orchestrate (brief implement.md ou fix.md)
+    preconditions:
+      - un test scellé (acceptation-<autre lot>.json, vert true ou false) contredit ce qu'exige un test scellé du lot courant
+    nominal:
+      - Le brief dit à la session qu'un conflit avec un test scellé d'un AUTRE lot est une question au lead.
+      - La session s'arrête sans modifier ni l'un ni l'autre test, et pose la question dans son rapport en nommant les deux tests (fichier et nom « Rn — … »).
+      - Le cycle passe le lot en question (pas de revue lancée).
+    alternatives:
+      - { si: la session ne s'arrête pas et modifie quand même le test de l'autre lot, alors: voir C2, regles: [R2] }
+      - { si: le test en conflit est un test scellé du lot courant lui-même, alors: le brief ne change pas (il reste soumis au verrou entier existant), regles: [R1] }
+    resultat: Le conflit arrive au lead, nommé, au lieu d'être tranché par la session.
+  - id: C2
+    titre: Le programme contrôle les tests scellés des lots livrés avant la revue
+    acteur: le cycle d'orchestrate
+    declencheur: fin d'une session implement ou fix du lot, avant tout lancement de revue
+    preconditions:
+      - au moins une acceptation scellée existe dans le dépôt, d'un autre lot (livré ou non)
+    nominal:
+      - Le cycle compare, pour chaque acceptation, l'empreinte de chaque test listé à celle du scellé (lockViolations, déjà appelé à chaque fin de session).
+      - Aucun écart que l'exception L183 n'excuse n'est trouvé.
+      - La revue est lancée.
+    alternatives:
+      - { si: un test scellé d'un autre lot a été modifié par un commit du lot, alors: le lot est rendu (handed-back), le message nomme le premier commit fautif, regles: [R2, R3] }
+      - { si: l'écart n'est dû à aucun commit (modification non commitée), alors: le lot est rendu sans nom de commit, regles: [R3] }
+      - { si: le test est revenu à son contenu d'avant le lot (bilan nul L184), alors: aucun écart, la revue est lancée, regles: [R4] }
+      - { si: la session a posé une question au lieu de rendre le rapport, alors: le contrôle a lieu quand même avant la question, regles: [R5] }
+    resultat: Aucune revue ne porte sur un lot qui a touché le test scellé d'un autre lot.
+  - id: C3
+    titre: Le rédacteur de tests ne cite que ce que la fiche dit
+    acteur: la session accept (acceptance-writer)
+    declencheur: commande cadence orchestrate (brief accept.md ou accept-back.md)
+    preconditions:
+      - la fiche du lot est conforme et ses règles sont écrites
+    nominal:
+      - Le brief demande, pour chaque assertion, de citer en commentaire la règle et la phrase de son énoncé qu'elle vérifie.
+      - La session relit ses tests contre ces phrases avant de commiter et retire ou affaiblit toute assertion qui va au-delà.
+      - La session commite le test rouge et l'acceptation.
+    alternatives:
+      - { si: une assertion utile ne découle d'aucune phrase de la fiche, alors: la session la retire et la signale dans « choix » ou « questions » du rapport, regles: [R6] }
+    resultat: Un test scellé n'affirme rien que la fiche n'écrive.
+  - id: C4
+    titre: La revue de code relit les tests rouges contre la fiche
+    acteur: le reviewer de code
+    declencheur: commande cadence orchestrate (brief review.md, lot avec acceptation scellée)
+    preconditions:
+      - le lot a une fiche et une acceptation scellée
+    nominal:
+      - Le reviewer lit chaque assertion du test scellé et la phrase de la règle qu'elle cite.
+      - Il vérifie que l'assertion n'affirme rien au-delà de cette phrase.
+      - Il signale en constat toute assertion sans phrase ou qui dépasse la fiche.
+    alternatives:
+      - { si: l'assertion dépasse la fiche, alors: constat majeur « test scellé plus fort que la fiche » ; le test ne se corrige que par le lead (cadence spec reseal), jamais par la session, regles: [R7] }
+    resultat: Un test trop fort est vu à la première revue, avant qu'il ne contraigne le code.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Les briefs implement et fix disent qu'un conflit avec un test scellé d'un AUTRE lot est une question au lead nommant les deux tests, jamais une modification ni un choix de la session."
+    statut: sourcee
+    source: "demande du lot L231 : « un conflit avec un test scellé d'un AUTRE lot = question au lead nommant les deux tests, jamais une modification ni un choix » ; briefs actuels : templates/orchestrate/implement.md et fix.md, qui ne disent rien du cas"
+    tests: ["R1 — brief implement : un conflit avec le test scellé d'un autre lot est une question nommant les deux tests", "R1 — brief fix : même consigne que l'implement"]
+  - id: R2
+    cas: [C1, C2]
+    enonce: "Quand un commit du lot modifie un test scellé d'un autre lot sans que l'exception L183 l'excuse, le lot est rendu au lead (handed-back) à la fin de la session, avant toute revue, avec le message du verrou existant."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:1539-1543 (lockViolations contrôlé à chaque fin de session, stop handed-back « verrou des tests d'acceptation : … ») ; demande du lot L231 : « le programme vérifie l'empreinte des tests scellés des lots livrés AVANT la revue et rend le lot »"
+    tests: ["R2 — fix qui modifie le test scellé d'un lot livré : lot rendu, aucune revue lancée", "R2 — implement qui modifie le test scellé d'un lot non livré (vert false) : lot rendu, aucune revue lancée"]
+  - id: R3
+    cas: [C2]
+    enonce: "Le message du verrou nomme, pour un test scellé modifié, le premier commit fautif : le plus ancien commit, après la référence du verrou (commit rouge, ou tête d'avant le lot pour un lot livré), qui a touché ce fichier, en sha court et sujet ; si aucun commit ne l'a touché (modification non commitée), le message ne cite aucun commit."
+    statut: hypothese
+    si_faux: "Si le lead préfère le dernier commit fautif ou la liste complète, seul le texte du message change ; aucune donnée ni contrat publié en jeu (le message n'est lu que par le lead dans le tableau de fin de vague)."
+    tests: ["R3 — deux commits touchent le test scellé : le message nomme le plus ancien (sha court et sujet)", "R3 — modification non commitée : message du verrou sans nom de commit", "R3 — deux tests scellés modifiés par deux commits : chaque ligne nomme son propre premier commit"]
+  - id: R4
+    cas: [C2]
+    enonce: "Les exemptions déjà codées restent entières : un test revenu à son contenu d'avant le lot (bilan nul, L184) et un test d'un lot livré que l'exception L183 admet ne sont pas des écarts, et le nom du commit fautif ne s'ajoute qu'à un écart déjà trouvé."
+    statut: sourcee
+    source: "src/orchestrate/accept.ts:311-324 (exception L183, vert true) et accept.ts:329-336 (bilan nul L184) ; tests existants test/orchestrate-accept.test.ts (lockViolations)"
+    tests: ["R4 — test revenu à son contenu d'avant le lot : aucun écart, aucun nom de commit", "R4 — lot livré dont la fiche a changé dans un commit qui cite le lot : modification admise, comme avant"]
+  - id: R5
+    cas: [C2]
+    enonce: "Le contrôle a lieu à la fin de toute session implement ou fix, une session qui pose une question comprise : un test scellé remplacé suivi d'une question rend le lot, il n'attend pas la reprise."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:1538-1539 (commentaire : « Contrôlé à CHAQUE fin de session, une question comprise (L200) »)"
+    tests: ["R5 — session qui modifie un test d'un autre lot puis pose une question : lot rendu avec le verrou, pas mis en question"]
+  - id: R6
+    cas: [C3]
+    enonce: "Les briefs accept et accept-back, et l'agent acceptance-writer, exigent que chaque assertion cite la règle et la phrase de son énoncé qu'elle vérifie, et que le rédacteur n'affirme rien au-delà : une assertion sans phrase de la fiche est retirée (ou signalée en « choix ») avant le commit, par un auto-contrôle listé dans le brief."
+    statut: sourcee
+    source: "demande du lot L231 : « l'acceptance-writer cite pour chaque assertion la phrase de la règle qu'elle vérifie et n'affirme rien au-delà (auto-contrôle dans le brief) » ; briefs actuels : templates/orchestrate/accept.md:5-9 et agents/acceptance-writer.md, sans cette consigne"
+    tests: ["R6 — brief accept : chaque assertion cite la phrase de la règle, rien au-delà", "R6 — brief accept-back : même consigne", "R6 — agents/acceptance-writer.md porte la même consigne"]
+  - id: R7
+    cas: [C4]
+    enonce: "Le brief de revue de code d'un lot à acceptation scellée demande de relire chaque assertion contre la phrase de règle qu'elle cite : une assertion sans phrase ou qui va au-delà de la fiche est un constat majeur, que le lead corrige par cadence spec reseal."
+    statut: hypothese
+    si_faux: "Si la revue de maquette devait relire ces tests, la consigne se déplacerait dans maquette.md ; or l'ordre du cycle (maquette, puis accept, afterMaquette dans cycle.ts) fait passer la revue de maquette avant l'écriture des tests rouges, donc la relecture tombe sur la revue de code. Texte de consigne seul en jeu."
+    tests: ["R7 — brief review d'un lot à acceptation scellée : relecture des assertions contre la fiche demandée", "R7 — agents/code-reviewer.md : assertion qui dépasse la fiche = constat majeur"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate (briefs implement.md et fix.md)
+    entree: "BriefVars existantes (chemin, lot, titre, objectif, fiche, commits, reponse…) ; aucune variable ajoutée"
+    sortie: "le brief texte avec la consigne « conflit avec le test scellé d'un autre lot = question nommant les deux tests » ; reste inchangé"
+    erreurs:
+      - { code: log error, message: "gabarit implement.md : valeur manquante pour {{chemin}}" }
+    regles: [R1]
+  - id: A2
+    appel: commande cadence orchestrate (verrou, fin de session implement ou fix)
+    entree: "dépôt après la session ; empreintes des acceptation-<lot>.json ; tête d'avant la session"
+    sortie: "rien si aucun écart ; sinon le lot passe handed-back avec le message du verrou, avant la revue"
+    erreurs:
+      - { code: log error, message: "verrou des tests d'acceptation : <fichier> : test d'acceptation de <lot> : empreinte modifiée depuis le commit rouge <sha7> (verrou <chemin>) ; premier commit fautif : <sha7> <sujet>" }
+      - { code: log error, message: "verrou des tests d'acceptation : <fichier> : empreinte différente de celle du scellé de <chemin> (test d'acceptation de <lot>)" }
+    regles: [R2, R3, R4, R5]
+  - id: A3
+    appel: commande cadence orchestrate (briefs accept.md et accept-back.md, agent acceptance-writer)
+    entree: "BriefVars existantes ; fiche conforme"
+    sortie: "le brief texte avec la consigne de citation et d'auto-contrôle"
+    erreurs:
+      - { code: log error, message: "gabarit accept.md : valeur manquante pour {{chemin}}" }
+    regles: [R6]
+  - id: A4
+    appel: commande cadence orchestrate (brief review.md et agent code-reviewer)
+    entree: "BriefVars existantes ; acceptation scellée du lot"
+    sortie: "le brief texte avec la relecture des assertions contre la fiche"
+    erreurs: []
+    sans_erreur: "le brief est un texte de consigne rendu sans appelant ; une variable manquante est déjà l'erreur de A1"
+    regles: [R7]
+
+donnees:
+  - { id: D1, objet: "templates/orchestrate/implement.md, fix.md, accept.md, accept-back.md, agents/acceptance-writer.md, agents/code-reviewer.md (texte des briefs)", existant: true, modification: changement, note: "texte de consigne rendu à chaque vague, aucun format stocké", decision: "texte de consigne réversible par un commit ; écrit en règles R1, R6, R7, aucune question au lead" }
+  - { id: D2, objet: "acceptation-<lot>.json (lot, fiche, fichiers, vert, empreintes, resceaux)", existant: true, modification: aucune, note: "lu par lockViolations, format et écriture inchangés ; le nom du commit fautif est calculé par git log, jamais stocké" }

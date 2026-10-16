@@ -2549,10 +2549,14 @@ lots:
     finished: 2026-10-15
   - id: L224
     title: "Publish 1.5.0 rouge sur le runner GitHub (run 38774759325, 2 fois) : test/session-all.test.ts:138 « un sous-dossier sans .git dans un dépôt est signalé » attend « ✗ … dépôt » sous ## pkg-a et reçoit « pkg-a — reprise du 2026-09-28 » ; vert en local (2169) ; trouver la différence d'environnement (git 2.55 safe.directory, tmp sous le workspace, détection du dépôt parent par session --all), corriger, puis republier 1.5.0 (retag ou 1.5.1)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-15
     started: 2026-10-16
+    review: { date: 2026-10-16, verdict: "conforme — revue Opus 16-10 (68eb1e7) 0 bloquant 0 majeur 2 mineurs corrigés (e7fa584, 2b3fad4), recontrôle Opus conforme avec 1 mineur en note (assertion /^✗ .*dépôt/ du test GIT_CEILING_DIRECTORIES accepte aussi la ligne « dépôt parent ») ; cause établie sur le runner (run 38866416409 sur v1.5.0 exact : rmSync sans erreur, .git encore présent, Node 24 / git 2.55) ; 3 runs tests.yml verts sur 68eb1e7 ; re-vérifié par le lead : 2170 tests, typecheck", commit: e7fa584aa1d22e272a4dee3ad032927d51f33b99 }
+    notes:
+      - { date: 2026-10-16, text: "16-10 : cause réelle = suppression du .git de pkg-a par rmSync(force) rendue sans erreur sur Node 24 alors que le dossier reste (course avec git 2.55 en tâche de fond, hypothèse) ; correctif dans les helpers de test (removeDirSync vérifié, gc.auto=0 / maintenance.auto=false), src/ inchangé ; workflow tests.yml (workflow_dispatch, branches diag/**) ; 1.5.1 publie aussi L221–L223" }
+    finished: 2026-10-16
   - id: L225
     title: "cadence perf [--since date] [--json] : tableau de bord permanent du workflow, sans modèle, lu dans .cadence/runs/*/wave.json et les plans raf des projets du dossier ; deux fenêtres (7 derniers jours contre les 7 précédents) et ⚠ sur une dégradation de plus de 25 % ; indicateurs 1 débit (lots prêts, livrés, rendus par jour, part des rendus sur budget), 2 passes de correction par lot (médiane, part ≥ 2, causes dominantes du cache de corrections), 5 interventions du lead (lots rendus par une vague puis terminés hors vague, sessions ux par lot visible) ; demande de Sylvain 16-10 : surveiller et s'améliorer sans micro-optimisation"
     status: todo

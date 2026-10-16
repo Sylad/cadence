@@ -561,13 +561,37 @@ function describe(ind: Indicator, kind: Kind): string {
   return `${value(ind.current, kind)} (précédente ${value(ind.previous, kind)}${ind.change === null ? '' : `, ${signed(ind.change)}`})`;
 }
 
+/** Les lignes que désigne le chemin `twin` d'un indicateur. */
+function twinsByPath(lines: [Line, Indicator][]): Map<string, [Line, Indicator]> {
+  const at = (label: string) => lines.find(([l]) => l.label === label)!;
+  return new Map([
+    ['throughput.escaped', at('défauts échappés')],
+    ['throughput.delivered', at('livrés')],
+    ['corrections.firstTime', at('part conforme du premier coup')],
+  ]);
+}
+
+/**
+ * L'en-tête perf du tour (L227) : une ligne par ⚠ de `result.warnings`, dans le même ordre. La ligne d'un ⚠ de tendance dit la valeur
+ * de son jumeau de qualité (vitesse et qualité côte à côte) et finit par sa décision ; le goulot net est repris tel quel.
+ */
+export function perfHeader(r: PerfResult): string[] {
+  const lines = indicatorLines(r);
+  const byPath = twinsByPath(lines);
+  const header: string[] = [];
+  for (const [line, ind] of lines) {
+    if (!ind.warn) continue;
+    const twin = ind.twin ? byPath.get(ind.twin) : undefined;
+    header.push(`⚠ ${line.label} : ${describe(ind, line.kind)}${twin ? ` · ${twin[0].label} : ${describe(twin[1], twin[0].kind)}` : ''} → ${DECISIONS[line.decision]}`);
+  }
+  header.push(...r.warnings.filter((w) => w.startsWith('⚠ goulot')));
+  return header;
+}
+
 /** Le tableau en texte : chaque indicateur de vitesse sur la même ligne que son jumeau de qualité (R8). */
 export function renderPerf(r: PerfResult): string[] {
   const lines = indicatorLines(r);
-  const byPath = new Map<string, [Line, Indicator]>([
-    ['throughput.escaped', lines.find(([l]) => l.label === 'défauts échappés')!],
-    ['corrections.firstTime', lines.find(([l]) => l.label === 'part conforme du premier coup')!],
-  ]);
+  const byPath = twinsByPath(lines);
   // Second jumeau d'affichage (L227) : la ligne « livrés » dit aussi les livraisons rouges, celle des défauts échappés les constats QA bloquants.
   const quality = new Map<string, [Line, Indicator]>([
     ['livrés', lines.find(([l]) => l.label === 'livraisons rouges')!],

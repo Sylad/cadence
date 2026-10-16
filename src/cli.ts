@@ -23,7 +23,7 @@ import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './or
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
-import { computePerf, perfWindows, readPlans, readProjectDeliveries, readProjectFailedDeliveries, renderPerf } from './perf.js';
+import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedDeliveries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
@@ -183,6 +183,12 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     if (values.json) io.out(JSON.stringify(rows, null, 2));
     else if (rows.length === 0) io.out(`aucun projet sous ${parent} (docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
     else {
+      // L'en-tête perf (L227) : un ⚠ par ligne avant les projets ; un dossier que perf ne lit pas n'en donne pas, et ses avertissements ne sont pas repris.
+      try {
+        for (const l of perfHeader(readPerf(parent, today, undefined, () => {}))) io.out(l);
+      } catch {
+        // pas de .cadence/runs, grille de prix mal formée, journaux ou plans illisibles : le tour ne change pas
+      }
       for (const r of rows) io.out(tourLine(r));
       // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
       const [slots] = liveLines(configuredCap(io.env));
@@ -891,25 +897,32 @@ async function corrections(rest: string[], values: { classify?: boolean; model?:
  * `cadence perf` (L225) : le tableau de bord du workflow, sans modèle ni écriture, lu dans <dossier>/.cadence/runs et les plans des projets du dossier.
  * Une erreur de saisie ou de lecture sort avec le code 1 (un ⚠ imprimé, 0). `--since` y est un jour qui tronque les fenêtres, non l'instant de `corrections --since`.
  */
+/** `cadence perf` sur un dossier : lecture seule, une RafError dit pourquoi le dossier n'est pas lisible ; `warn` reçoit les avertissements (stderr de perf). */
+function readPerf(parent: string, today: Day, since: string | undefined, warn: (line: string) => void): PerfResult {
+  // La grille se lit avant tout journal : une grille mal formée refuse la commande sans sortie partielle (R7).
+  const prices = readPerfConfig(join(parent, 'cadence.yaml'));
+  const runsDir = join(parent, '.cadence', 'runs');
+  if (!existsSync(runsDir)) throw new RafError(`perf : aucun journal de vague dans ${runsDir}`);
+  const cache = readCache(join(parent, '.cadence', 'corrections.json'));
+  const journals = readJournals(runsDir);
+  const warnings: string[] = [];
+  const plans = readPlans(parent, (l) => warnings.push(l));
+  if (plans.size === 0 && warnings.length === 0) warnings.push(`perf : aucun plan sous ${parent}, indicateurs du plan n/d`);
+  const deliveries = readProjectDeliveries(parent, [...plans.keys()]);
+  const failedDeliveries = readProjectFailedDeliveries(parent, [...plans.keys()]);
+  const result = computePerf({ journals, plans, cache, deliveries, failedDeliveries, prices, windows: perfWindows(today, since), today, since });
+  if (!prices) warnings.push('perf : aucune grille de prix (cadence.yaml perf.prices), coût en euros n/d');
+  for (const [model, lots] of Object.entries(result.cost.withoutPrice)) warnings.push(`perf : modèle sans prix dans perf.prices : ${model}, coût n/d pour ${lots} lot(s)`);
+  warnings.forEach(warn);
+  return result;
+}
+
 function perf(rest: string[], values: { since?: string; json?: boolean }, today: Day, io: Io): number {
   try {
     if (rest.length > 1) throw new RafError('usage : cadence perf [dossier] [--since date] [--json]');
     if (values.since !== undefined && Number.isNaN(Date.parse(values.since))) throw new RafError(`--since invalide : ${values.since} (une date ISO, ex. 2026-10-10T18:31Z)`);
     const parent = resolve(io.cwd, rest[0] ?? '.');
-    // La grille se lit avant tout journal : une grille mal formée refuse la commande sans sortie partielle (R7).
-    const prices = readPerfConfig(join(parent, 'cadence.yaml'));
-    const runsDir = join(parent, '.cadence', 'runs');
-    if (!existsSync(runsDir)) throw new RafError(`perf : aucun journal de vague dans ${runsDir}`);
-    const cache = readCache(join(parent, '.cadence', 'corrections.json'));
-    const journals = readJournals(runsDir);
-    const warnings: string[] = [];
-    const plans = readPlans(parent, (l) => warnings.push(l));
-    if (plans.size === 0 && warnings.length === 0) warnings.push(`perf : aucun plan sous ${parent}, indicateurs du plan n/d`);
-    const deliveries = readProjectDeliveries(parent, [...plans.keys()]);
-    const result = computePerf({ journals, plans, cache, deliveries, failedDeliveries: readProjectFailedDeliveries(parent, [...plans.keys()]), prices, windows: perfWindows(today, values.since), today, since: values.since });
-    if (!prices) warnings.push('perf : aucune grille de prix (cadence.yaml perf.prices), coût en euros n/d');
-    for (const [model, lots] of Object.entries(result.cost.withoutPrice)) warnings.push(`perf : modèle sans prix dans perf.prices : ${model}, coût n/d pour ${lots} lot(s)`);
-    for (const w of warnings) io.err(w);
+    const result = readPerf(parent, today, values.since, io.err);
     if (values.json) io.out(JSON.stringify(result, null, 2));
     else for (const l of renderPerf(result)) io.out(l);
     return 0;

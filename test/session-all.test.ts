@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { findProjects } from '../src/lead.js';
@@ -135,7 +135,10 @@ describe('cadence session start|close --all', () => {
     const { code, out } = await cad(mono, 'session', 'start', '--all');
     const lines = out.split('\n');
     expect(lines).toContain('## pkg-a');
-    expect(lines[lines.indexOf('## pkg-a') + 1]).toMatch(/^✗ .*dépôt/);
+    // Correctif L224 posé (GIT_DIR/GIT_WORK_TREE), cause du runner à confirmer : l'état vu par git accompagne l'échec.
+    const seen = (...args: string[]) => { try { return execFileSync('git', args, { cwd: join(mono, 'pkg-a'), encoding: 'utf8', stdio: 'pipe' }).trim(); } catch (e) { return `échec : ${(e as Error).message.split('\n')[0]}`; } };
+    const state = `git ${seen('--version')} ; toplevel de pkg-a : ${seen('rev-parse', '--show-toplevel')} ; entrées de pkg-a : ${readdirSync(join(mono, 'pkg-a')).join(',')} ; GIT_* : ${Object.keys(process.env).filter((k) => k.startsWith('GIT_')).join(',')}`;
+    expect(lines[lines.indexOf('## pkg-a') + 1], state).toMatch(/^✗ .*dépôt/);
     expect(out).not.toContain('Travail mono');
     expect(code).toBe(2);
   });

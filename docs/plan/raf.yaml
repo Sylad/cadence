@@ -2649,9 +2649,10 @@ lots:
     created: 2026-10-16
   - id: L233
     title: "orchestrate rejoue l'étape accept d'un lot déjà vert (vert: true) après un cadence spec reseal et exige des tests rouges (« des tests verts avant le code ne prouvent rien ») : ol-companion L161, vague 2026-10-16-1415, lot codé (27cef0d → 977a6f1), revue en cours ; la session accept a réécrit acceptation-L161.json (vert: false, resceaux effacés, fichier e2e + playwright.config ajoutés) malgré la réponse du lead « ne réécris ni l'acceptation ni la fiche », commit 4f3d6d7 annulé par reset ; attendu : un lot vert: true part à implement ou review, jamais à accept ; une session accept ne touche jamais resceaux ni vert sur un lot vert ; le brief accept refuse de réécrire un oracle vert et rend la main"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-16
+    started: 2026-10-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

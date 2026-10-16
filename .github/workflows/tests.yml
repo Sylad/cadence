@@ -44,3 +44,12 @@ jobs:
       # prepublishOnly de publish.yml : typecheck puis tests.
       - run: npm run typecheck
       - run: npm test
+
+      # Le run rouge de publish.yml faisait tourner la suite DANS `npm publish` (prepublishOnly), pas à côté : ici de même,
+      # sans --provenance ni jeton, le dry-run ne publie rien. `npm run env` est un script interne de npm : l'environnement donné aux scripts.
+      - name: Environnement que npm donne à ses scripts
+        run: npm run env | grep -E '^(npm_config_(tmp|cache|prefix|git|ignore_scripts)|TMPDIR|INIT_CWD|HOME|GIT_)' || true
+
+      - name: Suite sous npm publish --dry-run
+        continue-on-error: false
+        run: npm publish --dry-run --access public

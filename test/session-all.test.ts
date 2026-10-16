@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { findProjects } from '../src/lead.js';
@@ -140,6 +141,7 @@ describe('cadence session start|close --all', () => {
     const seen = (...args: string[]) => { const r = spawnSync('git', args, { cwd: join(mono, 'pkg-a'), encoding: 'utf8' }); return `${r.stdout.trim()} [code ${r.status ?? r.error?.message}, stderr : ${r.stderr.trim()}]`; };
     const state = [
       `node ${process.version} sur ${process.platform}`,
+      `TMPDIR : ${process.env.TMPDIR} ; tmpdir() : ${tmpdir()} ; INIT_CWD : ${process.env.INIT_CWD} ; dossier du test : ${mono}`,
       `git ${seen('--version')}`,
       `toplevel de pkg-a : ${seen('rev-parse', '--show-toplevel')}`,
       rm,

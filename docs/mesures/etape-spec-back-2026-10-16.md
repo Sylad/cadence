@@ -10,6 +10,8 @@ Relevé du 2026-10-16, journaux `.cadence/runs` de `~/projects/developpeur`, vag
 
 Un lot compte comme dans la référence : un journal où une session `implement` a abouti ; chaque lot n'a qu'un journal de ce type (L230 et L231 en ont deux, mais l'écriture n'a abouti que dans la seconde vague). Une passe de correction est une session `fix` aboutie.
 
+Ce décompte suit la référence (`src/corrections.ts`, tout `fix` abouti) : il **compte la passe des mineurs**, c'est-à-dire un `fix` suivi d'un `review-small`, que la revue du plan (`docs/plan/raf.yaml`) écrit « 0 passe(s) de correction + passe des mineurs ». 6 des 17 passes sont des passes des mineurs (L218, L219, L221, L229, L230, L231), d'où L219 = 1 et L231 = 1 ici contre 0 dans le plan. Sans elles : 11 passes, 70 % des lots avec au moins une correction (7 sur 10) et 40 % avec au moins deux (4 sur 10) ; le critère n'est atteint sur aucune ligne dans les deux lectures.
+
 | Lot | Passes de correction | Lot | Passes de correction |
 |---|---|---|---|
 | L217 | 2 | L222 | 2 |
@@ -34,11 +36,15 @@ Une cause par passe, celle du premier constat de la revue qui la précède (mêm
 |---|---|---|---|
 | spec floue ou critère absent | 0 | 0 % | — |
 | règle de gestion inventée | 0 | 0 % | — |
-| dérive d'architecture (documentation ou commentaire non suivi) | 6 | 35 % | L217 ×2, L219, L221 (docstring, documentation d'usage), L229 (CHANGELOG) |
-| test manquant | 5 | 29 % | L218 ×3 (R3, R4, R5/R6), L230 (R5), L231 (R4) |
-| bug de code | 6 | 35 % | L221 (conclusion sans UX), L222 ×2 (méthode de la mesure), L223 (option sur les vagues déjà lancées), L230 (R9 d'un lot mixte), L229 (message de refus) |
+| dérive d'architecture (documentation ou commentaire non suivi) | 6 | 35 % | L217 ×2, L219, L221 ×2 (docstring, documentation d'usage), L229 (CHANGELOG) |
+| test manquant | 4 | 24 % | L218 ×3 (R3, R4, R5/R6), L231 (R4) |
+| bug de code | 7 | 41 % | L221 (conclusion sans UX), L222 ×2 (méthode de la mesure), L223 (option sur les vagues déjà lancées), L230 (R9 d'un lot mixte), L230 (ligne fixe du brief « Report ALL… »), L229 (message de refus) |
 
-Lecture : la part « spec floue + règle inventée + test manquant » vaut 29 % (5 sur 17), contre 34 % (71 sur 208) pour les lots non visibles de la référence. La fiche supprime bien les deux causes qu'elle vise (zéro passe pour une spec floue ou une règle inventée), mais le « test manquant » reste, et la documentation non suivie (35 %) est la première cause, que la fiche ne prévient pas. Cinq des six passes de documentation viennent des lots L217 à L221, avant la liste d'auto-contrôle de L222 ; la dernière est de L229. Après L222, les trois lots L229, L230 et L231 font 5 passes (1,7 par lot), comme avant (12 passes sur 7 lots, 1,7).
+Lecture : la part « spec floue + règle inventée + test manquant » vaut 24 % (4 sur 17), contre 34 % (71 sur 208) pour les lots non visibles de la référence. La fiche supprime bien les deux causes qu'elle vise (zéro passe pour une spec floue ou une règle inventée), mais le « test manquant » reste, et la documentation non suivie (35 %) est la première cause, que la fiche ne prévient pas. Cinq des six passes de documentation viennent des lots L217 à L221, avant la liste d'auto-contrôle de L222 ; la dernière est de L229. Après L222, les trois lots L229, L230 et L231 font 5 passes (1,7 par lot), comme avant (12 passes sur 7 lots, 1,7).
+
+### Hypothèses par fiche
+
+La spec demande de suivre à part le nombre d'hypothèses (`statut: hypothese`) par fiche : L217 2, L218 2, L219 4, L220 4, L221 6, L222 2, L223 5, L229 2, L230 5, L231 4, soit 36 hypothèses sur 10 fiches (3,6 par fiche, de 2 à 6). Relevé seul : l'échantillon ne permet pas de dire si ce nombre prévient une passe.
 
 ## Coût
 
@@ -60,7 +66,7 @@ Passes évitées : **aucune**. Les 10 lots font 1,7 passe en moyenne contre 1,0 
 
 - Sur 10 lots d'un seul projet, **le critère de réussite n'est atteint sur aucune ligne** (90 % contre ≤ 40 %, 60 % contre ≤ 15 %) ; avec 8 lots ou plus le résultat est un verdict (seuil de la spec).
 - Aucune baisse des corrections ne compense le coût : ni la part de lots corrigés ni le nombre de passes n'ont diminué, et la spec et la revue de fiche ajoutent environ 177 000 tokens par lot.
-- Ce que la fiche apporte reste vrai pour les deux causes qu'elle vise (aucune passe pour une spec floue ou une règle inventée) ; elle ne prévient ni la documentation non suivie ni le test manquant, qui font 65 % des passes.
+- Ce que la fiche apporte reste vrai pour les deux causes qu'elle vise (aucune passe pour une spec floue ou une règle inventée) ; elle ne prévient ni la documentation non suivie ni le test manquant, qui font 59 % des passes.
 - Conformément à la spec, **le seuil (tout lot qui change un comportement) est à resserrer avant d'abandonner l'étape** : décision du lead. Piste lue dans les chiffres, non démontrée : les passes se concentrent sur la documentation non suivie et le test manquant, que le contrôle de la fiche ne vise pas ; resserrer le seuil sans traiter ces deux causes ne les ferait pas baisser.
 
 ## Limites

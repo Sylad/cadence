@@ -53,18 +53,28 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `raf todo <id> [--reason text]`: a started lot without work commits goes back to `todo`, with a dated note | [1.5.1](#151---2026-10-16) |
 | `cadence orchestrate --resume <wave> --budget <project>:<lot>=+N`: replays a lot handed back for its budget | [1.5.1](#151---2026-10-16) |
 | `cadence corrections --since <date>`: only the lots of the waves created after the date | [1.5.1](#151---2026-10-16) |
+| `orchestrate.maquetteReviews`: how many times the mockup of a lot with a screen is reviewed (default 3) | [1.6.0](#160---2026-10-16) |
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
 
-## [Unreleased]
+## [1.6.0] - 2026-10-16
+
+### Added
+
+- `orchestrate.maquetteReviews` in `cadence.yaml` (integer ≥ 1, default 3; any other value is a configuration error) sets how many times the mockup of a lot with a screen is reviewed, and the `spec` session budget of that lot follows it (L230).
+- A review of rank 2 or more may mark a blocking or major finding `inchange: true` (optional boolean of the review report): the wave journal then gets a `défaut de revue` line (L230).
+- The message for a sealed acceptance test that was modified, deleted or renamed now names the first offending commit (`premier commit fautif : <sha7> <subject>`) (L231).
 
 ### Changed
 
-- The acceptance lock (L231): the exception that lets a later lot modify the sealed tests of a delivered lot now opens only through a commit that cites the lot in progress, amends the sheet and comes after the red commit (the lot's own commits are read, not the working tree: a sheet amended by another lot, by a commit that cites no lot or only in the working tree opens nothing). The message for a modified, deleted or renamed sealed test names the first offending commit (`premier commit fautif : <sha7> <subject>`). The `implement` and `fix` briefs say that a conflict with the sealed test of another lot is a question naming both tests; the `accept`/`accept-back` briefs and the `acceptance-writer` agent require each assertion to cite the sentence of its rule and assert nothing beyond; the `review`/`review-small` briefs and the `code-reviewer` agent flag a sealed assertion that goes beyond its rule as major.
+- The mockup review of an orchestrated wave sweeps everything in its first report: a checklist rendered in the report (every state at 1440 and 390 px, every rule of the sheet, contrast, real envelope of the app, gutters, empty or stretched panels), what cannot be verified in `nonVerifie`, and all the blocking and major findings at once (L230).
+- The mockup is now reviewed up to 3 times instead of 2 by default; the sheet review keeps two reviews and a lot without a screen keeps two `spec` sessions (L230).
+- The `implement` and `fix` briefs say that a conflict with the sealed test of another lot is a question naming both tests (L231).
+- The `accept` and `accept-back` briefs and the `acceptance-writer` agent require each assertion to cite the sentence of its rule and to assert nothing beyond; the `review` and `review-small` briefs and the `code-reviewer` agent flag a sealed assertion that goes beyond its rule as major (L231).
 
-- The mockup review of an orchestrated wave sweeps everything in its first report (L230): a checklist rendered in the report (every state at 1440 and 390 px, every rule of the sheet, contrast, the real envelope of the app, gutters, empty or stretched panels, holes), what cannot be verified in `nonVerifie`, and ALL the blocking and major findings at once.
-- The mockup is reviewed up to `orchestrate.maquetteReviews` times (new key, integer ≥ 1, default 3 instead of 2). The `spec` session budget of a lot with a screen follows it; the sheet review keeps two reviews, and a lot without a screen keeps two `spec` sessions.
-- A review of rank 2 or more may mark a blocking or major finding `inchange: true` (optional boolean of a finding of the review report): the wave journal then gets a `défaut de revue` line.
+### Fixed
+
+- The exception that lets a later lot modify the sealed tests of a delivered lot opened too easily: it now opens only through a commit that cites the lot in progress, amends the sheet and comes after the red commit, so a sheet amended by another lot, by a commit that cites no lot or only in the working tree opens nothing (L231).
 
 ## [1.5.1] - 2026-10-16
 

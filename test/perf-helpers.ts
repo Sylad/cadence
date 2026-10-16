@@ -7,6 +7,12 @@ export interface PStep {
   status?: string;
   ended?: string;
   counted?: number;
+  model?: string;
+  started?: string;
+  /** Compteurs écrits tels quels dans le journal (remplace `counted`) ; `null` : pas de champ `tokens`. */
+  tokens?: Record<string, number> | null;
+  /** Écrit un `model` absent du journal (journal très ancien). */
+  noModel?: boolean;
   constats?: string[];
 }
 
@@ -35,7 +41,8 @@ export function writeJournal(runs: string, wave: string, project: string, lot: s
       const structured = { constats: s.constats.map((texte) => ({ gravite: 'majeur', texte })) };
       writeFileSync(join(dir, slug, report), JSON.stringify({ structured }));
     }
-    return { n, kind: s.kind, status: s.status ?? 'ok', ended: s.ended, tokens: s.counted === undefined ? undefined : { input: 0, cacheWrite: 0, cacheRead: 0, output: 0, counted: s.counted }, report, commits: [] };
+    const tokens = s.tokens !== undefined ? s.tokens ?? undefined : s.counted === undefined ? undefined : { input: 0, cacheWrite: 0, cacheRead: 0, output: 0, counted: s.counted };
+    return { n, kind: s.kind, status: s.status ?? 'ok', ...(s.noModel ? {} : { model: s.model ?? 'sonnet' }), started: s.started, ended: s.ended, tokens, report, commits: [] };
   });
   writeFileSync(join(dir, `${slug}.json`), JSON.stringify({ project, lot, visible: o.visible ?? false, status: o.status ?? 'ready', ...(o.budget === undefined ? {} : { budget: o.budget }), steps }));
 }

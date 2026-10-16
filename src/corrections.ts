@@ -58,7 +58,9 @@ interface RawStep {
   report?: string;
   commits?: string[];
   ended?: string;
-  tokens?: { counted?: unknown };
+  started?: string;
+  model?: unknown;
+  tokens?: { counted?: unknown; input?: unknown; cacheWrite?: unknown; cacheRead?: unknown; output?: unknown };
 }
 
 const isReview = (kind: string) => kind.startsWith('review') || kind === 'ux';
@@ -85,13 +87,31 @@ function findingsOf(report: any): string[] {
   return list.map((c: any) => (typeof c === 'string' ? c : c?.texte)).filter((t: unknown): t is string => typeof t === 'string' && t.length > 0);
 }
 
-/** Une étape d'un journal, telle que le lecteur partagé la rend (`tokens.counted` : le compte du budget, absent sans jetons lisibles). */
+/** Les quatre compteurs d'une session, rendus ensemble ou pas du tout (R16). */
+export interface StepUsage {
+  input: number;
+  cacheWrite: number;
+  cacheRead: number;
+  output: number;
+}
+
+/** Une étape d'un journal, telle que le lecteur partagé la rend (`tokens.counted` : le compte du budget, absent sans jetons lisibles ; `usage` : les quatre compteurs, absents d'un journal ancien qui ne porte que `counted`). */
 export interface JournalStep {
   n: number;
   kind: string;
   status: string;
+  model?: string;
+  started?: string;
   ended?: string;
   counted?: number;
+  usage?: StepUsage;
+}
+
+const USAGE_KEYS = ['input', 'cacheWrite', 'cacheRead', 'output'] as const;
+/** Les quatre compteurs d'une étape quand ce sont tous des nombres. */
+function usageOf(tokens: RawStep['tokens']): StepUsage | undefined {
+  if (!tokens || !USAGE_KEYS.every((k) => typeof tokens[k] === 'number')) return undefined;
+  return { input: tokens.input as number, cacheWrite: tokens.cacheWrite as number, cacheRead: tokens.cacheRead as number, output: tokens.output as number };
 }
 
 /** Une passe de correction et la date de fin de son étape fix (absente sans date lisible). */
@@ -163,7 +183,10 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         visible: !!rec.visible,
         status: String(rec.status),
         ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
-        steps: steps.map((s) => ({ n: s.n, kind: s.kind, status: s.status, ...(s.ended ? { ended: s.ended } : {}), ...(typeof s.tokens?.counted === 'number' ? { counted: s.tokens.counted } : {}) })),
+        steps: steps.map((s) => {
+          const usage = usageOf(s.tokens);
+          return { n: s.n, kind: s.kind, status: s.status, ...(typeof s.model === 'string' ? { model: s.model } : {}), ...(s.started ? { started: s.started } : {}), ...(s.ended ? { ended: s.ended } : {}), ...(typeof s.tokens?.counted === 'number' ? { counted: s.tokens.counted } : {}), ...(usage ? { usage } : {}) };
+        }),
         implemented: steps.some((s) => s.kind === 'implement' && done(s)),
         passes,
       });

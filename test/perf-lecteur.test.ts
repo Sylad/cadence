@@ -43,3 +43,42 @@ describe('lecteur partagé des journaux (R23)', () => {
     expect(w2.map((j) => [j.lot, j.waveReadable, j.waveCreated])).toEqual([['L9', false, undefined]]);
   });
 });
+
+describe('lecteur partagé des journaux — modèle, début et compteurs (R16)', () => {
+  const step = (kind: string, extra: Record<string, unknown>) => ({ kind, ended: '2026-10-10T08:30:00.000Z', started: '2026-10-10T08:00:00.000Z', ...extra });
+
+  it('R16 — une étape rend model, started et les quatre compteurs', () => {
+    const runs = tempDir();
+    writeWave(runs, 'w1');
+    writeJournal(runs, 'w1', 'alpha', 'L1', { steps: [step('implement', { model: 'opus', tokens: { input: 10, cacheWrite: 20, cacheRead: 30, output: 40, counted: 70 } })] });
+    const [s] = readJournals(runs)[0]!.steps;
+    expect(s).toMatchObject({ model: 'opus', started: '2026-10-10T08:00:00.000Z', counted: 70, usage: { input: 10, cacheWrite: 20, cacheRead: 30, output: 40 } });
+  });
+
+  it('R16 — une étape sans compteurs input/output rend counted seul', () => {
+    const runs = tempDir();
+    writeWave(runs, 'w1');
+    writeJournal(runs, 'w1', 'alpha', 'L1', { steps: [step('implement', { tokens: { counted: 500 } })] });
+    const [s] = readJournals(runs)[0]!.steps;
+    expect(s!.counted).toBe(500);
+    expect(s!.usage).toBeUndefined();
+  });
+
+  it('R16 — une étape locale rend ses quatre compteurs et counted 0', () => {
+    const runs = tempDir();
+    writeWave(runs, 'w1');
+    writeJournal(runs, 'w1', 'alpha', 'L1', { steps: [step('review', { model: 'local', tokens: { input: 1, cacheWrite: 2, cacheRead: 3, output: 4, counted: 0 } })] });
+    const [s] = readJournals(runs)[0]!.steps;
+    expect(s).toMatchObject({ model: 'local', counted: 0, usage: { input: 1, cacheWrite: 2, cacheRead: 3, output: 4 } });
+  });
+
+  it('R16 — readRuns donne la même sortie qu\'avant sur les mêmes journaux, quels que soient model, started et compteurs', () => {
+    const runs = tempDir();
+    writeWave(runs, 'w1');
+    writeJournal(runs, 'w1', 'alpha', 'L1', { steps: [step('implement', { tokens: { input: 1, cacheWrite: 2, cacheRead: 3, output: 4, counted: 7 } }), { kind: 'review', constats: ['bug'], ended: '2026-10-10T09:00:00.000Z' }, { kind: 'fix', ended: '2026-10-10T10:00:00.000Z' }] });
+    expect(readRuns(runs)).toEqual({
+      lots: [{ project: 'alpha', lot: 'L1', visible: false, fixes: 1 }],
+      passes: [{ key: 'w1/alpha--L1/3', project: 'alpha', lot: 'L1', visible: false, findings: ['bug'], commits: [] }],
+    });
+  });
+});

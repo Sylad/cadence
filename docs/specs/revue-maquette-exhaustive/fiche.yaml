@@ -1,0 +1,188 @@
+sujet:
+  id: revue-maquette-exhaustive
+  titre: "Revue de maquette exhaustive au premier passage, trois revues par vague"
+  lot: L230
+  perimetre:
+    modules:
+      - src/config.ts
+      - src/orchestrate/cycle.ts
+      - src/orchestrate/maquette.ts
+      - src/orchestrate/schemas.ts
+      - templates/orchestrate/maquette.md
+      - agents/ux-reviewer.md
+      - README.md
+      - CHANGELOG.md
+    endpoints: []
+    jobs: ["étape maquette d'orchestrate (revue de la maquette par ux-reviewer, mode maquette)"]
+    hors_perimetre:
+      - "la revue de la fiche back (étape fiche, code-reviewer) : elle garde ses 2 revues et son budget de 2 sessions spec"
+      - "la revue de conformité UX après le code (mode conformité, étape ux) : inchangée"
+      - "le schéma de l'état d'un lot (src/orchestrate/state.ts) : aucun champ ajouté, le défaut de revue ne va qu'au journal"
+      - "le contrôle par le programme que la liste à cocher est complète : il reste à la consigne de l'agent"
+
+cas:
+  - id: C1
+    titre: "Le lead règle le nombre de revues de maquette dans cadence.yaml"
+    acteur: le lead
+    declencheur: commande cadence orchestrate (lecture de orchestrate.maquetteReviews)
+    preconditions:
+      - "cadence.yaml existe, avec ou sans orchestrate.maquetteReviews"
+    nominal:
+      - "Le programme lit orchestrate.maquetteReviews."
+      - "Absent, il prend 3 ; présent, il prend l'entier déclaré."
+    alternatives:
+      - { si: "la valeur n'est pas un entier supérieur ou égal à 1", alors: "la commande s'arrête avec une erreur de configuration nommant la clé", regles: [R2] }
+    resultat: "Le plafond de revues de la maquette, 3 par défaut."
+  - id: C2
+    titre: "La première revue de maquette balaie tout et rend tous les majeurs"
+    acteur: l'agent ux-reviewer (mode maquette)
+    declencheur: job maquette (première revue du lot)
+    preconditions:
+      - "une fiche et une maquette valides ont été écrites par l'étape spec"
+    nominal:
+      - "Le brief maquette.md et l'agent exigent un balayage complet : chaque état de la fiche à 1440 et à 390 px, chaque règle de la fiche, le contraste, l'enveloppe réelle de l'app (largeur utile, barre latérale, en-tête), les gouttières, les panneaux vides ou étirés, les trous de mise en page."
+      - "La session rend la liste à cocher dans son rapport, avec ce qu'elle n'a pas pu vérifier dans nonVerifie."
+      - "Tous les constats bloquants et majeurs sont dans ce premier rapport."
+    alternatives:
+      - { si: "un point de la liste ne peut pas être vérifié (état non capturable, règle ambiguë)", alors: "il est écrit dans nonVerifie, pas coché", regles: [R3] }
+    resultat: "Un premier rapport qui contient tous les majeurs et la liste à cocher."
+  - id: C3
+    titre: "La boucle maquette → spec → maquette joue jusqu'à trois revues"
+    acteur: le programme (orchestrate)
+    declencheur: job maquette (revue non conforme)
+    preconditions:
+      - "orchestrate.maquette n'est pas false"
+      - "une revue vient de rendre un constat bloquant ou majeur"
+    nominal:
+      - "Le programme compte la revue (l.maquette.passes)."
+      - "Tant que le nombre de revues est inférieur à maquetteReviews et que le budget de sessions spec n'est pas épuisé, il renvoie à une session spec avec les constats, puis rejoue la revue."
+      - "Une revue conforme mène à accept ou implement."
+    alternatives:
+      - { si: "la dernière revue permise est encore non conforme", alors: "le lot est rendu au lead avec ce qui reste", regles: [R4] }
+      - { si: "le budget de sessions spec est épuisé avant la dernière revue", alors: "le lot est rendu au lead", regles: [R5] }
+      - { si: "orchestrate.maquetteReviews vaut 1", alors: "la première revue non conforme rend le lot", regles: [R4] }
+      - { si: "la revue de la fiche d'un lot mixte rend des constats", alors: "elle garde ses 2 revues et son budget de 2 sessions", regles: [R6] }
+    resultat: "Jusqu'à 3 revues de maquette par défaut, puis un rendu au lead."
+  - id: C4
+    titre: "Un majeur apparu en revue 2 sur un point inchangé est un défaut de revue"
+    acteur: le programme (orchestrate)
+    declencheur: job maquette (revue de rang 2 ou plus)
+    preconditions:
+      - "la revue de rang 2 ou plus rend un constat majeur ou bloquant"
+    nominal:
+      - "Le brief de la revue de rang 2 ou plus demande de marquer chaque constat bloquant ou majeur portant sur un point que la spec writer n'a pas changé et que la revue précédente n'avait pas relevé (champ inchange)."
+      - "Pour chaque constat ainsi marqué, le programme écrit une ligne « défaut de revue » dans le journal de la vague."
+      - "Le verdict et la boucle ne changent pas."
+    alternatives:
+      - { si: "le constat n'est pas marqué, ou la revue est la première", alors: "aucune ligne n'est écrite", regles: [R7] }
+      - { si: "le constat est un mineur", alors: "aucune ligne n'est écrite", regles: [R7] }
+    resultat: "Le lead compte dans le journal les revues qui ont manqué un majeur."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "orchestrate.maquetteReviews vaut 3 quand la clé est absente de cadence.yaml, et la valeur déclarée sinon."
+    statut: sourcee
+    source: "demande du lot : « l'étape maquette autorise 3 revues par vague au lieu de 2 (orchestrate.maquetteReviews, défaut 3) » ; défaut actuel de 2 : src/orchestrate/cycle.ts:1355"
+    tests:
+      - "R1 — cadence.yaml sans maquetteReviews : le plafond lu est 3"
+      - "R1 — maquetteReviews: 4 : le plafond lu est 4"
+  - id: R2
+    cas: [C1]
+    enonce: "Une valeur de orchestrate.maquetteReviews qui n'est pas un entier supérieur ou égal à 1 (0, négatif, décimal, texte, booléen) est refusée avec l'erreur de configuration habituelle ; la clé est ajoutée aux clés connues d'orchestrate."
+    statut: hypothese
+    si_faux: "Si 0 devait servir à sauter la revue, orchestrate.maquette: false le fait déjà ; seule la validation de la valeur change (aucune donnée)."
+    tests:
+      - "R2 — maquetteReviews: 0 : erreur nommant orchestrate.maquetteReviews"
+      - "R2 — maquetteReviews: 2.5 et maquetteReviews: 'trois' : erreur"
+      - "R2 — maquetteReviews n'est plus rejetée comme clé inconnue"
+  - id: R3
+    cas: [C2]
+    enonce: "Le brief maquette.md et le mode maquette de l'agent ux-reviewer exigent, dès la première revue, un balayage complet rendu en liste à cocher dans le rapport : chaque état de la fiche à 1440 et à 390 px, chaque règle de la fiche, le contraste, l'enveloppe réelle de l'app (largeur utile, barre latérale), les gouttières, les panneaux vides ou étirés, les trous ; ce qui n'est pas vérifiable va dans nonVerifie."
+    statut: sourcee
+    source: "demande du lot : « balayage complet états × règles de la fiche (liste à cocher rendue dans le rapport : chaque état à 1440 et 390, chaque règle, contraste, enveloppe réelle de l'app, gouttières, panneaux vides, trous) » ; brief actuel templates/orchestrate/maquette.md, agent agents/ux-reviewer.md section « Mockup mode »"
+    tests:
+      - "R3 — le brief maquette.md rendu contient chacun des sept points du balayage"
+      - "R3 — agents/ux-reviewer.md (mode maquette) contient la liste à cocher et la consigne nonVerifie"
+  - id: R4
+    cas: [C2, C3]
+    enonce: "Le brief de la première revue exige TOUS les majeurs et bloquants dans ce premier rapport, sans en garder pour une revue suivante ; et la revue de la maquette se joue au plus maquetteReviews fois : une revue non conforme de rang maquetteReviews rend le lot avec « maquette non conforme après <n> revues : <verdict> » (n = maquetteReviews)."
+    statut: sourcee
+    source: "demande du lot : « TOUS les majeurs dans la première revue » et « 3 revues par vague au lieu de 2 » ; code actuel src/orchestrate/cycle.ts:1355-1358 (passes >= 2, message « après 2 revues »)"
+    tests:
+      - "R4 — brief de la revue 1 : la consigne « tous les majeurs » est présente"
+      - "R4 — maquetteReviews 3, trois revues non conformes : lot rendu, message « après 3 revues »"
+      - "R4 — maquetteReviews 3, revue 2 non conforme : la spec est renvoyée, pas de rendu"
+      - "R4 — maquetteReviews 1 : première revue non conforme, lot rendu « après 1 revues »"
+  - id: R5
+    cas: [C3]
+    enonce: "Pour une maquette, le plafond de sessions spec (aujourd'hui 2) vaut maquetteReviews, dans le renvoi après revue et dans le contrôle du programme après une passe spec ; atteint, le lot est rendu avec « maquette non conforme et la spec a déjà joué <n> sessions : <verdict> » ; une réponse du lead rouvre un budget neuf."
+    statut: hypothese
+    si_faux: "Si le plafond des sessions spec devait rester 2, la 3ᵉ revue n'aurait jamais de correction à relire : le plafond de revues serait sans effet ; seul un compteur change (l.specRuns, format inchangé)."
+    tests:
+      - "R5 — maquetteReviews 3 : trois sessions spec permises, la quatrième refusée"
+      - "R5 — spec non conforme au contrôle programme à la 2ᵉ passe : encore une passe permise quand maquetteReviews vaut 3"
+      - "R5 — plafond atteint avant la dernière revue : message « la spec a déjà joué 3 sessions »"
+  - id: R6
+    cas: [C3]
+    enonce: "La revue de la fiche (étape fiche) garde 2 revues et son budget de 2 sessions spec ; maquetteReviews ne s'applique qu'à la revue de maquette."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:1355 (passes >= 2 commun aux deux revues) ; demande du lot : « l'étape maquette autorise 3 revues »"
+    tests:
+      - "R6 — fiche non conforme à la 2ᵉ revue avec maquetteReviews 3 : lot rendu « fiche non conforme après 2 revues »"
+  - id: R7
+    cas: [C4]
+    enonce: "Quand une revue de maquette de rang 2 ou plus rend un constat bloquant ou majeur marqué inchange: true, le programme écrit dans le journal de la vague une ligne « <projet>:<lot> — défaut de revue : maquette, revue <n>, majeur sur un point inchangé absent de la revue <n-1> — <texte> » ; rien n'est écrit en revue 1, pour un mineur ou un constat non marqué ; le verdict, l'état du lot et la boucle sont inchangés."
+    statut: sourcee
+    source: "demande du lot : « une revue 2 qui trouve un majeur absent de la revue 1 sur un point inchangé est comptée comme défaut de revue (journal) »"
+    tests:
+      - "R7 — revue 2 : majeur marqué inchange : une ligne « défaut de revue » dans le journal"
+      - "R7 — revue 1 avec inchange: true : aucune ligne"
+      - "R7 — revue 2 : mineur marqué inchange, ou majeur non marqué : aucune ligne"
+      - "R7 — l'état du lot après la ligne est identique à celui sans marque"
+  - id: R8
+    cas: [C4]
+    enonce: "Le constat du rapport de revue accepte un champ facultatif inchange (booléen) ; un rapport sans ce champ reste valide et se traite comme avant."
+    statut: hypothese
+    si_faux: "Si le programme devait détecter seul le point inchangé (comparaison de textes ou de fichiers), il faudrait un état par constat (state.ts) : c'est un choix de stockage à reprendre avec le lead ; avec le champ, seul le schéma de rapport, facultatif, change."
+    tests:
+      - "R8 — rapport de revue sans inchange : accepté, constats identiques"
+      - "R8 — rapport avec inchange: true : accepté"
+  - id: R9
+    cas: [C3, C4]
+    enonce: "Le brief des revues de rang 2 ou plus dit le rang et le plafond (« revue <n> sur <maquetteReviews> »), rappelle les points de la revue précédente à vérifier d'abord, et demande le marquage inchange de R7 ; la consigne à la session spec parle des passes restantes au lieu de « une seule passe de plus »."
+    statut: hypothese
+    si_faux: "Si le brief devait rester celui de la « seconde et dernière revue », la revue 3 recevrait une consigne fausse ; seul le texte du brief change (aucune donnée)."
+    tests:
+      - "R9 — brief de la revue 2 avec maquetteReviews 3 : « revue 2 sur 3 », pas « second and last »"
+      - "R9 — brief de la revue 3 : « dernière revue »"
+      - "R9 — brief de la revue 2 : la consigne de marquage inchange est présente"
+  - id: R10
+    cas: [C2]
+    enonce: "La liste à cocher est rendue dans le texte du rapport de la session ; les points non vérifiés vont dans nonVerifie. Le programme ne contrôle pas la liste."
+    statut: hypothese
+    si_faux: "Si la liste devait être structurée dans REVIEW_SCHEMA (un champ par point), le schéma de rapport changerait de façon non facultative : décision de contrat à prendre avec le lead ; ici seule la consigne de l'agent porte la liste."
+    tests:
+      - "R10 — le brief demande la liste à cocher dans le rapport et nonVerifie pour le reste"
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate
+    entree: "cadence.yaml, clé facultative orchestrate.maquetteReviews (entier ≥ 1, 3 par défaut)"
+    sortie: "le plafond de revues de maquette est lu ; la vague se déroule comme avant avec ce plafond"
+    erreurs:
+      - { code: log error, message: "cadence.yaml : orchestrate.maquetteReviews : entier supérieur ou égal à 1 attendu" }
+    regles: [R1, R2]
+  - id: A2
+    appel: job maquette
+    entree: "la fiche, la maquette, le rang de la revue, les constats de la revue précédente"
+    sortie: "rapport de revue (bloquants, majeurs, mineurs, constats avec inchange facultatif, nonVerifie, verdict) ; suite : accept, implement, spec ou rendu au lead"
+    erreurs:
+      - { code: log error, message: "maquette non conforme après <n> revues : <verdict>" }
+      - { code: log error, message: "maquette non conforme et la spec a déjà joué <n> sessions : <verdict>" }
+    regles: [R3, R4, R5, R6, R7, R8, R9, R10]
+
+donnees:
+  - { id: D1, objet: "cadence.yaml, clé orchestrate.maquetteReviews", existant: false, modification: aucune, note: "nouvelle clé facultative ; sans elle, 3" }
+  - { id: D2, objet: "REVIEW_SCHEMA, constats[].inchange (booléen facultatif)", existant: true, modification: aucune, note: "rapport interne agent → programme ; un rapport sans le champ reste valide (R8)" }
+  - { id: D3, objet: "journal de la vague (ligne « défaut de revue »)", existant: true, modification: aucune, note: "une ligne de texte de plus, format du journal inchangé" }

@@ -895,6 +895,16 @@ describe('cadence perf — tokens par estimate et part de revue (R2, R3)', () =>
     expect([data.tokens.byEstimate['0.5'].current, data.tokens.byEstimate['1'].current]).toEqual([100_000, 400_000]);
   });
 
+  it('R2 — les classes d\'estimate s\'impriment par estimate croissant, 0.5 avant 1', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...doneLots(c, 'A', 1, CUR, '2026-10-01', 2, 100_000), ...doneLots(c, 'B', 1, CUR, '2026-10-01', 0.5, 100_000), ...doneLots(c, 'C', 1, CUR, '2026-10-01', 1, 100_000)]);
+    const { text } = await cad(c.root);
+    const at = (k: string) => text.indexOf(`tokens par lot (estimate ${k})`);
+    expect(at('0.5')).toBeGreaterThan(-1);
+    expect(at('0.5')).toBeLessThan(at('1'));
+    expect(at('1')).toBeLessThan(at('2'));
+  });
+
   it('R2 — un orphelin et un journal sans jetons lisibles n\'entrent pas', async () => {
     const c = ctx();
     plan(c.root, 'alpha', [...doneLots(c, 'A', 1, CUR, '2026-10-01', 0.5, 100_000), ...doneLots(c, 'B', 1, CUR, '2026-10-01', 0.5)]);

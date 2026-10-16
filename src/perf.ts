@@ -492,7 +492,7 @@ interface Line {
 /** Les indicateurs imprimés, dans l'ordre du tableau, avec leur étiquette et la décision qu'ils éclairent. */
 function indicatorLines(r: PerfResult): [Line, Indicator][] {
   const speed: [Line, Indicator][] = [
-    ...Object.entries(r.tokens.byEstimate).map(([k, ind]): [Line, Indicator] => [{ label: `tokens par lot (estimate ${k})`, kind: 'tokens', decision: 'tokens' }, ind]),
+    ...Object.entries(r.tokens.byEstimate).sort(([a], [b]) => Number(a) - Number(b)).map(([k, ind]): [Line, Indicator] => [{ label: `tokens par lot (estimate ${k})`, kind: 'tokens', decision: 'tokens' }, ind]),
     [{ label: 'part des tokens de revue', kind: 'share', decision: 'reviewShare' }, r.tokens.reviewShare],
     [{ label: 'délai création → done', kind: 'days', decision: 'createdToDone' }, r.delays.createdToDone],
     [{ label: 'délai done → livraison', kind: 'days', decision: 'doneToDelivered' }, r.delays.doneToDelivered],

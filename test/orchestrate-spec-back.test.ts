@@ -419,7 +419,7 @@ describe('étape spec back : agents', () => {
   });
 });
 
-// Critère de fin de L188 : TERMINAISON. Quel que soit le chemin, l'agent spec joue au plus 2 sessions et la chaîne atteint l'implémentation (ready) ou rend le lot.
+// Critère de fin de L188 : TERMINAISON. Quel que soit le chemin, l'agent spec joue au plus 2 sessions (3 pour un lot à écran, L230) et la chaîne atteint l'implémentation (ready) ou rend le lot.
 describe('étape spec : terminaison de la chaîne, tous les chemins', () => {
   type Kind = 'ecran' | 'back' | 'mixte';
   const writes = (kind: Kind, sujet: boolean): Handler => (call) =>
@@ -438,7 +438,7 @@ describe('étape spec : terminaison de la chaîne, tous les chemins', () => {
               cases.push({ kind, pass1, pass2, ficheVerdict, maquetteVerdict, accept });
             }
 
-  it.each(cases)('%j : au plus 2 sessions spec, et le lot est prêt ou rendu', async (k) => {
+  it.each(cases)('%j : au plus 2 sessions spec (3 avec un écran), et le lot est prêt ou rendu', async (k) => {
     const never = () => claudeOut(reviewReport());
     const acceptHandler: Handler = (call) => {
       ecritAcceptation(call.opts.cwd, { sansFiche: k.kind === 'back', ecran: k.kind === 'back' ? 'cache-de-secours-365scores' : undefined, exemple: k.kind === 'back' ? EXEMPLE_BACK : undefined });
@@ -459,7 +459,7 @@ describe('étape spec : terminaison de la chaîne, tous les chemins', () => {
     const over = k.kind === 'back' ? back : { screen: 'page' as const, visible: true };
     const c = h.lot('L1', over, { fiche: true, maquette: true, ...(k.accept ? { accept: 'test -f done.flag', test: 'true' } : {}) });
     await runLot(c);
-    expect(kinds(h).filter((x) => x === 'spec').length).toBeLessThanOrEqual(2);
+    expect(kinds(h).filter((x) => x === 'spec').length).toBeLessThanOrEqual(k.kind === 'back' ? 2 : 3);
     expect(['ready', 'handed-back']).toContain(c.lot.status);
     if (c.lot.status === 'ready') {
       expect(kinds(h)).toContain('implement');
@@ -482,7 +482,7 @@ describe('étape spec : deux sessions spec au plus, chemins asymétriques', () =
     });
     const c = h.lot('L1', { screen: 'page' as const, visible: true }, { fiche: true, maquette: true });
     await runLot(c);
-    expect(specCount(h)).toBeLessThanOrEqual(2);
+    expect(specCount(h)).toBeLessThanOrEqual(3);
     expect(['ready', 'handed-back']).toContain(c.lot.status);
   });
 

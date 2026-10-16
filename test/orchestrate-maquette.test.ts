@@ -190,7 +190,7 @@ describe('revue de la maquette : la session', () => {
   });
 });
 
-describe('revue de la maquette : la boucle, deux passes au plus', () => {
+describe('revue de la maquette : la boucle, maquetteReviews revues au plus', () => {
   it('un majeur renvoie à la spec avec le constat, puis la maquette est relue', async () => {
     const h = harness({ lots, script: { spec: [spec, spec], maquette: [() => major(), ok], implement: [impl], review: [ok] } });
     const c = h.lot('L1', screen, config);
@@ -200,7 +200,7 @@ describe('revue de la maquette : la boucle, deux passes au plus', () => {
     expect(second).toContain('le message de R3 n’est pas visible dans #etat-erreur');
     expect(second).toContain('maquette.html:12');
     expect(second).toMatch(/UX review of your mockup/);
-    expect(h.calls[3].brief).toContain('second and last review');
+    expect(h.calls[3].brief).toContain('review 2 of 3');
     expect(c.lot.maquette).toMatchObject({ passes: 2, conforme: true });
     expect(c.lot.status).toBe('ready');
   });
@@ -212,9 +212,9 @@ describe('revue de la maquette : la boucle, deux passes au plus', () => {
     expect(kinds(h)).toEqual(['spec', 'maquette', 'spec', 'maquette', 'implement', 'review']);
   });
 
-  it('non conforme après la passe 2 : le lot est rendu au lead avec ce qui reste, sans implement', async () => {
+  it('non conforme après la passe 2 (maquetteReviews: 2) : le lot est rendu au lead avec ce qui reste, sans implement', async () => {
     const h = harness({ lots, script: { spec: [spec, spec], maquette: [() => major(), () => major('R2 : le bouton Réessayer manque')] } });
-    const c = h.lot('L1', screen, config);
+    const c = h.lot('L1', screen, { ...config, maquetteReviews: 2 });
     await runLot(c);
     expect(kinds(h)).toEqual(['spec', 'maquette', 'spec', 'maquette']);
     expect(c.lot.status).toBe('handed-back');

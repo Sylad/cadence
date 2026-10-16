@@ -234,6 +234,8 @@ export interface OrchestrateConfig {
   precheck: boolean;
   /** Revue UX de la maquette (L172, spec etape-spec S4) entre spec et accept ; `maquette: false` la saute (défaut : vrai). */
   maquette: boolean;
+  /** Nombre de revues de la maquette par lot (L230), entier ≥ 1 ; c'est aussi le plafond de sessions `spec` d'un lot à écran (défaut : 3). */
+  maquetteReviews: number;
   /** Revue de la fiche back (L188, spec etape-spec-back B3) entre spec et accept par `code-reviewer` en mode fiche ; `fiche: false` la saute (défaut : vrai). */
   fiche: boolean;
   /** `precheck: local` (L146) : le contrôle préalable part sur `claude-local` (Ollama de Big-Blue) ; Sonnet reste le repli. */
@@ -271,11 +273,11 @@ const MODELS = ['haiku', 'sonnet', 'opus'] as const;
 export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'fiche', 'ux', 'precheck', 'prodAccess', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, maquette: true, fiche: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, maquette: true, maquetteReviews: 3, fiche: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -308,6 +310,10 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   if (o.maquette != null) {
     if (typeof o.maquette !== 'boolean') throw bad('maquette : true ou false attendu');
     config.maquette = o.maquette;
+  }
+  if (o.maquetteReviews != null) {
+    if (typeof o.maquetteReviews !== 'number' || !Number.isInteger(o.maquetteReviews) || o.maquetteReviews < 1) throw bad('maquetteReviews : entier supérieur ou égal à 1 attendu');
+    config.maquetteReviews = o.maquetteReviews;
   }
   if (o.fiche != null) {
     if (typeof o.fiche !== 'boolean') throw bad('fiche : true ou false attendu');

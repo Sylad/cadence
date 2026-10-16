@@ -46,7 +46,7 @@ export const REVIEW_SCHEMA = {
     bloquants: num,
     majeurs: num,
     mineurs: num,
-    constats: { type: 'array', items: { type: 'object', properties: { gravite: { type: 'string', enum: ['bloquant', 'majeur', 'mineur'] }, fichier: str, ligne: num, texte: str }, required: ['gravite', 'texte'] } },
+    constats: { type: 'array', items: { type: 'object', properties: { gravite: { type: 'string', enum: ['bloquant', 'majeur', 'mineur'] }, fichier: str, ligne: num, texte: str, inchange: { type: 'boolean', description: 'optional, review 2 or later of a mockup: true when the finding is on a point the spec writer did not change and the previous review had not raised' } }, required: ['gravite', 'texte'] } },
     sousTaches: strings,
     nonVerifie: strings,
     verdict: str,
@@ -107,7 +107,7 @@ export interface ReviewReport {
   bloquants: number;
   majeurs: number;
   mineurs: number;
-  constats: { gravite: string; fichier?: string; ligne?: number; texte: string }[];
+  constats: { gravite: string; fichier?: string; ligne?: number; texte: string; inchange?: boolean }[];
   sousTaches: string[];
   nonVerifie: string[];
   verdict: string;

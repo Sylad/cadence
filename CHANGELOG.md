@@ -56,6 +56,14 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
 
+## [Unreleased]
+
+### Changed
+
+- The mockup review of an orchestrated wave sweeps everything in its first report (L230): a checklist rendered in the report (every state at 1440 and 390 px, every rule of the sheet, contrast, the real envelope of the app, gutters, empty or stretched panels, holes), what cannot be verified in `nonVerifie`, and ALL the blocking and major findings at once.
+- The mockup is reviewed up to `orchestrate.maquetteReviews` times (new key, integer ≥ 1, default 3 instead of 2). The `spec` session budget of a lot with a screen follows it; the sheet review keeps two reviews, and a lot without a screen keeps two `spec` sessions.
+- A review of rank 2 or more may mark a blocking or major finding `inchange: true` (optional boolean of a finding of the review report): the wave journal then gets a `défaut de revue` line.
+
 ## [1.5.1] - 2026-10-16
 
 1.5.0 was tagged but never reached npm: its publication stopped on a red test. 1.5.1 carries what 1.5.0 brought and what followed it.

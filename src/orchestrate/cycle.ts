@@ -484,7 +484,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
       screen: l.screen,
       back,
       problems: l.specProblems,
-      review: !reviewed.length ? undefined : back ? reviewedSheetText(reviewed, !!l.screen) : reviewedText(reviewed),
+      review: !reviewed.length ? undefined : back ? reviewedSheetText(reviewed, !!l.screen) : reviewedText(reviewed, { run: (l.specRuns ?? 0) + 1, max: specBudget(c) }),
       template: l.screen ? ficheTemplate() : undefined,
       templateBack: back || l.screen ? ficheBackTemplate() : undefined,
     });
@@ -497,7 +497,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     vars.reponse = '';
   }
   if (kind === 'maquette') {
-    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, previous: l.maquetteConstats });
+    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, max: c.config.maquetteReviews, previous: l.maquetteConstats });
     vars.reponse = '';
   }
   if (kind === 'accept') {
@@ -1144,6 +1144,9 @@ function takeReport(c: LotCtx, done: Done, rep: { choix?: string[]; questions: s
   return rep.questions.filter((q) => !isNonQuestion(q));
 }
 
+/** Plafond de sessions `spec` du lot (L230) : les revues de maquette d'un lot à écran, sinon deux. Fiche et maquette partagent `l.specRuns`. */
+const specBudget = (c: LotCtx): number => (c.lot.screen && c.config.maquette ? c.config.maquetteReviews : 2);
+
 /**
  * Étape spec (L171, spec etape-spec S3) : la session écrit maquette, captures et fiche dans `<spec.dir>/<écran>/`, le programme
  * en relève les écarts (une seconde passe, puis le lot est rendu), une hypothèse coûteuse à défaire devient une question au lead,
@@ -1164,7 +1167,7 @@ async function specStep(c: LotCtx): Promise<void> {
   const questions = takeReport(c, done, rep);
   if (questions.length) {
     l.questions = questions;
-    l.specRuns = undefined; // la réponse ouvre un nouveau budget de deux sessions
+    l.specRuns = undefined; // la réponse ouvre un nouveau budget de sessions
     l.specAsked = undefined; // la prochaine réponse porte sur la question de la session, pas sur d'anciennes hypothèses coûteuses
     l.next = 'spec';
     transition(c, 'question', questions[0]);
@@ -1195,8 +1198,8 @@ async function specStep(c: LotCtx): Promise<void> {
   const inDir = fiche === '' || fiche.startsWith(`${c.config.spec.dir.replace(/\/+$/, '')}/`);
   const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/${what}/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/${what}/fiche.yaml)`] : fiche ? checkSpec(l.repo, fiche, l.lot, partsOf(l, fiche)) : [`aucune fiche écrite : ${c.config.spec.dir}/${what}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
   if (problems.length) {
-    if ((l.specRuns ?? 0) >= 2) {
-      stop(c, 'handed-back', `spec non conforme après 2 passes : ${problems.join(' ; ')}`);
+    if ((l.specRuns ?? 0) >= specBudget(c)) {
+      stop(c, 'handed-back', `spec non conforme après ${specBudget(c)} passes : ${problems.join(' ; ')}`);
       return;
     }
     l.specProblems = problems;
@@ -1211,7 +1214,7 @@ async function specStep(c: LotCtx): Promise<void> {
   if (costly.length) {
     l.questions = costly.map((x) => `${x.id} est posée comme hypothèse mais touche un choix coûteux à défaire (${x.categorie}) : « ${x.siFaux} » — la confirmer, ou la corriger, avant que la fiche serve de référence.`);
     l.specAsked = [...l.questions];
-    l.specRuns = undefined; // la réponse du lead ouvre un nouveau budget de deux sessions, comme celle d'une question de la session
+    l.specRuns = undefined; // la réponse du lead ouvre un nouveau budget de sessions, comme celle d'une question de la session
     l.next = 'spec';
     transition(c, 'question', l.questions[0]);
     return;
@@ -1317,8 +1320,8 @@ const FICHE_REVIEW: SpecReview = { kind: 'fiche', label: 'fiche', source: 'code'
 const MAQUETTE_REVIEW: SpecReview = { kind: 'maquette', label: 'maquette', source: 'ux', after: afterMaquette, retry: () => 'spec' };
 
 /**
- * Revue de la spec (fiche ou maquette) : une session de lecture seule. Un bloquant ou un majeur renvoie à la spec (une seule seconde passe, avec
- * les constats ; pour un lot mixte, ceux des deux revues ensemble), puis la spec est relue ; ce qui reste après la seconde revue est rendu au lead.
+ * Revue de la spec (fiche ou maquette) : une session de lecture seule. Un bloquant ou un majeur renvoie à la spec (avec les constats ; pour un lot mixte, ceux des deux revues ensemble), puis la spec est relue : deux revues pour la fiche,
+ * `orchestrate.maquetteReviews` pour la maquette, dans le plafond de sessions spec du lot (`specBudget`) ; ce qui reste à la dernière revue est rendu au lead.
  * Les mineurs de la fiche vont en notes du lot (ceux de la maquette restent des propositions). Ce verdict n'est pas `raf review` ni `raf ux` : la revue après code garde ce rôle.
  */
 async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
@@ -1346,6 +1349,10 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
   addProposals(c, rep, r.kind, r.kind !== 'fiche');
   if (r.kind === 'fiche' && (await noteMinors(c, rep, `la ${r.label}`))) return;
   const constats = blockingConstats(rep, r.source);
+  if (r.kind === 'maquette' && passes >= 2) {
+    // Lu sur rep.constats : blockingConstats ne garde pas `inchange`. Seul le booléen vrai est une marque (checkShape ne descend pas dans constats[]).
+    for (const k of rep.constats) if ((k.gravite === 'bloquant' || k.gravite === 'majeur') && k.inchange === true) c.wave.log(`${lotKey(l.project, l.lot)} · défaut de revue : maquette, revue ${passes}, majeur sur un point inchangé absent de la revue ${passes - 1} : ${k.texte}`);
+  }
   const key = r.kind === 'fiche' ? 'ficheConstats' : 'maquetteConstats';
   if (summary.conforme) {
     l[key] = undefined;
@@ -1353,13 +1360,14 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
     save(c);
     return;
   }
-  if (passes >= 2) {
-    stop(c, 'handed-back', `${r.label} non conforme après 2 revues : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
+  const reviews = r.kind === 'maquette' ? c.config.maquetteReviews : 2;
+  if (passes >= reviews) {
+    stop(c, 'handed-back', `${r.label} non conforme après ${reviews} revue${reviews > 1 ? 's' : ''} : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
     return;
   }
-  // Le budget de deux sessions spec est épuisé (écarts du programme compris) : un renvoi à la spec serait une 3ᵉ session.
-  if ((l.specRuns ?? 0) >= 2) {
-    stop(c, 'handed-back', `${r.label} non conforme et la spec a déjà joué 2 sessions : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
+  // Le budget de sessions spec est épuisé (écarts du programme compris) : un renvoi à la spec serait une session de trop.
+  if ((l.specRuns ?? 0) >= specBudget(c)) {
+    stop(c, 'handed-back', `${r.label} non conforme et la spec a déjà joué ${specBudget(c)} sessions : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
     return;
   }
   l[key] = constats.length ? constats : [{ source: r.source, gravite: 'majeur', texte: summary.verdict }];

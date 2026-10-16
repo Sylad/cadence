@@ -179,6 +179,11 @@ export function appendDelivery(dir: string, day: Day, sha: string): void {
   appendFileSync(join(dir, 'deliveries.log'), `${day} ${sha}\n`);
 }
 
+/** Ajoute une livraison rouge (« jour sha raison ») à `deliveries-failed.log` ; la raison est la première ligne du message d'échec. */
+export function appendFailedDelivery(dir: string, day: Day, sha: string, reason: string): void {
+  appendFileSync(join(dir, 'deliveries-failed.log'), `${day} ${sha} ${reason.split('\n')[0]!.trim()}\n`);
+}
+
 export function lastDelivery(dir: string): string | null {
   const file = join(dir, 'deliveries.log');
   if (!existsSync(file)) return null;
@@ -195,5 +200,17 @@ export function readDeliveries(dir: string): Day[] | null {
       .filter(isDay);
   } catch {
     return null;
+  }
+}
+
+/** Les jours de `deliveries-failed.log` (une ligne « jour sha raison » par livraison rouge), dans l'ordre du fichier ; une ligne illisible est ignorée, un fichier absent ou illisible donne aucune livraison rouge. Lecture seule : ne crée rien. */
+export function readFailedDeliveries(dir: string): Day[] {
+  try {
+    return readFileSync(join(dir, 'deliveries-failed.log'), 'utf8')
+      .split('\n')
+      .map((l) => l.split(' ')[0]!)
+      .filter(isDay);
+  } catch {
+    return [];
   }
 }

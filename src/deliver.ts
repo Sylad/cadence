@@ -8,7 +8,7 @@ import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit }
 import { citedRefs } from './link.js';
 import { describeArticle, openArticleLots, type ArticleRule } from './articles.js';
 import { RafError, type Lot, type Plan } from './plan.js';
-import { appendDelivery, lastDelivery, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
+import { appendDelivery, appendFailedDelivery, lastDelivery, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
 
 export interface VerifyCheck {
   url?: string;
@@ -335,6 +335,12 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
   try {
     const fail = (msg: string) => {
       err(`deliver : ${msg}`);
+      // Une livraison rouge s'inscrit au journal des rouges (perf) ; son écriture ne change ni le code ni le message d'échec.
+      try {
+        appendFailedDelivery(ctx.state, ctx.today, sha, msg);
+      } catch (e) {
+        err(`deliver : journal des livraisons rouges non écrit : ${(e as Error).message}`);
+      }
       return 1;
     };
     out(`Livraison de ${env.CADENCE_SHORT} (${branch})`);

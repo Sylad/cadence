@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { findProjects } from '../src/lead.js';
@@ -135,9 +135,32 @@ describe('cadence session start|close --all', () => {
     const { code, out } = await cad(mono, 'session', 'start', '--all');
     const lines = out.split('\n');
     expect(lines).toContain('## pkg-a');
-    expect(lines[lines.indexOf('## pkg-a') + 1]).toMatch(/^✗ .*dépôt/);
+    // Vert en local, rouge sur le runner GitHub (git 2.55, L224) sans cause établie : l'état vu par git accompagne l'échec.
+    const seen = (...args: string[]) => { try { return execFileSync('git', args, { cwd: join(mono, 'pkg-a'), encoding: 'utf8', stdio: 'pipe' }).trim(); } catch (e) { return `échec : ${(e as Error).message.split('\n')[0]}`; } };
+    const state = `git ${seen('--version')} ; toplevel de pkg-a : ${seen('rev-parse', '--show-toplevel')} ; entrées de pkg-a : ${readdirSync(join(mono, 'pkg-a')).join(',')}`;
+    expect(lines[lines.indexOf('## pkg-a') + 1], state).toMatch(/^✗ .*dépôt/);
     expect(out).not.toContain('Travail mono');
     expect(code).toBe(2);
+  });
+
+  it('un sous-dossier sans .git est signalé même quand git ne remonte pas au dépôt parent (GIT_CEILING_DIRECTORIES)', async () => {
+    const root = tempDir();
+    const mono = join(root, 'mono');
+    await project(mono, 'mono');
+    await project(join(mono, 'pkg-a'), 'pkg-a');
+    rmSync(join(mono, 'pkg-a', '.git'), { recursive: true, force: true });
+    const before = process.env.GIT_CEILING_DIRECTORIES;
+    process.env.GIT_CEILING_DIRECTORIES = join(mono, 'pkg-a'); // git ne remonte plus de pkg-a vers mono : rev-parse échoue dans pkg-a
+    try {
+      const { code, out } = await cad(mono, 'session', 'start', '--all');
+      const lines = out.split('\n');
+      expect(lines[lines.indexOf('## pkg-a') + 1]).toMatch(/^✗ .*dépôt/);
+      expect(out).not.toContain('reprise du');
+      expect(code).toBe(2);
+    } finally {
+      if (before === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+      else process.env.GIT_CEILING_DIRECTORIES = before;
+    }
   });
 
   it('--all et --depth sont refusés hors de session, au lieu d\'être ignorés en silence', async () => {

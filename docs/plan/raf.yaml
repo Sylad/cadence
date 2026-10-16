@@ -2581,11 +2581,12 @@ lots:
       - { date: 2026-10-16, text: "16-10 : l'en-tête perf du tour montre vitesse et qualité côte à côte (règle VITE ET BIEN de L225) ; le skill lead relaie un ⚠ en une ligne et n'ouvre un lot d'amélioration que sur tendance confirmée ou goulot net ; jamais de lot pour une micro-optimisation" }
   - id: L228
     title: "cadence orchestrate --resume <vague> --budget projet:lot=+N --dry-run n'est pas une simulation : le 16-10 la commande a réellement relevé le budget de la vague 2026-10-15-0831 (540 000 → 727 912) et relancé la session fix de finance-tracker:L78 ; --dry-run doit être honoré par --resume comme par un lancement (afficher ce qui serait rejoué, ne rien écrire dans wave.json ni journal.log), ou refusé explicitement"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-16
     started: 2026-10-16
     review: { date: 2026-10-16, verdict: "compliant — orchestré (vague 2026-10-16-1405, 0 passe(s) de correction)", commit: d1856f3a8a02bfa0e3f2cb9106b0a989a4b5ec9f }
+    finished: 2026-10-16
   - id: L229
     title: "cadence spec reseal <lot livré> <test> --porteur <lot en cours> refuse un lot livré dont la fiche a été amendée par un lot ultérieur (ol-companion 16-10 : reseal L43 porté par L160 refusé car fix(L130) a58a129 a amendé docs/specs/composition-match/fiche.yaml le 12-10 sans citer L43) ; pour un lot livré, accepter une fiche amendée par des commits qui citent un lot livré ou le porteur (la fiche vivante est la référence), ou offrir une voie explicite ; message d'erreur qui dit quoi faire"
     status: todo

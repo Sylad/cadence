@@ -1,0 +1,85 @@
+sujet:
+  id: spec-reseal-lot-livre-fiche-amendee
+  titre: "cadence spec reseal d'un lot livré accepte une fiche amendée par un autre lot livré"
+  lot: L229
+  perimetre:
+    modules: [src/orchestrate/accept.ts, src/cli.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le rescellé d'un lot en cours (L217 inchangé : seul le lot lui-même est accepté)"
+      - "le verrou lockViolations et l'exception L183 (inchangés)"
+      - "une option qui contournerait la vérification (aucune voie par drapeau n'est ajoutée)"
+
+cas:
+  - id: C1
+    titre: Le lead rescelle un test d'un lot livré dont la fiche a été amendée par un autre lot livré
+    acteur: le lead
+    declencheur: commande cadence spec reseal
+    preconditions:
+      - "le lot (ex. L43) est livré, son acceptation est verte ; --porteur nomme un lot en cours (ex. L160)"
+      - "la fiche a changé depuis le commit rouge ; un des commits qui l'ont touchée cite un autre lot livré (ex. fix(L130) a58a129), ni le lot ni le porteur"
+      - la fiche est commitée ; le test nommé a été corrigé, aucun autre test listé n'a bougé
+    nominal:
+      - "La commande lit git log des commits qui ont touché la fiche depuis le rouge (accept.ts:171)."
+      - "Chaque commit doit citer le lot, le porteur, ou un lot livré du plan (status done) ; la citation se lit comme citedRefs (link.ts:27)."
+      - La commande refait l'empreinte du seul test nommé contre la fiche courante (comportement L217 inchangé).
+      - "Le journal resceaux garde ficheAmendee = sha court du dernier commit de la fiche ; la note et le commit du rescellé disent « fiche amendée en <sha> »."
+    alternatives:
+      - { si: "un commit de la fiche cite uniquement un lot non livré autre que le porteur (en cours, à faire) ou aucun lot connu", alors: "refus qui nomme le commit, les lots qu'il cite et dit quoi faire", regles: [R2, R3] }
+      - { si: "tous les commits de la fiche citent le lot ou le porteur", alors: "accepté comme avant (L217)", regles: [R4] }
+      - { si: "le lot est en cours (pas de --porteur)", alors: "seul le lot compte, comme avant", regles: [R4] }
+      - { si: "les autres gardes échouent (fiche non commitée, autre test touché, test inchangé, vague en cours)", alors: refus L217/L200 inchangé, regles: [R5] }
+    resultat: "Le test du lot livré est rescellé ; le journal dit quel commit a amendé la fiche. La fiche vivante est la référence, sans remise temporaire de la fiche."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Pour un lot livré (--porteur), un commit qui a touché la fiche depuis le commit rouge est admis s'il cite le lot, le porteur, ou tout lot livré du plan (status done) ; le rescellé est accepté quand tous les commits sont admis."
+    statut: sourcee
+    source: "demande du lot L229 : « pour un lot livré, accepter une fiche amendée par des commits qui citent un lot livré ou le porteur (la fiche vivante est la référence) » ; refus actuel : src/orchestrate/accept.ts:172-173 (ensemble citant = lot + porteur) ; cas vécu ol-companion : reseal L43 porté par L160 refusé à cause de a58a129 fix(L130)"
+    tests: ["R1 — lot livré : commit de la fiche citant un autre lot livré : rescellé accepté, ficheAmendee = ce commit", "R1 — lot livré : commits mêlés (lot, porteur, autre lot livré) : accepté"]
+  - id: R2
+    cas: [C1]
+    enonce: "Un commit de la fiche qui ne cite ni le lot, ni le porteur, ni un lot livré (cite un lot en cours autre que le porteur, un lot à faire, un lot inconnu, ou aucun lot) reste refusé : rien n'est écrit, acceptation.json et le test restent intacts."
+    statut: sourcee
+    source: "src/orchestrate/accept.ts:173-174 (garde conservée, une fiche modifiée passe par un lot et sa revue) ; test/orchestrate-reseal.test.ts:419 (R2 L217 : commit citant un autre lot refusé, fichiers intacts)"
+    tests: ["R2 — lot livré : commit de la fiche citant un autre lot en cours : refus, fichiers intacts", "R2 — lot livré : commit de la fiche sans citation de lot : refus", "R2 — lot livré : commit citant un lot absent du plan : refus"]
+  - id: R3
+    cas: [C1]
+    enonce: "Pour un lot livré, le message de refus dit quoi faire : il nomme le commit fautif, les lots qu'il cite (ou « aucun lot »), énumère ce qui est admis (le lot, le porteur, un lot livré) et la voie : faire citer le porteur ou un lot livré par ce commit (le réécrire avant qu'il soit poussé) ou, sinon, rescelle à la main avec le lead. Le message pour un lot en cours garde le texte L217."
+    statut: hypothese
+    si_faux: "Seul le texte du message change ; aucune donnée ni contrat en jeu."
+    tests: ["R3 — refus d'un lot livré : le message nomme le sha fautif, le lot cité, et la voie à suivre (--porteur / commit à citer)", "R3 — refus d'un lot en cours : message L217 inchangé"]
+  - id: R4
+    cas: [C1]
+    enonce: "Les cas déjà acceptés ne changent pas : fiche citant le lot ou le porteur (lot livré), fiche citant le lot (lot en cours), écart net vide (aucune attribution, aucune mention ficheAmendee) ; pour un lot en cours, un autre lot, même livré, n'est PAS admis."
+    statut: sourcee
+    source: "src/orchestrate/accept.ts:171-176 ; docs/specs/spec-reseal-fiche-amendee/fiche.yaml R1, R2, R5, R8 ; la demande du lot L229 ne vise que « pour un lot livré »"
+    tests: ["R4 — lot livré : commit citant le lot ou le porteur : accepté comme avant", "R4 — lot en cours : commit de la fiche citant un lot livré : refus, comme avant", "R4 — écart net vide : pas de ficheAmendee"]
+  - id: R5
+    cas: [C1]
+    enonce: "Toutes les autres gardes restent entières avec un amendement par un lot livré : fiche non commitée, autre test listé modifié, test nommé inchangé, fiche supprimée, refus pendant une vague, --reason et --porteur obligatoires, atomicité du commit."
+    statut: sourcee
+    source: "src/orchestrate/accept.ts:166-182 ; src/cli.ts:755-800"
+    tests: ["R5 — amendement par un lot livré et fiche non commitée : refus", "R5 — amendement par un lot livré et un second test modifié : refus", "R5 — amendement par un lot livré sous CADENCE_ORCHESTRATED : refus inchangé"]
+  - id: R6
+    cas: [C1]
+    enonce: "La liste des lots livrés vient du plan chargé (statut done) et est passée à resealAcceptation ; sans cette liste (appel direct, défaut), seuls le lot et le porteur sont admis, comme avant."
+    statut: hypothese
+    si_faux: "Si le statut « livré » devait inclure d'autres statuts du plan, seule la liste de statuts lue change ; aucune donnée en jeu."
+    tests: ["R6 — resealAcceptation sans liste de lots livrés : comportement L217", "R6 — un lot au statut todo ou doing n'est pas admis comme livré"]
+
+contrats:
+  - id: A1
+    appel: commande spec reseal
+    entree: "cadence spec reseal <lot livré> <test> --reason texte --porteur <lot en cours> ; fiche amendée, entre autres, par des commits citant d'autres lots livrés"
+    sortie: "code 0 ; sortie et journal resceaux inchangés (porteur, ficheAmendee = dernier commit de la fiche, y compris celui d'un autre lot livré)"
+    erreurs:
+      - { code: log error, message: "la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite ni <lot>, ni le porteur <porteur>, ni un lot livré : <sha7> (cite : <lots ou aucun lot>) — le commit doit citer le porteur ou un lot livré, ou la fiche être amendée par un commit du porteur" }
+      - { code: log error, message: "la fiche <fiche> a été modifiée depuis le commit rouge <sha7> par un commit qui ne cite pas <lot> : <sha7>" }
+    regles: [R1, R2, R3, R4, R5, R6]
+
+donnees:
+  - { id: D1, objet: "acceptation-<lot>.json, clé resceaux (journal)", existant: true, modification: aucune, note: "format inchangé : ficheAmendee déjà ajouté par L217 (accept.ts:27)" }
+  - { id: D2, objet: "fiche du lot (docs/specs/<sujet>/fiche.yaml)", existant: true, modification: aucune, note: "lue via git, jamais écrite par la commande" }

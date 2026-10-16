@@ -1,0 +1,182 @@
+# L227 — dernier lot de la famille perf (L225 tableau de bord, L226 tokens/délais/coût).
+# Décision que permet chaque indicateur : livraisons rouges → le pipeline de livraison (CI, déploiement, vérification) est-il le goulot ou la source de rework ? ;
+# constats QA bloquants → la revue laisse-t-elle passer des défauts graves sur des lots déjà livrés ?
+sujet:
+  id: perf-livraisons-rouges-entete-tour
+  titre: "cadence perf : livraisons rouges et constats QA bloquants ; en-tête perf de cadence lead tour et lecture par le skill lead"
+  lot: L227
+  perimetre:
+    modules: [src/perf.ts, src/deliver.ts, src/state.ts, src/cli.ts, src/lead.ts, skills/lead/SKILL.md]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "les indicateurs de L225 et L226 : inchangés, leurs règles restent celles de docs/specs/perf-tableau-de-bord/fiche.yaml et docs/specs/perf-tokens-delais-cout/fiche.yaml (dont les défauts échappés, R9, et la convention de note QA isQaDefectNote, src/perf.ts:187)"
+      - "la sortie --json de cadence lead tour : inchangée"
+      - "tout indicateur de volume produit (lignes, commits, tokens comme objectif)"
+      - "la création automatique du lot d'amélioration : le skill le propose à l'humain, il ne l'ouvre pas"
+
+cas:
+  - id: C1
+    titre: Le lead lit le tableau de bord avec les livraisons rouges et les constats QA bloquants
+    acteur: le lead (humain ou skill lead)
+    declencheur: commande cadence perf
+    preconditions:
+      - le dossier a un .cadence/runs et des plans lisibles
+    nominal:
+      - La commande calcule les deux fenêtres comme pour L225.
+      - Elle compte, par fenêtre, les livraisons rouges lues dans le journal des livraisons rouges de chaque projet.
+      - Elle compte, par fenêtre, les notes de plan « QA … bloquant » sur des lots déjà terminés.
+      - Elle imprime une section « Livraison » où les livraisons rouges sont sur la même ligne que le nombre de livrés (vitesse ↔ qualité).
+    alternatives:
+      - { si: "aucun projet n'a de journal de livraisons rouges", alors: "livraisons rouges n/d avec une mention, aucun ⚠, jamais 0", regles: [R2] }
+      - { si: "une fenêtre porte moins de 5 livraisons, ou la valeur précédente est nulle, ou --since tronque une fenêtre", alors: "pas de ⚠ sur tendance, la ligne dit pourquoi", regles: [R3] }
+      - { si: "les livraisons rouges montent de plus de 25 % d'une fenêtre à l'autre", alors: "⚠ sur la ligne avec sa décision", regles: [R3] }
+      - { si: "aucune note de plan ne ressemble à « QA … bloquant »", alors: "constats QA bloquants n/d, pas 0", regles: [R4] }
+      - { si: "--json", alors: "les deux indicateurs sont dans un bloc quality, les clés existantes sont inchangées", regles: [R5] }
+    resultat: Vitesse de livraison et qualité de livraison côte à côte, ⚠ seulement sur une tendance.
+  - id: C2
+    titre: Le tour du lead imprime l'en-tête perf
+    acteur: le lead
+    declencheur: commande cadence lead tour
+    preconditions:
+      - un dossier avec des projets
+    nominal:
+      - Le tour calcule les ⚠ de cadence perf pour le dossier.
+      - Il imprime une ligne par ⚠ avant les lignes de projet.
+      - Il imprime ensuite les lignes de projet comme avant.
+    alternatives:
+      - { si: "aucun ⚠ (tout est stable ou sans tendance)", alors: "aucune ligne d'en-tête, la sortie est celle d'avant L227", regles: [R6] }
+      - { si: "perf ne peut pas lire (pas de .cadence/runs, grille de prix mal formée, plan illisible)", alors: "pas d'en-tête, le tour continue et sort 0", regles: [R7] }
+      - { si: "--json", alors: "le JSON du tour est inchangé, sans en-tête", regles: [R8] }
+    resultat: Les ⚠ de perf sont visibles dès le tour, sans lancer cadence perf.
+  - id: C3
+    titre: Le skill lead lit l'en-tête avant de proposer les trois lots
+    acteur: le skill lead
+    declencheur: étape « Tour of the projects » du skill lead
+    preconditions:
+      - cadence lead tour a été lancé
+    nominal:
+      - Le skill lit l'en-tête perf avant de proposer les trois lots.
+      - Il relaie chaque ⚠ en une ligne dans son rapport.
+      - Il propose les trois lots habituels.
+    alternatives:
+      - { si: "un ⚠ est une tendance (deux fenêtres comparées, échantillon suffisant) ou un goulot net", alors: "le skill peut proposer en plus un lot d'amélioration, présenté à l'humain", regles: [R10] }
+      - { si: "pas de ⚠, ou une variation sans tendance, ou une micro-optimisation", alors: "aucun lot d'amélioration n'est proposé", regles: [R10, R11] }
+    resultat: Un lot d'amélioration n'apparaît que sur preuve, jamais sur une variation d'une semaine.
+  - id: C4
+    titre: cadence deliver note une livraison rouge
+    acteur: le lead ou le script de livraison
+    declencheur: commande cadence deliver
+    preconditions:
+      - le verrou de livraison est pris
+    nominal:
+      - La livraison échoue (script, CI, déploiement ou vérification).
+      - La commande écrit une entrée dans le journal des livraisons rouges du projet.
+      - Elle sort avec le code 1 et le message d'échec habituel.
+    alternatives:
+      - { si: "la livraison est verte", alors: "deliveries.log reçoit sa ligne comme avant, le journal rouge n'est pas touché", regles: [R1] }
+      - { si: "le refus survient avant le verrou (précondition, autre livraison en cours)", alors: "aucune entrée rouge", regles: [R1] }
+      - { si: "l'écriture du journal rouge échoue", alors: "la livraison garde son code et son message d'échec, un avertissement est écrit", regles: [R9] }
+    resultat: Les livraisons rouges sont comptables par jour.
+
+regles:
+  - id: R1
+    cas: [C1, C4]
+    enonce: "Une livraison rouge est un échec de cadence deliver survenu après la prise du verrou (script, CI, déploiement ou vérification, src/deliver.ts:332-361) ; chaque échec ajoute une entrée datée au journal des livraisons rouges du projet (emplacement et format : question Q1). Une livraison verte et un refus avant le verrou n'y écrivent rien, et deliveries.log (une ligne « jour sha » par livraison verte, src/state.ts:177-179) reste écrit et lu comme avant."
+    statut: sourcee
+    source: "titre du lot : « livraisons rouges … (journal de cadence deliver) » ; src/state.ts:177-193 : deliveries.log ne note que les livraisons vertes, il ne peut donc pas compter les rouges ; src/deliver.ts:332-361 pour les points d'échec"
+    tests: ["R1 — échec de CI après le verrou : une entrée rouge du jour, deliveries.log inchangé", "R1 — échec du script, du déploiement, de la vérification : une entrée chacun", "R1 — livraison verte : aucune entrée rouge, deliveries.log reçoit sa ligne", "R1 — refus avant le verrou (autre livraison en cours) : aucune entrée rouge"]
+  - id: R2
+    cas: [C1]
+    enonce: "Livraisons rouges d'une fenêtre = nombre d'entrées du journal rouge de tous les projets du dossier datées dans la fenêtre. Sans aucun journal rouge lisible (projets livrés avant L227 comme projets non git), la valeur est n/d (null en JSON) avec la mention « aucun journal de livraisons rouges », jamais 0, et elle ne porte aucun ⚠ ; un journal présent mais sans entrée dans la fenêtre donne 0."
+    statut: hypothese
+    si_faux: "Si une absence de journal devait valoir 0, un projet jamais instrumenté afficherait 0 rouge comme une réussite ; seul l'affichage de la valeur change, aucune donnée n'est écrite."
+    tests: ["R2 — aucun journal rouge : n/d, mention, pas de ⚠", "R2 — journal présent sans entrée dans la fenêtre : 0", "R2 — trois entrées dans la fenêtre courante, deux dans la précédente : 3 et 2", "R2 — une ligne illisible du journal est ignorée sans erreur"]
+  - id: R3
+    cas: [C1]
+    enonce: "Les livraisons rouges se jugent comme les indicateurs de L225 : une hausse de plus de 25 % de la fenêtre courante sur la précédente porte un ⚠ ; pas de ⚠ si l'une des deux fenêtres a moins de 5 livraisons (vertes + rouges), si la valeur précédente est nulle ou n/d, ou si --since tronque une fenêtre. L'indicateur est le jumeau de qualité de « livrés » (throughput.delivered) et s'imprime sur sa ligne ; le ⚠ finit par sa décision : « la livraison casse : corriger CI, déploiement ou vérification avant d'ajouter des lots »."
+    statut: sourcee
+    source: "src/perf.ts:29-31 (DEGRADATION 25 %, MIN_SAMPLE 5) et docs/specs/perf-tableau-de-bord/fiche.yaml R8, R12, R13 ; note du lot 16-10 (VITE ET BIEN). Le texte de la décision est une lecture du lead (hypothèse de libellé)."
+    tests: ["R3 — rouges 2 → 4 sur 10 livraisons par fenêtre : ⚠", "R3 — 2 → 2,4 (20 %) : pas de ⚠", "R3 — moins de 5 livraisons dans une fenêtre : pas de ⚠, la ligne dit l'échantillon", "R3 — précédente à 0 : pas de ⚠", "R3 — la ligne « livrés » contient la valeur des livraisons rouges", "R3 — --since qui tronque : pas de ⚠"]
+  - id: R4
+    cas: [C1]
+    enonce: "Constats QA bloquants d'une fenêtre = nombre de notes de plan datées dans la fenêtre, sur un lot déjà terminé à la date de la note (finished ≤ date), dont le texte est une note QA au sens de src/perf.ts:187 (commence par « QA », hors préfixe de date) et contient « bloquant » non précédé de « 0 » ou « aucun » ; « majeur » seul ne compte pas. Les notes sont comptées une à une (un lot à deux constats compte deux), à la différence des défauts échappés (lots distincts, bloquant ou majeur, src/perf.ts:284-294) qui restent inchangés. n/d tant qu'aucune note du plan n'est reconnue QA bloquante. Pas de ⚠ propre : c'est le complément de qualité, imprimé sur la ligne des défauts échappés ; il porte un ⚠ sous les mêmes règles que R3."
+    statut: hypothese
+    si_faux: "Si les constats bloquants devaient se confondre avec les défauts échappés, l'indicateur double une ligne existante : on le retire de la section et le JSON garde la clé à la valeur des défauts échappés ; aucune donnée n'est écrite."
+    tests: ["R4 — « 16-10 : QA … 2 bloquants » sur un lot terminé compte une note", "R4 — « QA … 1 majeur » seul ne compte pas", "R4 — « QA … aucun bloquant » et « QA … 0 bloquant » ne comptent pas", "R4 — une note QA datée avant finished ne compte pas", "R4 — deux notes bloquantes sur un même lot comptent 2, les défauts échappés comptent 1", "R4 — aucune note reconnue : n/d et pas de ⚠"]
+  - id: R5
+    cas: [C1]
+    enonce: "Avec --json, la sortie de cadence perf reçoit un bloc quality { redDeliveries, qaBlocking }, chacun au format Indicator de src/perf.ts:49 (current, previous, change, warn, twin, lots, note) ; redDeliveries a pour twin « throughput.delivered ». Toutes les clés existantes sont inchangées, et la sortie texte des sections de L225 et L226 est inchangée à la ligne « livrés » près, qui gagne le jumeau."
+    statut: hypothese
+    si_faux: "Si le skill lead attend d'autres noms de clé, seul le nom du bloc change avant que le skill ne le lise ; la commande est lue par ce seul lecteur, aucun consommateur externe publié. Le lead peut confirmer les noms avant l'implémentation."
+    tests: ["R5 — --json contient quality.redDeliveries et quality.qaBlocking au format Indicator", "R5 — les clés throughput, corrections, interventions, tokens, delays, cost sont identiques avant et après (jeu de données fixe)", "R5 — redDeliveries.twin vaut « throughput.delivered »"]
+  - id: R6
+    cas: [C2]
+    enonce: "cadence lead tour (texte) imprime, avant les lignes de projet, une ligne par ⚠ de cadence perf calculé pour le dossier du tour (les lignes « ⚠ … → décision » et « ⚠ goulot … » de result.warnings, src/perf.ts:460), dans l'ordre de perf. Aucun ⚠ : aucune ligne d'en-tête, la sortie est celle d'avant L227 octet pour octet."
+    statut: sourcee
+    source: "titre du lot : « cadence lead tour imprime l'en-tête perf (une ligne par ⚠, rien si tout est stable) » ; src/perf.ts:460 pour les lignes ⚠"
+    tests: ["R6 — deux ⚠ : deux lignes avant la première ligne de projet", "R6 — aucun ⚠ : sortie identique à celle d'avant", "R6 — un goulot net produit sa ligne ⚠ goulot", "R6 — une ligne d'en-tête contient sa décision et la valeur du jumeau de qualité (VITE ET BIEN)"]
+  - id: R7
+    cas: [C2]
+    enonce: "Quand cadence perf ne peut pas lire le dossier (pas de .cadence/runs, grille cadence.yaml perf.prices mal formée, journaux ou plans illisibles), le tour n'imprime aucune ligne d'en-tête, ne rapporte aucune erreur de perf, continue et sort 0 comme aujourd'hui (src/cli.ts:174-199). Les avertissements de perf (stderr) ne sont pas repris par le tour."
+    statut: hypothese
+    si_faux: "Si le tour devait signaler l'échec de perf, une ligne « perf · ✗ erreur » s'ajouterait ; le tour ne change pas de code de sortie."
+    tests: ["R7 — dossier sans .cadence/runs : tour identique à avant, code 0, rien sur stderr", "R7 — grille de prix mal formée : tour identique à avant, code 0", "R7 — dossier sans aucun projet : le message « aucun projet sous … » est inchangé et sans en-tête"]
+  - id: R8
+    cas: [C2]
+    enonce: "cadence lead tour --json imprime le même tableau de lignes qu'avant (src/cli.ts:184) : l'en-tête perf est réservé à la sortie texte, le contrat JSON du tour ne change pas."
+    statut: sourcee
+    source: "src/cli.ts:184 (le JSON du tour est le tableau de TourRow, lu par la bande et le skill lead)"
+    tests: ["R8 — tour --json avec des ⚠ de perf : le JSON est le tableau de lignes, sans clé de perf", "R8 — tour --json est identique octet pour octet à celui d'avant L227"]
+  - id: R9
+    cas: [C4, C2, C1]
+    enonce: "Aucun appel de modèle ni de réseau et aucune écriture dans le tour et dans perf (lecture seule, src/cli.ts:891). Seul cadence deliver écrit, et seulement le journal rouge (R1) ; si cette écriture échoue, la livraison garde son code de sortie et son message d'échec, et un avertissement « deliver : journal des livraisons rouges non écrit : <cause> » est écrit sur stderr."
+    statut: hypothese
+    si_faux: "Si l'échec d'écriture devait faire échouer deliver autrement, le code de sortie changerait ; il vaut déjà 1 sur une livraison rouge, donc rien d'observable ne se perd."
+    tests: ["R9 — le tour avec un modèle injoignable (OLLAMA_HOST injoignable) tourne sans erreur", "R9 — le tour et perf n'écrivent aucun fichier (arborescence identique avant/après)", "R9 — journal rouge non inscriptible : deliver sort 1 avec son message d'échec et l'avertissement"]
+  - id: R10
+    cas: [C3]
+    enonce: "Le skill lead lit l'en-tête perf du tour avant de proposer les trois lots et relaie chaque ⚠ en une ligne dans son rapport. Il ne propose un lot d'amélioration (en plus des trois, jamais à leur place, présenté à l'humain qui décide) que sur une tendance confirmée — un ⚠ de tendance, donc deux fenêtres comparées, échantillon suffisant et fenêtre non tronquée — ou un goulot net (⚠ goulot de L225 R19) ; au plus un lot d'amélioration par tour."
+    statut: sourcee
+    source: "titre du lot : « ne propose un lot d'amélioration que sur une tendance confirmée sur deux fenêtres ou un goulot net » ; note du lot 16-10. « Au plus un par tour » et « en plus des trois » sont des lectures du lead."
+    tests: ["R10 — SKILL.md demande de lire l'en-tête perf avant de proposer les trois lots", "R10 — SKILL.md réserve le lot d'amélioration à une tendance sur deux fenêtres ou à un goulot net", "R10 — SKILL.md fixe un lot d'amélioration au plus, en plus des trois"]
+  - id: R11
+    cas: [C3]
+    enonce: "Le skill lead n'ouvre jamais un lot pour une micro-optimisation ni sur la variation d'une seule fenêtre ; sans ⚠, il ne dit rien de perf."
+    statut: sourcee
+    source: "note du lot 16-10 : « jamais de lot pour une micro-optimisation » ; principe (3) de la note de L225 : un ⚠ ne vaut que sur une tendance ou un goulot net"
+    tests: ["R11 — SKILL.md interdit le lot de micro-optimisation", "R11 — SKILL.md ne demande aucune ligne de perf quand l'en-tête est vide"]
+  - id: R12
+    cas: [C1, C2, C3]
+    enonce: "README et CHANGELOG disent la nouveauté : le README décrit les livraisons rouges, les constats QA bloquants et l'en-tête perf du tour ; CHANGELOG.md porte une entrée « (L227) » en tête de Unreleased, au format Keep a Changelog existant. L'aide de cadence (src/cli.ts:65-67) décrit l'en-tête perf de lead tour."
+    statut: sourcee
+    source: "titre du lot : « README et CHANGELOG » ; format de CHANGELOG.md (entrées « (Lnn) »)"
+    tests: ["R12 — CHANGELOG.md contient une entrée citant L227", "R12 — le README cite les livraisons rouges et l'en-tête perf du tour", "R12 — l'aide de lead tour cite l'en-tête perf"]
+
+contrats:
+  - id: A1
+    appel: commande cadence perf
+    entree: "[dossier] [--since date] [--json] — inchangée"
+    sortie: "texte avec la section Livraison (livrés ↔ livraisons rouges, défauts échappés ↔ constats QA bloquants), ou JSON avec le bloc quality en plus (code 0)"
+    erreurs: []
+    sans_erreur: "les erreurs de saisie et de lecture de perf (usage, --since invalide, aucun journal de vague) sont celles de L225, inchangées ; un journal rouge absent n'est pas une erreur, c'est un n/d (R2)"
+    regles: [R2, R3, R4, R5, R9]
+  - id: A2
+    appel: commande cadence lead tour
+    entree: "[dossier] [--idle 3] [--depth n] [--json] — inchangée"
+    sortie: "texte : lignes ⚠ de perf puis lignes de projet (code 0) ; --json : tableau de lignes inchangé"
+    erreurs: []
+    sans_erreur: "le tour sort 0 même quand perf ne peut pas lire (R7) ; ses erreurs d'usage existantes (usage : cadence lead tour…, --idle invalide, dossier introuvable) sont inchangées"
+    regles: [R6, R7, R8, R9]
+  - id: A3
+    appel: commande cadence deliver
+    entree: "arguments inchangés"
+    sortie: "inchangée ; en plus, une entrée dans le journal rouge à chaque échec après le verrou"
+    erreurs:
+      - { code: log warn, message: "deliver : journal des livraisons rouges non écrit : <cause>" }
+    regles: [R1, R9]
+
+donnees:
+  - { id: D1, objet: "deliveries.log (une ligne « jour sha » par livraison verte)", existant: true, modification: aucune, note: "écrit et lu comme avant (src/state.ts:177-193) ; les rouges n'y entrent pas" }
+  - { id: D2, objet: "journal des livraisons rouges du projet (emplacement et format à fixer : question Q1)", existant: false, modification: ajout, note: "nouveau fichier, écrit par cadence deliver à chaque échec après le verrou, lu par perf" }
+  - { id: D3, objet: "notes de plan des lots (docs/plan/raf.yaml, champ notes)", existant: true, modification: aucune, note: "lues seules pour les constats QA bloquants, convention de src/perf.ts:187" }

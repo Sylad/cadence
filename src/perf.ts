@@ -1,12 +1,14 @@
-import { relative, sep } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { planLoader } from './config.js';
-import { CAUSES, type Cause, type Classification, type Journal, type JournalPass } from './corrections.js';
+import { CAUSES, isReview as isReviewKind, type Cause, type Classification, type Journal, type JournalPass } from './corrections.js';
 import { addDays, diffDays, isDay, toDay, type Day } from './dates.js';
+import { gitCommonDir } from './git.js';
 import { findProjects } from './lead.js';
 import type { Lot } from './plan.js';
+import { readDeliveries } from './state.js';
 
 /** Le lot d'un plan tel que `cadence perf` le lit. */
-export type PlanLot = Pick<Lot, 'id' | 'status' | 'finished' | 'notes'>;
+export type PlanLot = Pick<Lot, 'id' | 'status' | 'created' | 'finished' | 'estimate' | 'notes'>;
 /** Les plans lisibles du dossier : nom du projet (chemin relatif au dossier, séparateurs « / ») → ses lots. */
 export type Plans = Map<string, PlanLot[]>;
 
@@ -77,6 +79,17 @@ export interface CauseWindow {
   unclassifiedShare: number | null;
 }
 
+/** Les indicateurs de L226 : tokens par lot, délais, durées de mur. */
+export interface TokensBlock {
+  /** Par valeur exacte de l'estimate du plan (« 0.5 », « 1 »…) : médiane des tokens comptés par journal rendu ; `lots` = journaux. */
+  byEstimate: Record<string, Indicator>;
+  reviewShare: Indicator;
+}
+export interface DelaysBlock {
+  createdToDone: Indicator;
+  doneToDelivered: Indicator;
+}
+
 export interface PerfResult {
   since: string | null;
   today: Day;
@@ -84,6 +97,10 @@ export interface PerfResult {
   throughput: { ready: Indicator; rendered: Indicator; delivered: Indicator; onBudget: Indicator; escaped: Indicator };
   corrections: { medianPasses: Indicator; atLeast2: Indicator; firstTime: Indicator; causes: { current: CauseWindow; previous: CauseWindow } };
   interventions: { handedOut: Indicator & { count: { current: number | null; previous: number | null } }; ux: Indicator };
+  tokens: TokensBlock;
+  delays: DelaysBlock;
+  /** Médiane de la durée de mur en minutes, par sorte d'étape ; `lots` = étapes. */
+  durations: Record<string, Indicator>;
   /** Lots de journal rendus dans les deux fenêtres qui n'ont pas de lot dans les plans du dossier (R15). */
   orphans: number;
   warnings: string[];
@@ -94,6 +111,8 @@ export interface PerfInput {
   /** Les plans lisibles ; vide : les indicateurs qui lisent le plan sont n/d (R16). */
   plans: Plans;
   cache: Map<string, Classification>;
+  /** Jours de deliveries.log par projet ; un projet absent (pas un dépôt git, pas de journal de livraison) donne un délai de livraison n/d (R5). */
+  deliveries?: Map<string, Day[]>;
   windows: Windows;
   today: Day;
   since?: string;
@@ -125,6 +144,10 @@ function planLot(plans: Plans, project: string, lot: string): PlanLot | undefine
   return lots.find((l) => l.id === lot) ?? (lot.includes('/') ? lots.find((l) => l.id === lot.slice(0, lot.indexOf('/'))) : undefined);
 }
 
+/** Rang d'affichage d'une sorte d'étape : l'ordre du cycle, les sortes inconnues après. */
+const KIND_ORDER = ['spec', 'maquette', 'fiche', 'precheck', 'implement', 'review', 'review-small', 'ux', 'fix', 'accept'];
+const kindRank = (kind: string) => (KIND_ORDER.includes(kind) ? KIND_ORDER.indexOf(kind) : KIND_ORDER.length);
+
 const median = (xs: number[]): number | null => {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b);
@@ -154,6 +177,11 @@ const DECISIONS = {
   firstTime: 'la première écriture n\'est pas assez bonne : durcir la fiche ou le brief',
   handedOut: 'la vague s\'arrête trop tôt ou le lead la rattrape à la main : revoir la fin de cycle',
   ux: 'la revue d\'ergonomie coûte plus d\'un tour : renforcer la maquette',
+  tokens: 'l\'estimate est mal calibrée : redécouper le lot ou recaler l\'estimate et les budgets',
+  reviewShare: 'la revue pèse trop face à l\'écriture : alléger (seuil du lot léger, orchestrate.review.threshold)',
+  createdToDone: 'la file de lots s\'allonge : chercher le goulot de priorisation avant d\'ajouter des lots',
+  doneToDelivered: 'on livre trop rarement : livrer par lots plus petits',
+  duration: 'cette étape est lente : revoir ses timeouts, son effort ou son modèle',
 } as const;
 export type DecisionKey = keyof typeof DECISIONS;
 
@@ -280,10 +308,66 @@ export function computePerf(input: PerfInput): PerfResult {
   const visibleCounts = both(windows, (w) => visibleRendered(w).length);
   const budgetCounts = both(windows, (w) => withBudget(w).length);
 
-  const orphans = [...rendus.current, ...rendus.previous].filter((d) => planLot(plans, d.j.project, d.j.lot) === undefined).length;
-
   const mk = (vals: { current: number | null; previous: number | null }, lots: { current: number; previous: number }, dir: Direction | null, twin: string | null, nullNote: string | null = null) => indicator(vals.current, vals.previous, lots, windows, dir, twin, nullNote);
   const planNote = hasPlans ? null : 'plan illisible ou absent';
+
+  // Tokens par estimate et part de revue (R2, R3)
+  const twinFirstTime = 'corrections.firstTime';
+  const tokensByClass = (w: Window): Map<string, number[]> => {
+    const classes = new Map<string, number[]>();
+    for (const d of rendered(w)) {
+      const p = planLot(plans, d.j.project, d.j.lot);
+      const counted = d.j.steps.filter((x) => x.counted !== undefined);
+      if (!p || counted.length === 0) continue;
+      const key = String(p.estimate);
+      classes.set(key, [...(classes.get(key) ?? []), counted.reduce((sum, x) => sum + x.counted!, 0)]);
+    }
+    return classes;
+  };
+  const byClass = both(windows, tokensByClass);
+  const byEstimate: Record<string, Indicator> = {};
+  const classKeys = [...new Set([...byClass.current.keys(), ...byClass.previous.keys()])].sort((a, b) => Number(a) - Number(b));
+  for (const key of classKeys) {
+    const vals = both(windows, (w) => median((w === windows.current ? byClass.current : byClass.previous).get(key) ?? []));
+    byEstimate[key] = mk(vals, { current: byClass.current.get(key)?.length ?? 0, previous: byClass.previous.get(key)?.length ?? 0 }, 'up', twinFirstTime);
+  }
+  const reviewShare = both(windows, (w) => {
+    let review = 0;
+    let all = 0;
+    for (const d of rendered(w)) for (const x of d.j.steps) {
+      all += x.counted ?? 0;
+      if (isReviewKind(x.kind)) review += x.counted ?? 0;
+    }
+    return all === 0 ? null : review / all;
+  });
+
+  // Délais création → done et done → livraison (R4, R5) : les lots du plan done dont finished tombe dans la fenêtre
+  const doneIn = (w: Window) => [...plans].flatMap(([project, lots]) => lots.filter((l) => l.status === 'done' && l.finished !== undefined && inWindow(l.finished, w)).map((lot) => ({ project, lot })));
+  const timed = (w: Window) => doneIn(w).filter(({ lot }) => isDay(lot.created) && lot.finished! >= lot.created!);
+  const createdToDone = both(windows, (w) => timed(w).map(({ lot }) => diffDays(lot.created!, lot.finished!)));
+  const doneToDelivered = both(windows, (w) =>
+    timed(w).flatMap(({ project, lot }) => {
+      const next = (input.deliveries?.get(project) ?? []).filter((d) => d >= lot.finished!).sort()[0];
+      return next === undefined ? [] : [diffDays(lot.finished!, next)];
+    }));
+  const sizes = <T>(v: { current: T[]; previous: T[] }) => ({ current: v.current.length, previous: v.previous.length });
+
+  // Durée de mur par sorte d'étape (R6) : rangée par le jour de la fin de l'étape
+  const walls = all.filter((d) => finished(d.j)).flatMap((d) => d.j.steps.flatMap((x) => {
+    const from = Date.parse(x.started ?? '');
+    const to = Date.parse(x.ended ?? '');
+    return x.status === 'ok' && !Number.isNaN(from) && !Number.isNaN(to) && to >= from ? [{ kind: x.kind, minutes: (to - from) / 60_000, day: toDay(new Date(to)) }] : [];
+  }));
+  const wallsOf = (kind: string, w: Window) => walls.filter((x) => x.kind === kind && inWindow(x.day, w)).map((x) => x.minutes);
+  const durations: Record<string, Indicator> = {};
+  const wallKinds = [...new Set(walls.filter((x) => inWindow(x.day, windows.current) || inWindow(x.day, windows.previous)).map((x) => x.kind))].sort((a, b) => kindRank(a) - kindRank(b) || a.localeCompare(b));
+  for (const kind of wallKinds) {
+    const v = both(windows, (w) => wallsOf(kind, w));
+    durations[kind] = mk({ current: median(v.current), previous: median(v.previous) }, sizes(v), 'up', twinFirstTime);
+  }
+
+  const orphans = [...rendus.current, ...rendus.previous].filter((d) => planLot(plans, d.j.project, d.j.lot) === undefined).length;
+
   const throughput = {
     ready: mk(ready, lotsOf, null, twinEscaped),
     rendered: mk(both(windows, perDay), lotsOf, 'down', twinEscaped),
@@ -301,7 +385,12 @@ export function computePerf(input: PerfInput): PerfResult {
   const handed = mk(handedOut, lotsOf, 'up', twinEscaped, planNote);
   const interventions = { handedOut: { ...handed, count: handedCount }, ux: mk(ux, visibleCounts, 'up', twinEscaped) };
 
-  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, orphans, warnings: [] };
+  const tokens: TokensBlock = { byEstimate, reviewShare: mk(reviewShare, both(windows, (w) => rendered(w).length), 'up', twinFirstTime) };
+  const delays: DelaysBlock = {
+    createdToDone: mk({ current: median(createdToDone.current), previous: median(createdToDone.previous) }, sizes(createdToDone), 'up', twinFirstTime, planNote),
+    doneToDelivered: mk({ current: median(doneToDelivered.current), previous: median(doneToDelivered.previous) }, sizes(doneToDelivered), 'up', twinFirstTime, planNote),
+  };
+  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, tokens, delays, durations, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
   for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${DECISIONS[key.decision]}`);
   if (bottleneck) result.warnings.push(bottleneck);
@@ -325,7 +414,10 @@ const LABELS: Record<Cause, string> = {
   'faux-constat': 'faux constat de revue',
 };
 
-type Kind = 'count' | 'rate' | 'share' | 'num';
+/** Les dix premières lignes de `indicatorLines` sont celles de L225. */
+const LEGACY_LINES = 10;
+
+type Kind = 'count' | 'rate' | 'share' | 'num' | 'tokens' | 'days' | 'min';
 interface Line {
   label: string;
   kind: Kind;
@@ -334,6 +426,13 @@ interface Line {
 
 /** Les indicateurs imprimés, dans l'ordre du tableau, avec leur étiquette et la décision qu'ils éclairent. */
 function indicatorLines(r: PerfResult): [Line, Indicator][] {
+  const speed: [Line, Indicator][] = [
+    ...Object.entries(r.tokens.byEstimate).map(([k, ind]): [Line, Indicator] => [{ label: `tokens par lot (estimate ${k})`, kind: 'tokens', decision: 'tokens' }, ind]),
+    [{ label: 'part des tokens de revue', kind: 'share', decision: 'reviewShare' }, r.tokens.reviewShare],
+    [{ label: 'délai création → done', kind: 'days', decision: 'createdToDone' }, r.delays.createdToDone],
+    [{ label: 'délai done → livraison', kind: 'days', decision: 'doneToDelivered' }, r.delays.doneToDelivered],
+    ...Object.entries(r.durations).map(([k, ind]): [Line, Indicator] => [{ label: `durée de mur ${k}`, kind: 'min', decision: 'duration' }, ind]),
+  ];
   return [
     [{ label: 'prêts', kind: 'count', decision: 'rendered' }, r.throughput.ready],
     [{ label: 'rendus par jour', kind: 'rate', decision: 'rendered' }, r.throughput.rendered],
@@ -345,6 +444,7 @@ function indicatorLines(r: PerfResult): [Line, Indicator][] {
     [{ label: 'sessions ux par lot visible', kind: 'num', decision: 'ux' }, r.interventions.ux],
     [{ label: 'part conforme du premier coup', kind: 'share', decision: 'firstTime' }, r.corrections.firstTime],
     [{ label: 'défauts échappés', kind: 'count', decision: 'escaped' }, r.throughput.escaped],
+    ...speed,
   ];
 }
 
@@ -352,7 +452,11 @@ const num = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).repla
 const pct = (v: number) => `${Math.round(100 * v)} %`;
 function value(v: number | null, kind: Kind): string {
   if (v === null) return 'n/d';
-  return kind === 'share' ? pct(v) : num(v);
+  if (kind === 'share') return pct(v);
+  if (kind === 'tokens') return `${num(v / 1000)} k`;
+  if (kind === 'days') return `${num(v)} j`;
+  if (kind === 'min') return `${num(v)} min`;
+  return num(v);
 }
 const signed = (c: number) => `${c >= 0 ? '+' : '−'}${Math.round(100 * Math.abs(c))} %`;
 
@@ -391,6 +495,8 @@ export function renderPerf(r: PerfResult): string[] {
   section('Interventions du lead', ['lots terminés hors vague', 'sessions ux par lot visible']);
   const h = r.interventions.handedOut.count;
   out.push(`  lots rendus puis terminés hors vague : ${h.current ?? 'n/d'} (précédente ${h.previous ?? 'n/d'})`);
+  out.push('', 'Tokens, délais et durées (médianes par lot ou par étape)');
+  for (const l of lines.slice(LEGACY_LINES)) out.push(row(l));
   for (const wr of r.warnings.filter((x) => x.startsWith('⚠ goulot'))) out.push('', wr);
   if (r.orphans > 0) out.push('', `${r.orphans} lot(s) de journal sans plan`);
   return out;
@@ -408,4 +514,18 @@ export function readPlans(parent: string, warn: (line: string) => void): Plans {
     }
   }
   return plans;
+}
+
+/** Les jours de livraison de chaque projet du dossier, lus dans `<gitCommonDir>/cadence/deliveries.log` de son dépôt (R5). Sans dépôt git ni journal de livraison, le projet est absent de la carte ; rien n'est créé. */
+export function readProjectDeliveries(parent: string, projects: string[]): Map<string, Day[]> {
+  const deliveries = new Map<string, Day[]>();
+  for (const name of projects) {
+    try {
+      const days = readDeliveries(join(gitCommonDir(join(parent, name)), 'cadence'));
+      if (days) deliveries.set(name, days);
+    } catch {
+      // pas un dépôt git : délai de livraison n/d pour ce projet
+    }
+  }
+  return deliveries;
 }

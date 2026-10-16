@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, linkSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Day } from './dates.js';
+import { isDay, type Day } from './dates.js';
 import { gitCommonDir, gitPath } from './git.js';
 
 /** État local propre au worktree (notes de clôture). */
@@ -184,4 +184,16 @@ export function lastDelivery(dir: string): string | null {
   if (!existsSync(file)) return null;
   const last = readFileSync(file, 'utf8').trim().split('\n').pop();
   return last?.split(' ')[1] ?? null;
+}
+
+/** Tous les jours de `deliveries.log` (une ligne « jour sha » par livraison verte), dans l'ordre du fichier ; null si le fichier est absent ou illisible. Lecture seule : ne crée rien. */
+export function readDeliveries(dir: string): Day[] | null {
+  try {
+    return readFileSync(join(dir, 'deliveries.log'), 'utf8')
+      .split('\n')
+      .map((l) => l.split(' ')[0]!)
+      .filter(isDay);
+  } catch {
+    return null;
+  }
 }

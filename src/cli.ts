@@ -23,7 +23,7 @@ import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './or
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
-import { computePerf, perfWindows, readPlans, renderPerf } from './perf.js';
+import { computePerf, perfWindows, readPlans, readProjectDeliveries, renderPerf } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
@@ -903,7 +903,8 @@ function perf(rest: string[], values: { since?: string; json?: boolean }, today:
     const warnings: string[] = [];
     const plans = readPlans(parent, (l) => warnings.push(l));
     if (plans.size === 0 && warnings.length === 0) warnings.push(`perf : aucun plan sous ${parent}, indicateurs du plan n/d`);
-    const result = computePerf({ journals, plans, cache, windows: perfWindows(today, values.since), today, since: values.since });
+    const deliveries = readProjectDeliveries(parent, [...plans.keys()]);
+    const result = computePerf({ journals, plans, cache, deliveries, windows: perfWindows(today, values.since), today, since: values.since });
     for (const w of warnings) io.err(w);
     if (values.json) io.out(JSON.stringify(result, null, 2));
     else for (const l of renderPerf(result)) io.out(l);

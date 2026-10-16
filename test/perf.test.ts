@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { run } from '../src/cli.js';
@@ -42,11 +43,11 @@ function journal(c: Ctx, day: string, o: JOpts = {}): { project: string; lot: st
 }
 const many = <T>(n: number, f: (i: number) => T): T[] => Array.from({ length: n }, (_, i) => f(i));
 
-interface PLot { id: string; status?: string; finished?: string; notes?: [string, string][] }
+interface PLot { id: string; status?: string; finished?: string; created?: string; estimate?: number; notes?: [string, string][] }
 function plan(root: string, name: string, lots: PLot[]): void {
   const dir = join(root, name);
   mkdirSync(join(dir, 'docs', 'plan'), { recursive: true });
-  const body = lots.map((l) => [`  - id: ${l.id}`, '    title: "t"', `    status: ${l.status ?? 'done'}`, ...(l.finished ? [`    finished: ${l.finished}`] : []), ...(l.notes ? ['    notes:', ...l.notes.map(([d, t]) => `      - { date: ${d}, text: ${JSON.stringify(t)} }`)] : [])].join('\n')).join('\n');
+  const body = lots.map((l) => [`  - id: ${l.id}`, '    title: "t"', `    status: ${l.status ?? 'done'}`, ...(l.estimate === undefined ? [] : [`    estimate: ${l.estimate}`]), ...(l.created ? [`    created: ${l.created}`] : []), ...(l.finished ? [`    finished: ${l.finished}`] : []), ...(l.notes ? ['    notes:', ...l.notes.map(([d, t]) => `      - { date: ${d}, text: ${JSON.stringify(t)} }`)] : [])].join('\n')).join('\n');
   writeFileSync(join(dir, 'docs', 'plan', 'raf.yaml'), `version: 1\nproject: "${name}"\nprefix: L\nlots:\n${body}\n`);
 }
 
@@ -745,7 +746,7 @@ describe('cadence perf — sortie, erreurs, lecture seule', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('R11 — la sortie JSON n\'a aucune clé de lignes, de commits ni de tokens consommés au total', async () => {
+  it('R11 — la sortie JSON n\'a aucune clé de lignes, de commits ni de tokens consommés au total (précisée par R13 de L226 : seules des médianes par lot sont admises)', async () => {
     const c = ctx();
     journal(c, CUR, { passes: 1, budget: 1000, counted: 10 });
     const keys: string[] = [];
@@ -753,13 +754,13 @@ describe('cadence perf — sortie, erreurs, lecture seule', () => {
       if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { keys.push(k); walk(x); }
     };
     walk((await json(c.root)).data);
-    expect(keys.filter((k) => /ligne|line|commit|token|consomm|consumed/i.test(k))).toEqual([]);
+    expect(keys.filter((k) => /ligne|line|commit|consomm|consumed|total/i.test(k))).toEqual([]);
   });
 
   it('R11 — le texte n\'imprime aucun nombre de commits ni de lignes', async () => {
     const c = ctx();
     journal(c, CUR, { passes: 1, budget: 1000, counted: 10 });
-    expect((await cad(c.root)).text).not.toMatch(/commit|lignes? de code|token/i);
+    expect((await cad(c.root)).text).not.toMatch(/commit|lignes? de code|total/i);
   });
 
   it('R20 — --json imprime un seul objet JSON parsable avec les clés windows, throughput, corrections, interventions, warnings', async () => {
@@ -768,7 +769,7 @@ describe('cadence perf — sortie, erreurs, lecture seule', () => {
     const r = await cad(c.root, '--json');
     expect(r.out).toHaveLength(1);
     const data = JSON.parse(r.out[0]!);
-    expect(Object.keys(data)).toEqual(['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'orphans', 'warnings']);
+    expect(Object.keys(data)).toEqual(['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'tokens', 'delays', 'durations', 'orphans', 'warnings']);
     expect(data.today).toBe(TODAY);
   });
 
@@ -849,5 +850,465 @@ describe('cadence perf — sortie, erreurs, lecture seule', () => {
     const bin = readFileSync(new URL('../bin/cadence.js', import.meta.url), 'utf8');
     expect(bin).toContain('cadence perf [dossier] [--since date] [--json]');
     expect(bin).toContain("'perf'");
+  });
+});
+
+// ── L226 : tokens, délais, durées, coût ─────────────────────────────────────────────────────────
+
+/** Un journal d'un lot du plan, rendu le `d` : une étape implement (ou les étapes données). */
+function lotJournal(c: Ctx, d: string, id: string, o: { counted?: number; steps?: PStep[]; status?: string; project?: string; wave?: string } = {}) {
+  const steps = o.steps ?? [{ kind: 'implement', ended: at(d, '09:00:00'), ...(o.counted === undefined ? {} : { counted: o.counted }) }];
+  writeJournal(c.runs, o.wave ?? 'w1', o.project ?? 'alpha', id, { status: o.status ?? 'ready', steps });
+}
+/** n lots done (L<prefix>0…) finis le `finished`, créés le `created`, avec le journal de chaque lot si `counted` est donné. */
+function doneLots(c: Ctx, prefix: string, n: number, finished: string, created: string, estimate = 1, counted?: number): PLot[] {
+  return many(n, (i) => {
+    const id = `${prefix}${i}`;
+    if (counted !== undefined) lotJournal(c, finished, id, { counted });
+    return { id, finished, created, estimate };
+  });
+}
+const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, stdio: 'pipe' });
+function initRepo(dir: string, deliveries?: string[]): void {
+  mkdirSync(dir, { recursive: true });
+  git(dir, 'init', '-q');
+  if (deliveries) {
+    mkdirSync(join(dir, '.git', 'cadence'));
+    writeFileSync(join(dir, '.git', 'cadence', 'deliveries.log'), deliveries.map((l) => `${l}\n`).join(''));
+  }
+}
+
+describe('cadence perf — tokens par estimate et part de revue (R2, R3)', () => {
+  it('R2 — trois lots d\'estimate 0.5 à 100 k, 200 k, 300 k : médiane 200 k pour la classe 0.5', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...doneLots(c, 'A', 1, CUR, '2026-10-01', 0.5, 100_000), ...doneLots(c, 'B', 1, CUR, '2026-10-01', 0.5, 200_000), ...doneLots(c, 'C', 1, CUR, '2026-10-01', 0.5, 300_000)]);
+    const { data } = await json(c.root);
+    expect(data.tokens.byEstimate['0.5'].current).toBe(200_000);
+    expect(data.tokens.byEstimate['0.5'].lots.current).toBe(3);
+  });
+
+  it('R2 — deux estimates (0.5 et 1) donnent deux classes séparées', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...doneLots(c, 'A', 1, CUR, '2026-10-01', 0.5, 100_000), ...doneLots(c, 'B', 1, CUR, '2026-10-01', 1, 400_000)]);
+    const { data } = await json(c.root);
+    expect(Object.keys(data.tokens.byEstimate).sort()).toEqual(['0.5', '1']);
+    expect([data.tokens.byEstimate['0.5'].current, data.tokens.byEstimate['1'].current]).toEqual([100_000, 400_000]);
+  });
+
+  it('R2 — un orphelin et un journal sans jetons lisibles n\'entrent pas', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...doneLots(c, 'A', 1, CUR, '2026-10-01', 0.5, 100_000), ...doneLots(c, 'B', 1, CUR, '2026-10-01', 0.5)]);
+    lotJournal(c, CUR, 'B0', { steps: [{ kind: 'implement', ended: at(CUR), tokens: null }] });
+    lotJournal(c, CUR, 'Z9', { counted: 900_000 });
+    const { data } = await json(c.root);
+    expect(data.tokens.byEstimate['0.5'].current).toBe(100_000);
+    expect(data.tokens.byEstimate['0.5'].lots.current).toBe(1);
+  });
+
+  it('R2 — un lot failed compte (il a dépensé)', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0', status: 'todo', estimate: 1 }]);
+    lotJournal(c, CUR, 'A0', { counted: 250_000, status: 'failed' });
+    const { data } = await json(c.root);
+    expect(data.tokens.byEstimate['1'].current).toBe(250_000);
+  });
+
+  it('R3 — 300 k en implement, 100 k en review, 100 k en ux : part 40 %', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0' }]);
+    lotJournal(c, CUR, 'A0', { steps: [{ kind: 'implement', counted: 300_000, ended: at(CUR, '09:00:00') }, { kind: 'review', counted: 100_000, ended: at(CUR, '10:00:00') }, { kind: 'ux', counted: 100_000, ended: at(CUR, '11:00:00') }] });
+    const { data, text } = await json(c.root).then(async (r) => ({ data: r.data, text: (await cad(c.root)).text }));
+    expect(data.tokens.reviewShare.current).toBeCloseTo(0.4, 9);
+    expect(text).toContain('part des tokens de revue : 40 %');
+  });
+
+  it('R3 — une étape review-small compte, une étape fiche ne compte pas dans la revue', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0' }]);
+    lotJournal(c, CUR, 'A0', { steps: [{ kind: 'implement', counted: 100_000, ended: at(CUR, '09:00:00') }, { kind: 'review-small', counted: 50_000, ended: at(CUR, '10:00:00') }, { kind: 'fiche', counted: 50_000, ended: at(CUR, '11:00:00') }] });
+    const { data } = await json(c.root);
+    expect(data.tokens.reviewShare.current).toBeCloseTo(0.25, 9);
+  });
+
+  it('R3 — aucun journal rendu : n/d, pas 0 %', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0' }]);
+    lotJournal(c, PREV, 'A0', { steps: [{ kind: 'review', counted: 10, ended: at(PREV) }, { kind: 'implement', counted: 10, ended: at(PREV) }] });
+    const { data } = await json(c.root);
+    expect(data.tokens.reviewShare.current).toBeNull();
+    expect(data.tokens.reviewShare.previous).toBeCloseTo(0.5, 9);
+    expect(data.tokens.reviewShare.warn).toBe(false);
+  });
+});
+
+describe('cadence perf — délais création → done et done → livraison (R4, R5)', () => {
+  it('R4 — created 05-10, finished 09-10 : 4 jours', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: '2026-10-09' }]);
+    const { data } = await json(c.root);
+    expect(data.delays.createdToDone.previous).toBe(4);
+  });
+
+  it('R4 — médiane de 1, 2, 10 jours = 2', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-11', finished: '2026-10-12' }, { id: 'B', created: '2026-10-10', finished: '2026-10-12' }, { id: 'C', created: '2026-10-02', finished: '2026-10-12' }]);
+    const { data } = await json(c.root);
+    expect(data.delays.createdToDone.current).toBe(2);
+    expect(data.delays.createdToDone.lots.current).toBe(3);
+  });
+
+  it('R4 — un lot sans created lisible est écarté, sans erreur', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-10', finished: '2026-10-12' }, { id: 'B', finished: '2026-10-12' }]);
+    const r = await json(c.root);
+    expect(r.code).toBe(0);
+    expect(r.data.delays.createdToDone.current).toBe(2);
+    expect(r.data.delays.createdToDone.lots.current).toBe(1);
+  });
+
+  it('R4 — un lot done daté hors fenêtre n\'entre pas', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-09-01', finished: '2026-09-20' }]);
+    const { data } = await json(c.root);
+    expect([data.delays.createdToDone.current, data.delays.createdToDone.previous]).toEqual([null, null]);
+  });
+
+  it('R5 — done le 10-10, livraisons les 09-10 et 12-10 : 2 jours', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-01', finished: '2026-10-10' }]);
+    initRepo(join(c.root, 'alpha'), ['2026-10-09 aaa', '2026-10-12 bbb', '2026-10-14 ccc']);
+    const { data } = await json(c.root);
+    expect(data.delays.doneToDelivered.current).toBe(2);
+  });
+
+  it('R5 — livraison le jour même du done : 0 jour (et non n/d)', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-01', finished: '2026-10-10' }]);
+    initRepo(join(c.root, 'alpha'), ['2026-10-10 aaa']);
+    const { data } = await json(c.root);
+    expect(data.delays.doneToDelivered.current).toBe(0);
+  });
+
+  it('R5 — aucune livraison après le done : lot écarté, valeur n/d si aucun autre', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-01', finished: '2026-10-12' }]);
+    initRepo(join(c.root, 'alpha'), ['2026-10-09 aaa']);
+    const { data } = await json(c.root);
+    expect(data.delays.doneToDelivered.current).toBeNull();
+    expect(data.delays.createdToDone.current).toBe(11);
+  });
+
+  it('R5 — deliveries.log absent : n/d sans erreur ni ⚠', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-01', finished: '2026-10-12' }]);
+    initRepo(join(c.root, 'alpha'));
+    const r = await json(c.root);
+    expect(r.code).toBe(0);
+    expect(r.err).toEqual([]);
+    expect(r.data.delays.doneToDelivered).toMatchObject({ current: null, warn: false });
+  });
+
+  it('R5 — projet qui n\'est pas un dépôt git : n/d sans erreur', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-01', finished: '2026-10-12' }]);
+    const r = await json(c.root);
+    expect(r.code).toBe(0);
+    expect(r.err).toEqual([]);
+    expect(r.data.delays.doneToDelivered.current).toBeNull();
+  });
+
+  it('R5 — la lecture ne crée pas .git/cadence/ (arbre du dépôt identique)', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-01', finished: '2026-10-12' }]);
+    initRepo(join(c.root, 'alpha'));
+    const before = tree(join(c.root, 'alpha', '.git'));
+    await cad(c.root);
+    expect(tree(join(c.root, 'alpha', '.git'))).toEqual(before);
+    expect(existsSync(join(c.root, 'alpha', '.git', 'cadence'))).toBe(false);
+  });
+
+  it('R5 — deux projets, deux dépôts : chaque lot est rapproché des livraisons de SON dépôt', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-01', finished: '2026-10-10' }]);
+    plan(c.root, 'beta', [{ id: 'B', created: '2026-10-01', finished: '2026-10-10' }]);
+    initRepo(join(c.root, 'alpha'), ['2026-10-11 a']);
+    initRepo(join(c.root, 'beta'), ['2026-10-15 b']);
+    const { data } = await json(c.root);
+    // médiane de 1 jour (alpha) et 5 jours (beta) = 3
+    expect(data.delays.doneToDelivered.current).toBe(3);
+    expect(data.delays.doneToDelivered.lots.current).toBe(2);
+  });
+
+  it('R5 — projet en worktree : lit le deliveries.log du dépôt commun', async () => {
+    const c = ctx();
+    const main = join(c.root, 'main');
+    initRepo(main, ['2026-10-13 a']);
+    git(main, 'commit', '-q', '--allow-empty', '-m', 'init');
+    git(main, 'worktree', 'add', '-q', '--detach', join(c.root, 'wt'));
+    plan(c.root, 'wt', [{ id: 'A', created: '2026-10-01', finished: '2026-10-10' }]);
+    const { data } = await json(c.root);
+    expect(data.delays.doneToDelivered.current).toBe(3);
+  });
+});
+
+describe('cadence perf — durée de mur par étape (R6)', () => {
+  const stepAt = (kind: string, d: string, from: string, to: string, status = 'ok'): PStep => ({ kind, status, started: at(d, from), ended: at(d, to) });
+  async function durations(steps: PStep[]) {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0' }]);
+    lotJournal(c, CUR, 'A0', { steps });
+    return json(c.root);
+  }
+
+  it('R6 — implement du 16-10 10:00 à 10:30 : 30 minutes', async () => {
+    const { data } = await durations([stepAt('implement', '2026-10-16', '10:00:00', '10:30:00')]);
+    expect(data.durations.implement.current).toBe(30);
+  });
+
+  it('R6 — médiane de 10, 20, 90 minutes = 20', async () => {
+    const { data } = await durations([stepAt('review', CUR, '10:00:00', '10:10:00'), stepAt('review', CUR, '11:00:00', '11:20:00'), stepAt('review', CUR, '12:00:00', '13:30:00')]);
+    expect(data.durations.review.current).toBe(20);
+    expect(data.durations.review.lots.current).toBe(3);
+  });
+
+  it('R6 — une étape failed ou running est écartée', async () => {
+    const { data } = await durations([stepAt('implement', CUR, '10:00:00', '10:30:00', 'failed'), stepAt('fix', CUR, '10:00:00', '10:30:00', 'running'), stepAt('review', CUR, '10:00:00', '10:15:00')]);
+    expect(Object.keys(data.durations)).toEqual(['review']);
+  });
+
+  it('R6 — une étape sans started lisible est écartée sans erreur', async () => {
+    const r = await durations([{ kind: 'implement', ended: at(CUR), started: 'pas une date' }, { kind: 'fix', ended: at(CUR) }, stepAt('review', CUR, '10:00:00', '10:15:00')]);
+    expect(r.code).toBe(0);
+    expect(Object.keys(r.data.durations)).toEqual(['review']);
+  });
+
+  it('R6 — une étape terminée à 23:50 le jour J−6 est dans la courante, à 23:50 le jour J−7 dans la précédente', async () => {
+    const { data } = await durations([stepAt('implement', '2026-10-10', '23:20:00', '23:50:00'), stepAt('fix', '2026-10-09', '23:40:00', '23:50:00')]);
+    expect([data.durations.implement.current, data.durations.implement.previous]).toEqual([30, null]);
+    expect([data.durations.fix.current, data.durations.fix.previous]).toEqual([null, 10]);
+  });
+});
+
+describe('cadence perf — fenêtres, ⚠ et décisions des nouveaux indicateurs (R1, R12)', () => {
+  const delayCase = (c: Ctx, prev: number, cur: number, nPrev = 5, nCur = 5) => {
+    const lot = (prefix: string, n: number, finished: string, days: number) => many(n, (i) => ({ id: `${prefix}${i}`, finished, created: addDay(finished, -days) }));
+    plan(c.root, 'alpha', [...lot('P', nPrev, '2026-10-07', prev), ...lot('C', nCur, '2026-10-14', cur)]);
+  };
+  const addDay = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+  it('R1 — délai création → done 4 j → 6 j sur 5 lots par fenêtre : ⚠ ; 4 j → 5 j : pas de ⚠', async () => {
+    const a = ctx();
+    delayCase(a, 4, 6);
+    const worse = await cad(a.root);
+    expect(worse.text).toMatch(/^⚠ délai création → done : 6 j \(précédente 4 j, \+50 %\)/m);
+    const b = ctx();
+    delayCase(b, 4, 5);
+    expect((await json(b.root)).data.delays.createdToDone.warn).toBe(false);
+  });
+
+  it('R1 — 4 lots dans la courante : pas de ⚠ et la ligne dit « pas de tendance : échantillon »', async () => {
+    const c = ctx();
+    delayCase(c, 4, 6, 5, 4);
+    const r = await cad(c.root);
+    expect(r.text).not.toMatch(/^⚠ délai création/m);
+    expect(r.text).toMatch(/^ {2}délai création → done .*pas de tendance : échantillon/m);
+  });
+
+  it('R1 — fenêtre tronquée par --since : pas de ⚠ sur les nouvelles lignes', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...many(5, (i) => ({ id: `P${i}`, finished: '2026-10-09', created: '2026-10-05' })), ...many(5, (i) => ({ id: `C${i}`, finished: '2026-10-14', created: '2026-10-08' }))]);
+    const { data } = await json(c.root, '--since', '2026-10-08');
+    expect(data.delays.createdToDone).toMatchObject({ current: 6, previous: 4, warn: false, note: 'fenêtre tronquée' });
+  });
+
+  it('R1 — les fonctions de fenêtre et de ⚠ sont celles de L225 (un lot rendu au 8e jour passé est dans la précédente)', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A', created: '2026-10-08', finished: '2026-10-09' }, { id: 'B', created: '2026-10-01', finished: '2026-10-10' }]);
+    const { data } = await json(c.root);
+    expect([data.delays.createdToDone.previous, data.delays.createdToDone.current]).toEqual([1, 9]);
+    expect(data.windows.current.from).toBe('2026-10-10');
+  });
+
+  const tokensCase = (c: Ctx, prev: number, cur: number, estimate = 0.5, prefix = 'T') => ({
+    lots: [...doneLots(c, `${prefix}P`, 5, PREV, '2026-10-01', estimate, prev), ...doneLots(c, `${prefix}C`, 5, CUR, '2026-10-01', estimate, cur)],
+  });
+
+  it('R12 — tokens médians 100 k → 140 k sur 5 lots par fenêtre : ⚠ ; 100 k → 120 k : pas de ⚠', async () => {
+    const a = ctx();
+    plan(a.root, 'alpha', tokensCase(a, 100_000, 140_000).lots);
+    expect((await json(a.root)).data.tokens.byEstimate['0.5'].warn).toBe(true);
+    const b = ctx();
+    plan(b.root, 'alpha', tokensCase(b, 100_000, 120_000).lots);
+    expect((await json(b.root)).data.tokens.byEstimate['0.5'].warn).toBe(false);
+  });
+
+  it('R12 — pile 25 % : pas de ⚠', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', tokensCase(c, 100_000, 125_000).lots);
+    expect((await json(c.root)).data.tokens.byEstimate['0.5']).toMatchObject({ warn: false, change: 0.25 });
+  });
+
+  it('R12 — la ligne ⚠ finit par la décision de l\'indicateur', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', tokensCase(c, 100_000, 140_000).lots);
+    const line = (await cad(c.root)).out.find((l) => l.startsWith('⚠ tokens par lot'))!;
+    expect(line).toContain('100 k');
+    expect(line).toMatch(/→ l'estimate est mal calibrée : redécouper le lot ou recaler l'estimate et les budgets$/);
+  });
+
+  it('R12 — ⚠ sur la classe 0.5 sans ⚠ sur la classe 1', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...tokensCase(c, 100_000, 140_000, 0.5, 'H').lots, ...tokensCase(c, 100_000, 100_000, 1, 'U').lots]);
+    const { data } = await json(c.root);
+    expect([data.tokens.byEstimate['0.5'].warn, data.tokens.byEstimate['1'].warn]).toEqual([true, false]);
+  });
+});
+
+describe('cadence perf — jumeau de qualité, volume et JSON (R11, R13, R14, R17)', () => {
+  /** Un plan à un lot done avec journal (3 passes de lignes) pour que tous les indicateurs aient une valeur. */
+  function full(): Ctx {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: CUR, estimate: 1 }]);
+    lotJournal(c, CUR, 'A0', { steps: [{ kind: 'implement', counted: 100_000, started: at(CUR, '08:00:00'), ended: at(CUR, '09:00:00') }, { kind: 'review', counted: 50_000, started: at(CUR, '09:00:00'), ended: at(CUR, '09:30:00') }] });
+    return c;
+  }
+
+  it('R11 — chaque nouvelle ligne contient la part conforme du premier coup', async () => {
+    const lines = (await cad(full().root)).out;
+    for (const label of ['tokens par lot (estimate 1)', 'part des tokens de revue', 'délai création → done', 'durée de mur implement']) {
+      const l = lines.find((x) => x.includes(label));
+      expect(l, label).toBeDefined();
+      expect(l).toContain('part conforme du premier coup : 100 %');
+    }
+  });
+
+  it('R11 — le JSON lie chaque nouvel indicateur à corrections.firstTime par le champ twin', async () => {
+    const { data } = await json(full().root);
+    for (const ind of [data.tokens.byEstimate['1'], data.tokens.reviewShare, data.delays.createdToDone, data.delays.doneToDelivered, data.durations.implement]) expect(ind.twin).toBe('corrections.firstTime');
+  });
+
+  it('R11 — part conforme du premier coup n/d : la ligne l\'écrit n/d, sans ⚠ de ce chef', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: CUR }]);
+    const r = await cad(c.root);
+    const line = r.out.find((l) => l.includes('délai création → done'))!;
+    expect(line).toContain('part conforme du premier coup : n/d');
+    expect(line.startsWith('⚠')).toBe(false);
+  });
+
+  it('R13 — la sortie JSON n\'a aucune clé de total de tokens ni d\'euros d\'une fenêtre', async () => {
+    const { text } = await json(full().root);
+    const keys: string[] = [];
+    JSON.parse(text, function (k) { keys.push(k); return this[k]; });
+    expect(keys.filter((k) => /total|sum|spent|consumed/i.test(k))).toEqual([]);
+  });
+
+  it('R13 — le texte n\'imprime aucun total en tokens ni en euros d\'une fenêtre, seulement des médianes par lot', async () => {
+    const c = full();
+    // un second lot : le total serait 250 k, la médiane par lot 125 k
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: CUR, estimate: 1 }, ...doneLots(c, 'B', 1, CUR, '2026-10-05', 1, 100_000)]);
+    const { text } = await cad(c.root);
+    expect(text).not.toMatch(/250 k|total/);
+    expect(text).toContain('tokens par lot (estimate 1) : 125 k');
+  });
+
+  it('R13 — aucun nombre de commits ni de lignes', async () => {
+    const { text } = await cad(full().root);
+    expect(text).not.toMatch(/commits? :|lignes? de code/i);
+  });
+
+  it('R14 — le JSON porte tokens, delays, durations et cost en plus des clés de L225', async () => {
+    const { data } = await json(full().root);
+    for (const k of ['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'orphans', 'warnings', 'tokens', 'delays', 'durations']) expect(data).toHaveProperty(k);
+    expect(Object.keys(data.tokens).sort()).toEqual(['byEstimate', 'reviewShare']);
+    expect(Object.keys(data.delays).sort()).toEqual(['createdToDone', 'doneToDelivered']);
+  });
+
+  it('R14 — chaque nouvel indicateur porte current, previous, change, warn, twin', async () => {
+    const { data } = await json(full().root);
+    for (const ind of [data.tokens.byEstimate['1'], data.tokens.reviewShare, data.delays.createdToDone, data.delays.doneToDelivered, data.durations.implement]) expect(Object.keys(ind)).toEqual(expect.arrayContaining(['current', 'previous', 'change', 'warn', 'twin']));
+  });
+
+  it('R14 — les nombres du JSON égalent ceux du texte', async () => {
+    const c = full();
+    const { data } = await json(c.root);
+    const text = (await cad(c.root)).text;
+    expect(data.tokens.byEstimate['1'].current).toBe(150_000);
+    expect(text).toContain('tokens par lot (estimate 1) : 150 k');
+    expect(data.delays.createdToDone.current).toBe(7);
+    expect(text).toContain('délai création → done : 7 j');
+    expect(data.durations.implement.current).toBe(60);
+    expect(text).toContain('durée de mur implement : 60 min');
+  });
+
+  it('R14 — sur les mêmes journaux, les clés de L225 sont identiques avant et après le lot', async () => {
+    const c = ctx();
+    journal(c, CUR, { lot: 'A0', passes: 1 });
+    plan(c.root, 'alpha', [{ id: 'A0', finished: CUR }]);
+    const { data } = await json(c.root);
+    expect(data.throughput.ready).toMatchObject({ current: 1, previous: null, change: null, warn: false, twin: 'throughput.escaped' });
+    expect(data.throughput.delivered.current).toBe(1);
+    expect(data.corrections.medianPasses.current).toBe(1);
+    expect(data.corrections.firstTime.current).toBe(0);
+    expect(data.interventions.ux.current).toBeNull();
+    expect(data.orphans).toBe(0);
+  });
+
+  it('R17 — fenêtre précédente vide : n/d et pas de ⚠ sur chaque nouvel indicateur', async () => {
+    const { data } = await json(full().root);
+    for (const ind of [data.tokens.byEstimate['1'], data.tokens.reviewShare, data.delays.createdToDone, data.durations.implement]) expect(ind).toMatchObject({ previous: null, warn: false });
+  });
+
+  it('R17 — médiane de durée sans étape = null, jamais 0', async () => {
+    const { data } = await json(full().root);
+    expect(data.durations.implement.previous).toBeNull();
+    expect(data.delays.doneToDelivered.current).toBeNull();
+  });
+
+  it('R17 — plan illisible : délais et coût n/d, tokens par estimate n/d, durées par étape servies', async () => {
+    const c = full();
+    writeFileSync(join(c.root, 'alpha', 'docs', 'plan', 'raf.yaml'), 'version: [pas du yaml');
+    const r = await json(c.root);
+    expect(r.err.some((l) => l.includes('plan illisible'))).toBe(true);
+    expect(r.data.delays.createdToDone.current).toBeNull();
+    expect(r.data.tokens.byEstimate).toEqual({});
+    expect(r.data.durations.implement.current).toBe(60);
+  });
+});
+
+describe('cadence perf — lecture seule des nouveaux indicateurs (R15)', () => {
+  it('R15 — l\'arbre du dossier est inchangé après la commande', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: CUR }]);
+    initRepo(join(c.root, 'alpha'), ['2026-10-13 a']);
+    lotJournal(c, CUR, 'A0', { counted: 10 });
+    const before = tree(c.root);
+    await cad(c.root);
+    expect(tree(c.root)).toEqual(before);
+  });
+
+  it('R15 — un ⚠ imprimé et le code de sortie vaut 0', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...many(5, (i) => ({ id: `P${i}`, finished: '2026-10-07', created: '2026-10-03' })), ...many(5, (i) => ({ id: `C${i}`, finished: '2026-10-14', created: '2026-10-08' }))]);
+    const r = await cad(c.root);
+    expect(r.text).toMatch(/^⚠ délai création/m);
+    expect(r.code).toBe(0);
+  });
+
+  it('R15 — aucun appel à fetch', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: CUR }]);
+    const spy = vi.spyOn(globalThis, 'fetch');
+    await cad(c.root);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('R15 — .git/cadence/ n\'est pas créé dans un projet qui n\'en avait pas', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [{ id: 'A0', created: '2026-10-05', finished: CUR }]);
+    initRepo(join(c.root, 'alpha'));
+    await cad(c.root);
+    expect(existsSync(join(c.root, 'alpha', '.git', 'cadence'))).toBe(false);
   });
 });

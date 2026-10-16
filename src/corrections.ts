@@ -63,7 +63,7 @@ interface RawStep {
   tokens?: { counted?: unknown; input?: unknown; cacheWrite?: unknown; cacheRead?: unknown; output?: unknown };
 }
 
-const isReview = (kind: string) => kind.startsWith('review') || kind === 'ux';
+export const isReview = (kind: string) => kind.startsWith('review') || kind === 'ux';
 
 function readJson(file: string): any {
   try {

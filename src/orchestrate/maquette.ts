@@ -16,8 +16,8 @@ export function maquetteText(o: { fiche: string; passes: number; max: number; pr
     `Mockup mode: review the mockup \`${folder}/maquette.html\` against its sheet \`${o.fiche}\`. It is a local file, not an application: open it directly (file URL), do not start any server.`,
     `The spec writer committed the captures \`${folder}/maquette-<état>-<largeur>.png\` (one per state of the sheet and per width: ${LARGEURS.join(' and ')} px): look at every one, and re-capture a state yourself when a capture looks stale. Each state is the section \`#etat-<état>\` of the mockup.`,
     later
-      ? `This is review ${rank} of ${o.max}${rank >= o.max ? ', the last review' : ''}: the spec writer fixed the points of the previous one (below). Check them first, then run the whole sweep again. Mark \`inchange: true\` on every blocking or major finding about a point the spec writer did not change and the previous review had not raised.`
-      : `This is the first review of this mockup (${o.max} review${o.max > 1 ? 's' : ''} at most): there is no later review to keep a finding for.`,
+      ? `This is review ${rank} of ${o.max}${rank >= o.max ? ', the last review' : ''}: the spec writer fixed the points of the previous one (below). Check them first, then run the whole sweep again and report ALL the blocking and major findings of it in this report. Mark \`inchange: true\` on every blocking or major finding about a point the spec writer did not change and the previous review had not raised.`
+      : `This is the first review of this mockup (${o.max} review${o.max > 1 ? 's' : ''} at most): there is no later review to keep a finding for. Report ALL the blocking and major findings in this first report; do not keep one back for a later review.`,
   ];
   if (later && o.previous?.length) lines.push('', 'Points of the previous review that the spec writer had to fix:', ...bulletLines(o.previous));
   return lines.join('\n');

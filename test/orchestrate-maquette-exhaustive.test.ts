@@ -140,11 +140,15 @@ describe('R5/R6 — plafond de sessions spec du lot', () => {
     expect(c.lot.outcome).toContain('maquette non conforme et la spec a déjà joué 3 sessions : ');
   });
   it('R5 — réponse du lead : l.specRuns remis à zéro, trois sessions de nouveau permises', async () => {
-    const h = harness({ lots, script: { spec: [() => claudeOut(specReport({ questions: ['Quel périmètre ?'] }))] } });
+    const h = harness({ lots, script: { spec: [() => claudeOut(specReport({ questions: ['Quel périmètre ?'] })), hors, hors, hors] } });
     const c = h.lot('L1', { ...screen, specRuns: 2 }, cfg(3));
     await runLot(c);
     expect(c.lot.status).toBe('question');
     expect(c.lot.specRuns).toBeUndefined();
+    c.lot.pendingAnswer = 'Tout l’écran';
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'spec', 'spec', 'spec']);
+    expect(c.lot.outcome).toContain('spec non conforme après 3 passes : ');
   });
 
   const mixte: Handler = (call) => claudeOut(specReport({ fiche: ecritBack(call.opts.cwd, { mixte: true }) }));
@@ -239,6 +243,8 @@ describe('R9 — brief des revues de rang 2 ou plus', () => {
     expect(mq[1]).toContain('This is review 2 of 3');
     expect(mq[1]).not.toContain('second and last');
     expect(mq[1]).not.toContain('last review');
+    expect(mq[1]).not.toContain('in this first report');
+    expect(mq[0]).toContain('in this first report');
   });
   it('R9 — brief de la revue 3 : « dernière revue »', async () => {
     const { mq } = await briefs();

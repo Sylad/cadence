@@ -2773,9 +2773,10 @@ lots:
     finished: 2026-10-17
   - id: L239
     title: "spec reseal : la commande --resume proposée pour une vague arrêtée qui garde aussi un lot en file (todo au plan) du même dépôt est refusée « arbre sale » par le test déjà corrigé du lead, puis relance ce lot qui reprend le verrou — retirer aussi ces lots dans la commande (--drop) ou dire de faire le --resume avant de toucher au test (revue L238)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-17
+    started: 2026-10-17
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

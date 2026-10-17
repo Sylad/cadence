@@ -64,6 +64,12 @@ describe('auto-vérification en fin de session (L236)', () => {
     expect(renderBrief('fix', vars)).toContain('fix them, and nothing else');
   });
 
+  it('R6b — le brief fix relit aussi les commits de correction faits dans un dépôt voisin, avec la même plage', () => {
+    const b = bloc('fix');
+    expect(b).toContain('each repository where you committed a fix');
+    expect(b).toContain('neighbouring');
+  });
+
   it('R7 — les autres briefs (fix-minors, spec, spec-back, accept, review-small) n\'ont pas le bloc', () => {
     for (const kind of ['fix-minors', 'spec', 'spec-back', 'accept', 'review-small']) {
       expect(read(`../templates/orchestrate/${kind}.md`), kind).not.toContain(TITRE);

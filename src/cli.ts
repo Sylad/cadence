@@ -764,24 +764,63 @@ const git = (cwd: string, args: string[]): string => execFileSync('git', args, {
 /** Chemin à coller dans un shell : entre apostrophes dès qu'il contient autre chose que des caractères sûrs. */
 const shellPath = (p: string): string => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replace(/'/g, "'\\''")}'`);
 
-/** Le refus de `spec reseal` devant des vagues non terminées (L238) : chaque vague, son dossier de lancement, ses lots, et la commande à lancer telle quelle pour les clore. */
+/** Le refus de `spec reseal` devant des vagues non terminées (L238) : chaque vague (vivante ou arrêtée), son dossier de lancement, ses lots, et pour chaque vague arrêtée UNE commande à lancer telle quelle (un `--drop` par lot : `--resume` relance toute la vague avec les lots non retirés). */
 function openWavesRefusal(open: OpenWave[]): string {
-  const lines = open.map((w) => `  - vague ${w.wave} (${w.live ? 'vivante' : 'arrêtée'}, lancée depuis ${w.launchDir}) : ${w.lots.map((l) => `${l.key} (${l.status})`).join(', ')}`);
-  const how = open.flatMap((w) => (w.live ? [`  vague ${w.wave} : elle tourne encore, attendre qu'elle se termine`] : w.lots.map((l) => `  cd ${shellPath(w.launchDir)} && cadence orchestrate --resume ${w.wave} --drop ${l.key}`)));
+  const lines = open.map((w) => {
+    const where = [w.live ? 'vivante' : 'arrêtée', ...(w.live && w.pid !== undefined ? [`pid ${w.pid}`] : []), ...(w.launchDir ? [`lancée depuis ${w.launchDir}`] : [])].join(', ');
+    return `  - vague ${w.wave} (${where}) : ${w.lots.length ? w.lots.map((l) => `${l.key} (${l.status})`).join(', ') : 'lots illisibles'}`;
+  });
+  const how = open.map((w) =>
+    w.live
+      ? `  vague ${w.wave} : orchestration en cours, à attendre (le verrou du dépôt tombe dès que tous ses lots y sont prêts ou rendus)`
+      : `  cd ${shellPath(w.launchDir)} && cadence orchestrate --resume ${w.wave}${w.lots.map((l) => ` --drop ${l.key}`).join('')}`,
+  );
   return [
     `spec reseal : refusé — ${open.length > 1 ? `${open.length} vagues non terminées gardent` : 'une vague non terminée garde'} ouvert au moins un lot en cours de ce dépôt (un rescellé commité maintenant lui serait rendu comme « premier commit fautif » à la reprise de la vague) :`,
     ...lines,
-    'Marche à suivre : clore chacun de ces lots dans sa vague, puis relancer le rescellé :',
+    'Marche à suivre : clore chacun de ces lots dans sa vague (attendre les vivantes, retirer les lots des arrêtées), puis relancer le rescellé :',
     ...how,
   ].join('\n');
+}
+
+/**
+ * Les vagues non terminées qui gardent ouvert un lot de `repo` encore en cours au plan (L238). Une vague range son état dans le dossier d'où elle a été lancée (`RunStore.runsDir(cwd)`),
+ * souvent un dossier PARENT du dépôt (le dossier des projets) : on remonte donc de la racine du plan jusqu'à la racine du disque.
+ */
+function unfinishedWaves(root: string, repo: string, plan: Plan): OpenWave[] {
+  const launchDirs = new Set<string>();
+  for (let d = resolve(root); !launchDirs.has(d); d = dirname(d)) launchDirs.add(d);
+  launchDirs.add(repo);
+  const doing = new Set(plan.lots().filter((l) => l.status === 'doing').map((l) => l.id));
+  const alive = liveWaves(cadenceHome());
+  return [...launchDirs].flatMap((dir) => openWavesIn(dir, repo, (l) => doing.has(l.lot), alive));
+}
+
+/** La vague qui tient le verrou du dépôt rejoint la liste des vagues en cause, même quand l'état de ses lots ne dit rien (illisible, ou lots absents du plan) : le refus est unique et la nomme toujours. */
+function withHolder(open: OpenWave[], holder: { wave: string; pid: number }, repo: string): OpenWave[] {
+  const known = open.find((w) => w.wave === holder.wave);
+  if (known) return open.map((w) => (w === known ? { ...w, live: true, pid: holder.pid } : w));
+  const reg = liveWaves(cadenceHome()).find((w) => w.pid === holder.pid);
+  const keys = openLotsIn(cadenceHome(), holder.pid, repo) ?? [];
+  return [{ wave: holder.wave, launchDir: reg?.cwd ?? '', live: true, pid: holder.pid, lots: keys.map((key) => ({ key, status: 'ouvert' })) }, ...open];
 }
 
 function specReseal(args: string[], reason: string | undefined, porteur: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
   if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche" [--porteur <lot en cours>, pour un lot livré]');
   if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec reseal refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
   // Comme `deliver` : la vague tient le verrou du dépôt tant qu'un de ses lots y travaille (état illisible : on refuse) ; un commit du lead en pleine passe ferait signaler au lot suivant un écart qui n'est pas le sien.
+  // Le refus est UN message : la vague vivante qui tient le verrou (à attendre) et les vagues arrêtées du dépôt, avec leurs dossiers et leurs commandes (L238).
   const orchestrating = waveHolding(ctx.root);
-  if (orchestrating) throw new RafError(`spec reseal : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — rescellé une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
+  if (orchestrating) {
+    const repo = gitRoot(ctx.root) ?? ctx.root;
+    let open: OpenWave[] = [];
+    try {
+      open = unfinishedWaves(ctx.root, repo, ctx.loadPlan());
+    } catch {
+      // plan illisible : le verrou seul motive le refus, la vague qui le tient est nommée
+    }
+    throw new RafError(openWavesRefusal(withHolder(open, orchestrating, repo)));
+  }
   const [lotId, test] = args as [string, string];
   const plan = ctx.loadPlan();
   const lot = plan.lot(lotId);
@@ -800,15 +839,9 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   }
   const cite = livre ? (porteur as string) : lotId;
   if (!json) throw new RafError(`${lotId} : aucune acceptation sous ${dir} (le lot n'a pas passé l'étape accept)`);
-  // Une vague non terminée (arrêtée sur une question ou le quota, ou vivante) garde ouverts des lots que son `--resume` rejouera : un rescellé commité entre-temps serait rendu à l'un d'eux comme « premier commit fautif » (L238).
+  // Une vague non terminée (arrêtée sur une question ou le quota) garde ouverts des lots que son `--resume` rejouera : un rescellé commité entre-temps serait rendu à l'un d'eux comme « premier commit fautif » (L238).
   // Le verrou du rescellé couvre tous les lots ouverts du dépôt, pas seulement le porteur : on refuse dès qu'un lot DE CE DÉPÔT, encore en cours au plan, reste ouvert dans une vague non terminée.
-  // Une vague range son état dans le dossier d'où elle a été lancée (`RunStore.runsDir(cwd)`), souvent un dossier PARENT du dépôt (le dossier des projets) : on remonte donc de la racine du plan jusqu'à la racine du disque.
-  const launchDirs = new Set<string>();
-  for (let d = resolve(ctx.root); !launchDirs.has(d); d = dirname(d)) launchDirs.add(d);
-  launchDirs.add(repo);
-  const doing = new Set(plan.lots().filter((l) => l.status === 'doing').map((l) => l.id));
-  const alive = liveWaves(cadenceHome());
-  const open = [...launchDirs].flatMap((dir) => openWavesIn(dir, repo, (l) => doing.has(l.lot), alive));
+  const open = unfinishedWaves(ctx.root, repo, plan);
   if (open.length) throw new RafError(openWavesRefusal(open));
   const before = { json: readFileSync(join(repo, json), 'utf8'), test: existsSync(join(repo, test)) ? readFileSync(join(repo, test), 'utf8') : '' };
   let r: { avant: string; apres: string; ficheAmendee?: string };

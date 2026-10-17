@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
@@ -198,7 +198,8 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid: process.pid, wave: 'w9', started: 'x' }));
     const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
     expect(r.code).toBe(2);
-    expect(r.err).toMatch(/orchestration en cours \(vague w9/);
+    expect(r.err).toContain('vague w9 (vivante, pid ');
+    expect(r.err).toContain('à attendre');
     expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
   });
 
@@ -243,17 +244,26 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       expect(sujet(repo)).toBe('plan: L1 L2');
     });
 
-    it('cite TOUTES les vagues en cause avec une commande par lot, depuis le dossier de lancement de chacune', () => {
+    it('cite TOUTES les vagues en cause avec UNE commande par vague (un --drop par lot), depuis le dossier de lancement de chacune', () => {
       const parent = tempDir();
       const { repo, a } = avecPlanDeuxLots(parent);
       vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }, { project: 'ici', repo, lot: 'L2', status: 'suspended' }], 'interrupted', '2026-10-17-1000');
       vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L2', status: 'queued' }], 'interrupted', '2026-10-17-1100');
       const r = reseal(repo, a.test);
       expect(r.code).toBe(2);
-      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume 2026-10-17-1000 --drop ici:L1`);
-      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume 2026-10-17-1000 --drop ici:L2`);
+      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume 2026-10-17-1000 --drop ici:L1 --drop ici:L2`);
       expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume 2026-10-17-1100 --drop ici:L2`);
+      expect(r.err.match(/cadence orchestrate --resume 2026-10-17-1000/g)).toHaveLength(1);
       expect(sujet(repo)).toBe('plan: L1 L2');
+    });
+
+    it('la commande est exécutable telle quelle : chemin à espaces entre apostrophes', () => {
+      const parent = join(tempDir(), 'mes projets');
+      mkdirSync(parent);
+      const { repo, a } = avecPlan('doing', parent);
+      corrige(repo, a.test);
+      vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }]);
+      expect(reseal(repo, a.test).err).toContain(`cd '${parent}' && cadence orchestrate --resume ${WAVE} --drop ici:L1`);
     });
 
     it('trouve une vague lancée depuis un dossier au-dessus du dépôt (le cas réel : le dossier parent des projets), le dossier de lancement figure dans le message', () => {
@@ -305,21 +315,81 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       expect(r.code).toBe(0);
     });
 
-    it('une vague VIVANTE avec un lot en question refuse aussi, sans être dite suspendue ni proposer --resume : on attend sa fin', () => {
+    /** Une vague vivante comme l'orchestrateur la produit : inscrite au registre ET tenant le verrou du dépôt tant qu'un de ses lots n'est pas fini (command.ts : takeLock au départ, libéré quand tous sont finis). */
+    function vivante(launchDir: string, repo: string, id: string, lots: { lot: string; status: LotState['status'] }[]) {
+      vagueOuverte(launchDir, lots.map((l) => ({ project: 'ici', repo, ...l })), 'running' as never, id);
+      writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid: process.pid, wave: id, started: 'x' }));
+      registerWave(cadenceHome(), { pid: process.pid, wave: id, started: '2026-10-17T17:20:00Z', cwd: launchDir, repos: [repo] });
+    }
+    const finVivante = (repo: string) => {
+      unregisterWave(cadenceHome(), process.pid);
+      rmSync(join(sharedStateDir(repo), REPO_LOCK), { force: true });
+    };
+
+    it('une vague VIVANTE qui tient le verrou avec un lot en question : refus, la vague est dite à attendre (ni suspendue, ni --resume)', () => {
       const { repo, a } = avecPlan();
       corrige(repo, a.test);
-      vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L1', status: 'question' }]);
-      registerWave(cadenceHome(), { pid: process.pid, wave: WAVE, started: '2026-10-17T17:20:00Z', cwd: repo, repos: [] });
+      vivante(repo, repo, WAVE, [{ lot: 'L1', status: 'question' }]);
       try {
         const r = reseal(repo, a.test);
         expect(r.code).toBe(2);
-        expect(r.err).toContain(`vague ${WAVE} (vivante, lancée depuis ${repo}) : ici:L1 (question)`);
-        expect(r.err).toMatch(/elle tourne encore, attendre qu'elle se termine/);
-        expect(r.err).not.toMatch(/suspendue|arrêtée|--resume|cd /);
+        expect(r.err).toContain(`vague ${WAVE} (vivante, pid ${process.pid}, lancée depuis ${repo}) : ici:L1 (question)`);
+        expect(r.err).toContain(`vague ${WAVE} : orchestration en cours, à attendre`);
+        expect(r.err).not.toMatch(/suspendue|\(arrêtée|--resume|cd /);
         expect(sujet(repo)).toBe('plan: L1');
       } finally {
-        unregisterWave(cadenceHome(), process.pid);
+        finVivante(repo);
       }
+    });
+
+    it('vague vivante qui tient le verrou ET vague arrêtée du dépôt : UN seul message, la vivante à attendre, l’arrêtée avec son dossier et sa commande', () => {
+      const parent = tempDir();
+      const { repo, a } = avecPlanDeuxLots(parent);
+      vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }], 'interrupted', '2026-10-17-1000');
+      vivante(parent, repo, '2026-10-17-1100', [{ lot: 'L2', status: 'question' }]);
+      try {
+        const r = reseal(repo, a.test);
+        expect(r.code).toBe(2);
+        expect(r.err).toContain('2 vagues non terminées gardent');
+        expect(r.err).toContain(`vague 2026-10-17-1100 (vivante, pid ${process.pid}, lancée depuis ${parent}) : ici:L2 (question)`);
+        expect(r.err).toContain('vague 2026-10-17-1100 : orchestration en cours, à attendre');
+        expect(r.err).toContain(`vague 2026-10-17-1000 (arrêtée, lancée depuis ${parent}) : ici:L1 (question)`);
+        expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume 2026-10-17-1000 --drop ici:L1`);
+        expect(r.err).not.toContain('--resume 2026-10-17-1100');
+        expect(sujet(repo)).toBe('plan: L1 L2');
+      } finally {
+        finVivante(repo);
+      }
+    });
+
+    it('la vague qui tient le verrou est nommée même quand ses lots ne sont pas en cours au plan', () => {
+      const { repo, a } = avecPlanDeuxLots(undefined, 'done');
+      vivante(repo, repo, WAVE, [{ lot: 'L2', status: 'implementing' }]); // L2 est livré au plan : seul le verrou motive le refus
+      try {
+        const r = reseal(repo, a.test);
+        expect(r.code).toBe(2);
+        expect(r.err).toContain(`vague ${WAVE} (vivante, pid ${process.pid}, lancée depuis ${repo}) : ici:L2 (ouvert)`);
+        expect(r.err).toContain(`vague ${WAVE} : orchestration en cours, à attendre`);
+      } finally {
+        finVivante(repo);
+      }
+    });
+
+    it('reconnaît le même dépôt sous un autre chemin (worktree, lien symbolique) : sans la comparaison des .git communs, le refus tombait', () => {
+      const { repo, a } = avecPlan();
+      corrige(repo, a.test);
+      const worktree = join(tempDir(), 'wt');
+      git(repo, 'worktree', 'add', '-q', '-b', 'wt', worktree);
+      const lien = join(tempDir(), 'lien');
+      symlinkSync(repo, lien);
+      for (const [nom, autre] of [['worktree', worktree], ['lien symbolique', lien]] as const) {
+        vagueOuverte(repo, [{ project: 'ici', repo: autre, lot: 'L1', status: 'question' }], 'interrupted', `2026-10-17-${nom === 'worktree' ? '1000' : '1100'}`);
+      }
+      const r = reseal(repo, a.test);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain('2 vagues non terminées gardent');
+      expect(r.err).toContain('--resume 2026-10-17-1000 --drop ici:L1');
+      expect(r.err).toContain('--resume 2026-10-17-1100 --drop ici:L1');
     });
   });
 

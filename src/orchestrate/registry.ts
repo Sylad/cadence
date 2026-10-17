@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { processStart } from '../proc.js';
@@ -157,10 +157,10 @@ export async function acquireSlot(
   }
 }
 
-/** .git commun du dépôt `dir` (partagé par ses worktrees) ; null si `dir` n'est pas un dépôt. */
+/** .git commun du dépôt `dir` (partagé par ses worktrees), chemin réel (un lien symbolique vers le dépôt désigne le même) ; null si `dir` n'est pas un dépôt. */
 const commonDir = (dir: string): string | null => {
   try {
-    return gitCommonDir(dir);
+    return realpathSync(gitCommonDir(dir));
   } catch {
     return null;
   }
@@ -186,6 +186,8 @@ export interface OpenWave {
   launchDir: string;
   /** Le processus de la vague tourne encore (elle n'est pas suspendue : on attend sa fin). */
   live: boolean;
+  /** Pid du processus de la vague, quand elle est vivante. */
+  pid?: number;
   lots: { key: string; status: string }[];
 }
 
@@ -208,7 +210,8 @@ export function openWavesIn(launchDir: string, repo: string, doing: (lot: LotSta
         .lots()
         .filter((l) => !lotFinished(l) && (l.repo === repo || (mine !== null && commonDir(l.repo) === mine)) && doing(l))
         .map((l) => ({ key: lotKey(l.project, l.lot), status: l.status }));
-      if (lots.length) out.push({ wave: id, launchDir, live: live.some((w) => w.wave === id && w.cwd === launchDir), lots });
+      const alive = live.find((w) => w.wave === id && w.cwd === launchDir);
+      if (lots.length) out.push({ wave: id, launchDir, live: !!alive, ...(alive ? { pid: alive.pid } : {}), lots });
     } catch {
       // état illisible : une vague qu'on ne sait pas lire ne bloque pas un rescellé du lead
     }

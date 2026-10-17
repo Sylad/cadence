@@ -160,6 +160,13 @@ describe('gabarits', () => {
     expect(out).toContain('http://localhost:4200');
   });
 
+  it("review-small : les captures vont dans le dossier Playwright de la vague comme à l'étape ux, jamais à la racine du dépôt revu (L237)", () => {
+    const out = renderBrief('review-small', vars);
+    expect(out).toContain("Every screenshot, snapshot and trace you take lands there");
+    expect(out).toContain('take them with the Playwright tools');
+    expect(out).toContain("never at the repository root (`romans-1440px.png`, `expenses-390px.png`)");
+  });
+
   it('les briefs qui peuvent ouvrir un navigateur donnent une consigne Playwright vraie dans les deux cas (MCP de la vague, ou CLI hors du dépôt) (L74)', () => {
     for (const kind of ['implement', 'fix', 'fix-minors', 'review-small'] as const) {
       const out = renderBrief(kind, vars);

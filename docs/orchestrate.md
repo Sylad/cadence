@@ -631,7 +631,7 @@ folder whenever Playwright was loaded for the lot, even if no `ux` step ran
 (`<project>:<lot> — captures Playwright : <dir>`; `uxCaptures` in the wave state). For `maquette` and `spec` the server also gets
 `--allow-unrestricted-file-access`: the mockup is a local file, and by default the server blocks every `file://` URL. The `implement`, `fix`,
 `fix-minors`, `review-small` and `ux` briefs tell the session to give relative file names if a Playwright server is available, and
-otherwise to keep any Playwright CLI output outside the repository.
+otherwise to keep any Playwright CLI output outside the repository. The `review-small` brief also forbids a capture at the root of the reviewed repository (`romans-1440px.png`…, four times on 2026-10-17: finance L82 and L84, warhammer L138 and L139): it says that everything the session takes with the Playwright tools lands in that wave folder, like the `ux` step (L237).
 `--dry-run` prints, under each step, `mcp : aucun` or `mcp : playwright (…)`. There is no per-project override in
 `cadence.yaml` yet.
 

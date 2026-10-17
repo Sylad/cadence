@@ -62,7 +62,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- `cadence spec reseal` refuses while a stopped wave still has an open lot in the repository (L238, `docs/orchestrate.md`): a reseal accepted during a wave suspended on a question was committed outside any session, then `--resume --answer` handed the lot back for a lock violation naming the reseal commit as the first offending one (ol-companion L172). The error names the wave and its lots and says to wait for its end or to close it (`--resume <wave> --drop <lot>`). The stopped waves are looked up in the repository and in every folder above it, since a wave keeps its state where `cadence orchestrate` was launched (usually the parent folder of the projects).
+- `cadence spec reseal` refuses while a stopped wave still has the resealed lot open in the repository (L238, `docs/orchestrate.md`): a reseal accepted during a wave suspended on a question was committed outside any session, then `--resume --answer` handed the lot back for a lock violation naming the reseal commit as the first offending one (ol-companion L172). The error names the wave and the lot and says to wait for its end or to close it (`--resume <wave> --drop <lot>`). The stopped waves are looked up in the repository and in every folder above it, since a wave keeps its state where `cadence orchestrate` was launched (usually the parent folder of the projects). Only the resealed lot counts (the `--porteur` for a delivered lot): old abandoned waves whose other lots are long delivered no longer refuse every reseal.
 
 ### Added
 

@@ -236,6 +236,15 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       expect(r.err).toBe('');
       expect(r.code).toBe(0);
     });
+
+    it('accepte quand la vague arrêtée ne garde ouvert que d’autres lots du dépôt (vieille vague abandonnée, lot livré depuis) : seul le lot rescellé compte', () => {
+      const { repo, a } = avecPlan();
+      writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+      vagueSuspendue(repo, { 'ici:L43': 'suspended', 'ici:L54': 'question' }, 'interrupted');
+      const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+    });
   });
 
   it('le commit de la note du plan refusé (commit-msg) : erreur lisible qui dit que le rescellé a eu lieu et que la note reste à commiter', () => {

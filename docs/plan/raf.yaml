@@ -2765,10 +2765,17 @@ lots:
     created: 2026-10-17
   - id: L238
     title: "cadence spec reseal accepté pendant une vague SUSPENDUE (question en attente) du même dépôt, puis --resume --answer rend le lot pour violation du verrou des tests d'acceptation avec le commit de rescellement comme « premier commit fautif » (ol-companion L172, vague 2026-10-17-1720, 868af6d) : soit reseal refuse une vague suspendue du dépôt et dit d'attendre sa fin ou de la clore, soit le verrou adopte un rescellement commité par le lead hors session (resceaux d'acceptation.json)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-17
     started: 2026-10-17
+    review: { date: 2026-10-17, verdict: "conforme (revue Opus neuve après 4 passes de correction, 84fc286) : 0 bloquant, 0 majeur, 2 mineurs (commande --resume refusée « arbre sale » si la vague arrêtée garde aussi un lot en file du dépôt → L239 ; withHolder apparie la vague vivante par id seul, inatteignable en pratique) ; mutations : chaque filtre a son test ; vérifié en lecture seule sur les ~310 vagues réelles, aucune vieille vague ne bloque", commit: 84fc2867fa33021b4b02736bed4e4078332e3c81 }
+    finished: 2026-10-17
+  - id: L239
+    title: "spec reseal : la commande --resume proposée pour une vague arrêtée qui garde aussi un lot en file (todo au plan) du même dépôt est refusée « arbre sale » par le test déjà corrigé du lead, puis relance ce lot qui reprend le verrou — retirer aussi ces lots dans la commande (--drop) ou dire de faire le --resume avant de toucher au test (revue L238)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-17
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

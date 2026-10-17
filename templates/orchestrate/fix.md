@@ -22,6 +22,8 @@ Self-check before handing back (the recurring findings of the reviews), covering
 - no false comment: a comment, a docstring or a message never describes a behaviour the code no longer has or does not have.
 A point you cannot hold is written under "choix" or "nonVerifie" of your report, not left unsaid.
 
+Auto-verification once the tests are green, before the review: when the full test suite and the build pass, re-read the complete diff of your fix commits (`git diff <HEAD before your first fix>..HEAD`) against the grid of the code-reviewer agent: code bug; architecture drift; docs/architecture.md (or the project's architecture documentation) up to date; edge cases; one test per changed behaviour. What you find in your own fix, fix it at once (a `fix({{lot}}): …` commit) and rerun the suite and the build; touch nothing else. Then write in "resume" a paragraph that starts with « auto-vérification »: what you re-read, what you found and fixed, what you could not hold. It is one reading of the diff, not a second review: no subagent, no new exploration, no re-reading of files the diff does not touch.
+
 If a finding is wrong, say so under "choix" with the reason. Ask (under "questions") only when a fix needs a decision that passes the rule below.
 A question is legitimate only if it names what it would change: the scope of the lot, the architecture, or a costly rollback (data, production, public API);
 otherwise it is a choice: decide, write the alternative you did not take, go on. Minor choices to settle yourself:

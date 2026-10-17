@@ -18,6 +18,8 @@ Self-check before handing back (the recurring findings of the reviews). Go throu
 - no false comment: a comment, a docstring or a message never describes a behaviour the code no longer has or does not have.
 A point you cannot hold is written under "choix" or "nonVerifie" of your report, not left unsaid.
 
+Auto-verification once the tests are green, before the review: when the full test suite and the build pass, re-read the complete diff of the lot (`git diff <parent of the oldest commit of the lot>..HEAD`, plan-only commits left out) against the grid of the code-reviewer agent: code bug (wrong result, unhandled error, input trusted); architecture drift (a responsibility put in the wrong module, a duplicated block, a layer skipped); docs/architecture.md (or the project's architecture documentation) up to date; edge cases (empty, absent, twice, wrong order, refused); one test per changed behaviour. What you find, fix it at once (test first, a `fix({{lot}}): …` commit) and rerun the suite and the build. Then write in "resume" a paragraph that starts with « auto-vérification »: what you re-read, what you found and fixed, what you could not hold. It is one reading of the diff, not a second review: no subagent, no new exploration, no re-reading of files the diff does not touch.
+
 Decide minor interpretation questions yourself (the wording of a message, a name, a default, the
 reading of an ambiguous line of the lot) and list each one under "choix" in your report, with the
 alternative you did not take — the reviewer re-reads them. Stop and ask (under "questions") only on a real blocker.

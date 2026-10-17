@@ -23,6 +23,13 @@ describe('auto-vérification en fin de session (L236)', () => {
     expect(b).toContain('before the review');
   });
 
+  it('R1b — le diff du lot se relit commit par commit (raf commits + git show), jamais par une plage git diff qui avale les autres lots', () => {
+    const b = bloc('implement');
+    expect(b).toContain('raf commits L9');
+    expect(b).toContain('git show');
+    expect(b).not.toContain('git diff <parent');
+  });
+
   it('R2 — le bloc nomme la grille du code-reviewer : bug de code, dérive d\'architecture, docs/architecture.md, cas limites, un test par comportement changé', () => {
     const b = bloc('implement');
     expect(b).toContain('code-reviewer');
@@ -67,5 +74,12 @@ describe('auto-vérification en fin de session (L236)', () => {
     expect(read('../docs/orchestrate.md')).toMatch(/Auto-verification once the tests are green \(L236\)/);
     expect(read('../README.md')).toContain('L236');
     expect(read('../CHANGELOG.md')).toMatch(/auto-verification[^\n]*\(L236[,)]/i);
+  });
+
+  it('R9 — le README et le CHANGELOG disent que fix ne relit que ses commits de correction', () => {
+    const readme = read('../README.md').split('\n').find((l) => l.includes('**auto-verification**'))!;
+    expect(readme).toContain('of its fix commits, in `fix`');
+    const log = read('../CHANGELOG.md').split('\n').find((l) => /^- Auto-verification at the end/.test(l))!;
+    expect(log).toContain('of its fix commits, in `fix`');
   });
 });

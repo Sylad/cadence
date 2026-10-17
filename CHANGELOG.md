@@ -62,7 +62,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- Auto-verification at the end of an `implement` or `fix` session (L236, `docs/orchestrate.md`): once the full test suite and the build pass, the brief makes the session re-read the complete diff of its lot against the grid of the `code-reviewer` (code bug, architecture drift, `docs/architecture.md` up to date, edge cases, one test per changed behaviour), fix at once what it finds, and write an « auto-vérification » paragraph at the start of `resume`; no new report field. Measured before it: `cadence corrections --classify` from 10 to 17-10 gave 356 passes, 53 % code bug, 19 % architecture drift, 14 % unclear spec, and `cadence perf` 37 % right the first time; target: above 50 % on the next window, tokens per lot unchanged (one reading of the diff, not a second review).
+- Auto-verification at the end of an `implement` or `fix` session (L236, `docs/orchestrate.md`): once the full test suite and the build pass, the brief makes the session re-read the complete diff of its lot (of its fix commits, in `fix`) against the grid of the `code-reviewer` (code bug, architecture drift, `docs/architecture.md` up to date, edge cases, one test per changed behaviour), fix at once what it finds, and write an « auto-vérification » paragraph at the start of `resume`; no new report field. Measured before it: `cadence corrections --classify` from 10 to 17-10 gave 356 passes, 53 % code bug, 19 % architecture drift, 14 % unclear spec, and `cadence perf` 37 % right the first time; target: above 50 % on the next window, tokens per lot unchanged (one reading of the diff, not a second review).
 
 ## [1.8.0] - 2026-10-16
 

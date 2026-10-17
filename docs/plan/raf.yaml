@@ -2750,11 +2750,14 @@ lots:
     finished: 2026-10-16
   - id: L236
     title: "Auto-vérification en fin de session implement et fix, avant la revue : une fois les tests verts, le brief impose une relecture du diff complet du lot contre la grille du code-reviewer (bug de code, dérive d'architecture, docs/architecture.md à jour, cas limites, un test par comportement changé), la correction immédiate de ce qu'elle trouve, puis un paragraphe « auto-vérification » dans le rapport de la session ; mesure : cadence corrections --classify du 10 au 17-10 = 356 passes dont 53 % bug de code et 19 % dérive d'architecture, spec floue 14 % seulement, part conforme du premier coup 37 % (cadence perf 17-10) ; cible : part conforme du premier coup au-dessus de 50 % sur la fenêtre suivante, tokens par lot stables (l'auto-vérification ne doit pas coûter une passe de revue)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-17
     started: 2026-10-17
     review: { date: 2026-10-17, verdict: "compliant (1 minor note: implement's `git show <sha>` does not name `git -C <path>` for neighbouring-repository commits) — orchestré (vague 2026-10-17-1342, 1 passe(s) de correction + passe des mineurs)", commit: e8e4d23a744ae96f2a840b61159cd4d73264ccd7 }
+    notes:
+      - { date: 2026-10-17, text: "Mineur de revue 17-10 (note, pas de sous-tâche) : le bloc d'auto-vérification d'implement.md:21 et fix.md:25 prescrit git show <sha> pour les commits de raf commits <lot>, mais pour un lot à dépôts voisins (repos:) ces commits sont listés sous « dépôt <rel> : » et demandent git -C <chemin> show ; la consigne reposText('write') ne donne pas cette forme (briefs.ts:45-50), les tests R1/R1b rendent le brief sans repos. Mesure d'effet attendue : part conforme du premier coup de cadence perf sur la fenêtre suivante (37 % le 17-10, cible > 50 %)" }
+    finished: 2026-10-17
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

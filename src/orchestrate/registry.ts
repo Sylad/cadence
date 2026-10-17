@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { processStart } from '../proc.js';
 import { gitCommonDir } from '../git.js';
-import { lotFinished, lotKey, lotRepoPaths, RunStore } from './state.js';
+import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState } from './state.js';
 import { activeLock, holderAlive, releaseLock, takeLock, type OLock } from './lock.js';
 
 /**
@@ -179,21 +179,36 @@ export function openLotsIn(home: string, pid: number, repo: string): string[] | 
   }
 }
 
+/** Une vague non terminée qui garde ouvert un lot encore en cours au plan du dépôt (L238). */
+export interface OpenWave {
+  wave: string;
+  /** Dossier d'où la vague a été lancée : celui où `--resume` la retrouve. */
+  launchDir: string;
+  /** Le processus de la vague tourne encore (elle n'est pas suspendue : on attend sa fin). */
+  live: boolean;
+  lots: { key: string; status: string }[];
+}
+
 /**
- * Vagues lancées depuis `launchDir` qui ne tournent plus mais gardent le lot `lotId` ouvert (question en attente, suspendu, en file) dans `repo` (L238) :
- * un `--resume` le rejouera sur ce dépôt, comme une vague vivante. Les vagues terminées (`done`) n'en gardent aucun ; les autres lots ouverts de la vague ne comptent pas (un rescellé d'un autre lot ne leur est jamais rendu comme « premier commit fautif »).
+ * Vagues non terminées (`done` exclu : interrompues, suspendues, ou vivantes) lancées depuis `launchDir` qui gardent ouvert (état non terminal : question, suspendu, en file, en cours...)
+ * au moins un lot DU MÊME DÉPÔT que `repo` pour lequel `doing(lot)` est vrai (L238, `doing` : le lot est encore en cours au plan de ce dépôt). Un `--resume` rejouera ces lots sur ce dépôt :
+ * un rescellé commité entre-temps leur serait rendu comme « premier commit fautif ». Un lot livré au plan (vieille vague abandonnée) ou absent du plan ne compte jamais.
+ * Le dépôt d'un lot est celui de son projet (`lot.repo`), pas ses dépôts voisins : l'id d'un lot est propre au plan de son projet.
  */
-export function suspendedLotsIn(launchDir: string, repo: string, lotId: string): { wave: string; lots: { key: string; status: string }[] }[] {
+export function openWavesIn(launchDir: string, repo: string, doing: (lot: LotState) => boolean, live: LiveWave[] = []): OpenWave[] {
   const base = RunStore.runsDir(launchDir);
   if (!existsSync(base)) return [];
   const mine = commonDir(repo);
-  const out: { wave: string; lots: { key: string; status: string }[] }[] = [];
+  const out: OpenWave[] = [];
   for (const id of readdirSync(base).sort()) {
     try {
       const store = RunStore.find(launchDir, id);
       if (!store || store.readWave()?.status === 'done') continue;
-      const lots = store.lots().filter((l) => l.lot === lotId && !lotFinished(l) && lotRepoPaths(l).some((r) => r === repo || (mine !== null && commonDir(r) === mine))).map((l) => ({ key: lotKey(l.project, l.lot), status: l.status }));
-      if (lots.length) out.push({ wave: id, lots });
+      const lots = store
+        .lots()
+        .filter((l) => !lotFinished(l) && (l.repo === repo || (mine !== null && commonDir(l.repo) === mine)) && doing(l))
+        .map((l) => ({ key: lotKey(l.project, l.lot), status: l.status }));
+      if (lots.length) out.push({ wave: id, launchDir, live: live.some((w) => w.wave === id && w.cwd === launchDir), lots });
     } catch {
       // état illisible : une vague qu'on ne sait pas lire ne bloque pas un rescellé du lead
     }

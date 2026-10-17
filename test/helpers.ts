@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -19,8 +19,10 @@ export function cleanupTempDirs(): void {
   for (const dir of created.splice(0)) removeTree(dir);
 }
 
-export function gitRepo(): string {
-  const dir = tempDir();
+/** Dépôt git jetable ; avec `parent`, un sous-dossier de ce dossier (un lancement de vague « au-dessus du dépôt » sans écrire hors de l'arbre du test). */
+export function gitRepo(parent?: string): string {
+  const dir = parent ? join(parent, 'depot') : tempDir();
+  if (parent) mkdirSync(dir);
   const run = (...args: string[]) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
   run('init', '-q', '-b', 'main');
   run('config', 'user.email', 'test@example.com');

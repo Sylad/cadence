@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
+import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { sharedStateDir } from '../src/state.js';
 import { lockViolations, redSha, resealAcceptation, resealedRouge, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { run } from '../src/cli.js';
 import { DISALLOWED } from '../src/orchestrate/launch.js';
-import { gitRepo } from './helpers.js';
+import { gitRepo, tempDir } from './helpers.js';
 import { newLot, RunStore, type LotState, type WaveState } from '../src/orchestrate/state.js';
 import { git } from './orchestrate-harness.js';
 import { DIR, ecritAcceptation } from './accept-helpers.js';
@@ -18,9 +19,18 @@ const commitPaths = (repo: string, message: string, ...paths: string[]) => {
   git(repo, 'commit', '-q', '-m', message, '--', ...paths);
 };
 
+/** Une vague (état écrit dans `launchDir/.cadence/runs/<id>`) dont chaque lot est dans le statut donné ; `repo` : le dépôt du projet du lot. */
+function vagueOuverte(launchDir: string, lots: { project: string; repo: string; lot: string; status: LotState['status'] }[], waveStatus: WaveState['status'] = 'interrupted', id = '2026-10-17-1720') {
+  const store = RunStore.reserve(launchDir, id)!;
+  store.writeWave({ id: store.id, status: waveStatus, created: 'x', lots: lots.map((l) => `${l.project}:${l.lot}`) } as never);
+  for (const l of lots) {
+    store.writeLot({ ...newLot({ project: l.project, repo: l.repo, lot: l.lot, title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false }), status: l.status });
+  }
+}
+
 /** Un lot en cours (L1) dont l'acceptation est scellée et commitée, avec deux fichiers de tests. */
-function lotScelle(opts: { vert?: boolean } = {}) {
-  const repo = gitRepo();
+function lotScelle(opts: { vert?: boolean; parent?: string } = {}) {
+  const repo = gitRepo(opts.parent);
   const a = ecritAcceptation(repo);
   const second = 'test/autre.acceptation.test.ts';
   writeFileSync(join(repo, second), "it('autre', () => { throw new Error('rouge'); });\n");
@@ -138,8 +148,8 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     const code = run(argv, { cwd: repo, env: { RAF_TODAY: '2026-10-12', ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-12T10:00:00') });
     return { code, out: out.join('\n'), err: err.join('\n') };
   }
-  function avecPlan(statut = 'doing') {
-    const s = lotScelle();
+  function avecPlan(statut = 'doing', parent?: string) {
+    const s = lotScelle({ parent });
     cli(s.repo, {}, 'init', '--project', 'demo');
     cli(s.repo, {}, 'add', 'Lot un');
     if (statut === 'doing') cli(s.repo, {}, 'start', 'L1');
@@ -193,57 +203,123 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
   });
 
   // L238 : ol-companion L172 — reseal accepté pendant une vague suspendue (question en attente), puis --resume --answer rendait le lot avec le rescellé pour « premier commit fautif ».
-  describe('vague suspendue du dépôt (L238)', () => {
-    const vagueSuspendue = (repo: string, statuts: Record<string, LotState['status']>, waveStatus: WaveState['status'] = 'done', launchDir = repo) => {
-      const store = RunStore.reserve(launchDir, '2026-10-17-1720')!;
-      store.writeWave({ id: store.id, status: waveStatus, created: 'x', lots: Object.keys(statuts) } as never);
-      for (const [key, status] of Object.entries(statuts)) {
-        const [project, lot] = key.split(':');
-        store.writeLot({ ...newLot({ project, repo: project === 'ici' ? repo : join(repo, project), lot, title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false }), status });
-      }
-    };
+  // Règle : refus dès qu'une vague non terminée garde ouvert un lot DE CE DÉPÔT encore en cours au plan (le lot rescellé ou un autre) ; un lot livré au plan ou absent ne bloque jamais.
+  describe('vague non terminée qui garde un lot du dépôt ouvert (L238)', () => {
+    const WAVE = '2026-10-17-1720';
+    /** Un second lot en cours au plan du dépôt (L2), commité. */
+    function avecPlanDeuxLots(parent?: string, deuxieme: 'doing' | 'done' = 'doing') {
+      const s = lotScelle({ parent });
+      cli(s.repo, {}, 'init', '--project', 'demo');
+      cli(s.repo, {}, 'add', 'Lot un');
+      cli(s.repo, {}, 'add', 'Lot deux');
+      cli(s.repo, {}, 'start', 'L1');
+      cli(s.repo, {}, 'start', 'L2');
+      if (deuxieme === 'done') cli(s.repo, {}, 'done', 'L2', '--force');
+      commitPaths(s.repo, 'plan: L1 L2', 'docs/plan/raf.yaml', '.gitignore');
+      writeFileSync(join(s.repo, s.a.test), `${readFileSync(join(s.repo, s.a.test), 'utf8')}// corrigé\n`);
+      return s;
+    }
+    const corrige = (repo: string, test: string) => writeFileSync(join(repo, test), `${readFileSync(join(repo, test), 'utf8')}// corrigé\n`);
+    const reseal = (repo: string, test: string) => cli(repo, {}, 'spec', 'reseal', 'L1', test, '--reason', 'x');
+    const sujet = (repo: string) => git(repo, 'log', '-1', '--format=%s').trim();
 
-    it('refuse un lot de ce dépôt en question dans une vague arrêtée, dit d’attendre sa fin ou de la clore, et ne commite rien', () => {
+    it('refuse un lot de ce dépôt en question dans une vague arrêtée, cite la vague, son dossier de lancement et la commande exacte, et ne commite rien', () => {
       const { repo, a } = avecPlan();
-      writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
-      vagueSuspendue(repo, { 'ici:L1': 'question' }, 'interrupted');
-      const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+      corrige(repo, a.test);
+      vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L1', status: 'question' }]);
+      const r = reseal(repo, a.test);
       expect(r.code).toBe(2);
-      expect(r.err).toMatch(/vague 2026-10-17-1720 suspendue.*L1.*question/);
-      expect(r.err).toMatch(/--resume.*--drop/);
-      expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
+      expect(r.err).toContain(`vague ${WAVE} (arrêtée, lancée depuis ${repo}) : ici:L1 (question)`);
+      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume ${WAVE} --drop ici:L1`);
+      expect(sujet(repo)).toBe('plan: L1');
     });
 
-    it('refuse aussi quand la vague a été lancée depuis un dossier au-dessus du dépôt (le cas réel : le dossier parent des projets)', () => {
+    it('refuse aussi pour un AUTRE lot du dépôt encore en cours au plan : le verrou rend tous les lots ouverts, pas seulement celui du rescellé', () => {
+      const { repo, a } = avecPlanDeuxLots();
+      vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L2', status: 'question' }]);
+      const r = reseal(repo, a.test);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume ${WAVE} --drop ici:L2`);
+      expect(sujet(repo)).toBe('plan: L1 L2');
+    });
+
+    it('cite TOUTES les vagues en cause avec une commande par lot, depuis le dossier de lancement de chacune', () => {
+      const parent = tempDir();
+      const { repo, a } = avecPlanDeuxLots(parent);
+      vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }, { project: 'ici', repo, lot: 'L2', status: 'suspended' }], 'interrupted', '2026-10-17-1000');
+      vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L2', status: 'queued' }], 'interrupted', '2026-10-17-1100');
+      const r = reseal(repo, a.test);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume 2026-10-17-1000 --drop ici:L1`);
+      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume 2026-10-17-1000 --drop ici:L2`);
+      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume 2026-10-17-1100 --drop ici:L2`);
+      expect(sujet(repo)).toBe('plan: L1 L2');
+    });
+
+    it('trouve une vague lancée depuis un dossier au-dessus du dépôt (le cas réel : le dossier parent des projets), le dossier de lancement figure dans le message', () => {
+      const parent = tempDir();
+      const { repo, a } = avecPlan('doing', parent);
+      corrige(repo, a.test);
+      vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }]);
+      const r = reseal(repo, a.test);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume ${WAVE} --drop ici:L1`);
+      expect(sujet(repo)).toBe('plan: L1');
+    });
+
+    it('accepte quand le lot ouvert de la vague arrêtée est d’un autre dépôt, même s’il porte le même id (les ids sont propres à chaque plan)', () => {
       const { repo, a } = avecPlan();
-      writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
-      vagueSuspendue(repo, { 'ici:L1': 'question' }, 'interrupted', dirname(repo));
+      corrige(repo, a.test);
+      vagueOuverte(repo, [{ project: 'ailleurs', repo: gitRepo(), lot: 'L1', status: 'question' }]);
+      const r = reseal(repo, a.test);
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+    });
+
+    it('accepte quand les lots du dépôt sont finis dans la vague arrêtée (prêts), l’état non terminal d’un autre dépôt ne comptant pas', () => {
+      const { repo, a } = avecPlan();
+      corrige(repo, a.test);
+      vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L1', status: 'ready' }, { project: 'ailleurs', repo: gitRepo(), lot: 'L2', status: 'question' }]);
+      const r = reseal(repo, a.test);
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+    });
+
+    it('accepte une vieille vague interrompue dont les lots ouverts sont livrés (done) ou absents du plan du dépôt : seuls les lots encore en cours au plan comptent', () => {
+      const { repo, a } = avecPlanDeuxLots(undefined, 'done');
+      vagueOuverte(repo, [
+        { project: 'ici', repo, lot: 'L2', status: 'suspended' }, // done au plan
+        { project: 'ici', repo, lot: 'L43', status: 'question' }, // absent du plan
+      ]);
+      const r = reseal(repo, a.test);
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+    });
+
+    it('accepte quand la vague est terminée (done), même si un lot y est resté en question', () => {
+      const { repo, a } = avecPlan();
+      corrige(repo, a.test);
+      vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L1', status: 'question' }], 'done');
+      const r = reseal(repo, a.test);
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+    });
+
+    it('une vague VIVANTE avec un lot en question refuse aussi, sans être dite suspendue ni proposer --resume : on attend sa fin', () => {
+      const { repo, a } = avecPlan();
+      corrige(repo, a.test);
+      vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L1', status: 'question' }]);
+      registerWave(cadenceHome(), { pid: process.pid, wave: WAVE, started: '2026-10-17T17:20:00Z', cwd: repo, repos: [] });
       try {
-        const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+        const r = reseal(repo, a.test);
         expect(r.code).toBe(2);
-        expect(r.err).toMatch(/vague 2026-10-17-1720 suspendue.*L1.*question/);
-        expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
+        expect(r.err).toContain(`vague ${WAVE} (vivante, lancée depuis ${repo}) : ici:L1 (question)`);
+        expect(r.err).toMatch(/elle tourne encore, attendre qu'elle se termine/);
+        expect(r.err).not.toMatch(/suspendue|arrêtée|--resume|cd /);
+        expect(sujet(repo)).toBe('plan: L1');
       } finally {
-        rmSync(join(dirname(repo), '.cadence'), { recursive: true, force: true });
+        unregisterWave(cadenceHome(), process.pid);
       }
-    });
-
-    it('accepte quand la vague arrêtée n’a plus de lot ouvert dans ce dépôt (tous prêts, ou lot d’un autre dépôt)', () => {
-      const { repo, a } = avecPlan();
-      writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
-      vagueSuspendue(repo, { 'ici:L1': 'ready', 'ailleurs:L2': 'question' }, 'interrupted');
-      const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
-      expect(r.err).toBe('');
-      expect(r.code).toBe(0);
-    });
-
-    it('accepte quand la vague arrêtée ne garde ouvert que d’autres lots du dépôt (vieille vague abandonnée, lot livré depuis) : seul le lot rescellé compte', () => {
-      const { repo, a } = avecPlan();
-      writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
-      vagueSuspendue(repo, { 'ici:L43': 'suspended', 'ici:L54': 'question' }, 'interrupted');
-      const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
-      expect(r.err).toBe('');
-      expect(r.code).toBe(0);
     });
   });
 
@@ -296,6 +372,47 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
     expect(readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')).toContain('onglet lu à « blank » en CI');
     expect(git(repo, 'status', '--porcelain').trim()).toBe('');
     expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
+  });
+
+  // L238 : le chemin --porteur, la configuration réelle de l'incident (L172 porteur d'un rescellé de L160 livré).
+  describe('avec une vague non terminée du dépôt (L238)', () => {
+    const vague = (repo: string, lots: { lot: string; status: LotState['status'] }[]) => vagueOuverte(repo, lots.map((l) => ({ project: 'ici', repo, ...l })));
+    /** L1 livré, L2 porteur et L3 en cours au plan. */
+    function livreTroisLots() {
+      const s = livre();
+      cli(s.repo, {}, 'add', 'Lot trois');
+      cli(s.repo, {}, 'start', 'L3');
+      commitPaths(s.repo, 'plan: L3', 'docs/plan/raf.yaml');
+      return s;
+    }
+    const reseal = (repo: string, test: string) => cli(repo, {}, 'spec', 'reseal', 'L1', test, '--reason', 'x', '--porteur', 'L2');
+
+    it('refuse un lot livré dont un AUTRE lot du dépôt (ni le livré ni le porteur) reste ouvert dans une vague arrêtée', () => {
+      const { repo, a } = livreTroisLots();
+      vague(repo, [{ lot: 'L3', status: 'question' }]);
+      const r = reseal(repo, a.test);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume 2026-10-17-1720 --drop ici:L3`);
+      expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L3');
+    });
+
+    it('refuse aussi quand c’est le lot porteur qui reste ouvert dans la vague arrêtée', () => {
+      const { repo, a } = livre();
+      vague(repo, [{ lot: 'L2', status: 'suspended' }]);
+      const r = reseal(repo, a.test);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain('--drop ici:L2');
+      expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1 L2');
+    });
+
+    it('accepte quand la vague arrêtée ne garde ouvert que le lot livré (done au plan, ancienne vague abandonnée)', () => {
+      const { repo, a } = livre();
+      vague(repo, [{ lot: 'L1', status: 'question' }]);
+      const r = reseal(repo, a.test);
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+      expect(git(repo, 'log', '-2', '--format=%s').split('\n')[1]).toMatch(/^test\(L2\): acceptation rescellée du lot livré L1/);
+    });
   });
 
   it('exige le lot porteur, en cours et distinct du lot livré', () => {

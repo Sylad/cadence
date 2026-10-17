@@ -21,7 +21,7 @@ import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.j
 import { findProjects, leadTour, readLeadUx, tourLine } from './lead.js';
 import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
-import { cadenceHome, openLotsIn, suspendedLotsIn } from './orchestrate/registry.js';
+import { cadenceHome, liveWaves, openLotsIn, openWavesIn, type OpenWave } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedDeliveries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
@@ -761,6 +761,21 @@ function waveHolding(root: string): { wave: string; pid: number } | null {
  */
 const git = (cwd: string, args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
+/** Chemin à coller dans un shell : entre apostrophes dès qu'il contient autre chose que des caractères sûrs. */
+const shellPath = (p: string): string => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replace(/'/g, "'\\''")}'`);
+
+/** Le refus de `spec reseal` devant des vagues non terminées (L238) : chaque vague, son dossier de lancement, ses lots, et la commande à lancer telle quelle pour les clore. */
+function openWavesRefusal(open: OpenWave[]): string {
+  const lines = open.map((w) => `  - vague ${w.wave} (${w.live ? 'vivante' : 'arrêtée'}, lancée depuis ${w.launchDir}) : ${w.lots.map((l) => `${l.key} (${l.status})`).join(', ')}`);
+  const how = open.flatMap((w) => (w.live ? [`  vague ${w.wave} : elle tourne encore, attendre qu'elle se termine`] : w.lots.map((l) => `  cd ${shellPath(w.launchDir)} && cadence orchestrate --resume ${w.wave} --drop ${l.key}`)));
+  return [
+    `spec reseal : refusé — ${open.length > 1 ? `${open.length} vagues non terminées gardent` : 'une vague non terminée garde'} ouvert au moins un lot en cours de ce dépôt (un rescellé commité maintenant lui serait rendu comme « premier commit fautif » à la reprise de la vague) :`,
+    ...lines,
+    'Marche à suivre : clore chacun de ces lots dans sa vague, puis relancer le rescellé :',
+    ...how,
+  ].join('\n');
+}
+
 function specReseal(args: string[], reason: string | undefined, porteur: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
   if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche" [--porteur <lot en cours>, pour un lot livré]');
   if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec reseal refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
@@ -785,16 +800,16 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   }
   const cite = livre ? (porteur as string) : lotId;
   if (!json) throw new RafError(`${lotId} : aucune acceptation sous ${dir} (le lot n'a pas passé l'étape accept)`);
-  // Une vague arrêtée (question en attente, quota) ne tient aucun verrou mais son `--resume` rejoue ses lots ouverts : un rescellé du lot `cite` commité entre-temps serait rendu au lot comme « premier commit fautif » (L238).
+  // Une vague non terminée (arrêtée sur une question ou le quota, ou vivante) garde ouverts des lots que son `--resume` rejouera : un rescellé commité entre-temps serait rendu à l'un d'eux comme « premier commit fautif » (L238).
+  // Le verrou du rescellé couvre tous les lots ouverts du dépôt, pas seulement le porteur : on refuse dès qu'un lot DE CE DÉPÔT, encore en cours au plan, reste ouvert dans une vague non terminée.
   // Une vague range son état dans le dossier d'où elle a été lancée (`RunStore.runsDir(cwd)`), souvent un dossier PARENT du dépôt (le dossier des projets) : on remonte donc de la racine du plan jusqu'à la racine du disque.
   const launchDirs = new Set<string>();
   for (let d = resolve(ctx.root); !launchDirs.has(d); d = dirname(d)) launchDirs.add(d);
   launchDirs.add(repo);
-  const stopped = [...launchDirs].flatMap((dir) => suspendedLotsIn(dir, repo, cite));
-  if (stopped.length) {
-    const w = stopped[0];
-    throw new RafError(`spec reseal : vague ${w.wave} suspendue, lot ouvert de ce dépôt : ${w.lots.map((l) => `${l.key} (${l.status})`).join(', ')} — rescellé une fois la vague finie (cadence orchestrate --resume ${w.wave}) ou close (--resume ${w.wave} --drop <lot> pour chaque lot ouvert)`);
-  }
+  const doing = new Set(plan.lots().filter((l) => l.status === 'doing').map((l) => l.id));
+  const alive = liveWaves(cadenceHome());
+  const open = [...launchDirs].flatMap((dir) => openWavesIn(dir, repo, (l) => doing.has(l.lot), alive));
+  if (open.length) throw new RafError(openWavesRefusal(open));
   const before = { json: readFileSync(join(repo, json), 'utf8'), test: existsSync(join(repo, test)) ? readFileSync(join(repo, test), 'utf8') : '' };
   let r: { avant: string; apres: string; ficheAmendee?: string };
   try {

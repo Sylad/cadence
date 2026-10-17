@@ -66,6 +66,6 @@ describe('auto-vérification en fin de session (L236)', () => {
   it('R8 — docs/orchestrate.md, le README et le CHANGELOG décrivent l\'auto-vérification (L236)', () => {
     expect(read('../docs/orchestrate.md')).toMatch(/Auto-verification once the tests are green \(L236\)/);
     expect(read('../README.md')).toContain('L236');
-    expect(read('../CHANGELOG.md')).toMatch(/auto-verification[^\n]*\(L236\)|\(L236\)[^\n]*auto-verification/i);
+    expect(read('../CHANGELOG.md')).toMatch(/auto-verification[^\n]*\(L236[,)]/i);
   });
 });

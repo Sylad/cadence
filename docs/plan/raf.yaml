@@ -2764,6 +2764,7 @@ lots:
     estimate: 0.25
     created: 2026-10-17
     started: 2026-10-17
+    review: { date: 2026-10-17, verdict: "compliant — orchestré (vague 2026-10-17-l237-idisk4, 0 passe(s) de correction)", commit: 127da67a5a036e91922e6c0181a4330ff99b57dd }
   - id: L238
     title: "cadence spec reseal accepté pendant une vague SUSPENDUE (question en attente) du même dépôt, puis --resume --answer rend le lot pour violation du verrou des tests d'acceptation avec le commit de rescellement comme « premier commit fautif » (ol-companion L172, vague 2026-10-17-1720, 868af6d) : soit reseal refuse une vague suspendue du dépôt et dit d'attendre sa fin ou de la clore, soit le verrou adopte un rescellement commité par le lead hors session (resceaux d'acceptation.json)"
     status: done

@@ -764,16 +764,16 @@ const git = (cwd: string, args: string[]): string => execFileSync('git', args, {
 /** Chemin à coller dans un shell : entre apostrophes dès qu'il contient autre chose que des caractères sûrs. */
 const shellPath = (p: string): string => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replace(/'/g, "'\\''")}'`);
 
-/** Le refus de `spec reseal` devant des vagues non terminées (L238) : chaque vague (vivante ou arrêtée), son dossier de lancement, ses lots, et pour chaque vague arrêtée UNE commande à lancer telle quelle (un `--drop` par lot : `--resume` relance toute la vague avec les lots non retirés). */
+/** Le refus de `spec reseal` devant des vagues non terminées (L238) : chaque vague (vivante ou arrêtée), son dossier de lancement, ses lots, et pour chaque vague arrêtée UNE commande à lancer telle quelle (un `--drop` par lot ouvert du dépôt, y compris ceux en file qui ne sont pas en cours au plan : `--resume` relance toute la vague avec les lots non retirés, et un lot en file reprendrait le verrou, L239). */
 function openWavesRefusal(open: OpenWave[]): string {
   const lines = open.map((w) => {
     const where = [w.live ? 'vivante' : 'arrêtée', ...(w.live && w.pid !== undefined ? [`pid ${w.pid}`] : []), ...(w.launchDir ? [`lancée depuis ${w.launchDir}`] : [])].join(', ');
-    return `  - vague ${w.wave} (${where}) : ${w.lots.length ? w.lots.map((l) => `${l.key} (${l.status})`).join(', ') : 'lots illisibles'}`;
+    return `  - vague ${w.wave} (${where}) : ${w.lots.length ? [...w.lots.map((l) => `${l.key} (${l.status})`), ...w.others.map((l) => `${l.key} (${l.status}, pas en cours au plan)`)].join(', ') : 'lots illisibles'}`;
   });
   const how = open.map((w) =>
     w.live
       ? `  vague ${w.wave} : orchestration en cours, à attendre (le verrou du dépôt tombe dès que tous ses lots y sont prêts ou rendus)`
-      : `  cd ${shellPath(w.launchDir)} && cadence orchestrate --resume ${w.wave}${w.lots.map((l) => ` --drop ${l.key}`).join('')}`,
+      : `  cd ${shellPath(w.launchDir)} && cadence orchestrate --resume ${w.wave}${[...w.lots, ...w.others].map((l) => ` --drop ${l.key}`).join('')}`,
   );
   return [
     `spec reseal : refusé — ${open.length > 1 ? `${open.length} vagues non terminées gardent` : 'une vague non terminée garde'} ouvert au moins un lot en cours de ce dépôt (un rescellé commité maintenant lui serait rendu comme « premier commit fautif » à la reprise de la vague) :`,
@@ -802,7 +802,7 @@ function withHolder(open: OpenWave[], holder: { wave: string; pid: number }, rep
   if (known) return open.map((w) => (w === known ? { ...w, live: true, pid: holder.pid } : w));
   const reg = liveWaves(cadenceHome()).find((w) => w.pid === holder.pid);
   const keys = openLotsIn(cadenceHome(), holder.pid, repo) ?? [];
-  return [{ wave: holder.wave, launchDir: reg?.cwd ?? '', live: true, pid: holder.pid, lots: keys.map((key) => ({ key, status: 'ouvert' })) }, ...open];
+  return [{ wave: holder.wave, launchDir: reg?.cwd ?? '', live: true, pid: holder.pid, lots: keys.map((key) => ({ key, status: 'ouvert' })), others: [] }, ...open];
 }
 
 function specReseal(args: string[], reason: string | undefined, porteur: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {

@@ -257,6 +257,20 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       expect(sujet(repo)).toBe('plan: L1 L2');
     });
 
+    it('un lot en file (todo au plan) du même dépôt dans la vague arrêtée est retiré aussi dans la commande : sinon le --resume le relancerait et il reprendrait le verrou', () => {
+      const parent = tempDir();
+      const { repo, a } = avecPlan('doing', parent);
+      cli(repo, {}, 'add', 'Lot deux');
+      commitPaths(repo, 'plan: L2', 'docs/plan/raf.yaml', '.gitignore');
+      corrige(repo, a.test);
+      vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }, { project: 'ici', repo, lot: 'L2', status: 'queued' }]);
+      const r = reseal(repo, a.test);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume ${WAVE} --drop ici:L1 --drop ici:L2`);
+      expect(r.err).toContain('ici:L2 (queued, pas en cours au plan)');
+      expect(sujet(repo)).toBe('plan: L2');
+    });
+
     it('la commande est exécutable telle quelle : chemin à espaces entre apostrophes', () => {
       const parent = join(tempDir(), 'mes projets');
       mkdirSync(parent);

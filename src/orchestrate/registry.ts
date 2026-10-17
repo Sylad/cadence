@@ -189,6 +189,8 @@ export interface OpenWave {
   /** Pid du processus de la vague, quand elle est vivante. */
   pid?: number;
   lots: { key: string; status: string }[];
+  /** Les autres lots du dépôt que la vague garde ouverts sans être en cours au plan (en file, todo...) : le `--resume` les relancerait, ils reprendraient le verrou — la commande les retire aussi. */
+  others: { key: string; status: string }[];
 }
 
 /**
@@ -206,12 +208,14 @@ export function openWavesIn(launchDir: string, repo: string, doing: (lot: LotSta
     try {
       const store = RunStore.find(launchDir, id);
       if (!store || store.readWave()?.status === 'done') continue;
-      const lots = store
+      const open = store
         .lots()
-        .filter((l) => !lotFinished(l) && (l.repo === repo || (mine !== null && commonDir(l.repo) === mine)) && doing(l))
-        .map((l) => ({ key: lotKey(l.project, l.lot), status: l.status }));
+        .filter((l) => !lotFinished(l) && (l.repo === repo || (mine !== null && commonDir(l.repo) === mine)))
+        .map((l) => ({ in: doing(l), key: lotKey(l.project, l.lot), status: l.status }));
+      const lots = open.filter((l) => l.in).map(({ key, status }) => ({ key, status }));
+      const others = open.filter((l) => !l.in).map(({ key, status }) => ({ key, status }));
       const alive = live.find((w) => w.wave === id && w.cwd === launchDir);
-      if (lots.length) out.push({ wave: id, launchDir, live: !!alive, ...(alive ? { pid: alive.pid } : {}), lots });
+      if (lots.length) out.push({ wave: id, launchDir, live: !!alive, ...(alive ? { pid: alive.pid } : {}), lots, others });
     } catch {
       // état illisible : une vague qu'on ne sait pas lire ne bloque pas un rescellé du lead
     }

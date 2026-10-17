@@ -2758,6 +2758,11 @@ lots:
     notes:
       - { date: 2026-10-17, text: "Mineur de revue 17-10 (note, pas de sous-tâche) : le bloc d'auto-vérification d'implement.md:21 et fix.md:25 prescrit git show <sha> pour les commits de raf commits <lot>, mais pour un lot à dépôts voisins (repos:) ces commits sont listés sous « dépôt <rel> : » et demandent git -C <chemin> show ; la consigne reposText('write') ne donne pas cette forme (briefs.ts:45-50), les tests R1/R1b rendent le brief sans repos. Mesure d'effet attendue : part conforme du premier coup de cadence perf sur la fenêtre suivante (37 % le 17-10, cible > 50 %)" }
     finished: 2026-10-17
+  - id: L237
+    title: "L'étape review-small (Sonnet, lots ≤ 0,25 j) laisse ses captures Playwright à la racine du dépôt revu (romans-1440px.png, expenses-390px.png…) : 4 fois le 17-10 (finance L82, L84, warhammer L138, L139), rangées par orchestrate dans stray/ ; le brief review-small doit écrire ses captures sous le dossier Playwright de la vague comme l'étape ux, et un test du brief le vérifier"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-17
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { sharedStateDir } from '../src/state.js';
 import { lockViolations, redSha, resealAcceptation, resealedRouge, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
@@ -194,8 +194,8 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
 
   // L238 : ol-companion L172 — reseal accepté pendant une vague suspendue (question en attente), puis --resume --answer rendait le lot avec le rescellé pour « premier commit fautif ».
   describe('vague suspendue du dépôt (L238)', () => {
-    const vagueSuspendue = (repo: string, statuts: Record<string, LotState['status']>, waveStatus: WaveState['status'] = 'done') => {
-      const store = RunStore.reserve(repo, '2026-10-17-1720')!;
+    const vagueSuspendue = (repo: string, statuts: Record<string, LotState['status']>, waveStatus: WaveState['status'] = 'done', launchDir = repo) => {
+      const store = RunStore.reserve(launchDir, '2026-10-17-1720')!;
       store.writeWave({ id: store.id, status: waveStatus, created: 'x', lots: Object.keys(statuts) } as never);
       for (const [key, status] of Object.entries(statuts)) {
         const [project, lot] = key.split(':');
@@ -212,6 +212,20 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       expect(r.err).toMatch(/vague 2026-10-17-1720 suspendue.*L1.*question/);
       expect(r.err).toMatch(/--resume.*--drop/);
       expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
+    });
+
+    it('refuse aussi quand la vague a été lancée depuis un dossier au-dessus du dépôt (le cas réel : le dossier parent des projets)', () => {
+      const { repo, a } = avecPlan();
+      writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+      vagueSuspendue(repo, { 'ici:L1': 'question' }, 'interrupted', dirname(repo));
+      try {
+        const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+        expect(r.code).toBe(2);
+        expect(r.err).toMatch(/vague 2026-10-17-1720 suspendue.*L1.*question/);
+        expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
+      } finally {
+        rmSync(join(dirname(repo), '.cadence'), { recursive: true, force: true });
+      }
     });
 
     it('accepte quand la vague arrêtée n’a plus de lot ouvert dans ce dépôt (tous prêts, ou lot d’un autre dépôt)', () => {

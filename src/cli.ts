@@ -772,7 +772,11 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   const lot = plan.lot(lotId);
   const repo = gitRoot(ctx.root) ?? ctx.root;
   // Une vague arrêtée (question en attente, quota) ne tient aucun verrou mais son `--resume` rejoue les lots de ce dépôt : un rescellé commité entre-temps serait rendu au lot comme « premier commit fautif » (L238).
-  const stopped = [...new Set([ctx.root, repo])].flatMap((dir) => suspendedLotsIn(dir, repo));
+  // Une vague range son état dans le dossier d'où elle a été lancée (`RunStore.runsDir(cwd)`), souvent un dossier PARENT du dépôt (le dossier des projets) : on remonte donc de la racine du plan jusqu'à la racine du disque.
+  const launchDirs = new Set<string>();
+  for (let d = resolve(ctx.root); !launchDirs.has(d); d = dirname(d)) launchDirs.add(d);
+  launchDirs.add(repo);
+  const stopped = [...launchDirs].flatMap((dir) => suspendedLotsIn(dir, repo));
   if (stopped.length) {
     const w = stopped[0];
     throw new RafError(`spec reseal : vague ${w.wave} suspendue, lots ouverts de ce dépôt : ${w.lots.map((l) => `${l.key} (${l.status})`).join(', ')} — rescellé une fois la vague finie (cadence orchestrate --resume ${w.wave}) ou close (--resume ${w.wave} --drop <lot> pour chaque lot ouvert)`);

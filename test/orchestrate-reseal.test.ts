@@ -7,6 +7,7 @@ import { lockViolations, redSha, resealAcceptation, resealedRouge, sealAcceptati
 import { run } from '../src/cli.js';
 import { DISALLOWED } from '../src/orchestrate/launch.js';
 import { gitRepo } from './helpers.js';
+import { newLot, RunStore, type LotState, type WaveState } from '../src/orchestrate/state.js';
 import { git } from './orchestrate-harness.js';
 import { DIR, ecritAcceptation } from './accept-helpers.js';
 
@@ -189,6 +190,38 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/orchestration en cours \(vague w9/);
     expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
+  });
+
+  // L238 : ol-companion L172 — reseal accepté pendant une vague suspendue (question en attente), puis --resume --answer rendait le lot avec le rescellé pour « premier commit fautif ».
+  describe('vague suspendue du dépôt (L238)', () => {
+    const vagueSuspendue = (repo: string, statuts: Record<string, LotState['status']>, waveStatus: WaveState['status'] = 'done') => {
+      const store = RunStore.reserve(repo, '2026-10-17-1720')!;
+      store.writeWave({ id: store.id, status: waveStatus, created: 'x', lots: Object.keys(statuts) } as never);
+      for (const [key, status] of Object.entries(statuts)) {
+        const [project, lot] = key.split(':');
+        store.writeLot({ ...newLot({ project, repo: project === 'ici' ? repo : join(repo, project), lot, title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false }), status });
+      }
+    };
+
+    it('refuse un lot de ce dépôt en question dans une vague arrêtée, dit d’attendre sa fin ou de la clore, et ne commite rien', () => {
+      const { repo, a } = avecPlan();
+      writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+      vagueSuspendue(repo, { 'ici:L1': 'question' }, 'interrupted');
+      const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+      expect(r.code).toBe(2);
+      expect(r.err).toMatch(/vague 2026-10-17-1720 suspendue.*L1.*question/);
+      expect(r.err).toMatch(/--resume.*--drop/);
+      expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L1');
+    });
+
+    it('accepte quand la vague arrêtée n’a plus de lot ouvert dans ce dépôt (tous prêts, ou lot d’un autre dépôt)', () => {
+      const { repo, a } = avecPlan();
+      writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+      vagueSuspendue(repo, { 'ici:L1': 'ready', 'ailleurs:L2': 'question' }, 'interrupted');
+      const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+    });
   });
 
   it('le commit de la note du plan refusé (commit-msg) : erreur lisible qui dit que le rescellé a eu lieu et que la note reste à commiter', () => {

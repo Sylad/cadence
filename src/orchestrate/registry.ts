@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { processStart } from '../proc.js';
@@ -177,4 +177,26 @@ export function openLotsIn(home: string, pid: number, repo: string): string[] | 
   } catch {
     return null;
   }
+}
+
+/**
+ * Vagues lancées depuis `launchDir` qui ne tournent plus mais gardent des lots ouverts (question en attente, suspendus, en file) dans `repo` (L238) :
+ * un `--resume` les rejouera sur ce dépôt, comme une vague vivante. Les vagues terminées (`done`) n'en gardent aucun.
+ */
+export function suspendedLotsIn(launchDir: string, repo: string): { wave: string; lots: { key: string; status: string }[] }[] {
+  const base = RunStore.runsDir(launchDir);
+  if (!existsSync(base)) return [];
+  const mine = commonDir(repo);
+  const out: { wave: string; lots: { key: string; status: string }[] }[] = [];
+  for (const id of readdirSync(base).sort()) {
+    try {
+      const store = RunStore.find(launchDir, id);
+      if (!store || store.readWave()?.status === 'done') continue;
+      const lots = store.lots().filter((l) => !lotFinished(l) && lotRepoPaths(l).some((r) => r === repo || (mine !== null && commonDir(r) === mine))).map((l) => ({ key: lotKey(l.project, l.lot), status: l.status }));
+      if (lots.length) out.push({ wave: id, lots });
+    } catch {
+      // état illisible : une vague qu'on ne sait pas lire ne bloque pas un rescellé du lead
+    }
+  }
+  return out;
 }

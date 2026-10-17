@@ -60,6 +60,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence spec reseal` refuses while a stopped wave still has an open lot in the repository (L238, `docs/orchestrate.md`): a reseal accepted during a wave suspended on a question was committed outside any session, then `--resume --answer` handed the lot back for a lock violation naming the reseal commit as the first offending one (ol-companion L172). The error names the wave and its lots and says to wait for its end or to close it (`--resume <wave> --drop <lot>`).
+
 ### Added
 
 - Auto-verification at the end of an `implement` or `fix` session (L236, `docs/orchestrate.md`): once the full test suite and the build pass, the brief makes the session re-read the complete diff of its lot (of its fix commits, in `fix`) against the grid of the `code-reviewer` (code bug, architecture drift, `docs/architecture.md` up to date, edge cases, one test per changed behaviour), fix at once what it finds, and write an « auto-vérification » paragraph at the start of `resume`; no new report field. Measured before it: `cadence corrections --classify` from 10 to 17-10 gave 356 passes, 53 % code bug, 19 % architecture drift, 14 % unclear spec, and `cadence perf` 37 % right the first time; target: above 50 % on the next window, tokens per lot unchanged (one reading of the diff, not a second review).

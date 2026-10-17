@@ -21,7 +21,7 @@ import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.j
 import { findProjects, leadTour, readLeadUx, tourLine } from './lead.js';
 import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
-import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
+import { cadenceHome, openLotsIn, suspendedLotsIn } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedDeliveries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
@@ -771,6 +771,12 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   const plan = ctx.loadPlan();
   const lot = plan.lot(lotId);
   const repo = gitRoot(ctx.root) ?? ctx.root;
+  // Une vague arrêtée (question en attente, quota) ne tient aucun verrou mais son `--resume` rejoue les lots de ce dépôt : un rescellé commité entre-temps serait rendu au lot comme « premier commit fautif » (L238).
+  const stopped = [...new Set([ctx.root, repo])].flatMap((dir) => suspendedLotsIn(dir, repo));
+  if (stopped.length) {
+    const w = stopped[0];
+    throw new RafError(`spec reseal : vague ${w.wave} suspendue, lots ouverts de ce dépôt : ${w.lots.map((l) => `${l.key} (${l.status})`).join(', ')} — rescellé une fois la vague finie (cadence orchestrate --resume ${w.wave}) ou close (--resume ${w.wave} --drop <lot> pour chaque lot ouvert)`);
+  }
   const dir = readOrchestrateConfig(ctx.configPath).spec.dir;
   const json = findAcceptation(repo, dir, lotId);
   // Un lot livré (acceptation verte) se rescelle pour un test instable dont le contrat ne change pas : le lot en cours qui porte la correction est nommé (--porteur) et cité dans le commit.

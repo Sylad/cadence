@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
 import { coveredTasks } from '../src/audit.js';
@@ -253,7 +253,7 @@ describe('lot visible : code puis UX (L221)', () => {
     }
     const hn = harness({ lots: [{ title: 'Sans écran' }], script: { implement: [impl()], review: [major, minorReview(), ok], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
     await runLot(hn.lot('L1'));
-    for (const f of hn.calls.filter((c) => c.kind === 'fix')) expect(f.brief).not.toContain('.cadence');
+    for (const f of hn.calls.filter((c) => c.kind === 'fix')) expect(f.brief).not.toContain(join(hn.store.dir, 'demo--L1', 'playwright')); // le dossier temporaire (L242) est, lui, dans la vague
   });
 
   it('chaque session reçoit --strict-mcp-config et son fichier dans le dossier du lot ; lot visible : Playwright pour implement et ux (pas review), captures dans la vague (L74)', async () => {
@@ -2324,6 +2324,22 @@ describe('contrôle préalable sur le modèle local (L146)', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
     expect(h.calls[1].brief).toContain('moitié faite');
+  });
+});
+
+describe('dossier temporaire des sessions de vague (L242)', () => {
+  it('(L242/R3) chaque session reçoit un TMPDIR existant, sous le dossier de la vague et hors du dépôt, nommé dans son brief', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    await runLot(h.lot('L1'));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    for (const call of h.calls) {
+      const tmp = call.opts.env.TMPDIR;
+      expect(tmp, call.kind).toBeTruthy();
+      expect(existsSync(tmp), call.kind).toBe(true);
+      expect(relative(h.store.dir, tmp).startsWith('..'), 'sous la vague').toBe(false);
+      expect(relative(h.repo, tmp).startsWith('..'), 'hors du dépôt').toBe(true);
+      expect(call.brief, call.kind).toContain(tmp);
+    }
   });
 });
 

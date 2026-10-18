@@ -259,6 +259,13 @@ export class RunStore {
     return d;
   }
 
+  /** Dossier temporaire des sessions d'un lot (L242) : `<lotDir>/tmp`, sous la vague donc hors du dépôt. */
+  tmpDir(project: string, lot: string): string {
+    const d = join(this.lotDir(project, lot), 'tmp');
+    mkdirSync(d, { recursive: true });
+    return d;
+  }
+
   writeWave(w: WaveState): void {
     atomicWrite(join(this.dir, 'wave.json'), w);
   }

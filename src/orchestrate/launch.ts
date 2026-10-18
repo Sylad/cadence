@@ -43,6 +43,8 @@ export interface StepSpec {
   playwright?: boolean;
   /** Étape lancée par `claude-local` (modèle Ollama de Big-Blue, hors quota) : arguments de `buildLocalArgs`, jamais de relance `--resume` (L146). */
   local?: boolean;
+  /** Dossier temporaire de la session (L242) : exporté en `TMPDIR`, hors du dépôt, pour que ses journaux et dumps n'y salissent pas l'arbre de travail. */
+  tmpDir?: string;
   /** La session n'a pas accès à la production (L168) : `prodAccess` du projet lève la restriction (défaut : coupé). */
   prodAccess?: boolean;
 }
@@ -208,7 +210,7 @@ export async function runSession(
 ): Promise<SessionOutcome> {
   const sandbox = sandboxEnv(!!spec.prodAccess);
   const launch = (args: string[]) =>
-    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...sandbox.set, ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn, lot: spec.lot });
+    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...sandbox.set, ...(spec.tmpDir ? { TMPDIR: spec.tmpDir } : {}), ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn, lot: spec.lot });
   const out = await launch(spec.local ? buildLocalArgs(spec, deps.agents) : buildArgs(spec, deps.agents));
   const first = classify(out);
   if (spec.local) return first; // pas de relance de mise en forme : l'appelant se replie sur Sonnet

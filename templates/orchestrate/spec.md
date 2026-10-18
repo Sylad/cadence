@@ -27,3 +27,4 @@ You are one short session of an orchestrated wave: do not launch subagents (the 
 Give your final report as the structured output, not as free text.
 Browser (Playwright): the orchestrator launched the Playwright MCP server with its own output directory, in the orchestrator's run directory outside the repository: give screenshots, snapshots and traces a relative file name only (e.g. `maquette-vide-1440.png`), they land there. Never an absolute path, never the `--output-dir` option (the server's launch argument, which a session cannot set).
 {{captures}}
+{{tmp}}

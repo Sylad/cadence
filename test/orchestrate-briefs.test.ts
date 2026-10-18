@@ -3,7 +3,7 @@ import { cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tempDir } from './helpers.js';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TEMPLATES_DIR, loadTemplates, newsText, objective, renderBrief } from '../src/orchestrate/briefs.js';
+import { TEMPLATES_DIR, loadTemplates, newsText, objective, renderBrief, tmpText } from '../src/orchestrate/briefs.js';
 import { acceptText } from '../src/orchestrate/accept.js';
 import { WORK_SCHEMA, REVIEW_SCHEMA, checkShape } from '../src/orchestrate/schemas.js';
 import type { Lot } from '../src/plan.js';
@@ -32,6 +32,17 @@ describe('gabarits', () => {
     expect(fix).toContain('not a question and not a reason to stop');
     expect(fix).toContain('the next fresh review re-reads it');
     expect(renderBrief('fix-minors', vars)).toContain('A finding you contest is noted under "choix"');
+  });
+
+  it('(L242/R2) tous les briefs nomment le dossier temporaire de la session et interdisent d\'écrire les temporaires dans le dépôt ; sans dossier (--dry-run), pas de ligne', () => {
+    const kinds = Object.keys(loadTemplates()) as (keyof ReturnType<typeof loadTemplates>)[];
+    for (const kind of kinds) {
+      const out = renderBrief(kind, { ...vars, tmp: tmpText('/vague/w1/p-L9/tmp') });
+      expect(out, kind).toContain('/vague/w1/p-L9/tmp');
+      expect(out, kind).toContain('TMPDIR');
+      expect(renderBrief(kind, vars), kind).not.toContain('TMPDIR');
+    }
+    expect(tmpText('/x/tmp')).toMatch(/never inside the repository/);
   });
 
   it('ux.md : captures et snapshots dans le dossier du serveur Playwright de la vague, noms relatifs (L74)', () => {

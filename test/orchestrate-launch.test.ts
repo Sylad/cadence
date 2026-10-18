@@ -211,6 +211,18 @@ describe('runSession (lanceur injecté)', () => {
     expect(calls[1].env.PATH.split(':')[0]).toBe('/vague/tool/bin');
   });
 
+  it('(L242/R1) tmpDir de l\'étape devient TMPDIR de la session ; sans tmpDir, TMPDIR reste celui de l\'orchestrateur', async () => {
+    const calls: { env: Record<string, string> }[] = [];
+    const claude = async (_a: string[], opts: { env: Record<string, string> }) => {
+      calls.push(opts);
+      return { code: 0, stdout: sample, stderr: '', timedOut: false };
+    };
+    await runSession({ ...spec, kind: 'implement', agent: undefined, tmpDir: '/vague/w1/l1/tmp' }, { claude, agents: {} });
+    await runSession({ ...spec, kind: 'implement', agent: undefined }, { claude, agents: {} });
+    expect(calls[0].env.TMPDIR).toBe('/vague/w1/l1/tmp');
+    expect(calls[1].env).not.toHaveProperty('TMPDIR');
+  });
+
   it('passe cwd, environnement de garde, délai ; lit le résultat', async () => {
     const calls: { args: string[]; cwd: string; env: Record<string, string>; timeoutMs: number }[] = [];
     const out = await runSession(

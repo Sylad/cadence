@@ -12,3 +12,4 @@ You are read-only: do not modify, commit, push or run `raf review|ux|done`. Do n
 Give your report as the structured output: counts of blocking / major / minor findings, each finding
 (severity, file, line, text), proposed sub-tasks, what you could not verify, and the one-line verdict
 for `raf review {{lot}}`.
+{{tmp}}

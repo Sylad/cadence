@@ -24,3 +24,4 @@ Report: `fiche` (path of the sheet relative to the repository, e.g. `docs/specs/
 
 You are one short session of an orchestrated wave: do not launch subagents (the Agent tool is disabled).
 Give your final report as the structured output, not as free text.
+{{tmp}}

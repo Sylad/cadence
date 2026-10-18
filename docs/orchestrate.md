@@ -375,6 +375,13 @@ The sessions of the wave also get `.cadence/runs/<wave>/tool/bin` (the `raf` and
 `PATH`**, ahead of the per-project Node below and of the usual `PATH`: the `raf` a reviewer runs (`raf commits`…) is the
 snapshot's, not the installed one. A wave without a snapshot leaves the `PATH` as it is.
 
+**A temporary folder outside the repository (L242)**: each session gets a `TMPDIR` of its own lot, `.cadence/runs/<wave>/<project>--<lot>/tmp`
+(created before the session, exported in the environment of `claude -p`, so under the wave and never in the repository), and every brief
+names it: test logs, dumps and exports go there, not in the repository's `tmp/` (sessions left `tmp/suite-l149.txt`, `tmp/vt-*.json`,
+`tmp/*.log` four times on 2026-10-18, one lot handed back for a « dirty repository »). The folder is shared by the sessions of the lot
+(implement, review, fix…) and removed with the wave folder. A `--dry-run` brief or one delegated by hand has no wave folder, hence no
+such line.
+
 **The code in service (L195)**: on cadence's own repository, `bin/raf.js` and `bin/cadence.js` load `dist/`, so the `raf` and `cadence` of your
 `PATH` used to be whatever the working repository last built. The snapshot protects the wave running, not that installed tool, and a wave's
 sessions run `npm run build`, `npm install`… The code in service now lives in a **separate copy**: a detached git worktree built there,

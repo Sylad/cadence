@@ -34,6 +34,8 @@ export interface BriefVars {
   accept?: string;
   /** Consigne de la fiche d'écran (L174) pour implement, fix, revue de code et UX de conformité d'un lot qui a une fiche ; vide ailleurs. */
   fiche?: string;
+  /** Dossier temporaire de la session (L242) : `tmpText(dir)` ; vide sans vague (`--dry-run`, brief délégué à la main). */
+  tmp?: string;
   /** Consigne de la revue de maquette (L172) : fiche, maquette, captures, passe en cours ; vide ailleurs. */
   maquette?: string;
 }
@@ -56,6 +58,11 @@ export function reposText(role: 'write' | 'read', lot: string, repos: { rel: str
     ...cited.map((r) => `In \`${r.rel}\` only the commits that also contain \`${r.cite}\` count: the repository is shared with other projects.`),
     `\`raf commits ${lot}\` lists them all; read the diff of the neighbouring ones with \`git -C <path> log\` / \`git -C <path> show\` (${repos.map((r) => `git -C ${r.path} log`).join(' ; ')}), and review them like the rest. You are read-only there too.`,
   ].join('\n');
+}
+
+/** Consigne du dossier temporaire (L242) : les sessions y rangent journaux de tests, dumps et exports, jamais dans le dépôt (4 « dépôt sale » le 18-10). */
+export function tmpText(dir: string): string {
+  return `Temporary files: this session's \`TMPDIR\` is \`${dir}\` (outside the repository, already created and exported). Write test logs, dumps, exports and any scratch file there (\`> $TMPDIR/suite.txt\`), never inside the repository: not in its \`tmp/\`, not at its root. Leave the working tree with only the files of the lot.`;
 }
 
 /** Consigne d'implémentation d'un lot `visible` : son entrée Nouveautés (convention de `cadence news`, voir docs/news.md du paquet @sylad/cadence). */
@@ -118,7 +125,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', docs: vars.docs ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', docs: vars.docs ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

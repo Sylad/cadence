@@ -9,3 +9,4 @@ Answer `oui` only when every part of the lot is present, with a proof for each (
 some parts are present (say which); `non` otherwise. When in doubt, answer `non`: an implementation session follows.
 You are read-only: do not modify, commit, push or run `raf start|done|note|review|ux`. Do not launch subagents.
 Give your report as the structured output: `dejaPresent` (oui | partiel | non), `preuves` (the proofs), `resume` (one sentence).
+{{tmp}}

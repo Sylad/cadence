@@ -5,7 +5,7 @@
 `cadence perf [folder] [--since date] [--json]` is the permanent dashboard of the workflow. It calls no model, writes nothing
 (no journal, no plan, no cache) and reads, from the folder (default: the current one), the wave journals
 `<folder>/.cadence/runs/<wave>/<project>--<lot>.json` (with each wave's `wave.json`) and the plan of every project of the folder
-(one nesting level, like `cadence corrections`: `group/gamma`). Exit code `0`, even when a `⚠` is printed; `1` on a usage or read error.
+(one nesting level, like `cadence corrections`: `group/gamma`; a `tmp/` folder is never read: its working copies would count their lots twice, L241). Exit code `0`, even when a `⚠` is printed; `1` on a usage or read error.
 
 It compares two windows of 7 calendar days (local days): the **current** one (the last 7 days, today included) and the **previous**
 one (the 7 days before). Every speed indicator is printed on the same line as its **quality twin**, never alone ("fast *and* well"):

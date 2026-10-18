@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { findProjects, readLeadUx, tourLine, type TourRow } from '../src/lead.js';
+import { readPlans } from '../src/perf.js';
 import { sharedStateDir, stateDir, writeLock, writeNext } from '../src/state.js';
 import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -295,6 +296,28 @@ describe('cadence lead tour', () => {
     mkdirSync(join(root, 'casse'));
     writeFileSync(join(root, 'casse/cadence.yaml'), 'plan: [\n');
     expect(findProjects(root).map((d) => d.slice(root.length + 1))).toEqual(['alpha', 'beta', 'casse']);
+  });
+
+  it("L241 — findProjects ignore les copies de travail sous tmp/, à tout niveau, mais garde un projet nommé autrement", async () => {
+    const { root } = await parent();
+    const planned = (name: string) => {
+      mkdirSync(join(root, name, 'docs/plan'), { recursive: true });
+      writeFileSync(join(root, name, 'docs/plan/raf.yaml'), 'lots: []\n');
+    };
+    planned('tmp/l146-mut');
+    planned('groupe/tmp/copie');
+    planned('groupe/vrai');
+    planned('tmpx');
+    expect(findProjects(root, 3).map((d) => d.slice(root.length + 1))).toEqual(['alpha', 'beta', 'groupe/vrai', 'tmpx']);
+  });
+
+  it("L241 — cadence lead tour et readPlans ne comptent pas les copies sous tmp/", async () => {
+    const { root } = await parent();
+    mkdirSync(join(root, 'tmp/copie/docs/plan'), { recursive: true });
+    writeFileSync(join(root, 'tmp/copie/docs/plan/raf.yaml'), 'lots: []\n');
+    const { out } = await cad(root, 'lead', 'tour', '--depth', '2');
+    expect(out).not.toContain('tmp/copie');
+    expect([...readPlans(root, () => {}).keys()]).not.toContain('tmp/copie');
   });
 
   it('--idle règle le seuil de silence et refuse une valeur invalide', async () => {

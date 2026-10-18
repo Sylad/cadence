@@ -96,7 +96,7 @@ export function isProject(dir: string): boolean {
   }
 }
 
-/** Les projets sous `parent`, jusqu'à `depth` niveaux (1 : sous-dossiers directs) ; on ne descend pas dans un projet. */
+/** Les projets sous `parent`, jusqu'à `depth` niveaux (1 : sous-dossiers directs) ; on ne descend pas dans un projet, ni dans `tmp/` (copies de travail jetables, L241). */
 export function findProjects(parent: string, depth = 1): string[] {
   const found: string[] = [];
   let entries;
@@ -106,7 +106,7 @@ export function findProjects(parent: string, depth = 1): string[] {
     return found; // dossier illisible : on le saute, les autres projets tournent
   }
   for (const e of entries) {
-    if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules') continue;
+    if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'tmp') continue;
     const dir = join(parent, e.name);
     if (isProject(dir)) found.push(dir);
     else if (depth > 1) found.push(...findProjects(dir, depth - 1));

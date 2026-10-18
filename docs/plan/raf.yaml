@@ -2782,6 +2782,11 @@ lots:
     started: 2026-10-17
     review: { date: 2026-10-17, verdict: "conforme : la commande --resume proposée retire aussi (--drop) les lots en file du dépôt, les trois choix de l'auteur tiennent, test dédié, docs à jour, 0 constat — orchestré (vague 2026-10-17-l239-qsrc, 0 passe(s) de correction)", commit: 11236a7e6fd3ad432df961602789f3c232592b2b }
     finished: 2026-10-17
+  - id: L240
+    title: "Goulot perf 12–18-10 : toutes les durées de mur montent ensemble (ux +87 %, review +44 %, review-small +51 %, maquette et implement +27 %) et les tokens par lot aussi (estimate 0,5 : 390 k, +74 % ; estimate 1 : 451 k, +80 %) pendant que les livrés baissent de 51 % (cadence perf 18-10, fenêtres 05–11 et 12–18-10) ; ventiler les journaux de vague des deux fenêtres par étape, projet, modèle, taille de diff et nombre de passes pour séparer une cause commune (latence, charge, contexte des sessions) d'une cause propre (lots plus gros, auto-vérification L236, revue UX), consigner la mesure et la conclusion dans docs/perf/ ; corriger la cause si elle est dans cadence (test à l'appui), sinon recaler estimates et budgets par défaut ; rendre visibles dans cadence perf les causes des passes (0 classée sur la fenêtre)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-18
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

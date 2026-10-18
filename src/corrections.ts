@@ -117,6 +117,8 @@ function usageOf(tokens: RawStep['tokens']): StepUsage | undefined {
 /** Une passe de correction et la date de fin de son étape fix (absente sans date lisible). */
 export interface JournalPass extends FixPass {
   fixEnded?: string;
+  /** Sorte de la revue dont les constats ont déclenché la passe (`review`, `review-small`, `ux`) ; absente d'une passe sans constat à lire. */
+  reviewKind?: string;
 }
 
 /** Un journal `<vague>/<projet>--<lot>.json` lu, avec ce que `readRuns` et `cadence perf` en tirent. */
@@ -172,7 +174,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         // Une passe fix entre la revue et celle-ci a déjà traité ces constats : cette passe-ci (tests rouges) n'en a pas.
         const handled = review ? fixSteps.some((f) => f.n > review.n && f.n < fix.n) : false;
         const findings = review?.report && !handled ? findingsOf(readJson(join(waveDir, name, review.report))) : [];
-        return { key: `${wave}/${name}/${fix.n}`, project: rec.project, lot: rec.lot, visible: !!rec.visible, findings, commits: fix.commits ?? [], ...(fix.ended ? { fixEnded: fix.ended } : {}) };
+        return { key: `${wave}/${name}/${fix.n}`, project: rec.project, lot: rec.lot, visible: !!rec.visible, findings, commits: fix.commits ?? [], ...(fix.ended ? { fixEnded: fix.ended } : {}), ...(findings.length > 0 && review ? { reviewKind: review.kind } : {}) };
       });
       journals.push({
         wave,
@@ -204,7 +206,7 @@ export function readRuns(runsDir: string, until?: string, since?: string): Runs 
   for (const j of readJournals(runsDir, until, since)) {
     if (!j.implemented) continue;
     lots.push({ project: j.project, lot: j.lot, visible: j.visible, fixes: j.passes.length });
-    for (const { fixEnded: _ended, ...pass } of j.passes) passes.push(pass);
+    for (const { fixEnded: _ended, reviewKind: _kind, ...pass } of j.passes) passes.push(pass);
   }
   return { lots, passes };
 }

@@ -32,6 +32,8 @@ const MIN_SAMPLE = 5;
 /** Goulot net (R19) : une cause pèse au moins cette part des passes classées, avec au moins MIN_CLASSIFIED passes classées. */
 const BOTTLENECK_SHARE = 0.5;
 const MIN_CLASSIFIED = 10;
+/** Les étapes de la chaîne spec : un lot qui en a une est mesuré à part pour ses tokens (L240). */
+const SPEC_CHAIN = new Set(['spec', 'fiche', 'maquette', 'accept']);
 
 /**
  * Les deux fenêtres de 7 jours calendaires locaux : la courante finit à `today` inclus, la précédente la précède.
@@ -77,6 +79,8 @@ export interface CauseWindow {
   withoutFindings: number;
   /** Part des passes à constats que le cache ne classe pas ; null sans passe à constats. */
   unclassifiedShare: number | null;
+  /** Passes à constats de la fenêtre par sorte de revue qui les a levées (`review`, `review-small`, `ux`) : lu dans les journaux, sans modèle ni cache. */
+  byReview: Record<string, number>;
 }
 
 /** Les indicateurs de L226 : tokens par lot, délais, durées de mur. */
@@ -240,6 +244,9 @@ function indicator(current: number | null, previous: number | null, lots: { curr
   return { current, previous, change, warn, twin, lots, note };
 }
 
+/** Ordre des classes de tokens : estimate croissant, la classe « +spec » après la classe ordinaire du même estimate. */
+const byEstimateKey = (a: string, b: string): number => parseFloat(a) - parseFloat(b) || a.length - b.length;
+
 /** Les deux valeurs d'un indicateur, calculées fenêtre par fenêtre. */
 const both = <T>(windows: Windows, f: (w: Window) => T): { current: T; previous: T } => ({ current: f(windows.current), previous: f(windows.previous) });
 
@@ -247,12 +254,14 @@ function causeWindow(passes: { pass: JournalPass; day: Day }[], w: Window, cache
   const counts = new Map<Cause, number>();
   let unclassified = 0;
   let withoutFindings = 0;
+  const byReview: Record<string, number> = {};
   for (const { pass, day } of passes) {
     if (!inWindow(day, w)) continue;
     if (pass.findings.length === 0) {
       withoutFindings++;
       continue;
     }
+    if (pass.reviewKind) byReview[pass.reviewKind] = (byReview[pass.reviewKind] ?? 0) + 1;
     const c = cache.get(pass.key);
     if (!c) {
       unclassified++;
@@ -267,7 +276,7 @@ function causeWindow(passes: { pass: JournalPass; day: Day }[], w: Window, cache
     .sort((a, b) => b.passes - a.passes)
     .slice(0, 3);
   const withFindings = classified + unclassified;
-  return { top, classified, unclassified, withoutFindings, unclassifiedShare: withFindings === 0 ? null : unclassified / withFindings };
+  return { top, classified, unclassified, withoutFindings, unclassifiedShare: withFindings === 0 ? null : unclassified / withFindings, byReview };
 }
 
 export function computePerf(input: PerfInput): PerfResult {
@@ -358,14 +367,15 @@ export function computePerf(input: PerfInput): PerfResult {
       const p = planLot(plans, d.j.project, d.j.lot);
       const counted = d.j.steps.filter((x) => x.counted !== undefined);
       if (!p || counted.length === 0) continue;
-      const key = String(p.estimate);
+      // Un lot passé par la chaîne spec (écran ou back) porte 450 k de plus que le lot ordinaire de même estimate : classe à part, sinon l'arrivée de ces lots dans une fenêtre passe pour un lot ordinaire plus lourd (L240).
+      const key = `${p.estimate}${d.j.steps.some((x) => SPEC_CHAIN.has(x.kind)) ? '+spec' : ''}`;
       classes.set(key, [...(classes.get(key) ?? []), counted.reduce((sum, x) => sum + x.counted!, 0)]);
     }
     return classes;
   };
   const byClass = both(windows, tokensByClass);
   const byEstimate: Record<string, Indicator> = {};
-  const classKeys = [...new Set([...byClass.current.keys(), ...byClass.previous.keys()])].sort((a, b) => Number(a) - Number(b));
+  const classKeys = [...new Set([...byClass.current.keys(), ...byClass.previous.keys()])].sort(byEstimateKey);
   for (const key of classKeys) {
     const vals = both(windows, (w) => median((w === windows.current ? byClass.current : byClass.previous).get(key) ?? []));
     byEstimate[key] = mk(vals, { current: byClass.current.get(key)?.length ?? 0, previous: byClass.previous.get(key)?.length ?? 0 }, 'up', twinFirstTime);
@@ -519,7 +529,7 @@ interface Line {
 /** Les indicateurs imprimés, dans l'ordre du tableau, avec leur étiquette et la décision qu'ils éclairent. */
 function indicatorLines(r: PerfResult): [Line, Indicator][] {
   const speed: [Line, Indicator][] = [
-    ...Object.entries(r.tokens.byEstimate).sort(([a], [b]) => Number(a) - Number(b)).map(([k, ind]): [Line, Indicator] => [{ label: `tokens par lot (estimate ${k})`, kind: 'tokens', decision: 'tokens' }, ind]),
+    ...Object.entries(r.tokens.byEstimate).sort(([a], [b]) => byEstimateKey(a, b)).map(([k, ind]): [Line, Indicator] => [{ label: `tokens par lot (estimate ${k})`, kind: 'tokens', decision: 'tokens' }, ind]),
     [{ label: 'part des tokens de revue', kind: 'share', decision: 'reviewShare' }, r.tokens.reviewShare],
     [{ label: 'délai création → done', kind: 'days', decision: 'createdToDone' }, r.delays.createdToDone],
     [{ label: 'délai done → livraison', kind: 'days', decision: 'doneToDelivered' }, r.delays.doneToDelivered],
@@ -619,7 +629,9 @@ export function renderPerf(r: PerfResult): string[] {
   section('Passes de correction', ['médiane de passes de correction par lot', 'part des lots à au moins 2 passes', 'part conforme du premier coup']);
   const c = r.corrections.causes.current;
   const top = c.top.map((t, i) => `${i + 1}. ${LABELS[t.cause]} ${t.passes} (${pct(t.share)})`).join(' · ');
-  out.push(`  causes dominantes (${c.classified} passes classées) : ${top || 'aucune'} · non classé : ${c.unclassifiedShare === null ? 'n/d' : pct(c.unclassifiedShare)} · sans revue (tests rouges) : ${c.withoutFindings}`);
+  out.push(`  causes dominantes (${c.classified} passes classées) : ${top || 'aucune'} · non classé : ${c.unclassifiedShare === null ? 'n/d' : pct(c.unclassifiedShare)} · sans revue (tests rouges) : ${c.withoutFindings}${c.unclassified > 0 ? ' · à classer : cadence corrections --classify' : ''}`);
+  const origins = Object.entries(c.byReview).sort(([a, x], [b, y]) => y - x || a.localeCompare(b));
+  if (origins.length > 0) out.push(`  origine des passes à constats : ${origins.map(([k, n]) => `${k} ${n}`).join(' · ')}`);
   section('Interventions du lead', ['lots terminés hors vague', 'sessions ux par lot visible']);
   const h = r.interventions.handedOut.count;
   out.push(`  lots rendus puis terminés hors vague : ${h.current ?? 'n/d'} (précédente ${h.previous ?? 'n/d'})`);

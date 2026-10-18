@@ -1567,3 +1567,61 @@ describe('cadence perf — coût par lot livré (R8, R9, R10, R12)', () => {
     expect(tree(c.root)).toEqual(before);
   });
 });
+
+describe('cadence perf — goulot de la fenêtre 12–18-10 (L240)', () => {
+  const specLot = (c: Ctx, id: string, counted: number, day = CUR) =>
+    lotJournal(c, day, id, { steps: [{ kind: 'spec', counted, ended: at(day, '08:00:00') }, { kind: 'implement', ended: at(day, '09:00:00') }] });
+
+  it('Tokens — un lot passé par la chaîne spec compte dans une classe à part, « 0.5+spec » : il ne gonfle plus la médiane des lots ordinaires du même estimate', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...doneLots(c, 'A', 3, CUR, '2026-10-01', 0.5, 100_000), { id: 'S0', finished: CUR, created: '2026-10-01', estimate: 0.5 }, { id: 'S1', finished: CUR, created: '2026-10-01', estimate: 0.5 }]);
+    specLot(c, 'S0', 500_000);
+    specLot(c, 'S1', 700_000);
+    const { data } = await json(c.root);
+    expect(data.tokens.byEstimate['0.5']).toMatchObject({ current: 100_000, lots: { current: 3, previous: 0 } });
+    expect(data.tokens.byEstimate['0.5+spec']).toMatchObject({ current: 600_000, lots: { current: 2, previous: 0 } });
+  });
+
+  it('Tokens — la classe « 0.5+spec » s\'imprime après « 0.5 » et avant « 1 », avec son étiquette', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...doneLots(c, 'A', 1, CUR, '2026-10-01', 1, 100_000), ...doneLots(c, 'B', 1, CUR, '2026-10-01', 0.5, 100_000), { id: 'S0', finished: CUR, created: '2026-10-01', estimate: 0.5 }]);
+    specLot(c, 'S0', 500_000);
+    const { text } = await cad(c.root);
+    const at = (k: string) => text.indexOf(`tokens par lot (estimate ${k})`);
+    expect(at('0.5')).toBeGreaterThan(-1);
+    expect(at('0.5')).toBeLessThan(at('0.5+spec'));
+    expect(at('0.5+spec')).toBeLessThan(at('1'));
+  });
+
+  it('Causes — l\'origine des passes à constats (quelle revue les a levées) se compte sans modèle, classées ou non', async () => {
+    const c = ctx();
+    const steps = (kind: string): PStep[] => [{ kind: 'implement', ended: at(CUR, '09:00:00') }, { kind, constats: ['x'], ended: at(CUR, '10:00:00') }, { kind: 'fix', ended: at(CUR, '11:00:00') }];
+    writeJournal(c.runs, 'w1', 'alpha', 'A', { steps: steps('review') });
+    writeJournal(c.runs, 'w1', 'alpha', 'B', { steps: steps('review-small') });
+    writeJournal(c.runs, 'w1', 'alpha', 'C', { steps: steps('review-small') });
+    writeJournal(c.runs, 'w1', 'alpha', 'D', { steps: steps('ux') });
+    const { data, text } = await json(c.root).then(async (r) => ({ ...r, text: (await cad(c.root)).text }));
+    expect(data.corrections.causes.current.byReview).toEqual({ review: 1, 'review-small': 2, ux: 1 });
+    expect(data.corrections.causes.previous.byReview).toEqual({});
+    expect(text).toContain('origine des passes à constats : review-small 2 · review 1 · ux 1');
+  });
+
+  it('Causes — une passe sans constat (tests rouges) n\'a pas d\'origine de revue', async () => {
+    const c = ctx();
+    writeJournal(c.runs, 'w1', 'alpha', 'A', { steps: [{ kind: 'implement', ended: at(CUR, '09:00:00') }, { kind: 'fix', ended: at(CUR, '11:00:00') }] });
+    expect((await json(c.root)).data.corrections.causes.current.byReview).toEqual({});
+  });
+
+  it('Causes — des passes non classées : la ligne dit la commande qui les classe (cadence corrections --classify)', async () => {
+    const c = ctx();
+    many(2, () => journal(c, CUR, { passes: 1 }));
+    expect((await cad(c.root)).text).toContain('cadence corrections --classify');
+  });
+
+  it('Causes — tout est classé : pas de rappel de la commande', async () => {
+    const c = ctx();
+    const r = journal(c, CUR, { passes: 1 });
+    writeFileSync(join(c.root, '.cadence', 'corrections.json'), JSON.stringify({ [`${r.wave}/${r.project}--${r.lot}/3`]: { cause: 'bug-code', by: 'm' } }));
+    expect((await cad(c.root)).text).not.toContain('cadence corrections --classify');
+  });
+});

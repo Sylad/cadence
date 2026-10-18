@@ -2784,10 +2784,17 @@ lots:
     finished: 2026-10-17
   - id: L240
     title: "Goulot perf 12–18-10 : toutes les durées de mur montent ensemble (ux +87 %, review +44 %, review-small +51 %, maquette et implement +27 %) et les tokens par lot aussi (estimate 0,5 : 390 k, +74 % ; estimate 1 : 451 k, +80 %) pendant que les livrés baissent de 51 % (cadence perf 18-10, fenêtres 05–11 et 12–18-10) ; ventiler les journaux de vague des deux fenêtres par étape, projet, modèle, taille de diff et nombre de passes pour séparer une cause commune (latence, charge, contexte des sessions) d'une cause propre (lots plus gros, auto-vérification L236, revue UX), consigner la mesure et la conclusion dans docs/perf/ ; corriger la cause si elle est dans cadence (test à l'appui), sinon recaler estimates et budgets par défaut ; rendre visibles dans cadence perf les causes des passes (0 classée sur la fenêtre)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-18
     started: 2026-10-18
+    review: { date: 2026-10-18, verdict: "conforme (re-vérification par le relecteur après 1297fe9 et 27fcee4 : M1 M2 m3 m4 m6 levés, 0 bloquant 0 majeur) ; notes : « +30 k à l'estimate 1 » pris contre une classe qui contient les lots ux (≈ +60 k contre les ordinaires), « 10 % de conception » vrai pour le palier 750 k seulement (540 k : maritime 21 % de dépassements), origines des passes du § 11 non gelées ; fiche de L226 (R2, R14) muette sur la classe +spec", commit: 27fcee41fc98dabe9dcc3e76df2e18842e1f87a5 }
+    finished: 2026-10-18
+  - id: L241
+    title: "cadence perf compte comme projets les copies de travail sous tmp/ du dossier parent (readPlans descend dans tmp/*/docs/plan/raf.yaml) : 106 livrés fantômes dans la fenêtre 05–11-10 (copie tmp/l146-mut), le ⚠ « livrés −51 % » était en vrai −35 % (mesure de L240, docs/perf/goulot-2026-10-18.md) ; même lecture probable dans lead tour — ignorer tmp/ (et les dossiers listés par .gitignore ?) et le tester"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-18
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

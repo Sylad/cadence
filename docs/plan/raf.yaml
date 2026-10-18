@@ -2798,6 +2798,11 @@ lots:
     started: 2026-10-18
     review: { date: 2026-10-18, verdict: "compliant (1 minor note) — orchestré (vague 2026-10-18-l241, 0 passe(s) de correction)", commit: e88956f4f88292d8f1b48a25635cf900eb3fab23 }
     finished: 2026-10-18
+  - id: L242
+    title: "orchestrate : les sessions écrivent leurs fichiers temporaires dans le dépôt (tmp/suite-l149.txt, tmp/vt-*.json, tmp/*.log : 4 fois le 18-10, warhammer L149 rendu pour « dépôt sale ») — fournir à chaque session un dossier temporaire hors du dépôt (TMPDIR sous le dossier de la vague, exporté dans l'environnement de claude -p) et le nommer dans les briefs (implement, fix, review…) ; test qu'une session reçoit TMPDIR hors du dépôt ; README"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-18
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

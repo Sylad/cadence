@@ -259,7 +259,7 @@ export class RunStore {
     return d;
   }
 
-  /** Dossier temporaire des sessions d'un lot (L242) : `<lotDir>/tmp`, sous la vague donc hors du dépôt. */
+  /** Dossier temporaire des sessions d'un lot (L242) : `<lotDir>/tmp`, sous le dossier d'état de la vague, jamais suivi par git (exclu du dépôt par `.git/info/exclude` et le filtre de guard.ts quand la vague est lancée depuis lui). */
   tmpDir(project: string, lot: string): string {
     const d = join(this.lotDir(project, lot), 'tmp');
     mkdirSync(d, { recursive: true });

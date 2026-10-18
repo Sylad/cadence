@@ -3,7 +3,7 @@
 A small working method that lives in your repository: a versioned plan linked to your commits, waves of fresh AI sessions driven by a program, and deliveries proved by their effect.
 Solo developers and AI-assisted sessions lose track of *what is left to do* and *what each commit was for*; cadence keeps both in plain files next to the code.
 **raf** is the plan, **news** the changelog with screenshots, **session** the facts to open and close a day, **deliver** waits for the CI, deploys, then checks the effect.
-**orchestrate** runs a lot through spec, review, code and UX passes, each in its own session (with a `TMPDIR` of its own under the wave folder, never in the repository); the **lead** decides, re-verifies and delivers.
+**orchestrate** runs a lot through spec, review, code and UX passes, each in its own session (with a `TMPDIR` of its own under the wave's state folder, never tracked by git); the **lead** decides, re-verifies and delivers.
 Four [Claude Code](https://claude.com/claude-code) skills, three reviewer agents and a status-band plugin (`cadence-hud`) turn it into rituals.
 
 <picture>

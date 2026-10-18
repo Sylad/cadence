@@ -229,11 +229,11 @@ describe('lot visible : code puis UX (L221)', () => {
     expect(isAbsolute(dir)).toBe(true);
     expect(impl0.brief).toContain(`\`${dir}\``);
     const adds = impl0.args.flatMap((a, i) => (impl0.args[i - 1] === '--add-dir' ? [a] : []));
-    expect(adds).toEqual(['/tmp/x', dir]);
+    expect(adds).toEqual(['/tmp/x', dir, impl0.opts.env.TMPDIR]);
     expect(hv.calls[2]!.args).not.toContain(dir); // ux
     const hn = harness({ lots: [{ title: 'Sans écran' }], script: { implement: [impl()], review: [ok] } });
     await runLot(hn.lot('L1'));
-    expect(hn.calls[0]!.args).not.toContain('--add-dir');
+    expect(hn.calls[0]!.args.flatMap((a, i) => (hn.calls[0]!.args[i - 1] === '--add-dir' ? [a] : []))).toEqual([hn.calls[0]!.opts.env.TMPDIR]); // seul le TMPDIR (L242)
     expect(hn.calls[0]!.brief).not.toContain('playwright');
   });
 
@@ -249,7 +249,7 @@ describe('lot visible : code puis UX (L221)', () => {
       expect(f.brief).toContain(`\`${dir}\``);
       expect(f.brief).not.toMatch(/\{\{/);
       const adds = f.args.flatMap((a, i) => (f.args[i - 1] === '--add-dir' ? [a] : []));
-      expect(adds).toEqual(['/tmp/x', dir]);
+      expect(adds).toEqual(['/tmp/x', dir, f.opts.env.TMPDIR]);
     }
     const hn = harness({ lots: [{ title: 'Sans écran' }], script: { implement: [impl()], review: [major, minorReview(), ok], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
     await runLot(hn.lot('L1'));
@@ -2339,6 +2339,8 @@ describe('dossier temporaire des sessions de vague (L242)', () => {
       expect(relative(h.store.dir, tmp).startsWith('..'), 'sous la vague').toBe(false);
       expect(relative(h.repo, tmp).startsWith('..'), 'hors du dépôt').toBe(true);
       expect(call.brief, call.kind).toContain(tmp);
+      const adds = call.args.flatMap((a, i) => (call.args[i - 1] === '--add-dir' ? [a] : []));
+      expect(adds, `${call.kind} : --add-dir <TMPDIR>`).toContain(tmp);
     }
   });
 });

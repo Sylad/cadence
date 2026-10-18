@@ -638,6 +638,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   const playwright = !!mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright;
   if (playwright) l.uxCaptures = join(dirname(mcpConfig), 'playwright');
   l.pendingAnswer = null; // la réponse est dans le brief : elle ne repart pas avec la session suivante
+  const tmpDir = w.store.tmpDir(l.project, l.lot); // TMPDIR de la session, aussi en --add-dir : hors du cwd, un Write y serait refusé en `claude -p`
   const outcome = await runSession(
     {
       kind,
@@ -653,10 +654,10 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       lot: lotKey(l.project, l.lot),
       permissionMode: c.config.permissionMode,
       prodAccess: c.config.prodAccess,
-      addDirs: [...c.config.addDirs, ...(playwright && write ? [playwrightDir(dirname(mcpConfig))] : []), ...neighbourDirs(l)],
+      addDirs: [...c.config.addDirs, ...(playwright && write ? [playwrightDir(dirname(mcpConfig))] : []), tmpDir, ...neighbourDirs(l)],
       nodeBin: l.node?.link,
       toolBin: toolBinOf(w.store.dir),
-      tmpDir: w.store.tmpDir(l.project, l.lot),
+      tmpDir,
       mcpConfig,
       playwright,
       timeoutMs: write ? c.config.timeouts.work : c.config.timeouts.review,

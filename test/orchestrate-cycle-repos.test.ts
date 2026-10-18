@@ -38,12 +38,12 @@ const onlyNeighbour = (nb: string): Handler => () => claudeOut(workReport({ comm
 const ok: Handler = () => claudeOut(reviewReport());
 
 describe('sessions d\'un lot à dépôt voisin (L62)', () => {
-  it('chaque session reçoit le voisin en --add-dir, à la suite des dossiers de la configuration', async () => {
+  it('chaque session reçoit le voisin en --add-dir, après les dossiers de la configuration et le TMPDIR (L242)', async () => {
     const { h, c, nb } = scenario((n) => ({ implement: [both(n)], review: [ok] }), { addDirs: ['/autre/dossier'] });
     await runLot(c);
     expect(h.calls.map((k) => k.kind)).toEqual(['implement', 'review']);
     for (const call of h.calls) {
-      expect(call.args.filter((_a, k) => call.args[k - 1] === '--add-dir')).toEqual(['/autre/dossier', nb]);
+      expect(call.args.filter((_a, k) => call.args[k - 1] === '--add-dir')).toEqual(['/autre/dossier', call.opts.env.TMPDIR, nb]);
     }
   });
 
@@ -59,12 +59,13 @@ describe('sessions d\'un lot à dépôt voisin (L62)', () => {
     expect(review.brief).toContain(`git -C ${nb} log`);
   });
 
-  it('sans dépôt voisin, aucun brief ne parle de dépôts voisins et aucun --add-dir n\'est ajouté', async () => {
+  it('sans dépôt voisin, aucun brief ne parle de dépôts voisins et le seul --add-dir est le TMPDIR (L242)', async () => {
     const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }))], review: [ok] } });
     await runLot(h.lot('L1'));
     for (const call of h.calls) {
       expect(call.brief).not.toMatch(/neighbouring/i);
-      expect(call.args).not.toContain('--add-dir');
+      const adds = call.args.flatMap((a, i) => (call.args[i - 1] === '--add-dir' ? [a] : []));
+      expect(adds).toEqual([call.opts.env.TMPDIR]);
     }
   });
 

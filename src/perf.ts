@@ -367,7 +367,7 @@ export function computePerf(input: PerfInput): PerfResult {
       const p = planLot(plans, d.j.project, d.j.lot);
       const counted = d.j.steps.filter((x) => x.counted !== undefined);
       if (!p || counted.length === 0) continue;
-      // Un lot passé par la chaîne spec (écran ou back) porte 450 k de plus que le lot ordinaire de même estimate : classe à part, sinon l'arrivée de ces lots dans une fenêtre passe pour un lot ordinaire plus lourd (L240).
+      // Un lot passé par la chaîne spec (écran ou back) coûte plus que le lot ordinaire de même estimate (mesuré le 12–18-10 : +150 k à l'estimate 0,5, +30 k à 1 ; 450 k est l'écart de budget, pas l'écart mesuré) : classe à part, sinon l'arrivée de ces lots dans une fenêtre passe pour un lot ordinaire plus lourd (L240).
       const key = `${p.estimate}${d.j.steps.some((x) => SPEC_CHAIN.has(x.kind)) ? '+spec' : ''}`;
       classes.set(key, [...(classes.get(key) ?? []), counted.reduce((sum, x) => sum + x.counted!, 0)]);
     }

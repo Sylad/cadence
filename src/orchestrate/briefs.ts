@@ -62,7 +62,7 @@ export function reposText(role: 'write' | 'read', lot: string, repos: { rel: str
 
 /** Consigne du dossier temporaire (L242) : les sessions y rangent journaux de tests, dumps et exports, jamais dans le dépôt (4 « dépôt sale » le 18-10). */
 export function tmpText(dir: string): string {
-  return `Temporary files: this session's \`TMPDIR\` is \`${dir}\` (under the wave's state folder, never tracked by git, already created and exported). Write test logs, dumps, exports and any scratch file there (\`> $TMPDIR/suite.txt\`), never inside the repository: not in its \`tmp/\`, not at its root. Leave the working tree with only the files of the lot.`;
+  return `Temporary files: this session's \`TMPDIR\` is \`${dir}\` (short and outside the repository, never tracked by git, already created and exported; removed when the pass ends). Write test logs, dumps, exports and any scratch file there (\`> $TMPDIR/suite.txt\`), never inside the repository: not in its \`tmp/\`, not at its root. Leave the working tree with only the files of the lot.`;
 }
 
 /** Consigne d'implémentation d'un lot `visible` : son entrée Nouveautés (convention de `cadence news`, voir docs/news.md du paquet @sylad/cadence). */

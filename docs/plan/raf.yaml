@@ -2822,6 +2822,7 @@ lots:
     estimate: 0.25
     created: 2026-10-21
     started: 2026-10-21
+    review: { date: 2026-10-21, verdict: "compliant — orchestré (vague 2026-10-21-issues, 0 passe(s) de correction)", commit: 6c4584b62adce6da7a890a3e6cf550e13477c14a }
   - id: L245
     title: "session start et lead tour : nombre de commits de chaque lot en cours à côté de sa dernière activité (« 0 commit » visible, comme raf now) — une note de clôture lue comme « fini, raf done oublié » sur un lot sans commit ; test, README — issue GitHub #10"
     status: todo

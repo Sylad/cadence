@@ -5,7 +5,7 @@ import { planLoader, readPlanConfig } from './config.js';
 import { diffDays, type Day } from './dates.js';
 import { gitRoot, repoStatus } from './git.js';
 import { linkCommits } from './link.js';
-import { lastActivity, lockStatus } from './session.js';
+import { commitCount, lastActivity, lockStatus } from './session.js';
 import { parse } from 'yaml';
 import { RafError } from './plan.js';
 import { priorityRank, readPriority } from './orchestrate/continue.js';
@@ -65,7 +65,7 @@ export interface TourRow {
   project: string;
   /** Renseigné quand le projet n'a pas pu être lu : les autres champs sont alors vides. */
   error?: string;
-  doing: { id: string; silentDays?: number; /** ni `started`, ni commit, ni note : le lot le plus silencieux */ noActivity?: true }[];
+  doing: { id: string; /** commits liés au lot, comme raf now (0 compris) */ commits: number; silentDays?: number; /** ni `started`, ni commit, ni note : le lot le plus silencieux */ noActivity?: true }[];
   drift: string[];
   notes: string[];
   next: { id: string; title: string } | null;
@@ -125,10 +125,11 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     const { doing, ready, blocked } = nextUp(lots);
 
     row.doing = doing.map((l) => {
-      const last = lastActivity(l, all.byLot.get(l.id) ?? []);
-      if (!last) return { id: l.id, noActivity: true as const };
+      const commits = all.byLot.get(l.id) ?? [];
+      const last = lastActivity(l, commits);
+      if (!last) return { id: l.id, commits: commits.length, noActivity: true as const };
       const days = diffDays(last, today);
-      return days > idle ? { id: l.id, silentDays: days } : { id: l.id };
+      return days > idle ? { id: l.id, commits: commits.length, silentDays: days } : { id: l.id, commits: commits.length };
     });
     row.drift = audit(plan, root, join(root, 'docs/nouveautes'), today).map((i) => `${i.warning ? '⚠' : '✗'} ${i.message}`);
     row.notes = readNext(stateDir(root))?.lines ?? [];
@@ -185,7 +186,7 @@ const DRIFT_SHOWN = 2;
 /** Une ligne par projet : projet · en cours · dérive · notes · prochain lot prêt · dépôt. */
 export function tourLine(r: TourRow): string {
   if (r.error) return `${r.project} · ✗ erreur : ${r.error}`;
-  const doing = r.doing.length ? r.doing.map((d) => (d.noActivity ? `${d.id} (aucune activité)` : d.silentDays === undefined ? d.id : `${d.id} (silencieux ${d.silentDays}j)`)).join(', ') : 'rien';
+  const doing = r.doing.length ? r.doing.map((d) => `${d.id} (${[commitCount(d.commits), ...(d.noActivity ? ['aucune activité'] : d.silentDays === undefined ? [] : [`silencieux ${d.silentDays}j`])].join(', ')})`).join(', ') : 'rien';
   const drift = r.drift.length
     ? `${r.drift.length} (${r.drift.slice(0, DRIFT_SHOWN).join(' ; ')}${r.drift.length > DRIFT_SHOWN ? ' ; …' : ''})`
     : 'aucune';

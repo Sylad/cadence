@@ -62,7 +62,7 @@ describe('cadence lead tour', () => {
     expect(err).toBe('');
     const lines = out.split('\n');
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatch(/^alpha · en cours L1 \(silencieux 4 ?j\) · dérive /);
+    expect(lines[0]).toMatch(/^alpha · en cours L1 \(1 commit, silencieux 4 ?j\) · dérive /);
     expect(lines[0]).toContain('notes : finir L1 puis livrer');
     expect(lines[0]).toMatch(/prochain L2 Export, un titre assez long pour être tronqué à soixante ca…/);
     expect(lines[0]).toMatch(/dépôt non commité$/);
@@ -137,7 +137,7 @@ describe('cadence lead tour', () => {
     expect(code).toBe(0);
     const rows = JSON.parse(out) as Array<Record<string, unknown>>;
     expect(rows.map((r) => r.project)).toEqual(['alpha', 'beta']);
-    expect(rows[0]).toMatchObject({ project: 'alpha', doing: [{ id: 'L1', silentDays: 4 }], next: { id: 'L2' }, notes: ['finir L1 puis livrer'], repo: [] });
+    expect(rows[0]).toMatchObject({ project: 'alpha', doing: [{ id: 'L1', commits: 1, silentDays: 4 }], next: { id: 'L2' }, notes: ['finir L1 puis livrer'], repo: [] });
     expect(rows[1]).toMatchObject({ project: 'beta', doing: [], next: { id: 'T2', title: 'Second' }, repo: [] });
     expect(Array.isArray(rows[0]!.drift)).toBe(true);
   });
@@ -324,9 +324,9 @@ describe('cadence lead tour', () => {
     const { root } = await parent();
     const strict = await cad(root, 'lead', 'tour', '--idle', '10');
     expect(strict.code).toBe(0);
-    expect(strict.out.split('\n')[0]).toMatch(/^alpha · en cours L1 · /);
+    expect(strict.out.split('\n')[0]).toMatch(/^alpha · en cours L1 \(1 commit\) · /);
     const zero = await cad(root, 'lead', 'tour', '--idle', '0');
-    expect(zero.out.split('\n')[0]).toMatch(/en cours L1 \(silencieux 4 ?j\)/);
+    expect(zero.out.split('\n')[0]).toMatch(/en cours L1 \(1 commit, silencieux 4 ?j\)/);
     for (const bad of ['x', '-1', '1.5']) {
       const r = await cad(root, 'lead', 'tour', `--idle=${bad}`);
       expect(r.code).toBe(2);
@@ -346,9 +346,27 @@ describe('cadence lead tour', () => {
     const { root, beta } = await parent();
     writeFileSync(join(beta, 'suivi/taches.yaml'), 'taches:\n  - { id: T1, titre: Premier, etat: livre }\n  - { id: T2, titre: Second, etat: en_cours }\n');
     const { out } = await cad(root, 'lead', 'tour');
-    expect(out.split('\n')[1]).toMatch(/^beta · en cours T2 \(aucune activité\) · /);
+    expect(out.split('\n')[1]).toMatch(/^beta · en cours T2 \(0 commit, aucune activité\) · /);
     const json = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as TourRow[];
-    expect(json[1]!.doing).toEqual([{ id: 'T2', noActivity: true }]);
+    expect(json[1]!.doing).toEqual([{ id: 'T2', commits: 0, noActivity: true }]);
+  });
+});
+
+describe('lead tour — commits des lots en cours (L245)', () => {
+  it('R1 — chaque lot en cours dit son nombre de commits, « 0 commit » compris', async () => {
+    const { root, alpha } = await parent();
+    await cad(alpha, 'start', 'L2');
+    const { out } = await cad(root, 'lead', 'tour');
+    expect(out.split('\n')[0]).toMatch(/en cours L1 \(1 commit, silencieux 4 ?j\), L2 \(0 commit\) · /);
+    const json = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as TourRow[];
+    expect(json[0]!.doing).toEqual([{ id: 'L1', commits: 1, silentDays: 4 }, { id: 'L2', commits: 0 }]);
+  });
+
+  it('R1 — le pluriel suit le nombre', async () => {
+    const { root, alpha } = await parent();
+    git(alpha, 'add', '.');
+    commit(alpha, 'feat(L1): suite', '2026-09-25T10:00:00');
+    expect((await cad(root, 'lead', 'tour')).out).toMatch(/en cours L1 \(2 commits\) · /);
   });
 });
 

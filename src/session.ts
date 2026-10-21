@@ -100,6 +100,9 @@ export function lastActivity(lot: Lot, commits: Commit[]): Day | undefined {
   return days.length ? days.reduce(maxDay) : undefined;
 }
 
+/** « 0 commit », « 1 commit », « 3 commits » : le zéro se dit, une note de clôture sur un lot sans commit ne se lit pas comme « fini ». */
+export const commitCount = (n: number) => `${n} commit${n > 1 ? 's' : ''}`;
+
 const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
 /**
@@ -133,10 +136,11 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   out('\nEn cours');
   if (doing.length === 0) out('  (rien)');
   for (const l of doing) {
-    const last = lastActivity(l, all.byLot.get(l.id) ?? []);
+    const commits = all.byLot.get(l.id) ?? [];
+    const last = lastActivity(l, commits);
     const idle = last ? diffDays(last, today) : 0;
     const state = last ? `dernière activité ${last}${idle > opts.idle ? `, silencieux depuis ${idle} j` : ''}` : 'aucune activité';
-    out(`  ${l.id}  ${l.title}  (${state})`);
+    out(`  ${l.id}  ${l.title}  (${commitCount(commits.length)}, ${state})`);
   }
 
   section(out, 'En attente', gateWaiting(lots, blocked).map(({ lot, text }) => `${lot.id}  ${lot.title}  (${text})`));

@@ -39,7 +39,7 @@ Also: [news](docs/news.md) (changelog, UX, code and QA reviews, documentation th
 
 - **raf** (French *reste à faire*, "what is left to do"): the plan, linked to your commits by the lot id in the message, computed from `git log` and never stored.
 - **news**: a user-facing changelog with screenshots, tied to the plan; a lot is not done until its entry is written.
-- **session**: `session start` and `session close` gather the facts of a work session.
+- **session**: `session start` and `session close` gather the facts of a work session (each lot in progress shows its commit count, `0 commit` included, next to its last activity).
 - **deliver**: wait for the CI of the pushed commit, run the deploy commands, then **verify the effect**; a delivery is done only when its checks pass. A failed delivery is logged as a *red delivery*.
 - **auto-verification** (L236): before it reports, an `implement` or `fix` session re-reads the complete diff of its lot (of its fix commits, in `fix`) against the grid of the `code-reviewer` (code bug, architecture drift, architecture documentation, edge cases, one test per changed behaviour), fixes what it finds and writes an « auto-vérification » paragraph in its report; the measure is `cadence corrections --classify` and the share right the first time of `cadence perf`.
 - **perf**: `cadence perf` is the dashboard of the workflow (speed next to quality, `⚠` on a trend), including the red deliveries and the blocking QA findings; `cadence lead tour` opens with its *perf header*, one line per `⚠`, nothing when stable ([docs/perf.md](docs/perf.md)).

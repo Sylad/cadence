@@ -3,7 +3,7 @@
 # session
 
 ```sh
-cadence session start              # notes from the last close, lots in progress (silent ones flagged),
+cadence session start              # notes from the last close, lots in progress (commit count, `0 commit` included, and last activity; silent ones flagged),
                                    # work done since yesterday by lot, drift, repo state, 3 proposals
 cadence session start --since "3 days ago" --idle 2
 cadence session close              # commits by lot since the last `session start`,

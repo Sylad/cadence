@@ -50,11 +50,18 @@ describe('session start', () => {
     const { code, out } = await cad(dir, 'session', 'start', '--since', '2026-09-27');
     expect(code).toBe(0);
     expect(out).toContain('Notes de la dernière clôture (2026-09-27)\n  - finir L1');
-    expect(out).toMatch(/En cours\n {2}L1 {2}Cache {2}\(dernière activité 2026-09-24, silencieux depuis 4 j\)/);
+    expect(out).toMatch(/En cours\n {2}L1 {2}Cache {2}\(1 commit, dernière activité 2026-09-24, silencieux depuis 4 j\)/);
     expect(out).toMatch(/Fait depuis 2026-09-27\n {2}L2 — 1 commit\(s\) : feat\(L2\): début export\n {2}1 commit\(s\) sans lot/);
     expect(out).toContain('✗ L2 a 1 commit(s) mais est encore todo');
     expect(out).toContain('branche main, pas de branche amont');
     expect(out).toMatch(/Propositions\n {2}1\. L1 {2}Cache — en cours\n {2}2\. ⚡ L3 {2}Typo — gain rapide prêt\n {2}3\. L2 {2}Export — prêt/);
+  });
+
+  it('R1 — un lot en cours sans commit dit « 0 commit » à côté de sa dernière activité', async () => {
+    const dir = await project();
+    await cad(dir, 'start', 'L3');
+    const { out } = await cad(dir, 'session', 'start', '--since', '2026-09-27');
+    expect(out).toMatch(/L3 {2}Typo {2}\(0 commit, dernière activité \d{4}-\d{2}-\d{2}\)/);
   });
 
   it('signale une livraison en cours et un verrou périmé', async () => {

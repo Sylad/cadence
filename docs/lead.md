@@ -116,13 +116,13 @@ included; hidden folders, `node_modules` and `tmp/` — throwaway working copies
 sub-process, no call to `claude` — then prints **one line per project**:
 
 ```
-alpha · en cours L1 (silencieux 4j) · dérive 1 (✗ L2 a 1 commit(s) mais est encore todo) · notes : finir L1 puis livrer · prochain L3 Typo · dépôt non commité, non poussé
+alpha · en cours L1 (1 commit, silencieux 4j) · dérive 1 (✗ L2 a 1 commit(s) mais est encore todo) · notes : finir L1 puis livrer · prochain L3 Typo · dépôt non commité, non poussé
 beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second · dépôt propre
 ```
 
 | Column | Content |
 |---|---|
-| `en cours` | ids of the lots in progress; `(aucune activité)` when it has none at all, `(silencieux Nj)` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |
+| `en cours` | ids of the lots in progress, each with its number of commits (`0 commit` included: a close note on a lot without commit is not « done, `raf done` forgotten »); then `aucune activité` when it has no activity at all, `silencieux Nj` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |
 | `dérive` | the gaps `raf check` reports (a lot whose commits leave a document behind, [`docs.sync`](news.md#documentation-that-follows-the-code), included), counted and the first two shown |
 | `notes` | the notes left by the last `session close`, joined with ` / ` and cut at 120 characters |
 | `prochain` | the first ready lot (quick wins first) — id and title cut at 60 characters; a lot whose [`gate`](raf.md#plan-file) is not met is not ready |

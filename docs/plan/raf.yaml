@@ -2818,9 +2818,10 @@ lots:
     finished: 2026-10-21
   - id: L244
     title: "raf title <id> \"nouveau titre\" : remplace le titre d'un lot (tout statut, done compris) et ajoute une note datée avec l'ancien titre ; session start, raf now et les propositions affichent le nouveau ; test, README, aide de raf — issue GitHub #9"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-21
+    started: 2026-10-21
   - id: L245
     title: "session start et lead tour : nombre de commits de chaque lot en cours à côté de sa dernière activité (« 0 commit » visible, comme raf now) — une note de clôture lue comme « fini, raf done oublié » sur un lot sans commit ; test, README — issue GitHub #10"
     status: todo

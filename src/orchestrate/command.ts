@@ -898,6 +898,12 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
       }
       if (c.lot.status === 'implementing' || c.lot.status === 'reviewing' || c.lot.status === 'fixing') c.lot.status = 'suspended';
       store.writeLot(c.lot);
+      // Le TMPDIR court de la session tuée (L243) est hors de la vague : sans cela il resterait dans /tmp.
+      try {
+        store.removeTmpDir(c.lot.project, c.lot.lot);
+      } catch {
+        // nettoyage de confort
+      }
     }
     wave.status = 'interrupted';
     saveWave();

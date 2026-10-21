@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { orchestrate, realOrchestrateDeps } from '../src/orchestrate/command.js';
@@ -302,6 +302,7 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const lot = st.readLot('proj', 'L1')!;
     expect(lot.steps.map((x) => x.status)).toEqual(['interrupted']);
     expect(lot.status).toBe('suspended');
+    expect(readdirSync(st.lotDir('proj', 'L1'))).not.toContain('tmp'); // (L243) le TMPDIR court de la session tuée est retiré, lien compris
     expect(st.readWave()!.status).toBe('interrupted');
     expect(st.readWave()!.consumed).toBe(115);
     expect(st.readWave()!.cacheRead).toBe(7);

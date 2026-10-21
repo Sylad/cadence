@@ -2044,6 +2044,12 @@ export async function runLot(c: LotCtx): Promise<void> {
     l.next = null;
     transition(c, 'failed', `erreur : ${(e as Error).message}`);
   } finally {
+    // TMPDIR court des sessions (L243) : jetable, retiré à la fin de chaque passage du lot ; la session suivante (reprise, réponse) le recrée.
+    try {
+      c.wave.store.removeTmpDir(l.project, l.lot);
+    } catch {
+      // nettoyage de confort : jamais une cause d'échec du lot
+    }
     // Sorties du MCP Playwright qu'une session a écrites dans le dépôt (L50) : jetables, retirées à la fin de chaque passage du lot.
     try {
       cleanPlaywrightOutput(l.repo);

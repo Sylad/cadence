@@ -375,12 +375,14 @@ The sessions of the wave also get `.cadence/runs/<wave>/tool/bin` (the `raf` and
 `PATH`**, ahead of the per-project Node below and of the usual `PATH`: the `raf` a reviewer runs (`raf commits`…) is the
 snapshot's, not the installed one. A wave without a snapshot leaves the `PATH` as it is.
 
-**A temporary folder under the wave's state folder (L242)**: each session gets a `TMPDIR` of its own lot, `.cadence/runs/<wave>/<project>--<lot>/tmp`
-(created before the session, exported in the environment of `claude -p` and given to it as an `--add-dir`, so that a write there is not refused outside the working directory; under the wave's state folder, never tracked by git: when the wave is launched from the project's repository the folder is inside its tree, excluded by `.git/info/exclude` and by the filter of `guard.ts`), and every brief
-names it: test logs, dumps and exports go there, not in the repository's `tmp/` (sessions left `tmp/suite-l149.txt`, `tmp/vt-*.json`,
-`tmp/*.log` four times on 2026-10-18, one lot handed back for a « dirty repository »). The folder is shared by the sessions of the lot
-(implement, review, fix…) and removed with the wave folder. A `--dry-run` brief or one delegated by hand has no wave folder, hence no
-such line.
+**A short temporary folder per lot (L242, L243)**: each session gets a `TMPDIR` of its own lot, `<os.tmpdir()>/cadence-<8 hex of the sha1 of the lot's state folder>`
+(created before the session, exported in the environment of `claude -p` and given to it as an `--add-dir`, so that a write there is not refused outside the working directory; outside the repository, hence never tracked by git),
+and every brief names it: test logs, dumps and exports go there, not in the repository's `tmp/` (sessions left `tmp/suite-l149.txt`, `tmp/vt-*.json`,
+`tmp/*.log` four times on 2026-10-18, one lot handed back for a « dirty repository »). **It is short on purpose**: Chrome (the Playwright MCP) puts its Unix
+sockets under `TMPDIR`, and a socket path is limited to 107 characters. L242 put it under `.cadence/runs/<wave>/<project>--<lot>/tmp` (about 95 characters), Playwright
+refused to start (« Socket path too long ») and the UX reviews of the finance wave 2026-10-19-fin-prev had no capture, 4 lots out of 4. The path leaves 60 characters free
+(a test checks `TMPDIR` + 60 < 108); when `os.tmpdir()` is too long for that, `/tmp` is used. The wave's folder of the lot keeps a `tmp` **symbolic link** to it, to find it from there.
+The folder is shared by the sessions of the lot (implement, review, fix…) and **removed, link included, at the end of each pass of the lot, and when a signal interrupts the wave** (lot finished, suspended or waiting for an answer: nothing is left in `/tmp`; the next session recreates it, empty). A `--dry-run` brief or one delegated by hand has no wave folder, hence no such line.
 
 **The code in service (L195)**: on cadence's own repository, `bin/raf.js` and `bin/cadence.js` load `dist/`, so the `raf` and `cadence` of your
 `PATH` used to be whatever the working repository last built. The snapshot protects the wave running, not that installed tool, and a wave's

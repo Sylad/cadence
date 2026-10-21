@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
@@ -2328,20 +2328,54 @@ describe('contrôle préalable sur le modèle local (L146)', () => {
 });
 
 describe('dossier temporaire des sessions de vague (L242)', () => {
-  it('(L242/R3) chaque session reçoit un TMPDIR existant, sous le dossier de la vague et hors du dépôt, nommé dans son brief', async () => {
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
+  it('(L242/R3) chaque session reçoit un TMPDIR existant, hors du dépôt, nommé dans son brief', async () => {
+    const during: boolean[] = [];
+    const live = (hd: Handler): Handler => (call) => {
+      during.push(existsSync(call.opts.env.TMPDIR)); // la session tourne : son TMPDIR est là (supprimé seulement à la fin du lot, L243)
+      return hd(call);
+    };
+    const h = harness({ script: { implement: [live(impl())], review: [live(ok)] } });
     await runLot(h.lot('L1'));
     expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(during).toEqual([true, true]);
     for (const call of h.calls) {
       const tmp = call.opts.env.TMPDIR;
       expect(tmp, call.kind).toBeTruthy();
-      expect(existsSync(tmp), call.kind).toBe(true);
-      expect(relative(h.store.dir, tmp).startsWith('..'), 'sous la vague').toBe(false);
       expect(relative(h.repo, tmp).startsWith('..'), 'hors du dépôt').toBe(true);
       expect(call.brief, call.kind).toContain(tmp);
       const adds = call.args.flatMap((a, i) => (call.args[i - 1] === '--add-dir' ? [a] : []));
       expect(adds, `${call.kind} : --add-dir <TMPDIR>`).toContain(tmp);
     }
+  });
+});
+
+describe('TMPDIR court des sessions de vague (L243)', () => {
+  it('(L243/R1) le TMPDIR tient sous la limite des sockets Unix : chemin + 60 caractères < 108', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    await runLot(h.lot('L1'));
+    for (const call of h.calls) expect(call.opts.env.TMPDIR.length + 60, call.kind).toBeLessThan(108);
+  });
+
+  it('(L243/R2) le dossier de la vague garde un lien « tmp » vers le TMPDIR, et le TMPDIR est nommé d\'après le lot', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1');
+    const tmp = h.store.tmpDir(c.lot.project, c.lot.lot);
+    const link = join(h.store.lotDir(c.lot.project, c.lot.lot), 'tmp');
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(realpathSync(link)).toBe(realpathSync(tmp));
+    expect(h.store.tmpDir(c.lot.project, c.lot.lot)).toBe(tmp); // deux fois : même dossier, pas d'erreur
+    expect(h.store.tmpDir(c.lot.project, 'L2')).not.toBe(tmp);
+    for (const n of ['L1', 'L2']) h.store.removeTmpDir(c.lot.project, n);
+  });
+
+  it('(L243/R3) le TMPDIR est supprimé, lien compris, à la fin du passage du lot', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    const tmp = h.calls[0]!.opts.env.TMPDIR;
+    expect(existsSync(tmp)).toBe(false);
+    expect(lstatSync(join(h.store.lotDir(c.lot.project, c.lot.lot), 'tmp'), { throwIfNoEntry: false })).toBeUndefined();
   });
 });
 

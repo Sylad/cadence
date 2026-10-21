@@ -1,4 +1,6 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { gitCommonDir, gitRoot } from '../git.js';
 import type { Model, StepKind, StepModel } from './launch.js';
@@ -188,6 +190,8 @@ export const neighbourDirs = (l: Pick<LotState, 'repos'>): string[] => (l.repos 
 
 export const lotKey = (project: string, lot: string) => `${project}:${lot}`;
 /** Nom de dossier d'un lot dans la vague : le « / » d'un id de sous-tâche (`Q4/accueil-4-ux12`) ou d'un projet imbriqué (`groupe/gamma`) devient « __ » ; sans « / » le nom est inchangé. */
+/** Racine des TMPDIR de session : `os.tmpdir()`, ou `/tmp` quand celui-ci est trop long pour laisser 60 caractères sous la limite de 107 des sockets Unix. */
+const shortTmpBase = () => (join(tmpdir(), 'cadence-xxxxxxxx').length + 60 < 108 ? tmpdir() : '/tmp');
 export const lotSlug = (project: string, lot: string) => `${project.split('/').join('__')}--${lot.split('/').join('__')}`;
 const lotFile = (project: string, lot: string) => `${lotSlug(project, lot)}.json`;
 
@@ -259,11 +263,27 @@ export class RunStore {
     return d;
   }
 
-  /** Dossier temporaire des sessions d'un lot (L242) : `<lotDir>/tmp`, sous le dossier d'état de la vague, jamais suivi par git (exclu du dépôt par `.git/info/exclude` et le filtre de guard.ts quand la vague est lancée depuis lui). */
+  /**
+   * Dossier temporaire des sessions d'un lot (L243) : `<tmpdir>/cadence-<hash court du dossier du lot>`, hors du dépôt et hors de la vague, jamais suivi par git.
+   * Il est COURT à dessein : Chrome (Playwright MCP) range ses sockets Unix sous `TMPDIR` et refuse au-delà de 107 caractères
+   * (sous `.cadence/runs/<vague>/<projet>--<lot>/tmp`, L242, la revue UX échouait « Socket path too long »).
+   * Un lien `<lotDir>/tmp` y renvoie, pour le retrouver depuis le dossier de la vague.
+   */
   tmpDir(project: string, lot: string): string {
-    const d = join(this.lotDir(project, lot), 'tmp');
+    const lotDir = this.lotDir(project, lot);
+    const d = join(shortTmpBase(), `cadence-${createHash('sha1').update(lotDir).digest('hex').slice(0, 8)}`);
     mkdirSync(d, { recursive: true });
+    const link = join(lotDir, 'tmp');
+    rmSync(link, { recursive: true, force: true });
+    symlinkSync(d, link);
     return d;
+  }
+
+  /** Supprime le dossier temporaire du lot et son lien (fin de lot) ; sans effet s'ils n'existent pas. */
+  removeTmpDir(project: string, lot: string): void {
+    const link = join(this.lotDir(project, lot), 'tmp');
+    if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink()) rmSync(readlinkSync(link), { recursive: true, force: true });
+    rmSync(link, { recursive: true, force: true });
   }
 
   writeWave(w: WaveState): void {

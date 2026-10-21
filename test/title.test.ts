@@ -63,9 +63,8 @@ describe('raf title', () => {
     for (const argv of [['now'], ['show', 'L2'], ['list'], ['session', 'start']]) {
       const r = raf(dir, ...argv);
       expect(r.out, argv.join(' ')).toContain('Titre corrigé');
-      expect(r.out, argv.join(' ')).not.toContain('Ancien deux\n');
     }
-    expect(raf(dir, 'now').out).not.toContain('Ancien deux');
+    for (const argv of [['now'], ['list'], ['session', 'start']]) expect(raf(dir, ...argv).out, argv.join(' ')).not.toContain('Ancien deux');
   });
 
   it('R3 — titre vide, identique, lot inconnu, sous-tâche : refus, plan inchangé', () => {

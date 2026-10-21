@@ -2808,11 +2808,14 @@ lots:
     finished: 2026-10-18
   - id: L243
     title: "orchestrate : régression L242 — le TMPDIR de session (sous .cadence/runs/<vague>/<projet>--<lot>/tmp, ~95 car.) fait dépasser à Chrome la limite des sockets Unix (107) : Playwright MCP refuse de lancer (« Socket path too long »), revues UX sans capture (vague finance 2026-10-19-fin-prev, 4 lots sur 4). TMPDIR court hors du dépôt (ex. os.tmpdir()/cadence-<hash court>), lien ou mention depuis le dossier de la vague, nettoyé en fin de lot ; test : chemin TMPDIR + 60 car. < 108 ; README"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-21
     started: 2026-10-21
     review: { date: 2026-10-21, verdict: "conforme (18d6366 + 54aa9e2) — 2 mineurs : JSDoc de lotSlug déplacée, entrée CHANGELOG de L242 devenue contradictoire ; 2555 tests verts, 2 rouges connus (L48/t4, L48/t5), tsc vert — orchestré (vague 2026-10-21-tmpdir, 0 passe(s) de correction)", commit: 54aa9e263cfe34eefb459e2f0136fa5c04674964 }
+    notes:
+      - { date: 2026-10-21, text: "mineurs de revue gardés en note : JSDoc de lotSlug séparée de lotSlug par shortTmpBase (state.ts:192) ; entrée CHANGELOG [Unreleased] Added de L242 (« TMPDIR under the wave's state folder ») contredit l'entrée Fixed de L243 — à réconcilier à la prochaine release" }
+    finished: 2026-10-21
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

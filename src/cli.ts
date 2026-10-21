@@ -48,6 +48,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits
   raf note <id> "texte"
+  raf title <id> "nouveau titre"   remplace le titre d'un lot, de tout statut (done compris), et note l'ancien dans une note datée
   raf did <id> ["texte"]   un lot récurrent (--every) a été refait : le « dû depuis N j » repart de aujourd'hui
   raf ux enable         revue UX obligatoire avant « done » pour les lots --visible
   raf ux <id> "verdict" enregistre la revue d'ergonomie du lot (agent ux-reviewer)
@@ -312,6 +313,13 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       plan.did(rest[0], today, rest.slice(1).join(' '));
       plan.save();
       io.out(`${rest[0]} refait le ${today}`);
+      return 0;
+    }
+    case 'title': {
+      need(2, 'title <id> "nouveau titre"');
+      const plan = loadPlan();
+      plan.setTitle(rest[0], rest.slice(1).join(' '), today);
+      plan.save();
       return 0;
     }
     case 'public': {

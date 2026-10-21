@@ -19,7 +19,7 @@ raf init                         # docs/plan/raf.yaml + a post-commit hook
 raf add "My first lot" --estimate 1
 ```
 
-Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are, `raf done L1` when it is finished.
+Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are, `raf done L1` when it is finished. A title gone stale after a change of scope is replaced with `raf title L1 "new title"` (any status, the old one is kept in a dated note).
 
 ## Where to read more
 

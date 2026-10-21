@@ -539,6 +539,19 @@ export class Plan {
     this.note(ref, reason.trim() ? `remis en attente : ${reason.trim()}` : 'remis en attente', today);
   }
 
+  /** Remplace le titre d'un lot, de tout statut, et note l'ancien titre ; refuse un titre vide ou identique. */
+  setTitle(ref: string, text: string, today: Day): void {
+    this.writable();
+    if (ref.includes('/')) throw new RafError(`raf title se pose sur un lot, pas une sous-tâche : ${ref}`);
+    const title = text.trim();
+    if (title === '') throw new RafError('titre vide — raf title <id> "nouveau titre"');
+    const node = this.lotNode(ref);
+    const old = String(node.get('title') ?? '');
+    if (old === title) throw new RafError(`${ref} porte déjà ce titre`);
+    node.set('title', title);
+    this.note(ref, `titre remplacé : « ${old} »`, today);
+  }
+
   /** Pose, remplace (texte) ou efface (null) le titre public d'un lot ; la clé suit `title`. */
   setPublic(ref: string, text: string | null): void {
     this.writable();

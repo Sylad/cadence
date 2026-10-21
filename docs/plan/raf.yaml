@@ -2806,6 +2806,11 @@ lots:
     started: 2026-10-18
     review: { date: 2026-10-18, verdict: "conforme (af1c9fc + 80cd477) — TMPDIR par lot sous le dossier de la vague, exporté et en --add-dir, nommé dans tous les briefs ; 4 assertions adaptées restent exactes ; 2554 tests et build verts", commit: 80cd477899e5c9b8e439d491408ab213b2c2b464 }
     finished: 2026-10-18
+  - id: L243
+    title: "orchestrate : régression L242 — le TMPDIR de session (sous .cadence/runs/<vague>/<projet>--<lot>/tmp, ~95 car.) fait dépasser à Chrome la limite des sockets Unix (107) : Playwright MCP refuse de lancer (« Socket path too long »), revues UX sans capture (vague finance 2026-10-19-fin-prev, 4 lots sur 4). TMPDIR court hors du dépôt (ex. os.tmpdir()/cadence-<hash court>), lien ou mention depuis le dossier de la vague, nettoyé en fin de lot ; test : chemin TMPDIR + 60 car. < 108 ; README"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-21
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

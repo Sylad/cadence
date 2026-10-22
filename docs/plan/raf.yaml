@@ -2851,6 +2851,13 @@ lots:
       - { date: 2026-10-22, text: "Hypothèses (fiche plan-dossier-cache) — R7 : Un dossier qui porte .cadence/raf.yaml est un projet pour lead tour (lead.ts:86) ET pour orchestrate (command.ts:239), au même titre que docs/plan/raf.yaml ; l… ; si faux : Si seul docs/plan/raf.yaml comptait, les projets migrés disparaîtraient de lead tour : correction d'une ligne, aucune donnée en jeu" }
       - { date: 2026-10-22, text: "Hypothèses (fiche plan-dossier-cache) — R9 : Si .git/info/exclude contient la ligne /.cadence/ écrite par une version précédente, excludeState la remplace par /.cadence/runs/ ; les autres lignes sont cons… ; si faux : Sans ce remplacement un plan neuf sous .cadence/ resterait ignoré par git ; avec, seul un fichier local non versionné change (une ligne que l'outil avait lui-m…" }
       - { date: 2026-10-22, text: "Hypothèses (fiche plan-dossier-cache) — R11 : Le cache .cadence/corrections.json (écrit par cadence corrections, cli.ts:935, lu par cadence perf, cli.ts:972) garde son chemin et son format ; il est exclu d… ; si faux : Si ce cache devait être versionné ou rangé sous .cadence/runs/, il faudrait changer une ligne d'exclusion ou le chemin par défaut de cli.ts:935/972 ; c'est un…" }
+  - id: L247
+    title: "Recaler les estimates et les budgets de lot sur les coûts mesurés : tokens par lot +28 à +48 % sur deux fenêtres pour toutes les estimates, rendus par jour −36 %, étapes spec/maquette/ux +31 à +51 % ; chercher le goulot du flux avant d'ajouter des lots"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-22
+    notes:
+      - { date: 2026-10-22, text: "Ouvert par le lead le 22-10 sur l'en-tête perf du tour (tendance confirmée sur deux fenêtres), décision de Sylvain. Qualité en hausse en parallèle : 50 % conforme du premier coup (38 % avant), 0 défaut échappé — ne pas la dégrader pour gagner des tokens." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

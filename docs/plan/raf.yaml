@@ -2862,6 +2862,7 @@ lots:
     notes:
       - { date: 2026-10-22, text: "Ouvert par le lead le 22-10 sur l'en-tête perf du tour (tendance confirmée sur deux fenêtres), décision de Sylvain. Qualité en hausse en parallèle : 50 % conforme du premier coup (38 % avant), 0 défaut échappé — ne pas la dégrader pour gagner des tokens." }
     started: 2026-10-22
+    review: { date: 2026-10-22, verdict: "conforme — orchestré (vague 2026-10-22-cad-l247, 0 passe(s) de correction + passe des mineurs)", commit: f4526ecc96a3a9b27a862f3b3c9360a03504f91c }
   - id: L248
     title: "Ligne de déplacement du plan hérité : proposer mv (pas git mv) quand docs/plan/raf.yaml n'est pas suivi par git — git mv échoue (code 128, « not under version control ») et laisse un .cadence/ vide (cli.ts:101)"
     status: todo

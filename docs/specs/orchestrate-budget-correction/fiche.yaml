@@ -37,8 +37,8 @@ cas:
       - "Il affiche « budget du lot : N tokens comptés (base : … plus 450000 pour les étapes spec … ) » (command.ts:371)."
     alternatives:
       - { si: "le lot est à screen", alors: "le total mesuré de 1,3 M reste le plancher, l'allocation ne joue qu'au-delà", regles: [R2] }
-      - { si: "le lot n'a ni spec ni screen", alors: "budget ordinaire, plancher relevé à 540 k jusqu'à 0,5 j", regles: [R3] }
-    resultat: Un lot spec de 0,5 j dispose de 990 k (540 k + 450 k) au lieu de 800 k.
+      - { si: "le lot n'a ni spec ni screen", alors: "budget ordinaire, plancher relevé à 540 k jusqu'à 0,5 j (600 k depuis L247)", regles: [R3] }
+    resultat: Un lot spec de 0,5 j dispose de 1 050 k (600 k + 450 k) au lieu de 800 k.
   - id: C2
     titre: "Le budget ne garantit pas la passe de correction ET la revue courte qui la suit"
     acteur: le planificateur de la vague
@@ -58,10 +58,10 @@ cas:
 regles:
   - id: R1
     cas: [C1]
-    enonce: "SPEC_STAGE_ALLOCATION passe de 350 000 à 450 000 : lotBudget(e, 'spec') = budget ordinaire + 450 000 (0,5 j : 990 000 avec le plancher relevé de R3 ; 1 j : 1 200 000)."
+    enonce: "SPEC_STAGE_ALLOCATION passe de 350 000 à 450 000 : lotBudget(e, 'spec') = budget ordinaire + 450 000 (0,5 j : 1 050 000 avec le plancher relevé de R3 puis de L247 ; 1 j : 1 200 000)."
     statut: hypothese
     si_faux: "Seule la constante change (command.ts:84, tests de budget) ; aucune donnée en jeu. 450 k = chaîne mesurée la plus chère avant implement (388 k, L120) arrondie à +60 k ; L217 n'en a pris que 176 k, un lot de 0,5 j avec spec reste sous 990 k dans 2 cas sur 2 sans écran."
-    tests: ["R1 — lotBudget(0.5, 'spec') vaut 990000 et lotBudget(1, 'spec') 1200000", "R1 — lotBudgetBasis cite 450000 pour les étapes spec"]
+    tests: ["R1 — lotBudget(0.5, 'spec') vaut 1050000 et lotBudget(1, 'spec') 1200000", "R1 — lotBudgetBasis cite 450000 pour les étapes spec"]
   - id: R2
     cas: [C1]
     enonce: "Pour un lot à screen, le budget reste max(1 300 000, ordinaire + 450 000) : inchangé pour une estimate jusqu'à 1,25 j (1,3 M), plus haut au-delà (2 j : 1 590 000)."
@@ -70,10 +70,10 @@ regles:
     tests: ["R2 — lotBudget(0.5, 'screen') et lotBudget(1, 'screen') valent toujours 1300000", "R2 — lotBudget(2.5, 'screen') vaut 1425000 + 450000"]
   - id: R3
     cas: [C1]
-    enonce: "Le plancher d'un lot ordinaire jusqu'à 0,5 j passe de 450 000 à 540 000 (LOT_BUDGET_FLOOR), pour que la réserve de 155 000 (R4) laisse la même marge qu'avant : le fix d'un lot ordinaire est refusé à partir de 385 k dépensés (540 k − 155 k), comme avant (450 k − 65 k). Les paliers au-delà de 0,5 j (750 k, 570 k par jour) ne bougent pas : leur marge avant refus passe de 685 k à 595 k, recul assumé (le p90 du total de ces lots est 732 k)."
+    enonce: "Le plancher d'un lot ordinaire jusqu'à 0,5 j passe de 450 000 à 540 000 (LOT_BUDGET_FLOOR), puis à 600 000 par L247 (la marge avant refus du fix devient 445 k), pour que la réserve de 155 000 (R4) laisse la même marge qu'avant : le fix d'un lot ordinaire est refusé à partir de 385 k dépensés (540 k − 155 k), comme avant (450 k − 65 k) ; 445 k depuis le plancher de 600 k (L247). Les paliers au-delà de 0,5 j (750 k, 570 k par jour) ne bougent pas : leur marge avant refus passe de 685 k à 595 k, recul assumé (le p90 du total de ces lots est 732 k)."
     statut: hypothese
     si_faux: "Seule la constante change (command.ts:69, tests de budget), aucune donnée en jeu. Si le plancher devait rester à 450 k, un lot ordinaire de 0,5 j se verrait refuser le fix dès 295 k dépensés (scénario B26.1 : implement + revue Opus 250 k) ; si le palier de 750 k devait être relevé aussi (840 k), seule la constante LOT_BUDGET_ONE_DAY change. Base : test/orchestrate-command.test.ts:1285 (14 k + 282 k + 80 k + réserve) et CHANGELOG 0.26.0 ; p90 374 k d'un lot ≤ 0,5 j (command.ts:60-69) inchangé."
-    tests: ["R3 — lotBudget(0.1) et lotBudget(0.5) valent 540000 sans étape spec", "R3 — le plancher couvre 14 k + 282 k + 80 k + 155 k (la réserve de R4)", "R3 — lotBudget(0.75) vaut toujours 750000 et lotBudget(2) 1140000", "R3 — lotBudgetBasis d'un lot ≤ 0,5 j cite toujours le plancher"]
+    tests: ["R3 — lotBudget(0.1) et lotBudget(0.5) valent 600000 sans étape spec", "R3 — le plancher couvre 14 k + 282 k + 80 k + 155 k (la réserve de R4)", "R3 — lotBudget(0.75) vaut toujours 750000 et lotBudget(2) 1140000", "R3 — lotBudgetBasis d'un lot ≤ 0,5 j cite toujours le plancher"]
   - id: R4
     cas: [C2]
     enonce: "La réserve passe de 65 000 (revue seule) à 155 000, p90 mesuré d'une passe fix (65 k) plus d'une revue courte (88 k, Opus) arrondi : une passe fix est jouée seulement si dépensé + 155 000 < budget du lot, de sorte que la correction et la revue courte qui la suit soient payées. Sans budget de lot : toujours jouée (inchangé)."
@@ -97,7 +97,7 @@ contrats:
   - id: A1
     appel: commande cadence orchestrate --dry-run
     entree: "un lot du plan à spec true, ou à screen, ou ordinaire"
-    sortie: "la ligne « budget du lot : N tokens comptés (base : …) » : 990 000 pour un lot spec de 0,5 j, 1 300 000 pour un lot à écran, 540 000 pour un lot ordinaire de 0,5 j"
+    sortie: "la ligne « budget du lot : N tokens comptés (base : …) » : 1 050 000 pour un lot spec de 0,5 j, 1 300 000 pour un lot à écran, 600 000 pour un lot ordinaire de 0,5 j"
     erreurs: []
     sans_erreur: "le calcul du budget est pur et n'a pas de cas d'échec : le lot inconnu est déjà refusé par la commande (hors lot)"
     regles: [R1, R2, R3]

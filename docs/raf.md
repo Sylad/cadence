@@ -15,7 +15,7 @@
   count. Without a scope citing a lot, the whole message is read as before.
 - `raf check` audits drift between the plan and the history.
 - Plan upkeep needs no lot. A commit is plan upkeep when **every file it
-  touches is a plan file**: the plan itself, its Gantt page (only at its default place, `gantt.html` next to the plan — written elsewhere with `raf gantt -o`, declare it under `plan.files`), the `plan:` key of the config file in use (`cadence.yaml`, or
+  touches is a plan file**: the plan itself, its Gantt page (only at its default place, `gantt.html` next to the plan — written elsewhere with `raf gantt -o`, declare it under `plan.files`), with the default plan `.cadence/raf.yaml`, also the legacy `docs/plan/raf.yaml` and `docs/plan/gantt.html` (so that the old commits of the plan stay plan upkeep after the `git mv`), the `plan:` key of the config file in use (`cadence.yaml`, or
   the `--config` file; a change to `deliver:`/`session:` is work), or a file the
   project lists under `plan.files` in `cadence.yaml` (a page it generates from
   the plan, a journal), or the QA expectations file (`docs/qa/expectations.md`,

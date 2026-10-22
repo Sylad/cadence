@@ -2856,11 +2856,12 @@ lots:
     finished: 2026-10-22
   - id: L247
     title: "Recaler les estimates et les budgets de lot sur les coûts mesurés : tokens par lot +28 à +48 % sur deux fenêtres pour toutes les estimates, rendus par jour −36 %, étapes spec/maquette/ux +31 à +51 % ; chercher le goulot du flux avant d'ajouter des lots"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-22
     notes:
       - { date: 2026-10-22, text: "Ouvert par le lead le 22-10 sur l'en-tête perf du tour (tendance confirmée sur deux fenêtres), décision de Sylvain. Qualité en hausse en parallèle : 50 % conforme du premier coup (38 % avant), 0 défaut échappé — ne pas la dégrader pour gagner des tokens." }
+    started: 2026-10-22
   - id: L248
     title: "Ligne de déplacement du plan hérité : proposer mv (pas git mv) quand docs/plan/raf.yaml n'est pas suivi par git — git mv échoue (code 128, « not under version control ») et laisse un .cadence/ vide (cli.ts:101)"
     status: todo

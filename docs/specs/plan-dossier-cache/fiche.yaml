@@ -112,7 +112,8 @@ regles:
     source: "demande du lot et issue #11 : « un docs/plan/raf.yaml existant reste lu tant qu'il n'est pas déplacé, avec une ligne qui propose la commande de déplacement »"
     tests:
       - "R5 — plan hérité : raf now lit le plan, stderr propose le git mv, stdout identique à avant"
-      - "R5 — la ligne de déplacement est exécutable telle quelle, depuis la racine comme depuis un sous-dossier, sans .cadence/ préexistant"
+      - "R5 — la ligne de déplacement nomme la racine du projet et s'exécute telle quelle depuis un sous-dossier, sans .cadence/ préexistant"
+      - "R5 — la ligne de déplacement protège une racine qui contient des espaces"
       - "R5 — --file ou plan: vers docs/plan/raf.yaml : aucune ligne de déplacement"
   - id: R6
     cas: [C3]

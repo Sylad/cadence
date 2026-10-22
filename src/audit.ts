@@ -20,7 +20,7 @@ function configRel(plan: Plan, root: string): string {
 /**
  * Le plan, sa page Gantt, la configuration lue (cadence.yaml) et les fichiers tenus avec lui (plan.files). Le plan par défaut
  * (.cadence/raf.yaml) compte aussi son emplacement hérité docs/plan/ : après le `git mv` proposé par raf, les anciens commits du
- * plan et le commit du déplacement (qui liste la suppression et l'ajout) restent des commits de plan seul (L246).
+ * plan et le commit du déplacement (qui liste la suppression et l'ajout) restent des commits de plan seul (L246, fiche plan-dossier-cache R12).
  */
 export function ownFiles(plan: Plan, root: string): Set<string> {
   const own = new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), configRel(plan, root), ...plan.maintained]);

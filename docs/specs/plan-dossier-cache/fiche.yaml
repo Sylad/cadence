@@ -99,9 +99,9 @@ regles:
     tests: ["R3 — init avec plan: x/plan.yaml crée x/plan.yaml et pas .cadence/raf.yaml"]
   - id: R4
     cas: [C2]
-    enonce: "Quand .cadence/raf.yaml et docs/plan/raf.yaml existent tous deux, .cadence/raf.yaml est lu et une ligne stderr signale que docs/plan/raf.yaml est ignoré."
-    statut: hypothese
-    si_faux: "Si l'ancien devait gagner, seul l'ordre de résolution change ; aucune donnée en jeu (aucun fichier n'est écrit ni supprimé)."
+    enonce: "Quand .cadence/raf.yaml et docs/plan/raf.yaml existent tous deux, .cadence/raf.yaml est lu et un avertissement stderr nomme les deux fichiers et signale que docs/plan/raf.yaml est ignoré ; rien n'est écrit ni supprimé."
+    statut: sourcee
+    source: "réponse du lead (confirmée par Sylvain)"
     tests: ["R4 — les deux plans présents : le plan lu est .cadence/raf.yaml et la ligne d'avertissement est émise"]
   - id: R5
     cas: [C2]

@@ -81,7 +81,7 @@ The budget a wave gives a lot is derived from its estimate, measured on the runs
 
 | Lot | Budget |
 |---|---|
-| up to 0.5 day | 540 k tokens |
+| up to 0.5 day | 600 k tokens |
 | 0.5 to 1 day | 750 k |
 | beyond | 570 k per day, 750 k at least |
 | `screen: page` | 1.3 M at least, or the ordinary budget + 450 k if that is more |

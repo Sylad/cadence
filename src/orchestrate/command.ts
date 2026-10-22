@@ -67,8 +67,10 @@ export const DEFAULT_BUDGET = 2_000_000;
  * 1,09 M), au-delà d'un jour p90 1,14 M pour les 10 lots de 1,25 à 2 j (570 k par jour d'estimate), max 1,7 M (L188). Le plafond
  * de L78 (400 k par jour) rendait au lead, au deuxième tour, un lot de 1 j (L188 : 483 k puis 495 k).
  * Plancher relevé de 450 k à 540 k (L218) avec la réserve de la passe fix (155 k) : 14 k + 282 k + 80 k + 155 k = 531 k arrondis, la marge avant refus du fix reste 385 k.
+ * Relevé à 600 k (L247), mesuré sur 16–22-10 : 145 lots à 540 k, p90 451 k, 3 au-dessus (tous maritime-atlas : 12 lots, p90 556 k, max 609 k) ; la marge
+ * avant refus du fix passe à 445 k. Les lots à 750 k (60 lots, p90 571 k, 0 dépassement) et à 1,3 M (20 lots, p90 904 k, 1 dépassement) tiennent : inchangés.
  */
-const LOT_BUDGET_FLOOR = 540_000;
+const LOT_BUDGET_FLOOR = 600_000;
 /** Lot de plus de 0,5 j et d'au plus 1 j : p90 mesuré du total, 732 k arrondis à 750 k. */
 const LOT_BUDGET_ONE_DAY = 750_000;
 /** Tokens par jour d'estimate au-delà d'un jour : p90 1,14 M pour 2 j. */

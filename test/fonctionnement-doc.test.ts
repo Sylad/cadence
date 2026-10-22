@@ -38,7 +38,7 @@ describe('docs/fonctionnement.md (L211)', () => {
 
   it('dit les faits vérifiés contre le code : budgets, plafond, étapes, service', () => {
     const md = read('docs/fonctionnement.md')
-    for (const s of ['540 k', '750 k', '570 k', '1.3 M', '450 k', '155 k', 'CADENCE_MAX_SESSIONS', 'hook.autostart', '`lead.ux: lead`',
+    for (const s of ['600 k', '750 k', '570 k', '1.3 M', '450 k', '155 k', 'CADENCE_MAX_SESSIONS', 'hook.autostart', '`lead.ux: lead`',
       'cadence spec reseal', 'npm run service', '~/.local/share/cadence', 'screen: page', 'spec: true', 'raf check']) expect(md, s).toContain(s)
   })
 

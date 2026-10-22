@@ -69,8 +69,8 @@ function io(cwd: string) {
   return { io: i, out, err };
 }
 
-/** Revue non conforme qui coûte 400 k : le lot (budget 540 k) ne peut plus payer la passe fix → « correction non jouée (budget) ». */
-const costlyMajor = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }], verdict: 'non conforme' }), { cacheWrite: 400_000 });
+/** Revue non conforme qui coûte 460 k : le lot (budget 600 k, réserve du fix 155 k) ne peut plus payer la passe fix → « correction non jouée (budget) ». */
+const costlyMajor = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }], verdict: 'non conforme' }), { cacheWrite: 460_000 });
 
 /** Une vague réellement rendue sur budget par le programme (outcome produit par overBudget). */
 async function handedBack(over: Over = {}, projects: Record<string, { title: string; estimate?: number }[]> = { a: [{ title: 'un' }] }) {

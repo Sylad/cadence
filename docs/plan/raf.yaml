@@ -2841,6 +2841,10 @@ lots:
     spec: true
     created: 2026-10-22
     started: 2026-10-22
+    notes:
+      - { date: 2026-10-22, text: "Revue de la fiche — mineur : docs/specs/plan-dossier-cache/fiche.yaml:108 — R5 : « la ligne de déplacement part sur stderr à chaque commande qui charge le plan ». Le chemin par défaut est résolu à deux endroits (cli.ts:219 et config.ts:93 via planLoader, appelé à chaque chargement par l'orchestrateur/lead). La fiche ne dit pas si planLoader émet aussi la ligne (risque de répétition à chaque loadPlan dans cycle.ts, ex. commitPlan l.134) ni où vit la résolution commune ; perimetre ne liste pas plan.ts. Préciser : une fois par processus, et seulement côté CLI raf." }
+      - { date: 2026-10-22, text: "Revue de la fiche — mineur : docs/specs/plan-dossier-cache/fiche.yaml:119 — R6 : le comportement existe déjà (config.ts:68 chaîne → pas de format ; plan.ts:190 readonly = !!format ; cli.ts:238). Les tests R6 passeront donc dès le rouge : pas de rouge réel pour cette règle, à noter pour l'acceptation. Aucun écart de fond." }
+      - { date: 2026-10-22, text: "Revue de la fiche — mineur : docs/specs/plan-dossier-cache/fiche.yaml:104 — R4 cite « réponse du lead (confirmée par Sylvain) » comme source : non vérifiable dans le dépôt (aucun fichier:ligne). De plus R1 ne dit pas ce que fait raf init quand .gitignore du projet ignore déjà .cadence/ ; R9 remplace aussi une ligne /.cadence/ qu'un utilisateur aurait écrite lui-même (D3 la suppose écrite par l'outil)." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

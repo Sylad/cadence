@@ -124,6 +124,22 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     expect(raf(dir, ['list']).err).not.toContain('git mv');
   });
 
+  it('R5 — session start --all sur un plan hérité : la ligne de déplacement part sur stderr, pas dans le tableau de stdout', async () => {
+    const root = tempDir();
+    const dir = join(root, 'alpha');
+    mkdirSync(dir);
+    git(dir, 'init', '-q', '-b', 'main');
+    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'alpha', 'L', '2026-10-01');
+    plan.add('Hérité', '2026-10-01');
+    plan.save();
+    const out: string[] = [];
+    const err: string[] = [];
+    await run(['session', 'start', '--all'], { cwd: root, env: { RAF_TODAY: '2026-10-22' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-22T09:00:00') });
+    expect(out.join('\n')).toContain('## alpha');
+    expect(out.join('\n')).not.toContain('ancien emplacement');
+    expect(err.join('\n')).toContain(MOVE);
+  });
+
   it('R5 — --file ou plan: vers docs/plan/raf.yaml : aucune ligne de déplacement', () => {
     const dir = legacyRepo();
     expect(raf(dir, ['list', '--file', 'docs/plan/raf.yaml']).err).toBe('');
@@ -265,6 +281,16 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     excludeState(repo);
     mkdirSync(join(repo, '.cadence'));
     writeFileSync(join(repo, '.cadence/corrections.json'), '{}');
+    const s = await snapshot(repo, { remote: false });
+    expect(s.tracked).toEqual([]);
+    expect(s.untracked).toEqual([]);
+  });
+
+  it('R11 — garde d\'arbre propre : .cadence/corrections.json listé par git (sans exclude) n\'est compté ni en untracked ni en tracked', async () => {
+    const repo = gitRepo();
+    mkdirSync(join(repo, '.cadence'));
+    writeFileSync(join(repo, '.cadence/corrections.json'), '{}');
+    expect(execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: repo, encoding: 'utf8' })).toContain('.cadence/corrections.json');
     const s = await snapshot(repo, { remote: false });
     expect(s.tracked).toEqual([]);
     expect(s.untracked).toEqual([]);

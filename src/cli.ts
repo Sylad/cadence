@@ -225,9 +225,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const installing = command === 'skills' || (command === 'hook' && rest[0] === 'install');
   const planConfig = installing ? null : readPlanConfig(configPath, root);
   // Le défaut (ni --file, ni RAF_FILE, ni plan:) : .cadence/raf.yaml, ou le docs/plan/raf.yaml hérité, dont le déplacement est proposé sur stderr (L246).
+  // --file et RAF_FILE se lisent depuis le dossier courant ; le plan: de cadence.yaml, depuis la racine du dépôt où est ce fichier.
   const chosen = values.file ?? io.env.RAF_FILE ?? planConfig?.path;
   const fallback = chosen === undefined ? defaultPlan(root) : null;
-  const planPath = resolve(io.cwd, chosen ?? fallback!.path);
+  const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? (planConfig?.path !== undefined ? resolve(root, planConfig.path) : fallback!.path));
   if (fallback?.legacy && !installing) (io.notice ?? io.err)(legacyPlanLine(root, fallback.legacy));
   const loadPlan = () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
   const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));

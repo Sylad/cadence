@@ -64,6 +64,23 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     expect(existsSync(join(dir, '.cadence/notes'))).toBe(false);
   });
 
+  it('R3 — plan: x/plan.yaml relatif, lancé depuis un sous-dossier : résolu depuis la racine du dépôt, --file et RAF_FILE depuis le dossier courant', () => {
+    const dir = gitRepo();
+    writeFileSync(join(dir, 'cadence.yaml'), 'plan: x/plan.yaml\n');
+    expect(raf(dir, ['init', '--no-hook']).code).toBe(0);
+    raf(dir, ['add', 'Un lot']);
+    mkdirSync(join(dir, 'src'));
+    const depuisSrc = raf(join(dir, 'src'), ['list']);
+    expect(depuisSrc.err).toBe('');
+    expect(depuisSrc.out).toContain('Un lot');
+    expect(depuisSrc.code).toBe(0);
+    expect(existsSync(join(dir, 'src/x'))).toBe(false);
+    // --file et RAF_FILE restent relatifs au dossier courant
+    expect(raf(join(dir, 'src'), ['list', '--file', '../x/plan.yaml']).out).toContain('Un lot');
+    expect(raf(join(dir, 'src'), ['list'], { RAF_FILE: '../x/plan.yaml' }).out).toContain('Un lot');
+    expect(raf(join(dir, 'src'), ['list', '--file', 'x/plan.yaml']).code).not.toBe(0);
+  });
+
   it('R4 — les deux plans présents : le plan lu est .cadence/raf.yaml et la ligne d\'avertissement est émise', () => {
     const dir = legacyRepo();
     raf(dir, ['init', '--file', '.cadence/raf.yaml', '--no-hook']);

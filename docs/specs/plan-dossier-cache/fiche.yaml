@@ -3,7 +3,7 @@ sujet:
   titre: "Plan par défaut dans .cadence/ (versionné), docs/plan/ lu tant qu'il n'est pas déplacé"
   lot: L246
   perimetre:
-    modules: [src/cli.ts, src/config.ts, src/lead.ts, src/orchestrate/state.ts, src/orchestrate/guard.ts, src/orchestrate/command.ts]
+    modules: [src/cli.ts, src/config.ts, src/lead.ts, src/orchestrate/state.ts, src/orchestrate/guard.ts, src/orchestrate/command.ts (isProject l.239, refus l.258)]
     endpoints: []
     jobs: []
     hors_perimetre:
@@ -58,24 +58,24 @@ cas:
     preconditions:
       - le dossier de lancement est un dépôt git qui versionne .cadence/raf.yaml
     nominal:
-      - "excludeState ajoute /.cadence/runs/ (et non plus /.cadence/) à .git/info/exclude."
+      - "excludeState ajoute /.cadence/runs/ et /.cadence/corrections.json (et non plus /.cadence/) à .git/info/exclude."
       - "Les états de vague restent dans .cadence/runs/<vague>/ et hors git."
       - "Le plan, versionné, est commité par le cycle (commitPlan) comme l'est docs/plan/raf.yaml."
-      - "Le garde d'arbre propre ignore .cadence/runs/ mais compte une modification de .cadence/raf.yaml."
+      - "Le garde d'arbre propre ignore .cadence/runs/ et .cadence/corrections.json mais compte une modification de .cadence/raf.yaml."
     alternatives:
       - { si: ".git/info/exclude porte l'ancienne ligne /.cadence/", alors: "elle est remplacée par /.cadence/runs/", regles: [R9] }
     resultat: Les états de vague ne salissent jamais l'arbre ; le plan et les notes sont suivis par git.
   - id: C5
     titre: lead et orchestrate reconnaissent un projet au plan caché
     acteur: le lead
-    declencheur: commande cadence lead tour [dossier]
+    declencheur: commande cadence lead tour [dossier] (et cadence orchestrate, qui a sa propre isProject)
     preconditions:
       - "un sous-dossier porte .cadence/raf.yaml, sans cadence.yaml"
     nominal:
-      - "isProject (lead.ts:86) rend vrai pour .cadence/raf.yaml comme pour docs/plan/raf.yaml."
-      - "Le projet apparaît dans le tableau ; les messages « aucun projet » citent les deux chemins."
+      - "isProject (lead.ts:86) et celui de orchestrate (command.ts:239) rendent vrai pour .cadence/raf.yaml comme pour docs/plan/raf.yaml."
+      - "Le projet apparaît dans le tableau ; orchestrate l'accepte ; les messages « aucun projet » et le refus de command.ts:258 citent les deux chemins."
     alternatives: []
-    sans_alternative: les autres branches (cadence.yaml avec plan:, illisible) sont inchangées (lead.ts:88-96)
+    sans_alternative: "les autres branches (cadence.yaml avec plan:, illisible) sont inchangées (lead.ts:88-96)"
     resultat: Un projet migré n'est pas perdu de vue.
 
 regles:
@@ -119,17 +119,21 @@ regles:
     tests: ["R6 — plan: chemin.yaml : raf add écrit le plan", "R6 — plan avec fields: : raf add refusé « plan en lecture seule »"]
   - id: R7
     cas: [C5]
-    enonce: "Un dossier qui porte .cadence/raf.yaml est un projet pour lead tour et orchestrate, au même titre que docs/plan/raf.yaml ; les messages d'absence de projet citent les deux chemins."
+    enonce: "Un dossier qui porte .cadence/raf.yaml est un projet pour lead tour (lead.ts:86) ET pour orchestrate (command.ts:239), au même titre que docs/plan/raf.yaml ; les messages d'absence de projet (lead, et le refus command.ts:258) citent les deux chemins."
     statut: hypothese
     si_faux: "Si seul docs/plan/raf.yaml comptait, les projets migrés disparaîtraient de lead tour : correction d'une ligne, aucune donnée en jeu."
-    tests: ["R7 — isProject vrai avec .cadence/raf.yaml seul", "R7 — message « aucun projet » cite .cadence/raf.yaml"]
+    tests:
+      - "R7 — lead : isProject vrai avec .cadence/raf.yaml seul"
+      - "R7 — lead : message « aucun projet » cite .cadence/raf.yaml"
+      - "R7 — orchestrate : un dossier au seul .cadence/raf.yaml n'est pas refusé « n'est pas un projet cadence »"
+      - "R7 — orchestrate : un dossier sans plan est refusé et le message cite .cadence/raf.yaml et docs/plan/raf.yaml"
   - id: R8
     cas: [C4]
-    enonce: "Seul .cadence/runs/ est exclu de git (info/exclude) et ignoré par le garde d'arbre propre ; le reste de .cadence/ (plan, notes) est versionné et sa modification compte comme un fichier suivi sale."
+    enonce: "Seuls .cadence/runs/ et .cadence/corrections.json (cache de cadence corrections/perf, R11) sont exclus de git (info/exclude) et ignorés par le garde d'arbre propre ; le reste de .cadence/ (plan, notes) est versionné et sa modification compte comme un fichier suivi sale."
     statut: sourcee
     source: "demande du lot (« cohabitation avec .cadence/runs … à régler ») ; remplace src/orchestrate/state.ts:349-358 et le filtre src/orchestrate/guard.ts:282 qui visent tout .cadence/"
     tests:
-      - "R8 — excludeState écrit /.cadence/runs/ et non /.cadence/"
+      - "R8 — excludeState écrit /.cadence/runs/ et /.cadence/corrections.json, et non /.cadence/"
       - "R8 — snapshot : .cadence/runs/x ignoré, .cadence/raf.yaml modifié compté dans tracked"
       - "R8 — un plan sous .cadence/ est commitable par commitPlan sans git add -f"
   - id: R9
@@ -144,6 +148,16 @@ regles:
     statut: sourcee
     source: "demande du lot : « README et doc à jour » ; docs.sync de cadence.yaml"
     tests: ["R10 — le texte d'aide de raf cite .cadence/raf.yaml comme plan par défaut"]
+
+  - id: R11
+    cas: [C4]
+    enonce: "Le cache .cadence/corrections.json (écrit par cadence corrections, cli.ts:935, lu par cadence perf, cli.ts:972) garde son chemin et son format ; il est exclu de git comme .cadence/runs/ (info/exclude) et ignoré par le garde d'arbre propre, pour ne pas apparaître en untracked."
+    statut: hypothese
+    si_faux: "Si ce cache devait être versionné ou rangé sous .cadence/runs/, il faudrait changer une ligne d'exclusion ou le chemin par défaut de cli.ts:935/972 ; c'est un cache régénérable, aucune donnée perdue."
+    tests:
+      - "R11 — excludeState écrit aussi /.cadence/corrections.json"
+      - "R11 — snapshot : .cadence/corrections.json non compté en untracked ni en tracked"
+      - "R11 — cadence corrections lit et écrit toujours .cadence/corrections.json"
 
 contrats:
   - id: A1
@@ -167,7 +181,7 @@ contrats:
     sortie: "états dans .cadence/runs/, exclus de git ; plan et notes suivis"
     erreurs: []
     sans_erreur: "excludeState est silencieux hors dépôt git (state.ts:351) ; aucune nouvelle erreur"
-    regles: [R8, R9]
+    regles: [R8, R9, R11]
   - id: A4
     appel: commande cadence lead tour
     entree: "[dossier] [--depth n]"
@@ -175,8 +189,15 @@ contrats:
     erreurs: []
     sans_erreur: "un dossier sans plan n'est pas un projet, comme aujourd'hui (lead.ts:86-96)"
     regles: [R7]
+  - id: A5
+    appel: commande cadence orchestrate (reconnaissance du projet)
+    entree: "lot [projet] dont le dossier porte .cadence/raf.yaml, docs/plan/raf.yaml ou cadence.yaml avec plan:"
+    sortie: "projet accepté ; sinon refus de lot"
+    erreurs:
+      - { code: log error, message: "<projet>-<lot> : <dossier> n'est pas un projet cadence (.cadence/raf.yaml, docs/plan/raf.yaml, ou cadence.yaml avec une clé plan:)" }
+    regles: [R7]
 
 donnees:
   - { id: D1, objet: "chemin par défaut du plan : .cadence/raf.yaml (avant : docs/plan/raf.yaml)", existant: true, modification: changement, decision: "demande du lot et issue #11 (lead : chemin et lecture du plan hérité décidés par le lot) ; le format du fichier est inchangé", note: "docs/plan/raf.yaml reste lu tant qu'il n'est pas déplacé" }
   - { id: D2, objet: ".cadence/notes/.gitkeep", existant: false, modification: aucune, note: "nouveau dossier créé par raf init, versionné" }
-  - { id: D3, objet: ".git/info/exclude (ligne /.cadence/ devenue /.cadence/runs/)", existant: true, modification: changement, decision: "demande du lot : cohabitation avec .cadence/runs à régler ; fichier local non versionné, ligne écrite par l'outil", note: "R8, R9" }
+  - { id: D3, objet: ".git/info/exclude (ligne /.cadence/ devenue /.cadence/runs/ + /.cadence/corrections.json)", existant: true, modification: changement, decision: "demande du lot : cohabitation avec .cadence/runs à régler ; fichier local non versionné, ligne écrite par l'outil", note: "R8, R9, R11" }

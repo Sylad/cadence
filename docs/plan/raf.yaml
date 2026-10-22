@@ -2834,6 +2834,12 @@ lots:
     notes:
       - { date: 2026-10-21, text: "mineur de revue : docs/lead.md:136 (--json) ne documente pas le contenu de doing[] ni le nouveau champ commits (comme silentDays, noActivity)" }
     finished: 2026-10-21
+  - id: L246
+    title: "Plan par défaut dans un dossier caché versionné (issue #11) : raf init crée .cadence/raf.yaml et .cadence/notes/ (jamais publiés avec docs/, gardés dans git) ; un docs/plan/raf.yaml existant reste lu tant qu'il n'est pas déplacé, avec une ligne qui propose la commande de déplacement ; plan: <chemin> dans cadence.yaml sans correspondance de champs reste écrivable par raf ; cohabitation avec .cadence/runs (états de vague, non versionnés) à régler ; README et doc à jour"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-22
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

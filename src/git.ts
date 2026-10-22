@@ -21,6 +21,16 @@ export function gitRoot(cwd: string): string | null {
   }
 }
 
+/** Vrai quand `path` (relatif à `root`) est suivi par git : `git mv` échoue (code 128) sur un fichier non suivi. */
+export function isTracked(root: string, path: string): boolean {
+  try {
+    git(root, ['ls-files', '--error-unmatch', '--', path]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const FIELD = '\x1f';
 const RECORD = '\x1e';
 

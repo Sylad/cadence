@@ -97,6 +97,8 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
 
   it('R5 — plan hérité : raf now lit le plan, stderr propose le git mv, stdout identique à avant', () => {
     const dir = legacyRepo();
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-m', 'init');
     const r = raf(dir, ['list']);
     expect(r.code).toBe(0);
     expect(r.out).toContain('Hérité');
@@ -121,6 +123,23 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     expect(existsSync(join(dir, '.cadence/raf.yaml'))).toBe(true);
     expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(false);
     expect(existsSync(join(dir, 'src/.cadence'))).toBe(false);
+  });
+
+  it('L248 — plan hérité non suivi par git : la ligne propose mv, pas git mv, et elle s\'exécute en laissant .cadence/raf.yaml', () => {
+    const dir = legacyRepo();
+    const r = raf(dir, ['list']);
+    const line = r.err.split('\n').find((l) => l.includes('docs/plan/raf.yaml') && l.includes('déplacer'))!;
+    expect(line).not.toContain('git mv');
+    const cmd = line.slice(line.indexOf('déplacer : ') + 'déplacer : '.length);
+    expect(cmd).toBe(`cd ${dir} && mkdir -p .cadence && mv docs/plan/raf.yaml .cadence/raf.yaml`);
+    execFileSync('bash', ['-c', cmd], { cwd: dir, stdio: 'pipe' });
+    expect(existsSync(join(dir, '.cadence/raf.yaml'))).toBe(true);
+  });
+
+  it('L248 — plan hérité suivi par git : la ligne garde git mv', () => {
+    const dir = legacyRepo();
+    git(dir, 'add', 'docs/plan/raf.yaml');
+    expect(raf(dir, ['list']).err).toContain(MOVE);
   });
 
   it('R5 — la ligne de déplacement protège une racine qui contient des espaces', () => {
@@ -188,6 +207,7 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'alpha', 'L', '2026-10-01');
     plan.add('Hérité', '2026-10-01');
     plan.save();
+    git(dir, 'add', 'docs/plan/raf.yaml');
     const out: string[] = [];
     const err: string[] = [];
     await run(['session', 'start', '--all'], { cwd: root, env: { RAF_TODAY: '2026-10-22' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-22T09:00:00') });

@@ -523,8 +523,8 @@ retry count in the wave budget and in the step (`formatRetry: true`); if the out
 the step fails as usual — never a second retry.
 
 State is in `.cadence/runs/<wave>/` of the folder where the command is run (added to `.git/info/exclude`
-when that folder is in a repository; `.cadence/` and `.playwright-mcp/`, where the Playwright MCP writes its
-output, never count as a dirty repository, even when `.gitignore` does not list them): `wave.json`, one `<project>--<lot>.json` per lot (steps, tokens
+when that folder is in a repository, together with `.cadence/corrections.json`; the rest of `.cadence/`, the plan and its notes, is versioned. `.cadence/runs/`, `.cadence/corrections.json` and `.playwright-mcp/`, where the Playwright MCP writes its
+output, never count as a dirty repository, even when `.gitignore` does not list them, while a change to `.cadence/raf.yaml` does): `wave.json`, one `<project>--<lot>.json` per lot (steps, tokens
 kept apart, session ids, commits, verdicts), the JSON output of every session and a `journal.log`. After a
 cut (Ctrl-C, WSL closed) `--resume` replays an interrupted step entirely in a new session whose brief
 lists the commits already present; finished steps are never replayed.
@@ -646,4 +646,4 @@ otherwise to keep any Playwright CLI output outside the repository. The `review-
 
 Without `start`, a read-only plan's `todo` lot is refused (start it with the project's tool); without
 `verdict`, the review verdict stays in the wave's state and you report it. Only the plan's files
-(`plan.path`, `plan.files`, the QA expectations file) are committed from those commands; anything else dirty stops the lot (`.cadence/` and `.playwright-mcp/` excepted, as above).
+(`plan.path`, `plan.files`, the QA expectations file) are committed from those commands; anything else dirty stops the lot (`.cadence/runs/`, `.cadence/corrections.json` and `.playwright-mcp/` excepted, as above).

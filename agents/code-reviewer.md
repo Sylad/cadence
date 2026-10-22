@@ -21,7 +21,7 @@ fact. If the path or the id is missing, or the lot has no commit to review, say 
    folder's CLAUDE.md does not count unless it names this project. Then find the commands that
    test, type-check, lint and build: in the README, then in the manifest (`package.json` scripts,
    Makefile, `pyproject.toml`…).
-2. **Read the lot**: its title, notes and sub-tasks in the plan (`docs/plan/raf.yaml`, or the file
+2. **Read the lot**: its title, notes and sub-tasks in the plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file
    named by `plan:` in `cadence.yaml`). That is the goal the commits are measured against. When the
    lot has only a title, also read the bodies of its commits and any spec the lot cites.
 3. **Get the commits from the tool**: `raf commits <id>` prints exactly the set the gate counts —

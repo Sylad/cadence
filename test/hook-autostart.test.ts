@@ -53,7 +53,7 @@ function work(dir: string, env: NodeJS.ProcessEnv, message: string, extra: strin
   return spawnSync('git', ['commit', '-q', '-m', message, ...extra], { cwd: dir, env, encoding: 'utf8' });
 }
 
-const planText = (dir: string) => readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+const planText = (dir: string) => readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
 const count = (dir: string) => Number(git(dir, 'rev-list', '--count', 'HEAD').stdout.trim());
 
 describe('(L104) hook.autostart dans cadence.yaml', () => {
@@ -122,7 +122,7 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     expect(work(dir, env, 'wip').status).toBe(0);
     expect(work(dir, env, 'feat(L1): c', ['--no-verify']).status).toBe(0);
     raf(dir, 'add', 'C');
-    git(dir, 'add', 'docs/plan/raf.yaml');
+    git(dir, 'add', '.cadence/raf.yaml');
     expect(spawnSync('git', ['commit', '-qm', 'chore(L3): plan'], { cwd: dir, env, encoding: 'utf8' }).status).toBe(0);
   });
 
@@ -133,7 +133,7 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     expect(r.status).toBe(0);
     expect(r.stderr).toContain('raf start L1');
     expect(count(dir)).toBe(before + 1);
-    expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.split('\n').filter(Boolean).sort()).toEqual(['docs/plan/raf.yaml', 'src.txt']);
+    expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.split('\n').filter(Boolean).sort()).toEqual(['.cadence/raf.yaml', 'src.txt']);
     expect(git(dir, 'status', '--porcelain').stdout).toBe('');
     expect(raf(dir, 'show', 'L1').out).toContain('doing');
     expect(git(dir, 'reflog', '-1', '--format=%gs').stdout).toContain('commit');
@@ -179,7 +179,7 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     const r = spawnSync('git', ['commit', '-qm', 'feat(L1): a', 'a.txt'], { cwd: dir, env, encoding: 'utf8' });
     expect(r.status).toBe(0);
     expect(git(dir, 'status', '--porcelain').stdout).toBe('');
-    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toBe(planText(dir));
+    expect(git(dir, 'show', 'HEAD:.cadence/raf.yaml').stdout).toBe(planText(dir));
     // Le commit suivant ne remet pas le lot à todo.
     writeFileSync(join(dir, 'b.txt'), 'b');
     git(dir, 'add', 'b.txt');
@@ -207,7 +207,7 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
   it('start : un plan modifié et stagé n\'est pas démarré non plus', () => {
     const { dir, env } = project('start');
     raf(dir, 'add', 'C');
-    git(dir, 'add', 'docs/plan/raf.yaml');
+    git(dir, 'add', '.cadence/raf.yaml');
     const r = work(dir, env, 'feat(L1): a');
     expect(r.status).toBe(0);
     expect(r.stderr).toContain('démarrage automatique sauté');
@@ -217,18 +217,18 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
   it('start : plan stagé puis arbre restauré depuis HEAD — démarrage sauté, l\'index garde le plan stagé', () => {
     const { dir, env } = project('start');
     raf(dir, 'add', 'C');
-    git(dir, 'add', 'docs/plan/raf.yaml');
-    const staged = git(dir, 'show', ':docs/plan/raf.yaml').stdout;
+    git(dir, 'add', '.cadence/raf.yaml');
+    const staged = git(dir, 'show', ':.cadence/raf.yaml').stdout;
     // L'arbre de travail revient à HEAD, l'index garde la version stagée.
-    git(dir, 'restore', '--source=HEAD', '--worktree', 'docs/plan/raf.yaml');
-    expect(git(dir, 'status', '--porcelain').stdout.trim()).toBe('MM docs/plan/raf.yaml');
+    git(dir, 'restore', '--source=HEAD', '--worktree', '.cadence/raf.yaml');
+    expect(git(dir, 'status', '--porcelain').stdout.trim()).toBe('MM .cadence/raf.yaml');
     const r = work(dir, env, 'feat(L1): a');
     expect(r.status).toBe(0);
     expect(r.stderr).toContain('plan modifié non commité : démarrage automatique sauté');
     expect(r.stderr).toContain('L1 est encore todo');
     // Le plan stagé est parti tel quel dans le commit, sans passage de L1 à doing.
-    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toBe(staged);
-    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toMatch(/id: L1\n\s+title: A\n\s+status: todo/);
+    expect(git(dir, 'show', 'HEAD:.cadence/raf.yaml').stdout).toBe(staged);
+    expect(git(dir, 'show', 'HEAD:.cadence/raf.yaml').stdout).toMatch(/id: L1\n\s+title: A\n\s+status: todo/);
     expect(planText(dir)).not.toBe(staged);
   });
 
@@ -242,12 +242,12 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     writeFileSync(join(dir, 'src.txt'), 'x');
     git(dir, 'add', '-A');
     expect(git(dir, 'rev-parse', '--verify', '-q', 'HEAD').status).not.toBe(0);
-    const staged = git(dir, 'show', ':docs/plan/raf.yaml').stdout;
+    const staged = git(dir, 'show', ':.cadence/raf.yaml').stdout;
     const r = spawnSync('git', ['commit', '-qm', 'feat(L1): a'], { cwd: dir, env, encoding: 'utf8' });
     expect(r.status).toBe(0);
     expect(r.stderr).toContain('plan modifié non commité : démarrage automatique sauté');
     expect(r.stderr).toContain('L1 est encore todo');
-    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toBe(staged);
+    expect(git(dir, 'show', 'HEAD:.cadence/raf.yaml').stdout).toBe(staged);
     expect(raf(dir, 'show', 'L1').out).toContain('todo');
     expect(git(dir, 'status', '--porcelain').stdout).toBe('');
   });
@@ -263,12 +263,12 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     expect(r.stderr).toContain('L1 est encore todo');
     expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.trim()).toBe('a.txt');
     // Pas de « MM » : l'index ne porte pas de plan différent de celui de l'arbre de travail.
-    expect(git(dir, 'status', '--porcelain').stdout.trim()).toBe('M docs/plan/raf.yaml');
+    expect(git(dir, 'status', '--porcelain').stdout.trim()).toBe('M .cadence/raf.yaml');
     writeFileSync(join(dir, 'b.txt'), 'b');
     git(dir, 'add', 'b.txt');
     expect(spawnSync('git', ['commit', '-qm', 'feat(L2): b'], { cwd: dir, env, encoding: 'utf8' }).status).toBe(0);
     expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.trim()).toBe('b.txt');
-    expect(git(dir, 'show', 'HEAD:docs/plan/raf.yaml').stdout).toMatch(/id: L1\n\s+title: A\n\s+status: todo/);
+    expect(git(dir, 'show', 'HEAD:.cadence/raf.yaml').stdout).toMatch(/id: L1\n\s+title: A\n\s+status: todo/);
     expect(raf(dir, 'show', 'L1').out).toContain('todo');
     expect(raf(dir, 'show', 'L2').out).toContain('doing');
   });
@@ -295,7 +295,7 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     for (const mode of ['refuse', 'start']) {
       const { dir, env } = project(mode);
       raf(dir, 'add', 'Veille', '--every', '7');
-      git(dir, 'add', 'docs/plan/raf.yaml');
+      git(dir, 'add', '.cadence/raf.yaml');
       expect(spawnSync('git', ['commit', '-qm', 'chore(L3): plan'], { cwd: dir, env, encoding: 'utf8' }).status).toBe(0);
       const plan = planText(dir);
       expect(work(dir, env, 'feat(L3): veille').status).toBe(0);

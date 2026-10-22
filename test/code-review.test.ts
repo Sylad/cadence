@@ -17,7 +17,7 @@ async function rafOn(today: string, dir: string, ...argv: string[]) {
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
-const planOf = (dir: string) => readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+const planOf = (dir: string) => readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
 
 describe('revue de code', () => {
   it('inactive sans reviewSince : un lot à commits se ferme sans revue, check ne dit rien', async () => {
@@ -87,7 +87,7 @@ describe('revue de code', () => {
     await raf(dir, 'review', 'enable');
     await raf(dir, 'add', 'Publier');
     await raf(dir, 'start', 'L1');
-    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    execFileSync('git', ['add', '.cadence/raf.yaml'], { cwd: dir });
     execFileSync('git', ['commit', '-q', '-m', 'chore(plan): L1 publier'], { cwd: dir, env: { ...process.env, GIT_AUTHOR_DATE: '2026-09-28T10:00:00', GIT_COMMITTER_DATE: '2026-09-28T10:00:00' } });
     expect((await rafOn('2026-09-29', dir, 'done', 'L1')).code).toBe(0);
     expect((await raf(dir, 'check')).out).not.toContain('revue de code');
@@ -140,7 +140,7 @@ describe('revue de code', () => {
     }
     expect(planOf(dir)).not.toContain('review:');
     expect((await raf(dir, 'done', 'L1')).code).toBe(2);
-    expect(() => Plan.load(join(dir, 'docs/plan/raf.yaml')).recordReview('L1', ' ', '2026-09-28', null)).toThrow(/verdict vide/);
+    expect(() => Plan.load(join(dir, '.cadence/raf.yaml')).recordReview('L1', ' ', '2026-09-28', null)).toThrow(/verdict vide/);
   });
 
   it('un verdict écrit à la main dans le YAML est lu', async () => {
@@ -150,7 +150,7 @@ describe('revue de code', () => {
     await raf(dir, 'add', 'Cache');
     await raf(dir, 'start', 'L1');
     commit(dir, 'feat(L1): cache');
-    const path = join(dir, 'docs/plan/raf.yaml');
+    const path = join(dir, '.cadence/raf.yaml');
     writeFileSync(path, planOf(dir).replace('    status: doing\n', '    status: doing\n    review: { date: 2026-09-28, verdict: conforme }\n'));
     expect((await raf(dir, 'done', 'L1')).code).toBe(0);
   });
@@ -163,7 +163,7 @@ describe('revue de code', () => {
       await raf(dir, 'add', 'Cache');
       await raf(dir, 'start', 'L1');
       commit(dir, 'feat(L1): cache');
-      const path = join(dir, 'docs/plan/raf.yaml');
+      const path = join(dir, '.cadence/raf.yaml');
       writeFileSync(path, planOf(dir).replace('    status: doing\n', `    status: doing\n    review: ${written}\n`));
       expect(Plan.load(path).lot('L1').review, written).toBeUndefined();
       const refused = await raf(dir, 'done', 'L1');
@@ -246,7 +246,7 @@ describe('revue de code liée au commit relu', () => {
   it('un commit qui ne touche que le plan, après le verdict, ne le périme pas', async () => {
     const dir = await lotWithCommit();
     await raf(dir, 'review', 'L1', 'conforme');
-    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    execFileSync('git', ['add', '.cadence/raf.yaml'], { cwd: dir });
     execFileSync('git', ['commit', '-q', '-m', 'chore(plan): L1 relu'], { cwd: dir, env: { ...process.env, GIT_AUTHOR_DATE: '2026-09-28T12:00:00', GIT_COMMITTER_DATE: '2026-09-28T12:00:00' } });
     expect((await rafOn('2026-09-29', dir, 'done', 'L1')).code).toBe(0);
     expect((await rafOn('2026-09-29', dir, 'check')).out).toBe('✓ plan et historique cohérents');
@@ -271,7 +271,7 @@ describe('revue de code liée au commit relu', () => {
   it('un verdict écrit à la main sans champ commit n’est jamais périmé ; avec un commit que le lot n’a pas, il l’est', async () => {
     const handWritten = async (extra: string) => {
       const dir = await lotWithCommit();
-      writeFileSync(join(dir, 'docs/plan/raf.yaml'), planOf(dir).replace('    status: doing\n', `    status: doing\n    review: { date: 2026-09-28, verdict: conforme${extra} }\n`));
+      writeFileSync(join(dir, '.cadence/raf.yaml'), planOf(dir).replace('    status: doing\n', `    status: doing\n    review: { date: 2026-09-28, verdict: conforme${extra} }\n`));
       commit(dir, 'fix(L1): oubli', '2026-09-28T11:00:00');
       return dir;
     };
@@ -286,14 +286,14 @@ describe('revue de code liée au commit relu', () => {
 
 describe('raf commits', () => {
   const planCommit = (dir: string, message: string) => {
-    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    execFileSync('git', ['add', '.cadence/raf.yaml'], { cwd: dir });
     execFileSync('git', ['commit', '-q', '-m', message], { cwd: dir, env: { ...process.env, GIT_AUTHOR_DATE: '2026-09-28T12:00:00', GIT_COMMITTER_DATE: '2026-09-28T12:00:00' } });
   };
 
   it('liste les commits que la porte compte pour le lot, du plus ancien au plus récent', async () => {
     const dir = gitRepo();
     await raf(dir, 'init', '--no-hook');
-    const path = join(dir, 'docs/plan/raf.yaml');
+    const path = join(dir, '.cadence/raf.yaml');
     writeFileSync(path, planOf(dir).replace('lots:', "ignore: ['^auto: ']\nlots:"));
     await raf(dir, 'review', 'enable');
     await raf(dir, 'add', 'Cache');

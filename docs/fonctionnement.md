@@ -12,7 +12,7 @@ box with a blue outline is where the work is kept or checked.
   <img alt="A lot goes from todo to doing, receives commits that cite it, gets its review and UX verdicts, becomes done, then is delivered by cadence deliver" src="fonctionnement-lot-light.svg">
 </picture>
 
-The plan (`docs/plan/raf.yaml`, or the file `cadence.yaml` names) is the single source of truth:
+The plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file `cadence.yaml` names) is the single source of truth:
 `raf check` reports every commit that cites no lot (unless a motivated `raf ignore` covers it).
 `hook.autostart` in `cadence.yaml` sets what the pre-commit hook does with a commit that cites a lot
 still `todo`: `warn` (the default), `refuse`, or `start` it in the same commit. `raf done` is refused

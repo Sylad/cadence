@@ -36,7 +36,7 @@ async function setup(repos: (neighbour: string) => (string | { path: string; cit
   await raf(dir, 'add', 'Un lot');
   await raf(dir, 'start', 'L1');
   const rel = relative(dir, neighbour);
-  const file = join(dir, 'docs/plan/raf.yaml');
+  const file = join(dir, '.cadence/raf.yaml');
   const list = repos(rel).map((r) => JSON.stringify(r)).join(', ');
   writeFileSync(file, readFileSync(file, 'utf8').replace(/- id: L1\n/, `- id: L1\n    repos: [${list}]\n`));
   git(dir, 'add', '.');
@@ -124,7 +124,7 @@ describe('raf review : le sha lu de chaque dépôt', () => {
     const lastNeighbour = git(neighbour, 'rev-parse', 'HEAD~1');
     const r = await raf(dir, 'review', 'L1', 'conforme');
     expect(r.code).toBe(0);
-    const review = Plan.load(join(dir, 'docs/plan/raf.yaml')).lot('L1').review!;
+    const review = Plan.load(join(dir, '.cadence/raf.yaml')).lot('L1').review!;
     expect(review.commit).toBe(git(dir, 'rev-parse', 'HEAD'));
     expect(review.repos).toEqual({ [rel]: lastNeighbour });
   });
@@ -133,7 +133,7 @@ describe('raf review : le sha lu de chaque dépôt', () => {
     const { dir, rel } = await setup();
     commit(dir, 'feat(L1): côté projet');
     await raf(dir, 'review', 'L1', 'conforme');
-    expect(Plan.load(join(dir, 'docs/plan/raf.yaml')).lot('L1').review!.repos).toEqual({ [rel]: null });
+    expect(Plan.load(join(dir, '.cadence/raf.yaml')).lot('L1').review!.repos).toEqual({ [rel]: null });
   });
 
   it('un voisin introuvable fait refuser le verdict : on n\'enregistre pas un sha qu\'on n\'a pas lu', async () => {
@@ -142,14 +142,14 @@ describe('raf review : le sha lu de chaque dépôt', () => {
     const r = await raf(dir, 'review', 'L1', 'conforme');
     expect(r.code).toBe(2);
     expect(r.err).toContain('../disparu');
-    expect(Plan.load(join(dir, 'docs/plan/raf.yaml')).lot('L1').review).toBeUndefined();
+    expect(Plan.load(join(dir, '.cadence/raf.yaml')).lot('L1').review).toBeUndefined();
   });
 
   it('sans clé repos, le verdict est celui d\'avant (pas de repos)', async () => {
     const { dir } = await setup(() => []);
     commit(dir, 'feat(L1): seul');
     await raf(dir, 'review', 'L1', 'conforme');
-    expect(Plan.load(join(dir, 'docs/plan/raf.yaml')).lot('L1').review).not.toHaveProperty('repos');
+    expect(Plan.load(join(dir, '.cadence/raf.yaml')).lot('L1').review).not.toHaveProperty('repos');
   });
 });
 
@@ -158,7 +158,7 @@ describe('repoWork / repoShas', () => {
     const { dir, neighbour, rel } = await setup();
     commit(neighbour, 'feat(L1): a');
     commit(neighbour, 'feat(L10): autre lot');
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const { repos } = resolveLotRepos(dir, plan.lot('L1'));
     expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject)).toEqual(['feat(L1): a']);
     expect(repoShas(plan, repos, 'L1')).toEqual({ [rel]: git(neighbour, 'rev-parse', 'HEAD~1') });
@@ -167,7 +167,7 @@ describe('repoWork / repoShas', () => {
 
 describe('repoWork : rattachement au projet et à la période du lot (L62)', () => {
   const edit = (dir: string, from: RegExp, to: string) => {
-    const file = join(dir, 'docs/plan/raf.yaml');
+    const file = join(dir, '.cadence/raf.yaml');
     writeFileSync(file, readFileSync(file, 'utf8').replace(from, to));
   };
 
@@ -177,7 +177,7 @@ describe('repoWork : rattachement au projet et à la période du lot (L62)', () 
     commitAt(neighbour, 'feat(L1): dans la période', '2026-10-08T10:00:00');
     commitAt(neighbour, 'feat(L1): trop tard', '2026-10-20T10:00:00');
     edit(dir, /started: 2026-10-08/, 'started: 2026-10-01\n    finished: 2026-10-10');
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const { repos } = resolveLotRepos(dir, plan.lot('L1'));
     expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject)).toEqual(['feat(L1): dans la période']);
   });
@@ -197,7 +197,7 @@ describe('repoWork : rattachement au projet et à la période du lot (L62)', () 
       'fix(L1): couche aetherwx:graticule_10 publiée par le bootstrap',
       'maritime: frontend sha-1234567 (L1)',
     ]);
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const { repos } = resolveLotRepos(dir, plan.lot('L1'));
     expect(repoWork(plan, repos[0], 'L1')).toHaveLength(3);
     expect(Object.values(repoShas(plan, repos, 'L1'))[0]).toBe(git(neighbour, 'rev-parse', 'HEAD'));
@@ -211,7 +211,7 @@ describe('repoWork : rattachement au projet et à la période du lot (L62)', () 
     commitAt(neighbour, 'fix(L1): chart sans rapport', '2026-10-08T13:00:00');
     commitAt(neighbour, 'feat(L2): ol-companion mais un autre lot', '2026-10-08T14:00:00');
     commitAt(neighbour, 'fix(warhammer40k): dernier commit, autre app (L1)', '2026-10-08T15:00:00');
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const { repos, problems } = resolveLotRepos(dir, plan.lot('L1'));
     expect(problems).toEqual([]);
     expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject).reverse()).toEqual(['ol-companion: frontend→sha-1 — chore(L1): lot terminé', 'fix(L1): chart']);
@@ -227,7 +227,7 @@ describe('repoWork : rattachement au projet et à la période du lot (L62)', () 
     commitAt(neighbour, 'fix(warhammer40k): autre app (L1)', '2026-10-08T10:00:00');
     expect((await raf(dir, 'commits', 'L1')).out).toContain(`dépôt ${rel} : aucun commit du lot`);
     await raf(dir, 'review', 'L1', 'conforme');
-    expect(Plan.load(join(dir, 'docs/plan/raf.yaml')).lot('L1').review!.repos).toEqual({ [rel]: null });
+    expect(Plan.load(join(dir, '.cadence/raf.yaml')).lot('L1').review!.repos).toEqual({ [rel]: null });
   });
 
   it('voisin partagé sans cite : les commits des autres apps qui citent le même id comptent aussi (comportement par défaut)', async () => {
@@ -235,7 +235,7 @@ describe('repoWork : rattachement au projet et à la période du lot (L62)', () 
     commitAt(neighbour, 'ol-companion: frontend→sha-1 — chore(L1): lot terminé', '2026-10-08T10:00:00');
     commitAt(neighbour, 'fix(warhammer40k): retirer un montage (L1)', '2026-10-08T11:00:00');
     edit(dir, /^project: .*$/m, 'project: "ol-companion"');
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const { repos } = resolveLotRepos(dir, plan.lot('L1'));
     expect(repoWork(plan, repos[0], 'L1').map((c) => c.subject)).toEqual(['fix(warhammer40k): retirer un montage (L1)', 'ol-companion: frontend→sha-1 — chore(L1): lot terminé']);
     expect(Object.values(repoShas(plan, repos, 'L1'))[0]).toBe(git(neighbour, 'rev-parse', 'HEAD'));
@@ -269,7 +269,7 @@ describe('plan en lecture seule : fields.repos accepte les deux formes', () => {
 
 describe('coveredTasks : commits du lot dans un dépôt voisin (L156)', () => {
   const withTasks = (dir: string) => {
-    const file = join(dir, 'docs/plan/raf.yaml');
+    const file = join(dir, '.cadence/raf.yaml');
     writeFileSync(file, readFileSync(file, 'utf8').replace(/- id: L1\n/, '- id: L1\n    tasks:\n    - { id: t1, title: a, status: todo }\n    - { id: t2, title: b, status: todo }\n'.replace(/^/, '')));
   };
 
@@ -277,7 +277,7 @@ describe('coveredTasks : commits du lot dans un dépôt voisin (L156)', () => {
     const { dir, neighbour } = await setup();
     withTasks(dir);
     commit(neighbour, 'feat(L1/t2): fait dans le voisin');
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const { repos } = resolveLotRepos(dir, plan.lot('L1'));
     expect(coveredTasks(plan, dir, 'L1').map((c) => c.task)).toEqual([]);
     const neighbourWork = repos.flatMap((r) => repoWork(plan, r, 'L1'));
@@ -292,7 +292,7 @@ describe('coveredTasks : commits du lot dans un dépôt voisin (L156)', () => {
     commit(neighbour, 'feat(L1): sans sous-tâche');
     commit(neighbour, 'feat(L1/t1): voisin');
     commit(dir, 'feat(L1/t1): projet');
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const { repos } = resolveLotRepos(dir, plan.lot('L1'));
     const covered = coveredTasks(plan, dir, 'L1', repos.flatMap((r) => repoWork(plan, r, 'L1')));
     expect(covered.map((c) => c.task)).toEqual(['t1']);

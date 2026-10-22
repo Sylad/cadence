@@ -64,7 +64,7 @@ describe('cadence session start|close --all', () => {
     const root = tempDir();
     await project(join(root, 'alpha'), 'alpha');
     await project(join(root, 'beta'), 'beta');
-    writeFileSync(join(root, 'alpha/docs/plan/raf.yaml'), 'lots: [\n');
+    writeFileSync(join(root, 'alpha/.cadence/raf.yaml'), 'lots: [\n');
     const { code, out } = await cad(root, 'session', 'start', '--all');
     expect(code).toBe(2);
     const lines = out.split('\n');
@@ -94,7 +94,7 @@ describe('cadence session start|close --all', () => {
     const root = tempDir();
     await project(join(root, 'alpha'), 'alpha');
     await project(join(root, 'beta'), 'beta');
-    const plan = join(root, 'alpha', 'docs/plan/raf.yaml');
+    const plan = join(root, 'alpha', '.cadence/raf.yaml');
     const out: string[] = [];
     const err: string[] = [];
     const code = await run(['session', 'start', '--all'], { cwd: root, env: { RAF_TODAY: '2026-09-28', RAF_FILE: plan }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-09-28T18:30:00') });

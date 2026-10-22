@@ -199,7 +199,7 @@ describe('news CLI', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--project', 'demo', '--no-hook');
     expect(raf(dir, 'add', 'Montants', 'français', '--visible').out).toBe('L1');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('visible: true');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toContain('visible: true');
     raf(dir, 'start', 'L1');
     commit(dir, 'fix(L1): montants');
 

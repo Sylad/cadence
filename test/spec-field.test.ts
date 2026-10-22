@@ -14,11 +14,11 @@ function raf(dir: string, ...argv: string[]) {
   const code = run(argv, { cwd: dir, env: { RAF_TODAY: T }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date(`${T}T09:30:00`) });
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
-const yaml = (dir: string) => readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+const yaml = (dir: string) => readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
 
 describe('champ spec des lots (L186, spec etape-spec-back B1)', () => {
   it('Plan.add --spec écrit spec: true et le relit ; sans option, aucune clé', () => {
-    const p = Plan.create(join(tempDir(), 'docs/plan/raf.yaml'), 'demo');
+    const p = Plan.create(join(tempDir(), '.cadence/raf.yaml'), 'demo');
     p.add('Avec', T, { spec: true });
     p.add('Sans', T);
     p.save();
@@ -103,7 +103,7 @@ describe('champ spec des lots (L186, spec etape-spec-back B1)', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--project', 'demo');
     raf(dir, 'add', 'A', '--visible', '--screen', 'page');
-    const file = join(dir, 'docs/plan/raf.yaml');
+    const file = join(dir, '.cadence/raf.yaml');
     const base = yaml(dir);
     writeFileSync(file, base.replace('screen: page', 'screen: page\n    spec: true'));
     expect(raf(dir, 'check').out).not.toMatch(/L1 : spec/);

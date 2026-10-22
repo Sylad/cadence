@@ -111,7 +111,7 @@ describe('cadence lead tour — en-tête perf (L227)', () => {
     const c = setup({ projects: false });
     const r = await tour(c.root);
     expect(r.code).toBe(0);
-    expect(r.out).toEqual([`aucun projet sous ${c.root} (docs/plan/raf.yaml ou cadence.yaml avec plan:)`]);
+    expect(r.out).toEqual([`aucun projet sous ${c.root} (.cadence/raf.yaml, docs/plan/raf.yaml ou cadence.yaml avec plan:)`]);
   });
 
   it('R8 — tour --json avec des ⚠ de perf : le JSON est le tableau de lignes, sans clé de perf', async () => {

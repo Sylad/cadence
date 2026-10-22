@@ -42,7 +42,7 @@ async function repo(config = CONFIG) {
   await cad(dir, 'add', 'Un lot');
   await cad(dir, 'start', 'L1');
   write(dir, 'cadence.yaml', config);
-  git(dir, 'add', '--', 'docs', 'cadence.yaml');
+  git(dir, 'add', '--', '.cadence', 'cadence.yaml');
   commit(dir, 'chore(L1): départ', '2026-10-09T08:00:00');
   return dir;
 }
@@ -184,7 +184,7 @@ describe('cadence lead tour : docs.sync', () => {
     await cad(dir, 'add', 'Un lot');
     await cad(dir, 'start', 'L1');
     write(dir, 'cadence.yaml', CONFIG);
-    git(dir, 'add', '--', 'docs', 'cadence.yaml');
+    git(dir, 'add', '--', '.cadence', 'cadence.yaml');
     commit(dir, 'chore(L1): départ', '2026-10-09T08:00:00');
     work(dir, 'feat(L1): code', ['src/a.ts']);
     const { out } = await cad(root, 'lead', 'tour');

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative, sep } from 'node:path';
 import { audit, gateWaiting, nextUp, planCommits } from './audit.js';
-import { planLoader, readPlanConfig } from './config.js';
+import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readPlanConfig } from './config.js';
 import { diffDays, type Day } from './dates.js';
 import { gitRoot, repoStatus } from './git.js';
 import { linkCommits } from './link.js';
@@ -82,9 +82,9 @@ export function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
-/** Un dossier est un projet s'il porte docs/plan/raf.yaml, ou un cadence.yaml avec `plan:`. */
+/** Un dossier est un projet s'il porte .cadence/raf.yaml ou docs/plan/raf.yaml, ou un cadence.yaml avec `plan:`. */
 export function isProject(dir: string): boolean {
-  if (existsSync(join(dir, 'docs/plan/raf.yaml'))) return true;
+  if (existsSync(join(dir, PLAN_DEFAULT)) || existsSync(join(dir, PLAN_LEGACY))) return true;
   const conf = join(dir, 'cadence.yaml');
   if (!existsSync(conf) || !statSync(conf).isFile()) return false;
   try {

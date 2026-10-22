@@ -104,16 +104,17 @@ export interface Harness {
  * Dépôt jetable avec un plan, lots donnés ; le lanceur est un scénario : `script[kind]` est la file des
  * réponses de chaque type d'étape. Rien ne lance le vrai claude.
  */
-export function harness(opts: { lots?: { title: string; visible?: boolean; screen?: 'page' | 'component' | 'journey'; spec?: boolean; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number; templatesDir?: string } = {}): Harness {
+export function harness(opts: { lots?: { title: string; visible?: boolean; screen?: 'page' | 'component' | 'journey'; spec?: boolean; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number; templatesDir?: string; planRel?: string } = {}): Harness {
   const repo = gitRepo();
-  const planFile = join(repo, 'docs/plan/raf.yaml');
+  const planRel = opts.planRel ?? 'docs/plan/raf.yaml';
+  const planFile = join(repo, planRel);
   const plan = Plan.create(planFile, 'demo', 'L', '2026-09-01');
   for (const l of opts.lots ?? [{ title: 'Un lot' }]) {
     const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible || !!l.screen, screen: l.screen, spec: l.spec, quickwin: l.quickwin });
     if (l.status === 'doing') plan.setStatus(id, 'doing', '2026-10-01');
   }
   plan.save();
-  git(repo, 'add', '--', 'docs/plan/raf.yaml');
+  git(repo, 'add', '--', planRel);
   git(repo, 'commit', '-q', '-m', 'chore: plan');
   const launch = tempDir();
   const store = new RunStore(launch, 'w1');

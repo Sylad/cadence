@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
-import { planLoader, readOrchestrateConfig, type OrchestrateConfig } from '../config.js';
+import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, type OrchestrateConfig } from '../config.js';
 import { isDay, toDay, type Day } from '../dates.js';
 import { gitRoot, hooksDir } from '../git.js';
 import { onTermination } from '../proc.js';
@@ -236,7 +236,7 @@ export function projectEnv(repo: string): { config: OrchestrateConfig; loadPlan:
   return { config: readOrchestrateConfig(configPath), loadPlan, configPath };
 }
 
-const isProject = (dir: string) => existsSync(join(dir, 'docs/plan/raf.yaml')) || (existsSync(join(dir, 'cadence.yaml')) && /^plan\s*:/m.test(readFileSync(join(dir, 'cadence.yaml'), 'utf8')));
+const isProject = (dir: string) => existsSync(join(dir, PLAN_DEFAULT)) || existsSync(join(dir, PLAN_LEGACY)) || (existsSync(join(dir, 'cadence.yaml')) && /^plan\s*:/m.test(readFileSync(join(dir, 'cadence.yaml'), 'utf8')));
 
 function resolveTargets(args: Args, io: OrchestrateIo, refusals: string[]): Target[] {
   const out: Target[] = [];
@@ -255,7 +255,7 @@ function resolveTargets(args: Args, io: OrchestrateIo, refusals: string[]): Targ
       continue;
     }
     if (!isProject(projectDir)) {
-      refusals.push(`${key} : ${projectDir} n'est pas un projet cadence (docs/plan/raf.yaml, ou cadence.yaml avec une clé plan:)`);
+      refusals.push(`${key} : ${projectDir} n'est pas un projet cadence (${PLAN_DEFAULT}, ${PLAN_LEGACY}, ou cadence.yaml avec une clé plan:)`);
       continue;
     }
     const repo = gitRoot(projectDir);

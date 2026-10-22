@@ -19,7 +19,7 @@ function raf(dir: string, ...argv: string[]) {
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
-const yaml = (dir: string) => readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+const yaml = (dir: string) => readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
 const lots = (dir: string): Record<string, any>[] => parse(yaml(dir)).lots;
 const git = (dir: string, ...args: string[]) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
 
@@ -75,7 +75,7 @@ describe('raf todo', () => {
 
   it('R2 — un commit de plan seul (isPlanOnly) qui cite le lot ne bloque pas', () => {
     const dir = setup();
-    git(dir, 'add', 'docs/plan/raf.yaml');
+    git(dir, 'add', '.cadence/raf.yaml');
     commit(dir, 'chore(plan) L1: démarrage');
     expect(raf(dir, 'todo', 'L1').code).toBe(0);
   });
@@ -148,8 +148,8 @@ describe('raf todo', () => {
 
   it('R8 — commit de plan seul citant le lot : la remise en attente passe', () => {
     const dir = setup();
-    writeFileSync(join(dir, 'docs/plan/raf.yaml'), `${yaml(dir)}\n# retouche\n`);
-    git(dir, 'add', 'docs/plan/raf.yaml');
+    writeFileSync(join(dir, '.cadence/raf.yaml'), `${yaml(dir)}\n# retouche\n`);
+    git(dir, 'add', '.cadence/raf.yaml');
     commit(dir, 'chore(L1): plan seul');
     expect(raf(dir, 'todo', 'L1').code).toBe(0);
   });

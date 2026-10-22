@@ -50,7 +50,7 @@ function readQa(qa: unknown, file: string, workRoot?: string): string | undefine
 /**
  * Clé `plan:` de cadence.yaml : où est le plan et, s'il est tenu par un autre outil, comment le lire.
  * `root` : la racine du dépôt de travail (celle du CLI), d'où se résout un chemin absolu de `qa.expectations`.
- * Null quand le fichier ou la clé manque — le plan est alors docs/plan/raf.yaml au format de raf.
+ * Null quand le fichier ou la clé manque — le plan est alors .cadence/raf.yaml (ou docs/plan/raf.yaml hérité) au format de raf.
  */
 export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   if (!existsSync(file)) return null;
@@ -83,6 +83,20 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   return { ...(p.path != null ? { path: String(p.path) } : {}), settings };
 }
 
+export const PLAN_DEFAULT = '.cadence/raf.yaml';
+export const PLAN_LEGACY = 'docs/plan/raf.yaml';
+
+/**
+ * Le plan par défaut d'un projet (L246) : .cadence/raf.yaml, versionné et jamais publié avec docs/ ; un docs/plan/raf.yaml hérité
+ * reste le plan tant qu'il n'est pas déplacé et que .cadence/raf.yaml n'existe pas. `legacy` : le plan hérité existe (lu, ou ignoré
+ * quand les deux existent) — c'est à l'appelant d'en parler.
+ */
+export function defaultPlan(root: string): { path: string; legacy: 'read' | 'ignored' | null } {
+  const legacy = existsSync(join(root, PLAN_LEGACY));
+  if (existsSync(join(root, PLAN_DEFAULT))) return { path: join(root, PLAN_DEFAULT), legacy: legacy ? 'ignored' : null };
+  return { path: join(root, legacy ? PLAN_LEGACY : PLAN_DEFAULT), legacy: legacy ? 'read' : null };
+}
+
 /**
  * Le chargeur du plan du projet dont `root` est la racine : le `cadence.yaml` est lu tout de suite (une erreur sort ici), le plan à
  * chaque appel. Une seule lecture de « où est le plan et comment le lire » pour l'orchestrateur, `lead tour` et le tirage de `--continue`.
@@ -90,8 +104,8 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
 export function planLoader(root: string): () => Plan {
   const configPath = join(root, 'cadence.yaml');
   const planConfig = readPlanConfig(configPath, root);
-  const planPath = resolve(root, planConfig?.path ?? 'docs/plan/raf.yaml');
-  return () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
+  // Le défaut est résolu à chaque appel : un plan déplacé (git mv) pendant une vague est suivi.
+  return () => Plan.load(planConfig?.path ? resolve(root, planConfig.path) : defaultPlan(root).path, { ...planConfig?.settings, config: configPath });
 }
 
 function parseFormat(p: Record<string, unknown>, bad: (what: string) => RafError): PlanFormat {

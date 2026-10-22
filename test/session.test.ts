@@ -34,7 +34,7 @@ async function project() {
   git(dir, 'add', '.');
   commit(dir, 'chore: plan', '2026-09-20T09:00:00');
   await cad(dir, 'start', 'L1');
-  const plan = join(dir, 'docs/plan/raf.yaml');
+  const plan = join(dir, '.cadence/raf.yaml');
   writeFileSync(plan, readFileSync(plan, 'utf8').replace('started: 2026-09-28', 'started: 2026-09-22'));
   git(dir, 'commit', '-qam', 'chore: plan');
   commit(dir, 'feat(L1): cache', '2026-09-24T10:00:00');

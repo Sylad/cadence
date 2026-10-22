@@ -7,7 +7,7 @@ description: Lead several cadence projects from a parent folder without loading 
 
 The lead session stays small: it reads summaries, decides with the human, delegates, checks and
 delivers. Project files are changed by subagents, each with its own context; the facts of the tour come from `cadence lead tour`, a program. The projects
-are the sub-folders of the current directory that contain `docs/plan/raf.yaml`, or a `cadence.yaml`
+are the sub-folders of the current directory that contain `.cadence/raf.yaml` or `docs/plan/raf.yaml`, or a `cadence.yaml`
 with a `plan:` key. A project whose `cadence.yaml` maps the fields of a plan kept by its own tool is
 **read-only** for `raf`: it takes part in the tour, and its plan is changed with the project's own
 commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.

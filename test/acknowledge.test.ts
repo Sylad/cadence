@@ -27,7 +27,7 @@ describe('raf ignore : acquitter un commit sans réécrire l\'historique', () =>
     expect(raf(dir, 'check').code).toBe(1);
     const r = raf(dir, 'ignore', head(dir).slice(0, 7), '--reason', 'outillage');
     expect(r.code).toBe(0);
-    const text = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const text = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
     expect(text).toContain(`sha: ${head(dir)}`);
     expect(text).toContain('date: 2026-09-28');
     expect(text).toContain('reason: outillage');
@@ -62,10 +62,10 @@ describe('raf ignore : acquitter un commit sans réécrire l\'historique', () =>
 
   it('refuse un commit ou un sujet introuvable, sans argument, et ne touche pas au plan', () => {
     const dir = repo();
-    const avant = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const avant = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
     expect(raf(dir, 'ignore', 'inexistant').code).toBe(2);
     expect(raf(dir, 'ignore').code).toBe(2);
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(avant);
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toBe(avant);
   });
 
   it('acquitter deux fois le même commit n\'ajoute pas de seconde ligne', () => {
@@ -74,7 +74,7 @@ describe('raf ignore : acquitter un commit sans réécrire l\'historique', () =>
     raf(dir, 'ignore', 'chore: nettoyage', '--reason', 'outillage');
     const r = raf(dir, 'ignore', 'chore: nettoyage');
     expect(r.code).toBe(0);
-    const text = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const text = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
     expect(text.match(/chore: nettoyage/g)).toHaveLength(1);
     expect(text).toContain('reason: outillage');
   });
@@ -86,7 +86,7 @@ describe('raf ignore : acquitter un commit sans réécrire l\'historique', () =>
     commit(dir, 'other', '2026-09-28T10:00:00');
     const r = raf(dir, 'ignore', 'other');
     expect(r.code).toBe(0);
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('subject: other');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toContain('subject: other');
     expect(raf(dir, 'check').out).toContain('chore: avant');
   });
 

@@ -18,7 +18,7 @@ function raf(dir: string, ...argv: string[]) {
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
-const yaml = (dir: string) => readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+const yaml = (dir: string) => readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
 const lots = (dir: string): Record<string, any>[] => parse(yaml(dir)).lots;
 
 /** Un plan avec L1 (done), L2 (doing) et L3 (todo). */

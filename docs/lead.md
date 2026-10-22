@@ -111,7 +111,7 @@ page.
 
 `cadence lead tour [folder] [--idle 3] [--depth n] [--json]` is the lead's morning table, with no model in
 the loop. From a parent folder (default: the current one) it takes every direct sub-folder that
-holds `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key (a plan kept by another tool
+holds `.cadence/raf.yaml` or `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key (a plan kept by another tool
 included; hidden folders, `node_modules` and `tmp/` — throwaway working copies — are skipped), and for each one reads the same facts as `cadence session start` — in-process, no
 sub-process, no call to `claude` — then prints **one line per project**:
 

@@ -341,7 +341,7 @@ describe('refus avant d\'agir (code 2)', () => {
       const dir = join(parent, '.cadence', 'runs', 'w-t4', 'a--L1', 'playwright');
       const briefOf = (project: string) => readFileSync(out.split('\n').find((l) => l.includes('brief :') && l.includes(`${project}--L1--implement.md`))!.replace(/^\s*brief : /, '').trim(), 'utf8');
       expect(briefOf('a')).not.toContain(dir); // le dry-run ne crée pas ce dossier : le brief ne le cite pas (L48/t5)
-      expect(briefOf('b')).not.toContain('.cadence');
+      expect(briefOf('b')).not.toContain('.cadence/runs');
       const implement = (project: string) => out.split('\n').find((l) => l.startsWith('  implement : claude') && out.indexOf(l) > out.indexOf(`${project}:L1 —`))!;
       expect(implement('a')).toContain(`--add-dir ${dir}`);
       expect(implement('b')).not.toContain('--add-dir');

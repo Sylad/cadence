@@ -5,7 +5,7 @@ description: Start a work session on a repository that uses cadence — gather t
 
 # Session start — resume without reciting
 
-The repository already carries the state: the plan (`docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`), the history, the notes left at
+The repository already carries the state: the plan (`.cadence/raf.yaml`, or the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`), the history, the notes left at
 the last close. The only thing missing is the human's priority for today. This skill gathers the facts,
 proposes, and stops.
 
@@ -14,7 +14,7 @@ proposes, and stops.
 Every `cadence` / `raf` command works on the git repository of the current directory. When the
 session runs from a parent folder that holds several projects (not itself a repository), run
 `cadence session start --all` there (`--depth 2` for projects one folder deeper): one "## project"
-section per sub-folder that contains `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key.
+section per sub-folder that contains `.cadence/raf.yaml` or `docs/plan/raf.yaml`, or a `cadence.yaml` with a `plan:` key.
 Other commands (`raf …`, `cadence deliver`) still run inside the project concerned: `cd <project> && cadence …`.
 
 With no project named, run `cadence session start --all` from the parent folder (or `cadence session start` in **each** project that has a plan) and report

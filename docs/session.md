@@ -35,7 +35,7 @@ ouverture`, then the lines as written, blank ones dropped), so `session-close` c
 them without running `session start` again.
 
 `--all` runs the same command inside each project found under the current folder —
-`docs/plan/raf.yaml`, or a `cadence.yaml` with `plan:` — and never enters a project
+`.cadence/raf.yaml`, `docs/plan/raf.yaml`, or a `cadence.yaml` with `plan:` — and never enters a project
 to look for another. `--since` and `--idle` go to every project; an error in one
 project is printed in its section and the others still run. It replaces the shell
 loop over the sub-folders. A project that is not the root of its own git repository gets a `✗` line

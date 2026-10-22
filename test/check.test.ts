@@ -11,7 +11,7 @@ import { commit, gitRepo } from './helpers.js';
 describe('check against a real repository', () => {
   it('reports every kind of drift', () => {
     const dir = gitRepo();
-    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'demo');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'demo');
     plan.add('todo oublié', '2026-09-01');
     plan.add('en cours endormi', '2026-09-01');
     plan.add('fini trop vite', '2026-09-01');
@@ -52,7 +52,7 @@ describe('ignore : commits automatiques', () => {
     const dir = gitRepo();
     const io = (out: string[]) => ({ cwd: dir, env: { RAF_TODAY: '2026-09-28' }, out: (l: string) => out.push(l), err: () => {}, now: () => new Date() });
     run(['init', '--no-hook'], io([]));
-    const plan = join(dir, 'docs/plan/raf.yaml');
+    const plan = join(dir, '.cadence/raf.yaml');
     writeFileSync(plan, readFileSync(plan, 'utf8').replace('lots:', "ignore: ['^chore\\(batch\\):', '[invalide']\nlots:"));
     commit(dir, 'chore(batch): weekly content refresh', '2026-09-28T10:00:00');
     commit(dir, 'wip', '2026-09-28T11:00:00');
@@ -73,7 +73,7 @@ describe('planification', () => {
     const io = (out: string[]) => ({ cwd: dir, env: { RAF_TODAY: '2026-09-28' }, out: (l: string) => out.push(l), err: () => {}, now: () => new Date() });
     run(['init', '--no-hook'], io([]));
     run(['add', 'Audit'], io([]));
-    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    execFileSync('git', ['add', '.cadence/raf.yaml'], { cwd: dir });
     execFileSync('git', ['commit', '-qm', 'chore(L1): audit planifié'], { cwd: dir });
     const out: string[] = [];
     expect(await run(['check'], io(out))).toBe(0);
@@ -85,7 +85,7 @@ describe('planification', () => {
 });
 
 describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
-  const PLAN = 'docs/plan/raf.yaml';
+  const PLAN = '.cadence/raf.yaml';
   /** Plan publié que le projet dérive du plan (ol-companion, warhammer40k : « npm run plan »). */
   const PUBLISHED = 'frontend/public/plan-data/plan.json';
   const DECLARED = `plan:\n  files: [${PUBLISHED}]\n`;
@@ -282,7 +282,7 @@ describe('entretien du plan : les fichiers décident, jamais le sujet', () => {
       const opts = { cwd: dir, env: { RAF_TODAY: '2026-10-03' }, out: (l: string) => out.push(l), err: () => {}, now: () => new Date('2026-10-03T12:00:00') };
       await run(['init', '--no-hook'], opts);
       writeFileSync(join(dir, 'cadence.yaml'), config);
-      execFileSync('git', ['add', 'docs/plan/raf.yaml', 'cadence.yaml'], { cwd: dir });
+      execFileSync('git', ['add', '.cadence/raf.yaml', 'cadence.yaml'], { cwd: dir });
       execFileSync('git', ['commit', '-qm', 'chore: racine'], { cwd: dir, env: { ...process.env, GIT_AUTHOR_DATE: '2026-10-03T12:00:00', GIT_COMMITTER_DATE: '2026-10-03T12:00:00' } });
       out.length = 0;
       await run(['check'], opts);
@@ -385,8 +385,8 @@ describe('plan à clé dupliquée', () => {
 
   it('raf check refuse deux estimate: sous un lot, en nommant la ligne', async () => {
     const dir = gitRepo();
-    mkdirSync(join(dir, 'docs/plan'), { recursive: true });
-    writeFileSync(join(dir, 'docs/plan/raf.yaml'), lots('    estimate: 2\n'));
+    mkdirSync(join(dir, '.cadence'), { recursive: true });
+    writeFileSync(join(dir, '.cadence/raf.yaml'), lots('    estimate: 2\n'));
     const r = await check(dir);
     expect(r.code).not.toBe(0);
     expect(r.err).toContain('Map keys must be unique');

@@ -34,7 +34,7 @@ async function parent() {
   git(alpha, 'add', '.');
   commit(alpha, 'chore: plan', '2026-09-20T09:00:00');
   await cad(alpha, 'start', 'L1');
-  const plan = join(alpha, 'docs/plan/raf.yaml');
+  const plan = join(alpha, '.cadence/raf.yaml');
   writeFileSync(plan, readFileSync(plan, 'utf8').replace('started: 2026-09-28', 'started: 2026-09-22'));
   git(alpha, 'commit', '-qam', 'chore: plan');
   commit(alpha, 'feat(L1): cache', '2026-09-24T10:00:00');
@@ -56,7 +56,7 @@ describe('cadence lead tour', () => {
     const { root, alpha, beta } = await parent();
     writeFileSync(join(alpha, 'sale.txt'), 'x');
     const before = readFileSync(join(beta, 'suivi/taches.yaml'), 'utf8');
-    const planA = readFileSync(join(alpha, 'docs/plan/raf.yaml'), 'utf8');
+    const planA = readFileSync(join(alpha, '.cadence/raf.yaml'), 'utf8');
     const { code, out, err } = await cad(root, 'lead', 'tour');
     expect(code).toBe(0);
     expect(err).toBe('');
@@ -68,7 +68,7 @@ describe('cadence lead tour', () => {
     expect(lines[0]).toMatch(/dépôt non commité$/);
     expect(lines[1]).toMatch(/^beta · en cours rien · dérive .* · notes : aucune · prochain T2 Second · dépôt propre$/);
     expect(readFileSync(join(beta, 'suivi/taches.yaml'), 'utf8')).toBe(before);
-    expect(readFileSync(join(alpha, 'docs/plan/raf.yaml'), 'utf8')).toBe(planA);
+    expect(readFileSync(join(alpha, '.cadence/raf.yaml'), 'utf8')).toBe(planA);
   });
 
   it('prend le dossier en argument, et le dossier courant par défaut', async () => {
@@ -146,7 +146,7 @@ describe('cadence lead tour', () => {
     const { root, alpha } = await parent();
     await cad(alpha, 'add', 'Abandonné');
     await cad(alpha, 'drop', 'L3');
-    const plan = join(alpha, 'docs/plan/raf.yaml');
+    const plan = join(alpha, '.cadence/raf.yaml');
     writeFileSync(plan, readFileSync(plan, 'utf8').replace(/(title: Export[^\n]*\n(?:.*\n)*?\s+created: )2026-09-28/, '$12026-09-10'));
     const rows = JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as Array<Record<string, unknown>>;
     expect(rows[0]!.progress).toEqual({ done: 0, doing: 1, todo: 1, added7: 1 });
@@ -223,7 +223,7 @@ describe('cadence lead tour', () => {
 
   it("les lots « ajoutés cette semaine » sont ceux de moins de 7 jours : 6 jours comptent, 7 non (L149)", async () => {
     const { root, alpha } = await parent();
-    const plan = join(alpha, 'docs/plan/raf.yaml');
+    const plan = join(alpha, '.cadence/raf.yaml');
     const text = readFileSync(plan, 'utf8');
     const created = (day: string) => text.replace(/(title: Export[^\n]*\n(?:.*\n)*?\s+created: )2026-09-28/, `$1${day}`);
     const added7 = async () => (JSON.parse((await cad(root, 'lead', 'tour', '--json')).out) as Array<{ progress: { added7: number } }>)[0]!.progress.added7;
@@ -286,8 +286,8 @@ describe('cadence lead tour', () => {
   it('findProjects écarte dossiers cachés, node_modules et cadence.yaml avec seulement qa:, garde le cadence.yaml illisible', async () => {
     const { root } = await parent();
     const planned = (name: string) => {
-      mkdirSync(join(root, name, 'docs/plan'), { recursive: true });
-      writeFileSync(join(root, name, 'docs/plan/raf.yaml'), 'lots: []\n');
+      mkdirSync(join(root, name, '.cadence'), { recursive: true });
+      writeFileSync(join(root, name, '.cadence/raf.yaml'), 'lots: []\n');
     };
     planned('.hidden');
     planned('node_modules');
@@ -301,8 +301,8 @@ describe('cadence lead tour', () => {
   it("L241 — findProjects ignore les copies de travail sous tmp/, à tout niveau, mais garde un projet nommé autrement", async () => {
     const { root } = await parent();
     const planned = (name: string) => {
-      mkdirSync(join(root, name, 'docs/plan'), { recursive: true });
-      writeFileSync(join(root, name, 'docs/plan/raf.yaml'), 'lots: []\n');
+      mkdirSync(join(root, name, '.cadence'), { recursive: true });
+      writeFileSync(join(root, name, '.cadence/raf.yaml'), 'lots: []\n');
     };
     planned('tmp/l146-mut');
     planned('groupe/tmp/copie');
@@ -313,8 +313,8 @@ describe('cadence lead tour', () => {
 
   it("L241 — cadence lead tour et readPlans ne comptent pas les copies sous tmp/", async () => {
     const { root } = await parent();
-    mkdirSync(join(root, 'tmp/copie/docs/plan'), { recursive: true });
-    writeFileSync(join(root, 'tmp/copie/docs/plan/raf.yaml'), 'lots: []\n');
+    mkdirSync(join(root, 'tmp/copie/.cadence'), { recursive: true });
+    writeFileSync(join(root, 'tmp/copie/.cadence/raf.yaml'), 'lots: []\n');
     const { out } = await cad(root, 'lead', 'tour', '--depth', '2');
     expect(out).not.toContain('tmp/copie');
     expect([...readPlans(root, () => {}).keys()]).not.toContain('tmp/copie');

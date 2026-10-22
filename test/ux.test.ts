@@ -41,7 +41,7 @@ describe('revue UX', () => {
     expect((await raf(dir, 'check')).out).toContain('L1 est visible et terminé sans revue UX');
 
     expect((await raf(dir, 'ux', 'L1', 'conforme', 'après', 'correction', 'du', 'contraste')).code).toBe(0);
-    const yaml = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const yaml = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
     expect(yaml).toContain('uxSince: 2026-09-28');
     expect(yaml).toContain('ux: { date: 2026-09-28, verdict: conforme après correction du contraste }');
     expect((await raf(dir, 'check')).out).not.toContain('revue UX');
@@ -78,7 +78,7 @@ describe('revue UX', () => {
       expect(r.code).toBe(2);
       expect(r.err).toBe('raf: verdict vide : la revue UX attend son verdict — raf ux L1 "verdict"');
     }
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('ux:');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).not.toContain('ux:');
     expect((await raf(dir, 'done', 'L1')).code).toBe(2);
   });
 
@@ -89,7 +89,7 @@ describe('revue UX', () => {
       await raf(dir, 'ux', 'enable');
       await raf(dir, 'add', 'Écran', '--visible');
       await raf(dir, 'start', 'L1');
-      const path = join(dir, 'docs/plan/raf.yaml');
+      const path = join(dir, '.cadence/raf.yaml');
       writeFileSync(path, readFileSync(path, 'utf8').replace('    status: doing\n', `    status: doing\n    ux: ${written}\n`));
       const refused = await raf(dir, 'done', 'L1');
       expect(refused.code, written).toBe(2);
@@ -107,6 +107,6 @@ describe('revue UX', () => {
     const r = await raf(dir, 'ux', 'L1/t1', 'ok');
     expect(r.code).toBe(2);
     expect(r.err).toBe('raf: la revue UX se note sur un lot, pas une sous-tâche');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('ux:');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).not.toContain('ux:');
   });
 });

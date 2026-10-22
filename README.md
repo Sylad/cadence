@@ -15,7 +15,7 @@ Four [Claude Code](https://claude.com/claude-code) skills, three reviewer agents
 
 ```sh
 npm install -g @sylad/cadence    # or: npx -p @sylad/cadence raf …
-raf init                         # docs/plan/raf.yaml + a post-commit hook
+raf init                         # .cadence/raf.yaml + .cadence/notes/ + a post-commit hook
 raf add "My first lot" --estimate 1
 ```
 

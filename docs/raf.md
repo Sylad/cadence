@@ -2,8 +2,9 @@
 
 # raf
 
-- The plan is a YAML file in the repo (`docs/plan/raf.yaml`), edited by the CLI.
-  Your comments and hand edits are preserved.
+- The plan is a YAML file in the repo, edited by the CLI: `.cadence/raf.yaml` by default (versioned by git, never published with `docs/`),
+  with its notes in `.cadence/notes/`. Your comments and hand edits are preserved. A project that still has `docs/plan/raf.yaml` keeps it:
+  see [Where the plan is](#where-the-plan-is).
 - A commit belongs to a lot when its message cites the id: `feat(L3): …`,
   `fix: L3/t1 …`. The link is **computed from `git log`**, never stored, so
   committing never dirties the plan. The id is read as a whole word: `XL3`,
@@ -29,7 +30,7 @@
 ```sh
 npm install -g @sylad/cadence    # or: npx -p @sylad/cadence raf …
 
-raf init                          # docs/plan/raf.yaml + post-commit hook + .playwright-mcp/ in .gitignore
+raf init                          # .cadence/raf.yaml + .cadence/notes/.gitkeep + post-commit hook + .playwright-mcp/ in .gitignore
 raf add "Monthly dedup on merge" --estimate 2
 raf add "Typo in footer" --quickwin
 raf add "Loan cache" --after L1
@@ -39,7 +40,7 @@ git commit -m "feat(L1): dedup by calendar month"
 raf now                           # in progress, next up (quickwins first), recently done
 raf done L1/t1 && raf done L1
 raf check                         # exit 1 on drift
-raf gantt                         # docs/plan/gantt.html
+raf gantt                         # .cadence/gantt.html (next to the plan)
 ```
 
 ## Commands
@@ -80,7 +81,7 @@ hook:
 - `warn`: today's behaviour, the commit goes through, the post-commit hook warns.
 - `refuse`: the commit fails, loudly, with `raf start <id>` in the message (`--no-verify` still bypasses it).
 - `start`: the hook runs `raf start <id>` and stages the plan, so the plan change is **in the same commit** —
-  no amend afterwards, no dirty plan left behind. Only when `docs/plan/raf.yaml` is identical to `HEAD` (no
+  no amend afterwards, no dirty plan left behind. Only when the plan is identical to `HEAD` (no
   uncommitted change to the plan, staged or not): otherwise nothing is started, the hook says why
   (`plan modifié non commité : démarrage automatique sauté, raf start <id> à la main`) and behaves like `warn`.
 
@@ -91,6 +92,27 @@ pre-commit block to an existing repository. A read-only plan is never started by
 
 Global options: `--file path` or `RAF_FILE`; `RAF_TODAY=YYYY-MM-DD` to freeze
 the date. `cadence raf …` is the same as `raf …`.
+
+## Where the plan is
+
+The plan is resolved in this order: `--file`, then `RAF_FILE`, then the `plan:` key of `cadence.yaml`, then `.cadence/raf.yaml`,
+then the legacy `docs/plan/raf.yaml`.
+
+- `raf init` creates `.cadence/raf.yaml` and `.cadence/notes/` (with a `.gitkeep`, so git tracks the empty folder). It refuses
+  when a plan already exists where it would create one, a legacy `docs/plan/raf.yaml` included: it never creates a second plan
+  beside it. With `plan: path` in `cadence.yaml`, or `--file`, the plan and nothing else is created there.
+- A project that still has `docs/plan/raf.yaml` (and no `.cadence/raf.yaml`) keeps working, read and written as before. Every command
+  that loads the plan prints one line on **stderr** (standard output, `--json` included, is unchanged) with the move to do —
+  `git mv docs/plan/raf.yaml .cadence/raf.yaml` (`mv` outside a git repository). `raf` never moves the file itself. The line is not
+  printed when the path comes from `--file`, `RAF_FILE` or `plan:`.
+- When both files exist, `.cadence/raf.yaml` is read and a stderr warning says that `docs/plan/raf.yaml` is ignored; nothing is written
+  or deleted.
+- `.cadence/` is versioned, except `.cadence/runs/` (the state of the waves) and `.cadence/corrections.json` (the cache of
+  `cadence corrections`): `cadence orchestrate` adds those two to `.git/info/exclude` (it replaces the `/.cadence/` line an older
+  version wrote there) and the clean-tree guard ignores them, but a change to `.cadence/raf.yaml` or `.cadence/notes/` counts.
+- `raf gantt` writes `gantt.html` next to the plan, so `.cadence/gantt.html` by default.
+- `cadence lead tour`, `session --all` and `cadence orchestrate` recognise a project by `.cadence/raf.yaml`, `docs/plan/raf.yaml` or a
+  `cadence.yaml` with `plan:`.
 
 ## Plan file
 

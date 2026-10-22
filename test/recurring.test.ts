@@ -21,7 +21,7 @@ function raf(dir: string, today: string, ...argv: string[]) {
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
-const fresh = () => Plan.create(join(tempDir(), 'docs/plan/raf.yaml'), 'demo');
+const fresh = () => Plan.create(join(tempDir(), '.cadence/raf.yaml'), 'demo');
 
 describe('lot récurrent — modèle', () => {
   it('add --every pose la périodicité ; did pose last et une note', () => {
@@ -139,7 +139,7 @@ describe('raf — lots récurrents', () => {
     const r = raf(dir, '2026-09-01', 'add', 'sous', '--parent', 'L1', '--every', '7');
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/--every/);
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     expect(plan.lots()).toHaveLength(1);
     expect(readFileSync(plan.path, 'utf8')).not.toMatch(/every: 7|tasks:/);
   });

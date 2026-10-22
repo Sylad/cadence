@@ -18,7 +18,7 @@ function raf(dir: string, ...argv: string[]) {
 
 describe('champ screen des lots (L169, spec etape-spec S1)', () => {
   it('Plan.add écrit screen juste après visible, et le relit', () => {
-    const p = Plan.create(join(tempDir(), 'docs/plan/raf.yaml'), 'demo');
+    const p = Plan.create(join(tempDir(), '.cadence/raf.yaml'), 'demo');
     p.add('Page match', T, { visible: true, screen: 'page' });
     p.save();
     expect(readFileSync(p.path, 'utf8')).toMatch(/visible: true\n\s+screen: page\n/);
@@ -26,7 +26,7 @@ describe('champ screen des lots (L169, spec etape-spec S1)', () => {
   });
 
   it('Plan.add refuse un screen inconnu et un screen sans visible', () => {
-    const p = Plan.create(join(tempDir(), 'docs/plan/raf.yaml'), 'demo');
+    const p = Plan.create(join(tempDir(), '.cadence/raf.yaml'), 'demo');
     expect(() => p.add('A', T, { visible: true, screen: 'ecran' as never })).toThrow(/page, component, journey/);
     expect(() => p.add('A', T, { screen: 'page' })).toThrow(/screen.*visible/);
   });
@@ -35,7 +35,7 @@ describe('champ screen des lots (L169, spec etape-spec S1)', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--project', 'demo');
     expect(raf(dir, 'add', 'Page', '--visible', '--screen', 'journey').out).toBe('L1');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('screen: journey');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toContain('screen: journey');
     const r = raf(dir, 'add', 'Autre', '--screen', 'page');
     expect(r.code).not.toBe(0);
     expect(r.err).toMatch(/--screen.*--visible/);
@@ -56,7 +56,7 @@ describe('champ screen des lots (L169, spec etape-spec S1)', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--project', 'demo');
     raf(dir, 'add', 'A', '--visible', '--public', 'Une page');
-    const file = join(dir, 'docs/plan/raf.yaml');
+    const file = join(dir, '.cadence/raf.yaml');
     const base = readFileSync(file, 'utf8');
     writeFileSync(file, base.replace('visible: true', 'visible: true\n    screen: page'));
     expect(raf(dir, 'check').out).not.toMatch(/L1 : screen/);
@@ -92,11 +92,11 @@ describe('screen dans un plan externe et sur une sous-tâche (L169)', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--project', 'demo');
     raf(dir, 'add', 'Lot', '--visible');
-    const before = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const before = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
     const r = raf(dir, 'add', 'sub', '--parent', 'L1', '--screen', 'page');
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/pas sur une sous-tâche/);
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(before);
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toBe(before);
   });
 });
 

@@ -153,7 +153,7 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     cli(s.repo, {}, 'init', '--project', 'demo');
     cli(s.repo, {}, 'add', 'Lot un');
     if (statut === 'doing') cli(s.repo, {}, 'start', 'L1');
-    commitPaths(s.repo, 'plan: L1', 'docs/plan/raf.yaml', '.gitignore');
+    commitPaths(s.repo, 'plan: L1', '.cadence/raf.yaml', '.cadence/notes/.gitkeep', '.gitignore');
     return s;
   }
 
@@ -165,13 +165,13 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     expect(r.code).toBe(0);
     expect(git(repo, 'log', '-2', '--format=%s').split('\n')[1]).toMatch(/^test\(L1\): acceptation rescellée/);
     expect(git(repo, 'status', '--porcelain').trim()).toBe('');
-    expect(readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')).toContain('le test contredit la fiche');
+    expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).toContain('le test contredit la fiche');
     expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
   });
 
   it('un plan tenu par un autre outil (lecture seule) : le rescellé réussit, la note du lot reste à la main du lead', () => {
     const { repo, a } = avecPlan();
-    writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: docs/plan/raf.yaml\n  lots: lots\n');
+    writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: .cadence/raf.yaml\n  lots: lots\n');
     writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
     const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'le test contredit la fiche');
     expect(r.err).toBe('');
@@ -216,7 +216,7 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       cli(s.repo, {}, 'start', 'L1');
       cli(s.repo, {}, 'start', 'L2');
       if (deuxieme === 'done') cli(s.repo, {}, 'done', 'L2', '--force');
-      commitPaths(s.repo, 'plan: L1 L2', 'docs/plan/raf.yaml', '.gitignore');
+      commitPaths(s.repo, 'plan: L1 L2', '.cadence/raf.yaml', '.gitignore');
       writeFileSync(join(s.repo, s.a.test), `${readFileSync(join(s.repo, s.a.test), 'utf8')}// corrigé\n`);
       return s;
     }
@@ -261,7 +261,7 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       const parent = tempDir();
       const { repo, a } = avecPlan('doing', parent);
       cli(repo, {}, 'add', 'Lot deux');
-      commitPaths(repo, 'plan: L2', 'docs/plan/raf.yaml', '.gitignore');
+      commitPaths(repo, 'plan: L2', '.cadence/raf.yaml', '.gitignore');
       corrige(repo, a.test);
       vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }, { project: 'ici', repo, lot: 'L2', status: 'queued' }]);
       const r = reseal(repo, a.test);
@@ -418,7 +418,7 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     expect(r.err).toMatch(/rescellé a eu lieu.*commit [0-9a-f]+.*note.*à commiter.*plan refusé/);
     expect(r.err).not.toMatch(/\n\s+at /);
     expect(git(repo, 'log', '-1', '--format=%s').trim()).toMatch(/^test\(L1\): acceptation rescellée/);
-    expect(readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')).toContain('le test contredit la fiche');
+    expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).toContain('le test contredit la fiche');
   });
 });
 
@@ -438,7 +438,7 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
     cli(s.repo, {}, 'start', 'L1');
     cli(s.repo, {}, 'done', 'L1', '--force');
     cli(s.repo, {}, 'start', 'L2');
-    commitPaths(s.repo, 'plan: L1 L2', 'docs/plan/raf.yaml', '.gitignore');
+    commitPaths(s.repo, 'plan: L1 L2', '.cadence/raf.yaml', '.cadence/notes/.gitkeep', '.gitignore');
     writeFileSync(join(s.repo, s.a.test), `${readFileSync(join(s.repo, s.a.test), 'utf8')}// test instable corrigé\n`);
     return s;
   }
@@ -453,7 +453,7 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
     expect(doc.vert).toBe(true);
     expect(doc.resceaux).toHaveLength(1);
     expect(doc.resceaux[0]).toMatchObject({ test: a.test, raison: 'onglet lu à « blank » en CI', date: '2026-10-13', porteur: 'L2' });
-    expect(readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')).toContain('onglet lu à « blank » en CI');
+    expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).toContain('onglet lu à « blank » en CI');
     expect(git(repo, 'status', '--porcelain').trim()).toBe('');
     expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
   });
@@ -466,7 +466,7 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
       const s = livre();
       cli(s.repo, {}, 'add', 'Lot trois');
       cli(s.repo, {}, 'start', 'L3');
-      commitPaths(s.repo, 'plan: L3', 'docs/plan/raf.yaml');
+      commitPaths(s.repo, 'plan: L3', '.cadence/raf.yaml');
       return s;
     }
     const reseal = (repo: string, test: string) => cli(repo, {}, 'spec', 'reseal', 'L1', test, '--reason', 'x', '--porteur', 'L2');
@@ -512,7 +512,7 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
     cli(repo, {}, 'add', 'Lot trois');
     cli(repo, {}, 'start', 'L3');
     cli(repo, {}, 'done', 'L3', '--force');
-    commitPaths(repo, 'plan: L3', 'docs/plan/raf.yaml');
+    commitPaths(repo, 'plan: L3', '.cadence/raf.yaml');
     const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L3');
     expect(r.code).not.toBe(0);
     expect(r.err).toMatch(/L3 n'est pas en cours/);
@@ -533,7 +533,7 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
     cli(s.repo, {}, 'start', 'L1');
     cli(s.repo, {}, 'done', 'L1', '--force');
     cli(s.repo, {}, 'start', 'L2');
-    commitPaths(s.repo, 'plan: L1 L2', 'docs/plan/raf.yaml', '.gitignore');
+    commitPaths(s.repo, 'plan: L1 L2', '.cadence/raf.yaml', '.gitignore');
     writeFileSync(join(s.repo, s.a.test), 'autre\n');
     const r = cli(s.repo, {}, 'spec', 'reseal', 'L1', s.a.test, '--reason', 'x', '--porteur', 'L2');
     expect(r.code).not.toBe(0);
@@ -543,7 +543,7 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
 
   it('les messages de sortie nomment le lot porteur pour la note, pas le lot livré (plan en lecture seule, puis cas nominal)', () => {
     const ro = livre();
-    writeFileSync(join(ro.repo, 'cadence.yaml'), 'plan:\n  path: docs/plan/raf.yaml\n  lots: lots\n');
+    writeFileSync(join(ro.repo, 'cadence.yaml'), 'plan:\n  path: .cadence/raf.yaml\n  lots: lots\n');
     const r1 = cli(ro.repo, {}, 'spec', 'reseal', 'L1', ro.a.test, '--reason', 'x', '--porteur', 'L2');
     expect(r1.err).toBe('');
     expect(r1.out).toMatch(/note à ajouter au lot L2 /);
@@ -564,7 +564,7 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
     cli(s.repo, {}, 'add', 'Lot deux');
     cli(s.repo, {}, 'start', 'L1');
     cli(s.repo, {}, 'start', 'L2');
-    commitPaths(s.repo, 'plan: L1 L2', 'docs/plan/raf.yaml', '.gitignore');
+    commitPaths(s.repo, 'plan: L1 L2', '.cadence/raf.yaml', '.gitignore');
     return s;
   }
 });
@@ -583,7 +583,7 @@ describe('rescellé atomique et interdit aux sessions', () => {
     cli('init', '--project', 'demo');
     cli('add', 'Lot un');
     cli('start', 'L1');
-    commitPaths(repo, 'plan: L1', 'docs/plan/raf.yaml', '.gitignore');
+    commitPaths(repo, 'plan: L1', '.cadence/raf.yaml', '.gitignore');
     writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
     const jsonAvant = readFileSync(join(repo, a.json), 'utf8');
     const testAvant = readFileSync(join(repo, a.test), 'utf8');
@@ -635,7 +635,7 @@ describe('cadence spec reseal avec une fiche amendée dans le lot (L217)', () =>
       cli(s.repo, {}, 'done', 'L1', '--force');
       cli(s.repo, {}, 'start', 'L2');
     }
-    commitPaths(s.repo, 'plan: lots', 'docs/plan/raf.yaml', '.gitignore');
+    commitPaths(s.repo, 'plan: lots', '.cadence/raf.yaml', '.cadence/notes/.gitkeep', '.gitignore');
     return s;
   }
   const amende = (repo: string, fiche: string, message: string, ajout = '# amendée\n') => {
@@ -757,7 +757,7 @@ describe('cadence spec reseal avec une fiche amendée dans le lot (L217)', () =>
     corrige(repo, a.test);
     expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x').code).toBe(0);
     expect(Object.keys(journal(repo, a.json)[0]!).sort()).toEqual(['apres', 'avant', 'date', 'raison', 'test']);
-    expect(readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')).toContain('fiche inchangée');
+    expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).toContain('fiche inchangée');
   });
 
   it('R5 — fiche amendée : la note du lot et le commit mentionnent « fiche amendée en <sha> »', () => {
@@ -765,7 +765,7 @@ describe('cadence spec reseal avec une fiche amendée dans le lot (L217)', () =>
     const sha = amende(repo, a.fiche, 'feat(L1): fiche');
     corrige(repo, a.test);
     expect(cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x').code).toBe(0);
-    const plan = readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8');
+    const plan = readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8');
     expect(plan).toContain(`fiche amendée en ${sha}`);
     expect(plan).not.toContain('fiche inchangée');
     expect(git(repo, 'log', '-2', '--format=%s').split('\n')[1]).toContain(`fiche amendée en ${sha}`);
@@ -881,7 +881,7 @@ describe('cadence spec reseal d’un lot livré, fiche amendée par un autre lot
     }
     cli(s.repo, {}, 'start', 'L2');
     cli(s.repo, {}, 'start', 'L4');
-    commitPaths(s.repo, 'plan: lots', 'docs/plan/raf.yaml', '.gitignore');
+    commitPaths(s.repo, 'plan: lots', '.cadence/raf.yaml', '.gitignore');
     return s;
   }
   const amende = (repo: string, fiche: string, message: string, ajout = `# amendée ${Math.random()}\n`) => {
@@ -977,7 +977,7 @@ describe('cadence spec reseal d’un lot livré, fiche amendée par un autre lot
     cli(s.repo, {}, 'add', 'Lot un');
     cli(s.repo, {}, 'add', 'Lot deux');
     cli(s.repo, {}, 'start', 'L1');
-    commitPaths(s.repo, 'plan: lots', 'docs/plan/raf.yaml', '.gitignore');
+    commitPaths(s.repo, 'plan: lots', '.cadence/raf.yaml', '.gitignore');
     const faute = amende(s.repo, s.a.fiche, 'docs(L2): fiche');
     corrige(s.repo, s.a.test);
     const r = cli(s.repo, {}, 'spec', 'reseal', 'L1', s.a.test, '--reason', 'x');
@@ -1003,7 +1003,7 @@ describe('cadence spec reseal d’un lot livré, fiche amendée par un autre lot
     cli(s.repo, {}, 'start', 'L2');
     cli(s.repo, {}, 'done', 'L2', '--force');
     cli(s.repo, {}, 'start', 'L1');
-    commitPaths(s.repo, 'plan: lots', 'docs/plan/raf.yaml', '.gitignore');
+    commitPaths(s.repo, 'plan: lots', '.cadence/raf.yaml', '.gitignore');
     const faute = amende(s.repo, s.a.fiche, 'fix(L2): fiche d’un lot livré');
     corrige(s.repo, s.a.test);
     const r = cli(s.repo, {}, 'spec', 'reseal', 'L1', s.a.test, '--reason', 'x');

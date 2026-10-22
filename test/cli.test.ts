@@ -25,11 +25,11 @@ describe('raf public', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--project', 'demo');
     expect(raf(dir, 'add', 'Titre', 'technique', '--visible', '--public', 'Une nouveauté').out).toBe('L1');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('public: Une nouveauté');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toContain('public: Une nouveauté');
     expect(raf(dir, 'public', 'L1', 'Autre', 'titre').code).toBe(0);
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('public: Autre titre');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toContain('public: Autre titre');
     expect(raf(dir, 'public', 'L1', '--clear').code).toBe(0);
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('public:');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).not.toContain('public:');
   });
 
   it('raf public refuse sans titre ni --clear, et un lot inconnu', () => {
@@ -43,7 +43,7 @@ describe('raf public', () => {
 });
 
 describe('raf screen', () => {
-  const yaml = (dir: string) => readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+  const yaml = (dir: string) => readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
 
   it('pose screen: sur un lot visible existant, le remplace, puis le retire avec none', () => {
     const dir = gitRepo();
@@ -99,11 +99,11 @@ describe('raf public --clear', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--project', 'demo');
     raf(dir, 'add', 'A', '--public', 'Existant');
-    const avant = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const avant = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
     const r = raf(dir, 'public', 'L1', 'Titre', '--clear');
     expect(r.code).not.toBe(0);
     expect(r.err).toContain('--clear');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(avant);
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toBe(avant);
   });
 });
 
@@ -139,7 +139,7 @@ describe('raf CLI', () => {
   it('runs a full lot lifecycle', () => {
     const dir = gitRepo();
     expect(raf(dir, 'init', '--project', 'demo').code).toBe(0);
-    expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(true);
+    expect(existsSync(join(dir, '.cadence/raf.yaml'))).toBe(true);
     expect(raf(dir, 'add', 'Cache', 'des', 'prêts', '--estimate', '2').out).toBe('L1');
     expect(raf(dir, 'add', 'Petit', 'correctif', '--quickwin').out).toBe('L2');
     expect(raf(dir, 'add', 'Après', 'le', 'cache', '--after', 'L1').out).toBe('L3');
@@ -157,7 +157,7 @@ describe('raf CLI', () => {
     expect(raf(dir, 'done', 'L1').code).toBe(0);
     raf(dir, 'drop', 'L2', '--reason', 'plus utile');
     raf(dir, 'note', 'L3', 'à', 'découper');
-    const yaml = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const yaml = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
     expect(yaml).toContain('text: "abandonné : plus utile"');
     expect(yaml).toContain('text: à découper');
     expect(raf(dir, 'list', '--status', 'todo').out).toMatch(/^L3 +todo +Après le cache$/);
@@ -187,12 +187,12 @@ describe('raf CLI', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--no-hook');
     raf(dir, 'add', 'A');
-    const before = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const before = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
     commit(dir, 'feat(L1): a');
     expect(raf(dir, 'hook', 'post-commit').err).toContain('L1 est encore todo');
     commit(dir, 'wip');
     expect(raf(dir, 'hook', 'post-commit').err).toContain('commit sans lot');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(before);
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toBe(before);
   });
 
   it('(L15/t2) post-commit : seule la portée décide des lots annoncés, pas les mentions en passage', () => {
@@ -224,7 +224,7 @@ describe('raf CLI', () => {
     raf(dir, 'add', '</script><img src=x onerror=alert(1)>');
     const path = raf(dir, 'gantt').out;
     const html = readFileSync(path, 'utf8');
-    expect(path).toBe(join(dir, 'docs/plan/gantt.html'));
+    expect(path).toBe(join(dir, '.cadence/gantt.html'));
     expect(html).not.toMatch(/<script[^>]+src=|<link[^>]+href=|https?:\/\/(?!www\.w3\.org)/);
     expect(html.match(/<\/script>/g)).toHaveLength(2);
     const json = /<script type="application\/json" id="raf-data">(.*?)<\/script>/s.exec(html)![1];
@@ -239,7 +239,7 @@ describe('adoption date', () => {
     const dir = gitRepo();
     commit(dir, 'feat: ancien travail', '2026-09-20T10:00:00');
     raf(dir, 'init', '--no-hook');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('since: 2026-09-28');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toContain('since: 2026-09-28');
     expect(raf(dir, 'check').code).toBe(0);
     commit(dir, 'feat: nouveau travail sans lot', '2026-09-28T08:00:00');
     expect(raf(dir, 'check').out).toContain('commit sans lot');
@@ -251,7 +251,7 @@ describe('plan-only commits', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--no-hook');
     raf(dir, 'add', 'A');
-    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    execFileSync('git', ['add', '.cadence/raf.yaml'], { cwd: dir });
     commit(dir, 'chore: plan raf');
     expect(raf(dir, 'check').code).toBe(0);
     expect(raf(dir, 'hook', 'post-commit').err).toBe('');
@@ -267,7 +267,7 @@ describe('(L94) --config hors du dépôt, qa.expectations absolu dans le dépôt
     const dir = gitRepo();
     raf(dir, 'init', '--no-hook');
     raf(dir, 'add', 'A');
-    execFileSync('git', ['add', 'docs/plan/raf.yaml'], { cwd: dir });
+    execFileSync('git', ['add', '.cadence/raf.yaml'], { cwd: dir });
     commit(dir, 'chore: plan raf');
     mkdirSync(join(dir, 'docs/quality'), { recursive: true });
     writeFileSync(join(dir, 'docs/quality/pages.md'), 'attendus\n');
@@ -488,7 +488,7 @@ describe('titre public trop long (L106)', () => {
     expect(r.code).not.toBe(0);
     expect(r.err).toContain('88');
     expect(r.err).toContain('80');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('public:');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).not.toContain('public:');
     expect(raf(dir, 'add', 'B', '--public', long).code).not.toBe(0);
     expect(raf(dir, 'news', 'new', 'L1', '--title', long).code).not.toBe(0);
     expect(raf(dir, 'public', 'L1', 'y'.repeat(80)).code).toBe(0);
@@ -500,11 +500,11 @@ describe('titre public trop long (L106)', () => {
     expect(raf(dir, 'public', 'L1', long).code).toBe(0); // sans clé : rien n'est refusé
     expect(raf(dir, 'done', 'L1').code).toBe(0);
     const dir2 = setup('news:\n  publicTitleMax: 60\n');
-    writeFileSync(join(dir2, 'docs/plan/raf.yaml'), readFileSync(join(dir2, 'docs/plan/raf.yaml'), 'utf8').replace('title: A', `title: A\n    public: ${'y'.repeat(70)}`));
+    writeFileSync(join(dir2, '.cadence/raf.yaml'), readFileSync(join(dir2, '.cadence/raf.yaml'), 'utf8').replace('title: A', `title: A\n    public: ${'y'.repeat(70)}`));
     const r = raf(dir2, 'done', 'L1');
     expect(r.code).not.toBe(0);
     expect(r.err).toContain('70');
-    expect(readFileSync(join(dir2, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('status: done');
+    expect(readFileSync(join(dir2, '.cadence/raf.yaml'), 'utf8')).not.toContain('status: done');
   });
 
   it('raf check ne signale rien sans clé déclarée ni dossier de Nouveautés : aucun site ne publie ce titre', () => {
@@ -534,7 +534,7 @@ describe('titre public trop long (L106)', () => {
   it('la clé déclarée l\'emporte sur l\'absence du dossier de Nouveautés : raf check signale même sans docs/nouveautes', () => {
     const dir = setup('news:\n  publicTitleMax: 60\n');
     // raf public refuse lui-même au-delà de la clé : le public: s'écrit à la main, comme un titre venu d'ailleurs
-    writeFileSync(join(dir, 'docs/plan/raf.yaml'), readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8').replace('title: A', `title: A\n    public: ${'z'.repeat(70)}`));
+    writeFileSync(join(dir, '.cadence/raf.yaml'), readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8').replace('title: A', `title: A\n    public: ${'z'.repeat(70)}`));
     const r = raf(dir, 'check');
     expect(r.out).toContain('L1');
     expect(r.out).toContain('70');
@@ -581,14 +581,14 @@ describe('titre public trop long (L106)', () => {
     const r = raf(dir, 'done', 'L1', '--force');
     expect(r.code).not.toBe(0);
     expect(r.err).toContain('88');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).not.toContain('status: done');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).not.toContain('status: done');
     raf(dir, 'public', 'L1', 'court');
     expect(raf(dir, 'done', 'L1', '--force').code).toBe(0);
   });
 
   it('news new sans --title refuse un titre de lot trop long et propose --title', () => {
     const dir = setup('news:\n  publicTitleMax: 80\n');
-    writeFileSync(join(dir, 'docs/plan/raf.yaml'), readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8').replace('title: A', `title: ${long}`));
+    writeFileSync(join(dir, '.cadence/raf.yaml'), readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8').replace('title: A', `title: ${long}`));
     const r = raf(dir, 'news', 'new', 'L1');
     expect(r.code).not.toBe(0);
     expect(r.err).toContain('--title');

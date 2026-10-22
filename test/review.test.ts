@@ -86,7 +86,7 @@ describe('plan file robustness', () => {
   it('accepts project names YAML would otherwise choke on', () => {
     const dir = gitRepo();
     raf(dir, ['init', '--no-hook', '--project', '@sylad/cadence #2']);
-    expect(Plan.load(join(dir, 'docs/plan/raf.yaml')).project).toBe('@sylad/cadence #2');
+    expect(Plan.load(join(dir, '.cadence/raf.yaml')).project).toBe('@sylad/cadence #2');
     expect(raf(tempDir(), ['init', '--no-hook', '--prefix', 'L:'], {}).code).toBe(2);
   });
 
@@ -95,7 +95,7 @@ describe('plan file robustness', () => {
     raf(dir, ['init', '--no-hook']);
     raf(dir, ['add', 'a']);
     raf(dir, ['start', 'L1']);
-    const path = join(dir, 'docs/plan/raf.yaml');
+    const path = join(dir, '.cadence/raf.yaml');
     writeFileSync(path, readFileSync(path, 'utf8').replace('started: 2026-09-28', 'started: 2026-9-3'));
     expect(raf(dir, ['check']).out).toContain('started « 2026-9-3 »');
     expect(raf(dir, ['gantt']).code).toBe(0);

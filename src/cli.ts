@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { execFileSync } from 'node:child_process';
 import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig } from './config.js';
+import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
 import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
@@ -35,6 +35,8 @@ export interface Io {
   env: NodeJS.ProcessEnv;
   out: (line: string) => void;
   err: (line: string) => void;
+  /** Avis qui ne sont pas des erreurs (plan hérité, L246) ; absent : `err`. `session --all` y met la vraie sortie d'erreur, pas sa sortie standard. */
+  notice?: (line: string) => void;
   now: () => Date;
 }
 
@@ -60,7 +62,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf list [--status todo|doing|done|dropped]
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot (ou citant un id inconnu) sans réécrire l'historique ; raf check --ignored les liste
-  raf gantt [-o docs/plan/gantt.html]
+  raf gantt [-o .cadence/gantt.html]
   raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--dry-run] [--wave nom] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--budget projet:lot=+300k] [--answer projet:lot "réponse"] [--drop projet:lot] ; --drop projet:lot [--wave vague] ; --stop-after-current [--wave vague] ; --waits [--since AAAA-MM-JJ]
   cadence lead tour [dossier] [--idle 3] [--depth n] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier seul s'il est lui-même un projet (en cours, dérive, notes de clôture, prochain lot prêt, dépôt), précédées de l'en-tête perf : une ligne par ⚠ de cadence perf, rien si tout est stable
@@ -77,7 +79,7 @@ Un commit qui ne touche que le plan, la clé plan: de cadence.yaml (deliver/sess
 publié par exemple, ainsi que le fichier d'attendus QA : docs/qa/expectations.md ou qa.expectations) n'a pas à en citer, et ne compte pas pour les lots qu'il cite ; le sujet n'y change rien.
 Un lot --visible attend une entrée Nouveautés (docs/nouveautes/, --dir) avec capture ; raf check le vérifie.
 Un texte qui commence par « - » se passe après « -- » : raf note L1 -- "-5 %".
-Le plan est docs/plan/raf.yaml, ou celui que nomme « plan: » dans cadence.yaml ; un plan tenu par un
+Le plan est .cadence/raf.yaml (versionné, jamais publié avec docs/ ; un docs/plan/raf.yaml hérité reste lu, raf propose le git mv), ou celui que nomme « plan: » dans cadence.yaml ; un plan tenu par un
 autre outil se lit sans migration (correspondance des champs, voir docs/raf.md du paquet @sylad/cadence) et reste en lecture seule.
 Options communes : --file chemin (ou RAF_FILE), RAF_TODAY=AAAA-MM-JJ pour figer la date.`;
 
@@ -89,6 +91,12 @@ export function ensureGitignore(root: string, line: string): boolean {
   if (text.split('\n').some((l) => norm(l) === norm(line))) return false;
   writeFileSync(file, `${text}${text === '' || text.endsWith('\n') ? '' : '\n'}${line}\n`);
   return true;
+}
+
+/** La ligne stderr d'un docs/plan/raf.yaml hérité : le déplacement proposé (jamais fait), ou l'avertissement quand .cadence/raf.yaml existe aussi. */
+function legacyPlanLine(root: string, legacy: 'read' | 'ignored'): string {
+  if (legacy === 'ignored') return `raf: ${PLAN_LEGACY} est ignoré : ${PLAN_DEFAULT} existe aussi et fait foi (supprimer ou fusionner l'ancien)`;
+  return `raf: ${PLAN_LEGACY} est l'ancien emplacement du plan ; le déplacer : ${gitRoot(root) ? 'git mv' : 'mv'} ${PLAN_LEGACY} ${PLAN_DEFAULT}`;
 }
 
 export function run(argv: string[], io: Io): number | Promise<number> {
@@ -182,7 +190,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     if (!existsSync(parent)) throw new RafError(`lead tour : dossier introuvable : ${parent}`);
     const rows = leadTour(parent, today, idle, depth);
     if (values.json) io.out(JSON.stringify(rows, null, 2));
-    else if (rows.length === 0) io.out(`aucun projet sous ${parent} (docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
+    else if (rows.length === 0) io.out(`aucun projet sous ${parent} (.cadence/raf.yaml, docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
     else {
       // L'en-tête perf (L227) : un ⚠ par ligne avant les projets ; un dossier que perf ne lit pas n'en donne pas, et ses avertissements ne sont pas repris.
       try {
@@ -216,7 +224,11 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   // Installer les skills ou le hook ne lit pas le plan : un cadence.yaml fautif ne doit pas l'empêcher.
   const installing = command === 'skills' || (command === 'hook' && rest[0] === 'install');
   const planConfig = installing ? null : readPlanConfig(configPath, root);
-  const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? resolve(root, planConfig?.path ?? 'docs/plan/raf.yaml'));
+  // Le défaut (ni --file, ni RAF_FILE, ni plan:) : .cadence/raf.yaml, ou le docs/plan/raf.yaml hérité, dont le déplacement est proposé sur stderr (L246).
+  const chosen = values.file ?? io.env.RAF_FILE ?? planConfig?.path;
+  const fallback = chosen === undefined ? defaultPlan(root) : null;
+  const planPath = resolve(io.cwd, chosen ?? fallback!.path);
+  if (fallback?.legacy && !installing) (io.notice ?? io.err)(legacyPlanLine(root, fallback.legacy));
   const loadPlan = () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
   const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));
   // Limite DÉCLARÉE (news.publicTitleMax) : sans clé, seul « raf check » avertit ; avec, la pose d'un titre public est refusée.
@@ -238,6 +250,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (planConfig?.settings.format) throw new RafError(`plan en lecture seule : ${configPath} décrit un plan tenu par un autre outil`);
       const plan = Plan.create(planPath, values.project ?? basename(root), values.prefix ?? 'L', today);
       io.out(`plan créé : ${plan.path}`);
+      if (chosen === undefined) {
+        mkdirSync(join(root, '.cadence/notes'), { recursive: true });
+        writeFileSync(join(root, '.cadence/notes/.gitkeep'), '');
+      }
       if (ensureGitignore(root, '.playwright-mcp/')) io.out('.gitignore : .playwright-mcp/');
       if (!values['no-hook'] && gitRoot(io.cwd)) io.out(`hook : ${installHook(io.cwd).path}`);
       return 0;
@@ -1012,7 +1028,7 @@ async function sessionAll(rest: string[], values: { all?: boolean; depth?: strin
   if (values.idle !== undefined && !(Number.isInteger(Number(values.idle)) && Number(values.idle) >= 0)) throw new RafError(`--idle invalide : ${values.idle}`);
   const projects = findProjects(io.cwd, depth);
   if (projects.length === 0) {
-    io.out(`aucun projet sous ${io.cwd} (docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
+    io.out(`aucun projet sous ${io.cwd} (.cadence/raf.yaml, docs/plan/raf.yaml ou cadence.yaml avec plan:)`);
     return 0;
   }
   const argv = ['session', sub, ...(values.since === undefined ? [] : [`--since=${values.since}`]), ...(values.idle === undefined ? [] : ['--idle', values.idle])];
@@ -1028,7 +1044,7 @@ async function sessionAll(rest: string[], values: { all?: boolean; depth?: strin
       continue;
     }
     try {
-      code = await run(argv, { ...io, cwd: dir, err: (l) => io.out(`✗ ${l}`) });
+      code = await run(argv, { ...io, cwd: dir, err: (l) => io.out(`✗ ${l}`), notice: io.notice ?? io.err });
     } catch (e) {
       io.out(`✗ ${e instanceof Error ? e.message : String(e)}`);
       code = 2;

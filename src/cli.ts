@@ -7,7 +7,7 @@ import { repoSections, repoShas, resolveLotRepos } from './repos.js';
 import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
-import { deliver, parseDeliverConfig, realDeps } from './deliver.js';
+import { deliver, parseDeliverConfig, realDeps, shellQuote } from './deliver.js';
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
@@ -79,7 +79,7 @@ Un commit qui ne touche que le plan, la clé plan: de cadence.yaml (deliver/sess
 publié par exemple, ainsi que le fichier d'attendus QA : docs/qa/expectations.md ou qa.expectations) n'a pas à en citer, et ne compte pas pour les lots qu'il cite ; le sujet n'y change rien.
 Un lot --visible attend une entrée Nouveautés (docs/nouveautes/, --dir) avec capture ; raf check le vérifie.
 Un texte qui commence par « - » se passe après « -- » : raf note L1 -- "-5 %".
-Le plan est .cadence/raf.yaml (versionné, jamais publié avec docs/ ; un docs/plan/raf.yaml hérité reste lu, raf propose le git mv), ou celui que nomme « plan: » dans cadence.yaml ; un plan tenu par un
+Le plan est .cadence/raf.yaml (versionné, jamais publié avec docs/ ; un docs/plan/raf.yaml hérité reste lu, raf propose le git mv, avec cd <racine> pour qu'il s'exécute de n'importe quel dossier), ou celui que nomme « plan: » dans cadence.yaml ; un plan tenu par un
 autre outil se lit sans migration (correspondance des champs, voir docs/raf.md du paquet @sylad/cadence) et reste en lecture seule.
 Options communes : --file chemin (ou RAF_FILE), RAF_TODAY=AAAA-MM-JJ pour figer la date.`;
 
@@ -93,10 +93,14 @@ export function ensureGitignore(root: string, line: string): boolean {
   return true;
 }
 
-/** La ligne stderr d'un docs/plan/raf.yaml hérité : le déplacement proposé (jamais fait), ou l'avertissement quand .cadence/raf.yaml existe aussi. */
+/**
+ * La ligne stderr d'un docs/plan/raf.yaml hérité : le déplacement proposé (jamais fait), ou l'avertissement quand .cadence/raf.yaml existe aussi.
+ * La commande proposée commence par `cd <racine>` : elle s'exécute telle quelle depuis n'importe quel dossier (et non depuis la racine
+ * seulement) et, sous `session --all`, elle nomme le projet dont il s'agit.
+ */
 function legacyPlanLine(root: string, legacy: 'read' | 'ignored'): string {
   if (legacy === 'ignored') return `raf: ${PLAN_LEGACY} est ignoré : ${PLAN_DEFAULT} existe aussi et fait foi (supprimer ou fusionner l'ancien)`;
-  return `raf: ${PLAN_LEGACY} est l'ancien emplacement du plan ; le déplacer : mkdir -p ${dirname(PLAN_DEFAULT)} && ${gitRoot(root) ? 'git mv' : 'mv'} ${PLAN_LEGACY} ${PLAN_DEFAULT}`;
+  return `raf: ${PLAN_LEGACY} est l'ancien emplacement du plan ; le déplacer : cd ${shellQuote(root)} && mkdir -p ${dirname(PLAN_DEFAULT)} && ${gitRoot(root) ? 'git mv' : 'mv'} ${PLAN_LEGACY} ${PLAN_DEFAULT}`;
 }
 
 export function run(argv: string[], io: Io): number | Promise<number> {

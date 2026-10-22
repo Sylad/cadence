@@ -259,7 +259,7 @@ function substitute(text: string, sha: string): string {
 }
 
 /** Argument rendu tel quel au script par sh, quels que soient ses espaces, guillemets ou jokers. */
-function shellQuote(arg: string): string {
+export function shellQuote(arg: string): string {
   return /^[A-Za-z0-9_@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`;
 }
 

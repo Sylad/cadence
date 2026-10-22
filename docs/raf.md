@@ -103,7 +103,8 @@ then the legacy `docs/plan/raf.yaml`.
   beside it. With `plan: path` in `cadence.yaml`, or `--file`, the plan and nothing else is created there.
 - A project that still has `docs/plan/raf.yaml` (and no `.cadence/raf.yaml`) keeps working, read and written as before. Every command
   that loads the plan prints one line on **stderr** (standard output, `--json` included, is unchanged) with the move to do —
-  `mkdir -p .cadence && git mv docs/plan/raf.yaml .cadence/raf.yaml` (`mv` outside a git repository). `raf` never moves the file itself. The line is not
+  `cd <repository root> && mkdir -p .cadence && git mv docs/plan/raf.yaml .cadence/raf.yaml` (`mv` outside a git repository; the root is spelled out, quoted if
+  needed, so the line runs as is from any folder and, under `session --all`, names its project). `raf` never moves the file itself. The line is not
   printed when the path comes from `--file`, `RAF_FILE` or `plan:`.
 - When both files exist, `.cadence/raf.yaml` is read and a stderr warning says that `docs/plan/raf.yaml` is ignored; nothing is written
   or deleted.
@@ -147,6 +148,8 @@ format, and the plan stays writable:
 ```yaml
 plan: planning/todo.yaml
 ```
+
+A relative `plan:` path is read from the repository root, whatever folder you run `raf` from; `--file` and `RAF_FILE` are read from the current folder.
 
 A project that publishes its plan (a JSON generated from it and committed with it)
 declares that file, so a commit touching only the plan and its published copy is

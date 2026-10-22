@@ -108,15 +108,34 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     expect(existsSync(join(dir, '.cadence/raf.yaml'))).toBe(false);
   });
 
-  it('R5 — la ligne de déplacement est exécutable telle quelle, sans .cadence/ préexistant', () => {
+  it('R5 — la ligne de déplacement nomme la racine du projet et s\'exécute telle quelle depuis un sous-dossier, sans .cadence/ préexistant', () => {
     const dir = legacyRepo();
+    mkdirSync(join(dir, 'src'));
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-m', 'init');
+    // la ligne est émise depuis un sous-dossier : la racine vient du dépôt, pas du dossier courant
+    const line = raf(join(dir, 'docs/plan'), ['list']).err.split('\n').find((l) => l.includes(MOVE))!;
+    const cmd = line.slice(line.indexOf('déplacer : ') + 'déplacer : '.length);
+    expect(cmd).toBe(`cd ${dir} && mkdir -p .cadence && ${MOVE}`);
+    execFileSync('bash', ['-c', cmd], { cwd: join(dir, 'src'), stdio: 'pipe' });
+    expect(existsSync(join(dir, '.cadence/raf.yaml'))).toBe(true);
+    expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(false);
+    expect(existsSync(join(dir, 'src/.cadence'))).toBe(false);
+  });
+
+  it('R5 — la ligne de déplacement protège une racine qui contient des espaces', () => {
+    const parent = tempDir();
+    mkdirSync(join(parent, 'mon projet'));
+    const dir = join(parent, 'mon projet');
+    git(dir, 'init', '-q', '-b', 'main');
+    Plan.create(join(dir, 'docs/plan/raf.yaml'), 'demo', 'L', '2026-10-01').save();
     git(dir, 'add', '-A');
     git(dir, 'commit', '-m', 'init');
     const line = raf(dir, ['list']).err.split('\n').find((l) => l.includes(MOVE))!;
     const cmd = line.slice(line.indexOf('déplacer : ') + 'déplacer : '.length);
-    execFileSync('bash', ['-c', cmd], { cwd: dir, stdio: 'pipe' });
+    expect(cmd).toContain(`cd '${dir}' &&`);
+    execFileSync('bash', ['-c', cmd], { cwd: parent, stdio: 'pipe' });
     expect(existsSync(join(dir, '.cadence/raf.yaml'))).toBe(true);
-    expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(false);
   });
 
   it('R12 — après le git mv proposé, les commits du plan hérité et du déplacement restent des commits de plan seul', () => {
@@ -157,7 +176,7 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
   it('R5 — hors dépôt git, la ligne propose mv', () => {
     const dir = tempDir();
     Plan.create(join(dir, 'docs/plan/raf.yaml'), 'demo', 'L', '2026-10-01');
-    expect(raf(dir, ['list']).err).toContain('mv docs/plan/raf.yaml .cadence/raf.yaml');
+    expect(raf(dir, ['list']).err).toContain(`cd ${dir} && mkdir -p .cadence && mv docs/plan/raf.yaml .cadence/raf.yaml`);
     expect(raf(dir, ['list']).err).not.toContain('git mv');
   });
 
@@ -174,7 +193,7 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     await run(['session', 'start', '--all'], { cwd: root, env: { RAF_TODAY: '2026-10-22' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-22T09:00:00') });
     expect(out.join('\n')).toContain('## alpha');
     expect(out.join('\n')).not.toContain('ancien emplacement');
-    expect(err.join('\n')).toContain(MOVE);
+    expect(err.join('\n')).toContain(`cd ${dir} && mkdir -p .cadence && ${MOVE}`);
   });
 
   it('R5 — --file ou plan: vers docs/plan/raf.yaml : aucune ligne de déplacement', () => {

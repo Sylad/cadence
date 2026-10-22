@@ -3,7 +3,7 @@ sujet:
   titre: "Plan par défaut dans .cadence/ (versionné), docs/plan/ lu tant qu'il n'est pas déplacé"
   lot: L246
   perimetre:
-    modules: [src/cli.ts, src/config.ts, src/lead.ts, src/orchestrate/state.ts, src/orchestrate/guard.ts, src/orchestrate/command.ts (isProject l.239, refus l.258)]
+    modules: [src/cli.ts, src/config.ts, src/audit.ts, src/lead.ts, src/orchestrate/state.ts, src/orchestrate/guard.ts, src/orchestrate/command.ts (isProject l.239, refus l.258)]
     endpoints: []
     jobs: []
     hors_perimetre:
@@ -34,7 +34,7 @@ cas:
       - "docs/plan/raf.yaml existe, .cadence/raf.yaml n'existe pas, ni --file, ni RAF_FILE, ni plan: ne désignent un chemin"
     nominal:
       - "Le plan lu est docs/plan/raf.yaml, lisible et écrivable comme avant."
-      - "Une ligne sur stderr propose : git mv docs/plan/raf.yaml .cadence/raf.yaml (ou mv hors dépôt git)."
+      - "Une ligne sur stderr propose, exécutable depuis n'importe quel dossier et nommant le projet : cd <racine absolue du dépôt> && mkdir -p .cadence && git mv docs/plan/raf.yaml .cadence/raf.yaml (mv hors dépôt git)."
       - "La sortie standard, dont --json, est inchangée."
     alternatives:
       - { si: ".cadence/raf.yaml existe aussi", alors: "il est lu, et une ligne dit que docs/plan/raf.yaml est ignoré", regles: [R4] }
@@ -93,10 +93,12 @@ regles:
     tests: ["R2 — raf init avec docs/plan/raf.yaml présent : refus « existe déjà », aucun .cadence/raf.yaml créé"]
   - id: R3
     cas: [C1, C3]
-    enonce: "plan: <chemin> dans cadence.yaml, --file et RAF_FILE l'emportent sur le défaut ; init crée alors le plan à ce chemin, sans toucher .cadence/."
+    enonce: "plan: <chemin> dans cadence.yaml, --file et RAF_FILE l'emportent sur le défaut ; init crée alors le plan à ce chemin, sans toucher .cadence/. Un plan: relatif se résout depuis la racine du dépôt (celle de cadence.yaml), quel que soit le dossier de lancement ; --file et RAF_FILE se résolvent depuis le dossier courant."
     statut: sourcee
     source: "src/cli.ts:219 (--file > RAF_FILE > plan: > défaut)"
-    tests: ["R3 — init avec plan: x/plan.yaml crée x/plan.yaml et pas .cadence/raf.yaml"]
+    tests:
+      - "R3 — init avec plan: x/plan.yaml crée x/plan.yaml et pas .cadence/raf.yaml"
+      - "R3 — plan: x/plan.yaml relatif, lancé depuis un sous-dossier : résolu depuis la racine du dépôt, --file et RAF_FILE depuis le dossier courant"
   - id: R4
     cas: [C2]
     enonce: "Quand .cadence/raf.yaml et docs/plan/raf.yaml existent tous deux, .cadence/raf.yaml est lu et un avertissement stderr nomme les deux fichiers et signale que docs/plan/raf.yaml est ignoré ; rien n'est écrit ni supprimé."
@@ -105,11 +107,12 @@ regles:
     tests: ["R4 — les deux plans présents : le plan lu est .cadence/raf.yaml et la ligne d'avertissement est émise"]
   - id: R5
     cas: [C2]
-    enonce: "Un docs/plan/raf.yaml existant et sans .cadence/raf.yaml reste lu et écrit ; la ligne de déplacement « git mv docs/plan/raf.yaml .cadence/raf.yaml » part sur stderr à chaque commande qui charge le plan, jamais quand le chemin vient de --file, RAF_FILE ou plan:, et la sortie standard n'est pas modifiée."
+    enonce: "Un docs/plan/raf.yaml existant et sans .cadence/raf.yaml reste lu et écrit ; la ligne de déplacement « cd <racine absolue du dépôt> && mkdir -p .cadence && git mv docs/plan/raf.yaml .cadence/raf.yaml » (mv hors dépôt git ; exécutable depuis n'importe quel dossier, elle nomme le projet par sa racine) part sur stderr à chaque commande qui charge le plan, jamais quand le chemin vient de --file, RAF_FILE ou plan:, et la sortie standard n'est pas modifiée."
     statut: sourcee
     source: "demande du lot et issue #11 : « un docs/plan/raf.yaml existant reste lu tant qu'il n'est pas déplacé, avec une ligne qui propose la commande de déplacement »"
     tests:
       - "R5 — plan hérité : raf now lit le plan, stderr propose le git mv, stdout identique à avant"
+      - "R5 — la ligne de déplacement est exécutable telle quelle, depuis la racine comme depuis un sous-dossier, sans .cadence/ préexistant"
       - "R5 — --file ou plan: vers docs/plan/raf.yaml : aucune ligne de déplacement"
   - id: R6
     cas: [C3]
@@ -158,6 +161,14 @@ regles:
       - "R11 — excludeState écrit aussi /.cadence/corrections.json"
       - "R11 — snapshot : .cadence/corrections.json non compté en untracked ni en tracked"
       - "R11 — cadence corrections lit et écrit toujours .cadence/corrections.json"
+  - id: R12
+    cas: [C2]
+    enonce: "Quand le plan est .cadence/raf.yaml, les emplacements hérités docs/plan/raf.yaml et docs/plan/gantt.html restent des fichiers du plan pour l'audit : un commit qui ne touche qu'eux, ou le commit du déplacement, est un commit de plan seul (raf check, gate, isPlanOnly)."
+    statut: sourcee
+    source: "décision du lead (revue de L246) : sans elle, raf check passe de 0 à 260 écarts sur le dépôt cadence après le déplacement, les anciens commits du plan étant relus comme du travail sans lot"
+    tests:
+      - "R12 — après le git mv proposé, les commits du plan hérité et du déplacement restent des commits de plan seul"
+      - "R12 — un commit qui ne touche que docs/plan/gantt.html reste un commit de plan seul quand le plan est .cadence/raf.yaml"
 
 contrats:
   - id: A1

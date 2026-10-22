@@ -153,6 +153,15 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(() => checkLotsDone(seul.dir, 'HEAD', undefined)).toThrow(/L3 \(dropped\)/);
   });
 
+  it('L246 — checkLotsDone lit le plan déplacé en .cadence/raf.yaml', () => {
+    const { dir } = workRepo({ L1: 'done', L3: 'dropped' });
+    mkdirSync(join(dir, '.cadence'));
+    git(dir, 'mv', 'docs/plan/raf.yaml', '.cadence/raf.yaml');
+    writeFileSync(join(dir, 'c.txt'), 'c');
+    commitAll(dir, 'feat(L3): jamais annulé', 'c.txt'); // le git mv est déjà indexé
+    expect(() => checkLotsDone(dir, 'HEAD', undefined)).toThrow(/L3 \(dropped\)/);
+  });
+
   it("une installation qui échoue ne change rien : ni service/, ni liens, ni worktree restant", () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();

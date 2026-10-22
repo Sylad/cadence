@@ -31,9 +31,14 @@ const RETENTION_MS = 7 * 24 * 3600 * 1000;
 export const defaultRoot = () => join(homedir(), '.local', 'share', 'cadence');
 export const defaultBinDir = () => join(homedir(), '.local', 'bin');
 
-/** Statut des lots du plan du dépôt, tel que HEAD le porte (plan: de cadence.yaml, sinon docs/plan/raf.yaml). */
+/** Statut des lots du plan du dépôt, tel que HEAD le porte (plan: de cadence.yaml, sinon .cadence/raf.yaml, sinon docs/plan/raf.yaml hérité). */
 function planStatuses(repo) {
-  let planFile = 'docs/plan/raf.yaml';
+  let planFile = '.cadence/raf.yaml';
+  try {
+    git(repo, 'cat-file', '-e', `HEAD:${planFile}`);
+  } catch {
+    planFile = 'docs/plan/raf.yaml';
+  }
   if (existsSync(join(repo, 'cadence.yaml'))) {
     const cfg = parse(readFileSync(join(repo, 'cadence.yaml'), 'utf8')) ?? {};
     if (typeof cfg.plan === 'string') planFile = cfg.plan;

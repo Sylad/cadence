@@ -1,0 +1,182 @@
+sujet:
+  id: plan-dossier-cache
+  titre: "Plan par défaut dans .cadence/ (versionné), docs/plan/ lu tant qu'il n'est pas déplacé"
+  lot: L246
+  perimetre:
+    modules: [src/cli.ts, src/config.ts, src/lead.ts, src/orchestrate/state.ts, src/orchestrate/guard.ts, src/orchestrate/command.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "déplacer le plan à la place de l'utilisateur (la commande est proposée, jamais exécutée)"
+      - "le format du plan, les plans tenus par un autre outil (plan.fields/statuses…), qui restent en lecture seule (plan.ts:190-195)"
+      - "le déplacement du dossier des états de vague (.cadence/runs reste où il est)"
+
+cas:
+  - id: C1
+    titre: L'utilisateur initialise un projet neuf
+    acteur: un utilisateur de raf
+    declencheur: commande raf init
+    preconditions:
+      - "ni .cadence/raf.yaml ni docs/plan/raf.yaml n'existent, et cadence.yaml ne déclare pas plan"
+    nominal:
+      - "La commande résout le chemin du plan : .cadence/raf.yaml."
+      - "Le plan est créé (Plan.create, plan.ts:199) et .cadence/notes/ est créé avec un fichier .gitkeep."
+      - "La commande affiche « plan créé : <chemin> » puis la ligne du hook, comme aujourd'hui."
+    alternatives:
+      - { si: "un plan existe déjà au chemin résolu (.cadence/raf.yaml, ou docs/plan/raf.yaml hérité)", alors: "refus « <chemin> existe déjà », rien n'est créé", regles: [R2] }
+      - { si: "cadence.yaml déclare plan: <chemin>", alors: "le plan et ses notes sont créés à ce chemin, pas dans .cadence/", regles: [R3] }
+    resultat: Un plan et un dossier de notes dans .cadence/, destinés à git et jamais publiés avec docs/.
+  - id: C2
+    titre: Une commande raf lit un projet qui a encore docs/plan/raf.yaml
+    acteur: un utilisateur de raf
+    declencheur: toute commande raf qui charge le plan (raf now, raf show…)
+    preconditions:
+      - "docs/plan/raf.yaml existe, .cadence/raf.yaml n'existe pas, ni --file, ni RAF_FILE, ni plan: ne désignent un chemin"
+    nominal:
+      - "Le plan lu est docs/plan/raf.yaml, lisible et écrivable comme avant."
+      - "Une ligne sur stderr propose : git mv docs/plan/raf.yaml .cadence/raf.yaml (ou mv hors dépôt git)."
+      - "La sortie standard, dont --json, est inchangée."
+    alternatives:
+      - { si: ".cadence/raf.yaml existe aussi", alors: "il est lu, et une ligne dit que docs/plan/raf.yaml est ignoré", regles: [R4] }
+      - { si: "--file, RAF_FILE ou plan: désigne le chemin", alors: "pas de ligne de déplacement", regles: [R5] }
+    resultat: Aucun projet existant ne casse ; le déplacement est proposé, pas imposé.
+  - id: C3
+    titre: "Un plan déclaré par plan: <chemin> sans correspondance de champs"
+    acteur: un utilisateur de raf
+    declencheur: commande raf add (ou toute commande qui écrit le plan)
+    preconditions:
+      - "cadence.yaml porte plan: <chemin> (chaîne, ou objet avec seulement path/project/since/ignore/files)"
+    nominal:
+      - "Le plan est lu et écrit à ce chemin, au format de raf."
+    alternatives:
+      - { si: "l'objet plan: porte lots/fields/statuses/estimates", alors: "lecture seule, refus d'écrire", regles: [R6] }
+    resultat: Le plan reste modifiable par raf.
+  - id: C4
+    titre: Une vague orchestrée cohabite avec le plan versionné
+    acteur: l'orchestrateur
+    declencheur: commande cadence orchestrate
+    preconditions:
+      - le dossier de lancement est un dépôt git qui versionne .cadence/raf.yaml
+    nominal:
+      - "excludeState ajoute /.cadence/runs/ (et non plus /.cadence/) à .git/info/exclude."
+      - "Les états de vague restent dans .cadence/runs/<vague>/ et hors git."
+      - "Le plan, versionné, est commité par le cycle (commitPlan) comme l'est docs/plan/raf.yaml."
+      - "Le garde d'arbre propre ignore .cadence/runs/ mais compte une modification de .cadence/raf.yaml."
+    alternatives:
+      - { si: ".git/info/exclude porte l'ancienne ligne /.cadence/", alors: "elle est remplacée par /.cadence/runs/", regles: [R9] }
+    resultat: Les états de vague ne salissent jamais l'arbre ; le plan et les notes sont suivis par git.
+  - id: C5
+    titre: lead et orchestrate reconnaissent un projet au plan caché
+    acteur: le lead
+    declencheur: commande cadence lead tour [dossier]
+    preconditions:
+      - "un sous-dossier porte .cadence/raf.yaml, sans cadence.yaml"
+    nominal:
+      - "isProject (lead.ts:86) rend vrai pour .cadence/raf.yaml comme pour docs/plan/raf.yaml."
+      - "Le projet apparaît dans le tableau ; les messages « aucun projet » citent les deux chemins."
+    alternatives: []
+    sans_alternative: les autres branches (cadence.yaml avec plan:, illisible) sont inchangées (lead.ts:88-96)
+    resultat: Un projet migré n'est pas perdu de vue.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Sans cadence.yaml plan: et sans plan existant, le chemin par défaut du plan est .cadence/raf.yaml ; raf init y crée le plan et crée .cadence/notes/ avec un .gitkeep (pour que git le suive)."
+    statut: sourcee
+    source: "demande du lot et issue #11 : « raf init crée .cadence/raf.yaml et .cadence/notes/ »"
+    tests: ["R1 — raf init crée .cadence/raf.yaml et .cadence/notes/.gitkeep, pas docs/plan/raf.yaml"]
+  - id: R2
+    cas: [C1]
+    enonce: "raf init refuse quand un plan existe déjà au chemin résolu, y compris un docs/plan/raf.yaml hérité : il ne crée pas un second plan à côté."
+    statut: sourcee
+    source: "src/plan.ts:200 (« existe déjà ») ; le plan hérité reste le plan tant qu'il n'est pas déplacé (lot)"
+    tests: ["R2 — raf init avec docs/plan/raf.yaml présent : refus « existe déjà », aucun .cadence/raf.yaml créé"]
+  - id: R3
+    cas: [C1, C3]
+    enonce: "plan: <chemin> dans cadence.yaml, --file et RAF_FILE l'emportent sur le défaut ; init crée alors le plan à ce chemin, sans toucher .cadence/."
+    statut: sourcee
+    source: "src/cli.ts:219 (--file > RAF_FILE > plan: > défaut)"
+    tests: ["R3 — init avec plan: x/plan.yaml crée x/plan.yaml et pas .cadence/raf.yaml"]
+  - id: R4
+    cas: [C2]
+    enonce: "Quand .cadence/raf.yaml et docs/plan/raf.yaml existent tous deux, .cadence/raf.yaml est lu et une ligne stderr signale que docs/plan/raf.yaml est ignoré."
+    statut: hypothese
+    si_faux: "Si l'ancien devait gagner, seul l'ordre de résolution change ; aucune donnée en jeu (aucun fichier n'est écrit ni supprimé)."
+    tests: ["R4 — les deux plans présents : le plan lu est .cadence/raf.yaml et la ligne d'avertissement est émise"]
+  - id: R5
+    cas: [C2]
+    enonce: "Un docs/plan/raf.yaml existant et sans .cadence/raf.yaml reste lu et écrit ; la ligne de déplacement « git mv docs/plan/raf.yaml .cadence/raf.yaml » part sur stderr à chaque commande qui charge le plan, jamais quand le chemin vient de --file, RAF_FILE ou plan:, et la sortie standard n'est pas modifiée."
+    statut: sourcee
+    source: "demande du lot et issue #11 : « un docs/plan/raf.yaml existant reste lu tant qu'il n'est pas déplacé, avec une ligne qui propose la commande de déplacement »"
+    tests:
+      - "R5 — plan hérité : raf now lit le plan, stderr propose le git mv, stdout identique à avant"
+      - "R5 — --file ou plan: vers docs/plan/raf.yaml : aucune ligne de déplacement"
+  - id: R6
+    cas: [C3]
+    enonce: "Un plan: <chemin> (chaîne ou objet sans lots/fields/statuses/estimates) reste écrivable par raf ; seule une correspondance de champs rend le plan en lecture seule."
+    statut: sourcee
+    source: "src/config.ts:68-69 et src/plan.ts:190-195 ; issue #11 : « sans correspondance de champs, reste un plan que raf peut écrire »"
+    tests: ["R6 — plan: chemin.yaml : raf add écrit le plan", "R6 — plan avec fields: : raf add refusé « plan en lecture seule »"]
+  - id: R7
+    cas: [C5]
+    enonce: "Un dossier qui porte .cadence/raf.yaml est un projet pour lead tour et orchestrate, au même titre que docs/plan/raf.yaml ; les messages d'absence de projet citent les deux chemins."
+    statut: hypothese
+    si_faux: "Si seul docs/plan/raf.yaml comptait, les projets migrés disparaîtraient de lead tour : correction d'une ligne, aucune donnée en jeu."
+    tests: ["R7 — isProject vrai avec .cadence/raf.yaml seul", "R7 — message « aucun projet » cite .cadence/raf.yaml"]
+  - id: R8
+    cas: [C4]
+    enonce: "Seul .cadence/runs/ est exclu de git (info/exclude) et ignoré par le garde d'arbre propre ; le reste de .cadence/ (plan, notes) est versionné et sa modification compte comme un fichier suivi sale."
+    statut: sourcee
+    source: "demande du lot (« cohabitation avec .cadence/runs … à régler ») ; remplace src/orchestrate/state.ts:349-358 et le filtre src/orchestrate/guard.ts:282 qui visent tout .cadence/"
+    tests:
+      - "R8 — excludeState écrit /.cadence/runs/ et non /.cadence/"
+      - "R8 — snapshot : .cadence/runs/x ignoré, .cadence/raf.yaml modifié compté dans tracked"
+      - "R8 — un plan sous .cadence/ est commitable par commitPlan sans git add -f"
+  - id: R9
+    cas: [C4]
+    enonce: "Si .git/info/exclude contient la ligne /.cadence/ écrite par une version précédente, excludeState la remplace par /.cadence/runs/ ; les autres lignes sont conservées."
+    statut: hypothese
+    si_faux: "Sans ce remplacement un plan neuf sous .cadence/ resterait ignoré par git ; avec, seul un fichier local non versionné change (une ligne que l'outil avait lui-même ajoutée)."
+    tests: ["R9 — ancienne ligne /.cadence/ remplacée, autres lignes intactes, deuxième appel sans effet"]
+  - id: R10
+    cas: [C1]
+    enonce: "Le README et les pages docs/ citant docs/plan/raf.yaml comme défaut (README.md:18, cli.ts usage, docs/*.md) disent .cadence/raf.yaml et mentionnent le plan hérité et la commande de déplacement."
+    statut: sourcee
+    source: "demande du lot : « README et doc à jour » ; docs.sync de cadence.yaml"
+    tests: ["R10 — le texte d'aide de raf cite .cadence/raf.yaml comme plan par défaut"]
+
+contrats:
+  - id: A1
+    appel: commande raf init
+    entree: "[--project nom] [--prefix P] [--file chemin] ; cadence.yaml facultatif"
+    sortie: "« plan créé : <chemin> » ; plan et .cadence/notes/.gitkeep créés ; code 0"
+    erreurs:
+      - { code: log error, message: "<chemin> existe déjà" }
+      - { code: log error, message: "plan en lecture seule : <cadence.yaml> décrit un plan tenu par un autre outil" }
+    regles: [R1, R2, R3]
+  - id: A2
+    appel: commande raf (toute commande qui charge le plan)
+    entree: "plan résolu : --file > RAF_FILE > plan: > .cadence/raf.yaml > docs/plan/raf.yaml"
+    sortie: "inchangée sur stdout ; sur stderr, la ligne de déplacement ou d'avertissement (R4, R5)"
+    erreurs: []
+    sans_erreur: "le plan introuvable garde son message actuel « pas de plan à <chemin> — lancer « raf init » » (plan.ts:208), sans nouveau cas d'échec ; une ligne stderr n'est pas une erreur"
+    regles: [R3, R4, R5, R6]
+  - id: A3
+    appel: commande cadence orchestrate
+    entree: "dossier de lancement dans un dépôt git"
+    sortie: "états dans .cadence/runs/, exclus de git ; plan et notes suivis"
+    erreurs: []
+    sans_erreur: "excludeState est silencieux hors dépôt git (state.ts:351) ; aucune nouvelle erreur"
+    regles: [R8, R9]
+  - id: A4
+    appel: commande cadence lead tour
+    entree: "[dossier] [--depth n]"
+    sortie: "les projets, dont ceux au plan .cadence/raf.yaml"
+    erreurs: []
+    sans_erreur: "un dossier sans plan n'est pas un projet, comme aujourd'hui (lead.ts:86-96)"
+    regles: [R7]
+
+donnees:
+  - { id: D1, objet: "chemin par défaut du plan : .cadence/raf.yaml (avant : docs/plan/raf.yaml)", existant: true, modification: changement, decision: "demande du lot et issue #11 (lead : chemin et lecture du plan hérité décidés par le lot) ; le format du fichier est inchangé", note: "docs/plan/raf.yaml reste lu tant qu'il n'est pas déplacé" }
+  - { id: D2, objet: ".cadence/notes/.gitkeep", existant: false, modification: aucune, note: "nouveau dossier créé par raf init, versionné" }
+  - { id: D3, objet: ".git/info/exclude (ligne /.cadence/ devenue /.cadence/runs/)", existant: true, modification: changement, decision: "demande du lot : cohabitation avec .cadence/runs à régler ; fichier local non versionné, ligne écrite par l'outil", note: "R8, R9" }

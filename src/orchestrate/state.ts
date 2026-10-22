@@ -346,15 +346,23 @@ export class RunStore {
   }
 }
 
-/** Ajoute `.cadence/` à `.git/info/exclude` quand le dossier de lancement est dans un dépôt : l'état ne salit jamais un arbre. */
+/**
+ * Ajoute `.cadence/runs/` (états de vague) et `.cadence/corrections.json` (cache de `cadence corrections`) à `.git/info/exclude`
+ * quand le dossier de lancement est dans un dépôt : l'état ne salit jamais un arbre. Le reste de `.cadence/` (le plan, ses notes)
+ * est versionné. L'ancienne ligne `/.cadence/`, écrite par une version précédente, est remplacée : elle cacherait aussi le plan.
+ */
 export function excludeState(launchDir: string): void {
   const root = gitRoot(launchDir);
   if (!root) return;
-  const rel = relative(root, join(launchDir, '.cadence')).split('\\').join('/');
-  const pattern = `/${rel}/`;
+  const base = `/${relative(root, join(launchDir, '.cadence')).split('\\').join('/')}/`;
+  const wanted = [`${base}runs/`, `${base}corrections.json`];
   const file = join(gitCommonDir(launchDir), 'info', 'exclude');
   mkdirSync(join(gitCommonDir(launchDir), 'info'), { recursive: true });
   const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
-  if (text.split('\n').includes(pattern)) return;
-  appendFileSync(file, `${text === '' || text.endsWith('\n') ? '' : '\n'}${pattern}\n`);
+  const lines = text.split('\n');
+  const missing = wanted.filter((w) => !lines.includes(w));
+  if (!lines.includes(base) && missing.length === 0) return;
+  const kept = lines.filter((l) => l !== base);
+  const body = kept.join('\n');
+  writeFileSync(file, `${body}${body === '' || body.endsWith('\n') ? '' : '\n'}${missing.map((m) => `${m}\n`).join('')}`);
 }

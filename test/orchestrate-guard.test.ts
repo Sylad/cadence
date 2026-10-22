@@ -109,15 +109,15 @@ describe('snapshot et détection de push', () => {
     expect(pushed(before, await snapshot(dir))).toBe(false);
   });
 
-  it('suivi modifié, non suivi, .cadence/ exclu', async () => {
+  it('suivi modifié, non suivi, .cadence/runs/ exclu', async () => {
     const dir = gitRepo();
     writeFileSync(join(dir, 'a.txt'), '1');
     git(dir, 'add', 'a.txt');
     commit(dir, 'feat: a');
     writeFileSync(join(dir, 'a.txt'), '2');
     writeFileSync(join(dir, 'new.txt'), 'x');
-    mkdirSync(join(dir, '.cadence'));
-    writeFileSync(join(dir, '.cadence/state'), 'x');
+    mkdirSync(join(dir, '.cadence/runs'), { recursive: true });
+    writeFileSync(join(dir, '.cadence/runs/state'), 'x');
     const s = await snapshot(dir);
     expect(s.tracked).toEqual([' M a.txt']);
     expect(s.untracked).toEqual(['new.txt']);
@@ -217,14 +217,14 @@ describe('core.hooksPath dans l\'arbre suivi (L3/t19)', () => {
   const status = (dir: string) => execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: dir, encoding: 'utf8' });
   const exclude = (dir: string) => (existsSync(join(dir, '.git/info/exclude')) ? readFileSync(join(dir, '.git/info/exclude'), 'utf8') : '');
 
-  it('.playwright-mcp/ et .cadence/ : les noms que git cite entre guillemets (accents, espaces) ne sont pas sales non plus', async () => {
+  it('.playwright-mcp/ et .cadence/runs/ : les noms que git cite entre guillemets (accents, espaces) ne sont pas sales non plus', async () => {
     const dir = gitRepo();
     commit(dir, 'chore: init');
     mkdirSync(join(dir, '.playwright-mcp'));
-    mkdirSync(join(dir, '.cadence'));
+    mkdirSync(join(dir, '.cadence/runs'), { recursive: true });
     writeFileSync(join(dir, '.playwright-mcp/réglages.png'), 'x');
     writeFileSync(join(dir, '.playwright-mcp/a b.png'), 'x');
-    writeFileSync(join(dir, '.cadence/é f.json'), 'x');
+    writeFileSync(join(dir, '.cadence/runs/é f.json'), 'x');
     expect((await snapshot(dir, { remote: false })).untracked).toEqual([]);
     writeFileSync(join(dir, 'dehors é.png'), 'x');
     const s = await snapshot(dir, { remote: false });

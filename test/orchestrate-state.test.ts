@@ -70,12 +70,12 @@ describe('RunStore', () => {
 });
 
 describe('.git/info/exclude', () => {
-  it('ajoute .cadence/ une fois, dans un dépôt', () => {
+  it('ajoute .cadence/runs/ une fois, dans un dépôt', () => {
     const repo = gitRepo();
     excludeState(repo);
     excludeState(repo);
     const text = readFileSync(join(repo, '.git/info/exclude'), 'utf8');
-    expect(text.match(/\.cadence\//g)).toHaveLength(1);
+    expect(text.match(/\.cadence\/runs\//g)).toHaveLength(1);
   });
   it('ne fait rien hors d\'un dépôt', () => {
     const dir = tempDir();

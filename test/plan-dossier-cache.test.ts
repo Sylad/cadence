@@ -119,7 +119,7 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(false);
   });
 
-  it('R5 — après le git mv proposé, les commits du plan hérité et du déplacement restent des commits de plan seul', () => {
+  it('R12 — après le git mv proposé, les commits du plan hérité et du déplacement restent des commits de plan seul', () => {
     const dir = legacyRepo();
     git(dir, 'add', '-A');
     git(dir, 'commit', '-m', 'plan: ajout');
@@ -132,6 +132,26 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     expect(changedFiles(dir, deplace).sort()).toEqual(['.cadence/raf.yaml', 'docs/plan/raf.yaml']);
     expect(isPlanOnly(avant, plan, dir)).toBe(true);
     expect(isPlanOnly(deplace, plan, dir)).toBe(true);
+  });
+
+  it('R12 — un commit qui ne touche que docs/plan/gantt.html reste un commit de plan seul quand le plan est .cadence/raf.yaml', () => {
+    const dir = gitRepo();
+    Plan.create(join(dir, '.cadence/raf.yaml'), 'demo', 'L', '2026-10-01');
+    mkdirSync(join(dir, 'docs/plan'), { recursive: true });
+    writeFileSync(join(dir, 'docs/plan/gantt.html'), '<html></html>');
+    git(dir, 'add', '--', 'docs/plan/gantt.html');
+    git(dir, 'commit', '-m', 'plan: gantt');
+    const gantt = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+    writeFileSync(join(dir, 'autre.txt'), 'x');
+    writeFileSync(join(dir, 'docs/plan/gantt.html'), '<html>2</html>');
+    git(dir, 'add', '--', 'autre.txt', 'docs/plan/gantt.html');
+    git(dir, 'commit', '-m', 'travail');
+    const travail = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
+    expect(changedFiles(dir, gantt)).toEqual(['docs/plan/gantt.html']);
+    expect(isPlanOnly(gantt, plan, dir)).toBe(true);
+    // un fichier qui n'est pas du plan, même avec le gantt hérité, reste du travail
+    expect(isPlanOnly(travail, plan, dir)).toBe(false);
   });
 
   it('R5 — hors dépôt git, la ligne propose mv', () => {

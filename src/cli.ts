@@ -96,7 +96,7 @@ export function ensureGitignore(root: string, line: string): boolean {
 /** La ligne stderr d'un docs/plan/raf.yaml hérité : le déplacement proposé (jamais fait), ou l'avertissement quand .cadence/raf.yaml existe aussi. */
 function legacyPlanLine(root: string, legacy: 'read' | 'ignored'): string {
   if (legacy === 'ignored') return `raf: ${PLAN_LEGACY} est ignoré : ${PLAN_DEFAULT} existe aussi et fait foi (supprimer ou fusionner l'ancien)`;
-  return `raf: ${PLAN_LEGACY} est l'ancien emplacement du plan ; le déplacer : ${gitRoot(root) ? 'git mv' : 'mv'} ${PLAN_LEGACY} ${PLAN_DEFAULT}`;
+  return `raf: ${PLAN_LEGACY} est l'ancien emplacement du plan ; le déplacer : mkdir -p ${dirname(PLAN_DEFAULT)} && ${gitRoot(root) ? 'git mv' : 'mv'} ${PLAN_LEGACY} ${PLAN_DEFAULT}`;
 }
 
 export function run(argv: string[], io: Io): number | Promise<number> {

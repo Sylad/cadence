@@ -5,7 +5,7 @@ import type { Day } from './dates.js';
 import { parse } from 'yaml';
 import { changedFiles, fileAt, readCommits, type Commit } from './git.js';
 import { citedRefs, linkCommits, scopeOf, type Linked } from './link.js';
-import { readDocsConfig, readNewsConfig, readOrchestrateConfig } from './config.js';
+import { PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readNewsConfig, readOrchestrateConfig } from './config.js';
 import { ficheHypotheses } from './spec.js';
 import { docSyncGaps, filesOf, gapMessage } from './docsync.js';
 import { type Entry, loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong, reusedNewsTitle } from './news.js';
@@ -17,9 +17,18 @@ function configRel(plan: Plan, root: string): string {
   return plan.configFile ? relative(root, plan.configFile) : 'cadence.yaml';
 }
 
-/** Le plan, sa page Gantt, la configuration lue (cadence.yaml) et les fichiers tenus avec lui (plan.files). */
+/**
+ * Le plan, sa page Gantt, la configuration lue (cadence.yaml) et les fichiers tenus avec lui (plan.files). Le plan par défaut
+ * (.cadence/raf.yaml) compte aussi son emplacement hérité docs/plan/ : après le `git mv` proposé par raf, les anciens commits du
+ * plan et le commit du déplacement (qui liste la suppression et l'ajout) restent des commits de plan seul (L246).
+ */
 export function ownFiles(plan: Plan, root: string): Set<string> {
-  return new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), configRel(plan, root), ...plan.maintained]);
+  const own = new Set([relative(root, plan.path), relative(root, join(dirname(plan.path), 'gantt.html')), configRel(plan, root), ...plan.maintained]);
+  if (relative(root, plan.path) === PLAN_DEFAULT) {
+    own.add(PLAN_LEGACY);
+    own.add(join(dirname(PLAN_LEGACY), 'gantt.html'));
+  }
+  return own;
 }
 
 function withoutPlanKey(text: string | null): string | null {

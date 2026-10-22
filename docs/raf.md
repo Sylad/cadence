@@ -103,7 +103,7 @@ then the legacy `docs/plan/raf.yaml`.
   beside it. With `plan: path` in `cadence.yaml`, or `--file`, the plan and nothing else is created there.
 - A project that still has `docs/plan/raf.yaml` (and no `.cadence/raf.yaml`) keeps working, read and written as before. Every command
   that loads the plan prints one line on **stderr** (standard output, `--json` included, is unchanged) with the move to do —
-  `git mv docs/plan/raf.yaml .cadence/raf.yaml` (`mv` outside a git repository). `raf` never moves the file itself. The line is not
+  `mkdir -p .cadence && git mv docs/plan/raf.yaml .cadence/raf.yaml` (`mv` outside a git repository). `raf` never moves the file itself. The line is not
   printed when the path comes from `--file`, `RAF_FILE` or `plan:`.
 - When both files exist, `.cadence/raf.yaml` is read and a stderr warning says that `docs/plan/raf.yaml` is ignored; nothing is written
   or deleted.

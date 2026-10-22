@@ -9,6 +9,8 @@ import { orchestrate, realOrchestrateDeps } from '../src/orchestrate/command.js'
 import { excludeState } from '../src/orchestrate/state.js';
 import { snapshot } from '../src/orchestrate/guard.js';
 import { Plan } from '../src/plan.js';
+import { isPlanOnly } from '../src/audit.js';
+import { changedFiles } from '../src/git.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { gitRepo, tempDir } from './helpers.js';
 import { claudeOut, commitFile, harness, reviewReport, workReport } from './orchestrate-harness.js';
@@ -87,6 +89,32 @@ describe('plan par défaut dans .cadence/ (L246)', () => {
     expect(raf(dir, ['add', 'Autre']).code).toBe(0);
     expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toContain('Autre');
     expect(existsSync(join(dir, '.cadence/raf.yaml'))).toBe(false);
+  });
+
+  it('R5 — la ligne de déplacement est exécutable telle quelle, sans .cadence/ préexistant', () => {
+    const dir = legacyRepo();
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-m', 'init');
+    const line = raf(dir, ['list']).err.split('\n').find((l) => l.includes(MOVE))!;
+    const cmd = line.slice(line.indexOf('déplacer : ') + 'déplacer : '.length);
+    execFileSync('bash', ['-c', cmd], { cwd: dir, stdio: 'pipe' });
+    expect(existsSync(join(dir, '.cadence/raf.yaml'))).toBe(true);
+    expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(false);
+  });
+
+  it('R5 — après le git mv proposé, les commits du plan hérité et du déplacement restent des commits de plan seul', () => {
+    const dir = legacyRepo();
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-m', 'plan: ajout');
+    const avant = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+    mkdirSync(join(dir, '.cadence'));
+    git(dir, 'mv', 'docs/plan/raf.yaml', '.cadence/raf.yaml');
+    git(dir, 'commit', '-m', 'plan: déplacé');
+    const deplace = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
+    expect(changedFiles(dir, deplace).sort()).toEqual(['.cadence/raf.yaml', 'docs/plan/raf.yaml']);
+    expect(isPlanOnly(avant, plan, dir)).toBe(true);
+    expect(isPlanOnly(deplace, plan, dir)).toBe(true);
   });
 
   it('R5 — hors dépôt git, la ligne propose mv', () => {

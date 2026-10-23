@@ -21,14 +21,15 @@ Registers a PDF and builds, for it:
 - **the figure index**: one entry per caption at the start of a line (`Figure n`, `Fig. n`,
   `Table n`, `Tableau n`, `Planche n`). After a separator (`—`, `–`, `:`, `.`, `-`) the line is a
   caption whatever the case of the title (`Figure 1 — map of stations`); without one,
-  `Figure 3 shows…`, `Figure 5, which…` and `Figure 5 (page 4)` cite the figure. A
+  `Figure 3 shows…`, `Figure 5, which…` and `Figure 5 (page 4)` cite the figure. A separator
+  followed by nothing (`figure 24.` ending a sentence) is not a caption either. A
   table-of-contents entry (dot leaders on its line or on the next one, or any line of a contents
   page: one where at least two lines, and more than half, have dot leaders or end with a possible
   page number) is neither a caption nor a citation, so a figure that only the contents list names
   comes out as « nothing cites it ». A trailing number alone never makes an entry:
   `Table 4.1. … presented in Chapter 4` among prose is a caption. When several lines look like the
-  caption of one figure, the first on a page that holds an image wins, then the first with a
-  separator, then the first. Each entry has its page, line, box, its images, and **the passages that cite it** (page,
+  caption of one figure, those with a title are kept (`Figure 5 Jet speed` rather than a bare `Figure 5`), if any; among them
+  the first on a page that holds an image wins, then the first with a separator, then the first. Each entry has its page, line, box, its images, and **the passages that cite it** (page,
   line, exact line; `nommee` when the text names the figure, `designee` for « as shown
   below » / « ci-dessous », attached to the nearest caption of the page). Plurals count one citation per figure
   (`Figures 2 and 3`, `Tables 4 to 6`, `Figs. 2.1 et 2.2`); a number keeps the letters of an annex numbering (`Figure 1.B.1`, `Table 12.B.3`). Listed under **`unresolved`**

@@ -169,6 +169,17 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.figures).toMatchObject([{ label: 'Figure 1', page: 3 }, { label: 'Figure 2', page: 4 }]);
   });
 
+  it("un séparateur suivi d'un titre vide n'est pas une légende : « figure 24. » fin de phrase cède à « Figure 24: … » de la page suivante", () => {
+    const idx = indexText([page(15, 'The release is shown in', 'figure 24.', 'Next, the winds'), page(16, 'Figure 24: Radioactive Release information')]);
+    expect(idx.figures).toMatchObject([{ label: 'Figure 24', page: 16, line: 1, caption: 'Figure 24: Radioactive Release information' }]);
+    expect(idx.figures[0]!.citations.map((c) => [c.page, c.line])).toEqual([[15, 2]]);
+  });
+
+  it('plusieurs lignes en forme de légende : celle qui a un titre l\'emporte sur un numéro seul, même plus haut dans le document', () => {
+    const idx = indexText([page(7, 'Figure 12', 'The jet', 'Figure 12 Jet speed depiction and decode')]);
+    expect(idx.figures).toMatchObject([{ label: 'Figure 12', page: 7, line: 3, caption: 'Figure 12 Jet speed depiction and decode' }]);
+  });
+
   it('le numéro de la figure n\'est pas un numéro de page : « Figure 5 » seul sur sa ligne n\'est pas une entrée de sommaire, il reste une légende quand rien d\'autre ne légende la figure (titre à la ligne suivante)', () => {
     const idx = indexText([page(7, 'Figure 5', 'Jet speed depiction')]);
     expect(idx.figures).toMatchObject([{ label: 'Figure 5', page: 7, line: 1 }]);

@@ -71,12 +71,13 @@ const key = (label: string): string => label.toLowerCase();
  * Une ligne a la forme d'une légende quand elle COMMENCE par « Figure n » / « Table n » et que ce qui suit n'est pas une phrase en
  * cours. Après un séparateur (« Figure 1 — titre en minuscule », « Table 2: codes ») c'est une légende quelle que soit la casse ;
  * sans séparateur, une minuscule (« Figure 3 shows … »), une virgule ou une parenthèse (« Figure 5, which … », « Figure 5 (page 4) »)
- * en font une citation. « Table 2 The WMO … » a la forme d'une légende : `indexText` la départage des autres lignes de même forme.
+ * en font une citation. Un séparateur suivi d'un titre vide (« figure 24. » en fin de phrase) n'est pas une légende non plus. « Table 2 The WMO … » a la forme d'une légende : `indexText` la départage des autres lignes de même forme.
  */
 function captionForm(text: string): { label: string; kind: FigureKind; separated: boolean; title: string } | null {
   const m = CAPTION.exec(text.trim());
   if (!m) return null;
   if (m[3] === undefined && /^[a-zà-ÿ,;(\[]/.test(m[4]!)) return null;
+  if (m[3] !== undefined && m[4] === '') return null;
   return { ...labelOf(m[1]!, m[2]!), separated: m[3] !== undefined, title: m[4]! };
 }
 
@@ -113,6 +114,7 @@ interface Candidate {
   label: string;
   kind: FigureKind;
   separated: boolean;
+  title: string;
   page: number;
   line: number;
   text: string;
@@ -122,9 +124,10 @@ interface Candidate {
 /**
  * Légendes, citations et liens non résolus, d'après le texte seul ; les images viennent après (`attachRegions`).
  * Une légende est une ligne de forme de légende (`captionForm`) qui n'est pas une entrée de sommaire ; une entrée de sommaire ne
- * cite rien non plus. Quand plusieurs lignes ont la forme de la légende d'une même figure, on prend la première qui est sur une page
- * portant une image (`imagePages`), à défaut la première qui a un séparateur (« Table 3 — Mapping… » contre « Table 3 Identifies… »),
- * à défaut la première du document.
+ * cite rien non plus. Quand plusieurs lignes ont la forme de la légende d'une même figure, on ne garde que celles qui ont un titre
+ * (« Figure 5 Jet speed » plutôt que « Figure 5 » seul), s'il y en a ; parmi elles la première qui est sur une page portant une image
+ * (`imagePages`), à défaut la première qui a un séparateur (« Table 3 — Mapping… » contre « Table 3 Identifies… »), à défaut la
+ * première du document.
  */
 export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = new Set()): FigureIndex {
   const last = pages.reduce((m, p) => Math.max(m, p.n), 0);
@@ -140,7 +143,10 @@ export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = n
     });
   }
   const chosen = [...candidates.values()]
-    .map((list) => list.find((c) => imagePages.has(c.page)) ?? list.find((c) => c.separated) ?? list[0]!)
+    .map((all) => {
+      const list = all.some((c) => c.title !== '') ? all.filter((c) => c.title !== '') : all;
+      return list.find((c) => imagePages.has(c.page)) ?? list.find((c) => c.separated) ?? list[0]!;
+    })
     .sort((a, b) => a.page - b.page || a.line - b.line);
   const figures = new Map<string, Figure>(chosen.map((c) => [key(c.label), { label: c.label, kind: c.kind, page: c.page, line: c.line, caption: c.text, box: c.box, regions: [], citations: [] }]));
   const captionLine = new Set(chosen.map((c) => `${c.page}:${c.line}`));

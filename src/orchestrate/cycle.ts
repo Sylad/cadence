@@ -671,6 +671,11 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
         step.pid = pid;
         save(c);
       },
+      // La session neuve de la relance (L256) devient la session de l'étape dès son lancement : un signal pendant qu'elle tourne la tue (killSessions) et compte ses jetons (countInterrupted).
+      onRelaunch: (id) => {
+        step.sessionId = id;
+        save(c);
+      },
     },
   );
   step.ended = new Date().toISOString();

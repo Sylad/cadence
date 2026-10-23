@@ -378,6 +378,33 @@ describe('revue coupée (code 143, sortie vide) : une relance en session neuve (
     expect(out.cut).toBeUndefined();
   });
 
+  it("R8 — la session neuve est annoncée à l'appelant (onRelaunch) AVANT son lancement : un signal pendant la relance la trouve déjà enregistrée", async () => {
+    const events: string[] = [];
+    const out = await runSession(
+      { ...spec, agent: undefined },
+      {
+        claude: async (args) => {
+          events.push(`launch:${args[args.indexOf('--session-id') + 1]}`);
+          return events.length === 1 ? cut : good;
+        },
+        agents: {},
+        onRelaunch: (id) => events.push(`relaunch:${id}`),
+      },
+    );
+    expect(out.kind).toBe('ok');
+    expect(events).toHaveLength(3);
+    const fresh = events[1].replace('relaunch:', '');
+    expect(fresh).not.toBe(spec.sessionId);
+    expect(events).toEqual([`launch:${spec.sessionId}`, `relaunch:${fresh}`, `launch:${fresh}`]);
+  });
+
+  it("R8 — pas de relance, pas d'annonce : une session tuée par killSessions ou en échec ordinaire n'appelle pas onRelaunch", async () => {
+    const seen: string[] = [];
+    await runSession({ ...spec, agent: undefined }, { claude: async () => (killSessions(), { ...cut, code: 137 }), agents: {}, onRelaunch: (id) => seen.push(id) });
+    await runSession({ ...spec, agent: undefined }, { claude: async () => ({ code: 1, stdout: '', stderr: 'boom', timedOut: false }), agents: {}, onRelaunch: (id) => seen.push(id) });
+    expect(seen).toEqual([]);
+  });
+
   it('R2 — coupée de nouveau : échec nommé « coupure », marqué cut, pas de troisième lancement', async () => {
     const { calls, p } = run([cut, { ...cut, stderr: 'again' }]);
     const out = await p;

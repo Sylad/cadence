@@ -218,11 +218,11 @@ export function buildRetryArgs(spec: StepSpec, sessionId: string, agents: Record
  * s'ajoutent à ceux de la session ; toujours rien après elle, c'est l'échec habituel.
  * Seconde exception (L256) : une étape en lecture coupée par un signal sans rien écrire (code 143, sortie vide) est
  * relancée UNE fois à l'identique en session NEUVE (autre `--session-id`, jamais `--resume` : la coupée n'a rien à reprendre) ;
- * coupée de nouveau, elle rend un échec marqué `cut`. Le quota, le délai et un code ordinaire ne sont jamais relancés.
+ * coupée de nouveau, elle rend un échec marqué `cut`. `onRelaunch` reçoit l'identifiant de la session neuve juste avant son lancement. Le quota, le délai et un code ordinaire ne sont jamais relancés.
  */
 export async function runSession(
   spec: StepSpec,
-  deps: { claude: ClaudeFn; agents: Record<string, AgentDef>; onSpawn?: (pid: number) => void },
+  deps: { claude: ClaudeFn; agents: Record<string, AgentDef>; onSpawn?: (pid: number) => void; onRelaunch?: (sessionId: string) => void },
 ): Promise<SessionOutcome> {
   const sandbox = sandboxEnv(!!spec.prodAccess);
   const launch = (args: string[]) =>
@@ -235,6 +235,7 @@ export async function runSession(
   if (first.kind === 'failed' && READ_ONLY.has(spec.kind) && isCut(out) && killEpoch === epoch) {
     const relaunched: Relaunched = { sessionId: spec.sessionId, cause: `code ${out.code}, sortie vide`, stderr: out.stderr };
     const fresh = randomUUID();
+    deps.onRelaunch?.(fresh); // l'appelant l'enregistre AVANT le lancement : un signal pendant la relance retrouve la session neuve
     const again = await launch(buildArgs({ ...spec, sessionId: fresh }, deps.agents));
     const next = classify(again);
     if (next.kind === 'ok') return { ...next, relaunched };

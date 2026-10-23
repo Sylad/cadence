@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
+import type { StepState } from '../src/orchestrate/state.js';
 import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
 import { coveredTasks } from '../src/audit.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
-import { REVIEW_RESERVE, isNonQuestion, lotSpent, runLot } from '../src/orchestrate/cycle.js';
+import { Budget, REVIEW_RESERVE, countInterrupted, isNonQuestion, lotSpent, runLot } from '../src/orchestrate/cycle.js';
 import { runPool } from '../src/orchestrate/pool.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir, readAgents } from '../src/orchestrate/launch.js';
@@ -1233,6 +1234,39 @@ describe('revue coupée (L256)', () => {
     expect(c.lot.steps[1].tokens!.counted).toBeGreaterThanOrEqual(1010);
     expect(lotSpent(c.lot)).toBe(h.wave.budget.consumed);
     expect(readFileSync(join(h.store.dir, 'demo--L1', '2-review.first.err'), 'utf8')).toBe('Terminated');
+  });
+
+  it("R8 — pendant la relance, la session neuve est déjà l'étape (step.sessionId, enregistré sur disque) : un signal à ce moment-là compte ses jetons (countInterrupted)", async () => {
+    let first = '';
+    let fresh = '';
+    let onDisk = '';
+    let counted = false;
+    let registered: string | undefined;
+    const budgetAtRelaunch = new Budget(1e9);
+    const h = harness({ script: { implement: [impl()], review: [(call) => {
+      first = call.args[call.args.indexOf('--session-id') + 1];
+      return cut(call);
+    }, (call) => {
+      fresh = call.args[call.args.indexOf('--session-id') + 1];
+      const dir = projectLogDir(h.wave.claudeHome!, call.opts.cwd);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${fresh}.jsonl`), JSON.stringify({ type: 'assistant', message: { id: 'm2', usage: { input_tokens: 5, cache_creation_input_tokens: 400, cache_read_input_tokens: 0, output_tokens: 5 } } }));
+      registered = c.lot.steps[1].sessionId;
+      onDisk = h.store.readLot('demo', 'L1')?.steps[1].sessionId ?? '';
+      // Ce que fait le gestionnaire de signal de la vague, la session neuve en cours.
+      const snapshot: StepState = { ...c.lot.steps[1], status: 'interrupted' };
+      counted = countInterrupted(h.wave.claudeHome, c.lot.repo, snapshot, budgetAtRelaunch);
+      return ok(call);
+    }] } });
+    h.wave.claudeHome = tempDir();
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(first).not.toBe('');
+    expect(fresh).not.toBe(first);
+    expect(registered).toBe(fresh);
+    expect(onDisk).toBe(fresh);
+    expect(counted).toBe(true);
+    expect(budgetAtRelaunch.consumed).toBe(410);
   });
 
   it('R6 — revue coupée deux fois : lot en échec « coupure », ni quota ni échec ordinaire', async () => {

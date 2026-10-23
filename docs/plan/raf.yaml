@@ -2952,6 +2952,7 @@ lots:
     estimate: 0.25
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "compliant : 1 commit (bd69efe), avertissement et refus sautés avec --sha, R1 et R2 présents et verts, docs et CHANGELOG à jour, 1 note mineure de doc — orchestré (vague 2026-10-23-cad-attentes, 0 passe(s) de correction)", commit: bd69efeb4f06204aeefde9e3cbbbdca8c5926507 }
   - id: L258
     title: 'cadence orchestrate <projet>:<lot> --goal "…" (ou clé goal: du lot) remplace le titre comme objectif du brief, relayé dans le tableau ; tests (titre périmé = délégation à la main : maritime B28.4, B28.5, B28.6)'
     status: todo

@@ -3012,10 +3012,11 @@ lots:
       - { date: 2026-10-23, text: "Re-vérif du lead 23-10 : un rouge isolé sur une 1re passe (non nommé, sortie tronquée), puis 3 passes complètes vertes 2817/2817 — instabilité sous charge, comme deliver.test « (b) Ctrl-C »." }
   - id: L262
     title: "ref (issue #14, 2/10) : cadence ref measure — couleurs, contrastes WCAG, boîtes, OCR tesseract et taille de police estimée, tolérance déclarée ; tests sur images générées à valeurs connues"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L261 ]
     created: 2026-10-23
+    started: 2026-10-23
   - id: L263
     title: "ref (issue #14, 3/10) : schéma de l'inventaire (templates/inventaire.json) et cadence ref check, un cas par règle du schéma"
     status: todo

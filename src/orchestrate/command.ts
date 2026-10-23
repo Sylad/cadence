@@ -490,9 +490,9 @@ export function liveLines(cap = DEFAULT_MAX_SESSIONS): string[] {
 
 /** `--continue` (L252) : la ligne des lots prêts dont aucune ressource n'est prise par un lot en cours ni par une vague, sans les lots du premier tirage `drawn` ni les ressources qu'ils tiennent. Vide si aucun. */
 function freeLines(launch: string, drawn: LotState[]): string[] {
-  const projects = (isLeadProject(launch) ? [launch] : findProjects(launch)).map((dir) => ({ dir, name: basename(dir) }));
-  const free = readyFree(projects, cadenceHome(), drawn);
-  const line = freeLine(projects.filter((p) => free.has(p.dir)).map((p) => ({ project: p.name, free: free.get(p.dir)! })), 60);
+  const dirs = isLeadProject(launch) ? [launch] : findProjects(launch);
+  const free = readyFree(dirs, cadenceHome(), drawn);
+  const line = freeLine(dirs.filter((d) => free.has(d)).map((d) => ({ project: basename(d), free: free.get(d)! })), 60);
   return line ? [line] : [];
 }
 

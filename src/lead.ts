@@ -188,7 +188,7 @@ export function leadTour(parent: string, today: Day, idle = TOUR_IDLE, depth?: n
 /** Joint à chaque ligne ses lots prêts aux ressources libres (L252), calculés sur tous les projets du tour : ce qu'un projet tient en retire aux autres. */
 function withFree(rows: { dir: string; row: TourRow }[]): TourRow[] {
   const ok = rows.filter((x) => !x.row.error);
-  const free = readyFree(ok.map((x) => ({ dir: x.dir, name: x.row.project })), cadenceHome());
+  const free = readyFree(ok.map((x) => x.dir), cadenceHome());
   for (const x of ok) if (free.has(x.dir)) x.row.free = free.get(x.dir);
   return rows.map((x) => x.row);
 }

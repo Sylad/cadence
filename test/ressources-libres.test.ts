@@ -224,6 +224,65 @@ describe('L252 — orchestrate --continue : la même liste', () => {
   });
 });
 
+describe('L252 — un lot de vague se reconnaît à son dépôt, pas au nom du projet', () => {
+  /** Une vague vivante dont le lot `lot` est dans `repo`, enregistré sous le nom de projet `project`, lancée depuis `cwd`. */
+  const waveHolding = (cwd: string, project: string, repo: string, lot = 'L1') => {
+    const store = RunStore.reserve(cwd, '2026-10-23-0900')!;
+    store.writeWave({ id: store.id, created: '2026-10-23T09:00:00Z', cwd, budget: 1, consumed: 0, cacheRead: 0, status: 'running', pid: process.ppid, lots: [`${project}:${lot}`] });
+    store.writeLot({ project, repo, lot, title: 'Dans la vague', visible: false, small: true, status: 'running' } as never);
+    registerWave(cadenceHome(), { pid: process.ppid, wave: store.id, started: '2026-10-23T09:00:00Z', cwd, repos: [repo], cap: 2 });
+  };
+
+  it('R3 — projet imbriqué (depth: 2) : le lot d\'une vague --continue lancée depuis son dossier, enregistré sous le nom court, n\'est pas listé', async () => {
+    const { parent, dirs } = parentWith({ 'grp/alpha': [{ title: 'Dans la vague' }, { title: 'Libre' }] }, 'resources: [banc]\ndepth: 2\n');
+    waveHolding(join(parent, 'grp'), 'alpha', dirs['grp/alpha']!);
+    try {
+      const rows = JSON.parse((await tour(parent, '--json')).out) as { project: string; free?: { id: string }[] }[];
+      expect(rows.map((r) => r.project)).toEqual(['grp/alpha']);
+      expect(rows[0]!.free?.map((l) => l.id)).toEqual(['L2']);
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+  });
+
+  it('R3 — la vague d\'un autre dossier, qui joue un projet de même nom dans un autre dépôt, ne retire pas le lot de même id', async () => {
+    const { parent } = parentWith({ alpha: [{ title: 'Premier' }, { title: 'Second' }] });
+    const other = parentWith({ alpha: [{ title: 'Autre dépôt' }] });
+    waveHolding(other.parent, 'alpha', other.dirs.alpha!);
+    try {
+      const line = (await tour(parent)).out.split('\n').find((l) => l.startsWith(FREE))!;
+      expect(line).toBe(`${FREE}alpha:L1 Premier · alpha:L2 Second`);
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+  });
+
+  it('R3 — la vague d\'un autre dossier qui joue ce dépôt retire son lot, quel que soit le nom sous lequel elle le cite', async () => {
+    const { parent, dirs } = parentWith({ alpha: [{ title: 'Dans la vague' }, { title: 'Libre' }] });
+    waveHolding(tempDir(), 'sous-un-autre-nom', dirs.alpha!);
+    try {
+      const line = (await tour(parent)).out.split('\n').find((l) => l.startsWith(FREE))!;
+      expect(line).toBe(`${FREE}alpha:L2 Libre`);
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+  });
+
+  it('R7 — --continue : la vague d\'un autre dossier qui joue un projet de même nom ailleurs ne retire pas le lot de même id', async () => {
+    const { parent } = parentWith({ alpha: [{ title: 'Tiré' }, { title: 'Libre' }] });
+    const other = parentWith({ alpha: [{ title: 'Autre dépôt' }] });
+    waveHolding(other.parent, 'alpha', other.dirs.alpha!, 'L2');
+    try {
+      const r = io(parent);
+      await orchestrate(['--continue', '--dry-run', '--budget', '1M', '--max-sessions', '1'], r.io, fakeDeps().deps);
+      removeDryRunBriefs(r.out.join('\n'));
+      expect(r.out.find((l) => l.startsWith(FREE))).toBe(`${FREE}alpha:L2 Libre`);
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+  });
+});
+
 describe('L252 — lead tour lancé depuis un projet', () => {
   it('R1 — un lot doing d\'un projet voisin qui tient banc écarte les prêts qui l\'utilisent', async () => {
     const { dirs } = parentWith({ alpha: [{ title: 'Alpha banc', uses: ['banc'] }, { title: 'Alpha libre' }], beta: [{ title: 'Beta banc en cours', uses: ['banc'], doing: true }] });

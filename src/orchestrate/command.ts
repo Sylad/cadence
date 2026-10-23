@@ -488,10 +488,10 @@ export function liveLines(cap = DEFAULT_MAX_SESSIONS): string[] {
   return lines;
 }
 
-/** `--continue` (L252) : la ligne des lots prêts dont aucune ressource n'est prise par un lot en cours ni par une vague, tels qu'ils sont avant que la vague tire. Vide si aucun. */
-function freeLines(launch: string): string[] {
+/** `--continue` (L252) : la ligne des lots prêts dont aucune ressource n'est prise par un lot en cours ni par une vague, sans les lots du premier tirage `drawn` ni les ressources qu'ils tiennent. Vide si aucun. */
+function freeLines(launch: string, drawn: LotState[]): string[] {
   const projects = (isLeadProject(launch) ? [launch] : findProjects(launch)).map((dir) => ({ dir, name: basename(dir) }));
-  const free = readyFree(projects, cadenceHome());
+  const free = readyFree(projects, cadenceHome(), drawn);
   const line = freeLine(projects.filter((p) => free.has(p.dir)).map((p) => ({ project: p.name, free: free.get(p.dir)! })), 60);
   return line ? [line] : [];
 }
@@ -592,7 +592,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     const id = waveId(io, args.wave, launch);
     if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
     dryRun(pre.lots, io, deps, budget, id);
-    if (args.continue) for (const l of freeLines(launch)) io.out(l);
+    if (args.continue) for (const l of freeLines(launch, pre.lots)) io.out(l);
     if (args.continue) await continueDryRun(args, io, deps, launch, pre.lots, budget, firstSkipped);
     return 0;
   }
@@ -626,7 +626,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     }
   }
   const id = store.id;
-  if (args.continue) for (const l of freeLines(launch)) io.out(l);
+  if (args.continue) for (const l of freeLines(launch, pre.lots)) io.out(l);
   // Les candidats refusés au premier tirage : leur cause dit pourquoi ils ne jouent pas (même ligne que celles des tirages suivants).
   for (const s of firstSkipped) {
     io.err(`orchestrate : lot sauté — ${s}`);

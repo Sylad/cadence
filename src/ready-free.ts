@@ -1,6 +1,8 @@
+import { dirname } from 'node:path';
 import { nextUp } from './audit.js';
 import { planLoader } from './config.js';
 import { gitRoot } from './git.js';
+import { findProjects } from './lead.js';
 import type { Lot } from './plan.js';
 import { decisionPending } from './orchestrate/continue.js';
 import { liveWaves } from './orchestrate/registry.js';
@@ -15,14 +17,18 @@ export interface FreeLot {
 
 const plansOf = (dir: string): Lot[] => planLoader(gitRoot(dir) ?? dir)().lots();
 
+/** Un lot qu'une vague tient : sa clé et son dépôt suffisent à retrouver ses `uses:`. */
+type Held = Pick<LotState, 'project' | 'repo' | 'lot'>;
+
 /**
- * Les ressources prises à cet instant : celles des lots `doing` des projets `dirs`, et celles des lots non finis des vagues vivantes
- * (un lot de vague n'est `doing` dans le plan qu'une fois sa session partie). Avec leurs clés `projet:lot`, qui ne sont pas à proposer.
+ * Les ressources prises à cet instant : celles des lots `doing` des projets `dirs` et de leurs voisins du même dossier (une ressource se partage entre projets :
+ * lancé depuis l'un d'eux, on voit aussi les autres), celles des lots non finis des vagues vivantes (un lot de vague n'est `doing` dans le plan qu'une fois sa session partie)
+ * et celles des lots `held` (le tirage d'une vague qui part). Avec leurs clés `projet:lot`, qui ne sont pas à proposer.
  */
-function taken(dirs: string[], home: string): { resources: Set<string>; running: Set<string> } {
+function taken(dirs: string[], home: string, held: Held[]): { resources: Set<string>; running: Set<string> } {
   const resources = new Set<string>();
   const running = new Set<string>();
-  for (const dir of dirs) {
+  for (const dir of new Set([...dirs, ...dirs.flatMap((d) => findProjects(dirname(d)))])) {
     try {
       for (const l of nextUp(plansOf(dir)).doing) for (const r of l.uses ?? []) resources.add(r);
     } catch {
@@ -36,13 +42,14 @@ function taken(dirs: string[], home: string): { resources: Set<string>; running:
     } catch {
       continue; // état de vague illisible : la vague ne tient aucune ressource connue
     }
-    for (const s of live) {
-      running.add(lotKey(s.project, s.lot));
-      try {
-        for (const r of plansOf(s.repo).find((l) => l.id === s.lot)?.uses ?? []) resources.add(r);
-      } catch {
-        // plan illisible : aucune ressource connue
-      }
+    held = [...held, ...live];
+  }
+  for (const s of held) {
+    running.add(lotKey(s.project, s.lot));
+    try {
+      for (const r of plansOf(s.repo).find((l) => l.id === s.lot)?.uses ?? []) resources.add(r);
+    } catch {
+      // plan illisible : aucune ressource connue
     }
   }
   return { resources, running };
@@ -50,11 +57,11 @@ function taken(dirs: string[], home: string): { resources: Set<string>; running:
 
 /**
  * Pour chaque projet de `projects` (dossier et nom tel que les clés de vague le citent), ses lots prêts (comme `nextUp`, hors « à décider » et hors lots d'une vague vivante) dont aucune ressource
- * n'est prise par un lot `doing` d'un des projets ni par une vague vivante de `home`. Un lot sans `uses:` n'en tient aucune : il est libre.
+ * n'est prise par un lot `doing` d'un des projets (ou de leurs voisins) ni par une vague vivante de `home` ni par les lots `held` d'une vague qui part. Un lot sans `uses:` n'en tient aucune : il est libre.
  * Les projets sans lot libre n'ont pas d'entrée (clé : le dossier) ; un plan illisible est sauté.
  */
-export function readyFree(projects: { dir: string; name: string }[], home: string): Map<string, FreeLot[]> {
-  const { resources, running } = taken(projects.map((p) => p.dir), home);
+export function readyFree(projects: { dir: string; name: string }[], home: string, held: Held[] = []): Map<string, FreeLot[]> {
+  const { resources, running } = taken(projects.map((p) => p.dir), home, held);
   const out = new Map<string, FreeLot[]>();
   for (const { dir, name } of projects) {
     let ready: Lot[];

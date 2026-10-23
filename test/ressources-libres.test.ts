@@ -209,4 +209,29 @@ describe('L252 — orchestrate --continue : la même liste', () => {
     removeDryRunBriefs(r.out.join('\n'));
     expect(r.out.join('\n')).not.toContain(FREE);
   });
+
+  it('R7 — lancé depuis un projet, un lot doing d\'un projet voisin qui tient banc écarte les prêts qui l\'utilisent', async () => {
+    const { dirs } = parentWith({ alpha: [{ title: 'Alpha banc', uses: ['banc'] }], beta: [{ title: 'Beta banc en cours', uses: ['banc'], doing: true }] });
+    const r = io(dirs.alpha!);
+    await orchestrate(['--continue', '--dry-run', '--budget', '1M'], r.io, fakeDeps().deps);
+    removeDryRunBriefs(r.out.join('\n'));
+    expect(r.out.some((l) => l.startsWith(FREE))).toBe(false);
+  });
+
+  it('R7 — la vague qui part tire alpha:L1 : la ligne n\'annonce ni ce lot ni son concurrent sur banc', async () => {
+    const { parent } = parentWith({ alpha: [{ title: 'Alpha banc', uses: ['banc'] }], beta: [{ title: 'Beta banc', uses: ['banc'] }, { title: 'Beta libre' }] });
+    const r = io(parent);
+    await orchestrate(['--continue', '--dry-run', '--budget', '1M', '--max-sessions', '1'], r.io, fakeDeps().deps);
+    removeDryRunBriefs(r.out.join('\n'));
+    expect(r.out.find((l) => l.startsWith(FREE))).toBe(`${FREE}beta:L2 Beta libre`);
+  });
+});
+
+describe('L252 — lead tour lancé depuis un projet', () => {
+  it('R1 — un lot doing d\'un projet voisin qui tient banc écarte les prêts qui l\'utilisent', async () => {
+    const { dirs } = parentWith({ alpha: [{ title: 'Alpha banc', uses: ['banc'] }, { title: 'Alpha libre' }], beta: [{ title: 'Beta banc en cours', uses: ['banc'], doing: true }] });
+    const t = await tour(dirs.alpha!, '--json');
+    const rows = JSON.parse(t.out) as { project: string; free?: { id: string }[] }[];
+    expect(rows[0]!.free?.map((l) => l.id)).toEqual(['L2']);
+  });
 });

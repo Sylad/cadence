@@ -2948,9 +2948,10 @@ lots:
     created: 2026-10-23
   - id: L257
     title: "cadence deliver --sha <sha> ne refuse plus un fichier suivi modifié hors du sha livré (le plan après raf done) : livrer un sha ne lit pas l'arbre ; tests (23-10 : stash/pop pour livrer L129 sous L130)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-23
+    started: 2026-10-23
   - id: L258
     title: 'cadence orchestrate <projet>:<lot> --goal "…" (ou clé goal: du lot) remplace le titre comme objectif du brief, relayé dans le tableau ; tests (titre périmé = délégation à la main : maritime B28.4, B28.5, B28.6)'
     status: todo

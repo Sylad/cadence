@@ -45,7 +45,7 @@ const counted = (l: LotState) => l.steps.reduce((n, s) => n + (s.tokens?.counted
 const minutes = (l: LotState) => Math.round(l.steps.reduce((n, s) => n + (s.ended ? Date.parse(s.ended) - Date.parse(s.started) : 0), 0) / 60_000);
 
 /** Sha abrégés (7, comme `short` du cycle) des commits que git attribue au lot dans son dépôt, du plus ancien au plus récent (illisible ou sans plan : aucun). */
-export function gitCommitsOf(l: LotState): string[] {
+function gitCommitsOf(l: LotState): string[] {
   try {
     return lotWork(planLoader(l.repo)(), l.repo, l.lot).map((c) => c.sha.slice(0, 7)).reverse();
   } catch {
@@ -62,7 +62,7 @@ const sameCommit = (a: string, b: string) => a.length >= 4 && b.length >= 4 && (
  * Ce second groupe suit le premier sans respecter l'ordre de l'historique (git écarte les commits plan-seuls et de version, qui
  * reviennent par les étapes) : le premier et le dernier commit s'obtiennent par ascendance (`oldest`, `newest`), pas par position.
  */
-export function own(l: LotState, fromGit: (l: LotState) => string[]): string[] {
+function own(l: LotState, fromGit: (l: LotState) => string[]): string[] {
   const out = [...new Set(fromGit(l))];
   for (const c of l.steps.flatMap((s) => s.commits ?? []).filter((c) => !c.startsWith('[')).map((c) => c.split(' ')[0])) {
     if (!out.some((o) => sameCommit(o, c))) out.push(c);

@@ -945,6 +945,9 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
 /** Durée par défaut (minutes) d'une session du lead inscrite par `lead hold` : de quoi finir un correctif ou une revue, pas de quoi oublier la réservation toute la journée. */
 const HOLD_TTL_MINUTES = 60;
 
+/** Longueur maximale de l'étiquette encodée : un nom de fichier tient en 255 octets, `.json.tmp` en prend 9. */
+const HOLD_LABEL_MAX = 200;
+
 /** `cadence lead hold <étiquette> [--ttl minutes]` / `lead release <étiquette>` (L255) : inscrit, ou rend, une session lancée à la main par le lead, qui compte dans les créneaux libres. */
 function leadHold(rest: string[], ttl: string | undefined, io: Io): number {
   const [verb, label] = rest;
@@ -955,6 +958,8 @@ function leadHold(rest: string[], ttl: string | undefined, io: Io): number {
     io.out(releaseHold(cadenceHome(), label!) ? `session « ${label} » rendue` : `aucune session « ${label} » inscrite`);
     return 0;
   }
+  // le nom de fichier encode l'étiquette (6 octets par lettre accentuée) : au-delà, le système de fichiers refuse (ENAMETOOLONG)
+  if (encodeURIComponent(label!).length > HOLD_LABEL_MAX) throw new RafError(`étiquette trop longue (${usage})`);
   const minutes = ttl === undefined ? HOLD_TTL_MINUTES : Number(ttl);
   if (!(Number.isInteger(minutes) && minutes >= 1)) throw new RafError(`--ttl invalide : ${ttl} (un nombre entier de minutes ≥ 1)`);
   addHold(cadenceHome(), label!, minutes, io.now());

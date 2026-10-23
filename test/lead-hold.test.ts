@@ -111,6 +111,14 @@ describe('cadence lead hold / release (L255)', () => {
     expect(liveHolds(cadenceHome(), T0)).toEqual([]);
   });
 
+  it('R9b — une étiquette trop longue une fois encodée en nom de fichier : refus propre, code 2', async () => {
+    const dir = tempDir();
+    const r = await cad(dir, {}, T0, 'lead', 'hold', 'é'.repeat(60));
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/trop longue/);
+    expect(liveHolds(cadenceHome(), T0)).toEqual([]);
+  });
+
   it('R10 — lead tour compte les sessions du lead : 4 sessions pour un plafond de 3 ne se voient plus libres', async () => {
     const root = await project();
     registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-23-1000', started: '2026-10-23T10:00:00Z', cwd: root, repos: ['/x/a', '/x/b'], cap: 3 });

@@ -3029,6 +3029,12 @@ lots:
     after: [ L262 ]
     created: 2026-10-23
     started: 2026-10-23
+    notes:
+      - { date: 2026-10-23, text: "Revue de la fiche — mineur : docs/specs/ref-inventaire-schema/fiche.yaml:311 — Flux de sortie ambigu : les lignes « ✗ … » sont listées avec « log error », alors que R4 s'appuie sur spec check (src/cli.ts:1000-1007) qui écrit les ✗ et « N écart(s) » sur io.out, et que C2 réserve la sortie d'erreur au code 2. Un test sur le flux se trompera dans un sens ou l'autre. Préciser stdout pour le code 1." }
+      - { date: 2026-10-23, text: "Revue de la fiche — mineur : docs/specs/ref-inventaire-schema/fiche.yaml:311 — Le résumé de succès est figé à « inventaire valide : N éléments (…) » même pour une lecture (genre lecture) : libellé trompeur. Prévoir un libellé neutre ou selon le genre." }
+      - { date: 2026-10-23, text: "Revue de la fiche — mineur : docs/specs/ref-inventaire-schema/fiche.yaml:243 — Formes non définies : « point (échantillonnage : { x, y } ou zone) » sans dire que zone = { x, y, l, h } ; type de valeur d'un jeton (chaîne, nombre) non précisé ; position { x, y } de R17 sans contrainte de type. Deux implémentations valideront différemment." }
+      - { date: 2026-10-23, text: "Revue de la fiche — mineur : docs/specs/ref-inventaire-schema/fiche.yaml:30 — Entrées non couvertes par une règle ni par un sans_erreur : chemin qui est un dossier, BOM UTF-8, clé JSON dupliquée (la dernière gagne silencieusement), fichier très gros. Un motif sans_erreur serait utile ; un dossier devrait tomber dans « illisible » (code 2) comme readFiche." }
+      - { date: 2026-10-23, text: "Revue de la fiche — mineur : docs/specs/ref-inventaire-schema/fiche.yaml:285 — R27 : couvre « n'importe quel type » permet à un statut de se couvrir lui-même ; à dire explicitement. R9/R10 : le slug attendu est celui de document, qui peut être invalide (R6) : ordre d'évaluation non précisé, d'où des écarts en cascade." }
   - id: L264
     title: "ref (issue #14, 4/10) : générateur du corpus synthétique à vérité connue (evals/ref/, pages HTML rendues en PDF et PNG par Playwright, inventaire attendu, pièges : texte ambigu levé par la figure, figure qui contredit, table en image, gabarit type BUFR, contrôle translucide, page Proposal, scan bruité) et commande d'évaluation (rappel, précision, faux lu, tokens par page)"
     status: todo

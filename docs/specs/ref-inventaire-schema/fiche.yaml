@@ -21,7 +21,7 @@ cas:
       - "un fichier JSON existe, de genre inventaire ou lecture, conforme au schéma"
     nominal:
       - "La commande lit le fichier et le valide en entier."
-      - "Elle écrit une ligne de résumé : nombre d'éléments et répartition par type."
+      - "Elle écrit sur la sortie standard une ligne de résumé : nombre d'éléments et répartition par type."
       - "Elle sort avec le code 0."
     alternatives:
       - { si: "le fichier est le modèle templates/inventaire.json", alors: "il est valide et porte au moins un élément de chacun des onze types", regles: [R29] }
@@ -32,15 +32,15 @@ cas:
     acteur: un utilisateur de cadence
     declencheur: commande ref check
     preconditions:
-      - "aucun argument, plusieurs arguments, un fichier absent ou un fichier qui n'est pas du JSON"
+      - "aucun argument, plusieurs arguments, un fichier absent, un dossier, un fichier vide ou un fichier qui n'est pas du JSON"
     nominal:
       - "La commande refuse avant toute validation."
-      - "Elle écrit la raison sur la sortie d'erreur."
+      - "Elle écrit la raison sur la sortie d'erreur (stderr)."
       - "Elle sort avec le code 2, sans rien écrire sur disque."
     alternatives:
       - { si: "le nombre d'arguments n'est pas un", alors: "ligne d'usage", regles: [R2] }
-      - { si: "le fichier est absent ou son JSON est illisible", alors: "message nommant le fichier", regles: [R3] }
-      - { si: "le fichier est vide ou est un tableau, une chaîne ou un nombre", alors: "écart de racine (code 1), pas une erreur d'usage", regles: [R5] }
+      - { si: "le fichier est absent, est un dossier, est vide ou son JSON est illisible", alors: "message nommant le fichier", regles: [R3] }
+      - { si: "le JSON est un tableau, une chaîne ou un nombre", alors: "écart de racine (code 1), pas une erreur d'usage", regles: [R5] }
     resultat: "Une erreur d'usage claire, distincte d'un écart du fichier."
   - id: C3
     titre: Le fichier a des écarts d'en-tête ou de structure
@@ -50,10 +50,11 @@ cas:
       - "le JSON est lisible mais la racine ou le bloc document ne suit pas le schéma"
     nominal:
       - "La commande valide toute la racine."
-      - "Elle écrit une ligne ✗ par écart, puis « N écart(s) »."
+      - "Elle écrit sur la sortie standard une ligne ✗ par écart, puis « N écart(s) »."
       - "Elle sort avec le code 1."
     alternatives:
-      - { si: "version, genre ou clé de la racine invalide", alors: "écart de racine", regles: [R5, R28] }
+      - { si: "version ou genre de la racine invalide", alors: "écart de racine", regles: [R5] }
+      - { si: "clé inconnue à la racine ou dans un élément", alors: "ignorée, pas un écart", regles: [R28] }
       - { si: "slug ou sha256 du bloc document invalide", alors: "écart de document", regles: [R6] }
       - { si: "elements absent, pas un tableau ou vide", alors: "écart de liste", regles: [R7] }
       - { si: "plusieurs écarts à la fois", alors: "tous sont listés, pas seulement le premier", regles: [R4] }
@@ -71,7 +72,7 @@ cas:
     alternatives:
       - { si: "type hors des onze types", alors: "écart de type", regles: [R8] }
       - { si: "id qui ne suit pas <slug>#<type>-<n>, ou deux éléments de même id", alors: "écart d'id", regles: [R9, R10] }
-      - { si: "page, zone ou citation invalide, ou zone absente", alors: "écart de source", regles: [R11, R12] }
+      - { si: "page, zone ou citation invalide, ou zone absente", alors: "écart de source (un silence peut n'avoir pas de zone)", regles: [R11, R12, R31] }
       - { si: "confiance inconnue, incertain sans cause, ocr non booléen", alors: "écart de confiance", regles: [R13, R14, R15] }
     resultat: "Chaque élément fautif est localisé."
   - id: C5
@@ -85,16 +86,16 @@ cas:
       - "Elle écrit un écart par champ fautif."
       - "Elle sort avec le code 1."
     alternatives:
-      - { si: "ecran", alors: "largeur de référence et zones", regles: [R16] }
+      - { si: "ecran", alors: "largeur de référence et zones", regles: [R16, R32] }
       - { si: "composant", alors: "rôle, position, taille, contenu, écran parent", regles: [R17] }
       - { si: "etat", alors: "nom et cible", regles: [R18] }
-      - { si: "texte", alors: "libellé et rôle", regles: [R19] }
+      - { si: "texte", alors: "libellé et rôle", regles: [R19, R33] }
       - { si: "jeton", alors: "catégorie, valeur, point d'échantillonnage, contraste", regles: [R20] }
       - { si: "table", alors: "colonnes et lignes de même largeur", regles: [R21] }
       - { si: "gabarit", alors: "champs ordonnés avec bornes, obligation, format", regles: [R22] }
-      - { si: "schema", alors: "nœuds et flux", regles: [R23] }
+      - { si: "schema", alors: "nœuds et flux", regles: [R23, R34] }
       - { si: "statut", alors: "libellé et éléments couverts", regles: [R25] }
-      - { si: "silence", alors: "question", regles: [R26] }
+      - { si: "silence", alors: "question", regles: [R26, R35] }
     resultat: "Aucun élément ne passe sans les champs que ses consommateurs (diff, cover, compare) liront."
   - id: C6
     titre: Un lien ou une référence entre éléments est incohérent
@@ -140,22 +141,22 @@ regles:
     tests: ["R2 — sans argument : usage et code 2", "R2 — deux arguments : usage et code 2"]
   - id: R3
     cas: [C2]
-    enonce: "Un fichier absent ou dont le JSON est illisible est une erreur d'usage (code 2), pas un écart du fichier."
+    enonce: "Un fichier absent, un chemin qui est un dossier, un fichier vide (JSON.parse('') échoue) ou dont le JSON est illisible (BOM UTF-8 compris) est une erreur d'usage (code 2), pas un écart du fichier. Une clé JSON dupliquée n'est pas détectée : la dernière gagne, comme avec JSON.parse."
     statut: sourcee
     source: "src/spec.ts:286-293 (fiche introuvable ou illisible : code 2) ; design §1"
-    tests: ["R3 — fichier absent : code 2 et chemin nommé", "R3 — JSON invalide : code 2 et cause", "R3 — fichier vide : code 1 (écart de racine), pas 2"]
+    tests: ["R3 — fichier absent : code 2 et chemin nommé", "R3 — JSON invalide : code 2 et cause", "R3 — fichier vide : code 2 et chemin nommé", "R3 — chemin qui est un dossier : code 2", "R3 — clé dupliquée : acceptée, la dernière valeur est validée"]
   - id: R4
     cas: [C1, C3]
-    enonce: "check valide tout le fichier et écrit une ligne « ✗ <chemin> : <raison> » par écart, puis « N écart(s) » ; un fichier valide écrit une ligne de résumé « inventaire valide : N éléments (…) »."
+    enonce: "check valide tout le fichier et écrit une ligne « ✗ <chemin> : <raison> » par écart, puis « N écart(s) », sur la sortie standard (code 1) ; un fichier valide écrit sur la sortie standard un résumé « <genre> valide : N éléments (…) » où <genre> est « inventaire » ou « lecture »."
     statut: sourcee
     source: "design §1 : « une ligne ✗ par violation » ; src/cli.ts:1000-1007 (format de spec check)"
-    tests: ["R4 — deux écarts : deux lignes ✗ puis « 2 écart(s) »", "R4 — fichier valide : résumé avec le nombre d'éléments par type"]
+    tests: ["R4 — deux écarts : deux lignes ✗ puis « 2 écart(s) »", "R4 — fichier valide : résumé avec le nombre d'éléments par type", "R4 — écarts : lignes ✗ sur la sortie standard, rien sur la sortie d'erreur", "R4 — lecture valide : le résumé dit « lecture valide »"]
   - id: R5
     cas: [C2, C3]
-    enonce: "La racine est un objet qui porte version (1), genre (« inventaire » ou « lecture »), document et elements ; une racine d'un autre type, une version autre que 1 ou un genre inconnu sont des écarts."
+    enonce: "La racine est un objet qui porte version (1), genre (« inventaire » ou « lecture »), document et elements ; une racine d'un autre type (tableau, chaîne, nombre, null), une version autre que 1 ou un genre inconnu sont des écarts."
     statut: hypothese
     si_faux: "Si le format n'a pas besoin de version ou de genre, ces deux clés deviennent facultatives ; seul le modèle et le validateur changent (aucun inventaire n'existe encore)."
-    tests: ["R5 — racine tableau : écart", "R5 — version 2 : écart", "R5 — genre inconnu : écart"]
+    tests: ["R5 — racine tableau : écart, code 1", "R5 — racine chaîne : écart, code 1", "R5 — version 2 : écart", "R5 — genre inconnu : écart"]
   - id: R6
     cas: [C3]
     enonce: "document porte slug (kebab-case) et sha256 (64 caractères hexadécimaux minuscules) ; c'est l'identité utilisée par les ids."
@@ -176,7 +177,7 @@ regles:
     tests: ["R8 — type « bouton » : écart", "R8 — chacun des onze types est accepté"]
   - id: R9
     cas: [C4]
-    enonce: "L'id suit <slug>#<type>-<n> : le slug est celui de document, le type celui de l'élément, n un entier positif sans zéro initial."
+    enonce: "L'id suit <slug>#<type>-<n> : le slug est celui de document (comparé tel quel, même s'il est invalide : l'écart de R6 et celui de R9 sont alors tous deux listés, sans masquage), le type celui de l'élément, n un entier positif sans zéro initial."
     statut: sourcee
     source: "design §2 : « id stable <slug>#<type>-<n> »"
     tests: ["R9 — id d'un autre slug : écart", "R9 — id dont le type diffère de celui de l'élément : écart", "R9 — n = 0 ou 01 : écart"]
@@ -188,10 +189,10 @@ regles:
     tests: ["R10 — deux éléments de même id : écart citant les deux positions"]
   - id: R11
     cas: [C4]
-    enonce: "source porte page (entier ≥ 1) et zone { x, y, l, h } entiers (x et y ≥ 0, l et h ≥ 1) en pixels de la page rendue à 200 dpi ; seul un silence peut n'avoir pas de zone."
+    enonce: "source porte page (entier ≥ 1) et zone { x, y, l, h } entiers (x et y ≥ 0, l et h ≥ 1) en pixels de la page rendue à 200 dpi ; la zone est obligatoire (sauf pour un silence, R31)."
     statut: sourcee
-    source: "design §2 « source » ; la dispense du silence (ce que le document ne montre pas) est une hypothèse de rédaction : si_faux ajouterait une zone obligatoire partout"
-    tests: ["R11 — page 0 : écart", "R11 — l négatif ou nul : écart", "R11 — zone décimale : écart", "R11 — zone absente sur un composant : écart", "R11 — zone absente sur un silence : accepté"]
+    source: "design §2 « source »"
+    tests: ["R11 — page 0 : écart", "R11 — l négatif ou nul : écart", "R11 — zone décimale : écart", "R11 — zone absente sur un composant : écart"]
   - id: R12
     cas: [C4]
     enonce: "citations (facultatif) est un tableau de { page, ligne, extrait } : page entier ≥ 1, ligne entier ≥ 1, extrait non vide."
@@ -218,13 +219,13 @@ regles:
     tests: ["R15 — ocr « oui » : écart", "R15 — lecture, ocr true et lu : écart", "R15 — inventaire, ocr true et lu : accepté"]
   - id: R16
     cas: [C5]
-    enonce: "ecran porte largeur_reference (entier > 0, 1440 par défaut dans le modèle) et zones, un tableau non vide de { nom, x, y, l, h } en pixels à la largeur de référence plus pct { x, y, l, h } en pourcentage de l'écran (0 à 100)."
+    enonce: "ecran porte une largeur de référence (entier > 0, 1440 dans le modèle) et une mise en page mesurée : un tableau non vide de zones, chacune en pixels à cette largeur et en pourcentage de l'écran (0 à 100) ; les noms de clés sont fixés par R32."
     statut: sourcee
-    source: "design §2 : « ecran : largeur de référence, mise en page mesurée (zones en px à 1440 et en %) » ; les noms de clés sont une hypothèse de rédaction (si_faux : renommer avant le lot 4)"
+    source: "design §2 : « ecran : largeur de référence, mise en page mesurée (zones en px à 1440 et en %) »"
     tests: ["R16 — largeur 0 : écart", "R16 — zones vide : écart", "R16 — pct.l = 120 : écart"]
   - id: R17
     cas: [C5]
-    enonce: "composant porte role, position { x, y }, taille { l, h } (> 0), contenu (texte, peut être vide) et ecran (id d'un élément ecran)."
+    enonce: "composant porte role, position { x, y } (entiers ≥ 0), taille { l, h } (entiers ≥ 1), contenu (texte, peut être vide) et ecran (id d'un élément ecran)."
     statut: sourcee
     source: "design §2 : « composant : rôle, position, taille, contenu, écran parent »"
     tests: ["R17 — role vide : écart", "R17 — taille.h = 0 : écart", "R17 — ecran absent : écart"]
@@ -236,13 +237,13 @@ regles:
     tests: ["R18 — nom vide : écart", "R18 — cible absente : écart", "R18 — nom « hors_ligne » (hors liste citée) : accepté"]
   - id: R19
     cas: [C5]
-    enonce: "texte porte libelle (non vide, sans blanc en tête ni en fin) et role (non vide : titre, bouton, message_erreur…)."
+    enonce: "texte porte libelle (chaîne non vide) et role (non vide : titre, bouton, message_erreur…)."
     statut: sourcee
-    source: "design §2 : « texte : libellé, message ou unité verbatim, avec son rôle » ; le refus des blancs de bord (un libellé recopié tel quel n'en a pas) est une hypothèse de rédaction : si_faux, libellé accepté avec blancs"
-    tests: ["R19 — libelle vide : écart", "R19 — libelle « Valider » : écart", "R19 — role absent : écart"]
+    source: "design §2 : « texte : libellé, message ou unité verbatim, avec son rôle »"
+    tests: ["R19 — libelle vide : écart", "R19 — role absent : écart"]
   - id: R20
     cas: [C5]
-    enonce: "jeton porte categorie (couleur, taille_police, espacement, rayon, opacite) et valeur non vide ; un jeton mesure porte aussi point (échantillonnage : { x, y } ou zone) ; un contraste facultatif est { texte, fond, ratio } avec ratio entre 1 et 21."
+    enonce: "jeton porte categorie (couleur, taille_police, espacement, rayon, opacite) et valeur (chaîne non vide, ou nombre fini) ; un jeton mesure porte aussi point (échantillonnage : { x, y } entiers ≥ 0, ou une zone { x, y, l, h } comme en R11) ; un contraste facultatif est { texte, fond, ratio } avec ratio entre 1 et 21."
     statut: sourcee
     source: "design §2 : « jeton : couleur, taille de police, espacement, rayon, opacité ; valeur mesurée, point d'échantillonnage, contraste calculé pour un couple texte / fond » ; ratio 1 à 21 : bornes de la formule WCAG 2.2 (docs/ref.md, contraste)"
     tests: ["R20 — categorie « ombre » : écart", "R20 — jeton mesure sans point : écart", "R20 — ratio 22 : écart", "R20 — jeton lu sans point : accepté"]
@@ -260,10 +261,10 @@ regles:
     tests: ["R22 — min 5, max 2 : écart", "R22 — obligatoire « oui » : écart", "R22 — champs vide : écart", "R22 — champ sans bornes : accepté"]
   - id: R23
     cas: [C5]
-    enonce: "schema porte noeuds (tableau non vide de { id, libelle }, ids uniques dans le schéma) et flux (tableau de { de, vers, libelle, direction }) où de et vers sont des ids de noeuds du même schéma et direction vaut « de_vers » ou « bidirectionnel »."
+    enonce: "schema porte noeuds (tableau non vide de { id, libelle }, ids uniques dans le schéma) et flux (tableau de { de, vers, libelle, direction }) où de et vers sont des ids de noeuds du même schéma et direction est une chaîne non vide dont les valeurs sont fixées par R34."
     statut: sourcee
-    source: "design §2 : « schema : nœuds, flux, transitions, chacun avec libellé et direction » ; les deux valeurs de direction sont une hypothèse de rédaction (si_faux : ajouter une valeur)"
-    tests: ["R23 — flux vers un nœud absent : écart", "R23 — deux nœuds de même id : écart", "R23 — direction « haut » : écart", "R23 — flux vide : accepté"]
+    source: "design §2 : « schema : nœuds, flux, transitions, chacun avec libellé et direction »"
+    tests: ["R23 — flux vers un nœud absent : écart", "R23 — deux nœuds de même id : écart", "R23 — flux vide : accepté"]
   - id: R24
     cas: [C6]
     enonce: "lien porte figure (légende, non vide), passage { page, ligne, extrait } et constat (confirme, precise, contredit). precise ajoute lecture_ambigue, interpretation et raison, non vides ; contredit ajoute enonces, deux textes non vides, et ne porte pas d'interpretation (on ne tranche pas)."
@@ -278,22 +279,22 @@ regles:
     tests: ["R25 — couvre vide : écart", "R25 — libelle vide : écart"]
   - id: R26
     cas: [C5]
-    enonce: "silence porte question, un texte non vide qui se termine par « ? »."
+    enonce: "silence porte question, un texte non vide, rédigé en question (R35)."
     statut: sourcee
-    source: "design §2 : « silence : ce que le document ne montre pas et qu'un développeur devra décider, rédigé en question » ; la fin par « ? » est une hypothèse de rédaction : si_faux, toute phrase non vide serait acceptée"
-    tests: ["R26 — question sans point d'interrogation : écart", "R26 — question vide : écart"]
+    source: "design §2 : « silence : ce que le document ne montre pas et qu'un développeur devra décider, rédigé en question » "
+    tests: ["R26 — question vide : écart"]
   - id: R27
     cas: [C6]
-    enonce: "Toute référence (ecran d'un composant, cible d'un état, couvre d'un statut) désigne un id présent dans elements et du type attendu : ecran pour un composant ; composant ou ecran pour un état ; n'importe quel type pour couvre."
+    enonce: "Toute référence (ecran d'un composant, cible d'un état, couvre d'un statut) désigne un id présent dans elements et du type attendu : ecran pour un composant ; composant ou ecran pour un état ; n'importe quel type pour couvre (un statut peut donc se couvrir lui-même ou en couvrir un autre). Les références sont résolues sur la liste complète des ids, quel que soit l'ordre des éléments."
     statut: sourcee
     source: "design §2 : « écran parent », « le composant ou l'écran concerné », « les éléments qu'il couvre »"
-    tests: ["R27 — composant dont l'ecran est un texte : écart", "R27 — etat dont la cible n'existe pas : écart", "R27 — statut qui couvre un id absent : écart"]
+    tests: ["R27 — composant dont l'ecran est un texte : écart", "R27 — etat dont la cible n'existe pas : écart", "R27 — statut qui couvre un id absent : écart", "R27 — statut qui se couvre lui-même : accepté", "R27 — référence vers un élément placé plus loin dans la liste : acceptée"]
   - id: R28
     cas: [C3]
-    enonce: "Une clé inconnue, à la racine ou dans un élément, est un écart (faute de frappe repérée), sauf dans les champs de type libre listés par le schéma."
+    enonce: "Une clé inconnue, à la racine ou dans un élément, est ignorée : ce n'est pas un écart. Seules les clés que le schéma définit sont validées."
     statut: hypothese
-    si_faux: "Si les lots 5 et 6 ajoutent des champs (agent, modèle) avant que le schéma les déclare, il faut déclarer ces champs ou relâcher le refus ; seul check.ts et le modèle changent."
-    tests: ["R28 — clé « couleur » sur un texte : écart", "R28 — clé inconnue à la racine : écart"]
+    si_faux: "Si les fautes de frappe doivent être repérées, le refus des clés inconnues s'ajoute plus tard ; resserrer peut invalider des fichiers déjà écrits par les lots 4, 5 et 6, d'où le choix tolérant, qui laisse ces lots ajouter des champs (agent, modèle de lecture) sans rouvrir le schéma. Seuls check.ts et le modèle changent."
+    tests: ["R28 — clé « couleur » sur un texte valide : code 0", "R28 — clé inconnue à la racine : code 0"]
   - id: R29
     cas: [C1]
     enonce: "templates/inventaire.json est un inventaire valide, avec au moins un élément de chacun des onze types, ids d'un slug d'exemple."
@@ -306,34 +307,64 @@ regles:
     statut: hypothese
     si_faux: "Si check doit comparer l'empreinte à document.json, il lira references.dir et refusera un document inconnu (sortie 2) ; un ajout, aucun fichier existant ne change."
     tests: ["R30 — PATH vide : check fonctionne et sort 0", "R30 — le dossier du fichier est inchangé après l'appel"]
+  - id: R31
+    cas: [C4]
+    enonce: "Seul un élément de type silence peut n'avoir pas de zone dans source ; tous les autres types en portent une."
+    statut: hypothese
+    si_faux: "Si un silence doit aussi être localisé, la zone devient obligatoire partout ; si d'autres types peuvent en être dispensés, la liste s'allonge. Une condition dans check.ts."
+    tests: ["R31 — zone absente sur un silence : accepté", "R31 — zone absente sur un texte : écart"]
+  - id: R32
+    cas: [C5]
+    enonce: "Noms de clés de l'ecran : largeur_reference (entier > 0) et zones, un tableau non vide de { nom, x, y, l, h, pct } où x, y, l, h sont des entiers en pixels à largeur_reference et pct est { x, y, l, h } en pourcentage de l'écran, nombres de 0 à 100."
+    statut: hypothese
+    si_faux: "Le design §2 ne nomme pas ces clés. Si le lot 4 ou les lots 5 et 6 préfèrent d'autres noms, ils sont renommés dans check.ts et le modèle avant que le moindre fichier ne soit produit (aucun n'existe encore, D2) ; après, un renommage casse les fichiers écrits."
+    tests: ["R32 — largeur_reference 0 : écart", "R32 — zones vide : écart", "R32 — pct.l = 120 : écart", "R32 — zone sans pct : écart"]
+  - id: R33
+    cas: [C5]
+    enonce: "Le libelle d'un texte n'a ni blanc en tête ni blanc en fin (un libellé recopié tel quel n'en a pas)."
+    statut: hypothese
+    si_faux: "Si un libellé peut être recopié avec ses blancs, le refus disparaît ; une condition dans check.ts, aucune donnée en jeu."
+    tests: ["R33 — libelle « Valider » (blanc en fin) : écart", "R33 — libelle « Valider » sans blanc : accepté"]
+  - id: R34
+    cas: [C5]
+    enonce: "La direction d'un flux de schema vaut « de_vers » ou « bidirectionnel »."
+    statut: hypothese
+    si_faux: "Le design §2 demande une direction sans en fixer les valeurs. Si d'autres valeurs sont nécessaires (aucun sens, boucle), la liste s'allonge, ou les valeurs sont renommées avant le lot 5 ; après, un renommage casse les fichiers écrits."
+    tests: ["R34 — direction « haut » : écart", "R34 — « de_vers » et « bidirectionnel » : acceptées"]
+  - id: R35
+    cas: [C5]
+    enonce: "La question d'un silence se termine par « ? » (après suppression des blancs de fin)."
+    statut: hypothese
+    si_faux: "Si une question peut être rédigée sans point d'interrogation, toute phrase non vide est acceptée ; une condition dans check.ts."
+    tests: ["R35 — question sans point d'interrogation : écart", "R35 — question terminée par « ? » : acceptée"]
 
 contrats:
   - id: A1
     appel: commande ref check
     entree: "un chemin de fichier JSON (inventaire ou lecture), un seul argument"
-    sortie: "code 0 et « inventaire valide : N éléments (ecran: n, composant: n, …) » ; code 1 et une ligne « ✗ <chemin> : <raison> » par écart puis « N écart(s) » ; code 2 et la raison sur la sortie d'erreur"
+    sortie: "code 0 et, sur la sortie standard, « <genre> valide : N éléments (ecran: n, composant: n, …) » (genre = inventaire ou lecture) ; code 1 et, sur la sortie standard, une ligne « ✗ <chemin> : <raison> » par écart puis « N écart(s) » ; code 2 et la raison sur la sortie d'erreur"
     erreurs:
       - { code: log error, message: "usage : cadence ref check <inventaire.json | lecture.json>" }
       - { code: log error, message: "ref : fichier introuvable : <chemin>" }
       - { code: log error, message: "ref : <chemin> n'est pas du JSON lisible : <cause>" }
-      - { code: log error, message: "✗ racine : un objet est attendu" }
-      - { code: log error, message: "✗ version : 1 attendu" }
-      - { code: log error, message: "✗ genre : « inventaire » ou « lecture » attendu" }
-      - { code: log error, message: "✗ document.slug : kebab-case attendu" }
-      - { code: log error, message: "✗ document.sha256 : 64 caractères hexadécimaux minuscules attendus" }
-      - { code: log error, message: "✗ elements : un tableau non vide est attendu" }
-      - { code: log error, message: "✗ elements[<i>].type : l'un des onze types attendu" }
-      - { code: log error, message: "✗ elements[<i>].id : <slug>#<type>-<n> attendu" }
-      - { code: log error, message: "✗ elements[<i>].id : déjà porté par elements[<j>]" }
-      - { code: log error, message: "✗ elements[<i>].source.zone : x, y, l, h entiers attendus (l et h ≥ 1)" }
-      - { code: log error, message: "✗ elements[<i>].confiance : mesure, lu ou incertain attendu" }
-      - { code: log error, message: "✗ elements[<i>].cause : obligatoire pour un élément incertain" }
-      - { code: log error, message: "✗ elements[<i>].confiance : un texte ocr n'est jamais lu dans une lecture" }
-      - { code: log error, message: "✗ elements[<i>].<champ> : champ du type <type> manquant ou invalide" }
-      - { code: log error, message: "✗ elements[<i>].<champ> : clé inconnue" }
-      - { code: log error, message: "✗ elements[<i>].<champ> : <id> ne désigne aucun élément de type <type attendu>" }
-      - { code: log error, message: "✗ elements[<i>].interpretation : un lien contredit ne tranche pas" }
-    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, R22, R23, R24, R25, R26, R27, R28, R29, R30]
+      - { code: log error, message: "ref : <chemin> n'est pas un fichier lisible" }
+      - { code: log info, message: "✗ racine : un objet est attendu" }
+      - { code: log info, message: "✗ version : 1 attendu" }
+      - { code: log info, message: "✗ genre : « inventaire » ou « lecture » attendu" }
+      - { code: log info, message: "✗ document.slug : kebab-case attendu" }
+      - { code: log info, message: "✗ document.sha256 : 64 caractères hexadécimaux minuscules attendus" }
+      - { code: log info, message: "✗ elements : un tableau non vide est attendu" }
+      - { code: log info, message: "✗ elements[<i>].type : l'un des onze types attendu" }
+      - { code: log info, message: "✗ elements[<i>].id : <slug>#<type>-<n> attendu" }
+      - { code: log info, message: "✗ elements[<i>].id : déjà porté par elements[<j>]" }
+      - { code: log info, message: "✗ elements[<i>].source.zone : x, y, l, h entiers attendus (l et h ≥ 1)" }
+      - { code: log info, message: "✗ elements[<i>].confiance : mesure, lu ou incertain attendu" }
+      - { code: log info, message: "✗ elements[<i>].cause : obligatoire pour un élément incertain" }
+      - { code: log info, message: "✗ elements[<i>].confiance : un texte ocr n'est jamais lu dans une lecture" }
+      - { code: log info, message: "✗ elements[<i>].<champ> : champ du type <type> manquant ou invalide" }
+      - { code: log info, message: "✗ elements[<i>].<champ> : <id> ne désigne aucun élément de type <type attendu>" }
+      - { code: log info, message: "✗ elements[<i>].interpretation : un lien contredit ne tranche pas" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, R22, R23, R24, R25, R26, R27, R28, R29, R30, R31, R32, R33, R34, R35]
 
 donnees:
   - { id: D1, objet: "templates/inventaire.json (modèle d'inventaire, un élément de chaque type)", existant: false, modification: aucune, note: "fichier créé par le lot ; copié par les auteurs de lecture et le générateur du lot 4" }

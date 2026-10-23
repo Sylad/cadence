@@ -368,6 +368,16 @@ describe('revue coupée (code 143, sortie vide) : une relance en session neuve (
     expect(out.relaunched).toMatchObject({ sessionId: spec.sessionId, cause: 'code 143, sortie vide', stderr: 'Terminated' });
   });
 
+  it("R1 — une session tuée par killSessions (arrêt de la vague) n'est pas relancée : la neuve survivrait à l'orchestrateur", async () => {
+    const calls: string[][] = [];
+    const out = await runSession({ ...spec, agent: undefined }, { claude: async (args) => (calls.push(args), killSessions(), { ...cut, code: 137 }), agents: {} });
+    expect(calls).toHaveLength(1);
+    expect(out.kind).toBe('failed');
+    if (out.kind !== 'failed') return;
+    expect(out.relaunched).toBeUndefined();
+    expect(out.cut).toBeUndefined();
+  });
+
   it('R2 — coupée de nouveau : échec nommé « coupure », marqué cut, pas de troisième lancement', async () => {
     const { calls, p } = run([cut, { ...cut, stderr: 'again' }]);
     const out = await p;

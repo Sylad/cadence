@@ -227,10 +227,12 @@ export async function runSession(
   const sandbox = sandboxEnv(!!spec.prodAccess);
   const launch = (args: string[]) =>
     deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...sandbox.set, ...(spec.tmpDir ? { TMPDIR: spec.tmpDir } : {}), ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn, lot: spec.lot });
+  const epoch = killEpoch;
   const out = await launch(spec.local ? buildLocalArgs(spec, deps.agents) : buildArgs(spec, deps.agents));
   const first = classify(out);
   if (spec.local) return first; // pas de relance de mise en forme : l'appelant se replie sur Sonnet
-  if (first.kind === 'failed' && READ_ONLY.has(spec.kind) && isCut(out)) {
+  // Une session tuée par `killSessions` (arrêt de la vague) n'est pas une coupure à relancer : la neuve survivrait à l'orchestrateur.
+  if (first.kind === 'failed' && READ_ONLY.has(spec.kind) && isCut(out) && killEpoch === epoch) {
     const relaunched: Relaunched = { sessionId: spec.sessionId, cause: `code ${out.code}, sortie vide`, stderr: out.stderr };
     const fresh = randomUUID();
     const again = await launch(buildArgs({ ...spec, sessionId: fresh }, deps.agents));
@@ -275,6 +277,8 @@ function classify(out: LaunchOutcome): SessionOutcome {
 const live = new Set<number>();
 const trees = new Set<TreeTracker>();
 const marks = new Set<string>();
+/** Compte les arrêts de la vague (`killSessions`) : une session qui finit après un arrêt n'est pas relancée. */
+let killEpoch = 0;
 
 /** Suit un groupe de processus lancé par l'orchestrateur (commande du projet) : tué avec les sessions au signal. */
 export function trackGroup(pid: number): () => void {
@@ -284,6 +288,7 @@ export function trackGroup(pid: number): () => void {
 
 /** Tue les groupes de processus des sessions en cours (Ctrl-C, SIGTERM de l'orchestrateur). */
 export function killSessions(): void {
+  killEpoch++;
   for (const pid of live) {
     try {
       process.kill(-pid, 'SIGKILL');

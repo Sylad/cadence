@@ -54,8 +54,8 @@ has to delegate by hand. Three ways to give the goal, in this order of precedenc
 - on a plan **kept by another tool** (read-only, mapped by `plan.fields` in `cadence.yaml`, e.g. maritime's `docs/plan/taches.yaml`): map the
   key that holds the goal, `plan.fields: { goal: objectif }` (a list takes the first key present, like the other fields); without that
   mapping only a key literally named `goal` is read (a field left out is read under its own name), any other key is ignored without a message.
-The key is read for every lot of a launch, so it is the way to give a goal to several lots at once, on both plan kinds (the lot of the plan is
-never written: cadence only reads it). The notes and sub-tasks of the lot stay in the objective. The goal read at launch is kept in the state
+The key is read for every lot of a launch, so it is the way to give a goal to several lots at once, on both plan kinds (cadence only reads the plan,
+it never writes a goal into it). The notes and sub-tasks of the lot stay in the objective. The goal read at launch is kept in the state
 of the lot and is the only source afterwards (briefs, `--dry-run`, table): a `--resume` replays the sessions with the goal of the launch, and
 a `goal:` added or changed in the plan since is not read (to change it: `--resume --drop` the lot and launch it again). `--dry-run` prints
 `objectif donné : …` under the lot, and the table of the wave repeats it (`<project>:<lot> — objectif donné : …`) so the lead sees which

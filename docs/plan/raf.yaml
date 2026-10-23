@@ -2982,9 +2982,10 @@ lots:
     finished: 2026-10-23
   - id: L259
     title: "orchestrate : un Ctrl-C ou un SIGTERM de la vague pendant la relance d'une étape en lecture coupée (L256) ne laisse survivre aucune session claude — la session neuve est enregistrée sur l'étape dès son lancement (step.sessionId), tuée par killSessions, et ses jetons comptent (countInterrupted, reprise d'un orchestrateur mort) ; tests (revue L256)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-23
+    started: 2026-10-23
   - id: L260
     title: "orchestrate : les jetons d'une session coupée puis relancée (L256) comptent dans l'étape (step.tokens), donc dans lotSpent et la colonne du tableau, pas seulement dans le budget de la vague ; tests de la relance suivie d'un quota ou d'un échec (launch.ts:241 ?? fresh, cycle.ts:705 cutTokens) (revue L256)"
     status: todo

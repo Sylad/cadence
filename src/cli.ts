@@ -426,15 +426,16 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return now(loadPlan(), root, newsDir, today, io);
     case 'ignore': {
       need(1, 'ignore <sha> | "<sujet exact>" [--reason texte]');
+      if (rest.length > 1) throw new RafError('un seul commit attendu ; la raison se passe par --reason "texte"');
       const plan = loadPlan();
-      const arg = rest.join(' ');
+      const arg = rest[0];
       const commits = planCommits(plan, root);
       // Un sujet exact l'emporte sur un nom de ref homonyme (`other` à la fois sujet et branche).
-      const sha = rest.length === 1 && !commits.some((c) => c.subject === arg) ? resolveCommit(root, rest[0]) : null;
-      const found = rest.length === 1 && sha ? commits.find((c) => c.sha === sha) : commits.find((c) => c.subject === arg);
+      const sha = commits.some((c) => c.subject === arg) ? null : resolveCommit(root, arg);
+      const found = sha ? commits.find((c) => c.sha === sha) : commits.find((c) => c.subject === arg);
       if (!found) throw new RafError(`aucun commit ne correspond à « ${arg} » (sha ou sujet exact)`);
       // Un sha est exact ; un sujet vaut pour tous les commits qui le portent.
-      const bySha = rest.length === 1 && sha !== null;
+      const bySha = sha !== null;
       plan.acknowledge({ ...(bySha ? { sha: found.sha, subject: found.subject } : { subject: found.subject }), date: today, ...(values.reason ? { reason: values.reason } : {}) });
       plan.save();
       io.out(`${bySha ? short(found) : found.subject} acquitté`);

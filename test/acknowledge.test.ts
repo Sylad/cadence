@@ -60,6 +60,18 @@ describe('raf ignore : acquitter un commit sans réécrire l\'historique', () =>
     expect(r.out).not.toContain('chore: a');
   });
 
+  it('refuse un argument positionnel en trop (la raison sans --reason) et montre la forme attendue, sans toucher au plan', () => {
+    const dir = repo();
+    commit(dir, 'chore: a', '2026-09-28T10:00:00');
+    const avant = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
+    const r = raf(dir, 'ignore', head(dir).slice(0, 7), 'outillage');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('un seul commit attendu ; la raison se passe par --reason "texte"');
+    expect(r.err).not.toContain('aucun commit ne correspond');
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toBe(avant);
+    expect(raf(dir, 'ignore', head(dir).slice(0, 7), '--reason', 'outillage').code).toBe(0);
+  });
+
   it('refuse un commit ou un sujet introuvable, sans argument, et ne touche pas au plan', () => {
     const dir = repo();
     const avant = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');

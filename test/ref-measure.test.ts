@@ -130,6 +130,14 @@ describe('cadence ref measure (L262)', () => {
     expect(m.boites).toEqual([{ x: 250, y: 150, l: 80, h: 80 }]);
   });
 
+  it('boîtes : un élément pâle (gris 238 sur blanc, fond de carte) est une boîte, jamais des dimensions négatives', () => {
+    const t = setup();
+    t.paste(paint(400, 300, WHITE, [{ x: 50, y: 40, l: 100, h: 60, c: [238, 238, 238] }]));
+    const m = t.json('page', '--quoi', 'boites', '--largeur', '400').boites;
+    expect(m.contenu).toEqual({ x: 50, y: 40, l: 100, h: 60 });
+    expect(m.boites).toEqual([{ x: 50, y: 40, l: 100, h: 60 }]);
+  });
+
   it('boîtes : une zone d\'une seule couleur ne contient aucune boîte', () => {
     const t = setup();
     t.paste(SHAPES);

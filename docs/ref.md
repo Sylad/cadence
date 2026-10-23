@@ -72,8 +72,8 @@ factor. Without `--quoi`, the four measures; a point only has colours.
   components (3), AAA (7). `#767676` on white gives 4.54, `#777777` 4.48. A zone of one colour has no
   contrast to measure.
 - **`boites`**: the connected shapes that differ from the background (8 neighbours), the 20 largest first, and the
-  bounding box of all the content; coordinates are those of the page, not of the zone. Shapes under 16 pixels
-  are dust.
+  bounding box of all the content; coordinates are those of the page, not of the zone. A pixel belongs to a shape from a distance of 24 (RGB, Euclidean) to the background, the threshold under which a zone is flat: a pale card (`#eeeeee` on white) is a shape.
+  Shapes under 16 pixels are dust.
 - **`texte`**: the words tesseract reads (English model, `--psm 6`) with their box and confidence, and the
   **estimated font size**: the median height of the words that have no descender and a letter as tall
   as a capital (`Hello`, `2026`, not `gap`) read with confidence ≥ 60, divided by 0.72 (the cap height

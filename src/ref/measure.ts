@@ -20,9 +20,7 @@ const COLOR_TOLERANCE = 1;
 const FONT_TOLERANCE = 5;
 /** Hauteur de capitale, en part de la taille de police (Helvetica / Arial : 0,716 ; la valeur sert de repère, la tolérance couvre l'écart des autres polices). */
 const CAP_HEIGHT = 0.72;
-/** Distance (RVB, euclidienne) au fond à partir de laquelle un pixel est de l'encre. */
-const INK_DISTANCE = 40;
-/** En dessous de cette distance maximale au fond, la zone est unie. */
+/** Distance (RVB, euclidienne) au fond à partir de laquelle un pixel n'est plus du fond ; en dessous de cette distance maximale, la zone est unie. Un seul seuil : une zone non unie a toujours un pixel de contenu. */
 const FLAT_DISTANCE = 24;
 /** Une boîte de moins de pixels que cela est de la poussière. */
 const MIN_BOX_AREA = 16;
@@ -167,7 +165,7 @@ function measureBoxes(r: Raster, z: Zone, f: number) {
   const mask = new Uint8Array(z.l * z.h);
   let x0 = z.l, y0 = z.h, x1 = -1, y1 = -1;
   px.forEach((p, i) => {
-    if (distance(p, bg.rgb) < INK_DISTANCE) return;
+    if (distance(p, bg.rgb) < FLAT_DISTANCE) return;
     mask[i] = 1;
     const x = i % z.l;
     const y = (i - x) / z.l;

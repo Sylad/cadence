@@ -3002,10 +3002,12 @@ lots:
     finished: 2026-10-23
   - id: L261
     title: "ref (issue #14, 1/10) : poser le design de l'issue #14 dans docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md ; cadence ref add — rendu 200 dpi, texte positionné (pdftotext -bbox), images incluses, index des figures et des passages qui les citent, vérification des outils système (poppler, ImageMagick, tesseract : outil absent nommé avec sa commande, sortie 2) ; repartir des recettes de maritime-atlas (skill norme-etude, docs/normes) ; tests sur fixtures"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "conforme (contre-vérification Opus après reprise à la main) — critère du lead tenu : OGC 52 / Table 3 p45, WMO-702 116 / p107 rendue, SIGWX Figure 24 p16, WMO-49 Table IV.3 p201 ; différentiel sur 106 PDF de maritime : aucune vraie légende perdue depuis 1e39ba0 ; binaire cadence ref routé ; 2817/2817, tsc propre (re-vérifié par le lead)", commit: 00381d2738acc3402e8e2f5ffe2aa6c782eeceea }
+    finished: 2026-10-23
   - id: L262
     title: "ref (issue #14, 2/10) : cadence ref measure — couleurs, contrastes WCAG, boîtes, OCR tesseract et taille de police estimée, tolérance déclarée ; tests sur images générées à valeurs connues"
     status: todo

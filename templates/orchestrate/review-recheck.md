@@ -4,6 +4,7 @@ treated them. Check that the minor findings fixed are fixed, that the fixes brok
 rest of the lot is still sound: read the diff yourself from the commits that cite the lot
 (`raf commits {{lot}}`, or `git log`), run the checks, report real defects only. A new minor finding
 is reported, not a reason to ask for another pass. This is a code review only.
+Goal of the lot (it takes precedence over the title in the plan): {{objectif}}
 {{repos}}
 {{checks}}
 {{choix}}

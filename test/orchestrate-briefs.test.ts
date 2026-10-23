@@ -488,3 +488,17 @@ describe("objective : l'objectif remplace le titre (L258)", () => {
     expect(objective(lot()).split('\n')[0]).toBe('Un titre');
   });
 });
+
+describe("l'objectif donné atteint la revue (L258)", () => {
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Titre périmé', objectif: 'Objectif à jour', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: '', captures: '' };
+  it("R4 — les briefs de revue et d'UX portent l'objectif du lot en ligne dédiée", () => {
+    for (const kind of ['review', 'review-small', 'review-recheck', 'ux'] as const) {
+      expect(renderBrief(kind, vars), kind).toContain('Goal of the lot (it takes precedence over the title in the plan): Objectif à jour');
+    }
+  });
+  it("R4 — code-reviewer et qa-reviewer mesurent les commits à l'objectif du brief avant le titre du plan", () => {
+    for (const f of ['code-reviewer', 'qa-reviewer']) {
+      expect(read(`../agents/${f}.md`), f).toContain('goal of the lot given in the brief takes precedence over the title');
+    }
+  });
+});

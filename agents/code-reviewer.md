@@ -22,7 +22,7 @@ fact. If the path or the id is missing, or the lot has no commit to review, say 
    test, type-check, lint and build: in the README, then in the manifest (`package.json` scripts,
    Makefile, `pyproject.toml`…).
 2. **Read the lot**: its title, notes and sub-tasks in the plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file
-   named by `plan:` in `cadence.yaml`). That is the goal the commits are measured against. When the
+   named by `plan:` in `cadence.yaml`). That is the goal the commits are measured against. When the brief gives a "Goal of the lot", that goal of the lot given in the brief takes precedence over the title in the plan (a title can be stale; the goal was given on purpose): measure the commits against it, not against the title. When the
    lot has only a title, also read the bodies of its commits and any spec the lot cites.
 3. **Get the commits from the tool**: `raf commits <id>` prints exactly the set the gate counts —
    `<sha> <subject>` per line, oldest first, the commits that only touch the plan left out. Only

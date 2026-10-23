@@ -107,7 +107,7 @@ a delivery rarely changes them all:
 - the pages that call the changed endpoints (`raf commits <id>` and the diff tell which routes
   changed; the `api:` lines of the expectations, and the calls you see a page make, tell which
   pages use them);
-- the pages of the screens the lot changed (its title and notes in the plan, and
+- the pages of the screens the lot changed (the goal of the lot given in the brief takes precedence over the title in the plan; then its notes in the plan, and
   the components in its commits, name them);
 - the home page.
 

@@ -1,6 +1,7 @@
 Review the usability and accessibility of lot `{{lot}}` — "{{titre}}" — of the repository `{{chemin}}`,
 following your agent instructions. Read the diff yourself from the commits that cite the lot
 (`raf commits {{lot}}`, or `git log`).
+Goal of the lot (it takes precedence over the title in the plan): {{objectif}}
 {{ux}}
 {{fiche}}
 A proposed sub-task describes an observable bug (a wrong output, a crash, a measured regression); any other minor finding stays a note of this lot, not a sub-task.

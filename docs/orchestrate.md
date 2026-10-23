@@ -52,6 +52,7 @@ has to delegate by hand. `cadence orchestrate maritime:B28.4 --goal "…"` repla
 (two lots, `--continue`, `--resume`, `--status` are refused, exit 2, with nothing written); an empty text is refused. The goal is kept in the
 state of the lot: a `--resume` replays the sessions with it, `--dry-run` prints `objectif donné : …` under the lot, and the table of the wave
 repeats it (`<project>:<lot> — objectif donné : …`) so the lead sees which objective the sessions worked from.
+The review and UX briefs carry it too, on a line `Goal of the lot (it takes precedence over the title in the plan): …`, and `code-reviewer` / `qa-reviewer` measure the commits against it, not against the stale title still in a read-only plan.
 
 **`--resume --budget <project>:<lot>=+N` — replaying a lot handed back for its budget (L223)**: a lot handed back with
 `correction non jouée (budget)` or `budget du lot atteint` kept its findings but not its budget, and a plain `--resume` does not replay a

@@ -1,6 +1,7 @@
 import { lotWork } from '../audit.js';
 import { planLoader } from '../config.js';
-import { isAncestor } from '../git.js';
+import { gitRoot, isAncestor } from '../git.js';
+import { repoWork } from '../repos.js';
 import { quotaReset } from './result.js';
 import type { LotState, StepState, WaveState } from './state.js';
 
@@ -99,21 +100,61 @@ function deliverable(lots: LotState[], ancestor: (repo: string, a: string, b: st
 }
 
 /**
- * Livrer au fil de l'eau (L277) : les lots de la vague, dans le dépôt `repo`, qui empêchent de livrer `sha` — ceux qui ne sont pas prêts (en cours,
- * en file, en question, suspendus, rendus, échoués) et dont un commit est dans l'histoire de `sha`. Vide : tous les commits de `sha` qui citent un lot
- * de la vague citent des lots prêts, revus (« prêt » est l'état d'un lot dont la revue est conforme) ; `sha` est « livrable jusqu'à » de la vague.
- * Un lot sans commit ne bloque rien. Pour un lot dont `repo` est un autre dépôt et qui travaille aussi dans `repo` (clé `repos:`, L62), ses commits
- * ici sont les entrées d'étape `[rel] sha` de ce voisin (git ne les attribue qu'au dépôt du projet).
+ * Sha abrégés des commits de `l` dans `repo` que git lui attribue — dans le dépôt de son projet (commits qui citent le lot) ou, quand `repo` est
+ * l'un de ses dépôts voisins (clé `repos:`, L62), dans ce voisin (`repoWork` : commits qui citent le lot, dans sa période, et sa chaîne `cite:`).
+ * Contrairement à `gitCommitsOf`, une lecture impossible LÈVE : plan du projet illisible ou qui ne connaît pas le lot, dépôt qui n'est plus un dépôt
+ * git. « Aucun commit » et « commits illisibles » ne se confondent pas ici : la garde de `deliver --sha` refuse le second.
  */
-export function blockingLots(lots: LotState[], repo: string, sha: string, ancestor: (repo: string, a: string, b: string) => boolean = isAncestor, fromGit: (l: LotState) => string[] = gitCommitsOf): LotState[] {
-  return lots.filter((l) => {
-    if (l.status === 'ready') return false;
-    const neighbours = l.repo === repo ? [] : (l.repos ?? []).filter((r) => r.path === repo).map((r) => `[${r.rel}] `);
-    const mine = neighbours.length > 0
-      ? [...new Set(l.steps.flatMap((s) => s.commits ?? []).flatMap((c) => neighbours.filter((p) => c.startsWith(p)).map((p) => c.slice(p.length).split(' ')[0])))]
-      : own(l, fromGit);
-    return mine.length > 0 && ancestor(repo, oldest(repo, mine, ancestor), sha);
-  });
+export function gitCommitsIn(l: LotState, repo: string): string[] {
+  const plan = planLoader(l.repo)();
+  if (!plan.lots().some((x) => x.id === l.lot)) throw new Error(`le plan de ${l.repo} ne connaît pas le lot ${l.lot}`);
+  const neighbour = l.repo === repo ? undefined : (l.repos ?? []).find((r) => r.path === repo);
+  const where = neighbour ? neighbour.path : l.repo;
+  if (!gitRoot(where)) throw new Error(`${where} n'est pas un dépôt git`);
+  const work = neighbour ? repoWork(plan, neighbour, l.lot) : lotWork(plan, l.repo, l.lot);
+  return work.map((c) => c.sha.slice(0, 7)).reverse();
+}
+
+/** Sha des commits que les étapes de `l` ont notés dans `repo` : entrées `<sha> <sujet>` pour son dépôt, `[rel] <sha> <sujet>` pour un voisin. */
+function stepCommits(l: LotState, repo: string): string[] {
+  const entries = l.steps.flatMap((s) => s.commits ?? []);
+  const prefixes = l.repo === repo ? [] : (l.repos ?? []).filter((r) => r.path === repo).map((r) => `[${r.rel}] `);
+  if (prefixes.length === 0) return entries.filter((c) => !c.startsWith('[')).map((c) => c.split(' ')[0]);
+  return entries.flatMap((c) => prefixes.filter((p) => c.startsWith(p)).map((p) => c.slice(p.length).split(' ')[0]));
+}
+
+/** Ce que la garde de `deliver --sha` a établi sur les lots de la vague : ceux qui empêchent de livrer, et ceux dont on n'a pu vérifier les commits. */
+export interface WaveGuard {
+  blocking: LotState[];
+  unreadable: LotState[];
+}
+
+/**
+ * Livrer au fil de l'eau (L277) : les lots de la vague qui empêchent de livrer `sha` dans `repo` — ceux qui ne sont pas prêts (en cours, en file,
+ * en question, suspendus, rendus, échoués) et dont un commit est dans l'histoire de `sha`. `blocking` vide ET `unreadable` vide : tous les commits de
+ * `sha` qui citent un lot de la vague citent des lots prêts, revus (« prêt » est l'état d'un lot dont la revue est conforme) ; `sha` est
+ * « livrable jusqu'à » de la vague. Un lot sans commit ne bloque rien.
+ *
+ * Les commits d'un lot pas prêt sont l'union de ce que git lui attribue (`read`) et de ce que ses étapes ont noté : les entrées d'étape ne sont
+ * écrites qu'à la fin d'une session au rapport valide, git voit tout de suite le commit d'une session en cours, coupée par le quota ou échouée,
+ * dans son dépôt comme dans un voisin. Un lot dont les commits n'ont pu être lus (`read` lève) et dont aucun commit déjà connu ne bloque est
+ * `unreadable` : on ne laisse passer que ce qu'on a pu vérifier.
+ */
+export function blockingLots(lots: LotState[], repo: string, sha: string, ancestor: (repo: string, a: string, b: string) => boolean = isAncestor, read: (l: LotState, repo: string) => string[] = gitCommitsIn): WaveGuard {
+  const guard: WaveGuard = { blocking: [], unreadable: [] };
+  for (const l of lots) {
+    if (l.status === 'ready') continue;
+    let found: string[] = [];
+    let readable = true;
+    try {
+      found = read(l, repo);
+    } catch {
+      readable = false;
+    }
+    if ([...found, ...stepCommits(l, repo)].some((c) => ancestor(repo, c, sha))) guard.blocking.push(l);
+    else if (!readable) guard.unreadable.push(l);
+  }
+  return guard;
 }
 
 /** Tests déjà rouges au départ listés un par un dans le tableau ; au-delà, un compte. */

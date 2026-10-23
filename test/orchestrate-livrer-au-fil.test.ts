@@ -63,6 +63,20 @@ describe('livrer au fil de l\'eau pendant une vague (L277)', () => {
     return w;
   };
 
+  /** Enregistre une vague vivante `id` qui tient le verrou de `dir` avec ces lots, sans passer par `vague()` (fixtures à plan propre). */
+  const attendre = (dir: string, lots: LotState[], repos: string[] = [dir], id = 'w8') => {
+    const launch = tempDir();
+    const home = tempDir();
+    const store = RunStore.reserve(launch, id)!;
+    store.writeWave({ id, status: 'running', created: 'x', lots: lots.map((l) => `${l.project}:${l.lot}`) } as never);
+    for (const l of lots) store.writeLot(l);
+    mkdirSync(sharedStateDir(dir), { recursive: true });
+    writeFileSync(join(sharedStateDir(dir), REPO_LOCK), JSON.stringify({ pid: process.pid, wave: id, started: 'x' }));
+    registerWave(home, { pid: process.pid, wave: id, started: 'x', cwd: launch, repos });
+    saved = process.env.CADENCE_HOME;
+    process.env.CADENCE_HOME = home;
+  };
+
   it('R1 — --sha d\'un commit sous tout lot non prêt : la vague ne bloque plus la livraison', async () => {
     const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing' });
     const r = await cli(dir, 'deliver', '--dry-run', '--sha', shas.A);
@@ -124,37 +138,154 @@ describe('livrer au fil de l\'eau pendant une vague (L277)', () => {
     expect(r.err).toContain('orchestration en cours (vague w9');
   });
 
-  it('R8 — un commit qu\'un lot pas prêt a fait dans un dépôt voisin (clé repos:) bloque le sha du voisin', async () => {
-    const a = gitRepo();
-    const b = gitRepo();
-    for (const d of [a, b]) {
-      writeFileSync(join(d, 'cadence.yaml'), 'deliver:\n  ci: none\n  deploy: echo ok\n  verify:\n    - command: "true"\n');
-      execFileSync('git', ['add', '.'], { cwd: d });
-      commit(d, 'chore: init');
-    }
-    const avant = sha(b, 'HEAD');
-    writeFileSync(join(b, 'N.ts'), 'export const N = 1;\n');
-    execFileSync('git', ['add', 'N.ts'], { cwd: b });
-    commit(b, 'feat(L9): N', '2026-10-23T10:00:00');
-    const tete = sha(b, 'HEAD');
-    const launch = tempDir();
-    const home = tempDir();
-    const store = RunStore.reserve(launch, 'w8')!;
-    store.writeWave({ id: 'w8', status: 'running', created: 'x', lots: ['ici:L9'] } as never);
-    const lot = newLot({ project: 'ici', repo: a, lot: 'L9', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false });
+  it('R9 — le plan du lot (ici dans son worktree) est illisible : on ne peut pas dire que le sha est livrable, refus', async () => {
+    const dir = gitRepo();
+    await cli(dir, 'init', '--no-hook');
+    await cli(dir, 'add', 'Un lot');
+    await cli(dir, 'start', 'L1');
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  ci: none\n  deploy: echo ok\n  verify:\n    - command: "true"\n');
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    commit(dir, 'chore: plan');
+    const wt = join(tempDir(), 'wt');
+    execFileSync('git', ['worktree', 'add', '-q', '--detach', wt], { cwd: dir });
+    writeFileSync(join(wt, '.cadence', 'raf.yaml'), 'lots: [\n');
+    const lot = newLot({ project: 'ici', repo: wt, lot: 'L1', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false });
     lot.status = 'implementing';
-    lot.repos = [{ rel: '../b', path: b }];
-    lot.steps = [{ commits: [`[../b] ${tete.slice(0, 7)}`] } as never];
-    store.writeLot(lot);
-    mkdirSync(sharedStateDir(b), { recursive: true });
-    writeFileSync(join(sharedStateDir(b), REPO_LOCK), JSON.stringify({ pid: process.pid, wave: 'w8', started: 'x' }));
-    registerWave(home, { pid: process.pid, wave: 'w8', started: 'x', cwd: launch, repos: [a, b] });
-    saved = process.env.CADENCE_HOME;
-    process.env.CADENCE_HOME = home;
-    const refuse = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+    attendre(dir, [lot]);
+    const r = await cli(dir, 'deliver', '--dry-run', '--sha', 'HEAD');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('orchestration en cours (vague w8');
+    expect(r.err).toContain('ici:L1');
+    expect(r.err).toContain('illisible');
+  });
+
+  it.each(['failed', 'suspended', 'question', 'queued', 'reviewing', 'fixing'] as const)('R10 — un lot « %s » qui a commité dans le dépôt bloque le sha, quelle que soit la session', async (status) => {
+    // L3 travaille encore : sans lui la vague ne tiendrait plus le dépôt (tous les lots finis) et deliver irait son cours ordinaire.
+    const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': status, 'ici:L3': 'implementing' });
+    const refuse = await cli(dir, 'deliver', '--dry-run', '--sha', shas.C);
     expect(refuse.code).toBe(2);
-    expect(refuse.err).toContain('ici:L9');
-    const accepte = await cli(b, 'deliver', '--dry-run', '--sha', avant);
+    expect(refuse.err).toContain('ici:L2');
+    const accepte = await cli(dir, 'deliver', '--dry-run', '--sha', shas.A);
     expect(accepte.err).not.toContain('orchestration en cours');
+  });
+
+  it('R11 — un commit que git n\'attribue pas au lot mais que ses étapes ont noté le bloque encore', async () => {
+    const dir = gitRepo();
+    await cli(dir, 'init', '--no-hook');
+    await cli(dir, 'add', 'Un lot');
+    await cli(dir, 'start', 'L1');
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  ci: none\n  deploy: echo ok\n  verify:\n    - command: "true"\n');
+    writeFileSync(join(dir, 'X.ts'), 'export const X = 1;\n');
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    commit(dir, 'feat: sans citer le lot', '2026-10-23T10:00:00');
+    const tete = sha(dir, 'HEAD');
+    const lot = newLot({ project: 'ici', repo: dir, lot: 'L1', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false });
+    lot.status = 'implementing';
+    lot.steps = [{ commits: [`${tete.slice(0, 7)} feat: sans citer le lot`] } as never];
+    attendre(dir, [lot]);
+    const r = await cli(dir, 'deliver', '--dry-run', '--sha', tete);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('ici:L1');
+  });
+
+  describe('lot d\'un autre projet qui travaille ici (clé repos:)', () => {
+    /** Projet `a` (plan avec L1 démarré) et dépôt voisin `b` où `cadence deliver` tourne ; une vague tient les deux. */
+    async function voisin(over: { status?: LotState['status']; subject?: string | null; cite?: string; steps?: (b: string, tete: string) => string[]; plan?: 'ok' | 'casse' } = {}) {
+      const a = gitRepo();
+      const b = gitRepo();
+      await cli(a, 'init', '--no-hook');
+      await cli(a, 'add', 'Un lot');
+      await cli(a, 'add', 'Deux lot');
+      await cli(a, 'start', 'L1');
+      await cli(a, 'start', 'L2');
+      for (const d of [a, b]) {
+        writeFileSync(join(d, 'cadence.yaml'), 'deliver:\n  ci: none\n  deploy: echo ok\n  verify:\n    - command: "true"\n');
+        execFileSync('git', ['add', '.'], { cwd: d });
+        commit(d, 'chore: init');
+      }
+      if (over.plan === 'casse') writeFileSync(join(a, '.cadence', 'raf.yaml'), 'lots: [\n');
+      const avant = sha(b, 'HEAD');
+      let tete = avant;
+      if (over.subject !== null) {
+        writeFileSync(join(b, 'N.ts'), 'export const N = 1;\n');
+        execFileSync('git', ['add', 'N.ts'], { cwd: b });
+        commit(b, over.subject ?? 'feat(L1): N', '2026-10-23T10:00:00');
+        tete = sha(b, 'HEAD');
+      }
+      const lot = newLot({ project: 'ici', repo: a, lot: 'L1', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false });
+      lot.status = over.status ?? 'implementing';
+      lot.repos = [{ rel: '../b', path: b, ...(over.cite ? { cite: over.cite } : {}) }];
+      lot.steps = over.steps ? over.steps(b, tete).map((c) => ({ commits: [c] }) as never) : [];
+      // L2 travaille encore dans b, sans commit : sans lui la vague ne tiendrait plus b quand L1 est rendu ou échoué.
+      const autre = newLot({ project: 'ici', repo: a, lot: 'L2', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false });
+      autre.status = 'implementing';
+      autre.repos = [{ rel: '../b', path: b }];
+      attendre(b, [lot, autre], [a, b]);
+      return { a, b, avant, tete };
+    }
+
+    it('R8a — session en cours : le commit du voisin n\'est connu que par git, il bloque quand même', async () => {
+      const { b, avant, tete } = await voisin();
+      const refuse = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+      expect(refuse.code).toBe(2);
+      expect(refuse.err).toContain('ici:L1');
+      const accepte = await cli(b, 'deliver', '--dry-run', '--sha', avant);
+      expect(accepte.err).not.toContain('orchestration en cours');
+    });
+
+    it.each(['failed', 'suspended', 'handed-back'] as const)('R8b — session coupée ou échouée (%s) qui a commité dans le voisin : bloque, sans entrée d\'étape', async (status) => {
+      const { b, tete } = await voisin({ status });
+      const refuse = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+      expect(refuse.code).toBe(2);
+      expect(refuse.err).toContain('ici:L1');
+    });
+
+    it('R8c — commit connu des seules étapes (il ne cite pas le lot) : bloque encore', async () => {
+      const { b, tete } = await voisin({ subject: 'feat: sans citer', steps: (_b, t) => [`[../b] ${t.slice(0, 7)} feat: sans citer`] });
+      const refuse = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+      expect(refuse.code).toBe(2);
+      expect(refuse.err).toContain('ici:L1');
+    });
+
+    it('R8d — connu par les étapes ET par git : un seul blocage', async () => {
+      const { b, tete } = await voisin({ steps: (_b, t) => [`[../b] ${t.slice(0, 7)} feat(L1): N`] });
+      const refuse = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+      expect(refuse.code).toBe(2);
+      expect(refuse.err.match(/ici:L1/g)).toHaveLength(1);
+    });
+
+    it('R8e — aucun commit du lot dans le voisin : rien ne bloque', async () => {
+      const { b, tete } = await voisin({ subject: null });
+      const r = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+      expect(r.err).not.toContain('orchestration en cours');
+    });
+
+    it('R8f — un lot prêt qui a commité dans le voisin ne bloque pas', async () => {
+      const { b, tete } = await voisin({ status: 'ready' });
+      const r = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+      expect(r.err).not.toContain('orchestration en cours');
+    });
+
+    it('R8g — la chaîne cite: du lot écarte le commit d\'une autre application', async () => {
+      const { b, tete } = await voisin({ cite: 'aetherwx' });
+      const r = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+      expect(r.err).not.toContain('orchestration en cours');
+    });
+
+    it('R8h — plan du projet illisible, aucun commit connu : refus (on ne laisse passer que ce qui est vérifié)', async () => {
+      const { b, avant } = await voisin({ plan: 'casse', subject: null });
+      const r = await cli(b, 'deliver', '--dry-run', '--sha', avant);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain('orchestration en cours (vague w8');
+      expect(r.err).toContain('ici:L1');
+      expect(r.err).toContain('illisible');
+    });
+
+    it('R8i — plan illisible mais le commit est noté par les étapes : le refus dit qu\'il bloque', async () => {
+      const { b, tete } = await voisin({ plan: 'casse', steps: (_b, t) => [`[../b] ${t.slice(0, 7)} feat(L1): N`] });
+      const r = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain('contient des commits de lots pas prêts');
+    });
   });
 });

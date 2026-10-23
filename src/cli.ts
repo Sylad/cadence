@@ -548,9 +548,12 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         const target = resolveCommit(root, values.sha);
         if (lots === null) throw new RafError(`${refusal} — état de la vague illisible : --sha ${values.sha} ne peut pas être vérifié`);
         if (!target) throw new RafError(`${refusal} — --sha ${values.sha} : commit introuvable`);
-        const blocking = blockingLots(lots, root, target);
+        const { blocking, unreadable } = blockingLots(lots, root, target);
         if (blocking.length > 0) {
           throw new RafError(`${refusal} — ${target.slice(0, 7)} contient des commits de lots pas prêts : ${blocking.map((l) => `${l.project}:${l.lot} (${LABEL[l.status]})`).join(', ')} ; livrer un sha antérieur (« livrable jusqu'à » du tableau de la vague) ou attendre leur fin`);
+        }
+        if (unreadable.length > 0) {
+          throw new RafError(`${refusal} — commits illisibles (plan du projet ou dépôt) des lots pas prêts ${unreadable.map((l) => `${l.project}:${l.lot} (${LABEL[l.status]})`).join(', ')} : --sha ${values.sha} ne peut pas être vérifié ; rétablir le plan ou attendre la fin de ces lots`);
         }
       }
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans docs/deliver.md du paquet @sylad/cadence)`);

@@ -133,10 +133,17 @@ without `allowDirty`.
 repository in the wave is ready or handed back. `--sha` is the exception (L277): it is accepted while the wave runs when no
 commit in the history of `<sha>` belongs to a lot of the wave that is not ready (running, queued, in question, suspended,
 handed back, failed), that is when `<sha>` is « livrable jusqu'à » (the line the wave's final table prints). A ready lot is
-then delivered while the wave runs, without waiting for the slowest lot. The refusal names the lots that hold the sha back; an
-unreadable wave state or an unknown sha is refused too. A lot of the wave with no commit yet blocks nothing. Push the sha
-alone first (`git push origin <sha>:main`). While the wave runs, what is logged as delivered is `<sha>` itself, even when
-a project script sees HEAD move (a running lot committing): the « head moved by the script » rule applies outside a wave only.
+then delivered while the wave runs, without waiting for the slowest lot. The refusal names the lots that hold the sha back. A lot's commits
+are what git attributes to it in the repository (the commits that cite it) **and** what its sessions' reports noted, for the project's own
+repository as for a neighbour one (the lot's `repos:` key): git sees at once the commit of a session still running, cut by the quota or failed,
+which the reports only note when the session ends validly. A lot of the wave with no commit yet blocks nothing. What cannot be verified is
+refused: an unreadable wave state, an unknown sha, or a lot that is not ready whose commits cannot be read (its project's plan is unreadable or
+does not know the lot) while none of the commits already known holds the sha back. Push the sha alone first (`git push origin <sha>:main`).
+
+While the wave runs, what is logged as delivered is `<sha>` itself, except when a project script moves HEAD by itself (the timestamp commit of
+a `--news` entry, say, which is what then gets deployed): HEAD, read again after the script, is logged (« head moved by the script ») when no
+commit of a lot that is not ready is in its history, checked again at that moment against the wave's state. If a lot that is not ready committed
+in between, or the wave cannot say, the log keeps `<sha>`.
 
 cadence keeps what the script usually lacks: the preconditions (clean tree, pushed
 `HEAD`), the lock (never two deliveries at once), the delivery log and the lots

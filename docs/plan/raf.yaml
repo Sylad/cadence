@@ -3150,9 +3150,10 @@ lots:
     finished: 2026-10-23
   - id: L277
     title: "cadence deliver --sha <sha> accepté pendant une vague du même dépôt quand <sha> est le « livrable jusqu'à » de la vague (tous ses commits citent des lots prêts, revus) ; skill lead : livrer au fil de l'eau un lot prêt au lieu d'attendre la fin de la vague ; tests. Mesure 23-10 : 1 554 lots×minutes entre « prêt » et la fin de vague sur 28 vagues (warhammer Civils : 1 h 45 pour le premier prêt)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-23
+    started: 2026-10-23
   - id: L278
     title: "Correctifs et revues lancés à la main par le lead : budget et durée maximale déclarés (cadence lead hold --ttl l'indique, rien ne l'arrête) — au TTL échu, cadence lead tour et la bande le signalent en ⚠ et le skill lead dit de le reprendre ou de l'arrêter ; tests. Vécu 23-10 : correctif B28.6 plus de 5 h sur un créneau de 3"
     status: todo

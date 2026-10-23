@@ -127,6 +127,20 @@ describe('L252 — lead tour : les lots prêts dont les ressources sont libres',
     }
   });
 
+  it('R3 — un lot sans uses: d\'une vague vivante n\'est pas proposé comme libre', async () => {
+    const { parent, dirs } = parentWith({ alpha: [{ title: 'Dans la vague' }, { title: 'Libre' }] });
+    const store = RunStore.reserve(parent, '2026-10-23-0900')!;
+    store.writeWave({ id: store.id, created: '2026-10-23T09:00:00Z', cwd: parent, budget: 1, consumed: 0, cacheRead: 0, status: 'running', pid: process.ppid, lots: ['alpha:L1'] });
+    store.writeLot({ project: 'alpha', repo: dirs.alpha, lot: 'L1', title: 'Dans la vague', visible: false, small: true, status: 'queued' } as never);
+    registerWave(cadenceHome(), { pid: process.ppid, wave: store.id, started: '2026-10-23T09:00:00Z', cwd: parent, repos: [dirs.alpha], cap: 2 });
+    try {
+      const line = (await tour(parent)).out.split('\n').find((l) => l.startsWith(FREE))!;
+      expect(line).toBe(`${FREE}alpha:L2 Libre`);
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+  });
+
   it('R4 — aucun lot prêt libre : pas de ligne ; un lot « à décider » n\'est pas listé', async () => {
     const { parent } = parentWith({ alpha: [{ title: 'Banc en cours', uses: ['banc'], doing: true }, { title: 'Autre', uses: ['banc'] }, { title: 'Choix (à décider avec Sylvain)' }] });
     expect((await withIdleWave(parent, () => tour(parent))).out).not.toContain(FREE);

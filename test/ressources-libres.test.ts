@@ -187,19 +187,16 @@ describe('L252 — lead tour : les lots prêts dont les ressources sont libres',
 });
 
 describe('L252 — orchestrate --continue : la même liste', () => {
-  it('R7 — --dry-run --continue affiche la ligne, sans les lots que la simulation tire', async () => {
+  it('R7 — --dry-run --continue affiche la ligne, sans le lot que la simulation tire (même sans uses:) ni les lots qui prennent banc', async () => {
     const { parent } = parentWith({
-      alpha: [{ title: 'Banc en cours', uses: ['banc'], doing: true }, { title: 'Autre banc', uses: ['banc'] }, { title: 'Libre', uses: ['passerelle'] }],
+      alpha: [{ title: 'Banc en cours', uses: ['banc'], doing: true }, { title: 'Tiré' }, { title: 'Autre banc', uses: ['banc'] }, { title: 'Libre', uses: ['passerelle'] }],
       beta: [{ title: 'Beta banc', uses: ['banc'] }, { title: 'Beta libre' }],
     });
     const r = io(parent);
-    await orchestrate(['--continue', '--dry-run', '--budget', '1M'], r.io, fakeDeps().deps);
+    await orchestrate(['--continue', '--dry-run', '--budget', '1M', '--max-sessions', '1'], r.io, fakeDeps().deps);
     removeDryRunBriefs(r.out.join('\n'));
-    const line = r.out.find((l) => l.startsWith(FREE));
-    expect(line).toBeDefined();
-    expect(line).toContain('alpha:L3 Libre (passerelle)');
-    expect(line).toContain('beta:L2 Beta libre');
-    expect(line).not.toContain('banc)');
+    expect(r.out).toContain('alpha:L2 — Tiré'); // le lot que la simulation tire
+    expect(r.out.find((l) => l.startsWith(FREE))).toBe(`${FREE}alpha:L4 Libre (passerelle) · beta:L2 Beta libre`);
   });
 
   it('R7 — sans --continue la ligne n\'est pas écrite', async () => {

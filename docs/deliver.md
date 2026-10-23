@@ -90,7 +90,7 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   5 minutes is a failure (you probably pushed another commit than the one you
   deliver); every run must end `success`, `skipped` or `neutral`. `gh` errors
   are retried, and reported with their cause after 5 minutes.
-- Commands get `CADENCE_SHA`, `CADENCE_SHORT` (7 characters) and `CADENCE_BRANCH`;
+- Commands get `CADENCE_SHA`, `CADENCE_SHORT` (7 characters) and `CADENCE_BRANCH` (a `deliver.script` also gets `CADENCE_DEPLOYED_FILE`, see below);
   `${SHA}` and `${SHORT}` are replaced in `url` and `contains`.
 - On success the lots cited by the commits since the previous delivery are
   listed, so you can `raf done` those whose effect you have seen. With a
@@ -140,16 +140,25 @@ which the reports only note when the session ends validly. A lot of the wave wit
 refused: an unreadable wave state, an unknown sha, or a lot that is not ready whose commits cannot be read (its project's plan is unreadable or
 does not know the lot) while none of the commits already known holds the sha back. Push the sha alone first (`git push origin <sha>:main`).
 
-While the wave runs, what is logged as delivered is `<sha>` itself, except when a project script moves HEAD by itself (the timestamp commit of
-a `--news` entry, say, which is what then gets deployed): HEAD, read again after the script, is logged (« head moved by the script ») when no
-commit of a lot that is not ready is in its history, checked again at that moment against the wave's state. If a lot that is not ready committed
-in between, or the wave cannot say, the log keeps `<sha>`.
+**What is logged as delivered.** cadence no longer guesses which commit a project script deployed. Before running `deliver.script` it creates an
+empty file and hands its path to the script in `CADENCE_DEPLOYED_FILE` (next to `CADENCE_SHA`, `CADENCE_SHORT`, `CADENCE_BRANCH`). A script
+that deploys a commit other than `CADENCE_SHA` (it committed a `--news` timestamp itself, say) writes that sha into the file. After the script:
+
+- the file holds a sha that resolves to a commit: that is the sha logged, and `✓ livré :` names it (« sha déclaré par le script ») — it wins over
+  HEAD, during a wave or not;
+- the file holds anything else (not a commit, several lines): the delivery fails with a message that says so, nothing is logged;
+- the file is empty and the delivery runs **while a wave runs**: the log keeps `<sha>`, and if HEAD moved during the delivery a warning says
+  so (« la tête a avancé pendant la livraison ; sans sha déclaré par le script (CADENCE_DEPLOYED_FILE), le journal garde <sha> ») — the new
+  commit may be the script's, a running lot's, or a plan commit, and cadence cannot tell them apart;
+- the file is empty and **no wave runs**: the historical rule stays, a script that committed and pushed during the delivery has delivered the new
+  HEAD, which is logged (« head moved by the script »).
 
 cadence keeps what the script usually lacks: the preconditions (clean tree, pushed
 `HEAD`), the lock (never two deliveries at once), the delivery log and the lots
 delivered. Arguments are quoted for `sh`, so spaces and quotes reach the script
 intact. If the script commits and pushes during the delivery (stamping a
-changelog entry, say), the new `HEAD` is the sha recorded as delivered. Exit code
+changelog entry, say), outside a wave the new `HEAD` is the sha recorded as delivered; during a wave, or to be exact
+about it anywhere, the script declares it in `CADENCE_DEPLOYED_FILE` (above). Exit code
 0 of the script means delivered; `verify` checks, if any, run after it.
 
 ## verify: replay the effect checks, outside a delivery

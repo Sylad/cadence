@@ -27,6 +27,11 @@ deliver:
   script: ./scripts/ship.sh "$CADENCE_SHORT"
 ```
 
+A script that deploys a commit other than `$CADENCE_SHA` (it committed a Nouveautés timestamp itself)
+writes that sha into the file named by `$CADENCE_DEPLOYED_FILE`: cadence logs it as delivered and never guesses
+(a content that is not a commit fails the delivery; empty during a wave, the log keeps `$CADENCE_SHA` and a warning
+says the head moved).
+
 Its arguments go after `--`: `cadence deliver -- api frontend` (`--sha <rev>` to deliver a pushed
 commit other than HEAD). Ask the human (or the project's own
 delivery skill) which arguments this delivery needs; never guess them.

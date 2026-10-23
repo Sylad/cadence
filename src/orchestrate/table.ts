@@ -7,7 +7,7 @@ import type { LotState, StepState, WaveState } from './state.js';
 const k = (n: number) => `${Math.round(n / 1000)} k`;
 const m = (n: number) => `${(n / 1_000_000).toFixed(1).replace('.', ',')} M`;
 
-const LABEL: Record<LotState['status'], string> = {
+export const LABEL: Record<LotState['status'], string> = {
   queued: 'en attente',
   implementing: 'implémentation',
   reviewing: 'revue',
@@ -44,7 +44,7 @@ const counted = (l: LotState) => l.steps.reduce((n, s) => n + (s.tokens?.counted
 const minutes = (l: LotState) => Math.round(l.steps.reduce((n, s) => n + (s.ended ? Date.parse(s.ended) - Date.parse(s.started) : 0), 0) / 60_000);
 
 /** Sha abrégés (7, comme `short` du cycle) des commits que git attribue au lot dans son dépôt, du plus ancien au plus récent (illisible ou sans plan : aucun). */
-function gitCommitsOf(l: LotState): string[] {
+export function gitCommitsOf(l: LotState): string[] {
   try {
     return lotWork(planLoader(l.repo)(), l.repo, l.lot).map((c) => c.sha.slice(0, 7)).reverse();
   } catch {
@@ -61,7 +61,7 @@ const sameCommit = (a: string, b: string) => a.length >= 4 && b.length >= 4 && (
  * Ce second groupe suit le premier sans respecter l'ordre de l'historique (git écarte les commits plan-seuls et de version, qui
  * reviennent par les étapes) : le premier et le dernier commit s'obtiennent par ascendance (`oldest`, `newest`), pas par position.
  */
-function own(l: LotState, fromGit: (l: LotState) => string[]): string[] {
+export function own(l: LotState, fromGit: (l: LotState) => string[]): string[] {
   const out = [...new Set(fromGit(l))];
   for (const c of l.steps.flatMap((s) => s.commits ?? []).filter((c) => !c.startsWith('[')).map((c) => c.split(' ')[0])) {
     if (!out.some((o) => sameCommit(o, c))) out.push(c);
@@ -96,6 +96,20 @@ function deliverable(lots: LotState[], ancestor: (repo: string, a: string, b: st
     if (top) out.push({ ready: top.lot, sha: top.last, under: top.under! });
   }
   return out;
+}
+
+/**
+ * Livrer au fil de l'eau (L277) : les lots de la vague, dans le dépôt `repo`, qui empêchent de livrer `sha` — ceux qui ne sont pas prêts (en cours,
+ * en file, en question, suspendus, rendus, échoués) et dont un commit est dans l'histoire de `sha`. Vide : tous les commits de `sha` qui citent un lot
+ * de la vague citent des lots prêts, revus (« prêt » est l'état d'un lot dont la revue est conforme) ; `sha` est « livrable jusqu'à » de la vague.
+ * Un lot sans commit ne bloque rien.
+ */
+export function blockingLots(lots: LotState[], repo: string, sha: string, ancestor: (repo: string, a: string, b: string) => boolean = isAncestor, fromGit: (l: LotState) => string[] = gitCommitsOf): LotState[] {
+  return lots.filter((l) => {
+    if (l.status === 'ready') return false;
+    const mine = own(l, fromGit);
+    return mine.length > 0 && ancestor(repo, oldest(repo, mine, ancestor), sha);
+  });
 }
 
 /** Tests déjà rouges au départ listés un par un dans le tableau ; au-delà, un compte. */

@@ -223,17 +223,22 @@ const commonDir = (dir: string): string | null => {
   }
 };
 
-/** Lots de la vague `pid` qui travaillent encore dans `repo` (en cours, en file ou suspendus) ; null si l'état de la vague est illisible. */
-export function openLotsIn(home: string, pid: number, repo: string): string[] | null {
+/** Lots de la vague `pid` qui travaillent dans `repo` (ou l'un de ses worktrees), finis ou non ; null si l'état de la vague est illisible. */
+export function waveLotsIn(home: string, pid: number, repo: string): LotState[] | null {
   try {
     const w = liveWaves(home).find((x) => x.pid === pid);
     const store = w && RunStore.find(w.cwd, w.wave);
     if (!store) return null;
     const mine = commonDir(repo);
-    return store.lots().filter((l) => !lotFinished(l) && lotRepoPaths(l).some((r) => r === repo || (mine !== null && commonDir(r) === mine))).map((l) => lotKey(l.project, l.lot));
+    return store.lots().filter((l) => lotRepoPaths(l).some((r) => r === repo || (mine !== null && commonDir(r) === mine)));
   } catch {
     return null;
   }
+}
+
+/** Lots de la vague `pid` qui travaillent encore dans `repo` (en cours, en file ou suspendus) ; null si l'état de la vague est illisible. */
+export function openLotsIn(home: string, pid: number, repo: string): string[] | null {
+  return waveLotsIn(home, pid, repo)?.filter((l) => !lotFinished(l)).map((l) => lotKey(l.project, l.lot)) ?? null;
 }
 
 /** Une vague non terminée qui garde ouvert un lot encore en cours au plan du dépôt (L238). */

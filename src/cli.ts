@@ -22,7 +22,8 @@ import { findProjects, leadTour, readLeadUx, tourFreeLine, tourLine } from './le
 import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
-import { cadenceHome, liveWaves, openLotsIn, openWavesIn, type OpenWave } from './orchestrate/registry.js';
+import { cadenceHome, liveWaves, openLotsIn, openWavesIn, waveLotsIn, type OpenWave } from './orchestrate/registry.js';
+import { blockingLots, LABEL } from './orchestrate/table.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedDeliveries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
@@ -539,7 +540,19 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     case 'deliver': {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
       const orchestrating = waveHolding(root);
-      if (orchestrating) throw new RafError(`deliver : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid}) — livrer une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus)`);
+      if (orchestrating) {
+        const refusal = `deliver : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid})`;
+        if (values.sha === undefined) throw new RafError(`${refusal} — livrer une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus), ou un sha « livrable jusqu'à » de la vague (--sha)`);
+        // L277 : un sha dont tous les commits de la vague citent des lots prêts se livre au fil de l'eau ; l'état de la vague illisible ou un sha inconnu : refus.
+        const lots = waveLotsIn(cadenceHome(), orchestrating.pid, root);
+        const target = resolveCommit(root, values.sha);
+        if (lots === null) throw new RafError(`${refusal} — état de la vague illisible : --sha ${values.sha} ne peut pas être vérifié`);
+        if (!target) throw new RafError(`${refusal} — --sha ${values.sha} : commit introuvable`);
+        const blocking = blockingLots(lots, root, target);
+        if (blocking.length > 0) {
+          throw new RafError(`${refusal} — ${target.slice(0, 7)} contient des commits de lots pas prêts : ${blocking.map((l) => `${l.project}:${l.lot} (${LABEL[l.status]})`).join(', ')} ; livrer un sha antérieur (« livrable jusqu'à » du tableau de la vague) ou attendre leur fin`);
+        }
+      }
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans docs/deliver.md du paquet @sylad/cadence)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const plan = existsSync(planPath) ? loadPlan() : null;

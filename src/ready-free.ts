@@ -4,7 +4,7 @@ import { gitRoot } from './git.js';
 import type { Lot } from './plan.js';
 import { decisionPending } from './orchestrate/continue.js';
 import { liveWaves } from './orchestrate/registry.js';
-import { lotFinished, lotKey, RunStore } from './orchestrate/state.js';
+import { lotFinished, lotKey, RunStore, type LotState } from './orchestrate/state.js';
 
 /** Un lot prêt dont aucune ressource n'est prise (L252) ; `uses` n'est écrit que si le lot en porte. */
 export interface FreeLot {
@@ -30,9 +30,13 @@ function taken(dirs: string[], home: string): { resources: Set<string>; running:
     }
   }
   for (const w of liveWaves(home)) {
-    const store = RunStore.find(w.cwd, w.wave);
-    if (!store) continue;
-    for (const s of store.lots().filter((l) => !lotFinished(l))) {
+    let live: LotState[];
+    try {
+      live = RunStore.find(w.cwd, w.wave)?.lots().filter((l) => !lotFinished(l)) ?? [];
+    } catch {
+      continue; // état de vague illisible : la vague ne tient aucune ressource connue
+    }
+    for (const s of live) {
       running.add(lotKey(s.project, s.lot));
       try {
         for (const r of plansOf(s.repo).find((l) => l.id === s.lot)?.uses ?? []) resources.add(r);

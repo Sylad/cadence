@@ -114,6 +114,19 @@ describe('L252 — lead tour : les lots prêts dont les ressources sont libres',
     }
   });
 
+  it('R3 — un état de vague illisible ne casse pas le tour : la ligne reste donnée', async () => {
+    const { parent, dirs } = parentWith({ alpha: [{ title: 'Libre' }] });
+    const store = RunStore.reserve(parent, '2026-10-23-0900')!;
+    store.writeWave({ id: store.id, created: '2026-10-23T09:00:00Z', cwd: parent, budget: 1, consumed: 0, cacheRead: 0, status: 'running', pid: process.ppid, lots: [] });
+    writeFileSync(join(store.dir, 'alpha--L9.json'), '{ pas du json');
+    registerWave(cadenceHome(), { pid: process.ppid, wave: store.id, started: '2026-10-23T09:00:00Z', cwd: parent, repos: [dirs.alpha], cap: 2 });
+    try {
+      expect((await tour(parent)).out).toContain(`${FREE}alpha:L1 Libre`);
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+  });
+
   it('R4 — aucun lot prêt libre : pas de ligne ; un lot « à décider » n\'est pas listé', async () => {
     const { parent } = parentWith({ alpha: [{ title: 'Banc en cours', uses: ['banc'], doing: true }, { title: 'Autre', uses: ['banc'] }, { title: 'Choix (à décider avec Sylvain)' }] });
     expect((await withIdleWave(parent, () => tour(parent))).out).not.toContain(FREE);

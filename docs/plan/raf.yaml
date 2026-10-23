@@ -2989,9 +2989,10 @@ lots:
     review: { date: 2026-10-23, verdict: "compliant — orchestré (vague 2026-10-23-cad-ref, 0 passe(s) de correction)", commit: 5a6e009bf686de5d28e21fda8669a7cc60efbaae }
   - id: L260
     title: "orchestrate : les jetons d'une session coupée puis relancée (L256) comptent dans l'étape (step.tokens), donc dans lotSpent et la colonne du tableau, pas seulement dans le budget de la vague ; tests de la relance suivie d'un quota ou d'un échec (launch.ts:241 ?? fresh, cycle.ts:705 cutTokens) (revue L256)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-23
+    started: 2026-10-23
   - id: L261
     title: "ref (issue #14, 1/10) : poser le design de l'issue #14 dans docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md ; cadence ref add — rendu 200 dpi, texte positionné (pdftotext -bbox), images incluses, index des figures et des passages qui les citent, vérification des outils système (poppler, ImageMagick, tesseract : outil absent nommé avec sa commande, sortie 2) ; repartir des recettes de maritime-atlas (skill norme-etude, docs/normes) ; tests sur fixtures"
     status: todo

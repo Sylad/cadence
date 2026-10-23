@@ -45,10 +45,9 @@ describe('captures Playwright des étapes (L249)', () => {
     expect(doc).toMatch(/at 1440 and 390 px with a file name \(where it goes is the Playwright paragraph's rule\)/);
   });
 
-  it('R3 — le brief rendu avec {{shots}} porte le chemin absolu ; sans vague (délégation à la main) la consigne est absente', () => {
+  it('R3 — le brief rendu avec {{shots}} porte le chemin absolu (l\'absence de la consigne sans vague est vérifiée par le --dry-run, orchestrate-command.test.ts)', () => {
     const vars = { chemin: '/r/p', lot: 'L9', titre: 'T', objectif: 'x', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: '', captures: '' };
     expect(renderBrief('ux', { ...vars, shots: shotsText('/vague/pw') })).toContain('/vague/pw/');
-    expect(renderBrief('ux', vars)).not.toContain('/vague/pw');
   });
 
   it.each([['agents/ux-reviewer.md'], ['agents/qa-reviewer.md'], ['docs/skills.md']])('R5 — %s : hors vague, un exemple de capture arrive sous .playwright-mcp/ du dépôt, jamais à sa racine', (rel) => {

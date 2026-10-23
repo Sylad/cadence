@@ -186,6 +186,28 @@ describe('refus avant d\'agir (code 2)', () => {
     }
   });
 
+  it("L249 — dry-run (délégation à la main) : aucun brief écrit ne porte la consigne de captures de la vague (nom de fichier résolu sur le dépôt, dossier de vague inexistant)", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un', visible: true }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  ux:\n    url: http://localhost:4200\n');
+    git(dirs.a, 'add', '--', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: config');
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      const files = [...out.matchAll(/^\s*brief : (.+?)\s*$/gm)].map((m) => m[1]!);
+      expect(files.length).toBeGreaterThanOrEqual(3); // implement, review, ux
+      const briefs = files.map((f) => readFileSync(f, 'utf8'));
+      expect(briefs.some((b) => b.includes('Playwright'))).toBe(true); // la rubrique Playwright est bien là, sans la consigne de vague
+      for (const b of briefs) {
+        expect(b).not.toContain('resolves a file name you give it against the repository');
+        expect(b).not.toContain('/playwright/');
+        expect(b).not.toMatch(/\{\{/);
+      }
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
   it("R8 — dry-run d'un lot visible : la ligne étapes liste review avant ux (L221)", async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un', visible: true }] });
     writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  ux:\n    url: http://localhost:4200\n');

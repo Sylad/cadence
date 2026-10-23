@@ -216,7 +216,7 @@ describe('cadence ref check (L263)', () => {
   });
 
   it('R11 — page 0 : écart', () => {
-    expect(ecarts(doc([el('texte', (e) => (e.source.page = 0))]))).toContain('elements[0].source.page');
+    expect(ecarts(doc([el('texte', (e) => (e.source.page = 0))]))).toContain('✗ elements[0].source.page : champ du type texte manquant ou invalide');
   });
   it('R11 — l négatif ou nul : écart', () => {
     for (const l of [0, -3]) expect(ecarts(doc([el('texte', (e) => (e.source.zone.l = l))])), String(l)).toContain('✗ elements[0].source.zone : x, y, l, h entiers attendus (l et h ≥ 1)');
@@ -230,11 +230,17 @@ describe('cadence ref check (L263)', () => {
   });
 
   it('R12 — extrait vide : écart', () => {
-    expect(ecarts(doc([el('texte', (e) => (e.citations = [{ page: 1, ligne: 2, extrait: '' }]))]))).toContain('elements[0].citations[0].extrait');
+    expect(ecarts(doc([el('texte', (e) => (e.citations = [{ page: 1, ligne: 2, extrait: '' }]))]))).toContain('✗ elements[0].citations[0].extrait : champ du type texte manquant ou invalide');
     valide(doc([el('texte', (e) => (e.citations = [{ page: 1, ligne: 2, extrait: 'x' }]))]));
   });
+  it('R11 — source ou élément qui n\'est pas un objet : écarts du contrat', () => {
+    const out = ecarts(doc([el('texte', (e) => (e.source = 'x'))]));
+    expect(out).toContain('✗ elements[0].source.zone : x, y, l, h entiers attendus (l et h ≥ 1)');
+    expect(out).toContain('✗ elements[0].source.page : champ du type texte manquant ou invalide');
+    expect(ecarts(doc([BASE.texte!, 'x' as any]))).toContain('✗ elements[1].type : l\'un des onze types attendu');
+  });
   it('R12 — ligne manquante : écart', () => {
-    expect(ecarts(doc([el('texte', (e) => (e.citations = [{ page: 1, extrait: 'x' }]))]))).toContain('elements[0].citations[0].ligne');
+    expect(ecarts(doc([el('texte', (e) => (e.citations = [{ page: 1, extrait: 'x' }]))]))).toContain('✗ elements[0].citations[0].ligne : champ du type texte manquant ou invalide');
   });
 
   it('R13 — confiance « sûr » : écart', () => {
@@ -249,13 +255,13 @@ describe('cadence ref check (L263)', () => {
     expect(ecarts(doc([el('texte', (e) => { e.confiance = 'incertain'; e.cause = '  '; })]))).toContain('elements[0].cause');
   });
   it('R14 — lu avec une cause : écart', () => {
-    expect(ecarts(doc([el('texte', (e) => (e.cause = 'x'))]))).toContain('elements[0].cause');
-    expect(ecarts(doc([el('jeton', (e) => (e.cause = 'x'))]))).toContain('elements[0].cause');
+    expect(ecarts(doc([el('texte', (e) => (e.cause = 'x'))]))).toContain('✗ elements[0].cause : champ du type texte manquant ou invalide');
+    expect(ecarts(doc([el('jeton', (e) => (e.cause = 'x'))]))).toContain('✗ elements[0].cause : champ du type jeton manquant ou invalide');
     valide(doc([el('texte', (e) => { e.confiance = 'incertain'; e.cause = 'flou'; })]));
   });
 
   it('R15 — ocr « oui » : écart', () => {
-    expect(ecarts(doc([el('texte', (e) => (e.ocr = 'oui'))]))).toContain('elements[0].ocr');
+    expect(ecarts(doc([el('texte', (e) => (e.ocr = 'oui'))]))).toContain('✗ elements[0].ocr : champ du type texte manquant ou invalide');
   });
   it('R15 — lecture, ocr true et lu : écart', () => {
     expect(ecarts(doc([el('texte', (e) => (e.ocr = true))], { genre: 'lecture' }))).toContain('✗ elements[0].confiance : un texte ocr n\'est jamais lu dans une lecture');
@@ -346,7 +352,7 @@ describe('cadence ref check (L263)', () => {
   });
 
   it('R23 — flux vers un nœud absent : écart', () => {
-    expect(ecarts(doc([el('schema', (e) => (e.flux[0].vers = 'z'))]))).toContain('✗ elements[0].flux[0].vers : z ne désigne aucun nœud du schéma');
+    expect(ecarts(doc([el('schema', (e) => (e.flux[0].vers = 'z'))]))).toContain('✗ elements[0].flux[0].vers : z ne désigne aucun élément de type noeud');
   });
   it('R23 — deux nœuds de même id : écart', () => {
     expect(ecarts(doc([el('schema', (e) => (e.noeuds[1].id = 'a'))]))).toContain('✗ elements[0].noeuds[1].id : champ du type schema manquant ou invalide');
@@ -398,7 +404,7 @@ describe('cadence ref check (L263)', () => {
     expect(ecarts(doc([BASE.texte!, el('etat', (e) => (e.cible = 'exemple#texte-1'))]))).toContain('elements[1].cible');
   });
   it('R27 — statut qui couvre un id absent : écart', () => {
-    expect(ecarts(doc([el('statut', (e) => (e.couvre = ['exemple#ecran-9']))]))).toContain('✗ elements[0].couvre[0] : exemple#ecran-9 ne désigne aucun élément');
+    expect(ecarts(doc([el('statut', (e) => (e.couvre = ['exemple#ecran-9']))]))).toContain('✗ elements[0].couvre[0] : exemple#ecran-9 ne désigne aucun élément de type ecran, composant, etat, texte, jeton, table, gabarit, schema, lien, statut ou silence');
   });
   it('R27 — statut qui se couvre lui-même : accepté', () => {
     valide(doc([el('statut', (e) => (e.couvre = ['exemple#statut-1']))]));

@@ -60,12 +60,13 @@ export function checkInventaire(root: unknown): string[] {
   });
   elements.forEach((e, i) => {
     const at = `elements[${i}]`;
-    if (!isObj(e)) return bad(at, 'un objet est attendu');
+    if (!isObj(e)) return bad(`${at}.type`, "l'un des onze types attendu");
     const type = typeof e.type === 'string' && (TYPES as readonly string[]).includes(e.type) ? e.type : undefined;
     if (type === undefined) bad(`${at}.type`, "l'un des onze types attendu");
     checkId(e, i, type, typeof slug === 'string' ? slug : undefined, firstWith, bad);
-    checkSource(e, at, type, bad);
-    checkConfiance(e, at, root.genre === 'lecture', bad);
+    const champ = (path: string) => bad(path, `champ du type ${type ?? 'inconnu'} manquant ou invalide`);
+    checkSource(e, at, type, bad, champ);
+    checkConfiance(e, at, root.genre === 'lecture', bad, champ);
     if (type !== undefined) checkFields(e, at, type, (field) => bad(`${at}.${field}`, `champ du type ${type} manquant ou invalide`), bad);
   });
   elements.forEach((e, i) => {
@@ -86,31 +87,30 @@ function checkId(e: Obj, i: number, type: string | undefined, slug: string | und
   if (first !== undefined && first !== i) bad(at, `déjà porté par elements[${first}]`);
 }
 
-function checkSource(e: Obj, at: string, type: string | undefined, bad: Bad): void {
-  const source = e.source;
-  if (!isObj(source)) return bad(`${at}.source`, 'un objet avec page et zone est attendu');
-  if (!isInt(source.page, 1)) bad(`${at}.source.page`, 'entier ≥ 1 attendu');
+function checkSource(e: Obj, at: string, type: string | undefined, bad: Bad, champ: (path: string) => void): void {
+  const source = isObj(e.source) ? e.source : {};
+  if (!isInt(source.page, 1)) champ(`${at}.source.page`);
   // seul un silence peut n'avoir pas de zone ; s'il en porte une, elle est validée
   if (!(type === 'silence' && source.zone === undefined) && !zoneOk(source.zone)) bad(`${at}.source.zone`, 'x, y, l, h entiers attendus (l et h ≥ 1)');
   if (e.citations !== undefined) {
-    if (!Array.isArray(e.citations)) return bad(`${at}.citations`, 'un tableau de { page, ligne, extrait } est attendu');
+    if (!Array.isArray(e.citations)) return champ(`${at}.citations`);
     e.citations.forEach((c, j) => {
       const o = isObj(c) ? c : {};
-      if (!isInt(o.page, 1)) bad(`${at}.citations[${j}].page`, 'entier ≥ 1 attendu');
-      if (!isInt(o.ligne, 1)) bad(`${at}.citations[${j}].ligne`, 'entier ≥ 1 attendu');
-      if (!isText(o.extrait)) bad(`${at}.citations[${j}].extrait`, 'texte non vide attendu');
+      if (!isInt(o.page, 1)) champ(`${at}.citations[${j}].page`);
+      if (!isInt(o.ligne, 1)) champ(`${at}.citations[${j}].ligne`);
+      if (!isText(o.extrait)) champ(`${at}.citations[${j}].extrait`);
     });
   }
 }
 
-function checkConfiance(e: Obj, at: string, lecture: boolean, bad: Bad): void {
+function checkConfiance(e: Obj, at: string, lecture: boolean, bad: Bad, champ: (path: string) => void): void {
   const confiance = e.confiance;
   if (typeof confiance !== 'string' || !CONFIANCES.includes(confiance)) bad(`${at}.confiance`, 'mesure, lu ou incertain attendu');
-  if (e.ocr !== undefined && typeof e.ocr !== 'boolean') bad(`${at}.ocr`, 'booléen attendu');
+  if (e.ocr !== undefined && typeof e.ocr !== 'boolean') champ(`${at}.ocr`);
   if (confiance === 'incertain') {
     if (!isText(e.cause)) bad(`${at}.cause`, 'obligatoire pour un élément incertain');
   } else if (e.cause !== undefined && CONFIANCES.includes(confiance as string)) {
-    bad(`${at}.cause`, 'réservée à un élément incertain');
+    champ(`${at}.cause`);
   }
   if (lecture && e.ocr === true && confiance === 'lu') bad(`${at}.confiance`, "un texte ocr n'est jamais lu dans une lecture");
 }
@@ -249,14 +249,14 @@ function checkRefs(e: Obj, at: string, typeOf: Map<string, string>, bad: Bad): v
   if (e.type === 'etat') expect(`${at}.cible`, e.cible, ['composant', 'ecran']);
   if (e.type === 'statut' && Array.isArray(e.couvre)) {
     e.couvre.forEach((id, j) => {
-      if (typeof id === 'string' && !typeOf.has(id)) bad(`${at}.couvre[${j}]`, `${id} ne désigne aucun élément`);
+      if (typeof id === 'string' && !typeOf.has(id)) bad(`${at}.couvre[${j}]`, `${id} ne désigne aucun élément de type ${TYPES.slice(0, -1).join(', ')} ou ${TYPES[TYPES.length - 1]}`);
     });
   }
   if (e.type === 'schema' && Array.isArray(e.noeuds) && Array.isArray(e.flux)) {
     const noeuds = new Set(e.noeuds.map((n) => (isObj(n) ? n.id : undefined)));
     e.flux.forEach((f, j) => {
       if (!isObj(f)) return;
-      for (const k of ['de', 'vers']) if (typeof f[k] === 'string' && !noeuds.has(f[k])) bad(`${at}.flux[${j}].${k}`, `${f[k]} ne désigne aucun nœud du schéma`);
+      for (const k of ['de', 'vers']) if (typeof f[k] === 'string' && !noeuds.has(f[k])) bad(`${at}.flux[${j}].${k}`, `${f[k]} ne désigne aucun élément de type noeud`);
     });
   }
 }

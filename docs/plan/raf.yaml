@@ -2982,18 +2982,24 @@ lots:
     finished: 2026-10-23
   - id: L259
     title: "orchestrate : un Ctrl-C ou un SIGTERM de la vague pendant la relance d'une étape en lecture coupée (L256) ne laisse survivre aucune session claude — la session neuve est enregistrée sur l'étape dès son lancement (step.sessionId), tuée par killSessions, et ses jetons comptent (countInterrupted, reprise d'un orchestrateur mort) ; tests (revue L256)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "compliant — orchestré (vague 2026-10-23-cad-ref, 0 passe(s) de correction)", commit: 5a6e009bf686de5d28e21fda8669a7cc60efbaae }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à 3984e00 (worktree) : vitest 2750 (+4 sautés), tsc propre. Poussé et mis en service seul (L261 rendu au-dessus)." }
+    finished: 2026-10-23
   - id: L260
     title: "orchestrate : les jetons d'une session coupée puis relancée (L256) comptent dans l'étape (step.tokens), donc dans lotSpent et la colonne du tableau, pas seulement dans le budget de la vague ; tests de la relance suivie d'un quota ou d'un échec (launch.ts:241 ?? fresh, cycle.ts:705 cutTokens) (revue L256)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "compliant — le lot ajoute le test manquant (relance suivie d'un quota), et les mutations montrent que les trois issues (ok, échec, quota) sont couvertes pour launch.ts:241 et cycle.ts:705 — orchestré (vague 2026-10-23-cad-ref, 0 passe(s) de correction)", commit: 3984e0072baaa46678c187432aa83d65bb61cbdc }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à 3984e00 (worktree) : vitest 2750 (+4 sautés), tsc propre. Poussé et mis en service seul (L261 rendu au-dessus)." }
+    finished: 2026-10-23
   - id: L261
     title: "ref (issue #14, 1/10) : poser le design de l'issue #14 dans docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md ; cadence ref add — rendu 200 dpi, texte positionné (pdftotext -bbox), images incluses, index des figures et des passages qui les citent, vérification des outils système (poppler, ImageMagick, tesseract : outil absent nommé avec sa commande, sortie 2) ; repartir des recettes de maritime-atlas (skill norme-etude, docs/normes) ; tests sur fixtures"
     status: doing
@@ -3059,19 +3065,26 @@ lots:
     created: 2026-10-23
   - id: L271
     title: "orchestrate : un lot de revue UX planifiée (« Revue UX — <écran> ») sans visible: passe par precheck → implement → review sans aucune étape UX (finance L32 le 23-10 : la session n'a traité que la note du lot, la revue de l'écran n'a pas eu lieu) — le faire passer par l'ux-reviewer (titre « Revue UX — » ou clé dédiée), ou raf check signale un lot « Revue UX » non visible ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "compliant : 0 blocking, 0 major, 2 minor notes (L271 : raf check signale un lot ouvert « Revue UX — » non visible ; test/check.test.ts 31/31, tsc propre) — orchestré (vague 2026-10-23-cad-ref, 0 passe(s) de correction)", commit: 6571024c4a26c9290b5a48c5d0566d181a2e674c }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à 3984e00 (worktree) : vitest 2750 (+4 sautés), tsc propre. Poussé et mis en service seul (L261 rendu au-dessus)." }
+      - { date: 2026-10-23, text: "Variante retenue : raf check signale un lot « Revue UX — » non visible (le titre du lot l'autorisait), orchestrate n'ajoute pas d'étape UX." }
+    finished: 2026-10-23
   - id: L272
     title: "raf show <lot> affiche goal: (l'objectif qui remplacera le titre dans les briefs), natif ou mappé ; test (revue L258)"
-    status: doing
+    status: done
     estimate: 0.1
     quickwin: true
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "compliant — orchestré (vague 2026-10-23-cad-ref, 0 passe(s) de correction)", commit: 643f2c67d83872f20248d6e98a5e87d8c7dcba5b }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à 3984e00 (worktree) : vitest 2750 (+4 sautés), tsc propre. Poussé et mis en service seul (L261 rendu au-dessus)." }
+    finished: 2026-10-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

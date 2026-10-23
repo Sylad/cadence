@@ -3151,10 +3151,14 @@ lots:
     finished: 2026-10-23
   - id: L277
     title: "cadence deliver --sha <sha> accepté pendant une vague du même dépôt quand <sha> est le « livrable jusqu'à » de la vague (tous ses commits citent des lots prêts, revus) ; skill lead : livrer au fil de l'eau un lot prêt au lieu d'attendre la fin de la vague ; tests. Mesure 23-10 : 1 554 lots×minutes entre « prêt » et la fin de vague sur 28 vagues (warhammer Civils : 1 h 45 pour le premier prêt)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "conforme (code-reviewer Opus 23-10, 3e revue après décision lead CADENCE_DEPLOYED_FILE) : 0 bloquant, 0 majeur, 2 mineurs (révision non hexadécimale acceptée → L281 ; deployed-<pid> orphelin après signal → note) ; garde inchangée depuis 5f26aab, 2994/2994", commit: c0e888e9e6ee465abc93bd1ba4210ca0689d72ec }
+    notes:
+      - { date: 2026-10-23, text: "Mineur revue 23-10 : un signal (SIGINT/SIGTERM) laisse .git/cadence/deployed-<pid> vide (finally non joué) — sans effet, à nettoyer comme le verrou périmé si ça s'accumule" }
+    finished: 2026-10-23
   - id: L278
     title: "Correctifs et revues lancés à la main par le lead : budget et durée maximale déclarés (cadence lead hold --ttl l'indique, rien ne l'arrête) — au TTL échu, cadence lead tour et la bande le signalent en ⚠ et le skill lead dit de le reprendre ou de l'arrêter ; tests. Vécu 23-10 : correctif B28.6 plus de 5 h sur un créneau de 3"
     status: todo
@@ -3170,6 +3174,11 @@ lots:
     title: "perf : recaler estimate et budgets des lots sur la mesure — tokens par lot +26 % sur deux fenêtres (0,25 j : 117→148 k ; 0,5 j : 327→412 k) pendant que la part conforme du premier coup passe de 37 à 59 % ; budgets par défaut d'orchestrate et seuils de cadence perf dérivés des fenêtres mesurées, étapes spec (1,3→4,2 min), maquette (4,5→7,1) et ux (6,5→8,5) expliquées ou bornées ; décision Sylvain 23-10"
     status: todo
     estimate: 0.5
+    created: 2026-10-23
+  - id: L281
+    title: "deliver : CADENCE_DEPLOYED_FILE n'accepte qu'un sha hexadécimal — un script qui écrit HEAD ou un nom de branche voit sa révision résolue APRÈS le script, au commit d'un autre (mesuré : feat(L9) journalisé « sha déclaré par le script ») ; test (revue L277)"
+    status: todo
+    estimate: 0.1
     created: 2026-10-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

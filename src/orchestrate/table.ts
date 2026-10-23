@@ -102,12 +102,16 @@ function deliverable(lots: LotState[], ancestor: (repo: string, a: string, b: st
  * Livrer au fil de l'eau (L277) : les lots de la vague, dans le dépôt `repo`, qui empêchent de livrer `sha` — ceux qui ne sont pas prêts (en cours,
  * en file, en question, suspendus, rendus, échoués) et dont un commit est dans l'histoire de `sha`. Vide : tous les commits de `sha` qui citent un lot
  * de la vague citent des lots prêts, revus (« prêt » est l'état d'un lot dont la revue est conforme) ; `sha` est « livrable jusqu'à » de la vague.
- * Un lot sans commit ne bloque rien.
+ * Un lot sans commit ne bloque rien. Pour un lot dont `repo` est un autre dépôt et qui travaille aussi dans `repo` (clé `repos:`, L62), ses commits
+ * ici sont les entrées d'étape `[rel] sha` de ce voisin (git ne les attribue qu'au dépôt du projet).
  */
 export function blockingLots(lots: LotState[], repo: string, sha: string, ancestor: (repo: string, a: string, b: string) => boolean = isAncestor, fromGit: (l: LotState) => string[] = gitCommitsOf): LotState[] {
   return lots.filter((l) => {
     if (l.status === 'ready') return false;
-    const mine = own(l, fromGit);
+    const neighbours = l.repo === repo ? [] : (l.repos ?? []).filter((r) => r.path === repo).map((r) => `[${r.rel}] `);
+    const mine = neighbours.length > 0
+      ? [...new Set(l.steps.flatMap((s) => s.commits ?? []).flatMap((c) => neighbours.filter((p) => c.startsWith(p)).map((p) => c.slice(p.length).split(' ')[0])))]
+      : own(l, fromGit);
     return mine.length > 0 && ancestor(repo, oldest(repo, mine, ancestor), sha);
   });
 }

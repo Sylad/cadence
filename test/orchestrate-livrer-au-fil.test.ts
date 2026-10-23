@@ -123,4 +123,38 @@ describe('livrer au fil de l\'eau pendant une vague (L277)', () => {
     expect(r.code).toBe(2);
     expect(r.err).toContain('orchestration en cours (vague w9');
   });
+
+  it('R8 — un commit qu\'un lot pas prêt a fait dans un dépôt voisin (clé repos:) bloque le sha du voisin', async () => {
+    const a = gitRepo();
+    const b = gitRepo();
+    for (const d of [a, b]) {
+      writeFileSync(join(d, 'cadence.yaml'), 'deliver:\n  ci: none\n  deploy: echo ok\n  verify:\n    - command: "true"\n');
+      execFileSync('git', ['add', '.'], { cwd: d });
+      commit(d, 'chore: init');
+    }
+    const avant = sha(b, 'HEAD');
+    writeFileSync(join(b, 'N.ts'), 'export const N = 1;\n');
+    execFileSync('git', ['add', 'N.ts'], { cwd: b });
+    commit(b, 'feat(L9): N', '2026-10-23T10:00:00');
+    const tete = sha(b, 'HEAD');
+    const launch = tempDir();
+    const home = tempDir();
+    const store = RunStore.reserve(launch, 'w8')!;
+    store.writeWave({ id: 'w8', status: 'running', created: 'x', lots: ['ici:L9'] } as never);
+    const lot = newLot({ project: 'ici', repo: a, lot: 'L9', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false });
+    lot.status = 'implementing';
+    lot.repos = [{ rel: '../b', path: b }];
+    lot.steps = [{ commits: [`[../b] ${tete.slice(0, 7)}`] } as never];
+    store.writeLot(lot);
+    mkdirSync(sharedStateDir(b), { recursive: true });
+    writeFileSync(join(sharedStateDir(b), REPO_LOCK), JSON.stringify({ pid: process.pid, wave: 'w8', started: 'x' }));
+    registerWave(home, { pid: process.pid, wave: 'w8', started: 'x', cwd: launch, repos: [a, b] });
+    saved = process.env.CADENCE_HOME;
+    process.env.CADENCE_HOME = home;
+    const refuse = await cli(b, 'deliver', '--dry-run', '--sha', tete);
+    expect(refuse.code).toBe(2);
+    expect(refuse.err).toContain('ici:L9');
+    const accepte = await cli(b, 'deliver', '--dry-run', '--sha', avant);
+    expect(accepte.err).not.toContain('orchestration en cours');
+  });
 });

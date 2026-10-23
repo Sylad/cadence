@@ -71,7 +71,8 @@ const key = (label: string): string => label.toLowerCase();
  * Une ligne a la forme d'une légende quand elle COMMENCE par « Figure n » / « Table n » et que ce qui suit n'est pas une phrase en
  * cours. Après un séparateur (« Figure 1 — titre en minuscule », « Table 2: codes ») c'est une légende quelle que soit la casse ;
  * sans séparateur, une minuscule (« Figure 3 shows … »), une virgule ou une parenthèse (« Figure 5, which … », « Figure 5 (page 4) »)
- * en font une citation. Un séparateur suivi d'un titre vide (« figure 24. » en fin de phrase) n'est pas une légende non plus. « Table 2 The WMO … » a la forme d'une légende : `indexText` la départage des autres lignes de même forme.
+ * en font une citation. Un séparateur suivi d'un titre vide (« figure 24. » en fin de phrase) n'est pas une légende non plus.
+ * « Table 2 The WMO … » a la forme d'une légende : `indexText` la départage des autres lignes de même forme.
  */
 function captionForm(text: string): { label: string; kind: FigureKind; separated: boolean; title: string } | null {
   const m = CAPTION.exec(text.trim());

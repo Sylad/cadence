@@ -2972,10 +2972,14 @@ lots:
     finished: 2026-10-23
   - id: L258
     title: 'cadence orchestrate <projet>:<lot> --goal "…" (ou clé goal: du lot) remplace le titre comme objectif du brief, relayé dans le tableau ; tests (titre périmé = délégation à la main : maritime B28.4, B28.5, B28.6)'
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "conforme (revue Fable après reprise à la main) — 0 bloquant, 0 majeur, 4 notes ; --goal, goal: natif et mappé (plan.fields.goal) vérifiés sur une copie du plan maritime B28.4–B28.6 ; 2745/2745, tsc propre, raf check vert (re-vérifié par le lead)", commit: 3d21ec30ddd8e7be6601a91af7f01a2ba59e11e0 }
+    notes:
+      - { date: 2026-10-23, text: "Notes de la revue Fable (23-10) : raf show n'affiche pas goal ; qa-reviewer.md touché alors qu'orchestrate ne lance pas qa-reviewer, ux-reviewer.md non touché (ux.md porte la règle) ; « objectif donné » formaté à deux endroits (command.ts:416, table.ts:123). Pour maritime : ajouter goal: <clé> sous plan.fields de maritime-atlas/cadence.yaml et écrire la clé dans taches.yaml à la main, ou --goal sur un lancement d'un lot." }
+    finished: 2026-10-23
   - id: L259
     title: "orchestrate : un Ctrl-C ou un SIGTERM de la vague pendant la relance d'une étape en lecture coupée (L256) ne laisse survivre aucune session claude — la session neuve est enregistrée sur l'étape dès son lancement (step.sessionId), tuée par killSessions, et ses jetons comptent (countInterrupted, reprise d'un orchestrateur mort) ; tests (revue L256)"
     status: todo
@@ -3047,6 +3051,17 @@ lots:
     status: todo
     estimate: 0.5
     after: [ L269 ]
+    created: 2026-10-23
+  - id: L271
+    title: "orchestrate : un lot de revue UX planifiée (« Revue UX — <écran> ») sans visible: passe par precheck → implement → review sans aucune étape UX (finance L32 le 23-10 : la session n'a traité que la note du lot, la revue de l'écran n'a pas eu lieu) — le faire passer par l'ux-reviewer (titre « Revue UX — » ou clé dédiée), ou raf check signale un lot « Revue UX » non visible ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-23
+  - id: L272
+    title: "raf show <lot> affiche goal: (l'objectif qui remplacera le titre dans les briefs), natif ou mappé ; test (revue L258)"
+    status: todo
+    estimate: 0.1
+    quickwin: true
     created: 2026-10-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

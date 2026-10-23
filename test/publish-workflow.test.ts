@@ -26,6 +26,19 @@ describe('publish.yml', () => {
   });
 });
 
+describe('outils système des tests (L261)', () => {
+  const tests = readFileSync(join(root, '.github/workflows/tests.yml'), 'utf8');
+
+  it.each([['publish.yml', workflow], ['tests.yml', tests]])('%s installe poppler-utils après un apt-get update, avant npm ci', (_n, text) => {
+    const install = text.indexOf('apt-get install -y poppler-utils');
+    expect(install).toBeGreaterThan(-1);
+    const update = text.indexOf('apt-get update');
+    expect(update).toBeGreaterThan(-1);
+    expect(update).toBeLessThan(install);
+    expect(install).toBeLessThan(text.indexOf('- run: npm ci'));
+  });
+});
+
 describe('étape de contrôle du tag', () => {
   const files = ['package.json', '.claude-plugin/plugin.json', '.claude-plugin/marketplace.json'];
   const read = (f: string) => JSON.parse(readFileSync(join(root, f), 'utf8'));

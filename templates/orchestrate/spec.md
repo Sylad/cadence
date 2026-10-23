@@ -6,7 +6,7 @@ Read the lot, its notes and sub-tasks in the plan (`.cadence/raf.yaml`, the lega
 
 What you produce, in `<dir>/<écran>/`:
 1. `maquette.html`: static HTML + CSS, to the project's charter (reuse its variables, fonts and components; invent no style when an equivalent exists), no business JavaScript. Every state is an addressable section: `<section id="etat-vide">`, `etat-chargement`, `etat-erreur`, and `etat-charge` when the screen has data. Every field of the sheet carries `data-testid="<id of the field>"`.
-2. The captures described above, one per state and per width, copied from the Playwright output directory of this wave into the folder (a Playwright capture lands outside the repository: give it a relative file name only, then copy it).
+2. The captures described above, one per state and per width, copied from the Playwright output directory of this wave into the folder (give a capture the absolute path of that directory, as the Playwright paragraph says, then copy it).
 3. `fiche.yaml`, in the format of the template below. Check it with `cadence spec check <fiche>` until it is valid, and derive the QA expectations with `cadence spec qa <fiche>` only if the lot asks for it.
 
 Sheet rules:
@@ -25,6 +25,6 @@ Report: `fiche` (path of the sheet relative to the repository, e.g. `docs/specs/
 
 You are one short session of an orchestrated wave: do not launch subagents (the Agent tool is disabled).
 Give your final report as the structured output, not as free text.
-Browser (Playwright): the orchestrator launched the Playwright MCP server with its own output directory, in the orchestrator's run directory outside the repository: give screenshots, snapshots and traces a relative file name only (e.g. `maquette-vide-1440.png`), they land there. Never an absolute path, never the `--output-dir` option (the server's launch argument, which a session cannot set).
+Browser (Playwright): the orchestrator launched the Playwright MCP server with its own output directory, in the orchestrator's run directory outside the repository. {{shots}}
 {{captures}}
 {{tmp}}

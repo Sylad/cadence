@@ -292,14 +292,14 @@ describe('lot visible : code puis UX (L221)', () => {
     expect(c2.lot.uxCaptures).toBeUndefined();
   });
 
-  it('brief ux rendu avec orchestrate.ux : la consigne de captures est celle de l\'étape (noms relatifs, dossier de la vague), jamais un dossier tmp ni un chemin absolu (L74/t3)', async () => {
+  it('brief ux rendu avec orchestrate.ux : la consigne de captures est celle de l\'étape (chemin absolu du dossier de la vague, L249), jamais un dossier tmp (L74/t3)', async () => {
     const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], ux: [ok], review: [ok] } });
     const c = h.lot('L1', { visible: true }, { ux: { url: 'http://localhost:4200' } });
     await runLot(c);
     const brief = h.calls.find((x) => x.kind === 'ux')!.brief;
     expect(brief).toContain('http://localhost:4200');
     expect(brief).toContain('1440');
-    expect(brief).toContain('relative file name');
+    expect(brief).toContain(`${join(h.store.dir, 'demo--L1', 'playwright')}/`);
     expect(brief).not.toMatch(/tmp folder|shared tmp|OS temp/i);
   });
 
@@ -403,7 +403,7 @@ describe('petit lot', () => {
     expect(c.lot.status).toBe('ready');
   });
 
-  it('petit lot visible : review-small charge Playwright (captures dans la vague), son brief donne les noms relatifs ; petit lot sans écran : revue de code sans MCP (L74/t4)', async () => {
+  it('petit lot visible : review-small charge Playwright (captures dans la vague), son brief donne le chemin absolu du dossier de la vague (L249) ; petit lot sans écran : revue de code sans MCP (L74/t4)', async () => {
     const h = harness({ lots: [{ title: 'petit', estimate: 0.5, visible: true }], script: { implement: [impl()], 'review-small': [ok] } });
     const c = h.lot('L1', { small: true, visible: true }, { ux: { url: 'http://localhost:4200' } });
     await runLot(c);
@@ -413,7 +413,7 @@ describe('petit lot', () => {
     const rs = h.calls.find((x) => x.kind === 'review-small')!;
     expect(JSON.parse(rs.args[rs.args.indexOf('--agents') + 1])['code-reviewer'].tools).toContain('mcp__playwright');
     const brief = h.calls.find((x) => x.kind === 'review-small')!.brief;
-    expect(brief).toContain('relative file name');
+    expect(brief).toContain(`${join(lotDir, 'playwright')}/`);
     expect(brief).not.toContain('no browser MCP server is loaded');
     expect(brief).not.toMatch(/tmp folder|shared tmp/i);
     const h2 = harness({ lots: [{ title: 'petit', estimate: 0.5 }], script: { implement: [impl()], review: [ok] } });

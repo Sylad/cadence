@@ -36,6 +36,8 @@ export interface BriefVars {
   fiche?: string;
   /** Dossier temporaire de la session (L242) : `tmpText(dir)` ; vide sans vague (`--dry-run`, brief délégué à la main). */
   tmp?: string;
+  /** Consigne de nommage des captures Playwright (L249) : `shotsText(dossier de la vague)` pour une étape qui charge le serveur ; vide ailleurs et sans vague (`--dry-run`). */
+  shots?: string;
   /** Consigne de la revue de maquette (L172) : fiche, maquette, captures, passe en cours ; vide ailleurs. */
   maquette?: string;
 }
@@ -82,6 +84,14 @@ export function capturesText(captureDir: string): string {
   return `Playwright captures of this wave land in \`${captureDir}\` (outside the repository; this session may read it): a screenshot a finding asks for is copied from there into \`docs/nouveautes/captures/\`.`;
 }
 
+/**
+ * Consigne de nommage des captures Playwright (L249). Mesuré sur @playwright/mcp 0.0.83 : `--output-dir` ne sert qu'aux fichiers que le serveur nomme lui-même ;
+ * un nom donné par la session est résolu sur la racine de travail du serveur (le dépôt), d'où cinq lots sur cinq le 23-10 avec des captures à la racine. La session donne donc le chemin absolu du dossier de la vague, que le serveur autorise.
+ */
+export function shotsText(captureDir: string): string {
+  return `The Playwright server resolves a file name you give it against the repository, not against its output directory: a bare name such as page-home.png lands at the repository root. Give every screenshot, snapshot and trace the absolute path of the wave's capture directory, \`${captureDir}/\`, followed by the name (e.g. \`${captureDir}/page-home.png\`): the server allows it, and the repository stays clean. Never the \`--output-dir\` option (the server's launch argument, which a session cannot set).`;
+}
+
 /** Un gabarit : un par étape, plus deux variantes (passe des mineurs, revue courte qui la suit). */
 export type BriefName = StepKind | 'fix-minors' | 'review-recheck' | 'spec-back' | 'accept-back';
 
@@ -125,7 +135,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', docs: vars.docs ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', docs: vars.docs ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

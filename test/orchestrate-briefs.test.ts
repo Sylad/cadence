@@ -3,7 +3,7 @@ import { cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tempDir } from './helpers.js';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TEMPLATES_DIR, loadTemplates, newsText, objective, renderBrief, tmpText } from '../src/orchestrate/briefs.js';
+import { TEMPLATES_DIR, loadTemplates, newsText, objective, renderBrief, shotsText, tmpText } from '../src/orchestrate/briefs.js';
 import { acceptText } from '../src/orchestrate/accept.js';
 import { WORK_SCHEMA, REVIEW_SCHEMA, checkShape } from '../src/orchestrate/schemas.js';
 import type { Lot } from '../src/plan.js';
@@ -45,10 +45,10 @@ describe('gabarits', () => {
     expect(tmpText('/x/tmp')).toMatch(/never inside the repository/);
   });
 
-  it('ux.md : captures et snapshots dans le dossier du serveur Playwright de la vague, noms relatifs (L74)', () => {
-    const out = renderBrief('ux', vars);
+  it('ux.md : captures et snapshots dans le dossier du serveur Playwright de la vague, chemin absolu donné par {{shots}} (L74, L249)', () => {
+    const out = renderBrief('ux', { ...vars, shots: shotsText('/vague/pw') });
     expect(out).toContain("output directory, which lies in the orchestrator's run directory, outside the repository");
-    expect(out).toContain('relative file name');
+    expect(out).toContain('/vague/pw/');
     expect(out).not.toContain('.playwright-mcp');
     expect(out).not.toMatch(/pass `?--output-dir/); // le serveur est lancé avec son --output-dir : la session ne le prescrit pas
   });
@@ -172,20 +172,20 @@ describe('gabarits', () => {
   });
 
   it("review-small : les captures vont dans le dossier Playwright de la vague comme à l'étape ux, jamais à la racine du dépôt revu (L237)", () => {
-    const out = renderBrief('review-small', vars);
-    expect(out).toContain("Every screenshot, snapshot and trace you take lands there");
-    expect(out).toContain('take them with the Playwright tools');
-    expect(out).toContain("never at the repository root (`romans-1440px.png`, `expenses-390px.png`)");
+    const out = renderBrief('review-small', { ...vars, shots: shotsText('/vague/pw') });
+    expect(out).toContain('a capture reaches the run directory');
+    expect(out).toContain('/vague/pw/');
+    expect(out).toContain('never at the repository root (romans-1440px.png, expenses-390px.png)');
   });
 
   it('les briefs qui peuvent ouvrir un navigateur donnent une consigne Playwright vraie dans les deux cas (MCP de la vague, ou CLI hors du dépôt) (L74)', () => {
     for (const kind of ['implement', 'fix', 'fix-minors', 'review-small'] as const) {
-      const out = renderBrief(kind, vars);
+      const out = renderBrief(kind, { ...vars, shots: shotsText('/vague/pw') });
       expect(out, kind).toContain('Playwright');
       expect(out, kind).not.toContain('.playwright-mcp'); // les sorties ne tombent plus dans le dépôt
       expect(out, kind).toContain('do not install or start one');
       expect(out, kind).toContain('never inside the repository');
-      expect(out, kind).toContain('relative file name');
+      expect(out, kind).toContain('/vague/pw/');
       expect(out, kind).toContain("run directory outside the repository");
       expect(out, kind).not.toContain('no browser MCP server is loaded');
       // --output-dir est un argument de lancement du serveur MCP et /tmp est refusé hors racines autorisées : ni l'un ni l'autre ne se prescrit.
@@ -429,9 +429,9 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
 
 describe('agents hors orchestrate : même consigne Playwright que les briefs (L84)', () => {
   const flatten = (p: string): string => read(p).replace(/\s+/g, ' ');
-  const PLAYWRIGHT_RULE = 'Give screenshots and snapshots a relative file name only (e.g. `page-home.png`), never an absolute path: the Playwright MCP writes them under `.playwright-mcp/` (list them in the report if git does not ignore that folder), or in the wave\'s output directory outside the repository when a wave launched it';
+  const PLAYWRIGHT_RULE = 'Give screenshots and snapshots the absolute path of the capture directory your brief names when it names one (a wave\'s Playwright server resolves a bare name against the repository, not its output directory); with no such directory in the brief, a bare file name (e.g. `page-home.png`) and no other absolute path: the Playwright MCP writes them under `.playwright-mcp/` (list them in the report if git does not ignore that folder), or in the wave\'s output directory outside the repository when a wave launched it';
 
-  it.each(['ux-reviewer', 'qa-reviewer'])('%s répète la consigne Playwright : nom relatif, sorties sous .playwright-mcp/', (name) => {
+  it.each(['ux-reviewer', 'qa-reviewer'])('%s répète la consigne Playwright : dossier de captures du brief, sinon nom nu, sorties sous .playwright-mcp/', (name) => {
     expect(flatten(`../agents/${name}.md`)).toContain(PLAYWRIGHT_RULE);
   });
 

@@ -38,7 +38,7 @@ When the brief says "conformity" (the orchestrator, after the code, for a lot th
 
 1. **Look before judging.** Capture the screen with the browser tool available (Playwright or
    equivalent) at **1440 px** and **390 px** wide, in its main states: empty, loaded, error, loading,
-   and the key interaction. Look at every capture. Give screenshots and snapshots a relative file name only (e.g. `page-home.png`), never an absolute path: the Playwright MCP writes them under `.playwright-mcp/` (list them in the report if git does not ignore that folder), or in the wave's output directory outside the repository when a wave launched it. Anything else you create goes in a temporary directory outside the repository, removed afterwards.
+   and the key interaction. Look at every capture. Give screenshots and snapshots the absolute path of the capture directory your brief names when it names one (a wave's Playwright server resolves a bare name against the repository, not its output directory); with no such directory in the brief, a bare file name (e.g. `page-home.png`) and no other absolute path: the Playwright MCP writes them under `.playwright-mcp/` (list them in the report if git does not ignore that folder), or in the wave's output directory outside the repository when a wave launched it. Anything else you create goes in a temporary directory outside the repository, removed afterwards.
 2. **Walk the main task** a real user comes for (find, read, compare, act, undo) and count the steps.
 3. **Check, and measure where a number exists:**
    - Nielsen's 10 heuristics — especially visibility of system status, match with the user's words,

@@ -16,7 +16,7 @@ import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
-import { capturesText, newsText, objective, renderBrief, reposText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { capturesText, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import type { Tokens } from './result.js';
@@ -342,10 +342,11 @@ function constatLines(constats: Constat[]): string {
 }
 
 /** Consigne de captures : `uxText` n'alimente que `ux` et `review-small` d'un petit lot visible, deux étapes qui chargent toujours le serveur Playwright de la vague. */
-const SHOTS_TEXT = 'Take screenshots at 1440 and 390 px width, each with a relative file name only (e.g. `home-1440px.png`): they land in the wave\'s capture directory, outside the repository.';
+const shotsAt = (dir: string): string => `Take screenshots at 1440 and 390 px width, in the wave's capture directory (outside the repository), each named with its full path, e.g. \`${dir}/home-1440px.png\`.`;
 
 function uxText(c: LotCtx): string {
   const ux = c.config.ux;
+  const SHOTS_TEXT = shotsAt(playwrightDir(c.wave.store.lotDir(c.lot.project, c.lot.lot)));
   if (!ux) {
     return 'No way to run the app is declared (cadence.yaml: orchestrate.ux): review the interface from the code, and list under "nonVerifie" what you could not see.';
   }
@@ -474,6 +475,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
     vars.news = newsText(l.lot, pwDir);
     vars.captures = capturesText(pwDir);
   }
+  if (mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright) vars.shots = shotsText(playwrightDir(c.wave.store.lotDir(l.project, l.lot)));
   vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';
   if (kind === 'spec') {
     const reviewed = [...(l.ficheConstats ?? []), ...(l.maquetteConstats ?? [])];

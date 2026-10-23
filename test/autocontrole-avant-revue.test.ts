@@ -43,11 +43,11 @@ describe('auto-contrôle avant revue (L222)', () => {
     expect(l).toContain('always true');
   });
 
-  it('R4 — le brief implement demande la capture d\'un écran modifié, nom de fichier relatif', () => {
+  it('R4 — le brief implement demande la capture d\'un écran modifié, nom de fichier', () => {
     const l = liste('implement');
     expect(l).toContain('modified screen');
     expect(l).toContain('1440 and 390 px');
-    expect(l).toContain('relative file name');
+    expect(l).toContain('with a file name');
     expect(l).toContain('no modified screen');
   });
 

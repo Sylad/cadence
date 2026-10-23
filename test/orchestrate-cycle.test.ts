@@ -1297,6 +1297,25 @@ describe('revue coupée (L256)', () => {
     expect(lotSpent(c.lot)).toBe(h.wave.budget.consumed);
   });
 
+  it("R5 — (quota après relance) revue coupée puis relancée au quota : les jetons de la session coupée vont à l'étape interrompue, une seule fois, et le lot est suspendu", async () => {
+    const quota: Handler = () => ({ code: 1, stdout: JSON.stringify({ is_error: true, subtype: 'success', result: 'Claude AI usage limit reached|1759600000', session_id: 's', num_turns: 1, duration_ms: 1, usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 } }), stderr: '', timedOut: false });
+    const h = harness({ script: { implement: [impl()], review: [(call) => {
+      const first = call.args[call.args.indexOf('--session-id') + 1];
+      const dir = projectLogDir(h.wave.claudeHome!, call.opts.cwd);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${first}.jsonl`), JSON.stringify({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 7, cache_creation_input_tokens: 1000, cache_read_input_tokens: 0, output_tokens: 3 } } }));
+      return { code: 143, stdout: '', stderr: 'Terminated', timedOut: false };
+    }, quota] } });
+    h.wave.claudeHome = tempDir();
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('suspended');
+    expect(h.wave.quota.hit).toBe(true);
+    expect(c.lot.steps[1].status).toBe('interrupted');
+    expect(c.lot.steps[1].tokens!.counted).toBe(1010);
+    expect(lotSpent(c.lot)).toBe(h.wave.budget.consumed);
+  });
+
   it('R7 — une revue qui échoue sans être coupée est un « échec » (une seule session), distinct du quota et de la coupure', async () => {
     const h = harness({ script: { implement: [impl()], review: [() => ({ code: 1, stdout: '', stderr: 'boom', timedOut: false })] } });
     const c = h.lot('L1');

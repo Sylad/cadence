@@ -2912,10 +2912,11 @@ lots:
     review: { date: 2026-10-23, verdict: "conforme : les 2 correctifs vérifiés, aucune régression (tsc 0 erreur, 2649/2649 tests) — orchestré (vague 2026-10-23-cad-ress, 1 passe(s) de correction + passe des mineurs)", commit: f871b4b64970c2a95e6e9001d97b72361574232b }
   - id: L252
     title: "Ressources partagées (issue #13, 2/3) : cadence lead tour et orchestrate --continue affichent, en face des créneaux libres, les lots prêts de tous les projets dont aucune ressource n'est prise par un lot doing (ni par une vague en cours) ; --json idem ; tests"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L251 ]
     created: 2026-10-23
+    started: 2026-10-23
   - id: L253
     title: "Ressources partagées (issue #13, 3/3) : skill lead — relire la liste « prêts, ressources libres » à chaque retour d'agent et à chaque blocage, avant d'attendre ; test de la doc du skill"
     status: todo

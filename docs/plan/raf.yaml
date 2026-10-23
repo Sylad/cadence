@@ -3017,6 +3017,7 @@ lots:
     after: [ L261 ]
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "conforme (1 note mineure : CHANGELOG muet sur texte.moyenne) — orchestré (vague 2026-10-23-cad-l262, 2 passe(s) de correction + passe des mineurs)", commit: 3fd977993b2ba404821069c13f7e1fa1ec06487f }
   - id: L263
     title: "ref (issue #14, 3/10) : schéma de l'inventaire (templates/inventaire.json) et cadence ref check, un cas par règle du schéma"
     status: todo

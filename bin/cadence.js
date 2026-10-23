@@ -36,6 +36,9 @@ if (tool === 'raf') {
   cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]
                     enregistre un document de référence hors du dépôt : pages rendues, texte positionné, images, index des figures
                     et des passages qui les citent ; exige poppler, ImageMagick et tesseract (outil absent nommé avec sa commande, code 2)
+  cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]
+                    mesure une zone d'une page rendue : couleurs, contraste WCAG 2.2, boîtes, mots OCR et taille de police estimée,
+                    ramenés à 1440 px de large, tolérance déclarée
   cadence verify [--retry secondes] [--sha rév]
                     rejoue les vérifications d'effet (deliver.verify) hors livraison, une passe, en parallèle ;
                     code 0 tout vert, 1 un effet rouge, 2 rien à vérifier ; « session start » la lance aussi

@@ -296,10 +296,15 @@ describe('cadence ref add (L261)', () => {
   it('sans document ou avec un sous-verbe inconnu, donne l\'usage', () => {
     const { env, cwd } = setup();
     const usage = 'usage : cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]';
-    for (const argv of [['add'], ['plus'], ['norme.pdf'], ['list']]) {
-      const r = ref(cwd, env, ...argv);
-      expect(r.code).toBe(2);
-      expect(r.err.trim()).toBe(`raf: ${usage}`);
+    const r = ref(cwd, env, 'add');
+    expect(r.code).toBe(2);
+    expect(r.err.trim()).toBe(`raf: ${usage}`);
+    // un sous-verbe inconnu donne l'usage de chaque sous-verbe (L262 : ref measure)
+    for (const argv of [['plus'], ['norme.pdf'], ['list']]) {
+      const s = ref(cwd, env, ...argv);
+      expect(s.code).toBe(2);
+      expect(s.err.trim().split('\n')[0]).toBe(`raf: ${usage}`);
+      expect(s.err).toMatch(/\n\s+cadence ref measure <slug>/);
     }
   });
 });

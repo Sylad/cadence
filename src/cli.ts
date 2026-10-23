@@ -74,6 +74,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--since date] [--json]   mesure des passes de correction des journaux dossier/.cadence/runs : lots à ≥1 et ≥2 corrections, par projet, visibles ou non, passes par cause (classées par Ollama avec --classify, hors quota)
   cadence perf [dossier] [--since date] [--json]   tableau de bord du workflow, sans modèle : deux fenêtres (7 derniers jours contre les 7 précédents) lues dans dossier/.cadence/runs et les plans, chaque vitesse à côté de sa qualité, ⚠ au-delà de 25 % de dégradation ; tokens par lot selon l'estimate, part de la revue, délais création → done → livraison, durée de mur par étape, coût en euros par lot livré (grille cadence.yaml perf.prices) ; --since est un jour qui tronque les fenêtres
   cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]   enregistre un document de référence hors du dépôt (references.dir de cadence.yaml, sinon $XDG_DATA_HOME/cadence/references) : pages rendues à 200 dpi, texte positionné, images incluses, index des figures et des passages qui les citent ; exige poppler, ImageMagick et tesseract (outil absent nommé avec sa commande, code 2)
+  cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]   mesure une zone d'une page rendue (pixels de la page) : couleurs (point, moyenne, dominantes), contraste WCAG 2.2, boîtes, mots OCR tesseract et taille de police estimée ; valeurs ramenées à 1440 px de large, tolérance déclarée
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -180,6 +181,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       sample: { type: 'string' },
       sections: { type: 'string' },
       slug: { type: 'string' },
+      quoi: { type: 'string' },
+      largeur: { type: 'string' },
       until: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },

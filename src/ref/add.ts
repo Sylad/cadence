@@ -41,7 +41,7 @@ export function parseSections(text: string, pages: number): number[] {
 }
 
 const slugOf = (file: string): string => basename(file, extname(file)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-const SLUG = /^[a-z0-9][a-z0-9-]*$/;
+export const SLUG = /^[a-z0-9][a-z0-9-]*$/;
 
 export interface AddOptions {
   document: string;

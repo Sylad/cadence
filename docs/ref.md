@@ -7,7 +7,7 @@ tables drawn as pictures, message templates, figures of a norm (WMO, ICAO…). `
 turns such a document into files a session can read without losing the pictures. The whole
 design is in
 [`docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md`](superpowers/specs/2026-10-23-ref-documents-de-reference-design.md)
-(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10).
+(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10) and **`cadence ref measure`** (lot 2 of 10).
 
 ## `cadence ref add <document.pdf> [--sections 3-5,9] [--slug name]`
 
@@ -54,6 +54,48 @@ ones; a slug taken by another document is refused (`--slug` picks another name).
 A PDF that asks for a password, forbids copying, is damaged, is not a PDF or has no page is refused with the reason. Image
 documents (PNG, JPG) are not read yet.
 
+## `cadence ref measure <slug> <page> <zone> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]`
+
+Measures a zone of a **rendered** page of a document registered by `add` (a page `add` did not render
+is refused with the command that renders it). The zone is `page` (the whole page), `x,y` (one
+point) or `x,y,l,h` (a rectangle), in pixels of the rendered page (200 dpi: the unit of the boxes in
+`document.json`). Every length in the answer is brought back to a **reference width** of 1440 px
+(`--largeur`), the width of a screen, whatever the resolution of the page: the first line says the
+factor. Without `--quoi`, the four measures; a point only has colours.
+
+- **`couleurs`**: the exact colour of a point (`#c81e28`, `rgb(200, 30, 40)`); for a rectangle the
+  mean (rounded) and the **dominant colours** with their share of the zone (grouped by 8 levels per
+  channel, at most 5, none under 1 %).
+- **`contraste`**: WCAG 2.2 contrast ratio between the zone's **background** (its dominant colour) and
+  its **text** (the mean of the pixels farthest from the background: the anti-aliased edge is left out),
+  with the three thresholds read on the unrounded ratio: AA (4.5), AA large text and interface
+  components (3), AAA (7). `#767676` on white gives 4.54, `#777777` 4.48. A zone of one colour has no
+  contrast to measure.
+- **`boites`**: the connected shapes that differ from the background (8 neighbours), the 20 largest first, and the
+  bounding box of all the content; coordinates are those of the page, not of the zone. Shapes under 16 pixels
+  are dust.
+- **`texte`**: the words tesseract reads (English model, `--psm 6`) with their box and confidence, and the
+  **estimated font size**: the median height of the words that have no descender and a letter as tall
+  as a capital (`Hello`, `2026`, not `gap`) read with confidence ≥ 60, divided by 0.72 (the cap height
+  of Helvetica / Arial in em). The size is the one of the reference width.
+
+**Declared tolerance** (last line, and `tolerance` in `--json`): colours ±1/255 per channel (mean
+rounded), boxes ±1 pixel of the page, i.e. ±⌈factor⌉ px at the reference width, font size ±5 % (the cap
+height of a face is 0.70 to 0.73 em) plus one pixel of cap height, given with the measure
+(`police : ≈ 28.2 px (±10 %, 4 mot(s) …)`). The image is read as it is: an alpha channel is composed over white.
+Only 8-bit, non-interlaced PNG (what `pdftoppm` writes) is read; another kind is refused with the reason.
+
+```
+$ cadence ref measure norme 2 page --quoi contraste
+norme p.2 · zone 0,0,1700,2200 px de la page · ramené à 1440 px (×0.85)
+contraste : 4.54:1 (texte #767676 sur fond #ffffff) · AA ✓ · AA grand texte et composants ✓ · AAA ✗
+tolérance : couleurs ±1/255 par canal, boîtes ±1 px, police ±5 % plus un pixel de hauteur de capitale
+```
+
+`--json` prints one object (`document`, `page`, `zone`, `echelle`, `tolerance`, then `couleurs`,
+`contraste`, `boites`, `texte` as asked). Exit codes: 0 done, 2 refusal (tool, unknown document,
+page absent or not rendered, invalid zone or option).
+
 ### Where the files go
 
 Outside the repository: `references.dir` of `cadence.yaml` (relative to that file), by default
@@ -79,8 +121,7 @@ ref : outil absent du PATH, à installer (rien n'est installé d'office) :
   magick ou convert : sudo apt install imagemagick
 ```
 
-(`poppler-utils`, `imagemagick`, `tesseract-ocr`.) `add` itself does not call ImageMagick or
-tesseract — `cadence ref measure` will — but checks them at the first call, as the design asks.
-The rest of cadence depends on none of them.
+(`poppler-utils`, `imagemagick`, `tesseract-ocr`.) `add` does not call ImageMagick or tesseract, `measure` calls tesseract (and only for the text); both check all the tools at the first call, as the design asks.
+ImageMagick is not called by either: `measure` decodes the rendered PNG pages itself. The rest of cadence depends on none of them.
 
 Exit codes: 0 done, 2 refusal (tool, file, option, slug, folder).

@@ -59,10 +59,10 @@ jobs:
           git config --global user.name "cadence-ci"
           git config --global user.email "cadence-ci@users.noreply.github.com"
 
-      # Les tests de cadence ref (lancés avant la publication) rendent de vrais PDF avec poppler : sans lui la suite est rouge et la version ne sort pas (ImageMagick et tesseract y sont des faux).
+      # Les tests de cadence ref (lancés avant la publication) rendent de vrais PDF avec poppler et lisent leur texte avec tesseract : sans eux la suite est rouge et la version ne sort pas (ImageMagick y est un faux).
       - run: |
           sudo apt-get update
-          sudo apt-get install -y poppler-utils
+          sudo apt-get install -y poppler-utils tesseract-ocr
 
       - run: npm ci
       # Version déjà au registre (run en double, ou relance après une publication réussie) : on saute npm publish

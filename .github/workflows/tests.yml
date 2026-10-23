@@ -31,10 +31,10 @@ jobs:
           git config --global user.name "cadence-ci"
           git config --global user.email "cadence-ci@users.noreply.github.com"
 
-      # cadence ref appelle poppler (ses tests rendent de vrais PDF) ; ImageMagick et tesseract y sont remplacés par des faux.
+      # cadence ref appelle poppler et tesseract (ses tests rendent de vrais PDF et lisent leur texte par OCR) ; ImageMagick y est remplacé par un faux (ref measure décode les PNG lui-même).
       - run: |
           sudo apt-get update
-          sudo apt-get install -y poppler-utils
+          sudo apt-get install -y poppler-utils tesseract-ocr
 
       - run: npm ci
 

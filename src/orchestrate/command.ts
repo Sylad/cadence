@@ -213,6 +213,9 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     }
     else if (t === '--max-sessions') a.maxSessions = parseMaxSessions(value(t));
     else if (t === '--goal') {
+      // Un texte oublié ne doit pas avaler l'option suivante (`--goal --dry-run` lancerait une vraie vague payante).
+      const next = argv[i + 1];
+      if (next?.startsWith('--')) throw new RafError(`--goal attend un texte, pas l'option ${next}`);
       a.goal = value(t).trim();
       if (a.goal === '') throw new RafError('--goal attend un texte non vide');
     } else if (t === '--wave') a.wave = value(t);

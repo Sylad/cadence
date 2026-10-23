@@ -49,7 +49,7 @@ brief of a lot (and the title quoted in their first sentence) is the lot's title
 has to delegate by hand. `cadence orchestrate maritime:B28.4 --goal "…"` replaces it for that launch; the `goal:` key of the lot in the plan
 (`raf.yaml`, native format only) does the same for every launch, and is the way to give a goal to several lots at once. Order:
 `--goal`, then `goal:`, then the title; the notes and sub-tasks of the lot stay in the objective. `--goal` takes exactly one launched lot
-(two lots, `--continue`, `--resume`, `--status` are refused, exit 2, with nothing written); an empty text is refused. The goal is kept in the
+(two lots, `--continue`, `--resume`, `--status` are refused, exit 2, with nothing written); an empty text, or one starting with `--` (a forgotten text: `--goal --dry-run` would otherwise swallow the option and start a real wave), is refused. The goal is kept in the
 state of the lot: a `--resume` replays the sessions with it, `--dry-run` prints `objectif donné : …` under the lot, and the table of the wave
 repeats it (`<project>:<lot> — objectif donné : …`) so the lead sees which objective the sessions worked from.
 The review and UX briefs carry it too, on a line `Goal of the lot (it takes precedence over the title in the plan): …`, and `code-reviewer` / `qa-reviewer` measure the commits against it, not against the stale title still in a read-only plan.

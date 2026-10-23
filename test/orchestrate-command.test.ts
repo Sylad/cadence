@@ -1722,6 +1722,14 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
     expect(() => parseOrchestrateArgs(['a:L1', '--goal', '  '])).toThrow(/--goal attend un texte non vide/);
   });
 
+  it("R1 — --goal suivi d'une option (texte oublié) est refusé : aucune vague payante ne part à la place d'une simulation", async () => {
+    expect(() => parseOrchestrateArgs(['a:L1', '--goal', '--dry-run'])).toThrow(/--goal attend un texte, pas l'option --dry-run/);
+    expect(() => parseOrchestrateArgs(['a:L1', '--goal', '--budget', '2M'])).toThrow(/--goal attend un texte, pas l'option --budget/);
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    await expect(run(parent, ['a:L1', '--goal', '--dry-run'])).rejects.toThrow(/--goal attend un texte/);
+    expect(existsSync(join(parent, '.cadence'))).toBe(false);
+  });
+
   it('R1 — --goal avec deux lots, sans lot (--continue) ou avec --resume/--status est refusé avant d\'agir', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
     for (const argv of [['a:L1', 'a:L2', '--goal', 'x'], ['--continue', '--goal', 'x'], ['--resume', '--goal', 'x'], ['--status', '--goal', 'x']]) {

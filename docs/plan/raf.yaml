@@ -2914,11 +2914,15 @@ lots:
     finished: 2026-10-23
   - id: L252
     title: "Ressources partagées (issue #13, 2/3) : cadence lead tour et orchestrate --continue affichent, en face des créneaux libres, les lots prêts de tous les projets dont aucune ressource n'est prise par un lot doing (ni par une vague en cours) ; --json idem ; tests"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L251 ]
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "conforme (revue Fable, 3e) — 0 bloquant, 0 majeur, 1 mineur (test vide test/ressources-libres.test.ts:210, comportement couvert ailleurs) ; portée vérifiée à chaque point de lancement et disposition pour les deux commandes, texte et --json ; 2683/2683, tsc propre, raf check vert (re-vérifié par le lead)", commit: 255c26aaa979086f57e83b1850d4626d68deab15 }
+    notes:
+      - { date: 2026-10-23, text: "Mineurs de la revue Fable (23-10), en notes : test R7 « lancé depuis un projet » (test/ressources-libres.test.ts:210) ne peut échouer pour la raison de son titre (alpha n'a qu'un lot prêt, tiré) — ajouter un 2e lot prêt ; --resume … --continue n'imprime pas la ligne « prêts, ressources libres » ; avec resources: sans depth: et lead tour --depth 2, les deux commandes divergent (règle documentée)." }
+    finished: 2026-10-23
   - id: L253
     title: "Ressources partagées (issue #13, 3/3) : skill lead — relire la liste « prêts, ressources libres » à chaque retour d'agent et à chaque blocage, avant d'attendre ; test de la doc du skill"
     status: todo

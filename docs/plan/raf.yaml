@@ -3092,12 +3092,15 @@ lots:
     finished: 2026-10-23
   - id: L273
     title: "raf visible <id> on|off : pose ou retire visible: d'un lot existant (aujourd'hui seul raf add --visible existe) ; le message de raf check de L271 (« poser visible: true dans le plan ») renvoie vers cette commande ; test. Vécu 23-10 : L271 a passé raf check au rouge dans 6 projets (4 à 10 lots « Revue UX — » chacun), réparé par un script hors raf"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "compliant — 0 finding; commit 2ab5343 reviewed, 2824 tests green (116 files), tsc clean — orchestré (vague 2026-10-23-cad-hud, 0 passe(s) de correction)", commit: 2ab53438b1b261fadf5ce0de37ccb1607e2cb4b2 }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à HEAD (vitest 2840/2840, tsc propre) ; mis en service à 329e15f (L262 au-dessus, coupé par un push du lead)." }
+    finished: 2026-10-23
   - id: L274
     title: "ref add (suite L261) : citations au pluriel et plages — « Figures 2 and 3 », « Figures 2, 4 to 6 », « Figures 2–4 » (tiret demi-cadratin), « Figures 1.1 to 1.3 », « Figs. » — chaque figure citée, sans faux lien non résolu ; numéros d'annexe (Figure 1.B.1, Table 12.B.3 : 32 légendes de WMO-8 Vol I fusionnées en 4) ; tests sur fixtures — APRÈS le corpus d'évaluation (L264) pour mesurer"
     status: todo
@@ -3112,11 +3115,14 @@ lots:
     created: 2026-10-23
   - id: L276
     title: "cadence-hud : la bande affiche les sessions du lead inscrites par cadence lead hold (étiquette, âge, TTL restant) et la ligne des créneaux comme orchestrate --status (« sessions du lead : N · créneaux libres : X sur M »), même quand aucune vague ne tourne ; une session dont le TTL est échu disparaît ; README du plugin et tests (demande de Sylvain 23-10 : « un hub précis »)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "compliant (2 minor notes, no sub-task) — orchestré (vague 2026-10-23-cad-hud, 0 passe(s) de correction)", commit: e6a90f9e2403e2db84318a7572290b8279b929bf }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à HEAD (vitest 2840/2840, tsc propre) ; mis en service à 329e15f (L262 au-dessus, coupé par un push du lead)." }
+    finished: 2026-10-23
   - id: L277
     title: "cadence deliver --sha <sha> accepté pendant une vague du même dépôt quand <sha> est le « livrable jusqu'à » de la vague (tous ses commits citent des lots prêts, revus) ; skill lead : livrer au fil de l'eau un lot prêt au lieu d'attendre la fin de la vague ; tests. Mesure 23-10 : 1 554 lots×minutes entre « prêt » et la fin de vague sur 28 vagues (warhammer Civils : 1 h 45 pour le premier prêt)"
     status: todo

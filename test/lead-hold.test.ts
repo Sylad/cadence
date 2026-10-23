@@ -146,6 +146,18 @@ describe('cadence lead hold / release (L255)', () => {
   });
 });
 
+describe('aide (L255)', () => {
+  it('R15 — l\'aide de cadence nomme lead hold et lead release', async () => {
+    const r = await cad(tempDir(), {}, T0, '--help');
+    expect(r.out + r.err).toContain('cadence lead hold <étiquette>');
+    expect(r.out + r.err).toContain('lead release <étiquette>');
+  });
+
+  it('R16 — l\'aide de bin/cadence.js nomme aussi lead hold', () => {
+    expect(readFileSync(join(import.meta.dirname, '../bin/cadence.js'), 'utf8')).toContain('cadence lead hold <étiquette>');
+  });
+});
+
 describe('documentation (L255)', () => {
   const root = join(import.meta.dirname, '..');
   const read = (f: string) => readFileSync(join(root, f), 'utf8');

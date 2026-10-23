@@ -41,6 +41,8 @@ if (tool === 'raf') {
                     --max-sessions : sessions simultanées, toutes vagues confondues (CADENCE_MAX_SESSIONS)
                     --continue [--until HH:MM] [--priority a,b] : tire seul les lots prêts du plan, jusqu'à une borne
                     --waits [--since AAAA-MM-JJ] : l'attente de créneau de session par jour et par vague, lue dans les journaux
+  cadence lead hold <étiquette> [--ttl minutes] | lead release <étiquette>
+                    déclare, puis rend, une session lancée à la main par le lead : soustraite des créneaux libres
   cadence lead tour [dossier] [--idle 3] [--json]
                     le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier courant
                     s'il est lui-même un projet ; une première ligne « cadence.yaml · ✗ erreur » si priority: est illisible

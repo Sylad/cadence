@@ -11,6 +11,8 @@ import { stopApps } from './app.js';
 import { Plan, RafError, isOpen } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
+import { findProjects, isProject as isLeadProject } from '../lead.js';
+import { freeLine, readyFree } from '../ready-free.js';
 import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { readWaits, renderWaits } from './waits.js';
@@ -486,6 +488,14 @@ export function liveLines(cap = DEFAULT_MAX_SESSIONS): string[] {
   return lines;
 }
 
+/** `--continue` (L252) : la ligne des lots prêts dont aucune ressource n'est prise par un lot en cours ni par une vague, tels qu'ils sont avant que la vague tire. Vide si aucun. */
+function freeLines(launch: string): string[] {
+  const projects = (isLeadProject(launch) ? [launch] : findProjects(launch)).map((dir) => ({ dir, name: basename(dir) }));
+  const free = readyFree(projects, cadenceHome());
+  const line = freeLine(projects.filter((p) => free.has(p.dir)).map((p) => ({ project: p.name, free: free.get(p.dir)! })), 60);
+  return line ? [line] : [];
+}
+
 /** Efface l'écran et replace le curseur en haut : l'entrée d'un rendu de `--status --watch`. */
 const CLEAR_SCREEN = '\x1b[H\x1b[2J';
 const DEFAULT_WATCH_INTERVAL = 10;
@@ -582,6 +592,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     const id = waveId(io, args.wave, launch);
     if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
     dryRun(pre.lots, io, deps, budget, id);
+    if (args.continue) for (const l of freeLines(launch)) io.out(l);
     if (args.continue) await continueDryRun(args, io, deps, launch, pre.lots, budget, firstSkipped);
     return 0;
   }
@@ -615,6 +626,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     }
   }
   const id = store.id;
+  if (args.continue) for (const l of freeLines(launch)) io.out(l);
   // Les candidats refusés au premier tirage : leur cause dit pourquoi ils ne jouent pas (même ligne que celles des tirages suivants).
   for (const s of firstSkipped) {
     io.err(`orchestrate : lot sauté — ${s}`);

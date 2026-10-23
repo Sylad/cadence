@@ -18,7 +18,7 @@ import { invalidResource, Plan, RafError, SCREENS, STATUSES, type Lot, type Scre
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
-import { findProjects, leadTour, readLeadUx, tourLine } from './lead.js';
+import { findProjects, leadTour, readLeadUx, tourFreeLine, tourLine } from './lead.js';
 import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, liveWaves, openLotsIn, openWavesIn, type OpenWave } from './orchestrate/registry.js';
@@ -208,6 +208,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
       const [slots] = liveLines(configuredCap(io.env));
       if (slots) io.out(slots);
+      // en face des créneaux libres, les lots prêts dont aucune ressource n'est prise (L252) ; sans vague en cours, pas de créneau à remplir : seul --json les donne
+      const free = slots ? tourFreeLine(rows) : null;
+      if (free) io.out(free);
       // le réglage lead.ux du cadence.yaml du dossier (L197) : le lead lit ici qui pose le verdict UX, au lieu d'ouvrir le fichier
       try {
         if (readLeadUx(parent) === 'lead') io.out('verdict UX : lead (le lead pose raf ux d\'après le rapport du ux-reviewer et les captures ; l\'humain n\'est consulté qu\'en cas de doute)');

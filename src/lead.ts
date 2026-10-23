@@ -10,6 +10,8 @@ import { parse } from 'yaml';
 import { RafError } from './plan.js';
 import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { readNext, sharedStateDir, stateDir } from './state.js';
+import { freeLine, readyFree, type FreeLot } from './ready-free.js';
+import { cadenceHome } from './orchestrate/registry.js';
 
 /** Clé `lead.ux` du cadence.yaml du dossier parent (L197) : qui pose le verdict UX (`raf ux`) d'un lot visible. `human` (défaut) : l'humain ; `lead` : le lead, l'humain n'étant consulté qu'en cas de doute. */
 export function readLeadUx(parent: string): 'lead' | 'human' {
@@ -71,6 +73,8 @@ export interface TourRow {
   next: { id: string; title: string } | null;
   /** Lots en attente d'une condition de tirage (L219) ; absent quand aucun lot n'en porte. */
   waiting?: string[];
+  /** Lots prêts dont aucune ressource (`uses:`) n'est prise par un lot en cours ni par une vague (L252) ; absent quand aucun n'est libre. */
+  free?: FreeLot[];
   progress: TourProgress;
   /** « non commité », « non poussé », « livraison en cours » ; vide quand le dépôt est propre. */
   repo: string[];
@@ -173,12 +177,25 @@ export function leadTour(parent: string, today: Day, idle = TOUR_IDLE, depth?: n
   // --depth l'emporte sur la clé `depth:` ; une clé invalide se signale et laisse un seul niveau
   const levels = depth ?? attempt(() => readDepth(parent), 1);
   const dirs = findProjects(parent, levels);
-  if (dirs.length === 0 && isProject(parent)) return [...problems, tourRow(parent, today, idle)];
+  if (dirs.length === 0 && isProject(parent)) return [...problems, ...withFree([{ dir: parent, row: tourRow(parent, today, idle) }])];
   // un projet imbriqué est nommé par son chemin depuis le dossier : unique, et adressable par `orchestrate <projet>:<lot>` lancé d'ici ; la priorité et l'ordre alphabétique lisent le nom du dossier, comme orchestrate --continue
   const rows = dirs.map((dir) => ({ dir, key: basename(dir), row: tourRow(dir, today, idle, relative(parent, dir).split(sep).join('/')) }));
   const priority = attempt(() => readPriority(parent), [] as string[]);
-  const sorted = rows.sort((a, b) => priorityRank(a.key, priority) - priorityRank(b.key, priority) || a.key.localeCompare(b.key) || a.row.project.localeCompare(b.row.project)).map((x) => x.row);
+  const sorted = withFree(rows.sort((a, b) => priorityRank(a.key, priority) - priorityRank(b.key, priority) || a.key.localeCompare(b.key) || a.row.project.localeCompare(b.row.project)));
   return [...problems, ...sorted];
+}
+
+/** Joint à chaque ligne ses lots prêts aux ressources libres (L252), calculés sur tous les projets du tour : ce qu'un projet tient en retire aux autres. */
+function withFree(rows: { dir: string; row: TourRow }[]): TourRow[] {
+  const ok = rows.filter((x) => !x.row.error);
+  const free = readyFree(ok.map((x) => ({ dir: x.dir, name: x.row.project })), cadenceHome());
+  for (const x of ok) if (free.has(x.dir)) x.row.free = free.get(x.dir);
+  return rows.map((x) => x.row);
+}
+
+/** La ligne « prêts, ressources libres » du tour, ou null quand aucun lot prêt n'est libre. */
+export function tourFreeLine(rows: TourRow[]): string | null {
+  return freeLine(rows.filter((r) => r.free).map((r) => ({ project: r.project, free: r.free! })), TITLE_MAX);
 }
 
 const DRIFT_SHOWN = 2;

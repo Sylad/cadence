@@ -476,15 +476,15 @@ describe('ligne de base des tests dans les briefs (L213)', () => {
 
 describe("objective : l'objectif remplace le titre (L258)", () => {
   it("R3 — l'objectif donné ouvre le texte à la place du titre ; notes et sous-tâches restent", () => {
-    const out = objective(lot({ goal: 'Objectif à jour' }));
+    const out = objective(lot(), 'Objectif à jour');
     expect(out.split('\n')[0]).toBe('Objectif à jour');
     expect(out).not.toContain('Un titre');
     expect(out).toContain('décision A');
     expect(out).toContain('sous-tâche');
   });
-  it("R3 — l'objectif passé en argument l'emporte sur la clé goal: du lot, qui l'emporte sur le titre", () => {
+  it("R3 — l'objectif passé en argument (celui de l'état du lot) l'emporte sur le titre ; la clé goal: du plan n'est pas relue ici", () => {
     expect(objective(lot({ goal: 'clé' }), 'argument').split('\n')[0]).toBe('argument');
-    expect(objective(lot({ goal: 'clé' })).split('\n')[0]).toBe('clé');
+    expect(objective(lot({ goal: 'clé' })).split('\n')[0]).toBe('Un titre');
     expect(objective(lot()).split('\n')[0]).toBe('Un titre');
   });
 });

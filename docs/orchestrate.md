@@ -50,7 +50,7 @@ has to delegate by hand. `cadence orchestrate maritime:B28.4 --goal "…"` repla
 (`raf.yaml`, native format only) does the same for every launch, and is the way to give a goal to several lots at once. Order:
 `--goal`, then `goal:`, then the title; the notes and sub-tasks of the lot stay in the objective. `--goal` takes exactly one launched lot
 (two lots, `--continue`, `--resume`, `--status` are refused, exit 2, with nothing written); an empty text, or one starting with `--` (a forgotten text: `--goal --dry-run` would otherwise swallow the option and start a real wave), is refused. The goal is kept in the
-state of the lot: a `--resume` replays the sessions with it, `--dry-run` prints `objectif donné : …` under the lot, and the table of the wave
+state of the lot at launch and is the only source afterwards (briefs, `--dry-run`, table): a `--resume` replays the sessions with the goal of the launch, and a `goal:` added or changed in the plan since is not read (to change it: `--resume --drop` the lot and launch it again); `--dry-run` prints `objectif donné : …` under the lot, and the table of the wave
 repeats it (`<project>:<lot> — objectif donné : …`) so the lead sees which objective the sessions worked from.
 The review and UX briefs carry it too, on a line `Goal of the lot (it takes precedence over the title in the plan): …`, and `code-reviewer` / `qa-reviewer` measure the commits against it, not against the stale title still in a read-only plan.
 

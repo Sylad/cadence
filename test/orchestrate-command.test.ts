@@ -1766,12 +1766,14 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
   it('R3 — sans --goal, la clé goal: du lot remplace le titre ; --goal l\'emporte sur la clé', async () => {
     const { parent } = withGoalKey('Objectif de la clé');
     const byKey = await run(parent, ['a:L1', '--dry-run']);
+    expect(byKey.out.join('\n')).toContain('  objectif donné : Objectif de la clé (à la place du titre dans les briefs)');
     const keyBriefs = dryBriefs(byKey.out.join('\n'));
     for (const b of keyBriefs) {
       expect(b).toContain('Objectif de la clé');
       expect(b).not.toContain(STALE);
     }
     const byFlag = await run(parent, ['a:L1', '--goal', GOAL, '--dry-run']);
+    expect(byFlag.out.join('\n')).toContain(`  objectif donné : ${GOAL} (à la place du titre dans les briefs)`);
     for (const b of dryBriefs(byFlag.out.join('\n'))) {
       expect(b).toContain(GOAL);
       expect(b).not.toContain('Objectif de la clé');
@@ -1826,5 +1828,46 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
       expect(b).toContain(GOAL);
       expect(b).not.toContain(STALE);
     }
+  });
+
+  /** Lance a:L1 (arrêt sur une question), change la clé goal: du plan commité, puis reprend : les briefs de la reprise et le tableau. */
+  async function resumeAfterPlanGoal(launchKey: string | undefined, laterKey: string) {
+    const { parent, dirs } = withGoalKey(launchKey);
+    await run(parent, ['a:L1'], fakeDeps({ implement: () => claudeOut(workReport({ questions: ['Quelle base ?'] })) }));
+    const file = join(dirs.a, 'docs/plan/raf.yaml');
+    const text = readFileSync(file, 'utf8');
+    writeFileSync(file, launchKey === undefined ? text.replace(`title: ${STALE}\n`, `title: ${STALE}\n    goal: ${laterKey}\n`) : text.replace(`goal: ${launchKey}`, `goal: ${laterKey}`));
+    git(dirs.a, 'commit', '-qam', 'chore: plan goal change');
+    const briefs: string[] = [];
+    const again = fakeDeps({
+      implement: (cwd, b) => {
+        briefs.push(b);
+        return claudeOut(workReport({ commits: [commitFile(cwd, 'y.txt', 'feat(L1): travail')] }));
+      },
+    });
+    const r = await run(parent, ['--resume', '--answer', 'a:L1', 'SQLite'], again);
+    expect(briefs.length).toBeGreaterThan(0);
+    return { briefs, table: r.out.join('\n') };
+  }
+
+  it("R4 — une clé goal: ajoutée au plan après le lancement n'atteint ni les briefs ni le tableau de la reprise : un seul objectif, celui du lancement", async () => {
+    const { briefs, table } = await resumeAfterPlanGoal(undefined, 'Clé ajoutée après le lancement');
+    for (const b of briefs) {
+      expect(b).toContain(STALE);
+      expect(b).not.toContain('Clé ajoutée après le lancement');
+    }
+    expect(table).not.toContain('objectif donné');
+    expect(table).not.toContain('Clé ajoutée après le lancement');
+  });
+
+  it("R4 — une clé goal: changée après le lancement : la reprise garde l'objectif du lancement dans les briefs ET dans le tableau", async () => {
+    const { briefs, table } = await resumeAfterPlanGoal('Clé au lancement', 'Clé changée depuis');
+    for (const b of briefs) {
+      expect(b).toContain('Clé au lancement');
+      expect(b).not.toContain('Clé changée depuis');
+      expect(b).not.toContain(STALE);
+    }
+    expect(table).toContain('a:L1 — objectif donné : Clé au lancement');
+    expect(table).not.toContain('Clé changée depuis');
   });
 });

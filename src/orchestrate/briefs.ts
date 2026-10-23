@@ -143,8 +143,12 @@ export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates 
   return `${out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()}\n`;
 }
 
-/** L'objectif d'un lot (L258) : celui donné au lancement (`--goal`), sinon la clé `goal:` du lot, sinon son titre. */
-export const headline = (lot: Pick<Lot, 'title' | 'goal'>, goal?: string): string => goal ?? lot.goal ?? lot.title;
+/**
+ * L'objectif d'un lot (L258) : celui gardé dans l'état du lot (`LotState.goal`, fixé au lancement : `--goal`, sinon la clé `goal:` du plan),
+ * sinon son titre. Une seule source pour les briefs, la simulation et le tableau : la clé `goal:` du plan n'est pas relue en cours de vague,
+ * donc une reprise rejoue l'objectif du lancement.
+ */
+export const headline = (lot: Pick<Lot, 'title'>, goal?: string): string => goal ?? lot.title;
 
 /** `{{objectif}}` : l'objectif du lot (`headline`, le titre faute d'autre), ses notes et ses sous-tâches — Sylvain n'écrit rien d'autre. */
 export function objective(lot: Lot, goal?: string): string {

@@ -142,8 +142,9 @@ duplicated JSON key is not detected (the last one wins, as with `JSON.parse`). A
 | `statut` | `libelle`, `couvre` (non-empty array of ids of any type, itself included) |
 | `silence` | `question` (non-empty, ends with `?`) |
 
-References (`ecran`, `cible`, `couvre`, flux nodes) are resolved on the whole list of ids, wherever the element is. All deviations
-are listed, none masks another. The key names of `ecran` and the values of `direction` are a format shared with the later lots
+References (`ecran`, `cible`, `couvre`, flux nodes) are resolved on the whole list of ids, wherever the element is. Every slug and id
+deviation (R6/R9) is listed, none masks another; elsewhere a deviation can hide others (a non-object element only reports its
+`type`, an invalid `confiance` skips the `cause` check, an invalid `elements` validates no element). The key names of `ecran` and the values of `direction` are a format shared with the later lots
 (they are hypotheses of the sheet `docs/specs/ref-inventaire-schema/fiche.yaml`).
 
 ### Where the files go

@@ -22,8 +22,10 @@ Registers a PDF and builds, for it:
   `Table n`, `Tableau n`, `Planche n`; a table-of-contents line or `Figure 3 shows…` is not a
   caption), with its page, line, box, its images, and **the passages that cite it** (page,
   line, exact line; `nommee` when the text names the figure, `designee` for « as shown
-  below » / « ci-dessous », attached to the nearest caption of the page). A citation of a figure
-  with no caption is listed under **`unresolved`** (« lien non résolu »).
+  below » / « ci-dessous », attached to the nearest caption of the page). Plurals count one citation per figure
+  (`Figures 2 and 3`, `Tables 4 to 6`, `Figs. 2.1 et 2.2`). Listed under **`unresolved`**
+  (« lien non résolu »): a citation of a figure with no caption, a figure that nothing cites,
+  and an image on a page that has no caption (`image sans légende`).
 
 Without `--sections`, a document of 30 pages or fewer is rendered whole; a larger one only gets
 its index (text and figures), no page is rendered. With `--sections`, the pages asked for are

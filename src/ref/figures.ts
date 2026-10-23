@@ -37,13 +37,22 @@ export interface FigureIndex {
 
 const WORDS: Record<string, { kind: FigureKind; word: string }> = {
   figure: { kind: 'figure', word: 'Figure' },
+  figures: { kind: 'figure', word: 'Figure' },
   fig: { kind: 'figure', word: 'Figure' },
+  figs: { kind: 'figure', word: 'Figure' },
   table: { kind: 'table', word: 'Table' },
+  tables: { kind: 'table', word: 'Table' },
   tableau: { kind: 'table', word: 'Tableau' },
+  tableaux: { kind: 'table', word: 'Tableau' },
   planche: { kind: 'planche', word: 'Planche' },
+  planches: { kind: 'planche', word: 'Planche' },
 };
 const NUMBER = String.raw`[A-Z]{0,2}[-.]?\d+(?:[.-]\d+)*[a-z]?`;
-const REFERENCE = new RegExp(String.raw`\b(Figure|Fig|Table|Tableau|Planche)\.?\s+(${NUMBER})(?![\w])`, 'gi');
+/** Ce qui sépare deux numéros d'une énumération au pluriel : « 2, 3 », « 2 and 3 », « 4 to 6 ». */
+const SEPARATOR = String.raw`(?:\s*,\s*(?:(?:and|et)\s+)?|\s+(?:and|et|to|à|&)\s+)`;
+const REFERENCE = new RegExp(String.raw`\b(Figures?|Figs?|Tables?|Tableaux|Tableau|Planches?)\.?\s+(${NUMBER}(?:${SEPARATOR}${NUMBER})*)(?![\w])`, 'gi');
+const PLURAL = /^(?:figures|figs|tables|tableaux|planches)$/i;
+const NUMBER_ONLY = new RegExp(NUMBER, 'g');
 const CAPTION = new RegExp(String.raw`^(Figure|Fig|Table|Tableau|Planche)\.?\s+(${NUMBER})(?![\w])\s*(?:[:.–—-]\s*)?(.*)$`, 'i');
 const DEICTIC = /\b(as shown (?:below|above)|shown (?:below|above)|illustrated (?:below|above)|ci-(?:dessous|dessus))\b/i;
 /** Sommaire : « Figure 1 Titre ..... 12 ». */
@@ -64,6 +73,17 @@ function captionOf(text: string): { label: string; kind: FigureKind } | null {
   if (!m || LEADER.test(text)) return null;
   if (/^[a-zà-ÿ]/.test(m[3]!)) return null;
   return labelOf(m[1]!, m[2]!);
+}
+
+/** Numéros nommés par une référence : le seul numéro au singulier ; au pluriel la liste, et « 4 to 6 » donne 4, 5, 6 quand ce sont des entiers. */
+function numbersOf(head: string, list: string): string[] {
+  const nums = list.match(NUMBER_ONLY) ?? [];
+  if (!PLURAL.test(head)) return nums.slice(0, 1);
+  const range = /^(\d+)\s+(?:to|à)\s+(\d+)$/i.exec(list.trim());
+  if (range && Number(range[2]) >= Number(range[1]) && Number(range[2]) - Number(range[1]) < 50) {
+    return Array.from({ length: Number(range[2]) - Number(range[1]) + 1 }, (_, i) => String(Number(range[1]) + i));
+  }
+  return nums;
 }
 
 /** Légendes, citations et liens non résolus, d'après le texte seul ; les images viennent après (`attachRegions`). */
@@ -88,12 +108,14 @@ export function indexText(pages: PageText[]): FigureIndex {
       for (const m of l.text.matchAll(REFERENCE)) {
         // la légende ne se cite pas elle-même
         if (own && m.index === 0) continue;
-        const { label } = labelOf(m[1]!, m[2]!);
-        if (seen.has(key(label))) continue;
-        seen.add(key(label));
-        const fig = figures.get(key(label));
-        if (fig) fig.citations.push({ page: p.n, line, extrait: l.text.trim(), type: 'nommee' });
-        else unresolved.push({ label, page: p.n, extrait: l.text.trim() });
+        for (const num of numbersOf(m[1]!, m[2]!)) {
+          const { label } = labelOf(m[1]!, num);
+          if (seen.has(key(label))) continue;
+          seen.add(key(label));
+          const fig = figures.get(key(label));
+          if (fig) fig.citations.push({ page: p.n, line, extrait: l.text.trim(), type: 'nommee' });
+          else unresolved.push({ label, page: p.n, extrait: l.text.trim() });
+        }
       }
       const d = DEICTIC.exec(l.text);
       if (!d) return;
@@ -102,6 +124,8 @@ export function indexText(pages: PageText[]): FigureIndex {
       else unresolved.push({ label: d[1]!.toLowerCase(), page: p.n, extrait: l.text.trim() });
     });
   }
+  // une figure que rien ne cite est aussi à résoudre
+  for (const f of figures.values()) if (f.citations.length === 0) unresolved.push({ label: f.label, page: f.page, extrait: f.caption });
   return { figures: [...figures.values()], unresolved };
 }
 
@@ -120,7 +144,7 @@ export interface Placed {
 
 const centre = (b: Box): number => b.y + b.h / 2;
 
-/** Relie chaque image à la légende de sa page la plus proche (en hauteur) ; une page sans région connue ne la donne qu'à sa seule légende. */
+/** Relie chaque image à la légende de sa page la plus proche (en hauteur) ; une page sans région connue ne la donne qu'à sa seule légende. Une image sur une page sans légende est un lien non résolu. */
 export function attachRegions(index: FigureIndex, images: Placed[]): void {
   images.forEach((img, rank) => {
     const captions = index.figures.filter((f) => f.page === img.page);
@@ -130,5 +154,6 @@ export function attachRegions(index: FigureIndex, images: Placed[]): void {
         ? captions[0]!
         : null;
     target?.regions.push(rank);
+    if (captions.length === 0) index.unresolved.push({ label: 'image sans légende', page: img.page, extrait: '' });
   });
 }

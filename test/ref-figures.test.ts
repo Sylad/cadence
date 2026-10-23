@@ -48,4 +48,27 @@ describe("index des figures d'un texte (L261)", () => {
     ]);
     expect(idx.figures.map((f) => [f.label, f.regions])).toEqual([['Figure 1', [0]], ['Figure 2', [1]], ['Figure 3', [2]]]);
   });
+
+  it('une figure qu\'aucun passage ne cite est un lien non résolu', () => {
+    const idx = indexText([page(1, 'Figure 1 Lonely')]);
+    expect(idx.unresolved).toEqual([{ label: 'Figure 1', page: 1, extrait: 'Figure 1 Lonely' }]);
+  });
+
+  it('une image sur une page sans légende est un lien non résolu ; une image légendée ne l\'est pas', () => {
+    const idx = indexText([page(1, 'Figure 1 Carte', 'Voir Figure 1.'), page(2, 'texte seul')]);
+    attachRegions(idx, [{ page: 1, box: null }, { page: 2, box: null }]);
+    expect(idx.unresolved).toEqual([{ label: 'image sans légende', page: 2, extrait: '' }]);
+  });
+
+  it('le pluriel cite chaque figure listée : « Figures 2 and 3 », « Tables 4 to 6 », « Figs. 2.1 et 2.2 »', () => {
+    const idx = indexText([
+      page(1, 'See Figures 2 and 3 for details.', 'Voir Tables 4 to 6.', 'see Figs. 2.1 and 2.2', 'See Figure 2, 3 stations'),
+      page(2, 'Figure 2 A', 'Figure 3 B', 'Table 4 C', 'Table 5 D', 'Table 6 E', 'Figure 2.1 F', 'Figure 2.2 G'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([
+      ['Figure 2', [1, 4]], ['Figure 3', [1]], ['Table 4', [2]], ['Table 5', [2]], ['Table 6', [2]], ['Figure 2.1', [3]], ['Figure 2.2', [3]],
+    ]);
+    expect(idx.unresolved).toEqual([]);
+    expect([...citedPages(idx, new Set([1]))]).toEqual([2]);
+  });
 });

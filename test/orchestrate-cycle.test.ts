@@ -5,7 +5,7 @@ import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
 import { coveredTasks } from '../src/audit.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
-import { REVIEW_RESERVE, isNonQuestion, runLot } from '../src/orchestrate/cycle.js';
+import { REVIEW_RESERVE, isNonQuestion, lotSpent, runLot } from '../src/orchestrate/cycle.js';
 import { runPool } from '../src/orchestrate/pool.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir, readAgents } from '../src/orchestrate/launch.js';
@@ -1229,6 +1229,9 @@ describe('revue coupée (L256)', () => {
     expect(c.lot.steps[1].status).toBe('ok');
     expect(c.lot.steps[1].sessionId).not.toBe(first);
     expect(alone).toBeGreaterThanOrEqual(1010);
+    // La session coupée compte aussi pour l'étape : le budget du lot (L78) et le tableau la voient.
+    expect(c.lot.steps[1].tokens!.counted).toBeGreaterThanOrEqual(1010);
+    expect(lotSpent(c.lot)).toBe(h.wave.budget.consumed);
     expect(readFileSync(join(h.store.dir, 'demo--L1', '2-review.first.err'), 'utf8')).toBe('Terminated');
   });
 

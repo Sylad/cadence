@@ -19,7 +19,7 @@ import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
-import type { Tokens } from './result.js';
+import { sumTokens, type Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
 import { type Acceptation, acceptationFile, acceptCommands, isAcceptList, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
@@ -677,11 +677,16 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   const dir = w.store.lotDir(l.project, l.lot);
   const base = `${n}-${kind}`;
 
+  // Jetons de la session coupée (L256) : au budget de la vague ci-dessous, et à l'étape pour que le lot (L78) et le tableau les comptent.
+  let cutTokens: Tokens | null = null;
   if (outcome.relaunched) {
     // Étape en lecture coupée (signal, sortie vide) puis relancée en session neuve (L256) : la session coupée a consommé des jetons (son journal), garde sa sortie d'erreur, et la relance est signalée au tableau.
     const cutRun = outcome.relaunched;
     const spent = w.claudeHome ? journalTokens(w.claudeHome, l.repo, cutRun.sessionId) : null;
-    if (spent) w.budget.add(spent.tokens);
+    if (spent) {
+      w.budget.add(spent.tokens);
+      cutTokens = spent.tokens;
+    }
     writeFileSync(join(dir, `${base}.first.err`), cutRun.stderr);
     const text = `${kind} relancée en session neuve après une coupure (${cutRun.cause})`;
     l.warnings.push(text);
@@ -692,11 +697,13 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
     // Une session en échec, au quota ou tuée au délai a consommé des tokens : ceux de sa sortie, sinon ceux de son journal.
     const spent = outcome.tokens ? { tokens: outcome.tokens, sessionId: outcome.sessionId } : w.claudeHome ? journalTokens(w.claudeHome, l.repo, outcome.sessionId ?? sessionId) : null;
     if (spent) {
-      step.tokens = spent.tokens;
+      step.tokens = cutTokens ? sumTokens(cutTokens, spent.tokens) : spent.tokens;
       if (spent.sessionId) step.sessionId = spent.sessionId;
       w.budget.add(spent.tokens);
       w.saveWave();
       if (w.claudeHome && spent.sessionId) step.peakContext = peakContext(w.claudeHome, l.repo, spent.sessionId);
+    } else if (cutTokens) {
+      step.tokens = cutTokens;
     }
   }
   if (local && outcome.kind !== 'ok') {
@@ -737,7 +744,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   writeFileSync(join(dir, `${base}.json`), JSON.stringify({ ...res, structured: res.structured }, null, 2));
   step.report = `${base}.json`;
   step.sessionId = res.sessionId;
-  step.tokens = local ? { ...res.tokens, counted: 0 } : res.tokens; // local : hors quota, hors budget
+  step.tokens = local ? { ...res.tokens, counted: 0 } : cutTokens ? sumTokens(cutTokens, res.tokens) : res.tokens; // local : hors quota, hors budget
   if (res.formattingRetry) {
     step.formatRetry = true;
     w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} : rapport sans sortie structurée, relance de mise en forme`);

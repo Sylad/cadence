@@ -526,9 +526,9 @@ the step fails as usual — never a second retry.
 killed by a signal without writing anything (exit code above 128, such as 143 for SIGTERM, and an empty output) is *cut*. The
 orchestrator launches the same step **once more in a NEW session** (a fresh `--session-id`, the same brief; never `--resume`: a cut
 session has nothing to resume and the formatting retry above does not apply to it) before handing the lot back. The cut session's
-tokens are read from its journal and counted in the budget, its `stderr` is kept in `<n>-<kind>.first.err`, and the table shows
+tokens are read from its journal and counted in the wave budget **and in the step** (so the lot's own budget and the table's token column see them), its `stderr` is kept in `<n>-<kind>.first.err`, and the table shows
 `<kind> relancée en session neuve après une coupure (code 143, sortie vide)` among the warnings. Cut again, the lot fails with `coupure : …`.
-Write steps (implementation, correction, spec, acceptance) are never relaunched, nor are the local model, a timeout, a non-empty output or
+A session killed by the orchestrator itself (Ctrl-C or SIGTERM of the wave) is never relaunched: the new one would outlive it. Write steps (implementation, correction, spec, acceptance) are never relaunched, nor are the local model, a timeout, a non-empty output or
 an ordinary exit code. The table tells the three stops apart in the line under it: `quota atteint` (the lot is suspended, the wave
 resumes with `--resume`), `coupure : <kind> coupée (…), relancée une fois en session neuve, coupée de nouveau` (the session itself was
 killed twice: look at the machine, not the lot), `échec : <kind> sans résultat : <cause>` (the session ended without a usable report).

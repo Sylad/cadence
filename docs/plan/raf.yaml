@@ -3023,7 +3023,7 @@ lots:
     finished: 2026-10-23
   - id: L263
     title: "ref (issue #14, 3/10) : schéma de l'inventaire (templates/inventaire.json) et cadence ref check, un cas par règle du schéma"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     after: [ L262 ]
@@ -3049,6 +3049,7 @@ lots:
       - { date: 2026-10-23, text: "Hypothèses (fiche ref-inventaire-schema) — R34 : La direction d'un flux de schema vaut « de_vers » ou « bidirectionnel » ; si faux : Le design §2 demande une direction sans en fixer les valeurs" }
       - { date: 2026-10-23, text: "Hypothèses (fiche ref-inventaire-schema) — R35 : La question d'un silence se termine par «  ; si faux : Si une question peut être rédigée sans point d'interrogation, toute phrase non vide est acceptée ; une condition dans check.ts" }
     review: { date: 2026-10-23, verdict: "compliant : 0 blocking, 0 major, 0 minor — les 3 mineurs de la revue complète sont corrigés (eaf6571, e62cc1f, 69fb9fa), vitest 2946/2947 (seul échec : L61/t2, déjà rouge avant le lot), tsc propre — orchestré (vague 2026-10-23-2145, 1 passe(s) de correction + passe des mineurs)", commit: 69fb9fac5d1ad75bab711d91db1e608749d17bee }
+    finished: 2026-10-23
   - id: L264
     title: "ref (issue #14, 4/10) : générateur du corpus synthétique à vérité connue (evals/ref/, pages HTML rendues en PDF et PNG par Playwright, inventaire attendu, pièges : texte ambigu levé par la figure, figure qui contredit, table en image, gabarit type BUFR, contrôle translucide, page Proposal, scan bruité) et commande d'évaluation (rappel, précision, faux lu, tokens par page)"
     status: todo

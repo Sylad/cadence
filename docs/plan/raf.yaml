@@ -3008,6 +3008,8 @@ lots:
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "conforme (contre-vérification Opus après reprise à la main) — critère du lead tenu : OGC 52 / Table 3 p45, WMO-702 116 / p107 rendue, SIGWX Figure 24 p16, WMO-49 Table IV.3 p201 ; différentiel sur 106 PDF de maritime : aucune vraie légende perdue depuis 1e39ba0 ; binaire cadence ref routé ; 2817/2817, tsc propre (re-vérifié par le lead)", commit: 00381d2738acc3402e8e2f5ffe2aa6c782eeceea }
     finished: 2026-10-23
+    notes:
+      - { date: 2026-10-23, text: "Re-vérif du lead 23-10 : un rouge isolé sur une 1re passe (non nommé, sortie tronquée), puis 3 passes complètes vertes 2817/2817 — instabilité sous charge, comme deliver.test « (b) Ctrl-C »." }
   - id: L262
     title: "ref (issue #14, 2/10) : cadence ref measure — couleurs, contrastes WCAG, boîtes, OCR tesseract et taille de police estimée, tolérance déclarée ; tests sur images générées à valeurs connues"
     status: todo

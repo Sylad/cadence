@@ -113,8 +113,8 @@ function meanOf(px: [number, number, number][]): [number, number, number] {
   return [Math.round(s[0]! / px.length), Math.round(s[1]! / px.length), Math.round(s[2]! / px.length)];
 }
 
-/** Couleurs regroupées par 8 niveaux par canal, de la plus étendue à la moins étendue ; chacune est la moyenne de son groupe. */
-function dominant(px: [number, number, number][]): (Color & { part: number })[] {
+/** Couleurs regroupées par 8 niveaux par canal, de la plus étendue à la moins étendue (celles sous `minShare` de la zone sont écartées) ; chacune est la moyenne de son groupe. */
+function dominant(px: [number, number, number][], minShare = MIN_SHARE): (Color & { part: number })[] {
   const groups = new Map<number, [number, number, number][]>();
   for (const p of px) {
     const key = ((p[0] >> 3) << 10) | ((p[1] >> 3) << 5) | (p[2] >> 3);
@@ -124,7 +124,7 @@ function dominant(px: [number, number, number][]): (Color & { part: number })[] 
   }
   return [...groups.entries()]
     .sort((a, b) => b[1].length - a[1].length || a[0] - b[0])
-    .filter(([, g]) => g.length / px.length >= MIN_SHARE)
+    .filter(([, g]) => g.length / px.length >= minShare)
     .slice(0, MAX_DOMINANT)
     .map(([, g]) => ({ ...color(...meanOf(g)), part: round2(g.length / px.length) }));
 }
@@ -138,7 +138,7 @@ function measureColors(r: Raster, z: Zone, point: boolean) {
 /** Texte et fond d'une zone : le fond est la couleur dominante, le texte la moyenne des pixels les plus éloignés du fond. */
 function inkAndBackground(r: Raster, z: Zone): { bg: Color; fg: Color; px: [number, number, number][] } | null {
   const px = pixelsOf(r, z);
-  const bg = dominant(px)[0]!.rgb;
+  const bg = dominant(px, 0)[0]!.rgb;
   let far = 0;
   for (const p of px) far = Math.max(far, distance(p, bg));
   if (far < FLAT_DISTANCE) return null;
@@ -162,7 +162,7 @@ const scaleBox = (b: Box, f: number): Box => {
 
 function measureBoxes(r: Raster, z: Zone, f: number) {
   const found = inkAndBackground(r, z);
-  if (!found) return { fond: { hex: dominant(pixelsOf(r, z))[0]!.hex }, contenu: null, boites: [], total: 0 };
+  if (!found) return { fond: { hex: dominant(pixelsOf(r, z), 0)[0]!.hex }, contenu: null, boites: [], total: 0 };
   const { bg, px } = found;
   const mask = new Uint8Array(z.l * z.h);
   let x0 = z.l, y0 = z.h, x1 = -1, y1 = -1;

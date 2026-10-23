@@ -238,4 +238,23 @@ describe('cadence ref measure (L262)', () => {
     expect(m.contraste.rapport).toBe(21);
     expect(t.json('page', '--quoi', 'boites', '--largeur', '1700').boites.boites).toEqual([{ x: 200, y: 300, l: 600, h: 100 }]);
   });
+
+  it('une zone sans couleur dominante (photo, dégradé fin) se mesure : le fond est la couleur la plus étendue, sans plantage', () => {
+    const t = setup();
+    const w = 200, h = 200;
+    const rgba = Buffer.alloc(w * h * 4);
+    let seed = 7;
+    for (let i = 0; i < w * h; i++) {
+      for (let c = 0; c < 3; c++) {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        rgba[i * 4 + c] = (seed >> 8) & 0xff;
+      }
+      rgba[i * 4 + 3] = 255;
+    }
+    t.paste(encodePng(w, h, rgba));
+    const m = t.json('page');
+    expect(m.contraste.rapport).toBeGreaterThan(1);
+    expect(m.boites.fond.hex).toMatch(/^#[0-9a-f]{6}$/);
+    expect(m.couleurs.dominantes).toEqual([]);
+  });
 });

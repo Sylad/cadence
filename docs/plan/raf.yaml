@@ -3058,6 +3058,7 @@ lots:
     estimate: 0.25
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "compliant : 0 blocking, 0 major, 2 minor notes (L271 : raf check signale un lot ouvert « Revue UX — » non visible ; test/check.test.ts 31/31, tsc propre) — orchestré (vague 2026-10-23-cad-ref, 0 passe(s) de correction)", commit: 6571024c4a26c9290b5a48c5d0566d181a2e674c }
   - id: L272
     title: "raf show <lot> affiche goal: (l'objectif qui remplacera le titre dans les briefs), natif ou mappé ; test (revue L258)"
     status: doing

@@ -2,10 +2,10 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { LAUNCH_FOLDER, parseWaves } from '../hooks/collect'
+import { LAUNCH_FOLDER, parseCollected } from '../hooks/collect'
 import { register } from '../hooks/register'
-import { activeProjects, launchFolder, colorOfDone, parseTour, progressBar, projectFigures, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
-import type { Project, Wave } from '../types'
+import { activeProjects, freeSlots, holdText, liveHolds, slotsLine, launchFolder, colorOfDone, parseTour, progressBar, projectFigures, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import type { LeadHold, Project, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
 declare function setTimeout(fn: () => void, ms?: number): unknown
@@ -83,11 +83,11 @@ test('un lot se lit en trois cellules ou en une ligne', () => {
 })
 
 test('le collecteur se lit, et une sortie étrange vaut aucune vague', () => {
-  expect(parseWaves(JSON.stringify([WAVE]))[0]?.id).toBe(WAVE.id)
-  expect(parseWaves(JSON.stringify([{ ...WAVE, live: undefined }]))[0]?.live).toBe(true)
-  expect(parseWaves(JSON.stringify([{ ...WAVE, live: false }]))[0]?.live).toBe(false)
-  expect(parseWaves('{}')).toEqual([])
-  expect(() => parseWaves('pas du json')).toThrow()
+  expect(parseCollected(JSON.stringify([WAVE])).waves[0]?.id).toBe(WAVE.id)
+  expect(parseCollected(JSON.stringify([{ ...WAVE, live: undefined }])).waves[0]?.live).toBe(true)
+  expect(parseCollected(JSON.stringify([{ ...WAVE, live: false }])).waves[0]?.live).toBe(false)
+  expect(parseCollected('{}').waves).toEqual([])
+  expect(() => parseCollected('pas du json')).toThrow()
 })
 
 /** Répond aux lectures d'état du mod depuis la mémoire du test (le kit n'a pas d'écriture d'état). */
@@ -1284,4 +1284,102 @@ test('un cadence absent ou en échec garde le dernier tableau lu et ne met pas l
   await settle()
   expect((hud.state('projects') as Project[]).map(p => p.project)).toEqual(['ol', 'cadence'])
   expect(hud.state('error')).toBeNull()
+})
+
+// ── L276 : les sessions du lead (cadence lead hold) et les créneaux libres dans la bande ───────────────────────
+
+const T0 = Date.parse('2026-10-23T10:00:00.000Z')
+const HOLD: LeadHold = { label: 'correctif-L12', since: '2026-10-23T09:56:00.000Z', expires: '2026-10-23T10:56:00.000Z' }
+
+test('R1 — les sessions du lead dont l’échéance est passée disparaissent', () => {
+  const expired: LeadHold = { label: 'revue-L3', since: '2026-10-23T08:00:00.000Z', expires: '2026-10-23T09:00:00.000Z' }
+  expect(liveHolds([HOLD, expired], T0)).toEqual([HOLD])
+  // à l'échéance exacte la session ne compte plus (comme cadence lead hold)
+  expect(liveHolds([HOLD], Date.parse(HOLD.expires))).toEqual([])
+})
+
+test('R2 — une session du lead se lit : étiquette, âge, TTL restant', () => {
+  expect(holdText(HOLD, T0)).toBe('correctif-L12  depuis 4 min · reste 56 min')
+  expect(holdText({ ...HOLD, since: 'illisible' }, T0)).toBe('correctif-L12  reste 56 min')
+})
+
+test('R3 — les créneaux libres se calculent comme cadence orchestrate --status', () => {
+  const live = { ...WAVE, cap: 3, repos: 2 }
+  // total − min(plafond de la vague, dépôts tenus) − sessions du lead
+  expect(freeSlots([live], 3, 0)).toBe(1)
+  expect(freeSlots([live], 3, 1)).toBe(0)
+  expect(freeSlots([live], 3, 5)).toBe(0)
+  expect(freeSlots([], 3, 1)).toBe(2)
+  // une vague sans plafond compte pour le plus petit de total et de ses dépôts ; une vague terminée ne tient rien
+  expect(freeSlots([{ ...live, cap: undefined, repos: 1 }], 3, 0)).toBe(2)
+  expect(freeSlots([{ ...live, live: false }], 3, 0)).toBe(3)
+})
+
+test('R4 — la ligne des créneaux suit orchestrate --status, et se tait sans vague ni session', () => {
+  expect(slotsLine([], [HOLD], 3)).toBe('sessions du lead : 1 · créneaux libres : 2 sur 3')
+  expect(slotsLine([{ ...WAVE, repos: 1 }], [HOLD, { ...HOLD, label: 'qa' }], 3)).toBe('sessions du lead : 2 · créneaux libres : 0 sur 3')
+  expect(slotsLine([{ ...WAVE, repos: 1 }], [], 2)).toBe('créneaux libres : 1 sur 2')
+  expect(slotsLine([], [], 2)).toBeNull()
+  expect(slotsLine([{ ...WAVE, live: false }], [], 2)).toBeNull()
+})
+
+test('R5 — le collecteur rend aussi les sessions du lead et le plafond, un ancien format reste lu', () => {
+  const out = parseCollected(JSON.stringify({ waves: [WAVE], holds: [HOLD, { label: 3 }, null], cap: 3 }))
+  expect(out.waves.map(w => w.id)).toEqual([WAVE.id])
+  expect(out.holds).toEqual([HOLD])
+  expect(out.cap).toBe(3)
+  expect(parseCollected(JSON.stringify([WAVE]))).toMatchObject({ holds: [], cap: 2 })
+  expect(parseCollected(JSON.stringify({ waves: [], holds: [], cap: 0 })).cap).toBe(2)
+  expect(parseCollected('{}')).toEqual({ waves: [], holds: [], cap: 2 })
+})
+
+test('R6 — la bande affiche les sessions du lead et les créneaux sans aucune vague', async ($, on) => {
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], leadHolds: [HOLD], slotCap: 3, now: T0 })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
+    expect(await ui.find({ type: 'Text', text: /sessions du lead : 1 · créneaux libres : 2 sur 3/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /correctif-L12/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /depuis 4 min · reste 56 min/ })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
+test('R7 — la bande affiche les sessions du lead même sans contexte de session', async ($, on) => {
+  seed(on, { ...EMPTY, usage: null, waves: [], leadHolds: [HOLD], slotCap: 2, now: T0 })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /correctif-L12/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('R8 — une session du lead échue n’est plus dessinée', async ($, on) => {
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], leadHolds: [HOLD], slotCap: 3, now: Date.parse(HOLD.expires) + 1_000 })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /correctif-L12/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /créneaux libres/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('R9 — avec une vague en cours et aucune session du lead, la ligne ne garde que les créneaux libres', async ($, on) => {
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [{ ...WAVE, repos: 1 }], leadHolds: [], slotCap: 2, now: Date.parse('2026-10-07T19:14:11.066Z') })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /^créneaux libres : 1 sur 2$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /sessions du lead/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('R10 — le rafraîchissement lit les sessions du lead et le plafond dans la sortie du collecteur', async ($, on) => {
+  const hud = wired(on)
+  mock.clock(on)
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => ({ value: [] }) as never)
+  on('process.run', async (_$, e) => {
+    const argv = (e as unknown as { argv: string[] }).argv
+    if (argv[0] === 'cadence') return { value: { exitCode: 1, stdout: '', stderr: 'absent' } } as never
+    return { value: { exitCode: 0, stdout: JSON.stringify({ waves: [], holds: [HOLD], cap: 3 }), stderr: '' } } as never
+  })
+  await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  expect(hud.state('leadHolds')).toEqual([HOLD])
+  expect(hud.state('slotCap')).toBe(3)
 })

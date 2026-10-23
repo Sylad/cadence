@@ -1,4 +1,4 @@
-import type { Wave } from '../types'
+import type { LeadHold, Wave } from '../types'
 
 /**
  * Le collecteur des vagues `cadence orchestrate`, exécuté par python3 -I : il lit le registre
@@ -7,6 +7,9 @@ import type { Wave } from '../types'
  * en cours il compte les processus `claude` descendants de la session (sessions filles, équipes).
  * Sans vague vivante, il rend la dernière vague terminée du dossier courant (`live: false`, `ended` = date
  * de son wave.json) pour que la bande garde son statut sous les yeux ; elle la masque 30 min après sa fin (WAVE_LINGER_MS).
+ * Il rend aussi, avec les vagues, les sessions du lead inscrites par `cadence lead hold` (`<home>/holds/*.json`, sans
+ * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions (CADENCE_MAX_SESSIONS, 2 par défaut).
+ * Sortie : `{waves, holds, cap}`.
  */
 export const COLLECTOR = `
 import json, os, glob, datetime
@@ -93,7 +96,7 @@ for f in sorted(glob.glob(os.path.join(home, 'waves', '*.json'))):
     out.append({
         'id': r['wave'], 'pid': pid, 'cwd': r['cwd'], 'cap': r.get('cap'), 'started': r.get('started'),
         'status': w.get('status'), 'budget': w.get('budget'), 'consumed': w.get('consumed'),
-        'live': True, 'lots': read_lots(d, True),
+        'live': True, 'repos': len(r.get('repos') or []), 'lots': read_lots(d, True),
     })
 
 if not out:
@@ -115,16 +118,39 @@ if not out:
             'started': w.get('created'), 'status': w.get('status'), 'budget': w.get('budget'),
             'consumed': w.get('consumed'), 'live': False, 'ended': ended, 'lots': read_lots(d, False),
         })
-print(json.dumps(out))
+holds = []
+for hf in sorted(glob.glob(os.path.join(home, 'holds', '*.json'))):
+    h = load(hf)
+    if isinstance(h, dict) and isinstance(h.get('label'), str) and isinstance(h.get('expires'), str):
+        holds.append({'label': h['label'], 'since': str(h.get('since')), 'expires': h['expires']})
+
+raw_cap = (os.environ.get('CADENCE_MAX_SESSIONS') or '').strip()
+cap = int(raw_cap) if raw_cap.isdigit() and int(raw_cap) >= 1 else 2
+print(json.dumps({'waves': out, 'holds': holds, 'cap': cap}))
 `
 
-/** Lit la sortie du collecteur ; une sortie illisible vaut aucune vague. Sans champ \`live\`, la vague est vivante. */
-export const parseWaves = (stdout: string): Wave[] => {
+/** Plafond de sessions quand le collecteur n'en donne pas de valide (le défaut de cadence). */
+export const DEFAULT_CAP = 2
+
+export type Collected = { waves: Wave[]; holds: LeadHold[]; cap: number }
+
+/**
+ * Lit la sortie du collecteur : `{waves, holds, cap}`, ou l'ancienne liste de vagues seule. Une sortie illisible
+ * (JSON invalide) lève ; une forme étrange vaut aucune vague, aucune session du lead et le plafond par défaut.
+ * Sans champ \`live\`, la vague est vivante.
+ */
+export const parseCollected = (stdout: string): Collected => {
   const raw: unknown = JSON.parse(stdout)
-  if (!Array.isArray(raw)) return []
-  return raw
+  const obj = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+  const list: unknown = Array.isArray(raw) ? raw : obj.waves
+  const waves = (Array.isArray(list) ? list : [])
     .filter((w): w is Wave => typeof w === 'object' && w !== null && typeof (w as Wave).id === 'string')
     .map(w => ({ ...w, live: w.live !== false }))
+  const holds = (Array.isArray(obj.holds) ? obj.holds : []).filter(
+    (h): h is LeadHold => typeof h === 'object' && h !== null && typeof (h as LeadHold).label === 'string' && typeof (h as LeadHold).expires === 'string',
+  )
+  const cap = typeof obj.cap === 'number' && Number.isInteger(obj.cap) && obj.cap >= 1 ? obj.cap : DEFAULT_CAP
+  return { waves, holds, cap }
 }
 
 /**

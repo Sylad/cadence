@@ -54,10 +54,15 @@ export type Wave = {
   consumed?: number
   /** Vraie pour une vague dont le processus orchestrate vit ; fausse pour la dernière vague terminée, gardée en gris. */
   live: boolean
+  /** Nombre de dépôts que la vague tient encore (registre des vagues) : ils prennent chacun un créneau, dans la limite de son plafond. */
+  repos?: number
   /** Fin de la vague (date de son wave.json), seulement quand `live` est fausse. */
   ended?: string
   lots: WaveLot[]
 }
+
+/** Une session lancée à la main par le lead et inscrite par `cadence lead hold` (`holds/<étiquette>.json` du dossier de cadence) : elle prend un créneau jusqu'à son échéance. */
+export type LeadHold = { label: string; since: string; expires: string }
 
 /** Une ligne de `cadence lead tour --json` (L149) : ce que la bande en garde pour dessiner l'avancement d'un plan. */
 export type Project = {
@@ -82,6 +87,10 @@ declare module 'claude-code' {
       waves: Wave[]
       /** Projets actifs (au moins un lot ouvert), dans l'ordre de priorité de `cadence lead tour`. */
       projects: Project[]
+      /** Sessions du lead inscrites par `cadence lead hold` (celles dont l'échéance est passée sont écartées au dessin). */
+      leadHolds: LeadHold[]
+      /** Plafond de sessions simultanées (CADENCE_MAX_SESSIONS, 2 par défaut). */
+      slotCap: number
       /** La liste des projets est repliée sur une ligne (`/hud projets`). */
       projectsFolded: boolean
       error: string | null

@@ -1,6 +1,6 @@
 import type { ThemeKey } from 'claude-code'
 
-import type { CommandInfo, ModelsSummary, Project, Wave, WaveLot } from '../types'
+import type { CommandInfo, LeadHold, ModelsSummary, Project, Wave, WaveLot } from '../types'
 
 /** Couleur d'un taux d'occupation (contexte, fenêtre, budget) : vert, puis orange, puis rouge. */
 export const colorOfPercent = (percent: number | undefined, warn = 60, bad = 85): ThemeKey =>
@@ -447,3 +447,26 @@ export const launchFolder = (stdout: string, cwd: string): string => {
 
 /** Vrai quand `cwd` est le dossier de lancement ou l'un de ses descendants (un cd dans un sous-projet). */
 export const isInside = (cwd: string, folder: string): boolean => cwd === folder || cwd.startsWith(folder === '/' ? '/' : `${folder}/`)
+
+// ── L276 : sessions du lead et créneaux libres ──────────────────────────────────────────────────────────────
+
+/** Les sessions du lead dont l'échéance n'est pas passée à `now` (à l'échéance exacte, elle ne compte plus : comme `cadence lead hold`). */
+export const liveHolds = (holds: readonly LeadHold[], now: number): LeadHold[] => holds.filter(h => Date.parse(h.expires) > now)
+
+/** Les créneaux que le lead peut encore donner, comme `cadence orchestrate --status` : le plafond moins, pour chaque vague vivante, le plus petit de son plafond et des dépôts qu'elle tient, moins les sessions du lead. */
+export const freeSlots = (waves: readonly Wave[], cap: number, leadSessions: number): number =>
+  Math.max(0, cap - waves.filter(w => w.live).reduce((n, w) => n + Math.min(w.cap ?? cap, w.repos ?? 0), 0) - leadSessions)
+
+/** « sessions du lead : 1 · créneaux libres : 2 sur 3 » (sans le premier segment à zéro) ; null sans vague vivante ni session du lead : rien à dire. */
+export const slotsLine = (waves: readonly Wave[], holds: readonly LeadHold[], cap: number): string | null => {
+  if (!waves.some(w => w.live) && holds.length === 0) return null
+  const lead = holds.length > 0 ? `sessions du lead : ${holds.length} · ` : ''
+  return `${lead}créneaux libres : ${freeSlots(waves, cap, holds.length)} sur ${cap}`
+}
+
+/** « correctif-L12  depuis 4 min · reste 56 min » : l'étiquette, l'âge (omis si la date est illisible) et le TTL restant. */
+export const holdText = (hold: LeadHold, now: number): string => {
+  const since = Date.parse(hold.since)
+  const age = Number.isFinite(since) ? `depuis ${duration(now - since)} · ` : ''
+  return `${hold.label}  ${age}reste ${duration(Date.parse(hold.expires) - now)}`
+}

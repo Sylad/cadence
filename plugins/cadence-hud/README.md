@@ -47,6 +47,15 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
   début du titre du lot sur la largeur restante — et une seule
   ligne grise `en attente` listant les lots qui n'ont pas démarré. Les lots de projets différents gardent le
   préfixe `projet:` ;
+- les **sessions du lead** (L276) : celles que le lead a lancées à la main et inscrites par `cadence lead hold <étiquette>`
+  (`<home>/holds/<étiquette>.json`, home = `CADENCE_HOME`, sinon `~/.cadence/orchestrate`). Une ligne grise reprend la ligne
+  des créneaux de `cadence orchestrate --status` — `sessions du lead : 1 · créneaux libres : 2 sur 3` — puis une ligne par
+  session : l'étiquette, son âge et le TTL restant (`correctif-L12  depuis 4 min · reste 56 min`). Le calcul est celui de
+  `--status` : plafond (`CADENCE_MAX_SESSIONS`, 2 par défaut) moins, pour chaque vague vivante, le plus petit de son plafond
+  et des dépôts qu'elle tient, moins les sessions du lead. Elle s'affiche **même sans vague en cours** (une session
+  inscrite suffit) ; avec une vague et aucune session du lead, elle se réduit à `créneaux libres : 1 sur 2` ; sans vague
+  ni session, rien. Une session dont le TTL est échu **disparaît** de la bande à son échéance (le mod ne supprime aucun
+  fichier : `cadence` s'en charge), et `cadence lead release` la retire au rafraîchissement suivant (5 s) ;
 - sans vague vivante, la **dernière vague terminée** du dossier courant reste sur une ligne grise avec son statut
   (`terminée` / `interrompue il y a 12 min`) et le bilan de ses lots (`3 prêts · 1 échec · 3 suspendus`), **sans
   budget** (il n'a plus d'objet une fois la vague finie) ; elle **disparaît 30 min après sa fin**, ou plus tôt

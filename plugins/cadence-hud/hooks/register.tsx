@@ -1,9 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { Register, RenderChildren, Timer } from 'claude-code'
 
-import type { AgentsSummary, CommandInfo, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
-import { CONTEXT_WRITER, COLLECTOR, LAUNCH_FOLDER, parseWaves } from './collect'
-import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, isInside, k, launchFolder, limitLabel, isWaveShown, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
+import type { AgentsSummary, CommandInfo, LeadHold, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
+import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, LAUNCH_FOLDER, parseCollected } from './collect'
+import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -16,6 +16,8 @@ const info = atom({ plugin: 'cadence-hud', key: 'commandInfo' } as const, {})
 const models = atom({ plugin: 'cadence-hud', key: 'models' } as const, { byModel: {}, usdSeen: 0 })
 const waves = atom({ plugin: 'cadence-hud', key: 'waves' } as const, [])
 const projects = atom({ plugin: 'cadence-hud', key: 'projects' } as const, [])
+const leadHolds = atom({ plugin: 'cadence-hud', key: 'leadHolds' } as const, [])
+const slotCap = atom({ plugin: 'cadence-hud', key: 'slotCap' } as const, DEFAULT_CAP)
 const projectsFolded = atom({ plugin: 'cadence-hud', key: 'projectsFolded' } as const, false)
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
@@ -107,10 +109,12 @@ export const register: Register = on => {
         }
 
         let found: Wave[] = []
+        let foundHolds: LeadHold[] = []
+        let foundCap = DEFAULT_CAP
         let problem: string | null = null
         if (collected.exitCode === 0) {
           try {
-            found = parseWaves(collected.stdout)
+            ;({ waves: found, holds: foundHolds, cap: foundCap } = parseCollected(collected.stdout))
           } catch (err) {
             problem = `collecteur illisible : ${String(err).slice(0, 60)}`
           }
@@ -131,6 +135,8 @@ export const register: Register = on => {
         await update($, usage, () => nextUsage)
         await update($, agents, () => summary)
         await update($, waves, () => found)
+        await update($, leadHolds, () => foundHolds)
+        await update($, slotCap, () => foundCap)
         await update($, error, () => problem)
         await update($, now, () => at)
         void refreshProjects(found, at)
@@ -242,7 +248,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, cap] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
@@ -253,10 +259,13 @@ export const register: Register = on => {
       read($, now),
       read($, projects),
       read($, projectsFolded),
+      read($, leadHolds),
+      read($, slotCap),
     ])
     const w = allWaves.filter(wave => isWaveShown(wave, at))
     const shownProjects = activeProjects(allProjects)
-    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0) return next(e)
+    const holds = liveHolds(allHolds, at)
+    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0) return next(e)
 
     const ambiguous = parseAmbiguous(await $.env.get('CADENCE_HUD_AMBIGUOUS'))
     const { Box, Text } = $.ui.resolve(e)
@@ -491,6 +500,22 @@ export const register: Register = on => {
       )
     })
 
+    // comme `cadence orchestrate --status` : la ligne des créneaux, puis une ligne par session que le lead a inscrite
+    const slots = slotsLine(w, holds, cap)
+    const leadRows = slots && (
+      <Box key="lead" flexDirection="column">
+        <Text color="subtle" wrap="truncate-end">
+          {slots}
+        </Text>
+        {holds.map(hold => (
+          <Text key={`hold-${hold.label}`} dimColor wrap="truncate-end">
+            {'  '}
+            {holdText(hold, at)}
+          </Text>
+        ))}
+      </Box>
+    )
+
     const nameWidth = Math.max(0, ...shownProjects.map(p => p.project.length))
     const projectRows =
       shownProjects.length === 0 ? null : folded ? (
@@ -533,6 +558,7 @@ export const register: Register = on => {
       <Box flexDirection="column">
         {contextRow}
         {waveRows}
+        {leadRows}
         {projectRows}
         {problem && (
           <Text color="warning" dimColor>

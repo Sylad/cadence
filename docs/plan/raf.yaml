@@ -3054,9 +3054,10 @@ lots:
     created: 2026-10-23
   - id: L271
     title: "orchestrate : un lot de revue UX planifiée (« Revue UX — <écran> ») sans visible: passe par precheck → implement → review sans aucune étape UX (finance L32 le 23-10 : la session n'a traité que la note du lot, la revue de l'écran n'a pas eu lieu) — le faire passer par l'ux-reviewer (titre « Revue UX — » ou clé dédiée), ou raf check signale un lot « Revue UX » non visible ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-23
+    started: 2026-10-23
   - id: L272
     title: "raf show <lot> affiche goal: (l'objectif qui remplacera le titre dans les briefs), natif ou mappé ; test (revue L258)"
     status: doing

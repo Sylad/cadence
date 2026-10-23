@@ -300,7 +300,7 @@ describe('L252 — une ressource se partage à tous les niveaux du dossier qui l
   function layout(holder: 'x' | 'grp/alpha', yaml = 'resources: [banc]\ndepth: 2\n') {
     const other = holder === 'x' ? 'grp/alpha' : 'x';
     const { parent, dirs } = parentWith({ [holder]: HOLDER, [other]: OTHER }, yaml);
-    return { parent, other, otherName: basename(other), at: { P: parent, 'P/grp': join(parent, 'grp'), 'P/grp/alpha': dirs['grp/alpha']!, 'P/x': dirs.x! } };
+    return { otherName: basename(other), at: { P: parent, 'P/grp': join(parent, 'grp'), 'P/grp/alpha': dirs['grp/alpha']!, 'P/x': dirs.x! } };
   }
 
   // tout point de lancement voit le même lot doing, tenu à l'autre niveau : la ressource est prise, seuls « Tiré » et « Libre » sont libres

@@ -21,7 +21,12 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
   subagent, check `cadence orchestrate --status`, and while a wave runs, start none beyond the free slots. Read the cap and the
   free slots, do not compute them: `cadence orchestrate --status` and `cadence lead tour` print
   `créneaux libres : N sur M` (M is the configured cap; the registry subtracts, for each live wave, min(cap,
-  repositories it still holds) from the M slots; no line from `lead tour` means no live wave, so all M are free).
+  repositories it still holds) and one slot per lead session (below) from the M slots; no line from `lead tour` means no live wave and no lead session, so all M are free).
+  **A session you start by hand counts too** (a fix subagent, a review, a QA pass launched outside a wave): the registry does not
+  see it, so declare it. Right before starting it, `cadence lead hold <label> [--ttl minutes]` (60 minutes by default,
+  the label names the session: `correctif-L12`); as soon as it comes back, `cadence lead release <label>`. While it is held, both
+  commands print `sessions du lead : N (labels)` and subtract it from `créneaux libres`; an `--ttl` that runs out ends the hold
+  by itself if you forget, but release it: a stale hold hides a free slot. Holding does not block anything and never raises the cap.
   Never raise `--max-sessions` or `CADENCE_MAX_SESSIONS` yourself to speed a wave up: raising the cap is a decision of
   the human (a trial at 3 was decided on 2026-10-12); if the slots are the bottleneck, say so and let them decide.
 - **Never two subagents in the same repository at the same time**, and the lead does not commit in a

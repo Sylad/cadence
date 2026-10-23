@@ -20,6 +20,7 @@ import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { findProjects, leadTour, readLeadUx, tourFreeLine, tourLine } from './lead.js';
 import { configuredCap, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
+import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, liveWaves, openLotsIn, openWavesIn, type OpenWave } from './orchestrate/registry.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
@@ -156,6 +157,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       status: { type: 'string' },
       since: { type: 'string' },
       idle: { type: 'string' },
+      ttl: { type: 'string' },
       session: { type: 'string' },
       all: { type: 'boolean' },
       depth: { type: 'string' },
@@ -187,7 +189,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const root = gitRoot(io.cwd) ?? io.cwd;
   // Le tour parcourt les sous-dossiers (ou, sans sous-projet, prend le dossier lui-même s'il est un projet) : il ne lit pas le plan du dossier courant.
   if (command === 'lead') {
-    if (rest[0] !== 'tour' || rest.length > 2) throw new RafError('usage : cadence lead tour [dossier] [--idle 3] [--depth n] [--json]');
+    if (rest[0] === 'hold' || rest[0] === 'release') return leadHold(rest, values.ttl, io);
+    if (values.ttl !== undefined) throw new RafError('--ttl ne va qu\'avec lead hold');
+    if (rest[0] !== 'tour' || rest.length > 2) throw new RafError('usage : cadence lead tour [dossier] [--idle 3] [--depth n] [--json] | lead hold <étiquette> [--ttl minutes] | lead release <étiquette>');
     const idle = values.idle === undefined ? undefined : Number(values.idle);
     if (idle !== undefined && !(Number.isInteger(idle) && idle >= 0)) throw new RafError(`--idle invalide : ${values.idle}`);
     const depth = values.depth === undefined ? undefined : Number(values.depth);
@@ -206,7 +210,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
       for (const r of rows) io.out(tourLine(r));
       // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
-      const [slots] = liveLines(configuredCap(io.env));
+      const [slots] = liveLines(configuredCap(io.env), io.now());
       if (slots) io.out(slots);
       // en face des créneaux libres, les lots prêts dont aucune ressource n'est prise (L252) ; sans vague en cours, pas de créneau à remplir : seul --json les donne
       const free = slots ? tourFreeLine(rows) : null;
@@ -934,6 +938,26 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
     }
   }
   io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha}${r.ficheAmendee ? `, fiche amendée en ${r.ficheAmendee}` : ''} ; raison dans ${json} et en note du lot ${cite}${tracked ? '' : ' (plan à commiter)'}`);
+  return 0;
+}
+
+/** Durée par défaut (minutes) d'une session du lead inscrite par `lead hold` : de quoi finir un correctif ou une revue, pas de quoi oublier la réservation toute la journée. */
+const HOLD_TTL_MINUTES = 60;
+
+/** `cadence lead hold <étiquette> [--ttl minutes]` / `lead release <étiquette>` (L255) : inscrit, ou rend, une session lancée à la main par le lead, qui compte dans les créneaux libres. */
+function leadHold(rest: string[], ttl: string | undefined, io: Io): number {
+  const [verb, label] = rest;
+  const usage = verb === 'hold' ? 'usage : cadence lead hold <étiquette> [--ttl minutes]' : 'usage : cadence lead release <étiquette>';
+  if (rest.length !== 2 || !label!.trim()) throw new RafError(usage);
+  if (verb === 'release') {
+    if (ttl !== undefined) throw new RafError(`--ttl ne va qu'avec lead hold (${usage})`);
+    io.out(releaseHold(cadenceHome(), label!) ? `session « ${label} » rendue` : `aucune session « ${label} » inscrite`);
+    return 0;
+  }
+  const minutes = ttl === undefined ? HOLD_TTL_MINUTES : Number(ttl);
+  if (!(Number.isInteger(minutes) && minutes >= 1)) throw new RafError(`--ttl invalide : ${ttl} (un nombre entier de minutes ≥ 1)`);
+  addHold(cadenceHome(), label!, minutes, io.now());
+  io.out(`session « ${label} » inscrite pour ${minutes} min : elle compte dans les créneaux libres (cadence lead release « ${label} » à sa fin)`);
   return 0;
 }
 

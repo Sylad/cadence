@@ -8,7 +8,8 @@ import { activeLock, holderAlive, releaseLock, takeLock, type OLock } from './lo
 
 /**
  * État commun à toutes les vagues de l'utilisateur, quel que soit le dossier d'où elles partent : le registre
- * des vagues vivantes (`waves/<pid>.json`) et les créneaux de sessions simultanées (`slots/slot-<n>.lock`).
+ * des vagues vivantes (`waves/<pid>.json`), les créneaux de sessions simultanées (`slots/slot-<n>.lock`) et les
+ * sessions lancées à la main par le lead (`holds/<étiquette>.json`, L255).
  * Les verrous de DÉPÔT restent dans le dépôt (`.git/cadence/orchestrate.lock`).
  */
 export function cadenceHome(env: NodeJS.ProcessEnv = process.env): string {
@@ -64,9 +65,65 @@ export function liveWaves(home: string): LiveWave[] {
  * rendent entre deux étapes : les sessions vivantes à l'instant ne disent pas ce que la vague va reprendre).
  * Une vague sans plafond connu compte pour `total`.
  */
-export function freeSlots(waves: LiveWave[], total: number): number {
+export function freeSlots(waves: LiveWave[], total: number, leadSessions = 0): number {
   const held = waves.reduce((n, w) => n + Math.min(w.cap ?? total, w.repos.length), 0);
-  return Math.max(0, total - held);
+  return Math.max(0, total - held - leadSessions);
+}
+
+/**
+ * Une session lancée à la main par le lead (sous-agent de correctif, de revue, de QA) : aucune vague ne la porte, le
+ * registre ne la voit pas. Le lead l'inscrit (`cadence lead hold`), elle compte dans les créneaux pris jusqu'à son
+ * `release` ou, si le lead l'oublie, jusqu'à son échéance.
+ */
+export interface LeadHold {
+  label: string;
+  since: string;
+  expires: string;
+}
+
+const holdsDir = (home: string) => join(home, 'holds');
+/** Le libellé est libre (espaces, « / »), le nom de fichier l'encode. */
+const holdFile = (home: string, label: string) => join(holdsDir(home), `${encodeURIComponent(label)}.json`);
+
+/** Inscrit la session `label` pour `ttlMinutes` minutes à partir de `now` ; la poser de nouveau la renouvelle. */
+export function addHold(home: string, label: string, ttlMinutes: number, now: Date): void {
+  mkdirSync(holdsDir(home), { recursive: true });
+  const file = holdFile(home, label);
+  const hold: LeadHold = { label, since: now.toISOString(), expires: new Date(now.getTime() + ttlMinutes * 60_000).toISOString() };
+  writeFileSync(`${file}.tmp`, JSON.stringify(hold));
+  renameSync(`${file}.tmp`, file);
+}
+
+/** Retire la session `label` ; faux quand elle n'était pas inscrite. */
+export function releaseHold(home: string, label: string): boolean {
+  const file = holdFile(home, label);
+  if (!existsSync(file)) return false;
+  rmSync(file, { force: true });
+  return true;
+}
+
+/** Les sessions du lead dont l'échéance n'est pas passée à `now` (les autres, et les fichiers illisibles, sont écartés au passage). */
+export function liveHolds(home: string, now: Date): LeadHold[] {
+  let names: string[];
+  try {
+    names = readdirSync(holdsDir(home)).filter((n) => n.endsWith('.json'));
+  } catch {
+    return [];
+  }
+  const out: LeadHold[] = [];
+  for (const n of names) {
+    const file = join(holdsDir(home), n);
+    let hold: LeadHold | null = null;
+    try {
+      const raw = JSON.parse(readFileSync(file, 'utf8'));
+      if (typeof raw.label === 'string' && Date.parse(raw.expires) > now.getTime()) hold = { label: raw.label, since: String(raw.since), expires: String(raw.expires) };
+    } catch {
+      // illisible : écarté comme une échéance passée
+    }
+    if (hold) out.push(hold);
+    else rmSync(file, { force: true });
+  }
+  return out.sort((a, b) => a.since.localeCompare(b.since) || a.label.localeCompare(b.label));
 }
 
 /** Inscrit la vague ; écarte au passage les entrées de processus morts (les `.tmp` d'une inscription en cours ne sont pas touchés). */

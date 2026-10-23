@@ -40,7 +40,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   one project at a time; a delivery that changes what a page shows or what it is
   served is then checked in the running app by the `qa-reviewer` agent, whose
   blocking findings come back to you. As many
-  subagents as the session cap at most (2 by default, `CADENCE_MAX_SESSIONS`), never two in the same repository. The whole flow is drawn in
+  subagents as the session cap at most (2 by default, `CADENCE_MAX_SESSIONS`), the ones it starts by hand declared with `cadence lead hold`, never two in the same repository. The whole flow is drawn in
   [docs/lead.md](lead.md); how a lot, a wave, the lead and the service of cadence itself fit together, in four figures, is in
   [docs/fonctionnement.md](fonctionnement.md).
 - **ux-reviewer** (agent): captures at 1440 and 390 px, findings grounded in a

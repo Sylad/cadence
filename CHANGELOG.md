@@ -60,6 +60,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence lead hold <label> [--ttl minutes]` and `cadence lead release <label>` (L255, `docs/lead.md`): the sessions the lead starts by hand (fix subagent, review, QA) are registered with a time limit (60 minutes by default) and subtracted from `créneaux libres` in `cadence orchestrate --status` and `cadence lead tour`, which print `sessions du lead : N (labels)` — even with no live wave. On 2026-10-23 the lead ran 4 sessions under a cap of 3 because the registry did not see them. The `lead` skill declares every session it starts by hand.
+
 ### Fixed
 
 - `cadence deliver --sha <sha>` no longer refuses a tracked file modified outside the delivered sha (L257, `docs/deliver.md`): delivering a pushed sha never reads the working tree, so the plan modified by `raf done` no longer forced a stash/pop to deliver L129 under L130 (2026-10-23). Without `--sha` the clean-tree precondition is unchanged.

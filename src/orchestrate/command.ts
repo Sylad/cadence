@@ -13,7 +13,7 @@ import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { findProjects, isProject as isLeadProject } from '../lead.js';
 import { freeLine, readyFree } from '../ready-free.js';
-import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
+import { acquireSlot, cadenceHome, freeSlots, liveHolds, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { readWaits, renderWaits } from './waits.js';
 import { acceptationFile, acceptText } from './accept.js';
@@ -477,13 +477,15 @@ function duration(ms: number): string {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
 }
 
-/** Vagues vivantes (toutes, quel que soit leur dossier de départ), créneaux libres et dépôts qu'elles tiennent. */
-export function liveLines(cap = DEFAULT_MAX_SESSIONS): string[] {
+/** Vagues vivantes (toutes, quel que soit leur dossier de départ), sessions du lead (L255), créneaux libres et dépôts qu'elles tiennent. Rien sans vague ni session du lead. */
+export function liveLines(cap = DEFAULT_MAX_SESSIONS, now = new Date()): string[] {
   const home = cadenceHome();
   const waves = liveWaves(home);
-  if (waves.length === 0) return [];
+  const holds = liveHolds(home, now);
+  if (waves.length === 0 && holds.length === 0) return [];
   const slots = liveSlots(home).length;
-  const lines = [`vagues en cours : ${waves.length} · sessions en cours : ${slots} · créneaux libres : ${freeSlots(waves, cap)} sur ${cap}`];
+  const lead = holds.length ? ` · sessions du lead : ${holds.length} (${holds.map((h) => h.label).join(', ')})` : '';
+  const lines = [`vagues en cours : ${waves.length} · sessions en cours : ${slots}${lead} · créneaux libres : ${freeSlots(waves, cap, holds.length)} sur ${cap}`];
   for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · plafond ${w.cap ?? '?'} · dépôts : ${w.repos.join(', ')}`);
   return lines;
 }
@@ -501,13 +503,14 @@ const CLEAR_SCREEN = '\x1b[H\x1b[2J';
 const DEFAULT_WATCH_INTERVAL = 10;
 
 /** Ce que `--status` montre à un instant : les vagues vivantes, puis le tableau (absent si seules les vagues vivantes comptent). */
-function statusView(args: Args, launch: string, cap: number): { live: string[]; table?: string[]; running: boolean } {
+function statusView(args: Args, launch: string, cap: number, now: Date): { live: string[]; table?: string[]; running: boolean } {
   const store = typeof args.status === 'string' ? RunStore.find(launch, args.status) : RunStore.last(launch);
-  const live = liveLines(cap);
-  if (!store && live.length && args.status === true) return { live, running: true };
+  const live = liveLines(cap, now);
+  const waveLive = liveWaves(cadenceHome()).length > 0;
+  if (!store && live.length && args.status === true) return { live, running: waveLive };
   if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');
   // `running` : la vague suivie tourne — pour un <id> explicite, elle seule compte, pas les autres vagues de la machine
-  const running = typeof args.status === 'string' ? liveWaves(cadenceHome()).some((w) => w.wave === store.readWave()!.id) : live.length > 0;
+  const running = typeof args.status === 'string' ? liveWaves(cadenceHome()).some((w) => w.wave === store.readWave()!.id) : waveLive;
   return { live, table: renderTable(store.readWave()!, store.lots()), running };
 }
 
@@ -543,7 +546,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.status !== undefined) {
     maxSessions(args, io); // une valeur invalide est refusée ici aussi
     if (!args.watch) {
-      const { live, table } = statusView(args, launch, configuredCap(io.env, args.maxSessions));
+      const { live, table } = statusView(args, launch, configuredCap(io.env, args.maxSessions), io.now());
       for (const line of live) io.out(line);
       if (!table) return 0; // sans identifiant : les vagues vivantes suffisent
       if (live.length) io.out('');
@@ -553,7 +556,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     // --watch : le même tableau, rafraîchi ; il s'arrête seul quand plus aucune vague ne tourne (le dernier rendu reste affiché)
     const sleep = deps.watchSleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
     for (;;) {
-      const { live, table, running } = statusView(args, launch, configuredCap(io.env, args.maxSessions));
+      const { live, table, running } = statusView(args, launch, configuredCap(io.env, args.maxSessions), io.now());
       io.out(CLEAR_SCREEN);
       for (const line of live) io.out(line);
       if (table) {

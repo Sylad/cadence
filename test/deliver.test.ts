@@ -393,8 +393,7 @@ describe('deliver : script du projet (L2)', () => {
         return 0;
       },
     });
-    const { c, out } = ctx(dir, { config: SCRIPT, sha: target });
-    c.duringWave = true;
+    const { c, out } = ctx(dir, { config: SCRIPT, sha: target, duringWave: true });
     expect(await deliver(c, deps)).toBe(0);
     expect(lastDelivery(stateDir(dir))).toBe(target);
     expect(out.join('\n')).not.toContain('tête déplacée');

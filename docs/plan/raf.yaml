@@ -2930,6 +2930,26 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-23
+  - id: L255
+    title: "Créneaux : les sessions lancées à la main par le lead (sous-agents de correctif, revue, QA) comptent dans orchestrate --status et lead tour — cadence lead hold <étiquette> / release (registre de sessions externes avec TTL), soustrait des créneaux libres ; skill lead mis à jour ; tests (23-10 : 4 sessions pour un plafond de 3)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-23
+  - id: L256
+    title: "Revue coupée (code 143, sortie vide) : orchestrate relance une fois la même étape en session neuve avant de rendre le lot, et distingue quota, coupure et échec dans le tableau ; tests (finance L130, vague 2026-10-23-fin-l129) — vérifier d'abord les lots voisins L21, L25/L26 pour ne pas doublonner"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-23
+  - id: L257
+    title: "cadence deliver --sha <sha> ne refuse plus un fichier suivi modifié hors du sha livré (le plan après raf done) : livrer un sha ne lit pas l'arbre ; tests (23-10 : stash/pop pour livrer L129 sous L130)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-23
+  - id: L258
+    title: 'cadence orchestrate <projet>:<lot> --goal "…" (ou clé goal: du lot) remplace le titre comme objectif du brief, relayé dans le tableau ; tests (titre périmé = délégation à la main : maritime B28.4, B28.5, B28.6)'
+    status: todo
+    estimate: 0.5
+    created: 2026-10-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

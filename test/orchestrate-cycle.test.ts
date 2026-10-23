@@ -1246,6 +1246,23 @@ describe('revue coupée (L256)', () => {
     expect(c.lot.steps[1].cause).toMatch(/^coupée/);
   });
 
+  it("R5 — (échec après relance) revue coupée puis relancée en échec ordinaire sans jeton récupérable : les jetons de la session coupée vont à l'étape, une seule fois", async () => {
+    const h = harness({ script: { implement: [impl()], review: [(call) => {
+      const first = call.args[call.args.indexOf('--session-id') + 1];
+      const dir = projectLogDir(h.wave.claudeHome!, call.opts.cwd);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${first}.jsonl`), JSON.stringify({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 7, cache_creation_input_tokens: 1000, cache_read_input_tokens: 0, output_tokens: 3 } } }));
+      return { code: 143, stdout: '', stderr: 'Terminated', timedOut: false };
+    }, () => ({ code: 1, stdout: '', stderr: 'boom', timedOut: false })] } });
+    h.wave.claudeHome = tempDir();
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(c.lot.outcome).toMatch(/^échec : review sans résultat/);
+    expect(c.lot.steps[1].tokens!.counted).toBe(1010);
+    expect(lotSpent(c.lot)).toBe(h.wave.budget.consumed);
+  });
+
   it('R7 — une revue qui échoue sans être coupée est un « échec » (une seule session), distinct du quota et de la coupure', async () => {
     const h = harness({ script: { implement: [impl()], review: [() => ({ code: 1, stdout: '', stderr: 'boom', timedOut: false })] } });
     const c = h.lot('L1');

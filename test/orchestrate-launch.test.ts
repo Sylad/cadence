@@ -389,6 +389,17 @@ describe('revue coupée (code 143, sortie vide) : une relance en session neuve (
     expect(out.relaunched?.sessionId).toBe(spec.sessionId);
   });
 
+  it("R2 — relancée puis en échec ordinaire (code 1) : classée échec, non cut, avec l'identifiant de la session neuve", async () => {
+    const { calls, p } = run([cut, { code: 1, stdout: '', stderr: 'boom', timedOut: false }]);
+    const out = await p;
+    expect(calls).toHaveLength(2);
+    expect(out.kind).toBe('failed');
+    if (out.kind !== 'failed') return;
+    expect(out.cut).toBeUndefined();
+    expect(out.relaunched?.sessionId).toBe(spec.sessionId);
+    expect(out.sessionId).toBe(calls[1][calls[1].indexOf('--session-id') + 1]);
+  });
+
   it('R3 — la relance est réservée aux étapes en lecture : ni implement/fix/spec/accept, ni modèle local', async () => {
     for (const kind of ['implement', 'fix', 'spec', 'accept'] as const) {
       const { calls, p } = run([cut], { kind });

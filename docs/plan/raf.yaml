@@ -2893,7 +2893,7 @@ lots:
     finished: 2026-10-23
   - id: L251
     title: "Ressources partagées (issue #13, 1/3) : clé uses: [nom] sur un lot (raf add/raf uses <lot> <res>… --uses), liste des ressources déclarée dans le cadence.yaml du dossier parent (resources:), raf check refuse une ressource non déclarée ; doc docs/raf.md + CHANGELOG"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-23
@@ -2909,7 +2909,9 @@ lots:
       - { date: 2026-10-23, text: "Hypothèses (fiche ressources-partagees-uses) — R6 : Poser uses: n'exige pas que le nom soit déjà déclaré : raf add --uses et raf uses acceptent un nom inconnu du parent, et c'est raf check qui le refuse (R10) ; si faux : Si l'écriture doit refuser un nom non déclaré (comme --after refuse une dépendance inconnue), raf add et raf uses lisent resources du parent et échouent avant…" }
       - { date: 2026-10-23, text: "Hypothèses (fiche ressources-partagees-uses) — R7 : raf uses <lot> <res>… remplace la liste du lot ; sans nom, il retire la clé uses: ; la clé est écrite en flow, à sa place (après after:, avant created:) ; si faux : Si la commande doit ajouter aux ressources existantes ou refuser un lot terminé, seul le calcul de la nouvelle liste ou un contrôle de statut change ; aucune d…" }
       - { date: 2026-10-23, text: "Hypothèses (fiche ressources-partagees-uses) — R8 : raf check ne contrôle que les lots ouverts (todo, doing) : un lot done ou dropped dont la ressource a été retirée de resources: n'est pas un écart ; si faux : Si les lots terminés sont aussi contrôlés, un retrait de ressource de la liste fait échouer raf check à jamais sur l'historique ; seul le filtre de statut chan…" }
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à 8672498 : vitest 2645 (+4 sautés), tsc propre. Hypothèses de la fiche (R2 noms, R4 resources: du cadence.yaml le plus proche, R6 nom non déclaré accepté à l'écriture, R7 raf uses remplace, R8 check des lots ouverts seulement) relayées à Sylvain, gardées. Sous-tâche proposée par la revue : un nom valide que YAML lit comme un nombre (123, 1e3) est refusé par raf check. Poussé et mis en service seul (L252 rendu au-dessus)." }
     review: { date: 2026-10-23, verdict: "conforme : les 2 correctifs vérifiés, aucune régression (tsc 0 erreur, 2649/2649 tests) — orchestré (vague 2026-10-23-cad-ress, 1 passe(s) de correction + passe des mineurs)", commit: f871b4b64970c2a95e6e9001d97b72361574232b }
+    finished: 2026-10-23
   - id: L252
     title: "Ressources partagées (issue #13, 2/3) : cadence lead tour et orchestrate --continue affichent, en face des créneaux libres, les lots prêts de tous les projets dont aucune ressource n'est prise par un lot doing (ni par une vague en cours) ; --json idem ; tests"
     status: doing

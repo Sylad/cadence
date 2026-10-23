@@ -48,16 +48,17 @@ raf gantt                         # .cadence/gantt.html (next to the plan)
 | Command | Effect |
 |---|---|
 | `raf init [--project name] [--prefix L] [--no-hook]` | create the plan, install the hook, add `.playwright-mcp/` to `.gitignore` |
-| `raf add "title" [--estimate d] [--quickwin] [--visible [--screen page\|component\|journey]] [--spec] [--public "title"] [--after L2,L4] [--parent L3]` | add a lot or a sub-task, print its id (`--public`: the lot's title in the public's words, written as `public:` right after `title:`; `--screen`: the screen a visible lot creates or changes — a new `page`, a new `component` or a modified `journey` — written as `screen:` right after `visible:`, shown by `raf show`; it requires `--visible`, and `raf check` reports a `screen:` without `visible:` or with another value as an error. Only `page` triggers the spec step of `orchestrate` (L209), never inferred from the title; `--spec`: the lot changes a behaviour (something a user, an API client or another service can observe), written as `spec: true` right after `screen:`, `visible:`, `quickwin:` or `estimate:` (whichever comes last), shown by `raf show`, refused on a sub-task. Also set by the lead at planning time, never inferred from the title) |
-| `raf add "title" --every <days>` · `raf did <id> ["text"]` | recurring lot: `every` (days) and `last` (last time done) fields; the lot stays `todo`, `raf now` and `session start` list it under « Récurrent » with « dû depuis N j » / « prochain dans N j »; `raf did` resets the count (spec: `docs/superpowers/specs/2026-10-04-L11-tache-recurrente.md`) |
+| `raf add "title" [--estimate d] [--quickwin] [--visible [--screen page\|component\|journey]] [--spec] [--public "title"] [--after L2,L4] [--uses banc,passerelle] [--parent L3]` | add a lot or a sub-task, print its id (`--public`: the lot's title in the public's words, written as `public:` right after `title:`; `--screen`: the screen a visible lot creates or changes — a new `page`, a new `component` or a modified `journey` — written as `screen:` right after `visible:`, shown by `raf show`; it requires `--visible`, and `raf check` reports a `screen:` without `visible:` or with another value as an error. Only `page` triggers the spec step of `orchestrate` (L209), never inferred from the title; `--spec`: the lot changes a behaviour (something a user, an API client or another service can observe), written as `spec: true` right after `screen:`, `visible:`, `quickwin:` or `estimate:` (whichever comes last), shown by `raf show`, refused on a sub-task. Also set by the lead at planning time, never inferred from the title); `--uses`: the shared resources the lot occupies, written as `uses: [banc, passerelle]` after `after:` and before `created:` ([shared resources](#shared-resources-uses-and-resources), L251), refused on a sub-task) |
+| `raf add "title" --every <days>` · `raf did <id> ["text"]` | recurring lot: `every` (days) and `last` (last time done) fields; the lot stays `todo`, `raf now` and `session start` list it under « Récurrent » with « dû depuis N j » / « prochain dans N j »; `raf did` resets the count (spec: `docs/superpowers/specs/2026-10-04-L11-tache-recurrente.md`); `--uses`: the shared resources the lot occupies, written as `uses: [banc, passerelle]` after `after:` and before `created:` ([shared resources](#shared-resources-uses-and-resources), L251), refused on a sub-task) |
 | `raf screen <id> page\|component\|journey\|none` | set, replace or remove `screen:` on an existing lot, to adopt the [spec step](orchestrate.md#the-spec-step-of-a-lot-with-screen) on a plan already written (only `page` adopts the [spec step](orchestrate.md#the-spec-step-of-a-lot-with-screen); `component` and `journey` do not); refused on a lot without `visible:` (like `raf add --screen`) and on a sub-task; `none` removes the key and leaves `visible:` alone |
 | `raf spec <id> on\|off` | set or remove `spec:` on an existing lot (a lot that changes a behaviour, for the back-end spec step of `cadence orchestrate`, see [The spec step of a lot with `spec: true`](orchestrate.md#the-spec-step-of-a-lot-with-spec-true)); refused on a sub-task; `off` is refused on a lot that has `screen: page` (the page implies the spec: remove `screen:` first) and `on` there only says so and changes nothing; on `component` and `journey` (ordinary path since L209) both work and set or remove the back-end `spec:`. `raf spec` only takes `on`/`off`: `cadence spec check\|qa <fiche.yaml>` keeps its own subcommands. `raf check` reports a `spec:` that is neither `true` nor `false` (`spec : true ou false attendu`) |
+| `raf uses <lot> [<resource>…]` | replace the `uses:` list of a lot of any status (`done` and `dropped` included) by the names given (duplicates removed, order kept); with no name, remove the key. Prints nothing. A name is a word of lowercase letters, digits, `-` and `_` (else `ressource invalide : <name> (lettres minuscules, chiffres, - et _)`, plan unchanged); a sub-task is refused (`uses se pose sur un lot, pas sur une sous-tâche : L1/t1`); an unknown lot is `lot inconnu : <id>`. A name not yet declared is accepted: `raf check` refuses it (L251) |
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf todo <id> [--reason text]` | put a started lot back to `todo` (`doing` → `todo`, `started:` removed, dated note « remis en attente : reason »): refused when work commits cite the lot (plan-only and version commits do not count, as `raf commits`), when the lot is not `doing` (a `done` or `dropped` lot is reopened by hand), or on a sub-task; sub-tasks and other keys are left as they are |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
 | `raf title <id> "new title"` | replace the title of a lot of any status (`done` included) and add a dated note « titre remplacé : « old title » »; `raf now`, `raf show`, `raf list`, `session start` and the proposals read the new one. Refused on an empty or identical title, an unknown lot or a sub-task |
-| `raf show <id> [--notes]` | one lot: status, dates, `after`, public title, dated notes in order, then the counted commits (as `raf commits`, neighbouring repositories included); `--notes` prints the notes alone |
+| `raf show <id> [--notes]` | one lot: status, dates, `after`, `uses : banc, passerelle` when the lot has `uses:`, public title, dated notes in order, then the counted commits (as `raf commits`, neighbouring repositories included); `--notes` prints the notes alone |
 | `raf commits <id>` | the commits counted for a lot (the set the code review gate uses), one `<sha> <subject>` per line, oldest first; a lot that declares `repos:` ([neighbouring repositories](orchestrate.md#a-lot-whose-work-is-in-a-neighbouring-repository)) gets, after them, one `dépôt <path> :` section per neighbour with the commits there that cite the lot and fall within the lot's period (`started` to `finished`) and, when the lot declares a `cite:` for that neighbour, contain that string (`aucun commit du lot`, or `introuvable` for a path that is not there) |
 | `raf now` | what to do next |
 | `raf list [--status s]` | flat list |
@@ -92,6 +93,29 @@ pre-commit block to an existing repository. A read-only plan is never started by
 
 Global options: `--file path` or `RAF_FILE`; `RAF_TODAY=YYYY-MM-DD` to freeze
 the date. `cadence raf …` is the same as `raf …`.
+
+## Shared resources: `uses:` and `resources:`
+
+Some projects of a folder share one thing that only one lot at a time can use (a test bench, a gateway, a
+device). L251 (GitHub issue #13, 1/3) lets the plan **declare** it; nothing locks on it yet (`raf start` and
+`cadence orchestrate` ignore `uses:`).
+
+- The folder that holds the projects lists the resources in its `cadence.yaml`, next to `depth:` and `priority:`:
+  `resources: [banc, passerelle]`. A name is a word of lowercase letters, digits, `-` and `_`.
+- A lot says which ones it occupies with `uses: [banc]` (a flow list; optional): `raf add "title" --uses banc,passerelle`, or on an existing lot
+  `raf uses L3 banc passerelle` (`raf uses L3` removes the key). `uses:` belongs to a lot, never to a sub-task, and `raf show` prints it.
+  It is a native key of raf's own plan; a plan kept by another tool is read-only and has no `uses` mapping.
+- The list is read from the nearest `cadence.yaml` that carries the `resources:` key, starting at the parent of the project's root and going up
+  (a project at `depth: 2`, `folder/group/project`, reads `folder/cadence.yaml` when `group` carries none): the first file that has the key
+  wins, even with `resources: []`, and the search goes no higher. No file carries it: nothing is declared. Duplicates in the list are ignored.
+  The search is not bounded: without a nearer file it goes up to the root of the file system.
+- `raf check` reads that file only when an open lot (`todo`, `doing`) carries `uses:`, and writes one gap per name it does not declare:
+  `✗ L3 utilise la ressource « banc », non déclarée dans <folder>/cadence.yaml (resources:)` (exit code 1). Without a declaring file the
+  gap names the `cadence.yaml` of the parent folder. `done` and `dropped` lots are not checked, so removing a resource from the list does not
+  fail the history. A `uses:` that is not a list of valid names is a gap of the lot (`✗ L3 : uses doit être une liste de noms de ressources`);
+  an unreadable `cadence.yaml`, or a `resources:` that is not a list of valid names, is a gap naming the file
+  (`<file> : resources doit être une liste de noms de ressources`), never an empty list. A plan where no open lot carries `uses:` gets the same
+  `raf check` as before.
 
 ## Where the plan is
 

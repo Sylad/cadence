@@ -14,7 +14,7 @@ import { gitRoot, isTracked, readCommits, matchesHead, resolveCommit, stage, sta
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
-import { Plan, RafError, SCREENS, STATUSES, type Lot, type Screen, type Status } from './plan.js';
+import { invalidResource, Plan, RafError, SCREENS, STATUSES, type Lot, type Screen, type Status } from './plan.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
@@ -43,10 +43,11 @@ export interface Io {
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
 
   raf init [--project nom] [--prefix L] [--no-hook]
-  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--public "titre public"] [--every jours] [--after L2,L4] [--parent L3]
+  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--parent L3]
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (seule la valeur page adopte l'étape spec d'orchestrate)
   raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
+  raf uses <lot> [<ressource>…]   remplace les ressources partagées du lot (uses:, déclarées par resources: dans le cadence.yaml du dossier parent ; raf check refuse un nom non déclaré) ; sans nom, retire la clé
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits
   raf note <id> "texte"
@@ -147,6 +148,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       dir: { type: 'string' },
       title: { type: 'string' },
       after: { type: 'string' },
+      uses: { type: 'string' },
       parent: { type: 'string' },
       force: { type: 'boolean' },
       reason: { type: 'string' },
@@ -272,6 +274,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         if (values.spec) throw new RafError('--spec se pose sur un lot, pas sur une sous-tâche');
         if (values.public !== undefined) throw new RafError('--public se pose sur un lot, pas sur une sous-tâche');
         if (values.every !== undefined) throw new RafError('--every se pose sur un lot, pas sur une sous-tâche');
+        if (values.uses !== undefined) throw new RafError(`uses se pose sur un lot, pas sur une sous-tâche : ${values.parent}`);
         id = plan.addTask(values.parent, rest.join(' '));
       } else {
         const estimate = values.estimate === undefined ? undefined : Number(values.estimate);
@@ -280,7 +283,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         const every = values.every === undefined ? undefined : Number(values.every);
         if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new RafError(`périodicité invalide : ${values.every} (un nombre entier de jours)`);
         if (values.public !== undefined) refuseLongTitle(values.public);
-        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, public: values.public, every, after });
+        const uses = values.uses?.split(',').map((n) => n.trim()).filter(Boolean);
+        if (uses?.length === 0) throw new RafError(invalidResource(''));
+        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, public: values.public, every, after, uses });
       }
       plan.save();
       io.out(id);
@@ -343,6 +348,13 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       plan.save();
       return 0;
     }
+    case 'uses': {
+      need(1, 'uses <lot> [<ressource>…]');
+      const plan = loadPlan();
+      plan.setUses(rest[0], rest.slice(1));
+      plan.save();
+      return 0;
+    }
     case 'public': {
       need(values.clear ? 1 : 2, 'public <id> "titre public" | public <id> --clear');
       if (values.clear && rest.length > 1) throw new RafError('--clear n\'attend pas de titre');
@@ -401,6 +413,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (lot.public) io.out(`public : ${lot.public}`);
       if (lot.screen) io.out(`screen : ${lot.screen}`);
       if (lot.spec) io.out('spec : true');
+      if (lot.uses) io.out(`uses : ${lot.uses.join(', ')}`);
       const gate = gateProgress(plan.lots(), lot);
       if (lot.gate && gate) io.out(lot.gate.invalid ? `gate : ${gateText(gate)}` : `gate : ${gate.n} lots ${gate.label} faits`);
       if (notes.length) {

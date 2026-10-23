@@ -51,6 +51,8 @@ export interface Lot {
   /** Dernier passage d'un lot récurrent ; absent = jamais fait. */
   last?: Day;
   after: string[];
+  /** Ressources partagées que le lot occupe (clé `uses:`, L251) ; absente sans clé, ou si la clé est mal formée (remontée par check). */
+  uses?: string[];
   created?: Day;
   started?: Day;
   finished?: Day;
@@ -83,6 +85,18 @@ export type Gate = { count: number; criterion: 'spec' | 'screen'; invalid?: unde
 export const GATE_INVALID = 'gate invalide : count: entier ≥ 1 et un critère spec: true ou screen: page attendus';
 
 export class RafError extends Error {}
+
+/** Un nom de ressource partagée (L251) : un mot de lettres minuscules, chiffres, « - » et « _ ». */
+export const RESOURCE_NAME = /^[a-z0-9_-]+$/;
+export const RESOURCES_BAD_LIST = 'doit être une liste de noms de ressources';
+
+export const invalidResource = (name: string) => `ressource invalide : ${name === '' ? '(vide)' : name} (lettres minuscules, chiffres, - et _)`;
+
+/** Les noms de ressources de `--uses` ou de `raf uses` : chacun valide (`RafError` sinon), sans doublon, dans l'ordre donné. */
+export function cleanUses(names: string[]): string[] {
+  for (const n of names) if (!RESOURCE_NAME.test(n)) throw new RafError(invalidResource(n));
+  return [...new Set(names)];
+}
 
 export type Ref = { lot: string; task?: string };
 
@@ -422,7 +436,7 @@ export class Plan {
     return node as YAMLMap;
   }
 
-  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; public?: string; every?: number; after?: string[] } = {}): string {
+  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; public?: string; every?: number; after?: string[]; uses?: string[] } = {}): string {
     this.writable();
     if (opts.screen !== undefined) {
       if (!SCREENS.includes(opts.screen)) throw new RafError(`screen inconnu : ${String(opts.screen)} (${SCREENS.join(', ')})`);
@@ -446,10 +460,13 @@ export class Plan {
     if (opts.spec) entry.spec = true;
     if (opts.every !== undefined) entry.every = opts.every;
     if (opts.after?.length) entry.after = opts.after;
+    if (opts.uses?.length) entry.uses = cleanUses(opts.uses);
     entry.created = today;
     const node = this.doc.createNode(entry) as YAMLMap;
-    const after = node.get('after');
-    if (isSeq(after)) after.flow = true;
+    for (const key of ['after', 'uses']) {
+      const seq = node.get(key);
+      if (isSeq(seq)) seq.flow = true;
+    }
     (this.doc.get('lots') as YAMLSeq).add(node);
     return id;
   }
@@ -460,6 +477,28 @@ export class Plan {
     const node = this.doc.createNode(repos.map((r) => (r.cite === undefined ? r.path : { path: r.path, cite: r.cite }))) as YAMLSeq;
     node.flow = true;
     this.lotNode(lotId).set('repos', node);
+  }
+
+  /** Remplace les ressources partagées d'un lot de tout statut (clé `uses:` en flow, avant `created:`) ; sans nom, retire la clé. Jamais sur une sous-tâche. */
+  setUses(ref: string, names: string[]): void {
+    this.writable();
+    if (ref.includes('/')) throw new RafError(`uses se pose sur un lot, pas sur une sous-tâche : ${ref}`);
+    const node = this.lotNode(ref);
+    const uses = cleanUses(names);
+    if (uses.length === 0) {
+      node.delete('uses');
+      return;
+    }
+    const list = this.doc.createNode(uses) as YAMLSeq;
+    list.flow = true;
+    if (node.has('uses')) {
+      node.set('uses', list);
+      return;
+    }
+    const keys = node.items.map((p) => String((p.key as { value?: unknown })?.value ?? p.key));
+    const created = keys.indexOf('created');
+    const after = keys.indexOf('after');
+    node.items.splice(created >= 0 ? created : after >= 0 ? after + 1 : keys.length, 0, this.doc.createPair('uses', list));
   }
 
   addTask(lotId: string, title: string): string {
@@ -742,6 +781,11 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
   };
   const after = raw.after == null ? [] : Array.isArray(raw.after) ? raw.after.map(String) : [String(raw.after)];
   const last = asDay('last');
+  let uses: string[] | undefined;
+  if (raw.uses != null) {
+    if (Array.isArray(raw.uses) && raw.uses.every((n) => typeof n === 'string' && RESOURCE_NAME.test(n))) uses = [...new Set(raw.uses as string[])];
+    else problems.push(`uses ${RESOURCES_BAD_LIST}`);
+  }
   let screen: Screen | undefined;
   if (raw.screen != null) {
     if (SCREENS.includes(raw.screen as Screen)) screen = raw.screen as Screen;
@@ -768,6 +812,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     ...(Number.isInteger(raw.every) && (raw.every as number) > 0 ? { every: raw.every as number } : {}),
     ...(last ? { last } : {}),
     after,
+    ...(uses?.length ? { uses } : {}),
     created: asDay('created'),
     started: asDay('started'),
     finished: asDay('finished'),

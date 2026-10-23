@@ -104,6 +104,20 @@ describe('cadence ref measure (L262)', () => {
     expect(yellow).toMatchObject({ aa: false, aaGrand: false });
   });
 
+  it('contraste : avec deux couleurs de texte, le verdict est celui de la moins contrastée, et la couleur annoncée existe dans l\'image', () => {
+    const t = setup();
+    // rouge (5,72) et bleu (6,35) sur blanc : aucun n'atteint AAA ; leur moyenne (#693c78, 8,34) n'existe pas dans l'image
+    t.paste(paint(200, 100, WHITE, [{ x: 20, y: 20, l: 60, h: 30, c: RED }, { x: 110, y: 20, l: 60, h: 30, c: [10, 90, 200] }]));
+    const two = t.json('page', '--quoi', 'contraste').contraste;
+    expect(two).toMatchObject({ texte: { hex: '#c81e28' }, aaa: false, aa: true });
+    expect(two.rapport).toBe(5.72);
+    // noir et #999999 (2,85) sur blanc : le second texte échoue en AA, il ne disparaît pas derrière le noir
+    t.paste(paint(200, 100, WHITE, [{ x: 20, y: 20, l: 60, h: 30, c: [0, 0, 0] }, { x: 110, y: 20, l: 60, h: 30, c: [0x99, 0x99, 0x99] }]));
+    const grey = t.json('page', '--quoi', 'contraste').contraste;
+    expect(grey).toMatchObject({ texte: { hex: '#999999' }, aa: false });
+    expect(grey.rapport).toBe(2.85);
+  });
+
   it('contraste : une zone d\'une seule couleur n\'a pas de contraste à mesurer', () => {
     const t = setup();
     t.paste(SHAPES);

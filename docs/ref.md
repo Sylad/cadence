@@ -67,8 +67,10 @@ factor. Without `--quoi`, the four measures; a point only has colours.
   mean (rounded) and the **dominant colours** with their share of the zone (grouped by 8 levels per
   channel, at most 5, none under 1 %).
 - **`contraste`**: WCAG 2.2 contrast ratio between the zone's **background** (its dominant colour) and
-  its **text** (the mean of the pixels farthest from the background: the anti-aliased edge is left out),
-  with the three thresholds read on the unrounded ratio: AA (4.5), AA large text and interface
+  its **text**: every colour carried by at least 10 % of the non-background pixels is a text colour
+  (an anti-aliased edge is spread over many shades and stays under that share), and the verdict is the
+  one of the **least contrasted** text colour, never a mean of several (a red and a blue text do not
+  make a purple that is not in the image). The three thresholds are read on the unrounded ratio: AA (4.5), AA large text and interface
   components (3), AAA (7). `#767676` on white gives 4.54, `#777777` 4.48. A zone of one colour has no
   contrast to measure.
 - **`boites`**: the connected shapes that differ from the background (8 neighbours), the 20 largest first, and the

@@ -28,6 +28,8 @@ const MAX_BOXES = 20;
 /** Une couleur qui couvre moins de cette part de la zone n'est pas dominante. */
 const MIN_SHARE = 0.01;
 const MAX_DOMINANT = 5;
+/** Part minimale des pixels non-fond pour qu'une couleur soit une couleur de texte, et non un dégradé d'anticrénelage. */
+const MIN_INK_SHARE = 0.1;
 /** Confiance tesseract (0-100) à partir de laquelle la hauteur d'un mot sert à estimer la police. */
 const FONT_CONFIDENCE = 60;
 
@@ -134,22 +136,28 @@ function measureColors(r: Raster, z: Zone, point: boolean) {
 }
 
 /** Texte et fond d'une zone : le fond est la couleur dominante, le texte la moyenne des pixels les plus éloignés du fond. */
-function inkAndBackground(r: Raster, z: Zone): { bg: Color; fg: Color; px: [number, number, number][] } | null {
+function inkAndBackground(r: Raster, z: Zone): { bg: Color; fg: Color; px: [number, number, number][]; ink: [number, number, number][] } | null {
   const px = pixelsOf(r, z);
   const bg = dominant(px, 0)[0]!.rgb;
   let far = 0;
   for (const p of px) far = Math.max(far, distance(p, bg));
   if (far < FLAT_DISTANCE) return null;
   const ink = px.filter((p) => distance(p, bg) >= far * 0.75);
-  return { bg: color(...bg), fg: color(...meanOf(ink)), px };
+  return { bg: color(...bg), fg: color(...meanOf(ink)), px, ink: px.filter((p) => distance(p, bg) >= FLAT_DISTANCE) };
 }
 
+/** Le texte peut avoir plusieurs couleurs : chaque couleur portée par au moins `MIN_INK_SHARE` des pixels non-fond est un texte, et le verdict est celui de la moins contrastée (jamais une moyenne, qui n'existe pas dans l'image). */
 function measureContrast(r: Raster, z: Zone) {
   const found = inkAndBackground(r, z);
   if (!found) return null;
-  const ratio = contrastRatio(found.fg.rgb, found.bg.rgb);
+  const texts = dominant(found.ink, MIN_INK_SHARE);
+  if (texts.length === 0) texts.push({ ...found.fg, part: 1 });
+  const ratios = texts.map((t) => contrastRatio(t.rgb, found.bg.rgb));
+  const worst = ratios.indexOf(Math.min(...ratios));
+  const ratio = ratios[worst]!;
+  const { part: _part, ...texte } = texts[worst]!;
   // les seuils se lisent sur le rapport non arrondi : 4,499 n'atteint pas 4,5
-  return { texte: found.fg, fond: found.bg, rapport: round2(ratio), aa: ratio >= 4.5, aaGrand: ratio >= 3, aaa: ratio >= 7 };
+  return { texte, fond: found.bg, rapport: round2(ratio), aa: ratio >= 4.5, aaGrand: ratio >= 3, aaa: ratio >= 7 };
 }
 
 const scaleBox = (b: Box, f: number): Box => {

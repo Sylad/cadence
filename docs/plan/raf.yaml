@@ -2938,9 +2938,10 @@ lots:
     created: 2026-10-23
   - id: L255
     title: "Créneaux : les sessions lancées à la main par le lead (sous-agents de correctif, revue, QA) comptent dans orchestrate --status et lead tour — cadence lead hold <étiquette> / release (registre de sessions externes avec TTL), soustrait des créneaux libres ; skill lead mis à jour ; tests (23-10 : 4 sessions pour un plafond de 3)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-23
+    started: 2026-10-23
   - id: L256
     title: "Revue coupée (code 143, sortie vide) : orchestrate relance une fois la même étape en session neuve avant de rendre le lot, et distingue quota, coupure et échec dans le tableau ; tests (finance L130, vague 2026-10-23-fin-l129) — vérifier d'abord les lots voisins L21, L25/L26 pour ne pas doublonner"
     status: todo

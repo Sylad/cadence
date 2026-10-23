@@ -380,6 +380,27 @@ describe('deliver : script du projet (L2)', () => {
     expect(out.join('\n')).toContain('livré : L1');
   });
 
+  it('L277 — pendant une vague, un script qui voit la tête avancer (lot en cours) journalise le sha livré, pas la tête', async () => {
+    const dir = pushedRepo();
+    expect(await deliver(ctx(dir, { config: SCRIPT }).c, fakeDeps().deps)).toBe(0);
+    commit(dir, 'feat(L1): cache');
+    git(dir, 'push', '-q');
+    const target = headSha(dir);
+    const { deps } = fakeDeps({
+      exec: () => {
+        commit(dir, 'feat(L2): lot en cours');
+        git(dir, 'push', '-q');
+        return 0;
+      },
+    });
+    const { c, out } = ctx(dir, { config: SCRIPT, sha: target });
+    c.duringWave = true;
+    expect(await deliver(c, deps)).toBe(0);
+    expect(lastDelivery(stateDir(dir))).toBe(target);
+    expect(out.join('\n')).not.toContain('tête déplacée');
+    expect(out.join('\n')).toContain('livré : L1');
+  });
+
   it('simulation : montre la commande complète, n’exécute rien', async () => {
     const dir = pushedRepo();
     const { deps, execs } = fakeDeps();

@@ -78,6 +78,8 @@ export interface DeliverCtx {
   dryRun: boolean;
   /** Commit à livrer (toute révision git) ; HEAD par défaut. */
   sha?: string;
+  /** Livraison au fil de l'eau (L277) : une vague tient le dépôt, des lots y commitent encore ; ce qui est livré est `sha`, jamais la tête relue. */
+  duringWave?: boolean;
   /** Arguments de la ligne de commande, ajoutés au script du projet. */
   args: string[];
   /** Articles d'un dépôt voisin à rafraîchir après une livraison verte (clé `docs.articles`, L144). */
@@ -366,8 +368,9 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     if (failed) return fail(failed);
 
     // Un script de projet peut commiter pendant la livraison (horodatage d'une entrée Nouveautés) :
-    // ce qu'il a livré est alors la nouvelle tête, pas le sha de départ.
-    const head = script === null || !atHead ? sha : (headSha(ctx.root) ?? sha);
+    // ce qu'il a livré est alors la nouvelle tête, pas le sha de départ. Pendant une vague, une tête qui avance est
+    // le commit d'un lot en cours, ni revu ni déployé : seul `sha` est livré.
+    const head = script === null || !atHead || ctx.duringWave ? sha : (headSha(ctx.root) ?? sha);
     const moved = head !== sha && isAncestor(ctx.root, sha, head);
     const final = moved ? head : sha;
     const ids = deliveredIds(ctx, lastDelivery(ctx.state), final);

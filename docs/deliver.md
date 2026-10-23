@@ -135,7 +135,8 @@ commit in the history of `<sha>` belongs to a lot of the wave that is not ready 
 handed back, failed), that is when `<sha>` is « livrable jusqu'à » (the line the wave's final table prints). A ready lot is
 then delivered while the wave runs, without waiting for the slowest lot. The refusal names the lots that hold the sha back; an
 unreadable wave state or an unknown sha is refused too. A lot of the wave with no commit yet blocks nothing. Push the sha
-alone first (`git push origin <sha>:main`).
+alone first (`git push origin <sha>:main`). While the wave runs, what is logged as delivered is `<sha>` itself, even when
+a project script sees HEAD move (a running lot committing): the « head moved by the script » rule applies outside a wave only.
 
 cadence keeps what the script usually lacks: the preconditions (clean tree, pushed
 `HEAD`), the lock (never two deliveries at once), the delivery log and the lots

@@ -230,4 +230,12 @@ describe('cadence ref measure (L262)', () => {
     expect(JSON.parse(out).couleurs.point.hex).toBe('#ffffff');
     expect(execFileSync(process.execPath, [bin, '--help'], { encoding: 'utf8' })).toMatch(/^\s*cadence ref measure <slug> <page>/m);
   });
+
+  it('une page entière à 200 dpi (1700 × 2200 px) se mesure sans dépassement', () => {
+    const t = setup();
+    t.paste(paint(1700, 2200, WHITE, [{ x: 200, y: 300, l: 600, h: 100, c: [0, 0, 0] }]));
+    const m = t.json('page', '--quoi', 'contraste');
+    expect(m.contraste.rapport).toBe(21);
+    expect(t.json('page', '--quoi', 'boites', '--largeur', '1700').boites.boites).toEqual([{ x: 200, y: 300, l: 600, h: 100 }]);
+  });
 });

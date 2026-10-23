@@ -139,7 +139,8 @@ function measureColors(r: Raster, z: Zone, point: boolean) {
 function inkAndBackground(r: Raster, z: Zone): { bg: Color; fg: Color; px: [number, number, number][] } | null {
   const px = pixelsOf(r, z);
   const bg = dominant(px)[0]!.rgb;
-  const far = Math.max(...px.map((p) => distance(p, bg)));
+  let far = 0;
+  for (const p of px) far = Math.max(far, distance(p, bg));
   if (far < FLAT_DISTANCE) return null;
   const ink = px.filter((p) => distance(p, bg) >= far * 0.75);
   return { bg: color(...bg), fg: color(...meanOf(ink)), px };

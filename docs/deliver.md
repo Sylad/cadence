@@ -124,7 +124,10 @@ cadence deliver --sha 6b0d9aa -- api                                  # an earli
 `--sha` (any mode) delivers a pushed commit other than `HEAD` — for a CI that
 builds each service only on the commit that touched it. `allowDirty` suits a
 working tree shared by several sessions when the delivery starts from a pushed
-sha and never from local files; without it a modified tree is refused.
+sha and never from local files; without it a modified tree is refused. `--sha`
+itself never reads the working tree: a tracked file modified outside the delivered
+sha (the plan after `raf done`, say) neither refuses nor is reported, with or
+without `allowDirty`.
 
 cadence keeps what the script usually lacks: the preconditions (clean tree, pushed
 `HEAD`), the lock (never two deliveries at once), the delivery log and the lots

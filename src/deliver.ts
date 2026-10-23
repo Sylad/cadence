@@ -283,9 +283,11 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     return refuse('des arguments ne se passent qu\'à un script de projet (deliver.script dans cadence.yaml)');
   }
   const script = config.script === undefined ? null : [config.script, ...ctx.args.map(shellQuote)].join(' ');
+  // --sha livre un commit poussé et ne lit pas l'arbre : un fichier modifié (le plan après raf done) n'y change rien.
   const repo = repoStatus(ctx.root);
-  if (repo.dirty && !config.allowDirty) return refuse(`${repo.dirty} fichier(s) suivi(s) modifié(s) : commiter et pousser d'abord`);
-  if (repo.dirty) err(`deliver : ${repo.dirty} fichier(s) suivi(s) modifié(s) : non livré(s), seul ${sha.slice(0, 7)} l'est (allowDirty)`);
+  const dirty = ctx.sha === undefined ? repo.dirty : 0;
+  if (dirty && !config.allowDirty) return refuse(`${dirty} fichier(s) suivi(s) modifié(s) : commiter et pousser d'abord`);
+  if (dirty) err(`deliver : ${dirty} fichier(s) suivi(s) modifié(s) : non livré(s), seul ${sha.slice(0, 7)} l'est (allowDirty)`);
   if (!onRemote(ctx.root, sha)) return refuse(`${sha.slice(0, 7)} non poussé : la CI n'a rien construit (git push)`);
   const lock = readLock(ctx.state);
   if (lock && lockAlive(lock)) {

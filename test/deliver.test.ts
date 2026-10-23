@@ -531,6 +531,30 @@ describe('deliver : sha choisi et arbre partagé (L2)', () => {
     expect(err.join('\n')).toContain('1 fichier(s) suivi(s) modifié(s) : non livré(s)');
     expect(() => parseDeliverConfig('deliver:\n  script: x\n  allowDirty: oui\n', 'f')).toThrow(/allowDirty/);
   });
+
+  const STRICT = parseDeliverConfig('deliver:\n  script: ./livrer.sh "$CADENCE_SHORT"\n', 'cadence.yaml');
+
+  it('R1 — --sha ne lit pas l’arbre : un fichier suivi modifié (le plan) ne refuse pas, sans allowDirty, et rien n’est signalé', async () => {
+    const dir = pushedRepo();
+    commit(dir, 'feat(L1): api');
+    const api = headSha(dir)!;
+    commit(dir, 'feat(L9): frontend');
+    git(dir, 'push', '-q');
+    writeFileSync(join(dir, 'README.md'), 'plan modifié par raf done');
+    const { deps, execs } = fakeDeps();
+    const { c, err } = ctx(dir, { config: STRICT, sha: api.slice(0, 7) });
+    expect(await deliver(c, deps)).toBe(0);
+    expect(execs[0].env).toMatchObject({ CADENCE_SHA: api });
+    expect(err.join('\n')).not.toContain('modifié');
+  });
+
+  it('R2 — sans --sha, le même arbre modifié reste refusé (code 2)', async () => {
+    const dir = pushedRepo();
+    writeFileSync(join(dir, 'README.md'), 'plan modifié par raf done');
+    const { c, err } = ctx(dir, { config: STRICT });
+    expect(await deliver(c, fakeDeps().deps)).toBe(2);
+    expect(err.join('\n')).toContain('1 fichier(s) suivi(s) modifié(s) : commiter et pousser d\'abord');
+  });
 });
 
 describe('cadence deliver (CLI)', () => {

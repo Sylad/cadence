@@ -64,7 +64,7 @@ one fresh short session per step; the wave runs from a frozen copy of the cadenc
 `cd <project> && raf start <lot>`, then starts from the brief written by `cadence orchestrate --dry-run
 <project>:<lot>`: it is already rendered (`{{chemin}}`, `{{lot}}`, `{{titre}}`, `{{objectif}}` and `{{news}}`,
 the News instruction of a `visible` lot, are filled in; it names no wave Playwright directory — a hand delegation has none — so the screenshot goes under the OS temp directory, then into `docs/nouveautes/captures/`). The lead only adjusts the goal to what done looks
-like (the human's words) and keeps the rest verbatim.
+like (the human's words) and keeps the rest verbatim. **A stale title is no reason to delegate by hand**: the lot's scope changed since the plan was written, so give the new goal to the program — `--goal "…"` on the launch (one lot), or the `goal:` key of the lot in the plan (every launch) — and it replaces the title as the objective of every brief and shows in the wave table.
 
 A lot that adds or changes a screen is `visible`: after the implementation, have the
 `ux-reviewer` agent review it (give it the URL or the way to run the app) and bring its verdict and
@@ -78,6 +78,8 @@ silent wait, no polling loop — `cadence orchestrate --status` shows where the 
 ```sh
 cadence orchestrate <project>:<lot> <project>:<lot>@haiku … --wave <id> [--budget 2M]
 ```
+
+For a single lot whose title is stale, add `--goal "<what done looks like>"` (refused with two lots, `--continue` or `--resume`).
 
 **Make the wave visible to the human.** Name the background task after what it runs — « vague `<id>` :
 `<project>:<lot>`, … » (its `description`), so the task list says which projects and lots, not just « a task

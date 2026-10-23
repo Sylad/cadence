@@ -2942,6 +2942,7 @@ lots:
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "conforme : 6 commits (434f4ed…9e49d82). Les constats corrigés le sont : plafond de 200 octets sur l'étiquette encodée (R9b), test --watch avec une session du lead, et la ligne « prêts » est testée et documentée. Le constat de la sémantique d'affichage de hold reste une note assumée. tsc 0, suite 111 fichiers / 2709 tests verts, aucun nouveau défaut — orchestré (vague 2026-10-23-cad-attentes, 2 passe(s) de correction + passe des mineurs)", commit: 9e49d821c216b28595be47b0a3f9a8c15c53e980 }
   - id: L256
     title: "Revue coupée (code 143, sortie vide) : orchestrate relance une fois la même étape en session neuve avant de rendre le lot, et distingue quota, coupure et échec dans le tableau ; tests (finance L130, vague 2026-10-23-fin-l129) — vérifier d'abord les lots voisins L21, L25/L26 pour ne pas doublonner"
     status: todo

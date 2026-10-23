@@ -3,18 +3,19 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { TEMPLATES_DIR, renderBrief, shotsText } from '../src/orchestrate/briefs.js';
 import { runLot } from '../src/orchestrate/cycle.js';
-import { harness, workReport, commitFile, reviewReport, claudeOut, type Handler } from './orchestrate-harness.js';
+import { harness, workReport, commitFile, reviewReport, specReport, claudeOut, type Handler } from './orchestrate-harness.js';
+import { ecrit } from './spec-helpers.js';
 
 /** Où le serveur Playwright MCP (0.0.83, mesuré le 23-10) range un nom de fichier donné par la session : `path.resolve(racine de travail, nom)`, et non `--output-dir` (réservé aux fichiers sans nom). */
 const landing = (workspace: string, name: string): string => resolve(workspace, name);
 const inside = (dir: string, file: string): boolean => !relative(dir, file).startsWith('..') && !isAbsolute(relative(dir, file));
 
-const ROOT = join(TEMPLATES_DIR, '..', '..');
 const impl = (): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a.txt')] }));
 const ok: Handler = () => claudeOut(reviewReport());
 
-/** Les chemins de fichier image que la consigne de captures donne en exemple. */
-const examples = (brief: string): string[] => [...brief.matchAll(/`([^`\s<]*\.png)`/g)].map((m) => m[1]!);
+/** Les chemins de fichier que la consigne de captures donne en exemple, quelle que soit la sortie du serveur (image, trace, PDF). */
+const examples = (brief: string): string[] => [...brief.matchAll(/`([^`\s<]*\.(?:png|jpe?g|webp|zip|pdf))`/g)].map((m) => m[1]!);
+const ROOT = join(TEMPLATES_DIR, '..', '..');
 
 describe('captures Playwright des étapes (L249)', () => {
   it('R1 — shotsText dit que le serveur range un nom de fichier sur le dépôt et exige le chemin absolu du dossier de la vague', () => {
@@ -82,6 +83,33 @@ describe('captures Playwright des étapes (L249)', () => {
       const file = landing(c.lot.repo, n);
       expect(inside(c.lot.repo, file), `${n} → ${file}`).toBe(false);
       expect(inside(pw, file), `${n} → ${file}`).toBe(true);
+    }
+  });
+});
+
+describe('briefs rendus en vague : {{shots}} rempli pour chaque étape qui charge le serveur (L249)', () => {
+  const pwOf = (h: ReturnType<typeof harness>): string => join(h.store.dir, 'demo--L1', 'playwright');
+  const major: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }], verdict: 'non conforme' }));
+  const minor: Handler = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', fichier: 'a.txt', ligne: 3, texte: 'nommage' }] }));
+  const fix = (file: string): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, file, `fix(L1): ${file}`)] }));
+
+  it('fix et fix-minors d\'un lot visible portent le chemin absolu du dossier de la vague suivi de « / »', async () => {
+    const h = harness({ lots: [{ title: 'Écran', visible: true }], script: { implement: [impl()], review: [major, minor, ok], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    await runLot(h.lot('L1', { visible: true }));
+    const fixes = h.calls.filter((c) => c.kind === 'fix');
+    expect(fixes.some((f) => f.brief.includes('A fresh review of the commits'))).toBe(true); // fix
+    expect(fixes.some((f) => f.brief.includes('only minor findings'))).toBe(true); // fix-minors
+    for (const f of fixes) expect(f.brief).toContain(shotsText(pwOf(h)));
+  });
+
+  it('spec et maquette d\'un lot à écran portent le chemin absolu du dossier de la vague', async () => {
+    const spec: Handler = (call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }));
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { spec: [spec], maquette: [ok], implement: [impl()], review: [ok] } });
+    await runLot(h.lot('L1', { visible: true, screen: 'page' }, { maquette: true }));
+    for (const kind of ['spec', 'maquette'] as const) {
+      const call = h.calls.find((c) => c.kind === kind);
+      expect(call, kind).toBeDefined();
+      expect(call!.brief, kind).toContain(shotsText(pwOf(h)));
     }
   });
 });

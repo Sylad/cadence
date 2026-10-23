@@ -9,11 +9,12 @@ import { harness, workReport, commitFile, reviewReport, claudeOut, type Handler 
 const landing = (workspace: string, name: string): string => resolve(workspace, name);
 const inside = (dir: string, file: string): boolean => !relative(dir, file).startsWith('..') && !isAbsolute(relative(dir, file));
 
+const ROOT = join(TEMPLATES_DIR, '..', '..');
 const impl = (): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a.txt')] }));
 const ok: Handler = () => claudeOut(reviewReport());
 
 /** Les chemins de fichier image que la consigne de captures donne en exemple. */
-const examples = (brief: string): string[] => [...brief.matchAll(/`([^`\s]*\.png)`/g)].map((m) => m[1]!);
+const examples = (brief: string): string[] => [...brief.matchAll(/`([^`\s<]*\.png)`/g)].map((m) => m[1]!);
 
 describe('captures Playwright des étapes (L249)', () => {
   it('R1 — shotsText dit que le serveur range un nom de fichier sur le dépôt et exige le chemin absolu du dossier de la vague', () => {
@@ -48,6 +49,22 @@ describe('captures Playwright des étapes (L249)', () => {
     const vars = { chemin: '/r/p', lot: 'L9', titre: 'T', objectif: 'x', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: '', captures: '' };
     expect(renderBrief('ux', { ...vars, shots: shotsText('/vague/pw') })).toContain('/vague/pw/');
     expect(renderBrief('ux', vars)).not.toContain('/vague/pw');
+  });
+
+  it.each([['agents/ux-reviewer.md'], ['agents/qa-reviewer.md'], ['docs/skills.md']])('R5 — %s : hors vague, un exemple de capture arrive sous .playwright-mcp/ du dépôt, jamais à sa racine', (rel) => {
+    const repo = '/un/depot';
+    const names = examples(readFileSync(join(ROOT, rel), 'utf8').replace(/\s+/g, ' '));
+    expect(names.length, rel).toBeGreaterThan(0);
+    for (const n of names) {
+      const file = landing(repo, n);
+      expect(inside(join(repo, '.playwright-mcp'), file), `${n} → ${file}`).toBe(true);
+    }
+  });
+
+  it('R5 — aucune copie de la consigne ne dit plus que le serveur range un nom nu sous .playwright-mcp/', () => {
+    for (const rel of ['agents/ux-reviewer.md', 'agents/qa-reviewer.md', 'docs/skills.md']) {
+      expect(readFileSync(join(ROOT, rel), 'utf8').replace(/\s+/g, ' '), rel).not.toContain('a bare file name (e.g. `page-home.png`)');
+    }
   });
 
   it.each([

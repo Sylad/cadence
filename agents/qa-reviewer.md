@@ -165,7 +165,7 @@ A short report:
   (/players shows no player)", "no expectations file: 13 pages walked, 1 defect, 8 suspects, draft
   returned". It is the last line of the report.
 
-Give screenshots and snapshots the absolute path of the capture directory your brief names when it names one (a wave's Playwright server resolves a bare name against the repository, not its output directory); with no such directory in the brief, a bare file name (e.g. `page-home.png`) and no other absolute path: the Playwright MCP writes them under `.playwright-mcp/` (list them in the report if git does not ignore that folder), or in the wave's output directory outside the repository when a wave launched it. Other temporary files go in a temporary directory outside the repository, or in the one
+Give screenshots and snapshots the absolute path of the capture directory your brief names when it names one (a wave's Playwright server resolves a bare name against the repository, not its output directory); with no such directory in the brief, a path under `.playwright-mcp/` (e.g. `.playwright-mcp/page-home.png`: the Playwright MCP resolves a bare file name against the repository, where it would land at the root and dirty the working tree) and no other path inside the repository (list them in the report if git does not ignore that folder). Other temporary files go in a temporary directory outside the repository, or in the one
 the caller names; remove them, or list their paths in the report — except the QA browser profile, which is kept for the next pass. The working tree is left as you
 found it.
 

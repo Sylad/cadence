@@ -429,9 +429,9 @@ describe('entrée Nouveautés dans le brief d\'un lot visible (L48)', () => {
 
 describe('agents hors orchestrate : même consigne Playwright que les briefs (L84)', () => {
   const flatten = (p: string): string => read(p).replace(/\s+/g, ' ');
-  const PLAYWRIGHT_RULE = 'Give screenshots and snapshots the absolute path of the capture directory your brief names when it names one (a wave\'s Playwright server resolves a bare name against the repository, not its output directory); with no such directory in the brief, a bare file name (e.g. `page-home.png`) and no other absolute path: the Playwright MCP writes them under `.playwright-mcp/` (list them in the report if git does not ignore that folder), or in the wave\'s output directory outside the repository when a wave launched it';
+  const PLAYWRIGHT_RULE = 'Give screenshots and snapshots the absolute path of the capture directory your brief names when it names one (a wave\'s Playwright server resolves a bare name against the repository, not its output directory); with no such directory in the brief, a path under `.playwright-mcp/` (e.g. `.playwright-mcp/page-home.png`: the Playwright MCP resolves a bare file name against the repository, where it would land at the root and dirty the working tree) and no other path inside the repository (list them in the report if git does not ignore that folder)';
 
-  it.each(['ux-reviewer', 'qa-reviewer'])('%s répète la consigne Playwright : dossier de captures du brief, sinon nom nu, sorties sous .playwright-mcp/', (name) => {
+  it.each(['ux-reviewer', 'qa-reviewer'])('%s répète la consigne Playwright : dossier de captures du brief, sinon un chemin sous .playwright-mcp/ (jamais un nom nu)', (name) => {
     expect(flatten(`../agents/${name}.md`)).toContain(PLAYWRIGHT_RULE);
   });
 

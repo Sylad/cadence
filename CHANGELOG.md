@@ -73,6 +73,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `cadence ref add` now runs from the `cadence` binary (L261): `bin/cadence.js` did not route `ref`, so `cadence ref add <pdf>` printed the general help and exited 2; the binary's help names it.
 - `cadence orchestrate`: a Ctrl-C or a SIGTERM of the wave during the relaunch of a cut review (L259, `docs/orchestrate.md`, review of L256) leaves no `claude` session alive and loses no tokens: the new session is recorded as the step's `sessionId` the moment it is launched (`onRelaunch`), so the wave's stop kills it and counts its journal, and so does the resume of a dead orchestrator.
 - `cadence orchestrate`: a review cut by a signal (exit code 143, empty output) is relaunched once in a new session before the lot is handed back, and the table tells a cut (`coupure : …`) from a failure (`échec : …`) and from the quota (L256, `docs/orchestrate.md`, finance L130 of the wave 2026-10-23-fin-l129): the cut session's tokens are counted in the wave budget and in the step, a session killed by the wave's own stop is not relaunched, write steps are never relaunched.
 - `cadence orchestrate`: the tokens of a cut review session (L256) are counted in the step (`step.tokens`), hence in the lot's spend and the table column, whether the relaunch ends ok, in a failure or at the quota (L260, tests of the three outcomes).

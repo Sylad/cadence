@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { gitRepo, tempDir } from './helpers.js';
+import { gitRepo, tempDir, testPackage } from './helpers.js';
 import { NORME, stubTools, writePdf, type FixturePage } from './ref-fixture.js';
 
 interface Doc {
@@ -297,6 +297,20 @@ describe('cadence ref add (L261)', () => {
     const { env, cwd } = setup();
     expect(ref(cwd, env, 'add').err).toContain('usage : cadence ref add');
     expect(ref(cwd, env, 'plus').err).toContain('usage : cadence ref');
+  });
+});
+
+describe('le binaire cadence (L261)', () => {
+  it('« cadence ref add » est routé vers la commande : le binaire du paquet l\'exécute au lieu d\'imprimer l\'aide générale', () => {
+    const { base, refs, env, cwd } = setup();
+    const out = execFileSync(process.execPath, [join(testPackage(), 'bin/cadence.js'), 'ref', 'add', writePdf(base, 'norme.pdf', NORME), '--slug', 'norme'], { cwd, env, encoding: 'utf8' });
+    expect(out).toContain('figures : 2');
+    expect(readDoc(refs, 'norme').figures.map((f) => f.label)).toEqual(['Figure 1', 'Table 2']);
+  });
+
+  it('l\'aide du binaire nomme « cadence ref add »', () => {
+    const aide = execFileSync(process.execPath, [join(testPackage(), 'bin/cadence.js'), '--help'], { encoding: 'utf8' });
+    expect(aide).toMatch(/^\s*cadence ref add <document\.pdf>/m);
   });
 });
 

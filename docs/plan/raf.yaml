@@ -3023,11 +3023,12 @@ lots:
     finished: 2026-10-23
   - id: L263
     title: "ref (issue #14, 3/10) : schéma de l'inventaire (templates/inventaire.json) et cadence ref check, un cas par règle du schéma"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     after: [ L262 ]
     created: 2026-10-23
+    started: 2026-10-23
   - id: L264
     title: "ref (issue #14, 4/10) : générateur du corpus synthétique à vérité connue (evals/ref/, pages HTML rendues en PDF et PNG par Playwright, inventaire attendu, pièges : texte ambigu levé par la figure, figure qui contredit, table en image, gabarit type BUFR, contrôle translucide, page Proposal, scan bruité) et commande d'évaluation (rappel, précision, faux lu, tokens par page)"
     status: todo

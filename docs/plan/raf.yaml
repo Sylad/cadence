@@ -2925,12 +2925,15 @@ lots:
     finished: 2026-10-23
   - id: L253
     title: "Ressources partagées (issue #13, 3/3) : skill lead — relire la liste « prêts, ressources libres » à chaque retour d'agent et à chaque blocage, avant d'attendre ; test de la doc du skill"
-    status: doing
+    status: done
     estimate: 0.25
     after: [ L252 ]
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "compliant (L253 : 1 commit, ecc778c ; vitest 2688/2688 sur 110 fichiers, tsc sans erreur ; 1 mineur en note) — orchestré (vague 2026-10-23-cad-attentes, 0 passe(s) de correction)", commit: ecc778c9d304c41205eb445d3596d17f00f6e2d1 }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à 0e1e5ca (worktree) : vitest 2716 (+4 sautés), tsc propre. Poussé et mis en service seul (L258 rendu au-dessus)." }
+    finished: 2026-10-23
   - id: L254
     title: "Étude : vidéo https://youtu.be/2JGN5XEJmRc (vendeur de formation, présentation commerciale) — transcription (yt-dlp via pipx, sous-titres), séparer ce qui est vérifiable (doc Anthropic, mesure sur nos sessions/transcriptions) du discours commercial, comparer à cadence et à la config de Sylvain ; livrable : note courte dans tmp/ + lots proposés seulement si une idée se mesure chez nous (méthode de l'étude du 23-10 sur les skills)"
     status: todo
@@ -2938,31 +2941,51 @@ lots:
     created: 2026-10-23
   - id: L255
     title: "Créneaux : les sessions lancées à la main par le lead (sous-agents de correctif, revue, QA) comptent dans orchestrate --status et lead tour — cadence lead hold <étiquette> / release (registre de sessions externes avec TTL), soustrait des créneaux libres ; skill lead mis à jour ; tests (23-10 : 4 sessions pour un plafond de 3)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "conforme : 6 commits (434f4ed…9e49d82). Les constats corrigés le sont : plafond de 200 octets sur l'étiquette encodée (R9b), test --watch avec une session du lead, et la ligne « prêts » est testée et documentée. Le constat de la sémantique d'affichage de hold reste une note assumée. tsc 0, suite 111 fichiers / 2709 tests verts, aucun nouveau défaut — orchestré (vague 2026-10-23-cad-attentes, 2 passe(s) de correction + passe des mineurs)", commit: 9e49d821c216b28595be47b0a3f9a8c15c53e980 }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à 0e1e5ca (worktree) : vitest 2716 (+4 sautés), tsc propre. Poussé et mis en service seul (L258 rendu au-dessus)." }
+    finished: 2026-10-23
   - id: L256
     title: "Revue coupée (code 143, sortie vide) : orchestrate relance une fois la même étape en session neuve avant de rendre le lot, et distingue quota, coupure et échec dans le tableau ; tests (finance L130, vague 2026-10-23-fin-l129) — vérifier d'abord les lots voisins L21, L25/L26 pour ne pas doublonner"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "conforme, 4 notes mineures : 4 commits (ccb7bdb, 566ac61, be589bd, 0e1e5ca) ; tsc vert ; suite complète 2720/2720 ; relance en session neuve limitée aux étapes en lecture, pas de relance après l'arrêt de la vague, coupure, échec et quota distincts, docs et CHANGELOG à jour ; 1 sous-tâche sur les jetons de la session neuve perdus si la vague est arrêtée pendant la relance — orchestré (vague 2026-10-23-cad-attentes, 3 passe(s) de correction)", commit: 0e1e5caeb31c087deab62ce3f56c965c501e1a7d }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à 0e1e5ca (worktree) : vitest 2716 (+4 sautés), tsc propre. Poussé et mis en service seul (L258 rendu au-dessus)." }
+      - { date: 2026-10-23, text: "Mineurs de revue (23-10), en notes : READ_ONLY / WRITE_STEPS / write de session() écrits trois fois (une seule liste dérivée suffirait) ; une étape d'écriture coupée s'affiche « échec », pas « coupure » ; pas de relance de mise en forme après une relance réussie (documenté) ; R8 de orchestrate-table.test.ts ne traverse aucun code de L256 ; R3 ne couvre pas maquette ni fiche." }
+    finished: 2026-10-23
   - id: L257
     title: "cadence deliver --sha <sha> ne refuse plus un fichier suivi modifié hors du sha livré (le plan après raf done) : livrer un sha ne lit pas l'arbre ; tests (23-10 : stash/pop pour livrer L129 sous L130)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "compliant : 1 commit (bd69efe), avertissement et refus sautés avec --sha, R1 et R2 présents et verts, docs et CHANGELOG à jour, 1 note mineure de doc — orchestré (vague 2026-10-23-cad-attentes, 0 passe(s) de correction)", commit: bd69efeb4f06204aeefde9e3cbbbdca8c5926507 }
+    notes:
+      - { date: 2026-10-23, text: "Re-vérifié par le lead le 23-10 à 0e1e5ca (worktree) : vitest 2716 (+4 sautés), tsc propre. Poussé et mis en service seul (L258 rendu au-dessus)." }
+    finished: 2026-10-23
   - id: L258
     title: 'cadence orchestrate <projet>:<lot> --goal "…" (ou clé goal: du lot) remplace le titre comme objectif du brief, relayé dans le tableau ; tests (titre périmé = délégation à la main : maritime B28.4, B28.5, B28.6)'
     status: doing
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-23
+  - id: L259
+    title: "orchestrate : un Ctrl-C ou un SIGTERM de la vague pendant la relance d'une étape en lecture coupée (L256) ne laisse survivre aucune session claude — la session neuve est enregistrée sur l'étape dès son lancement (step.sessionId), tuée par killSessions, et ses jetons comptent (countInterrupted, reprise d'un orchestrateur mort) ; tests (revue L256)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-23
+  - id: L260
+    title: "orchestrate : les jetons d'une session coupée puis relancée (L256) comptent dans l'étape (step.tokens), donc dans lotSpent et la colonne du tableau, pas seulement dans le budget de la vague ; tests de la relance suivie d'un quota ou d'un échec (launch.ts:241 ?? fresh, cycle.ts:705 cutTokens) (revue L256)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

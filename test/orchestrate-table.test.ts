@@ -288,3 +288,17 @@ describe('renderTable : correction non jouée (L218)', () => {
     expect(out).toContain('    · [majeur] src/a.ts:3 — un défaut');
   });
 });
+
+describe('renderTable : quota, coupure et échec se distinguent (L256)', () => {
+  it('R8 — la ligne sous le tableau dit « quota atteint », « coupure : … » ou « échec : … », jamais la même chose', () => {
+    const mk = (status: LotState['status'], outcome?: string) => {
+      const l = lot();
+      l.status = status;
+      if (outcome) l.outcome = outcome;
+      return renderTable(wave, [l]).filter((x) => x.startsWith('demo:L1 — '));
+    };
+    expect(mk('suspended', 'quota atteint')).toEqual(['demo:L1 — quota atteint']);
+    expect(mk('failed', 'coupure : review coupée (code 143, sortie vide), relancée une fois en session neuve, coupée de nouveau')).toEqual(['demo:L1 — coupure : review coupée (code 143, sortie vide), relancée une fois en session neuve, coupée de nouveau']);
+    expect(mk('failed', 'échec : review sans résultat : code 1')).toEqual(['demo:L1 — échec : review sans résultat : code 1']);
+  });
+});

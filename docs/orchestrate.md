@@ -522,6 +522,17 @@ format. It applies to every step that has a schema (implementation, correction, 
 retry count in the wave budget and in the step (`formatRetry: true`); if the output is still missing after it,
 the step fails as usual — never a second retry.
 
+**Cut review, relaunched once (L256)**: a read-only step (review, small review, UX, precheck, mockup review, sheet) whose session is
+killed by a signal without writing anything (exit code above 128, such as 143 for SIGTERM, and an empty output) is *cut*. The
+orchestrator launches the same step **once more in a NEW session** (a fresh `--session-id`, the same brief; never `--resume`: a cut
+session has nothing to resume and the formatting retry above does not apply to it) before handing the lot back. The cut session's
+tokens are read from its journal and counted in the budget, its `stderr` is kept in `<n>-<kind>.first.err`, and the table shows
+`<kind> relancée en session neuve après une coupure (code 143, sortie vide)` among the warnings. Cut again, the lot fails with `coupure : …`.
+Write steps (implementation, correction, spec, acceptance) are never relaunched, nor are the local model, a timeout, a non-empty output or
+an ordinary exit code. The table tells the three stops apart in the line under it: `quota atteint` (the lot is suspended, the wave
+resumes with `--resume`), `coupure : <kind> coupée (…), relancée une fois en session neuve, coupée de nouveau` (the session itself was
+killed twice: look at the machine, not the lot), `échec : <kind> sans résultat : <cause>` (the session ended without a usable report).
+
 State is in `.cadence/runs/<wave>/` of the folder where the command is run (added to `.git/info/exclude`
 when that folder is in a repository, together with `.cadence/corrections.json`; the rest of `.cadence/`, the plan and its notes, is versioned. `.cadence/runs/`, `.cadence/corrections.json` and `.playwright-mcp/`, where the Playwright MCP writes its
 output, never count as a dirty repository, even when `.gitignore` does not list them, while a change to `.cadence/raf.yaml` does): `wave.json`, one `<project>--<lot>.json` per lot (steps, tokens

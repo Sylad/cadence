@@ -1207,6 +1207,52 @@ describe('budget et quota', () => {
   });
 });
 
+describe('revue coupée (L256)', () => {
+  const cut: Handler = () => ({ code: 143, stdout: '', stderr: 'Terminated', timedOut: false });
+
+  it('R5 — revue coupée puis réussie : le lot est prêt, la relance est signalée, la session coupée est comptée au budget et sa sortie d\'erreur gardée', async () => {
+    let first = '';
+    const h = harness({ script: { implement: [impl()], review: [(call) => {
+      first = call.args[call.args.indexOf('--session-id') + 1];
+      const dir = projectLogDir(h.wave.claudeHome!, call.opts.cwd);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${first}.jsonl`), JSON.stringify({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 7, cache_creation_input_tokens: 1000, cache_read_input_tokens: 0, output_tokens: 3 } } }));
+      return { code: 143, stdout: '', stderr: 'Terminated', timedOut: false };
+    }, ok] } });
+    h.wave.claudeHome = tempDir();
+    const c = h.lot('L1');
+    await runLot(c);
+    const alone = h.wave.budget.consumed;
+    expect(c.lot.status).toBe('ready');
+    expect(kinds(h)).toEqual(['implement', 'review', 'review']);
+    expect(c.lot.warnings.some((w) => /review relancée en session neuve après une coupure \(code 143, sortie vide\)/.test(w))).toBe(true);
+    expect(c.lot.steps[1].status).toBe('ok');
+    expect(c.lot.steps[1].sessionId).not.toBe(first);
+    expect(alone).toBeGreaterThanOrEqual(1010);
+    expect(readFileSync(join(h.store.dir, 'demo--L1', '2-review.first.err'), 'utf8')).toBe('Terminated');
+  });
+
+  it('R6 — revue coupée deux fois : lot en échec « coupure », ni quota ni échec ordinaire', async () => {
+    const h = harness({ script: { implement: [impl()], review: [cut, cut] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(c.lot.outcome).toBe('coupure : review coupée (code 143, sortie vide), relancée une fois en session neuve, coupée de nouveau');
+    expect(h.wave.quota.hit).toBe(false);
+    expect(kinds(h)).toEqual(['implement', 'review', 'review']);
+    expect(c.lot.steps[1].cause).toMatch(/^coupée/);
+  });
+
+  it('R7 — une revue qui échoue sans être coupée est un « échec » (une seule session), distinct du quota et de la coupure', async () => {
+    const h = harness({ script: { implement: [impl()], review: [() => ({ code: 1, stdout: '', stderr: 'boom', timedOut: false })] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(c.lot.outcome).toMatch(/^échec : review sans résultat/);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+});
+
 describe('reprise après coupure', () => {
   it('l\'étape interrompue est relancée entière, avec les commits déjà présents dans le brief', async () => {
     const h = harness({ script: { implement: [impl('b.txt')], review: [ok] } });

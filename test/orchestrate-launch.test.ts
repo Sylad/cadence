@@ -346,6 +346,76 @@ describe('relance de mise en forme (L26)', () => {
   });
 });
 
+describe('revue coupée (code 143, sortie vide) : une relance en session neuve (L256)', () => {
+  const cut = { code: 143, stdout: '', stderr: 'Terminated', timedOut: false };
+  const run = (outs: { code: number; stdout: string; stderr: string; timedOut: boolean }[], over: Partial<StepSpec> = {}) => {
+    const calls: string[][] = [];
+    const p = runSession({ ...spec, agent: undefined, ...over }, { claude: async (args) => (calls.push(args), outs[calls.length - 1] ?? outs[outs.length - 1]), agents: {} });
+    return { calls, p };
+  };
+  const good = { code: 0, stdout: sample, stderr: '', timedOut: false };
+
+  it('R1 — une revue coupée (143, sortie vide) est relancée UNE fois en session neuve : autre --session-id, jamais --resume', async () => {
+    const { calls, p } = run([cut, good]);
+    const out = await p;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][calls[0].indexOf('--session-id') + 1]).toBe(spec.sessionId);
+    expect(calls[1][calls[1].indexOf('--session-id') + 1]).not.toBe(spec.sessionId);
+    expect(calls[1]).not.toContain('--resume');
+    expect(calls[1][calls[1].indexOf('-p') + 1]).toBe('BRIEF');
+    expect(out.kind).toBe('ok');
+    if (out.kind !== 'ok') return;
+    expect(out.relaunched).toMatchObject({ sessionId: spec.sessionId, cause: 'code 143, sortie vide', stderr: 'Terminated' });
+  });
+
+  it('R2 — coupée de nouveau : échec nommé « coupure », marqué cut, pas de troisième lancement', async () => {
+    const { calls, p } = run([cut, { ...cut, stderr: 'again' }]);
+    const out = await p;
+    expect(calls).toHaveLength(2);
+    expect(out.kind).toBe('failed');
+    if (out.kind !== 'failed') return;
+    expect(out.cut).toBe(true);
+    expect(out.cause).toBe('coupée (code 143, sortie vide), relancée une fois en session neuve, coupée de nouveau');
+    expect(out.relaunched?.sessionId).toBe(spec.sessionId);
+  });
+
+  it('R3 — la relance est réservée aux étapes en lecture : ni implement/fix/spec/accept, ni modèle local', async () => {
+    for (const kind of ['implement', 'fix', 'spec', 'accept'] as const) {
+      const { calls, p } = run([cut], { kind });
+      const out = await p;
+      expect(calls, kind).toHaveLength(1);
+      expect(out.kind === 'failed' && out.cut, kind).toBeFalsy();
+    }
+    const local = run([cut], { local: true });
+    await local.p;
+    expect(local.calls).toHaveLength(1);
+    for (const kind of ['review', 'review-small', 'ux', 'precheck'] as const) {
+      const { calls, p } = run([cut, good], { kind });
+      await p;
+      expect(calls, kind).toHaveLength(2);
+    }
+  });
+
+  it('R4 — seule une sortie VIDE avec un code de signal est une coupure : code 1, sortie non vide, délai, quota → pas de relance', async () => {
+    const raw = JSON.parse(sample);
+    raw.is_error = true;
+    raw.result = 'Claude AI usage limit reached|1759600000';
+    delete raw.structured_output;
+    const cases = [
+      { code: 1, stdout: '', stderr: '', timedOut: false },
+      { code: 143, stdout: 'texte', stderr: '', timedOut: false },
+      { code: 143, stdout: '', stderr: '', timedOut: true },
+      { code: 1, stdout: JSON.stringify(raw), stderr: '', timedOut: false },
+    ];
+    for (const c of cases) {
+      const { calls, p } = run([c, good]);
+      const out = await p;
+      expect(calls).toHaveLength(1);
+      expect(out.kind === 'failed' && out.cut).toBeFalsy();
+    }
+  });
+});
+
 describe('pic de contexte', () => {
   it('relu dans le journal .jsonl de la session', () => {
     const home = tempDir();

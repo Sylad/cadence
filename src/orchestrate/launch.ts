@@ -176,10 +176,23 @@ export function readAgents(dir: string): Record<string, AgentDef> {
   return out;
 }
 
+/** Une session coupée (signal, sortie vide) que `runSession` a relancée en session neuve : son identifiant (ses jetons sont à compter), la cause, sa sortie d'erreur. */
+export interface Relaunched {
+  sessionId: string;
+  cause: string;
+  stderr: string;
+}
+
 export type SessionOutcome =
-  | { kind: 'ok'; result: SessionResult; /** Sortie brute de la première session, quand une relance de mise en forme a eu lieu. */ firstStdout?: string }
-  | { kind: 'quota'; message: string; result?: SessionResult; tokens?: Tokens; sessionId?: string; firstStdout?: string }
-  | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string; firstStdout?: string };
+  | { kind: 'ok'; result: SessionResult; /** Sortie brute de la première session, quand une relance de mise en forme a eu lieu. */ firstStdout?: string; relaunched?: Relaunched }
+  | { kind: 'quota'; message: string; result?: SessionResult; tokens?: Tokens; sessionId?: string; firstStdout?: string; relaunched?: Relaunched }
+  | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string; firstStdout?: string; relaunched?: Relaunched; /** Vrai quand la session a été coupée (signal, sortie vide), y compris après sa relance : ni un quota, ni un échec ordinaire. */ cut?: boolean };
+
+/** Étapes en lecture seule : seules relancées à neuf après une coupure (une étape d'écriture a pu laisser un travail à moitié fait). */
+const READ_ONLY: ReadonlySet<StepKind> = new Set(['review', 'review-small', 'ux', 'precheck', 'maquette', 'fiche']);
+
+/** Session tuée par un signal (code 128 + n : 143 SIGTERM, 137 SIGKILL…) sans rien écrire : la coupure, ni un quota (un message) ni un échec (une sortie). */
+const isCut = (out: LaunchOutcome): boolean => !out.timedOut && out.code > 128 && out.stdout.trim() === '';
 
 /** Consigne de la relance de mise en forme : rendre le rapport déjà établi au format demandé, rien d'autre. */
 export const FORMAT_RETRY_PROMPT = 'Return your report now in the required format (the JSON structure of the schema), exactly as you concluded it. Do not do any further work, do not add anything else.';
@@ -203,6 +216,9 @@ export function buildRetryArgs(spec: StepSpec, sessionId: string, agents: Record
  * exception près : une session réussie qui finit en texte sans `structured_output` est relancée UNE fois, par
  * `--resume` de la même session, pour qu'elle rende son rapport au format demandé. Les jetons de la relance
  * s'ajoutent à ceux de la session ; toujours rien après elle, c'est l'échec habituel.
+ * Seconde exception (L256) : une étape en lecture coupée par un signal sans rien écrire (code 143, sortie vide) est
+ * relancée UNE fois à l'identique en session NEUVE (autre `--session-id`, jamais `--resume` : la coupée n'a rien à reprendre) ;
+ * coupée de nouveau, elle rend un échec marqué `cut`. Le quota, le délai et un code ordinaire ne sont jamais relancés.
  */
 export async function runSession(
   spec: StepSpec,
@@ -214,6 +230,15 @@ export async function runSession(
   const out = await launch(spec.local ? buildLocalArgs(spec, deps.agents) : buildArgs(spec, deps.agents));
   const first = classify(out);
   if (spec.local) return first; // pas de relance de mise en forme : l'appelant se replie sur Sonnet
+  if (first.kind === 'failed' && READ_ONLY.has(spec.kind) && isCut(out)) {
+    const relaunched: Relaunched = { sessionId: spec.sessionId, cause: `code ${out.code}, sortie vide`, stderr: out.stderr };
+    const fresh = randomUUID();
+    const again = await launch(buildArgs({ ...spec, sessionId: fresh }, deps.agents));
+    const next = classify(again);
+    if (next.kind === 'ok') return { ...next, relaunched };
+    const tail = { ...next, sessionId: next.sessionId ?? fresh, relaunched };
+    return tail.kind === 'failed' && isCut(again) ? { ...tail, cut: true, cause: `coupée (${relaunched.cause}), relancée une fois en session neuve, coupée de nouveau` } : tail;
+  }
   const missing = first.kind === 'failed' && !out.timedOut && out.code === 0 ? lacksStructuredOutput(out.stdout) : null;
   if (!missing) return first;
   const spentFirst = first.kind === 'failed' ? first.tokens : undefined;

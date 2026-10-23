@@ -677,6 +677,17 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   const dir = w.store.lotDir(l.project, l.lot);
   const base = `${n}-${kind}`;
 
+  if (outcome.relaunched) {
+    // Étape en lecture coupée (signal, sortie vide) puis relancée en session neuve (L256) : la session coupée a consommé des jetons (son journal), garde sa sortie d'erreur, et la relance est signalée au tableau.
+    const cutRun = outcome.relaunched;
+    const spent = w.claudeHome ? journalTokens(w.claudeHome, l.repo, cutRun.sessionId) : null;
+    if (spent) w.budget.add(spent.tokens);
+    writeFileSync(join(dir, `${base}.first.err`), cutRun.stderr);
+    const text = `${kind} relancée en session neuve après une coupure (${cutRun.cause})`;
+    l.warnings.push(text);
+    w.log(`${lotKey(l.project, l.lot)} · session ${n} ${text}`);
+    w.saveWave();
+  }
   if (outcome.kind !== 'ok' && !local) {
     // Une session en échec, au quota ou tuée au délai a consommé des tokens : ceux de sa sortie, sinon ceux de son journal.
     const spent = outcome.tokens ? { tokens: outcome.tokens, sessionId: outcome.sessionId } : w.claudeHome ? journalTokens(w.claudeHome, l.repo, outcome.sessionId ?? sessionId) : null;
@@ -708,7 +719,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
     step.report = `${base}.json`;
     step.status = 'failed';
     step.cause = outcome.cause;
-    return stop(c, 'failed', `${kind} sans résultat : ${outcome.cause}`);
+    return stop(c, 'failed', outcome.cut ? `coupure : ${kind} ${outcome.cause}` : `échec : ${kind} sans résultat : ${outcome.cause}`);
   }
   if (outcome.kind === 'quota') {
     if (outcome.firstStdout !== undefined) writeFileSync(join(dir, `${base}.first.json`), outcome.firstStdout);

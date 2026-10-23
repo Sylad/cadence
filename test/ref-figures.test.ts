@@ -145,4 +145,32 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.figures).toMatchObject([{ label: 'Table 3', page: 45, line: 1 }]);
     expect(idx.figures[0]!.citations.map((c) => c.page)).toEqual([44]);
   });
+
+  it("un numéro final seul ne fait pas d'une vraie légende une entrée de sommaire : « Table 4.1. … presented in Chapter 4 » au milieu de la prose reste la légende", () => {
+    const idx = indexText([
+      page(1, 'Contents'),
+      page(2, 'Voir Table 4.1.'),
+      page(3, 'The forecaster compares the charts.', 'Table 4.1. Specific examples of manual forecasting presented in Chapter 4', 'Chart', 'Notes'),
+      page(4, 'rien'),
+      page(5, 'rien'),
+    ]);
+    expect(idx.figures).toMatchObject([{ label: 'Table 4.1', page: 3, line: 2 }]);
+    expect(idx.unresolved).toEqual([]);
+  });
+
+  it('une légende seule sur sa page, titre fini par un chiffre (« Figure 4.9. Weather situation at t = 0 »), reste la légende', () => {
+    const idx = indexText([page(1, 'Voir Figure 4.9.'), page(2, 'Figure 4.9. Weather situation over the North Atlantic at t = 0')]);
+    expect(idx.figures).toMatchObject([{ label: 'Figure 4.9', page: 2 }]);
+    expect(idx.unresolved).toEqual([]);
+  });
+
+  it('une page dont les lignes sont presque toutes des légendes finies par un numéro de page est un sommaire, sans points de conduite non plus', () => {
+    const idx = indexText([page(1, 'Figures', 'Figure 1 Station model 3', 'Figure 2 Wind at 500 hPa 4'), page(3, 'Figure 1 Station model'), page(4, 'Figure 2 Wind at 500 hPa')]);
+    expect(idx.figures).toMatchObject([{ label: 'Figure 1', page: 3 }, { label: 'Figure 2', page: 4 }]);
+  });
+
+  it('le numéro de la figure n\'est pas un numéro de page : « Figure 5 » seul sur sa ligne n\'est pas une entrée de sommaire, il reste une légende quand rien d\'autre ne légende la figure (titre à la ligne suivante)', () => {
+    const idx = indexText([page(7, 'Figure 5', 'Jet speed depiction')]);
+    expect(idx.figures).toMatchObject([{ label: 'Figure 5', page: 7, line: 1 }]);
+  });
 });

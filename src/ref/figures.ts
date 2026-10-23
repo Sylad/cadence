@@ -58,8 +58,8 @@ const CAPTION = new RegExp(String.raw`^(Figure|Fig|Table|Tableau|Planche)\.?\s+(
 const DEICTIC = /\b(as shown (?:below|above)|shown (?:below|above)|illustrated (?:below|above)|ci-(?:dessous|dessus))\b/i;
 /** Points de conduite d'un sommaire : « Figure 1 Titre ..... 12 ». */
 const LEADER = /\.{4,}|(?:\.\s){4,}/;
-/** Numéro de page en fin de ligne d'un sommaire sans points de conduite : « Figure 1 Titre 12 ». */
-const TRAILING_PAGE = /\s(\d{1,4})\s*$/;
+/** Numéro de page en fin de titre d'un sommaire sans points de conduite : « Figure 1 Titre 12 » (le titre est « Titre 12 », le numéro de la figure n'en est pas un). */
+const TRAILING_PAGE = /(?:^|\s)(\d{1,4})\s*$/;
 
 const labelOf = (word: string, num: string): { label: string; kind: FigureKind } => {
   const w = WORDS[word.toLowerCase()]!;
@@ -73,26 +73,29 @@ const key = (label: string): string => label.toLowerCase();
  * sans séparateur, une minuscule (« Figure 3 shows … »), une virgule ou une parenthèse (« Figure 5, which … », « Figure 5 (page 4) »)
  * en font une citation. « Table 2 The WMO … » a la forme d'une légende : `indexText` la départage des autres lignes de même forme.
  */
-function captionForm(text: string): { label: string; kind: FigureKind; separated: boolean } | null {
+function captionForm(text: string): { label: string; kind: FigureKind; separated: boolean; title: string } | null {
   const m = CAPTION.exec(text.trim());
   if (!m) return null;
   if (m[3] === undefined && /^[a-zà-ÿ,;(\[]/.test(m[4]!)) return null;
-  return { ...labelOf(m[1]!, m[2]!), separated: m[3] !== undefined };
+  return { ...labelOf(m[1]!, m[2]!), separated: m[3] !== undefined, title: m[4]! };
 }
 
 /**
- * Lignes d'une page qui sont des entrées de sommaire (liste des figures, des tables) : points de conduite sur la ligne ou sur la
- * suivante (titre coupé), ou ligne de forme de légende qui finit par un numéro de page possible ; toutes les lignes d'une page
- * dont plus de la moitié sont des entrées en sont aussi.
+ * Lignes d'une page qui sont des entrées de sommaire (liste des figures, des tables). Une ligne à points de conduite (sur elle ou
+ * sur la suivante, titre coupé) en est une. Un numéro final ne suffit jamais : « Table 4.1. … presented in Chapter 4 » est une
+ * vraie légende ; il ne compte que dans une page de sommaire, où plus de la moitié des lignes (deux au moins) sont des entrées à
+ * points de conduite ou des lignes de forme de légende qui finissent par un numéro de page possible. Toutes les lignes d'une page
+ * de sommaire en sont.
  */
 function tocLines(page: PageText, lastPage: number): boolean[] {
-  const entries = page.lines.map((l, i) => {
-    if (LEADER.test(l.text) || LEADER.test(page.lines[i + 1]?.text ?? '')) return true;
-    const number = TRAILING_PAGE.exec(l.text)?.[1];
-    return number !== undefined && Number(number) <= lastPage && captionForm(l.text) !== null;
+  const leaders = page.lines.map((l, i) => LEADER.test(l.text) || LEADER.test(page.lines[i + 1]?.text ?? ''));
+  const numbered = page.lines.map((l) => {
+    const number = TRAILING_PAGE.exec(captionForm(l.text)?.title ?? '')?.[1];
+    return number !== undefined && Number(number) <= lastPage;
   });
-  const mostly = entries.filter(Boolean).length * 2 > entries.length;
-  return entries.map((e) => e || mostly);
+  const candidates = page.lines.filter((_, i) => leaders[i] || numbered[i]).length;
+  const contents = candidates >= 2 && candidates * 2 > page.lines.length;
+  return leaders.map((e) => e || contents);
 }
 
 /** Numéros nommés par une référence : le seul numéro au singulier ; au pluriel la liste, et « 4 to 6 » donne 4, 5, 6 quand ce sont des entiers. */

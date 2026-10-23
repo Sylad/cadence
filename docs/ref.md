@@ -22,9 +22,11 @@ Registers a PDF and builds, for it:
   `Table n`, `Tableau n`, `Planche n`). After a separator (`—`, `–`, `:`, `.`, `-`) the line is a
   caption whatever the case of the title (`Figure 1 — map of stations`); without one,
   `Figure 3 shows…`, `Figure 5, which…` and `Figure 5 (page 4)` cite the figure. A
-  table-of-contents entry (dot leaders on its line or on the next one, a trailing page number, or
-  a page made mostly of such entries) is neither a caption nor a citation, so a figure that only
-  the contents list names comes out as « nothing cites it ». When several lines look like the
+  table-of-contents entry (dot leaders on its line or on the next one, or any line of a contents
+  page: one where at least two lines, and more than half, have dot leaders or end with a possible
+  page number) is neither a caption nor a citation, so a figure that only the contents list names
+  comes out as « nothing cites it ». A trailing number alone never makes an entry:
+  `Table 4.1. … presented in Chapter 4` among prose is a caption. When several lines look like the
   caption of one figure, the first on a page that holds an image wins, then the first with a
   separator, then the first. Each entry has its page, line, box, its images, and **the passages that cite it** (page,
   line, exact line; `nommee` when the text names the figure, `designee` for « as shown

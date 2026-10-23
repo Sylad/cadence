@@ -2875,10 +2875,14 @@ lots:
     finished: 2026-10-22
   - id: L249
     title: "orchestrate : les captures Playwright des étapes en lecture seule tombent à la racine du dépôt malgré le brief (« nom relatif seulement ») — 5 lots sur 5 le 23-10 (finance L119 L120 L122 L124, warhammer L175 : savings-1440px.png… déplacés dans stray/), et l'implémentation L119 dit « nom relatif résolu sur le dépôt » : mesurer où le serveur Playwright MCP lancé par la vague résout un filename relatif (cwd de la session ou --output-dir), puis corriger à la source (lancement du serveur, ou brief qui donne le chemin absolu du dossier de la vague) ; test qui échoue si une capture d'une étape review-small/ux arrive dans le dépôt ; stray/ reste le filet"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "conforme : 1 mineur en note (briefs.ts:76 et :84, « given above » alors que {{shots}} vient plus bas dans implement, fix et fix-minors) — vague rendue après 2 passes, reprise à la main (Sonnet a9a960c 35e79f4 4fbee9f, puis 6d12c98), revue Opus neuve puis re-vérification ; vitest 2611 et typecheck re-vérifiés par le lead", commit: 6d12c98d5ac76961745ae7d690118f9cbffe25aa }
+    notes:
+      - { date: 2026-10-23, text: "Mineur gardé en note : « the absolute path given above » (briefs.ts:76, :84) précède le paragraphe {{shots}} dans implement.md, fix.md et fix-minors.md → « given in the Playwright paragraph ». Notes antérieures au lot : cadence spec check sur la fiche L222 rend A3 « exit 2 » ; spec.md annonce un serveur Playwright même pour un lot screen: non visible ; e2e « SIGTERM pendant la revue UX » instable sous charge (laisse cadence-*.lock). Non vérifié : aucune vraie vague avec serveur Playwright réel ; serveur lancé en @latest." }
+    finished: 2026-10-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

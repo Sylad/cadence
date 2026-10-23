@@ -71,8 +71,14 @@ export function readyFree(projects: { dir: string; name: string }[], home: strin
   return out;
 }
 
-/** « prêts, ressources libres : projet:L3 titre (banc) · … », ou null quand aucun lot prêt n'est libre. */
+/** Lots listés par projet dans la ligne ; au-delà, « projet +K » (le --json donne tout). */
+const FREE_SHOWN = 3;
+
+/** « prêts, ressources libres : projet:L3 titre (banc) · … », au plus FREE_SHOWN lots par projet puis « projet +K », ou null quand aucun lot prêt n'est libre. */
 export function freeLine(entries: { project: string; free: FreeLot[] }[], titleMax: number): string | null {
-  const items = entries.flatMap((e) => e.free.map((l) => `${e.project}:${l.id} ${l.title.length <= titleMax ? l.title : `${l.title.slice(0, titleMax - 1)}…`}${l.uses?.length ? ` (${l.uses.join(', ')})` : ''}`));
+  const items = entries.flatMap((e) => [
+    ...e.free.slice(0, FREE_SHOWN).map((l) => `${e.project}:${l.id} ${l.title.length <= titleMax ? l.title : `${l.title.slice(0, titleMax - 1)}…`}${l.uses?.length ? ` (${l.uses.join(', ')})` : ''}`),
+    ...(e.free.length > FREE_SHOWN ? [`${e.project} +${e.free.length - FREE_SHOWN}`] : []),
+  ]);
   return items.length ? `prêts, ressources libres : ${items.join(' · ')}` : null;
 }

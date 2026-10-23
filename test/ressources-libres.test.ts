@@ -141,6 +141,17 @@ describe('L252 — lead tour : les lots prêts dont les ressources sont libres',
     }
   });
 
+  it('R8 — la ligne est bornée à 3 lots par projet, avec « +K » ; le --json garde tous les lots', async () => {
+    const { parent } = parentWith({
+      alpha: ['A', 'B', 'C', 'D', 'E'].map((title) => ({ title })),
+      beta: [{ title: 'Seul' }],
+    });
+    const line = (await withIdleWave(parent, () => tour(parent))).out.split('\n').find((l) => l.startsWith(FREE))!;
+    expect(line).toBe(`${FREE}alpha:L1 A · alpha:L2 B · alpha:L3 C · alpha +2 · beta:L1 Seul`);
+    const rows = JSON.parse((await tour(parent, '--json')).out);
+    expect(rows.find((r: { project: string }) => r.project === 'alpha').free).toHaveLength(5);
+  });
+
   it('R4 — aucun lot prêt libre : pas de ligne ; un lot « à décider » n\'est pas listé', async () => {
     const { parent } = parentWith({ alpha: [{ title: 'Banc en cours', uses: ['banc'], doing: true }, { title: 'Autre', uses: ['banc'] }, { title: 'Choix (à décider avec Sylvain)' }] });
     expect((await withIdleWave(parent, () => tour(parent))).out).not.toContain(FREE);

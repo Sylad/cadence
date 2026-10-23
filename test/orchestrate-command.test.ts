@@ -1688,3 +1688,135 @@ describe('--continue (L147)', () => {
     expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1', 'b:L1', 'a:L2', 'b:L2', 'a:L3', 'a:L4']);
   });
 });
+
+describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans le brief, relayé dans le tableau", () => {
+  const STALE = 'B28.4 titre périmé';
+  const GOAL = 'Livrer le sous-lot B28.6 seul';
+
+  /** Un projet à un lot ; `key` pose `goal:` sous le titre dans le plan commité. */
+  function withGoalKey(key?: string) {
+    const { parent, dirs } = parentWith({ a: [{ title: STALE }] });
+    if (key !== undefined) {
+      const file = join(dirs.a, 'docs/plan/raf.yaml');
+      writeFileSync(file, readFileSync(file, 'utf8').replace(`title: ${STALE}\n`, `title: ${STALE}\n    goal: ${key}\n`));
+      git(dirs.a, 'commit', '-qam', 'chore: plan goal');
+    }
+    return { parent, dirs };
+  }
+  const run = async (parent: string, argv: string[], f = fakeDeps()) => {
+    const r = io(parent);
+    return { code: await orchestrate(argv, r.io, f.deps), ...r, f };
+  };
+  /** Les briefs d'un lot rendus par `--dry-run`, lus puis supprimés. */
+  const dryBriefs = (out: string) => {
+    const files = [...out.matchAll(/^\s*brief : (.+?)\s*$/gm)].map((m) => m[1]!);
+    const texts = files.map((f) => readFileSync(f, 'utf8'));
+    removeDryRunBriefs(out);
+    return texts;
+  };
+
+  it("R1 — --goal prend un texte non vide et s'applique à exactement un lot lancé", () => {
+    expect(parseOrchestrateArgs(['a:L1', '--goal', 'Faire X']).goal).toBe('Faire X');
+    expect(parseOrchestrateArgs(['a:L1']).goal).toBeUndefined();
+    expect(() => parseOrchestrateArgs(['a:L1', '--goal'])).toThrow(/--goal attend une valeur/);
+    expect(() => parseOrchestrateArgs(['a:L1', '--goal', '  '])).toThrow(/--goal attend un texte non vide/);
+  });
+
+  it('R1 — --goal avec deux lots, sans lot (--continue) ou avec --resume/--status est refusé avant d\'agir', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
+    for (const argv of [['a:L1', 'a:L2', '--goal', 'x'], ['--continue', '--goal', 'x'], ['--resume', '--goal', 'x'], ['--status', '--goal', 'x']]) {
+      await expect(run(parent, argv), argv.join(' ')).rejects.toThrow(/--goal s'applique à un seul lot lancé/);
+    }
+    expect(existsSync(join(parent, '.cadence'))).toBe(false);
+  });
+
+  it("R2 — la clé goal: du lot est lue par le plan ; vide ou absente, le lot n'a pas d'objectif propre", () => {
+    const { dirs } = withGoalKey('"  Objectif à jour  "');
+    expect(Plan.load(join(dirs.a, 'docs/plan/raf.yaml')).lot('L1').goal).toBe('Objectif à jour');
+    const empty = withGoalKey('""');
+    expect(Plan.load(join(empty.dirs.a, 'docs/plan/raf.yaml')).lot('L1').goal).toBeUndefined();
+    const none = withGoalKey();
+    expect(Plan.load(join(none.dirs.a, 'docs/plan/raf.yaml')).lot('L1').goal).toBeUndefined();
+  });
+
+  it("R3 — --goal remplace le titre périmé dans l'objectif de tous les briefs ; notes et sous-tâches restent", async () => {
+    const { parent, dirs } = withGoalKey();
+    const plan = Plan.load(join(dirs.a, 'docs/plan/raf.yaml'));
+    plan.addTask('L1', 'sous-tâche conservée');
+    plan.save();
+    git(dirs.a, 'commit', '-qam', 'chore: sous-tâche');
+    const r = await run(parent, ['a:L1', '--goal', GOAL, '--dry-run']);
+    const briefs = dryBriefs(r.out.join('\n'));
+    expect(briefs.length).toBeGreaterThanOrEqual(2);
+    for (const b of briefs) {
+      expect(b).toContain(GOAL);
+      expect(b).not.toContain(STALE);
+    }
+    expect(briefs.join('\n')).toContain('sous-tâche conservée');
+  });
+
+  it('R3 — sans --goal, la clé goal: du lot remplace le titre ; --goal l\'emporte sur la clé', async () => {
+    const { parent } = withGoalKey('Objectif de la clé');
+    const byKey = await run(parent, ['a:L1', '--dry-run']);
+    const keyBriefs = dryBriefs(byKey.out.join('\n'));
+    for (const b of keyBriefs) {
+      expect(b).toContain('Objectif de la clé');
+      expect(b).not.toContain(STALE);
+    }
+    const byFlag = await run(parent, ['a:L1', '--goal', GOAL, '--dry-run']);
+    for (const b of dryBriefs(byFlag.out.join('\n'))) {
+      expect(b).toContain(GOAL);
+      expect(b).not.toContain('Objectif de la clé');
+    }
+  });
+
+  it('R3 — sans objectif, le titre reste l\'objectif du brief et la simulation ne cite aucun objectif', async () => {
+    const { parent } = withGoalKey();
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    const out = r.out.join('\n');
+    expect(out).not.toContain('objectif donné');
+    for (const b of dryBriefs(out)) expect(b).toContain(STALE);
+  });
+
+  it("R4 — un vrai lancement donne l'objectif aux briefs implement et review, et le tableau le relaie", async () => {
+    const { parent } = withGoalKey();
+    const briefs: Record<string, string> = {};
+    const f = fakeDeps({
+      implement: (cwd, brief) => {
+        briefs.implement = brief;
+        return claudeOut(workReport({ commits: [commitFile(cwd, 'x.txt', 'feat(L1): travail')] }));
+      },
+      review: (_cwd, brief) => {
+        briefs.review = brief;
+        return claudeOut(reviewReport());
+      },
+    });
+    const r = await run(parent, ['a:L1', '--goal', GOAL], f);
+    expect(r.code).toBe(0);
+    expect(briefs.implement).toContain(GOAL);
+    expect(briefs.implement).not.toContain(STALE);
+    expect(briefs.review).toContain(GOAL);
+    expect(briefs.review).not.toContain(STALE);
+    // le tableau relaie l'objectif donné
+    expect(r.out.join('\n')).toContain(`a:L1 — objectif donné : ${GOAL}`);
+  });
+
+  it("R4 — la reprise (--resume) rejoue les sessions avec l'objectif donné au lancement, pas le titre du plan", async () => {
+    const { parent } = withGoalKey();
+    const first = fakeDeps({ implement: () => claudeOut(workReport({ questions: ['Quelle base ?'] })) });
+    await run(parent, ['a:L1', '--goal', GOAL], first);
+    const brief: string[] = [];
+    const again = fakeDeps({
+      implement: (cwd, b) => {
+        brief.push(b);
+        return claudeOut(workReport({ commits: [commitFile(cwd, 'y.txt', 'feat(L1): travail')] }));
+      },
+    });
+    await run(parent, ['--resume', '--answer', 'a:L1', 'SQLite'], again);
+    expect(brief.length).toBeGreaterThan(0);
+    for (const b of brief) {
+      expect(b).toContain(GOAL);
+      expect(b).not.toContain(STALE);
+    }
+  });
+});

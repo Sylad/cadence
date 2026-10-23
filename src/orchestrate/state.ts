@@ -77,6 +77,8 @@ export interface LotState {
   repo: string;
   lot: string;
   title: string;
+  /** Objectif donné au lancement (`--goal`, ou clé `goal:` du lot, L258) : remplace le titre dans les briefs, rendu au tableau. Absent : le titre. */
+  goal?: string;
   visible: boolean;
   small: boolean;
   /** Seuil de l'étape spec (clé de lot `screen:`, L169) : le lot passe par `spec` avant `implement`. Absent : chemin actuel. */
@@ -167,6 +169,7 @@ export interface NewLot {
   repo: string;
   lot: string;
   title: string;
+  goal?: string;
   visible: boolean;
   small: boolean;
   screen?: Screen;

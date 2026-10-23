@@ -143,9 +143,12 @@ export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates 
   return `${out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()}\n`;
 }
 
-/** `{{objectif}}` : le titre du lot, ses notes et ses sous-tâches — Sylvain n'écrit rien d'autre. */
-export function objective(lot: Lot): string {
-  const lines = [`${lot.title}`];
+/** L'objectif d'un lot (L258) : celui donné au lancement (`--goal`), sinon la clé `goal:` du lot, sinon son titre. */
+export const headline = (lot: Pick<Lot, 'title' | 'goal'>, goal?: string): string => goal ?? lot.goal ?? lot.title;
+
+/** `{{objectif}}` : l'objectif du lot (`headline`, le titre faute d'autre), ses notes et ses sous-tâches — Sylvain n'écrit rien d'autre. */
+export function objective(lot: Lot, goal?: string): string {
+  const lines = [headline(lot, goal)];
   if (lot.notes.length) lines.push('', 'Notes of the lot (decisions included):', ...lot.notes.map((n) => `- ${n.date}: ${n.text}`));
   if (lot.tasks.length) lines.push('', 'Sub-tasks:', ...lot.tasks.map((t) => `- ${t.id} [${t.status}] ${t.title}`));
   return lines.join('\n');

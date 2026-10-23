@@ -14,7 +14,7 @@ import { pidAlive, sharedStateDir } from '../state.js';
 import { findProjects, isProject as isLeadProject } from '../lead.js';
 import { freeLine, readyFree } from '../ready-free.js';
 import { acquireSlot, cadenceHome, freeSlots, liveHolds, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
-import { loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
+import { headline, loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { readWaits, renderWaits } from './waits.js';
 import { acceptationFile, acceptText } from './accept.js';
 import { ficheReviewText } from './fiche.js';
@@ -124,6 +124,8 @@ export interface Args {
   budget?: number;
   /** `--budget projet:lot=+N` (L223) : relève le budget d'un lot rendu sur budget, avec `--resume` ; `text` est le N tel que donné. */
   lotBudgets: { project?: string; lot: string; raise: number; text: string }[];
+  /** `--goal "…"` (L258) : l'objectif du seul lot lancé, à la place de son titre dans les briefs. */
+  goal?: string;
   maxSessions?: number;
   wave?: string;
   /** `--continue` (L147) : la vague tire elle-même le prochain lot prêt du plan quand ceux en cours sont finis. */
@@ -210,7 +212,10 @@ export function parseOrchestrateArgs(argv: string[]): Args {
       else a.budget = parseBudget(v);
     }
     else if (t === '--max-sessions') a.maxSessions = parseMaxSessions(value(t));
-    else if (t === '--wave') a.wave = value(t);
+    else if (t === '--goal') {
+      a.goal = value(t).trim();
+      if (a.goal === '') throw new RafError('--goal attend un texte non vide');
+    } else if (t === '--wave') a.wave = value(t);
     else if (t === '--drop') a.drop.push(lotArg(value(t)));
     else if (t === '--stop-after-current') a.stopAfterCurrent = true;
     else if (t === '--continue') a.continue = true;
@@ -361,8 +366,9 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       continue;
     }
     const small = lot.estimate <= 0.5 || lot.quickwin;
+    const goal = args.goal ?? lot.goal;
     const screen = specScreen(t.repo, env.config.spec.dir, lot);
-    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, visible: lot.visible, small, ...(screen ? { screen } : {}), ...(lot.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
+    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...(lot.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.light = lot.estimate <= env.config.review.threshold;
     state.budget = lotBudget(lot.estimate, screen ? 'screen' : lot.spec ? 'spec' : undefined);
@@ -404,6 +410,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const lot = env.loadPlan().lot(l.lot);
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
+    if (l.goal) io.out(`  objectif donné : ${l.goal} (à la place du titre dans les briefs)`);
     io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, l.screen ? 'screen' : l.specLot ? 'spec' : undefined)})`);
     io.out(`  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
     if (l.repos?.length) io.out(`  dépôts voisins : ${l.repos.map((r) => r.rel).join(', ')} (verrou, garde de push et --add-dir ; leurs commits citent ${l.lot})`);
@@ -430,7 +437,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     io.out(l.light ? '  revue conforme avec mineurs : pas de passe des mineurs, ils sont rendus en notes' : '  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, lotSlug(l.project, l.lot), 'playwright');
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
-    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: lot.title, objectif: objective(lot), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '' };
+    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '' };
     if (specStage) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, back: !!l.specLot });
     if (l.screen && env.config.maquette) vars.maquette = maquetteText({ fiche: `${env.config.spec.dir}/<écran>/fiche.yaml`, passes: 0, max: env.config.maquetteReviews });
     if (l.specLot && env.config.fiche) vars.fiche = ficheReviewText({ fiche: `${env.config.spec.dir}/<sujet>/fiche.yaml`, passes: 0 });
@@ -537,6 +544,8 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   // L228 : la reprise n'a pas de simulation — elle relève le budget, réécrit wave.json et relance les sessions. Refusée ici, avant le réexec de l'instantané (une vague ancienne ne connaît pas ce refus).
   if (args.resume !== undefined && args.dryRun) throw new RafError('--resume ne se combine pas avec --dry-run (la reprise écrit l\'état de la vague et relance les sessions, elle ne se simule pas)');
   if (args.lotBudgets.length && args.resume === undefined) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume");
+  // L258 : l'objectif donné ne vaut que pour UN lot lancé (la clé goal: du lot sert quand plusieurs partent ; --continue tire ses lots lui-même).
+  if (args.goal !== undefined && (args.lots.length !== 1 || args.continue || args.resume !== undefined || args.status !== undefined || args.waits || args.drop.length || args.stopAfterCurrent)) throw new RafError("--goal s'applique à un seul lot lancé : <projet>:<lot> --goal \"…\" (plusieurs lots : la clé goal: de chacun)");
   if (args.since !== undefined && !args.waits) throw new RafError('--since s\'utilise avec --waits');
   if (args.waits) {
     if (args.lots.length || args.status !== undefined || args.resume !== undefined || args.watch || args.drop.length || args.stopAfterCurrent || args.continue || args.dryRun) throw new RafError('--waits ne se combine avec aucune autre action');

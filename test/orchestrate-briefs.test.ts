@@ -473,3 +473,18 @@ describe('ligne de base des tests dans les briefs (L213)', () => {
     expect(line('implement')).not.toContain('first commit that cites');
   });
 });
+
+describe("objective : l'objectif remplace le titre (L258)", () => {
+  it("R3 — l'objectif donné ouvre le texte à la place du titre ; notes et sous-tâches restent", () => {
+    const out = objective(lot({ goal: 'Objectif à jour' }));
+    expect(out.split('\n')[0]).toBe('Objectif à jour');
+    expect(out).not.toContain('Un titre');
+    expect(out).toContain('décision A');
+    expect(out).toContain('sous-tâche');
+  });
+  it("R3 — l'objectif passé en argument l'emporte sur la clé goal: du lot, qui l'emporte sur le titre", () => {
+    expect(objective(lot({ goal: 'clé' }), 'argument').split('\n')[0]).toBe('argument');
+    expect(objective(lot({ goal: 'clé' })).split('\n')[0]).toBe('clé');
+    expect(objective(lot()).split('\n')[0]).toBe('Un titre');
+  });
+});

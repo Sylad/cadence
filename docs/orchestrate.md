@@ -12,6 +12,7 @@ exception is a **formatting retry** (below).
 cadence orchestrate finance-tracker:L41 ol-companion:L22 cadence:L18@haiku
 cadence orchestrate L18                      # from inside a project
 cadence orchestrate maritime-atlas:Q4/accueil-4-ux12@haiku   # a lot id may contain "/" (sub-tasks of read-only plans)
+cadence orchestrate maritime:B28.4 --goal "…"   # the goal replaces the stale title as the objective of the briefs (below)
 cadence orchestrate … --budget 1.5M          # 1500000, 1.5M, 800k; default 2M
 cadence orchestrate … --max-sessions 3       # sessions running at the same moment, all waves together; default 2
 cadence orchestrate … --dry-run              # preconditions + the plan of the wave; nothing is started
@@ -42,6 +43,15 @@ handed back instead of being replayed (an unknown or finished lot is refused, ex
 this way is left out of the resume checks (repository lock, `.nvmrc` Node, dirty tree): only the lots that will be replayed can
 refuse the resume, and a refusal writes nothing to `control.log`.
 `--resume --stop-after-current` is refused (exit 2): resuming contradicts stopping.
+
+**`--goal "…"` and `goal:` — the objective of the briefs when the title is stale (L258)**: the first line of the `{{objectif}}` of every
+brief of a lot (and the title quoted in their first sentence) is the lot's title; when a change of scope made it stale, the lead no longer
+has to delegate by hand. `cadence orchestrate maritime:B28.4 --goal "…"` replaces it for that launch; the `goal:` key of the lot in the plan
+(`raf.yaml`, native format only) does the same for every launch, and is the way to give a goal to several lots at once. Order:
+`--goal`, then `goal:`, then the title; the notes and sub-tasks of the lot stay in the objective. `--goal` takes exactly one launched lot
+(two lots, `--continue`, `--resume`, `--status` are refused, exit 2, with nothing written); an empty text is refused. The goal is kept in the
+state of the lot: a `--resume` replays the sessions with it, `--dry-run` prints `objectif donné : …` under the lot, and the table of the wave
+repeats it (`<project>:<lot> — objectif donné : …`) so the lead sees which objective the sessions worked from.
 
 **`--resume --budget <project>:<lot>=+N` — replaying a lot handed back for its budget (L223)**: a lot handed back with
 `correction non jouée (budget)` or `budget du lot atteint` kept its findings but not its budget, and a plain `--resume` does not replay a

@@ -154,6 +154,7 @@ lots:
     estimate: 2          # working days
     quickwin: false
     visible: true        # user-facing: a news entry is expected when done
+    goal: Dedup on merge, bank line kept   # optional (L258): replaces the title as the objective of the `orchestrate` briefs when the title is stale
     after: [L0]
     gate: { count: 8, spec: true }   # optional: not before 8 lots with `spec: true` are done (or `screen: page`)
     created: 2026-09-28

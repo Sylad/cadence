@@ -302,3 +302,13 @@ describe('renderTable : quota, coupure et échec se distinguent (L256)', () => {
     expect(mk('failed', 'échec : review sans résultat : code 1')).toEqual(['demo:L1 — échec : review sans résultat : code 1']);
   });
 });
+
+describe('renderTable : objectif donné (L258)', () => {
+  it("R4 — un lot lancé avec un objectif en rend une ligne « objectif donné : … » ; sans objectif, aucune", () => {
+    const l = lot();
+    l.status = 'ready';
+    expect(renderTable(wave, [l]).join('\n')).not.toContain('objectif donné');
+    l.goal = 'Livrer B28.6 seul';
+    expect(renderTable(wave, [l])).toContain('demo:L1 — objectif donné : Livrer B28.6 seul');
+  });
+});

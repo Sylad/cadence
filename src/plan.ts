@@ -46,6 +46,8 @@ export interface Lot {
   spec?: true;
   /** Titre public du lot, en langage du public (pages Nouveautés et Plan) ; absent = pas de titre public. */
   public?: string;
+  /** Objectif du lot (clé `goal:`, L258) : remplace le titre comme objectif des briefs d'orchestrate quand le titre est périmé ; absent = le titre. */
+  goal?: string;
   /** Périodicité en jours : le lot est récurrent, il reste `todo` et se refait (`raf did`). */
   every?: number;
   /** Dernier passage d'un lot récurrent ; absent = jamais fait. */
@@ -809,6 +811,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     ...(spec ? { spec } : {}),
     ...(gate ? { gate } : {}),
     ...(typeof raw.public === 'string' && raw.public.trim() !== '' ? { public: raw.public.trim() } : {}),
+    ...(typeof raw.goal === 'string' && raw.goal.trim() !== '' ? { goal: raw.goal.trim() } : {}),
     ...(Number.isInteger(raw.every) && (raw.every as number) > 0 ? { every: raw.every as number } : {}),
     ...(last ? { last } : {}),
     after,

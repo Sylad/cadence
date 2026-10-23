@@ -122,6 +122,7 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
     out.push(`${d.ready.project}:${d.ready.lot} — livrable jusqu'à ${d.sha} (dernier commit de ${d.ready.lot}, sous ${d.under.lot} ${d.under.status === 'handed-back' || d.under.status === 'failed' ? 'rendu' : LABEL[d.under.status]}) : git push origin ${d.sha}:main && cadence deliver --sha ${d.sha}`);
   }
   for (const l of lots) {
+    if (l.goal) out.push(`${l.project}:${l.lot} — objectif donné : ${l.goal}`);
     if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);
     if (l.uxCaptures) out.push(`${l.project}:${l.lot} — captures Playwright : ${l.uxCaptures}`);
     for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);

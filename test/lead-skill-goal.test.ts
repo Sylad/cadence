@@ -15,6 +15,11 @@ describe('skills/lead/SKILL.md et docs/lead.md — objectif d\'un titre périmé
     expect(delegation).toMatch(/stale/i)
   })
 
+  it('R1 — le skill et docs/lead.md disent comment donner un objectif sur un plan tenu par un autre outil (plan.fields.goal)', () => {
+    expect(delegation).toContain('plan.fields: { goal:')
+    expect(doc).toContain('plan.fields: { goal:')
+  })
+
   it('R2 — la commande de la vague (2b) propose --goal', () => {
     const wave = skill.slice(skill.indexOf('### 2b.'), skill.indexOf('### 2c.'))
     expect(wave).toContain('--goal')

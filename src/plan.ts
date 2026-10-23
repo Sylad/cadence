@@ -102,7 +102,7 @@ export function cleanUses(names: string[]): string[] {
 
 export type Ref = { lot: string; task?: string };
 
-export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'screen', 'spec', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent', 'gate'] as const;
+export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'screen', 'spec', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent', 'gate', 'goal'] as const;
 /** Nature de l'écran d'un lot visible : nouvelle page, nouveau composant, parcours modifié. */
 export const SCREENS = ['page', 'component', 'journey'] as const;
 export type Screen = (typeof SCREENS)[number];
@@ -729,6 +729,7 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
         notes: typeof notes === 'string' ? [{ text: notes }] : notes,
         repos: pick('repos'),
         gate: pick('gate'),
+        goal: pick('goal'),
       },
       problems,
     );

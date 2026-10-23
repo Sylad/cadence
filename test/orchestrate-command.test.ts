@@ -1830,6 +1830,72 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
     }
   });
 
+  /**
+   * Un plan tenu par un autre outil (en lecture seule, clés mappées par `fields:`), lot en cours : son objectif est la clé `objectif`,
+   * mappée sur `goal` si `mapGoal`. Retourne le dossier parent.
+   */
+  function mappedPlan(mapGoal: boolean, goalKey = 'objectif') {
+    const { parent, dirs } = parentWith({ a: [{ title: 'inutile' }] });
+    git(dirs.a, 'rm', '-q', '--', 'docs/plan/raf.yaml');
+    mkdirSync(join(dirs.a, 'docs/suivi'), { recursive: true });
+    writeFileSync(join(dirs.a, 'docs/suivi/taches.yaml'), `taches:\n- id: B28.4\n  titre: ${STALE}\n  etat: en_cours\n  ${goalKey}: ${GOAL}\n`);
+    writeFileSync(join(dirs.a, 'cadence.yaml'), `plan:\n  path: docs/suivi/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat${mapGoal ? ', goal: objectif' : ''} }\n  statuses: { doing: en_cours }\norchestrate:\n  precheck: false\n`);
+    git(dirs.a, 'add', '--', 'docs/suivi/taches.yaml', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: plan tenu par un autre outil');
+    return parent;
+  }
+
+  it("R2 — sur un plan tenu par un autre outil, fields.goal mappe l'objectif : il atteint les briefs, la simulation et le tableau", async () => {
+    const parent = mappedPlan(true);
+    const dry = await run(parent, ['a:B28.4', '--dry-run']);
+    expect(dry.code).toBe(0);
+    expect(dry.out.join('\n')).toContain(`  objectif donné : ${GOAL} (à la place du titre dans les briefs)`);
+    for (const b of dryBriefs(dry.out.join('\n'))) {
+      expect(b).toContain(GOAL);
+      expect(b).not.toContain(STALE);
+    }
+    const real = await run(parent, ['a:B28.4']);
+    expect(real.code).toBe(0);
+    expect(real.out.join('\n')).toContain(`a:B28.4 — objectif donné : ${GOAL}`);
+  });
+
+  it("R2 — plusieurs lots lancés ensemble sur un plan tenu par un autre outil : chacun reçoit l'objectif de sa propre clé mappée (le cas maritime B28.4–B28.6)", async () => {
+    const parent = mappedPlan(true);
+    const file = join(parent, 'a/docs/suivi/taches.yaml');
+    writeFileSync(file, ['B28.4', 'B28.5', 'B28.6'].map((id) => `- { id: ${id}, titre: ${STALE}, etat: en_cours, objectif: "Objectif de ${id}" }\n`).join('').replace(/^/, 'taches:\n'));
+    git(join(parent, 'a'), 'commit', '-qam', 'chore: trois lots');
+    const dry = await run(parent, ['a:B28.4', 'a:B28.5', 'a:B28.6', '--dry-run']);
+    const out = dry.out.join('\n');
+    for (const id of ['B28.4', 'B28.5', 'B28.6']) {
+      expect(out).toContain(`objectif donné : Objectif de ${id} `);
+      const files = [...out.matchAll(new RegExp(`brief : (\\S*a--${id.replace('.', '\\.')}--\\S+)`, 'g'))].map((m) => m[1]!);
+      expect(files.length, id).toBeGreaterThanOrEqual(2);
+      for (const f of files) {
+        const b = readFileSync(f, 'utf8');
+        expect(b).toContain(`Objectif de ${id}`);
+        expect(b).not.toContain(STALE);
+      }
+    }
+    removeDryRunBriefs(out);
+  });
+
+  it("R2 — fields.goal peut mapper une autre clé que « goal » ; --goal l'emporte sur la clé mappée", async () => {
+    const parent = mappedPlan(true);
+    const byFlag = await run(parent, ['a:B28.4', '--goal', 'Autre objectif', '--dry-run']);
+    expect(byFlag.out.join('\n')).toContain('objectif donné : Autre objectif');
+    expect(byFlag.out.join('\n')).not.toContain(GOAL);
+    removeDryRunBriefs(byFlag.out.join('\n'));
+  });
+
+  it("R2 — sans fields.goal, une clé nommée « goal » d'un plan tenu par un autre outil est lue sous son nom ; une autre clé est ignorée", async () => {
+    const own = await run(mappedPlan(false, 'goal'), ['a:B28.4', '--dry-run']);
+    expect(own.out.join('\n')).toContain(`objectif donné : ${GOAL}`);
+    removeDryRunBriefs(own.out.join('\n'));
+    const ignored = await run(mappedPlan(false), ['a:B28.4', '--dry-run']);
+    expect(ignored.out.join('\n')).not.toContain('objectif donné');
+    for (const b of dryBriefs(ignored.out.join('\n'))) expect(b).toContain(STALE);
+  });
+
   /** Lance a:L1 (arrêt sur une question), change la clé goal: du plan commité, puis reprend : les briefs de la reprise et le tableau. */
   async function resumeAfterPlanGoal(launchKey: string | undefined, laterKey: string) {
     const { parent, dirs } = withGoalKey(launchKey);

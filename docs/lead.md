@@ -20,7 +20,7 @@ picture, not its source.
    quick wins. It stops and waits: the human picks the lots and the order (`--priority`, or the
    `priority:` list of the parent folder's `cadence.yaml`).
 2. **Wave.** The lead starts `cadence orchestrate <project>:<lot> … --wave <id>` in the background.
-   When a lot's title is stale, the lead does not delegate by hand: it passes `--goal "…"` (one lot per launch) or relies on the `goal:` key of the lot, which replaces the title as the objective of the briefs (L258, [orchestrate](orchestrate.md)).
+   When a lot's title is stale, the lead does not delegate by hand: it passes `--goal "…"` (one lot per launch), or writes a `goal:` key on the lots in the plan (several lots at once) — in the native plan as `goal:`, in a plan kept by another tool (read-only) by mapping its key with `plan.fields: { goal: <their key> }` in `cadence.yaml` — which replaces the title as the objective of the briefs (L258, [orchestrate](orchestrate.md)).
    For each lot the program runs, in fresh sessions and in this order: `precheck → spec → maquette →
    accept → implement → review → ux`. The **precheck** applies to any lot without a commit yet (unless
    `orchestrate.precheck: false`). The spec steps exist only for a lot that declares

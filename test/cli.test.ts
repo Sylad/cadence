@@ -354,9 +354,9 @@ describe('raf show', () => {
     expect(docText()).not.toMatch(/raf show[^\n]*in full/);
   });
 
-  it('README — la liste des champs renommables de plan.fields cite gate et dit que spec: true d\'un gate demande plan.fields.spec', () => {
+  it('README — la liste des champs renommables de plan.fields cite gate et goal, et dit que spec: true d\'un gate demande plan.fields.spec', () => {
     const readme = docText();
-    expect(readme).toMatch(/`parent`, `gate`; one left out/);
+    expect(readme).toMatch(/`parent`, `gate`, `goal` \(L258[^\n]*\); one left out/);
     expect(readme).toMatch(/gate: \{ count: N, spec: true \}[^\n]*read-only plan[^\n]*plan\.fields\.spec/);
   });
 

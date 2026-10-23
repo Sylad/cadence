@@ -202,6 +202,19 @@ describe('a plan in another format', () => {
     expect(plan.lot('NC2.4').finished).toBe('2026-09-20');
   });
 
+  it('(L258) reads the goal from the field mapped to `goal`, trimmed, and ignores a blank or non-string one', () => {
+    const dir = tempDir();
+    const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), 'plan:\n  lots: taches\n  fields: { title: titre, status: etat, goal: [objectif, but] }\n  statuses: { todo: prevu }\n'))!;
+    expect(cfg.settings.format!.fields.goal).toEqual(['objectif', 'but']);
+    const plan = Plan.load(
+      write(join(dir, 'p.yaml'), "taches:\n- { id: A1, titre: x, etat: prevu, objectif: '  Livrer B28.6 seul ' }\n- { id: A2, titre: y, etat: prevu, but: Le but }\n- { id: A3, titre: z, etat: prevu, objectif: '   ' }\n- { id: A4, titre: w, etat: prevu, objectif: 7 }\n- { id: A5, titre: v, etat: prevu, goal: Pas mappé }\n"),
+      cfg.settings,
+    );
+    expect(plan.lot('A1').goal).toBe('Livrer B28.6 seul');
+    expect(plan.lot('A2').goal).toBe('Le but');
+    for (const id of ['A3', 'A4', 'A5']) expect(plan.lot(id)).not.toHaveProperty('goal');
+  });
+
   it('reads the public title from the field mapped to `public`, trimmed, and ignores a blank or non-string one', () => {
     const dir = tempDir();
     const cfg = readPlanConfig(write(join(dir, 'cadence.yaml'), 'plan:\n  lots: taches\n  fields: { title: titre, status: etat, public: titre_public }\n  statuses: { todo: prevu }\n'))!;

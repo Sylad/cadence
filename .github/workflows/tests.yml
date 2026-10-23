@@ -31,6 +31,9 @@ jobs:
           git config --global user.name "cadence-ci"
           git config --global user.email "cadence-ci@users.noreply.github.com"
 
+      # cadence ref appelle poppler (ses tests rendent de vrais PDF) ; ImageMagick et tesseract y sont remplacés par des faux.
+      - run: sudo apt-get install -y poppler-utils
+
       - run: npm ci
 
       - name: Environnement vu par la suite

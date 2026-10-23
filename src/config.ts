@@ -516,3 +516,26 @@ export function readDocsConfig(file: string): DocsConfig {
   }
   return config;
 }
+
+export interface ReferencesConfig {
+  /** Dossier des documents de référence (cadence ref), relatif au dossier du cadence.yaml. */
+  dir?: string;
+}
+
+/** Clé `references:` de cadence.yaml. */
+export function readReferencesConfig(file: string): ReferencesConfig {
+  if (!existsSync(file)) return {};
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const r = (raw as { references?: unknown } | null)?.references;
+  if (r == null) return {};
+  if (!isObject(r)) throw new RafError(`${file} : references doit être un objet { dir }`);
+  for (const k of Object.keys(r)) if (k !== 'dir') throw new RafError(`${file} : references.${k} inconnu (attendu : dir)`);
+  if (r.dir == null) return {};
+  if (typeof r.dir !== 'string' || r.dir.trim() === '') throw new RafError(`${file} : references.dir : chemin attendu`);
+  return { dir: r.dir.trim() };
+}

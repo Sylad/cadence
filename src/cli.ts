@@ -26,6 +26,7 @@ import { cadenceHome, liveWaves, openLotsIn, openWavesIn, type OpenWave } from '
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedDeliveries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
+import { refCommand } from './ref/command.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
@@ -71,6 +72,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   cadence lead hold <étiquette> [--ttl minutes] | lead release <étiquette>   déclare (60 min par défaut), puis rend, une session lancée à la main par le lead : elle est soustraite des créneaux libres de orchestrate --status et de lead tour
   cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--since date] [--json]   mesure des passes de correction des journaux dossier/.cadence/runs : lots à ≥1 et ≥2 corrections, par projet, visibles ou non, passes par cause (classées par Ollama avec --classify, hors quota)
   cadence perf [dossier] [--since date] [--json]   tableau de bord du workflow, sans modèle : deux fenêtres (7 derniers jours contre les 7 précédents) lues dans dossier/.cadence/runs et les plans, chaque vitesse à côté de sa qualité, ⚠ au-delà de 25 % de dégradation ; tokens par lot selon l'estimate, part de la revue, délais création → done → livraison, durée de mur par étape, coût en euros par lot livré (grille cadence.yaml perf.prices) ; --since est un jour qui tronque les fenêtres
+  cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]   enregistre un document de référence hors du dépôt (references.dir de cadence.yaml, sinon $XDG_DATA_HOME/cadence/references) : pages rendues à 200 dpi, texte positionné, images incluses, index des figures et des passages qui les citent ; exige poppler, ImageMagick et tesseract (outil absent nommé avec sa commande, code 2)
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -175,6 +177,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       model: { type: 'string' },
       cache: { type: 'string' },
       sample: { type: 'string' },
+      sections: { type: 'string' },
+      slug: { type: 'string' },
       until: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
@@ -228,6 +232,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   }
   if (command === 'corrections') return corrections(rest, values, io);
   if (command === 'perf') return perf(rest, values, today, io);
+  if (command === 'ref') return refCommand(rest, values, root, io);
   // `spec` est aussi un verbe de raf (raf spec <lot> on|off, L186) : seuls check et qa vont à la fiche.
   if (command === 'spec' && (rest[0] === 'check' || rest[0] === 'qa')) return spec(rest, io);
   const reseal = command === 'spec' && rest[0] === 'reseal';

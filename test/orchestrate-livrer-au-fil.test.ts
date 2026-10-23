@@ -317,16 +317,58 @@ describe('livrer au fil de l\'eau pendant une vague (L277)', () => {
       const two = newLot({ project: 'ici', repo: dir, lot: 'L2', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false });
       attendre(dir, [one, two]);
       const r = await cli(dir, 'deliver', '--sha', a, '--', 'chore: nouveautés horodatées');
-      return { r, a, head: sha(dir, 'HEAD'), journal: lastDelivery(sharedStateDir(dir)) };
+      return { r, dir, a, head: sha(dir, 'HEAD'), journal: lastDelivery(sharedStateDir(dir)) };
     }
     const COMMIT = 'git -c gc.auto=0 -c maintenance.auto=false commit -q --allow-empty -m';
 
-    it('H1 — le script du projet commite l\'horodatage (aucun lot pas prêt n\'a commité) : le journal garde la nouvelle tête, qui est ce qui est déployé', async () => {
-      const { r, a, head, journal } = await livre(`${COMMIT} "$1" && git push -q`);
+    it('H1 — le script du projet commite l\'horodatage ET le déclare (CADENCE_DEPLOYED_FILE) : le journal garde ce commit, nommé « sha déclaré par le script »', async () => {
+      const { r, a, head, journal } = await livre(`${COMMIT} "$1" && git push -q && git rev-parse HEAD > "$CADENCE_DEPLOYED_FILE"`);
       expect(r.code).toBe(0);
       expect(head).not.toBe(a);
       expect(journal).toBe(head);
-      expect(r.out).toContain('tête déplacée par le script');
+      expect(r.out).toContain('sha déclaré par le script');
+    });
+
+    it('H1b — le même commit d\'horodatage SANS déclaration, pendant une vague : on ne devine plus, le journal garde le sha et un avertissement le dit', async () => {
+      const { r, a, head, journal } = await livre(`${COMMIT} "$1" && git push -q`);
+      expect(r.code).toBe(0);
+      expect(head).not.toBe(a);
+      expect(journal).toBe(a);
+      expect(r.out).not.toContain('tête déplacée');
+      expect(r.err).toContain('la tête a avancé pendant la livraison');
+      expect(r.err).toContain('CADENCE_DEPLOYED_FILE');
+    });
+
+    it('A (revue) — le script commite N et le déclare, puis un lot pas prêt commite C par-dessus : le journal garde N, pas le sha de départ', async () => {
+      const { r, dir, a, head, journal } = await livre(`${COMMIT} "$1" && git push -q && git rev-parse HEAD > "$CADENCE_DEPLOYED_FILE" && ${COMMIT} "feat(L2): travail en cours" && git push -q`);
+      expect(r.code).toBe(0);
+      expect(journal).not.toBe(a);
+      expect(journal).not.toBe(head);
+      expect(execFileSync('git', ['log', '-1', '--format=%s', journal!], { cwd: dir, encoding: 'utf8' }).trim()).toBe('chore: nouveautés horodatées');
+      expect(r.out).toContain(`✓ livré : ${journal!.slice(0, 7)} (sha déclaré par le script)`);
+    });
+
+    it('A (revue) — même scénario sans déclaration : le journal garde le sha de départ et l\'avertissement le dit', async () => {
+      const { r, a, journal } = await livre(`${COMMIT} "$1" && git push -q && ${COMMIT} "feat(L2): travail en cours" && git push -q`);
+      expect(r.code).toBe(0);
+      expect(journal).toBe(a);
+      expect(r.err).toContain(`le journal garde ${a.slice(0, 7)}`);
+    });
+
+    it('B (revue) — le script ne commite rien, orchestrate commite un commit de plan seul : le journal garde le sha, rien n\'est attribué au script', async () => {
+      const { r, a, head, journal } = await livre(`printf '# L2 en cours\\n' >> .cadence/raf.yaml && git add .cadence/raf.yaml && ${COMMIT} "plan: L2 en cours" && git push -q`);
+      expect(r.code).toBe(0);
+      expect(head).not.toBe(a);
+      expect(journal).toBe(a);
+      expect(r.out).not.toContain('tête déplacée par le script');
+      expect(r.out).not.toContain('sha déclaré');
+    });
+
+    it('un sha déclaré qui n\'est pas un commit : la livraison échoue, rien au journal', async () => {
+      const { r, journal } = await livre('echo "pas-un-sha" > "$CADENCE_DEPLOYED_FILE"');
+      expect(r.code).toBe(1);
+      expect(r.err).toContain('CADENCE_DEPLOYED_FILE');
+      expect(journal).toBeNull();
     });
 
     it('H2 — la tête avance parce qu\'un lot en cours commite : le journal garde le sha livré', async () => {
@@ -351,11 +393,12 @@ describe('livrer au fil de l\'eau pendant une vague (L277)', () => {
       expect(r.out).not.toContain('tête déplacée');
     });
 
-    it('H5 — le script avance la tête mais le plan est devenu illisible : rien n\'est vérifié, le journal garde le sha livré', async () => {
+    it('H5 — le script avance la tête sans la déclarer alors que le plan est devenu illisible : la règle ne lit plus le plan, le journal garde le sha livré et avertit', async () => {
       const { r, a, journal } = await livre(`printf 'lots: [\\n' > .cadence/raf.yaml && ${COMMIT} "$1" && git push -q`);
       expect(r.code).toBe(0);
       expect(journal).toBe(a);
       expect(r.out).not.toContain('tête déplacée');
+      expect(r.err).toContain('la tête a avancé pendant la livraison');
     });
   });
 });

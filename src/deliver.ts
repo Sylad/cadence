@@ -1,5 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { constants } from 'node:os';
+import { join } from 'node:path';
 import { parse } from 'yaml';
 import { onTermination, readProcs, SIGNAL_GRACE_MS, TreeTracker } from './proc.js';
 import type { Day } from './dates.js';
@@ -79,11 +81,11 @@ export interface DeliverCtx {
   /** Commit à livrer (toute révision git) ; HEAD par défaut. */
   sha?: string;
   /**
-   * Livraison au fil de l'eau (L277) : une vague tient le dépôt, des lots y commitent encore. Dit si une tête relue après le script est livrable,
-   * c'est-à-dire si aucun commit d'un lot pas prêt n'est dans son histoire (ou si la vague ne peut pas le dire : faux). Présent, la tête relue
-   * ne devient le sha journalisé que si elle est livrable — ce que le script a commité lui-même (horodatage) ; sinon le sha livré reste `sha`.
+   * Livraison au fil de l'eau (L277) : une vague tient le dépôt, des lots y commitent encore. La tête peut avancer pendant le script
+   * sans que cadence sache de qui est le commit : on ne devine pas, le journal garde le sha de départ (avec un avertissement) sauf si
+   * le script déclare ce qu'il a déployé (CADENCE_DEPLOYED_FILE).
    */
-  deliverableHead?: (head: string) => boolean;
+  duringWave?: boolean;
   /** Arguments de la ligne de commande, ajoutés au script du projet. */
   args: string[];
   /** Articles d'un dépôt voisin à rafraîchir après une livraison verte (clé `docs.articles`, L144). */
@@ -353,10 +355,25 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     };
     out(`Livraison de ${env.CADENCE_SHORT} (${branch})`);
 
+    let declared: string | null = null;
     if (script !== null) {
       out(`→ script du projet : ${script}`);
-      const code = await deps.exec(script, env, config.deployTimeout * 1000);
-      if (code !== 0) return fail(`script de livraison en échec (${codeText(code)}) : ${script}`);
+      // Le script qui déploie un autre commit que CADENCE_SHA y écrit son sha : cadence ne le devine pas.
+      const file = join(ctx.state, `deployed-${process.pid}`);
+      try {
+        writeFileSync(file, '');
+        const code = await deps.exec(script, { ...env, CADENCE_DEPLOYED_FILE: file }, config.deployTimeout * 1000);
+        if (code !== 0) return fail(`script de livraison en échec (${codeText(code)}) : ${script}`);
+        const text = readFileSync(file, 'utf8').trim();
+        if (text !== '') {
+          declared = text.includes('\n') ? null : resolveCommit(ctx.root, text);
+          if (declared === null) return fail(`CADENCE_DEPLOYED_FILE : « ${text.split('\n')[0].slice(0, 80)} » n'est pas un commit du dépôt (le script doit y écrire le sha qu'il a déployé, ou rien)`);
+        }
+      } catch (e) {
+        return fail(`CADENCE_DEPLOYED_FILE illisible : ${(e as Error).message}`);
+      } finally {
+        rmSync(file, { force: true });
+      }
     } else {
       const ci = await waitCi(ctx, deps, sha, env);
       if (ci) return fail(ci);
@@ -371,16 +388,30 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     const failed = await verifyAll(ctx, deps, sha, env);
     if (failed) return fail(failed);
 
-    // Un script de projet peut commiter pendant la livraison (horodatage d'une entrée Nouveautés) :
-    // ce qu'il a livré est alors la nouvelle tête, pas le sha de départ. Pendant une vague, la tête peut aussi avoir
-    // avancé du commit d'un lot en cours, ni revu ni déployé : elle ne compte que si aucun commit d'un lot pas prêt n'est dans son histoire.
-    const head = script === null || !atHead ? sha : (headSha(ctx.root) ?? sha);
-    const moved = head !== sha && isAncestor(ctx.root, sha, head) && (ctx.deliverableHead?.(head) ?? true);
-    const final = moved ? head : sha;
+    // Ce qui est journalisé : le sha que le script déclare (CADENCE_DEPLOYED_FILE) l'emporte. Sans déclaration, hors vague, un script qui a commité
+    // pendant la livraison (horodatage d'une entrée Nouveautés) a livré la nouvelle tête ; pendant une vague on ne devine plus qui a commité
+    // (le script, un lot en cours, un commit de plan) : le journal garde le sha de départ et l'avertissement le dit.
+    let final = sha;
+    let how: 'sha' | 'declared' | 'moved' = 'sha';
+    if (declared !== null && declared !== sha) {
+      final = declared;
+      how = 'declared';
+    } else if (declared === null && script !== null) {
+      const head = headSha(ctx.root);
+      if (ctx.duringWave) {
+        if (head !== null && head !== head0) {
+          err(`deliver : la tête a avancé pendant la livraison ; sans sha déclaré par le script (CADENCE_DEPLOYED_FILE), le journal garde ${env.CADENCE_SHORT}`);
+        }
+      } else if (atHead && head !== null && head !== sha && isAncestor(ctx.root, sha, head)) {
+        final = head;
+        how = 'moved';
+      }
+    }
     const ids = deliveredIds(ctx, lastDelivery(ctx.state), final);
     const delivered = deliveredLots(ctx, ids, lastDelivery(ctx.state), final);
     appendDelivery(ctx.state, ctx.today, final);
-    if (moved) out(`✓ livré : ${final.slice(0, 7)} (tête déplacée par le script depuis ${env.CADENCE_SHORT})`);
+    if (how === 'declared') out(`✓ livré : ${final.slice(0, 7)} (sha déclaré par le script)`);
+    else if (how === 'moved') out(`✓ livré : ${final.slice(0, 7)} (tête déplacée par le script depuis ${env.CADENCE_SHORT})`);
     else out(`✓ livré${config.verify.length ? ' et vérifié' : ''} : ${env.CADENCE_SHORT}`);
     if (delivered) out(delivered);
     refreshArticles(ctx, ids, final);

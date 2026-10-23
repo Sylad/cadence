@@ -380,45 +380,113 @@ describe('deliver : script du projet (L2)', () => {
     expect(out.join('\n')).toContain('livré : L1');
   });
 
-  it('L277 — pendant une vague, une tête non livrable (un lot pas prêt y a commité) laisse le sha livré dans le journal', async () => {
-    const dir = pushedRepo();
-    expect(await deliver(ctx(dir, { config: SCRIPT }).c, fakeDeps().deps)).toBe(0);
-    commit(dir, 'feat(L1): cache');
-    git(dir, 'push', '-q');
-    const target = headSha(dir);
-    const { deps } = fakeDeps({
-      exec: () => {
-        commit(dir, 'feat(L2): lot en cours');
-        git(dir, 'push', '-q');
-        return 0;
-      },
-    });
-    const { c, out } = ctx(dir, { config: SCRIPT, sha: target, deliverableHead: () => false });
-    expect(await deliver(c, deps)).toBe(0);
-    expect(lastDelivery(stateDir(dir))).toBe(target);
-    expect(out.join('\n')).not.toContain('tête déplacée');
-    expect(out.join('\n')).toContain('livré : L1');
-  });
+  describe('sha déclaré par le script (L277, CADENCE_DEPLOYED_FILE)', () => {
+    /** Dépôt poussé dont la tête est le commit de L1 ; rend ce commit. */
+    async function livraisonDeL1() {
+      const dir = pushedRepo();
+      expect(await deliver(ctx(dir, { config: SCRIPT }).c, fakeDeps().deps)).toBe(0);
+      commit(dir, 'feat(L1): cache');
+      git(dir, 'push', '-q');
+      return { dir, target: headSha(dir)! };
+    }
+    const avance = (dir: string, subject: string) => {
+      commit(dir, subject);
+      git(dir, 'push', '-q');
+      return headSha(dir)!;
+    };
 
-  it('L277 — pendant une vague, une tête que la garde dit livrable (le commit du script seul) est journalisée, la garde reçoit cette tête', async () => {
-    const dir = pushedRepo();
-    expect(await deliver(ctx(dir, { config: SCRIPT }).c, fakeDeps().deps)).toBe(0);
-    commit(dir, 'feat(L1): cache');
-    git(dir, 'push', '-q');
-    const target = headSha(dir);
-    const { deps } = fakeDeps({
-      exec: () => {
-        commit(dir, 'chore: nouveautés horodatées');
-        git(dir, 'push', '-q');
-        return 0;
-      },
+    it('le script reçoit CADENCE_DEPLOYED_FILE : un fichier vide, à côté des autres variables', async () => {
+      const dir = pushedRepo();
+      let seen: string | undefined;
+      let content: string | undefined;
+      const { deps } = fakeDeps({
+        exec: (_cmd, env) => {
+          seen = env.CADENCE_DEPLOYED_FILE;
+          content = readFileSync(seen, 'utf8');
+          return 0;
+        },
+      });
+      expect(await deliver(ctx(dir, { config: SCRIPT }).c, deps)).toBe(0);
+      expect(seen).toBeTruthy();
+      expect(content).toBe('');
+      expect(existsSync(seen!)).toBe(false); // nettoyé après la livraison
     });
-    const asked: string[] = [];
-    const { c, out } = ctx(dir, { config: SCRIPT, sha: target, deliverableHead: (h: string) => (asked.push(h), true) });
-    expect(await deliver(c, deps)).toBe(0);
-    expect(asked).toEqual([headSha(dir)]);
-    expect(lastDelivery(stateDir(dir))).toBe(headSha(dir));
-    expect(out.join('\n')).toContain('tête déplacée par le script');
+
+    it('hors vague, sans déclaration : le comportement historique, la tête déplacée par le script est journalisée', async () => {
+      const { dir, target } = await livraisonDeL1();
+      let moved = '';
+      const { deps } = fakeDeps({ exec: () => ((moved = avance(dir, 'nouveautés : horodatées')), 0) });
+      const { c, out } = ctx(dir, { config: SCRIPT, sha: target });
+      expect(await deliver(c, deps)).toBe(0);
+      expect(lastDelivery(stateDir(dir))).toBe(moved);
+      expect(out.join('\n')).toMatch(/✓ livré : [0-9a-f]{7} \(tête déplacée par le script depuis [0-9a-f]{7}\)/);
+    });
+
+    it('hors vague, avec déclaration : le sha déclaré l\'emporte sur la tête', async () => {
+      const { dir, target } = await livraisonDeL1();
+      let declared = '';
+      const { deps } = fakeDeps({
+        exec: (_cmd, env) => {
+          declared = avance(dir, 'nouveautés : horodatées');
+          writeFileSync(env.CADENCE_DEPLOYED_FILE, `${declared}\n`);
+          avance(dir, 'chore: autre commit');
+          return 0;
+        },
+      });
+      const { c, out } = ctx(dir, { config: SCRIPT, sha: target });
+      expect(await deliver(c, deps)).toBe(0);
+      expect(lastDelivery(stateDir(dir))).toBe(declared);
+      expect(out.join('\n')).toContain(`✓ livré : ${declared.slice(0, 7)} (sha déclaré par le script)`);
+      expect(out.join('\n')).not.toContain('tête déplacée');
+    });
+
+    it('un contenu qui n\'est pas un commit : échec de livraison, rien au journal, message clair', async () => {
+      const { dir, target } = await livraisonDeL1();
+      const { deps } = fakeDeps({ exec: (_cmd, env) => (writeFileSync(env.CADENCE_DEPLOYED_FILE, 'pas-un-sha\n'), 0) });
+      const { c, err } = ctx(dir, { config: SCRIPT, sha: target });
+      expect(await deliver(c, deps)).toBe(1);
+      expect(err.join('\n')).toContain('CADENCE_DEPLOYED_FILE');
+      expect(err.join('\n')).toContain('pas-un-sha');
+      expect(lastDelivery(stateDir(dir))).not.toBe(target);
+      expect(readLock(stateDir(dir))).toBeNull();
+    });
+
+    it('pendant une vague, sans déclaration : le journal garde le sha de départ et un avertissement le dit', async () => {
+      const { dir, target } = await livraisonDeL1();
+      const { deps } = fakeDeps({ exec: () => (avance(dir, 'chore: nouveautés horodatées'), 0) });
+      const { c, out, err } = ctx(dir, { config: SCRIPT, sha: target, duringWave: true });
+      expect(await deliver(c, deps)).toBe(0);
+      expect(lastDelivery(stateDir(dir))).toBe(target);
+      expect(out.join('\n')).not.toContain('tête déplacée');
+      expect(err.join('\n')).toContain(`la tête a avancé pendant la livraison ; sans sha déclaré par le script (CADENCE_DEPLOYED_FILE), le journal garde ${target.slice(0, 7)}`);
+    });
+
+    it('pendant une vague, tête immobile : ni avertissement ni changement', async () => {
+      const { dir, target } = await livraisonDeL1();
+      const { c, out, err } = ctx(dir, { config: SCRIPT, sha: target, duringWave: true });
+      expect(await deliver(c, fakeDeps().deps)).toBe(0);
+      expect(lastDelivery(stateDir(dir))).toBe(target);
+      expect(err.join('\n')).not.toContain('la tête a avancé');
+      expect(out.join('\n')).not.toContain('tête déplacée');
+    });
+
+    it('pendant une vague, avec déclaration : le sha déclaré est journalisé et nommé', async () => {
+      const { dir, target } = await livraisonDeL1();
+      let declared = '';
+      const { deps } = fakeDeps({
+        exec: (_cmd, env) => {
+          declared = avance(dir, 'chore: nouveautés horodatées');
+          writeFileSync(env.CADENCE_DEPLOYED_FILE, declared);
+          avance(dir, 'feat(L2): lot pas prêt');
+          return 0;
+        },
+      });
+      const { c, out, err } = ctx(dir, { config: SCRIPT, sha: target, duringWave: true });
+      expect(await deliver(c, deps)).toBe(0);
+      expect(lastDelivery(stateDir(dir))).toBe(declared);
+      expect(out.join('\n')).toContain(`✓ livré : ${declared.slice(0, 7)} (sha déclaré par le script)`);
+      expect(err.join('\n')).not.toContain('la tête a avancé');
+    });
   });
 
   it('simulation : montre la commande complète, n’exécute rien', async () => {

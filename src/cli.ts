@@ -137,21 +137,6 @@ function failure(e: unknown, io: Io): number {
   throw e;
 }
 
-/**
- * Pendant une vague : la tête relue après le script de livraison est-elle livrable (aucun commit d'un lot pas prêt dans son histoire) ?
- * L'état de la vague est relu maintenant (des lots ont pu commiter pendant la livraison) ; illisible, la réponse est non.
- */
-function headIsDeliverable(pid: number, root: string, head: string): boolean {
-  try {
-    const lots = waveLotsIn(cadenceHome(), pid, root);
-    if (lots === null) return false;
-    const { blocking, unreadable } = blockingLots(lots, root, head);
-    return blocking.length === 0 && unreadable.length === 0;
-  } catch {
-    return false;
-  }
-}
-
 function dispatch(argv: string[], io: Io): number | Promise<number> {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -577,7 +562,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const articles = readDocsConfig(configPath).articles;
       // Sans public: d'un lot visible, le site reprend le titre de sa Nouveauté la plus récente.
       const publicTitle = (lot: Lot) => lot.public ?? (lot.visible ? loadEntries(newsDir).find((e) => e.lots.includes(lot.id))?.title : undefined);
-      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], sha: values.sha, deliverableHead: orchestrating ? (head: string) => headIsDeliverable(orchestrating.pid, root, head) : undefined, args: rest, articles, publicTitle, out: io.out, err: io.err };
+      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], sha: values.sha, duringWave: !!orchestrating, args: rest, articles, publicTitle, out: io.out, err: io.err };
       return deliver(ctx, realDeps(root));
     }
     case 'verify': {

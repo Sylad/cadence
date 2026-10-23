@@ -20,9 +20,10 @@ cas:
       - le dossier qui contient le projet porte un cadence.yaml
     nominal:
       - "Le lead écrit « resources: [banc, passerelle] » dans le cadence.yaml du dossier parent."
-      - "Les commandes qui lisent la liste (raf check) la trouvent par le dossier parent de la racine du projet."
+      - "Les commandes qui lisent la liste (raf check) la trouvent en remontant depuis le dossier parent de la racine du projet (R4)."
     alternatives:
       - { si: resources est absente ou vide, alors: aucune ressource n'est déclarée, regles: [R4] }
+      - { si: le projet est à depth > 1 (dossier/groupe/projet), alors: la liste est lue dans le cadence.yaml ancêtre le plus proche qui porte resources, regles: [R4] }
       - { si: resources n'est pas une liste de noms valides, alors: erreur de lecture nommant le fichier, regles: [R3] }
       - { si: le cadence.yaml du parent est illisible, alors: erreur de lecture nommant le fichier, regles: [R3] }
     resultat: La liste des ressources connues du dossier, lisible par tous ses projets.
@@ -97,13 +98,13 @@ regles:
     enonce: "Un resources: du cadence.yaml parent qui n'est pas une liste de noms valides (R2), un uses: du plan qui n'en est pas une, ou un cadence.yaml parent illisible, est une erreur nommant le fichier ou le lot (« <fichier> : resources doit être une liste de noms de ressources », « <lot> : uses doit être une liste de noms de ressources »), jamais une liste vide silencieuse. Le second est un écart bad-field de raf check."
     statut: sourcee
     source: "src/lead.ts:16-30 et src/lead.ts:35-45 (readLeadUx, readDepth : clé du parent mal formée = RafError nommant le fichier) ; src/check.ts:52 (bad-field)"
-    tests: ["R3 — resources: banc (chaîne) : erreur nommant le fichier", "R3 — cadence.yaml parent illisible : erreur nommant le fichier", "R3 — uses: 3 dans le plan : écart bad-field"]
+    tests: ["R3 — resources: banc (chaîne) : erreur nommant le fichier", "R3 — cadence.yaml parent illisible : erreur nommant le fichier", "R3 — uses: 3 dans le plan : écart bad-field", "R3 — resources: [Banc X] (nom invalide) : erreur nommant le fichier"]
   - id: R4
     cas: [C1, C4]
-    enonce: "Les ressources déclarées sont celles de la clé resources: du cadence.yaml du dossier parent de la racine du projet ; une clé absente, vide, ou un parent sans cadence.yaml donne une liste vide, et tout uses: d'un lot ouvert est alors non déclaré."
+    enonce: "Les ressources déclarées sont celles de la clé resources: du cadence.yaml le plus proche en remontant depuis le dossier parent de la racine du projet : le parent direct d'abord, puis ses ancêtres (un projet à depth: 2, dossier/groupe/projet, lit le cadence.yaml de dossier si groupe n'en porte pas ou n'y déclare pas resources:) ; le premier fichier qui porte la clé resources: (même vide) l'emporte et on ne cherche pas plus haut. Aucun fichier ne la porte : liste vide, et tout uses: d'un lot ouvert est alors non déclaré. Les doublons dans resources: sont tolérés et retirés, comme ceux de --uses (R2). Le nom du fichier lu est celui cité par l'écart (R10)."
     statut: hypothese
-    si_faux: "Si le fichier doit aussi se chercher plus haut (lead tour --depth > 1) ou dans le cadence.yaml du projet, seul l'endroit de lecture change ; la clé et le format restent."
-    tests: ["R4 — resources: [banc] dans le parent : banc déclaré", "R4 — parent sans cadence.yaml : banc non déclaré", "R4 — resources: [] : banc non déclaré"]
+    si_faux: "Si le fichier ne doit se lire que dans le parent direct, ou être rattaché au depth: du dossier de tour, seule la recherche du fichier change (une boucle de remontée en moins ou un calcul de profondeur en plus) ; la clé, son format et le cas du parent direct restent identiques."
+    tests: ["R4 — resources: [banc] dans le parent : banc déclaré", "R4 — parent sans cadence.yaml : banc non déclaré", "R4 — resources: [] : banc non déclaré", "R4 — projet à profondeur 2, resources: [banc] dans le dossier grand-parent : banc déclaré, aucun écart faux", "R4 — le parent direct porte resources: [] et le grand-parent [banc] : banc non déclaré (le plus proche l'emporte)", "R4 — resources: [banc, banc] : banc déclaré, sans erreur"]
   - id: R5
     cas: [C2, C3]
     enonce: "uses: se pose sur un lot, jamais sur une sous-tâche : --uses avec --parent, ou raf uses L1/t1, est refusé avec « uses se pose sur un lot, pas sur une sous-tâche : <ref> » ; un lot inconnu avec « lot inconnu : <id> » ; un plan tenu par un autre outil refuse l'écriture comme toute commande qui modifie le plan."

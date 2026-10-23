@@ -2898,6 +2898,9 @@ lots:
     spec: true
     created: 2026-10-23
     started: 2026-10-23
+    notes:
+      - { date: 2026-10-23, text: "Revue de la fiche — mineur : docs/specs/ressources-partagees-uses/fiche.yaml — Entrée dupliquée dans resources: du cadence.yaml parent (resources: [banc, banc]) : aucune règle ni sans_erreur (R3/R4 ne traitent que la forme). Cas inoffensif, mais à motiver pour qu'il ne soit pas laissé au hasard." }
+      - { date: 2026-10-23, text: "Revue de la fiche — mineur : docs/specs/ressources-partagees-uses/fiche.yaml — R3 cite lead.ts:16-30 et 35-45 : les lignes vérifiées sont 14-30 (readLeadUx) et 33-45 (readDepth), ce qui est cohérent, et check.ts:52 (bad-field) est exact. Les sources existent et disent bien ce que la règle affirme. R7 (hypothèse) ne détruit rien d'existant : le remplacement de la liste d'un lot terminé modifie un historique, mais c'est mineur et le si_faux est correct. Aucun test de R3 ne couvre resources: contenant un nom invalide (R2) alors que l'énoncé le prévoit." }
   - id: L252
     title: "Ressources partagées (issue #13, 2/3) : cadence lead tour et orchestrate --continue affichent, en face des créneaux libres, les lots prêts de tous les projets dont aucune ressource n'est prise par un lot doing (ni par une vague en cours) ; --json idem ; tests"
     status: todo

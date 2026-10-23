@@ -213,7 +213,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
       const [slots] = liveLines(configuredCap(io.env), io.now());
       if (slots) io.out(slots);
-      // en face des créneaux libres, les lots prêts dont aucune ressource n'est prise (L252) ; sans vague en cours, pas de créneau à remplir : seul --json les donne
+      // en face des créneaux libres, les lots prêts dont aucune ressource n'est prise (L252) ; sans vague en cours ni session tenue par le lead (L255), pas de créneau à remplir : seul --json les donne
       const free = slots ? tourFreeLine(rows) : null;
       if (free) io.out(free);
       // le réglage lead.ux du cadence.yaml du dossier (L197) : le lead lit ici qui pose le verdict UX, au lieu d'ouvrir le fichier

@@ -63,7 +63,7 @@ picture, not its source.
    UX reviewer's captures: the lead records `raf ux` on the human's verdict, never on its own — unless the parent folder's `cadence.yaml` says `lead.ux: lead`: then the lead forms the verdict from the reviewer's report and its own look at the captures, and asks the human only at the slightest doubt. Then
    `raf done`.
 6. **Delivery.** Push (for a « livrable jusqu'à <sha> », that sha alone, never HEAD), then
-   `cadence deliver`. After a green delivery that changes what a page shows or what it is served, the
+   `cadence deliver`. A lot that turns ready is delivered while the wave runs (`cadence deliver --sha <sha>`, accepted when no commit of the sha belongs to a lot that is not ready), not at the end of the wave. After a green delivery that changes what a page shows or what it is served, the
    `qa-reviewer` agent walks the delivered pages in a real browser, reads only, and brings its blocking
    findings to the human. It is not a gate: a finding becomes a new lot.
 7. **Threshold and chaining.** Before every new wave the lead reads `cadence session context`. Under

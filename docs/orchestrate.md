@@ -533,6 +533,10 @@ on `main`). A lot's commits are read from git (the commits that cite it, whateve
 version commits do not count), not only from the sessions' reports, so a failed or timed-out session that committed still
 bounds the line. Nothing is printed when every lot is ready or when the ready lots sit above the unfinished one.
 
+**Delivering while the wave runs** (L277): the same sha can be delivered before the wave ends. `cadence deliver --sha <sha>` is accepted
+during a wave of the same repository when no commit in the history of `<sha>` belongs to a lot of the wave that is not ready; the
+refusal names the lots that do. Without `--sha`, `cadence deliver` is still refused until every lot of the repository is ready or handed back.
+
 **Formatting retry** (the only `--resume` of a session): when a session ends successfully but in plain text,
 without the `structured_output` the schema asks for (the verdict is there, not in the required shape), the
 orchestrator resumes **that same session once** (`claude -p --resume <session-id> --json-schema <same schema>`,

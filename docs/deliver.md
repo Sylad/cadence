@@ -129,6 +129,14 @@ itself never reads the working tree: a tracked file modified outside the deliver
 sha (the plan after `raf done`, say) neither refuses nor is reported, with or
 without `allowDirty`.
 
+**While a wave runs.** `cadence orchestrate` holds the repository: a plain `cadence deliver` is refused until every lot of the
+repository in the wave is ready or handed back. `--sha` is the exception (L277): it is accepted while the wave runs when no
+commit in the history of `<sha>` belongs to a lot of the wave that is not ready (running, queued, in question, suspended,
+handed back, failed), that is when `<sha>` is « livrable jusqu'à » (the line the wave's final table prints). A ready lot is
+then delivered while the wave runs, without waiting for the slowest lot. The refusal names the lots that hold the sha back; an
+unreadable wave state or an unknown sha is refused too. A lot of the wave with no commit yet blocks nothing. Push the sha
+alone first (`git push origin <sha>:main`).
+
 cadence keeps what the script usually lacks: the preconditions (clean tree, pushed
 `HEAD`), the lock (never two deliveries at once), the delivery log and the lots
 delivered. Arguments are quoted for `sh`, so spaces and quotes reach the script

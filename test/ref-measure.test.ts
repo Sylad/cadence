@@ -278,5 +278,15 @@ describe('cadence ref measure (L262)', () => {
     expect(m.contraste.rapport).toBeGreaterThan(1);
     expect(m.boites.fond.hex).toMatch(/^#[0-9a-f]{6}$/);
     expect(m.couleurs.dominantes).toEqual([]);
+    // pas de couleur de texte portée par 10 % des pixels : le verdict porte sur une moyenne, dite telle quelle
+    expect(m.contraste.texte.moyenne).toBe(true);
+    expect(t.ref('measure', 'doc', '1', 'page', '--quoi', 'couleurs').out).toMatch(/^couleurs : moyenne #[0-9a-f]{6} ; dominantes aucune/m);
+    expect(t.ref('measure', 'doc', '1', 'page', '--quoi', 'contraste').out).toMatch(/^contraste : .*moyenne des pixels les plus éloignés du fond/m);
+  });
+
+  it('un texte à couleur dominante ne porte pas la marque de moyenne', () => {
+    const t = setup();
+    t.paste(paint(200, 100, WHITE, [{ x: 20, y: 20, l: 100, h: 40, c: RED }]));
+    expect(t.json('page', '--quoi', 'contraste').contraste.texte.moyenne).toBeUndefined();
   });
 });

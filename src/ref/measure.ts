@@ -146,16 +146,19 @@ function inkAndBackground(r: Raster, z: Zone): { bg: Color; fg: Color; px: [numb
   return { bg: color(...bg), fg: color(...meanOf(ink)), px, ink: px.filter((p) => distance(p, bg) >= FLAT_DISTANCE) };
 }
 
-/** Le texte peut avoir plusieurs couleurs : chaque couleur portée par au moins `MIN_INK_SHARE` des pixels non-fond est un texte, et le verdict est celui de la moins contrastée (jamais une moyenne, qui n'existe pas dans l'image). */
+/** Le texte peut avoir plusieurs couleurs : chaque couleur portée par au moins `MIN_INK_SHARE` des pixels non-fond est un texte, et le verdict est celui de la moins contrastée (jamais une moyenne, qui n'existe pas dans l'image), sauf si aucune couleur n'en porte autant (dégradé, photo) : le texte est alors la moyenne des pixels les plus éloignés du fond et la sortie le signale (`texte.moyenne`). */
 function measureContrast(r: Raster, z: Zone) {
   const found = inkAndBackground(r, z);
   if (!found) return null;
   const texts = dominant(found.ink, MIN_INK_SHARE);
-  if (texts.length === 0) texts.push({ ...found.fg, part: 1 });
+  // repli (dégradé, photo) : aucune couleur ne domine, le texte est la moyenne des pixels les plus éloignés du fond, et la sortie le dit
+  const repli = texts.length === 0;
+  if (repli) texts.push({ ...found.fg, part: 1 });
   const ratios = texts.map((t) => contrastRatio(t.rgb, found.bg.rgb));
   const worst = ratios.indexOf(Math.min(...ratios));
   const ratio = ratios[worst]!;
-  const { part: _part, ...texte } = texts[worst]!;
+  const { part: _part, ...couleur } = texts[worst]!;
+  const texte = repli ? { ...couleur, moyenne: true } : couleur;
   // les seuils se lisent sur le rapport non arrondi : 4,499 n'atteint pas 4,5
   return { texte, fond: found.bg, rapport: round2(ratio), aa: ratio >= 4.5, aaGrand: ratio >= 3, aaa: ratio >= 7 };
 }
@@ -310,11 +313,11 @@ function render(m: Record<string, any>, point: boolean): string[] {
   const lines = [`${m.document} p.${m.page} · zone ${point ? `${z.x},${z.y}` : `${z.x},${z.y},${z.l},${z.h}`} px de la page · ramené à ${m.echelle.largeur} px (×${m.echelle.facteur})`];
   const c = m.couleurs;
   if (c?.point) lines.push(`couleurs : ${c.point.hex} rgb(${c.point.rgb.join(', ')})`);
-  else if (c) lines.push(`couleurs : moyenne ${c.moyenne.hex} ; dominantes ${c.dominantes.map((d: any) => `${d.hex} ${pct(d.part)}`).join(', ')}`);
+  else if (c) lines.push(`couleurs : moyenne ${c.moyenne.hex} ; dominantes ${c.dominantes.length === 0 ? 'aucune' : c.dominantes.map((d: any) => `${d.hex} ${pct(d.part)}`).join(', ')}`);
   if ('contraste' in m) {
     const k = m.contraste;
     const ok = (b: boolean): string => (b ? '✓' : '✗');
-    lines.push(k ? `contraste : ${k.rapport}:1 (texte ${k.texte.hex} sur fond ${k.fond.hex}) · AA ${ok(k.aa)} · AA grand texte et composants ${ok(k.aaGrand)} · AAA ${ok(k.aaa)}` : 'contraste : zone d\'une seule couleur, rien à mesurer');
+    lines.push(k ? `contraste : ${k.rapport}:1 (texte ${k.texte.hex}${k.texte.moyenne ? ', moyenne des pixels les plus éloignés du fond : aucune couleur de texte ne domine' : ''} sur fond ${k.fond.hex}) · AA ${ok(k.aa)} · AA grand texte et composants ${ok(k.aaGrand)} · AAA ${ok(k.aaa)}` : 'contraste : zone d\'une seule couleur, rien à mesurer');
   }
   if (m.boites) {
     const b = m.boites;

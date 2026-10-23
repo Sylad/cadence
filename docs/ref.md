@@ -70,7 +70,7 @@ factor. Without `--quoi`, the four measures; a point only has colours.
   its **text**: every colour carried by at least 10 % of the non-background pixels is a text colour
   (an anti-aliased edge is spread over many shades and stays under that share), and the verdict is the
   one of the **least contrasted** text colour, never a mean of several (a red and a blue text do not
-  make a purple that is not in the image). The three thresholds are read on the unrounded ratio: AA (4.5), AA large text and interface
+  make a purple that is not in the image). The one exception is a zone where no colour reaches that share (a gradient, text over a photo): the text is then the mean of the pixels furthest from the background, a colour that may not exist in the image, and the answer says so (`texte.moyenne: true` in JSON, a note on the `contraste` line). The three thresholds are read on the unrounded ratio: AA (4.5), AA large text and interface
   components (3), AAA (7). `#767676` on white gives 4.54, `#777777` 4.48. A zone of one colour has no
   contrast to measure.
 - **`boites`**: the connected shapes that differ from the background (8 neighbours), the 20 largest first, and the

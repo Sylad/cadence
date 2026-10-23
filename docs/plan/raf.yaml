@@ -2949,6 +2949,7 @@ lots:
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-23
+    review: { date: 2026-10-23, verdict: "conforme, 4 notes mineures : 4 commits (ccb7bdb, 566ac61, be589bd, 0e1e5ca) ; tsc vert ; suite complète 2720/2720 ; relance en session neuve limitée aux étapes en lecture, pas de relance après l'arrêt de la vague, coupure, échec et quota distincts, docs et CHANGELOG à jour ; 1 sous-tâche sur les jetons de la session neuve perdus si la vague est arrêtée pendant la relance — orchestré (vague 2026-10-23-cad-attentes, 3 passe(s) de correction)", commit: 0e1e5caeb31c087deab62ce3f56c965c501e1a7d }
   - id: L257
     title: "cadence deliver --sha <sha> ne refuse plus un fichier suivi modifié hors du sha livré (le plan après raf done) : livrer un sha ne lit pas l'arbre ; tests (23-10 : stash/pop pour livrer L129 sous L130)"
     status: doing

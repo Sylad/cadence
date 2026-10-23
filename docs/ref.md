@@ -21,7 +21,10 @@ Registers a PDF and builds, for it:
 - **the figure index**: one entry per caption at the start of a line (`Figure n`, `Fig. n`,
   `Table n`, `Tableau n`, `Planche n`). After a separator (`—`, `–`, `:`, `.`, `-`) the line is a
   caption whatever the case of the title (`Figure 1 — map of stations`); without one,
-  `Figure 3 shows…`, `Figure 5, which…` and `Figure 5 (page 4)` cite the figure. A separator
+  `Figure 3 shows…`, `Figure 5, which…` and `Figure 5 (page 4) and…` cite the figure. One exception:
+  a line made only of the number and one closed parenthesis (`Table IV.3 (in accordance with
+  4.3.11)`, WMO-No. 49 vol. II) is a caption when no other line looks like the caption of that
+  number; with another one, or open (`Table 11 (see Example…`), it cites. A separator
   followed by nothing (`figure 24.` ending a sentence) is not a caption either. A
   table-of-contents entry (dot leaders on its line or on the next one, or any line of a contents
   page: one where at least two lines, and more than half, have dot leaders or end with a possible

@@ -55,6 +55,8 @@ const PLURAL = /^(?:figures|figs|tables|tableaux|planches)$/i;
 const NUMBER_ONLY = new RegExp(NUMBER, 'g');
 /** « Figure n » en début de ligne, puis le séparateur éventuel (tiret, deux-points, point) et le reste de la ligne. */
 const CAPTION = new RegExp(String.raw`^(Figure|Fig|Table|Tableau|Planche)\.?\s+(${NUMBER})(?![\w])\s*([:.–—-])?\s*(.*)$`, 'i');
+/** Le reste d'une ligne qui n'est qu'une parenthèse fermée : « (in accordance with 4.3.11) ». */
+const WHOLE_PARENTHESIS = /^\([^()]*\)$/;
 const DEICTIC = /\b(as shown (?:below|above)|shown (?:below|above)|illustrated (?:below|above)|ci-(?:dessous|dessus))\b/i;
 /** Points de conduite d'un sommaire : « Figure 1 Titre ..... 12 ». */
 const LEADER = /\.{4,}|(?:\.\s){4,}/;
@@ -70,16 +72,19 @@ const key = (label: string): string => label.toLowerCase();
 /**
  * Une ligne a la forme d'une légende quand elle COMMENCE par « Figure n » / « Table n » et que ce qui suit n'est pas une phrase en
  * cours. Après un séparateur (« Figure 1 — titre en minuscule », « Table 2: codes ») c'est une légende quelle que soit la casse ;
- * sans séparateur, une minuscule (« Figure 3 shows … »), une virgule ou une parenthèse (« Figure 5, which … », « Figure 5 (page 4) »)
+ * sans séparateur, une minuscule (« Figure 3 shows … »), une virgule ou une parenthèse (« Figure 5, which … », « Figure 5 (page 4) and … »)
  * en font une citation. Un séparateur suivi d'un titre vide (« figure 24. » en fin de phrase) n'est pas une légende non plus.
+ * Exception : une ligne faite UNIQUEMENT du numéro et d'une parenthèse fermée (« Table IV.3 (in accordance with 4.3.11) ») a la forme
+ * d'une légende, `parenthetical` ; `indexText` ne la retient que si aucune autre ligne ne l'est pour ce numéro.
  * « Table 2 The WMO … » a la forme d'une légende : `indexText` la départage des autres lignes de même forme.
  */
-function captionForm(text: string): { label: string; kind: FigureKind; separated: boolean; title: string } | null {
+function captionForm(text: string): { label: string; kind: FigureKind; separated: boolean; parenthetical: boolean; title: string } | null {
   const m = CAPTION.exec(text.trim());
   if (!m) return null;
-  if (m[3] === undefined && /^[a-zà-ÿ,;(\[]/.test(m[4]!)) return null;
+  const parenthetical = m[3] === undefined && WHOLE_PARENTHESIS.test(m[4]!);
+  if (m[3] === undefined && !parenthetical && /^[a-zà-ÿ,;(\[]/.test(m[4]!)) return null;
   if (m[3] !== undefined && m[4] === '') return null;
-  return { ...labelOf(m[1]!, m[2]!), separated: m[3] !== undefined, title: m[4]! };
+  return { ...labelOf(m[1]!, m[2]!), separated: m[3] !== undefined, parenthetical, title: m[4]! };
 }
 
 /**
@@ -115,6 +120,7 @@ interface Candidate {
   label: string;
   kind: FigureKind;
   separated: boolean;
+  parenthetical: boolean;
   title: string;
   page: number;
   line: number;
@@ -144,10 +150,14 @@ export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = n
     });
   }
   const chosen = [...candidates.values()]
-    .map((all) => {
+    .map((candidatesOfLabel) => {
+      // une ligne « Table n (…) » n'est une légende que si elle est la seule ligne de forme de légende de ce numéro
+      const all = candidatesOfLabel.filter((c) => !c.parenthetical || candidatesOfLabel.length === 1);
+      if (all.length === 0) return null;
       const list = all.some((c) => c.title !== '') ? all.filter((c) => c.title !== '') : all;
       return list.find((c) => imagePages.has(c.page)) ?? list.find((c) => c.separated) ?? list[0]!;
     })
+    .filter((c) => c !== null)
     .sort((a, b) => a.page - b.page || a.line - b.line);
   const figures = new Map<string, Figure>(chosen.map((c) => [key(c.label), { label: c.label, kind: c.kind, page: c.page, line: c.line, caption: c.text, box: c.box, regions: [], citations: [] }]));
   const captionLine = new Set(chosen.map((c) => `${c.page}:${c.line}`));

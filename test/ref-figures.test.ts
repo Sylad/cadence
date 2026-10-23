@@ -97,6 +97,31 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.figures[0]!.citations.map((c) => [c.page, c.line])).toEqual([[1, 1], [1, 2], [1, 3]]);
   });
 
+  it('une ligne entière « Table IV.3 (in accordance with 4.3.11) » sans autre candidate pour ce numéro reste une légende que le corps cite', () => {
+    const idx = indexText([page(200, 'see Table IV.3 for the codes'), page(201, 'Table IV.3 (in accordance with 4.3.11)'), page(202, 'see Table IV.3 again')]);
+    expect(idx.figures).toMatchObject([{ label: 'Table IV.3', page: 201, line: 1, caption: 'Table IV.3 (in accordance with 4.3.11)' }]);
+    expect(idx.figures[0]!.citations.map((c) => c.page)).toEqual([200, 202]);
+    expect(idx.unresolved).toEqual([]);
+  });
+
+  it('une parenthèse qui n\'est pas toute la ligne reste une citation : « Table 11 (see Example… » (la suite est ailleurs), « Figure 1 (a), (b), (c) and (d) In the vicinity… », « Figure 5 (page 4) and… »', () => {
+    const idx = indexText([page(1, 'Table 11 (see Example 2', 'Figure 1 (a), (b), (c) and (d) In the vicinity of', 'Figure 5 (page 4) and more'), page(2, 'Table 11 Codes', 'Figure 1 Map', 'Figure 5 Jets')]);
+    expect(idx.figures.map((f) => [f.label, f.page])).toEqual([['Table 11', 2], ['Figure 1', 2], ['Figure 5', 2]]);
+    expect(idx.figures.map((f) => f.citations.length)).toEqual([1, 1, 1]);
+  });
+
+  it('une ligne entière « Table 2 (…) » ne légende pas quand une autre ligne en forme de légende existe pour ce numéro', () => {
+    const idx = indexText([page(1, 'Table 2 (continued)'), page(2, 'Table 2 Codes')]);
+    expect(idx.figures).toMatchObject([{ label: 'Table 2', page: 2, line: 1 }]);
+    expect(idx.figures[0]!.citations.map((c) => [c.page, c.line])).toEqual([[1, 1]]);
+  });
+
+  it('deux lignes entières « Table 2 (…) » et rien d\'autre : aucune ne légende, les deux sont des liens non résolus', () => {
+    const idx = indexText([page(1, 'Table 2 (continued)'), page(2, 'Table 2 (concluded)')]);
+    expect(idx.figures).toEqual([]);
+    expect(idx.unresolved.map((u) => [u.label, u.page])).toEqual([['Table 2', 1], ['Table 2', 2]]);
+  });
+
   it('une ligne de sommaire dont les points de conduite passent à la ligne suivante ne légende rien', () => {
     const idx = indexText([
       page(9, 'Table 3 — Mapping OGC API — EDR Sections to Common Requirements Classes', '.............................................26', 'Table 4 — Paths ...... 34'),

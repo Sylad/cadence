@@ -81,4 +81,68 @@ describe("index des figures d'un texte (L261)", () => {
     ]);
     expect(idx.unresolved).toEqual([]);
   });
+
+  it.each([['Figure 1 — map of stations'], ['Figure 1 – map of stations'], ['Figure 1: map of stations'], ['Table 1 — map of stations'], ['Table 1 – map of stations'], ['Table 1: map of stations']])(
+    'après un séparateur (tiret, deux-points), « %s » est une légende même si le titre commence par une minuscule',
+    (caption) => {
+      const idx = indexText([page(1, caption, `see ${caption.slice(0, 8).trim()}`)]);
+      expect(idx.figures).toMatchObject([{ page: 1, line: 1, caption }]);
+      expect(idx.unresolved).toEqual([]);
+    },
+  );
+
+  it('sans séparateur, « Figure 3 shows… » reste une citation, et une virgule ou une parenthèse après le numéro ne légende rien', () => {
+    const idx = indexText([page(1, 'Figure 3 shows the model.', 'Figure 3, which gives the model', 'Figure 3 (page 4) and more'), page(2, 'Figure 3 Station model')]);
+    expect(idx.figures).toMatchObject([{ label: 'Figure 3', page: 2, line: 1 }]);
+    expect(idx.figures[0]!.citations.map((c) => [c.page, c.line])).toEqual([[1, 1], [1, 2], [1, 3]]);
+  });
+
+  it('une ligne de sommaire dont les points de conduite passent à la ligne suivante ne légende rien', () => {
+    const idx = indexText([
+      page(9, 'Table 3 — Mapping OGC API — EDR Sections to Common Requirements Classes', '.............................................26', 'Table 4 — Paths ...... 34'),
+      page(45, 'Table 3 — Mapping OGC API — EDR Sections to Common Requirements Classes', 'API-EDR SECTION'),
+    ]);
+    expect(idx.figures).toMatchObject([{ label: 'Table 3', page: 45, line: 1 }]);
+  });
+
+  it('une ligne de sommaire qui finit par un numéro de page ne légende rien', () => {
+    const idx = indexText([page(2, 'Figure 2 Station model 12', 'Table 4 — Codes 13'), page(12, 'Figure 2 Station model'), page(13, 'Table 4 — Codes')]);
+    expect(idx.figures).toMatchObject([{ label: 'Figure 2', page: 12 }, { label: 'Table 4', page: 13 }]);
+  });
+
+  it('un numéro final qui ne peut pas être une page du document ne fait pas d\'une légende une ligne de sommaire', () => {
+    const idx = indexText([page(1, 'Figure 2 Wind at 500')]);
+    expect(idx.figures).toMatchObject([{ label: 'Figure 2', page: 1 }]);
+  });
+
+  it('une page dont la plupart des lignes sont des entrées de sommaire ne légende rien, même sa ligne sans points de conduite', () => {
+    const idx = indexText([
+      page(3, 'LIST OF TABLES', 'Table 1 — Paths ...... 10', 'Table 2 — Queries ...... 11', 'Table 3 — Area ...... 12', 'Table 7 — Radius query structure'),
+      page(20, 'Table 7 — Radius query structure'),
+    ]);
+    expect(idx.figures).toMatchObject([{ label: 'Table 7', page: 20 }]);
+  });
+
+  it('une ligne de sommaire ne cite rien : la figure qu\'elle seule nomme est « une figure que rien ne cite »', () => {
+    const idx = indexText([page(1, 'Figure 1 Station model ........ 12', 'Table 4 — Codes', '..... 13'), page(12, 'Figure 1 Station model'), page(13, 'Table 4 — Codes')]);
+    expect(idx.figures.map((f) => f.citations)).toEqual([[], []]);
+    expect(idx.unresolved.map((u) => u.label)).toEqual(['Figure 1', 'Table 4']);
+  });
+
+  it('une prose coupée en début de ligne avant la vraie légende ne place pas la figure : « Table 2 The WMO… » cède à la page qui porte l\'image', () => {
+    const idx = indexText([page(1, 'Table 2 The WMO codes are listed', 'Figure 5, which gives the model', 'Figure 5 (page 4) and more'), page(2, 'Figure 5 Station model', 'Table 2 The WMO codes')], new Set([2]));
+    expect(idx.figures.map((f) => [f.label, f.page, f.line])).toEqual([['Figure 5', 2, 1], ['Table 2', 2, 2]]);
+    expect(idx.figures[1]!.citations.map((c) => [c.page, c.line])).toEqual([[1, 1]]);
+  });
+
+  it('sans image pour départager, la première ligne en forme de légende reste la légende', () => {
+    const idx = indexText([page(1, 'Table 2 The WMO codes are listed'), page(2, 'Table 2 Codes')]);
+    expect(idx.figures).toMatchObject([{ label: 'Table 2', page: 1 }]);
+  });
+
+  it('sans image pour départager, une ligne à séparateur (« Table 3 — Mapping… ») l\'emporte sur une prose coupée (« Table 3 Identifies the… ») plus haut dans le document', () => {
+    const idx = indexText([page(44, 'Table 3 Identifies the classes which are'), page(45, 'Table 3 — Mapping OGC API sections')]);
+    expect(idx.figures).toMatchObject([{ label: 'Table 3', page: 45, line: 1 }]);
+    expect(idx.figures[0]!.citations.map((c) => c.page)).toEqual([44]);
+  });
 });

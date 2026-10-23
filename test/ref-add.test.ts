@@ -107,6 +107,20 @@ describe('cadence ref add (L261)', () => {
     expect(readDoc(refs, 'norme').sha256).toBe(createHash('sha256').update(readFileSync(pdf)).digest('hex'));
   });
 
+  it("un sommaire et une prose coupée avant la légende ne placent pas la figure : --sections rend la page de la légende, pas celle du sommaire", () => {
+    const { base, refs, env, cwd } = setup();
+    const pages: FixturePage[] = [
+      { lines: [{ x: 72, y: 700, t: 'Figure 1 - Station model' }, { x: 72, y: 680, t: '......................................... 3' }] },
+      { lines: [{ x: 72, y: 700, t: 'Figure 1 The station model is a' }] },
+      { lines: [{ x: 72, y: 380, t: 'Figure 1 - Station model' }], image: { x: 72, y: 400, w: 200, h: 100 } },
+      { lines: [{ x: 72, y: 700, t: 'The model is drawn in Figure 1.' }] },
+    ];
+    ref(cwd, env, 'add', writePdf(base, 'norme.pdf', pages), '--slug', 'norme', '--sections', '4');
+    const doc = readDoc(refs, 'norme');
+    expect(doc.figures).toMatchObject([{ label: 'Figure 1', page: 3, regions: [0] }]);
+    expect(readdirSync(join(refs, 'norme', 'pages')).sort()).toEqual(['page-3.png', 'page-4.png']);
+  });
+
   it('--sections ne rend que les pages visées et celles des figures qu\'elles citent', () => {
     const { base, refs, env, cwd } = setup();
     const pdf = writePdf(base, 'norme.pdf', NORME);

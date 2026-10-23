@@ -72,7 +72,8 @@ export function add(o: AddOptions): void {
   }
 
   const text = textLayout(tools, file);
-  const index = indexText(text);
+  const listed = listImages(tools, file);
+  const index = indexText(text, new Set(listed.map((i) => i.page)));
   // pages à rendre : celles visées, celles déjà rendues par un appel précédent du même document, et celles des figures qu'elles citent
   const keep = new Set(before?.pages.filter((p) => p.rendered).map((p) => p.n));
   const visees = new Set([...wanted, ...keep]);
@@ -81,7 +82,6 @@ export function add(o: AddOptions): void {
 
   renderPages(tools, file, ordered, join(docDir, 'pages'));
   renderThumbnails(tools, file, total, join(docDir, 'thumbs'));
-  const listed = listImages(tools, file);
   const images: StoredImage[] = [];
   const placed: Placed[] = [];
   const regions = new Map<number, ReturnType<typeof imageRegions>>();

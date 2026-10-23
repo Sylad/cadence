@@ -53,10 +53,13 @@ const SEPARATOR = String.raw`(?:\s*,\s*(?:(?:and|et)\s+)?|\s+(?:and|et|to|à|&)\
 const REFERENCE = new RegExp(String.raw`\b(Figures?|Figs?|Tables?|Tableaux|Tableau|Planches?)\.?\s+(${NUMBER}(?:${SEPARATOR}${NUMBER})*)(?![\w])`, 'gi');
 const PLURAL = /^(?:figures|figs|tables|tableaux|planches)$/i;
 const NUMBER_ONLY = new RegExp(NUMBER, 'g');
-const CAPTION = new RegExp(String.raw`^(Figure|Fig|Table|Tableau|Planche)\.?\s+(${NUMBER})(?![\w])\s*(?:[:.–—-]\s*)?(.*)$`, 'i');
+/** « Figure n » en début de ligne, puis le séparateur éventuel (tiret, deux-points, point) et le reste de la ligne. */
+const CAPTION = new RegExp(String.raw`^(Figure|Fig|Table|Tableau|Planche)\.?\s+(${NUMBER})(?![\w])\s*([:.–—-])?\s*(.*)$`, 'i');
 const DEICTIC = /\b(as shown (?:below|above)|shown (?:below|above)|illustrated (?:below|above)|ci-(?:dessous|dessus))\b/i;
-/** Sommaire : « Figure 1 Titre ..... 12 ». */
+/** Points de conduite d'un sommaire : « Figure 1 Titre ..... 12 ». */
 const LEADER = /\.{4,}|(?:\.\s){4,}/;
+/** Numéro de page en fin de ligne d'un sommaire sans points de conduite : « Figure 1 Titre 12 ». */
+const TRAILING_PAGE = /\s(\d{1,4})\s*$/;
 
 const labelOf = (word: string, num: string): { label: string; kind: FigureKind } => {
   const w = WORDS[word.toLowerCase()]!;
@@ -65,14 +68,31 @@ const labelOf = (word: string, num: string): { label: string; kind: FigureKind }
 const key = (label: string): string => label.toLowerCase();
 
 /**
- * Une ligne est une légende quand elle COMMENCE par « Figure n » / « Table n » et que ce qui suit n'est pas une phrase en cours
- * (« Figure 3 shows … » cite, « Figure 3 Station model » légende) ; une ligne de sommaire n'en est pas une.
+ * Une ligne a la forme d'une légende quand elle COMMENCE par « Figure n » / « Table n » et que ce qui suit n'est pas une phrase en
+ * cours. Après un séparateur (« Figure 1 — titre en minuscule », « Table 2: codes ») c'est une légende quelle que soit la casse ;
+ * sans séparateur, une minuscule (« Figure 3 shows … »), une virgule ou une parenthèse (« Figure 5, which … », « Figure 5 (page 4) »)
+ * en font une citation. « Table 2 The WMO … » a la forme d'une légende : `indexText` la départage des autres lignes de même forme.
  */
-function captionOf(text: string): { label: string; kind: FigureKind } | null {
+function captionForm(text: string): { label: string; kind: FigureKind; separated: boolean } | null {
   const m = CAPTION.exec(text.trim());
-  if (!m || LEADER.test(text)) return null;
-  if (/^[a-zà-ÿ]/.test(m[3]!)) return null;
-  return labelOf(m[1]!, m[2]!);
+  if (!m) return null;
+  if (m[3] === undefined && /^[a-zà-ÿ,;(\[]/.test(m[4]!)) return null;
+  return { ...labelOf(m[1]!, m[2]!), separated: m[3] !== undefined };
+}
+
+/**
+ * Lignes d'une page qui sont des entrées de sommaire (liste des figures, des tables) : points de conduite sur la ligne ou sur la
+ * suivante (titre coupé), ou ligne de forme de légende qui finit par un numéro de page possible ; toutes les lignes d'une page
+ * dont plus de la moitié sont des entrées en sont aussi.
+ */
+function tocLines(page: PageText, lastPage: number): boolean[] {
+  const entries = page.lines.map((l, i) => {
+    if (LEADER.test(l.text) || LEADER.test(page.lines[i + 1]?.text ?? '')) return true;
+    const number = TRAILING_PAGE.exec(l.text)?.[1];
+    return number !== undefined && Number(number) <= lastPage && captionForm(l.text) !== null;
+  });
+  const mostly = entries.filter(Boolean).length * 2 > entries.length;
+  return entries.map((e) => e || mostly);
 }
 
 /** Numéros nommés par une référence : le seul numéro au singulier ; au pluriel la liste, et « 4 to 6 » donne 4, 5, 6 quand ce sont des entiers. */
@@ -86,22 +106,46 @@ function numbersOf(head: string, list: string): string[] {
   return nums;
 }
 
-/** Légendes, citations et liens non résolus, d'après le texte seul ; les images viennent après (`attachRegions`). */
-export function indexText(pages: PageText[]): FigureIndex {
-  const figures = new Map<string, Figure>();
-  const captionLine = new Set<string>();
+interface Candidate {
+  label: string;
+  kind: FigureKind;
+  separated: boolean;
+  page: number;
+  line: number;
+  text: string;
+  box: Box;
+}
+
+/**
+ * Légendes, citations et liens non résolus, d'après le texte seul ; les images viennent après (`attachRegions`).
+ * Une légende est une ligne de forme de légende (`captionForm`) qui n'est pas une entrée de sommaire ; une entrée de sommaire ne
+ * cite rien non plus. Quand plusieurs lignes ont la forme de la légende d'une même figure, on prend la première qui est sur une page
+ * portant une image (`imagePages`), à défaut la première qui a un séparateur (« Table 3 — Mapping… » contre « Table 3 Identifies… »),
+ * à défaut la première du document.
+ */
+export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = new Set()): FigureIndex {
+  const last = pages.reduce((m, p) => Math.max(m, p.n), 0);
+  const toc = new Map(pages.map((p) => [p.n, tocLines(p, last)]));
+  const candidates = new Map<string, Candidate[]>();
   for (const p of pages) {
     p.lines.forEach((l, i) => {
-      const c = captionOf(l.text);
-      if (!c || figures.has(key(c.label))) return;
-      figures.set(key(c.label), { label: c.label, kind: c.kind, page: p.n, line: i + 1, caption: l.text.trim(), box: { x: l.x, y: l.y, l: l.l, h: l.h }, regions: [], citations: [] });
-      captionLine.add(`${p.n}:${i + 1}`);
+      const c = toc.get(p.n)![i] ? null : captionForm(l.text);
+      if (!c) return;
+      const list = candidates.get(key(c.label)) ?? [];
+      list.push({ ...c, page: p.n, line: i + 1, text: l.text.trim(), box: { x: l.x, y: l.y, l: l.l, h: l.h } });
+      candidates.set(key(c.label), list);
     });
   }
+  const chosen = [...candidates.values()]
+    .map((list) => list.find((c) => imagePages.has(c.page)) ?? list.find((c) => c.separated) ?? list[0]!)
+    .sort((a, b) => a.page - b.page || a.line - b.line);
+  const figures = new Map<string, Figure>(chosen.map((c) => [key(c.label), { label: c.label, kind: c.kind, page: c.page, line: c.line, caption: c.text, box: c.box, regions: [], citations: [] }]));
+  const captionLine = new Set(chosen.map((c) => `${c.page}:${c.line}`));
   const unresolved: Unresolved[] = [];
   for (const p of pages) {
     const captions = [...figures.values()].filter((f) => f.page === p.n);
     p.lines.forEach((l, i) => {
+      if (toc.get(p.n)![i]) return;
       const line = i + 1;
       const own = captionLine.has(`${p.n}:${line}`);
       const seen = new Set<string>();

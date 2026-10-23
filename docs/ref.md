@@ -19,8 +19,14 @@ Registers a PDF and builds, for it:
 - **embedded images** (`pdfimages`, `images/p<page>-<n>.png`) with their region in the same
   pixels (`pdftohtml -xml`);
 - **the figure index**: one entry per caption at the start of a line (`Figure n`, `Fig. n`,
-  `Table n`, `Tableau n`, `Planche n`; a table-of-contents line or `Figure 3 shows…` is not a
-  caption), with its page, line, box, its images, and **the passages that cite it** (page,
+  `Table n`, `Tableau n`, `Planche n`). After a separator (`—`, `–`, `:`, `.`, `-`) the line is a
+  caption whatever the case of the title (`Figure 1 — map of stations`); without one,
+  `Figure 3 shows…`, `Figure 5, which…` and `Figure 5 (page 4)` cite the figure. A
+  table-of-contents entry (dot leaders on its line or on the next one, a trailing page number, or
+  a page made mostly of such entries) is neither a caption nor a citation, so a figure that only
+  the contents list names comes out as « nothing cites it ». When several lines look like the
+  caption of one figure, the first on a page that holds an image wins, then the first with a
+  separator, then the first. Each entry has its page, line, box, its images, and **the passages that cite it** (page,
   line, exact line; `nommee` when the text names the figure, `designee` for « as shown
   below » / « ci-dessous », attached to the nearest caption of the page). Plurals count one citation per figure
   (`Figures 2 and 3`, `Tables 4 to 6`, `Figs. 2.1 et 2.2`); a number keeps the letters of an annex numbering (`Figure 1.B.1`, `Table 12.B.3`). Listed under **`unresolved`**

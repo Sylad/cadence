@@ -380,7 +380,7 @@ describe('deliver : script du projet (L2)', () => {
     expect(out.join('\n')).toContain('livré : L1');
   });
 
-  it('L277 — pendant une vague, un script qui voit la tête avancer (lot en cours) journalise le sha livré, pas la tête', async () => {
+  it('L277 — pendant une vague, une tête non livrable (un lot pas prêt y a commité) laisse le sha livré dans le journal', async () => {
     const dir = pushedRepo();
     expect(await deliver(ctx(dir, { config: SCRIPT }).c, fakeDeps().deps)).toBe(0);
     commit(dir, 'feat(L1): cache');
@@ -393,11 +393,32 @@ describe('deliver : script du projet (L2)', () => {
         return 0;
       },
     });
-    const { c, out } = ctx(dir, { config: SCRIPT, sha: target, duringWave: true });
+    const { c, out } = ctx(dir, { config: SCRIPT, sha: target, deliverableHead: () => false });
     expect(await deliver(c, deps)).toBe(0);
     expect(lastDelivery(stateDir(dir))).toBe(target);
     expect(out.join('\n')).not.toContain('tête déplacée');
     expect(out.join('\n')).toContain('livré : L1');
+  });
+
+  it('L277 — pendant une vague, une tête que la garde dit livrable (le commit du script seul) est journalisée, la garde reçoit cette tête', async () => {
+    const dir = pushedRepo();
+    expect(await deliver(ctx(dir, { config: SCRIPT }).c, fakeDeps().deps)).toBe(0);
+    commit(dir, 'feat(L1): cache');
+    git(dir, 'push', '-q');
+    const target = headSha(dir);
+    const { deps } = fakeDeps({
+      exec: () => {
+        commit(dir, 'chore: nouveautés horodatées');
+        git(dir, 'push', '-q');
+        return 0;
+      },
+    });
+    const asked: string[] = [];
+    const { c, out } = ctx(dir, { config: SCRIPT, sha: target, deliverableHead: (h: string) => (asked.push(h), true) });
+    expect(await deliver(c, deps)).toBe(0);
+    expect(asked).toEqual([headSha(dir)]);
+    expect(lastDelivery(stateDir(dir))).toBe(headSha(dir));
+    expect(out.join('\n')).toContain('tête déplacée par le script');
   });
 
   it('simulation : montre la commande complète, n’exécute rien', async () => {

@@ -6,7 +6,7 @@ import { run } from '../src/cli.js';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { registerWave } from '../src/orchestrate/registry.js';
 import { newLot, RunStore, type LotState } from '../src/orchestrate/state.js';
-import { sharedStateDir } from '../src/state.js';
+import { lastDelivery, sharedStateDir } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 async function cli(dir: string, ...argv: string[]) {
@@ -286,6 +286,76 @@ describe('livrer au fil de l\'eau pendant une vague (L277)', () => {
       const r = await cli(b, 'deliver', '--dry-run', '--sha', tete);
       expect(r.code).toBe(2);
       expect(r.err).toContain('contient des commits de lots pas prêts');
+    });
+  });
+
+  describe('sha journalisé quand la tête avance pendant la livraison', () => {
+    /**
+     * Dépôt poussé dont la tête est A (`feat(L1)`, lot prêt) ; L2 est en file, sans commit. `deliver.script` fait avancer la tête : il commite le
+     * sujet reçu en argument (puis pousse), comme le script de maritime-atlas avec `--news`. Rend le sha de A, la tête après et ce que le journal en garde.
+     */
+    async function livre(script: string) {
+      const dir = gitRepo();
+      const origin = tempDir();
+      execFileSync('git', ['init', '-q', '--bare', '-b', 'main'], { cwd: origin });
+      await cli(dir, 'init', '--no-hook');
+      await cli(dir, 'add', 'Un lot');
+      await cli(dir, 'add', 'Deux lot');
+      await cli(dir, 'start', 'L1');
+      await cli(dir, 'start', 'L2');
+      const livrer = join(tempDir(), 'livrer.sh');
+      writeFileSync(livrer, `${script}\n`);
+      writeFileSync(join(dir, 'cadence.yaml'), `deliver:\n  script: sh ${livrer}\n  verify:\n    - command: "true"\n`);
+      writeFileSync(join(dir, 'A.ts'), 'export const A = 1;\n');
+      execFileSync('git', ['add', '.'], { cwd: dir });
+      commit(dir, 'feat(L1): A', '2026-10-23T10:00:00');
+      execFileSync('git', ['remote', 'add', 'origin', origin], { cwd: dir });
+      execFileSync('git', ['push', '-q', '-u', 'origin', 'main'], { cwd: dir, stdio: 'ignore' });
+      const a = sha(dir, 'HEAD');
+      const one = newLot({ project: 'ici', repo: dir, lot: 'L1', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false });
+      one.status = 'ready';
+      const two = newLot({ project: 'ici', repo: dir, lot: 'L2', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false });
+      attendre(dir, [one, two]);
+      const r = await cli(dir, 'deliver', '--sha', a, '--', 'chore: nouveautés horodatées');
+      return { r, a, head: sha(dir, 'HEAD'), journal: lastDelivery(sharedStateDir(dir)) };
+    }
+    const COMMIT = 'git -c gc.auto=0 -c maintenance.auto=false commit -q --allow-empty -m';
+
+    it('H1 — le script du projet commite l\'horodatage (aucun lot pas prêt n\'a commité) : le journal garde la nouvelle tête, qui est ce qui est déployé', async () => {
+      const { r, a, head, journal } = await livre(`${COMMIT} "$1" && git push -q`);
+      expect(r.code).toBe(0);
+      expect(head).not.toBe(a);
+      expect(journal).toBe(head);
+      expect(r.out).toContain('tête déplacée par le script');
+    });
+
+    it('H2 — la tête avance parce qu\'un lot en cours commite : le journal garde le sha livré', async () => {
+      const { r, a, head, journal } = await livre(`${COMMIT} "feat(L2): travail en cours" && git push -q`);
+      expect(r.code).toBe(0);
+      expect(head).not.toBe(a);
+      expect(journal).toBe(a);
+      expect(r.out).not.toContain('tête déplacée');
+    });
+
+    it('H3 — un lot en cours commite, puis le script commite l\'horodatage : la tête porte du code non revu, le journal garde le sha livré', async () => {
+      const { r, a, journal } = await livre(`${COMMIT} "feat(L2): travail en cours" && ${COMMIT} "$1" && git push -q`);
+      expect(r.code).toBe(0);
+      expect(journal).toBe(a);
+      expect(r.out).not.toContain('tête déplacée');
+    });
+
+    it('H4 — la tête n\'avance pas : le journal garde le sha, sans mention de tête déplacée', async () => {
+      const { r, a, journal } = await livre('true');
+      expect(r.code).toBe(0);
+      expect(journal).toBe(a);
+      expect(r.out).not.toContain('tête déplacée');
+    });
+
+    it('H5 — le script avance la tête mais le plan est devenu illisible : rien n\'est vérifié, le journal garde le sha livré', async () => {
+      const { r, a, journal } = await livre(`printf 'lots: [\\n' > .cadence/raf.yaml && ${COMMIT} "$1" && git push -q`);
+      expect(r.code).toBe(0);
+      expect(journal).toBe(a);
+      expect(r.out).not.toContain('tête déplacée');
     });
   });
 });

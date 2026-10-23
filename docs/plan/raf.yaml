@@ -2959,9 +2959,10 @@ lots:
     review: { date: 2026-10-23, verdict: "compliant : 1 commit (bd69efe), avertissement et refus sautés avec --sha, R1 et R2 présents et verts, docs et CHANGELOG à jour, 1 note mineure de doc — orchestré (vague 2026-10-23-cad-attentes, 0 passe(s) de correction)", commit: bd69efeb4f06204aeefde9e3cbbbdca8c5926507 }
   - id: L258
     title: 'cadence orchestrate <projet>:<lot> --goal "…" (ou clé goal: du lot) remplace le titre comme objectif du brief, relayé dans le tableau ; tests (titre périmé = délégation à la main : maritime B28.4, B28.5, B28.6)'
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-23
+    started: 2026-10-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

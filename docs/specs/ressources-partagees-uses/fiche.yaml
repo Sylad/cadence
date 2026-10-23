@@ -1,0 +1,188 @@
+sujet:
+  id: ressources-partagees-uses
+  titre: "Ressources partagées : clé uses: sur un lot, liste resources: du dossier parent, raf check"
+  lot: L251
+  perimetre:
+    modules: [src/plan.ts, src/cli.ts, src/check.ts, src/audit.ts, src/lead.ts, docs/raf.md, CHANGELOG.md]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "l'affichage, en face des créneaux libres, des lots prêts dont les ressources sont libres (cadence lead tour, orchestrate --continue : lot L252)"
+      - "le skill lead (lot L253)"
+      - "tout verrou : uses: ne bloque ni raf start ni orchestrate dans ce lot, il ne fait que déclarer"
+
+cas:
+  - id: C1
+    titre: Le lead déclare les ressources partagées du dossier parent
+    acteur: le lead
+    declencheur: clé resources dans le cadence.yaml du dossier parent des projets
+    preconditions:
+      - le dossier qui contient le projet porte un cadence.yaml
+    nominal:
+      - "Le lead écrit « resources: [banc, passerelle] » dans le cadence.yaml du dossier parent."
+      - "Les commandes qui lisent la liste (raf check) la trouvent par le dossier parent de la racine du projet."
+    alternatives:
+      - { si: resources est absente ou vide, alors: aucune ressource n'est déclarée, regles: [R4] }
+      - { si: resources n'est pas une liste de noms valides, alors: erreur de lecture nommant le fichier, regles: [R3] }
+      - { si: le cadence.yaml du parent est illisible, alors: erreur de lecture nommant le fichier, regles: [R3] }
+    resultat: La liste des ressources connues du dossier, lisible par tous ses projets.
+
+  - id: C2
+    titre: Le lead pose les ressources qu'un lot occupe à la création
+    acteur: le lead
+    declencheur: commande raf add "titre" --uses banc[,passerelle]
+    preconditions:
+      - le plan est modifiable (tenu par raf)
+    nominal:
+      - "La commande lit la liste --uses, sépare sur la virgule, retire les blancs et les doublons."
+      - "Le lot est créé avec la clé uses: [banc] en flow, après after: s'il y en a, avant created:."
+      - "L'id du lot est affiché."
+    alternatives:
+      - { si: --uses est vide ou ne contient qu'un nom invalide, alors: refus, aucun lot créé, regles: [R2] }
+      - { si: --uses accompagne --parent (sous-tâche), alors: refus, regles: [R5] }
+      - { si: le nom n'est pas dans resources du parent, alors: accepté, le refus est celui de raf check (C4), regles: [R6] }
+      - { si: le plan est tenu par un autre outil, alors: refus (comportement existant de writable), regles: [R5] }
+    resultat: Un lot portant uses:, sans lire la liste des ressources.
+
+  - id: C3
+    titre: Le lead pose, remplace ou retire les ressources d'un lot existant
+    acteur: le lead
+    declencheur: commande raf uses <lot> [<ressource>…]
+    preconditions:
+      - le lot existe et le plan est modifiable
+    nominal:
+      - "La commande remplace la liste uses: du lot par les noms donnés (dédoublonnés, ordre conservé)."
+      - "Le plan est enregistré ; la commande n'affiche rien et rend 0."
+    alternatives:
+      - { si: "aucun nom n'est donné", alors: "la clé uses: est retirée du lot", regles: [R7] }
+      - { si: l'id est une sous-tâche, alors: refus, regles: [R5] }
+      - { si: l'id est inconnu, alors: refus « lot inconnu », regles: [R5] }
+      - { si: un nom est invalide, alors: refus, plan inchangé, regles: [R2] }
+      - { si: le lot est done ou dropped, alors: accepté (la clé reste lisible dans l'historique), regles: [R7] }
+    resultat: Le lot porte exactement les ressources données, ou n'en porte plus.
+
+  - id: C4
+    titre: raf check refuse une ressource non déclarée
+    acteur: le lead ou le hook
+    declencheur: commande raf check
+    preconditions:
+      - "un lot todo ou doing porte uses:"
+    nominal:
+      - "raf check lit uses: de chaque lot ouvert et resources: du cadence.yaml du dossier parent."
+      - "Chaque nom absent de la liste est un écart « ✗ »."
+      - "Sans écart, la sortie et le code 0 sont ceux d'aujourd'hui."
+    alternatives:
+      - { si: "aucun lot ne porte uses:", alors: "sortie identique à celle d'avant le lot, le cadence.yaml du parent n'est pas lu", regles: [R9] }
+      - { si: le lot est done ou dropped, alors: pas d'écart, regles: [R8] }
+      - { si: le dossier parent n'a pas de cadence.yaml ou pas de resources, alors: toute ressource d'un lot ouvert est non déclarée, regles: [R4] }
+      - { si: "uses: du plan est mal formé (pas une liste de noms)", alors: "écart bad-field du lot", regles: [R3] }
+      - { si: le cadence.yaml du parent est illisible, alors: écart nommant le fichier, regles: [R3] }
+    resultat: Une faute de frappe ou une ressource oubliée est vue avant que la liste serve à ordonnancer.
+
+regles:
+  - id: R1
+    cas: [C2, C3]
+    enonce: "Un lot peut porter la clé facultative uses: [nom, …] (liste de noms de ressources) ; un plan sans uses: se lit, s'écrit et s'affiche (raf show) comme avant, et raf show affiche « uses : banc, passerelle » pour un lot qui en porte."
+    statut: sourcee
+    source: "demande du lot L251 : « clé uses: [nom] sur un lot (raf add/raf uses <lot> <res>… --uses) »"
+    tests: ["R1 — raf add --uses banc,passerelle écrit uses: [banc, passerelle]", "R1 — un lot sans uses: : plan et sortie de raf show inchangés", "R1 — raf show affiche les ressources du lot"]
+  - id: R2
+    cas: [C2, C3]
+    enonce: "Un nom de ressource est un mot non vide de lettres minuscules, chiffres, « - » et « _ » ; --uses vide ou un nom invalide est refusé avec « ressource invalide : <nom> (lettres minuscules, chiffres, - et _) » et le plan reste inchangé. Les doublons sont retirés, l'ordre est conservé."
+    statut: hypothese
+    si_faux: "Si les noms peuvent porter majuscules ou espaces, seule la validation de forme change ; les plans écrits restent lisibles."
+    tests: ["R2 — nom avec espace ou majuscule : refus, aucun lot créé", "R2 — --uses vide : refus", "R2 — banc,banc : une seule entrée"]
+  - id: R3
+    cas: [C1, C3, C4]
+    enonce: "Un resources: du cadence.yaml parent qui n'est pas une liste de noms valides (R2), un uses: du plan qui n'en est pas une, ou un cadence.yaml parent illisible, est une erreur nommant le fichier ou le lot (« <fichier> : resources doit être une liste de noms de ressources », « <lot> : uses doit être une liste de noms de ressources »), jamais une liste vide silencieuse. Le second est un écart bad-field de raf check."
+    statut: sourcee
+    source: "src/lead.ts:16-30 et src/lead.ts:35-45 (readLeadUx, readDepth : clé du parent mal formée = RafError nommant le fichier) ; src/check.ts:52 (bad-field)"
+    tests: ["R3 — resources: banc (chaîne) : erreur nommant le fichier", "R3 — cadence.yaml parent illisible : erreur nommant le fichier", "R3 — uses: 3 dans le plan : écart bad-field"]
+  - id: R4
+    cas: [C1, C4]
+    enonce: "Les ressources déclarées sont celles de la clé resources: du cadence.yaml du dossier parent de la racine du projet ; une clé absente, vide, ou un parent sans cadence.yaml donne une liste vide, et tout uses: d'un lot ouvert est alors non déclaré."
+    statut: hypothese
+    si_faux: "Si le fichier doit aussi se chercher plus haut (lead tour --depth > 1) ou dans le cadence.yaml du projet, seul l'endroit de lecture change ; la clé et le format restent."
+    tests: ["R4 — resources: [banc] dans le parent : banc déclaré", "R4 — parent sans cadence.yaml : banc non déclaré", "R4 — resources: [] : banc non déclaré"]
+  - id: R5
+    cas: [C2, C3]
+    enonce: "uses: se pose sur un lot, jamais sur une sous-tâche : --uses avec --parent, ou raf uses L1/t1, est refusé avec « uses se pose sur un lot, pas sur une sous-tâche : <ref> » ; un lot inconnu avec « lot inconnu : <id> » ; un plan tenu par un autre outil refuse l'écriture comme toute commande qui modifie le plan."
+    statut: sourcee
+    source: "src/cli.ts:271-274 (--screen, --spec, --public, --every refusés avec --parent) ; src/plan.ts:400 (lot inconnu) ; Plan.writable"
+    tests: ["R5 — add --parent L1 --uses banc : refus avec le message", "R5 — raf uses L1/t1 banc : refus", "R5 — raf uses L99 banc : « lot inconnu : L99 »", "R5 — plan en lecture seule : refus, fichier intact"]
+  - id: R6
+    cas: [C2, C3]
+    enonce: "Poser uses: n'exige pas que le nom soit déjà déclaré : raf add --uses et raf uses acceptent un nom inconnu du parent, et c'est raf check qui le refuse (R10)."
+    statut: hypothese
+    si_faux: "Si l'écriture doit refuser un nom non déclaré (comme --after refuse une dépendance inconnue), raf add et raf uses lisent resources du parent et échouent avant d'écrire ; raf check reste inchangé."
+    tests: ["R6 — raf add --uses inconnu : lot créé, code 0", "R6 — raf uses L1 inconnu : accepté"]
+  - id: R7
+    cas: [C3]
+    enonce: "raf uses <lot> <res>… remplace la liste du lot ; sans nom, il retire la clé uses: ; la clé est écrite en flow, à sa place (après after:, avant created:). Un lot done ou dropped peut être modifié."
+    statut: hypothese
+    si_faux: "Si la commande doit ajouter aux ressources existantes ou refuser un lot terminé, seul le calcul de la nouvelle liste ou un contrôle de statut change ; aucune donnée existante n'est touchée."
+    tests: ["R7 — raf uses L1 a b puis raf uses L1 c : uses: [c]", "R7 — raf uses L1 sans nom : clé retirée", "R7 — les autres clés du lot sont intactes"]
+  - id: R8
+    cas: [C4]
+    enonce: "raf check ne contrôle que les lots ouverts (todo, doing) : un lot done ou dropped dont la ressource a été retirée de resources: n'est pas un écart."
+    statut: hypothese
+    si_faux: "Si les lots terminés sont aussi contrôlés, un retrait de ressource de la liste fait échouer raf check à jamais sur l'historique ; seul le filtre de statut change."
+    tests: ["R8 — lot done avec ressource non déclarée : pas d'écart", "R8 — lot doing avec ressource non déclarée : écart"]
+  - id: R9
+    cas: [C4]
+    enonce: "Un plan où aucun lot ne porte uses: donne exactement la sortie et le code de raf check d'avant le lot, sans lire le cadence.yaml du dossier parent."
+    statut: sourcee
+    source: "demande du lot L251 : clé facultative ; tests existants de raf check (test/check.test.ts, test/cli.test.ts) qui doivent rester verts"
+    tests: ["R9 — plan sans uses: et parent illisible : raf check inchangé", "R9 — la suite existante de raf check reste verte"]
+  - id: R10
+    cas: [C4]
+    enonce: "Pour chaque lot ouvert et chaque nom de son uses: absent de resources:, raf check écrit un écart « ✗ <lot> utilise la ressource « <nom> », non déclarée dans <cadence.yaml du parent> (resources:) » ; le code de sortie est 1. Un lot dont tous les noms sont déclarés n'en produit pas."
+    statut: sourcee
+    source: "demande du lot L251 : « raf check refuse une ressource non déclarée »"
+    tests: ["R10 — uses: [banc] non déclaré : écart avec le lot, le nom et le fichier, code 1", "R10 — deux noms dont un déclaré : un seul écart", "R10 — tous déclarés : code 0"]
+  - id: R11
+    cas: [C1, C2, C3]
+    enonce: "La documentation (docs/raf.md : raf add --uses, raf uses, la clé uses: des champs, resources: du cadence.yaml parent, l'écart de raf check ; l'aide de raf) et le CHANGELOG décrivent la clé, les deux commandes et la liste."
+    statut: sourcee
+    source: "demande du lot L251 : « doc docs/raf.md + CHANGELOG » ; cadence.yaml docs.sync"
+    tests: ["R11 — docs/raf.md cite uses, raf uses et resources:", "R11 — le CHANGELOG cite L251", "R11 — raf aide liste raf uses"]
+
+contrats:
+  - id: A1
+    appel: commande raf add
+    entree: "\"titre\" [--uses banc,passerelle] (les options existantes inchangées)"
+    sortie: "l'id du lot sur la sortie standard, code 0 ; plan écrit avec uses: [banc, passerelle] quand --uses est donné, sinon plan écrit comme avant"
+    erreurs:
+      - { code: log error, message: "ressource invalide : <nom> (lettres minuscules, chiffres, - et _)" }
+      - { code: log error, message: "uses se pose sur un lot, pas sur une sous-tâche : <ref>" }
+    regles: [R1, R2, R5, R6]
+  - id: A2
+    appel: commande raf uses
+    entree: "<lot> [<ressource>…]"
+    sortie: "rien sur la sortie standard, code 0 ; uses: du lot remplacé, ou retiré sans nom"
+    erreurs:
+      - { code: log error, message: "ressource invalide : <nom> (lettres minuscules, chiffres, - et _)" }
+      - { code: log error, message: "uses se pose sur un lot, pas sur une sous-tâche : <ref>" }
+      - { code: log error, message: "lot inconnu : <id>" }
+      - { code: log error, message: "usage : raf uses <lot> [<ressource>…]" }
+    regles: [R1, R2, R5, R6, R7]
+  - id: A3
+    appel: commande raf check
+    entree: "options existantes inchangées"
+    sortie: "un écart « ✗ » par ressource non déclarée d'un lot ouvert, code 1 ; sinon la sortie existante"
+    erreurs:
+      - { code: log error, message: "✗ <lot> utilise la ressource « <nom> », non déclarée dans <fichier> (resources:)" }
+      - { code: log error, message: "✗ <lot> : uses doit être une liste de noms de ressources" }
+      - { code: log error, message: "<fichier> : resources doit être une liste de noms de ressources" }
+    regles: [R3, R4, R8, R9, R10]
+  - id: A4
+    appel: commande raf show
+    entree: "<id>"
+    sortie: "la sortie existante, plus une ligne « uses : banc, passerelle » pour un lot qui porte uses:"
+    erreurs: []
+    sans_erreur: "raf show n'a pas de nouvelle branche d'échec ; ses refus (lot inconnu) sont ceux d'aujourd'hui"
+    regles: [R1]
+
+donnees:
+  - { id: D1, objet: "plan raf.yaml, lot : clé facultative uses (liste de noms, flow)", existant: true, modification: ajout, decision: "demande du lot L251 : « clé uses: [nom] sur un lot » ; clé facultative, un plan sans uses se lit et s'écrit comme avant (R1, R9)", note: "nouvelle entrée de FIELDS dans src/plan.ts ; les plans tenus par un autre outil ne la mappent pas" }
+  - { id: D2, objet: "cadence.yaml du dossier parent : clé resources (liste de noms)", existant: true, modification: ajout, decision: "demande du lot L251 : « liste des ressources déclarée dans le cadence.yaml du dossier parent (resources:) » ; à côté de priority:, depth:, lead.ux", note: "clé facultative lue seulement par raf check quand un lot ouvert porte uses: ; le lot L252 la relira" }

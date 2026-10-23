@@ -75,10 +75,10 @@ regles:
     tests: ["R3 — le brief implement interdit le code mort et le test qui ne peut pas échouer"]
   - id: R4
     cas: [C1]
-    enonce: "La liste demande, pour un écran modifié, la capture due de chaque état (1440 et 390 px, nom de fichier relatif) ; un lot sans écran modifié n'en doit pas."
+    enonce: "La liste demande, pour un écran modifié, la capture due de chaque état (1440 et 390 px, avec un nom de fichier ; où il va est la règle du paragraphe Playwright, L249) ; un lot sans écran modifié n'en doit pas."
     statut: sourcee
-    source: "titre du lot L222 : « capture due pour un écran modifié » ; consigne Playwright existante de implement.md (nom relatif seul)"
-    tests: ["R4 — le brief implement demande la capture d'un écran modifié, nom de fichier relatif"]
+    source: "titre du lot L222 : « capture due pour un écran modifié » ; consigne Playwright de implement.md (le dossier de captures de la vague, chemin absolu donné par le brief, L249)"
+    tests: ["R4 — le brief implement demande la capture d'un écran modifié, nom de fichier"]
   - id: R5
     cas: [C1]
     enonce: "La liste interdit un commentaire faux : un commentaire, une docstring ou un message qui décrit un comportement que le code n'a plus ou n'a pas."

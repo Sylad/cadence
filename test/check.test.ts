@@ -404,3 +404,33 @@ describe('plan à clé dupliquée', () => {
     expect(r.err).toContain('line 5');
   });
 });
+
+describe('lot « Revue UX — » non visible (L271)', () => {
+  const issuesOf = (setup: (plan: Plan) => void) => {
+    const dir = gitRepo();
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'demo');
+    setup(plan);
+    const lots = plan.lots();
+    return check(lots, linkCommits(lots, readCommits(dir), plan.refs), '2026-09-28').filter((i) => i.kind === 'ux-review-not-visible');
+  };
+
+  it('R1 — un lot ouvert « Revue UX — <écran> » sans visible: est signalé, avec la commande qui le corrige', () => {
+    const found = issuesOf((p) => p.add('Revue UX — écran Bilans', '2026-09-27'));
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toContain('L1');
+    expect(found[0].message).toContain('visible');
+  });
+
+  it('R2 — le même lot déclaré visible n’est pas signalé', () => {
+    expect(issuesOf((p) => p.add('Revue UX — écran Bilans', '2026-09-27', { visible: true }))).toEqual([]);
+  });
+
+  it('R3 — un lot terminé ou abandonné, ou un titre qui ne commence pas par « Revue UX — », n’est pas signalé', () => {
+    const found = issuesOf((p) => {
+      p.add('Revue UX — ancien écran', '2026-09-01');
+      p.setStatus('L1', 'done', '2026-09-02', { force: true });
+      p.add('Corriger la revue UX — note', '2026-09-27');
+    });
+    expect(found).toEqual([]);
+  });
+});

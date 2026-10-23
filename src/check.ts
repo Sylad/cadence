@@ -5,12 +5,15 @@ import { isOpen, type Lot } from './plan.js';
 import { isRecurring } from './recurring.js';
 
 export interface Issue {
-  kind: 'orphan-commit' | 'unknown-ref' | 'todo-with-commits' | 'idle' | 'done-open-tasks' | 'bad-dependency' | 'cycle' | 'bad-field';
+  kind: 'orphan-commit' | 'unknown-ref' | 'todo-with-commits' | 'idle' | 'done-open-tasks' | 'bad-dependency' | 'cycle' | 'bad-field' | 'ux-review-not-visible';
   message: string;
 }
 
 /** Un commit sur une ligne : sha abrégé et sujet. */
 export const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
+
+/** Titre d'un lot de revue UX planifiée : « Revue UX — <écran> ». */
+const UX_REVIEW_TITLE = /^revue ux\s+—/i;
 
 export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7): Issue[] {
   const issues: Issue[] = [];
@@ -39,6 +42,10 @@ export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7): Is
       if (open.length > 0) {
         issues.push({ kind: 'done-open-tasks', message: `${lot.id} terminé avec sous-tâche(s) ouverte(s) : ${open.map((t) => t.id).join(', ')}` });
       }
+    }
+    // L271 : sans visible:, le lot ne passe par aucune étape UX d'orchestrate (precheck → implement → review) et la revue de l'écran n'a pas lieu.
+    if (isOpen(lot.status) && UX_REVIEW_TITLE.test(lot.title) && !lot.visible) {
+      issues.push({ kind: 'ux-review-not-visible', message: `${lot.id} est une revue UX (« ${lot.title.slice(0, 60)} ») sans visible: — l'étape UX n'aurait pas lieu : poser visible: true dans le plan (raf add --visible pour un nouveau lot)` });
     }
     for (const p of lot.problems) issues.push({ kind: 'bad-field', message: `${lot.id} : ${p}` });
     for (const d of lot.after) {

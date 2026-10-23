@@ -2986,6 +2986,68 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-23
+  - id: L261
+    title: "ref (issue #14, 1/10) : poser le design de l'issue #14 dans docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md ; cadence ref add — rendu 200 dpi, texte positionné (pdftotext -bbox), images incluses, index des figures et des passages qui les citent, vérification des outils système (poppler, ImageMagick, tesseract : outil absent nommé avec sa commande, sortie 2) ; repartir des recettes de maritime-atlas (skill norme-etude, docs/normes) ; tests sur fixtures"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-23
+  - id: L262
+    title: "ref (issue #14, 2/10) : cadence ref measure — couleurs, contrastes WCAG, boîtes, OCR tesseract et taille de police estimée, tolérance déclarée ; tests sur images générées à valeurs connues"
+    status: todo
+    estimate: 0.5
+    after: [ L261 ]
+    created: 2026-10-23
+  - id: L263
+    title: "ref (issue #14, 3/10) : schéma de l'inventaire (templates/inventaire.json) et cadence ref check, un cas par règle du schéma"
+    status: todo
+    estimate: 0.5
+    spec: true
+    after: [ L262 ]
+    created: 2026-10-23
+  - id: L264
+    title: "ref (issue #14, 4/10) : générateur du corpus synthétique à vérité connue (evals/ref/, pages HTML rendues en PDF et PNG par Playwright, inventaire attendu, pièges : texte ambigu levé par la figure, figure qui contredit, table en image, gabarit type BUFR, contrôle translucide, page Proposal, scan bruité) et commande d'évaluation (rappel, précision, faux lu, tokens par page)"
+    status: todo
+    estimate: 0.5
+    after: [ L263 ]
+    created: 2026-10-23
+  - id: L265
+    title: "ref (issue #14, 5/10) : agent reference-analyst et cadence ref analyse en lecture unique ; mesure de référence sur le corpus (rappel, faux lu, tokens par page, plafond déclaré)"
+    status: todo
+    estimate: 0.5
+    after: [ L264 ]
+    created: 2026-10-23
+  - id: L266
+    title: "ref (issue #14, 6/10) : double lecture indépendante, cadence ref diff, troisième regard ; mesure comparée à la lecture unique — POINT D'ARRÊT : les lots 7 à 10 ne partent que si H1 tient (faux lu et rappel precise nettement meilleurs), décision du lead notée sur l'issue"
+    status: todo
+    estimate: 0.5
+    after: [ L265 ]
+    created: 2026-10-23
+  - id: L267
+    title: "ref (issue #14, 7/10) : fiche — clés ref, references, ecartes dans cadence spec check ; cadence ref cover (couvre, oublie, écarte, cite un incertain en sourcee)"
+    status: todo
+    estimate: 0.5
+    spec: true
+    after: [ L266 ]
+    created: 2026-10-23
+  - id: L268
+    title: "ref (issue #14, 8/10) : étape ref dans orchestrate — champ refs du lot (raf add --ref), questions, réutilisation par empreinte, couverture après spec / fiche"
+    status: todo
+    estimate: 0.5
+    spec: true
+    after: [ L267 ]
+    created: 2026-10-23
+  - id: L269
+    title: "ref (issue #14, 9/10) : cadence ref compare (proportions ±10 %, ΔE 5) et son tableau dans la consigne de ux-reviewer (conformité) ; tests sur captures décalées ou recolorées d'un écart connu"
+    status: todo
+    estimate: 0.5
+    after: [ L268 ]
+    created: 2026-10-23
+  - id: L270
+    title: "ref (issue #14, 10/10) : corpus public WMO (passages où la figure précise le texte, cités par URL et sha256, téléchargés à l'évaluation, jamais commités) ; contrôle local privé par chemin, hors dépôt"
+    status: todo
+    estimate: 0.5
+    after: [ L269 ]
+    created: 2026-10-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

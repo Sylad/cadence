@@ -31,7 +31,7 @@ Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are
 | [docs/deliver.md](docs/deliver.md) | delivery: wait for CI, deploy, verify the effect |
 | [docs/spec.md](docs/spec.md) | the screen and back-end sheets, `cadence spec check\|qa\|reseal` |
 | [docs/lead.md](docs/lead.md) | the lead workflow and `cadence lead tour` |
-| [docs/ref.md](docs/ref.md) | reference documents: `cadence ref add` (rendered pages, positioned text, images, figure index), `cadence ref measure` (colours, WCAG contrast, boxes, OCR, font size) |
+| [docs/ref.md](docs/ref.md) | reference documents: `cadence ref add` (rendered pages, positioned text, images, figure index), `cadence ref measure` (colours, WCAG contrast, boxes, OCR, font size), `cadence ref check` (the inventory schema, `templates/inventaire.json`) |
 | [docs/stabilite.md](docs/stabilite.md) | what is guaranteed from 1.0.0 and what is not |
 
 Also: [news](docs/news.md) (changelog, UX, code and QA reviews, documentation that follows the code), [session](docs/session.md), [corrections](docs/corrections.md), [perf](docs/perf.md), [skills and agents](docs/skills.md), [cadence-hud](docs/cadence-hud.md), [releasing](docs/releasing.md), [overview](docs/overview.md), [how it all works](docs/fonctionnement.md) (four figures).

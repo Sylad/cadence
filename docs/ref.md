@@ -7,7 +7,7 @@ tables drawn as pictures, message templates, figures of a norm (WMO, ICAO…). `
 turns such a document into files a session can read without losing the pictures. The whole
 design is in
 [`docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md`](superpowers/specs/2026-10-23-ref-documents-de-reference-design.md)
-(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10) and **`cadence ref measure`** (lot 2 of 10).
+(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) and **`cadence ref check`** with the inventory schema (lot 3 of 10).
 
 ## `cadence ref add <document.pdf> [--sections 3-5,9] [--slug name]`
 
@@ -97,6 +97,54 @@ tolérance : couleurs ±1/255 par canal, boîtes ±1 px, police ±5 % plus un pi
 `--json` prints one object (`document`, `page`, `zone`, `echelle`, `tolerance`, then `couleurs`,
 `contraste`, `boites`, `texte` as asked). Exit codes: 0 done, 2 refusal (tool, unknown document,
 page absent or not rendered, invalid zone or option).
+
+## `cadence ref check <inventaire.json | lecture.json>`
+
+Validates an **inventory** (`genre: "inventaire"`) or a **reading** (`genre: "lecture"`): the JSON file in which the
+reference analysis lists what the document shows. The model to copy is
+[`templates/inventaire.json`](../templates/inventaire.json) (one element of each of the eleven types, slug `exemple`).
+`check` validates the **form**, never the truth of a measure; it calls no system tool (it works with an empty `PATH`), does not read
+`references.dir` and writes no file.
+
+```
+$ cadence ref check inventaire.json
+✗ elements[3].libelle : champ du type texte manquant ou invalide
+✗ elements[5].ecran : exemple#texte-1 ne désigne aucun élément de type ecran
+2 écart(s)
+$ cadence ref check templates/inventaire.json
+inventaire valide : 11 éléments (ecran: 1, composant: 1, etat: 1, texte: 1, jeton: 1, table: 1, gabarit: 1, schema: 1, lien: 1, statut: 1, silence: 1)
+```
+
+Exit codes: **0** valid (summary on the standard output; « lecture valide » for a reading), **1** deviations (one
+`✗ <path> : <reason>` line per deviation then `N écart(s)`, **on the standard output**), **2** wrong call (not exactly one
+argument) or unreadable file (absent, a folder, empty, not JSON, UTF-8 BOM included): the reason goes to the error output. A
+duplicated JSON key is not detected (the last one wins, as with `JSON.parse`). An unknown key, at the root or in an element, is ignored.
+
+**Root**: `version` (1), `genre`, `document` `{ slug (kebab-case), sha256 (64 lowercase hex) }`, `elements` (non-empty array).
+
+**Every element**: `type` (`ecran`, `composant`, `etat`, `texte`, `jeton`, `table`, `gabarit`, `schema`, `lien`, `statut`, `silence`);
+`id` = `<slug of document>#<type>-<n>` (n ≥ 1, no leading zero; the slug is compared as it is, even invalid, and two elements never share an id);
+`source` `{ page ≥ 1, zone { x, y, l, h } }` in pixels of the page rendered at 200 dpi (x, y ≥ 0, l, h ≥ 1; the zone is optional only for a `silence`);
+`citations` (optional) `[{ page, ligne, extrait }]`; `confiance` (`mesure`, `lu`, `incertain`); `cause` (non-empty, **only** on an
+`incertain` element); `ocr` (optional boolean; in a reading an `ocr: true` element is never `lu`).
+
+| Type | Own keys |
+|---|---|
+| `ecran` | `largeur_reference` (integer > 0, 1440 in the model), `zones` (non-empty) `[{ nom, x, y, l, h, pct { x, y, l, h } }]`: pixels at that width, `pct` numbers from 0 to 100 |
+| `composant` | `role`, `position { x, y }` (≥ 0), `taille { l, h }` (≥ 1), `contenu` (text, may be empty), `ecran` (id of an `ecran`) |
+| `etat` | `nom` (non-empty, open list), `cible` (id of a `composant` or an `ecran`) |
+| `texte` | `libelle` (non-empty, no leading or trailing blank), `role` |
+| `jeton` | `categorie` (`couleur`, `taille_police`, `espacement`, `rayon`, `opacite`), `valeur` (non-empty string or finite number), `point` (`{ x, y }` or a zone `{ x, y, l, h }`; required when `confiance` is `mesure`), `contraste` (optional) `{ texte, fond, ratio 1 to 21 }` |
+| `table` | `colonnes` (non-empty array of texts), `lignes` (non-empty, each row has as many text cells as columns) |
+| `gabarit` | `nom`, `champs` (non-empty, ordered) `[{ nom, obligatoire (boolean), format, min?, max? }]`, `min ≤ max` |
+| `schema` | `noeuds` (non-empty) `[{ id, libelle }]` (unique ids), `flux` `[{ de, vers, libelle, direction }]` (`de`, `vers` = node ids; `direction` = `de_vers` or `bidirectionnel`) |
+| `lien` | `figure`, `passage { page, ligne, extrait }`, `constat` (`confirme`, `precise`, `contredit`); `precise` adds `lecture_ambigue`, `interpretation`, `raison`; `contredit` adds `enonces` (exactly two texts) and carries no `interpretation` |
+| `statut` | `libelle`, `couvre` (non-empty array of ids of any type, itself included) |
+| `silence` | `question` (non-empty, ends with `?`) |
+
+References (`ecran`, `cible`, `couvre`, flux nodes) are resolved on the whole list of ids, wherever the element is. All deviations
+are listed, none masks another. The key names of `ecran` and the values of `direction` are a format shared with the later lots
+(they are hypotheses of the sheet `docs/specs/ref-inventaire-schema/fiche.yaml`).
 
 ### Where the files go
 

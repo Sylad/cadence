@@ -2,13 +2,15 @@ import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { RafError } from '../plan.js';
 import { add } from './add.js';
+import { checkInventaire, readInventaire, summaryInventaire } from './check.js';
 import { measure } from './measure.js';
 import { referencesDir } from './store.js';
 
 const USAGE_ADD = 'usage : cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]';
+const USAGE_CHECK = 'usage : cadence ref check <inventaire.json | lecture.json>';
 const USAGE_MEASURE = 'usage : cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]';
 
-/** `cadence ref <sous-verbe> …` : les documents de référence (issue #14). */
+/** `cadence ref <sous-verbe> …` : les documents de référence (issue #14) ; `check` valide un inventaire ou une lecture. */
 export function refCommand(rest: string[], values: { sections?: string; slug?: string; config?: string; quoi?: string; largeur?: string; json?: boolean }, root: string, io: Io): number {
   const [verb, ...args] = rest;
   const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
@@ -21,5 +23,18 @@ export function refCommand(rest: string[], values: { sections?: string; slug?: s
     measure({ slug: args[0]!, page: args[1]!, zone: args[2]!, quoi: values.quoi, largeur: values.largeur, env: io.env, refsDir, json: values.json === true, out: io.out });
     return 0;
   }
-  throw new RafError(verb === 'add' ? USAGE_ADD : verb === 'measure' ? USAGE_MEASURE : `${USAGE_ADD}\n       ${USAGE_MEASURE.replace('usage : ', '')}`);
+  if (verb === 'check' && args.length === 1) {
+    // pas d'outil système ni de references.dir : seul le fichier donné est lu (R30)
+    const inventaire = readInventaire(resolve(io.cwd, args[0]!));
+    const problems = checkInventaire(inventaire);
+    for (const m of problems) io.out(`✗ ${m}`);
+    if (problems.length > 0) {
+      io.out(`${problems.length} écart(s)`);
+      return 1;
+    }
+    io.out(summaryInventaire(inventaire as Record<string, unknown>));
+    return 0;
+  }
+  const others = (u: string) => u.replace('usage : ', '');
+  throw new RafError(verb === 'add' ? USAGE_ADD : verb === 'measure' ? USAGE_MEASURE : verb === 'check' ? USAGE_CHECK : `${USAGE_ADD}\n       ${others(USAGE_MEASURE)}\n       ${others(USAGE_CHECK)}`);
 }

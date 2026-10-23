@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "genre": "inventaire",
+  "document": { "slug": "exemple", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+  "elements": [
+    {
+      "type": "ecran", "id": "exemple#ecran-1", "confiance": "mesure",
+      "source": { "page": 1, "zone": { "x": 0, "y": 0, "l": 1700, "h": 2200 } },
+      "largeur_reference": 1440,
+      "zones": [{ "nom": "entete", "x": 0, "y": 0, "l": 1440, "h": 96, "pct": { "x": 0, "y": 0, "l": 100, "h": 8 } }]
+    },
+    {
+      "type": "composant", "id": "exemple#composant-1", "confiance": "mesure",
+      "source": { "page": 1, "zone": { "x": 120, "y": 600, "l": 240, "h": 64 } },
+      "role": "bouton", "position": { "x": 120, "y": 600 }, "taille": { "l": 240, "h": 64 }, "contenu": "Valider", "ecran": "exemple#ecran-1"
+    },
+    {
+      "type": "etat", "id": "exemple#etat-1", "confiance": "lu",
+      "source": { "page": 2, "zone": { "x": 120, "y": 600, "l": 240, "h": 64 } },
+      "citations": [{ "page": 2, "ligne": 14, "extrait": "le bouton est grisé tant que le formulaire est vide" }],
+      "nom": "vide", "cible": "exemple#composant-1"
+    },
+    {
+      "type": "texte", "id": "exemple#texte-1", "confiance": "lu",
+      "source": { "page": 1, "zone": { "x": 140, "y": 612, "l": 120, "h": 28 } },
+      "libelle": "Valider", "role": "bouton"
+    },
+    {
+      "type": "jeton", "id": "exemple#jeton-1", "confiance": "mesure",
+      "source": { "page": 1, "zone": { "x": 120, "y": 600, "l": 240, "h": 64 } },
+      "categorie": "couleur", "valeur": "#c81e28", "point": { "x": 130, "y": 610 },
+      "contraste": { "texte": "#ffffff", "fond": "#c81e28", "ratio": 5.9 }
+    },
+    {
+      "type": "table", "id": "exemple#table-1", "confiance": "lu",
+      "source": { "page": 3, "zone": { "x": 100, "y": 400, "l": 1500, "h": 300 } },
+      "colonnes": ["Code", "Sens", "Unité"],
+      "lignes": [["T", "température", "K"], ["P", "pression", "Pa"]]
+    },
+    {
+      "type": "gabarit", "id": "exemple#gabarit-1", "confiance": "lu",
+      "source": { "page": 4, "zone": { "x": 100, "y": 300, "l": 1500, "h": 500 } },
+      "nom": "message d'observation",
+      "champs": [
+        { "nom": "date", "obligatoire": true, "format": "AAAAMMJJ" },
+        { "nom": "vent", "obligatoire": false, "format": "entier", "min": 0, "max": 360 }
+      ]
+    },
+    {
+      "type": "schema", "id": "exemple#schema-1", "confiance": "lu",
+      "source": { "page": 5, "zone": { "x": 100, "y": 300, "l": 1500, "h": 900 } },
+      "noeuds": [{ "id": "capteur", "libelle": "Capteur" }, { "id": "serveur", "libelle": "Serveur" }],
+      "flux": [{ "de": "capteur", "vers": "serveur", "libelle": "envoie la mesure", "direction": "de_vers" }]
+    },
+    {
+      "type": "lien", "id": "exemple#lien-1", "confiance": "lu",
+      "source": { "page": 5, "zone": { "x": 100, "y": 300, "l": 1500, "h": 900 } },
+      "figure": "Figure 1 — chaîne de mesure", "passage": { "page": 5, "ligne": 3, "extrait": "comme le montre la figure ci-dessous" }, "constat": "confirme"
+    },
+    {
+      "type": "statut", "id": "exemple#statut-1", "confiance": "lu",
+      "source": { "page": 1, "zone": { "x": 1400, "y": 20, "l": 200, "h": 40 } },
+      "libelle": "Proposal", "couvre": ["exemple#ecran-1", "exemple#composant-1"]
+    },
+    {
+      "type": "silence", "id": "exemple#silence-1", "confiance": "incertain",
+      "source": { "page": 2 },
+      "cause": "le document ne montre aucun écran d'erreur",
+      "question": "Que voit l'utilisateur quand le serveur ne répond pas ?"
+    }
+  ]
+}

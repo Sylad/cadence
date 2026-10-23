@@ -48,6 +48,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--parent L3]
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (seule la valeur page adopte l'étape spec d'orchestrate)
+  raf visible <id> on|off   pose ou retire visible: d'un lot existant (changement visible : entrée Nouveautés et étape UX d'orchestrate) ; off est refusé tant que le lot a un screen:
   raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
   raf uses <lot> [<ressource>…]   remplace les ressources partagées du lot (uses:, déclarées par resources: dans le cadence.yaml du dossier parent ; raf check refuse un nom non déclaré) ; sans nom, retire la clé
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
@@ -383,6 +384,13 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       if (rest[1] !== 'none' && !(SCREENS as readonly string[]).includes(rest[1])) throw new RafError(`screen inconnu : ${rest[1]} (${SCREENS.join(', ')}, none)`);
       plan.setScreen(rest[0], rest[1] === 'none' ? null : (rest[1] as Screen));
+      plan.save();
+      return 0;
+    }
+    case 'visible': {
+      if (rest.length !== 2 || (rest[1] !== 'on' && rest[1] !== 'off')) throw new RafError('usage : raf visible <id> on|off');
+      const plan = loadPlan();
+      plan.setVisible(rest[0], rest[1] === 'on');
       plan.save();
       return 0;
     }

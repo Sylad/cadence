@@ -45,7 +45,7 @@ export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7): Is
     }
     // L271 : sans visible:, le lot ne passe par aucune étape UX d'orchestrate (precheck → implement → review) et la revue de l'écran n'a pas lieu.
     if (isOpen(lot.status) && UX_REVIEW_TITLE.test(lot.title) && !lot.visible) {
-      issues.push({ kind: 'ux-review-not-visible', message: `${lot.id} est une revue UX (« ${lot.title.slice(0, 60)} ») sans visible: — l'étape UX n'aurait pas lieu : poser visible: true dans le plan (raf add --visible pour un nouveau lot)` });
+      issues.push({ kind: 'ux-review-not-visible', message: `${lot.id} est une revue UX (« ${lot.title.slice(0, 60)} ») sans visible: — l'étape UX n'aurait pas lieu : poser visible: true dans le plan (raf visible ${lot.id} on, ou raf add --visible pour un nouveau lot)` });
     }
     for (const p of lot.problems) issues.push({ kind: 'bad-field', message: `${lot.id} : ${p}` });
     for (const d of lot.after) {

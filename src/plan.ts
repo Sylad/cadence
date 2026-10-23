@@ -630,6 +630,26 @@ export class Plan {
     node.items.splice(keys.indexOf('visible') + 1, 0, this.doc.createPair('screen', screen));
   }
 
+  /** Pose (true) ou retire (false) le `visible:` d'un lot existant ; retirer est refusé tant que le lot a un `screen:` (un écran est un changement visible). */
+  setVisible(ref: string, on: boolean): void {
+    this.writable();
+    if (ref.includes('/')) throw new RafError(`visible se pose sur un lot, pas une sous-tâche : ${ref}`);
+    const node = this.lotNode(ref);
+    const lot = this.lot(ref);
+    if (!on) {
+      if (lot.screen) throw new RafError(`${ref} a screen: ${lot.screen} — retirer d'abord screen: (raf screen ${ref} none), un écran est un changement visible`);
+      node.delete('visible');
+      return;
+    }
+    if (node.has('visible')) {
+      node.set('visible', true);
+      return;
+    }
+    const keys = node.items.map((p) => String((p.key as { value?: unknown })?.value ?? p.key));
+    const at = Math.max(...['quickwin', 'estimate', 'status'].map((k) => keys.indexOf(k)));
+    node.items.splice(at + 1, 0, this.doc.createPair('visible', true));
+  }
+
   /** Pose (true) ou retire (false) le `spec:` d'un lot existant ; `screen: page` l'implique, donc on ne retire pas la spec d'un lot à page (`component` et `journey` suivent le chemin ordinaire depuis L209 : leur `spec: true` est la spec back). Renvoie false quand `screen: page` rendait la pose sans objet. */
   setSpec(ref: string, on: boolean): boolean {
     this.writable();

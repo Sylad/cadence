@@ -25,8 +25,8 @@ export function readResources(root: string): Resources {
       } catch (e) {
         throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
       }
-      const list = (raw as { resources?: unknown } | null)?.resources;
-      if (list != null) {
+      if (raw != null && typeof raw === 'object' && Object.hasOwn(raw, 'resources')) {
+        const list = (raw as { resources: unknown }).resources ?? [];
         if (!Array.isArray(list) || !list.every((n) => typeof n === 'string' && RESOURCE_NAME.test(n))) throw new RafError(`${file} : resources ${RESOURCES_BAD_LIST}`);
         return { file, names: [...new Set(list as string[])] };
       }

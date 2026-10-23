@@ -172,6 +172,20 @@ describe('R4 — où sont les ressources déclarées', () => {
     expect(r.out).toContain(`non déclarée dans ${join(group, 'cadence.yaml')}`);
   });
 
+  it('R4 — resources: sans valeur dans le parent direct, [banc] au grand-parent : la clé présente l\'emporte, banc non déclaré', () => {
+    const top = tempDir();
+    const group = join(top, 'groupe');
+    mkdirSync(group);
+    writeFileSync(join(top, 'cadence.yaml'), 'resources: [banc]\n');
+    writeFileSync(join(group, 'cadence.yaml'), 'resources:\n');
+    const dir = gitRepo(group);
+    raf(dir, 'init', '--project', 'demo', '--no-hook');
+    raf(dir, 'add', 'A', '--uses', 'banc');
+    const r = raf(dir, 'check');
+    expect(r.code).toBe(1);
+    expect(r.out).toContain(`non déclarée dans ${join(group, 'cadence.yaml')}`);
+  });
+
   it('R4 — resources: [banc, banc] : banc déclaré, sans erreur', () => {
     const { dir } = project('resources: [banc, banc]\n');
     raf(dir, 'add', 'A', '--uses', 'banc');
@@ -350,6 +364,14 @@ describe('R11 — documentation', () => {
     expect(doc).toContain('`uses`');
     expect(doc).toContain('resources:');
     expect(doc).toContain('utilise la ressource');
+  });
+
+  it('R11 — docs/raf.md : --uses hors de la ligne --every, uses de raf show après spec', () => {
+    const lines = read('docs/raf.md').split('\n');
+    const every = lines.find((l) => l.startsWith('| `raf add "title" --every'))!;
+    expect(every).not.toContain('--uses');
+    const show = lines.find((l) => l.startsWith('| `raf show <id>'))!;
+    expect(show.indexOf('public title')).toBeLessThan(show.indexOf('`uses : banc, passerelle`'));
   });
 
   it('R11 — le CHANGELOG cite L251', () => {

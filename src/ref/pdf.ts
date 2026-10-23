@@ -106,6 +106,15 @@ export function renderPages(tools: ToolPaths, file: string, pages: number[], dir
   for (const n of pages) exec(tools.pdftoppm!, ['-r', String(DPI), '-png', '-singlefile', '-f', String(n), '-l', String(n), file, join(dir, `page-${n}`)]);
 }
 
+/** Résolution des vignettes de toutes les pages (à parcourir pour repérer les planches d'un document sans texte). */
+export const THUMB_DPI = 40;
+
+/** Vignettes basse résolution de toutes les pages dans `dir/page-<n>.png`. */
+export function renderThumbnails(tools: ToolPaths, file: string, total: number, dir: string): void {
+  mkdirSync(dir, { recursive: true });
+  for (let n = 1; n <= total; n++) exec(tools.pdftoppm!, ['-r', String(THUMB_DPI), '-png', '-singlefile', '-f', String(n), '-l', String(n), file, join(dir, `page-${n}`)]);
+}
+
 /** Extrait les images d'une page dans `dir/p<page>-<slot sur 3 chiffres>.png`. */
 export function extractImages(tools: ToolPaths, file: string, page: number, dir: string): void {
   mkdirSync(dir, { recursive: true });

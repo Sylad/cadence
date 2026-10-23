@@ -215,6 +215,70 @@ describe('cadence ref add (L261)', () => {
     expect(ref(cwd, env, 'add', pdf, '--sections', '3-1').code).toBe(2);
   });
 
+  it("signale les pages sans texte (scannées) et fait des vignettes de toutes les pages d'un grand document", () => {
+    const { base, refs, env, cwd } = setup();
+    const scan: FixturePage[] = Array.from({ length: 31 }, (_, i) => ({ lines: i === 4 ? [{ x: 72, y: 700, t: 'Un titre assez long pour compter.' }] : [], image: { x: 72, y: 400, w: 200, h: 100 } }));
+    const r = ref(cwd, env, 'add', writePdf(base, 'scan.pdf', scan), '--slug', 'scan');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('pages sans texte : 30 (1-4, 6-31)');
+    expect(r.out).toContain('rendues : 0');
+    expect(existsSync(join(refs, 'scan', 'thumbs', 'page-1.png'))).toBe(true);
+    expect(existsSync(join(refs, 'scan', 'thumbs', 'page-31.png'))).toBe(true);
+    expect(existsSync(join(refs, 'scan', 'pages', 'page-1.png'))).toBe(false);
+    expect(pngSize(join(refs, 'scan', 'thumbs', 'page-1.png')).w).toBe(340);
+  });
+
+  it('un document dont toutes les pages ont du texte ne signale aucune page sans texte', () => {
+    const { base, env, cwd } = setup();
+    expect(ref(cwd, env, 'add', writePdf(base, 'norme.pdf', NORME), '--slug', 'norme').out).not.toContain('sans texte');
+  });
+
+  it('refuse un PDF chiffré avec mot de passe, et un PDF chiffré dont la copie est interdite, sortie 2', () => {
+    const { base, refs, env, cwd } = setup();
+    const pdf = writePdf(base, 'norme.pdf', NORME);
+    const faux = (name: string, body: string): NodeJS.ProcessEnv => {
+      const dir = join(base, name);
+      mkdirSync(dir);
+      writeFileSync(join(dir, 'pdfinfo'), `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+      return { ...env, PATH: `${dir}:${env.PATH}` };
+    };
+    const mdp = ref(cwd, faux('mdp', 'echo "Command Line Error: Incorrect password" >&2; exit 1'), 'add', pdf);
+    expect(mdp.code).toBe(2);
+    expect(mdp.err).toContain('PDF chiffré (mot de passe demandé)');
+    const copie = ref(cwd, faux('copie', 'echo "Pages:          3"; echo "Encrypted:      yes (print:yes copy:no change:no addNotes:no algorithm:AES)"'), 'add', pdf);
+    expect(copie.code).toBe(2);
+    expect(copie.err).toContain('copie est interdite');
+    expect(existsSync(refs)).toBe(false);
+  });
+
+  it('un PDF chiffré dont la copie est permise est lu', () => {
+    const { base, env, cwd } = setup();
+    const dir = join(base, 'permis');
+    mkdirSync(dir);
+    const real = execFileSync('which', ['pdfinfo'], { encoding: 'utf8' }).trim();
+    writeFileSync(join(dir, 'pdfinfo'), `#!/bin/sh\n${real} "$@" | sed 's/^Encrypted:.*/Encrypted:      yes (print:yes copy:yes)/'\n`, { mode: 0o755 });
+    expect(ref(cwd, { ...env, PATH: `${dir}:${env.PATH}` }, 'add', writePdf(base, 'norme.pdf', NORME), '--slug', 'norme').code).toBe(0);
+  });
+
+  it('refuse une clé references: mal formée de cadence.yaml, sortie 2, avec la raison', () => {
+    const { base, env, cwd } = setup();
+    const pdf = writePdf(base, 'norme.pdf', NORME);
+    const essai = (yaml: string) => {
+      writeFileSync(join(cwd, 'cadence.yaml'), yaml);
+      return ref(cwd, env, 'add', pdf);
+    };
+    for (const [yaml, raison] of [
+      ['references: abc\n', 'doit être un objet'],
+      ['references:\n  dossier: x\n', 'references.dossier inconnu'],
+      ['references:\n  dir: ""\n', 'references.dir : chemin attendu'],
+      ['references:\n  dir: 12\n', 'references.dir : chemin attendu'],
+    ] as const) {
+      const r = essai(yaml);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain(raison);
+    }
+  });
+
   it('sans document ou avec un sous-verbe inconnu, donne l\'usage', () => {
     const { env, cwd } = setup();
     expect(ref(cwd, env, 'add').err).toContain('usage : cadence ref add');

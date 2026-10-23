@@ -27,6 +27,12 @@ Registers a PDF and builds, for it:
   (« lien non résolu »): a citation of a figure with no caption, a figure that nothing cites,
   and an image on a page that has no caption (`image sans légende`).
 
+- **thumbnails of every page** (`thumbs/page-<n>.png`, 40 dpi) and the **pages without text**:
+  a page with fewer than 20 characters of text is taken for scanned and reported
+  (`pages sans texte : 30 (1-4, 6-31)`), so a scanned norm does not look indexed while its index
+  is empty; the thumbnails tell which pages to render with `--sections`. (Both recipes come from
+  the `norme-etude` skill of maritime-atlas: `refdoc.py index`.)
+
 Without `--sections`, a document of 30 pages or fewer is rendered whole; a larger one only gets
 its index (text and figures), no page is rendered. With `--sections`, the pages asked for are
 rendered **plus the pages of the figures they name**, wherever they are in the document. Running
@@ -46,6 +52,7 @@ inside a Git repository is refused: the documents may be private. One folder per
 <references.dir>/<slug>/document.json   source, sha256, pages (lines, boxes), images, figures, unresolved
 <references.dir>/<slug>/pages/          page-<n>.png, 200 dpi
 <references.dir>/<slug>/images/         p<page>-<n>.png
+<references.dir>/<slug>/thumbs/         page-<n>.png, 40 dpi, every page
 ```
 
 ### System tools

@@ -3117,6 +3117,22 @@ lots:
     created: 2026-10-23
     started: 2026-10-23
     review: { date: 2026-10-23, verdict: "compliant (2 minor notes, no sub-task) — orchestré (vague 2026-10-23-cad-hud, 0 passe(s) de correction)", commit: e6a90f9e2403e2db84318a7572290b8279b929bf }
+  - id: L277
+    title: "cadence deliver --sha <sha> accepté pendant une vague du même dépôt quand <sha> est le « livrable jusqu'à » de la vague (tous ses commits citent des lots prêts, revus) ; skill lead : livrer au fil de l'eau un lot prêt au lieu d'attendre la fin de la vague ; tests. Mesure 23-10 : 1 554 lots×minutes entre « prêt » et la fin de vague sur 28 vagues (warhammer Civils : 1 h 45 pour le premier prêt)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-23
+  - id: L278
+    title: "Correctifs et revues lancés à la main par le lead : budget et durée maximale déclarés (cadence lead hold --ttl l'indique, rien ne l'arrête) — au TTL échu, cadence lead tour et la bande le signalent en ⚠ et le skill lead dit de le reprendre ou de l'arrêter ; tests. Vécu 23-10 : correctif B28.6 plus de 5 h sur un créneau de 3"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-23
+  - id: L279
+    title: "orchestrate : un worktree par lot dans une vague (git worktree add par lot, fusion par cherry-pick ou rebase au « prêt »), pour que deux lots indépendants d'un même dépôt avancent en parallèle dans la limite des créneaux ; verrou de dépôt adapté ; conflits rendus au lead ; tests. Vécu 23-10 : L261 (4 corrections) a bloqué la file cadence ; étude de faisabilité d'abord (spec)"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-23
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

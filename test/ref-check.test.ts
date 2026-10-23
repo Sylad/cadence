@@ -469,7 +469,7 @@ describe('cadence ref check (L263)', () => {
     expect(ecarts(doc([el('ecran', (e) => (e.largeur_reference = 14.5))]))).toContain('elements[0].largeur_reference');
   });
   it('R32 — zones vide : écart', () => {
-    expect(ecarts(doc([el('ecran', (e) => delete e.zones)]))).toContain('elements[0].zones');
+    expect(ecarts(doc([el('ecran', (e) => (e.zones = []))]))).toContain('elements[0].zones');
   });
   it('R32 — pct.l = 120 : écart', () => {
     expect(ecarts(doc([el('ecran', (e) => (e.zones[0].pct.l = 120))]))).toContain('elements[0].zones[0].pct.l');

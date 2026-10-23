@@ -20,7 +20,7 @@ raf init                         # .cadence/raf.yaml + .cadence/notes/ + a post-
 raf add "My first lot" --estimate 1
 ```
 
-Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are, `raf done L1` when it is finished. A title gone stale after a change of scope is replaced with `raf title L1 "new title"` (any status, the old one is kept in a dated note). A lot that occupies a resource shared between projects says so with `raf add --uses banc` or `raf uses L1 banc`, the folder's `cadence.yaml` lists the resources (`resources: [banc]`), and `raf check` refuses a name that is not declared ([docs/raf.md](docs/raf.md#shared-resources-uses-and-resources)); `cadence lead tour` and `orchestrate --continue` list, next to the free slots, the ready lots whose resources no `doing` lot or live wave holds (`--json`: `free`).
+Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are, `raf done L1` when it is finished. A title gone stale after a change of scope is replaced with `raf title L1 "new title"` (any status, the old one is kept in a dated note). A lot that occupies a resource shared between projects says so with `raf add --uses banc` or `raf uses L1 banc`, the folder's `cadence.yaml` lists the resources (`resources: [banc]`), and `raf check` refuses a name that is not declared ([docs/raf.md](docs/raf.md#shared-resources-uses-and-resources)); `cadence lead tour` and `orchestrate --continue` list, next to the free slots, the ready lots whose resources no `doing` lot (in any project sharing them, at every `depth:` of the declaring `cadence.yaml`) or live wave holds (`--json`: `free`).
 
 ## Where to read more
 

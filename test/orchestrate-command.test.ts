@@ -1504,6 +1504,7 @@ describe('--continue (L147)', () => {
     expect(doneBy(f.calls)).toEqual(['b', 'b', 'a']);
     expect(o.out.join('\n')).toMatch(/continue : tire b:L2\n/);
     expect(o.out.join('\n')).toMatch(/continue : arrêt — plus aucun lot prêt/);
+    expect(o.out.find((l) => l.startsWith('prêts, ressources libres : '))).toBe('prêts, ressources libres : a:L1 a un · b:L2 b deux'); // au départ de la vague réelle, hors le lot du premier tirage
     const store = RunStore.last(parent)!;
     expect(store.readWave()!.lots).toEqual(['b:L1', 'b:L2', 'a:L1']);
     expect(store.readWave()!.status).toBe('done');

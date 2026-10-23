@@ -2,10 +2,11 @@ import { dirname, resolve } from 'node:path';
 import { nextUp } from './audit.js';
 import { planLoader } from './config.js';
 import { gitRoot } from './git.js';
-import { findProjects } from './lead.js';
+import { findProjects, readDepth } from './lead.js';
 import type { Lot } from './plan.js';
 import { decisionPending } from './orchestrate/continue.js';
 import { liveWaves } from './orchestrate/registry.js';
+import { readResources } from './resources.js';
 import { lotFinished, RunStore, type LotState } from './orchestrate/state.js';
 
 /** Un lot prêt dont aucune ressource n'est prise (L252) ; `uses` n'est écrit que si le lot en porte. */
@@ -24,20 +25,36 @@ const repoOf = (dir: string): string => gitRoot(dir) ?? resolve(dir);
  */
 const lotAt = (repo: string, lot: string): string => `${repo}:${lot}`;
 
+/**
+ * Les projets qui partagent les ressources de `dir` : ceux que trouve `findProjects` sous le dossier du cadence.yaml qui déclare ses `resources:`
+ * (le plus proche en remontant, voir `readResources`), sur la profondeur `depth:` de ce fichier (un niveau à défaut) : `P/x` et `P/grp/alpha`
+ * partagent le banc que déclare `P/cadence.yaml` (`depth: 2`), d'où qu'on les interroge. Sans ressource déclarée, ou avec un cadence.yaml
+ * illisible ou une `depth:` invalide (que leur ligne de tour signale), ce sont les projets du dossier parent, sur un niveau.
+ */
+function sharingProjects(dir: string): string[] {
+  try {
+    const { file, names } = readResources(repoOf(dir));
+    if (names.length) return findProjects(dirname(file), readDepth(dirname(file)));
+  } catch {
+    // cadence.yaml illisible ou depth: invalide
+  }
+  return findProjects(dirname(dir));
+}
+
 const plansOf = (dir: string): Lot[] => planLoader(repoOf(dir))().lots();
 
 /** Un lot qu'une vague tient : son dépôt et son id suffisent à le reconnaître et à retrouver ses `uses:`. */
 type Held = Pick<LotState, 'repo' | 'lot'>;
 
 /**
- * Les ressources prises à cet instant : celles des lots `doing` des projets `dirs` et de leurs voisins du même dossier (une ressource se partage entre projets :
- * lancé depuis l'un d'eux, on voit aussi les autres), celles des lots non finis des vagues vivantes (un lot de vague n'est `doing` dans le plan qu'une fois sa session partie)
+ * Les ressources prises à cet instant : celles des lots `doing` des projets `dirs` et de ceux qui partagent leurs ressources (`sharingProjects` : lancé depuis l'un d'eux,
+ * on voit aussi les autres), celles des lots non finis des vagues vivantes (un lot de vague n'est `doing` dans le plan qu'une fois sa session partie)
  * et celles des lots `held` (le tirage d'une vague qui part). Avec leurs lots (`dépôt:lot`, voir `lotAt`), qui ne sont pas à proposer.
  */
 function taken(dirs: string[], home: string, held: Held[]): { resources: Set<string>; running: Set<string> } {
   const resources = new Set<string>();
   const running = new Set<string>();
-  for (const dir of new Set([...dirs, ...dirs.flatMap((d) => findProjects(dirname(d)))])) {
+  for (const dir of new Set([...dirs, ...dirs.flatMap(sharingProjects)])) {
     try {
       for (const l of nextUp(plansOf(dir)).doing) for (const r of l.uses ?? []) resources.add(r);
     } catch {
@@ -66,7 +83,7 @@ function taken(dirs: string[], home: string, held: Held[]): { resources: Set<str
 
 /**
  * Pour chaque dossier de projet de `dirs`, ses lots prêts (comme `nextUp`, hors « à décider » et hors lots d'une vague vivante) dont aucune ressource
- * n'est prise par un lot `doing` d'un des projets (ou de leurs voisins) ni par une vague vivante de `home` ni par les lots `held` d'une vague qui part. Un lot sans `uses:` n'en tient aucune : il est libre.
+ * n'est prise par un lot `doing` d'un des projets (ou de ceux qui partagent leurs ressources, voir `sharingProjects`) ni par une vague vivante de `home` ni par les lots `held` d'une vague qui part. Un lot sans `uses:` n'en tient aucune : il est libre.
  * Les projets sans lot libre n'ont pas d'entrée (clé : le dossier) ; un plan illisible est sauté.
  */
 export function readyFree(dirs: string[], home: string, held: Held[] = []): Map<string, FreeLot[]> {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { run } from '../src/cli.js';
 import { Plan } from '../src/plan.js';
 import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
@@ -289,5 +289,67 @@ describe('L252 — lead tour lancé depuis un projet', () => {
     const t = await tour(dirs.alpha!, '--json');
     const rows = JSON.parse(t.out) as { project: string; free?: { id: string }[] }[];
     expect(rows[0]!.free?.map((l) => l.id)).toEqual(['L2']);
+  });
+});
+
+describe('L252 — une ressource se partage à tous les niveaux du dossier qui la déclare (dossier/groupe/projet)', () => {
+  const HOLDER: L[] = [{ title: 'Banc en cours', uses: ['banc'], doing: true }];
+  const OTHER: L[] = [{ title: 'Tiré' }, { title: 'X banc', uses: ['banc'] }, { title: 'Libre' }];
+
+  /** `holder` tient banc (lot doing), `other` est l'autre projet ; l'un est `x` (P/x), l'autre `grp/alpha` (P/grp/alpha) ; `yaml` : cadence.yaml de P. */
+  function layout(holder: 'x' | 'grp/alpha', yaml = 'resources: [banc]\ndepth: 2\n') {
+    const other = holder === 'x' ? 'grp/alpha' : 'x';
+    const { parent, dirs } = parentWith({ [holder]: HOLDER, [other]: OTHER }, yaml);
+    return { parent, other, otherName: basename(other), at: { P: parent, 'P/grp': join(parent, 'grp'), 'P/grp/alpha': dirs['grp/alpha']!, 'P/x': dirs.x! } };
+  }
+
+  // tout point de lancement voit le même lot doing, tenu à l'autre niveau : la ressource est prise, seuls « Tiré » et « Libre » sont libres
+  const FROM = [
+    ['P', 'grp/alpha', ['--depth', '1']],
+    ['P', 'grp/alpha', []],
+    ['P/grp', 'x', []],
+    ['P/grp/alpha', 'x', []],
+    ['P/x', 'grp/alpha', []],
+  ] as const;
+
+  it.each(FROM)('lead tour depuis %s (lot doing de %s) : banc est pris, X banc n\'est pas libre', async (from, holder, flags) => {
+    const l = layout(holder);
+    const rows = JSON.parse((await tour(l.at[from], '--json', ...flags)).out) as { project: string; free?: { id: string }[] }[];
+    expect(rows.find((r) => basename(r.project) === l.otherName)!.free?.map((f) => f.id)).toEqual(['L1', 'L3']);
+  });
+
+  it.each([FROM[1], FROM[2], FROM[3], FROM[4]])('orchestrate --continue --dry-run depuis %s (lot doing de %s) : banc est pris, la ligne ne liste pas X banc', async (from, holder) => {
+    const l = layout(holder);
+    const r = io(l.at[from]);
+    await orchestrate(['--continue', '--dry-run', '--budget', '1M', '--max-sessions', '1'], r.io, fakeDeps().deps);
+    removeDryRunBriefs(r.out.join('\n'));
+    expect(r.out.find((line) => line.startsWith(FREE))).toBe(`${FREE}${l.otherName}:L3 Libre`);
+  });
+
+  it('sans depth: dans le cadence.yaml déclarant, un projet d\'un niveau plus bas n\'est pas vu : la ressource que son lot doing tient reste libre ici', async () => {
+    const l = layout('grp/alpha', 'resources: [banc]\n');
+    const rows = JSON.parse((await tour(l.at['P/x'], '--json')).out) as { free?: { id: string }[] }[];
+    expect(rows[0]!.free?.map((f) => f.id)).toEqual(['L1', 'L2', 'L3']);
+  });
+
+  it('sans depth: dans le cadence.yaml déclarant, les projets voisins du même dossier se partagent la ressource', async () => {
+    const { parent } = parentWith({ alpha: HOLDER, beta: OTHER }, 'resources: [banc]\n');
+    const rows = JSON.parse((await tour(join(parent, 'beta'), '--json')).out) as { free?: { id: string }[] }[];
+    expect(rows[0]!.free?.map((f) => f.id)).toEqual(['L1', 'L3']);
+  });
+
+  it('une depth: invalide dans le cadence.yaml déclarant ne casse pas le calcul : les voisins du même dossier se partagent la ressource', async () => {
+    const { parent } = parentWith({ alpha: HOLDER, beta: OTHER }, 'resources: [banc]\ndepth: 0\n');
+    const rows = JSON.parse((await tour(join(parent, 'beta'), '--json')).out) as { free?: { id: string }[] }[];
+    expect(rows[0]!.free?.map((f) => f.id)).toEqual(['L1', 'L3']);
+  });
+
+  it('sans cadence.yaml qui déclare resources:, les projets voisins du même dossier (un niveau) se partagent encore la ressource, pas ceux d\'un niveau plus bas', async () => {
+    const sibling = parentWith({ alpha: HOLDER, beta: OTHER }, 'depth: 2\n');
+    const rows = JSON.parse((await tour(join(sibling.parent, 'beta'), '--json')).out) as { free?: { id: string }[] }[];
+    expect(rows[0]!.free?.map((f) => f.id)).toEqual(['L1', 'L3']);
+    const nested = layout('grp/alpha', 'depth: 2\n');
+    const rowsNested = JSON.parse((await tour(nested.at['P/x'], '--json')).out) as { free?: { id: string }[] }[];
+    expect(rowsNested[0]!.free?.map((f) => f.id)).toEqual(['L1', 'L2', 'L3']);
   });
 });

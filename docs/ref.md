@@ -23,7 +23,7 @@ Registers a PDF and builds, for it:
   caption), with its page, line, box, its images, and **the passages that cite it** (page,
   line, exact line; `nommee` when the text names the figure, `designee` for « as shown
   below » / « ci-dessous », attached to the nearest caption of the page). Plurals count one citation per figure
-  (`Figures 2 and 3`, `Tables 4 to 6`, `Figs. 2.1 et 2.2`). Listed under **`unresolved`**
+  (`Figures 2 and 3`, `Tables 4 to 6`, `Figs. 2.1 et 2.2`); a number keeps the letters of an annex numbering (`Figure 1.B.1`, `Table 12.B.3`). Listed under **`unresolved`**
   (« lien non résolu »): a citation of a figure with no caption, a figure that nothing cites,
   and an image on a page that has no caption (`image sans légende`).
 

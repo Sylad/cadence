@@ -47,7 +47,7 @@ const WORDS: Record<string, { kind: FigureKind; word: string }> = {
   planche: { kind: 'planche', word: 'Planche' },
   planches: { kind: 'planche', word: 'Planche' },
 };
-const NUMBER = String.raw`[A-Z]{0,2}[-.]?\d+(?:[.-]\d+)*[a-z]?`;
+const NUMBER = String.raw`[A-Z]{0,2}[-.]?\d+(?:[.-](?:\d+|[A-Z](?![a-z])))*[a-z]?`;
 /** Ce qui sépare deux numéros d'une énumération au pluriel : « 2, 3 », « 2 and 3 », « 4 to 6 ». */
 const SEPARATOR = String.raw`(?:\s*,\s*(?:(?:and|et)\s+)?|\s+(?:and|et|to|à|&)\s+)`;
 const REFERENCE = new RegExp(String.raw`\b(Figures?|Figs?|Tables?|Tableaux|Tableau|Planches?)\.?\s+(${NUMBER}(?:${SEPARATOR}${NUMBER})*)(?![\w])`, 'gi');

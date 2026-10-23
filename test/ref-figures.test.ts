@@ -71,4 +71,14 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.unresolved).toEqual([]);
     expect([...citedPages(idx, new Set([1]))]).toEqual([2]);
   });
+  it("les numéros d'annexe des normes OMM gardent leur lettre : « Figure 1.B.1 » n'est pas la Figure 1", () => {
+    const idx = indexText([
+      page(1, 'See Figure 1.D.5 and Figures 1.B.1 and 1.B.2.', 'Voir Table 12.B.3.'),
+      page(2, 'Figure 1.B.1 Wind profile', 'Figure 1.B.2 Temperature profile', 'Figure 1.D.5 Radiation', 'Table 12.B.3 Codes'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.page, f.citations.map((c) => c.line)])).toEqual([
+      ['Figure 1.B.1', 2, [1]], ['Figure 1.B.2', 2, [1]], ['Figure 1.D.5', 2, [1]], ['Table 12.B.3', 2, [2]],
+    ]);
+    expect(idx.unresolved).toEqual([]);
+  });
 });

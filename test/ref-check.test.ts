@@ -409,6 +409,12 @@ describe('cadence ref check (L263)', () => {
   it('R27 — statut qui se couvre lui-même : accepté', () => {
     valide(doc([el('statut', (e) => (e.couvre = ['exemple#statut-1']))]));
   });
+  it("R27 — statut qui couvre un élément dont le type est absent : pas d'écart de référence", () => {
+    const sansType = el('texte', (e) => delete e.type);
+    const lignes = ecarts(doc([sansType, el('statut', (e) => (e.couvre = [sansType.id]))]));
+    expect(lignes).toContain('elements[0].type');
+    expect(lignes).not.toContain('couvre');
+  });
   it('R27 — référence vers un élément placé plus loin dans la liste : acceptée', () => {
     valide(doc([BASE.composant!, BASE.ecran!]));
   });

@@ -70,7 +70,7 @@ export function checkInventaire(root: unknown): string[] {
     if (type !== undefined) checkFields(e, at, type, (field) => bad(`${at}.${field}`, `champ du type ${type} manquant ou invalide`), bad);
   });
   elements.forEach((e, i) => {
-    if (isObj(e)) checkRefs(e, `elements[${i}]`, typeOf, bad);
+    if (isObj(e)) checkRefs(e, `elements[${i}]`, typeOf, firstWith, bad);
   });
   return problems;
 }
@@ -241,7 +241,7 @@ function checkFields(e: Obj, at: string, type: string, fail: (field: string) => 
 }
 
 /** Les références d'un élément, résolues sur la liste complète des ids (R27) et sur les noeuds du schéma (R23). */
-function checkRefs(e: Obj, at: string, typeOf: Map<string, string>, bad: Bad): void {
+function checkRefs(e: Obj, at: string, typeOf: Map<string, string>, ids: Map<string, number>, bad: Bad): void {
   const expect = (path: string, id: unknown, types: string[]) => {
     if (typeof id === 'string' && !types.includes(typeOf.get(id) ?? '')) bad(path, `${id} ne désigne aucun élément de type ${types.join(' ou ')}`);
   };
@@ -249,7 +249,7 @@ function checkRefs(e: Obj, at: string, typeOf: Map<string, string>, bad: Bad): v
   if (e.type === 'etat') expect(`${at}.cible`, e.cible, ['composant', 'ecran']);
   if (e.type === 'statut' && Array.isArray(e.couvre)) {
     e.couvre.forEach((id, j) => {
-      if (typeof id === 'string' && !typeOf.has(id)) bad(`${at}.couvre[${j}]`, `${id} ne désigne aucun élément de type ${TYPES.slice(0, -1).join(', ')} ou ${TYPES[TYPES.length - 1]}`);
+      if (typeof id === 'string' && !ids.has(id)) bad(`${at}.couvre[${j}]`, `${id} ne désigne aucun élément de type ${TYPES.slice(0, -1).join(', ')} ou ${TYPES[TYPES.length - 1]}`);
     });
   }
   if (e.type === 'schema' && Array.isArray(e.noeuds) && Array.isArray(e.flux)) {

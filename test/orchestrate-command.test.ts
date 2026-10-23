@@ -5,7 +5,7 @@ import { lotSlug } from '../src/orchestrate/state.js';
 import { lotBudget, lotBudgetBasis, orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
-import { acquireSlot, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
+import { acquireSlot, addHold, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
@@ -701,6 +701,22 @@ describe('--status --watch (L49)', () => {
     const r = io(parent);
     expect(await orchestrate(['--status', '--watch'], r.io, f.deps)).toBe(0);
     expect(r.out.filter((l) => l === CLEAR)).toHaveLength(1);
+  });
+});
+
+describe('--status --watch avec une session du lead tenue (L255)', () => {
+  it('une session du lead tenue sans vague vivante ne retient pas --watch : un seul rendu, sans attendre', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    expect(await orchestrate(['a:L1', '--wave', '2026-10-08-1000'], io(parent).io, f.deps)).toBe(0);
+    addHold(cadenceHome(), 'correctif-L12', 60, new Date());
+    f.deps.watchSleep = async () => {
+      throw new Error('ne doit pas attendre');
+    };
+    const r = io(parent);
+    expect(await orchestrate(['--status', '--watch'], r.io, f.deps)).toBe(0);
+    expect(r.out.join('\n')).toContain('sessions du lead : 1 (correctif-L12)');
+    expect(r.out.filter((l) => l === '\x1b[H\x1b[2J')).toHaveLength(1);
   });
 });
 

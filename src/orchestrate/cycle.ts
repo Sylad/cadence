@@ -353,10 +353,10 @@ function docsText(c: LotCtx): string {
 }
 
 /** Gabarit d'une étape : la passe des mineurs et la revue courte qui la suit ont chacune le leur. */
-export function briefName(l: LotState, kind: SessionKind): BriefName {
+export function briefName(l: LotState, kind: SessionKind, integration = false): BriefName {
   if (l.specLot && !l.screen && (kind === 'spec' || kind === 'accept')) return `${kind}-back`;
   if (kind === 'fix' && l.minorFix) return 'fix-minors';
-  if (kind === 'review-small' && l.minorPass && !(l.small && l.visible)) return 'review-recheck';
+  if (kind === 'review-small' && l.minorPass && !integration && !(l.small && l.visible)) return 'review-recheck'; // la revue d'intégration (R17) garde le gabarit qui porte {{integration}}
   return kind;
 }
 
@@ -492,7 +492,7 @@ function briefFor(c: LotCtx, kind: SessionKind): string {
     if (kind === 'implement' && l.precheck) vars.commits = [vars.commits, l.precheck].filter(Boolean).join('\n');
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
-  return renderBrief(briefName(l, kind), vars, c.wave.templates);
+  return renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
 }
 
 /** Les dépôts voisins du lot, vus avant et après une session. */

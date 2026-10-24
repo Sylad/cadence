@@ -261,6 +261,26 @@ describe('R9 / R17 — verdict reporté ou revue courte après un rebase', () =>
     expect(readFileSync(join(repo, 'f.txt'), 'utf8')).toContain('l4 par L1');
     expect(readFileSync(join(repo, 'f.txt'), 'utf8')).toContain('l7 par L2');
   });
+  it('R17 — un lot passé par la passe des mineurs reçoit quand même le gabarit d\'intégration (pas review-recheck)', async () => {
+    const { parent } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true', f5);
+    const seenMinors = new Set<string>();
+    const f = near({
+      review: async (_cwd, brief) => {
+        const lot = lotOf(brief);
+        if (seenMinors.has(lot)) return claudeOut(reviewReport());
+        seenMinors.add(lot);
+        return claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', fichier: 'f.txt', ligne: 1, texte: 'nommage' }], verdict: 'conforme, un mineur' }));
+      },
+    });
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+    expect(r.code).toBe(0);
+    const small = f.calls.filter((c) => c.kind === 'review-small');
+    const integ = small.filter((c) => c.brief.includes('Integration re-review'));
+    expect(integ).toHaveLength(1);
+    expect(f.calls.some((c) => c.kind === 'fix' && c.lot === integ[0].lot)).toBe(true); // ce lot a bien eu sa passe des mineurs
+    expect(integ[0].brief).not.toContain('Check that the minor findings fixed are fixed');
+    expect(small.filter((c) => c.lot === integ[0].lot).length).toBeGreaterThanOrEqual(2); // revue de rappel puis revue d'intégration
+  });
   it('R17 — revue sans constat : verdict au sha intégré, branche avancée', async () => {
     const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true', f5);
     const f = near({ 'review-small': async () => claudeOut(reviewReport({ verdict: 'rebase sans dégât' })) });

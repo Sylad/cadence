@@ -1,0 +1,217 @@
+sujet:
+  id: orchestrate-worktree-par-lot
+  titre: "orchestrate : un worktree par lot dans une vague — deux lots indépendants d'un même dépôt avancent en parallèle (étude de faisabilité)"
+  lot: L279
+  perimetre:
+    modules: [src/orchestrate/pool.ts, src/orchestrate/command.ts, src/orchestrate/cycle.ts, src/orchestrate/lock.ts, src/orchestrate/registry.ts, src/config.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le verrou d'orchestration du dépôt (REPO_LOCK, lock.ts:26) : une seule VAGUE par dépôt, inchangé ; seul le « un seul lot à la fois » interne à la vague tombe"
+      - "les lots qui partagent un dépôt voisin (repos:, L62) : restent à la suite les uns des autres (R2), aucun worktree de voisin"
+      - "le plafond de sessions toutes vagues confondues (--max-sessions, registre des créneaux) : inchangé, c'est lui qui borne le parallélisme"
+      - "le push et le déploiement : jamais faits par orchestrate (hook pre-push de garde inchangé) ; la livraison par `cadence deliver` reste au lead"
+      - "la résolution d'un conflit de fusion : rendue au lead, jamais tentée par le programme"
+      - "la prévention des conflits (prédire quels fichiers deux lots touchent) : non faite, les conflits sont constatés à l'intégration"
+
+cas:
+  - id: C1
+    titre: "Une vague joue deux lots indépendants du même dépôt en parallèle, chacun dans son worktree"
+    acteur: le lead
+    declencheur: "commande cadence orchestrate <projet>:<lotA> <projet>:<lotB> (orchestrate.worktrees: true, --max-sessions 2 au moins)"
+    preconditions:
+      - "les deux lots sont du même dépôt (sans dépôt voisin partagé), sans dependsOn entre eux"
+      - "le dépôt est sur une branche, son arbre n'a aucun fichier suivi modifié, aucune autre orchestration ne le tient"
+      - "le plafond de sessions libre laisse au moins deux créneaux"
+    nominal:
+      - "Les gardes de départ passent comme aujourd'hui (command.ts:358-365), une fois par dépôt ; le verrou de dépôt est pris une fois pour la vague (command.ts:850)."
+      - "Pour chaque lot, le programme crée une branche propre `cadence/<vague>/<slug du lot>` au sommet courant de la branche du dépôt, et son worktree par `git worktree add -b` hors du dépôt."
+      - "Les dépendances ignorées (node_modules…) sont reliées dans le worktree comme pour le worktree jetable de base (cycle.ts:219-240)."
+      - "Le lot joue tout son cycle (spec, accept, implement, revues, corrections) avec le worktree comme dépôt : ses commits, son arbre propre, son contrôle de HEAD et son plan sont ceux du worktree."
+      - "Le pool lance les deux lots ensemble, chacun prenant un créneau ; sans créneau libre, le second attend."
+      - "Au « prêt » de chaque lot, le programme l'intègre à la branche du dépôt (C2)."
+    alternatives:
+      - { si: "orchestrate.worktrees absent ou false", alors: "comportement actuel : une file par dépôt, un lot à la fois dans le dépôt lui-même", regles: [R1] }
+      - { si: "le dépôt est en HEAD détaché, ou un des lots a un dépôt voisin partagé avec l'autre", alors: "ces lots restent à la suite les uns des autres dans le dépôt, avec un avertissement", regles: [R2] }
+      - { si: "un lot dépend de l'autre (dependsOn)", alors: "il attend que son prédécesseur soit prêt ET intégré, puis part du sommet de la branche qui le contient", regles: [R4] }
+      - { si: "un seul créneau de session est libre", alors: "les lots s'enchaînent sans erreur, un worktree à la fois en session", regles: [R3] }
+      - { si: "la création du worktree ou de la branche échoue (branche existante, disque plein, index.lock)", alors: "le lot est rendu avec la cause, les autres lots continuent", regles: [R5] }
+    resultat: "Deux lots indépendants d'un même dépôt avancent en parallèle dans la limite des créneaux, sans que L261 (4 corrections) fasse attendre les autres lots du dépôt."
+  - id: C2
+    titre: "Un lot prêt est intégré à la branche du dépôt"
+    acteur: le programme (fin de cycle d'un lot)
+    declencheur: le lot passe à ready dans son worktree (cycle.ts:2009)
+    preconditions:
+      - "le lot a un worktree et une branche propres, verdict de revue conforme enregistré sur la branche du lot"
+    nominal:
+      - "Le programme prend le verrou d'intégration du dépôt (un seul lot s'intègre à la fois ; attente bornée pour les autres)."
+      - "Si la branche du dépôt n'a pas bougé depuis le départ du lot, la branche avance en fast-forward (aucun sha ne change)."
+      - "Sinon la branche du lot est rebasée sur le sommet courant de la branche du dépôt, puis avance en fast-forward."
+      - "Les contrôles (tests, build) sont rejoués au sommet intégré quand le rebase a changé les commits ; verts, le lot est ready, vert au sommet."
+      - "Le worktree et la branche du lot, propres et fusionnés, sont retirés ; une ligne de journal dit les shas intégrés."
+    alternatives:
+      - { si: "le rebase rencontre un conflit", alors: "rebase abandonné, lot rendu au lead avec les fichiers en conflit, worktree et branche conservés", regles: [R6] }
+      - { si: "les contrôles rejoués sont rouges au sommet intégré", alors: "la branche du dépôt n'avance pas, lot rendu avec les échecs", regles: [R7] }
+      - { si: "l'arbre du dépôt (celui du lead) a des fichiers suivis modifiés au moment de l'avance", alors: "pas d'avance, lot rendu, branche du lot conservée", regles: [R8] }
+      - { si: "le sommet intégré diffère de celui que la revue a lu (rebase non vide)", alors: "le verdict est enregistré pour le sommet intégré, jamais pour le sha rebasé qu'il n'a pas relu sans le dire", regles: [R9] }
+      - { si: "un autre lot s'intègre déjà", alors: "le lot attend le verrou d'intégration, sans bloquer les sessions des autres", regles: [R10] }
+    resultat: "La branche du dépôt reçoit les lots un par un, sur un historique linéaire ; aucun commit n'est perdu, aucun conflit n'est résolu à l'aveugle."
+  - id: C3
+    titre: "Le lead reprend une vague interrompue qui laissait des worktrees"
+    acteur: le lead
+    declencheur: commande cadence orchestrate --resume <vague>
+    preconditions:
+      - "la vague a été interrompue (processus tué, quota, budget) ou a rendu des lots avec leurs worktrees conservés"
+    nominal:
+      - "Pour chaque lot repris, le worktree et la branche déterministes du lot sont retrouvés et réutilisés tels quels (commits et arbre du lot intacts)."
+      - "Un worktree enregistré par git mais dont le dossier a disparu est élagué puis recréé sur la branche existante."
+      - "Les lots rendus, avec worktree conservé, restent tels quels jusqu'à ce que le lead les règle (rebase à la main puis --resume, ou retrait)."
+    alternatives:
+      - { si: "le worktree du lot a un arbre sale que le cycle n'a pas laissé", alors: "même refus qu'un dépôt sale (code 2), avant toute écriture", regles: [R11] }
+      - { si: "le lot est retiré par --drop", alors: "son worktree et sa branche sont conservés, une ligne dit où", regles: [R12] }
+    resultat: "Une reprise ne perd ni commit ni worktree de lot, et ne laisse pas de worktree orphelin non signalé."
+  - id: C4
+    titre: "Une seconde vague vise le dépôt pendant que la première y a des worktrees"
+    acteur: le lead
+    declencheur: "commande cadence orchestrate <projet>:<lot> lancée dans une autre vague"
+    preconditions:
+      - "une vague vivante tient le verrou du dépôt"
+    nominal:
+      - "La seconde vague est refusée avant toute écriture, comme aujourd'hui (command.ts:364-366), sans créer de worktree."
+    alternatives: []
+    sans_alternative: "le seul échec est le refus du verrou, déjà couvert par R13 ; le cas n'a pas d'autre branche"
+    resultat: "Une seule vague par dépôt, même quand elle y a plusieurs worktrees."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Les worktrees par lot ne s'activent que par la clé orchestrate.worktrees: true de cadence.yaml ; absente ou false, la vague se comporte exactement comme avant (une file par dépôt, lots à la suite dans le dépôt)."
+    statut: hypothese
+    si_faux: "Si le parallèle doit être le défaut, seule la valeur par défaut de la clé change (config.ts, une ligne) ; l'activation progressive protège les vagues en cours le temps de roder la fusion."
+    tests: ["R1 — sans orchestrate.worktrees, deux lots du même dépôt jouent à la suite dans le dépôt, aucun worktree créé", "R1 — orchestrate.worktrees: oui (valeur non booléenne) est refusé à la lecture de la config"]
+  - id: R2
+    cas: [C1]
+    enonce: "Seuls les lots dont le dépôt est sur une branche et dont aucun dépôt voisin (repos:) n'est partagé avec un autre lot du groupe passent en worktree ; les autres restent à la suite dans leur file, avec un avertissement dans le journal qui dit pourquoi."
+    statut: sourcee
+    source: "src/orchestrate/pool.ts:9-11 (deux lots qui partagent un dépôt voisin sont dans la même file) et cycle.ts:786-789 (le lot repose sur une branche) : le worktree ne remplace pas ces gardes"
+    tests: ["R2 — dépôt en HEAD détaché : lots à la suite et avertissement", "R2 — deux lots partageant un voisin : même file, aucun worktree", "R2 — un lot seul d'un dépôt : joué dans le dépôt, pas de worktree"]
+  - id: R3
+    cas: [C1]
+    enonce: "Le parallélisme interne à un dépôt est borné par le plafond de sessions de la vague (--max-sessions) : au plus ce nombre de lots du groupe jouent en même temps, un lot sans créneau attend sans être rendu."
+    statut: sourcee
+    source: "demande du lot : « avancent en parallèle dans la limite des créneaux » ; plafond command.ts:111-112 et pool.ts:5"
+    tests: ["R3 — trois lots indépendants d'un dépôt, plafond 2 : jamais plus de deux sessions simultanées", "R3 — plafond 1 : les lots s'enchaînent, aucun refus"]
+  - id: R4
+    cas: [C1]
+    enonce: "Un lot qui dépend d'un lot du même dépôt (dependsOn) attend que celui-ci soit ready ET intégré avant de créer son worktree, qui part alors du sommet de la branche du dépôt ; un prédécesseur rendu ou en échec le rend aussi, comme aujourd'hui."
+    statut: sourcee
+    source: "src/orchestrate/pool.ts:39-53 (un lot attend ses dépendances ready, rendu si une dépendance est rendue ou en échec) ; le point « intégré » est la conséquence du départ depuis le sommet"
+    tests: ["R4 — B dépend de A : le worktree de B naît après l'intégration de A et contient ses commits", "R4 — A rendu sur conflit : B est rendu « dépendance non prête dans la vague : A »"]
+  - id: R5
+    cas: [C1]
+    enonce: "Quand le worktree ou la branche d'un lot ne peut être créé, ce lot seul est rendu au lead avec la cause git ; les autres lots du groupe continuent et le verrou de dépôt n'est pas touché."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:790-796 (une remise de branche impossible rend le lot, l'orchestrateur ne s'arrête pas, L214) ; baselineFailures (cycle.ts:219-249) traite déjà l'échec de `worktree add`"
+    tests: ["R5 — branche cadence/<vague>/<lot> déjà présente et non reconnue : lot rendu avec la cause, l'autre lot joue", "R5 — échec de git worktree add : aucun dossier ni branche laissés"]
+  - id: R6
+    cas: [C2]
+    enonce: "Un conflit au rebase d'intégration abandonne le rebase (git rebase --abort), ne touche pas la branche du dépôt, rend le lot au lead avec la liste des fichiers en conflit et conserve le worktree et la branche du lot tels qu'avant le rebase."
+    statut: sourcee
+    source: "demande du lot : « conflits rendus au lead » ; principe coded : un lot qui laisse le dépôt dans un état douteux est rendu, jamais réparé à l'aveugle (cycle.ts:809-814)"
+    tests: ["R6 — deux lots modifient la même ligne : le second est handed-back avec le fichier en conflit", "R6 — après le conflit, la branche du dépôt est au même sha qu'avant et le worktree du lot est intact", "R6 — aucun rebase en cours dans le worktree après l'échec"]
+  - id: R7
+    cas: [C2]
+    enonce: "Quand le rebase a changé les commits du lot, les commandes de test et de build du projet sont rejouées dans le worktree au sommet rebasé avant l'avance de la branche ; un rouge nouveau rend le lot et laisse la branche du dépôt intacte. Les rouges déjà présents au sha de base (baseline, L213) ne comptent pas."
+    statut: hypothese
+    si_faux: "Si deux lots sans conflit textuel ne peuvent pas se casser mutuellement, la relance est du temps perdu et se retire ; si au contraire elle manque, un sommet intégré rouge n'est vu qu'à la livraison."
+    tests: ["R7 — rebase non vide puis test rouge au sommet : branche du dépôt inchangée, lot rendu", "R7 — fast-forward pur : aucune relance des tests", "R7 — rouge présent au sha de base : ne rend pas le lot"]
+  - id: R8
+    cas: [C2]
+    enonce: "L'avance de la branche du dépôt (git merge --ff-only dans son arbre) n'est tentée que si ce dépôt n'a aucun fichier suivi modifié ; sinon le lot est rendu avec la liste de ces fichiers et sa branche est conservée, sans toucher l'arbre du lead."
+    statut: sourcee
+    source: "src/orchestrate/command.ts:361 (un dépôt à fichiers suivis modifiés est refusé : l'arbre du lead n'est jamais écrasé) ; cycle.ts:141-143 (arbre sale : lot rendu)"
+    tests: ["R8 — arbre du lead modifié pendant la vague : lot rendu, fichiers listés, arbre inchangé", "R8 — arbre propre : branche avancée en fast-forward"]
+  - id: R9
+    cas: [C2]
+    enonce: "Le verdict d'un lot intégré est enregistré pour le sha intégré dans la branche du dépôt : après un rebase non vide, le programme ne laisse jamais au plan un sha de verdict qui n'existe pas dans l'historique de la branche, et le lot reste conforme tant que le diff du lot est inchangé."
+    statut: hypothese
+    si_faux: "Si le verdict doit rester lié au sha relu (pré-rebase), le plan garde un sha absent de la branche et la porte « commit postérieur à la revue » rend le lot ; voir la question sur le sha du verdict."
+    tests: ["R9 — après rebase non vide, le sha du verdict est dans l'historique de la branche du dépôt", "R9 — fast-forward pur : le sha du verdict est celui relu"]
+  - id: R10
+    cas: [C2]
+    enonce: "Les intégrations d'un dépôt sont sérialisées par un verrou propre au dépôt, pris dans l'état commun aux worktrees (celui de deliver), avec le même mécanisme (pid + heure de démarrage, périmé si le porteur est mort) que le verrou d'orchestration ; un lot qui attend ce verrou ne retient aucun créneau de session."
+    statut: sourcee
+    source: "src/orchestrate/lock.ts:26, :57 et :99 (takeLock/releaseLock, porteur vivant ou périmé) et src/state.ts:14 (état commun à tous les worktrees) : mécanisme existant réutilisé sous un autre nom"
+    tests: ["R10 — deux lots prêts en même temps : intégrés l'un après l'autre, historique linéaire", "R10 — verrou d'intégration d'un pid mort : retiré, l'intégration passe", "R10 — pendant l'attente du verrou aucun créneau de session n'est occupé"]
+  - id: R11
+    cas: [C3]
+    enonce: "À la reprise, le worktree de chaque lot suit les mêmes gardes qu'un dépôt : un fichier suivi modifié refuse la reprise (code 2) avant toute écriture, et le worktree d'un lot dont la session a été interrompue est rejoué, pas recréé (ses commits et son arbre sont gardés)."
+    statut: sourcee
+    source: "src/orchestrate/command.ts:1105 (arbre sale refusé avant toute écriture à la reprise) et :1082 (étape en cours interrompue)"
+    tests: ["R11 — reprise avec worktree de lot sale : code 2, état de la vague inchangé", "R11 — reprise d'un lot suspendu : même chemin de worktree, mêmes commits", "R11 — worktree enregistré mais dossier disparu : élagué et recréé sur la branche existante"]
+  - id: R12
+    cas: [C3]
+    enonce: "Un worktree n'est retiré que par le programme et seulement quand sa branche est fusionnée dans celle du dépôt et son arbre propre ; un lot rendu, retiré par --drop, en échec ou en conflit garde son worktree et sa branche, et le journal en donne le chemin."
+    statut: hypothese
+    si_faux: "Si le retrait automatique des worktrees des lots rendus est préféré, des commits non intégrés du lot ne seraient plus que dans le reflog : action destructive, d'où le choix prudent (aucune suppression sans fusion)."
+    tests: ["R12 — lot ready intégré : worktree et branche retirés", "R12 — lot rendu : worktree et branche conservés et chemin journalisé", "R12 — branche non fusionnée : jamais supprimée (aucun -D)"]
+  - id: R13
+    cas: [C4, C1]
+    enonce: "Le verrou d'orchestration du dépôt reste pris une fois par vague, au dépôt du projet, et libéré par freeRepo quand tous ses lots sont finis ET intégrés ou rendus ; une seconde vague visant ce dépôt est refusée avant toute écriture avec le message existant, sans créer de worktree."
+    statut: sourcee
+    source: "src/orchestrate/command.ts:365 (refus « une orchestration y est déjà en cours »), :850-853 (prise du verrou) et :947-949 (libération quand tous les lots du dépôt sont finis)"
+    tests: ["R13 — seconde vague sur un dépôt à worktrees : refus, aucun worktree créé", "R13 — le verrou n'est libéré qu'après l'intégration du dernier lot"]
+  - id: R14
+    cas: [C1]
+    enonce: "Le worktree et la branche d'un lot ont des noms déterministes (worktree : sous le dossier de la vague, hors du dépôt ; branche : cadence/<vague>/<slug du lot>) et rien d'autre n'est stocké : la reprise les retrouve par ces noms."
+    statut: hypothese
+    si_faux: "Si le chemin doit être mémorisé dans l'état du lot (LotState), c'est un changement de format de l'état de vague : voir la question sur le stockage."
+    tests: ["R14 — le chemin du worktree se déduit de la vague et du lot, sans champ ajouté à l'état du lot", "R14 — l'état d'une vague écrit avant L279 se relit sans changement"]
+  - id: R15
+    cas: [C1]
+    enonce: "Les sessions d'un lot en worktree n'écrivent que dans ce worktree : le dépôt du lead n'est modifié que par l'avance de C2, et le contrôle « HEAD déplacé » (L214) et la détection de push s'appliquent à chaque worktree comme à un dépôt."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:766-815 (incidents push et hook, HEAD déplacé, surveillés par dépôt) ; src/orchestrate/registry.ts:217-233 (les worktrees d'un dépôt sont reconnus par leur .git commun)"
+    tests: ["R15 — un push depuis un worktree de lot arrête la vague (incident)", "R15 — un lot dont la session change de branche dans son worktree est rendu « HEAD déplacé »"]
+  - id: R16
+    cas: [C1]
+    enonce: "Une étape d'un lot qui lance l'application (L60) ne part pas pendant qu'une autre en a lancé une dans le même dépôt : ces étapes sont sérialisées par dépôt, les autres étapes de lots continuent en parallèle."
+    statut: hypothese
+    si_faux: "Si les ports de l'application sont choisis librement par lot, la sérialisation est un ralentissement inutile ; si elle manque, deux applications se disputent un port et l'étape UX échoue (lot rendu à tort)."
+    tests: ["R16 — deux lots à écran : une seule application lancée à la fois dans le dépôt", "R16 — un lot sans écran n'est pas retardé par l'étape UX d'un autre"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate
+    entree: "<projet>:<lot>… [--budget 2M] [--max-sessions n] ; cadence.yaml : orchestrate.worktrees: true|false (défaut false)"
+    sortie: "lots du même dépôt joués en parallèle dans des worktrees, intégrés un par un à la branche du dépôt ; tableau de fin de vague avec, par lot rendu, le chemin de son worktree ; code 0 si tous prêts, comme aujourd'hui"
+    erreurs:
+      - { code: log warn, message: "orchestrate : <dépôt> : worktrees demandés mais <raison> : lots joués à la suite" }
+      - { code: log error, message: "cadence.yaml : orchestrate.worktrees doit être true ou false" }
+      - { code: log error, message: "orchestrate : <projet>:<lot> : worktree impossible : <cause git>" }
+      - { code: log error, message: "orchestrate : <dépôt> : une orchestration y est déjà en cours (<vague>, pid <pid>)" }
+    regles: [R1, R2, R3, R4, R5, R13, R14, R15, R16]
+  - id: A2
+    appel: commande cadence orchestrate --resume
+    entree: "<vague> [--drop projet:lot] [--answer …] [--budget …]"
+    sortie: "lots repris dans leurs worktrees retrouvés ; lot retiré par --drop : worktree conservé et chemin journalisé"
+    erreurs:
+      - { code: log error, message: "orchestrate : <dépôt> : arbre sale, <n> fichier(s) suivi(s) modifié(s) : <fichiers>" }
+      - { code: log warn, message: "orchestrate : <projet>:<lot> : worktree conservé : <chemin> (branche <branche>)" }
+    regles: [R11, R12, R13, R14]
+  - id: A3
+    appel: commande cadence orchestrate (intégration d'un lot prêt)
+    entree: "le lot passe à ready dans son worktree ; verrou d'intégration du dépôt"
+    sortie: "branche du dépôt avancée (fast-forward ou après rebase), lot ready, worktree et branche retirés ; journal « <projet>:<lot> intégré : <sha départ>..<sha intégré> »"
+    erreurs:
+      - { code: log warn, message: "<projet>:<lot> → handed-back — intégration impossible : conflit en rebasant <branche> sur <branche du dépôt> (fichiers : <liste>) ; worktree conservé : <chemin>" }
+      - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : tests rouges au sommet intégré (<échecs>) ; branche du dépôt inchangée, worktree conservé : <chemin>" }
+      - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : arbre du dépôt modifié (<fichiers>) ; branche conservée : <branche>" }
+    regles: [R6, R7, R8, R9, R10, R12]
+
+donnees:
+  - { id: D1, objet: "branche git cadence/<vague>/<slug> et worktree <dossier de la vague>/worktrees/<slug> (créés et retirés par le programme)", existant: false, modification: aucune, note: "objets git locaux, jamais poussés (hook pre-push de garde inchangé) ; nom déterministe, rien n'est stocké (R14)" }
+  - { id: D2, objet: "verrou d'intégration du dépôt (fichier dans l'état commun aux worktrees, format OLock de lock.ts)", existant: false, modification: aucune, note: "même format que orchestrate.lock, autre nom ; vidé à la libération ou périmé si le porteur est mort" }
+  - { id: D3, objet: "cadence.yaml : clé orchestrate.worktrees (booléen)", existant: false, modification: aucune, note: "clé nouvelle, absente = comportement actuel (R1)" }
+  - { id: D4, objet: "état de vague et de lot (.cadence/runs/<vague>/*.json, LotState)", existant: true, modification: aucune, note: "format inchangé (R14) : un état écrit avant L279 se relit sans changement" }
+  - { id: D5, objet: "plan du projet (verdict de revue, plan.recordReview) commité sur la branche du lot puis intégré", existant: true, modification: aucune, note: "même format ; seul le sha enregistré peut changer après un rebase (R9), voir la question" }

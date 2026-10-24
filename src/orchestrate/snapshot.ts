@@ -154,3 +154,13 @@ export function spawnReexec(toolDir: string, argv: string[], env: NodeJS.Process
     });
   });
 }
+
+/** L'instantané de la vague connaît-il `--resume --replay` (L279, reprise d'un lot rendu sur une écriture de plan refusée) ? Sans instantané : on suppose que oui. */
+export function waveReadsReplay(waveDir: string): boolean {
+  if (!snapshotExists(waveDir)) return true;
+  try {
+    return readFileSync(join(toolDirOf(waveDir), 'dist', 'orchestrate', 'command.js'), 'utf8').includes("'--replay'");
+  } catch {
+    return false;
+  }
+}

@@ -23,6 +23,7 @@ cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redr
 cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
 cadence orchestrate --resume <wave> --budget maritime:B26.4=+300k   # replay a lot handed back for its budget, with the budget raised (below)
 cadence orchestrate --resume <wave> --integrate ccc:L29   # replay a lot handed back at the integration step of a worktree wave (« One worktree per lot »)
+cadence orchestrate --resume <wave> --replay ccc:L29      # same, and also a lot handed back on a refused plan write (fiche notes) at the step it had reached
 cadence orchestrate --remove-worktree ccc:L29 [--abandon-commits]   # remove the kept worktree and branch of a lot (« One worktree per lot »)
 cadence orchestrate --resume … --dry-run                         # refused: a resume cannot be simulated, it writes the wave state and relaunches sessions
 cadence orchestrate --drop ccc:L29 [--wave <wave>]   # from another terminal: take a lot out of the running wave
@@ -504,7 +505,13 @@ nothing below applies and the wave behaves as before; any other value is refused
   red tests, blocking finding of the short review, plan write refused) keeps `next: integrate`, its worktree and its branch. **Only
   `--resume <wave> --integrate <project:lot>` replays it** (repeatable): a plain `--resume`, `--drop`, `--answer` or `--budget` never does. The lot
   restarts at `suspended`, step `integrate` (`<project>:<lot> → suspended — intégration reprise (--resume --integrate)`), and the rebase and the checks run
-  again — after a conflict the lead resolves it by hand in the worktree and commits, otherwise the lot is handed back again. Refused (exit 2, before
+  again — after a conflict the lead resolves it by hand in the worktree and commits, otherwise the lot is handed back again.
+  **A lot handed back on a refused plan write outside the integration** (the fiche's hypothesis notes, or the minor findings of the fiche review: the repository
+  is not on its start branch, holds a modified tracked file or the lock stayed held) keeps the step it had reached (`next`, e.g. `implement` or `fiche`) and its
+  worktree, and is replayed the same way by the general option `--resume <wave> --replay <project:lot>` (lead's decision of 24 October: the integration option,
+  generalised and renamed; `--integrate` keeps meaning the integration step only). The lot restarts at `suspended` on that step
+  (`<project>:<lot> → suspended — écriture du plan reprise à l'étape <step> (--resume --replay)`): the notes are written again without duplicates (a review of the
+  fiche is replayed and counted once). `--replay` is refused for a lot handed back in any other way, with the same exit code and rules as `--integrate`. Refused (exit 2, before
   anything is written, like the other resume refusals): a lot unknown or named twice, also named by `--drop`, `--answer` or `--budget`, a lot that is not
   handed back at the integration step (`le lot n'est pas rendu à l'étape d'intégration (<status>, étape <step or aucune> : <cause>)`: a lot handed back for
   review, tests or budget has `next` empty and takes the usual paths), and, like any resume, a repository with a modified tracked file.

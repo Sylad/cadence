@@ -21,7 +21,7 @@ import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specScreen, specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { Budget, DROPPED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
+import { Budget, DROPPED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -33,7 +33,7 @@ import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable } from './table.js';
-import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
+import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -146,8 +146,8 @@ export interface Args {
   drop: { project?: string; lot: string }[];
   /** `--stop-after-current` (L79) : la vague vivante finit ses sessions en cours puis s'arrête, reprenable. */
   stopAfterCurrent: boolean;
-  /** `--integrate projet:lot` (L279, R27), avec `--resume` : rejoue à l'intégration un lot rendu à cette étape (`next: integrate`) ; ni `--resume` seul ni `--drop`, `--answer`, `--budget` ne le font. */
-  integrate: { project?: string; lot: string }[];
+  /** `--integrate projet:lot` (L279, R27), avec `--resume` : rejoue à l'intégration un lot rendu à cette étape (`next: integrate`) ; ni `--resume` seul ni `--drop`, `--answer`, `--budget` ne le font. `--replay projet:lot` (L279, R26/R27, décision du lead du 24-10) en est la forme générale : elle rejoue aussi un lot rendu sur « écriture de plan refusée » (notes d'hypothèses ou de mineurs de la fiche) à l'étape gardée. */
+  integrate: { project?: string; lot: string; replay?: boolean }[];
   /** `--remove-worktree projet:lot` (L279, R20) : retire le worktree et la branche conservés d'un lot ; `--abandon-commits` confirme l'abandon de ses commits non intégrés. */
   removeWorktree?: { project?: string; lot: string };
   abandonCommits: boolean;
@@ -232,6 +232,7 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     else if (t === '--drop') a.drop.push(lotArg(value(t)));
     else if (t === '--stop-after-current') a.stopAfterCurrent = true;
     else if (t === '--integrate') a.integrate.push(lotArg(value(t)));
+    else if (t === '--replay') a.integrate.push({ ...lotArg(value(t)), replay: true });
     else if (t === '--remove-worktree') a.removeWorktree = lotArg(value(t));
     else if (t === '--abandon-commits') a.abandonCommits = true;
     else if (t === '--continue') a.continue = true;
@@ -616,7 +617,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.resume !== undefined && args.dryRun) throw new RafError('--resume ne se combine pas avec --dry-run (la reprise écrit l\'état de la vague et relance les sessions, elle ne se simule pas)');
   if (args.lotBudgets.length && args.resume === undefined) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume");
   // L279 : --integrate rejoue une intégration rendue, donc une vague arrêtée ; --abandon-commits ne vaut qu'avec --remove-worktree.
-  if (args.integrate.length && args.resume === undefined) throw new RafError("--integrate ne vaut qu'avec --resume");
+  if (args.integrate.length && args.resume === undefined) throw new RafError(`${args.integrate.some((t) => !t.replay) ? '--integrate' : '--replay'} ne vaut qu'avec --resume`);
   if (args.abandonCommits && !args.removeWorktree) throw new RafError("--abandon-commits ne vaut qu'avec --remove-worktree");
   if (args.removeWorktree && (args.lots.length || args.resume !== undefined || args.status !== undefined || args.continue || args.dryRun || args.drop.length || args.stopAfterCurrent || args.waits)) throw new RafError("--remove-worktree ne se combine avec aucune autre action");
   // L258 : l'objectif donné ne vaut que pour UN lot lancé (la clé goal: du lot sert quand plusieurs partent ; --continue tire ses lots lui-même).
@@ -657,7 +658,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);
@@ -1123,8 +1124,8 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     // La reprise tourne sur l'instantané de la vague, jamais sur le dist/ courant ; une vague d'avant L61 n'en a pas.
     if (snapshotExists(store.dir)) {
       // Une vague d'avant L223 refuserait « projet:lot=+N » comme budget invalide : seul le lot visé justifie de la rejouer avec le dist/ courant.
-      if ((!args.lotBudgets.length || waveReadsLotBudget(store.dir)) && (!args.integrate.length || waveReadsIntegrate(store.dir))) return deps.snapshot.reexec(toolDirOf(store.dir), argv, io.env, io);
-      io.err(`orchestrate : vague ${store.id} : son instantané ne connaît pas ${args.lotBudgets.length && !waveReadsLotBudget(store.dir) ? '--budget projet:lot=+N (antérieur à L223)' : '--integrate (antérieur à L279)'} : reprise avec le dist/ et les gabarits courants`);
+      if ((!args.lotBudgets.length || waveReadsLotBudget(store.dir)) && (!args.integrate.length || waveReadsIntegrate(store.dir)) && (!args.integrate.some((t) => t.replay) || waveReadsReplay(store.dir))) return deps.snapshot.reexec(toolDirOf(store.dir), argv, io.env, io);
+      io.err(`orchestrate : vague ${store.id} : son instantané ne connaît pas ${args.lotBudgets.length && !waveReadsLotBudget(store.dir) ? '--budget projet:lot=+N (antérieur à L223)' : `${args.integrate.some((t) => t.replay) && waveReadsIntegrate(store.dir) ? '--replay' : '--integrate'} (antérieur à L279)`} : reprise avec le dist/ et les gabarits courants`);
     } else {
       io.err(`orchestrate : vague ${store.id} sans instantané (antérieure à L61) : reprise avec le dist/ et les gabarits courants`);
     }
@@ -1183,18 +1184,19 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   const budgeted = args.lotBudgets.map((b) => lots.filter((x) => x.lot === b.lot && (b.project ? x.project === b.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
   for (const t of args.integrate) {
     const matches = lots.filter((x) => x.lot === t.lot && (t.project ? x.project === t.project : true));
+    const opt = t.replay ? '--replay' : '--integrate';
     const where = `${t.project ? `${t.project}:` : ''}${t.lot}`;
     if (matches.length !== 1) {
-      refusals.push(matches.length ? `--integrate ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--integrate ${where} : lot inconnu dans la vague ${wave.id}`);
+      refusals.push(matches.length ? `${opt} ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `${opt} ${where} : lot inconnu dans la vague ${wave.id}`);
       continue;
     }
     const l = matches[0];
     const key = lotKey(l.project, l.lot);
-    if (integ.includes(l)) refusals.push(`--integrate ${key} : lot visé deux fois`);
-    else if (dropped.includes(l)) refusals.push(`--integrate ${key} : lot aussi retiré par --drop`);
-    else if (answered.includes(l)) refusals.push(`--integrate ${key} : lot aussi visé par --answer`);
-    else if (budgeted.includes(l)) refusals.push(`--integrate ${key} : lot aussi visé par --budget`);
-    else if (l.status !== 'handed-back' || l.next !== 'integrate') refusals.push(`--integrate ${key} : le lot n'est pas rendu à l'étape d'intégration (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})`);
+    if (integ.includes(l)) refusals.push(`${opt} ${key} : lot visé deux fois`);
+    else if (dropped.includes(l)) refusals.push(`${opt} ${key} : lot aussi retiré par --drop`);
+    else if (answered.includes(l)) refusals.push(`${opt} ${key} : lot aussi visé par --answer`);
+    else if (budgeted.includes(l)) refusals.push(`${opt} ${key} : lot aussi visé par --budget`);
+    else if (l.status !== 'handed-back' || (l.next !== 'integrate' && !(t.replay && planNoteHandBack(l)))) refusals.push(`${opt} ${key} : le lot n'est pas rendu ${t.replay ? "à l'étape d'intégration ni sur une écriture de plan refusée" : "à l'étape d'intégration"} (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})`);
     else integ.push(l);
   }
   // Un lot retiré ne jouera rien : il ne subit ni le verrou du dépôt, ni le .nvmrc, ni l'arbre sale — un refus pour LUI ne doit pas faire échouer la reprise des autres.
@@ -1268,10 +1270,13 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   }
   for (const l of integ) {
     const k = lotKey(l.project, l.lot);
+    const planNote = l.next !== 'integrate'; // rendu sur une écriture de plan refusée (--replay) : le lot repart de l'étape gardée
+    if (planNote && l.outcome?.startsWith(HYPOTHESES_HANDBACK)) l.hypotheses = undefined; // les notes d'hypothèses se posent de nouveau (sans doublon) à l'entrée de l'étape
     l.status = 'suspended';
     l.outcome = null;
-    store.journal(`${k} → suspended — intégration reprise (--resume --integrate)`);
-    io.out(`${k} → suspended — intégration reprise (--resume --integrate)`);
+    const text = planNote ? `écriture du plan reprise à l'étape ${l.next} (--resume --replay)` : 'intégration reprise (--resume --integrate)';
+    store.journal(`${k} → suspended — ${text}`);
+    io.out(`${k} → suspended — ${text}`);
   }
   for (const l of live) {
     if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';

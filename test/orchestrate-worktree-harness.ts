@@ -11,7 +11,7 @@ import { tempDir } from './helpers.js';
 
 // L279 — doublures communes aux tests e2e des worktrees de lot : vrais dépôts git, sessions simulées.
 export const WAVE = '2026-10-04-1412';
-export type Kind = 'implement' | 'review' | 'fix' | 'review-small' | 'ux';
+export type Kind = 'implement' | 'review' | 'fix' | 'review-small' | 'ux' | 'spec' | 'fiche';
 export type Handler = (cwd: string, brief: string, args: string[]) => LaunchOutcome | Promise<LaunchOutcome>;
 
 export interface LotSpec {
@@ -19,6 +19,8 @@ export interface LotSpec {
   estimate?: number;
   after?: string[];
   visible?: boolean;
+  /** Lot sans écran à fiche back (`spec: true`). */
+  spec?: boolean;
   /** Dépôts voisins (clé de lot `repos:`), chemins relatifs au dépôt du projet. */
   repos?: string[];
   /** Sous-tâches du lot (`L1/t1`…). */
@@ -36,7 +38,7 @@ export function setup(lots: LotSpec[] = [{ title: 'un' }, { title: 'deux' }], ya
   git(repo, 'config', 'commit.gpgsign', 'false');
   const plan = Plan.create(join(repo, 'docs/plan/raf.yaml'), 'a', 'L', '2026-09-01');
   for (const l of lots) {
-    const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 0.5, after: l.after, visible: l.visible });
+    const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 0.5, after: l.after, visible: l.visible, spec: l.spec });
     if (l.repos) plan.setRepos(id, l.repos.map((path) => ({ path })));
     for (const t of l.tasks ?? []) plan.addTask(id, t);
   }

@@ -1337,7 +1337,7 @@ async function noteHypotheses(c: LotCtx, lines: string[], sujet: string): Promis
     return commitPlan(c, `plan: ${l.lot} hypothèses de la fiche ${sujet} notées (orchestrate ${c.wave.id})`);
   });
   if (dirty) {
-    handBackPlan(c, `notes des hypothèses de la fiche : ${dirty}`);
+    handBackPlan(c, `${HYPOTHESES_HANDBACK}${dirty}`);
     return true;
   }
   return false;
@@ -1365,7 +1365,7 @@ async function noteMinors(c: LotCtx, rep: ReviewReport, label: string): Promise<
     return commitPlan(c, `plan: ${c.lot.lot} mineurs de la revue de ${label} notés (orchestrate ${c.wave.id})`);
   });
   if (dirty) {
-    handBackPlan(c, `notes des mineurs de la revue de ${label} : ${dirty}`);
+    handBackPlan(c, `${MINORS_HANDBACK}${label} : ${dirty}`);
     return true;
   }
   return false;
@@ -1411,10 +1411,11 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
   }
   const summary = summarize(rep, done.after.head ?? '');
   const passes = (l[r.kind]?.passes ?? 0) + 1;
-  l[r.kind] = { passes, conforme: summary.conforme, verdict: summary.verdict };
   // Fiche : les mineurs sont des notes du lot (design § 4). Maquette : inchangé (propositions du tableau final).
   addProposals(c, rep, r.kind, r.kind !== 'fiche');
+  // Un lot rendu sur le refus d'écrire ses notes (R26) rejoue cette revue à la reprise : le compte des passes n'est posé qu'une fois les notes écrites.
   if (r.kind === 'fiche' && (await noteMinors(c, rep, `la ${r.label}`))) return;
+  l[r.kind] = { passes, conforme: summary.conforme, verdict: summary.verdict };
   const constats = blockingConstats(rep, r.source);
   if (r.kind === 'maquette' && passes >= 2) {
     // Lu sur rep.constats : blockingConstats ne garde pas `inchange`. Seul le booléen vrai est une marque (checkShape ne descend pas dans constats[]).
@@ -2083,6 +2084,16 @@ async function planWrite(c: LotCtx, write: () => Promise<string | null>): Promis
     grant.release();
   }
 }
+
+/** Début de la cause d'un lot rendu sur le refus d'écrire les notes d'hypothèses de sa fiche, et des mineurs de la revue de sa fiche (handBackPlan). */
+export const HYPOTHESES_HANDBACK = 'notes des hypothèses de la fiche : ';
+const MINORS_HANDBACK = 'notes des mineurs de la revue de ';
+
+/**
+ * Lot rendu sur une écriture de plan refusée hors intégration (R26) : en worktree il garde l'étape atteinte (`next`), et `--resume --replay` le rejoue à cette étape
+ * (décision du lead du 24-10). Aucun champ d'état : la cause rendue le désigne.
+ */
+export const planNoteHandBack = (l: LotState): boolean => l.status === 'handed-back' && l.next !== null && l.next !== undefined && !!l.outcome && (l.outcome.startsWith(HYPOTHESES_HANDBACK) || l.outcome.startsWith(MINORS_HANDBACK));
 
 /** Une écriture de plan refusée rend le lot au lead ; en worktree, il garde l'étape atteinte pour la reprise (R26), sinon `stop` la vide comme avant. */
 function handBackPlan(c: LotCtx, why: string): void {

@@ -531,8 +531,13 @@ nothing below applies and the wave behaves as before; any other value is refused
   (`orchestrate : <project>:<lot> : branche cadence/<wave>/… d'une vague précédente reprise (N commit(s) non intégré(s))`). Nothing is recovered when the branch is integrated,
   started from another branch, is not cadence's, or belongs to a live wave; the lot then starts afresh as before. A branch whose worktree holds a modified tracked file (the same
   guard as `--resume`), or one of whose commits modifies the plan or a file generated with it, is not recovered either (it would end in an integration conflict): the journal says why
-  (`… d'une vague précédente non reprise : <cause>`), the lot starts afresh and the kept branch stays untouched for the lead to clean or integrate by hand. The lead may also integrate by hand: rebase the kept branch on
-  the repository's branch in its worktree, run the checks, `git merge --ff-only <branch>` from the repository, write the verdict, then `cadence orchestrate --remove-worktree <project>:<lot> [--wave <wave>]`.
+  (`… d'une vague précédente non reprise : <cause>`), the lot starts afresh and the kept branch stays untouched for the lead to clean or integrate by hand. The same refusal, with git's own message as the cause,
+  answers a `git worktree move` or `git branch -m` that fails (a locked worktree for instance): the move is undone and nothing is renamed. A lot handed back **at the integration step** (`next: integrate`) never takes this path: its
+  branch keeps its own wave's name and is replayed by `--resume --integrate`, so a kept branch of another wave is not renamed in its place. The recovery path needs the worktree mode on (`CADENCE_EXPERIMENTAL_WORKTREES=1`): without the
+  variable a new wave leaves every kept branch where it is. The branch of a lot of a wave started at the repository root (`.` as project) is `cadence/<wave>/_--<lot>` (the leading dot of the project becomes `_`).
+  **Integrating by hand** (a refused branch, or a lead who prefers to): in the kept worktree (`cadence orchestrate --status` lists it), (1) `git rebase <repository's branch>` and settle the conflicts; (2) run the project's tests and
+  build there; (3) from the repository, `git merge --ff-only <branch>` (the branch of the repository must not have moved since the rebase: otherwise rebase again); (4) write the verdict of the lot in the plan (by
+  the lead, never by a session); (5) `cadence orchestrate --remove-worktree <project>:<lot> [--wave <wave>]`, which removes the worktree and the branch now that all its commits are integrated.
 - **Nothing is deleted with unintegrated commits.** A worktree whose commits are all in the repository's branch is removed after the integration, by a guarded
   branch deletion (never `-D`). A lot handed back, dropped (`--drop`), failed or in conflict keeps its worktree and branch, and the journal gives the path
   (`orchestrate : <project>:<lot> : worktree conservé : <path> (branche <branch>)`). The final table, `cadence orchestrate --status` and `cadence lead tour`

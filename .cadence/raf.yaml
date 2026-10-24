@@ -3546,9 +3546,10 @@ lots:
     finished: 2026-10-24
   - id: L315
     title: "orchestrate overBudget : un lot repris de sa branche et jamais revu (resumedReviewed faux) est rendu avec la cause « tests rouges après la dernière revue de la branche reprise » au lieu de « après l'implémentation » (cycle.ts:982, revue L311) ; conditionner le libellé à resumedReviewed ; test des deux libellés"
-    status: todo
+    status: doing
     estimate: 0.05
     created: 2026-10-24
+    started: 2026-10-24
   - id: L316
     title: "Essai 3 mesuré du mode worktree (suite L310) : deux lots neufs et indépendants (L315 dans src/orchestrate, L265 dans src/ref) avec orchestrate.worktrees: true et CADENCE_EXPERIMENTAL_WORKTREES=1, après L311 et L314 en service (b2e6273) ; mesure : temps de mur contre somme des lots, intégrations automatiques (rebase, union CHANGELOG L314, verdict reporté ou revue courte), incidents ; conclusion en note (proposer l'activation par défaut à Sylvain, garder expérimental, ou corriger) ; config remise à false après l'essai sauf décision"
     status: doing

@@ -375,9 +375,10 @@ describe('R11 — documentation', () => {
   });
 
   it('R11 — le CHANGELOG cite L251', () => {
-    const unreleased = read('CHANGELOG.md').split(/^## \[1\./m)[0]!;
-    expect(unreleased).toContain('L251');
-    expect(unreleased).toContain('uses');
+    // whole changelog: the entry stays found after a release renames [Unreleased]
+    const changelog = read('CHANGELOG.md');
+    expect(changelog).toContain('L251');
+    expect(changelog).toContain('uses');
   });
 
   it('R11 — raf aide liste raf uses', () => {

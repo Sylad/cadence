@@ -249,7 +249,7 @@ describe('documentation (L255)', () => {
     expect(read('docs/lead.md')).toContain('cadence lead hold');
     expect(read('docs/orchestrate.md')).toContain('sessions du lead');
     expect(read('README.md')).toContain('lead hold');
-    const unreleased = read('CHANGELOG.md').split('## [Unreleased]')[1]!.split(/\n## \[/)[0]!;
-    expect(unreleased).toContain('L255');
+    // whole changelog: the entry stays found after a release renames [Unreleased]
+    expect(read('CHANGELOG.md')).toContain('L255');
   });
 });

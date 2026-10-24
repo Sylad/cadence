@@ -102,6 +102,38 @@ describe('porte « code modifié sans test » (L287)', () => {
     expect(kinds(h)).toEqual(['implement', 'review']);
   });
 
+  it('R13 — budget du lot : la porte ne joue pas quand la correction et la revue qui la suit ne sont plus payées, avertissement et revue', async () => {
+    const h = harness({ script: { implement: [impl('a.ts')], review: [ok] } });
+    const c = h.lot('L1', { budget: 100 }, { testGate: GATE });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.warnings.join('\n')).toContain('porte « code sans test » non jouée');
+    expect(c.lot.warnings.join('\n')).toContain('budget');
+  });
+
+  it('R14 — deux passes de correction déjà faites : avertissement, pas de troisième passe, la revue part', async () => {
+    const h = harness({ script: { implement: [impl('a.ts')], review: [ok] } });
+    const c = h.lot('L1', { pass: 2 }, { testGate: GATE });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.warnings.join('\n')).toContain('porte « code sans test » non jouée');
+    expect(c.lot.warnings.join('\n')).toContain('2 passe(s)');
+  });
+
+  it('R15 — la passe des mineurs ne joue pas la porte : du code sans test y passe, la revue courte part', async () => {
+    const h = harness({ script: { fix: [fix('b.ts')], 'review-small': [ok] } });
+    const c = h.lot('L1', {}, { testGate: GATE });
+    commitFile(h.repo, 'a.ts', 'feat(L1): a');
+    c.lot.minorPass = true;
+    c.lot.minorFix = true;
+    c.lot.constats = [{ source: 'code', gravite: 'mineur', fichier: 'a.ts', ligne: 1, texte: 'nommage' }];
+    c.lot.next = 'fix';
+    await runLot(c);
+    expect(kinds(h)).toEqual(['fix', 'review-small']);
+    expect(c.lot.warnings.join('\n')).not.toContain('porte');
+  });
+
   it('R12 — docs/orchestrate.md et le README décrivent la porte et sa clé', () => {
     const doc = docText();
     expect(doc).toContain('testGate');

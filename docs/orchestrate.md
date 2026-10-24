@@ -176,8 +176,8 @@ cites it, all sessions included). If it touches code (`testGate.code`, minus `te
 file (`testGate.tests`), the lot goes straight to a correction pass — no review session is spent finding what a file list
 already shows (a missing test was 32 % of the major findings of the 24-10 audit, one pass ≈ 190 k tokens). The pass counts
 as one of the two correction passes, its brief names the files, and the gate plays once per lot: if the correction adds no
-test, the review goes ahead and judges it. It does not play during the minors pass, nor when the two passes are already used
-(a warning says so). Absent key: no gate.
+test, the review goes ahead and judges it. It does not play during the minors pass, nor when the two passes are already used,
+nor when the lot budget no longer pays the correction and the review after it (a warning says so each time; the review goes ahead). Absent key: no gate.
 
 ```yaml
 orchestrate:

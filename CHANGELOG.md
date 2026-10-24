@@ -55,10 +55,19 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `cadence corrections --since <date>`: only the lots of the waves created after the date | [1.5.1](#151---2026-10-16) |
 | `orchestrate.maquetteReviews`: how many times the mockup of a lot with a screen is reviewed (default 3) | [1.6.0](#160---2026-10-16) |
 | `cadence perf`: the workflow dashboard (speed next to quality, cost in euros, red deliveries), and the perf header of `cadence lead tour` | [1.8.0](#180---2026-10-16) |
+| `.cadence/raf.yaml` as the default plan, and `raf migrate [--dry-run]` to move a legacy `docs/plan/raf.yaml` and its readers | [1.9.0](#190---2026-10-24) |
+| `raf title <id> "…"`, `raf visible <id> on\|off`, `uses: [resource]` on a lot (`raf uses`), `goal:` / `--goal` on a lot | [1.9.0](#190---2026-10-24) |
+| `cadence lead hold <label> [--ttl]` / `lead release`: the lead's hand-started sessions counted in the free slots, an expired one flagged; shown by `cadence-hud` | [1.9.0](#190---2026-10-24) |
+| `cadence ref add\|measure\|check\|corpus\|eval`: reference documents outside the repository, measures on rendered pages, inventory schema, evaluation corpus and scoring | [1.9.0](#190---2026-10-24) |
+| `doc-keeper` agent and `docs.articles` (also the documents of a neighbouring repository), called by `cadence orchestrate` before the review when `docs.sync` reports a gap | [1.9.0](#190---2026-10-24) |
+| `orchestrate.testGate`: a lot whose commits touch code without a test goes to a correction pass before the review | [1.9.0](#190---2026-10-24) |
+| `orchestrate.precheck: local` pre-checks every lot with no commit, whatever its title | [1.9.0](#190---2026-10-24) |
+| `orchestrate.worktrees` (experimental, `CADENCE_EXPERIMENTAL_WORKTREES=1`): one git worktree per lot, `--resume --integrate\|--replay`, `--remove-worktree` | [1.9.0](#190---2026-10-24) |
+| `cadence deliver --sha <sha>` while a wave of the same repository runs, `CADENCE_DEPLOYED_FILE`, and the class and last lines of a red delivery in `deliveries-failed.log` | [1.9.0](#190---2026-10-24) |
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
 
-## [Unreleased]
+## [1.9.0] - 2026-10-24
 
 ### Fixed
 

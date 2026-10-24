@@ -6,7 +6,7 @@ des passes (§ « Causes des passes » : `cadence perf --json` et `cadence corre
     python3 -I docs/perf/ventilation.py <dossier des projets> [instant de gel]
 
 <dossier des projets> porte `.cadence/runs` (le chemin `.../.cadence/runs` lui-même est accepté) et les dépôts des projets : le script lit le plan
-de chacun (`docs/plan/raf.yaml`, ou le `plan.path` de son `cadence.yaml`) pour l'estimate des lots et les livrés, et lance `git diff --shortstat`
+de chacun (`.cadence/raf.yaml`, à défaut `docs/plan/raf.yaml`, ou le `plan.path` de son `cadence.yaml`) pour l'estimate des lots et les livrés, et lance `git diff --shortstat`
 dans le dépôt de chaque journal. Lecture seule : ni journal ni plan ni dépôt n'est écrit. Dépend de PyYAML (paquet système python3-yaml).
 
 L'instant de gel (ISO, UTC) écarte tout journal qui a une étape terminée après lui : la vague 2026-10-18-l240 (première étape à 06:54 UTC) tournait
@@ -79,9 +79,15 @@ def read_plan(project):
         conf = (yaml.safe_load(open(os.path.join(root, 'cadence.yaml'))) or {}).get('plan') or {}
     except OSError:
         conf = {}
-    try:
-        doc = yaml.safe_load(open(os.path.join(root, conf.get('path', 'docs/plan/raf.yaml'))))
-    except OSError:
+    # sans `plan.path` : .cadence/raf.yaml, puis docs/plan/raf.yaml pour un projet pas encore migré (comme scripts/mise-en-service.mjs)
+    doc = None
+    for rel in ([conf['path']] if conf.get('path') else ['.cadence/raf.yaml', 'docs/plan/raf.yaml']):
+        try:
+            doc = yaml.safe_load(open(os.path.join(root, rel)))
+            break
+        except OSError:
+            continue
+    if doc is None:
         return None
     f = conf.get('fields') or {}
     est_map = conf.get('estimates') or {}

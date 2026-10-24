@@ -1191,7 +1191,10 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   if (!store) throw new RafError(`vague inconnue : ${args.resume}`);
   if (deps.snapshot) {
     // La reprise tourne sur l'instantané de la vague, jamais sur le dist/ courant ; une vague d'avant L61 n'en a pas.
-    if (snapshotExists(store.dir)) {
+    if (LOT_LIKE.test(store.id) && snapshotExists(store.dir)) {
+      // L309 : `--resume suite2` serait relu par n'importe quel parseur comme un lot à lancer ; `--wave suite2`, un instantané d'avant L309 le prendrait pour un simple nom et reprendrait une autre vague.
+      io.err(`orchestrate : vague ${store.id} : son nom ressemble à un lot, l'instantané ne saurait pas le relire comme une vague : reprise avec le dist/ et les gabarits courants`);
+    } else if (snapshotExists(store.dir)) {
       // Une vague d'avant L223 refuserait « projet:lot=+N » comme budget invalide : seul le lot visé justifie de la rejouer avec le dist/ courant.
       if ((!args.lotBudgets.length || waveReadsLotBudget(store.dir)) && (!args.integrate.length || waveReadsIntegrate(store.dir)) && (!args.integrate.some((t) => t.replay) || waveReadsReplay(store.dir))) return deps.snapshot.reexec(toolDirOf(store.dir), resumeArgv(argv, store.id), io.env, io);
       io.err(`orchestrate : vague ${store.id} : son instantané ne connaît pas ${args.lotBudgets.length && !waveReadsLotBudget(store.dir) ? '--budget projet:lot=+N (antérieur à L223)' : `${args.integrate.some((t) => t.replay) && waveReadsIntegrate(store.dir) ? '--replay' : '--integrate'} (antérieur à L279)`} : reprise avec le dist/ et les gabarits courants`);

@@ -97,4 +97,22 @@ describe('orchestrate --resume : une option ignorée est refusée (L309)', () =>
       [tool, '--resume', 'vague-x', '--answer', 'a:L1', 'texte --wave', '--drop', 'b:L2'],
     ]);
   });
+
+  it('R6 — un id de vague qui ressemble à un lot (suite2) : l\'instantané ne le relirait pas comme vague, la reprise tourne sur le dist/ courant et reprend bien cette vague', async () => {
+    const launch = tempDir();
+    const cible = wave(launch, 'suite2', '2026-10-19T10:00:00', 'interrupted');
+    wave(launch, 'autre', '2026-10-24T20:30:00', 'interrupted');
+    const tool = toolDirOf(cible.dir);
+    mkdirSync(join(tool, 'bin'), { recursive: true });
+    writeFileSync(join(tool, 'bin', 'cadence.js'), '');
+    const recu: string[][] = [];
+    const { d, calls } = deps();
+    const withSnapshot = { ...d, claudeInfo: () => null, snapshot: { packageRoot: tempDir(), reexec: async (t: string, argv: string[]) => (recu.push([t, ...argv]), 0) } };
+    const { io: i, err } = io(launch);
+    expect(await orchestrate(['--resume', '--wave', 'suite2'], i, withSnapshot)).toBe(2);
+    expect(recu).toEqual([]);
+    expect(err.join('\n')).toMatch(/vague suite2.*ressemble à un lot.*dist\/ et les gabarits courants/);
+    expect(err.join('\n')).toMatch(/claude introuvable/);
+    expect(calls).toEqual([]);
+  });
 });

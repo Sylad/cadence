@@ -3175,6 +3175,9 @@ lots:
     spec: true
     created: 2026-10-23
     started: 2026-10-24
+    notes:
+      - { date: 2026-10-24, text: "Revue de la fiche — mineur : docs/specs/orchestrate-worktree-par-lot/fiche.yaml — R3 : le groupe a plus de lots que de créneaux, mais seule la création du worktree est dite. Le moment (au démarrage du lot ou à la prise de créneau) n'est pas précisé, ce qui compte pour R5 et R14. Le test « R16 — un lot sans écran n'est pas retardé » dépend d'un ordonnancement fin que la fiche ne décrit pas." }
+      - { date: 2026-10-24, text: "Revue de la fiche — mineur : docs/specs/orchestrate-worktree-par-lot/fiche.yaml — R10 cite state.ts:14 pour l'état commun aux worktrees. Le commentaire de `sharedStateDir` est à cette ligne et `stateDir` (local au worktree) juste avant : la source existe, mais la référence est à ±2 lignes. R7 et R16 sont des hypothèses sans catégorie coûteuse cachée : `si_faux` présent, pas de finding." }
   - id: L280
     title: "perf : recaler estimate et budgets des lots sur la mesure — tokens par lot +26 % sur deux fenêtres (0,25 j : 117→148 k ; 0,5 j : 327→412 k) pendant que la part conforme du premier coup passe de 37 à 59 % ; budgets par défaut d'orchestrate et seuils de cadence perf dérivés des fenêtres mesurées, étapes spec (1,3→4,2 min), maquette (4,5→7,1) et ux (6,5→8,5) expliquées ou bornées ; décision Sylvain 23-10"
     status: done

@@ -3391,6 +3391,7 @@ lots:
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "compliant — 1 commit (9053283), 0 blocking, 0 major, 1 minor (note); 30 tests of orchestrate-worktree-resume green, 147 tests of the 9 worktree files green, tsc clean — orchestré (vague 2026-10-24-1615, 0 passe(s) de correction)", commit: 9053283447685ef8e20c6465dcebf22cae98d7e2 }
   - id: L301
     title: "worktrees (suite revue L279, à faire avant activation) : lot rendu hors intégration (revue non conforme, tests rouges, HEAD déplacé, plan touché, verrou d'acceptation) — chemin de reprise : nouvelle vague du même lot qui retrouve sa branche cadence/<vague>/<lot> la plus récente (ou intégration à la main documentée) ; docs/orchestrate.md:517 « usual paths » corrigé ; mineurs de la revue : intégration après arrêt de l'application UX (cycle.ts:1891), worktree hors du dépôt quand la vague part de sa racine (lotTreeDir), foreignDirty/ownFile et git/tryGit dédupliqués, tests de waveReadsIntegrate/Replay ; tests"
     status: todo

@@ -3149,6 +3149,7 @@ lots:
     notes:
       - { date: 2026-10-24, text: "[L274/t1] livré dans L274 (d92435f zéros de tête, cadratin collé, milieu de plage ; c5de8b2 plages à tiret ou à lettre) — vague 2026-10-24-essai-wt2, précheck « partiel » qui a fait entrer t1 et t2 dans L274" }
       - { date: 2026-10-24, text: "[L274/t2] livré dans L274 (2c58dd6 code figures OMM, mesure WMO-306 I.2 1388 → 1176 liens non résolus, 148 fausses citations retirées ; 617487b code en fin de ligne précédente)" }
+      - { date: 2026-10-24, text: "Mineurs de la dernière revue laissés en notes (cas rares, non mesurés sur le corpus) : « Figures 9 to 010 » réécrit la seconde borne à la largeur de la première (padStart) ; « Tables 4.8–10–12 » cite la Table 11 à tort ; la passe des mineurs n'a pas eu lieu (budget du lot)." }
     finished: 2026-10-24
   - id: L275
     title: "ref add (suite L261) : pages sans couche texte signalées (recette scanned_pages de norme-etude : un PDF scanné de plus de 30 pages sort en 0 avec un index vide) ; figure sans citation et image sans légende listées en « lien non résolu » comme le dit le design ; échecs de pdftotext / pdftoppm / pdfimages / pdftohtml traduits en RafError ; tests — APRÈS L264"
@@ -3501,6 +3502,27 @@ lots:
     started: 2026-10-24
     notes:
       - { date: 2026-10-24, text: "24-10 (lead) — essai 1 (vague 2026-10-24-essai-wt, L309 + L274 en worktrees) : temps de mur 49 min contre 89 min en série (gain 40 min, 45 %) ; deux worktrees créés à 0,5 s d'écart, aucune gêne mutuelle, main intact (seuls les commits de plan, R21), worktrees conservés listés au tableau. Les deux lots rendus non conformes pour des défauts de fond (L309 : 1 majeur table.ts:174 ; L274 : 1 majeur après 3 passes) → AUCUNE intégration éprouvée (rebase, patch-id, verdict reporté). Suite : reprendre L309 et L274 en worktree (branches cadence/2026-10-24-essai-wt/*, reprise L301) pour éprouver l'intégration ; config remise à false en attendant." }
+      - { date: 2026-10-24, text: "24-10 (lead) — essai 2 (vague 2026-10-24-essai-wt2, reprise des branches conservées de l'essai 1) : reprise L301 OK (les deux branches retrouvées, renommées et déplacées, le lot repart de ses commits) ; L274 conforme après 2 corrections puis INTÉGRÉ par l'orchestrateur (rebase + fast-forward bc67c0b..781f363, verdict reporté par patch-id identique bd0a0dc → 781f363, R hybride) : intégration automatique éprouvée sur un cas réel ; L309 rendu en 3 min par le précheck de reprise (« livrable déjà présent » : ses propres commits) → L311 ; repris à la main dans son worktree (2 corrections Sonnet + revue Opus conforme) pendant que L274 tournait, puis intégré à la main : conflit CHANGELOG [Unreleased] (deux entrées ajoutées) → L314. Mur vague 44 min (L274 seul) ; L309 à la main en parallèle ~25 min. CONCLUSION : garder expérimental ; corriger L311 et L314, puis un essai 3 de deux lots neufs (sans reprise) avant de proposer l'activation par défaut à Sylvain. Config remise à false." }
+  - id: L311
+    title: "orchestrate worktrees : la reprise d'une branche conservée (L301) ne repasse pas par le précheck — les commits du lot lui-même lui font dire « livrable déjà présent » et le lot est rendu sans que le majeur de sa dernière revue soit corrigé (vécu essai 2 de L310, 24-10 : L309 rendu en 3 min, précheck local « oui » confirmé par Sonnet) ; un lot repris de sa branche repart à la correction avec les constats de sa dernière revue (ou à la revue s'il n'en a pas) ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L312
+    title: "perf (⚠ tendance deux fenêtres, tour du lead 24-10 soir, décision Sylvain) : tokens par lot en hausse à estimate 0.25 (médiane 150,0 k contre 116,6 k, +29 %) et 0.5 (440,6 k contre 318,7 k, +38 %) alors que la part conforme du premier coup monte (61 % contre 39 %) — ventiler la hausse par étape (precheck, implement, review/review-small, fix), par modèle et par projet sur les deux fenêtres ; recaler ce que la mesure justifie (budgets par catégorie de docs/orchestrate.md « Each lot also has its own budget », grille d'estimate de raf add et du brief du lead) et rien d'autre ; si la hausse vient d'une qualité achetée (revue Opus, passes de mineurs) et pas d'une estimate fausse, le conseil « l'estimate est mal calibrée » de cadence perf ne doit plus sortir seul : il cite l'étape qui porte la hausse ; mesure avant/après et conclusion en note ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L313
+    title: "ref add (suites revue L274, valeurs de code OMM) : « indicator figures 1 to 6, 8 and 9 » (WMO-306 vol. I.1 p. 46) ne cite plus les vraies Figures 2, 3, 4 ; « code » porté par la phrase d'une plage au demi-cadratin (306_i1 p. 39 : 2 faux liens non résolus nouveaux) ; « code » en fin de la page précédente (vol. I.2 p. 1327) ; test de la garde « code table » ; chiffres de l'entrée L274 du CHANGELOG remesurés sur le code livré (ils valent pour bca690d) ; différentiel avant/après sur les PDF de maritime cité dans le commit"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L314
+    title: "orchestrate worktrees : deux lots parallèles qui ajoutent chacun une entrée sous [Unreleased] du CHANGELOG entrent en conflit à l'intégration du second (vécu essai 2 de L310, 24-10 : L309 rebasé sur L274, conflit ### Added / ### Fixed résolu à la main par le lead) — conflit systématique dès que docs.sync impose l'entrée au lot ; résoudre ces conflits d'ajout pur dans CHANGELOG.md (union par section, ordre Keep a Changelog, un seul titre de section) à l'intégration, tout autre conflit reste rendu next: integrate ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

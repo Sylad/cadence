@@ -7,6 +7,7 @@ import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchest
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { acquireSlot, addHold, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { RunStore } from '../src/orchestrate/state.js';
+import { resumeAnswerHint } from '../src/orchestrate/table.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
 import { Plan } from '../src/plan.js';
@@ -1000,11 +1001,36 @@ describe('une vague', () => {
     });
     const first = io(parent);
     expect(await orchestrate(['a:L1'], first.io, f.deps)).toBe(1);
-    expect(first.out.join('\n')).toContain('question : a:L1 — « Quelle base ? » (cadence orchestrate --resume --answer a:L1 "…")');
+    expect(first.out.join('\n')).toContain('question : a:L1 — « Quelle base ? » (cadence orchestrate --resume --wave 2026-10-04-1412 --answer a:L1 "…")');
     expect(new RunStore(parent, '2026-10-04-1412').readWave()!.status).toBe('interrupted');
     const second = io(parent);
     expect(await orchestrate(['--resume', '--answer', 'a:L1', 'SQLite'], second.io, f.deps)).toBe(0);
     expect(new RunStore(parent, '2026-10-04-1412').readLot('a', 'L1')!.answers).toEqual(['SQLite']);
+  });
+
+  it('L309 — la commande imprimée pour répondre à une question nomme la vague : relue, elle la désigne et n\'est pas refusée quand une autre vague est non terminée', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    // Une vieille vague non terminée traîne dans le dossier : `--resume` sans vague serait refusé (plusieurs vagues non terminées).
+    new RunStore(parent, '2026-10-01-0900').writeWave({ id: '2026-10-01-0900', created: '2026-10-01T09:00:00', cwd: parent, budget: 1_000_000, consumed: 0, cacheRead: 0, status: 'interrupted', pid: 1, lots: [] });
+    let n = 0;
+    const f = fakeDeps({
+      implement: (cwd) => (n++ === 0 ? claudeOut(workReport({ questions: ['Quelle base ?'] })) : claudeOut(workReport({ commits: [commitFile(cwd, 'x.txt', 'feat(L1): x')] }))),
+    });
+    const first = io(parent);
+    expect(await orchestrate(['a:L1'], first.io, f.deps)).toBe(1);
+    const printed = first.out.join('\n').match(/\(cadence orchestrate (--resume [^)]*)\)/)![1];
+    const argv = printed.replace('"…"', 'SQLite').split(' ');
+    expect(parseOrchestrateArgs(argv)).toMatchObject({ resume: '2026-10-04-1412', answers: [{ project: 'a', lot: 'L1', text: 'SQLite' }] });
+    // La même commande sans la vague est bien refusée : c'est ce que l'indication évite.
+    await expect(orchestrate(['--resume', '--answer', 'a:L1', 'SQLite'], io(parent).io, f.deps)).rejects.toThrow(/plusieurs vagues non terminées/);
+    expect(await orchestrate(argv, io(parent).io, f.deps)).toBe(0);
+    expect(new RunStore(parent, '2026-10-04-1412').readLot('a', 'L1')!.answers).toEqual(['SQLite']);
+  });
+
+  it('L309 — l\'indication reste relue comme une vague quand l\'id ressemble à un lot (suite2)', () => {
+    const hint = resumeAnswerHint('suite2', { project: 'a', lot: 'L1' });
+    expect(hint).toBe('cadence orchestrate --resume --wave suite2 --answer a:L1 "…"');
+    expect(parseOrchestrateArgs(hint.replace('cadence orchestrate ', '').replace('"…"', 'ok').split(' '))).toMatchObject({ resume: 'suite2', lots: [], answers: [{ project: 'a', lot: 'L1', text: 'ok' }] });
   });
 
   it('L120 — plan en lecture seule, lot « Q4/accueil-4-ux12 » : --dry-run, vague, question, --answer, --status', async () => {
@@ -1037,7 +1063,7 @@ describe('une vague', () => {
     });
     const first = io(parent);
     expect(await orchestrate([id], first.io, f.deps)).toBe(1);
-    expect(first.out.join('\n')).toContain(`--resume --answer ${id} "…"`);
+    expect(first.out.join('\n')).toContain(`--resume --wave 2026-10-04-1412 --answer ${id} "…"`);
     const runs = join(parent, '.cadence/runs/2026-10-04-1412');
     expect(readdirSync(runs)).toContain('ma--Q4__accueil-4-ux12.json');
     expect(readdirSync(runs).filter((x) => x.includes('/'))).toEqual([]);

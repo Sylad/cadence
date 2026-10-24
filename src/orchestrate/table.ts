@@ -160,6 +160,14 @@ export function blockingLots(lots: LotState[], repo: string, sha: string, ancest
 /** Tests déjà rouges au départ listés un par un dans le tableau ; au-delà, un compte. */
 const BASELINE_LISTED = 30;
 
+/**
+ * La commande qui répond à une question (L309) : elle nomme la vague, car `--resume` sans vague est refusé dès que le dossier en garde plusieurs non terminées.
+ * `--resume --wave <id>` (et non `--resume <id>`) : un id qui ressemble à un lot (`suite2`) serait lu comme un lot à lancer sans `--wave`.
+ */
+export function resumeAnswerHint(waveId: string, l: Pick<LotState, 'project' | 'lot'>): string {
+  return `cadence orchestrate --resume --wave ${waveId} --answer ${l.project}:${l.lot} "…"`;
+}
+
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. */
 export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[] } = {}): string[] {
   const rows = lots.map((l) => [`${l.project}:${l.lot}`, LABEL[l.status], String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`]);
@@ -171,7 +179,7 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
   const tail = [`${by('ready')} prêt(s)`, by('question') ? `${by('question')} question(s)` : '', by('handed-back') + by('failed') ? `${by('handed-back') + by('failed')} rendu(s) au lead` : '', by('suspended') ? `${by('suspended')} suspendu(s)` : ''].filter(Boolean);
   out.push(`vague ${wave.id} : ${k(wave.consumed)} / ${m(wave.budget)} comptés (lecture de cache ${m(wave.cacheRead)}) — ${tail.join(', ')} — ${wave.status}`);
   for (const l of lots.filter((x) => x.status === 'question')) {
-    out.push(`question : ${l.project}:${l.lot} — « ${l.questions.join(' / ')} » (cadence orchestrate --resume --answer ${l.project}:${l.lot} "…")`);
+    out.push(`question : ${l.project}:${l.lot} — « ${l.questions.join(' / ')} » (${resumeAnswerHint(wave.id, l)})`);
   }
   for (const l of lots.filter((x) => x.status === 'handed-back' || x.status === 'failed' || x.status === 'suspended')) {
     out.push(`${l.project}:${l.lot} — ${l.outcome ?? LABEL[l.status]}`);

@@ -53,7 +53,9 @@ picture, not its source.
 3. **Relay.** The lead follows the wave's journal (`tail -n +1 -F .cadence/runs/<id>/journal.log`, one
    line per transition) and tells the human each line in one sentence, with no polling loop. A
    question from a session comes back to the human at once; the answer goes in with
-   `cadence orchestrate --resume --answer <project>:<lot> "…"`. The lead never answers in the
+   `cadence orchestrate --resume --wave <wave> --answer <project>:<lot> "…"` (the wave is named: the
+   command is printed under each question of the table, ready to run; without a wave, `--resume` is refused as
+   soon as the folder keeps several unfinished waves). The lead never answers in the
    human's place. `--drop` and `--stop-after-current` steer a wave that is running.
 4. **Review.** The final table of the wave lists the lots ready, handed back, and the line
    « livrable jusqu'à <sha> » for a ready lot stacked under a handed-back one. Minor findings come back in

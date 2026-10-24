@@ -3507,9 +3507,10 @@ lots:
     finished: 2026-10-24
   - id: L311
     title: "orchestrate worktrees : la reprise d'une branche conservée (L301) ne repasse pas par le précheck — les commits du lot lui-même lui font dire « livrable déjà présent » et le lot est rendu sans que le majeur de sa dernière revue soit corrigé (vécu essai 2 de L310, 24-10 : L309 rendu en 3 min, précheck local « oui » confirmé par Sonnet) ; un lot repris de sa branche repart à la correction avec les constats de sa dernière revue (ou à la revue s'il n'en a pas) ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L312
     title: "perf (⚠ tendance deux fenêtres, tour du lead 24-10 soir, décision Sylvain) : tokens par lot en hausse à estimate 0.25 (médiane 150,0 k contre 116,6 k, +29 %) et 0.5 (440,6 k contre 318,7 k, +38 %) alors que la part conforme du premier coup monte (61 % contre 39 %) — ventiler la hausse par étape (precheck, implement, review/review-small, fix), par modèle et par projet sur les deux fenêtres ; recaler ce que la mesure justifie (budgets par catégorie de docs/orchestrate.md « Each lot also has its own budget », grille d'estimate de raf add et du brief du lead) et rien d'autre ; si la hausse vient d'une qualité achetée (revue Opus, passes de mineurs) et pas d'une estimate fausse, le conseil « l'estimate est mal calibrée » de cadence perf ne doit plus sortir seul : il cite l'étape qui porte la hausse ; mesure avant/après et conclusion en note ; tests"
     status: todo

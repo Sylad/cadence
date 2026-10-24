@@ -211,3 +211,31 @@ tokens par page : non mesurés
 A reading whose `document.slug` or `document.sha256` differs from the expected one is refused (never a measure over two versions
 mixed). Exit codes: **0** done, **2** refusal (wrong call, file absent or unreadable, invalid reading, other document, folder with
 no `attendu.json`). `--json` prints one object: `total`, `types`, `pieges`, `tokens`, `cas`.
+
+## `cadence ref corpus <dossier> [--sans-rendu]`
+
+Writes the **synthetic corpus with a known truth** that `ref eval` scores against (design §« Évaluation »): seven small documents,
+one per trap taken from a real defect, each with the inventory that is true of what is drawn.
+
+| Case (= trap) | What it draws | Expected `piege` element |
+|---|---|---|
+| `texte-ambigu-leve-par-figure` | « written beside the arrow » (head or tail?), the figure puts `120 KT` over the tail | `lien` `precise` |
+| `figure-contredit-texte` | text says 80 kt, the figure draws the threshold at 100 kt | `lien` `contredit` |
+| `table-en-image` | a code table rasterised at render time: its cells are not in the PDF text layer | `table` |
+| `gabarit-type-bufr` | BUFR section 1: ordered fields, mandatory or optional, format, bounds | `gabarit` |
+| `controle-translucide` | a white button at 25 % opacity on a striped gradient, next to an opaque one | `jeton` `opacite` |
+| `page-proposal` | page 1 requirements, page 2 a panel mock-up carrying a « Proposal » badge | `statut` |
+| `scan-bruite` | a station sheet rasterised, grainy and blurred: the PDF has no text layer, expected texts are `ocr` | `texte` (`ocr`) |
+
+Each case folder holds `document.html` (one 8.5×11 in `section.page` per page, deterministic), `attendu.json` (an inventory that
+passes `ref check`, slug `corpus-<case>`, `sha256` of the HTML, `pages`, zones in pixels at 200 dpi, `piege` on the trap elements), and,
+unless `--sans-rendu`, `document.pdf` and `page-<n>.png` (1700×2200, 200 dpi) written by **Playwright** (Chromium). Texts of a table,
+a template or a schema belong to it and are not listed as `texte`; labels of a figure are. Playwright is not a dependency of cadence:
+install it (`npm i -D playwright`, `npx playwright install chromium`) or point `CADENCE_PLAYWRIGHT` to the folder of the package;
+without it the command exits **2** and writes nothing (`--sans-rendu` still writes HTML and expected files). An existing folder is
+refused (exit 2). The corpus is written where you say, not in `evals/`, which `claude plugin eval` reads as case folders.
+
+```
+$ cadence ref corpus tmp/corpus-ref
+$ cadence ref eval tmp/corpus-ref lectures/     # lectures/<case>/lecture.json
+```

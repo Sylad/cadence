@@ -1,8 +1,11 @@
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { RafError } from '../plan.js';
 import { add } from './add.js';
 import { checkInventaire, readInventaire, summaryInventaire } from './check.js';
+import { buildCorpus } from './corpus.js';
+import { chargerPlaywright, rendre } from './corpus-render.js';
 import { evaluer, formatEvaluation } from './evaluate.js';
 import { measure } from './measure.js';
 import { referencesDir } from './store.js';
@@ -10,10 +13,11 @@ import { referencesDir } from './store.js';
 const USAGE_ADD = 'usage : cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]';
 const USAGE_CHECK = 'usage : cadence ref check <inventaire.json | lecture.json>';
 const USAGE_EVAL = 'usage : cadence ref eval <attendu.json | dossier> <lecture.json | dossier> [--json]';
+const USAGE_CORPUS = 'usage : cadence ref corpus <dossier> [--sans-rendu]';
 const USAGE_MEASURE = 'usage : cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]';
 
 /** `cadence ref <sous-verbe> …` : les documents de référence (issue #14) ; `check` valide un inventaire ou une lecture. */
-export function refCommand(rest: string[], values: { sections?: string; slug?: string; config?: string; quoi?: string; largeur?: string; json?: boolean }, root: string, io: Io): number {
+export function refCommand(rest: string[], values: { sections?: string; slug?: string; config?: string; 'sans-rendu'?: boolean; quoi?: string; largeur?: string; json?: boolean }, root: string, io: Io): number | Promise<number> {
   const [verb, ...args] = rest;
   const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
   const refsDir = (): string => referencesDir(root, configPath, io.env);
@@ -43,6 +47,22 @@ export function refCommand(rest: string[], values: { sections?: string; slug?: s
     else for (const l of formatEvaluation(ev)) io.out(l);
     return 0;
   }
+  if (verb === 'corpus' && args.length === 1) return corpus(resolve(io.cwd, args[0]!), values['sans-rendu'] === true, io);
   const others = (u: string) => u.replace('usage : ', '');
-  throw new RafError(verb === 'add' ? USAGE_ADD : verb === 'measure' ? USAGE_MEASURE : verb === 'check' ? USAGE_CHECK : verb === 'eval' ? USAGE_EVAL : `${USAGE_ADD}\n       ${others(USAGE_MEASURE)}\n       ${others(USAGE_CHECK)}\n       ${others(USAGE_EVAL)}`);
+  throw new RafError(verb === 'add' ? USAGE_ADD : verb === 'measure' ? USAGE_MEASURE : verb === 'check' ? USAGE_CHECK : verb === 'eval' ? USAGE_EVAL : verb === 'corpus' ? USAGE_CORPUS : `${USAGE_ADD}\n       ${others(USAGE_MEASURE)}\n       ${others(USAGE_CHECK)}\n       ${others(USAGE_EVAL)}\n       ${others(USAGE_CORPUS)}`);
+}
+
+/** `ref corpus <dossier>` : un sous-dossier par piège (document.html, attendu.json, puis document.pdf et page-<n>.png sauf --sans-rendu). */
+async function corpus(dossier: string, sansRendu: boolean, io: Io): Promise<number> {
+  if (existsSync(dossier)) throw new RafError(`ref corpus : ${dossier} existe déjà (un corpus n'est jamais mêlé à un autre : choisissez un dossier neuf)`);
+  const playwright = sansRendu ? null : chargerPlaywright(io.env, io.cwd);
+  const cas = buildCorpus();
+  for (const c of cas) {
+    mkdirSync(join(dossier, c.nom), { recursive: true });
+    writeFileSync(join(dossier, c.nom, 'document.html'), c.html);
+    writeFileSync(join(dossier, c.nom, 'attendu.json'), `${JSON.stringify(c.inventaire, null, 2)}\n`);
+  }
+  if (playwright) await rendre(playwright, dossier, cas);
+  io.out(`corpus : ${cas.length} cas, ${cas.reduce((n, c) => n + c.pages, 0)} pages, ${cas.reduce((n, c) => n + c.inventaire.elements.length, 0)} éléments attendus dans ${dossier}${sansRendu ? ' (sans rendu : ni PDF ni PNG)' : ''}`);
+  return 0;
 }

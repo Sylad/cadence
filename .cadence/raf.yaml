@@ -3057,11 +3057,13 @@ lots:
     finished: 2026-10-23
   - id: L264
     title: "ref (issue #14, 4/10) : générateur du corpus synthétique à vérité connue (evals/ref/, pages HTML rendues en PDF et PNG par Playwright, inventaire attendu, pièges : texte ambigu levé par la figure, figure qui contredit, table en image, gabarit type BUFR, contrôle translucide, page Proposal, scan bruité) et commande d'évaluation (rappel, précision, faux lu, tokens par page)"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L263 ]
     created: 2026-10-23
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme, 2 notes mineures (revue Opus ciblée 24-10 après 3 revues du lot entier : faux lu 0 % rejoué sur une lecture fidèle, tokens par page 5000/5 avec le cas sans pages exclu, mutations détectées ; notes : titres de tests R5 plus forts que leurs assertions ; workflow tests.yml manuel, publish.yml sans rendu réel)", commit: 10fa3807b91b7f1fe25394bfdbedb1ca82ec2989 }
+    finished: 2026-10-24
   - id: L265
     title: "ref (issue #14, 5/10) : agent reference-analyst et cadence ref analyse en lecture unique ; mesure de référence sur le corpus (rappel, faux lu, tokens par page, plafond déclaré)"
     status: todo

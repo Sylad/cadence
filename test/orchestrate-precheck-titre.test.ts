@@ -50,6 +50,14 @@ describe('orchestrate — précheck conditionnel au titre du lot (L288)', () => 
     expect(need(['Premier', 'Le MODEL12 et la ligne L10'], 'L2')).toBe(false);
   });
 
+  it('R5 bis — un lot L<n> cité en plage ou suffixé (« L1-L2 », « L1-bis », « L1.3 ») compte toujours : seul un mot collé le défait', () => {
+    expect(need(['Premier', 'x', 'Un mot collé : ML1 et L1x'], 'L3')).toBe(false);
+    expect(need(['Premier', 'x', 'Suite de L1-bis : la mesure'], 'L3')).toBe(true);
+    expect(need(['Premier', 'x', 'Suite de L1-2 : la mesure'], 'L3')).toBe(true);
+    expect(need(['Premier', 'x', 'Voir L1.3 : la mesure'], 'L3')).toBe(true);
+    expect(need(['Premier', 'x', 'Suite de L1-L2 : la mesure'], 'L3')).toBe(true);
+  });
+
   it('R6 — orchestrate.precheck: false coupe le précheck même pour un titre qui cite un constat', () => {
     expect(need(['Corriger le constat'], 'L1', { precheck: false })).toBe(false);
   });

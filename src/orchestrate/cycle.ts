@@ -1001,7 +1001,7 @@ const CITES_FINDING = /(?<![\w-])(?:constat\w*|revues?|reviews?|audits?)(?![\w-]
 
 /**
  * Le texte du lot (titre, goal, objectif donné) cite un constat, ou un autre lot dont le travail a pu être fait. Pour un lot
- * `L<n>`, « L12 » compte dans le texte de `L30` et non celui de `L12` ni d'un lot postérieur ; tout identifiant du plan qui n'est
+ * `L<n>`, « L12 » compte dans le texte de `L30` (aussi dans « L12-L15 », « L12-bis », « L12.3 ») et non celui de `L12` ni d'un lot postérieur ; tout identifiant du plan qui n'est
  * pas `L<n>` (`Q-CAN5`, `B28.1`, `Q4/qa-expectations`) compte cité en entier (`B28.1` n'est pas `B28.10`), pour un lot `L<n>`
  * comme pour un autre ; un lot d'un autre projet (`cadence:L68`) compte toujours.
  */
@@ -1013,7 +1013,7 @@ function citesPriorWork(text: string, lot: string, ids: string[]): boolean {
   return ids.some((id) => {
     if (id === lot) return false;
     const n = /^L(\d+)$/.exec(id);
-    if (own && n) return Number(n[1]) < Number(own[1]) && cited(id);
+    if (own && n) return Number(n[1]) < Number(own[1]) && new RegExp(`(?<![\\w-])${id}(?!\\w)`).test(text);
     return cited(id);
   });
 }

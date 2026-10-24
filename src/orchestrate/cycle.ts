@@ -979,7 +979,7 @@ function overBudget(c: LotCtx, reserve = false): null {
   const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
   // Passe d'écriture qui vient d'être jouée, nommée d'après le compteur : l.pass - 1 passes de correction l'ont précédée (minorPass reste vrai après la passe des mineurs).
   const played = l.pass - 1;
-  const after = l.minorPass && played === (l.minorPassAt ?? 0) ? 'la passe des mineurs' : played > 0 ? `la passe fix ${played}` : "l'implémentation";
+  const after = l.minorPass && played === (l.minorPassAt ?? 0) ? 'la passe des mineurs' : played > 0 ? `la passe fix ${played}` : l.resumedFrom ? 'la dernière revue de la branche reprise' : "l'implémentation";
   const notPlayed = l.next === 'fix' ? 'correction non jouée (budget) : ' : '';
   const prefix = notPlayed + (red ? `tests rouges après ${after}, correction suivante non abordable : ` : '');
   const unreviewed = red ? ' ; le lot revient sans revue, avec ses constats' : '';
@@ -1790,12 +1790,12 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   // Reprise : une session précédente de l'étape (correction ordinaire ou passe des mineurs) a pu commiter avant d'être coupée ; la revue d'origine ne vaut alors plus.
   // Référence : le HEAD de départ de la première session coupée de la série qui précède celle-ci (pas la revue, qui peut ne pas exister encore).
-  let resumedFrom: string | undefined;
+  let interruptedAt: string | undefined;
   for (const s of l.steps.slice(0, -1).reverse()) {
     if (s.kind !== 'fix' || s.status !== 'interrupted') break;
-    resumedFrom = s.headBefore;
+    interruptedAt = s.headBefore;
   }
-  const headMoved = kind === 'fix' && made === 0 && !!resumedFrom && git(wd(c), 'rev-parse', 'HEAD') !== resumedFrom;
+  const headMoved = kind === 'fix' && made === 0 && !!interruptedAt && git(wd(c), 'rev-parse', 'HEAD') !== interruptedAt;
   if (minorsPass && made === 0 && !headMoved) {
     // Rien à corriger (mineurs jugés faux, listés en « choix ») : la revue conforme d'origine vaut, HEAD n'a pas bougé.
     for (const k of l.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine('code', k));
@@ -2451,8 +2451,12 @@ export async function runLot(c: LotCtx): Promise<void> {
       if (!(await ensureTree(c))) return;
       l.startedSha = (await snapshot(wd(c), { remote: false })).head ?? undefined;
       // Un lot repris de sa branche conservée (L311) n'a rien à faire contrôler : ses commits sont les siens. Il repart à la correction des constats de sa dernière revue, à la revue s'il en a passé une sans constat, à l'écriture s'il n'a jamais été revu.
-      l.next = l.resumedFrom ? (l.constats.length ? 'fix' : l.resumedReviewed ? firstReview(c) : firstWrite(c)) : needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos, l.goal) ? 'precheck' : firstWrite(c);
-      save(c);
+      // La correction de départ est une passe comme les autres (toFix : l.pass, verdict, tableau, MAX_PASSES bornent le total, reprise comprise).
+      if (l.resumedFrom && l.constats.length) toFix(c, l.constats, 'reprise de la branche');
+      else {
+        l.next = l.resumedFrom ? (l.resumedReviewed ? firstReview(c) : firstWrite(c)) : needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos, l.goal) ? 'precheck' : firstWrite(c);
+        save(c);
+      }
     }
     while (l.next && !TERMINAL.has(l.status)) {
       const kind = l.next;

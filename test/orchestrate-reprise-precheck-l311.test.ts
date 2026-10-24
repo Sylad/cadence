@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RunStore } from '../src/orchestrate/state.js';
+import { MAX_PASSES } from '../src/orchestrate/cycle.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { fake, lotOf, run, setup, WAVE } from './orchestrate-worktree-harness.js';
 import { tempDir } from './helpers.js';
@@ -29,6 +30,33 @@ async function premiereVague() {
   git(repo, 'commit', '-q', '-m', 'chore: precheck actif');
   return { parent, repo };
 }
+
+describe('R5 — la correction de départ d\'un lot repris est une passe de correction', () => {
+  const fixer = () => async (cwd: string, brief: string) => claudeOut(workReport({ commits: [commitFile(cwd, `corr-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`, `fix(${lotOf(brief)}): corrige`)] }));
+
+  it('R5 — après la correction de départ, pass vaut 1 et le verdict dit « 1 passe(s) de correction »', async () => {
+    const { parent } = await premiereVague();
+    const f2 = fake({ review: async () => claudeOut(reviewReport()), fix: fixer() });
+    await run(parent, ['a:L2'], f2);
+    expect(f2.calls.map((c) => c.kind)[0]).toBe('fix');
+    const lot = new RunStore(parent, `${WAVE}-2`).readLot('a', 'L2')!;
+    expect(lot.status).toBe('ready');
+    expect(lot.pass).toBe(1);
+    expect(lot.verdict).toContain('1 passe(s) de correction');
+    expect(lot.verdict).not.toContain('0 passe(s)');
+  });
+
+  it('R6 — revues toujours non conformes : au plus MAX_PASSES corrections en tout, reprise comprise, puis le lot est rendu', async () => {
+    const { parent } = await premiereVague();
+    const f2 = fake({ review: async () => claudeOut(nonConforme), fix: fixer() });
+    await run(parent, ['a:L2'], f2);
+    const lot = new RunStore(parent, `${WAVE}-2`).readLot('a', 'L2')!;
+    expect(f2.calls.filter((c) => c.kind === 'fix')).toHaveLength(MAX_PASSES);
+    expect(lot.pass).toBe(MAX_PASSES);
+    expect(lot.status).toBe('handed-back');
+    expect(lot.outcome ?? '').toContain(`${MAX_PASSES} passe(s) de correction`);
+  });
+});
 
 describe('R1 — un lot repris de sa branche ne repasse pas par le contrôle préalable', () => {
   it('R1 — la branche porte des commits du lot : aucune session precheck, le lot repart à la correction avec les constats de sa dernière revue', async () => {

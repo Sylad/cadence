@@ -277,3 +277,23 @@ export function planSeenFrom(plan: Plan, repo: string, root: string): Plan {
   };
   return Object.create(plan, { path: { value: under(plan.path) }, configFile: { get: () => (plan.configFile === null ? null : under(plan.configFile)) } }) as Plan;
 }
+
+/** Âge lisible d'un worktree conservé : minutes, heures, puis jours. */
+export function ageText(ms: number): string {
+  const min = Math.max(0, Math.round(ms / 60_000));
+  return min < 60 ? `${min} min` : min < 48 * 60 ? `${Math.round(min / 60)} h` : `${Math.round(min / 1440)} j`;
+}
+
+export const KEPT_TITLE = 'worktrees de lot conservés (cadence orchestrate --remove-worktree <projet>:<lot> pour les retirer) :';
+
+/** Une ligne par worktree conservé (R19) : dépôt, lot, âge, commits non intégrés, chemin. */
+export const keptLine = (repoName: string, t: KeptTree, now = Date.now()): string => `  ${repoName} · ${t.lot} · ${ageText(now - t.created)} · ${t.unintegrated} commit(s) non intégré(s) · ${t.dir ?? `(worktree absent, branche ${t.branch})`}`;
+
+/**
+ * Les lignes qui disent les worktrees de lot conservés (R19) : un titre puis une ligne par worktree ; aucune ligne quand il n'y en a pas. Source commune de
+ * `cadence orchestrate --status`, du tableau de fin de vague et de `cadence lead tour`.
+ */
+export function keptLines(repos: string[], now = Date.now()): string[] {
+  const rows = [...new Set(repos)].flatMap((repo) => keptTrees(repo).map((t) => keptLine(basename(repo), t, now)));
+  return rows.length ? [KEPT_TITLE, ...rows] : [];
+}

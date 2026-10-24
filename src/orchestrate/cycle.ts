@@ -2022,7 +2022,7 @@ async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise
 /**
  * Écrit au plan, dans le dépôt du projet, l'entrée du lot : verdict (au sha `commit`, avec la trace `reporte` d'un verdict reporté), sous-tâches couvertes
  * passées à done, puis le commit du plan seul ; pour un plan en lecture seule, l'outil `orchestrate.verdict` du projet, lancé dans ce dépôt (R21, R23).
- * Rend la cause d'un refus (arbre sale hors plan), null sinon. Un verdict déjà écrit au même sha n'est pas écrit deux fois (reprise de l'intégration, R23).
+ * Rend la cause d'un refus (arbre sale hors plan), null sinon. Un verdict déjà écrit et commité au même sha n'est pas écrit deux fois (reprise de l'intégration, R23).
  */
 async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, reporte?: Reporte): Promise<string | null> {
   const l = c.lot;
@@ -2032,7 +2032,11 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
   // Sous-tâches ouvertes que des commits du lot citent (L82) : la revue conforme vaut pour elles, sinon `raf done` refuserait le lot.
   const covered = coveredTasks(plan, l.repo, l.lot, neighbours.flatMap((r) => repoWork(plan, r, l.lot)));
   if (!plan.readonly) {
-    if (commit !== null && plan.lot(l.lot).review?.commit === commit && !covered.length) return null;
+    // En worktree, rien n'est écrit si le dépôt du lead a déjà un fichier suivi modifié hors plan : le refus ne laisse pas un plan modifié non commité (R26).
+    const foreign = c.tree ? foreignDirty(c) : [];
+    if (foreign.length) return `arbre du dépôt modifié (${foreign.join(', ')})`;
+    // Déjà écrit et commité au même sha (reprise de l'intégration, R23) : une seule fois.
+    if (c.tree && commit !== null && plan.lot(l.lot).review?.commit === commit && !covered.length && !trackedDirty(l.repo).includes(relative(l.repo, plan.path))) return null;
     plan.recordReview(l.lot, verdict, c.wave.today, commit, neighbours.length ? shas : undefined, reporte);
     for (const k of covered) plan.setStatus(`${l.lot}/${k.task}`, 'done', c.wave.today);
     if (covered.length) l.warnings.push(`sous-tâches closes (couvertes par des commits qui les citent, revue conforme) : ${covered.map((k) => `${l.lot}/${k.task} (${k.sha.slice(0, 7)})`).join(', ')}`);
@@ -2055,6 +2059,14 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
   return null;
 }
 
+/** Les fichiers suivis modifiés du dépôt du projet qui ne sont ni le plan, ni ce qui est tenu avec lui, ni une acceptation : ce que `commitPlan` refuserait (R26). */
+function foreignDirty(c: LotCtx): string[] {
+  const plan = c.loadPlan();
+  const own = new Set([relative(c.lot.repo, plan.path), ...plan.maintained]);
+  const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
+  return trackedDirty(c.lot.repo).filter((f) => !own.has(f) && !(f.startsWith(specDir) && isAcceptationFile(f)));
+}
+
 /** Une écriture de plan du programme (R21, R26) : sous la file et le verrou du dépôt, le dépôt encore sur la branche de départ, aucun fichier suivi modifié hors plan. Rend la cause du refus, null si l'écriture a eu lieu. Hors worktree, rien ne change. */
 async function planWrite(c: LotCtx, write: () => Promise<string | null>): Promise<string | null> {
   if (!c.tree) return write();
@@ -2064,10 +2076,7 @@ async function planWrite(c: LotCtx, write: () => Promise<string | null>): Promis
   try {
     const cur = repoBranch(l.repo);
     if (cur !== c.tree.base) return `écriture du plan refusée : dépôt sur ${cur ?? 'HEAD détaché'} et non ${c.tree.base}`;
-    const plan = c.loadPlan();
-    const own = new Set([relative(l.repo, plan.path), ...plan.maintained]);
-    const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
-    const foreign = trackedDirty(l.repo).filter((f) => !own.has(f) && !(f.startsWith(specDir) && isAcceptationFile(f)));
+    const foreign = foreignDirty(c);
     if (foreign.length) return `écriture du plan refusée : arbre du dépôt modifié (${foreign.join(', ')})`;
     return await write();
   } finally {
@@ -2123,7 +2132,7 @@ async function integrateLot(c: LotCtx): Promise<void> {
         const red: Constat[] = [];
         const runs: CheckRun[] = [];
         await programChecks(c, red, runs);
-        l.checks = { head: tip, runs };
+        l.checks = runs.length ? { head: tip, runs } : undefined;
         save(c);
         if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map((k) => k.texte.split('\n')[0]).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
         const before = patchId(t.dir, mergeBase(t.dir, reviewed, t.base), reviewed);

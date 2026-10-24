@@ -6,6 +6,7 @@ import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { Plan } from '../src/plan.js';
 import { claudeOut, commitFile, git, kindOf, briefOf, reviewReport, workReport } from './orchestrate-harness.js';
+import { existsSync } from 'node:fs';
 import { tempDir } from './helpers.js';
 
 // L279 — doublures communes aux tests e2e des worktrees de lot : vrais dépôts git, sessions simulées.
@@ -21,7 +22,7 @@ export interface LotSpec {
 }
 
 /** Un dépôt `a` sous un dossier de lancement, des lots, un cadence.yaml (worktrees par défaut). */
-export function setup(lots: LotSpec[] = [{ title: 'un' }, { title: 'deux' }], yaml = 'worktrees: true\n') {
+export function setup(lots: LotSpec[] = [{ title: 'un' }, { title: 'deux' }], yaml = 'worktrees: true\n', files: Record<string, string> = {}) {
   const parent = tempDir();
   const repo = join(parent, 'a');
   mkdirSync(repo, { recursive: true });
@@ -35,7 +36,8 @@ export function setup(lots: LotSpec[] = [{ title: 'un' }, { title: 'deux' }], ya
   plan.save();
   writeFileSync(join(repo, 'cadence.yaml'), `orchestrate:\n  precheck: false\n${yaml.split('\n').filter(Boolean).map((l) => `  ${l}`).join('\n')}\n`);
   writeFileSync(join(repo, 'base.txt'), 'base\n');
-  git(repo, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml', 'base.txt');
+  for (const [f, text] of Object.entries(files)) writeFileSync(join(repo, f), text);
+  git(repo, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml', 'base.txt', ...Object.keys(files));
   git(repo, 'commit', '-q', '-m', 'chore: plan');
   return { parent, repo };
 }
@@ -88,4 +90,29 @@ export function meeting(n: number, safetyMs = 4000) {
     if (waiting >= n) release();
     await Promise.race([met, new Promise((r) => setTimeout(r, safetyMs))]);
   };
+}
+
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Attend (au plus 5 s) qu'une condition soit vraie. */
+export async function until(cond: () => boolean): Promise<void> {
+  for (let i = 0; i < 250 && !cond(); i++) await sleep(20);
+}
+
+/** Une implémentation qui commite `shared.txt` avec le contenu de son lot ; L1 attend que L2 se soit intégré (le fichier est dans le dépôt du lead) : L1 rebase en conflit. */
+export const sharedFile = (repo: string): Handler => async (cwd, brief) => {
+  const lot = lotOf(brief);
+  if (lot === 'L1') await until(() => existsSync(join(repo, 'shared.txt')));
+  writeFileSync(join(cwd, 'shared.txt'), `contenu de ${lot}\n`);
+  git(cwd, 'add', '--', 'shared.txt');
+  git(cwd, 'commit', '-q', '-m', `feat(${lot}): travail`);
+  return claudeOut(workReport({ commits: [{ sha: git(cwd, 'rev-parse', 'HEAD'), sujet: `feat(${lot}): travail` }] }));
+};
+
+/** Deux lots modifient le même fichier : L2 s'intègre, L1 est rendu pour conflit à l'étape d'intégration, son worktree conservé. */
+export async function conflictWave() {
+  const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }]);
+  const f = fake({ implement: sharedFile(repo) });
+  const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+  return { parent, repo, f, r, dir: join(store(parent).dir, 'worktrees', 'a--L1'), branch: `cadence/${WAVE}/a--L1` };
 }

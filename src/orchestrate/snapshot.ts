@@ -122,6 +122,19 @@ export function waveReadsLotBudget(waveDir: string): boolean {
   }
 }
 
+/**
+ * L'instantané de la vague connaît-il `--resume --integrate` (L279) ? Un instantané plus ancien refuserait l'option comme inconnue.
+ * Sans instantané : rien à relire, on suppose que oui.
+ */
+export function waveReadsIntegrate(waveDir: string): boolean {
+  if (!snapshotExists(waveDir)) return true;
+  try {
+    return readFileSync(join(toolDirOf(waveDir), 'dist', 'orchestrate', 'command.js'), 'utf8').includes('abandonCommits');
+  } catch {
+    return false;
+  }
+}
+
 /** Relance réelle : un processus node sur la copie, signaux transmis, code de sortie rendu. */
 export function spawnReexec(toolDir: string, argv: string[], env: NodeJS.ProcessEnv, sink: LineSink): Promise<number> {
   return new Promise((resolve, reject) => {

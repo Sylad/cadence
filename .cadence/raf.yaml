@@ -3524,6 +3524,7 @@ lots:
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "compliant (1 minor note: garde de plage « code figure … figures 20–49 » aveugle à une phrase coupée entre deux lignes quand la ligne courante ne commence pas par la référence) — orchestré (vague 2026-10-24-2235, 0 passe(s) de correction)", commit: 955f34f8881aacd69f0c4c90d25e55eb2c66682d }
   - id: L314
     title: "orchestrate worktrees : deux lots parallèles qui ajoutent chacun une entrée sous [Unreleased] du CHANGELOG entrent en conflit à l'intégration du second (vécu essai 2 de L310, 24-10 : L309 rebasé sur L274, conflit ### Added / ### Fixed résolu à la main par le lead) — conflit systématique dès que docs.sync impose l'entrée au lot ; résoudre ces conflits d'ajout pur dans CHANGELOG.md (union par section, ordre Keep a Changelog, un seul titre de section) à l'intégration, tout autre conflit reste rendu next: integrate ; tests"
     status: doing

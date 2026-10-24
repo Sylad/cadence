@@ -3377,6 +3377,7 @@ lots:
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "compliant (1 minor) — orchestré (vague 2026-10-24-1615, 0 passe(s) de correction)", commit: 87821de325d2f5b2fea5cc7c800d5d55f88667ff }
   - id: L299
     title: "worktrees (suite revue L279, à faire avant activation) : revérifier branche de départ et arbre du lead juste avant advance() et writeVerdict ; le lead passé sur une autre branche pendant les contrôles ou la revue courte ne reçoit ni fast-forward ni commit de plan, lot rendu next: integrate (R24, R22, R8) ; test qui change de branche pendant la revue courte (reproduit par la revue 24-10 : feat(L2) et plan sur « autre », L2 prêt)"
     status: todo

@@ -192,15 +192,36 @@ const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f]/g;
 
+const MASK = '***';
+const SECRET_WORDS = new Set(['token', 'secret', 'password', 'passwd', 'pwd', 'pass', 'key', 'credential', 'credentials', 'auth', 'authorization', 'signature', 'sig', 'jwt', 'cookie']);
+// Un nom de variable ou de paramètre d'URL est sensible quand l'un de ses mots (séparés par _ - . ou une majuscule) en est un.
+const sensitiveName = (name: string): boolean =>
+  name
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .split(/[_.-]/)
+    .some((w) => SECRET_WORDS.has(w.toLowerCase()));
+const TOKEN_SHAPES = /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{16,}|sk-[A-Za-z0-9_-]{16,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{30,})\b/g;
+const BEARER = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
+const URL_USERINFO = /(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi;
+const ASSIGNMENT = /([A-Za-z][A-Za-z0-9_.-]*)=("[^"]*"|'[^']*'|[^\s&"']+)/g;
+
+/** Masque ce qui ressemble à un secret (jeton connu, Bearer, identifiants d'URL, VAR=valeur ou paramètre d'URL au nom sensible) : motifs probables, pas une garantie. */
+export const maskSecrets = (line: string): string =>
+  line
+    .replace(BEARER, `$1 ${MASK}`)
+    .replace(URL_USERINFO, `$1${MASK}@`)
+    .replace(TOKEN_SHAPES, MASK)
+    .replace(ASSIGNMENT, (m, name: string) => (sensitiveName(name) ? `${name}=${MASK}` : m));
+
 const clean = (line: string, max: number): string => {
-  const t = line.replace(ANSI, '').replace(CONTROL, ' ').replaceAll('⏎', ' ').trim();
+  const t = maskSecrets(line.replace(ANSI, '').replace(CONTROL, ' ')).replaceAll('⏎', ' ').trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 };
 
 /**
  * Ajoute une livraison rouge à `deliveries-failed.log` : une ligne « jour sha [classe] raison ⏎ ligne ⏎ ligne ».
  * La raison est la première ligne du message d'échec ; `tail` (sortie de la commande en échec) est borné à ses
- * 5 dernières lignes non vides de 200 caractères, sans séquence ANSI.
+ * 5 dernières lignes non vides de 200 caractères, sans séquence ANSI, secrets probables masqués (raison comprise).
  */
 export function appendFailedDelivery(dir: string, day: Day, sha: string, reason: string, cls?: FailClass, tail: string[] = []): void {
   const kept = tail.flatMap((l) => clean(l, LINE_MAX) || []).slice(-TAIL_LINES);

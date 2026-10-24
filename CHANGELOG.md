@@ -62,6 +62,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- The reason of a red delivery (L289, `docs/deliver.md`) keeps the last frame of a line rewritten with `\r` (progress bar) instead of 5 frames of the bar, and masks probable secrets (known tokens, `Bearer`, `user:pass@` in URLs, `NAME=value` and URL parameters with a sensitive name) before `deliveries-failed.log` is written; the masking is a list of patterns, not a guarantee.
 - `cadence orchestrate` sessions no longer hold their slot after their report (L285, `docs/orchestrate.md`): `claude -p` waits for background tasks (`run_in_background` on Bash or sub-agents, `Monitor`) before exiting; sessions now start with `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` and `Monitor` is denied (24-10 audit: 127 sessions waited after their report, 833 min lost). Not killed at `StructuredOutput`: the real cost is only in the `result` message.
 - `cadence orchestrate` recognises the real « You've hit your weekly limit · resets … » message as a quota stop (L286, `docs/orchestrate.md`): the wave is suspended instead of the lot being marked failed (3 lots failed on 14-10 for this reason).
 

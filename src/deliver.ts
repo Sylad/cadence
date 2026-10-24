@@ -108,7 +108,9 @@ export const TIMED_OUT = 124;
 
 /** Sortie gardée d'une commande : de quoi retrouver ses dernières lignes. */
 const OUTPUT_KEPT = 8_192;
-const outputTail = (text: string): string[] => text.split(/\r?\n|\r/).filter((l) => l.trim() !== '');
+/** Les lignes de la sortie ; une ligne réécrite par \r (barre de progression) ne garde que sa dernière image non vide. */
+const outputTail = (text: string): string[] =>
+  text.split('\n').flatMap((l) => l.split('\r').filter((f) => f.trim() !== '').slice(-1));
 
 const codeText = (code: number) => (code === TIMED_OUT ? 'délai dépassé' : `code ${code}`);
 

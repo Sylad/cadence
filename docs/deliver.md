@@ -54,7 +54,14 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   deploy command or the check command. A GitHub CI run or an URL check has no output of its
   own, so no line follows. cadence now relays the output of those commands through itself
   (same bytes on its own stdout and stderr, but the command no longer sees a terminal there,
-  so it may drop colours or progress bars). `cadence perf` reads classes and projects from it
+  so it may drop colours or progress bars). A line rewritten with `\r` (a progress bar that
+  did not drop) keeps only its last non-empty frame, not 5 frames of the bar. **Probable
+  secrets are masked** (`***`) in the reason and in those lines before the file is written:
+  known token shapes (GitHub, GitLab, npm, Slack, AWS key id, `sk-…`), `Bearer`/`Basic`
+  values, `user:password@` in a URL, and any `NAME=value` (shell variable or URL query
+  parameter) whose name has a word such as token, secret, password, key, auth, signature.
+  This is a list of likely patterns, not a guarantee: a secret of another shape printed by a
+  command can still land in the log, which stays local (`<git common dir>/cadence/`). `cadence perf` reads classes and projects from it
   ([perf](perf.md#delivery-quality-and-the-tour-header-l227)); a line written before L282
   has no class and counts as « non classée ».
 - Every command is killed when it exceeds its budget (CI, `deployTimeout`, what is

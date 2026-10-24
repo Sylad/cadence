@@ -3407,6 +3407,7 @@ lots:
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "compliant (1 minor: CRLF mixte sur la ligne source insérée) — orchestré (vague 2026-10-24-1700, 0 passe(s) de correction)", commit: 56c7f1fe35754817b5fbd93b7f4ea7371ca12b2d }
   - id: L303
     title: "worktrees (suites des revues L298–L300, avant activation) : rapport de coupure au délai étendu aux dépôts voisins (cycle.ts:723) ; refus tardif d'intégration : verdict de revue courte non dupliqué à la reprise (cycle.ts:2239/2202) ; test qui atteint le contrôle de branche de writeVerdict (cycle.ts:2101) ; branche retirée distinguée d'une branche sans branch.<nom>.base (command.ts:929) ; CHANGELOG : double « ### Fixed » de [Unreleased] ; tests"
     status: todo

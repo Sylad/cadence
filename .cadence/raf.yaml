@@ -3238,13 +3238,14 @@ lots:
     finished: 2026-10-24
   - id: L284
     title: "raf migrate : commande rejouable qui déplace le plan de docs/plan/raf.yaml vers .cadence/raf.yaml (git mv) et met à jour les lecteurs connus du chemin dans le dépôt (scripts plan-data, tests, CI, skills : inventaire listé, --dry-run qui montre chaque fichier touché, refus si un lecteur reste non traité) ; migration de cadence lui-même (37 références) ; doc ; tests. Les 8 autres projets migrent ensuite par un lot chacun (avatar 4, codex 5, discotheque 1, evatosorus 4, finance 8, jobmail 3, ol 6, warhammer 4 lecteurs). L'avertissement « ancien emplacement » à chaque appel raf entre dans le contexte de chaque session — décision Sylvain 24-10, redécoupé par le lead"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-24
     notes:
       - { date: 2026-10-24, text: "titre remplacé : « plan à l'emplacement .cadence/raf.yaml (L246) dans les 9 projets : inventaire des lecteurs de docs/plan/raf.yaml par projet (outils plan-data, tests, CI, skills : avatar 4, codex 5, discotheque 1, evatosorus 4, finance 8, jobmail 3, ol 6, warhammer 4, cadence 37), procédure de migration rejouable (raf migrate ou script) et migration ; l'avertissement « ancien emplacement » imprimé à chaque appel raf entre dans le contexte de chaque session — décision Sylvain 24-10 »" }
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "conforme : 2 notes mineures (chemins construits non détectés, fichiers > 2 Mio ignorés sans signalement) — orchestré (vague 2026-10-24-1750, 2 passe(s) de correction)", commit: 39332ca7898d5b22d63d86941e3b0f1ae1fb18f2 }
+    finished: 2026-10-24
   - id: L285
     title: "orchestrate : les sessions de vague ne laissent plus de tâche de fond qui retient la sortie — env CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1 au lancement de claude -p (retire run_in_background de Bash et des sous-agents) et Monitor dans --disallowedTools ; ne PAS tuer sur StructuredOutput (coût réel seulement dans le message result) ; test du lancement ; mesure après : sessions dont la fin suit le StructuredOutput de plus d'1 min. Sources : code.claude.com/docs/en/headless.md, env-vars.md, permissions.md, agent-sdk/cost-tracking.md ; étude tmp/L285-etude-taches-de-fond-2026-10-24.md. Audit 24-10 : 127 sessions, 833 min, 12,1 M tokens non comptés"
     status: done
@@ -3426,11 +3427,28 @@ lots:
     finished: 2026-10-24
   - id: L304
     title: "worktrees (suites revue L301, avant activation) : reprise d'une branche de vague passée (recoverTree) — refuser ou signaler au moment de la reprise un worktree conservé aux fichiers suivis modifiés (comme R11), une branche dont un commit touche le plan (au lieu d'aller jusqu'au conflit d'intégration), la branche d'un lot rendu À l'intégration dans sa vague (next: integrate) ; échec de git worktree move / branch -m journalisé, pas avalé (worktree.ts:226) ; doc : nom de branche cadence/<vague>/_--<lot> pour une vague à la racine, procédure d'intégration à la main écrite ; test sans la variable : une nouvelle vague laisse la branche conservée ; CHANGELOG [Unreleased] : un seul « ### Fixed » et un seul « ### Added » ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant — orchestré (vague 2026-10-24-1750, 0 passe(s) de correction)", commit: 5d59d5eec8e43b08afca507af36e084cf3b8787b }
+    finished: 2026-10-24
+  - id: L305
+    title: "raf migrate (suites revue L284, AVANT de migrer un autre projet) : docs/perf/ventilation.py:83 lit .cadence/raf.yaml (repli docs/plan/raf.yaml) — read_plan('cadence') rend None depuis la migration ; docs/stabilite.md:17 et docs/fonctionnement.md:15 rétablis (mention du legacy réécrite à tort) et mis sous migrate.keep, avec test/ventilation-plan.test.ts ; chemins construits non détectés signalés non traités (pathlib Path('docs') / 'plan' / 'raf.yaml' — jobmail plan_public.py:31 —, join découpé sur plusieurs lignes) ; fichier texte non UTF-8 classé non traité (pas de U+FFFD à la réécriture) ; fichier > 2 Mio qui cite le chemin signalé non traité ; refus sans --dry-run : stdout ne prétend plus « mis à jour » avant le refus ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L306
+    title: "agent bibliothécaire générique (agents/doc-keeper.md du paquet) : pour un dépôt et un lot, lit le diff, la carte des docs du projet (docs.sync du cadence.yaml, README, docs/, CHANGELOG, Nouveautés) et dit quelles docs doivent changer, puis les met à jour (session d'écriture) ou les liste (lecture seule) ; orchestrate l'appelle quand docs.sync signale une doc en retard sur le lot (avant la revue), le lead à la main ; docs hors dépôt seulement par configuration (clé, absente par défaut, ex. dans le cadence.yaml du dossier parent : « tel projet est aussi décrit par tel fichier de tel dépôt » → le bibliothécaire propose un lot dans le plan de ce dépôt, sans l'écrire lui-même) ; rien de propre à un dossier dans le code (cadence sert aussi ailleurs) ; doc et tests — demande Sylvain 24-10"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-24
+  - id: L307
+    title: "docs.sync dans chaque projet du dossier qui n'en a pas : le bibliothécaire (lecture seule) établit par projet la carte code → docs (README, docs/, CHANGELOG/Nouveautés) ; le lead la pose dans le cadence.yaml du projet (commit acquitté par raf ignore, ou lot du projet) et vérifie raf check ; pour nous : avatar-pandora, claude-code-codex, discotheque, evatosorus, finance-tracker, jobmail-assistant, ol-companion, warhammer40k, maritime-atlas (plan raf.py : via un lot maritime) ; et clé de docs hors dépôt dans ~/projects/developpeur/cadence.yaml pour les études de cas de claude-code-codex — demande Sylvain 24-10"
+    status: todo
+    estimate: 0.25
+    after: [ L306 ]
+    created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -3279,9 +3279,10 @@ lots:
     finished: 2026-10-24
   - id: L290
     title: "README : section « Installer comme plugin Claude Code » (/plugin marketplace add Sylad/cadence, /plugin install cadence@cadence et cadence-hud@cadence, lien avec la CLI npm) ; description et topics du dépôt GitHub (claude-code, claude-code-plugin, …) — décision Sylvain 24-10 (visibilité locale, pas de soumission externe)"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-10-24
+    started: 2026-10-24
   - id: L291
     title: "orchestrate testGate (suite de la revue L287) : les fichiers supprimés par le lot ne comptent pas comme code sans test (diff-tree --diff-filter=d ; un lot de code mort supprimé déclenchait une passe ≈ 65 k tokens) ; les dépôts voisins du lot (l.repos, comme hasWork) sont lus ; la porte ne joue pas quand le budget ne paie pas correction + revue courte (fixAffordable), avec avertissement ; R10 rendu capable d'échouer (retirer !l.testGate le fait rougir) ; doc : sur un lot léger la porte mène à une revue Opus ; tests"
     status: doing

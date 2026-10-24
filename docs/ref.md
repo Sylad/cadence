@@ -229,13 +229,42 @@ covered by a `statut`, the `largeur_reference` of an `ecran`.
 - **tokens par page**: the `usage: { tokens }` of the reading divided by the `pages` of the expected document, for the cases that
   have one; without `usage`, « non mesurés » (`null` in `--json`), never a zero.
 
+The output is the totals, then one line per type present (in the order of the eleven types), then the pièges (`✓` all found, `✗`
+some missing) and, last, the cases without a reading. This one is a reading of the corpus that confirms a link the figure makes
+precise, misreads a table cell, an opacity and a state, drops one line of the scan and counts 4,200 tokens for the one case that
+reports `usage`:
+
 ```
 $ cadence ref eval tmp/corpus-ref lectures/
-7 cas · 38 éléments attendus · 36 lus
-rappel : 89.5 % (34/38) · précision : 94.4 % (34/36)
-faux lu : 2.9 % (1/35 sûrs)
-tokens par page : non mesurés
+7 cas · 44 éléments attendus · 43 lus
+rappel : 88.6 % (39/44) · précision : 90.7 % (39/43)
+faux lu : 10 % (4/40 sûrs)
+tokens par page : 4200 (4200 sur 1 pages)
+par type :
+  ecran      rappel 100 % (2/2) · précision 100 % (2/2) · faux lu 0/2
+  composant  rappel 100 % (5/5) · précision 100 % (5/5) · faux lu 0/5
+  etat       rappel 50 % (1/2) · précision 50 % (1/2) · faux lu 1/2
+  texte      rappel 96.3 % (26/27) · précision 100 % (26/26) · faux lu 0/23
+  jeton      rappel 50 % (1/2) · précision 50 % (1/2) · faux lu 1/2
+  table      rappel 0 % (0/1) · précision 0 % (0/1) · faux lu 1/1
+  gabarit    rappel 100 % (1/1) · précision 100 % (1/1) · faux lu 0/1
+  lien       rappel 66.7 % (2/3) · précision 66.7 % (2/3) · faux lu 1/3
+  statut     rappel 100 % (1/1) · précision 100 % (1/1) · faux lu 0/1
+pièges :
+  ✗ controle-translucide : 0/1
+  ✓ figure-contredit-texte : 1/1
+  ✓ gabarit-type-bufr : 1/1
+  ✓ page-proposal : 1/1
+  ✗ scan-bruite : 3/4
+  ✗ table-en-image : 0/1
+  ✗ texte-ambigu-leve-par-figure : 0/1
 ```
+
+Reading it: the `etat` line is the recall of the states (the threshold of the design is 95 % of the components **and** states);
+in `faux lu 1/2` the second number is the number of sûrs read of that type (an `incertain` one, like the OCR texts of the scan,
+is not in it). A misread affirmation (the table cell, the confirmed link) is an element found but not juste; a misread part of the identity (the opacity, the name of a state) is a missing element and an invented one; both cost recall and add a faux lu, while a dropped element (the scan line) costs recall only. The `✗` pièges name what a reader must work on: here the confirmed link, the cell and the
+opacity are exactly the traps of those cases.
+
 
 A reading whose `document.slug` or `document.sha256` differs from the expected one is refused (never a measure over two versions
 mixed). Exit codes: **0** done, **2** refusal (wrong call, file absent or unreadable, invalid reading, other document, folder with

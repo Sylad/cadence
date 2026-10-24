@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { needsPrecheck, runLot } from '../src/orchestrate/cycle.js';
 import { commitFile, claudeOut, harness, precheckReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
-import { tempDir } from './helpers.js';
+import { gitRepo, tempDir } from './helpers.js';
+import { lotSlug } from '../src/orchestrate/state.js';
+import { Plan } from '../src/plan.js';
 import { writeJournal, writeWave } from './perf-helpers.js';
 
 const ok: Handler = () => claudeOut(reviewReport());
@@ -56,6 +58,17 @@ describe('orchestrate — précheck conditionnel au titre du lot (L288)', () => 
     const h = harness({ lots: [{ title: 'Premier' }, { title: 'Suite de L1' }], script: { precheck: [() => claudeOut(precheckReport())], implement: [impl], review: [ok] } });
     await runLot(h.lot('L2', {}, { precheck: true }));
     expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+  });
+
+  it('R16 — pour un lot dont l\'id n\'est pas L<n>, tout autre lot cité (Q-1, B28.1) déclenche le précheck, pas le lot lui-même', () => {
+    const repo = gitRepo();
+    const plan = Plan.create(join(repo, 'plan.yaml'), 'demo', 'Q-', '2026-09-01');
+    const a = plan.add('Le contrat', '2026-10-01', { estimate: 1 });
+    const b = plan.add(`Suite du contrat ${a} : la mesure`, '2026-10-01', { estimate: 1 });
+    const c = plan.add(`Le lot ${'Q-3'} seul`, '2026-10-01', { estimate: 1 });
+    plan.save();
+    expect(needsPrecheck({ precheck: true }, plan, repo, b)).toBe(true);
+    expect(needsPrecheck({ precheck: true }, plan, repo, c)).toBe(false);
   });
 
   it('R9 — le verdict du précheck est enregistré dans l\'état du lot : oui, partiel, non', async () => {
@@ -120,14 +133,32 @@ describe('cadence perf — part de « oui » du précheck (L288)', () => {
     expect(d.precheck.yes.lots.current).toBe(2);
   });
 
-  it('R13 — un lot sans verdict (précheck absent, journal ancien) n\'entre pas au dénominateur ; sans verdict, la part est n/d', async () => {
+  it('R13 — un lot sans précheck (aucune étape precheck, donc aucun verdict) n\'entre pas au dénominateur ; sans verdict, la part est n/d', async () => {
     const c = ctx();
-    lot(c, CUR);
+    writeJournal(c.runs, 'w1', 'alpha', `L${++seq}`, { status: 'ready', steps: [{ kind: 'implement', ended: `${CUR}T09:00:00` }] });
     lot(c, CUR, 'oui', 'handed-back');
     const d = await json(c.root);
     expect(d.precheck.yes.current).toBe(1);
     expect(d.precheck.yes.lots.current).toBe(1);
     expect(d.precheck.yes.previous).toBeNull();
+  });
+
+  it('R17 — un journal d\'avant L288 (sans precheckVerdict) rend son verdict : « oui » si le lot a été rendu « livrable déjà présent », « partiel » s\'il porte un constat de précheck, « non » sinon', async () => {
+    const c = ctx();
+    const old = (day: string, extra: Record<string, unknown>) => {
+      const slug = `L${++seq}`;
+      writeJournal(c.runs, 'w1', 'alpha', slug, { status: 'ready', steps: [{ kind: 'precheck', ended: `${day}T08:00:00` }, { kind: 'implement', ended: `${day}T09:00:00` }] });
+      const file = join(c.runs, 'w1', `${lotSlug('alpha', slug)}.json`);
+      const rec = JSON.parse(readFileSync(file, 'utf8'));
+      writeFileSync(file, JSON.stringify({ ...rec, ...extra }));
+    };
+    old(CUR, { status: 'handed-back', outcome: 'livrable déjà présent : tout est là (a.ts:1)' });
+    old(CUR, { precheck: 'A pre-check found part of the deliverable' });
+    old(CUR, {});
+    old(CUR, { status: 'handed-back', outcome: 'revue non conforme après 2 passes' });
+    const d = await json(c.root);
+    expect(d.precheck.yes.lots.current).toBe(4);
+    expect(d.precheck.yes.current).toBe(0.25);
   });
 
   it('R14 — l\'indicateur est une information : ni ⚠ ni jumeau, même quand la part de « oui » double', async () => {

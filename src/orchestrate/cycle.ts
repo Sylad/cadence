@@ -996,11 +996,17 @@ function badReport(c: LotCtx, step: StepState, e: unknown): null {
 /** Mots d'un titre qui disent que le lot reprend un constat : le livrable peut déjà exister. */
 const CITES_FINDING = /constat|revue|review|audit/i;
 
-/** Le titre cite un constat, ou un lot antérieur du plan (« L12 » pour le lot L30) : un autre lot a pu faire le travail. */
-function titleCitesPriorWork(title: string, lot: string): boolean {
+/**
+ * Le titre cite un constat, ou un lot antérieur du plan : un autre lot a pu faire le travail. Pour un lot `L<n>`, « L12 » compte
+ * dans le titre de `L30` et non celui de `L12` ni d'un lot postérieur ; pour un autre identifiant (`Q-CAN6`, `B28.1`), tout autre
+ * lot du plan cité en entier compte.
+ */
+function titleCitesPriorWork(title: string, lot: string, ids: string[]): boolean {
   if (CITES_FINDING.test(title)) return true;
   const own = /^L(\d+)$/.exec(lot);
-  return [...title.matchAll(/(?<![\w-])L(\d+)(?!\w)/g)].some((m) => (own ? Number(m[1]) < Number(own[1]) : `L${m[1]}` !== lot));
+  if (own) return [...title.matchAll(/(?<![\w-])L(\d+)(?!\w)/g)].some((m) => Number(m[1]) < Number(own[1]));
+  const cited = (id: string) => new RegExp(`(?<![\\w.-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`).test(title);
+  return ids.some((id) => id !== lot && cited(id));
 }
 
 /**
@@ -1009,7 +1015,7 @@ function titleCitesPriorWork(title: string, lot: string): boolean {
  * contrôle coûtait 7 % des tokens pour 10 « oui » sur 30 mesurés (audit du 24-10).
  */
 export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: string, lot: string, repos: LotRepo[] = []): boolean {
-  return config.precheck && !hasWork(plan, { repo, repos, lot }) && titleCitesPriorWork(plan.lot(lot).title, lot);
+  return config.precheck && !hasWork(plan, { repo, repos, lot }) && titleCitesPriorWork(plan.lot(lot).title, lot, plan.lots().map((l) => l.id));
 }
 
 /**

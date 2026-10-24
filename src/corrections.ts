@@ -147,6 +147,18 @@ export interface Journal {
  * Lit TOUS les journaux de vague `<runs>/<vague>/<projet>--<lot>.json` lisibles (seuls un journal sans `steps` lisible ou, sous `until` ou `since`, une vague sans date de création lisible sont écartés) : c'est la lecture que partagent `readRuns` et `cadence perf` (L225), le filtre « session implement aboutie » n'est pas ici mais dans leurs prédicats (`implemented`). Chaque pas `fix` abouti est une passe, rattachée aux constats de la dernière revue qui la précède.
  * `until` : date ISO, ne lit que les vagues créées jusque-là et, dans chacune, les étapes terminées (`ended`) jusque-là ; une vague ou une étape sans date lisible est écartée. `since` : date ISO, ne garde que les vagues créées strictement après.
  */
+/**
+ * Verdict du contrôle préalable d'un journal : `precheckVerdict` (L288) ; pour un journal d'avant, relu de ce qu'il garde : le lot
+ * rendu « livrable déjà présent » est un « oui », celui qui porte le constat du précheck (`precheck`) un « partiel », tout autre
+ * lot dont l'étape precheck a abouti un « non ». Sans étape precheck aboutie, aucun verdict.
+ */
+function precheckVerdictOf(rec: Record<string, any>, steps: RawStep[]): 'oui' | 'partiel' | 'non' | undefined {
+  if (rec.precheckVerdict === 'oui' || rec.precheckVerdict === 'partiel' || rec.precheckVerdict === 'non') return rec.precheckVerdict;
+  if (!steps.some((s) => s.kind === 'precheck' && s.status === 'ok')) return undefined;
+  if (typeof rec.outcome === 'string' && rec.outcome.startsWith('livrable déjà présent')) return 'oui';
+  return typeof rec.precheck === 'string' && rec.precheck !== '' ? 'partiel' : 'non';
+}
+
 export function readJournals(runsDir: string, until?: string, since?: string): Journal[] {
   const journals: Journal[] = [];
   if (!existsSync(runsDir)) return journals;
@@ -190,7 +202,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         small: !!rec.small,
         status: String(rec.status),
         ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
-        ...(rec.precheckVerdict === 'oui' || rec.precheckVerdict === 'partiel' || rec.precheckVerdict === 'non' ? { precheck: rec.precheckVerdict as 'oui' | 'partiel' | 'non' } : {}),
+        ...(precheckVerdictOf(rec, steps) ? { precheck: precheckVerdictOf(rec, steps) } : {}),
         steps: steps.map((s) => {
           const usage = usageOf(s.tokens);
           return { n: s.n, kind: s.kind, status: s.status, ...(typeof s.model === 'string' ? { model: s.model } : {}), ...(s.started ? { started: s.started } : {}), ...(s.ended ? { ended: s.ended } : {}), ...(typeof s.tokens?.counted === 'number' ? { counted: s.tokens.counted } : {}), ...(usage ? { usage } : {}) };

@@ -3478,9 +3478,10 @@ lots:
       - { date: 2026-10-24, text: "24-10 (lead) — mineurs en note : commentaire briefs.ts:33 cite encore describedBy ; R23 ne rejoue pas la reprise." }
   - id: L309
     title: "orchestrate --resume : refuser (code 2, avant d'agir) une option ignorée — --resume --wave <id> reprend aujourd'hui en silence une AUTRE vague non terminée (vécu 24-10 : --resume --wave 2026-10-24-2030 --budget 3M a relancé 2026-10-19-suite2, maritime Q-LBL8, sans décision) ; accepter --wave <id> comme synonyme de l'argument, ou le refuser avec la syntaxe juste ; sans argument, ne reprendre une vague que s'il n'y en a qu'une non terminée, sinon les lister et refuser ; tests"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-10-24
+    started: 2026-10-24
   - id: L310
     title: "Essai réel mesuré du mode worktree (L279, L299–L304) — décision Sylvain 24-10 : une vague de deux lots cadence indépendants (L309 dans src/orchestrate, L274 dans src/ref) avec orchestrate.worktrees: true et CADENCE_EXPERIMENTAL_WORKTREES=1 ; mesure : temps de mur de la vague contre somme des durées des lots, intégrations (rebase, patch-id, verdict reporté ou revue courte), incidents ; conclusion écrite en note (activer par défaut, garder expérimental, ou corriger) ; config remise à false après l'essai sauf décision"
     status: doing

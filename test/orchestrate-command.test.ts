@@ -1318,6 +1318,14 @@ describe('Node du projet (.nvmrc)', () => {
 });
 
 describe('budget par lot (L78, recalibré L194)', () => {
+  it("L280 — les budgets tiennent le p90 mesuré du 17 au 23-10 avec 10 % de marge (aucun relèvement : 0 lot sur 309 au-dessus de son budget)", () => {
+    const p90Mesures: [string, number, number][] = [
+      ['plancher jusqu\'à 0,5 j (100 lots à 600 k, p90 452 k ; classe estimate 0,5 p90 513 k)', lotBudget(0.5), 513_000],
+      ['de 0,5 à 1 j (63 lots à 750 k, p90 563 k)', lotBudget(1), 563_000],
+      ['lot à écran (9 lots à 1,3 M, p90 875 k)', lotBudget(0.5, 'screen'), 875_000],
+    ];
+    for (const [nom, budget, p90] of p90Mesures) expect(budget, nom).toBeGreaterThanOrEqual(p90 * 1.1);
+  });
   it("la base d'un lot de plus d'un jour dit que 750 k reste un plancher tant que l'estimate × 570 k ne le dépasse pas", () => {
     expect(lotBudgetBasis(1.25)).toContain('plancher de 750000');
     expect(lotBudgetBasis(2)).toContain('570000 par jour');

@@ -3071,6 +3071,7 @@ lots:
     after: [ L264 ]
     created: 2026-10-23
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme, 1 note mineure (jetons de la session coupée non comptés après une relance) — orchestré (vague 2026-10-24-essai-wt3, 1 passe(s) de correction)", commit: 9940fb62418e36029a155020cacf9952e20fe3ab, reporte: { de: 174a8f9171a5938eac7f77ba8ad3201749eb9455, vers: 9940fb62418e36029a155020cacf9952e20fe3ab, patchId: 50c2f069b26b277dfa518e02bdfab65af58b3ee0 } }
   - id: L266
     title: "ref (issue #14, 6/10) : double lecture indépendante, cadence ref diff, troisième regard ; mesure comparée à la lecture unique — POINT D'ARRÊT : les lots 7 à 10 ne partent que si H1 tient (faux lu et rappel precise nettement meilleurs), décision du lead notée sur l'issue"
     status: todo

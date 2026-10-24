@@ -235,6 +235,60 @@ describe('cadence ref eval — rappel, précision, faux lu, tokens par page', ()
     expect(json.types.etat).toMatchObject({ attendus: 2, justes: 2 });
     expect(json.types.lien.attendus).toBe(3);
   });
+  describe('ce que chaque type affirme une fois retrouvé : une affirmation fausse est un faux lu, jamais un rappel', () => {
+    const etat = (n: number, cible: string, extra: Obj = {}): Obj => ({ type: 'etat', id: `cas#etat-${n}`, source: src, confiance: 'lu', nom: 'desactive', cible, ...extra });
+    const gabarit = (champs: Obj[], extra: Obj = {}): Obj => ({ type: 'gabarit', id: 'cas#gabarit-1', source: src, confiance: 'lu', nom: 'Section 1', champs, ...extra });
+    const champs = (): Obj[] => [{ nom: 'date', obligatoire: true, format: 'AAAAMMJJ' }, { nom: 'vent', obligatoire: false, format: 'entier', min: 0, max: 360 }];
+    const schema = (flux: Obj[], noeuds: Obj[] = [{ id: 'a', libelle: 'Capteur' }, { id: 'b', libelle: 'Serveur' }]): Obj => ({ type: 'schema', id: 'cas#schema-1', source: src, confiance: 'lu', noeuds, flux });
+    const fluxAB = (extra: Obj = {}): Obj => ({ de: 'a', vers: 'b', libelle: 'envoie', direction: 'de_vers', ...extra });
+    const compte = (attendu: Obj[], lus: Obj[], type: string): Obj => evaluer(doc('inventaire', attendu), doc('lecture', lus), ['--json']).json.types[type];
+
+    it('R21 — un état est retrouvé par son nom et l’identité de sa cible, pas par l’id de la cible ; sur un autre composant il est un faux lu', () => {
+      const base = [ecran, composant(1, 'Valider'), composant(2, 'Annuler')];
+      const attendu = [...base, etat(1, 'cas#composant-1')];
+      expect(compte(attendu, [...base, etat(5, 'cas#composant-1', { id: 'cas#etat-5' })], 'etat')).toMatchObject({ attendus: 1, justes: 1, faux_lu: 0 });
+      const renumerotes = [ecran, composant(7, 'Valider', { id: 'cas#composant-7' }), composant(8, 'Annuler', { id: 'cas#composant-8' }), etat(1, 'cas#composant-7')];
+      expect(compte(attendu, renumerotes, 'etat')).toMatchObject({ justes: 1, faux_lu: 0 });
+      expect(compte(attendu, [...base, etat(1, 'cas#composant-2')], 'etat')).toMatchObject({ attendus: 1, lus: 1, justes: 0, faux_lu: 1, rappel: 0 });
+      expect(compte(attendu, [...base, etat(1, 'cas#composant-1', { nom: 'chargement' })], 'etat')).toMatchObject({ justes: 0, faux_lu: 1 });
+    });
+
+    it('R22 — un écran est juste à la même largeur de référence ; à une autre il est retrouvé mais faux lu', () => {
+      const autre = { ...ecran, largeur_reference: 390 };
+      expect(compte([ecran], [ecran], 'ecran')).toMatchObject({ justes: 1, faux_lu: 0 });
+      expect(compte([ecran], [autre], 'ecran')).toMatchObject({ attendus: 1, lus: 1, justes: 0, faux_lu: 1, rappel: 0 });
+    });
+
+    it('R23 — un composant se retrouve par son rôle et son contenu : un autre rôle est un composant manqué et un composant en trop', () => {
+      const r = compte([ecran, composant(1, 'Valider')], [ecran, composant(1, 'Valider', { role: 'champ' })], 'composant');
+      expect(r).toMatchObject({ attendus: 1, lus: 1, justes: 0, faux_lu: 1, rappel: 0, precision: 0 });
+    });
+
+    it('R24 — un gabarit à un champ faux (obligatoire, format, borne) est un faux lu ; les mêmes champs sont justes', () => {
+      const attendu = [gabarit(champs())];
+      expect(compte(attendu, [gabarit(champs())], 'gabarit')).toMatchObject({ justes: 1, faux_lu: 0 });
+      for (const [nom, change] of [['obligatoire', { obligatoire: true }], ['format', { format: 'texte' }], ['max', { max: 359 }], ['min', { min: 1 }]] as const) {
+        const faux = champs();
+        Object.assign(faux[1]!, change);
+        expect(compte(attendu, [gabarit(faux)], 'gabarit'), nom).toMatchObject({ attendus: 1, lus: 1, justes: 0, faux_lu: 1 });
+      }
+      expect(compte(attendu, [gabarit(champs().reverse())], 'gabarit'), 'ordre des champs').toMatchObject({ justes: 0, faux_lu: 1 });
+    });
+
+    it('R25 — un schéma est retrouvé par ses nœuds ; un flux inversé, un libellé de flux ou une direction faux sont des faux lus, l’ordre des flux ne compte pas', () => {
+      const attendu = [schema([fluxAB()])];
+      expect(compte(attendu, [schema([fluxAB()])], 'schema')).toMatchObject({ justes: 1, faux_lu: 0 });
+      const inverse = schema([fluxAB({ de: 'b', vers: 'a' })]);
+      expect(compte(attendu, [inverse], 'schema')).toMatchObject({ attendus: 1, lus: 1, justes: 0, faux_lu: 1, rappel: 0 });
+      expect(compte(attendu, [schema([fluxAB({ libelle: 'reçoit' })])], 'schema')).toMatchObject({ justes: 0, faux_lu: 1 });
+      expect(compte(attendu, [schema([fluxAB({ direction: 'bidirectionnel' })])], 'schema')).toMatchObject({ justes: 0, faux_lu: 1 });
+      const deux = [{ id: 'a', libelle: 'Capteur' }, { id: 'b', libelle: 'Serveur' }, { id: 'c', libelle: 'Écran' }];
+      const f2 = { de: 'b', vers: 'c', libelle: 'affiche', direction: 'de_vers' };
+      expect(compte([schema([fluxAB(), f2], deux)], [schema([f2, fluxAB()], deux)], 'schema')).toMatchObject({ justes: 1, faux_lu: 0 });
+      const renomme = schema([fluxAB()], [{ id: 'a', libelle: 'Sonde' }, { id: 'b', libelle: 'Serveur' }]);
+      expect(compte(attendu, [renomme], 'schema')).toMatchObject({ justes: 0, faux_lu: 1 });
+    });
+  });
   it('R19 — un fichier contre un dossier (dans un sens ou dans l’autre) est refusé avec les combinaisons acceptées, jamais une lecture ignorée en silence', () => {
     const dir = tempDir();
     mkdirSync(join(dir, 'corpus', 'un'), { recursive: true });

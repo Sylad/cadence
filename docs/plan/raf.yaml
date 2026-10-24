@@ -3384,6 +3384,7 @@ lots:
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme, 3 notes mineures (titre « ### Fixed » en double dans le CHANGELOG ; revue courte rejouée et texte de verdict dupliqué à la reprise après le refus tardif ; contrôle de branche de writeVerdict non testé) — orchestré (vague 2026-10-24-1615, 0 passe(s) de correction)", commit: 1c351c0858cdf66c57946528d494ddd44b0d77e7 }
   - id: L300
     title: "worktrees (suite revue L279, à faire avant activation) : reprise d'un lot next: integrate dont la branche cadence/<vague>/<lot> n'existe plus (retirée par --remove-worktree --abandon-commits) : aucun worktree recréé au sommet (planTrees/ensureTree), lot rendu « commits abandonnés » ; jamais de verdict conforme à commit null ; test avec deux lots du groupe repris ensemble (reproduit par la revue 24-10)"
     status: todo

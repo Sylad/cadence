@@ -3373,9 +3373,10 @@ lots:
     review: { date: 2026-10-24, verdict: "compliant (2 notes mineures : reformatage cosmétique des collections de flux par yaml, réponse corrective sourcée avec l'ancien énoncé si la session spec est perdue) — vitest 3239/3239, tsc propre — orchestré (vague 2026-10-24-1615, 0 passe(s) de correction)", commit: 3986ea88b2c823c82c52c325730a90b37654b34a }
   - id: L298
     title: "orchestrate : délai des étapes d'écriture (timeouts.work, 45 min fixes) proportionné à l'estimate et à la spec du lot, ou prolongé tant que la session commite ; à l'échéance, le travail non commité est signalé dans le tableau (fichiers, tests) au lieu d'un « échec » sec ; tests. Vécu 24-10 : implement de L279 (0,5 j + fiche) coupé à 45 min après 6 commits, 44 lignes vertes non commitées — décision Sylvain 24-10"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L299
     title: "worktrees (suite revue L279, à faire avant activation) : revérifier branche de départ et arbre du lead juste avant advance() et writeVerdict ; le lead passé sur une autre branche pendant les contrôles ou la revue courte ne reçoit ni fast-forward ni commit de plan, lot rendu next: integrate (R24, R22, R8) ; test qui change de branche pendant la revue courte (reproduit par la revue 24-10 : feat(L2) et plan sur « autre », L2 prêt)"
     status: todo

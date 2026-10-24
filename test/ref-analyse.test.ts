@@ -28,7 +28,7 @@ if (mode === 'crash') { process.stderr.write('boom'); process.exit(1); }
 const file = /(\\S+\\/lectures\\/a\\.json)/.exec(brief)[1];
 const doc = JSON.parse(fs.readFileSync(file.replace('/lectures/a.json', '/document.json'), 'utf8'));
 const texte = { type: 'texte', id: doc.slug + '#texte-1', source: { page: 1, zone: { x: 10, y: 10, l: 100, h: 20 } }, confiance: 'lu', libelle: 'Figure 1 Station model', role: 'legende' };
-const lecture = { version: 1, genre: mode === 'genre' ? 'inventaire' : 'lecture', document: { slug: doc.slug, sha256: mode === 'autre' ? 'c'.repeat(64) : doc.sha256 }, elements: [mode === 'invalide' ? { ...texte, role: 'etiquette' } : texte] };
+const lecture = { ...(mode === 'usage-menti' ? { usage: { tokens: 1 } } : {}), version: 1, genre: mode === 'genre' ? 'inventaire' : 'lecture', document: { slug: doc.slug, sha256: mode === 'autre' ? 'c'.repeat(64) : doc.sha256 }, elements: [mode === 'invalide' ? { ...texte, role: 'etiquette' } : texte] };
 if (mode !== 'sans-fichier') { fs.mkdirSync(require('node:path').dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(lecture)); }
 out({ structured_output: { resume: 'lu', questions: mode === 'question' ? ['Que veut dire Figure 1 ?'] : [] } });
 `;
@@ -155,6 +155,12 @@ describe('cadence ref analyse (L265)', () => {
     const code = await run(['ref', 'eval', join(s.base, 'attendu.json'), join(s.refs, 'norme', 'lectures', 'a.json')], { cwd: s.cwd, env: s.env, out: (l) => out.push(l), err: () => undefined, now: () => new Date() });
     expect(code).toBe(0);
     expect(out.join('\n')).toContain('tokens par page : 333');
+  });
+
+  it('R20 — un usage écrit par l\'agent est remplacé par le compte du programme', async () => {
+    const s = setup('usage-menti');
+    expect((await analyse(s)).code).toBe(0);
+    expect(lectureOf(s).usage).toEqual({ tokens: 1000, modele: 'sonnet', session: 's-1' });
   });
 
   it('R9 — le plafond d\'une lecture est de 20 pages : 21 pages rendues sont refusées avant toute session, 20 passent', async () => {

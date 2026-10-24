@@ -78,7 +78,7 @@ function ecartsDeLecture(lecture: unknown, doc: { slug: string; sha256: string }
 export async function analyse(o: AnalyseOptions): Promise<number> {
   const model = (o.model ?? 'sonnet') as Model;
   if (!ANALYSE_MODELS.includes(model)) throw new RafError(`ref analyse : --model invalide : « ${o.model} » (attendu : ${ANALYSE_MODELS.join(', ')})`);
-  const { slug, docDir, doc } = add({ ...o, out: o.out });
+  const { slug, docDir, doc } = add({ document: o.document, slug: o.slug, sections: o.sections, env: o.env, cwd: o.cwd, refsDir: o.refsDir, now: o.now, out: o.out });
   const pages = doc.pages.filter((p) => p.rendered).map((p) => p.n);
   const sections = `\n  choisir les pages à lire : cadence ref analyse ${o.document} --slug ${slug} --sections 3-12`;
   if (pages.length === 0) throw new RafError(`ref analyse : aucune page rendue : rien à lire${sections}`);

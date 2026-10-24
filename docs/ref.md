@@ -276,7 +276,7 @@ no `attendu.json`). `--json` prints one object: `total`, `types`, `pieges`, `tok
 ## `cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug name] [--model sonnet|opus|haiku]`
 
 The whole chain **in a single reading** (the baseline that the double reading of the next lots is measured against, design §« Mesure »): `add`, then **one fresh session** of the
-[`reference-analyst`](../agents/reference-analyst.md) agent (`claude -p`, model `sonnet` unless `--model` says otherwise, effort and permission mode of `orchestrate`
+[`reference-analyst`](../agents/reference-analyst.md) agent (`claude -p`, model `sonnet` unless `--model` says otherwise, the review effort and the permission mode of `orchestrate`
 in `cadence.yaml`, a working directory that is the document folder), then the program checks what the session wrote. The agent looks at every rendered page whole, then every zone at full resolution, measures
 with `cadence ref measure`, copies every text verbatim, links every figure to the passages that cite it (`confirme`, `precise`, `contredit`), writes what the document does not show as a `silence`,
 marks `incertain` (with its cause) what it cannot read for sure, and writes **`<references.dir>/<slug>/lectures/a.json`**: a reading (`genre: "lecture"`) in the format of
@@ -306,7 +306,7 @@ question : Que veut dire « Figure 1 » ?
 ```
 
 The last line is one `question :` per question of the agent (a `contredit`, an `incertain`). Exit codes: **0** a valid reading, **1** a refused reading (no file, `ref check` deviations, wrong genre, wrong document: one
-`✗ <reason>` line then `N écart(s)` on the standard output, the file is left as written, without `usage`), **2** refusal (unknown `--model`, no page or more than 20, tool or file as for `add`, a session that
+`✗ <reason>` line then `N écart(s)` on the standard output, the file is left as written, no `usage` is added), **2** refusal (unknown `--model`, no page or more than 20, tool or file as for `add`, a session that
 failed: `la session de lecture a échoué : <cause>`), **3** quota reached (message on the error output, no reading; run it again later). The tokens per page of the output divide by the pages **read**; `ref eval` divides by the `pages` of the expected inventory,
 the same number for a corpus case read whole.
 

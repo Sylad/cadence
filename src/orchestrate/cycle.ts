@@ -26,7 +26,7 @@ import { type Acceptation, acceptationFile, acceptCommands, isAcceptList, accept
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
 import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
-import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, hypothesisNote, specText, type FicheParts } from './spec.js';
+import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, hypothesisNote, LEAD_SOURCE, ruleIdsSourcedByLead, sourceRules, specText, type FicheParts } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 import { advance, INTEGRATE_WAIT_MS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
@@ -460,7 +460,7 @@ function briefFor(c: LotCtx, kind: SessionKind): string {
     });
     const mine = lotCommitLines(c);
     if (mine) vars.commits = `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}`;
-    if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer) : `Answer from the human to your earlier question: ${l.pendingAnswer}`;
+    if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer, ruleIdsSourcedByLead(wd(c), ficheOf(c) ?? '', l.specAskedRules ?? [])) : `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
   if (kind === 'fiche') {
     vars.fiche = ficheReviewText({ fiche: ficheOf(c) ?? '', passes: l.fiche?.passes ?? 0, previous: l.ficheConstats });
@@ -1207,6 +1207,28 @@ function takeReport(c: LotCtx, done: Done, rep: { choix?: string[]; questions: s
   return rep.questions.filter((q) => !isNonQuestion(q));
 }
 
+/**
+ * La réponse du lead à une question sur des hypothèses coûteuses de la fiche (L297) : le programme passe lui-même ces règles en `sourcee`
+ * (`réponse du lead, <date>, vague <id>`) et commite la fiche AVANT la session spec reprise, qui pourrait être perdue ou ne rien écrire — la fiche est alors
+ * conforme quand la revue de fiche la lit. Rend vrai quand le lot est rendu (fiche introuvable, commit refusé).
+ */
+function sourceAnsweredRules(c: LotCtx): boolean {
+  const l = c.lot;
+  if (!l.pendingAnswer || !l.specAsked?.length || !l.specAskedRules?.length) return false;
+  const fiche = ficheOf(c);
+  if (!fiche) return false; // la session spec reprise l'écrira : l'ancienne consigne s'applique
+  try {
+    const ids = sourceRules(wd(c), fiche, l.specAskedRules, `${LEAD_SOURCE}, ${c.wave.today}, vague ${c.wave.id}`);
+    if (!ids.length) return false;
+    git(wd(c), 'add', '--', fiche);
+    git(wd(c), 'commit', '-q', '-m', `spec(${l.lot}): ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead (orchestrate ${c.wave.id})`, '--', fiche);
+    return false;
+  } catch (e) {
+    stop(c, 'handed-back', `réponse du lead non reportée dans la fiche ${fiche} : ${(e as Error).message.split('\n')[0]}`);
+    return true;
+  }
+}
+
 /** Plafond de sessions `spec` du lot (L230) : les revues de maquette d'un lot à écran, sinon deux. Fiche et maquette partagent `l.specRuns`. */
 const specBudget = (c: LotCtx): number => (c.lot.screen && c.config.maquette ? c.config.maquetteReviews : 2);
 
@@ -1217,6 +1239,7 @@ const specBudget = (c: LotCtx): number => (c.lot.screen && c.config.maquette ? c
  */
 async function specStep(c: LotCtx): Promise<void> {
   const l = c.lot;
+  if (sourceAnsweredRules(c)) return;
   const done = await session(c, 'spec');
   if (!done) return;
   l.specRuns = (l.specRuns ?? 0) + 1;
@@ -1232,6 +1255,7 @@ async function specStep(c: LotCtx): Promise<void> {
     l.questions = questions;
     l.specRuns = undefined; // la réponse ouvre un nouveau budget de sessions
     l.specAsked = undefined; // la prochaine réponse porte sur la question de la session, pas sur d'anciennes hypothèses coûteuses
+    l.specAskedRules = undefined;
     l.next = 'spec';
     transition(c, 'question', questions[0]);
     return;
@@ -1277,12 +1301,14 @@ async function specStep(c: LotCtx): Promise<void> {
   if (costly.length) {
     l.questions = costly.map((x) => `${x.id} est posée comme hypothèse mais touche un choix coûteux à défaire (${x.categorie}) : « ${x.siFaux} » — la confirmer, ou la corriger, avant que la fiche serve de référence.`);
     l.specAsked = [...l.questions];
+    l.specAskedRules = costly.map((x) => x.id);
     l.specRuns = undefined; // la réponse du lead ouvre un nouveau budget de sessions, comme celle d'une question de la session
     l.next = 'spec';
     transition(c, 'question', l.questions[0]);
     return;
   }
   l.specAsked = undefined;
+  l.specAskedRules = undefined;
   l.spec = { fiche, hypotheses: (doc.regles ?? []).filter((r) => r.statut === 'hypothese').length };
   l.specProblems = undefined;
   l.hypotheses = undefined; // la fiche vient d'être (ré)écrite : ses hypothèses se posent une fois la fiche relue, pas avant (settleHypotheses)

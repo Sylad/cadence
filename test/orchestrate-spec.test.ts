@@ -300,7 +300,7 @@ describe('étape spec : question ciblée', () => {
     expect(kinds(h)).toEqual(['spec', 'spec', 'implement', 'review']);
   });
 
-  it('la reprise rappelle la règle posée en question et dit de la passer en sourcee avec la réponse du lead', async () => {
+  it('la reprise rappelle la règle posée en question et dit que le programme l\'a passée en sourcee avec la réponse du lead (L297)', async () => {
     const m = spec({ fiche: (d) => { d.regles[2].si_faux = 'Si faux, une migration du stockage des rappels serait à écrire.'; } });
     const confirme = spec({ fiche: (d) => { d.regles[2].statut = 'sourcee'; d.regles[2].source = 'réponse du lead'; delete d.regles[2].si_faux; } });
     const h = harness({ lots, script: { spec: [m, confirme], implement: [impl], review: [ok] } });
@@ -311,7 +311,7 @@ describe('étape spec : question ciblée', () => {
     await runLot(c);
     expect(h.calls[1].brief).toContain('R3');
     expect(h.calls[1].brief).toContain('migration du stockage');
-    expect(h.calls[1].brief).toContain('source: réponse du lead');
+    expect(h.calls[1].brief).toMatch(/already set R3 to `statut: sourcee`/);
     expect(kinds(h)).toEqual(['spec', 'spec', 'implement', 'review']);
   });
 

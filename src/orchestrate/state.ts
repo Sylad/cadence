@@ -107,6 +107,8 @@ export interface LotState {
   specRuns?: number;
   /** Questions posées par le programme sur des hypothèses coûteuses de la fiche (--answer vide `questions` : elles restent là pour le brief de reprise). */
   specAsked?: string[];
+  /** Ids des règles `hypothese` dont `specAsked` pose la question : la réponse du lead les passe en `sourcee` (L297). */
+  specAskedRules?: string[];
   /** Lot léger (estimate ≤ orchestrate.review.threshold, L108) : une revue légère, pas de passe des mineurs. Absent : lot ordinaire. */
   light?: boolean;
   model: Model;

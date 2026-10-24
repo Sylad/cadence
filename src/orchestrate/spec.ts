@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parse } from 'yaml';
+import { isMap, isSeq, parse, parseDocument } from 'yaml';
 import type { Screen } from '../plan.js';
 import { acceptationFile } from './accept.js';
 import { checkFiche, fichesDuDossier, LARGEURS } from '../spec.js';
@@ -82,13 +82,54 @@ export function ficheReady(repo: string, fiche: string, lot: string, parts: Fich
   }
 }
 
-/** Consigne de reprise après la réponse du lead à des hypothèses coûteuses : la règle confirmée n'est plus une hypothèse. */
-export function answeredText(asked: string[], answer: string): string {
+/**
+ * Passe en `sourcee` les règles `hypothese` nommées (L297) : `source` dit d'où vient la réponse, `si_faux` disparaît. Le reste de la fiche
+ * (ordre, commentaires) est conservé. Rend les ids effectivement changés ; une règle absente ou déjà sourcée n'est pas touchée.
+ */
+export function sourceRules(repo: string, fiche: string, ids: string[], source: string): string[] {
+  const file = join(repo, fiche);
+  const doc = parseDocument(readFileSync(file, 'utf8'));
+  const regles = doc.get('regles');
+  if (!isSeq(regles)) return [];
+  const changed: string[] = [];
+  for (const r of regles.items) {
+    if (!isMap(r)) continue;
+    const id = String(r.get('id'));
+    if (!ids.includes(id) || r.get('statut') !== 'hypothese') continue;
+    r.set('statut', 'sourcee');
+    r.set('source', source);
+    r.delete('si_faux');
+    changed.push(id);
+  }
+  if (changed.length) writeFileSync(file, doc.toString());
+  return changed;
+}
+
+/** Les règles nommées que la fiche donne déjà pour sourcées par la réponse du lead (ce que `sourceRules` a posé). */
+export function ruleIdsSourcedByLead(repo: string, fiche: string, ids: string[]): string[] {
+  try {
+    const doc = parse(readFileSync(join(repo, fiche), 'utf8'));
+    return list(isObj(doc) ? doc.regles : []).filter((r) => ids.includes(String(r.id)) && r.statut === 'sourcee' && String(r.source).startsWith(LEAD_SOURCE)).map((r) => String(r.id));
+  } catch {
+    return [];
+  }
+}
+
+/** Début de la source d'une règle tranchée par le lead : `réponse du lead, <date>, vague <id>`. */
+export const LEAD_SOURCE = 'réponse du lead';
+
+/**
+ * Consigne de reprise après la réponse du lead à des hypothèses coûteuses. Les règles que le programme a déjà passées en `sourcee` (`sourced`) ne sont plus à
+ * réécrire que si le lead les a corrigées ; les autres, l'agent les passe lui-même.
+ */
+export function answeredText(asked: string[], answer: string, sourced: string[] = []): string {
   return [
     'The program asked the lead about expensive-to-undo hypotheses of your sheet:',
     ...asked.map((q) => `- ${q}`),
     `Answer from the lead: ${answer}`,
-    'Apply it to the sheet: a rule the lead confirms becomes `statut: sourcee` with `source: réponse du lead` (no `si_faux`); a rule the lead corrects is rewritten as they say (`sourcee`, same source). Do not leave it as `hypothese`, or the program asks the same question again.',
+    sourced.length
+      ? `The program already set ${sourced.join(', ')} to \`statut: sourcee\` with the lead's answer as its \`source\` (no \`si_faux\`). Touch the sheet only if the lead corrected a rule: rewrite its \`enonce\` as they say and keep the \`sourcee\` status and the \`source\`. Do not turn it back into a \`hypothese\`.`
+      : 'Apply it to the sheet: a rule the lead confirms becomes `statut: sourcee` with `source: réponse du lead` (no `si_faux`); a rule the lead corrects is rewritten as they say (`sourcee`, same source). Do not leave it as `hypothese`, or the program asks the same question again.',
   ].join('\n');
 }
 

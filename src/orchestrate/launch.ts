@@ -9,13 +9,16 @@ import { sandboxEnv } from './sandbox.js';
 import { killMarked, SESSION_MARK_VAR, TreeTracker } from '../proc.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
-export type StepKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche';
+/** Les étapes qui sont une session de claude. */
+export type SessionKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche';
+/** Les étapes d'un lot : ses sessions, plus l'intégration à la branche du dépôt (L279, R14), que le programme joue seul : elle ne passe par aucune table de sessions (schéma, gabarit, modèle). */
+export type StepKind = SessionKind | 'integrate';
 export type Model = 'sonnet' | 'opus' | 'haiku';
 /** Modèle d'une étape : celui de Claude, ou `local` (claude-local → Ollama, L146). */
 export type StepModel = Model | 'local';
 
 export interface StepSpec {
-  kind: StepKind;
+  kind: SessionKind;
   /** Identifiant de la session (uuid), passé à `claude --session-id` : son journal se retrouve sans deviner. */
   sessionId: string;
   brief: string;
@@ -56,7 +59,7 @@ export type McpServers = Record<string, { command: string; args: string[] }>;
  * et `review-small` d'un petit lot visible (sa seule revue d'ergonomie) ; rien pour `review`, ni pour un lot sans écran.
  * Sorties dans `outputDir`, hors du dépôt.
  */
-export function mcpServersFor(kind: StepKind, visible: boolean, outputDir: string, small = false, screen = true): McpServers {
+export function mcpServersFor(kind: SessionKind, visible: boolean, outputDir: string, small = false, screen = true): McpServers {
   if (!(kind === 'ux' || kind === 'maquette' || (visible && ((kind === 'spec' && screen) || kind === 'implement' || kind === 'fix' || (kind === 'review-small' && small))))) return {};
   // La maquette est un fichier local : sans cette option le serveur bloque toute URL file:// (« Access to "file:" protocol is blocked »).
   const files = kind === 'maquette' || kind === 'spec' ? ['--allow-unrestricted-file-access'] : [];
@@ -69,7 +72,7 @@ export function playwrightDir(lotDir: string): string {
 }
 
 /** Écrit `<lotDir>/mcp-<étape>.json` (et, si Playwright est chargé, le dossier `playwright/`) ; rend le chemin absolu du fichier. */
-export function writeMcpConfig(lotDir: string, kind: StepKind, visible: boolean, small = false, screen = true): string {
+export function writeMcpConfig(lotDir: string, kind: SessionKind, visible: boolean, small = false, screen = true): string {
   const dir = resolve(lotDir);
   const out = playwrightDir(dir);
   const servers = mcpServersFor(kind, visible, out, small, screen);
@@ -192,7 +195,7 @@ export type SessionOutcome =
   | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string; firstStdout?: string; relaunched?: Relaunched; /** Vrai quand la session a été coupée (signal, sortie vide), y compris après sa relance : ni un quota, ni un échec ordinaire. */ cut?: boolean };
 
 /** Étapes en lecture seule : seules relancées à neuf après une coupure (une étape d'écriture a pu laisser un travail à moitié fait). */
-const READ_ONLY: ReadonlySet<StepKind> = new Set(['review', 'review-small', 'ux', 'precheck', 'maquette', 'fiche']);
+const READ_ONLY: ReadonlySet<SessionKind> = new Set(['review', 'review-small', 'ux', 'precheck', 'maquette', 'fiche']);
 
 /** Session tuée par un signal (code 128 + n : 143 SIGTERM, 137 SIGKILL…) sans rien écrire : la coupure, ni un quota (un message) ni un échec (une sortie). */
 const isCut = (out: LaunchOutcome): boolean => !out.timedOut && out.code > 128 && out.stdout.trim() === '';

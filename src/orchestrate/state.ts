@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { gitCommonDir, gitRoot } from '../git.js';
-import type { Model, StepKind, StepModel } from './launch.js';
+import type { Model, SessionKind, StepKind, StepModel } from './launch.js';
 import type { Screen } from '../plan.js';
 import type { Tokens } from './result.js';
 
@@ -29,7 +29,7 @@ export interface WaveState {
 
 export interface StepState {
   n: number;
-  kind: StepKind;
+  kind: SessionKind;
   model: StepModel;
   /** Niveau d'effort demandé à la session (`--effort`, L137) ; absent : celui de la session (`default`, ou une vague d'avant L137). */
   effort?: string;

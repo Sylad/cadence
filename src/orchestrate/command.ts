@@ -21,11 +21,13 @@ import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specScreen, specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { Budget, DROPPED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, handBackDroppedQuestions, needsPrecheck, type LotCtx, type WaveCtx } from './cycle.js';
+import { Budget, DROPPED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
-import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
+import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
-import { runPool } from './pool.js';
+import { groupLots, runPool } from './pool.js';
+import { repoBranch } from './integrate.js';
+import { baseBranchOf, keptTrees, lotBranch, lotTreeDir } from './worktree.js';
 import { schemaFor } from './schemas.js';
 import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
@@ -59,6 +61,8 @@ export interface OrchestrateDeps {
    * depuis cette copie. Absent (tests, processus déjà relancé) : la vague tourne sur le paquet courant, sans copie.
    */
   snapshot?: SnapshotDeps;
+  /** Attente du verrou d'intégration du dépôt (L279, R25) : défauts 10 minutes et 1 s ; réglable pour les tests. */
+  integrate?: { waitMs?: number; pollMs?: number };
 }
 
 export const DEFAULT_BUDGET = 2_000_000;
@@ -827,6 +831,28 @@ function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx:
   return lots.map((lot, i) => ({ wave: wctx, lot, config: envs[i].config, loadPlan: envs[i].loadPlan }));
 }
 
+/**
+ * Quels lots jouent dans un worktree (L279). Un groupe de lots du même dépôt (`groupLots`) y joue si `orchestrate.worktrees` est vrai, s'il a au moins deux lots,
+ * si le dépôt est sur une branche et si aucun de ses lots n'a de dépôt voisin (`repos:`, R2) ; sinon les lots restent à la suite, avec un avertissement qui dit pourquoi.
+ * Un lot dont la branche existe déjà (reprise, R11) retrouve son worktree quel que soit le groupe. La branche de départ est celle du dépôt du lead à cet instant,
+ * ou celle que la branche du lot a notée à sa création.
+ */
+function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: string) => void): void {
+  for (const group of groupLots(ctxs)) {
+    const repo = group[0].lot.repo;
+    const branch = repoBranch(repo);
+    const requested = group.length > 1 && group.every((c) => c.config.worktrees);
+    const why = !requested ? null : group.some((c) => c.lot.repos?.length) ? 'des lots du groupe ont des dépôts voisins (repos:)' : !branch ? 'le dépôt est en HEAD détaché' : null;
+    if (why) log(`orchestrate : ${basename(repo)} : worktrees demandés mais ${why} : lots joués à la suite`);
+    for (const c of group) {
+      const lotBr = lotBranch(wave, c.lot.project, c.lot.lot);
+      const known = baseBranchOf(repo, lotBr);
+      const base = known ?? branch;
+      if (((requested && !why) || known) && base) c.tree = { dir: lotTreeDir(store.dir, c.lot.project, c.lot.lot), branch: lotBr, base, active: false };
+    }
+  }
+}
+
 /** Pose les verrous et les hooks, joue la vague, range l'état, rend le tableau et le code de sortie. */
 async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, cap: number, all: LotState[] = lots): Promise<number> {
   const launch = store.launchDir;
@@ -928,11 +954,13 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
       store.journal(line);
     },
     saveWave,
+    integrate: deps.integrate,
   };
   wave.status = 'running';
   wave.pid = process.pid;
   saveWave();
   const ctxs = contexts(lots, envs, wctx);
+  planTrees(ctxs, store, wave.id, wctx.log);
 
   // Ctrl-C, SIGTERM : les sessions sont tuées en bloc, les étapes marquées interrompues, les verrous et hooks libérés.
   const forget = onTermination(async () => {
@@ -942,7 +970,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
       for (const s of c.lot.steps) {
         if (s.status === 'running') s.status = 'interrupted';
         // Les tokens d'une session tuée comptent : relus dans son journal.
-        if (s.status === 'interrupted') countInterrupted(deps.claudeHome, c.lot.repo, s, budget);
+        if (s.status === 'interrupted') countInterrupted(deps.claudeHome, workDir(c), s, budget);
       }
       if (c.lot.status === 'implementing' || c.lot.status === 'reviewing' || c.lot.status === 'fixing') c.lot.status = 'suspended';
       store.writeLot(c.lot);
@@ -960,12 +988,14 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const finished = lotFinished;
   try {
     await runPool(ctxs, cap, all, (c) => {
+      // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.
+      if (c.tree?.active && c.lot.status !== 'ready') wctx.log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : worktree conservé : ${c.tree.dir} (branche ${c.tree.branch})`);
       // Un dépôt dont tous les lots de la vague (reprise comprise) sont prêts ou rendus peut être livré pendant que la vague continue ailleurs.
       if (wctx.incident) return;
       for (const r of lotRepoPaths(c.lot)) {
         if (held.includes(join(sharedStateDir(r), REPO_LOCK)) && all.filter((l) => lotRepoPaths(l).includes(r)).every(finished)) freeRepo(r);
       }
-    });
+    }, (lots) => lots.every((c) => c.tree));
     handBackDroppedQuestions(ctxs); // un lot en question retiré pendant la vague : rendu avant de fixer le statut de la vague
   } finally {
     forget();
@@ -1071,7 +1101,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     else drops.push(lotKey(matches[0].project, matches[0].lot));
   }
   // --resume --budget projet:lot=+N (L223) : un lot rendu sur budget est remis en jeu avec son budget relevé. Il subit ensuite les gardes d'un lot vivant.
-  const raised = new Map<LotState, { from: number; to: number; step: StepKind }>();
+  const raised = new Map<LotState, { from: number; to: number; step: SessionKind }>();
   const answered = args.answers.map((a) => lots.filter((x) => x.lot === a.lot && (a.project ? x.project === a.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
   const dropped = args.drop.map((d) => lots.filter((x) => x.lot === d.lot && (d.project ? x.project === d.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
   for (const b of args.lotBudgets) {

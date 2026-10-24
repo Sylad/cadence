@@ -4,6 +4,7 @@ You are given the repository path and the lot id only: read the diff yourself fr
 cite the lot (`raf commits {{lot}}`, or `git log`), run the checks, report real defects only.
 Goal of the lot (it takes precedence over the title in the plan): {{objectif}}
 {{repos}}
+{{integration}}
 {{fiche}}
 {{ux}}
 {{checks}}

@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
+import type { Plan } from '../plan.js';
 import { lotSlug } from './state.js';
 
 /** Un worktree par lot (L279) : nom du dossier de la vague où ils vivent, hors du dépôt du lead. */
@@ -263,4 +264,16 @@ export function keptTrees(repo: string): KeptTree[] {
     });
   }
   return out;
+}
+
+/**
+ * Le plan vu depuis un worktree (R21) : le même plan, avec le chemin du fichier correspondant sous `root` — pour les lectures d'historique
+ * (lotWork, isPlanOnly, coveredTasks, unreviewedWork) qui rapportent le fichier de plan à la racine qu'on leur passe. Ne sert jamais à écrire.
+ */
+export function planSeenFrom(plan: Plan, repo: string, root: string): Plan {
+  const under = (p: string): string => {
+    const rel = relative(repo, p);
+    return rel === '' || rel.startsWith('..') || isAbsolute(rel) ? p : join(root, rel);
+  };
+  return Object.create(plan, { path: { value: under(plan.path) }, configFile: { get: () => (plan.configFile === null ? null : under(plan.configFile)) } }) as Plan;
 }

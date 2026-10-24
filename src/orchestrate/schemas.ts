@@ -1,4 +1,4 @@
-import type { StepKind } from './launch.js';
+import type { SessionKind } from './launch.js';
 
 const str = { type: 'string' } as const;
 const num = { type: 'number' } as const;
@@ -62,7 +62,7 @@ export const PRECHECK_SCHEMA = {
 } as const;
 
 /** Une revue de maquette rend le même rapport qu'une revue d'ergonomie (REVIEW_SCHEMA). */
-export const schemaFor = (kind: StepKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'spec' ? SPEC_SCHEMA : kind === 'accept' ? ACCEPT_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
+export const schemaFor = (kind: SessionKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'spec' ? SPEC_SCHEMA : kind === 'accept' ? ACCEPT_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
 
 export interface PrecheckReport {
   dejaPresent: 'oui' | 'partiel' | 'non';

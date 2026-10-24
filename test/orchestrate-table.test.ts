@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderTable } from '../src/orchestrate/table.js';
 import { newLot, type LotState, type ReviewSummary, type StepState, type WaveState } from '../src/orchestrate/state.js';
-import type { StepKind } from '../src/orchestrate/launch.js';
+import type { SessionKind } from '../src/orchestrate/launch.js';
 import { Plan } from '../src/plan.js';
 import { commitFile, git } from './orchestrate-harness.js';
 import { gitRepo } from './helpers.js';
@@ -65,7 +65,7 @@ describe('renderTable : captures UX (L74)', () => {
 });
 
 describe('renderTable : colonne revue (L51)', () => {
-  const step = (kind: StepKind, status: StepState['status'] = 'ok'): StepState => ({ n: 1, kind, model: 'sonnet', status, started: '2026-10-04T10:00:00Z' });
+  const step = (kind: SessionKind, status: StepState['status'] = 'ok'): StepState => ({ n: 1, kind, model: 'sonnet', status, started: '2026-10-04T10:00:00Z' });
   const summary = (over: Partial<ReviewSummary>): ReviewSummary => ({ conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: 'v', sousTaches: [], nonVerifie: [], head: 'abc', ...over });
   const cell = (l: LotState) => renderTable(wave, [l])[1];
 

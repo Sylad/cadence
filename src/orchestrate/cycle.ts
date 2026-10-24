@@ -10,15 +10,15 @@ import { readDocsConfig, type OrchestrateConfig } from '../config.js';
 import { docSyncBrief, docSyncGaps, filesOf } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
-import { changedFiles, readCommits, resolveCommit, type Commit } from '../git.js';
+import { changedFiles, gitCommonDir, readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
-import { capturesText, headline, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
-import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type StepKind, type StepModel } from './launch.js';
+import { capturesText, headline, integrationText, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import { sumTokens, type Tokens } from './result.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
@@ -29,7 +29,9 @@ import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, hypothesisNote, specText, type FicheParts } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
-import { linkIgnored } from './worktree.js';
+import { advance, INTEGRATE_WAIT_MS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
+import { mutexFor } from './mutex.js';
+import { gitFailure, integrated, linkIgnored, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
 export const MAX_PASSES = 2;
@@ -83,6 +85,17 @@ export interface WaveCtx {
   movedRepos?: Set<string>;
   log: (line: string) => void;
   saveWave: () => void;
+  /** Attente du verrou d'intégration du dépôt (L279, R25) : bornes par défaut INTEGRATE_WAIT_MS et INTEGRATE_POLL_MS ; réglables pour les tests. */
+  integrate?: { waitMs?: number; pollMs?: number };
+}
+
+/** Le worktree prévu pour un lot (L279) : créé à la prise du créneau (`active` une fois prêt), retrouvé à la reprise. */
+export interface LotTree {
+  dir: string;
+  branch: string;
+  /** Branche du dépôt sur laquelle le lot est parti et à laquelle il s'intègre (R24). */
+  base: string;
+  active: boolean;
 }
 
 export interface LotCtx {
@@ -92,21 +105,28 @@ export interface LotCtx {
   loadPlan: () => Plan;
   /** Issue du lancement de l'application par le programme, le temps de l'étape qui la voit (L60). */
   app?: AppState;
+  /** Worktree du lot (L279) ; absent : le lot joue dans le dépôt lui-même. */
+  tree?: LotTree;
+  /** Posé le temps de la revue courte du diff rebasé (R17) : le brief le dit à la session. */
+  integration?: { base: string };
 }
 
 const TERMINAL = new Set(['ready', 'handed-back', 'failed']);
+
+/**
+ * Où le lot travaille (L279) : son worktree quand il en a un, sinon le dépôt du projet. Tout ce que le cycle lit ou écrit du travail du lot — sessions,
+ * commits, contrôles, fiche, acceptation — passe par là ; le plan, lui, n'est jamais lu ni écrit ici que dans le dépôt du projet (`c.lot.repo`, R21).
+ */
+export const workDir = (c: LotCtx): string => (c.tree?.active ? c.tree.dir : c.lot.repo);
+const wd = workDir;
+
+/** Le plan tel que les lectures d'historique (lotWork, isPlanOnly, coveredTasks, unreviewedWork) le voient depuis `wd(c)` : son chemin est celui du fichier correspondant dans le worktree (R21). */
+const histPlan = (c: LotCtx): Plan => (wd(c) === c.lot.repo ? c.loadPlan() : planSeenFrom(c.loadPlan(), c.lot.repo, wd(c)));
 
 const short = (c: { sha: string; subject: string }) => `${c.sha.slice(0, 7)} ${c.subject}`;
 
 function git(repo: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-}
-
-/** Le message d'une commande git qui a échoué : sa sortie d'erreur (sur une ligne), à défaut le message de l'exception. */
-function gitFailure(e: unknown): string {
-  const err = (e as { stderr?: unknown }).stderr;
-  const text = typeof err === 'string' && err.trim() ? err : e instanceof Error ? e.message : String(e);
-  return text.trim().replace(/\s*\n\s*/g, ' ');
 }
 
 function save(c: LotCtx): void {
@@ -131,9 +151,13 @@ function trackedPaths(s: Snapshot): string[] {
   return s.tracked.map((l) => l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, ''));
 }
 
-/** Commit d'entretien du plan, chemins explicites. Rend un message d'arbre sale quand autre chose que le plan a bougé. */
-async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
-  const repo = c.lot.repo;
+/**
+ * Commit d'entretien du plan, chemins explicites. Rend un message d'arbre sale quand autre chose que le plan a bougé.
+ * Dans le dépôt du projet (`root` par défaut) : jamais dans un worktree de lot (R21). Les commits de TRAVAIL du cycle (scellé et `vert: true` de l'acceptation)
+ * se font, eux, dans `wd(c)`, sur la branche du lot.
+ */
+async function commitPlan(c: LotCtx, message: string, root = c.lot.repo): Promise<string | null> {
+  const repo = root;
   const plan = c.loadPlan();
   const own = new Set([relative(repo, plan.path), ...plan.maintained]);
   // Les acceptation.json (L173) rejoignent les fichiers que le cycle a le droit de commiter : il y pose le scellé et `vert: true`.
@@ -152,7 +176,7 @@ async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
  * Sha d'où le lot est parti : le parent de son plus ancien commit de travail (un lot relancé, ou déjà en partie commité, a ses propres
  * commits avant la vague), à défaut le HEAD d'avant la première session de la vague.
  */
-const startSha = (c: LotCtx): string | undefined => lotStartHead(c.lot.repo, lotWork(c.loadPlan(), c.lot.repo, c.lot.lot).map((k) => k.sha)) ?? c.lot.steps.find((s) => s.headBefore)?.headBefore;
+const startSha = (c: LotCtx): string | undefined => lotStartHead(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha)) ?? c.lot.steps.find((s) => s.headBefore)?.headBefore;
 
 /**
  * Échecs des tests au sha de départ du lot (L213) : la commande est rejouée dans un worktree jetable de ce sha, hors du dépôt,
@@ -208,7 +232,7 @@ async function againstBaseline(c: LotCtx, command: string, output: string): Prom
 const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g, '\\$&');
 
 /** Commande du projet, asynchrone : la boucle d'événements reste libre (délai de l'autre créneau, signaux). Son groupe est tué au délai et au signal. */
-function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000, env: Record<string, string> = {}, cwd = c.lot.repo): Promise<{ code: number; output: string }> {
+function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000, env: Record<string, string> = {}, cwd = wd(c)): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
     const child = spawn('sh', ['-c', command], { cwd, env: { ...withoutLaunchVars(process.env), ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const pid = child.pid;
@@ -253,7 +277,7 @@ async function startLot(c: LotCtx): Promise<string | null> {
   if (lot.status === 'todo') {
     if (plan.readonly) {
       if (!c.config.start) return 'plan en lecture seule : démarrer le lot avec l\'outil du projet';
-      const r = await sh(c, c.config.start.replaceAll('{lot}', c.lot.lot));
+      const r = await sh(c, c.config.start.replaceAll('{lot}', c.lot.lot), undefined, undefined, c.lot.repo);
       if (r.code !== 0) return `orchestrate.start en échec (code ${r.code}) : ${r.output.trim().split('\n').slice(-3).join(' ')}`;
     } else {
       plan.setStatus(c.lot.lot, 'doing', c.wave.today);
@@ -266,15 +290,15 @@ async function startLot(c: LotCtx): Promise<string | null> {
 }
 
 function lotCommitLines(c: LotCtx): string {
-  const plan = c.loadPlan();
-  const mine = lotWork(plan, c.lot.repo, c.lot.lot).reverse().map((k) => `- ${short(k)}`);
+  const plan = histPlan(c);
+  const mine = lotWork(plan, wd(c), c.lot.lot).reverse().map((k) => `- ${short(k)}`);
   const theirs = (c.lot.repos ?? []).flatMap((r) => repoWork(plan, r, c.lot.lot).reverse().map((k) => `- [${r.rel}] ${short(k)}`));
   return [...mine, ...theirs].join('\n');
 }
 
 /** Le lot a déjà du travail (commits citant le lot) dans son dépôt ou dans un dépôt voisin. */
-function hasWork(plan: Plan, l: Pick<LotState, 'repo' | 'repos' | 'lot'>): boolean {
-  return lotWork(plan, l.repo, l.lot).length > 0 || (l.repos ?? []).some((r) => repoWork(plan, r, l.lot).length > 0);
+function hasWork(plan: Plan, root: string, l: Pick<LotState, 'repos' | 'lot'>): boolean {
+  return lotWork(plan, root, l.lot).length > 0 || (l.repos ?? []).some((r) => repoWork(plan, r, l.lot).length > 0);
 }
 
 function constatLines(constats: Constat[]): string {
@@ -314,7 +338,7 @@ function checksText(c: LotCtx): string {
   // Sans orchestrate.test aucun rejeu : la base annoncée par la session (non vérifiée) est la seule trace des échecs de départ ; elle s'ajoute aux runs du programme (le build), elle ne les remplace pas.
   const declared = b && !b.verified && b.failures.length ? `The author reports ${b.failures.length} test(s) already red at the start sha${b.sha ? ` ${b.sha.slice(0, 7)}` : ''}, before this lot (not verified by the program):\n${b.failures.map((t) => `- ${t}`).join('\n')}\nThey are not defects of this lot, do not report them as findings; a failing test outside this list is still a finding.` : '';
   const k = c.lot.checks;
-  if (!k?.runs.length || k.head !== git(c.lot.repo, 'rev-parse', 'HEAD')) return declared;
+  if (!k?.runs.length || k.head !== git(wd(c), 'rev-parse', 'HEAD')) return declared;
   const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? 'green' : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`}`);
   const ran = [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
   return declared ? `${ran}\n${declared}` : ran;
@@ -322,14 +346,14 @@ function checksText(c: LotCtx): string {
 
 /** Consigne docs.sync du brief de revue (L143) : calculée sur les commits du lot au moment de la revue, pas écrite d'avance. */
 function docsText(c: LotCtx): string {
-  const plan = c.loadPlan();
-  const { sync } = readDocsConfig(plan.configFile ?? join(c.lot.repo, 'cadence.yaml'));
+  const plan = histPlan(c);
+  const { sync } = readDocsConfig(plan.configFile ?? join(wd(c), 'cadence.yaml'));
   if (!sync.length) return '';
-  return docSyncBrief(sync, docSyncGaps(sync, filesOf(c.lot.repo, lotWork(plan, c.lot.repo, c.lot.lot))));
+  return docSyncBrief(sync, docSyncGaps(sync, filesOf(wd(c), lotWork(plan, wd(c), c.lot.lot))));
 }
 
 /** Gabarit d'une étape : la passe des mineurs et la revue courte qui la suit ont chacune le leur. */
-export function briefName(l: LotState, kind: StepKind): BriefName {
+export function briefName(l: LotState, kind: SessionKind): BriefName {
   if (l.specLot && !l.screen && (kind === 'spec' || kind === 'accept')) return `${kind}-back`;
   if (kind === 'fix' && l.minorFix) return 'fix-minors';
   if (kind === 'review-small' && l.minorPass && !(l.small && l.visible)) return 'review-recheck';
@@ -361,7 +385,7 @@ const hasSpecStage = (l: LotState): boolean => !!(l.screen || l.specLot);
  * Les parties que la fiche du lot doit avoir : l'écran d'un lot à `screen:`, le sujet d'un lot à `spec: true` (sans écran). Un lot mixte est un lot
  * `screen:` dont la FICHE a une partie back (bloc `sujet`, décision du lead) : la fiche écrite le dit, pas un champ du plan.
  */
-const partsOf = (l: LotState, fiche?: string | null): FicheParts => ({ screen: !!l.screen, back: !!l.specLot || (!!l.screen && !!fiche && ficheHasBack(l.repo, fiche)) });
+const partsOf = (c: LotCtx, fiche?: string | null): FicheParts => ({ screen: !!c.lot.screen, back: !!c.lot.specLot || (!!c.lot.screen && !!fiche && ficheHasBack(wd(c), fiche)) });
 
 /** Gabarit du lanceur de tests livré avec le paquet, joint au brief de l'étape accept. */
 function acceptRunner(): string | undefined {
@@ -375,14 +399,14 @@ function acceptRunner(): string | undefined {
 /** Fiche du lot : celle de l'étape spec, ou la fiche retrouvée dans le dépôt (reprise). */
 function ficheOf(c: LotCtx): string | null {
   const l = c.lot;
-  return l.spec && 'fiche' in l.spec ? l.spec.fiche : findFiche(l.repo, c.config.spec.dir, l.lot);
+  return l.spec && 'fiche' in l.spec ? l.spec.fiche : findFiche(wd(c), c.config.spec.dir, l.lot);
 }
 
 /**
  * Consigne de la fiche pour les étapes en aval d'un lot qui en a une (L174) : implement, fix, revue de code, UX de conformité.
  * Vide quand le lot n'a pas de fiche (sous le seuil, ou pas encore écrite) ou qu'elle est illisible.
  */
-function avalOf(c: LotCtx, kind: StepKind): string {
+function avalOf(c: LotCtx, kind: SessionKind): string {
   const l = c.lot;
   const step = kind === 'implement' || kind === 'fix' || kind === 'ux' ? kind : kind === 'review' || kind === 'review-small' ? 'review' : null;
   const fiche = step ? ficheOf(c) : null;
@@ -391,7 +415,7 @@ function avalOf(c: LotCtx, kind: StepKind): string {
   let contracts: string[];
   let screen: boolean;
   try {
-    const doc = parse(readFileSync(join(l.repo, fiche), 'utf8'));
+    const doc = parse(readFileSync(join(wd(c), fiche), 'utf8'));
     rules = ficheRules(doc);
     contracts = ficheContracts(doc);
     screen = hasScreenPart(doc);
@@ -399,19 +423,19 @@ function avalOf(c: LotCtx, kind: StepKind): string {
     return '';
   }
   if (!rules.length || (step === 'ux' && !screen)) return '';
-  const acceptation = l.accept?.acceptation ?? findAcceptation(l.repo, c.config.spec.dir, l.lot) ?? undefined;
+  const acceptation = l.accept?.acceptation ?? findAcceptation(wd(c), c.config.spec.dir, l.lot) ?? undefined;
   const o = { fiche, rules, acceptation, rouge: l.accept?.rouge, contracts, screen };
   const text = avalFicheText(step, o);
   // la revue courte d'un petit lot visible est sa seule passe : elle porte aussi la conformité à la maquette
   return kind === 'review-small' && l.small && l.visible && screen ? `${text}\n${avalFicheText('ux', o)}` : text;
 }
 
-function briefFor(c: LotCtx, kind: StepKind): string {
+function briefFor(c: LotCtx, kind: SessionKind): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
   const tmpDir = c.wave.store.tmpDir(l.project, l.lot);
-  const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []) };
+  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = newsText(l.lot, pwDir);
@@ -422,7 +446,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   if (kind === 'spec') {
     const reviewed = [...(l.ficheConstats ?? []), ...(l.maquetteConstats ?? [])];
     const written = ficheOf(c);
-    const back = partsOf(l, written).back;
+    const back = partsOf(c, written).back;
     const session = { run: (l.specRuns ?? 0) + 1, max: specBudget(c) };
     vars.spec = specText({
       dir: c.config.spec.dir,
@@ -449,7 +473,7 @@ function briefFor(c: LotCtx, kind: StepKind): string {
   if (kind === 'accept') {
     const fiche = ficheOf(c) ?? '';
     const folder = posix.dirname(fiche);
-    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: !!l.screen && partsOf(l, fiche).back, acceptation: acceptationFile(fiche, l.lot), command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(), problems: l.acceptProblems });
+    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: !!l.screen && partsOf(c, fiche).back, acceptation: acceptationFile(fiche, l.lot), command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(), problems: l.acceptProblems });
     vars.objectif = ''; // l'oracle est écrit depuis la fiche et la maquette seules, pas depuis le texte du lot
     vars.commits = '';
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
@@ -495,18 +519,18 @@ const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) 
 export const REVIEW_RESERVE = 155_000;
 
 /** Étapes d'écriture : les seules que le budget du lot borne (`session`), donc les seules qu'il puisse laisser non jouées. */
-const WRITE_STEPS: readonly StepKind[] = ['implement', 'fix', 'spec', 'accept'];
+const WRITE_STEPS: readonly SessionKind[] = ['implement', 'fix', 'spec', 'accept'];
 
 /**
  * Étape d'écriture que le budget a laissée non jouée (L223), pour un lot rendu au lead sur budget ; null sinon. `stop` vide `next` : l'étape se lit
  * dans l'outcome que `overBudget` écrit (« étape « fix » non jouée »), repli sur `next` s'il est resté. Reconnu par ce texte (aucun marqueur dans
  * l'état) : « correction non jouée (budget) » ou « budget du lot atteint ».
  */
-export function budgetStep(l: LotState): StepKind | null {
+export function budgetStep(l: LotState): SessionKind | null {
   if (l.status !== 'handed-back' || !/correction non jouée \(budget\)|budget du lot atteint/.test(l.outcome ?? '')) return null;
-  const named = /étape « ([\w-]+) » non jouée/.exec(l.outcome ?? '')?.[1] as StepKind | undefined;
+  const named = /étape « ([\w-]+) » non jouée/.exec(l.outcome ?? '')?.[1] as SessionKind | undefined;
   const step = named ?? l.next;
-  return step && WRITE_STEPS.includes(step) ? step : null;
+  return step && step !== 'integrate' && WRITE_STEPS.includes(step) ? step : null;
 }
 
 /** Le budget du lot paie-t-il la passe de correction et la revue courte qui la suit ? Sans budget de lot : toujours. */
@@ -536,7 +560,7 @@ function halted(w: WaveCtx, lot?: LotState): string | null {
 }
 
 /** Modèle d'une revue (L108) : la revue légère d'un lot léger tant qu'aucune correction n'a eu lieu, sinon la revue complète (UX comprise). */
-function reviewModel(c: LotCtx, kind: StepKind): Model {
+function reviewModel(c: LotCtx, kind: SessionKind): Model {
   const { light, full } = c.config.review;
   return c.lot.light && c.lot.pass === 0 && (kind === 'review' || kind === 'review-small') ? light : full;
 }
@@ -545,9 +569,9 @@ function reviewModel(c: LotCtx, kind: StepKind): Model {
 /** Rendu par `session(…, true)` quand l'étape locale n'a rien donné (Ollama éteint, délai, rapport sans structure) : l'appelant se replie sur Sonnet (L146). */
 const LOCAL_FAILED = Symbol('local-failed');
 
-async function session(c: LotCtx, kind: StepKind, local: true): Promise<Done | null | typeof LOCAL_FAILED>;
-async function session(c: LotCtx, kind: StepKind, local?: false): Promise<Done | null>;
-async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done | null | typeof LOCAL_FAILED> {
+async function session(c: LotCtx, kind: SessionKind, local: true): Promise<Done | null | typeof LOCAL_FAILED>;
+async function session(c: LotCtx, kind: SessionKind, local?: false): Promise<Done | null>;
+async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Done | null | typeof LOCAL_FAILED> {
   const w = c.wave;
   const l = c.lot;
   if (dropped(c)) return stop(c, 'handed-back', DROPPED);
@@ -559,7 +583,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
 
   const model: StepModel = kind === 'spec' || kind === 'accept' || kind === 'fiche' ? 'sonnet' : write ? l.model : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
-  const before = await snapshot(l.repo);
+  const before = await snapshot(wd(c));
   const neighbours = l.repos ?? [];
   const beforeOthers = await Promise.all(neighbours.map((r) => snapshot(r.path)));
   const n = l.steps.length + 1;
@@ -593,7 +617,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       local,
       schema: schemaFor(kind),
       agent: kind === 'spec' ? 'spec-writer' : kind === 'accept' ? 'acceptance-writer' : kind === 'ux' || kind === 'maquette' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
-      cwd: l.repo,
+      cwd: wd(c),
       wave: w.id,
       lot: lotKey(l.project, l.lot),
       permissionMode: c.config.permissionMode,
@@ -629,7 +653,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   if (outcome.relaunched) {
     // Étape en lecture coupée (signal, sortie vide) puis relancée en session neuve (L256) : la session coupée a consommé des jetons (son journal), garde sa sortie d'erreur, et la relance est signalée au tableau.
     const cutRun = outcome.relaunched;
-    const spent = w.claudeHome ? journalTokens(w.claudeHome, l.repo, cutRun.sessionId) : null;
+    const spent = w.claudeHome ? journalTokens(w.claudeHome, wd(c), cutRun.sessionId) : null;
     if (spent) {
       w.budget.add(spent.tokens);
       cutTokens = spent.tokens;
@@ -642,13 +666,13 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   }
   if (outcome.kind !== 'ok' && !local) {
     // Une session en échec, au quota ou tuée au délai a consommé des tokens : ceux de sa sortie, sinon ceux de son journal.
-    const spent = outcome.tokens ? { tokens: outcome.tokens, sessionId: outcome.sessionId } : w.claudeHome ? journalTokens(w.claudeHome, l.repo, outcome.sessionId ?? sessionId) : null;
+    const spent = outcome.tokens ? { tokens: outcome.tokens, sessionId: outcome.sessionId } : w.claudeHome ? journalTokens(w.claudeHome, wd(c), outcome.sessionId ?? sessionId) : null;
     if (spent) {
       step.tokens = cutTokens ? sumTokens(cutTokens, spent.tokens) : spent.tokens;
       if (spent.sessionId) step.sessionId = spent.sessionId;
       w.budget.add(spent.tokens);
       w.saveWave();
-      if (w.claudeHome && spent.sessionId) step.peakContext = peakContext(w.claudeHome, l.repo, spent.sessionId);
+      if (w.claudeHome && spent.sessionId) step.peakContext = peakContext(w.claudeHome, wd(c), spent.sessionId);
     } else if (cutTokens) {
       step.tokens = cutTokens;
     }
@@ -698,14 +722,14 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
   }
   if (!local) w.budget.add(res.tokens);
   w.saveWave();
-  if (w.claudeHome) step.peakContext = peakContext(w.claudeHome, l.repo, res.sessionId);
+  if (w.claudeHome) step.peakContext = peakContext(w.claudeHome, wd(c), res.sessionId);
 
-  const after = await snapshot(l.repo);
+  const after = await snapshot(wd(c));
   const afterOthers = await Promise.all(neighbours.map((r) => snapshot(r.path)));
   const others: Others = neighbours.map((repo, i) => ({ repo, before: beforeOthers[i], after: afterOthers[i] }));
   step.headAfter = after.head ?? undefined;
   // Le dépôt du projet d'abord, puis chaque voisin : mêmes contrôles, l'incident nomme le dépôt voisin.
-  const watched = [{ where: '', path: l.repo, before, after }, ...others.map((o) => ({ where: ` dans ${o.repo.rel}`, path: o.repo.path, before: o.before, after: o.after }))];
+  const watched = [{ where: '', path: wd(c), before, after }, ...others.map((o) => ({ where: ` dans ${o.repo.rel}`, path: o.repo.path, before: o.before, after: o.after }))];
   // Les incidents d'abord, dans TOUS les dépôts surveillés (projet et voisins) : un push ou un hook de garde supprimé où que ce soit arrête la vague, avant tout traitement d'un HEAD déplacé ou d'un lot rendu (L214).
   for (const { where, before: b, after: a } of watched) {
     if (pushed(b, a)) {
@@ -739,7 +763,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       }
       if (b.branch && why === null && failed === null) {
         Object.assign(a, await snapshot(path));
-        if (path === l.repo) step.headAfter = a.head ?? undefined;
+        if (path === wd(c)) step.headAfter = a.head ?? undefined;
         const text = `${kind} : la session a fini${where} ${was} (arbre propre, rien hors de la branche) — branche ${b.branch} remise`;
         l.warnings.push(text);
         w.log(`${lotKey(l.project, l.lot)} · ${text}`);
@@ -759,7 +783,7 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
     if (!write && b.head === a.head && b.tracked.join() === a.tracked.join() && b.untracked.join() !== a.untracked.join() && b.untracked.every((f) => a.untracked.includes(f))) {
       const fresh = a.untracked.filter((f) => !b.untracked.includes(f)).map(unquotePath);
       const stray = join(dir, 'stray');
-      const to = where ? join(stray, relative(l.repo, path).replace(/[\\/]/g, '_')) : stray;
+      const to = where ? join(stray, relative(wd(c), path).replace(/[\\/]/g, '_')) : stray;
       const moved = moveStray(path, fresh, to);
       if (moved.length) {
         const text = `${kind} : ${moved.length} fichier(s) non suivi(s) laissé(s)${where} par une étape en lecture seule, déplacé(s) dans ${to} : ${moved.join(', ')}`;
@@ -774,9 +798,34 @@ async function session(c: LotCtx, kind: StepKind, local = false): Promise<Done |
       return handBack(c, kind, res.structured, step, where, path, b, a);
     }
   }
+  const touched = write && c.tree?.active ? planTouched(c, before.head, after) : null;
+  if (touched) {
+    step.status = 'failed';
+    step.cause = touched;
+    return stop(c, 'handed-back', `la session a modifié le plan dans son worktree ${touched} : le plan n'est écrit que par le programme ; worktree conservé : ${wd(c)}`);
+  }
   step.status = 'ok';
   save(c);
   return { step, report: res.structured, before, after, others };
+}
+
+/**
+ * Une session d'écriture a-t-elle touché, dans son worktree, le fichier de plan ou un fichier généré avec lui (plan.files, la page Gantt) ? (R21) Le plan n'est
+ * écrit que par le programme, dans le dépôt du projet : un commit de plan sur la branche du lot reviendrait en conflit au rebase. Rend « (fichier, commit sha) »
+ * ou « (fichier, non commité) », null sinon.
+ */
+function planTouched(c: LotCtx, headBefore: string | null, after: Snapshot): string | null {
+  const plan = c.loadPlan();
+  const rel = relative(c.lot.repo, plan.path);
+  const files = new Set([rel, join(dirname(rel), 'gantt.html'), ...plan.files]);
+  if (headBefore && after.head && headBefore !== after.head) {
+    for (const sha of git(wd(c), 'log', '--format=%H', `${headBefore}..${after.head}`).split('\n').filter(Boolean)) {
+      const hit = changedFiles(wd(c), sha).find((f) => files.has(f));
+      if (hit) return `(${hit}, commit ${sha.slice(0, 7)})`;
+    }
+  }
+  const dirty = trackedPaths(after).find((f) => files.has(f));
+  return dirty ? `(${dirty}, non commité)` : null;
 }
 
 /** Pourquoi la branche de départ ne peut pas être remise sans risque après un HEAD déplacé (L214), null si elle le peut : arbre propre et rien hors de la branche. */
@@ -800,7 +849,7 @@ function headStranded(path: string, b: Snapshot, a: Snapshot): string | null {
 }
 
 /** Incident du LOT (L133) : la revue a laissé des traces (captures, commit), ni push ni garde supprimée — les lots des autres dépôts continuent. */
-function handBack(c: LotCtx, kind: StepKind, report: unknown, step: StepState, where: string, path: string, b: Snapshot, a: Snapshot, left?: string[]): null {
+function handBack(c: LotCtx, kind: SessionKind, report: unknown, step: StepState, where: string, path: string, b: Snapshot, a: Snapshot, left?: string[]): null {
   const l = c.lot;
   const w = c.wave;
   step.status = 'failed';
@@ -859,7 +908,7 @@ function moveStray(repo: string, files: string[], to: string): string[] {
 }
 
 /** Verdict d'une revue interrompue par un incident du lot : rapporté au lead plutôt que perdu (L133). Rien n'est enregistré dans le plan. */
-function lostVerdict(c: LotCtx, kind: StepKind, report: unknown): string {
+function lostVerdict(c: LotCtx, kind: SessionKind, report: unknown): string {
   if (kind === 'precheck') return '';
   let rep: ReviewReport;
   try {
@@ -967,7 +1016,7 @@ function citesPriorWork(text: string, lot: string, ids: string[]): boolean {
  * réels, et le contrôle ne coûte plus rien au quota (seul un « oui » est confirmé par Sonnet).
  */
 export function needsPrecheck(config: { precheck: boolean; precheckLocal?: boolean }, plan: Plan, repo: string, lot: string, repos: LotRepo[] = [], goal?: string): boolean {
-  if (!config.precheck || hasWork(plan, { repo, repos, lot })) return false;
+  if (!config.precheck || hasWork(plan, repo, { repos, lot })) return false;
   if (config.precheckLocal) return true;
   const l = plan.lot(lot);
   const text = [l.title, l.goal, goal].filter(Boolean).join('\n');
@@ -1036,11 +1085,11 @@ async function precheck(c: LotCtx): Promise<void> {
 }
 
 /** Première session d'écriture d'un lot : la spec quand il déclare `screen:` ou `spec: true` et qu'aucune fiche n'est écrite, sinon l'implémentation. */
-function firstWrite(c: LotCtx): StepKind {
+function firstWrite(c: LotCtx): SessionKind {
   const l = c.lot;
   if (!hasSpecStage(l) || l.spec) return 'implement';
-  const fiche = findFiche(l.repo, c.config.spec.dir, l.lot);
-  return fiche && ficheReady(l.repo, fiche, l.lot, partsOf(l, fiche)) ? afterSpec(c, fiche) : 'spec';
+  const fiche = findFiche(wd(c), c.config.spec.dir, l.lot);
+  return fiche && ficheReady(wd(c), fiche, l.lot, partsOf(c, fiche)) ? afterSpec(c, fiche) : 'spec';
 }
 
 const NO_TEST_ACCEPT = 'étape accept : orchestrate.test absent, rien ne prouve que les tests rouges sont exclus du lanceur de tests et de la CI (vérifier à la main la config du lanceur avant de livrer)';
@@ -1050,22 +1099,22 @@ const NO_ACCEPT = 'étape accept ignorée : orchestrate.accept absent (commande 
  * Étape qui suit une spec écrite : la revue UX de la maquette (S4) tant qu'elle n'est pas conforme (`orchestrate.maquette`), sauf si une
  * acceptation conforme est déjà commitée (elle n'a pu être écrite qu'après la revue) ; puis les tests d'acceptation rouges (S5).
  */
-function afterSpec(c: LotCtx, fiche: string): StepKind {
+function afterSpec(c: LotCtx, fiche: string): SessionKind {
   const l = c.lot;
   // Revue de la fiche back (L188) d'abord, puis celle de la maquette d'un lot mixte ; la même preuve (acceptation scellée, code déjà commité) dispense des deux.
-  if (c.config.fiche && partsOf(l, fiche).back && !l.fiche?.conforme && !acceptationProof(c, fiche) && !codeAfterFiche(c, fiche)) return 'fiche';
+  if (c.config.fiche && partsOf(c, fiche).back && !l.fiche?.conforme && !acceptationProof(c, fiche) && !codeAfterFiche(c, fiche)) return 'fiche';
   return afterFiche(c, fiche);
 }
 
 /** Étape qui suit une fiche relue : la revue UX de la maquette d'un lot à écran (S4), sinon `afterMaquette`. */
-function afterFiche(c: LotCtx, fiche: string): StepKind {
+function afterFiche(c: LotCtx, fiche: string): SessionKind {
   const l = c.lot;
   if (l.screen && c.config.maquette && !l.maquette?.conforme && !acceptationProof(c, fiche) && !codeAfterFiche(c, fiche)) return 'maquette';
   return afterMaquette(c, fiche);
 }
 
 /** Étape qui suit une maquette relue (ou une fiche, pour un lot sans écran) : les tests d'acceptation rouges (S5) quand le projet déclare sa commande dédiée et qu'aucune acceptation conforme n'est déjà commitée, sinon l'implémentation. */
-function afterMaquette(c: LotCtx, fiche: string): StepKind {
+function afterMaquette(c: LotCtx, fiche: string): SessionKind {
   const l = c.lot;
   // Des constats de la revue de fiche attendent la revue de la maquette (lot mixte) : les deux partent ensemble à la seconde passe `spec`.
   if (l.ficheConstats?.length) return 'spec';
@@ -1075,7 +1124,7 @@ function afterMaquette(c: LotCtx, fiche: string): StepKind {
   }
   const json = lotAcceptation(c, fiche);
   if (acceptationProof(c, fiche)) {
-    l.accept = { acceptation: json, rouge: redSha(l.repo, json) ?? '' };
+    l.accept = { acceptation: json, rouge: redSha(wd(c), json) ?? '' };
     return 'implement';
   }
   return 'accept';
@@ -1087,27 +1136,27 @@ function codeAfterFiche(c: LotCtx, fiche: string): boolean {
   let sha: string;
   try {
     // Le point de départ est le commit qui a créé la fiche : un commit plus récent du dossier (capture corrigée) ne doit pas masquer le code commité avant lui.
-    sha = git(l.repo, 'log', '--diff-filter=A', '--format=%H', '--', fiche).split('\n').filter(Boolean).pop() ?? git(l.repo, 'log', '-1', '--format=%H', '--', posix.dirname(fiche));
+    sha = git(wd(c), 'log', '--diff-filter=A', '--format=%H', '--', fiche).split('\n').filter(Boolean).pop() ?? git(wd(c), 'log', '-1', '--format=%H', '--', posix.dirname(fiche));
   } catch {
     return false;
   }
   if (!sha) return false;
   const dir = `${posix.dirname(fiche)}/`;
-  const after = new Set(readCommits(l.repo, { range: `${sha}..HEAD` }).map((k) => k.sha));
+  const after = new Set(readCommits(wd(c), { range: `${sha}..HEAD` }).map((k) => k.sha));
   // Un commit de la session spec elle-même (fiche, maquette, captures) ou de la session accept (tests listés) n'est pas du code.
   const tests = new Set<string>();
   const json = lotAcceptation(c, fiche);
   if (listed(c, json)) {
-    const doc = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
+    const doc = parseAcceptation(readFileSync(join(wd(c), json), 'utf8'));
     if (typeof doc !== 'string') for (const f of doc.fichiers) tests.add(posix.normalize(f));
   }
-  return lotWork(c.loadPlan(), l.repo, l.lot).some((k) => after.has(k.sha) && changedFiles(l.repo, k.sha).some((f) => !f.startsWith(dir) && !tests.has(f)));
+  return lotWork(histPlan(c), wd(c), l.lot).some((k) => after.has(k.sha) && changedFiles(wd(c), k.sha).some((f) => !f.startsWith(dir) && !tests.has(f)));
 }
 
 /** L'acceptation du lot : celle que git suit déjà pour lui (même un ancien `acceptation.json`), sinon `acceptation-<lot>.json` à côté de la fiche. */
-const lotAcceptation = (c: LotCtx, fiche: string): string => findAcceptation(c.lot.repo, c.config.spec.dir, c.lot.lot) ?? acceptationFile(fiche, c.lot.lot);
+const lotAcceptation = (c: LotCtx, fiche: string): string => findAcceptation(wd(c), c.config.spec.dir, c.lot.lot) ?? acceptationFile(fiche, c.lot.lot);
 
-const listed = (c: LotCtx, json: string): boolean => existsSync(join(c.lot.repo, json));
+const listed = (c: LotCtx, json: string): boolean => existsSync(join(wd(c), json));
 
 /** Une acceptation porte-t-elle une empreinte par fichier listé ? Le contenu n'est pas comparé (L233) : `empreintes: {}` ou celles d'un autre fichier ne scellent rien. */
 const hasSeals = (doc: Acceptation): boolean => !!doc.empreintes && doc.fichiers.every((f) => !!(doc.empreintes as Record<string, string>)[posix.normalize(f)]);
@@ -1120,7 +1169,7 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
   const l = c.lot;
   const json = lotAcceptation(c, fiche);
   if (!c.config.accept || !listed(c, json)) return false;
-  const doc = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
+  const doc = parseAcceptation(readFileSync(join(wd(c), json), 'utf8'));
   if (typeof doc === 'string') return false;
   // Un lot déjà vert (L233) n'a plus d'oracle à écrire : le cycle seul a pu poser `vert: true`, après le scellé et les tests rouges. Même une preuve qui ne tient plus
   // (test rescellé ou corrigé depuis, fiche amendée) ne renvoie jamais à accept, qui réécrirait un oracle vert et exigerait des tests rouges : le lot part à implement ou à la revue.
@@ -1131,10 +1180,10 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
   const emp = doc.empreintes ?? {};
   const sealed = doc.fichiers.every((f) => {
     const norm = posix.normalize(f);
-    return existsSync(join(l.repo, norm)) && emp[norm] === git(l.repo, 'hash-object', '--', norm).trim();
+    return existsSync(join(wd(c), norm)) && emp[norm] === git(wd(c), 'hash-object', '--', norm).trim();
   });
   if (!sealed) return false;
-  return checkAcceptation(l.repo, json, l.lot, fiche).length === 0;
+  return checkAcceptation(wd(c), json, l.lot, fiche).length === 0;
 }
 
 /** Chemins salis par une session : suivis modifiés, nouveaux fichiers non suivis, et ceux des dépôts voisins. */
@@ -1149,7 +1198,7 @@ function dirtAfter(done: Done): string[] {
 /** Suite commune des étapes spec et accept : commits de la session (avertis s'ils ne citent pas le lot), choix reportés, vraies questions (les non-questions deviennent un avertissement). */
 function takeReport(c: LotCtx, done: Done, rep: { choix?: string[]; questions: string[] }): string[] {
   const l = c.lot;
-  const commits: Commit[] = readCommits(l.repo, { range: done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined });
+  const commits: Commit[] = readCommits(wd(c), { range: done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined });
   done.step.commits = commits.map(short).reverse();
   for (const k of commits) if (!citedRefs(k, c.loadPlan().refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} : ${short(k)}`);
   for (const x of rep.choix ?? []) if (!(l.choix ??= []).includes(x)) l.choix.push(x);
@@ -1205,12 +1254,12 @@ async function specStep(c: LotCtx): Promise<void> {
 
   // Le chemin du rapport est ramené relatif au dépôt (absolu, `./…` ou `a/../b` donneraient de faux écarts) ; hors du dépôt, c'est un écart.
   const reported = rep.fiche.trim();
-  const asked = reported ? relative(l.repo, resolve(l.repo, reported)) : '';
+  const asked = reported ? relative(wd(c), resolve(wd(c), reported)) : '';
   const outside = asked === '..' || asked.startsWith('../') || isAbsolute(asked);
-  const fiche = outside ? '' : asked || findFiche(l.repo, c.config.spec.dir, l.lot) || '';
+  const fiche = outside ? '' : asked || findFiche(wd(c), c.config.spec.dir, l.lot) || '';
   const what = l.screen ? '<écran>' : '<sujet>';
   const inDir = fiche === '' || fiche.startsWith(`${c.config.spec.dir.replace(/\/+$/, '')}/`);
-  const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/${what}/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/${what}/fiche.yaml)`] : fiche ? checkSpec(l.repo, fiche, l.lot, partsOf(l, fiche)) : [`aucune fiche écrite : ${c.config.spec.dir}/${what}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
+  const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/${what}/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/${what}/fiche.yaml)`] : fiche ? checkSpec(wd(c), fiche, l.lot, partsOf(c, fiche)) : [`aucune fiche écrite : ${c.config.spec.dir}/${what}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
   if (problems.length) {
     if ((l.specRuns ?? 0) >= specBudget(c)) {
       stop(c, 'handed-back', `spec non conforme après ${specBudget(c)} passes : ${problems.join(' ; ')}`);
@@ -1222,7 +1271,7 @@ async function specStep(c: LotCtx): Promise<void> {
     return;
   }
   l.specProblems = undefined; // les contrôles passent : les écarts de la passe précédente sont corrigés
-  const doc = parse(readFileSync(join(l.repo, fiche), 'utf8')) as { regles?: { statut?: unknown }[]; sujet?: { id?: unknown } };
+  const doc = parse(readFileSync(join(wd(c), fiche), 'utf8')) as { regles?: { statut?: unknown }[]; sujet?: { id?: unknown } };
   // Un choix coûteux à défaire n'est pas une hypothèse : la question remonte au lead, la session reprend avec sa réponse.
   const costly = costlyHypotheses(doc);
   if (costly.length) {
@@ -1258,7 +1307,7 @@ async function settleHypotheses(c: LotCtx): Promise<boolean> {
   if (!fiche) return false;
   let doc: { sujet?: { id?: unknown } };
   try {
-    doc = parse(readFileSync(join(l.repo, fiche), 'utf8')) as typeof doc;
+    doc = parse(readFileSync(join(wd(c), fiche), 'utf8')) as typeof doc;
   } catch {
     return false;
   }
@@ -1273,20 +1322,22 @@ async function noteHypotheses(c: LotCtx, lines: string[], sujet: string): Promis
   const l = c.lot;
   l.hypotheses = lines;
   if (!lines.length) return false;
-  const plan = c.loadPlan();
   const texts = lines.map((x) => hypothesisNote(sujet, x));
-  if (plan.readonly) {
-    for (const t of texts) propose(c, `[note à poser] ${t}`);
-    return false;
-  }
-  const have = new Set(plan.lot(l.lot).notes.map((n) => n.text));
-  const fresh = texts.filter((t) => !have.has(t));
-  if (!fresh.length) return false;
-  for (const t of fresh) plan.note(l.lot, t, c.wave.today);
-  plan.save();
-  const dirty = await commitPlan(c, `plan: ${l.lot} hypothèses de la fiche ${sujet} notées (orchestrate ${c.wave.id})`);
+  const dirty = await planWrite(c, async () => {
+    const plan = c.loadPlan();
+    if (plan.readonly) {
+      for (const t of texts) propose(c, `[note à poser] ${t}`);
+      return null;
+    }
+    const have = new Set(plan.lot(l.lot).notes.map((n) => n.text));
+    const fresh = texts.filter((t) => !have.has(t));
+    if (!fresh.length) return null;
+    for (const t of fresh) plan.note(l.lot, t, c.wave.today);
+    plan.save();
+    return commitPlan(c, `plan: ${l.lot} hypothèses de la fiche ${sujet} notées (orchestrate ${c.wave.id})`);
+  });
   if (dirty) {
-    stop(c, 'handed-back', `notes des hypothèses de la fiche : ${dirty}`);
+    handBackPlan(c, `notes des hypothèses de la fiche : ${dirty}`);
     return true;
   }
   return false;
@@ -1300,19 +1351,21 @@ async function noteHypotheses(c: LotCtx, lines: string[], sujet: string): Promis
 async function noteMinors(c: LotCtx, rep: ReviewReport, label: string): Promise<boolean> {
   const texts = rep.constats.filter((k) => k.gravite === 'mineur').map((k) => `Revue de ${label} — mineur : ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`);
   if (!texts.length) return false;
-  const plan = c.loadPlan();
-  if (plan.readonly) {
-    for (const t of texts) propose(c, `[note à poser] ${t}`);
-    return false;
-  }
-  const have = new Set(plan.lot(c.lot.lot).notes.map((n) => n.text));
-  const fresh = [...new Set(texts)].filter((t) => !have.has(t));
-  if (!fresh.length) return false;
-  for (const t of fresh) plan.note(c.lot.lot, t, c.wave.today);
-  plan.save();
-  const dirty = await commitPlan(c, `plan: ${c.lot.lot} mineurs de la revue de ${label} notés (orchestrate ${c.wave.id})`);
+  const dirty = await planWrite(c, async () => {
+    const plan = c.loadPlan();
+    if (plan.readonly) {
+      for (const t of texts) propose(c, `[note à poser] ${t}`);
+      return null;
+    }
+    const have = new Set(plan.lot(c.lot.lot).notes.map((n) => n.text));
+    const fresh = [...new Set(texts)].filter((t) => !have.has(t));
+    if (!fresh.length) return null;
+    for (const t of fresh) plan.note(c.lot.lot, t, c.wave.today);
+    plan.save();
+    return commitPlan(c, `plan: ${c.lot.lot} mineurs de la revue de ${label} notés (orchestrate ${c.wave.id})`);
+  });
   if (dirty) {
-    stop(c, 'handed-back', `notes des mineurs de la revue de ${label} : ${dirty}`);
+    handBackPlan(c, `notes des mineurs de la revue de ${label} : ${dirty}`);
     return true;
   }
   return false;
@@ -1325,9 +1378,9 @@ interface SpecReview {
   label: string;
   source: 'code' | 'ux';
   /** Étape suivante quand la relecture est conforme, ou quand la seconde passe `spec` doit d'abord avoir lieu (constats gardés). */
-  after: (c: LotCtx, fiche: string) => StepKind;
+  after: (c: LotCtx, fiche: string) => SessionKind;
   /** Étape suivante quand des constats renvoient à la spec. */
-  retry: (c: LotCtx, fiche: string) => StepKind;
+  retry: (c: LotCtx, fiche: string) => SessionKind;
 }
 
 const FICHE_REVIEW: SpecReview = { kind: 'fiche', label: 'fiche', source: 'code', after: afterFiche, retry: afterFiche };
@@ -1401,7 +1454,7 @@ interface AcceptRun { command: string; code: number; output: string }
  * listés sous aucune racine sont rendus (`orphans`) sans rien lancer.
  */
 async function runAccept(c: LotCtx, json: string): Promise<{ runs: AcceptRun[]; orphans: string[] }> {
-  const abs = join(c.lot.repo, json);
+  const abs = join(wd(c), json);
   const doc = parseAcceptation(readFileSync(abs, 'utf8'));
   const plan = planAcceptRuns(acceptCommands(c.config.accept), typeof doc === 'string' ? [] : doc.fichiers, !isAcceptList(c.config.accept));
   if (plan.orphans.length) return { runs: [], orphans: plan.orphans };
@@ -1415,8 +1468,8 @@ const tail = (output: string, n = 40): string => output.trim().split('\n').slice
 /** Écarts des tests d'acceptation écrits par la session (vide = acceptés) : autres lots intacts, acceptation.json conforme, tests rouges, config.test toujours verte. */
 async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore: string | undefined): Promise<string[]> {
   const l = c.lot;
-  const out = headBefore ? lockViolations(l.repo, c.config.spec.dir, headBefore, { skip: json }) : [];
-  out.push(...checkAcceptation(l.repo, json, l.lot, fiche, l.steps.find((s) => s.kind === 'accept')?.headBefore));
+  const out = headBefore ? lockViolations(wd(c), c.config.spec.dir, headBefore, { skip: json }) : [];
+  out.push(...checkAcceptation(wd(c), json, l.lot, fiche, l.steps.find((s) => s.kind === 'accept')?.headBefore));
   if (out.length) return out;
   const red = await runAccept(c, json);
   if (red.orphans.length) out.push(`fichiers listés dans ${json} sous la racine d'aucune commande de orchestrate.accept (le dossier de son « cd <dossier> && » initial, sinon le dépôt) : ${red.orphans.join(', ')} — aucun lanceur ne les prendrait`);
@@ -1438,15 +1491,15 @@ async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore
 function greenDrift(c: LotCtx, json: string, first: string, before: string, was: Acceptation): string | null {
   const l = c.lot;
   if (!listed(c, json)) return 'acceptation.json supprimé depuis la première session accept (verrou des tests d\'acceptation)';
-  const text = readFileSync(join(l.repo, json), 'utf8');
+  const text = readFileSync(join(wd(c), json), 'utf8');
   // `before` vient de git() qui rogne les blancs de fin, le fichier écrit par le programme finit par un saut de ligne : les deux se comparent rognés.
   if (text.trim() === before.trim()) return null;
   const now = parseAcceptation(text);
-  const dirty = git(l.repo, 'status', '--porcelain', '--', json).trim() !== '';
+  const dirty = git(wd(c), 'status', '--porcelain', '--', json).trim() !== '';
   let bySession = false;
   try {
-    const mine = waveCommits(c, l.repo);
-    bySession = git(l.repo, 'log', '--format=%H', `${first}..HEAD`, '--', json).split('\n').some((sha) => sha && mine(sha));
+    const mine = waveCommits(c, c.lot.repo);
+    bySession = git(wd(c), 'log', '--format=%H', `${first}..HEAD`, '--', json).split('\n').some((sha) => sha && mine(sha));
   } catch {
     bySession = true;
   }
@@ -1474,7 +1527,7 @@ async function acceptStep(c: LotCtx): Promise<void> {
   const first = l.steps.find((s) => s.kind === 'accept')?.headBefore;
   let text: string | null = null;
   try {
-    text = first ? git(l.repo, 'show', `${first}:${json}`) : listed(c, json) ? readFileSync(join(l.repo, json), 'utf8') : null;
+    text = first ? git(wd(c), 'show', `${first}:${json}`) : listed(c, json) ? readFileSync(join(wd(c), json), 'utf8') : null;
   } catch {
     text = null;
   }
@@ -1487,7 +1540,7 @@ async function acceptStep(c: LotCtx): Promise<void> {
       stop(c, 'handed-back', `verrou des tests d'acceptation : ${json} : ${drift}`);
       return;
     }
-    l.accept = { acceptation: json, rouge: redSha(l.repo, json) ?? '' };
+    l.accept = { acceptation: json, rouge: redSha(wd(c), json) ?? '' };
     l.next = 'implement';
     // Un lot en question n'a plus rien à demander : la réponse du lead (« ne réécris rien ») est prise en compte par ce choix, elle ne repart pas dans le brief d'implement.
     l.pendingAnswer = null;
@@ -1527,13 +1580,13 @@ async function acceptStep(c: LotCtx): Promise<void> {
     return;
   }
   l.acceptProblems = undefined;
-  sealAcceptation(l.repo, json);
-  const dirty = await commitPlan(c, `test(${l.lot}): acceptation scellée, empreintes des tests rouges (orchestrate ${c.wave.id})`);
+  sealAcceptation(wd(c), json);
+  const dirty = await commitPlan(c, `test(${l.lot}): acceptation scellée, empreintes des tests rouges (orchestrate ${c.wave.id})`, wd(c));
   if (dirty) {
     stop(c, 'handed-back', `scellé de ${json} : ${dirty}`);
     return;
   }
-  l.accept = { acceptation: json, rouge: git(l.repo, 'rev-parse', 'HEAD') };
+  l.accept = { acceptation: json, rouge: git(wd(c), 'rev-parse', 'HEAD') };
   l.next = 'implement';
   save(c);
 }
@@ -1545,18 +1598,49 @@ async function acceptStep(c: LotCtx): Promise<void> {
 async function acceptGreen(c: LotCtx): Promise<Constat | null> {
   const l = c.lot;
   if (!c.config.accept) return null;
-  const json = l.accept?.acceptation ?? findAcceptation(l.repo, c.config.spec.dir, l.lot);
-  if (!json || !existsSync(join(l.repo, json))) return null;
-  const a = parseAcceptation(readFileSync(join(l.repo, json), 'utf8'));
+  const json = l.accept?.acceptation ?? findAcceptation(wd(c), c.config.spec.dir, l.lot);
+  if (!json || !existsSync(join(wd(c), json))) return null;
+  const a = parseAcceptation(readFileSync(join(wd(c), json), 'utf8'));
   if (typeof a === 'string' || a.vert) return null;
   const { runs, orphans } = await runAccept(c, json);
   if (orphans.length) return { source: 'tests', gravite: 'bloquant', texte: `fichiers listés dans ${json} sous la racine d'aucune commande de orchestrate.accept : ${orphans.join(', ')}` };
   const failed = runs.filter((r) => r.code !== 0);
   if (failed.length) return { source: 'tests', gravite: 'bloquant', texte: `tests d'acceptation encore rouges (${failed.map((r) => `${r.command}, code ${r.code}`).join(' ; ')}) : à rendre verts sans modifier les fichiers listés dans ${json} :\n${failed.map((r) => (failed.length > 1 ? `$ ${r.command}\n` : '') + tail(r.output)).join('\n')}` };
-  setVert(l.repo, json);
-  const dirty = await commitPlan(c, `chore(${l.lot}): acceptation verte, vert: true posé par le cycle (orchestrate ${c.wave.id})`);
+  setVert(wd(c), json);
+  const dirty = await commitPlan(c, `chore(${l.lot}): acceptation verte, vert: true posé par le cycle (orchestrate ${c.wave.id})`, wd(c));
   if (dirty) return { source: 'tests', gravite: 'bloquant', texte: `vert: true de ${json} : ${dirty}` };
   return null;
+}
+
+/** Un contrôle lancé par le programme : sa commande, son code, et les tests rouges qui l'étaient déjà au sha de départ (L213). */
+type CheckRun = NonNullable<LotState['checks']>['runs'][number];
+
+/**
+ * Les contrôles du programme (`orchestrate.test` puis `orchestrate.build`), joués dans `wd(c)` : chaque résultat est ajouté à `runs`, chaque rouge NOUVEAU à `red`
+ * (un test déjà rouge au sha de départ n'en est pas un, L213). S'arrête au premier rouge. Après une écriture (work) et, au sommet rebasé, avant l'avance de la branche du dépôt (R7).
+ */
+async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<void> {
+  const l = c.lot;
+  for (const [label, command] of [['tests', c.config.test], ['build', c.config.build]] as const) {
+    if (!command) continue;
+    const r = await sh(c, command);
+    const run: CheckRun = { label, command, code: r.code };
+    runs.push(run);
+    if (r.code === 0) continue;
+    const vs: VsBase = label === 'tests' ? await againstBaseline(c, command, r.output) : { kind: 'unknown' };
+    if (vs.kind === 'existing') {
+      run.dejaRouges = vs.n;
+      const note = `${vs.n} test(s) déjà rouge(s) au sha de départ ${(l.baseline?.sha ?? '').slice(0, 7)}, pas un défaut du lot : listés à part, la revue a lieu`;
+      if (!l.warnings.includes(note)) l.warnings.push(note);
+      continue;
+    }
+    if (vs.kind === 'new') {
+      red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) : ${vs.nouveaux.length} test(s) rouge(s) qui ne l'étaient pas au sha de départ :\n${vs.nouveaux.map((t) => `- ${t}`).join('\n')}${vs.existants ? `\n(${vs.existants} autre(s) test(s) déjà rouge(s) au sha de départ : à ne pas corriger)` : ''}` });
+      return;
+    }
+    red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
+    return;
+  }
 }
 
 /** Étape d'écriture (implémentation, correction) : contrôles, puis étape suivante décidée. */
@@ -1579,9 +1663,9 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     l.uxVerdict = null;
     l.constats = l.constats.filter((k) => k.source !== 'ux');
   }
-  const plan = c.loadPlan();
+  const plan = histPlan(c);
   const range = done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined;
-  const commits: Commit[] = readCommits(l.repo, { range });
+  const commits: Commit[] = readCommits(wd(c), { range });
   // Commits de la session dans chaque dépôt voisin (L62) : de la tête d'avant la session à la tête d'après.
   const theirs = done.others.map((o) => ({ repo: o.repo, commits: o.before.head ? readCommits(o.repo.path, { range: `${o.before.head}..HEAD` }) : [] }));
   const made = commits.length + theirs.reduce((n, t) => n + t.commits.length, 0);
@@ -1591,12 +1675,12 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   for (const a of rep.commits) {
     if ([...real].some((s) => s.startsWith(a.sha) || a.sha.startsWith(s.slice(0, 7)))) continue;
     // Reprise : le rapport cite aussi les commits d'une session précédente du lot, hors de la plage de celle-ci.
-    const full = /^[0-9a-f]{4,40}$/i.test(a.sha) ? resolveCommit(l.repo, a.sha) : null;
-    if (full && lotCommits(plan, l.repo, l.lot).some((k) => k.sha === full)) continue;
+    const full = /^[0-9a-f]{4,40}$/i.test(a.sha) ? resolveCommit(wd(c), a.sha) : null;
+    if (full && lotCommits(plan, wd(c), l.lot).some((k) => k.sha === full)) continue;
     l.warnings.push(full ? `commit annoncé n'appartient pas à ${l.lot} : ${a.sha} ${a.sujet}` : `commit annoncé absent de git : ${a.sha} ${a.sujet}`);
   }
   for (const k of commits) {
-    if (isPlanOnly(k.sha, plan, l.repo)) continue;
+    if (isPlanOnly(k.sha, plan, wd(c))) continue;
     if (!citedRefs(k, plan.refs).some((r) => r.lot === l.lot)) l.warnings.push(`commit qui ne cite pas ${l.lot} : ${short(k)}`);
   }
   for (const t of theirs) {
@@ -1609,7 +1693,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
 
   // Verrou des tests d'acceptation (L173) : ceux de TOUS les lots du dépôt, pas seulement du lot courant ; une modification est une question au lead. Contrôlé à CHAQUE fin de session, une question comprise (L200) :
   // une session qui remplace un test scellé puis pose une question ne passe pas par la reprise du lead pour se faire adopter.
-  const locked = done.step.headBefore ? lockViolations(l.repo, c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: l.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(l.repo, lotWork(c.loadPlan(), l.repo, l.lot).map((k) => k.sha)), lotCommits: lotCommits(c.loadPlan(), l.repo, l.lot).map((k) => k.sha) }) : [];
+  const locked = done.step.headBefore ? lockViolations(wd(c), c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: l.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(wd(c), lotWork(c.loadPlan(), wd(c), l.lot).map((k) => k.sha)), lotCommits: lotCommits(c.loadPlan(), wd(c), l.lot).map((k) => k.sha) }) : [];
   if (locked.length) {
     stop(c, 'handed-back', `verrou des tests d'acceptation : ${locked.join(' ; ')}`);
     return;
@@ -1637,7 +1721,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     if (s.kind !== 'fix' || s.status !== 'interrupted') break;
     resumedFrom = s.headBefore;
   }
-  const headMoved = kind === 'fix' && made === 0 && !!resumedFrom && git(l.repo, 'rev-parse', 'HEAD') !== resumedFrom;
+  const headMoved = kind === 'fix' && made === 0 && !!resumedFrom && git(wd(c), 'rev-parse', 'HEAD') !== resumedFrom;
   if (minorsPass && made === 0 && !headMoved) {
     // Rien à corriger (mineurs jugés faux, listés en « choix ») : la revue conforme d'origine vaut, HEAD n'a pas bougé.
     for (const k of l.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine('code', k));
@@ -1653,7 +1737,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   // La session peut n'avoir plus rien à commiter (réponse du lead, lot commité avant la vague) : le travail du lot est déjà dans git.
   // Même règle côté fix (L56) : la passe n'avait rien à ajouter, le lot a déjà ses commits de travail → revue neuve ; la passe reste consommée, MAX_PASSES borne la boucle.
-  const alreadyDone = hasWork(plan, l);
+  const alreadyDone = hasWork(plan, wd(c), l);
   if (made === 0 && !alreadyDone && !headMoved) {
     stop(c, 'handed-back', `${kind} sans commit`);
     return;
@@ -1680,33 +1764,12 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   if (rep.tests.vert && !c.config.test && newFailures?.length) l.warnings.push(`rapport incohérent : tests annoncés verts mais nouveaux échecs déclarés (${newFailures.join(' ; ')}) ; pas de correction, non vérifié par le programme (orchestrate.test absent)`);
   if (!rep.build.vert) red.push({ source: 'tests', gravite: 'bloquant', texte: `build annoncé rouge par la session : ${rep.build.commande} — ${rep.build.resultat}` });
-  const runs: NonNullable<LotState['checks']>['runs'] = [];
+  const runs: CheckRun[] = [];
   if (red.length === 0) {
     const green = await acceptGreen(c);
     if (green) red.push(green);
   }
-  if (red.length === 0) {
-    for (const [label, command] of [['tests', c.config.test], ['build', c.config.build]] as const) {
-      if (!command) continue;
-      const r = await sh(c, command);
-      const run: (typeof runs)[number] = { label, command, code: r.code };
-      runs.push(run);
-      if (r.code === 0) continue;
-      const vs: VsBase = label === 'tests' ? await againstBaseline(c, command, r.output) : { kind: 'unknown' };
-      if (vs.kind === 'existing') {
-        run.dejaRouges = vs.n;
-        const note = `${vs.n} test(s) déjà rouge(s) au sha de départ ${(l.baseline?.sha ?? '').slice(0, 7)}, pas un défaut du lot : listés à part, la revue a lieu`;
-        if (!l.warnings.includes(note)) l.warnings.push(note);
-        continue;
-      }
-      if (vs.kind === 'new') {
-        red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) : ${vs.nouveaux.length} test(s) rouge(s) qui ne l'étaient pas au sha de départ :\n${vs.nouveaux.map((t) => `- ${t}`).join('\n')}${vs.existants ? `\n(${vs.existants} autre(s) test(s) déjà rouge(s) au sha de départ : à ne pas corriger)` : ''}` });
-        break;
-      }
-      red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
-      break;
-    }
-  }
+  if (red.length === 0) await programChecks(c, red, runs);
   // La session annonçait des tests rouges et le programme ne les voit pas rouges au départ : l'annonce vaut.
   if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && r.dejaRouges)) red.push(claimed);
   if (red.length) {
@@ -1718,7 +1781,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   if (gate && !l.testGate && !minorsPass) {
     // Le diff du lot : son dépôt et ses dépôts voisins (comme hasWork), sans les fichiers que le lot supprime (du code mort supprimé n'a pas de test à écrire).
     const touched = new Set([
-      ...filesOf(l.repo, lotWork(plan, l.repo, l.lot), { withoutDeleted: true }),
+      ...filesOf(wd(c), lotWork(plan, wd(c), l.lot), { withoutDeleted: true }),
       ...(l.repos ?? []).flatMap((r) => [...filesOf(r.path, repoWork(plan, r, l.lot), { withoutDeleted: true })]),
     ]);
     const missing = testGateMissing(gate, touched);
@@ -1733,7 +1796,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     }
   }
   l.constats = [];
-  l.checks = runs.length ? { head: git(l.repo, 'rev-parse', 'HEAD'), runs } : undefined;
+  l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), runs } : undefined;
   l.next = firstReview(c);
   save(c);
 }
@@ -1742,13 +1805,13 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
 const noCommitNote = (l: LotState): string => (l.warnings.some((w) => w.startsWith('passe des mineurs sans commit')) ? ' sans commit' : '');
 
 /** Revue de code qui clôt le cycle : complète, ou courte une fois la passe des mineurs jouée. */
-const codeReview = (l: LotState): StepKind => (l.minorPass ? 'review-small' : 'review');
+const codeReview = (l: LotState): SessionKind => (l.minorPass ? 'review-small' : 'review');
 
 /**
  * Première étape après un travail d'écriture (L221) : la revue de code, jamais l'UX. La revue UX d'un lot visible est jouée une seule fois,
  * après la dernière revue de code conforme (`uxAfterReview`), sur le code qui sera livré.
  */
-function firstReview(c: LotCtx): StepKind {
+function firstReview(c: LotCtx): SessionKind {
   const l = c.lot;
   if (l.small) return l.visible || l.minorPass ? 'review-small' : 'review'; // passe unique code + ergonomie ; sans écran, une revue de code
   if (l.visible && !c.config.ux) l.uxNote = 'UX à faire par le lead (aucune application déclarée : cadence.yaml orchestrate.ux)';
@@ -1776,7 +1839,7 @@ function toFix(c: LotCtx, constats: Constat[], what: string): void {
 }
 
 /** Les deux étapes qui voient l'application : la revue UX, et la passe unique d'un petit lot visible. */
-const seesApp = (l: LotState, kind: StepKind) => kind === 'ux' || (kind === 'review-small' && l.small && l.visible);
+const seesApp = (l: LotState, kind: SessionKind) => kind === 'ux' || (kind === 'review-small' && l.small && l.visible);
 
 const appNote = (state: AppState, ux: { url?: string }): string =>
   state.kind === 'busy' ? `UX non vérifiée : port occupé (${ux.url} répond déjà, l'application n'a pas été lancée)` : state.kind === 'unverified' ? `UX non vérifiée : ${state.cause}` : '';
@@ -1790,21 +1853,30 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   const l = c.lot;
   const ux = c.config.ux;
   // Un état repris, écrit avant L221, peut porter next = ux : l'UX ne part que sur une revue de code conforme du HEAD courant, sinon la revue de code passe d'abord (R9).
-  if (kind === 'ux' && !(l.code?.conforme && l.code.head === git(l.repo, 'rev-parse', 'HEAD'))) {
+  if (kind === 'ux' && !(l.code?.conforme && l.code.head === git(wd(c), 'rev-parse', 'HEAD'))) {
     l.next = codeReview(l);
     if (l.status === 'suspended') l.status = 'reviewing'; // reprise d'un lot suspendu : la boucle de runLot enchaîne sur la revue de code au lieu de rendre la main
     save(c);
     return;
   }
   if (!ux?.command || !ux.url || !seesApp(l, kind)) return reviewStep(c, kind);
+  // Une seule application à la fois dans le dépôt (L279, R16) : l'étape qui la lance attend celle d'un autre lot du dépôt, sans retenir de créneau de session ; les autres étapes ne passent pas ici.
+  const appTurn = (await mutexFor(`app:${gitCommonDir(c.lot.repo)}`).acquire())!;
   const halt = halted(c.wave, l);
   if (halt) {
+    appTurn();
     suspend(c, halt); // la session n'aurait pas lieu : l'application ne se lance pas pour rien
     return;
   }
   let skipped = false;
   c.wave.log(`${lotKey(l.project, l.lot)} · lancement de l'application (${ux.url})`);
-  const app = await startApp({ command: ux.command, url: ux.url, cwd: l.repo, nodeBin: l.node?.link, log: join(c.wave.store.lotDir(l.project, l.lot), 'ux-app.log'), timeoutMs: (ux.timeout ?? APP_TIMEOUT_S) * 1000 });
+  let app: Awaited<ReturnType<typeof startApp>>;
+  try {
+    app = await startApp({ command: ux.command, url: ux.url, cwd: wd(c), nodeBin: l.node?.link, log: join(c.wave.store.lotDir(l.project, l.lot), 'ux-app.log'), timeoutMs: (ux.timeout ?? APP_TIMEOUT_S) * 1000 });
+  } catch (e) {
+    appTurn();
+    throw e;
+  }
   try {
     c.app = app.state;
     if (app.state.kind !== 'ready') {
@@ -1819,6 +1891,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
   } finally {
     c.app = undefined;
     await app.stop();
+    appTurn();
     if (skipped && l.code) await conclude(c, l.code, noCommitNote(l));
   }
 }
@@ -1901,18 +1974,29 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   toFix(c, constats, 'revue non conforme');
 }
 
-/** Revue conforme : le verdict est enregistré avec le sha relu, puis le commit du plan. `raf done` reste au lead. */
+/** Trace d'un verdict reporté après un rebase (R9) : le sha relu, le sha intégré qui le remplace, et le patch-id (le même des deux côtés) qui le garantit. */
+export interface Reporte {
+  de: string;
+  vers: string;
+  patchId: string;
+}
+
+/**
+ * Revue conforme : le verdict est enregistré avec le sha relu, puis le commit du plan. `raf done` reste au lead.
+ * Un lot en worktree (L279) n'écrit rien au plan ici : le verdict et la clôture des sous-tâches attendent l'intégration, qui les écrit après l'avance de la branche
+ * du dépôt (R22, R23) ; le lot passe alors à l'étape `integrate`, la seule que `--resume --integrate` rejoue (R14, R27).
+ */
 async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise<void> {
   const l = c.lot;
-  const plan = c.loadPlan();
+  const plan = histPlan(c);
   // Dépôts voisins du lot (L62) : le sha lu de chacun est enregistré avec le verdict, et dit dans son texte (un plan en lecture seule n'a que le texte).
   const neighbours = l.repos ?? [];
   const shas = repoShas(plan, neighbours, l.lot);
   const read = neighbours.length ? ` ; dépôts relus : ${neighbours.map((r) => `${r.rel}@${shas[r.rel]?.slice(0, 7) ?? 'aucun commit du lot'}`).join(', ')}` : '';
   const verdict = `${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction${l.minorPass ? ` + passe des mineurs${minorNote}` : ''}${read})`;
   l.verdict = verdict;
-  const newer = lotWork(plan, l.repo, l.lot)[0]?.sha ?? null;
-  const moved = (code.head && newer !== null && git(l.repo, 'rev-parse', 'HEAD') !== code.head ? [''] : []).concat(
+  const newer = lotWork(plan, wd(c), l.lot)[0]?.sha ?? null;
+  const moved = (code.head && newer !== null && git(wd(c), 'rev-parse', 'HEAD') !== code.head ? [''] : []).concat(
     neighbours.filter((r) => shas[r.rel] !== null && code.repoHeads?.[r.rel] && git(r.path, 'rev-parse', 'HEAD') !== code.repoHeads[r.rel]).map((r) => ` dans ${r.rel}`),
   );
   if (moved.length) {
@@ -1920,34 +2004,182 @@ async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise
     return;
   }
   l.constats = [];
+  if (c.tree?.active) {
+    l.next = 'integrate';
+    save(c);
+    await integrateLot(c);
+    return;
+  }
+  const dirty = await writeVerdict(c, verdict, newer);
+  if (dirty) {
+    stop(c, 'handed-back', dirty);
+    return;
+  }
+  l.next = null;
+  transition(c, 'ready', 'prêt à livrer');
+}
+
+/**
+ * Écrit au plan, dans le dépôt du projet, l'entrée du lot : verdict (au sha `commit`, avec la trace `reporte` d'un verdict reporté), sous-tâches couvertes
+ * passées à done, puis le commit du plan seul ; pour un plan en lecture seule, l'outil `orchestrate.verdict` du projet, lancé dans ce dépôt (R21, R23).
+ * Rend la cause d'un refus (arbre sale hors plan), null sinon. Un verdict déjà écrit au même sha n'est pas écrit deux fois (reprise de l'intégration, R23).
+ */
+async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, reporte?: Reporte): Promise<string | null> {
+  const l = c.lot;
+  const plan = c.loadPlan();
+  const neighbours = l.repos ?? [];
+  const shas = repoShas(plan, neighbours, l.lot);
   // Sous-tâches ouvertes que des commits du lot citent (L82) : la revue conforme vaut pour elles, sinon `raf done` refuserait le lot.
   const covered = coveredTasks(plan, l.repo, l.lot, neighbours.flatMap((r) => repoWork(plan, r, l.lot)));
   if (!plan.readonly) {
-    plan.recordReview(l.lot, verdict, c.wave.today, newer, neighbours.length ? shas : undefined);
+    if (commit !== null && plan.lot(l.lot).review?.commit === commit && !covered.length) return null;
+    plan.recordReview(l.lot, verdict, c.wave.today, commit, neighbours.length ? shas : undefined, reporte);
     for (const k of covered) plan.setStatus(`${l.lot}/${k.task}`, 'done', c.wave.today);
     if (covered.length) l.warnings.push(`sous-tâches closes (couvertes par des commits qui les citent, revue conforme) : ${covered.map((k) => `${l.lot}/${k.task} (${k.sha.slice(0, 7)})`).join(', ')}`);
     plan.save();
     const dirty = await commitPlan(c, `plan: ${l.lot} revue de code enregistrée (orchestrate ${c.wave.id})`);
-    if (dirty) {
-      stop(c, 'handed-back', dirty);
-      return;
-    }
+    if (dirty) return dirty;
   } else {
     for (const k of covered) propose(c, `[sous-tâche clore] ${l.lot}/${k.task} — couverte par ${k.sha.slice(0, 7)}, revue conforme : à clore avant raf done`);
   }
   if (plan.readonly && c.config.verdict) {
-    const r = await sh(c, c.config.verdict.replaceAll('{lot}', l.lot).replaceAll('{verdict}', shEscape(verdict)));
+    // La trace d'un verdict reporté va dans le texte, le seul endroit où l'outil du projet la lit (R23).
+    const text = reporte ? `${verdict} ; verdict reporté : ${reporte.de.slice(0, 7)} → ${reporte.vers.slice(0, 7)} (patch-id identique)` : verdict;
+    const r = await sh(c, c.config.verdict.replaceAll('{lot}', l.lot).replaceAll('{verdict}', shEscape(text)), undefined, undefined, l.repo);
     if (r.code !== 0) l.warnings.push(`orchestrate.verdict en échec (code ${r.code}) : le lead reporte le verdict`);
     else {
       const dirty = await commitPlan(c, `plan: ${l.lot} revue de code notée (orchestrate ${c.wave.id})`);
-      if (dirty) {
-        stop(c, 'handed-back', dirty);
-        return;
-      }
+      if (dirty) return dirty;
     }
   }
+  return null;
+}
+
+/** Une écriture de plan du programme (R21, R26) : sous la file et le verrou du dépôt, le dépôt encore sur la branche de départ, aucun fichier suivi modifié hors plan. Rend la cause du refus, null si l'écriture a eu lieu. Hors worktree, rien ne change. */
+async function planWrite(c: LotCtx, write: () => Promise<string | null>): Promise<string | null> {
+  if (!c.tree) return write();
+  const l = c.lot;
+  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);
+  if (!grant.ok) return `écriture du plan refusée : verrou tenu par ${grant.holder.wave} (pid ${grant.holder.pid})`;
+  try {
+    const cur = repoBranch(l.repo);
+    if (cur !== c.tree.base) return `écriture du plan refusée : dépôt sur ${cur ?? 'HEAD détaché'} et non ${c.tree.base}`;
+    const plan = c.loadPlan();
+    const own = new Set([relative(l.repo, plan.path), ...plan.maintained]);
+    const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
+    const foreign = trackedDirty(l.repo).filter((f) => !own.has(f) && !(f.startsWith(specDir) && isAcceptationFile(f)));
+    if (foreign.length) return `écriture du plan refusée : arbre du dépôt modifié (${foreign.join(', ')})`;
+    return await write();
+  } finally {
+    grant.release();
+  }
+}
+
+/** Une écriture de plan refusée rend le lot au lead ; en worktree, il garde l'étape atteinte pour la reprise (R26), sinon `stop` la vide comme avant. */
+function handBackPlan(c: LotCtx, why: string): void {
+  if (c.tree) transition(c, 'handed-back', why);
+  else stop(c, 'handed-back', why);
+}
+
+const minutesText = (ms: number): string => (ms % 60_000 === 0 ? `${ms / 60_000} minute${ms === 60_000 ? '' : 's'}` : `${Math.round(ms / 1000)} s`);
+
+/**
+ * Intégration d'un lot en worktree à la branche du dépôt (L279, C2), AVANT sa transition à ready (R22). Sous le verrou d'intégration : branche du dépôt encore
+ * celle de départ (R24), aucun fichier suivi modifié (R8), rebase sur le sommet courant (conflit : abandonné, rendu au lead, R6), contrôles rejoués au sommet
+ * rebasé (R7), report du verdict si le patch-id est le même (R9) ou revue courte du diff rebasé sinon (R17), avance en fast-forward, puis écriture du plan dans le
+ * dépôt du projet (R23). Tout rendu garde `next: integrate` et le worktree : seul `--resume --integrate` le rejoue (R14, R27).
+ */
+async function integrateLot(c: LotCtx): Promise<void> {
+  const l = c.lot;
+  const t = c.tree!;
+  const key = lotKey(l.project, l.lot);
+  const kept = `worktree conservé : ${t.dir}`;
+  const refuse = (why: string): void => {
+    l.next = 'integrate';
+    transition(c, 'handed-back', why);
+  };
+  const waitMs = c.wave.integrate?.waitMs ?? INTEGRATE_WAIT_MS;
+  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);
+  if (!grant.ok) return refuse(`intégration refusée : verrou d'intégration tenu par ${grant.holder.wave} (pid ${grant.holder.pid}) depuis plus de ${minutesText(waitMs)} ; ${kept}`);
+  let verdict = l.verdict ?? '';
+  let reporte: Reporte | undefined;
+  let start = '';
+  try {
+    const cur = repoBranch(l.repo);
+    if (cur !== t.base) return refuse(`intégration refusée : le dépôt est sur ${cur ?? 'HEAD détaché'} et non sur ${t.base} ; branche conservée : ${t.branch}`);
+    const dirty = trackedDirty(l.repo);
+    if (dirty.length) return refuse(`intégration refusée : arbre du dépôt modifié (${dirty.join(', ')}) ; branche conservée : ${t.branch}`);
+    start = git(l.repo, 'rev-parse', `refs/heads/${t.base}`);
+    // Une branche déjà contenue dans celle du dépôt (arrêt entre l'avance et l'écriture du verdict) : ni rebase ni avance, seul le plan reste à écrire (R23).
+    if (!integrated(l.repo, t.branch, t.base)) {
+      const reviewed = l.code?.head ?? git(t.dir, 'rev-parse', 'HEAD');
+      const rebased = rebaseOnto(t.dir, t.base);
+      if (rebased.kind === 'conflict') {
+        return refuse(`intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`} ; ${kept}`);
+      }
+      const tip = git(t.dir, 'rev-parse', 'HEAD');
+      if (tip !== reviewed) {
+        // Le rebase a changé les commits : tests et build rejoués au sommet rebasé, avant que la branche du dépôt ne bouge (R7).
+        const red: Constat[] = [];
+        const runs: CheckRun[] = [];
+        await programChecks(c, red, runs);
+        l.checks = { head: tip, runs };
+        save(c);
+        if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map((k) => k.texte.split('\n')[0]).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
+        const before = patchId(t.dir, mergeBase(t.dir, reviewed, t.base), reviewed);
+        const after = patchId(t.dir, t.base, 'HEAD');
+        if (before !== '' && before === after) {
+          const vers = lotWork(histPlan(c), t.dir, l.lot)[0]?.sha ?? tip;
+          reporte = { de: reviewed, vers, patchId: before };
+        } else {
+          // Le diff du lot n'est plus celui qui a été relu (contexte modifié, conflit résolu) : une revue courte du diff rebasé avant l'avance (R17).
+          const short = await shortReview(c);
+          if (short === null) return;
+          if (short.refused) return refuse(`intégration refusée : revue courte du diff rebasé : ${short.refused} ; branche du dépôt inchangée, ${kept}`);
+          verdict = `${verdict} ; revue courte du diff rebasé (patch-id différent) : ${short.verdict}`;
+          l.verdict = verdict;
+        }
+      }
+      advance(l.repo, t.branch);
+    }
+    const end = git(l.repo, 'rev-parse', `refs/heads/${t.base}`);
+    if (end !== start) c.wave.log(`${key} intégré : ${start.slice(0, 7)}..${end.slice(0, 7)}`);
+    if (reporte) c.wave.log(`${key} verdict reporté : ${reporte.de.slice(0, 7)} → ${reporte.vers.slice(0, 7)} (patch-id identique)`);
+    // Le plan, sous le même verrou, après l'avance : un commit de plan seul au sommet de la branche du dépôt, `commit` = dernier commit de travail intégré (R23).
+    const commit = lotWork(c.loadPlan(), l.repo, l.lot)[0]?.sha ?? null;
+    const refusal = await writeVerdict(c, verdict, commit, reporte);
+    if (refusal) return refuse(`écriture du plan refusée : ${refusal}`);
+  } catch (e) {
+    return refuse(`intégration impossible : ${gitFailure(e)} ; ${kept}`);
+  } finally {
+    grant.release();
+  }
+  // Intégré : le worktree et la branche, propres et fusionnés, sont retirés (R12) ; sinon ils restent et le journal le dit.
+  const removed = removeTree({ repo: l.repo, dir: t.dir, branch: t.branch, base: t.base });
+  if (!removed.ok) c.wave.log(`orchestrate : ${key} : worktree conservé : ${t.dir} (branche ${t.branch})`);
+  else t.active = false;
   l.next = null;
   transition(c, 'ready', 'prêt à livrer');
+}
+
+/**
+ * Revue courte (`review-small`) du diff rebasé (R17), jouée sous le verrou d'intégration. `refused` : le nombre de constats bloquants ou majeurs, dit en clair ;
+ * `null` : la session n'a pas eu lieu (budget, quota, arrêt) et le lot est suspendu ou rendu par `session`.
+ */
+async function shortReview(c: LotCtx): Promise<{ verdict: string; refused?: undefined } | { refused: string; verdict?: undefined } | null> {
+  c.integration = { base: c.tree!.base };
+  try {
+    const done = await session(c, 'review-small');
+    if (!done) return null;
+    const rep = checkShape<ReviewReport>(done.report, REVIEW_SCHEMA);
+    const n = rep.bloquants + rep.majeurs;
+    if (n > 0) return { refused: `${n} constat(s) bloquant(s) ou majeur(s)` };
+    return { verdict: rep.verdict };
+  } catch (e) {
+    return { refused: `rapport illisible (${(e as Error).message})` };
+  } finally {
+    c.integration = undefined;
+  }
 }
 
 /** Formes connues de « pas de question » : l'entrée entière, normalisée, doit en égaler une (liste fermée, L52). */
@@ -2012,6 +2244,23 @@ function waveCommits(c: LotCtx, repo: string): (sha: string) => boolean {
   return (sha) => known.has(sha) || prefixes.some((p) => sha.startsWith(p));
 }
 
+/** Crée le worktree du lot à la prise de son créneau, ou le retrouve à la reprise (R3, R11). Faux quand il est impossible : le lot seul est rendu avec la cause git, les autres continuent (R5). */
+async function ensureTree(c: LotCtx): Promise<boolean> {
+  const t = c.tree;
+  if (!t || t.active) return true;
+  const l = c.lot;
+  const key = lotKey(l.project, l.lot);
+  const made = prepareTree({ repo: l.repo, dir: t.dir, branch: t.branch, base: t.base, lot: key });
+  if (!made.ok) {
+    c.wave.log(`orchestrate : ${key} : worktree impossible : ${made.cause}`);
+    stop(c, 'handed-back', `worktree impossible : ${made.cause}`);
+    return false;
+  }
+  t.active = true;
+  c.wave.log(`${key} · worktree ${made.reused ? 'retrouvé' : 'créé'} : ${t.dir} (branche ${t.branch})`);
+  return true;
+}
+
 /** Joue le cycle d'un lot jusqu'à son terme, ou jusqu'à l'arrêt (question, budget, quota). Ne lève jamais. */
 export async function runLot(c: LotCtx): Promise<void> {
   const l = c.lot;
@@ -2023,8 +2272,10 @@ export async function runLot(c: LotCtx): Promise<void> {
       return;
     }
     if (l.status === 'question' && !l.pendingAnswer) return;
+    // Un lot déjà commencé retrouve son worktree (R11) ; un lot neuf n'en a un qu'une fois son raf start fait, dans le dépôt du projet (R21).
+    if ((l.next !== null || l.steps.length > 0) && !(await ensureTree(c))) return;
     // Un test rescellé par le lead pendant la question (L200) a déplacé le commit rouge : l'ancre suit, le verrou garde le reste.
-    if (l.status === 'question' && l.accept?.rouge) l.accept.rouge = resealedRouge(l.repo, l.accept.acceptation, l.accept.rouge, waveCommits(c, l.repo)) ?? l.accept.rouge;
+    if (l.status === 'question' && l.accept?.rouge) l.accept.rouge = resealedRouge(wd(c), l.accept.acceptation, l.accept.rouge, waveCommits(c, l.repo)) ?? l.accept.rouge;
     if (l.next === null && l.steps.length === 0) {
       if (dropped(c)) {
         stop(c, 'handed-back', DROPPED);
@@ -2036,17 +2287,18 @@ export async function runLot(c: LotCtx): Promise<void> {
         suspend(c, halt);
         return;
       }
-      const before = await snapshot(l.repo, { remote: false });
-      if (before.tracked.length) {
-        stop(c, 'handed-back', `dépôt sale avant le lot : ${trackedPaths(before).join(', ')}`);
-        return;
-      }
-      const why = await startLot(c);
+      // Le raf start et son commit de plan sont une écriture du dépôt du projet : sous le verrou du dépôt quand le lot a un worktree (R21, R26).
+      const why = await planWrite(c, async () => {
+        const before = await snapshot(l.repo, { remote: false });
+        if (before.tracked.length) return `dépôt sale avant le lot : ${trackedPaths(before).join(', ')}`;
+        return startLot(c);
+      });
       if (why) {
         stop(c, 'handed-back', why);
         return;
       }
-      l.startedSha = (await snapshot(l.repo, { remote: false })).head ?? undefined;
+      if (!(await ensureTree(c))) return;
+      l.startedSha = (await snapshot(wd(c), { remote: false })).head ?? undefined;
       l.next = needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos, l.goal) ? 'precheck' : firstWrite(c);
       save(c);
     }
@@ -2059,6 +2311,7 @@ export async function runLot(c: LotCtx): Promise<void> {
       else if (kind === 'maquette') await maquetteStep(c);
       else if (kind === 'accept') await acceptStep(c);
       else if (kind === 'implement' || kind === 'fix') await work(c, kind);
+      else if (kind === 'integrate') await integrateLot(c);
       else await review(c, kind);
       if (l.status === 'suspended' || l.status === 'question') return;
     }
@@ -2074,7 +2327,7 @@ export async function runLot(c: LotCtx): Promise<void> {
     }
     // Sorties du MCP Playwright qu'une session a écrites dans le dépôt (L50) : jetables, retirées à la fin de chaque passage du lot.
     try {
-      cleanPlaywrightOutput(l.repo);
+      cleanPlaywrightOutput(wd(c));
     } catch {
       // nettoyage de confort : jamais une cause d'échec du lot
     }

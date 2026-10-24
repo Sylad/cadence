@@ -24,6 +24,12 @@ export interface Verdict {
    * le lot, sha du dernier commit du lot lu dans ce dépôt (null s'il n'y en avait aucun). Absent sans dépôt voisin.
    */
   repos?: Record<string, string | null>;
+  /**
+   * Verdict reporté au sha intégré (L279, D5) : l'intégration d'un lot en worktree a rebasé ses commits sans changer son diff (même patch-id) ; `de` est le sha relu
+   * avant le rebase, `vers` le dernier commit de travail intégré — celui que porte `commit`. Écrit par le seul programme, purement informatif : la porte
+   * de `raf done` ne le lit pas.
+   */
+  reporte?: { de: string; vers: string; patchId: string };
 }
 
 export interface Task {
@@ -386,8 +392,8 @@ export class Plan {
   }
 
   /** `commit` : sha du dernier commit compté du lot (le plan ne lit pas git), null s'il n'en a aucun. */
-  recordReview(lotId: string, verdict: string, today: Day, commit: string | null, repos?: Record<string, string | null>): void {
-    this.recordVerdict('review', 'la revue de code', lotId, { date: today, verdict, commit, ...(repos && Object.keys(repos).length ? { repos } : {}) });
+  recordReview(lotId: string, verdict: string, today: Day, commit: string | null, repos?: Record<string, string | null>, reporte?: Verdict['reporte']): void {
+    this.recordVerdict('review', 'la revue de code', lotId, { date: today, verdict, commit, ...(repos && Object.keys(repos).length ? { repos } : {}), ...(reporte ? { reporte } : {}) });
   }
 
   private enableGate(key: 'uxSince' | 'reviewSince', today: Day): boolean {
@@ -886,5 +892,7 @@ function asVerdict(raw: unknown): Verdict | undefined {
     const repos = Object.entries(v.repos as Record<string, unknown>).map(([k, sha]) => [k, sha == null || String(sha).trim() === '' ? null : String(sha).trim()] as const);
     if (repos.length) verdict.repos = Object.fromEntries(repos);
   }
+  const r = v.reporte as Record<string, unknown> | null | undefined;
+  if (r && typeof r === 'object' && !Array.isArray(r) && r.de != null && r.vers != null) verdict.reporte = { de: String(r.de), vers: String(r.vers), patchId: String(r.patchId ?? '') };
   return verdict;
 }

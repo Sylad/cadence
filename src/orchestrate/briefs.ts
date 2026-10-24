@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RafError, type Lot } from '../plan.js';
-import type { StepKind } from './launch.js';
+import type { SessionKind } from './launch.js';
 
 /** Gabarits livrés avec le paquet (à la racine, à côté de dist/ et src/). */
 export const TEMPLATES_DIR = fileURLToPath(new URL('../../templates/orchestrate', import.meta.url));
@@ -26,6 +26,8 @@ export interface BriefVars {
   captures: string;
   /** Dépôts voisins du lot (clé de lot `repos:`, L62) : `reposText(kind, …)` ; absent ou vide pour un lot du dépôt du projet seul. */
   repos?: string;
+  /** Revue courte du diff rebasé à l'intégration (L279, R17) : `integrationText(base)` ; vide ailleurs. */
+  integration?: string;
   /** Consigne docs.sync (L143) de la revue : les écarts calculés par le programme, à passer en constat majeur ; vide sans règle déclarée. */
   docs?: string;
   /** Consigne de l'étape spec (L171) : dossier, largeurs, commande de rendu, écarts de la passe précédente ; vide ailleurs. */
@@ -62,6 +64,11 @@ export function reposText(role: 'write' | 'read', lot: string, repos: { rel: str
   ].join('\n');
 }
 
+/** Revue courte du diff rebasé (L279, R17) : la branche du lot vient d'être rebasée sur celle du dépôt et son diff n'est plus celui que la revue a lu. */
+export function integrationText(base: string): string {
+  return `Integration re-review: this lot's branch was just rebased onto \`${base}\`, which moved while the lot was being written, and the diff of the lot is no longer the one an earlier review read (context changed or a conflict was resolved). Review the rebased diff only (\`git diff ${base}...HEAD\`): report a finding only for what the rebase changed or broke in the lot's own change. The program has already re-run the tests and the build on the rebased tip.`;
+}
+
 /** Consigne du dossier temporaire (L242) : les sessions y rangent journaux de tests, dumps et exports, jamais dans le dépôt (4 « dépôt sale » le 18-10). */
 export function tmpText(dir: string): string {
   return `Temporary files: this session's \`TMPDIR\` is \`${dir}\` (short and outside the repository, never tracked by git, already created and exported; removed when the pass ends). Write test logs, dumps, exports and any scratch file there (\`> $TMPDIR/suite.txt\`), never inside the repository: not in its \`tmp/\`, not at its root. Leave the working tree with only the files of the lot.`;
@@ -93,7 +100,7 @@ export function shotsText(captureDir: string): string {
 }
 
 /** Un gabarit : un par étape, plus deux variantes (passe des mineurs, revue courte qui la suit). */
-export type BriefName = StepKind | 'fix-minors' | 'review-recheck' | 'spec-back' | 'accept-back';
+export type BriefName = SessionKind | 'fix-minors' | 'review-recheck' | 'spec-back' | 'accept-back';
 
 const FILES: Record<BriefName, string> = {
   precheck: 'precheck.md',
@@ -135,7 +142,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', docs: vars.docs ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

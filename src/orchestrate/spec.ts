@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isMap, isSeq, parse, parseDocument } from 'yaml';
+import { isMap, isNode, isScalar, isSeq, parse, parseDocument, stringify, type Node } from 'yaml';
 import type { Screen } from '../plan.js';
 import { acceptationFile } from './accept.js';
 import { checkFiche, fichesDuDossier, LARGEURS } from '../spec.js';
@@ -82,27 +82,68 @@ export function ficheReady(repo: string, fiche: string, lot: string, parts: Fich
   }
 }
 
+/** Une édition du texte de la fiche : les octets `[start, end[` deviennent `text`. */
+type Edit = { start: number; end: number; text: string };
+
+/** Début de la ligne qui contient l'offset. */
+const lineStart = (text: string, at: number): number => text.lastIndexOf('\n', at - 1) + 1;
+
+/** Fin de la ligne qui contient l'offset, saut de ligne compris (ou la fin du texte). */
+const lineEnd = (text: string, at: number): number => {
+  if (at > 0 && text[at - 1] === '\n') return at; // un scalaire bloc finit déjà en début de ligne
+  const nl = text.indexOf('\n', at);
+  return nl === -1 ? text.length : nl + 1;
+};
+
 /**
- * Passe en `sourcee` les règles `hypothese` nommées (L297) : `source` dit d'où vient la réponse, `si_faux` disparaît. Le reste de la fiche
- * (ordre, commentaires) est conservé. Rend les ids effectivement changés ; une règle absente ou déjà sourcée n'est pas touchée.
+ * Passe en `sourcee` les règles `hypothese` nommées (L297) : `source` dit d'où vient la réponse, `si_faux` disparaît. Seules les lignes `statut`,
+ * `source` et `si_faux` de ces règles sont éditées dans le texte (L302) : le reste de la fiche — ordre, commentaires, style de flux `[R2]` — est conservé
+ * à l'octet près, ce qu'une réécriture du document (`doc.toString`) ne garantit pas. Une règle écrite en style de flux (`{id: R1, …}`) n'est pas éditée : erreur.
+ * Rend les ids effectivement changés ; une règle absente ou déjà sourcée n'est pas touchée.
  */
 export function sourceRules(repo: string, fiche: string, ids: string[], source: string): string[] {
   const file = join(repo, fiche);
-  const doc = parseDocument(readFileSync(file, 'utf8'));
-  const regles = doc.get('regles');
+  const text = readFileSync(file, 'utf8');
+  const regles = parseDocument(text).get('regles');
   if (!isSeq(regles)) return [];
   const changed: string[] = [];
+  const edits: Edit[] = [];
+  const sourceValue = stringify(source).trimEnd();
   for (const r of regles.items) {
     if (!isMap(r)) continue;
     const id = String(r.get('id'));
     if (!ids.includes(id) || r.get('statut') !== 'hypothese') continue;
-    r.set('statut', 'sourcee');
-    r.set('source', source);
-    r.delete('si_faux');
+    if (r.flow) throw new Error(`${id} est écrite en style de flux (${fiche}) : à passer en sourcée à la main`);
+    const pair = (key: string) => r.items.find((p) => isScalar(p.key) && p.key.value === key);
+    const statut = pair('statut');
+    const valueEnd = (p: NonNullable<typeof statut>) => (isNode(p.value) && p.value.range ? p.value.range[1] : (p.key as Node).range![1]);
+    if (!statut || !isNode(statut.value) || !statut.value.range || !isNode(statut.key) || !statut.key.range) continue;
+    edits.push({ start: statut.value.range[0], end: statut.value.range[1], text: 'sourcee' });
+    const src = pair('source');
+    if (src && isNode(src.value) && src.value.range) edits.push({ start: src.value.range[0], end: src.value.range[1], text: sourceValue });
+    else {
+      const at = lineEnd(text, valueEnd(statut));
+      const indent = ' '.repeat(statut.key.range[0] - lineStart(text, statut.key.range[0]));
+      edits.push({ start: at, end: at, text: `${at > 0 && text[at - 1] !== '\n' ? '\n' : ''}${indent}source: ${sourceValue}\n` });
+    }
+    const siFaux = pair('si_faux');
+    if (siFaux && isNode(siFaux.key) && siFaux.key.range) edits.push({ start: lineStart(text, siFaux.key.range[0]), end: lineEnd(text, valueEnd(siFaux)), text: '' });
     changed.push(id);
   }
-  if (changed.length) writeFileSync(file, doc.toString({ lineWidth: 0 })); // lineWidth 0 : pas de reflux des longues lignes de la fiche
+  if (!changed.length) return changed;
+  let out = text;
+  for (const e of edits.sort((x, y) => y.start - x.start || y.end - x.end)) out = out.slice(0, e.start) + e.text + out.slice(e.end);
+  writeFileSync(file, out);
   return changed;
+}
+
+/**
+ * La réponse du lead corrige-t-elle la règle (la supprime, la change, la remplace) au lieu de la confirmer ? Une lecture prudente (L302) : au moindre
+ * mot de correction ou de refus, la règle n'est pas passée en `sourcee` telle quelle, la session spec reprise l'applique. Se tromper dans ce sens
+ * ne coûte qu'une session ; l'autre sens source une règle que le lead vient de refuser.
+ */
+export function answerAltersRule(answer: string): boolean {
+  return /(?<![\p{L}])(non|no|pas|supprim\p{L}*|retir\p{L}*|enl[eè]v\p{L}*|abandonn\p{L}*|chang\p{L}*|modifi\p{L}*|remplac\p{L}*|corrig\p{L}*|plut[oô]t|à la place|sauf|remove|delet\p{L}*|drop|change|replace\p{L}*|instead|rather|except)(?![\p{L}])/iu.test(answer);
 }
 
 /** Les règles nommées que la fiche donne déjà pour sourcées par la réponse du lead (ce que `sourceRules` a posé). */

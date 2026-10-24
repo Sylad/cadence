@@ -44,9 +44,12 @@ describe('L297 — la réponse du lead source la règle posée en question', () 
     const h = harness({ lots, script: { spec: [spec((d) => { coutR3(d); d.regles[0].enonce = longue; }), rien], implement: [impl], review: [ok] } });
     const c = h.lot('L1', screen);
     await runLot(c);
+    const avant = readFileSync(join(h.repo, FICHE), 'utf8').split('\n');
     answer(c);
     await runLot(c);
-    expect(readFileSync(join(h.repo, FICHE), 'utf8')).toContain(longue);
+    const apres = readFileSync(join(h.repo, FICHE), 'utf8').split('\n');
+    expect(avant.filter((x) => !apres.includes(x))).toEqual([`    si_faux: ${COUT}`]);
+    expect(apres.filter((x) => !avant.includes(x))).toEqual([expect.stringMatching(/^ {4}source: réponse du lead/)]);
   });
 
   it('R2 — la fiche sourcée est commitée avec le seul fichier de la fiche, avant la session spec reprise', async () => {

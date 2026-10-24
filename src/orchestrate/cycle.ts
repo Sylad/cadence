@@ -27,7 +27,7 @@ import { type Acceptation, acceptationFile, acceptCommands, isAcceptList, accept
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
 import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
-import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, hypothesisNote, LEAD_SOURCE, ruleIdsSourcedByLead, sourceRules, specText, type FicheParts } from './spec.js';
+import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, answerAltersRule, hypothesisNote, LEAD_SOURCE, ruleIdsSourcedByLead, sourceRules, specText, type FicheParts } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 import { advance, INTEGRATE_WAIT_MS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
@@ -1247,11 +1247,12 @@ function takeReport(c: LotCtx, done: Done, rep: { choix?: string[]; questions: s
 /**
  * La réponse du lead à une question sur des hypothèses coûteuses de la fiche (L297) : le programme passe lui-même ces règles en `sourcee`
  * (`réponse du lead, <date>, vague <id>`) et commite la fiche AVANT la session spec reprise, qui pourrait être perdue ou ne rien écrire — la fiche est alors
- * conforme quand la revue de fiche la lit. Rend vrai quand le lot est rendu (fiche introuvable, commit refusé).
+ * conforme quand la revue de fiche la lit. Une réponse qui supprime ou change la règle (`answerAltersRule`) n'en source aucune. Rend vrai quand le lot est rendu (fiche introuvable, commit refusé).
  */
 function sourceAnsweredRules(c: LotCtx): boolean {
   const l = c.lot;
   if (!l.pendingAnswer || !l.specAsked?.length || !l.specAskedRules?.length) return false;
+  if (answerAltersRule(l.pendingAnswer)) return false; // le lead corrige la règle : la session spec reprise l'applique, sinon la question lui revient (L302)
   const fiche = ficheOf(c);
   if (!fiche) return false; // la session spec reprise l'écrira : l'ancienne consigne s'applique
   try {

@@ -3214,11 +3214,12 @@ lots:
     created: 2026-10-24
   - id: L285
     title: "orchestrate : les sessions de vague ne laissent plus de tâche de fond qui retient la sortie — env CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1 au lancement de claude -p (retire run_in_background de Bash et des sous-agents) et Monitor dans --disallowedTools ; ne PAS tuer sur StructuredOutput (coût réel seulement dans le message result) ; test du lancement ; mesure après : sessions dont la fin suit le StructuredOutput de plus d'1 min. Sources : code.claude.com/docs/en/headless.md, env-vars.md, permissions.md, agent-sdk/cost-tracking.md ; étude tmp/L285-etude-taches-de-fond-2026-10-24.md. Audit 24-10 : 127 sessions, 833 min, 12,1 M tokens non comptés"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-24
     notes:
       - { date: 2026-10-24, text: "titre remplacé : « orchestrate : une session se termine dès son rapport structuré (StructuredOutput) au lieu d'attendre la fin de ses tâches de fond, et ses tokens sont comptés depuis son journal (segments après le rapport compris) ; étude de faisabilité d'abord (stream-json, variable de la CLI qui interdit les tâches de fond) ; tests. Audit 24-10 : 127 sessions ont attendu après leur rapport, 833 min perdues, 12,1 M tokens non comptés (6,4 %), launch.ts n'attend que close »" }
+    started: 2026-10-24
   - id: L286
     title: "orchestrate : « hit your weekly limit » reconnu comme quota (isQuotaMessage, result.ts:75) → vague suspendue, pas de lot failed ; test sur le message réel. Audit 24-10 : 3 lots failed le 14-10"
     status: done

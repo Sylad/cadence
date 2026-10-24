@@ -3398,9 +3398,10 @@ lots:
     finished: 2026-10-24
   - id: L301
     title: "worktrees (suite revue L279, à faire avant activation) : lot rendu hors intégration (revue non conforme, tests rouges, HEAD déplacé, plan touché, verrou d'acceptation) — chemin de reprise : nouvelle vague du même lot qui retrouve sa branche cadence/<vague>/<lot> la plus récente (ou intégration à la main documentée) ; docs/orchestrate.md:517 « usual paths » corrigé ; mineurs de la revue : intégration après arrêt de l'application UX (cycle.ts:1891), worktree hors du dépôt quand la vague part de sa racine (lotTreeDir), foreignDirty/ownFile et git/tryGit dédupliqués, tests de waveReadsIntegrate/Replay ; tests"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-24
+    started: 2026-10-24
   - id: L302
     title: "orchestrate (suite revue L297) : sourcer une règle de fiche après --answer ne reformate pas la fiche (doc.toString change [R2] en [ R2 ] sur les 17 fiches de docs/specs — garder le style de flux d'origine ou n'éditer que les lignes de la règle) ; une réponse qui supprime ou change la règle (« non, supprime R3 », « change en X ») ne la marque pas « sourcée » telle quelle : la règle est laissée à la session spec reprise, ou rendue au lead si la session ne la traite pas ; tests"
     status: doing

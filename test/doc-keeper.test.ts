@@ -135,7 +135,7 @@ describe('orchestrate appelle le bibliothécaire avant la revue (L306)', () => {
     expect(h.calls[2].brief).toContain('- src-a.txt changed, but none of README.md was touched');
   });
 
-  it('R13 — le brief du bibliothécaire n'est pas celui d'une correction de revue : il nomme le lot, la documentation et le préfixe docs(lot)', async () => {
+  it('R13 — le brief du bibliothécaire n\'est pas celui d\'une correction de revue : il nomme le lot, la documentation et le préfixe docs(lot)', async () => {
     const h = harness({ script: { implement: [impl('src-a.txt')], fix: [keep()], review: [ok] } });
     withConfig(h);
     await runLot(h.lot('L1'));

@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { claudeOut, git, reviewReport, specReport } from './orchestrate-harness.js';
 import { ecritBack } from './spec-helpers.js';
-import { fake, planOf, run, setup, store, WAVE, type Handler } from './orchestrate-worktree-harness.js';
+import { fake, planOf, run, setup, store, until, WAVE, type Handler } from './orchestrate-worktree-harness.js';
 import { tempDir } from './helpers.js';
 
 // L279 — R26 hors intégration : un lot rendu sur une écriture de plan refusée (notes d'hypothèses, mineurs de la fiche) est rejoué par --resume --replay
@@ -17,13 +17,16 @@ afterEach(() => {
 });
 
 /** Le lead modifie un fichier suivi de son dépôt pendant que la spec travaille : l'écriture de plan qui suit est refusée. */
-const dirtyRepo = (repo: string): Handler => (cwd) => {
+const dirtyRepo = (repo: string, started: () => boolean): Handler => async (cwd) => {
+  await until(started); // L2 a déjà écrit son `raf start` : seul le lot L1 rencontre l'arbre sale
   writeFileSync(join(repo, 'base.txt'), 'modifié par le lead\n');
   return claudeOut(specReport({ fiche: ecritBack(cwd) }));
 };
 
-const wave = (repo: string, fiche?: Handler) =>
-  fake({ spec: dirtyRepo(repo), ...(fiche ? { fiche } : {}) });
+function wave(repo: string, fiche?: Handler) {
+  const f: ReturnType<typeof fake> = fake({ spec: dirtyRepo(repo, () => f.calls.some((c) => c.lot === 'L2')), ...(fiche ? { fiche } : {}) });
+  return f;
+}
 
 async function refused(fiche?: Handler) {
   const { parent, repo } = setup([{ title: 'un', spec: true }, { title: 'deux' }]);
@@ -48,6 +51,7 @@ describe('R26 — un lot rendu sur une écriture de plan refusée est reprenable
 
     const g = fake();
     const r = await run(parent, ['--resume', WAVE, '--replay', 'a:L1'], g);
+    expect(r.err).toBe('');
     expect(r.out).toContain("a:L1 → suspended — écriture du plan reprise à l'étape implement (--resume --replay)");
     expect(g.calls.filter((c) => c.lot === 'L1').map((c) => c.kind)).toEqual(['implement', 'review']); // la spec et sa revue ne sont pas rejouées
     expect(store(parent).readLot('a', 'L1')!.status).toBe('ready');

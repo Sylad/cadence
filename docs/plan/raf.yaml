@@ -3288,6 +3288,7 @@ lots:
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "compliant — orchestré (vague 2026-10-24-1240, 0 passe(s) de correction)", commit: 42a8cb0d4751db20c482d32849a79638ca6a07f8 }
   - id: L292
     title: "orchestrate précheck (suite de la revue L288) : les identifiants de lot du plan qui ne sont pas L<n> (Q-CAN5, B28.1, Q4/…) cités dans le titre ou le goal: comptent — mesure revue : 8 des 17 « oui » réels perdus (cadence:L68, maritime Q4/qa-expectations…), Q-CAN6 perdait son précheck ; le critère lit aussi goal: (L258) ; « review » cherché comme mot, pas dans qa-reviewer/review-small ; test B28.1 contre B28.10"
     status: doing

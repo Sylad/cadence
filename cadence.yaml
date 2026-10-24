@@ -9,7 +9,7 @@ docs:
 # Porte « code modifié sans test » (L287) : le code du paquet sans fichier de test touché part en correction avant la revue.
 orchestrate:
   # Mode worktree expérimental (L279) : essai du 24-10 (L310) — parallèle mesuré, intégration pas encore éprouvée ; true + CADENCE_EXPERIMENTAL_WORKTREES=1 pour la suite de l'essai.
-  worktrees: false
+  worktrees: true
   # Précheck sur le modèle local (claude-local, hors quota) pour tout lot sans commit ; un « oui » local est confirmé par Sonnet (L146, L296 de cadence, 24-10).
   precheck: local
   testGate:

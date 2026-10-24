@@ -115,14 +115,17 @@ interface Named {
 }
 const named = (num: string): Named => ({ num, interior: false });
 
+/** Un numéro divisé en préfixe (« 1.B. », « 3- », « A- », « A ») et chiffres finaux. */
+const TRAILING_DIGITS = /^(.*\D)?(\d+)$/;
+
 /**
- * Numéros d'une plage : « 4 » et « 6 » donnent 4, 5, 6 ; « 1.1 » et « 1.3 » donnent 1.1, 1.2, 1.3. Les bornes sont nommées, le milieu non.
+ * Numéros d'une plage : « 4 » et « 6 » donnent 4, 5, 6 ; « 1.1 » et « 1.3 » donnent 1.1, 1.2, 1.3, de même « 3-1 »/« 3-3 » et « A1 »/« A3 ». Les bornes sont nommées, le milieu non.
  * Sinon les bornes seules : préfixes différents, plage décroissante, 50 numéros ou plus. Une borne nue après une borne à préfixe
  * (« 4.8–10 », « A3–1 ») n'est pas une figure à part : seule la première est gardée.
  */
 function expand(from: string, to: string): Named[] {
-  const a = /^(.*\.)?(\d+)$/.exec(from);
-  const b = /^(.*\.)?(\d+)$/.exec(to);
+  const a = TRAILING_DIGITS.exec(from);
+  const b = TRAILING_DIGITS.exec(to);
   if (b && b[1] === undefined && (!a || a[1] !== undefined)) return [named(from)];
   if (!a || !b || (a[1] ?? '') !== (b[1] ?? '')) return [named(from), named(to)];
   const [lo, hi] = [Number(a[2]), Number(b[2])];

@@ -113,6 +113,16 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.figures.map((f) => [f.label, f.citations.length])).toEqual([['Figure 2', 1], ['Figure 3', 1], ['Figure 7', 0], ['Figure 10', 0]]);
     expect(idx.unresolved.filter((u) => u.page === 1).map((u) => u.label)).toEqual(['Table 2', 'Table 3']);
   });
+  it('R6 — une plage dont les bornes ont le même préfixe à tiret ou à lettre est développée : « Figures 3-1 to 3-3 », « Figures 3-1–3-3 », « Tables A-1 to A-3 », « Tables A1 to A3 »', () => {
+    const idx = indexText([
+      page(1, 'see Figures 3-1 to 3-3', 'Figures 3-1–3-3 again', 'Tables A-1 to A-3', 'Tables A1 to A3'),
+      page(2, 'Figure 3-1 A', 'Figure 3-2 B', 'Figure 3-3 C', 'Table A-1 D', 'Table A-2 E', 'Table A-3 F', 'Table A1 G', 'Table A2 H', 'Table A3 I'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([
+      ['Figure 3-1', [1, 2]], ['Figure 3-2', [1, 2]], ['Figure 3-3', [1, 2]], ['Table A-1', [3]], ['Table A-2', [3]], ['Table A-3', [3]], ['Table A1', [4]], ['Table A2', [4]], ['Table A3', [4]],
+    ]);
+    expect(idx.unresolved).toEqual([]);
+  });
   it("les numéros d'annexe des normes OMM gardent leur lettre : « Figure 1.B.1 » n'est pas la Figure 1", () => {
     const idx = indexText([
       page(1, 'See Figure 1.D.5 and Figures 1.B.1 and 1.B.2.', 'Voir Table 12.B.3.'),

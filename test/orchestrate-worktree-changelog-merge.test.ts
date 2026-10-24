@@ -163,3 +163,24 @@ describe('R4 — au rebase d\'intégration', () => {
     expect(git(t.dir, 'status', '--porcelain')).toBe('');
   });
 });
+
+describe('R4 — commit devenu vide', () => {
+  it('R4 — la même entrée ajoutée des deux côtés : le commit du lot devenu vide ne bloque pas le rebase', () => {
+    const repo = gitRepo();
+    writeFileSync(join(repo, 'CHANGELOG.md'), BASE);
+    git(repo, 'add', '--', 'CHANGELOG.md');
+    git(repo, 'commit', '-q', '-m', 'init');
+    const store = new RunStore(tempDir(), 'w1');
+    const t = { repo, dir: lotTreeDir(store.dir, 'p', 'L1'), branch: lotBranch('w1', 'p', 'L1'), base: 'main', lot: 'p:L1' };
+    expect(prepareTree(t).ok).toBe(true);
+    writeFileSync(join(t.dir, 'x.txt'), 'x\n');
+    writeFileSync(join(t.dir, 'CHANGELOG.md'), log('### Added\n\n- base A\n- même\n'));
+    git(t.dir, 'add', '--', 'x.txt', 'CHANGELOG.md');
+    git(t.dir, 'commit', '-q', '-m', 'feat(L1): lot');
+    writeFileSync(join(repo, 'CHANGELOG.md'), log('### Added\n\n- base A\n- même\n'));
+    git(repo, 'add', '--', 'CHANGELOG.md');
+    git(repo, 'commit', '-q', '-m', 'autre');
+    expect(rebaseOnto(t.dir, 'main').kind).toBe('rebased');
+    expect(readFileSync(join(t.dir, 'CHANGELOG.md'), 'utf8')).toBe(log('### Added\n\n- base A\n- même\n'));
+  });
+});

@@ -993,29 +993,42 @@ function badReport(c: LotCtx, step: StepState, e: unknown): null {
   return stop(c, 'failed', `${step.kind} : ${(e as Error).message}`);
 }
 
-/** Mots d'un titre qui disent que le lot reprend un constat : le livrable peut déjà exister. */
-const CITES_FINDING = /constat|revue|review|audit/i;
+/**
+ * Mots du titre ou du goal qui disent que le lot reprend un constat : le livrable peut déjà exister. Mots entiers (« review » ne
+ * se lit pas dans `qa-reviewer` ni `review-small`), au pluriel ou accordés pour « constat ».
+ */
+const CITES_FINDING = /(?<![\w-])(?:constat\w*|revues?|reviews?|audits?)(?![\w-])/i;
 
 /**
- * Le titre cite un constat, ou un lot antérieur du plan : un autre lot a pu faire le travail. Pour un lot `L<n>`, « L12 » compte
- * dans le titre de `L30` et non celui de `L12` ni d'un lot postérieur ; pour un autre identifiant (`Q-CAN6`, `B28.1`), tout autre
- * lot du plan cité en entier compte.
+ * Le texte du lot (titre, goal, objectif donné) cite un constat, ou un autre lot dont le travail a pu être fait. Pour un lot
+ * `L<n>`, « L12 » compte dans le texte de `L30` et non celui de `L12` ni d'un lot postérieur ; tout identifiant du plan qui n'est
+ * pas `L<n>` (`Q-CAN5`, `B28.1`, `Q4/qa-expectations`) compte cité en entier (`B28.1` n'est pas `B28.10`), pour un lot `L<n>`
+ * comme pour un autre ; un lot d'un autre projet (`cadence:L68`) compte toujours.
  */
-function titleCitesPriorWork(title: string, lot: string, ids: string[]): boolean {
-  if (CITES_FINDING.test(title)) return true;
+function citesPriorWork(text: string, lot: string, ids: string[]): boolean {
+  if (CITES_FINDING.test(text)) return true;
+  if (/(?<![\w-])[a-z][\w-]*:L\d+(?!\w)/i.test(text)) return true;
   const own = /^L(\d+)$/.exec(lot);
-  if (own) return [...title.matchAll(/(?<![\w-])L(\d+)(?!\w)/g)].some((m) => Number(m[1]) < Number(own[1]));
-  const cited = (id: string) => new RegExp(`(?<![\\w.-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`).test(title);
-  return ids.some((id) => id !== lot && cited(id));
+  const cited = (id: string) => new RegExp(`(?<![\\w.-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`).test(text);
+  return ids.some((id) => {
+    if (id === lot) return false;
+    const n = /^L(\d+)$/.exec(id);
+    if (own && n) return Number(n[1]) < Number(own[1]) && cited(id);
+    return cited(id);
+  });
 }
 
 /**
  * Le contrôle préalable ne vaut que pour un lot sans commit (avec des commits, l'implémentation reprend légitimement) dont le
- * titre cite un constat ou un lot antérieur (L288) : sans cela rien ne laisse croire qu'un autre lot l'a déjà livré, et le
- * contrôle coûtait 7 % des tokens pour 10 « oui » sur 30 mesurés (audit du 24-10).
+ * titre ou le goal (clé `goal:` du plan, ou `goal` donné au lancement) cite un constat ou un autre lot (L288, L292) : sans cela
+ * rien ne laisse croire qu'un autre lot l'a déjà livré, et le contrôle coûtait 7 % des tokens pour 10 « oui » sur 30 mesurés
+ * (audit du 24-10).
  */
-export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: string, lot: string, repos: LotRepo[] = []): boolean {
-  return config.precheck && !hasWork(plan, { repo, repos, lot }) && titleCitesPriorWork(plan.lot(lot).title, lot, plan.lots().map((l) => l.id));
+export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: string, lot: string, repos: LotRepo[] = [], goal?: string): boolean {
+  if (!config.precheck || hasWork(plan, { repo, repos, lot })) return false;
+  const l = plan.lot(lot);
+  const text = [l.title, l.goal, goal].filter(Boolean).join('\n');
+  return citesPriorWork(text, lot, plan.lots().map((x) => x.id));
 }
 
 /**
@@ -2086,7 +2099,7 @@ export async function runLot(c: LotCtx): Promise<void> {
         return;
       }
       l.startedSha = (await snapshot(l.repo, { remote: false })).head ?? undefined;
-      l.next = needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos) ? 'precheck' : firstWrite(c);
+      l.next = needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos, l.goal) ? 'precheck' : firstWrite(c);
       save(c);
     }
     while (l.next && !TERMINAL.has(l.status)) {

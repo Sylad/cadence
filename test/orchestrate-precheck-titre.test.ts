@@ -12,6 +12,12 @@ import { writeJournal, writeWave } from './perf-helpers.js';
 const ok: Handler = () => claudeOut(reviewReport());
 const impl: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L2): a')] }));
 const kinds = (h: ReturnType<typeof harness>) => h.calls.map((c) => c.kind);
+const planOf = (lots: { id: string; title: string; goal?: string }[]) => {
+  const repo = gitRepo();
+  const file = join(repo, 'plan.yaml');
+  writeFileSync(file, `version: 1\nproject: demo\nprefix: L\nlots:\n${lots.map((l) => `  - id: ${JSON.stringify(l.id)}\n    title: ${JSON.stringify(l.title)}\n${l.goal ? `    goal: ${JSON.stringify(l.goal)}\n` : ''}    status: todo\n    estimate: 1\n    created: 2026-10-01\n`).join('')}`);
+  return { repo, plan: Plan.load(file) };
+};
 const need = (titles: string[], lot: string, config = { precheck: true }) => {
   const h = harness({ lots: titles.map((title) => ({ title })) });
   return needsPrecheck(config, h.plan(), h.repo, lot);
@@ -69,6 +75,43 @@ describe('orchestrate — précheck conditionnel au titre du lot (L288)', () => 
     plan.save();
     expect(needsPrecheck({ precheck: true }, plan, repo, b)).toBe(true);
     expect(needsPrecheck({ precheck: true }, plan, repo, c)).toBe(false);
+  });
+
+  it('R17 — un lot L<n> dont le titre cite un lot du plan d\'un autre format (Q-CAN5, B28.1, Q4/qa-expectations) déclenche le précheck', () => {
+    for (const id of ['Q-CAN5', 'B28.1', 'Q4/qa-expectations']) {
+      const { repo, plan } = planOf([{ id, title: 'Autre' }, { id: 'L9', title: `Suite de ${id} : la mesure` }]);
+      expect(needsPrecheck({ precheck: true }, plan, repo, 'L9'), id).toBe(true);
+    }
+    const { repo, plan } = planOf([{ id: 'Q-CAN5', title: 'Autre' }, { id: 'L9', title: 'Une mesure sans rapport' }]);
+    expect(needsPrecheck({ precheck: true }, plan, repo, 'L9')).toBe(false);
+  });
+
+  it('R18 — B28.1 cité ne vaut pas pour B28.10 ni B28.100 : seul l\'identifiant entier compte (le point final d\'une phrase n\'est pas une extension)', () => {
+    const lots = (title: string) => planOf([{ id: 'B28.1', title: 'a' }, { id: 'B28.10', title: 'b' }, { id: 'B29', title }]);
+    const needs = (title: string) => { const { repo, plan } = lots(title); return needsPrecheck({ precheck: true }, plan, repo, 'B29'); };
+    expect(needs('Le lot B28.10 seul')).toBe(true);
+    expect(needs('Le lot B28.100 seul')).toBe(false);
+    expect(needs('Fin de B28.1.')).toBe(true);
+    expect(needs('Le lot B28.1x seul')).toBe(false);
+  });
+
+  it('R19 — le goal: du lot (ou l\'objectif donné au lancement) est lu comme le titre : un lot antérieur ou un constat cité compte', () => {
+    const { repo, plan } = planOf([{ id: 'L1', title: 'Premier' }, { id: 'L2', title: 'Titre périmé', goal: 'Suite de L1 : la mesure' }, { id: 'L3', title: 'Autre' }]);
+    expect(needsPrecheck({ precheck: true }, plan, repo, 'L2')).toBe(true);
+    expect(needsPrecheck({ precheck: true }, plan, repo, 'L3')).toBe(false);
+    expect(needsPrecheck({ precheck: true }, plan, repo, 'L3', [], 'Corriger le constat')).toBe(true);
+  });
+
+  it('R20 — « review » compte comme mot, pas dans qa-reviewer ni review-small ; revues, audits, constats comptent', () => {
+    expect(need(['Ajouter un qa-reviewer au lot'], 'L1')).toBe(false);
+    expect(need(['Le pas review-small voit l\'app'], 'L1')).toBe(false);
+    expect(need(['Corriger la review du lot'], 'L1')).toBe(true);
+    expect(need(['Suite des revues'], 'L1')).toBe(true);
+    expect(need(['Les constats du relecteur'], 'L1')).toBe(true);
+  });
+
+  it('R21 — un lot d\'un autre projet cité (cadence:L68) compte comme un lot antérieur, quel que soit le numéro', () => {
+    expect(need(['Premier', 'Reprendre cadence:L68 : la mesure'], 'L2')).toBe(true);
   });
 
   it('R9 — le verdict du précheck est enregistré dans l\'état du lot : oui, partiel, non', async () => {

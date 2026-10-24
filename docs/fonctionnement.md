@@ -22,10 +22,10 @@ while a sub-task is open. A delivery is finished only when its effect checks pas
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="fonctionnement-wave-dark.svg">
-  <img alt="A lot without commits whose title cites a finding or an earlier lot starts with a precheck (unless disabled), then by type through spec, mockup or sheet review and sealed acceptance tests, or straight to the implementation; then the UX pass if visible, the code review, corrections and an automatic raf review" src="fonctionnement-wave-light.svg">
+  <img alt="A lot without commits whose title cites a finding or another lot starts with a precheck (unless disabled), then by type through spec, mockup or sheet review and sealed acceptance tests, or straight to the implementation; then the UX pass if visible, the code review, corrections and an automatic raf review" src="fonctionnement-wave-light.svg">
 </picture>
 
-A lot without commits yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or an earlier lot starts with the **precheck** (unless `orchestrate.precheck: false`; a lot that already has commits, or whose title cites neither, is never pre-checked — L288): is the deliverable already there? « Yes » hands the lot back
+A lot without commits yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (its `goal:` counts like its title) starts with the **precheck** (unless `orchestrate.precheck: false`; a lot that already has commits, or whose title (or `goal:`) cites neither, is never pre-checked — L288): is the deliverable already there? « Yes » hands the lot back
 to the lead; « partial » passes what exists to the implementation. Then:
 
 - `screen: page` only: **spec** (mockup and screen sheet), **mockup review** (`ux-reviewer`, two

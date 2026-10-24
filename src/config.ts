@@ -309,6 +309,11 @@ export interface OrchestrateConfig {
    */
   prodAccess: boolean;
   /**
+   * Un worktree par lot (L279) : deux lots indépendants d'un même dépôt jouent en parallèle, chacun dans son worktree, intégrés un par un à la
+   * branche du dépôt. Défaut : non (une file par dépôt, lots à la suite dans le dépôt).
+   */
+  worktrees: boolean;
+  /**
    * Étape spec (L169, spec etape-spec) : `dir` = dossier des specs d'écran du projet cible, relatif à la racine du dépôt
    * (défaut `docs/specs`, un sous-dossier par écran) ; `render` = commande de rendu des maquettes, donnée à la session de l'étape spec (L171).
    */
@@ -336,11 +341,11 @@ const MODELS = ['haiku', 'sonnet', 'opus'] as const;
 export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'testGate', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, maquette: true, maquetteReviews: 3, fiche: true, precheckLocal: false, prodAccess: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, maquette: true, maquetteReviews: 3, fiche: true, precheckLocal: false, prodAccess: false, worktrees: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -390,6 +395,10 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   if (o.prodAccess != null) {
     if (typeof o.prodAccess !== 'boolean') throw bad('prodAccess : true ou false attendu');
     config.prodAccess = o.prodAccess;
+  }
+  if (o.worktrees != null) {
+    if (typeof o.worktrees !== 'boolean') throw bad('worktrees doit être true ou false');
+    config.worktrees = o.worktrees;
   }
   if (o.testGate != null && o.testGate !== false) {
     const g = o.testGate;

@@ -620,6 +620,7 @@ orchestrate:
   spec: { dir: docs/specs }              # spec step (see « The spec step of a lot with screen: »): folder of the screen specs, relative to the repository (default docs/specs); render: the command the spec session runs to render the mockups at 1440 and 390 px (optional, Playwright otherwise)
   testGate: { code: [src/**] }           # code changed without a test goes to a correction pass before the review (see « Code changed without a test »); absent: no gate
   prodAccess: false                      # default: wave sessions get no access to production (see « Production access of the sessions »); true lifts it for this project
+  worktrees: false                       # default: one lot at a time per repository, in the repository itself; true plays independent lots of one repository in parallel, each in its own git worktree (see « One worktree per lot »)
   effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, maquette, fiche, accept, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default

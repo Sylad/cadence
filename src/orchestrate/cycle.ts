@@ -2,8 +2,8 @@ import { execFileSync, spawn } from 'node:child_process';
 import { parse } from 'yaml';
 import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
-import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
@@ -29,6 +29,7 @@ import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, hypothesisNote, specText, type FicheParts } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
+import { linkIgnored } from './worktree.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
 export const MAX_PASSES = 2;
@@ -153,54 +154,6 @@ async function commitPlan(c: LotCtx, message: string): Promise<string | null> {
  */
 const startSha = (c: LotCtx): string | undefined => lotStartHead(c.lot.repo, lotWork(c.loadPlan(), c.lot.repo, c.lot.lot).map((k) => k.sha)) ?? c.lot.steps.find((s) => s.headBefore)?.headBefore;
 
-/** Dossiers ignorés de sortie de build : jamais liés dans le worktree jetable, une commande de tests qui y écrit toucherait le build du lot. */
-const OUTPUT_DIRS = new Set(['dist', 'build', 'out', 'coverage', 'target', '.next', '.nuxt', '.output', '.angular', '.turbo', '.svelte-kit', '.parcel-cache']);
-
-/**
- * Un `node_modules` dans le worktree de base (L213) : un vrai dossier dont chaque entrée est un lien vers celle du dépôt vivant, SAUF les liens
- * de workspace (npm, pnpm, yarn : `node_modules/@x/shared -> ../../packages/shared`) qui pointent vers du code du dépôt hors de tout
- * `node_modules`. Lier le dossier d'un bloc les ferait résoudre dans le dépôt vivant, donc exécuter le code du lot au lieu de celui du sha de
- * départ ; ils sont refaits vers la copie du worktree (absente au sha de départ : pas de lien). Les dossiers de portée `@x` sont parcourus,
- * pas les paquets. Ajoute chaque lien créé à `links`.
- */
-function mirrorNodeModules(repo: string, dir: string, name: string, links: string[]): void {
-  const repoReal = realpathSync(repo);
-  const workspaceCopy = (live: string): string | null => {
-    let real: string;
-    try {
-      real = realpathSync(live);
-    } catch {
-      return null; // lien mort dans le dépôt vivant : rien à refaire
-    }
-    const rel = relative(repoReal, real);
-    if (!rel || rel.startsWith('..') || isAbsolute(rel) || rel.split(sep).includes('node_modules')) return null;
-    return join(dir, rel);
-  };
-  const link = (target: string, at: string): void => {
-    symlinkSync(target, at);
-    links.push(at);
-  };
-  const mirror = (liveDir: string, to: string, scope: boolean): void => {
-    mkdirSync(to);
-    for (const e of readdirSync(liveDir, { withFileTypes: true })) {
-      const live = join(liveDir, e.name);
-      const at = join(to, e.name);
-      if (e.isSymbolicLink()) {
-        const copy = workspaceCopy(live);
-        if (copy) {
-          if (existsSync(copy)) link(copy, at);
-          continue;
-        }
-      } else if (!scope && e.isDirectory() && e.name.startsWith('@')) {
-        mirror(live, at, true);
-        continue;
-      }
-      link(live, at);
-    }
-  };
-  mirror(join(repo, name), join(dir, name), false);
-}
-
 /**
  * Échecs des tests au sha de départ du lot (L213) : la commande est rejouée dans un worktree jetable de ce sha, hors du dépôt,
  * avec des liens vers les dossiers ignorés de tout niveau (node_modules, .venv… ; `dist` et les autres sorties de build exclus, une commande
@@ -217,19 +170,7 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
   const links: string[] = [];
   try {
     git(l.repo, 'worktree', 'add', '--detach', '-f', dir, sha);
-    // Tous niveaux : en monorepo les dépendances vivent dans packages/*/node_modules. `--directory` ne descend pas dans un dossier ignoré, donc
-    // chaque entrée est le dossier ou fichier ignoré le plus haut ; son parent doit exister au sha de départ (sinon rien où le relier).
-    const ignored = git(l.repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.startsWith('.cadence') && !f.split('/').some((p) => OUTPUT_DIRS.has(p)));
-    for (const name of ignored) {
-      const to = join(dir, name);
-      if (existsSync(to) || !existsSync(dirname(to))) continue;
-      if (basename(name) === 'node_modules' && lstatSync(join(l.repo, name)).isDirectory()) {
-        mirrorNodeModules(l.repo, dir, name, links);
-        continue;
-      }
-      symlinkSync(join(l.repo, name), to);
-      links.push(to);
-    }
+    links.push(...linkIgnored(l.repo, dir));
     const r = await sh(c, command, 30 * 60_000, {}, dir);
     const failures = r.code === 0 ? [] : failedTests(r.output);
     l.baseline = { sha, command, failures, verified: true };

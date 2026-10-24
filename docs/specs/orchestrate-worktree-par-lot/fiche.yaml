@@ -113,10 +113,10 @@ regles:
     tests: ["R2 — dépôt en HEAD détaché : lots à la suite et avertissement", "R2 — deux lots partageant un voisin : même file, aucun worktree", "R2 — un lot seul d'un dépôt : joué dans le dépôt, pas de worktree"]
   - id: R3
     cas: [C1]
-    enonce: "Le parallélisme interne à un dépôt est borné par le plafond de sessions de la vague (--max-sessions) : au plus ce nombre de lots du groupe jouent en même temps, un lot sans créneau attend sans être rendu et sans worktree : son worktree n'est créé qu'à la prise du créneau."
+    enonce: "Le parallélisme interne à un dépôt est borné par le plafond de sessions de la vague (--max-sessions) : au plus ce nombre de lots du groupe jouent en même temps, un lot sans créneau attend sans être rendu et sans worktree : son worktree n'est créé qu'à la prise du créneau. Le mode par défaut reste inchangé : le registre des vagues ne reçoit les files (lanes) que lorsqu'un lot joue dans un worktree, sinon les créneaux libres restent min(plafond, dépôts tenus), voisins compris."
     statut: sourcee
     source: "demande du lot : « avancent en parallèle dans la limite des créneaux » ; plafond command.ts:111-112 et pool.ts:5"
-    tests: ["R3 — trois lots indépendants d'un dépôt, plafond 2 : jamais plus de deux sessions simultanées", "R3 — plafond 1 : les lots s'enchaînent, aucun refus", "R3 — un lot en attente de créneau n'a ni worktree ni branche créés"]
+    tests: ["R3 — trois lots indépendants d'un dépôt, plafond 2 : jamais plus de deux sessions simultanées", "R3 — plafond 1 : les lots s'enchaînent, aucun refus", "R3 — un lot en attente de créneau n'a ni worktree ni branche créés", "R3 — vague sans worktrees avec un lot à dépôt voisin : aucune file écrite, créneaux = min(plafond, dépôts tenus) comme avant L279"]
   - id: R4
     cas: [C1]
     enonce: "Un lot qui dépend d'un lot du même dépôt (dependsOn) attend que celui-ci soit ready (état atteint seulement après son intégration, R22) avant de créer son worktree, qui part alors du sommet de la branche du dépôt ; un prédécesseur rendu ou en échec le rend aussi, comme aujourd'hui."

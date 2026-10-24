@@ -917,8 +917,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const repos = [...new Set(lots.flatMap(lotRepoPaths))];
   /** Libère un dépôt : son verrou et sa garde de push (L132 : dès que ses lots sont finis, pas à la fin de la vague). */
   const freed = new Set<string>();
-  /** Lots que la vague joue à la fois sur les dépôts qu'elle tient encore (un par dépôt, un par lot en worktree) : ce que le registre compte pour les créneaux libres. */
-  const lanes = () => groupLots(ctxs).filter((g) => g.every((c) => lotRepoPaths(c.lot).every((r) => !freed.has(r)))).reduce((n, g) => n + (g.every((c) => c.tree) ? g.length : 1), 0);
+  /** Lots que la vague joue à la fois sur les dépôts qu'elle tient encore (un par dépôt, un par lot en worktree) : ce que le registre compte pour les créneaux libres. Absent (undefined) tant qu'aucun lot ne joue dans un worktree : le calcul reste celui des dépôts tenus. */
+  const lanes = (): number | undefined => ctxs.some((c) => c.tree) ? groupLots(ctxs).filter((g) => g.every((c) => lotRepoPaths(c.lot).every((r) => !freed.has(r)))).reduce((n, g) => n + (g.every((c) => c.tree) ? g.length : 1), 0) : undefined; // hors mode worktree, rien n'est écrit : le registre compte les dépôts tenus, comme avant L279
   const freeRepo = (r: string) => {
     freed.add(r);
     const file = join(sharedStateDir(r), REPO_LOCK);

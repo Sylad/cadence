@@ -83,6 +83,23 @@ describe('R3 — les créneaux libres comptent les lots en parallèle', () => {
   });
 });
 
+describe('R3 — mode par défaut inchangé : le registre ne reçoit pas de files', () => {
+  it('R3 — vague sans worktrees avec un lot à dépôt voisin : aucune file écrite, créneaux = min(plafond, dépôts tenus) comme avant L279', async () => {
+    const { parent } = setup([{ title: 'un', repos: ['../voisin'] }], '');
+    neighbour(parent);
+    const seen: { lanes: number | undefined; repos: number; free: number }[] = [];
+    const f = fake({
+      implement: writes(async () => {
+        const w = liveWaves(cadenceHome())[0]!;
+        seen.push({ lanes: w.lanes, repos: w.repos.length, free: freeSlots([w], 3) });
+      }),
+    });
+    const r = await run(parent, ['a:L1', '--max-sessions', '3'], f);
+    expect(r.code).toBe(0);
+    expect(seen).toEqual([{ lanes: undefined, repos: 2, free: 1 }]); // 3 - min(3, 2 dépôts tenus), pas 3 - min(3, 1)
+  });
+});
+
 describe('R15 — les gardes de dépôt valent pour chaque worktree', () => {
   it('R15 — un push depuis un worktree de lot arrête la vague (incident)', async () => {
     const { parent, repo } = setup();

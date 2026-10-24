@@ -59,7 +59,10 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   secrets are masked** (`***`) in the reason and in those lines before the file is written:
   known token shapes (GitHub, GitLab, npm, Slack, AWS key id, `sk-…`), `Bearer`/`Basic`
   values, `user:password@` in a URL, and any `NAME=value` (shell variable or URL query
-  parameter) whose name has a word such as token, secret, password, key, auth, signature.
+  parameter) whose name has a word such as token, secret, password, key, auth, signature, or
+  ends with one of token, secret, password, key, credential, signature (`APIKEY`, `ACCESSTOKEN`,
+  `GITHUBTOKEN`). A quoted value never closed (cut by the 8192 characters kept, or spread over
+  several lines) is masked up to the end of the line (L294).
   This is a list of likely patterns, not a guarantee: a secret of another shape printed by a
   command can still land in the log, which stays local (`<git common dir>/cadence/`). `cadence perf` reads classes and projects from it
   ([perf](perf.md#delivery-quality-and-the-tour-header-l227)); a line written before L282

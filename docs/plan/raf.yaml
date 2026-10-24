@@ -3183,9 +3183,10 @@ lots:
     finished: 2026-10-24
   - id: L281
     title: "deliver : CADENCE_DEPLOYED_FILE n'accepte qu'un sha hexadécimal — un script qui écrit HEAD ou un nom de branche voit sa révision résolue APRÈS le script, au commit d'un autre (mesuré : feat(L9) journalisé « sha déclaré par le script ») ; test (revue L277)"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-10-23
+    started: 2026-10-24
   - id: L282
     title: "deliver : deliveries-failed.log garde la raison de l'échec (dernières lignes de sortie du script, de la CI ou des contrôles, bornées) et une classe (refus avant action, CI, déploiement, vérification) ; cadence perf ventile les livraisons rouges par classe et par projet ; tests. Mesure 24-10 : 25 rouges sur 17–23-10 (14 maritime « livrer.sh code 1 »), cause illisible — décision Sylvain 24-10"
     status: todo

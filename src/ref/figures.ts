@@ -128,7 +128,7 @@ const TRAILING_DIGITS = /^(.*\D)?(\d+)$/;
 function expand(from: string, to: string): Named[] {
   const a = TRAILING_DIGITS.exec(from);
   const b = TRAILING_DIGITS.exec(to);
-  if (b && b[1] === undefined && (!a || a[1] !== undefined)) return [named(from)];
+  if (b && b[1] === undefined && a && a[1] !== undefined) return [named(from)];
   if (!a || !b || (a[1] ?? '') !== (b[1] ?? '')) return [named(from), named(to)];
   const [lo, hi] = [Number(a[2]), Number(b[2])];
   if (hi < lo || hi - lo >= 50) return [named(from), named(to)];
@@ -204,7 +204,9 @@ export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = n
       for (const m of l.text.matchAll(REFERENCE)) {
         // la légende ne se cite pas elle-même
         if (own && m.index === 0) continue;
-        if (labelOf(m[1]!, '').kind === 'figure' && CODE_FIGURE.test(l.text.slice(0, m.index))) continue;
+        // « code » peut finir la ligne précédente : l'extrait PDF coupe les lignes, pas le texte
+        const before = l.text.slice(0, m.index);
+        if (labelOf(m[1]!, '').kind === 'figure' && CODE_FIGURE.test(before.trim() === '' ? `${p.lines[i - 1]?.text ?? ''} ${before}` : before)) continue;
         for (const { num, interior } of numbersOf(m[1]!, m[2]!)) {
           const { label } = labelOf(m[1]!, num);
           const fig = figures.get(key(label));

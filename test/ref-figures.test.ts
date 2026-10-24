@@ -169,6 +169,24 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.unresolved).toEqual([{ label: 'Figure 2', page: 2, extrait: 'Figure 2 Wind' }]);
   });
 
+  it("R10 — « code » qui termine la ligne précédente précède la référence : l'extrait PDF coupe les lignes, pas le texte", () => {
+    const idx = indexText([
+      page(1, 'values reported using code', 'figures 2, 3 and 9.', 'see Figure 3 for the codes', 'a code', 'Figure 7 shows'),
+      page(2, 'Figure 3 Station model', 'Figure 2 Wind', 'Figure 7 Jets'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([['Figure 3', [3]], ['Figure 2', []], ['Figure 7', []]]);
+    expect(idx.unresolved).toEqual([{ label: 'Figure 2', page: 2, extrait: 'Figure 2 Wind' }, { label: 'Figure 7', page: 2, extrait: 'Figure 7 Jets' }]);
+  });
+
+  it('R1 — une plage dont la première borne finit par une lettre garde sa seconde borne nue : « Figures 2b to 3 » cite la Figure 2b et la Figure 3', () => {
+    const idx = indexText([
+      page(1, 'see Figures 2b to 3', 'and Figures 1.B to 2', 'then Figures 5b–6'),
+      page(2, 'Figure 2b Wind', 'Figure 3 Jets', 'Figure 1.B Sea', 'Figure 2 Swell', 'Figure 5b Ice', 'Figure 6 Fog'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.length])).toEqual([['Figure 2b', 1], ['Figure 3', 1], ['Figure 1.B', 1], ['Figure 2', 1], ['Figure 5b', 1], ['Figure 6', 1]]);
+    expect(idx.unresolved).toEqual([]);
+  });
+
   it("les numéros d'annexe des normes OMM gardent leur lettre : « Figure 1.B.1 » n'est pas la Figure 1", () => {
     const idx = indexText([
       page(1, 'See Figure 1.D.5 and Figures 1.B.1 and 1.B.2.', 'Voir Table 12.B.3.'),

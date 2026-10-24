@@ -54,8 +54,8 @@ export interface AddOptions {
   out: (line: string) => void;
 }
 
-/** `cadence ref add` : enregistre un PDF, rend les pages visées, garde le texte positionné et les images, construit l'index des figures. */
-export function add(o: AddOptions): void {
+/** `cadence ref add` : enregistre un PDF, rend les pages visées, garde le texte positionné et les images, construit l'index des figures. Rend le dossier du document. */
+export function add(o: AddOptions): { slug: string; docDir: string; doc: StoredDocument } {
   // Les outils d'abord : sans eux, rien n'est lu ni écrit.
   const tools = requireTools(o.env);
   const file = resolve(o.cwd, o.document);
@@ -123,4 +123,5 @@ export function add(o: AddOptions): void {
   o.out(`liens non résolus : ${index.unresolved.length}`);
   o.out(`dossier : ${docDir}`);
   if (ordered.length === 0) o.out(`aucune page rendue (grand document : seul l'index est construit) — cadence ref add ${o.document} --slug ${slug} --sections 3-5 pour rendre des pages`);
+  return { slug, docDir, doc };
 }

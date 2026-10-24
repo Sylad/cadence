@@ -7,7 +7,7 @@ tables drawn as pictures, message templates, figures of a norm (WMO, ICAO…). `
 turns such a document into files a session can read without losing the pictures. The whole
 design is in
 [`docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md`](superpowers/specs/2026-10-23-ref-documents-de-reference-design.md)
-(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) **`cadence ref check`** with the inventory schema (lot 3 of 10), and **`cadence ref eval`** (lot 4 of 10, with the synthetic corpus `cadence ref corpus`).
+(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) **`cadence ref check`** with the inventory schema (lot 3 of 10), **`cadence ref eval`** (lot 4 of 10, with the synthetic corpus `cadence ref corpus`) and **`cadence ref analyse`** (lot 5 of 10: the `reference-analyst` agent, one single reading).
 
 ## `cadence ref add <document.pdf> [--sections 3-5,9] [--slug name]`
 
@@ -272,6 +272,47 @@ opacity are exactly the traps of those cases.
 A reading whose `document.slug` or `document.sha256` differs from the expected one is refused (never a measure over two versions
 mixed). Exit codes: **0** done, **2** refusal (wrong call, file absent or unreadable, invalid reading, other document, folder with
 no `attendu.json`). `--json` prints one object: `total`, `types`, `pieges`, `tokens`, `cas`.
+
+## `cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug name] [--model sonnet|opus|haiku]`
+
+The whole chain **in a single reading** (the baseline that the double reading of the next lots is measured against, design §« Mesure »): `add`, then **one fresh session** of the
+[`reference-analyst`](../agents/reference-analyst.md) agent (`claude -p`, model `sonnet` unless `--model` says otherwise, effort and permission mode of `orchestrate`
+in `cadence.yaml`, a working directory that is the document folder), then the program checks what the session wrote. The agent looks at every rendered page whole, then every zone at full resolution, measures
+with `cadence ref measure`, copies every text verbatim, links every figure to the passages that cite it (`confirme`, `precise`, `contredit`), writes what the document does not show as a `silence`,
+marks `incertain` (with its cause) what it cannot read for sure, and writes **`<references.dir>/<slug>/lectures/a.json`**: a reading (`genre: "lecture"`) in the format of
+[`templates/inventaire.json`](../templates/inventaire.json), validated by `cadence ref check` before it hands back. The brief names the document folder, the rendered pages, the file to write, the model and the two commands; it never names an expected inventory or a corpus,
+and the agent is told never to look for one. The session needs `claude` on the `PATH` (or `CADENCE_CLAUDE_BIN`) and the system tools of `ref add`.
+
+**The program does not trust the report.** Once the session is back it reads `lectures/a.json` itself: the file must exist (the one of an earlier run is removed before the session starts), pass `ref check`, be a `lecture`
+and carry the `slug` and `sha256` of the document that was read, never another (a reading of two versions mixed is refused). Then it writes **`usage`** into the file —
+`{ tokens, modele, session }`, `tokens` being the input, cache-write and output tokens of the session (the count of the orchestrate budget; cache reads are left out), which the agent never writes — so that
+`ref eval` reads the tokens per page from the file.
+
+**Declared ceiling: 20 pages per reading** (`LECTURE_PAGES_MAX`, design §5 « Taille »). The pages read are the pages rendered by `add` (those of `--sections`, plus the pages of the figures they cite,
+plus those rendered by an earlier `add` of the same document). More than 20 is refused before any session (exit 2, the count and `--sections` to choose fewer), and so is a large document with no
+`--sections` (no page rendered); the pages `add` rendered stay. Splitting into several readings is not done here (lot 6 and after).
+
+```
+$ cadence ref analyse norme.pdf --sections 4-9
+norme : norme.pdf
+pages : 120
+rendues : 7 (4, 5, 7, 8, 9, 33, 34)
+…
+norme : lecture unique (sonnet) — 7 pages lues (plafond d'une lecture : 20)
+lecture : ~/.local/share/cadence/references/norme/lectures/a.json
+éléments : 41 (mesure : 6, lu : 32, incertain : 3)
+tokens : 182000 (26000 par page, 7 pages lues)
+question : Que veut dire « Figure 1 » ?
+```
+
+The last line is one `question :` per question of the agent (a `contredit`, an `incertain`). Exit codes: **0** a valid reading, **1** a refused reading (no file, `ref check` deviations, wrong genre, wrong document: one
+`✗ <reason>` line then `N écart(s)` on the standard output, the file is left as written, without `usage`), **2** refusal (unknown `--model`, no page or more than 20, tool or file as for `add`, a session that
+failed: `la session de lecture a échoué : <cause>`), **3** quota reached (message on the error output, no reading; run it again later). The tokens per page of the output divide by the pages **read**; `ref eval` divides by the `pages` of the expected inventory,
+the same number for a corpus case read whole.
+
+### Reference measure on the corpus
+
+`docs/mesures/ref-lecture-unique-2026-10-24.md` states what the single reading is measured on and with which commands (recall, false « read », tokens per page against the corpus of `ref corpus`, the declared ceiling), and what was measured.
 
 ## `cadence ref corpus <dossier> [--sans-rendu]`
 

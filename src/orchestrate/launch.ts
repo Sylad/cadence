@@ -18,7 +18,8 @@ export type Model = 'sonnet' | 'opus' | 'haiku';
 export type StepModel = Model | 'local';
 
 export interface StepSpec {
-  kind: SessionKind;
+  /** Une étape d'une vague, ou `ref` : la lecture de `cadence ref analyse`, lancée hors vague par la même mécanique de session. */
+  kind: SessionKind | 'ref';
   /** Identifiant de la session (uuid), passé à `claude --session-id` : son journal se retrouve sans deviner. */
   sessionId: string;
   brief: string;
@@ -202,7 +203,7 @@ export type SessionOutcome =
   | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string; firstStdout?: string; relaunched?: Relaunched; /** Vrai quand la session a été coupée (signal, sortie vide), y compris après sa relance : ni un quota, ni un échec ordinaire. */ cut?: boolean };
 
 /** Étapes en lecture seule : seules relancées à neuf après une coupure (une étape d'écriture a pu laisser un travail à moitié fait). */
-const READ_ONLY: ReadonlySet<SessionKind> = new Set(['review', 'review-small', 'ux', 'precheck', 'maquette', 'fiche']);
+const READ_ONLY: ReadonlySet<StepSpec['kind']> = new Set(['review', 'review-small', 'ux', 'precheck', 'maquette', 'fiche', 'ref']);
 
 /** Session tuée par un signal (code 128 + n : 143 SIGTERM, 137 SIGKILL…) sans rien écrire : la coupure, ni un quota (un message) ni un échec (une sortie). */
 const isCut = (out: LaunchOutcome): boolean => !out.timedOut && out.code > 128 && out.stdout.trim() === '';

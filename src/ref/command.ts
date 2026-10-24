@@ -3,7 +3,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { RafError } from '../plan.js';
+import { AGENTS_DIR } from '../skills.js';
+import { realClaude, readAgents } from '../orchestrate/launch.js';
 import { add } from './add.js';
+import { analyse } from './analyse.js';
 import { checkInventaire, readInventaire, summaryInventaire } from './check.js';
 import { buildCorpus } from './corpus.js';
 import { chargerPlaywright, lancer, rendre } from './corpus-render.js';
@@ -12,19 +15,24 @@ import { measure } from './measure.js';
 import { referencesDir } from './store.js';
 
 const USAGE_ADD = 'usage : cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]';
+const USAGE_ANALYSE = 'usage : cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug nom] [--model sonnet|opus|haiku]';
 const USAGE_CHECK = 'usage : cadence ref check <inventaire.json | lecture.json>';
 const USAGE_EVAL = 'usage : cadence ref eval <attendu.json | dossier> <lecture.json | dossier> [--json]';
 const USAGE_CORPUS = 'usage : cadence ref corpus <dossier> [--sans-rendu]';
 const USAGE_MEASURE = 'usage : cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]';
 
 /** `cadence ref <sous-verbe> …` : les documents de référence (issue #14) ; `check` valide un inventaire ou une lecture. */
-export function refCommand(rest: string[], values: { sections?: string; slug?: string; config?: string; 'sans-rendu'?: boolean; quoi?: string; largeur?: string; json?: boolean }, root: string, io: Io): number | Promise<number> {
+export function refCommand(rest: string[], values: { sections?: string; slug?: string; model?: string; config?: string; 'sans-rendu'?: boolean; quoi?: string; largeur?: string; json?: boolean }, root: string, io: Io): number | Promise<number> {
   const [verb, ...args] = rest;
   const configPath = resolve(io.cwd, values.config ?? join(root, 'cadence.yaml'));
   const refsDir = (): string => referencesDir(root, configPath, io.env);
   if (verb === 'add' && args.length === 1) {
     add({ document: args[0]!, slug: values.slug, sections: values.sections, env: io.env, cwd: io.cwd, refsDir, now: io.now(), out: io.out });
     return 0;
+  }
+  if (verb === 'analyse' && args.length === 1) {
+    const claude = realClaude(io.env.CADENCE_CLAUDE_BIN || 'claude', io.env);
+    return analyse({ document: args[0]!, slug: values.slug, sections: values.sections, model: values.model, env: io.env, cwd: io.cwd, refsDir, configPath, now: io.now(), out: io.out, err: io.err, claude, agents: readAgents(AGENTS_DIR) });
   }
   if (verb === 'measure' && args.length === 3) {
     measure({ slug: args[0]!, page: args[1]!, zone: args[2]!, quoi: values.quoi, largeur: values.largeur, env: io.env, refsDir, json: values.json === true, out: io.out });
@@ -50,7 +58,7 @@ export function refCommand(rest: string[], values: { sections?: string; slug?: s
   }
   if (verb === 'corpus' && args.length === 1) return corpus(resolve(io.cwd, args[0]!), values['sans-rendu'] === true, io);
   const others = (u: string) => u.replace('usage : ', '');
-  throw new RafError(verb === 'add' ? USAGE_ADD : verb === 'measure' ? USAGE_MEASURE : verb === 'check' ? USAGE_CHECK : verb === 'eval' ? USAGE_EVAL : verb === 'corpus' ? USAGE_CORPUS : `${USAGE_ADD}\n       ${others(USAGE_MEASURE)}\n       ${others(USAGE_CHECK)}\n       ${others(USAGE_EVAL)}\n       ${others(USAGE_CORPUS)}`);
+  throw new RafError(verb === 'add' ? USAGE_ADD : verb === 'analyse' ? USAGE_ANALYSE : verb === 'measure' ? USAGE_MEASURE : verb === 'check' ? USAGE_CHECK : verb === 'eval' ? USAGE_EVAL : verb === 'corpus' ? USAGE_CORPUS : `${USAGE_ADD}\n       ${others(USAGE_ANALYSE)}\n       ${others(USAGE_MEASURE)}\n       ${others(USAGE_CHECK)}\n       ${others(USAGE_EVAL)}\n       ${others(USAGE_CORPUS)}`);
 }
 
 /** `ref corpus <dossier>` : un sous-dossier par piège (document.html, attendu.json, puis document.pdf et page-<n>.png sauf --sans-rendu). */

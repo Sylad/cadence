@@ -65,6 +65,13 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   document behind the lot; the lead calls it by hand. A document outside the repository only when the project's
   `cadence.yaml` names it (`docs.articles`): the agent then proposes a lot for that repository's plan and never writes it
   ([news](news.md#the-librarian-doc-keeper)).
+- **reference-analyst** (agent, L265): given the folder of a document registered by `cadence ref add` and the file to
+  write, it looks at every rendered page whole, then every zone at full resolution, measures with `cadence ref measure`
+  (never by eye), copies every text verbatim, links each figure to the passages that cite it and writes one reading in
+  the format of `templates/inventaire.json`, validated by `cadence ref check`; what it cannot read for sure is
+  `incertain` with its cause, what the document does not show is a `silence`. Its tools are `Read`, `Write`, `Bash`,
+  `Grep`, `Glob`: it writes only its reading, never the tokens (the program counts them), never an expected inventory.
+  `cadence ref analyse` launches it ([ref](ref.md#cadence-ref-analyse-documentpdf---sections-3-59---slug-name---model-sonnetopushaiku)).
 - **qa-reviewer** (agent): any web app (read-only like `ux-reviewer`: same tool list, no `Edit`, no `Write`); given a repository and a base URL (and
   optionally a lot id, to walk only the pages it touched — those that call the
   changed endpoints, those of the screens it changed, the pages that consume the services the lot changed,

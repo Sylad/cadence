@@ -96,7 +96,7 @@ The final review is always played; the budget bounds the writing passes. A `scre
 
 - **Session cap.** As many sessions or subagents running at once as the cap (2 by default, set by the
   human with `CADENCE_MAX_SESSIONS` or `--max-sessions`). The lead never raises it itself.
-- Never two sessions in the same repository at the same time — except in a wave with `orchestrate.worktrees: true`, where two independent lots of one repository play at once, each in its own worktree and on its own branch ([docs/orchestrate.md](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279)).
+- Never two sessions in the same repository at the same time. (An experimental worktree mode, `orchestrate.worktrees: true`, would let two independent lots of one repository play at once; it is refused without `CADENCE_EXPERIMENTAL_WORKTREES=1`, lots L299–L301 to do before it is enabled — [docs/orchestrate.md](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279).)
 - A session cannot ask the human anything: it stops and reports, and the lead brings the question back.
 - A sealed acceptance test that contradicts its sheet is corrected by the lead with
   `cadence spec reseal <lot> <test> --reason "…"`, never by editing `acceptation.json`.

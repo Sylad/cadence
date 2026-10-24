@@ -134,7 +134,7 @@ keeps its `/` (`maritime-atlas:Q4/accueil-4-ux12@haiku`); this holds for `--dry-
 same for the lot folder and the dry-run briefs); ids without `/` are unchanged.
 
 You choose the lots; the order is the order given (one queue per repository, as many repositories at the
-same time as the session cap allows — 2 by default; with `orchestrate.worktrees: true` the lots of one repository play in parallel, each in its own worktree, within the same cap — « One worktree per lot »). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
+same time as the session cap allows — 2 by default; the experimental `orchestrate.worktrees: true` mode, refused without `CADENCE_EXPERIMENTAL_WORKTREES=1` (lots L299–L301 to do before activation), would play the lots of one repository in parallel, each in its own worktree — « One worktree per lot »). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
 lot (default Sonnet; reviews are Opus, except the light review below; Haiku only when you write it, for a mechanical lot). Run it
 in the background and read `--status`: it prints one line per transition and the final table.
 
@@ -452,7 +452,7 @@ rollback, the older ones are removed only once they are more than 7 days old, co
 
 > **Experimental, not enabled.** This mode is infrastructure that two code reviews found defective at the core (lots L299, L300 and L301 of the plan
 > carry the fixes). Until they are done, `orchestrate.worktrees: true` is **refused** by `cadence orchestrate` (exit 2, before acting, `--dry-run`
-> included) with a message naming those lots, unless the environment variable `CADENCE_EXPERIMENTAL_WORKTREES=1` is set — which only the tests of the
+> included) with a message naming those lots — on start **and on resume** (`--resume`, `--integrate`, `--replay`, `--continue`: a resumed lot whose configuration asks for worktrees, or whose `cadence/<wave>/…` branch is to be found again, is refused before anything is written: wave state, registry, git) — unless the environment variable `CADENCE_EXPERIMENTAL_WORKTREES=1` is set — which only the tests of the
 > mode do. The default mode (key absent or `false`) is unchanged. What follows describes the mode as built.
 
 By default a wave plays the lots of one repository one after the other, in the repository itself: a lot with four correction passes

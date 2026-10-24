@@ -97,10 +97,20 @@ describe('cadence ref eval — rappel, précision, faux lu, tokens par page', ()
     expect(r.json.types.table).toMatchObject({ justes: 0, faux_lu: 0 });
   });
 
-  it('R7 — l’identité d’un élément ignore ses id, sa zone et la casse : deux lectures indépendantes numérotent à leur façon', () => {
-    const lue = [texte(7, 'TITRE', { source: { page: 3, zone: { x: 1, y: 1, l: 5, h: 5 } } }), ...ATTENDU.elements.filter((e: Obj) => e.type !== 'texte')];
+  it('R7 — l’identité d’un élément ignore ses id et sa zone, et la casse d’un rôle ou d’un contenu : deux lectures indépendantes numérotent à leur façon', () => {
+    const lue = [texte(7, 'Titre', { source: { page: 3, zone: { x: 1, y: 1, l: 5, h: 5 } } }), ...ATTENDU.elements.filter((e: Obj) => e.type !== 'texte' && e.type !== 'composant'), composant(9, 'VALIDER')];
     const r = evaluer(ATTENDU, doc('lecture', lue), ['--json']);
     expect(r.json.types.texte).toMatchObject({ justes: 1, rappel: 1 });
+    expect(r.json.types.composant).toMatchObject({ justes: 1, rappel: 1 });
+  });
+
+  it('R7 — la casse d’un texte compte (verbatim) : `120 KT` lu `120 kt` est un faux lu ; les blancs répétés ne comptent pas', () => {
+    const att = doc('inventaire', [ecran, texte(1, '120 KT', { role: 'etiquette-figure' })]);
+    const kt = evaluer(att, doc('lecture', [ecran, texte(1, '120 kt', { role: 'etiquette-figure' })]), ['--json']);
+    expect(kt.json.types.texte).toMatchObject({ attendus: 1, lus: 1, justes: 0, faux_lu: 1, rappel: 0 });
+    expect(evaluer(att, doc('lecture', [ecran, texte(1, '120 kt', { role: 'etiquette-figure' })])).out).toContain('faux lu : 50 % (1/2 sûrs)');
+    const blancs = evaluer(att, doc('lecture', [ecran, texte(1, '120   KT', { role: 'etiquette-figure' })]), ['--json']);
+    expect(blancs.json.types.texte).toMatchObject({ justes: 1, faux_lu: 0, rappel: 1 });
   });
 
   it('R8 — un élément attendu n’est apparié qu’une fois : deux lectures identiques font un élément en trop', () => {

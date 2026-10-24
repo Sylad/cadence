@@ -59,6 +59,8 @@ const norm = (v: unknown): string => {
   const s = String(v ?? '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
   return /^-?\d+(\.\d+)?$/.test(s) ? String(Number(s)) : s;
 };
+/** Le libellé d'un `texte` est verbatim : seuls les blancs sont normalisés, la casse compte (`120 KT` n'est pas `120 kt`). */
+const normTexte = (v: unknown): string => String(v ?? '').normalize('NFC').replace(/\s+/g, ' ').trim();
 const noms = (xs: unknown, cle: string): string[] => (Array.isArray(xs) ? xs.map((x) => norm((x as Obj)?.[cle])) : []);
 
 /** Ce qui désigne un élément, indépendamment de son id, de sa zone et de sa confiance : deux lectures indépendantes numérotent à leur façon. */
@@ -75,6 +77,7 @@ function identite(e: Obj, parId: Map<string, Obj>): string {
     case 'etat':
       return `${norm(e.nom)}>${cible(e.cible)}`;
     case 'texte':
+      return normTexte(e.libelle);
     case 'statut':
       return norm(e.libelle);
     case 'jeton':

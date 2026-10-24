@@ -215,7 +215,7 @@ inventory (`genre: "inventaire"`), `lecture` a reading or an inventory of the sa
 `<cas>/lecture.json`; a case without a reading counts as read with nothing (recall 0) and is named under `sans lecture`.
 
 An element read is matched to an expected one **by type and identity**, never by id or zone (two independent readings number
-their elements their own way; case and blanks inside a text do not count): `texte` and `statut` by `libelle`, `composant` by
+their elements their own way; blanks inside a text do not count, and the case does not either, except for a `texte`, which is verbatim: `120 KT` is not `120 kt`): `texte` and `statut` by `libelle`, `composant` by
 `role` and `contenu`, `etat` by `nom` and the identity of its target, `jeton` by `categorie` and `valeur` (a colour is compared as
 written), `table` by `colonnes`, `gabarit` by `nom`, `schema` by the labels of its nodes, `lien` by `figure`, `silence` by
 `question`, `ecran` (one per document). An expected element is matched once. The matched element is **juste** if it also says the

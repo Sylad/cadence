@@ -3507,10 +3507,14 @@ lots:
     finished: 2026-10-24
   - id: L311
     title: "orchestrate worktrees : la reprise d'une branche conservée (L301) ne repasse pas par le précheck — les commits du lot lui-même lui font dire « livrable déjà présent » et le lot est rendu sans que le majeur de sa dernière revue soit corrigé (vécu essai 2 de L310, 24-10 : L309 rendu en 3 min, précheck local « oui » confirmé par Sonnet) ; un lot repris de sa branche repart à la correction avec les constats de sa dernière revue (ou à la revue s'il n'en a pas) ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme : 0 bloquant, 0 majeur, 1 mineur (libellé overBudget faux pour un lot repris jamais revu, cycle.ts:982 → L315) ; majeur précédent (pass/MAX_PASSES à la reprise) réglé par 84fdbe9 — revue Opus neuve, correction à la main après la vague 2026-10-24-2235", commit: 84fdbe932072469a5906dd207d72b4077764a18d }
+    notes:
+      - { date: 2026-10-24, text: "Non vérifié (revue) : après un SIGKILL entre planTrees (branche renommée) et la première sauvegarde du lot, une --resume trouverait la branche renommée sans resumedFrom et repasserait par le précheck ; état illisible de l'ancienne vague (autre dossier de lancement) non couvert par un test." }
+    finished: 2026-10-24
   - id: L312
     title: "perf (⚠ tendance deux fenêtres, tour du lead 24-10 soir, décision Sylvain) : tokens par lot en hausse à estimate 0.25 (médiane 150,0 k contre 116,6 k, +29 %) et 0.5 (440,6 k contre 318,7 k, +38 %) alors que la part conforme du premier coup monte (61 % contre 39 %) — ventiler la hausse par étape (precheck, implement, review/review-small, fix), par modèle et par projet sur les deux fenêtres ; recaler ce que la mesure justifie (budgets par catégorie de docs/orchestrate.md « Each lot also has its own budget », grille d'estimate de raf add et du brief du lead) et rien d'autre ; si la hausse vient d'une qualité achetée (revue Opus, passes de mineurs) et pas d'une estimate fausse, le conseil « l'estimate est mal calibrée » de cadence perf ne doit plus sortir seul : il cite l'étape qui porte la hausse ; mesure avant/après et conclusion en note ; tests"
     status: done
@@ -3539,6 +3543,11 @@ lots:
     notes:
       - { date: 2026-10-24, text: "Mineur de revue : la ligne de journal « conflit d'ajout pur résolu » (cycle.ts:2265) n'est atteinte par aucun test d'integrateLot." }
     finished: 2026-10-24
+  - id: L315
+    title: "orchestrate overBudget : un lot repris de sa branche et jamais revu (resumedReviewed faux) est rendu avec la cause « tests rouges après la dernière revue de la branche reprise » au lieu de « après l'implémentation » (cycle.ts:982, revue L311) ; conditionner le libellé à resumedReviewed ; test des deux libellés"
+    status: todo
+    estimate: 0.05
+    created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

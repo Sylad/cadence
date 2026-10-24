@@ -171,6 +171,25 @@ orchestrate:
 
 `full` is also the model of the UX review and of the single pass of a small lot that is not light.
 
+**Code changed without a test (L287)**: before any review session, the program checks the diff of the lot (every commit that
+cites it, all sessions included). If it touches code (`testGate.code`, minus `testGate.except`) without touching a single test
+file (`testGate.tests`), the lot goes straight to a correction pass — no review session is spent finding what a file list
+already shows (a missing test was 32 % of the major findings of the 24-10 audit, one pass ≈ 190 k tokens). The pass counts
+as one of the two correction passes, its brief names the files, and the gate plays once per lot: if the correction adds no
+test, the review goes ahead and judges it. It does not play during the minors pass, nor when the two passes are already used
+(a warning says so). Absent key: no gate.
+
+```yaml
+orchestrate:
+  testGate:
+    code: [src/**, bin/*.js]       # required: patterns of the code files (same patterns as docs.sync, `!…` excludes)
+    tests: ['**/*.test.*', '**/*.spec.*', 'test/**', 'tests/**', '**/__tests__/**']   # default: one touched test file lifts the gate
+    except: [src/**/*.d.ts]        # code files that need no test (types, configuration, migrations…); default none
+    threshold: 1                   # default 1: how many code files (after exceptions) before the gate plays
+```
+
+`testGate: false` is the same as no key.
+
 **Effort level per pass** (L137). Each session is launched with `claude -p --effort <level>` (Claude Code 2.1.284; an
 older `claude` is refused at launch unless every pass is `default`). Defaults: `precheck` low (it only reads),
 `implement` and `fix` medium, `review` high (`review-small` follows `review`), `ux` high. A project overrides any of them
@@ -595,6 +614,7 @@ orchestrate:
   maquetteReviews: 3                     # default 3: how many reviews of the mockup per lot (integer ≥ 1); also the `spec` session budget of a lot with a screen
   fiche: true                            # default: review of the back-end sheet of a lot with spec: true between spec and accept (see « The spec step of a lot with spec: true »); false skips it
   spec: { dir: docs/specs }              # spec step (see « The spec step of a lot with screen: »): folder of the screen specs, relative to the repository (default docs/specs); render: the command the spec session runs to render the mockups at 1440 and 390 px (optional, Playwright otherwise)
+  testGate: { code: [src/**] }           # code changed without a test goes to a correction pass before the review (see « Code changed without a test »); absent: no gate
   prodAccess: false                      # default: wave sessions get no access to production (see « Production access of the sessions »); true lifts it for this project
   effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, maquette, fiche, accept, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)

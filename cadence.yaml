@@ -5,3 +5,9 @@ docs:
     - paths: [src/**, bin/*.js, templates/**, agents/**, skills/**, '!**/*.test.ts']
       docs: [README.md, 'docs/*.md']
   since: 2026-10-09
+
+# Porte « code modifié sans test » (L287) : le code du paquet sans fichier de test touché part en correction avant la revue.
+orchestrate:
+  testGate:
+    code: [src/**, 'bin/*.js', '!**/*.test.ts']
+    tests: ['test/**']

@@ -124,6 +124,8 @@ export interface LotState {
   pass: number;
   /** Bloquants+majeurs de chaque revue de code non conforme, dans l'ordre : une passe de plus si ça baisse jusqu'à un seul (L205). */
   reviewCounts?: number[];
+  /** Vrai une fois la porte « code modifié sans test » jouée (L287) : elle ne se rejoue pas, que la correction ait ajouté un test ou non. */
+  testGate?: boolean;
   /** Vrai une fois la passe unique de correction des mineurs lancée (revue conforme avec mineurs) ; elle ne se rejoue pas. */
   minorPass?: boolean;
   /** Passes de correction faites quand la passe des mineurs a été décidée : sert à nommer la dernière passe d'écriture jouée. */

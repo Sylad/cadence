@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, type OrchestrateConfig } from '../config.js';
 import { docSyncBrief, docSyncGaps, filesOf } from '../docsync.js';
+import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
 import { changedFiles, readCommits, resolveCommit, type Commit } from '../git.js';
 import { citedRefs } from '../link.js';
@@ -1734,6 +1735,19 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   if (red.length) {
     toFix(c, red, 'tests rouges');
     return;
+  }
+  // Porte « code modifié sans test » (L287) : le diff du lot, toutes sessions comprises, touche du code sans fichier de test → correction directe, sans session de revue. Une seule fois par lot, et jamais pendant la passe des mineurs.
+  const gate = c.config.testGate;
+  if (gate && !l.testGate && !minorsPass) {
+    const missing = testGateMissing(gate, filesOf(l.repo, lotWork(plan, l.repo, l.lot)));
+    if (missing.length) {
+      l.testGate = true;
+      if (l.pass >= MAX_PASSES) l.warnings.push(`porte « code sans test » non jouée : ${l.pass} passe(s) de correction déjà faite(s) (${missing.join(', ')})`);
+      else {
+        toFix(c, [{ source: 'code', gravite: 'majeur', fichier: missing[0], texte: `code modifié sans test (orchestrate.testGate, vérifié par le programme) : ${missing.join(', ')} — aucun fichier de test touché par les commits du lot. Écris les tests de chaque règle modifiée, nommés d'après la règle (test d'abord), puis commite avec le lot cité.` }], 'code sans test');
+        return;
+      }
+    }
   }
   l.constats = [];
   l.checks = runs.length ? { head: git(l.repo, 'rev-parse', 'HEAD'), runs } : undefined;

@@ -4,6 +4,7 @@ import { parse } from 'yaml';
 import { isDay, type Day } from './dates.js';
 import type { ArticleRule } from './articles.js';
 import type { DocSyncRule } from './docsync.js';
+import { DEFAULT_TEST_PATTERNS, type TestGateConfig } from './testgate.js';
 import { gitRoot } from './git.js';
 import { FIELDS, Plan, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
@@ -287,6 +288,11 @@ export interface OrchestrateConfig {
    * l'orchestrateur qui lance la commande (depuis la racine du dépôt) et attend l'URL, `timeout` secondes (300 par défaut).
    */
   ux?: { url?: string; command?: string; timeout?: number };
+  /**
+   * Porte « code modifié sans test » (L287), avant la revue : le diff du lot touche du code (`code`, hors `except`) sans aucun fichier de
+   * test (`tests`) → une passe de correction directe, sans session de revue. Une seule fois par lot. Absente : pas de porte.
+   */
+  testGate?: TestGateConfig;
   /** Contrôle préalable « livrable déjà présent ? » avant la première implémentation d'un lot sans commit (défaut : vrai). */
   precheck: boolean;
   /** Revue UX de la maquette (L172, spec etape-spec S4) entre spec et accept ; `maquette: false` la saute (défaut : vrai). */
@@ -330,7 +336,7 @@ const MODELS = ['haiku', 'sonnet', 'opus'] as const;
 export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'testGate', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
@@ -384,6 +390,23 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   if (o.prodAccess != null) {
     if (typeof o.prodAccess !== 'boolean') throw bad('prodAccess : true ou false attendu');
     config.prodAccess = o.prodAccess;
+  }
+  if (o.testGate != null && o.testGate !== false) {
+    const g = o.testGate;
+    if (!isObject(g)) throw bad('testGate doit être false ou un objet { code, tests, except, threshold }');
+    for (const k of Object.keys(g)) if (!['code', 'tests', 'except', 'threshold'].includes(k)) throw bad(`testGate.${k} inconnu (attendu : code, tests, except, threshold)`);
+    const patterns = (key: 'code' | 'tests' | 'except', fallback: string[] | null): string[] => {
+      if (g[key] == null) {
+        if (fallback) return fallback;
+        throw bad(`testGate.${key} : au moins un motif de chemin attendu`);
+      }
+      const v = list(g[key]);
+      if (v.some((x) => !x.trim()) || (key !== 'except' && !v.length)) throw bad(`testGate.${key} : motifs de chemin non vides attendus`);
+      return v.map((x) => x.trim());
+    };
+    const threshold = g.threshold ?? 1;
+    if (typeof threshold !== 'number' || !Number.isInteger(threshold) || threshold < 1) throw bad('testGate.threshold : entier supérieur ou égal à 1 attendu');
+    config.testGate = { code: patterns('code', null), tests: patterns('tests', DEFAULT_TEST_PATTERNS), except: patterns('except', []), threshold };
   }
   if (o.spec != null) {
     if (!isObject(o.spec)) throw bad('spec doit être un objet { dir, render }');

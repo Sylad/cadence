@@ -3197,9 +3197,10 @@ lots:
     review: { date: 2026-10-24, verdict: "compliant: 0 blocking, 0 major, 2 minor (suite 3010/3010 tests green, tsc clean) — orchestré (vague 2026-10-24-1050, 0 passe(s) de correction)", commit: 04d2e6f5c29e0243e5a2973a9b9af37e26f98277 }
   - id: L283
     title: "perf : « sessions ux par lot visible » compte aussi l'UX faite dans review-small d'un petit lot visible (seesApp) ; nouvel indicateur : part des lots visibles revus par une étape ux dédiée ; docs/perf.md et tests. Mesure 24-10 : 139 lots visibles sur 140 « petits » (≤ 0,5 j) → 0,0 affiché (−97 %), faux signal"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-10-24
+    started: 2026-10-24
   - id: L284
     title: "plan à l'emplacement .cadence/raf.yaml (L246) dans les 9 projets : inventaire des lecteurs de docs/plan/raf.yaml par projet (outils plan-data, tests, CI, skills : avatar 4, codex 5, discotheque 1, evatosorus 4, finance 8, jobmail 3, ol 6, warhammer 4, cadence 37), procédure de migration rejouable (raf migrate ou script) et migration ; l'avertissement « ancien emplacement » imprimé à chaque appel raf entre dans le contexte de chaque session — décision Sylvain 24-10"
     status: todo

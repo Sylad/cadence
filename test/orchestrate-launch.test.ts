@@ -229,6 +229,20 @@ describe('runSession (lanceur injecté)', () => {
     expect(calls[1].env).not.toHaveProperty('TMPDIR');
   });
 
+  it("(L285) toute session de travail est lancée sans tâche de fond : CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1 et Monitor interdit", async () => {
+    const calls: { args: string[]; env: Record<string, string> }[] = [];
+    const claude = async (args: string[], opts: { env: Record<string, string> }) => {
+      calls.push({ args, env: opts.env });
+      return { code: 0, stdout: sample, stderr: '', timedOut: false };
+    };
+    await runSession({ ...spec, kind: 'implement', agent: undefined }, { claude, agents: {} });
+    expect(calls[0].env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).toBe('1');
+    const i = calls[0].args.indexOf('--disallowedTools');
+    expect(calls[0].args.slice(i + 1)).toContain('Monitor');
+    expect(buildLocalArgs({ ...spec, agent: undefined }, {})).toContain('Monitor');
+    expect(buildRetryArgs({ ...spec, agent: undefined }, 's1', {})).toContain('Monitor');
+  });
+
   it('passe cwd, environnement de garde, délai ; lit le résultat', async () => {
     const calls: { args: string[]; cwd: string; env: Record<string, string>; timeoutMs: number }[] = [];
     const out = await runSession(

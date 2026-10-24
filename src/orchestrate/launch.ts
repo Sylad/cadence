@@ -110,8 +110,8 @@ export interface LaunchOpts {
 /** Le lanceur : injecté dans les tests, `realClaude` en vrai. Jamais `--resume` d'une session de travail, sauf la relance de mise en forme. */
 export type ClaudeFn = (args: string[], opts: LaunchOpts) => Promise<LaunchOutcome>;
 
-/** Outils interdits à toute session : pas de sous-agent, pas de push, de livraison, de verdict ni de rescellé d'un test d'acceptation (le chemin du lead, L200). */
-export const DISALLOWED = ['Agent', 'Bash(git push:*)', 'Bash(cadence deliver:*)', 'Bash(raf done:*)', 'Bash(raf review:*)', 'Bash(raf ux:*)', 'Bash(cadence spec reseal:*)', 'Bash(raf spec reseal:*)'];
+/** Outils interdits à toute session : pas de sous-agent, pas de push, de livraison, de verdict ni de rescellé d'un test d'acceptation (le chemin du lead, L200) ; pas de `Monitor` (tâche de fond que `-p` attend, L285). */
+export const DISALLOWED = ['Agent', 'Monitor', 'Bash(git push:*)', 'Bash(cadence deliver:*)', 'Bash(raf done:*)', 'Bash(raf review:*)', 'Bash(raf ux:*)', 'Bash(cadence spec reseal:*)', 'Bash(raf spec reseal:*)'];
 
 /** Outils MCP du serveur Playwright, par le préfixe du serveur (sonde réelle du 07-10 : `mcp__playwright` expose tous les `browser_*`). */
 export const PLAYWRIGHT_TOOLS = 'mcp__playwright';
@@ -126,6 +126,9 @@ function agentsFor(spec: StepSpec, agents: Record<string, AgentDef>): Record<str
 function effortArgs(spec: StepSpec): string[] {
   return spec.effort && spec.effort !== 'default' ? ['--effort', spec.effort] : [];
 }
+
+/** Retire `run_in_background` de Bash et des sous-agents : `claude -p` attend toute tâche de fond avant de sortir (jusqu'à 10 min d'inactivité), la session finie ne rendait pas la main (L285). */
+export const NO_BACKGROUND_ENV = { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' };
 
 export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): string[] {
   const args = ['-p', spec.brief, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, ...effortArgs(spec)];
@@ -226,7 +229,7 @@ export async function runSession(
 ): Promise<SessionOutcome> {
   const sandbox = sandboxEnv(!!spec.prodAccess);
   const launch = (args: string[]) =>
-    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...sandbox.set, ...(spec.tmpDir ? { TMPDIR: spec.tmpDir } : {}), ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn, lot: spec.lot });
+    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...NO_BACKGROUND_ENV, ...sandbox.set, ...(spec.tmpDir ? { TMPDIR: spec.tmpDir } : {}), ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn, lot: spec.lot });
   const epoch = killEpoch;
   const out = await launch(spec.local ? buildLocalArgs(spec, deps.agents) : buildArgs(spec, deps.agents));
   const first = classify(out);

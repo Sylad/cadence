@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
+import { ROLES } from '../src/ref/check.js';
 import { tempDir } from './helpers.js';
 
 type Obj = Record<string, any>;
@@ -283,6 +284,17 @@ describe('cadence ref check (L263)', () => {
 
   it('R17 — role vide : écart', () => {
     expect(ecarts(doc([BASE.ecran!, el('composant', (e) => (e.role = ''))]))).toContain('✗ elements[1].role : champ du type composant manquant ou invalide');
+  });
+  it('R17 — role hors de la liste fermée : écart qui nomme la liste, pour un composant comme pour un texte', () => {
+    expect(ecarts(doc([BASE.ecran!, el('composant', (e) => (e.role = 'panel'))]))).toContain("✗ elements[1].role : « panel » n'est pas un rôle de la liste : " + Object.keys(ROLES).join(', '));
+    expect(ecarts(doc([el('texte', (e) => (e.role = 'label'))]))).toContain('elements[0].role : « label » n\'est pas un rôle de la liste');
+    for (const role of Object.keys(ROLES)) valide(doc([el('texte', (e) => (e.role = role))]));
+    expect(ecarts(doc([el('texte', (e) => (e.role = 'toString'))]))).toContain('n\'est pas un rôle de la liste');
+  });
+  it('R17 — le modèle écrit la liste des rôles, avec une définition, et c\'est celle du schéma', () => {
+    const modele = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'templates', 'inventaire.json'), 'utf8'));
+    expect(modele.roles).toEqual(ROLES);
+    expect(Object.values(modele.roles).every((d) => typeof d === 'string' && d.length > 10)).toBe(true);
   });
   it('R17 — taille.h = 0 : écart', () => {
     expect(ecarts(doc([BASE.ecran!, el('composant', (e) => (e.taille.h = 0))]))).toContain('✗ elements[1].taille.h : champ du type composant manquant ou invalide');

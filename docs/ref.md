@@ -131,9 +131,9 @@ duplicated JSON key is not detected (the last one wins, as with `JSON.parse`). A
 | Type | Own keys |
 |---|---|
 | `ecran` | `largeur_reference` (integer > 0, 1440 in the model), `zones` (non-empty) `[{ nom, x, y, l, h, pct { x, y, l, h } }]`: pixels at that width, `pct` numbers from 0 to 100 |
-| `composant` | `role`, `position { x, y }` (≥ 0), `taille { l, h }` (≥ 1), `contenu` (text, may be empty), `ecran` (id of an `ecran`) |
+| `composant` | `role` (from the list of roles below), `position { x, y }` (≥ 0), `taille { l, h }` (≥ 1), `contenu` (text, may be empty), `ecran` (id of an `ecran`) |
 | `etat` | `nom` (non-empty, open list), `cible` (id of a `composant` or an `ecran`) |
-| `texte` | `libelle` (non-empty, no leading or trailing blank), `role` |
+| `texte` | `libelle` (non-empty, no leading or trailing blank), `role` (from the list of roles below) |
 | `jeton` | `categorie` (`couleur`, `taille_police`, `espacement`, `rayon`, `opacite`), `valeur` (non-empty string or finite number), `point` (`{ x, y }` or a zone `{ x, y, l, h }`; required when `confiance` is `mesure`), `contraste` (optional) `{ texte, fond, ratio 1 to 21 }` |
 | `table` | `colonnes` (non-empty array of texts), `lignes` (non-empty, each row has as many text cells as columns) |
 | `gabarit` | `nom`, `champs` (non-empty, ordered) `[{ nom, obligatoire (boolean), format, min?, max? }]`, `min ≤ max` |
@@ -141,6 +141,23 @@ duplicated JSON key is not detected (the last one wins, as with `JSON.parse`). A
 | `lien` | `figure`, `passage { page, ligne, extrait }`, `constat` (`confirme`, `precise`, `contredit`); `precise` adds `lecture_ambigue`, `interpretation`, `raison`; `contredit` adds `enonces` (exactly two texts) and carries no `interpretation` |
 | `statut` | `libelle`, `couvre` (non-empty array of ids of any type, itself included) |
 | `silence` | `question` (non-empty, ends with `?`) |
+
+**Roles** (`role` of a `texte` and of a `composant`): a **closed list**, because the role takes part in the identity of a component and
+in the verdict on a text in `ref eval`. A role outside the list is a deviation of the schema (`« label » n'est pas un rôle de la
+liste : …`), never a reading error counted later. The list is in `ROLES` of `src/ref/check.ts` and in the `roles` key of
+[`templates/inventaire.json`](../templates/inventaire.json) (one line of definition per role; a test keeps both identical):
+
+| Role | Definition |
+|---|---|
+| `titre` | title of a document, a page or a section |
+| `paragraphe` | sentence or block of running text |
+| `etiquette-figure` | word or value written inside a figure (arrow, axis, curve, threshold) |
+| `legende` | text that names a figure or a table (« Figure 1 — … ») |
+| `exigence` | statement of one requirement in a list of requirements |
+| `ligne` | line of a record or a form, with no other function |
+| `titre-panneau` | title of a panel or a window of an interface |
+| `bouton` | control one acts on (`composant`), or its label (`texte`) |
+| `panneau` | interface area that groups controls (`composant`) |
 
 References (`ecran`, `cible`, `couvre`, flux nodes) are resolved on the whole list of ids, wherever the element is. Every slug and id
 deviation (R6/R9) is listed, none masks another; elsewhere a deviation can hide others (a non-object element only reports its

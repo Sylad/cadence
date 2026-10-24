@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
+import { checkInventaire } from '../src/ref/check.js';
+import { buildCorpus } from '../src/ref/corpus.js';
 import { tempDir } from './helpers.js';
 
 type Obj = Record<string, any>;
@@ -188,5 +190,28 @@ describe('cadence ref eval — rappel, précision, faux lu, tokens par page', ()
     expect(evaluer(attendu, lue, ['--json']).json.types.statut).toMatchObject({ justes: 1 });
     const faux = doc('lecture', [ecran, composant(4, 'Panneau', { id: 'cas#composant-4' }), { type: 'statut', id: 'cas#statut-9', source: src, confiance: 'lu', libelle: 'Proposal', couvre: ['cas#ecran-1'] }]);
     expect(evaluer(attendu, faux, ['--json']).json.types.statut).toMatchObject({ justes: 0, faux_lu: 1 });
+  });
+  it('R18 — les rôles sont une liste fermée : « label » pour « etiquette-figure » est refusé au schéma, une lecture parfaite aux rôles de la liste a un faux lu de 0 %', () => {
+    const dir = tempDir();
+    const corpus = buildCorpus();
+    for (const c of corpus) {
+      mkdirSync(join(dir, 'corpus', c.nom), { recursive: true });
+      mkdirSync(join(dir, 'lectures', c.nom), { recursive: true });
+      writeFileSync(join(dir, 'corpus', c.nom, 'attendu.json'), JSON.stringify(c.inventaire));
+      writeFileSync(join(dir, 'lectures', c.nom, 'lecture.json'), JSON.stringify(c.inventaire));
+    }
+    const parfaite = lancer([join(dir, 'corpus'), join(dir, 'lectures'), '--json'], dir);
+    expect(parfaite.code).toBe(0);
+    expect(parfaite.json.total).toMatchObject({ faux_lu: 0, rappel: 1, precision: 1, taux_faux_lu: 0 });
+
+    const ambigu = clone(corpus.find((c) => c.nom === 'texte-ambigu-leve-par-figure')!.inventaire) as Obj;
+    let renommes = 0;
+    for (const e of ambigu.elements) if (e.role === 'etiquette-figure') { e.role = 'label'; renommes++; }
+    expect(renommes).toBe(3);
+    expect(checkInventaire(ambigu)).toContain("elements[2].role : « label » n'est pas un rôle de la liste : titre, paragraphe, etiquette-figure, legende, exigence, ligne, titre-panneau, bouton, panneau");
+    writeFileSync(join(dir, 'lectures', 'texte-ambigu-leve-par-figure', 'lecture.json'), JSON.stringify(ambigu));
+    const r = lancer([join(dir, 'corpus'), join(dir, 'lectures')], dir);
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/lecture.*pas valide.*« label » n'est pas un rôle/s);
   });
 });

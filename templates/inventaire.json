@@ -2,6 +2,17 @@
   "version": 1,
   "genre": "inventaire",
   "document": { "slug": "exemple", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+  "roles": {
+    "titre": "titre d'un document, d'une page ou d'une section",
+    "paragraphe": "phrase ou bloc de texte courant",
+    "etiquette-figure": "mot ou valeur écrit dans une figure (flèche, axe, courbe, seuil)",
+    "legende": "texte qui désigne une figure ou un tableau (« Figure 1 — … »)",
+    "exigence": "énoncé d'une exigence dans une liste d'exigences",
+    "ligne": "ligne d'un relevé ou d'un formulaire, sans autre fonction",
+    "titre-panneau": "titre d'un panneau ou d'une fenêtre d'interface",
+    "bouton": "contrôle sur lequel on agit (composant), ou son libellé (texte)",
+    "panneau": "zone d'interface qui regroupe des contrôles (composant)"
+  },
   "elements": [
     {
       "type": "ecran", "id": "exemple#ecran-1", "confiance": "mesure",

@@ -10,6 +10,19 @@ const CATEGORIES = ['couleur', 'taille_police', 'espacement', 'rayon', 'opacite'
 const DIRECTIONS = ['de_vers', 'bidirectionnel'];
 const CONSTATS = ['confirme', 'precise', 'contredit'];
 
+/** Le vocabulaire fermé des rôles d'un `texte` et d'un `composant` : le rôle décide de l'identité et de la justesse d'un élément, donc il est écrit ici, une ligne par rôle (repris dans templates/inventaire.json et docs/ref.md). */
+export const ROLES: Record<string, string> = {
+  titre: "titre d'un document, d'une page ou d'une section",
+  paragraphe: 'phrase ou bloc de texte courant',
+  'etiquette-figure': "mot ou valeur écrit dans une figure (flèche, axe, courbe, seuil)",
+  legende: 'texte qui désigne une figure ou un tableau (« Figure 1 — … »)',
+  exigence: "énoncé d'une exigence dans une liste d'exigences",
+  ligne: "ligne d'un relevé ou d'un formulaire, sans autre fonction",
+  'titre-panneau': "titre d'un panneau ou d'une fenêtre d'interface",
+  bouton: "contrôle sur lequel on agit (composant), ou son libellé (texte)",
+  panneau: "zone d'interface qui regroupe des contrôles (composant)",
+};
+
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isInt = (v: unknown, min: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= min;
 const isText = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
@@ -138,6 +151,7 @@ function checkFields(e: Obj, at: string, type: string, fail: (field: string) => 
     }
     case 'composant': {
       need('role', isText(e.role));
+      checkRole(e, at, bad);
       const position = sub(e.position);
       const taille = sub(e.taille);
       for (const k of ['x', 'y']) need(`position.${k}`, isInt(position[k], 0));
@@ -154,6 +168,7 @@ function checkFields(e: Obj, at: string, type: string, fail: (field: string) => 
       // un libellé recopié tel quel n'a ni blanc en tête ni blanc en fin (R33)
       need('libelle', isText(e.libelle) && e.libelle === e.libelle.trim());
       need('role', isText(e.role));
+      checkRole(e, at, bad);
       return;
     case 'jeton': {
       need('categorie', typeof e.categorie === 'string' && CATEGORIES.includes(e.categorie));
@@ -238,6 +253,11 @@ function checkFields(e: Obj, at: string, type: string, fail: (field: string) => 
       need('question', isText(e.question) && e.question.trimEnd().endsWith('?'));
       return;
   }
+}
+
+/** Un rôle non vide hors de la liste est un écart de schéma, jamais une erreur de lecture mesurée plus tard. */
+function checkRole(e: Obj, at: string, bad: Bad): void {
+  if (isText(e.role) && !Object.hasOwn(ROLES, e.role)) bad(`${at}.role`, `« ${e.role} » n'est pas un rôle de la liste : ${Object.keys(ROLES).join(', ')}`);
 }
 
 /** Les références d'un élément, résolues sur la liste complète des ids (R27) et sur les noeuds du schéma (R23). */

@@ -195,7 +195,7 @@ const CONTROL = /[\u0000-\u001f\u007f]/g;
 const MASK = '***';
 const SECRET_WORDS = new Set(['token', 'secret', 'password', 'passwd', 'pwd', 'pass', 'key', 'credential', 'credentials', 'auth', 'authorization', 'signature', 'sig', 'jwt', 'cookie']);
 // Mots sensibles qui, collés à un autre (APIKEY, ACCESSTOKEN, GITHUBTOKEN), terminent encore un nom : pas « pass », « sig » ou « auth » (BYPASS, ...).
-const SECRET_SUFFIXES = ['token', 'secret', 'password', 'passwd', 'key', 'credential', 'credentials', 'signature'];
+const SECRET_SUFFIXES = ['token', 'secret', 'password', 'passwd', 'key', 'credential', 'credentials', 'signature', 'pwd'];
 // Un nom de variable ou de paramètre d'URL est sensible quand l'un de ses mots (séparés par _ - . ou une majuscule) en est un, ou finit par l'un des suffixes.
 const sensitiveName = (name: string): boolean =>
   name
@@ -205,8 +205,7 @@ const sensitiveName = (name: string): boolean =>
 const TOKEN_SHAPES = /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{16,}|sk-[A-Za-z0-9_-]{16,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{30,})\b/g;
 const BEARER = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 const URL_USERINFO = /(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi;
-// Une valeur entre guillemets jamais refermés (sortie arrêtée en son milieu, ou répartie sur plusieurs lignes) court jusqu'à la fin de la ligne.
-const ASSIGNMENT = /([A-Za-z][A-Za-z0-9_.-]*)=("[^"]*(?:"|$)|'[^']*(?:'|$)|[^\s&"']+)/g;
+const ASSIGNMENT = /([A-Za-z][A-Za-z0-9_.-]*)=("[^"]*"|'[^']*'|[^\s&"']+)/g;
 
 /** Masque ce qui ressemble à un secret (jeton connu, Bearer, identifiants d'URL, VAR=valeur ou paramètre d'URL au nom sensible) : motifs probables, pas une garantie. */
 export const maskSecrets = (line: string): string =>
@@ -214,11 +213,7 @@ export const maskSecrets = (line: string): string =>
     .replace(BEARER, `$1 ${MASK}`)
     .replace(URL_USERINFO, `$1${MASK}@`)
     .replace(TOKEN_SHAPES, MASK)
-    .replace(ASSIGNMENT, (m, name: string, value: string) => {
-      if (sensitiveName(name)) return `${name}=${MASK}`;
-      // Valeur entre guillemets d'un nom ordinaire : un secret peut suivre à l'intérieur, on la rescanne.
-      return /^["']/.test(value) ? `${name}=${value[0]}${maskSecrets(value.slice(1))}` : m;
-    });
+    .replace(ASSIGNMENT, (m, name: string) => (sensitiveName(name) ? `${name}=${MASK}` : m));
 
 const clean = (line: string, max: number): string => {
   const t = maskSecrets(line.replace(ANSI, '').replace(CONTROL, ' ')).replaceAll('⏎', ' ').trim();

@@ -60,11 +60,12 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   known token shapes (GitHub, GitLab, npm, Slack, AWS key id, `sk-…`), `Bearer`/`Basic`
   values, `user:password@` in a URL, and any `NAME=value` (shell variable or URL query
   parameter) whose name has a word such as token, secret, password, key, auth, signature, or
-  ends with one of token, secret, password, key, credential, signature (`APIKEY`, `ACCESSTOKEN`,
-  `GITHUBTOKEN`). The 8192 characters kept are the END of the output, so the bound cannot cut the end of a value; it can cut its beginning (the name and the opening quote gone), and that case is not handled — the log stays local.
-  A quoted value never closed (output stopped inside it, or spread over
-  several lines) is masked up to the end of the line when its name is sensitive; behind an ordinary name
-  (`MODE="a b API_KEY=x`) the content is scanned again, so a later secret is still masked (L294).
+  ends with one of token, secret, password, pwd, key, credential, signature (`APIKEY`,
+  `ACCESSTOKEN`, `GITHUBTOKEN`, `MYSQLPWD`) (L294). The 8192 characters kept are the END of the
+  output (`OUTPUT_KEPT`, `src/deliver.ts`), so the bound cannot cut the end of a value; it can cut
+  its beginning (the name and the opening quote gone), and that case is **not handled** — the log
+  stays local. A quoted value never closed is not treated either (L294 tried, and each fix opened a
+  new leak): only closed values and unquoted values are matched.
   This is a list of likely patterns, not a guarantee: a secret of another shape printed by a
   command can still land in the log, which stays local (`<git common dir>/cadence/`). `cadence perf` reads classes and projects from it
   ([perf](perf.md#delivery-quality-and-the-tour-header-l227)); a line written before L282

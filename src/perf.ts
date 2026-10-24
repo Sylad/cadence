@@ -108,7 +108,7 @@ export interface CostBlock {
 /** Les livraisons rouges d'une fenêtre ventilées (L282) ; `inconnue` : une ligne d'avant la classe. */
 export type RedClass = FailClass | 'inconnue';
 export interface RedBreakdown {
-  total: number;
+  count: number;
   byClass: Record<RedClass, number>;
   /** Par projet, les seules classes présentes. */
   byProject: Record<string, Partial<Record<RedClass, number>>>;
@@ -502,11 +502,11 @@ export function computePerf(input: PerfInput): PerfResult {
     return [...plans.values()].flat().filter((l) => l.status === 'done' && l.finished !== undefined).reduce((sum, l) => sum + l.notes.filter((n) => isDay(n.date) && inWindow(n.date, w) && l.finished! <= n.date && isQaBlockingNote(n.text)).length, 0);
   };
   const breakdown = (w: Window): RedBreakdown => {
-    const b: RedBreakdown = { total: 0, byClass: { refus: 0, ci: 0, deploiement: 0, verification: 0, inconnue: 0 }, byProject: {} };
+    const b: RedBreakdown = { count: 0, byClass: { refus: 0, ci: 0, deploiement: 0, verification: 0, inconnue: 0 }, byProject: {} };
     for (const [project, entries] of input.failures ?? []) {
       for (const e of entries.filter((x) => inWindow(x.day, w))) {
         const cls: RedClass = e.cls ?? 'inconnue';
-        b.total += 1;
+        b.count += 1;
         b.byClass[cls] += 1;
         const p = (b.byProject[project] ??= {});
         p[cls] = (p[cls] ?? 0) + 1;
@@ -629,7 +629,7 @@ const RED_LABELS: Record<RedClass, string> = { refus: 'refus avant action', ci: 
 
 /** Deux lignes (par classe, par projet) des livraisons rouges de la fenêtre courante, la plus grosse d'abord ; aucune sans livraison rouge. */
 function redBreakdownLines(b: RedBreakdown): string[] {
-  if (b.total === 0) return [];
+  if (b.count === 0) return [];
   const order = (a: [string, number], c: [string, number]) => c[1] - a[1] || a[0].localeCompare(c[0]);
   // À égalité, l'ordre des étapes de la livraison (refus, CI, déploiement, vérification), les lignes sans classe en dernier.
   const rank = (k: RedClass) => (k === 'inconnue' ? FAIL_CLASSES.length : FAIL_CLASSES.indexOf(k));

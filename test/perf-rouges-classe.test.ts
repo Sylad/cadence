@@ -38,11 +38,11 @@ describe('cadence perf — livraisons rouges par classe et par projet (L282)', (
   it('R9 — --json : quality.reds ventile chaque fenêtre par classe (anciennes lignes : « inconnue ») et par projet', async () => {
     const r = JSON.parse((await perf(setup(), '--json')).text);
     expect(r.quality.reds.current).toEqual({
-      total: 5,
+      count: 5,
       byClass: { refus: 0, ci: 1, deploiement: 2, verification: 1, inconnue: 1 },
       byProject: { maritime: { deploiement: 2 }, alpha: { ci: 1, verification: 1, inconnue: 1 } },
     });
-    expect(r.quality.reds.previous.total).toBe(1);
+    expect(r.quality.reds.previous.count).toBe(1);
     expect(r.quality.reds.previous.byClass.ci).toBe(1);
     expect(r.quality.redDeliveries.current).toBe(5);
   });

@@ -303,6 +303,10 @@ install it (`npm i -D playwright`, `npx playwright install chromium`) or point `
 without it, or when Chromium does not launch (`npx playwright install chromium` missing), the command exits **2** and writes nothing (`--sans-rendu` still writes HTML and expected files). An existing folder is
 refused (exit 2). The corpus is written where you say, not in `evals/`, which `claude plugin eval` reads as case folders.
 
+The tests of the real render (PDF and PNG sizes, page counts, hash, zones of the texts against `pdftotext -bbox`) run only when
+`CADENCE_PLAYWRIGHT` points to the package; `.github/workflows/tests.yml` installs Playwright and Chromium and sets it. Locally:
+`CADENCE_PLAYWRIGHT=<folder of the playwright package> npx vitest run test/ref-corpus.test.ts`.
+
 The PDF changes at every render, so the expected `sha256` is the one of the PDF just written: register it with the slug of the
 expected file (`cadence ref add tmp/corpus-ref/<case>/document.pdf --slug corpus-<case>`), or `ref eval` refuses the reading.
 

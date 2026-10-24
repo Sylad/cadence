@@ -36,6 +36,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y poppler-utils tesseract-ocr
 
+      # Les tests de rendu réel de cadence ref corpus (R16, R17, R18, R20) rendent le corpus avec Playwright et son Chromium, que le dépôt ne porte pas
+      # (sans CADENCE_PLAYWRIGHT ils sont ignorés). Playwright est installé hors du dépôt, à la version qui sert à la maison (maritime-atlas/qa),
+      # avec les polices système que Chromium attend (fonts-liberation pour Arial, d'où les zones de R20).
+      - name: Playwright et Chromium (rendu réel du corpus)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" --no-audit --no-fund playwright@1.61.0
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          echo "CADENCE_PLAYWRIGHT=$RUNNER_TEMP/pw/node_modules/playwright" >> "$GITHUB_ENV"
+
       - run: npm ci
 
       - name: Environnement vu par la suite

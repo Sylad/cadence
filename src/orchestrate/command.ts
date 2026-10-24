@@ -309,6 +309,22 @@ function olderThanEffort(version: string): boolean {
 /** Variable d'environnement qui lève le refus de `orchestrate.worktrees: true` (mode expérimental, L279 ; lots L299–L301). Posée par le harnais des tests du mode. */
 export const EXPERIMENTAL_WORKTREES_ENV = 'CADENCE_EXPERIMENTAL_WORKTREES';
 
+/**
+ * Seule décision d'activation du mode worktree (L279) : le départ (`preflight`), la file des lots (`planTrees`, `dryRun`) et la reprise (`resume`) passent tous par elle.
+ * Le mode joue si la configuration le demande (ou si le lot repris a une branche `cadence/<vague>/…` à retrouver, `branchKept`) ET si la variable vaut exactement `1`.
+ */
+export function worktreesEnabled(config: { worktrees: boolean }, env: Record<string, string | undefined>, branchKept = false): boolean {
+  return (config.worktrees || branchKept) && env[EXPERIMENTAL_WORKTREES_ENV] === '1';
+}
+
+/** Le refus de la garde d'activation, ou null : le mode est demandé (configuration, ou branche de lot à retrouver) sans que la variable le permette. */
+function worktreesRefusal(key: string, config: { worktrees: boolean }, env: Record<string, string | undefined>, keptBranch?: string): string | null {
+  const wanted = config.worktrees || !!keptBranch;
+  if (!wanted || worktreesEnabled(config, env, !!keptBranch)) return null;
+  const what = config.worktrees ? 'orchestrate.worktrees: true' : `la branche ${keptBranch} (lot joué dans un worktree)`;
+  return `${key} : ${what} est refusé : le mode worktree par lot est EXPÉRIMENTAL et non activable tant que les lots L299, L300 et L301 ne sont pas faits (retirer la clé, ou poser ${EXPERIMENTAL_WORKTREES_ENV}=1 pour les tests du mode)`;
+}
+
 /** Préconditions : tout ce qui peut être refusé l'est ici, avant d'agir, sans verrou ni écriture. */
 async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
   const refusals: string[] = [];
@@ -332,8 +348,9 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       continue;
     }
     // L279 : le mode worktree est une infrastructure expérimentale, non activable tant que L299–L301 ne sont pas faits (refus avant d'agir, `--dry-run` compris).
-    if (env.config.worktrees && io.env[EXPERIMENTAL_WORKTREES_ENV] !== '1') {
-      refusals.push(`${key} : orchestrate.worktrees: true est refusé : le mode worktree par lot est EXPÉRIMENTAL et non activable tant que les lots L299, L300 et L301 ne sont pas faits (retirer la clé, ou poser ${EXPERIMENTAL_WORKTREES_ENV}=1 pour les tests du mode)`);
+    const refused = worktreesRefusal(key, env.config, io.env);
+    if (refused) {
+      refusals.push(refused);
       continue;
     }
     if (info && olderThanEffort(info.version) && Object.values(env.config.effort).some((e) => e !== 'default')) {
@@ -438,7 +455,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     if (l.goal) io.out(`  objectif donné : ${l.goal} (à la place du titre dans les briefs)`);
     io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, l.screen ? 'screen' : l.specLot ? 'spec' : undefined)})`);
     const mine = lots.filter((o) => o.repo === l.repo);
-    const together = env.config.worktrees && mine.length > 1 && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
+    const together = worktreesEnabled(env.config, io.env) && mine.length > 1 && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
     io.out(together ? `  file ${basename(l.repo)} · en parallèle des autres lots du dépôt, dans son worktree (cadence/${id}/${lotSlug(l.project, l.lot)}, créé à la prise du créneau)` : `  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
     if (l.repos?.length) io.out(`  dépôts voisins : ${l.repos.map((r) => r.rel).join(', ')} (verrou, garde de push et --add-dir ; leurs commits citent ${l.lot})`);
     if (l.node) {
@@ -896,18 +913,18 @@ function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx:
  * Un lot dont la branche existe déjà (reprise, R11) retrouve son worktree quel que soit le groupe. La branche de départ est celle du dépôt du lead à cet instant,
  * ou celle que la branche du lot a notée à sa création.
  */
-function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: string) => void): void {
+function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: string) => void, env: Record<string, string | undefined>): void {
   for (const group of groupLots(ctxs)) {
     const repo = group[0].lot.repo;
     const branch = repoBranch(repo);
-    const requested = group.length > 1 && group.every((c) => c.config.worktrees);
+    const requested = group.length > 1 && group.every((c) => worktreesEnabled(c.config, env));
     const why = !requested ? null : group.some((c) => c.lot.repos?.length) ? 'des lots du groupe ont des dépôts voisins (repos:)' : !branch ? 'le dépôt est en HEAD détaché' : null;
     if (why) log(`orchestrate : ${basename(repo)} : worktrees demandés mais ${why} : lots joués à la suite`);
     for (const c of group) {
       const lotBr = lotBranch(wave, c.lot.project, c.lot.lot);
       const known = baseBranchOf(repo, lotBr);
       const base = known ?? branch;
-      if (((requested && !why) || known) && base) c.tree = { dir: lotTreeDir(store.dir, c.lot.project, c.lot.lot), branch: lotBr, base, active: false };
+      if (((requested && !why) || (known && worktreesEnabled(c.config, env, true))) && base) c.tree = { dir: lotTreeDir(store.dir, c.lot.project, c.lot.lot), branch: lotBr, base, active: false };
     }
   }
 }
@@ -1021,7 +1038,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   wave.pid = process.pid;
   saveWave();
   const ctxs = contexts(lots, envs, wctx);
-  planTrees(ctxs, store, wave.id, wctx.log);
+  planTrees(ctxs, store, wave.id, wctx.log, io.env);
   try {
     updateWaveRepos(home, process.pid, repos, lanes());
   } catch {
@@ -1208,6 +1225,20 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     else if (budgeted.includes(l)) refusals.push(`${opt} ${key} : lot aussi visé par --budget`);
     else if (l.status !== 'handed-back' || (l.next !== 'integrate' && !(t.replay && planNoteHandBack(l)))) refusals.push(`${opt} ${key} : le lot n'est pas rendu ${t.replay ? "à l'étape d'intégration ni sur une écriture de plan refusée" : "à l'étape d'intégration"} (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})`);
     else integ.push(l);
+  }
+  // L279 : la garde d'activation du mode worktree vaut aussi à la reprise (--resume, --integrate, --replay) : un lot repris dont la configuration demande les worktrees, ou dont la branche est à retrouver, est refusé sans la variable, avant toute écriture.
+  for (const l of lots) {
+    if (lotFinished(l) && !raised.has(l) && !integ.includes(l)) continue;
+    if (drops.includes(lotKey(l.project, l.lot))) continue;
+    let config: { worktrees: boolean };
+    try {
+      config = projectEnv(l.repo).config;
+    } catch {
+      continue; // un cadence.yaml illisible est refusé par execute, comme avant
+    }
+    const br = lotBranch(wave.id, l.project, l.lot);
+    const refused = worktreesRefusal(lotKey(l.project, l.lot), config, io.env, baseBranchOf(l.repo, br) ? br : undefined);
+    if (refused) refusals.push(refused);
   }
   // Un lot retiré ne jouera rien : il ne subit ni le verrou du dépôt, ni le .nvmrc, ni l'arbre sale — un refus pour LUI ne doit pas faire échouer la reprise des autres.
   const live: LotState[] = [];

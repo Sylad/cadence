@@ -3245,6 +3245,30 @@ lots:
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
+    review:
+      {
+        date: 2026-10-24,
+        verdict: "compliant (0 blocking, 0 major, 2 minor notes)
+
+
+          Commit examiné : 87c7b0f feat(L289). Résultats des commandes :
+
+          - `vitest run` : 124 fichiers, 3026 tests, tous verts.
+
+          - `tsc --noEmit` : propre.
+
+
+          Choix de l'auteur relus, aucun n'est faux :
+
+          - Le masquage est dans `clean` de state.ts : la raison et la sortie passent par ce seul point.
+
+          - Le masquage se fait avant la troncature à `LINE_MAX` et `REASON_MAX`, donc une valeur coupée par la borne ne fuit pas.
+
+          - La dernière image non vide d'une ligne à `\\r` est bien celle qui est gardée.
+
+          - docs/deliver.md et CHANGELOG.md suivent le changement. — orchestré (vague 2026-10-24-1125, 0 passe(s) de correction)",
+        commit: 87c7b0ff2f215bd4a2a9d2aa6cef25dc11f0f0f9
+      }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

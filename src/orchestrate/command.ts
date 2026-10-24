@@ -32,7 +32,7 @@ import { schemaFor } from './schemas.js';
 import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
-import { quotaText, renderTable } from './table.js';
+import { quotaText, renderTable, resumeCommand } from './table.js';
 import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
@@ -247,7 +247,7 @@ export function parseOrchestrateArgs(argv: string[]): Args {
   // L309 : --wave <id> après un --resume sans valeur désigne la vague à reprendre ; sans cela le --resume reprenait en silence une AUTRE vague.
   if (a.resume !== undefined && a.wave !== undefined) {
     if (a.resume === true) a.resume = a.wave;
-    else if (a.resume !== a.wave) throw new RafError(`--resume ${a.resume} et --wave ${a.wave} désignent deux vagues : une seule (cadence orchestrate --resume <vague>)`);
+    else if (a.resume !== a.wave) throw new RafError(`--resume ${a.resume} et --wave ${a.wave} désignent deux vagues : une seule (${resumeCommand('<vague>')})`);
   }
   return a;
 }
@@ -646,7 +646,12 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.resume !== undefined && args.stopAfterCurrent) throw new RafError('--resume ne se combine pas avec --stop-after-current (il reprend la vague, il ne l\'arrête pas)');
   // L228 : la reprise n'a pas de simulation — elle relève le budget, réécrit wave.json et relance les sessions. Refusée ici, avant le réexec de l'instantané (une vague ancienne ne connaît pas ce refus).
   // L309 : la reprise rejoue les lots de la vague ; des lots à lancer seraient ignorés en silence (--continue, lui, tire la suite du plan après la reprise : L147).
-  if (args.resume !== undefined && args.lots.length) throw new RafError('--resume ne se combine pas avec des lots à lancer (il reprend les lots de la vague ; --answer, --drop, --integrate, --replay et --budget projet:lot=+N nomment ceux qu\'ils visent)');
+  if (args.resume !== undefined && args.lots.length) {
+    // Un id de vague qui ressemble à un lot (`--resume suite2`) est lu comme un lot à lancer : le refus donne la forme qui le désigne comme vague.
+    const asWave = args.lots.find((l) => l.project === undefined && l.model === undefined && RunStore.find(launch, l.lot));
+    const hint = asWave ? `« ${asWave.lot} » est une vague de ce dossier : ${resumeCommand(asWave.lot)}` : `pour désigner la vague : ${resumeCommand('<vague>')}`;
+    throw new RafError(`--resume ne se combine pas avec des lots à lancer (il reprend les lots de la vague ; --answer, --drop, --integrate, --replay et --budget projet:lot=+N nomment ceux qu'ils visent) ; ${hint}`);
+  }
   if (args.resume !== undefined && args.dryRun) throw new RafError('--resume ne se combine pas avec --dry-run (la reprise écrit l\'état de la vague et relance les sessions, elle ne se simule pas)');
   if (args.lotBudgets.length && args.resume === undefined) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume");
   // L279 : --integrate rejoue une intégration rendue, donc une vague arrêtée ; --abandon-commits ne vaut qu'avec --remove-worktree.
@@ -1089,7 +1094,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
       // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.
       if (c.tree?.active && c.lot.status !== 'ready') wctx.log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : worktree conservé : ${c.tree.dir} (branche ${c.tree.branch})`);
       // Un lot rendu à l'étape d'intégration (`next: integrate`) : la ligne donne la commande qui le reprend (L279, R27).
-      if (c.tree?.active && c.lot.status === 'handed-back' && c.lot.next === 'integrate') wctx.log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : rendu à l'intégration : reprise par cadence orchestrate --resume ${wctx.id} --integrate ${lotKey(c.lot.project, c.lot.lot)}`);
+      if (c.tree?.active && c.lot.status === 'handed-back' && c.lot.next === 'integrate') wctx.log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : rendu à l'intégration : reprise par ${resumeCommand(wctx.id, '--integrate', lotKey(c.lot.project, c.lot.lot))}`);
       // Un dépôt dont tous les lots de la vague (reprise comprise) sont prêts ou rendus peut être livré pendant que la vague continue ailleurs.
       if (wctx.incident) return;
       for (const r of lotRepoPaths(c.lot)) {
@@ -1154,7 +1159,7 @@ function control(args: Args, io: OrchestrateIo): number {
   if (args.stopAfterCurrent) {
     store.requestStopAfterCurrent();
     store.journal('demande : arrêt après les sessions en cours');
-    io.out(`vague ${store.id} : arrêt demandé — les sessions en cours finissent, aucune autre ne part ; reprise par « cadence orchestrate --resume ${store.id} »`);
+    io.out(`vague ${store.id} : arrêt demandé — les sessions en cours finissent, aucune autre ne part ; reprise par « ${resumeCommand(store.id)} »`);
   }
   return 0;
 }
@@ -1163,7 +1168,7 @@ function control(args: Args, io: OrchestrateIo): number {
 function singleUnfinished(launch: string): RunStore {
   const open = RunStore.unfinished(launch);
   if (open.length === 0) throw new RafError('aucune vague à reprendre dans ce dossier');
-  if (open.length > 1) throw new RafError(`plusieurs vagues non terminées dans ce dossier, laquelle reprendre ?\n${open.map((s) => `  ${s.id} (${s.readWave()?.status ?? 'illisible'}, lancée ${s.readWave()?.created ?? '?'})`).join('\n')}\nreprise : cadence orchestrate --resume <vague>`);
+  if (open.length > 1) throw new RafError(`plusieurs vagues non terminées dans ce dossier, laquelle reprendre ?\n${open.map((s) => `  ${s.id} (${s.readWave()?.status ?? 'illisible'}, lancée ${s.readWave()?.created ?? '?'})`).join('\n')}\nreprise : ${resumeCommand('<vague>')}`);
   return open[0];
 }
 

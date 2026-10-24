@@ -161,11 +161,17 @@ export function blockingLots(lots: LotState[], repo: string, sha: string, ancest
 const BASELINE_LISTED = 30;
 
 /**
- * La commande qui répond à une question (L309) : elle nomme la vague, car `--resume` sans vague est refusé dès que le dossier en garde plusieurs non terminées.
- * `--resume --wave <id>` (et non `--resume <id>`) : un id qui ressemble à un lot (`suite2`) serait lu comme un lot à lancer sans `--wave`.
+ * La commande de reprise d'une vague, SEULE forme que le programme imprime (L309) : `--resume --wave <id>` et non `--resume <id>`, car un id qui ressemble à un lot
+ * (`suite2`) est lu comme un lot à lancer sans `--wave` (et refusé), et `--resume` sans vague est refusé dès que le dossier en garde plusieurs non terminées.
+ * `extra` : les options qui suivent (`--drop a:L1`, `--integrate a:L1`...).
  */
+export function resumeCommand(waveId: string, ...extra: string[]): string {
+  return ['cadence orchestrate --resume --wave', waveId, ...extra].join(' ');
+}
+
+/** La commande qui répond à une question (L309) : la reprise ci-dessus, avec `--answer`. */
 export function resumeAnswerHint(waveId: string, l: Pick<LotState, 'project' | 'lot'>): string {
-  return `cadence orchestrate --resume --wave ${waveId} --answer ${l.project}:${l.lot} "…"`;
+  return resumeCommand(waveId, '--answer', `${l.project}:${l.lot}`, '"…"');
 }
 
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. */

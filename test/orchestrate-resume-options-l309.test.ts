@@ -56,10 +56,29 @@ describe('orchestrate --resume : une option ignorée est refusée (L309)', () =>
     wave(launch, 'finie', '2026-10-22T10:00:00', 'done');
     const { d, calls } = deps();
     const err = await orchestrate(['--resume', '--budget', '3M'], io(launch).io, d).then(() => '', (e: Error) => e.message);
-    expect(err).toMatch(/plusieurs vagues non terminées[^]*recente[^]*vieille[^]*--resume <vague>/);
+    expect(err).toMatch(/plusieurs vagues non terminées[^]*recente[^]*vieille[^]*--resume --wave <vague>/);
     expect(err).not.toMatch(/finie/);
     expect(calls).toEqual([]);
     expect(new RunStore(launch, 'vieille').readWave()!.budget).toBe(1_000_000);
+  });
+
+  it('R3b — la consigne du refus multi-vagues, avec une vague suite2, est une commande qui désigne la vague et n\'est pas refusée', async () => {
+    const launch = tempDir();
+    wave(launch, 'suite2', '2026-10-19T10:00:00', 'interrupted');
+    wave(launch, 'recente', '2026-10-24T20:30:00', 'interrupted');
+    const err = await orchestrate(['--resume'], io(launch).io, deps().d).then(() => '', (e: Error) => e.message);
+    const printed = /reprise : cadence orchestrate ([^\n]*)/.exec(err)![1].replace('<vague>', 'suite2');
+    expect(parseOrchestrateArgs(printed.split(' '))).toMatchObject({ resume: 'suite2', lots: [] });
+    // Même forme sur l'orchestrate complet : la vague est trouvée (ni refus « lots à lancer », ni « vague inconnue », ni autre vague reprise).
+    await expect(orchestrate(printed.split(' '), io(launch).io, deps().d)).resolves.toBe(0);
+  });
+
+  it('R3c — « --resume suite2 » (id lu comme un lot) : le refus donne la forme --resume --wave suite2 quand c\'est une vague du dossier, sinon un rappel', async () => {
+    const launch = tempDir();
+    wave(launch, 'suite2', '2026-10-19T10:00:00', 'interrupted');
+    const d = deps().d;
+    await expect(orchestrate(['--resume', 'suite2', '--drop', 'a:L1'], io(launch).io, d)).rejects.toThrow(/lots à lancer[^]*« suite2 » est une vague de ce dossier : cadence orchestrate --resume --wave suite2/);
+    await expect(orchestrate(['--resume', 'zz9'], io(launch).io, d)).rejects.toThrow(/lots à lancer[^]*cadence orchestrate --resume --wave <vague>/);
   });
 
   it('R4 — les vagues non terminées : les terminées ne comptent pas, la plus récente d\'abord', () => {

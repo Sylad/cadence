@@ -151,6 +151,24 @@ describe('orchestrate --drop / --stop-after-current sur une vague vivante', () =
     expect(store.readLot('b', 'L1')!.status).toBe('suspended');
   });
 
+  it('L309 — la commande de reprise imprimée après --stop-after-current désigne la vague (id qui ressemble à un lot : suite2)', async () => {
+    const parent = parentWith(['a']);
+    let printed = '';
+    const { d } = deps(async (kind) => {
+      if (kind === 'implement' && !printed) {
+        const r = io(parent);
+        expect(await orchestrate(['--stop-after-current', '--wave', 'suite2'], r.io, d)).toBe(0);
+        printed = /« (cadence orchestrate [^»]*) »/.exec(r.out.join('\n'))![1];
+      }
+    });
+    await orchestrate(['a:L1', '--wave', 'suite2'], io(parent).io, d);
+    expect(printed).toContain('--resume --wave suite2');
+    // Relue par l'analyse : elle désigne la vague et ne se heurte pas au refus « lots à lancer ».
+    const argv = printed.replace('cadence orchestrate ', '').split(' ');
+    expect(parseOrchestrateArgs(argv)).toMatchObject({ resume: 'suite2', lots: [] });
+    await expect(orchestrate(argv, io(parent).io, deps(() => {}).d)).resolves.toBeTypeOf('number');
+  });
+
   it('refus (code 2) : aucune vague vivante, lot inconnu ou déjà fini', async () => {
     const parent = parentWith(['a']);
     const none = io(parent);

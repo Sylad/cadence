@@ -6,6 +6,7 @@ import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/re
 import { sharedStateDir } from '../src/state.js';
 import { lockViolations, redSha, resealAcceptation, resealedRouge, sealAcceptation, setVert } from '../src/orchestrate/accept.js';
 import { run } from '../src/cli.js';
+import { parseOrchestrateArgs } from '../src/orchestrate/command.js';
 import { DISALLOWED } from '../src/orchestrate/launch.js';
 import { gitRepo, tempDir } from './helpers.js';
 import { newLot, RunStore, type LotState, type WaveState } from '../src/orchestrate/state.js';
@@ -231,7 +232,7 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       const r = reseal(repo, a.test);
       expect(r.code).toBe(2);
       expect(r.err).toContain(`vague ${WAVE} (arrêtée, lancée depuis ${repo}) : ici:L1 (question)`);
-      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume ${WAVE} --drop ici:L1`);
+      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume --wave ${WAVE} --drop ici:L1`);
       expect(sujet(repo)).toBe('plan: L1');
     });
 
@@ -240,8 +241,18 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L2', status: 'question' }]);
       const r = reseal(repo, a.test);
       expect(r.code).toBe(2);
-      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume ${WAVE} --drop ici:L2`);
+      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume --wave ${WAVE} --drop ici:L2`);
       expect(sujet(repo)).toBe('plan: L1 L2');
+    });
+
+    it('L309 — la commande à lancer désigne la vague par --wave : un id qui ressemble à un lot (suite2) n\'est pas lu comme un lot à lancer', () => {
+      const { repo, a } = avecPlan();
+      corrige(repo, a.test);
+      vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L1', status: 'question' }], 'interrupted', 'suite2');
+      const r = reseal(repo, a.test);
+      const printed = /&& (cadence orchestrate [^\n]*)/.exec(r.err)![1];
+      expect(printed).toBe('cadence orchestrate --resume --wave suite2 --drop ici:L1');
+      expect(parseOrchestrateArgs(printed.replace('cadence orchestrate ', '').split(' '))).toMatchObject({ resume: 'suite2', lots: [], drop: [{ project: 'ici', lot: 'L1' }] });
     });
 
     it('cite TOUTES les vagues en cause avec UNE commande par vague (un --drop par lot), depuis le dossier de lancement de chacune', () => {
@@ -251,9 +262,9 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       vagueOuverte(repo, [{ project: 'ici', repo, lot: 'L2', status: 'queued' }], 'interrupted', '2026-10-17-1100');
       const r = reseal(repo, a.test);
       expect(r.code).toBe(2);
-      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume 2026-10-17-1000 --drop ici:L1 --drop ici:L2`);
-      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume 2026-10-17-1100 --drop ici:L2`);
-      expect(r.err.match(/cadence orchestrate --resume 2026-10-17-1000/g)).toHaveLength(1);
+      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume --wave 2026-10-17-1000 --drop ici:L1 --drop ici:L2`);
+      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume --wave 2026-10-17-1100 --drop ici:L2`);
+      expect(r.err.match(/cadence orchestrate --resume --wave 2026-10-17-1000/g)).toHaveLength(1);
       expect(sujet(repo)).toBe('plan: L1 L2');
     });
 
@@ -266,7 +277,7 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }, { project: 'ici', repo, lot: 'L2', status: 'queued' }]);
       const r = reseal(repo, a.test);
       expect(r.code).toBe(2);
-      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume ${WAVE} --drop ici:L1 --drop ici:L2`);
+      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume --wave ${WAVE} --drop ici:L1 --drop ici:L2`);
       expect(r.err).toContain('ici:L2 (queued, pas en cours au plan)');
       expect(sujet(repo)).toBe('plan: L2');
     });
@@ -277,7 +288,7 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       const { repo, a } = avecPlan('doing', parent);
       corrige(repo, a.test);
       vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }]);
-      expect(reseal(repo, a.test).err).toContain(`cd '${parent}' && cadence orchestrate --resume ${WAVE} --drop ici:L1`);
+      expect(reseal(repo, a.test).err).toContain(`cd '${parent}' && cadence orchestrate --resume --wave ${WAVE} --drop ici:L1`);
     });
 
     it('trouve une vague lancée depuis un dossier au-dessus du dépôt (le cas réel : le dossier parent des projets), le dossier de lancement figure dans le message', () => {
@@ -287,7 +298,7 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       vagueOuverte(parent, [{ project: 'ici', repo, lot: 'L1', status: 'question' }]);
       const r = reseal(repo, a.test);
       expect(r.code).toBe(2);
-      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume ${WAVE} --drop ici:L1`);
+      expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume --wave ${WAVE} --drop ici:L1`);
       expect(sujet(repo)).toBe('plan: L1');
     });
 
@@ -368,8 +379,8 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
         expect(r.err).toContain(`vague 2026-10-17-1100 (vivante, pid ${process.pid}, lancée depuis ${parent}) : ici:L2 (question)`);
         expect(r.err).toContain('vague 2026-10-17-1100 : orchestration en cours, à attendre');
         expect(r.err).toContain(`vague 2026-10-17-1000 (arrêtée, lancée depuis ${parent}) : ici:L1 (question)`);
-        expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume 2026-10-17-1000 --drop ici:L1`);
-        expect(r.err).not.toContain('--resume 2026-10-17-1100');
+        expect(r.err).toContain(`cd ${parent} && cadence orchestrate --resume --wave 2026-10-17-1000 --drop ici:L1`);
+        expect(r.err).not.toContain('--resume --wave 2026-10-17-1100');
         expect(sujet(repo)).toBe('plan: L1 L2');
       } finally {
         finVivante(repo);
@@ -402,8 +413,8 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
       const r = reseal(repo, a.test);
       expect(r.code).toBe(2);
       expect(r.err).toContain('2 vagues non terminées gardent');
-      expect(r.err).toContain('--resume 2026-10-17-1000 --drop ici:L1');
-      expect(r.err).toContain('--resume 2026-10-17-1100 --drop ici:L1');
+      expect(r.err).toContain('--resume --wave 2026-10-17-1000 --drop ici:L1');
+      expect(r.err).toContain('--resume --wave 2026-10-17-1100 --drop ici:L1');
     });
   });
 
@@ -476,7 +487,7 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
       vague(repo, [{ lot: 'L3', status: 'question' }]);
       const r = reseal(repo, a.test);
       expect(r.code).toBe(2);
-      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume 2026-10-17-1720 --drop ici:L3`);
+      expect(r.err).toContain(`cd ${repo} && cadence orchestrate --resume --wave 2026-10-17-1720 --drop ici:L3`);
       expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('plan: L3');
     });
 

@@ -645,7 +645,7 @@ describe('--status : créneaux libres et vague choisie (L141)', () => {
     expect(r.out.join('\n')).not.toContain('vague ol-gains-1 :');
   });
 
-  it('RunStore.last avec unfinished (--resume sans identifiant) prend la dernière lancée non terminée, pas la dernière par ordre alphabétique', async () => {
+  it('RunStore.unfinished range les vagues non terminées de la plus récente lancée à la plus ancienne (pas par ordre alphabétique) et ignore les terminées', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }] });
     expect(await orchestrate(['a:L1', '--wave', '2026-10-09-1253'], io(parent).io, fakeDeps().deps)).toBe(0);
     const base = new RunStore(parent, '2026-10-09-1253').readWave()!;

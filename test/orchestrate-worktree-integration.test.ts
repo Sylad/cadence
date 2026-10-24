@@ -7,6 +7,7 @@ import { INTEGRATION_LOCK } from '../src/orchestrate/integrate.js';
 import { cadenceHome, liveSlots } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { branches, conflictWave, fake, inWorktree, lotOf, meeting, planOf, run, setup, sharedFile, store, subjects, writes } from './orchestrate-worktree-harness.js';
+import { parseOrchestrateArgs } from '../src/orchestrate/command.js';
 import { tempDir } from './helpers.js';
 
 // L279 — C2 : l'intégration d'un lot prêt à la branche du dépôt (R4 à R9, R17, R22 à R25), de bout en bout.
@@ -100,7 +101,13 @@ describe('R6 — un conflit au rebase d\'intégration est rendu au lead', () => 
   });
   it('R6 — la sortie cite la commande qui reprend le lot rendu à l\'intégration', async () => {
     const { r } = await conflict();
-    expect(r.out).toContain('orchestrate : a:L1 : rendu à l\'intégration : reprise par cadence orchestrate --resume 2026-10-04-1412 --integrate a:L1');
+    expect(r.out).toContain('orchestrate : a:L1 : rendu à l\'intégration : reprise par cadence orchestrate --resume --wave 2026-10-04-1412 --integrate a:L1');
+  });
+  it('L309 — la commande de reprise imprimée désigne la vague (id qui ressemble à un lot : suite2) et n\'est pas lue comme un lot à lancer', async () => {
+    const { parent } = setup([{ title: 'un' }, { title: 'deux' }]);
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2', '--wave', 'suite2'], fake({ implement: sharedFile(parent + '/a') }));
+    const printed = /reprise par (cadence orchestrate [^\n]*)/.exec(r.out)![1];
+    expect(parseOrchestrateArgs(printed.replace('cadence orchestrate ', '').split(' '))).toMatchObject({ resume: 'suite2', lots: [], integrate: [{ project: 'a', lot: 'L1' }] });
   });
   it('R6 — après le conflit, la branche du dépôt est au même sha qu\'avant et le worktree du lot est intact', async () => {
     const { parent, repo } = await conflict();

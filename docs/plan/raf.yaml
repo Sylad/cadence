@@ -3167,10 +3167,11 @@ lots:
     created: 2026-10-23
   - id: L279
     title: "orchestrate : un worktree par lot dans une vague (git worktree add par lot, fusion par cherry-pick ou rebase au « prêt »), pour que deux lots indépendants d'un même dépôt avancent en parallèle dans la limite des créneaux ; verrou de dépôt adapté ; conflits rendus au lead ; tests. Vécu 23-10 : L261 (4 corrections) a bloqué la file cadence ; étude de faisabilité d'abord (spec)"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-23
+    started: 2026-10-24
   - id: L280
     title: "perf : recaler estimate et budgets des lots sur la mesure — tokens par lot +26 % sur deux fenêtres (0,25 j : 117→148 k ; 0,5 j : 327→412 k) pendant que la part conforme du premier coup passe de 37 à 59 % ; budgets par défaut d'orchestrate et seuils de cadence perf dérivés des fenêtres mesurées, étapes spec (1,3→4,2 min), maquette (4,5→7,1) et ux (6,5→8,5) expliquées ou bornées ; décision Sylvain 23-10"
     status: done

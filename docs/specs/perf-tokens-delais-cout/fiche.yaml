@@ -83,9 +83,9 @@ cas:
 regles:
   - id: R1
     cas: [C1, C2]
-    enonce: "Les nouveaux indicateurs se calculent dans les mêmes deux fenêtres de 7 jours que L225 (mêmes bornes, même --since, même troncature) et suivent le même ⚠ : dégradation relative de plus de 25 % de la courante sur la précédente, au moins 5 lots (ou 5 étapes pour la durée par étape) dans chaque fenêtre, valeur précédente non nulle, aucune fenêtre tronquée, n/d sans ⚠."
+    enonce: "Les nouveaux indicateurs se calculent dans les mêmes deux fenêtres de 7 jours que L225 (mêmes bornes, même --since, même troncature) et suivent le même ⚠ : dégradation relative de plus de 25 % de la courante sur la précédente, au moins 5 lots (ou 10 étapes pour la durée de mur par étape, amendement du lot L280 : sous 10 étapes la variation n'est pas interprétable) dans chaque fenêtre, valeur précédente non nulle, aucune fenêtre tronquée, n/d sans ⚠."
     statut: sourcee
-    source: "titre du lot L226 : « mêmes fenêtres et ⚠ que le lot précédent » ; src/perf.ts:27 (DEGRADATION = 0,25), src/perf.ts:29 (MIN_SAMPLE = 5), perf.ts perfWindows"
+    source: "titre du lot L226 : « mêmes fenêtres et ⚠ que le lot précédent » ; src/perf.ts:27 (DEGRADATION = 0,25), src/perf.ts:29 (MIN_SAMPLE = 5), perf.ts perfWindows ; durée de mur par étape : src/perf.ts:33 (MIN_STEPS = 10, lot L280, docs/perf/recalage-2026-10-24.md)"
     tests: ["R1 — délai création → done 4 j → 6 j sur 5 lots par fenêtre : ⚠ ; 4 j → 5 j : pas de ⚠", "R1 — 4 lots dans la courante : pas de ⚠ et la ligne dit « pas de tendance : échantillon »", "R1 — fenêtre tronquée par --since : pas de ⚠ sur les nouvelles lignes", "R1 — les fonctions de fenêtre et de ⚠ sont celles de L225 (un lot rendu au 8e jour passé est dans la précédente)"]
   - id: R2
     cas: [C1]

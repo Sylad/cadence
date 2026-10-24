@@ -3328,9 +3328,10 @@ lots:
     review: { date: 2026-10-24, verdict: "conforme, 0 bloquant, 0 majeur ; 2 notes mineures de documentation (phrase redondante de la clé precheck, tiret absent du paragraphe de détail de la ligne 220) — orchestré (vague 2026-10-24-1340, 0 passe(s) de correction)", commit: a3494af982dec1e62dea068c915b5ce1bed81d7f }
   - id: L296
     title: "orchestrate précheck : décider le critère du titre de L288 sur la mesure — il fait perdre 7 des 17 « oui » réels (L171, L68, Q-LBL3, Q-NOW5, Q4/dashboard-21-mesure-prod, Q4/qa-expectations, Q4/qa-expectations-nouveautes ; leurs titres ne citent rien) contre 33 % de prechecks évités (≈ 20 k tokens chacun) ; options : retirer le critère et faire le précheck de tout lot sans commit par le modèle local (hors quota) après mesure de concordance local/Sonnet sur les 17 « oui » et 20 « partiel » ; tests. Revue L292 24-10"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

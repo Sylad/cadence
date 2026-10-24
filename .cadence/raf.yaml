@@ -3559,13 +3559,15 @@ lots:
     finished: 2026-10-25
   - id: L316
     title: "Essai 3 mesuré du mode worktree (suite L310) : deux lots neufs et indépendants (L315 dans src/orchestrate, L265 dans src/ref) avec orchestrate.worktrees: true et CADENCE_EXPERIMENTAL_WORKTREES=1, après L311 et L314 en service (b2e6273) ; mesure : temps de mur contre somme des lots, intégrations automatiques (rebase, union CHANGELOG L314, verdict reporté ou revue courte), incidents ; conclusion en note (proposer l'activation par défaut à Sylvain, garder expérimental, ou corriger) ; config remise à false après l'essai sauf décision"
-    status: doing
+    status: done
     estimate: 0.05
     created: 2026-10-24
     started: 2026-10-24
     notes:
       - { date: 2026-10-25, text: "25-10 00 h (lead) — essai 3 (vague 2026-10-24-essai-wt3, deux lots neufs L315 + L265) : mur 38 min contre 49 min en série (11 + 38 ; gain 11 min, 22 %, borné par le lot long) ; deux intégrations AUTOMATIQUES sur un main qui a bougé entre les deux (5aca8fa..04ac7a6 puis f7cafce..9940fb6), deux verdicts reportés par patch-id identique, aucun conflit, aucune intervention du lead dans l'intégration ; suite 3482 verts au lead après l'essai. Incident hors worktree : la porte docs.sync a lancé une correction qui n'a rien commité et le lot est passé prêt avec un écart raf check (L319). BILAN des trois essais : parallèle réel (−45 %, −22 %), reprise de branche corrigée (L311), union CHANGELOG (L314), intégration et report de verdict éprouvés sans incident sur 3 lots. Recommandation du lead : proposer à Sylvain l'activation par défaut (décision à lui). Config remise à false en attendant." }
-    review: { date: 2026-10-25, verdict: "conforme : lot d'essai, commits de config seuls (bascule orchestrate.worktrees, remise à false cadence.yaml:12), aucun code ; mesure et bilan en note (lead)", commit: c3178afac128529b683d00f4faa0b45d9780643f }
+      - { date: 2026-10-25, text: "Correctif de la note précédente : le lot de la porte docs.sync est L317 (pas L319) ; L318 = resumedReviewed (suite L315), L319 = ref analyse (suites L265)." }
+    review: { date: 2026-10-25, verdict: "conforme : lot d'essai, commits de config seuls (bascule orchestrate.worktrees, remise à false vérifiée cadence.yaml:12 dans 6f… dernier commit), aucun code ; mesure et bilan en note (lead)", commit: fe373696961977c2e8d5caa42017d78ab6aa3c2b }
+    finished: 2026-10-25
   - id: L317
     title: "orchestrate : une correction lancée par la porte docs.sync (« documentation en retard », cycle.ts:1882) qui ne commite rien laisse passer le lot à la revue (« ⚠ fix sans nouveau commit ») et il finit prêt alors que raf check reste rouge (vécu essai 3, 24-10 : L315, cycle.ts sans doc) ; soit la session écrit la doc, soit l'écart est acquitté explicitement et motivé (raf docs-ok <lot> --reason, lu par docSyncIssues et par la porte) ; jamais prêt avec un écart docs.sync ouvert ; tests"
     status: todo

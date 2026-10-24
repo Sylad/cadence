@@ -3520,9 +3520,10 @@ lots:
     review: { date: 2026-10-24, verdict: "compliant (2 minor notes: window dates in docs/perf.md, wording of the over-budget count in the note) — orchestré (vague 2026-10-24-2235, 0 passe(s) de correction)", commit: ce0f621b95886f338c0839175a3e7037f8643923 }
   - id: L313
     title: "ref add (suites revue L274, valeurs de code OMM) : « indicator figures 1 to 6, 8 and 9 » (WMO-306 vol. I.1 p. 46) ne cite plus les vraies Figures 2, 3, 4 ; « code » porté par la phrase d'une plage au demi-cadratin (306_i1 p. 39 : 2 faux liens non résolus nouveaux) ; « code » en fin de la page précédente (vol. I.2 p. 1327) ; test de la garde « code table » ; chiffres de l'entrée L274 du CHANGELOG remesurés sur le code livré (ils valent pour bca690d) ; différentiel avant/après sur les PDF de maritime cité dans le commit"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L314
     title: "orchestrate worktrees : deux lots parallèles qui ajoutent chacun une entrée sous [Unreleased] du CHANGELOG entrent en conflit à l'intégration du second (vécu essai 2 de L310, 24-10 : L309 rebasé sur L274, conflit ### Added / ### Fixed résolu à la main par le lead) — conflit systématique dès que docs.sync impose l'entrée au lot ; résoudre ces conflits d'ajout pur dans CHANGELOG.md (union par section, ordre Keep a Changelog, un seul titre de section) à l'intégration, tout autre conflit reste rendu next: integrate ; tests"
     status: doing

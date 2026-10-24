@@ -101,7 +101,7 @@ export function sourceRules(repo: string, fiche: string, ids: string[], source: 
     r.delete('si_faux');
     changed.push(id);
   }
-  if (changed.length) writeFileSync(file, doc.toString());
+  if (changed.length) writeFileSync(file, doc.toString({ lineWidth: 0 })); // lineWidth 0 : pas de reflux des longues lignes de la fiche
   return changed;
 }
 

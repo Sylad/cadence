@@ -39,6 +39,16 @@ describe('L297 — la réponse du lead source la règle posée en question', () 
     expect(r3).not.toHaveProperty('si_faux');
   });
 
+  it('R2b — le reste de la fiche n\'est pas reformaté : seules les lignes de la règle changent', async () => {
+    const longue = 'mot '.repeat(60).trim();
+    const h = harness({ lots, script: { spec: [spec((d) => { coutR3(d); d.regles[0].enonce = longue; }), rien], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', screen);
+    await runLot(c);
+    answer(c);
+    await runLot(c);
+    expect(readFileSync(join(h.repo, FICHE), 'utf8')).toContain(longue);
+  });
+
   it('R2 — la fiche sourcée est commitée avec le seul fichier de la fiche, avant la session spec reprise', async () => {
     const h = harness({ lots, script: { spec: [spec(coutR3), rien], implement: [impl], review: [ok] } });
     const c = h.lot('L1', screen);

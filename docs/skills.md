@@ -58,6 +58,13 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   verdict for `raf review`. It takes the lot's commits from `raf commits`, never
   runs a build whose output is used live, and never edits code. A README or usage
   documentation that does not follow the lot's change is a *major* finding.
+- **doc-keeper** (agent, L306): any stack; given a repository and a lot id, it reads the diff of the lot and the
+  project's map of documents (`docs.sync` of `cadence.yaml`, README, `docs/`, CHANGELOG, news entries), says which
+  documents must change and where, then updates them in a writing session (explicit paths, `docs(<lot>): …`) or
+  only lists them in a read-only one. `cadence orchestrate` calls it before the review when `docs.sync` reports a
+  document behind the lot; the lead calls it by hand. A document outside the repository only when the folder's
+  `cadence.yaml` names it (`describedBy`): the agent then proposes a lot for that repository's plan and never writes it
+  ([news](news.md#the-librarian-doc-keeper)).
 - **qa-reviewer** (agent): any web app (read-only like `ux-reviewer`: same tool list, no `Edit`, no `Write`); given a repository and a base URL (and
   optionally a lot id, to walk only the pages it touched — those that call the
   changed endpoints, those of the screens it changed, the pages that consume the services the lot changed,

@@ -130,6 +130,10 @@ export interface LotState {
   reviewCounts?: number[];
   /** Vrai une fois la porte « code modifié sans test » jouée (L287) : elle ne se rejoue pas, que la correction ait ajouté un test ou non. */
   testGate?: boolean;
+  /** Vrai une fois le bibliothécaire appelé avant la revue (L306), ou écarté faute de passe ou de budget : il ne se rappelle pas. */
+  docsGate?: boolean;
+  /** Vrai entre la décision de la passe du bibliothécaire et la fin de sa session `fix` : celle-ci reçoit le brief de la documentation et l'agent doc-keeper. */
+  docsFix?: boolean;
   /** Vrai une fois la passe unique de correction des mineurs lancée (revue conforme avec mineurs) ; elle ne se rejoue pas. */
   minorPass?: boolean;
   /** Passes de correction faites quand la passe des mineurs a été décidée : sert à nommer la dernière passe d'écriture jouée. */

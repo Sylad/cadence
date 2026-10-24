@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+import type { DescribedBy } from './config.js';
 import { changedFiles, type Commit } from './git.js';
 
 /** Une paire de la clé `docs.sync` de cadence.yaml : si des commits touchent `paths`, ils touchent aussi un des `docs`. */
@@ -70,5 +72,18 @@ export function docSyncBrief(rules: DocSyncRule[], gaps: DocSyncGap[]): string {
   return [
     'Documentation (cadence.yaml docs.sync): the program computed that the commits of the lot touch code without touching the document that describes it. Report ONE MAJOR finding per line below, quoting the line, unless the change really leaves the document true (say why then):',
     ...gaps.map((g) => `- ${listFiles(g.touched)} changed, but none of ${g.rule.docs.join(', ')} was touched`),
+  ].join('\n');
+}
+
+/**
+ * Consigne du bibliothécaire (L306) sur les documents hors dépôt : seulement ceux que la configuration déclare (`describedBy`, cadence.yaml du dossier parent).
+ * Vide sans entrée. Le bibliothécaire ne les écrit pas : il propose un lot pour le plan de ce dépôt.
+ */
+export function describedByBrief(parent: string, entries: DescribedBy[]): string {
+  if (!entries.length) return '';
+  return [
+    'Documents outside this repository, declared by the configuration (describedBy of the cadence.yaml of the folder above): the project is also described by',
+    ...entries.map((e) => `- \`${e.file}\` of the repository \`${e.repo}\` (${join(parent, e.repo)})`),
+    'If the change makes one of them false or leaves it out, do not edit it and do not touch the plan of that repository: write a proposed lot (a title, then the file, the passage and the sentence to change) and put it in the "resume" of your report, starting with « lot proposé ». Read it to be exact; read it only.',
   ].join('\n');
 }

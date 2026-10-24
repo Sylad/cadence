@@ -197,6 +197,18 @@ orchestrate:
 
 `testGate: false` is the same as no key.
 
+**Librarian before the review** (L306). When `docs.sync` (see [news](news.md#documentation-that-follows-the-code)) reports that
+the commits of the lot touch code without touching the document that describes it, the lot goes to a documentation pass
+before its review: a `fix` session launched with the `doc-keeper` agent (`agents/doc-keeper.md`) and its own brief
+(`fix-docs`), which lists the lines the program computed and asks for the documents to be brought up to date, nothing else. The
+pass counts as one of the two correction passes and plays once per lot: if the librarian touches no document, the review goes
+ahead and carries the gap as before (one major finding per line). It does not play during the minors pass, nor when a
+correction pass is already used (its pass would take the last one), nor when the lot budget no longer pays it and the review after
+it (a warning `bibliothécaire non appelé` says so each time; the review goes ahead). Without `docs.sync`, or with no gap: no pass.
+When the `cadence.yaml` of the folder above the repository declares `describedBy` for the project, the brief names those
+documents, forbids editing them and asks for a proposed lot in the report; the proposal is the lead's to take into the plan of the other
+repository.
+
 **Effort level per pass** (L137). Each session is launched with `claude -p --effort <level>` (Claude Code 2.1.284; an
 older `claude` is refused at launch unless every pass is `default`). Defaults: `precheck` low (it only reads),
 `implement` and `fix` medium, `review` high (`review-small` follows `review`), `ux` high. A project overrides any of them

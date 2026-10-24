@@ -354,7 +354,7 @@ describe('instantané des gabarits (L39)', () => {
     const dir = tempDir();
     cpSync(TEMPLATES_DIR, dir, { recursive: true });
     const snap = loadTemplates(dir);
-    expect(Object.keys(snap).sort()).toEqual(['accept', 'accept-back', 'fiche', 'fix', 'fix-minors', 'implement', 'maquette', 'precheck', 'review', 'review-recheck', 'review-small', 'spec', 'spec-back', 'ux']);
+    expect(Object.keys(snap).sort()).toEqual(['accept', 'accept-back', 'fiche', 'fix', 'fix-docs', 'fix-minors', 'implement', 'maquette', 'precheck', 'review', 'review-recheck', 'review-small', 'spec', 'spec-back', 'ux']);
     writeFileSync(join(dir, 'review.md'), 'changé {{lot}}\n');
     expect(renderBrief('review', vars, snap)).toContain('Review lot `L9`');
     expect(renderBrief('review', vars, dir)).toBe('changé L9\n');

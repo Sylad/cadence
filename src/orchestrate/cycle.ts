@@ -6,8 +6,8 @@ import { basename, dirname, isAbsolute, join, posix, relative, resolve } from 'n
 import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
-import { readDocsConfig, type OrchestrateConfig } from '../config.js';
-import { docSyncBrief, docSyncGaps, filesOf } from '../docsync.js';
+import { readDescribedBy, readDocsConfig, type OrchestrateConfig } from '../config.js';
+import { describedByBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
 import { changedFiles, gitCommonDir, readCommits, resolveCommit, type Commit } from '../git.js';
@@ -348,6 +348,7 @@ function docsText(c: LotCtx): string {
 /** Gabarit d'une étape : la passe des mineurs et la revue courte qui la suit ont chacune le leur. */
 export function briefName(l: LotState, kind: SessionKind, integration = false): BriefName {
   if (l.specLot && !l.screen && (kind === 'spec' || kind === 'accept')) return `${kind}-back`;
+  if (kind === 'fix' && l.docsFix) return 'fix-docs';
   if (kind === 'fix' && l.minorFix) return 'fix-minors';
   if (kind === 'review-small' && l.minorPass && !integration && !(l.small && l.visible)) return 'review-recheck'; // la revue d'intégration (R17) garde le gabarit qui porte {{integration}}
   return kind;
@@ -476,6 +477,7 @@ function briefFor(c: LotCtx, kind: SessionKind): string {
     if (kind === 'fix') {
       vars.commits = lotCommitLines(c);
       vars.constats = constatLines(l.constats);
+      if (l.docsFix) vars.elsewhere = describedByBrief(dirname(l.repo), readDescribedBy(join(dirname(l.repo), 'cadence.yaml'), basename(l.repo)));
     } else if (interrupted) {
       const mine = lotCommitLines(c);
       vars.commits = mine
@@ -630,7 +632,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       effort,
       local,
       schema: schemaFor(kind),
-      agent: kind === 'spec' ? 'spec-writer' : kind === 'accept' ? 'acceptance-writer' : kind === 'ux' || kind === 'maquette' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : write ? undefined : 'code-reviewer',
+      agent: kind === 'spec' ? 'spec-writer' : kind === 'accept' ? 'acceptance-writer' : kind === 'ux' || kind === 'maquette' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : kind === 'fix' && l.docsFix ? 'doc-keeper' : write ? undefined : 'code-reviewer',
       cwd: wd(c),
       wave: w.id,
       lot: lotKey(l.project, l.lot),
@@ -1710,6 +1712,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const minorsPass = kind === 'fix' && l.minorFix === true;
   const done = await session(c, kind);
   if (!done) return;
+  l.docsFix = false; // la passe du bibliothécaire est jouée : la suite se décide sur son rapport
   l.minorFix = false; // la passe des mineurs est jouée : la suite se décide sur son rapport
   let rep: WorkReport;
   try {
@@ -1852,6 +1855,23 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
       else if (!fixAffordable(l)) l.warnings.push(`porte « code sans test » non jouée : budget du lot (${lotSpent(l)} / ${l.budget} tokens comptés), il ne reste pas de quoi payer la correction et la revue qui la suit (${missing.join(', ')})`);
       else {
         toFix(c, [{ source: 'code', gravite: 'majeur', fichier: missing[0], texte: `code modifié sans test (orchestrate.testGate, vérifié par le programme) : ${missing.join(', ')} — aucun fichier de test touché par les commits du lot. Écris les tests de chaque règle modifiée, nommés d'après la règle (test d'abord), puis commite avec le lot cité.` }], 'code sans test');
+        return;
+      }
+    }
+  }
+  // Bibliothécaire (L306) : docs.sync signale un document en retard sur les commits du lot → une passe doc-keeper avant la revue, une seule fois par lot, aux mêmes conditions de passe et de budget que la porte ci-dessus. Si elle ne touche pas le document, la revue part et porte l'écart (brief docs.sync, constat majeur).
+  if (!l.docsGate && !minorsPass) {
+    const plan = histPlan(c);
+    const { sync } = readDocsConfig(plan.configFile ?? join(wd(c), 'cadence.yaml'));
+    const gaps = sync.length ? docSyncGaps(sync, filesOf(wd(c), lotWork(plan, wd(c), l.lot))) : [];
+    if (gaps.length) {
+      l.docsGate = true;
+      const late = gaps.flatMap((g) => g.touched).join(', ');
+      if (l.pass >= MAX_PASSES - 1) l.warnings.push(`bibliothécaire non appelé : ${l.pass} passe(s) de correction déjà faite(s), sa passe prendrait la dernière et la revue arriverait sans passe pour ses majeurs (${late})`);
+      else if (!fixAffordable(l)) l.warnings.push(`bibliothécaire non appelé : budget du lot (${lotSpent(l)} / ${l.budget} tokens comptés), il ne reste pas de quoi payer sa passe et la revue qui la suit (${late})`);
+      else {
+        l.docsFix = true;
+        toFix(c, gaps.map((g) => ({ source: 'code', gravite: 'majeur', fichier: g.touched[0], texte: gapMessage(l.lot, g) })), 'documentation en retard');
         return;
       }
     }

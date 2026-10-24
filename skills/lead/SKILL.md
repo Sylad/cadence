@@ -183,6 +183,7 @@ is always recorded by the lead's own `raf ux`, never by a subagent.
 
 0. After an orchestrated wave the review is already done, by a fresh session: read the table, then go to
    point 2. For a lot delegated by hand:
+0b. For a lot delegated by hand, `raf check` or the `dérive` column reporting `documentation en retard` is handled **before** the review: hand the lot to the `doc-keeper` agent (a fresh subagent; the absolute path of the project and the lot id; it updates the documents, or only lists them if you say read-only). A proposed lot it returns for a document outside the repository (`describedBy`) is yours to decide: it never writes to that plan.
 1. The `code-reviewer` agent, as a fresh subagent (most capable model), reviews the lot. Give it
    the absolute path of the project and the lot id, **not** the author's report: it reads the diff
    itself from the commits that cite the lot, runs the checks, and returns real defects only,

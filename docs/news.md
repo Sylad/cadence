@@ -150,6 +150,37 @@ to be reported as one **major** finding per line — a stale document is not lef
 memory of a sentence. Touching a document is what the program checks; whether its text is true is
 still the review's reading. The commits of neighbouring repositories (`repos:`) are not audited.
 
+### The librarian: `doc-keeper`
+
+`docs.sync` says *that* a document is behind; the `doc-keeper` agent (L306, `agents/doc-keeper.md`, generic: it knows no
+folder and no project) says *which* passage and writes it. Given a repository and a lot, it reads the diff of the lot
+(the commits that cite it), draws the map of the project's documents (the `docs.sync` rules, the README, the pages of
+`docs/`, the CHANGELOG, the news entries, the architecture document), lists the documents the change makes false or leaves
+out, then:
+
+- **writing session**: updates them and commits with explicit paths and `docs(<lot>): …`;
+- **read-only session** (no write tool, or a brief that says so): changes nothing and lists, document by document, the
+  passage to write.
+
+`cadence orchestrate` calls it by itself when `docs.sync` reports a document behind the commits of the lot, **before the
+review** (see « Librarian before the review » in [orchestrate](orchestrate.md)); the lead calls it by hand otherwise
+([lead](lead.md)).
+
+A document **outside the repository** is the librarian's only when the configuration names it. The key `describedBy` is
+absent by default; it goes in the `cadence.yaml` of the folder above the repositories and says « this project is also
+described by this file of that repository »:
+
+```yaml
+describedBy:
+  - project: my-app             # the folder name of the project (the repository the lot is in)
+    repo: showcase-site         # a repository next to it, relative to the folder of this cadence.yaml
+    file: src/studies/my-app.mdx
+```
+
+The librarian then reads that file and, when the change makes it false, **proposes a lot** for the plan of that repository
+(a title, then the file, the passage and the sentence to change) in the `resume` of its report, starting with
+« lot proposé ». It never edits that file and never writes to that plan: the lead decides whether the lot enters it.
+
 ### An article elsewhere that follows the delivery
 
 A case study that lives in a neighbouring repository (the project's article on a showcase site) goes stale

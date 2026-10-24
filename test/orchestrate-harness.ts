@@ -75,6 +75,7 @@ export function kindOf(args: string[]): Call['kind'] {
   if (agent === 'ux-reviewer') return brief.includes('UX review of the mockup') ? 'maquette' : 'ux';
   if (agent === 'spec-writer') return 'spec';
   if (agent === 'acceptance-writer') return 'accept';
+  if (agent === 'doc-keeper') return 'fix';
   if (agent === 'code-reviewer' && brief.includes('Sheet review of lot')) return 'fiche';
   if (agent === 'code-reviewer') return brief.includes('single pass') || brief.includes('short re-review') ? 'review-small' : 'review';
   return brief.includes('found the defects below') || brief.includes('found only minor findings') ? 'fix' : 'implement';
@@ -128,7 +129,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; scree
     if (!next) throw new Error(`pas de réponse scénarisée pour ${kind}`);
     return next(call);
   };
-  const agents: Record<string, AgentDef> = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'StructuredOutput'] }, 'ux-reviewer': { description: 'd', prompt: 'p' }, 'precheck-reader': { description: 'd', prompt: 'p', tools: ['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput'] }, 'spec-writer': { description: 'd', prompt: 'p', tools: ['Read', 'Write', 'Edit', 'Bash', 'StructuredOutput'] }, 'acceptance-writer': { description: 'd', prompt: 'p', tools: ['Read', 'Write', 'Edit', 'Bash', 'StructuredOutput'] } };
+  const agents: Record<string, AgentDef> = { 'code-reviewer': { description: 'd', prompt: 'p', tools: ['Read', 'StructuredOutput'] }, 'ux-reviewer': { description: 'd', prompt: 'p' }, 'precheck-reader': { description: 'd', prompt: 'p', tools: ['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput'] }, 'spec-writer': { description: 'd', prompt: 'p', tools: ['Read', 'Write', 'Edit', 'Bash', 'StructuredOutput'] }, 'acceptance-writer': { description: 'd', prompt: 'p', tools: ['Read', 'Write', 'Edit', 'Bash', 'StructuredOutput'] }, 'doc-keeper': { description: 'd', prompt: 'p', tools: ['Read', 'Grep', 'Glob', 'Bash', 'Write', 'Edit', 'StructuredOutput'] } };
   const wave: WaveCtx = {
     id: 'w1',
     store,

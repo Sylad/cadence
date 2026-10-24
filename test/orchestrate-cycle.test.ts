@@ -452,7 +452,7 @@ describe('contrôles autour des sessions', () => {
     writeFileSync(join(h.repo, 'cadence.yaml'), 'docs:\n  sync:\n    - paths: [src-*.txt]\n      docs: [README.md]\n');
     git(h.repo, 'add', '--', 'cadence.yaml');
     git(h.repo, 'commit', '-q', '-m', 'chore(L1): docs.sync', '--', 'cadence.yaml');
-    const c = h.lot('L1');
+    const c = h.lot('L1', { docsGate: true });
     await runLot(c);
     const brief = h.calls[1].brief;
     expect(brief).toContain('docs.sync');

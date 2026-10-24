@@ -114,6 +114,15 @@ page.
 
 The held sessions are kept in the `holds/` folder of the cadence home (`CADENCE_HOME`, shared by every folder and every wave). While at least one is held, the line of the live waves of `cadence orchestrate --status` and of `cadence lead tour` gains a segment and subtracts them: `vagues en cours : 1 · sessions en cours : 0 · sessions du lead : 1 (correctif-L12) · créneaux libres : 0 sur 3`. A held session alone is enough to print the line (`vagues en cours : 0`). It is a display, like the rest of the slots line: a hold blocks no session and never raises the cap (a wave that is already running keeps its own slot counting), and the `lead` skill declares every hand-started session with it.
 
+## The librarian by hand
+
+For a lot the lead delegated by hand, `raf check` or the `dérive` column of `cadence lead tour` reporting `documentation en retard` is
+handled before the review, as an orchestrated wave does it: the lead hands the project (absolute path) and the lot id to the
+`doc-keeper` agent ([skills](skills.md), [news](news.md#the-librarian-doc-keeper)), in a writing session, or read-only when it
+only wants the list of the documents to change (L306). A document outside the repository is named by the `describedBy` key
+of the `cadence.yaml` of the folder, never guessed; the agent proposes a lot for the plan of that repository, in the `resume` of its
+report, and the lead decides whether to add it (`raf add` in that repository). The agent never writes to that plan.
+
 ## lead tour
 
 `cadence lead tour [folder] [--idle 3] [--depth n] [--json]` is the lead's morning table, with no model in

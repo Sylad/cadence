@@ -30,6 +30,8 @@ export interface BriefVars {
   integration?: string;
   /** Consigne docs.sync (L143) de la revue : les écarts calculés par le programme, à passer en constat majeur ; vide sans règle déclarée. */
   docs?: string;
+  /** Consigne du bibliothécaire (L306) sur les documents hors dépôt déclarés par `describedBy` ; vide ailleurs et sans clé. */
+  elsewhere?: string;
   /** Consigne de l'étape spec (L171) : dossier, largeurs, commande de rendu, écarts de la passe précédente ; vide ailleurs. */
   spec?: string;
   /** Consigne de l'étape accept (L173) : fiche, maquette, commande dédiée, gabarit du lanceur, écarts de la passe précédente ; vide ailleurs. */
@@ -99,8 +101,8 @@ export function shotsText(captureDir: string): string {
   return `The Playwright server resolves a file name you give it against the repository, not against its output directory: a bare name such as page-home.png lands at the repository root. Give every screenshot, snapshot and trace the absolute path of the wave's capture directory, \`${captureDir}/\`, followed by the name (e.g. \`${captureDir}/page-home.png\`): the server allows it, and the repository stays clean. Never the \`--output-dir\` option (the server's launch argument, which a session cannot set).`;
 }
 
-/** Un gabarit : un par étape, plus deux variantes (passe des mineurs, revue courte qui la suit). */
-export type BriefName = SessionKind | 'fix-minors' | 'review-recheck' | 'spec-back' | 'accept-back';
+/** Un gabarit : un par étape, plus les variantes (passe des mineurs, passe du bibliothécaire, revue courte qui suit la passe des mineurs). */
+export type BriefName = SessionKind | 'fix-minors' | 'fix-docs' | 'review-recheck' | 'spec-back' | 'accept-back';
 
 const FILES: Record<BriefName, string> = {
   precheck: 'precheck.md',
@@ -113,6 +115,7 @@ const FILES: Record<BriefName, string> = {
   implement: 'implement.md',
   fix: 'fix.md',
   'fix-minors': 'fix-minors.md',
+  'fix-docs': 'fix-docs.md',
   review: 'review.md',
   ux: 'ux.md',
   'review-small': 'review-small.md',
@@ -142,7 +145,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

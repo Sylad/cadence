@@ -30,7 +30,7 @@ Réserve : à la classe 0,25 seule, la part sans passe `fix` ne monte pas (84 % 
 
 ## 3. Ce qui est recalé, et ce qui ne l'est pas
 
-- **Budgets : inchangés.** 0 lot sur 322 au-dessus de son budget (20 sur 324 la fenêtre précédente) ; p90 460 k sous 600 k, 408 k sous 540 k, 557 k sous 750 k, 744 k sous 1,3 M. Relever sans dépassement ne servirait à rien (même lecture que `recalage-2026-10-24.md` §2).
+- **Budgets : inchangés.** 0 lot sur 322 au-dessus de son budget (32 sur 324 la fenêtre précédente) ; p90 460 k sous 600 k, 408 k sous 540 k, 557 k sous 750 k, 744 k sous 1,3 M. Relever sans dépassement ne servirait à rien (même lecture que `recalage-2026-10-24.md` §2).
 - **Grille d'estimate de `raf add` et du brief du lead** : ni l'une ni l'autre ne porte de jetons (`raf add --estimate` prend des jours, le brief du lead ne cite aucun coût par classe) ; rien à y recaler. Les 150 k et 440 k restent dans ce document et dans `docs/perf.md`.
 - **Le conseil de `cadence perf`** change (la seule modification de code) : le `⚠ tokens par lot` cite l'étape qui porte la hausse, et quand la part conforme du premier coup monte il ne dit plus « l'estimate est mal calibrée » mais « de la qualité payée, pas une estimate fausse ; juger cette étape (modèle, effort, passes) avant de recaler l'estimate ».
 

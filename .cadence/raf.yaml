@@ -3513,25 +3513,32 @@ lots:
     started: 2026-10-24
   - id: L312
     title: "perf (⚠ tendance deux fenêtres, tour du lead 24-10 soir, décision Sylvain) : tokens par lot en hausse à estimate 0.25 (médiane 150,0 k contre 116,6 k, +29 %) et 0.5 (440,6 k contre 318,7 k, +38 %) alors que la part conforme du premier coup monte (61 % contre 39 %) — ventiler la hausse par étape (precheck, implement, review/review-small, fix), par modèle et par projet sur les deux fenêtres ; recaler ce que la mesure justifie (budgets par catégorie de docs/orchestrate.md « Each lot also has its own budget », grille d'estimate de raf add et du brief du lead) et rien d'autre ; si la hausse vient d'une qualité achetée (revue Opus, passes de mineurs) et pas d'une estimate fausse, le conseil « l'estimate est mal calibrée » de cadence perf ne doit plus sortir seul : il cite l'étape qui porte la hausse ; mesure avant/après et conclusion en note ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant (2 minor notes: window dates in docs/perf.md, wording of the over-budget count in the note) — orchestré (vague 2026-10-24-2235, 0 passe(s) de correction)", commit: ce0f621b95886f338c0839175a3e7037f8643923 }
+    notes:
+      - { date: 2026-10-24, text: "Mesure (lead, 24-10) : aucun recalage de budget ni d'estimate justifié (0 lot sur 322 au-dessus de son budget) ; le ⚠ tokens cite désormais l'étape porteuse et « qualité payée ». Mineurs de revue : docs/perf.md:49 libellé de fenêtre faux (17–24 contre 10–17 au lieu de 18–24 contre 11–17) ; recalage-2026-10-24-soir.md:28 « 32 sur 324 » compte le budget d'époque, à préciser." }
+    finished: 2026-10-24
   - id: L313
     title: "ref add (suites revue L274, valeurs de code OMM) : « indicator figures 1 to 6, 8 and 9 » (WMO-306 vol. I.1 p. 46) ne cite plus les vraies Figures 2, 3, 4 ; « code » porté par la phrase d'une plage au demi-cadratin (306_i1 p. 39 : 2 faux liens non résolus nouveaux) ; « code » en fin de la page précédente (vol. I.2 p. 1327) ; test de la garde « code table » ; chiffres de l'entrée L274 du CHANGELOG remesurés sur le code livré (ils valent pour bca690d) ; différentiel avant/après sur les PDF de maritime cité dans le commit"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant (1 minor note: garde de plage « code figure … figures 20–49 » aveugle à une phrase coupée entre deux lignes quand la ligne courante ne commence pas par la référence) — orchestré (vague 2026-10-24-2235, 0 passe(s) de correction)", commit: 955f34f8881aacd69f0c4c90d25e55eb2c66682d }
+    finished: 2026-10-24
   - id: L314
     title: "orchestrate worktrees : deux lots parallèles qui ajoutent chacun une entrée sous [Unreleased] du CHANGELOG entrent en conflit à l'intégration du second (vécu essai 2 de L310, 24-10 : L309 rebasé sur L274, conflit ### Added / ### Fixed résolu à la main par le lead) — conflit systématique dès que docs.sync impose l'entrée au lot ; résoudre ces conflits d'ajout pur dans CHANGELOG.md (union par section, ordre Keep a Changelog, un seul titre de section) à l'intégration, tout autre conflit reste rendu next: integrate ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant (1 minor: journal line of the CHANGELOG resolution not covered by a test) — orchestré (vague 2026-10-24-2235, 0 passe(s) de correction)", commit: 5c62d35df53e9cdfd5b6a72000b47e78f53e6520 }
+    notes:
+      - { date: 2026-10-24, text: "Mineur de revue : la ligne de journal « conflit d'ajout pur résolu » (cycle.ts:2265) n'est atteinte par aucun test d'integrateLot." }
+    finished: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

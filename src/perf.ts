@@ -120,7 +120,8 @@ export interface PerfResult {
   windows: Windows;
   throughput: { ready: Indicator; rendered: Indicator; delivered: Indicator; onBudget: Indicator; escaped: Indicator };
   corrections: { medianPasses: Indicator; atLeast2: Indicator; firstTime: Indicator; causes: { current: CauseWindow; previous: CauseWindow } };
-  interventions: { handedOut: Indicator & { count: { current: number | null; previous: number | null } }; ux: Indicator };
+  /** `ux` : sessions qui voient l'application par lot visible (étape ux, et review-small d'un petit lot visible) ; `dedicatedUx` : part des lots visibles revus par au moins une étape ux dédiée (information, sans ⚠ ni jumeau). */
+  interventions: { handedOut: Indicator & { count: { current: number | null; previous: number | null } }; ux: Indicator; dedicatedUx: Indicator };
   tokens: TokensBlock;
   delays: DelaysBlock;
   /** Médiane de la durée de mur en minutes, par sorte d'étape ; `lots` = étapes. */
@@ -362,9 +363,15 @@ export function computePerf(input: PerfInput): PerfResult {
     return !hasPlans || n === 0 ? null : handedOutOf(w) / n;
   });
   const visibleRendered = (w: Window) => rendered(w).filter((d) => d.j.visible);
+  // Une session qui voit l'application : l'étape ux, et la review-small d'un petit lot visible (sa seule revue d'ergonomie, `seesApp` du cycle) ; celle d'un lot plus gros n'est qu'une revue de code (L283).
+  const seesApp = (j: Journal, s: JournalStep) => s.status === 'ok' && (s.kind === 'ux' || (s.kind === 'review-small' && j.small));
   const ux = both(windows, (w) => {
     const set = visibleRendered(w);
-    return set.length === 0 ? null : set.reduce((sum, d) => sum + d.j.steps.filter((s) => s.kind === 'ux' && s.status === 'ok').length, 0) / set.length;
+    return set.length === 0 ? null : set.reduce((sum, d) => sum + d.j.steps.filter((s) => seesApp(d.j, s)).length, 0) / set.length;
+  });
+  const dedicatedUx = both(windows, (w) => {
+    const set = visibleRendered(w);
+    return set.length === 0 ? null : set.filter((d) => d.j.steps.some((s) => s.kind === 'ux' && s.status === 'ok')).length / set.length;
   });
   const visibleCounts = both(windows, (w) => visibleRendered(w).length);
   const budgetCounts = both(windows, (w) => withBudget(w).length);
@@ -479,7 +486,7 @@ export function computePerf(input: PerfInput): PerfResult {
     causes,
   };
   const handed = mk(handedOut, lotsOf, 'up', twinEscaped, planNote);
-  const interventions = { handedOut: { ...handed, count: handedCount }, ux: mk(ux, visibleCounts, 'up', twinEscaped) };
+  const interventions = { handedOut: { ...handed, count: handedCount }, ux: mk(ux, visibleCounts, 'up', twinEscaped), dedicatedUx: mk(dedicatedUx, visibleCounts, null, null) };
 
   const tokens: TokensBlock = { byEstimate, reviewShare: mk(reviewShare, both(windows, (w) => rendered(w).length), 'up', twinFirstTime) };
   const delays: DelaysBlock = {
@@ -543,8 +550,8 @@ const LABELS: Record<Cause, string> = {
   'faux-constat': 'faux constat de revue',
 };
 
-/** Les douze premières lignes de `indicatorLines` sont celles de L225 et les deux de qualité de livraison de L227 ; les suivantes sont celles de L226. */
-const LEGACY_LINES = 12;
+/** Les treize premières lignes de `indicatorLines` sont celles de L225 (dont la part des lots visibles revus par une étape ux, L283) et les deux de qualité de livraison de L227 ; les suivantes sont celles de L226. */
+const LEGACY_LINES = 13;
 
 type Kind = 'count' | 'rate' | 'share' | 'num' | 'tokens' | 'days' | 'min' | 'eur';
 interface Line {
@@ -572,6 +579,7 @@ function indicatorLines(r: PerfResult): [Line, Indicator][] {
     [{ label: 'part des lots à au moins 2 passes', kind: 'share', decision: 'atLeast2' }, r.corrections.atLeast2],
     [{ label: 'lots terminés hors vague', kind: 'share', decision: 'handedOut' }, r.interventions.handedOut],
     [{ label: 'sessions ux par lot visible', kind: 'num', decision: 'ux' }, r.interventions.ux],
+    [{ label: 'part des lots visibles revus par une étape ux', kind: 'share', decision: 'ux' }, r.interventions.dedicatedUx],
     [{ label: 'part conforme du premier coup', kind: 'share', decision: 'firstTime' }, r.corrections.firstTime],
     [{ label: 'défauts échappés', kind: 'count', decision: 'escaped' }, r.throughput.escaped],
     [{ label: 'livraisons rouges', kind: 'count', decision: 'redDeliveries' }, r.quality.redDeliveries],
@@ -679,7 +687,7 @@ export function renderPerf(r: PerfResult): string[] {
   out.push(`  causes dominantes (${c.classified} passes classées) : ${top || 'aucune'} · non classé : ${c.unclassifiedShare === null ? 'n/d' : pct(c.unclassifiedShare)} · sans revue (tests rouges) : ${c.withoutFindings}${c.unclassified > 0 ? ' · à classer : cadence corrections --classify' : ''}`);
   const origins = Object.entries(c.byReview).sort(([a, x], [b, y]) => y - x || a.localeCompare(b));
   if (origins.length > 0) out.push(`  origine des passes à constats : ${origins.map(([k, n]) => `${k} ${n}`).join(' · ')}`);
-  section('Interventions du lead', ['lots terminés hors vague', 'sessions ux par lot visible']);
+  section('Interventions du lead', ['lots terminés hors vague', 'sessions ux par lot visible', 'part des lots visibles revus par une étape ux']);
   const h = r.interventions.handedOut.count;
   out.push(`  lots rendus puis terminés hors vague : ${h.current ?? 'n/d'} (précédente ${h.previous ?? 'n/d'})`);
   out.push('', 'Tokens, délais et durées (médianes par lot ou par étape)');

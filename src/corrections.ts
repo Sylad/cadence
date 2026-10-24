@@ -131,6 +131,8 @@ export interface Journal {
   project: string;
   lot: string;
   visible: boolean;
+  /** Petit lot (champ `small` du journal) ; faux pour un journal ancien qui ne le porte pas. */
+  small: boolean;
   status: string;
   budget?: number;
   steps: JournalStep[];
@@ -183,6 +185,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         project: rec.project,
         lot: rec.lot,
         visible: !!rec.visible,
+        small: !!rec.small,
         status: String(rec.status),
         ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
         steps: steps.map((s) => {

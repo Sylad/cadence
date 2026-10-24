@@ -3551,6 +3551,7 @@ lots:
     estimate: 0.05
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme : 0 bloquant, 0 majeur, 1 mineur (resumedReviewed vrai pour un lot rendu pour tests rouges sans revue, command.ts:948 → le libellé « branche reprise » revient dans ce cas) — orchestré (vague 2026-10-24-essai-wt3, 1 passe(s) de correction)", commit: 04ac7a6f85f620ea1c2c7f96f8b054e9c119fb94, reporte: { de: 19fb0755376c2e810989c44c2b28cb516dcbc153, vers: 04ac7a6f85f620ea1c2c7f96f8b054e9c119fb94, patchId: e2b6b53167e642cf8f8bbf802438238f7064251a } }
   - id: L316
     title: "Essai 3 mesuré du mode worktree (suite L310) : deux lots neufs et indépendants (L315 dans src/orchestrate, L265 dans src/ref) avec orchestrate.worktrees: true et CADENCE_EXPERIMENTAL_WORKTREES=1, après L311 et L314 en service (b2e6273) ; mesure : temps de mur contre somme des lots, intégrations automatiques (rebase, union CHANGELOG L314, verdict reporté ou revue courte), incidents ; conclusion en note (proposer l'activation par défaut à Sylvain, garder expérimental, ou corriger) ; config remise à false après l'essai sauf décision"
     status: doing

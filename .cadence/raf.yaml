@@ -3489,6 +3489,8 @@ lots:
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
+    notes:
+      - { date: 2026-10-24, text: "24-10 (lead) — essai 1 (vague 2026-10-24-essai-wt, L309 + L274 en worktrees) : temps de mur 49 min contre 89 min en série (gain 40 min, 45 %) ; deux worktrees créés à 0,5 s d'écart, aucune gêne mutuelle, main intact (seuls les commits de plan, R21), worktrees conservés listés au tableau. Les deux lots rendus non conformes pour des défauts de fond (L309 : 1 majeur table.ts:174 ; L274 : 1 majeur après 3 passes) → AUCUNE intégration éprouvée (rebase, patch-id, verdict reporté). Suite : reprendre L309 et L274 en worktree (branches cadence/2026-10-24-essai-wt/*, reprise L301) pour éprouver l'intégration ; config remise à false en attendant." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

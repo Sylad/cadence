@@ -55,6 +55,8 @@ const SEPARATOR = String.raw`(?:\s*,\s*(?:(?:and|et)\s+)?|\s+(?:and|et|&)\s+|${R
 const REFERENCE = new RegExp(String.raw`\b(Figures?|Figs?|Tables?|Tableaux|Tableau|Planches?)\.?\s+(${NUMBER}(?:${SEPARATOR}${NUMBER})*)(?![\w])`, 'gi');
 const PLURAL = /^(?:figures|figs|tables|tableaux|planches)$/i;
 const NUMBER_ONLY = new RegExp(NUMBER, 'g');
+/** Ce qui précède une référence qui n'en est pas une : « code figure 3 » des normes OMM est une valeur de code, pas une figure. */
+const CODE_FIGURE = /\bcode\s+$/i;
 /** « Figure n » en début de ligne, puis le séparateur éventuel (tiret, deux-points, point) et le reste de la ligne. */
 const CAPTION = new RegExp(String.raw`^(Figure|Fig|Table|Tableau|Planche)\.?\s+(${NUMBER})(?![\w])\s*([:.–—-])?\s*(.*)$`, 'i');
 /** Le reste d'une ligne qui n'est qu'une parenthèse fermée : « (in accordance with 4.3.11) ». */
@@ -202,6 +204,7 @@ export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = n
       for (const m of l.text.matchAll(REFERENCE)) {
         // la légende ne se cite pas elle-même
         if (own && m.index === 0) continue;
+        if (labelOf(m[1]!, '').kind === 'figure' && CODE_FIGURE.test(l.text.slice(0, m.index))) continue;
         for (const { num, interior } of numbersOf(m[1]!, m[2]!)) {
           const { label } = labelOf(m[1]!, num);
           const fig = figures.get(key(label));

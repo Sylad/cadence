@@ -82,14 +82,14 @@ describe("index des figures d'un texte (L261)", () => {
     ]);
     expect(idx.unresolved).toEqual([]);
   });
-  it("R2 — au milieu d'une plage, une figure absente n'est pas un lien non résolu (« code figures 11–20 ») ; ses bornes le restent ; une plage d'annexe « 1.B.1 to 1.B.3 » est développée", () => {
+  it("R2 — au milieu d'une plage, une figure absente n'est pas un lien non résolu (« figures 11–20 ») ; ses bornes le restent ; une plage d'annexe « 1.B.1 to 1.B.3 » est développée", () => {
     const idx = indexText([
-      page(1, 'See Figures 2–4.', 'See Figures 1.B.1 to 1.B.3', 'the code figures 11–20 give'),
+      page(1, 'See Figures 2–4.', 'See Figures 1.B.1 to 1.B.3', 'the figures 11–20 give'),
       page(2, 'Figure 2 A', 'Figure 4 C', 'Figure 1.B.1 D', 'Figure 1.B.2 F', 'Figure 1.B.3 E'),
     ]);
     expect(idx.unresolved).toEqual([
-      { label: 'Figure 11', page: 1, extrait: 'the code figures 11–20 give' },
-      { label: 'Figure 20', page: 1, extrait: 'the code figures 11–20 give' },
+      { label: 'Figure 11', page: 1, extrait: 'the figures 11–20 give' },
+      { label: 'Figure 20', page: 1, extrait: 'the figures 11–20 give' },
     ]);
     expect(idx.figures.map((f) => [f.label, f.citations.length])).toEqual([['Figure 2', 1], ['Figure 4', 1], ['Figure 1.B.1', 1], ['Figure 1.B.2', 1], ['Figure 1.B.3', 1]]);
   });
@@ -143,7 +143,7 @@ describe("index des figures d'un texte (L261)", () => {
     ]);
     expect(idx.unresolved.filter((u) => u.page === 1)).toEqual([]);
   });
-  it("R9 — le milieu d'une plage ne masque pas une citation explicite du même numéro sur la même ligne : « code figures 11–20; see also Figure 15 », « Figures 2–4 and Figure 3 » sans légende 3", () => {
+  it("R9 — le milieu d'une plage ne masque pas une citation explicite du même numéro sur la même ligne : « figures 11–20; see also Figure 15 », « Figures 2–4 and Figure 3 » sans légende 3", () => {
     const idx = indexText([
       page(1, 'Figures 2–4 and Figure 3 here', 'the figures 11–20; see also Figure 15'),
       page(2, 'Figure 2 A', 'Figure 4 B'),
@@ -160,6 +160,15 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.figures.map((f) => f.citations.length)).toEqual([1, 1, 1]);
     expect(idx.unresolved).toEqual([]);
   });
+  it('R10 — « code figure(s) n » (valeur de code OMM) n\'est ni une citation ni un lien non résolu, même quand la figure existe', () => {
+    const idx = indexText([
+      page(1, 'Code figure 3 indicates a trace', 'the code figures 2 and 3 are used', 'Code Figs. 5 to 6 apply', 'see Figure 3 for the codes', 'the code. Figure 7 shows'),
+      page(2, 'Figure 3 Station model', 'Figure 2 Wind', 'Figure 7 Jets'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([['Figure 3', [4]], ['Figure 2', []], ['Figure 7', [5]]]);
+    expect(idx.unresolved).toEqual([{ label: 'Figure 2', page: 2, extrait: 'Figure 2 Wind' }]);
+  });
+
   it("les numéros d'annexe des normes OMM gardent leur lettre : « Figure 1.B.1 » n'est pas la Figure 1", () => {
     const idx = indexText([
       page(1, 'See Figure 1.D.5 and Figures 1.B.1 and 1.B.2.', 'Voir Table 12.B.3.'),

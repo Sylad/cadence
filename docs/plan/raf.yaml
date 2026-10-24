@@ -3366,36 +3366,50 @@ lots:
     finished: 2026-10-24
   - id: L297
     title: "orchestrate : une réponse donnée par --resume --answer à une question sur une règle « hypothèse » de la fiche passe cette règle en « sourcée » (source : réponse du lead, date, vague) avant la revue de fiche suivante ; tests. Vécu 24-10 : L279 rendu « fiche non conforme » pour R27 alors que la réponse était donnée (une vague perdue, sourcée à la main) — décision Sylvain 24-10"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant (2 notes mineures : reformatage cosmétique des collections de flux par yaml, réponse corrective sourcée avec l'ancien énoncé si la session spec est perdue) — vitest 3239/3239, tsc propre — orchestré (vague 2026-10-24-1615, 0 passe(s) de correction)", commit: 3986ea88b2c823c82c52c325730a90b37654b34a }
+    finished: 2026-10-24
   - id: L298
     title: "orchestrate : délai des étapes d'écriture (timeouts.work, 45 min fixes) proportionné à l'estimate et à la spec du lot, ou prolongé tant que la session commite ; à l'échéance, le travail non commité est signalé dans le tableau (fichiers, tests) au lieu d'un « échec » sec ; tests. Vécu 24-10 : implement de L279 (0,5 j + fiche) coupé à 45 min après 6 commits, 44 lignes vertes non commitées — décision Sylvain 24-10"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant (1 minor) — orchestré (vague 2026-10-24-1615, 0 passe(s) de correction)", commit: 87821de325d2f5b2fea5cc7c800d5d55f88667ff }
+    finished: 2026-10-24
   - id: L299
     title: "worktrees (suite revue L279, à faire avant activation) : revérifier branche de départ et arbre du lead juste avant advance() et writeVerdict ; le lead passé sur une autre branche pendant les contrôles ou la revue courte ne reçoit ni fast-forward ni commit de plan, lot rendu next: integrate (R24, R22, R8) ; test qui change de branche pendant la revue courte (reproduit par la revue 24-10 : feat(L2) et plan sur « autre », L2 prêt)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "conforme, 3 notes mineures (titre « ### Fixed » en double dans le CHANGELOG ; revue courte rejouée et texte de verdict dupliqué à la reprise après le refus tardif ; contrôle de branche de writeVerdict non testé) — orchestré (vague 2026-10-24-1615, 0 passe(s) de correction)", commit: 1c351c0858cdf66c57946528d494ddd44b0d77e7 }
+    finished: 2026-10-24
   - id: L300
     title: "worktrees (suite revue L279, à faire avant activation) : reprise d'un lot next: integrate dont la branche cadence/<vague>/<lot> n'existe plus (retirée par --remove-worktree --abandon-commits) : aucun worktree recréé au sommet (planTrees/ensureTree), lot rendu « commits abandonnés » ; jamais de verdict conforme à commit null ; test avec deux lots du groupe repris ensemble (reproduit par la revue 24-10)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant — 1 commit (9053283), 0 blocking, 0 major, 1 minor (note); 30 tests of orchestrate-worktree-resume green, 147 tests of the 9 worktree files green, tsc clean — orchestré (vague 2026-10-24-1615, 0 passe(s) de correction)", commit: 9053283447685ef8e20c6465dcebf22cae98d7e2 }
+    finished: 2026-10-24
   - id: L301
     title: "worktrees (suite revue L279, à faire avant activation) : lot rendu hors intégration (revue non conforme, tests rouges, HEAD déplacé, plan touché, verrou d'acceptation) — chemin de reprise : nouvelle vague du même lot qui retrouve sa branche cadence/<vague>/<lot> la plus récente (ou intégration à la main documentée) ; docs/orchestrate.md:517 « usual paths » corrigé ; mineurs de la revue : intégration après arrêt de l'application UX (cycle.ts:1891), worktree hors du dépôt quand la vague part de sa racine (lotTreeDir), foreignDirty/ownFile et git/tryGit dédupliqués, tests de waveReadsIntegrate/Replay ; tests"
     status: todo
     estimate: 0.5
+    created: 2026-10-24
+  - id: L302
+    title: "orchestrate (suite revue L297) : sourcer une règle de fiche après --answer ne reformate pas la fiche (doc.toString change [R2] en [ R2 ] sur les 17 fiches de docs/specs — garder le style de flux d'origine ou n'éditer que les lignes de la règle) ; une réponse qui supprime ou change la règle (« non, supprime R3 », « change en X ») ne la marque pas « sourcée » telle quelle : la règle est laissée à la session spec reprise, ou rendue au lead si la session ne la traite pas ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L303
+    title: "worktrees (suites des revues L298–L300, avant activation) : rapport de coupure au délai étendu aux dépôts voisins (cycle.ts:723) ; refus tardif d'intégration : verdict de revue courte non dupliqué à la reprise (cycle.ts:2239/2202) ; test qui atteint le contrôle de branche de writeVerdict (cycle.ts:2101) ; branche retirée distinguée d'une branche sans branch.<nom>.base (command.ts:929) ; CHANGELOG : double « ### Fixed » de [Unreleased] ; tests"
+    status: todo
+    estimate: 0.25
     created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

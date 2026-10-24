@@ -2098,6 +2098,11 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
   // En worktree, rien n'est écrit (ni plan, ni outil du projet) si le dépôt du lead a déjà un fichier suivi modifié hors plan : le refus ne laisse pas un plan modifié non commité (R26).
   const foreign = c.tree ? foreignDirty(c) : [];
   if (foreign.length) return `arbre du dépôt modifié (${foreign.join(', ')})`;
+  // Le commit de plan va sur la branche courante du dépôt : en worktree, elle doit être encore la branche de départ (R24), même si le lead a bougé depuis l'avance.
+  if (c.tree) {
+    const cur = repoBranch(l.repo);
+    if (cur !== c.tree.base) return `dépôt sur ${cur ?? 'HEAD détaché'} et non ${c.tree.base}`;
+  }
   if (!plan.readonly) {
     // Déjà écrit et commité au même sha (reprise de l'intégration, R23) : une seule fois.
     if (c.tree && commit !== null && plan.lot(l.lot).review?.commit === commit && !covered.length && !trackedDirty(l.repo).includes(relative(l.repo, plan.path))) return null;
@@ -2129,6 +2134,14 @@ function foreignDirty(c: LotCtx): string[] {
   const own = new Set([relative(c.lot.repo, plan.path), ...plan.maintained]);
   const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
   return trackedDirty(c.lot.repo).filter((f) => !own.has(f) && !(f.startsWith(specDir) && isAcceptationFile(f)));
+}
+
+/** Pourquoi le dépôt du lead n'est plus celui que l'intégration a vu au départ : branche changée ou HEAD détaché (R24), fichier suivi modifié (R8). Null s'il est intact. */
+function leadMoved(repo: string, base: string): string | null {
+  const cur = repoBranch(repo);
+  if (cur !== base) return `le dépôt est sur ${cur ?? 'HEAD détaché'} et non sur ${base}`;
+  const dirty = trackedDirty(repo);
+  return dirty.length ? `arbre du dépôt modifié (${dirty.join(', ')})` : null;
 }
 
 /** Une écriture de plan du programme (R21, R26) : sous la file et le verrou du dépôt, le dépôt encore sur la branche de départ, aucun fichier suivi modifié hors plan. Rend la cause du refus, null si l'écriture a eu lieu. Hors worktree, rien ne change. */
@@ -2190,10 +2203,8 @@ async function integrateLot(c: LotCtx): Promise<void> {
   let reporte: Reporte | undefined;
   let start = '';
   try {
-    const cur = repoBranch(l.repo);
-    if (cur !== t.base) return refuse(`intégration refusée : le dépôt est sur ${cur ?? 'HEAD détaché'} et non sur ${t.base} ; branche conservée : ${t.branch}`);
-    const dirty = trackedDirty(l.repo);
-    if (dirty.length) return refuse(`intégration refusée : arbre du dépôt modifié (${dirty.join(', ')}) ; branche conservée : ${t.branch}`);
+    const moved = leadMoved(l.repo, t.base);
+    if (moved) return refuse(`intégration refusée : ${moved} ; branche conservée : ${t.branch}`);
     start = git(l.repo, 'rev-parse', `refs/heads/${t.base}`);
     // Une branche déjà contenue dans celle du dépôt (arrêt entre l'avance et l'écriture du verdict) : ni rebase ni avance, seul le plan reste à écrire (R23).
     if (!integrated(l.repo, t.branch, t.base)) {
@@ -2225,6 +2236,9 @@ async function integrateLot(c: LotCtx): Promise<void> {
           l.verdict = verdict;
         }
       }
+      // Les contrôles rejoués et la revue courte ont pu durer : le lead a pu changer de branche ou salir son arbre depuis le contrôle du départ (R24, R8).
+      const late = leadMoved(l.repo, t.base);
+      if (late) return refuse(`intégration refusée : ${late} ; branche du dépôt inchangée, ${kept}`);
       advance(l.repo, t.branch);
     }
     const end = git(l.repo, 'rev-parse', `refs/heads/${t.base}`);

@@ -490,7 +490,9 @@ nothing below applies and the wave behaves as before; any other value is refused
   (a file next to the wave lock, same format, pid and start time, stale when the holder is dead, plus an in-memory queue because the lots of a wave share
   a pid; the wait is bounded to 10 minutes and holds no session slot):
   1. the repository must still be on its start branch (`le dépôt est sur <branch> et non sur <start branch>`) and have no modified tracked file
-     (`arbre du dépôt modifié (<files>)`): the program never changes the lead's branch or tree;
+     (`arbre du dépôt modifié (<files>)`): the program never changes the lead's branch or tree. The check is made again right before the
+     fast-forward (the replayed checks and the short review can last) and right before the plan is written: a lead moved to another branch, or whose
+     tree got dirty, in the meantime gets neither the fast-forward nor a plan commit, and the lot is handed back with `next: integrate` (L299);
   2. the lot's branch is rebased on the tip of the repository's branch (`git rebase`); a conflict is **aborted** (`git rebase --abort`), the lot
      is handed back with the files in conflict, its worktree and branch untouched, and no session tries to resolve it;
   3. if the rebase changed the commits, the tests and the build (`orchestrate.test`, `orchestrate.build`) are run again at the rebased tip, a red that

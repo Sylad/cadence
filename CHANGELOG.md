@@ -62,6 +62,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+### Fixed
+
+- `cadence orchestrate` worktree mode (experimental, not enabled; L299, `docs/orchestrate.md`): the lead's branch and tree are checked again right before the fast-forward and before the plan is written, so a lead moved to another branch (or with a modified tracked file) during the replayed checks or the short review receives neither the fast-forward nor a plan commit, and the lot is handed back with `next: integrate`.
 - `cadence orchestrate --resume --answer` on an expensive-to-undo hypothesis of the sheet (L297, `docs/orchestrate.md`): the program itself sets the rule to `sourcee` (`source: réponse du lead, <date>, vague <id>`) and commits the sheet before the resumed `spec` session, so a lost or silent session no longer hands the lot back as « fiche non conforme » (L279, R27).
 - `cadence orchestrate` test gate (L291, `docs/orchestrate.md`): files deleted by the lot no longer count as code without a test (a lot removing dead code triggered a ≈ 65 k-token pass), the neighbour repositories of the lot (`repos:`) are read like the main one, and the docs say that on a light lot the gate leads to an Opus review.
 - The masking of `deliveries-failed.log` (L294, `docs/deliver.md`) also catches one-word names ending with a sensitive word (`APIKEY`, `ACCESSTOKEN`, `GITHUBTOKEN`, `MYSQLPWD`). A quoted value never closed is not treated (each attempt opened a new leak), and neither is the beginning of a value cut by the 8192 characters kept: the bound keeps the END of the output so it cannot cut the end of a value, and the log stays local.

@@ -312,6 +312,56 @@ describe('R9 / R17 — verdict reporté ou revue courte après un rebase', () =>
   });
 });
 
+describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance et l\'écriture du plan (L299)', () => {
+  const f5 = { 'f.txt': lines(12) };
+  const edit = (cwd: string, n: number, lot: string) => {
+    writeFileSync(join(cwd, 'f.txt'), lines(12).replace(`l${n}\n`, `l${n} par ${lot}\n`));
+    git(cwd, 'add', '--', 'f.txt');
+    git(cwd, 'commit', '-q', '-m', `feat(${lot}): travail`);
+    return claudeOut(workReport({ commits: [{ sha: git(cwd, 'rev-parse', 'HEAD'), sujet: `feat(${lot}): travail` }] }));
+  };
+  // deux lots voisins : le second à s'intégrer est rebasé avec un patch-id différent, donc passe par une revue courte (le temps où le lead peut bouger)
+  async function movesDuringShortReview(how: (repo: string) => void) {
+    const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true', f5);
+    const f = fake({
+      implement: async (cwd, brief) => {
+        await meeting(2)();
+        const lot = lotOf(brief);
+        return edit(cwd, lot === 'L1' ? 4 : 7, lot);
+      },
+      'review-small': async () => {
+        how(repo);
+        return claudeOut(reviewReport({ verdict: 'rebase sans dégât' }));
+      },
+    });
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+    const small = f.calls.find((c) => c.kind === 'review-small')!;
+    return { parent, repo, r, lot: small.lot };
+  }
+  it('R24 — le lead passe sur une autre branche pendant la revue courte : ni fast-forward ni commit de plan, lot rendu next: integrate', async () => {
+    const { parent, repo, r, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    expect(r.code).toBe(1);
+    const l = store(parent).readLot('a', lot)!;
+    expect(l.status).toBe('handed-back');
+    expect(l.next).toBe('integrate');
+    expect(l.outcome).toMatch(/^intégration refusée : le dépôt est sur autre et non sur main ; branche du dépôt inchangée, worktree conservé : /);
+    expect(git(repo, 'symbolic-ref', '--short', 'HEAD')).toBe('autre');
+    expect(subjects(repo).some((s) => s.startsWith(`feat(${lot})`))).toBe(false);
+    expect(subjects(repo).some((s) => s.startsWith(`plan: ${lot} revue`))).toBe(false);
+    expect(git(repo, 'log', '--format=%s', 'main').split('\n').some((s) => s.startsWith(`feat(${lot})`))).toBe(false); // la branche de départ n'a pas avancé
+  });
+  it('R8 — le lead modifie un fichier suivi pendant la revue courte : ni fast-forward ni commit de plan, lot rendu next: integrate', async () => {
+    const { parent, repo, r, lot } = await movesDuringShortReview((repo) => appendFileSync(join(repo, 'base.txt'), 'sale\n'));
+    expect(r.code).toBe(1);
+    const l = store(parent).readLot('a', lot)!;
+    expect(l.status).toBe('handed-back');
+    expect(l.next).toBe('integrate');
+    expect(l.outcome).toMatch(/^intégration refusée : arbre du dépôt modifié \(base\.txt\) ; branche du dépôt inchangée, worktree conservé : /);
+    expect(subjects(repo).some((s) => s.startsWith(`feat(${lot})`))).toBe(false);
+    expect(subjects(repo).some((s) => s.startsWith(`plan: ${lot} revue`))).toBe(false);
+  });
+});
+
 describe('R23 — le verdict est écrit après l\'avance, dans un commit de plan seul', () => {
   it('R23 — après report, la branche du dépôt se termine par un commit de plan seul et `vers` est le dernier commit de travail intégré ; la branche du lot ne porte aucun commit de plan', async () => {
     const { parent, repo } = setup();

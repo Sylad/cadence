@@ -214,4 +214,21 @@ describe('cadence ref eval — rappel, précision, faux lu, tokens par page', ()
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/lecture.*pas valide.*« label » n'est pas un rôle/s);
   });
+  it('R19 — un fichier contre un dossier (dans un sens ou dans l’autre) est refusé avec les combinaisons acceptées, jamais une lecture ignorée en silence', () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'corpus', 'un'), { recursive: true });
+    writeFileSync(join(dir, 'corpus', 'un', 'attendu.json'), JSON.stringify(ATTENDU));
+    writeFileSync(join(dir, 'lecture.json'), JSON.stringify(doc('lecture', ATTENDU.elements)));
+    writeFileSync(join(dir, 'attendu.json'), JSON.stringify(ATTENDU));
+    mkdirSync(join(dir, 'lectures', 'un'), { recursive: true });
+    writeFileSync(join(dir, 'lectures', 'un', 'lecture.json'), JSON.stringify(doc('lecture', ATTENDU.elements)));
+    const dossierFichier = lancer([join(dir, 'corpus'), join(dir, 'lecture.json')], dir);
+    expect(dossierFichier.code).toBe(2);
+    expect(dossierFichier.out).toBe('');
+    expect(dossierFichier.err).toMatch(/combinaisons acceptées : deux fichiers .* ou deux dossiers .*reçu un dossier et un fichier/);
+    const fichierDossier = lancer([join(dir, 'attendu.json'), join(dir, 'lectures')], dir);
+    expect(fichierDossier.code).toBe(2);
+    expect(fichierDossier.err).toMatch(/reçu un fichier et un dossier/);
+    expect(lancer([join(dir, 'corpus'), join(dir, 'lectures')], dir).code).toBe(0);
+  });
 });

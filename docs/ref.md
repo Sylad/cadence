@@ -198,7 +198,7 @@ Exit codes: 0 done, 2 refusal (tool, file, option, slug, folder).
 
 Scores a reading against the inventory that is known to be true (the evaluation of the design, §« Mesure »). `attendu` is an
 inventory (`genre: "inventaire"`), `lecture` a reading or an inventory of the same document; both go through the checks of
-`ref check` first. Two folders work too: `attendu` holds `<cas>/attendu.json` (what `ref corpus` writes) and `lecture`
+`ref check` first. Two folders work too (a file against a folder, or the reverse, is refused with exit 2 and the accepted combinations: two files, or two folders): `attendu` holds `<cas>/attendu.json` (what `ref corpus` writes) and `lecture`
 `<cas>/lecture.json`; a case without a reading counts as read with nothing (recall 0) and is named under `sans lecture`.
 
 An element read is matched to an expected one **by type and identity**, never by id or zone (two independent readings number

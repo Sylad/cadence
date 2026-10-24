@@ -252,10 +252,15 @@ function cheminsDeCas(chemin: string, fichier: string): { nom: string; fichier: 
 
 /** `ref eval <attendu> <lecture>` : deux fichiers, ou deux dossiers (`<cas>/attendu.json`, `<cas>/lecture.json`). */
 export function evaluer(attendu: string, lecture: string): Evaluation {
-  const dossier = existsSync(attendu) && statSync(attendu).isDirectory();
   const attendus = cheminsDeCas(attendu, 'attendu.json');
+  const lecturesTrouvees = cheminsDeCas(lecture, 'lecture.json');
+  const dossier = statSync(attendu).isDirectory();
+  // un fichier contre un dossier ne s'apparie à aucun cas : la lecture serait ignorée, la mesure fausse
+  if (dossier !== statSync(lecture).isDirectory()) {
+    throw new RafError(`ref eval : combinaisons acceptées : deux fichiers (attendu.json lecture.json) ou deux dossiers (<cas>/attendu.json, <cas>/lecture.json) ; reçu ${dossier ? 'un dossier et un fichier' : 'un fichier et un dossier'}`);
+  }
   if (dossier && attendus.length === 0) throw new RafError(`ref eval : aucun attendu.json dans les sous-dossiers de ${attendu}`);
-  const lectures = new Map(cheminsDeCas(lecture, 'lecture.json').map((c) => [c.nom, c.fichier]));
+  const lectures = new Map(lecturesTrouvees.map((c) => [c.nom, c.fichier]));
   const cas = attendus.map((a) => {
     const att = charger(a.fichier, ['inventaire'], "l'attendu");
     const fichier = dossier ? lectures.get(a.nom) : lecture;

@@ -3220,6 +3220,7 @@ lots:
     notes:
       - { date: 2026-10-24, text: "titre remplacé : « orchestrate : une session se termine dès son rapport structuré (StructuredOutput) au lieu d'attendre la fin de ses tâches de fond, et ses tokens sont comptés depuis son journal (segments après le rapport compris) ; étude de faisabilité d'abord (stream-json, variable de la CLI qui interdit les tâches de fond) ; tests. Audit 24-10 : 127 sessions ont attendu après leur rapport, 833 min perdues, 12,1 M tokens non comptés (6,4 %), launch.ts n'attend que close »" }
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme — orchestré (vague 2026-10-24-1125, 0 passe(s) de correction)", commit: 940cf6a7c16e8d1b99822af9b78da59cebb64a67 }
   - id: L286
     title: "orchestrate : « hit your weekly limit » reconnu comme quota (isQuotaMessage, result.ts:75) → vague suspendue, pas de lot failed ; test sur le message réel. Audit 24-10 : 3 lots failed le 14-10"
     status: done

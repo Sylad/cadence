@@ -2031,10 +2031,10 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
   const shas = repoShas(plan, neighbours, l.lot);
   // Sous-tâches ouvertes que des commits du lot citent (L82) : la revue conforme vaut pour elles, sinon `raf done` refuserait le lot.
   const covered = coveredTasks(plan, l.repo, l.lot, neighbours.flatMap((r) => repoWork(plan, r, l.lot)));
+  // En worktree, rien n'est écrit (ni plan, ni outil du projet) si le dépôt du lead a déjà un fichier suivi modifié hors plan : le refus ne laisse pas un plan modifié non commité (R26).
+  const foreign = c.tree ? foreignDirty(c) : [];
+  if (foreign.length) return `arbre du dépôt modifié (${foreign.join(', ')})`;
   if (!plan.readonly) {
-    // En worktree, rien n'est écrit si le dépôt du lead a déjà un fichier suivi modifié hors plan : le refus ne laisse pas un plan modifié non commité (R26).
-    const foreign = c.tree ? foreignDirty(c) : [];
-    if (foreign.length) return `arbre du dépôt modifié (${foreign.join(', ')})`;
     // Déjà écrit et commité au même sha (reprise de l'intégration, R23) : une seule fois.
     if (c.tree && commit !== null && plan.lot(l.lot).review?.commit === commit && !covered.length && !trackedDirty(l.repo).includes(relative(l.repo, plan.path))) return null;
     plan.recordReview(l.lot, verdict, c.wave.today, commit, neighbours.length ? shas : undefined, reporte);
@@ -2100,13 +2100,15 @@ const minutesText = (ms: number): string => (ms % 60_000 === 0 ? `${ms / 60_000}
  */
 async function integrateLot(c: LotCtx): Promise<void> {
   const l = c.lot;
-  const t = c.tree!;
   const key = lotKey(l.project, l.lot);
-  const kept = `worktree conservé : ${t.dir}`;
   const refuse = (why: string): void => {
     l.next = 'integrate';
     transition(c, 'handed-back', why);
   };
+  // Un lot repris à l'intégration dont le worktree a été retiré entre-temps (`--remove-worktree`) n'a plus rien à intégrer.
+  if (!c.tree?.active) return refuse("intégration impossible : le worktree du lot n'existe plus (retiré par --remove-worktree ?) : sa branche n'est plus là pour être intégrée");
+  const t = c.tree;
+  const kept = `worktree conservé : ${t.dir}`;
   const waitMs = c.wave.integrate?.waitMs ?? INTEGRATE_WAIT_MS;
   const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);
   if (!grant.ok) return refuse(`intégration refusée : verrou d'intégration tenu par ${grant.holder.wave} (pid ${grant.holder.pid}) depuis plus de ${minutesText(waitMs)} ; ${kept}`);

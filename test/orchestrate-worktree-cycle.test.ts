@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
+import { removeDryRunBriefs } from './helpers.js';
 import { branches, fake, inWorktree, lotOf, meeting, run, setup, store, subjects, writes } from './orchestrate-worktree-harness.js';
 import { tempDir } from './helpers.js';
 
@@ -118,5 +119,20 @@ describe('C1 / R3 / R10 / R12 — deux lots indépendants du même dépôt en pa
     expect(r.code).toBe(0);
     expect(peak).toBe(1);
     expect(store(parent).readLot('a', 'L2')!.status).toBe('ready');
+  });
+});
+
+describe('A1 — la simulation dit quels lots jouent dans un worktree', () => {
+  it('A1 — --dry-run : « en parallèle des autres lots du dépôt, dans son worktree » pour des lots qui y vont, la file ordinaire sinon, et rien n\'est créé', async () => {
+    const together = setup();
+    const a = await run(together.parent, ['a:L1', 'a:L2', '--dry-run'], fake());
+    removeDryRunBriefs(a.out);
+    expect(a.out).toContain('file a · en parallèle des autres lots du dépôt, dans son worktree (cadence/2026-10-04-1412/a--L1, créé à la prise du créneau)');
+    expect(branches(together.repo)).toBe('');
+    expect(existsSync(join(store(together.parent).dir, 'worktrees'))).toBe(false);
+    const plain = setup([{ title: 'un' }, { title: 'deux' }], '');
+    const b = await run(plain.parent, ['a:L1', 'a:L2', '--dry-run'], fake());
+    removeDryRunBriefs(b.out);
+    expect(b.out).not.toContain('worktree');
   });
 });

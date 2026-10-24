@@ -428,7 +428,9 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     if (l.goal) io.out(`  objectif donné : ${l.goal} (à la place du titre dans les briefs)`);
     io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, l.screen ? 'screen' : l.specLot ? 'spec' : undefined)})`);
-    io.out(`  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
+    const mine = lots.filter((o) => o.repo === l.repo);
+    const together = env.config.worktrees && mine.length > 1 && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
+    io.out(together ? `  file ${basename(l.repo)} · en parallèle des autres lots du dépôt, dans son worktree (cadence/${id}/${lotSlug(l.project, l.lot)}, créé à la prise du créneau)` : `  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
     if (l.repos?.length) io.out(`  dépôts voisins : ${l.repos.map((r) => r.rel).join(', ')} (verrou, garde de push et --add-dir ; leurs commits citent ${l.lot})`);
     if (l.node) {
       const sk = l.node.skipped;
@@ -1239,7 +1241,12 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   }
   // Une étape interrompue (signal, crash) dont les tokens n'ont pas été comptés : relue dans le journal de sa session.
   const recovered = new Budget(0);
-  for (const l of [...live, ...removed]) for (const s of l.steps) if (s.status === 'interrupted') countInterrupted(deps.claudeHome, l.repo, s, recovered);
+  // La session d'un lot en worktree a travaillé dans son worktree : c'est là que son journal se range.
+  const workdirOf = (l: LotState): string => {
+    const dir = lotTreeDir(store.dir, l.project, l.lot);
+    return existsSync(join(dir, '.git')) ? dir : l.repo;
+  };
+  for (const l of [...live, ...removed]) for (const s of l.steps) if (s.status === 'interrupted') countInterrupted(deps.claudeHome, workdirOf(l), s, recovered);
   wave.consumed += recovered.consumed;
   wave.cacheRead += recovered.cacheRead;
   if (recovered.consumed || recovered.cacheRead) store.writeWave(wave);

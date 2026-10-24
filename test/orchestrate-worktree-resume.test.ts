@@ -289,6 +289,18 @@ describe('R27 — --resume --integrate rejoue seul une intégration rendue', () 
     expect(git(repo, 'rev-parse', 'main')).toBe(main);
     expect(git(repo, 'rev-parse', branch)).toBe(tip);
   });
+  it('R27 — --integrate d\'un lot dont le worktree a été retiré par --remove-worktree : rendu de nouveau à l\'intégration, rien n\'est rejoué', async () => {
+    const { parent } = await conflictWave();
+    expect((await run(parent, ['--remove-worktree', 'a:L1', '--abandon-commits'], fake())).code).toBe(0);
+    const g = fake();
+    const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], g);
+    expect(r.code).toBe(1);
+    const l = store(parent).readLot('a', 'L1')!;
+    expect(l.status).toBe('handed-back');
+    expect(l.next).toBe('integrate');
+    expect(l.outcome).toMatch(/^intégration impossible : le worktree du lot n'existe plus/);
+    expect(g.calls).toHaveLength(0);
+  });
   it('R27 — --integrate sur un lot rendu hors intégration (next null) : refus code 2 avec statut et étape cités, état de la vague inchangé', async () => {
     const { parent } = setup();
     const f = fake({ implement: async () => claudeOut(workReport({ commits: [] })) });

@@ -195,4 +195,34 @@ describe('orchestrate appelle le bibliothécaire avant la revue (L306)', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['fix', 'review-small']);
   });
+
+  it('R18 — le lot proposé du bibliothécaire (resume « lot proposé … ») arrive au lead : proposition du lot, donc tableau de fin de vague', async () => {
+    const proposal = 'lot proposé — site : src/etudes/demo.mdx, la phrase sur le bibliothécaire';
+    const h = harness({ script: { implement: [impl('src-a.txt')], fix: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'README.md', 'docs(L1): README.md')], resume: proposal }))], review: [ok] } });
+    withConfig(h);
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.proposals).toEqual([proposal]);
+  });
+
+  it('R19 — un resume ordinaire du bibliothécaire ne crée aucune proposition', async () => {
+    const h = harness({ script: { implement: [impl('src-a.txt')], fix: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'README.md', 'docs(L1): README.md')], resume: 'README à jour, rien hors dépôt' }))], review: [ok] } });
+    withConfig(h);
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.proposals).toEqual([]);
+  });
+});
+
+describe('le lead appelle le bibliothécaire à la main (L306)', () => {
+  const skill = readFileSync(join(root, 'skills', 'lead', 'SKILL.md'), 'utf8');
+  const point = skill.split('\n').find((l) => l.startsWith('0b.')) ?? '';
+
+  it('R20 — le skill lead fait lire la clé describedBy du cadence.yaml du dossier et passer ses entrées au bibliothécaire', () => {
+    expect(point).not.toBe('');
+    expect(point).toContain('describedBy');
+    expect(point).toMatch(/`cadence\.yaml` of the folder above/);
+    expect(point).toMatch(/entries/);
+    expect(point).toMatch(/no entry/);
+  });
 });

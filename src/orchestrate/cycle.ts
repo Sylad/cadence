@@ -1710,6 +1710,7 @@ async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promi
 async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const l = c.lot;
   const minorsPass = kind === 'fix' && l.minorFix === true;
+  const docsPass = kind === 'fix' && l.docsFix === true;
   const done = await session(c, kind);
   if (!done) return;
   l.docsFix = false; // la passe du bibliothécaire est jouée : la suite se décide sur son rapport
@@ -1721,6 +1722,8 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     badReport(c, done.step, e);
     return;
   }
+  // Le lot proposé du bibliothécaire (L306, document hors dépôt) est dans son resume : il devient une proposition du lot, donc une ligne du tableau de fin de vague.
+  if (docsPass && /^lot propos/i.test(rep.resume.trim())) propose(c, rep.resume.trim());
   // L'écriture a changé le code (L221) : le verdict et les constats de la revue UX d'avant ne valent plus, l'UX est rejouée après la prochaine revue de code conforme.
   if (!l.small) {
     l.ux = undefined;

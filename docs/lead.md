@@ -120,7 +120,7 @@ For a lot the lead delegated by hand, `raf check` or the `dérive` column of `ca
 handled before the review, as an orchestrated wave does it: the lead hands the project (absolute path) and the lot id to the
 `doc-keeper` agent ([skills](skills.md), [news](news.md#the-librarian-doc-keeper)), in a writing session, or read-only when it
 only wants the list of the documents to change (L306). A document outside the repository is named by the `describedBy` key
-of the `cadence.yaml` of the folder, never guessed; the agent proposes a lot for the plan of that repository, in the `resume` of its
+of the `cadence.yaml` of the folder, never guessed: the lead reads that key itself and puts its entries for the project in the brief, because the agent examines no outside document the brief does not name. The agent proposes a lot for the plan of that repository, in the `resume` of its
 report, and the lead decides whether to add it (`raf add` in that repository). The agent never writes to that plan.
 
 ## lead tour

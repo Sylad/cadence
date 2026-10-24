@@ -3214,13 +3214,14 @@ lots:
     created: 2026-10-24
   - id: L285
     title: "orchestrate : les sessions de vague ne laissent plus de tâche de fond qui retient la sortie — env CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1 au lancement de claude -p (retire run_in_background de Bash et des sous-agents) et Monitor dans --disallowedTools ; ne PAS tuer sur StructuredOutput (coût réel seulement dans le message result) ; test du lancement ; mesure après : sessions dont la fin suit le StructuredOutput de plus d'1 min. Sources : code.claude.com/docs/en/headless.md, env-vars.md, permissions.md, agent-sdk/cost-tracking.md ; étude tmp/L285-etude-taches-de-fond-2026-10-24.md. Audit 24-10 : 127 sessions, 833 min, 12,1 M tokens non comptés"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-24
     notes:
       - { date: 2026-10-24, text: "titre remplacé : « orchestrate : une session se termine dès son rapport structuré (StructuredOutput) au lieu d'attendre la fin de ses tâches de fond, et ses tokens sont comptés depuis son journal (segments après le rapport compris) ; étude de faisabilité d'abord (stream-json, variable de la CLI qui interdit les tâches de fond) ; tests. Audit 24-10 : 127 sessions ont attendu après leur rapport, 833 min perdues, 12,1 M tokens non comptés (6,4 %), launch.ts n'attend que close »" }
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "conforme — orchestré (vague 2026-10-24-1125, 0 passe(s) de correction)", commit: 940cf6a7c16e8d1b99822af9b78da59cebb64a67 }
+    finished: 2026-10-24
   - id: L286
     title: "orchestrate : « hit your weekly limit » reconnu comme quota (isQuotaMessage, result.ts:75) → vague suspendue, pas de lot failed ; test sur le message réel. Audit 24-10 : 3 lots failed le 14-10"
     status: done
@@ -3231,21 +3232,23 @@ lots:
     finished: 2026-10-24
   - id: L287
     title: "orchestrate : porte mécanique « code modifié sans test » avant la revue Opus (diff du lot : fichiers de src/ changés sans fichier de test touché → passe de correction directe, sans session de revue) ; seuil et exceptions dans cadence.yaml ; tests. Audit 24-10 : test manquant = 32 % des majeurs de revue (224 sur 690), une passe ≈ 190 k tokens"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "conforme (3 mineurs en notes : R10 ne protège pas le drapeau « une fois par lot », passage en revue Opus d'un lot léger non documenté, titre de R12) — orchestré (vague 2026-10-24-1125, 2 passe(s) de correction)", commit: e180552bd9dd30797d49f7c4f0d3f6be5d6f520f }
+    finished: 2026-10-24
   - id: L288
     title: "orchestrate : précheck conditionnel (lot sans commit et dont le titre ne cite ni constat ni lot antérieur → pas de précheck) ou confié au modèle local ; mesure avant/après de la part de « oui ». Audit 24-10 : 13,4 M tokens (7,1 %) de précheck pour 10 « oui » et 20 « partiel »"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant (0 blocking, 0 major, 3 minor notes) — orchestré (vague 2026-10-24-1125, 2 passe(s) de correction)", commit: 90206051181bc64e340fe67e4058988bb40649dd }
+    finished: 2026-10-24
   - id: L289
     title: "deliver : la raison d'une livraison rouge (L282) garde la dernière image d'une ligne réécrite par \\r (barre de progression) au lieu de 5 images de la barre, et masque les secrets probables (motifs jeton/clé/URL signée/VAR=valeur sensible) avant d'écrire deliveries-failed.log ; docs/deliver.md mentionne le risque ; tests. Revue L282 24-10"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
@@ -3273,6 +3276,32 @@ lots:
           - docs/deliver.md et CHANGELOG.md suivent le changement. — orchestré (vague 2026-10-24-1125, 0 passe(s) de correction)",
         commit: 87c7b0ff2f215bd4a2a9d2aa6cef25dc11f0f0f9
       }
+    finished: 2026-10-24
+  - id: L290
+    title: "README : section « Installer comme plugin Claude Code » (/plugin marketplace add Sylad/cadence, /plugin install cadence@cadence et cadence-hud@cadence, lien avec la CLI npm) ; description et topics du dépôt GitHub (claude-code, claude-code-plugin, …) — décision Sylvain 24-10 (visibilité locale, pas de soumission externe)"
+    status: todo
+    estimate: 0.1
+    created: 2026-10-24
+  - id: L291
+    title: "orchestrate testGate (suite de la revue L287) : les fichiers supprimés par le lot ne comptent pas comme code sans test (diff-tree --diff-filter=d ; un lot de code mort supprimé déclenchait une passe ≈ 65 k tokens) ; les dépôts voisins du lot (l.repos, comme hasWork) sont lus ; la porte ne joue pas quand le budget ne paie pas correction + revue courte (fixAffordable), avec avertissement ; R10 rendu capable d'échouer (retirer !l.testGate le fait rougir) ; doc : sur un lot léger la porte mène à une revue Opus ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L292
+    title: "orchestrate précheck (suite de la revue L288) : les identifiants de lot du plan qui ne sont pas L<n> (Q-CAN5, B28.1, Q4/…) cités dans le titre ou le goal: comptent — mesure revue : 8 des 17 « oui » réels perdus (cadence:L68, maritime Q4/qa-expectations…), Q-CAN6 perdait son précheck ; le critère lit aussi goal: (L258) ; « review » cherché comme mot, pas dans qa-reviewer/review-small ; test B28.1 contre B28.10"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L293
+    title: "cadence perf (suite de la revue L288) : la part de « oui » du précheck lit les journaux d'avant L288 (étape precheck + outcome « livrable déjà présent » = oui, champ precheck = partiel, sinon non) — n/d affiché malgré 170 prechecks ; un journal écrit depuis L288 sans precheckVerdict (rapport illisible, Sonnet en échec après le local) n'est plus compté « non » ; tests"
+    status: todo
+    estimate: 0.1
+    created: 2026-10-24
+  - id: L294
+    title: "deliver (suite de la revue L289) : masquage des secrets dans deliveries-failed.log — noms en un seul mot (APIKEY, ACCESSTOKEN, GITHUBTOKEN) et valeur entre guillemets non fermés (coupée par la borne de 8192) masqués ; tests sur les cas mesurés"
+    status: todo
+    estimate: 0.1
+    created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

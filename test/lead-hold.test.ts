@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Plan } from '../src/plan.js';
 import { run } from '../src/cli.js';
 import { orchestrate, type OrchestrateIo } from '../src/orchestrate/command.js';
-import { addHold, cadenceHome, freeSlots, liveHolds, registerWave, releaseHold, unregisterWave } from '../src/orchestrate/registry.js';
+import { addHold, cadenceHome, expiredHolds, freeSlots, liveHolds, registerWave, releaseHold, unregisterWave } from '../src/orchestrate/registry.js';
 import { tempDir } from './helpers.js';
 
 // L255 : les sessions lancées à la main par le lead comptent dans les créneaux libres (23-10 : 4 sessions pour un plafond de 3).
@@ -38,12 +38,32 @@ describe('registre des sessions externes du lead (L255)', () => {
     expect(liveHolds(home, minutes(1))).toEqual([{ label: 'correctif-L12', since: T0.toISOString(), expires: minutes(30).toISOString() }]);
   });
 
-  it('R2 — une session dont le TTL est passé ne compte plus et son fichier est écarté', () => {
+  it('R2 — une session dont le TTL est passé ne compte plus dans les créneaux, mais reste lisible comme échue jusqu\'au release', () => {
     const home = tempDir();
     addHold(home, 'revue', 10, T0);
     expect(liveHolds(home, minutes(9))).toHaveLength(1);
+    expect(expiredHolds(home, minutes(9))).toEqual([]);
     expect(liveHolds(home, minutes(10))).toEqual([]);
-    expect(liveHolds(home, minutes(0))).toEqual([]); // écartée par la lecture précédente
+    expect(expiredHolds(home, minutes(10)).map((h) => h.label)).toEqual(['revue']); // à l'échéance exacte
+    expect(expiredHolds(home, minutes(300)).map((h) => h.label)).toEqual(['revue']); // lue deux fois : la première lecture ne l'écarte pas
+    expect(releaseHold(home, 'revue')).toBe(true);
+    expect(expiredHolds(home, minutes(300))).toEqual([]);
+  });
+
+  it('R2b — une échue oubliée depuis plus de 24 h est écartée, un fichier illisible aussi', () => {
+    const home = tempDir();
+    addHold(home, 'vieille', 10, T0);
+    expect(expiredHolds(home, minutes(10 + 24 * 60 - 1)).map((h) => h.label)).toEqual(['vieille']);
+    expect(expiredHolds(home, minutes(10 + 24 * 60))).toEqual([]);
+    expect(releaseHold(home, 'vieille')).toBe(false); // le fichier est parti
+  });
+
+  it('R2c — renouveler une session échue (lead hold sur le même libellé) la rend vivante et retire le signal', () => {
+    const home = tempDir();
+    addHold(home, 'correctif', 10, T0);
+    addHold(home, 'correctif', 60, minutes(20));
+    expect(expiredHolds(home, minutes(21))).toEqual([]);
+    expect(liveHolds(home, minutes(21)).map((h) => h.label)).toEqual(['correctif']);
   });
 
   it('R3 — le même libellé posé deux fois se renouvelle, il ne compte pas deux fois', () => {
@@ -165,7 +185,40 @@ describe('cadence lead hold / release (L255)', () => {
     addHold(cadenceHome(), 'revue', 30, T0);
     expect(await status(minutes(5))).toContain('sessions du lead : 1 (revue) · créneaux libres : 1 sur 3');
     expect(await status(minutes(31))).not.toContain('sessions du lead');
+    expect(await status(minutes(31))).toContain('⚠ session du lead échue : revue');
     unregisterWave(cadenceHome(), process.ppid);
+  });
+});
+
+describe('session du lead échue (L278)', () => {
+  it('R1 — au TTL échu, lead tour signale la session en ⚠ avec son âge et ce qu\'il faut en faire, sans la compter dans les créneaux', async () => {
+    const root = await project();
+    await cad(root, {}, T0, 'lead', 'hold', 'correctif-B28', '--ttl', '180');
+    const before = (await cad(root, {}, minutes(179), 'lead', 'tour')).out;
+    expect(before).not.toContain('⚠ session du lead');
+    const after = (await cad(root, {}, minutes(310), 'lead', 'tour')).out;
+    expect(after).toContain('⚠ session du lead échue : correctif-B28 (inscrite depuis 5 h 10 min, échue depuis 2 h 10 min)');
+    expect(after).toContain('cadence lead hold correctif-B28 --ttl <minutes>');
+    expect(after).toContain('cadence lead release correctif-B28');
+    expect(after).not.toContain('créneaux libres'); // échue : plus de créneau pris, la ligne des créneaux se tait comme sans session
+  });
+
+  it('R2 — l\'avertissement suit la ligne des créneaux quand une session vivante l\'affiche, et cesse au release', async () => {
+    const root = await project();
+    await cad(root, {}, T0, 'lead', 'hold', 'vieille', '--ttl', '30');
+    await cad(root, {}, minutes(100), 'lead', 'hold', 'neuve');
+    const lines = (await cad(root, {}, minutes(110), 'lead', 'tour')).out.split('\n');
+    const slots = lines.findIndex((l) => l.includes('sessions du lead : 1 (neuve)'));
+    expect(slots).toBeGreaterThanOrEqual(0);
+    expect(lines[slots + 1]).toContain('⚠ session du lead échue : vieille');
+    await cad(root, {}, minutes(111), 'lead', 'release', 'vieille');
+    expect((await cad(root, {}, minutes(112), 'lead', 'tour')).out).not.toContain('⚠ session du lead');
+  });
+
+  it('R3 — le skill lead dit de reprendre ou d\'arrêter la session échue', () => {
+    const skill = readFileSync(join(import.meta.dirname, '..', 'skills', 'lead', 'SKILL.md'), 'utf8');
+    expect(skill).toMatch(/⚠ session du lead échue/);
+    expect(skill).toMatch(/lead hold <label> --ttl/);
   });
 });
 

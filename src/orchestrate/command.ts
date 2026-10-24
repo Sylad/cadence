@@ -13,7 +13,7 @@ import { AGENTS_DIR } from '../skills.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { findProjects, isProject as isLeadProject } from '../lead.js';
 import { freeLine, readyFree } from '../ready-free.js';
-import { acquireSlot, cadenceHome, freeSlots, liveHolds, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
+import { acquireSlot, cadenceHome, expiredHolds, freeSlots, liveHolds, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
 import { headline, loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { readWaits, renderWaits } from './waits.js';
 import { acceptationFile, acceptText } from './accept.js';
@@ -501,6 +501,24 @@ export function liveLines(cap = DEFAULT_MAX_SESSIONS, now = new Date()): string[
   return lines;
 }
 
+/** Durée à la minute : « 12 min », « 5 h 10 min », « 2 j 3 h ». */
+function longDuration(ms: number): string {
+  const m = Math.max(0, Math.floor(ms / 60_000));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h ${String(m % 60).padStart(2, '0')} min`;
+  return `${Math.floor(h / 24)} j ${h % 24} h`;
+}
+
+/** Une ligne ⚠ par session du lead dont le TTL est échu et qui n'a pas été rendue (L278) : vide sans session échue. */
+export function expiredHoldLines(now = new Date()): string[] {
+  return expiredHolds(cadenceHome(), now).map((h) => {
+    const since = Date.parse(h.since);
+    const age = Number.isFinite(since) ? `inscrite depuis ${longDuration(now.getTime() - since)}, ` : '';
+    return `⚠ session du lead échue : ${h.label} (${age}échue depuis ${longDuration(now.getTime() - Date.parse(h.expires))}) — la reprendre (cadence lead hold ${h.label} --ttl <minutes>) ou l'arrêter (cadence lead release ${h.label})`;
+  });
+}
+
 /** `--continue` (L252) : la ligne des lots prêts dont aucune ressource n'est prise par un lot en cours ni par une vague, sans les lots du premier tirage `drawn` ni les ressources qu'ils tiennent. Vide si aucun. */
 function freeLines(launch: string, drawn: LotState[]): string[] {
   const dirs = isLeadProject(launch) ? [launch] : findProjects(launch);
@@ -516,7 +534,7 @@ const DEFAULT_WATCH_INTERVAL = 10;
 /** Ce que `--status` montre à un instant : les vagues vivantes, puis le tableau (absent si seules les vagues vivantes comptent). */
 function statusView(args: Args, launch: string, cap: number, now: Date): { live: string[]; table?: string[]; running: boolean } {
   const store = typeof args.status === 'string' ? RunStore.find(launch, args.status) : RunStore.last(launch);
-  const live = liveLines(cap, now);
+  const live = [...liveLines(cap, now), ...expiredHoldLines(now)];
   const waveLive = liveWaves(cadenceHome()).length > 0;
   if (!store && live.length && args.status === true) return { live, running: waveLive };
   if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');

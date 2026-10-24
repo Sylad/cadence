@@ -4,7 +4,7 @@ import type { TestBody } from 'claude-code/testing'
 
 import { LAUNCH_FOLDER, parseCollected } from '../hooks/collect'
 import { register } from '../hooks/register'
-import { activeProjects, freeSlots, holdText, liveHolds, slotsLine, launchFolder, colorOfDone, parseTour, progressBar, projectFigures, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import { activeProjects, expiredHolds, expiredHoldText, freeSlots, holdText, liveHolds, slotsLine, launchFolder, colorOfDone, parseTour, progressBar, projectFigures, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
 import type { LeadHold, Project, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
@@ -1351,11 +1351,38 @@ test('R7 — la bande affiche les sessions du lead même sans contexte de sessio
   await ui.unmount()
 })
 
-test('R8 — une session du lead échue n’est plus dessinée', async ($, on) => {
+test('R8 — une session du lead échue ne compte plus dans les créneaux et n’a plus sa ligne de TTL', async ($, on) => {
   seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], leadHolds: [HOLD], slotCap: 3, now: Date.parse(HOLD.expires) + 1_000 })
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Text', text: /correctif-L12/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /reste/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /créneaux libres/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+// ── L278 : une session du lead dont le TTL est échu est signalée en ⚠ ────────────────────────────────────────
+
+test('L278 R1 — les sessions échues se séparent des vivantes, et se lisent avec leur échéance dépassée', () => {
+  const expired: LeadHold = { label: 'correctif-B28', since: '2026-10-23T05:00:00.000Z', expires: '2026-10-23T08:00:00.000Z' }
+  expect(expiredHolds([HOLD, expired], T0)).toEqual([expired])
+  expect(expiredHolds([HOLD], Date.parse(HOLD.expires))).toEqual([HOLD]) // à l'échéance exacte
+  expect(expiredHoldText(expired, T0)).toBe('⚠ session du lead échue : correctif-B28  depuis 5 h 00 · échue depuis 2 h 00')
+  expect(expiredHoldText({ ...expired, since: 'illisible' }, T0)).toBe('⚠ session du lead échue : correctif-B28  échue depuis 2 h 00')
+})
+
+test('L278 R2 — la bande dessine le ⚠ d’une session échue, même sans vague ni session vivante', async ($, on) => {
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], leadHolds: [HOLD], slotCap: 3, now: Date.parse(HOLD.expires) + 3_600_000 })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
+    expect(await ui.find({ type: 'Text', text: /⚠ session du lead échue : correctif-L12/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /échue depuis 1 h 00/ })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
+test('L278 R3 — une session encore vivante n’a pas de ⚠', async ($, on) => {
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], leadHolds: [HOLD], slotCap: 3, now: T0 })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /⚠ session du lead/ })).toBeUndefined()
   await ui.unmount()
 })
 

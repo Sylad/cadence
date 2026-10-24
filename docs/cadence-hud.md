@@ -37,7 +37,7 @@ sessions du lead : 1 · créneaux libres : 2 sur 3
 ```
 
 With a live wave and no held session the line reads `créneaux libres : 1 sur 2`; with neither, nothing. A session whose
-time limit has run out disappears. They are read from disk (`holds/` of the cadence home), like the waves.
+time limit has run out stops counting in the slots but is not dropped (L278): a row `⚠ session du lead échue : correctif-B28  échue depuis 2 h 10` stays under the others (in red) until `cadence lead release <label>` or a renewed `lead hold`, since nothing stops the session itself. They are read from disk (`holds/` of the cadence home), like the waves.
 
 The bar is lots done over lots done + in progress + to do (dropped and recurring lots left out); the count of lots in progress is followed by their ids (`2 en cours : L149 L153`), cut to three then `…` (`5 en cours : L1 L2 L3 …`), the count alone at zero;
 `+N cette semaine` counts the lots created in the last 7 days (today and the six before) and is left out at zero. The source is

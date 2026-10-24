@@ -3,7 +3,7 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, CommandInfo, LeadHold, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
 import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, LAUNCH_FOLDER, parseCollected } from './collect'
-import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
+import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 const PLUGIN = 'cadence-hud'
 const REFRESH_MS = 5_000
@@ -265,7 +265,8 @@ export const register: Register = on => {
     const w = allWaves.filter(wave => isWaveShown(wave, at))
     const shownProjects = activeProjects(allProjects)
     const holds = liveHolds(allHolds, at)
-    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0) return next(e)
+    const lateHolds = expiredHolds(allHolds, at)
+    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0 && lateHolds.length === 0) return next(e)
 
     const ambiguous = parseAmbiguous(await $.env.get('CADENCE_HUD_AMBIGUOUS'))
     const { Box, Text } = $.ui.resolve(e)
@@ -502,15 +503,22 @@ export const register: Register = on => {
 
     // comme `cadence orchestrate --status` : la ligne des créneaux, puis une ligne par session que le lead a inscrite
     const slots = slotsLine(w, holds, cap)
-    const leadRows = slots && (
+    const leadRows = (slots || lateHolds.length > 0) && (
       <Box key="lead" flexDirection="column">
-        <Text color="subtle" wrap="truncate-end">
-          {slots}
-        </Text>
+        {slots && (
+          <Text color="subtle" wrap="truncate-end">
+            {slots}
+          </Text>
+        )}
         {holds.map(hold => (
           <Text key={`hold-${hold.label}`} dimColor wrap="truncate-end">
             {'  '}
             {holdText(hold, at)}
+          </Text>
+        ))}
+        {lateHolds.map(hold => (
+          <Text key={`late-${hold.label}`} color={colorOfLot('failed')} wrap="truncate-end">
+            {expiredHoldText(hold, at)}
           </Text>
         ))}
       </Box>

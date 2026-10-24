@@ -73,7 +73,7 @@ export function freeSlots(waves: LiveWave[], total: number, leadSessions = 0): n
 /**
  * Une session lancée à la main par le lead (sous-agent de correctif, de revue, de QA) : aucune vague ne la porte, le
  * registre ne la voit pas. Le lead l'inscrit (`cadence lead hold`), elle compte dans les créneaux pris jusqu'à son
- * `release` ou, si le lead l'oublie, jusqu'à son échéance.
+ * `release` ou, si le lead l'oublie, jusqu'à son échéance, qui la signale ensuite en ⚠ (`expiredHolds`).
  */
 export interface LeadHold {
   label: string;
@@ -102,28 +102,53 @@ export function releaseHold(home: string, label: string): boolean {
   return true;
 }
 
-/** Les sessions du lead dont l'échéance n'est pas passée à `now` (les autres, et les fichiers illisibles, sont écartés au passage). */
-export function liveHolds(home: string, now: Date): LeadHold[] {
+/** Une session échue reste lisible (et signalée en ⚠) jusqu'à son `release` ou, oubliée, ce délai après son échéance. */
+const EXPIRED_HOLD_KEEP_MS = 24 * 3600_000;
+
+/** Lit les sessions du lead : celles dont l'échéance n'est pas passée à `now`, et celles échues depuis moins de 24 h ; le reste, et les fichiers illisibles, sont écartés au passage. */
+function scanHolds(home: string, now: Date): { live: LeadHold[]; expired: LeadHold[] } {
   let names: string[];
   try {
     names = readdirSync(holdsDir(home)).filter((n) => n.endsWith('.json'));
   } catch {
-    return [];
+    return { live: [], expired: [] };
   }
-  const out: LeadHold[] = [];
+  const live: LeadHold[] = [];
+  const expired: LeadHold[] = [];
   for (const n of names) {
     const file = join(holdsDir(home), n);
     let hold: LeadHold | null = null;
+    let overdue = false;
     try {
       const raw = JSON.parse(readFileSync(file, 'utf8'));
-      if (typeof raw.label === 'string' && Date.parse(raw.expires) > now.getTime()) hold = { label: raw.label, since: String(raw.since), expires: String(raw.expires) };
+      const end = Date.parse(raw.expires);
+      if (typeof raw.label === 'string' && Number.isFinite(end)) {
+        hold = { label: raw.label, since: String(raw.since), expires: String(raw.expires) };
+        overdue = end <= now.getTime();
+        if (now.getTime() - end >= EXPIRED_HOLD_KEEP_MS) hold = null;
+      }
     } catch {
-      // illisible : écarté comme une échéance passée
+      // illisible : écarté
     }
-    if (hold) out.push(hold);
-    else rmSync(file, { force: true });
+    if (!hold) rmSync(file, { force: true });
+    else (overdue ? expired : live).push(hold);
   }
-  return out.sort((a, b) => a.since.localeCompare(b.since) || a.label.localeCompare(b.label));
+  const byAge = (a: LeadHold, b: LeadHold) => a.since.localeCompare(b.since) || a.label.localeCompare(b.label);
+  return { live: live.sort(byAge), expired: expired.sort(byAge) };
+}
+
+/** Les sessions du lead dont l'échéance n'est pas passée à `now` : seules elles comptent dans les créneaux. */
+export function liveHolds(home: string, now: Date): LeadHold[] {
+  return scanHolds(home, now).live;
+}
+
+/**
+ * Les sessions du lead dont le TTL est échu à `now` (L278) et que personne n'a rendues : plus de créneau pris, mais la
+ * session tourne peut-être encore. `lead tour`, `orchestrate --status` et la bande les signalent en ⚠ : le lead la
+ * reprend (`lead hold`) ou l'arrête (`lead release`). Rien ne l'arrête ici.
+ */
+export function expiredHolds(home: string, now: Date): LeadHold[] {
+  return scanHolds(home, now).expired;
 }
 
 /** Inscrit la vague ; écarte au passage les entrées de processus morts (les `.tmp` d'une inscription en cours ne sont pas touchés). */

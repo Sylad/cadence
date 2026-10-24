@@ -25,8 +25,12 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
   **A session you start by hand counts too** (a fix subagent, a review, a QA pass launched outside a wave): the registry does not
   see it, so declare it. Right before starting it, `cadence lead hold <label> [--ttl minutes]` (60 minutes by default,
   the label names the session: `correctif-L12`); as soon as it comes back, `cadence lead release <label>`. While it is held, both
-  commands print `sessions du lead : N (labels)` and subtract it from `créneaux libres`; an `--ttl` that runs out ends the hold
-  by itself if you forget, but release it: a stale hold hides a free slot. Holding does not block anything and never raises the cap.
+  commands print `sessions du lead : N (labels)` and subtract it from `créneaux libres`; the `--ttl` is the maximum duration you
+  declare for the session (size it to the slot you have, not to the optimistic case). When it runs out the hold stops counting, but
+  nothing stops the session: `lead tour` and `orchestrate --status` print `⚠ session du lead échue : <label> (…)` until you
+  release it, and the band shows the same ⚠ row. **At each ⚠, decide at once**: either it is still worth the slot, so renew it
+  with `cadence lead hold <label> --ttl <minutes>` and say why in one sentence, or stop it (`TaskStop` or the agent's end) and
+  `cadence lead release <label>`. A fix that ran 5 h on a 3 h slot (23-10) is the case this catches. Holding does not block anything and never raises the cap.
   Never raise `--max-sessions` or `CADENCE_MAX_SESSIONS` yourself to speed a wave up: raising the cap is a decision of
   the human (a trial at 3 was decided on 2026-10-12); if the slots are the bottleneck, say so and let them decide.
 - **Never two subagents in the same repository at the same time**, and the lead does not commit in a

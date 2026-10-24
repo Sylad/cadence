@@ -453,6 +453,9 @@ export const isInside = (cwd: string, folder: string): boolean => cwd === folder
 /** Les sessions du lead dont l'échéance n'est pas passée à `now` (à l'échéance exacte, elle ne compte plus : comme `cadence lead hold`). */
 export const liveHolds = (holds: readonly LeadHold[], now: number): LeadHold[] => holds.filter(h => Date.parse(h.expires) > now)
 
+/** Les sessions du lead dont le TTL est échu à `now` (à l'échéance exacte, déjà) : rien ne les arrête, la bande les signale (L278). */
+export const expiredHolds = (holds: readonly LeadHold[], now: number): LeadHold[] => holds.filter(h => Date.parse(h.expires) <= now)
+
 /** Les créneaux que le lead peut encore donner, comme `cadence orchestrate --status` : le plafond moins, pour chaque vague vivante, le plus petit de son plafond et des dépôts qu'elle tient, moins les sessions du lead. */
 export const freeSlots = (waves: readonly Wave[], cap: number, leadSessions: number): number =>
   Math.max(0, cap - waves.filter(w => w.live).reduce((n, w) => n + Math.min(w.cap ?? cap, w.repos ?? 0), 0) - leadSessions)
@@ -469,4 +472,11 @@ export const holdText = (hold: LeadHold, now: number): string => {
   const since = Date.parse(hold.since)
   const age = Number.isFinite(since) ? `depuis ${duration(now - since)} · ` : ''
   return `${hold.label}  ${age}reste ${duration(Date.parse(hold.expires) - now)}`
+}
+
+/** « ⚠ session du lead échue : correctif-B28  depuis 5 h 00 · échue depuis 2 h 00 » : l'étiquette, l'âge (omis si la date est illisible) et le temps passé depuis l'échéance. */
+export const expiredHoldText = (hold: LeadHold, now: number): string => {
+  const since = Date.parse(hold.since)
+  const age = Number.isFinite(since) ? `depuis ${duration(now - since)} · ` : ''
+  return `⚠ session du lead échue : ${hold.label}  ${age}échue depuis ${duration(now - Date.parse(hold.expires))}`
 }

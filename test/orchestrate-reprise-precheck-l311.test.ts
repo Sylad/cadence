@@ -101,6 +101,20 @@ describe('R1 — un lot repris de sa branche ne repasse pas par le contrôle pr�
     expect(kinds[0]).toBe('implement');
   });
 
+  it('L318 — un lot rendu pour tests rouges sans aucune revue (constat source tests, aucune étape review) n\'est pas tenu pour déjà revu (resumedReviewed faux), il repart à la correction de ses tests rouges', async () => {
+    const { parent } = await premiereVague();
+    const file = join(new RunStore(parent, WAVE).dir, 'a--L2.json');
+    const old = JSON.parse(readFileSync(file, 'utf8'));
+    const rouges = [{ source: 'tests', gravite: 'majeur', description: 'npm test : 2 failed' }];
+    writeFileSync(file, JSON.stringify({ ...old, constats: rouges, steps: old.steps.filter((s: { kind: string }) => !s.kind.startsWith('review')) }));
+    const f2 = fake();
+    await run(parent, ['a:L2'], f2);
+    const kinds = f2.calls.map((c) => c.kind);
+    expect(kinds).not.toContain('precheck');
+    expect(kinds[0]).toBe('fix');
+    expect(new RunStore(parent, `${WAVE}-2`).readLot('a', 'L2')!.resumedReviewed).toBe(false);
+  });
+
   it('R3 — un lot neuf qui cite un autre lot passe toujours par le contrôle préalable', async () => {
     const { parent, repo } = setup([{ title: 'un' }, { title: 'deux, suite de L1' }]);
     writeFileSync(join(repo, 'cadence.yaml'), 'orchestrate:\n  precheck: true\n  worktrees: true\n');

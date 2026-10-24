@@ -214,7 +214,11 @@ export const maskSecrets = (line: string): string =>
     .replace(BEARER, `$1 ${MASK}`)
     .replace(URL_USERINFO, `$1${MASK}@`)
     .replace(TOKEN_SHAPES, MASK)
-    .replace(ASSIGNMENT, (m, name: string) => (sensitiveName(name) ? `${name}=${MASK}` : m));
+    .replace(ASSIGNMENT, (m, name: string, value: string) => {
+      if (sensitiveName(name)) return `${name}=${MASK}`;
+      // Valeur entre guillemets d'un nom ordinaire : un secret peut suivre à l'intérieur, on la rescanne.
+      return /^["']/.test(value) ? `${name}=${value[0]}${maskSecrets(value.slice(1))}` : m;
+    });
 
 const clean = (line: string, max: number): string => {
   const t = maskSecrets(line.replace(ANSI, '').replace(CONTROL, ' ')).replaceAll('⏎', ' ').trim();

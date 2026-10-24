@@ -21,6 +21,7 @@ import { capturesText, headline, integrationText, newsText, objective, renderBri
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import { sumTokens, type Tokens } from './result.js';
+import { cutReport, EXTENSION_MS, MAX_EXTENSIONS, workTimeoutMs } from './timeouts.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
 import { type Acceptation, acceptationFile, acceptCommands, isAcceptList, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
@@ -607,6 +608,27 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   if (playwright) l.uxCaptures = join(dirname(mcpConfig), 'playwright');
   l.pendingAnswer = null; // la réponse est dans le brief : elle ne repart pas avec la session suivante
   const tmpDir = w.store.tmpDir(l.project, l.lot); // TMPDIR de la session, aussi en --add-dir : hors du cwd, un Write y serait refusé en `claude -p`
+  // Délai (L298) : l'étape d'écriture est proportionnée à l'estimate et à la fiche du lot, puis prolongée à chaque échéance où elle a commité.
+  const delay = write ? workTimeoutMs(c.config.timeouts.work, l.estimate, hasSpecStage(l)) : c.config.timeouts.review;
+  let seenHead = before.head;
+  const extend = write
+    ? {
+        progressed: () => {
+          const head = (() => {
+            try {
+              return git(wd(c), 'rev-parse', 'HEAD').trim();
+            } catch {
+              return seenHead;
+            }
+          })();
+          const moved = head !== seenHead;
+          seenHead = head;
+          return moved;
+        },
+        ms: EXTENSION_MS,
+        max: MAX_EXTENSIONS,
+      }
+    : undefined;
   const outcome = await runSession(
     {
       kind,
@@ -628,7 +650,8 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       tmpDir,
       mcpConfig,
       playwright,
-      timeoutMs: write ? c.config.timeouts.work : c.config.timeouts.review,
+      timeoutMs: delay,
+      extend,
     },
     {
       claude: w.claude,
@@ -697,6 +720,21 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
     step.report = `${base}.json`;
     step.status = 'failed';
     step.cause = outcome.cause;
+    if (write && outcome.cause === 'délai dépassé') {
+      // L298 : le travail laissé par une étape d'écriture coupée au délai est signalé (commits, fichiers, tests), pas un « échec » sec.
+      const after = await snapshot(wd(c));
+      const files = dirtBetween(before, after);
+      const commits = before.head ? readCommits(wd(c), { range: `${before.head}..HEAD` }).length : 0;
+      let numstat = '';
+      try {
+        numstat = git(wd(c), 'diff', '--numstat', 'HEAD');
+      } catch {
+        // pas de HEAD : aucune ligne comptée
+      }
+      const report = cutReport({ minutes: Math.round(delay / 60_000), commits, files, numstat });
+      step.cause = report;
+      return stop(c, files.length || commits ? 'handed-back' : 'failed', `délai dépassé : ${kind} ${report}`);
+    }
     return stop(c, 'failed', outcome.cut ? `coupure : ${kind} ${outcome.cause}` : `échec : ${kind} sans résultat : ${outcome.cause}`);
   }
   if (outcome.kind === 'quota') {
@@ -1188,12 +1226,11 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
 
 /** Chemins salis par une session : suivis modifiés, nouveaux fichiers non suivis, et ceux des dépôts voisins. */
 function dirtAfter(done: Done): string[] {
-  return [
-    ...trackedPaths(done.after),
-    ...done.after.untracked.filter((f) => !done.before.untracked.includes(f)),
-    ...done.others.flatMap((o) => [...trackedPaths(o.after), ...o.after.untracked.filter((f) => !o.before.untracked.includes(f))].map((f) => `${o.repo.rel}: ${f}`)),
-  ];
+  return [...dirtBetween(done.before, done.after), ...done.others.flatMap((o) => dirtBetween(o.before, o.after).map((f) => `${o.repo.rel}: ${f}`))];
 }
+
+/** Chemins salis d'un dépôt entre deux relevés : suivis modifiés, et fichiers non suivis apparus. */
+const dirtBetween = (before: Snapshot, after: Snapshot): string[] => [...trackedPaths(after), ...after.untracked.filter((f) => !before.untracked.includes(f))];
 
 /** Suite commune des étapes spec et accept : commits de la session (avertis s'ils ne citent pas le lot), choix reportés, vraies questions (les non-questions deviennent un avertissement). */
 function takeReport(c: LotCtx, done: Done, rep: { choix?: string[]; questions: string[] }): string[] {

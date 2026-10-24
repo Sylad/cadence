@@ -1514,6 +1514,12 @@ describe('budget par lot (L78, recalibré L194)', () => {
     const store = RunStore.last(parent)!;
     expect(store.readLot('a', 'L1')!.budget).toBe(1_140_000);
   });
+
+  it("L298 R11 — l'estimate du plan est écrite dans l'état du lot (le délai des écritures en est proportionné)", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un', estimate: 2 }] });
+    await orchestrate(['a:L1', '--budget', '1'], io(parent).io, fakeDeps().deps);
+    expect(RunStore.last(parent)!.readLot('a', 'L1')!.estimate).toBe(2);
+  });
 });
 
 describe('--continue (L147)', () => {

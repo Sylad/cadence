@@ -635,7 +635,7 @@ Exception: when the tests are red after a write pass, the lot goes to a fix pass
 refused for lack of budget the lot is handed back to the lead without a review, with its findings, and the cause names
 the red tests: the pass it names is the one whose tests were red, counted by its number (« la passe fix 2 », « l'implémentation »), and « la passe des mineurs » appears only when that pass was the one played. The wave budget stays for the others. When the budget (or the usage limit) is reached no new session starts, the running ones
 finish, the wave is *suspended* (exit code 3) and `--resume --budget …` continues. A session that returns
-nothing readable, times out (45 min for work, 25 for a review) or fails is not retried; the lot is handed
+nothing readable, times out (a work step: see « Time limit of a write step »; 25 min for a review) or fails is not retried; the lot is handed
 back with the cause. Exit codes: 0 every lot ready · 1 at least one lot handed back (question, failure,
 review still not compliant after two passes, or three when it converges) · 2 refused before acting · 3 wave suspended.
 
@@ -717,7 +717,7 @@ orchestrate:
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default
   addDirs: [/home/me/projects/tmp]       # extra directories the sessions may use
-  timeouts: { implement: 45, review: 25 }   # minutes
+  timeouts: { implement: 45, review: 25 }   # minutes; `implement` is the base for a 0.25-day lot (see « Time limit of a write step »)
   # a plan kept by the project's own tool is read-only for raf: the orchestrator calls these instead
   start: python3 scripts/raf.py start {lot}
   verdict: python3 scripts/raf.py note {lot} "revue de code : {verdict}"
@@ -797,3 +797,17 @@ folder whenever Playwright was loaded for the lot, even if no `ux` step ran
 Without `start`, a read-only plan's `todo` lot is refused (start it with the project's tool); without
 `verdict`, the review verdict stays in the wave's state and you report it. Only the plan's files
 (`plan.path`, `plan.files`, the QA expectations file) are committed from those commands; anything else dirty stops the lot (`.cadence/runs/`, `.cadence/corrections.json` and `.playwright-mcp/` excepted, as above).
+
+### Time limit of a write step (L298)
+
+`timeouts.implement` (45 min by default) is the limit of a lot estimated at 0.25 day. The limit of a write step
+(implementation, fix, spec, acceptance) is **proportioned to the lot**: multiplied by `estimate / 0.25` (never below 1: a
+0.5-day lot gets 90 min), by 1.5 more when the lot has a sheet (`screen:` or `spec: true`), and never above 4 times the
+base. The estimate is kept in the lot's state; a state written before L298 has none and keeps the base. A review keeps
+`timeouts.review`.
+
+The limit is also **extended while the session commits**: at each deadline, if HEAD moved since the previous deadline (or since
+the start), the session gets 15 more minutes, 8 times at most (2 h at the most after the proportioned limit); with no commit since,
+it is cut. A cut write step is no longer a bare « failure »: the table gives the commits kept, the files left **uncommitted**
+(with those that are tests, and the lines added) and says the work stays in the repository. A cut that left commits or files
+hands the lot back to the lead; a cut that left nothing is a failure.

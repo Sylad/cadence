@@ -36,6 +36,8 @@ export interface StepSpec {
   permissionMode: string;
   addDirs: string[];
   timeoutMs: number;
+  /** Prolongation à l'échéance d'une étape d'écriture qui commite (L298), transmise au lanceur. */
+  extend?: LaunchOpts['extend'];
   /** Dossier `bin` d'un Node (`.nvmrc` du projet) : mis en tête du PATH de la session, jamais de l'orchestrateur. */
   nodeBin?: string;
   /** `<vague>/tool/bin` : `raf` et `cadence` de l'instantané, en tête du PATH de la session (avant le Node du projet). */
@@ -108,6 +110,11 @@ export interface LaunchOpts {
   unset?: string[];
   /** Clé du lot (`projet:lot`) qui lance la session : l'attente d'un créneau s'inscrit au journal sous ce lot. */
   lot?: string;
+  /**
+   * Prolongation à l'échéance (L298) : `progressed()` dit si la session a commité depuis la dernière échéance (ou son départ) ;
+   * si oui, elle reçoit `ms` de plus, `max` fois au plus. Absent : l'échéance coupe.
+   */
+  extend?: { progressed: () => boolean; ms: number; max: number };
 }
 
 /** Le lanceur : injecté dans les tests, `realClaude` en vrai. Jamais `--resume` d'une session de travail, sauf la relance de mise en forme. */
@@ -232,7 +239,7 @@ export async function runSession(
 ): Promise<SessionOutcome> {
   const sandbox = sandboxEnv(!!spec.prodAccess);
   const launch = (args: string[]) =>
-    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...NO_BACKGROUND_ENV, ...sandbox.set, ...(spec.tmpDir ? { TMPDIR: spec.tmpDir } : {}), ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, onSpawn: deps.onSpawn, lot: spec.lot });
+    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...NO_BACKGROUND_ENV, ...sandbox.set, ...(spec.tmpDir ? { TMPDIR: spec.tmpDir } : {}), ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, extend: spec.extend, onSpawn: deps.onSpawn, lot: spec.lot });
   const epoch = killEpoch;
   const out = await launch(spec.local ? buildLocalArgs(spec, deps.agents) : buildArgs(spec, deps.agents));
   const first = classify(out);
@@ -339,7 +346,13 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env, l
       child.stdout!.on('data', (d: Buffer) => out.push(d));
       child.stderr!.on('data', (d: Buffer) => err.push(d));
       let timedOut = false;
-      const timer = setTimeout(() => {
+      let extended = 0;
+      const deadline = (): void => {
+        if (opts.extend && extended < opts.extend.max && opts.extend.progressed()) {
+          extended++;
+          timer = setTimeout(deadline, Math.max(1_000, opts.extend.ms));
+          return;
+        }
         timedOut = true;
         tree.kill();
         killMarked(mark);
@@ -348,7 +361,8 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env, l
         } catch {
           // déjà mort
         }
-      }, Math.max(1_000, opts.timeoutMs));
+      };
+      let timer = setTimeout(deadline, Math.max(1_000, opts.timeoutMs));
       // Aucun descendant ne survit à la session, dans son groupe ou hors de lui. Dès que la racine sort (`exit`), pas
       // à `close` : un descendant qui tient stdout/stderr ouverts retarderait `close` jusqu'au délai (« délai dépassé »
       // pour une session pourtant sortie en code 0).

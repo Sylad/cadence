@@ -81,6 +81,8 @@ export interface LotState {
   goal?: string;
   visible: boolean;
   small: boolean;
+  /** Estimate du plan, en jours (L298) : le délai des étapes d'écriture en est proportionné. Absent (état antérieur) : le délai de base. */
+  estimate?: number;
   /** Seuil de l'étape spec (clé de lot `screen:`, L169) : le lot passe par `spec` avant `implement`. Absent : chemin actuel. */
   screen?: Screen;
   /** Lot à `spec: true` sans écran (L188) : il passe par `spec` avant `implement`, sa fiche est back seule. Jamais posé sur un lot à `screen:` : un lot mixte est un lot à écran dont la fiche a un bloc `sujet` (le cycle lit la fiche). */

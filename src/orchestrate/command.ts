@@ -412,6 +412,7 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
     const screen = specScreen(t.repo, env.config.spec.dir, lot);
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...(lot.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
+    state.estimate = lot.estimate;
     state.light = lot.estimate <= env.config.review.threshold;
     state.budget = lotBudget(lot.estimate, screen ? 'screen' : lot.spec ? 'spec' : undefined);
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));

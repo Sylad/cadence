@@ -3513,9 +3513,10 @@ lots:
     started: 2026-10-24
   - id: L312
     title: "perf (⚠ tendance deux fenêtres, tour du lead 24-10 soir, décision Sylvain) : tokens par lot en hausse à estimate 0.25 (médiane 150,0 k contre 116,6 k, +29 %) et 0.5 (440,6 k contre 318,7 k, +38 %) alors que la part conforme du premier coup monte (61 % contre 39 %) — ventiler la hausse par étape (precheck, implement, review/review-small, fix), par modèle et par projet sur les deux fenêtres ; recaler ce que la mesure justifie (budgets par catégorie de docs/orchestrate.md « Each lot also has its own budget », grille d'estimate de raf add et du brief du lead) et rien d'autre ; si la hausse vient d'une qualité achetée (revue Opus, passes de mineurs) et pas d'une estimate fausse, le conseil « l'estimate est mal calibrée » de cadence perf ne doit plus sortir seul : il cite l'étape qui porte la hausse ; mesure avant/après et conclusion en note ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L313
     title: "ref add (suites revue L274, valeurs de code OMM) : « indicator figures 1 to 6, 8 and 9 » (WMO-306 vol. I.1 p. 46) ne cite plus les vraies Figures 2, 3, 4 ; « code » porté par la phrase d'une plage au demi-cadratin (306_i1 p. 39 : 2 faux liens non résolus nouveaux) ; « code » en fin de la page précédente (vol. I.2 p. 1327) ; test de la garde « code table » ; chiffres de l'entrée L274 du CHANGELOG remesurés sur le code livré (ils valent pour bca690d) ; différentiel avant/après sur les PDF de maritime cité dans le commit"
     status: todo

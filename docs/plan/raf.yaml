@@ -3371,6 +3371,21 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-24
+  - id: L299
+    title: "worktrees (suite revue L279, à faire avant activation) : revérifier branche de départ et arbre du lead juste avant advance() et writeVerdict ; le lead passé sur une autre branche pendant les contrôles ou la revue courte ne reçoit ni fast-forward ni commit de plan, lot rendu next: integrate (R24, R22, R8) ; test qui change de branche pendant la revue courte (reproduit par la revue 24-10 : feat(L2) et plan sur « autre », L2 prêt)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L300
+    title: "worktrees (suite revue L279, à faire avant activation) : reprise d'un lot next: integrate dont la branche cadence/<vague>/<lot> n'existe plus (retirée par --remove-worktree --abandon-commits) : aucun worktree recréé au sommet (planTrees/ensureTree), lot rendu « commits abandonnés » ; jamais de verdict conforme à commit null ; test avec deux lots du groupe repris ensemble (reproduit par la revue 24-10)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L301
+    title: "worktrees (suite revue L279, à faire avant activation) : lot rendu hors intégration (revue non conforme, tests rouges, HEAD déplacé, plan touché, verrou d'acceptation) — chemin de reprise : nouvelle vague du même lot qui retrouve sa branche cadence/<vague>/<lot> la plus récente (ou intégration à la main documentée) ; docs/orchestrate.md:517 « usual paths » corrigé ; mineurs de la revue : intégration après arrêt de l'application UX (cycle.ts:1891), worktree hors du dépôt quand la vague part de sa racine (lotTreeDir), foreignDirty/ownFile et git/tryGit dédupliqués, tests de waveReadsIntegrate/Replay ; tests"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -82,3 +82,18 @@ describe('précontrôle conditionnel (L211)', () => {
     }
   })
 })
+
+describe('précheck conditionnel dans la doc (L288)', () => {
+  it('L288 — fonctionnement.md, lead.md et les descriptions de figure disent que le précheck dépend du titre du lot', () => {
+    const fonct = read('docs/fonctionnement.md')
+    const lead = read('docs/lead.md')
+    const precheckLines = (s: string) => s.split('\n').filter((l) => /pre-?check/i.test(l)).join('\n')
+    expect(fonct).toMatch(/title cites a finding[^\n]*precheck/i)
+    expect(fonct).not.toContain('A lot without commits yet starts with the **precheck**')
+    expect(lead).not.toContain('applies to any lot without a commit yet')
+    expect(lead).not.toContain('without a commit yet (unless')
+    for (const l of precheckLines(lead).split('\n').filter((x) => /commit/.test(x))) expect(l, l).toMatch(/title/)
+    for (const v of ['light', 'dark']) expect(read(`docs/fonctionnement-wave-${v}.svg`), v).toMatch(/title[^<]*precheck/i)
+    expect(fonct).toMatch(/<img alt="[^"]*title[^"]*precheck/i)
+  })
+})

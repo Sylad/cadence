@@ -3570,9 +3570,10 @@ lots:
     finished: 2026-10-25
   - id: L317
     title: "orchestrate : une correction lancée par la porte docs.sync (« documentation en retard », cycle.ts:1882) qui ne commite rien laisse passer le lot à la revue (« ⚠ fix sans nouveau commit ») et il finit prêt alors que raf check reste rouge (vécu essai 3, 24-10 : L315, cycle.ts sans doc) ; soit la session écrit la doc, soit l'écart est acquitté explicitement et motivé (raf docs-ok <lot> --reason, lu par docSyncIssues et par la porte) ; jamais prêt avec un écart docs.sync ouvert ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-25
+    started: 2026-10-25
   - id: L318
     title: "orchestrate reprise (suite revue L315) : resumedReviewed vaut vrai pour un lot rendu pour tests rouges sans aucune revue (command.ts:948 compte aussi les constats source 'tests') → overBudget affiche « après la dernière revue de la branche reprise » au lieu de « après l'implémentation » ; ne compter que les constats de revue ou les étapes review* ; test"
     status: todo

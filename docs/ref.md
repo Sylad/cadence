@@ -236,15 +236,15 @@ reports `usage`:
 
 ```
 $ cadence ref eval tmp/corpus-ref lectures/
-7 cas · 44 éléments attendus · 43 lus
-rappel : 88.6 % (39/44) · précision : 90.7 % (39/43)
-faux lu : 10 % (4/40 sûrs)
+7 cas · 47 éléments attendus · 46 lus
+rappel : 89.4 % (42/47) · précision : 91.3 % (42/46)
+faux lu : 9.3 % (4/43 sûrs)
 tokens par page : 4200 (4200 sur 1 pages)
 par type :
   ecran      rappel 100 % (2/2) · précision 100 % (2/2) · faux lu 0/2
   composant  rappel 100 % (5/5) · précision 100 % (5/5) · faux lu 0/5
   etat       rappel 50 % (1/2) · précision 50 % (1/2) · faux lu 1/2
-  texte      rappel 96.3 % (26/27) · précision 100 % (26/26) · faux lu 0/23
+  texte      rappel 96.7 % (29/30) · précision 100 % (29/29) · faux lu 0/26
   jeton      rappel 50 % (1/2) · précision 50 % (1/2) · faux lu 1/2
   table      rappel 0 % (0/1) · précision 0 % (0/1) · faux lu 1/1
   gabarit    rappel 100 % (1/1) · précision 100 % (1/1) · faux lu 0/1
@@ -288,7 +288,14 @@ one per trap taken from a real defect, each with the inventory that is true of w
 Each case folder holds `document.html` (one 8.5×11 in `section.page` per page, deterministic), `attendu.json` (an inventory that
 passes `ref check`, slug `corpus-<case>`, `sha256` of the `document.pdf` once rendered (of the HTML with `--sans-rendu`, which writes no PDF), `pages`, zones in pixels at 200 dpi, `piege` on the trap elements), and,
 unless `--sans-rendu`, `document.pdf` and `page-<n>.png` (1700×2200, 200 dpi) written by **Playwright** (Chromium). Texts of a table,
-a template or a schema belong to it and are not listed as `texte`; labels of a figure are. Playwright is not a dependency of cadence:
+a template or a schema belong to it and are not listed as `texte`; labels of a figure are.
+
+**One convention for the labels** (what a faithful reading must find, so that `ref eval` does not count it as a faux lu): every
+visible text outside a table or a template is an expected `texte`, with its role, **including the label of a component**: the
+button `Layers` is a `composant` (`bouton`, `contenu: "Layers"`) **and** a `texte` (`bouton`, `libelle: "Layers"`), the rows `Wind`
+and `Waves` of the panel are `case_a_cocher` components and `case_a_cocher` texts, the `Proposal` badge is a `statut` and a `badge`
+`texte`. The tests check it both ways: every label of the expected inventory is drawn, and every drawn text (the HTML, and the
+words of `pdftotext` once rendered) has an expected `texte`. Playwright is not a dependency of cadence:
 install it (`npm i -D playwright`, `npx playwright install chromium`) or point `CADENCE_PLAYWRIGHT` to the folder of the package;
 without it, or when Chromium does not launch (`npx playwright install chromium` missing), the command exits **2** and writes nothing (`--sans-rendu` still writes HTML and expected files). An existing folder is
 refused (exit 2). The corpus is written where you say, not in `evals/`, which `claude plugin eval` reads as case folders.

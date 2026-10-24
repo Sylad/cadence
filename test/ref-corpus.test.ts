@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { checkInventaire } from '../src/ref/check.js';
 import { buildCorpus } from '../src/ref/corpus.js';
+import { agreger, evaluerCas } from '../src/ref/evaluate.js';
 import { tempDir } from './helpers.js';
 
 type Obj = Record<string, any>;
@@ -15,6 +16,13 @@ const corpus = buildCorpus();
 const cas = (nom: string) => corpus.find((c) => c.nom === nom)!;
 const elements = (nom: string, type: string): Obj[] => cas(nom).inventaire.elements.filter((e: Obj) => e.type === type);
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ');
+
+const decode = (t: string) => t.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+/** Les textes dessinés d'une page, un par nœud de texte, dans l'ordre du document ; les cellules des `<table>` appartiennent à leur table ou à leur gabarit. */
+const textesDessines = (html: string, page: number): string[] => {
+  const section = html.split('<section class="page">')[page]!.split('</section>')[0]!;
+  return section.replace(/<table[\s\S]*?<\/table>/g, '<br>').split(/<[^>]+>/).map(decode).filter((t) => t !== '');
+};
 
 function corpusCmd(args: string[], env: NodeJS.ProcessEnv = {}) {
   const dir = tempDir();
@@ -64,6 +72,38 @@ describe('cadence ref corpus — le corpus synthétique à vérité connue (eval
         for (const d of dits) expect(html, `${c.nom} : « ${d} »`).toContain(d);
       }
     }
+  });
+
+  // Convention unique (docs/ref.md) : tout libellé visible hors table et gabarit est attendu comme `texte`, avec son rôle ; sinon une lecture fidèle compterait de faux lus.
+  it('R5 — dans l’autre sens : chaque texte dessiné (hors cellules de table et de gabarit) est un `texte` attendu, à la casse près du dessin', () => {
+    for (const c of corpus) {
+      const attendus = elements(c.nom, 'texte').map((e) => e.libelle);
+      for (let page = 1; page <= c.pages; page++) {
+        for (const dessine of textesDessines(c.html, page)) expect(attendus, `${c.nom} p${page} : « ${dessine} » est dessiné sans élément texte attendu`).toContain(dessine);
+      }
+    }
+  });
+
+  it('R5 — les libellés de composant et de statut du corpus sont des textes attendus, avec le rôle du composant', () => {
+    for (const c of corpus) {
+      const textes = elements(c.nom, 'texte');
+      for (const comp of elements(c.nom, 'composant').filter((e) => e.contenu)) {
+        expect(textes.find((t) => t.libelle === comp.contenu && t.source.page === comp.source.page)?.role, `${c.nom} : « ${comp.contenu} »`).toBeDefined();
+      }
+    }
+    const proposal = elements('page-proposal', 'texte');
+    expect(proposal.filter((t) => ['Wind', 'Waves'].includes(t.libelle)).map((t) => t.role)).toEqual(['case_a_cocher', 'case_a_cocher']);
+    expect(proposal.find((t) => t.libelle === 'Proposal')).toMatchObject({ role: 'badge' });
+  });
+
+  it('R5 — une lecture fidèle du corpus (ce qui est dessiné, rien d’autre) donne un faux lu de 0 %', () => {
+    const cas = corpus.map((c) => {
+      const lecture = { ...c.inventaire, genre: 'lecture', elements: c.inventaire.elements.map((e: Obj) => ({ ...e, piege: undefined })) };
+      return evaluerCas(c.nom, c.inventaire, lecture);
+    });
+    const ev = agreger(cas);
+    expect(ev.total.faux_lu).toBe(0);
+    expect(ev.total.taux_faux_lu).toBe(0);
   });
 
   it('R6 — texte ambigu levé par la figure : un lien precise dont la lecture ambiguë est dans le texte et la raison dans la figure', () => {
@@ -227,6 +267,10 @@ describe('cadence ref corpus — le corpus synthétique à vérité connue (eval
         expect(dedans / ((x1 - x0) * (y1 - y0)), `${c.nom} : « ${e.libelle} » dessiné en [${[x0, y0, x1, y1].map(Math.round)}], attendu en [${z.x},${z.y},${z.x + z.l},${z.y + z.h}]`).toBeGreaterThanOrEqual(0.85);
         verifies++;
       }
+      // dans l'autre sens : chaque mot que le rendu dessine appartient à un texte attendu (les cellules du gabarit sont à son élément ; le scan n'a pas de couche texte)
+      if (elements(c.nom, 'gabarit').length > 0) continue;
+      const connus = new Set(elements(c.nom, 'texte').flatMap((e) => e.libelle.split(' ')));
+      pages.forEach((page, i) => page.forEach((w) => expect(connus, `${c.nom} p${i + 1} : « ${w.mot} » est dessiné sans texte attendu`).toContain(w.mot)));
     }
     expect(verifies).toBeGreaterThanOrEqual(20);
   }, 120_000);

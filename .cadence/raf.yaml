@@ -3451,10 +3451,14 @@ lots:
     finished: 2026-10-24
   - id: L307
     title: "docs.sync dans chaque projet du dossier qui n'en a pas : le bibliothécaire (lecture seule) établit par projet la carte code → docs (README, docs/, CHANGELOG/Nouveautés) ; le lead la pose dans le cadence.yaml du projet (commit acquitté par raf ignore, ou lot du projet) et vérifie raf check ; pour nous : avatar-pandora, claude-code-codex, discotheque, evatosorus, finance-tracker, jobmail-assistant, ol-companion, warhammer40k, maritime-atlas (plan raf.py : via un lot maritime) ; et clé de docs hors dépôt dans ~/projects/developpeur/cadence.yaml pour les études de cas de claude-code-codex — demande Sylvain 24-10"
-    status: todo
+    status: done
     estimate: 0.25
     after: [ L306 ]
     created: 2026-10-24
+    notes:
+      - { date: 2026-10-24, text: "24-10 (lead) — fait hors du dépôt cadence : docs.sync + docs.articles posés dans avatar-pandora, claude-code-codex, discotheque, evatosorus, finance-tracker, jobmail-assistant (cadence.yaml créé), ol-companion, warhammer40k (commits config acquittés par raf ignore) et maritime-atlas (tâche I-CAD1, avec precheck: local) ; cartes établies en lecture seule, rejeu 0 à 10 % des lots signalés (evatosorus 9/21) ; maritime : seule l'étude de cas maritime-atlas.astro (récits rétrospectifs écartés, bruit)." }
+    started: 2026-10-24
+    finished: 2026-10-24
   - id: L308
     title: "bibliothécaire (suites revue L306, AVANT L307) : une seule clé pour les docs hors dépôt — fusionner describedBy dans docs.articles existante (src/config.ts:538-566), migration de la clé et doc ; le « lot proposé » pour un document hors dépôt remonte au lead (proposals du lot, tableau de fin de vague), pas seulement dans le resume ; le brief ne demande plus de lire un document que la session ne peut pas lire (ou --add-dir du dépôt de ce document, en lecture) ; à la main, le skill lead passe la carte hors dépôt à l'agent ; repo absolu refusé ou résolu ; calcul des écarts docs.sync dédupliqué (cycle.ts:342 et :1864) ; docsFix non remis à false avant les questions (cycle.ts:1716) ; test R15 hors du /tmp commun ; README:61 ligne blanche ; docs/stabilite.md : doc-keeper et la clé rangés ; tests"
     status: done

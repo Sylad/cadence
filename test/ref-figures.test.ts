@@ -71,9 +71,9 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.unresolved).toEqual([]);
     expect([...citedPages(idx, new Set([1]))]).toEqual([2]);
   });
-  it('R1 — les plages citent chaque figure : « Figures 2–4 » (demi-cadratin), « Figures 2, 4 to 6 », « Figures 1.1 to 1.3 », « Figs. 2 — 3 »', () => {
+  it('R1 — les plages citent chaque figure : « Figures 2–4 » (demi-cadratin), « Figures 2, 4 to 6 », « Figures 1.1 to 1.3 », « Figs. 2—3 »', () => {
     const idx = indexText([
-      page(1, 'See Figures 2–4.', 'See Figures 7, 9 to 11 now', 'Voir Figures 1.1 to 1.3', 'cf. Figs. 5 \u2014 6'),
+      page(1, 'See Figures 2–4.', 'See Figures 7, 9 to 11 now', 'Voir Figures 1.1 to 1.3', 'cf. Figs. 5\u20146'),
       page(2, 'Figure 2 A', 'Figure 3 B', 'Figure 4 C', 'Figure 7 D', 'Figure 9 E', 'Figure 10 F', 'Figure 11 G', 'Figure 1.1 H', 'Figure 1.2 I', 'Figure 1.3 J', 'Figure 5 K', 'Figure 6 L'),
     ]);
     expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([
@@ -99,11 +99,19 @@ describe("index des figures d'un texte (L261)", () => {
   });
   it('R4 — bornes sans préfixe commun, plage décroissante ou de 50 numéros ou plus : les deux bornes seules, aucun numéro inventé', () => {
     const idx = indexText([
-      page(1, 'Tables A3–1 and A3-2 here', 'tables 4.8–10 here', 'Figures 6 to 4 here', 'Figures 1 to 80 here', 'Figures 2 and 3 — 1995 here'),
+      page(1, 'Tables A3–1 and A3-2 here', 'tables 4.8–10 here', 'Figures 6 to 4 here', 'Figures 1 to 80 here', 'Figures 1.1 to 2.3 here'),
     ]);
     expect(idx.unresolved.map((u) => u.label)).toEqual([
-      'Table A3', 'Table A3-2', 'Table 4.8', 'Figure 6', 'Figure 4', 'Figure 1', 'Figure 80', 'Figure 2', 'Figure 3', 'Figure 1995',
+      'Table A3', 'Table A3-2', 'Table 4.8', 'Figure 6', 'Figure 4', 'Figure 1', 'Figure 80', 'Figure 1.1', 'Figure 2.3',
     ]);
+  });
+  it('R5 — un tiret entouré d\'espaces après une citation au pluriel est de la prose, pas une plage : « Figures 2 and 3 — 10 stations » ne cite que 2 et 3', () => {
+    const idx = indexText([
+      page(1, 'Figures 2 and 3 — 10 stations reported', 'see Tables 2 and 3 – 12 cases are listed'),
+      page(2, 'Figure 2 A', 'Figure 3 B', 'Figure 7 C', 'Figure 10 D'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.length])).toEqual([['Figure 2', 1], ['Figure 3', 1], ['Figure 7', 0], ['Figure 10', 0]]);
+    expect(idx.unresolved.filter((u) => u.page === 1).map((u) => u.label)).toEqual(['Table 2', 'Table 3']);
   });
   it("les numéros d'annexe des normes OMM gardent leur lettre : « Figure 1.B.1 » n'est pas la Figure 1", () => {
     const idx = indexText([

@@ -48,8 +48,8 @@ const WORDS: Record<string, { kind: FigureKind; word: string }> = {
   planches: { kind: 'planche', word: 'Planche' },
 };
 const NUMBER = String.raw`[A-Z]{0,2}[-.]?\d+(?:[.-](?:\d+|[A-Z](?![a-z])))*[a-z]?`;
-/** Ce qui joint les deux bornes d'une plage : « 4 to 6 », « 4 à 6 », « 2–4 » (demi-cadratin ou cadratin). */
-const RANGE = String.raw`(?:\s+(?:to|à)\s+|\s*[–—]\s*)`;
+/** Ce qui joint les deux bornes d'une plage : « 4 to 6 », « 4 à 6 », « 2–4 » (demi-cadratin ou cadratin collé aux numéros ; entouré d'espaces, c'est une incise de prose). */
+const RANGE = String.raw`(?:\s+(?:to|à)\s+|[–—])`;
 /** Ce qui sépare deux numéros d'une énumération au pluriel : « 2, 3 », « 2 and 3 », plus les plages. */
 const SEPARATOR = String.raw`(?:\s*,\s*(?:(?:and|et)\s+)?|\s+(?:and|et|&)\s+|${RANGE})`;
 const REFERENCE = new RegExp(String.raw`\b(Figures?|Figs?|Tables?|Tableaux|Tableau|Planches?)\.?\s+(${NUMBER}(?:${SEPARATOR}${NUMBER})*)(?![\w])`, 'gi');

@@ -25,32 +25,34 @@ cas:
       - "le plafond de sessions libre laisse au moins deux créneaux"
     nominal:
       - "Les gardes de départ passent comme aujourd'hui (command.ts:358-365), une fois par dépôt ; le verrou de dépôt est pris une fois pour la vague (command.ts:850)."
-      - "Pour chaque lot, le programme crée une branche propre `cadence/<vague>/<slug du lot>` au sommet courant de la branche du dépôt, et son worktree par `git worktree add -b` hors du dépôt."
+      - "Quand un lot prend son créneau de session (et non au lancement de la vague : un lot qui attend un créneau n'a pas de worktree), le programme crée sa branche propre `cadence/<vague>/<slug du lot>` au sommet courant de la branche du dépôt, et son worktree par `git worktree add -b` hors du dépôt."
       - "Les dépendances ignorées (node_modules…) sont reliées dans le worktree comme pour le worktree jetable de base (cycle.ts:219-240)."
-      - "Le lot joue tout son cycle (spec, accept, implement, revues, corrections) avec le worktree comme dépôt : ses commits, son arbre propre, son contrôle de HEAD et son plan sont ceux du worktree."
+      - "Le lot joue tout son cycle (spec, accept, implement, revues, corrections) avec le worktree comme dépôt : ses commits, son arbre propre et son contrôle de HEAD sont ceux du worktree ; son plan l'est aussi quand il est suivi par le dépôt, sinon il est lu et écrit en place (R21)."
       - "Le pool lance les deux lots ensemble, chacun prenant un créneau ; sans créneau libre, le second attend."
       - "Au « prêt » de chaque lot, le programme l'intègre à la branche du dépôt (C2)."
     alternatives:
       - { si: "orchestrate.worktrees absent ou false", alors: "comportement actuel : une file par dépôt, un lot à la fois dans le dépôt lui-même", regles: [R1] }
       - { si: "le dépôt est en HEAD détaché, ou un des lots a un dépôt voisin partagé avec l'autre", alors: "ces lots restent à la suite les uns des autres dans le dépôt, avec un avertissement", regles: [R2] }
-      - { si: "un lot dépend de l'autre (dependsOn)", alors: "il attend que son prédécesseur soit prêt ET intégré, puis part du sommet de la branche qui le contient", regles: [R4] }
+      - { si: "un lot dépend de l'autre (dependsOn)", alors: "il attend que son prédécesseur soit ready, ce qui n'arrive qu'après son intégration (R22), puis part du sommet de la branche qui le contient", regles: [R4, R22] }
       - { si: "un seul créneau de session est libre", alors: "les lots s'enchaînent sans erreur, un worktree à la fois en session", regles: [R3] }
       - { si: "la création du worktree ou de la branche échoue (branche existante, disque plein, index.lock)", alors: "le lot est rendu avec la cause, les autres lots continuent", regles: [R5] }
     resultat: "Deux lots indépendants d'un même dépôt avancent en parallèle dans la limite des créneaux, sans que L261 (4 corrections) fasse attendre les autres lots du dépôt."
   - id: C2
     titre: "Un lot prêt est intégré à la branche du dépôt"
     acteur: le programme (fin de cycle d'un lot)
-    declencheur: le lot passe à ready dans son worktree (cycle.ts:2009)
+    declencheur: "la fin du cycle d'un lot dans son worktree, juste avant la transition à ready (cycle.ts:2009)"
     preconditions:
       - "le lot a un worktree et une branche propres, verdict de revue conforme enregistré sur la branche du lot"
+      - "la branche du dépôt est toujours celle sur laquelle les lots sont partis"
     nominal:
-      - "Le programme prend le verrou d'intégration du dépôt (un seul lot s'intègre à la fois ; attente bornée pour les autres)."
+      - "Le programme prend le verrou d'intégration du dépôt (un seul lot s'intègre à la fois ; attente bornée pour les autres, R25)."
       - "Si la branche du dépôt n'a pas bougé depuis le départ du lot, la branche avance en fast-forward (aucun sha ne change)."
       - "Sinon la branche du lot est rebasée sur le sommet courant de la branche du dépôt, puis avance en fast-forward."
       - "Quand le rebase a changé les commits, le programme compare le patch-id stable du diff du lot avant et après (git patch-id --stable, diff cumulé de la base au sommet du lot)."
       - "Patch-id identique : les tests et le build sont rejoués au sommet intégré ; verts, le verdict de revue est reporté au sha intégré, avec une trace qui cite l'ancien sha relu et le nouveau."
       - "Patch-id différent : tests et build rejoués, puis une revue courte (review-small) du diff rebasé est jouée avant l'avance ; sans bloquant ni majeur, son verdict est enregistré au sha intégré."
       - "Le worktree et la branche du lot, propres et fusionnés, sont retirés ; une ligne de journal dit les shas intégrés."
+      - "Seulement alors le lot passe à ready : l'intégration précède la transition (R22), aucun état ni champ n'est ajouté au lot."
     alternatives:
       - { si: "le rebase rencontre un conflit (non résolu automatiquement)", alors: "rebase abandonné, lot rendu au lead avec les fichiers en conflit, worktree et branche conservés ; aucune session ne résout le conflit", regles: [R6] }
       - { si: "les contrôles rejoués sont rouges au sommet intégré", alors: "la branche du dépôt n'avance pas, lot rendu avec les échecs", regles: [R7] }
@@ -59,6 +61,11 @@ cas:
       - { si: "le rebase est non vide et le patch-id diffère (contexte modifié, conflit déjà résolu à la main)", alors: "revue courte du diff rebasé avant l'intégration ; un bloquant ou un majeur rend le lot au lead", regles: [R17] }
       - { si: "raf done lit un verdict dont le sha n'est plus celui du dernier commit du lot", alors: "seul un verdict portant la trace d'un report par le programme est accepté ; tout autre reste refusé", regles: [R18] }
       - { si: "un autre lot s'intègre déjà", alors: "le lot attend le verrou d'intégration, sans bloquer les sessions des autres", regles: [R10] }
+      - { si: "l'attente du verrou d'intégration dépasse la borne", alors: "lot rendu, worktree et branche conservés, branche du dépôt inchangée", regles: [R25] }
+      - { si: "le dépôt du lead n'est plus sur la branche de départ de la vague", alors: "pas d'avance ni de changement de branche, lot rendu, branche du lot conservée", regles: [R24] }
+      - { si: "le plan du projet est modifié par plusieurs lots (conflit sur le plan seul, plan en lecture seule, plan hors du dépôt)", alors: "le plan suit la règle R21 : conflit sur le plan seul rejoué par le programme, autre conflit rendu", regles: [R21] }
+      - { si: "l'intégration échoue ou est refusée", alors: "le lot n'est jamais passé à ready : il est rendu, ses dépendants le sont aussi", regles: [R22] }
+      - { si: "le verdict est reporté ou enregistré après le rebase", alors: "il l'est dans un commit de plan seul de la branche du lot, et désigne le dernier commit de travail", regles: [R23] }
     resultat: "La branche du dépôt reçoit les lots un par un, sur un historique linéaire ; aucun commit n'est perdu, aucun conflit n'est résolu à l'aveugle."
   - id: C3
     titre: "Le lead reprend une vague interrompue qui laissait des worktrees"
@@ -103,15 +110,15 @@ regles:
     tests: ["R2 — dépôt en HEAD détaché : lots à la suite et avertissement", "R2 — deux lots partageant un voisin : même file, aucun worktree", "R2 — un lot seul d'un dépôt : joué dans le dépôt, pas de worktree"]
   - id: R3
     cas: [C1]
-    enonce: "Le parallélisme interne à un dépôt est borné par le plafond de sessions de la vague (--max-sessions) : au plus ce nombre de lots du groupe jouent en même temps, un lot sans créneau attend sans être rendu."
+    enonce: "Le parallélisme interne à un dépôt est borné par le plafond de sessions de la vague (--max-sessions) : au plus ce nombre de lots du groupe jouent en même temps, un lot sans créneau attend sans être rendu et sans worktree : son worktree n'est créé qu'à la prise du créneau."
     statut: sourcee
     source: "demande du lot : « avancent en parallèle dans la limite des créneaux » ; plafond command.ts:111-112 et pool.ts:5"
-    tests: ["R3 — trois lots indépendants d'un dépôt, plafond 2 : jamais plus de deux sessions simultanées", "R3 — plafond 1 : les lots s'enchaînent, aucun refus"]
+    tests: ["R3 — trois lots indépendants d'un dépôt, plafond 2 : jamais plus de deux sessions simultanées", "R3 — plafond 1 : les lots s'enchaînent, aucun refus", "R3 — un lot en attente de créneau n'a ni worktree ni branche créés"]
   - id: R4
     cas: [C1]
-    enonce: "Un lot qui dépend d'un lot du même dépôt (dependsOn) attend que celui-ci soit ready ET intégré avant de créer son worktree, qui part alors du sommet de la branche du dépôt ; un prédécesseur rendu ou en échec le rend aussi, comme aujourd'hui."
+    enonce: "Un lot qui dépend d'un lot du même dépôt (dependsOn) attend que celui-ci soit ready (état atteint seulement après son intégration, R22) avant de créer son worktree, qui part alors du sommet de la branche du dépôt ; un prédécesseur rendu ou en échec le rend aussi, comme aujourd'hui."
     statut: sourcee
-    source: "src/orchestrate/pool.ts:39-53 (un lot attend ses dépendances ready, rendu si une dépendance est rendue ou en échec) ; le point « intégré » est la conséquence du départ depuis le sommet"
+    source: "src/orchestrate/pool.ts:39-53 (un lot attend ses dépendances au statut ready, rendu si une dépendance est rendue ou en échec) ; « intégré » découle de R22 : ready n'est atteint qu'après l'intégration"
     tests: ["R4 — B dépend de A : le worktree de B naît après l'intégration de A et contient ses commits", "R4 — A rendu sur conflit : B est rendu « dépendance non prête dans la vague : A »"]
   - id: R5
     cas: [C1]
@@ -147,7 +154,7 @@ regles:
     cas: [C2]
     enonce: "Les intégrations d'un dépôt sont sérialisées par un verrou propre au dépôt, pris dans l'état commun aux worktrees (celui de deliver), avec le même mécanisme (pid + heure de démarrage, périmé si le porteur est mort) que le verrou d'orchestration ; un lot qui attend ce verrou ne retient aucun créneau de session."
     statut: sourcee
-    source: "src/orchestrate/lock.ts:26, :57 et :99 (takeLock/releaseLock, porteur vivant ou périmé) et src/state.ts:14 (état commun à tous les worktrees) : mécanisme existant réutilisé sous un autre nom"
+    source: "src/orchestrate/lock.ts:26, :57 et :99 (takeLock/releaseLock, porteur vivant ou périmé) et src/state.ts:14 (`sharedStateDir`, état commun à tous les worktrees ; `stateDir`, local au worktree, est à la ligne 7) : mécanisme existant réutilisé sous un autre nom"
     tests: ["R10 — deux lots prêts en même temps : intégrés l'un après l'autre, historique linéaire", "R10 — verrou d'intégration d'un pid mort : retiré, l'intégration passe", "R10 — pendant l'attente du verrou aucun créneau de session n'est occupé"]
   - id: R11
     cas: [C3]
@@ -184,7 +191,7 @@ regles:
     enonce: "Une étape d'un lot qui lance l'application (L60) ne part pas pendant qu'une autre en a lancé une dans le même dépôt : ces étapes sont sérialisées par dépôt, les autres étapes de lots continuent en parallèle."
     statut: hypothese
     si_faux: "Si les ports de l'application sont choisis librement par lot, la sérialisation est un ralentissement inutile ; si elle manque, deux applications se disputent un port et l'étape UX échoue (lot rendu à tort)."
-    tests: ["R16 — deux lots à écran : une seule application lancée à la fois dans le dépôt", "R16 — un lot sans écran n'est pas retardé par l'étape UX d'un autre"]
+    tests: ["R16 — deux lots à écran : une seule application lancée à la fois dans le dépôt", "R16 — le verrou d'application est par dépôt, pris seulement par les étapes qui lancent l'application : une étape sans application d'un autre lot n'attend pas ce verrou"]
   - id: R17
     cas: [C2]
     enonce: "Après un rebase non fast-forward dont le patch-id du diff du lot diffère (conflit résolu, contexte modifié), une revue courte (review-small, Sonnet) du diff rebasé est jouée avant l'intégration : sans constat bloquant ni majeur, son verdict est enregistré au sha intégré et la branche avance ; un bloquant ou un majeur rend le lot au lead, la branche du dépôt est inchangée et le worktree est conservé."
@@ -210,6 +217,37 @@ regles:
     source: "réponse du lead (24-10) : « une commande explicite du lead les retire (refus tant qu'un commit n'est ni intégré ni confirmé abandonné par une option nommée) » ; les noms --remove-worktree et --abandon-commits sont ceux de la fiche (cf. choix)"
     tests: ["R20 — commits non intégrés sans --abandon-commits : refus code 2, worktree et branche intacts", "R20 — avec --abandon-commits : worktree et branche retirés", "R20 — worktree entièrement intégré : retiré sans option", "R20 — lot inconnu ou sans worktree : refus code 2"]
 
+  - id: R21
+    cas: [C1, C2]
+    enonce: "Le plan se lit et s'écrit là où il vit : un plan suivi par le dépôt (y compris en lecture seule, plan.readonly) est celui du worktree du lot, ses commits de plan (commitPlan, setStatus, save, outil orchestrate.start/verdict lancé avec le worktree comme dossier courant) sont des commits de la branche du lot ; un plan situé hors du dépôt (`plan:` de cadence.yaml) est lu et écrit en place, sans commit ni conflit. Au rebase d'intégration, un conflit qui ne touche que le plan et ses fichiers entretenus (plan.maintained) n'est pas rendu : le programme abandonne ces commits de plan, rebase le travail, puis rejoue sur le sommet l'entrée du lot (statut, verdict) avec l'API du plan ; un conflit qui touche aussi un autre fichier suit R6."
+    statut: hypothese
+    si_faux: "Si le plan devait rester celui du dépôt du lead, les commits de plan seraient faits dans son arbre (qui doit rester propre, R8) : la sérialisation passerait par le verrou d'intégration et le coût est un déplacement de code, sans donnée en jeu. Si le rejeu automatique d'un conflit de plan est refusé, ces conflits sont rendus au lead (R6), avec plus de lots rendus sans conflit réel de code."
+    tests: ["R21 — deux lots du même dépôt passent à doing puis ready : le second s'intègre sans être rendu, le plan porte les deux statuts", "R21 — plan hors du dépôt (plan: ../x.yaml) : lu et écrit en place, aucun commit de plan, aucun conflit", "R21 — plan en lecture seule suivi par le dépôt : orchestrate.start et orchestrate.verdict lancés dans le worktree, commit de plan sur la branche du lot", "R21 — conflit sur le plan et sur un fichier de code : lot rendu (R6), rien rejoué", "R21 — après le rejeu, le plan de la branche du dépôt garde les entrées de l'autre lot inchangées"]
+  - id: R22
+    cas: [C2, C1]
+    enonce: "En mode worktree, l'intégration se fait AVANT la transition à ready : la transition à ready (cycle.ts:2009) n'a lieu qu'une fois la branche du dépôt avancée ; toute intégration refusée ou en échec (R6, R7, R8, R17, R24, R25) rend le lot au lead sans qu'il ait été ready. Aucun état ni champ n'est ajouté au lot (D4) : un dépendant (pool.ts:39-53) ne voit donc jamais un lot ready non intégré."
+    statut: hypothese
+    si_faux: "Si ready devait précéder l'intégration, il faudrait un état ou un indicateur d'intégration dans le lot (changement de modèle stocké : question au lead) ; ici, rien de stocké n'est ajouté."
+    tests: ["R22 — A et B dépendant de A : B ne part qu'après l'avance de la branche, et son worktree contient les commits de A", "R22 — intégration de A en conflit : A n'est jamais ready, B est rendu", "R22 — l'état d'un lot ne contient aucun champ nouveau après intégration"]
+  - id: R23
+    cas: [C2]
+    enonce: "Le report (R9) et le verdict de la revue courte (R17) sont écrits par le programme dans un commit de plan seul, ajouté à la branche du lot dans son worktree après le rebase et avant l'avance (plan.recordReview, avec la trace `reporte`). Le sha du verdict (`vers`) est celui du dernier commit de travail du lot rebasé, pas ce commit de plan : la porte de `raf done` ignore les commits réduits au plan (audit.ts:215-217), et `unreviewed` ne trouve ainsi aucun commit après lui. Le patch-id de R9 est calculé sur le diff des seuls commits de travail (plan exclu)."
+    statut: sourcee
+    source: "src/audit.ts:215-218 (workCommits écarte les commits de plan seul) et :261-269 (unreviewed lit le commit relu dans le verdict) ; src/plan.ts:389 (recordReview écrit date, verdict, commit)"
+    tests: ["R23 — après report, le commit de tête de la branche est un commit de plan seul et `vers` est le dernier commit de travail", "R23 — raf done après report : unreviewedWork vaut 0", "R23 — le sha cité dans la trace du journal est `vers`, pas le tête de branche", "R23 — le patch-id ignore les modifications du plan : deux plans différents, même patch-id"]
+  - id: R24
+    cas: [C2]
+    enonce: "L'avance n'est tentée que si le dépôt du lead est encore sur la branche sur laquelle les lots sont partis (relevée au départ de la vague, relue à chaque intégration) ; s'il est en HEAD détaché ou sur une autre branche, le lot est rendu avec les deux noms de branche, sa branche est conservée, et le programme ne change jamais la branche du lead (aucun checkout, aucun ff sur une autre branche)."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:786-789 et :809-814 (la branche attendue est vérifiée, un HEAD déplacé rend le lot, sans réparation) ; réponse du lead : l'arbre du lead n'est jamais déplacé (R8, command.ts:361)"
+    tests: ["R24 — le lead passe sur une autre branche pendant la vague : lot rendu, aucune branche avancée, HEAD du lead inchangé", "R24 — HEAD détaché du lead à l'intégration : lot rendu", "R24 — le lead revient sur la branche de départ puis --resume : le lot s'intègre"]
+  - id: R25
+    cas: [C2]
+    enonce: "L'attente du verrou d'intégration est bornée à 10 minutes (une intégration dure un rebase et la relance des tests) ; au-delà, le lot est rendu au lead avec le porteur du verrou (vague, pid), son worktree et sa branche sont conservés, la branche du dépôt est inchangée, et --resume le reprend à l'intégration."
+    statut: hypothese
+    si_faux: "Si 10 minutes est trop court pour une suite de tests longue, des lots sont rendus à tort : seule la constante change (une ligne de config, aucune donnée)."
+    tests: ["R25 — verrou tenu plus que la borne : lot rendu, worktree conservé, branche du dépôt inchangée", "R25 — verrou libéré avant la borne : le lot s'intègre", "R25 — --resume d'un lot rendu sur le délai : repris à l'intégration sans rejouer ses étapes"]
+
 contrats:
   - id: A1
     appel: commande cadence orchestrate
@@ -220,7 +258,7 @@ contrats:
       - { code: log error, message: "cadence.yaml : orchestrate.worktrees doit être true ou false" }
       - { code: log error, message: "orchestrate : <projet>:<lot> : worktree impossible : <cause git>" }
       - { code: log error, message: "orchestrate : <dépôt> : une orchestration y est déjà en cours (<vague>, pid <pid>)" }
-    regles: [R1, R2, R3, R4, R5, R13, R14, R15, R16]
+    regles: [R1, R2, R3, R4, R5, R13, R14, R15, R16, R21]
   - id: A2
     appel: commande cadence orchestrate --resume
     entree: "<vague> [--drop projet:lot] [--answer …] [--budget …]"
@@ -231,14 +269,16 @@ contrats:
     regles: [R11, R12, R13, R14, R19]
   - id: A3
     appel: commande cadence orchestrate (intégration d'un lot prêt)
-    entree: "le lot passe à ready dans son worktree ; verrou d'intégration du dépôt"
-    sortie: "branche du dépôt avancée (fast-forward ou après rebase), lot ready, worktree et branche retirés ; journal « <projet>:<lot> intégré : <sha départ>..<sha intégré> » ; après un rebase non vide à patch-id identique, verdict reporté et journal « <projet>:<lot> verdict reporté : <ancien sha relu> → <nouveau sha> (patch-id identique) »"
+    entree: "la fin du cycle du lot dans son worktree (avant ready) ; verrou d'intégration du dépôt"
+    sortie: "branche du dépôt avancée (fast-forward ou après rebase), worktree et branche retirés puis lot ready (jamais ready avant l'intégration) ; journal « <projet>:<lot> intégré : <sha départ>..<sha intégré> » ; après un rebase non vide à patch-id identique, verdict reporté et journal « <projet>:<lot> verdict reporté : <ancien sha relu> → <nouveau sha> (patch-id identique) »"
     erreurs:
       - { code: log warn, message: "<projet>:<lot> → handed-back — intégration impossible : conflit en rebasant <branche> sur <branche du dépôt> (fichiers : <liste>) ; worktree conservé : <chemin>" }
       - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : tests rouges au sommet intégré (<échecs>) ; branche du dépôt inchangée, worktree conservé : <chemin>" }
       - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : revue courte du diff rebasé : <n> constat(s) bloquant(s) ou majeur(s) ; branche du dépôt inchangée, worktree conservé : <chemin>" }
       - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : arbre du dépôt modifié (<fichiers>) ; branche conservée : <branche>" }
-    regles: [R6, R7, R8, R9, R10, R12, R17]
+      - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : le dépôt est sur <branche courante> et non sur <branche de départ> ; branche conservée : <branche>" }
+      - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : verrou d'intégration tenu par <vague> (pid <pid>) depuis plus de 10 minutes ; worktree conservé : <chemin>" }
+    regles: [R6, R7, R8, R9, R10, R12, R17, R21, R22, R23, R24, R25]
   - id: A4
     appel: commande raf done
     entree: "<lot> (porte de revue de code active) ; verdict du lot, éventuellement avec la trace `reporte` écrite par l'intégration"
@@ -260,4 +300,4 @@ donnees:
   - { id: D2, objet: "verrou d'intégration du dépôt (fichier dans l'état commun aux worktrees, format OLock de lock.ts)", existant: false, modification: aucune, note: "même format que orchestrate.lock, autre nom ; vidé à la libération ou périmé si le porteur est mort" }
   - { id: D3, objet: "cadence.yaml : clé orchestrate.worktrees (booléen)", existant: false, modification: aucune, note: "clé nouvelle, absente = comportement actuel (R1)" }
   - { id: D4, objet: "état de vague et de lot (.cadence/runs/<vague>/*.json, LotState)", existant: true, modification: aucune, note: "format inchangé (R14) : un état écrit avant L279 se relit sans changement" }
-  - { id: D5, objet: "plan du projet : entrée de verdict de revue (review: { date, verdict, commit, repos? }, plan.recordReview, src/plan.ts:389)", existant: true, modification: ajout, decision: "réponse du lead du 24-10 (validée par Sylvain) : verdict reporté au sha intégré, « le report est tracé (champ ou note dédiés) » ; champ optionnel `reporte: { de, vers, patchId }` ajouté à l'entrée, absent des verdicts existants qui se relisent sans changement (R18)", note: "champ optionnel écrit par le seul programme à l'intégration ; la porte l'exige pour accepter un sha reporté" }
+  - { id: D5, objet: "plan du projet : entrée de verdict de revue (review: { date, verdict, commit, repos? }, plan.recordReview, src/plan.ts:389)", existant: true, modification: ajout, decision: "réponse du lead du 24-10 (validée par Sylvain) : verdict reporté au sha intégré, « le report est tracé (champ ou note dédiés) » ; champ optionnel `reporte: { de, vers, patchId }` ajouté à l'entrée, absent des verdicts existants qui se relisent sans changement (R18)", note: "champ optionnel écrit par le seul programme à l'intégration, dans un commit de plan seul de la branche du lot ; `vers` = dernier commit de travail (R23) ; la porte l'exige pour accepter un sha reporté" }

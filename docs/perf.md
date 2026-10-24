@@ -38,7 +38,7 @@ current window, with at least 10 classified passes) is flagged by a `⚠` even w
 
 ## Tokens, delays, wall time and cost (L226)
 
-The same two windows, the same `⚠` (more than 25 % worse, at least 5 lots in each window, or 10 steps for a wall-time duration (L280: a class of fewer steps moves by more than 25 % from one window to the next, `docs/perf/recalage-2026-10-24.md`), previous value not zero, no truncated window) and the same
+The same two windows, the same `⚠` (more than 25 % worse, at least 5 lots in each window, or 10 steps for a wall-time duration (L280: under 10 steps the change from one window to the next cannot be interpreted, `docs/perf/recalage-2026-10-24.md`), previous value not zero, no truncated window) and the same
 quality twin (the share of lots right the first time) on the same line. A rise is the worse direction for each of them.
 
 | Indicator | Reading | Decision it informs |

@@ -29,7 +29,7 @@ export interface Windows {
 const DEGRADATION = 0.25;
 /** Sous ce nombre de lots dans l'une des deux fenêtres, pas de tendance (R13). */
 const MIN_SAMPLE = 5;
-/** Durées de mur : sous ce nombre d'étapes dans l'une des deux fenêtres, pas de tendance (L280). Mesuré sur 12–18-10 contre 05–11 et 17–23-10 contre 10–16 : une classe de moins de 10 étapes varie de plus de 25 % d'une fenêtre à l'autre (`accept` −61 % sur 7, `ux` +31 % sur 5). */
+/** Durées de mur : sous ce nombre d'étapes dans l'une des deux fenêtres, pas de tendance (L280). Mesuré sur 12–18-10 contre 05–11 et 17–23-10 contre 10–16 : sous 10 étapes, la variation d'une fenêtre à l'autre n'est pas interprétable (`accept` −61 % sur 7, `ux` +31 % sur 5, sans changement du travail). */
 const MIN_STEPS = 10;
 /** Goulot net (R19) : une cause pèse au moins cette part des passes classées, avec au moins MIN_CLASSIFIED passes classées. */
 const BOTTLENECK_SHARE = 0.5;

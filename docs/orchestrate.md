@@ -22,6 +22,8 @@ cadence orchestrate --status [<wave>]        # the live waves and the repositori
 cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running (with an explicit `<wave>`: when that wave is no longer running)
 cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
 cadence orchestrate --resume <wave> --budget maritime:B26.4=+300k   # replay a lot handed back for its budget, with the budget raised (below)
+cadence orchestrate --resume <wave> --integrate ccc:L29   # replay a lot handed back at the integration step of a worktree wave (« One worktree per lot »)
+cadence orchestrate --remove-worktree ccc:L29 [--abandon-commits]   # remove the kept worktree and branch of a lot (« One worktree per lot »)
 cadence orchestrate --resume … --dry-run                         # refused: a resume cannot be simulated, it writes the wave state and relaunches sessions
 cadence orchestrate --drop ccc:L29 [--wave <wave>]   # from another terminal: take a lot out of the running wave
 cadence orchestrate --stop-after-current [--wave <wave>]   # from another terminal: let the running sessions finish, start nothing else
@@ -131,7 +133,7 @@ keeps its `/` (`maritime-atlas:Q4/accueil-4-ux12@haiku`); this holds for `--dry-
 same for the lot folder and the dry-run briefs); ids without `/` are unchanged.
 
 You choose the lots; the order is the order given (one queue per repository, as many repositories at the
-same time as the session cap allows — 2 by default). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
+same time as the session cap allows — 2 by default; with `orchestrate.worktrees: true` the lots of one repository play in parallel, each in its own worktree, within the same cap — « One worktree per lot »). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
 lot (default Sonnet; reviews are Opus, except the light review below; Haiku only when you write it, for a mechanical lot). Run it
 in the background and read `--status`: it prints one line per transition and the final table.
 
@@ -445,6 +447,82 @@ cite a lot whose status is not `done` (`plan:` commits are ignored); a lot `drop
 rollback, the older ones are removed only once they are more than 7 days old, counted from the day they left service (a wave's snapshot links its `node_modules` to the copy that launched it). The first run is also what installs the links in `~/.local/bin`. It prints the fingerprint of the copy
 (bin, dist, package.json).
 
+## One worktree per lot (`orchestrate.worktrees`, L279)
+
+By default a wave plays the lots of one repository one after the other, in the repository itself: a lot with four correction passes
+holds the whole queue. With `orchestrate: { worktrees: true }` in the project's `cadence.yaml`, two independent lots of the same repository
+play **at the same time**, each in its own `git worktree` on its own branch, within the session cap (`--max-sessions`). Absent or `false`,
+nothing below applies and the wave behaves as before; any other value is refused when the configuration is read
+(`orchestrate.worktrees doit être true ou false`).
+
+- **Which lots.** The lots of one repository (as project; two lots that share a neighbour `repos:` are one group) go to worktrees when the
+  group has at least two lots, the repository is on a branch (not a detached `HEAD`) and no lot of the group declares `repos:`. Otherwise they
+  stay one after the other in the repository, with `orchestrate : <repository> : worktrees demandés mais <reason> : lots joués à la suite` in the
+  journal. A lot alone in its repository plays in it. A lot that already has its branch (a resume) keeps its worktree whatever the group.
+- **When.** At the moment the lot takes its place under the cap, after its `raf start` — not at launch: a lot waiting for a place has neither a
+  worktree nor a branch. A lot that depends on another lot of the repository (`after`) waits until that one is `ready`, which in this mode only
+  happens **after** its integration, then starts from the tip of the repository's branch, which contains it. If the worktree or the branch cannot be
+  created (a branch of that name that is not cadence's, a full disk, an `index.lock`) only that lot is handed back, with git's cause
+  (`orchestrate : <project>:<lot> : worktree impossible : <cause>`); the other lots go on. Dependency folders ignored by git (`node_modules`…)
+  are linked into the worktree like in the baseline worktree.
+- **Names, nothing stored.** The worktree is `.cadence/runs/<wave>/worktrees/<project>--<lot>`, the branch `cadence/<wave>/<project>--<lot>`; the
+  branch the lots started from is noted in the git config of the lot's branch (`branch.<name>.cadence-base`), with the lot and the creation time.
+  A resume finds them by their names. `LotState` gains no field: the integration step is the value `integrate` of the existing `next`.
+- **The plan is never written in a worktree.** Everything the program writes to the plan for a lot — `raf start`, the notes of the sheet's
+  hypotheses and of the review's minors, the closing of the covered sub-tasks, the review verdict — is written **by the program, in the
+  project's own checkout**, one after the other under the repository's integration lock, each as a plan-only commit with explicit paths. A
+  read-only plan (`plan:` in `cadence.yaml`) gets `orchestrate.start` and `orchestrate.verdict` run in that checkout, never in the worktree; a plan
+  outside the repository is read and written in place, without a commit. The lots' branches carry work commits only (the acceptance seal and
+  `vert: true` are work of the lot), so a plan conflict at the rebase cannot happen. A session that modifies the plan file, a file generated with it
+  (`plan.files`, the Gantt page) in its worktree — committed or not — gets its lot handed back, naming the file and the commit.
+  Before each of these writes the program checks that the repository is still on the branch the lots started from, that no tracked file other than the
+  plan is modified in the project's checkout, and takes the lock; a refusal hands the lot back with the cause
+  (`écriture du plan refusée : arbre du dépôt modifié (<files>)`, `dépôt sur <branch> et non <start branch>`, `verrou tenu par <wave> (pid <pid>)`), writes
+  and commits nothing, and keeps the step the lot reached.
+- **Integration, before `ready`.** At the end of its cycle (compliant review, UX included) the lot is integrated into the repository's branch, and only
+  then does it become `ready`; the repository's branch gets the lots one by one, on a linear history. Under the repository's **integration lock**
+  (a file next to the wave lock, same format, pid and start time, stale when the holder is dead, plus an in-memory queue because the lots of a wave share
+  a pid; the wait is bounded to 10 minutes and holds no session slot):
+  1. the repository must still be on its start branch (`le dépôt est sur <branch> et non sur <start branch>`) and have no modified tracked file
+     (`arbre du dépôt modifié (<files>)`): the program never changes the lead's branch or tree;
+  2. the lot's branch is rebased on the tip of the repository's branch (`git rebase`); a conflict is **aborted** (`git rebase --abort`), the lot
+     is handed back with the files in conflict, its worktree and branch untouched, and no session tries to resolve it;
+  3. if the rebase changed the commits, the tests and the build (`orchestrate.test`, `orchestrate.build`) are run again at the rebased tip, a red that
+     was not already red at the lot's base sha (L213) hands the lot back and leaves the repository's branch alone;
+  4. the patch-id of the lot's diff (`git patch-id --stable`, work commits only) is compared before and after the rebase. **Same patch-id**: the
+     reviewed diff is the integrated diff, the verdict is **carried over** to the integrated sha, with a `reporte: { de, vers, patchId }` trace in the plan
+     (and in the journal: `<project>:<lot> verdict reporté : <old sha> → <new sha> (patch-id identique)`); no new review. **Different patch-id** (context
+     changed): a short review (`review-small`) of the rebased diff is played before the branch moves, a blocking or major finding hands the lot back;
+  5. the repository's branch advances by `git merge --ff-only` (`<project>:<lot> intégré : <from>..<to>`), then the program writes the verdict and closes the
+     covered sub-tasks in a plan-only commit, on the tip. The verdict's `commit` is the last work commit integrated (`vers`), so the `raf done` gate,
+     **unchanged**, finds no work commit after the reviewed one; the `reporte` trace is information, the gate does not read it. A read-only plan gets the
+     trace in the text passed to `orchestrate.verdict`;
+  6. the worktree and the branch, clean and merged, are removed; the lot is `ready`.
+  A stop between the advance and the plan write is resumed at the `integrate` step: the branch being already contained in the repository's, the rebase
+  and the advance are skipped and the verdict is written once.
+- **A lot handed back at the integration step** (lock held for more than 10 minutes, repository's branch changed, tracked file modified, rebase conflict,
+  red tests, blocking finding of the short review, plan write refused) keeps `next: integrate`, its worktree and its branch. **Only
+  `--resume <wave> --integrate <project:lot>` replays it** (repeatable): a plain `--resume`, `--drop`, `--answer` or `--budget` never does. The lot
+  restarts at `suspended`, step `integrate` (`<project>:<lot> → suspended — intégration reprise (--resume --integrate)`), and the rebase and the checks run
+  again — after a conflict the lead resolves it by hand in the worktree and commits, otherwise the lot is handed back again. Refused (exit 2, before
+  anything is written, like the other resume refusals): a lot unknown or named twice, also named by `--drop`, `--answer` or `--budget`, a lot that is not
+  handed back at the integration step (`le lot n'est pas rendu à l'étape d'intégration (<status>, étape <step or aucune> : <cause>)`: a lot handed back for
+  review, tests or budget has `next` empty and takes the usual paths), and, like any resume, a repository with a modified tracked file.
+- **Nothing is deleted with unintegrated commits.** A worktree whose commits are all in the repository's branch is removed after the integration, by a guarded
+  branch deletion (never `-D`). A lot handed back, dropped (`--drop`), failed or in conflict keeps its worktree and branch, and the journal gives the path
+  (`orchestrate : <project>:<lot> : worktree conservé : <path> (branche <branch>)`). The final table, `cadence orchestrate --status` and `cadence lead tour`
+  list each kept worktree: repository, lot, age, number of unintegrated commits, path. Only the lead removes one:
+  `cadence orchestrate --remove-worktree <project>:<lot> [--wave <wave>]` refuses (exit 2, nothing removed) while a commit is neither integrated nor
+  declared abandoned with `--abandon-commits`; a fully integrated worktree is removed without the option
+  (`orchestrate : <project>:<lot> : worktree retiré (<n> commit(s) abandonné(s))`).
+- **Resume.** The worktree of each resumed lot is found again by its name (a worktree git still lists whose folder is gone is pruned and recreated on the
+  existing branch) and is subject to the guards of a repository: a modified tracked file refuses the resume (exit 2, nothing written). The wave's lock
+  stays one per repository, taken once and released when all the lots of the repository are finished and integrated or handed back; a second wave aiming at
+  that repository is refused as before, without creating a worktree.
+- **The application of a UX step.** A step that starts the application (`orchestrate.ux`) waits, in the program, for the application another lot of the
+  same repository started, without holding a session slot; steps that do not start the application never wait for it.
+- **Slots.** `cadence orchestrate --status` counts a wave's parallel lots in its held slots, so the free slots are not overestimated.
+
 ## A lot whose work is in a neighbouring repository
 
 Some lots are done in another repository that is not a cadence project (B64 of `maritime-atlas` lives in
@@ -488,7 +566,7 @@ the name `repos`). The effect, for `cadence orchestrate`:
 - **Lock and guard**: the neighbour gets the repository lock (`orchestrate.lock`, so `cadence deliver` refuses it too, and no
   other wave can hold it), the temporary `pre-push` hook, and the same after-session checks (push, tampered hook, a review
   that changed it). Two lots that share a repository, as project or as neighbour, run one after the other, never two
-  sessions in one repository; `--status` lists the neighbours among the repositories a wave still holds (a repository released once all its lots are finished no longer appears).
+  sessions in one repository (a lot that declares `repos:` is never put in a worktree, so the rule holds for it even with `orchestrate.worktrees: true`); `--status` lists the neighbours among the repositories a wave still holds (a repository released once all its lots are finished no longer appears).
 - **Sessions**: every session gets each neighbour as `--add-dir`, and the briefs name them: the implementation and the
   corrections must commit there too, with a message that cites the lot (`feat(B64): …`), and never push; the reviewers read
   the commits that cite the lot in the project **and** in each neighbour (`raf commits <lot>` lists them all; in a neighbour only the commits that cite the lot and are dated within the lot's period count, and also contain the `cite:` string when the lot declares one for it — a `fix(B64): …` outside the period, or one without the `cite:` string, is not listed.) A lot whose

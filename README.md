@@ -3,7 +3,7 @@
 A small working method that lives in your repository: a versioned plan linked to your commits, waves of fresh AI sessions driven by a program, and deliveries proved by their effect.
 Solo developers and AI-assisted sessions lose track of *what is left to do* and *what each commit was for*; cadence keeps both in plain files next to the code.
 **raf** is the plan, **news** the changelog with screenshots, **session** the facts to open and close a day, **deliver** waits for the CI, deploys, then checks the effect.
-**orchestrate** runs a lot through spec, review, code and UX passes, each in its own session (with a short `TMPDIR` of its own, `<os tmpdir>/cadence-<hash>`, outside the repository and the wave's state folder, removed at the end of each pass of the lot; short because Chrome's Unix sockets live there and are limited to 107 characters); the **lead** decides, re-verifies and delivers.
+**orchestrate** runs a lot through spec, review, code and UX passes, each in its own session (with a short `TMPDIR` of its own, `<os tmpdir>/cadence-<hash>`, outside the repository and the wave's state folder, removed at the end of each pass of the lot; short because Chrome's Unix sockets live there and are limited to 107 characters); the **lead** decides, re-verifies and delivers. With `orchestrate.worktrees: true` in `cadence.yaml`, independent lots of one repository play in parallel, each in its own git worktree, integrated one by one into the repository's branch (rebase, tests re-run, verdict carried over when the diff is unchanged; conflicts are handed back, never resolved blindly — [docs/orchestrate.md](docs/orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279)).
 Four [Claude Code](https://claude.com/claude-code) skills, three reviewer agents and a status-band plugin (`cadence-hud`) turn it into rituals.
 
 <picture>
@@ -39,7 +39,7 @@ The two plugins are independent. `cadence@cadence` carries the rituals, which ca
 | Page | What it covers |
 |---|---|
 | [docs/raf.md](docs/raf.md) | the plan: commands, plan file, foreign plan formats, Gantt |
-| [docs/orchestrate.md](docs/orchestrate.md) | waves of sessions: budgets, spec, accept and review steps, neighbouring repositories |
+| [docs/orchestrate.md](docs/orchestrate.md) | waves of sessions: budgets, spec, accept and review steps, neighbouring repositories, one worktree per lot |
 | [docs/deliver.md](docs/deliver.md) | delivery: wait for CI, deploy, verify the effect |
 | [docs/spec.md](docs/spec.md) | the screen and back-end sheets, `cadence spec check\|qa\|reseal` |
 | [docs/lead.md](docs/lead.md) | the lead workflow and `cadence lead tour` |

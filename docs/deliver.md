@@ -144,9 +144,9 @@ does not know the lot) while none of the commits already known holds the sha bac
 empty file and hands its path to the script in `CADENCE_DEPLOYED_FILE` (next to `CADENCE_SHA`, `CADENCE_SHORT`, `CADENCE_BRANCH`). A script
 that deploys a commit other than `CADENCE_SHA` (it committed a `--news` timestamp itself, say) writes that sha into the file. After the script:
 
-- the file holds a sha that resolves to a commit: that is the sha logged, and `✓ livré :` names it (« sha déclaré par le script ») — it wins over
+- the file holds a hexadecimal sha (7 to 40 characters) that resolves to a commit: that is the sha logged, and `✓ livré :` names it (« sha déclaré par le script ») — it wins over
   HEAD, during a wave or not;
-- the file holds anything else (not a commit, several lines): the delivery fails with a message that says so, nothing is logged;
+- the file holds anything else (not a commit, several lines, `HEAD` or a branch name — a revision would be resolved after the script, possibly at another lot's commit, so only a sha is accepted): the delivery fails with a message that says so, nothing is logged;
 - the file is empty and the delivery runs **while a wave runs**: the log keeps `<sha>`, and if HEAD moved during the delivery a warning says
   so (« la tête a avancé pendant la livraison ; sans sha déclaré par le script (CADENCE_DEPLOYED_FILE), le journal garde <sha> ») — the new
   commit may be the script's, a running lot's, or a plan commit, and cadence cannot tell them apart;

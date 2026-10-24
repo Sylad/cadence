@@ -451,6 +451,29 @@ describe('deliver : script du projet (L2)', () => {
       expect(readLock(stateDir(dir))).toBeNull();
     });
 
+    it.each([
+      ['HEAD', () => 'HEAD'],
+      ['un nom de branche', (dir: string) => execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim()],
+    ])('R1 — %s écrit dans le fichier : refusé, la révision serait résolue après le script (au commit d\'un autre)', async (_nom, rev) => {
+      const { dir, target } = await livraisonDeL1();
+      const { deps } = fakeDeps({ exec: (_cmd, env) => (writeFileSync(env.CADENCE_DEPLOYED_FILE, `${rev(dir)}\n`), 0) });
+      const { c, err } = ctx(dir, { config: SCRIPT, sha: target });
+      expect(await deliver(c, deps)).toBe(1);
+      expect(err.join('\n')).toContain('CADENCE_DEPLOYED_FILE');
+      expect(err.join('\n')).toContain('sha');
+      expect(lastDelivery(stateDir(dir))).not.toBe(headSha(dir));
+      expect(readLock(stateDir(dir))).toBeNull();
+    });
+
+    it('R1 — un sha abrégé hexadécimal reste accepté et résolu', async () => {
+      const { dir, target } = await livraisonDeL1();
+      let declared = '';
+      const { deps } = fakeDeps({ exec: (_cmd, env) => (declared = avance(dir, 'nouveautés : horodatées'), writeFileSync(env.CADENCE_DEPLOYED_FILE, declared.slice(0, 10)), 0) });
+      const { c } = ctx(dir, { config: SCRIPT, sha: target });
+      expect(await deliver(c, deps)).toBe(0);
+      expect(lastDelivery(stateDir(dir))).toBe(declared);
+    });
+
     it('pendant une vague, sans déclaration : le journal garde le sha de départ et un avertissement le dit', async () => {
       const { dir, target } = await livraisonDeL1();
       const { deps } = fakeDeps({ exec: () => (avance(dir, 'chore: nouveautés horodatées'), 0) });

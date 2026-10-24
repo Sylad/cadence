@@ -366,8 +366,9 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
         if (code !== 0) return fail(`script de livraison en échec (${codeText(code)}) : ${script}`);
         const text = readFileSync(file, 'utf8').trim();
         if (text !== '') {
-          declared = text.includes('\n') ? null : resolveCommit(ctx.root, text);
-          if (declared === null) return fail(`CADENCE_DEPLOYED_FILE : « ${text.split('\n')[0].slice(0, 80)} » n'est pas un commit du dépôt (le script doit y écrire le sha qu'il a déployé, ou rien)`);
+          // Un sha seulement : HEAD ou une branche seraient résolus après le script, au commit d'un autre.
+          declared = /^[0-9a-f]{7,40}$/i.test(text) ? resolveCommit(ctx.root, text) : null;
+          if (declared === null) return fail(`CADENCE_DEPLOYED_FILE : « ${text.split('\n')[0].slice(0, 80)} » n'est pas un sha de commit du dépôt (le script doit y écrire le sha hexadécimal qu'il a déployé, ni HEAD ni une branche, ou rien)`);
         }
       } catch (e) {
         return fail(`CADENCE_DEPLOYED_FILE illisible : ${(e as Error).message}`);

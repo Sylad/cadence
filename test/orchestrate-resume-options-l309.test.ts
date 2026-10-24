@@ -1,5 +1,8 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { orchestrate, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
+import { toolDirOf } from '../src/orchestrate/snapshot.js';
 import { RunStore, type WaveState } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import type { ClaudeFn } from '../src/orchestrate/launch.js';
@@ -73,5 +76,25 @@ describe('orchestrate --resume : une option ignorée est refusée (L309)', () =>
     const { d } = deps();
     const launch = tempDir();
     await expect(orchestrate(['--resume', 'a:L1'], io(launch).io, d)).rejects.toThrow(/--resume ne se combine pas avec des lots à lancer/);
+  });
+
+  it('R6 — la reprise sur l\'instantané reçoit un argv normalisé : --wave <id> devient --resume <id>, l\'instantané d\'avant L309 ne choisit pas une autre vague', async () => {
+    const launch = tempDir();
+    const cible = wave(launch, 'vague-x', '2026-10-19T10:00:00', 'interrupted');
+    wave(launch, 'vague-y', '2026-10-24T20:30:00', 'interrupted');
+    const tool = toolDirOf(cible.dir);
+    mkdirSync(join(tool, 'bin'), { recursive: true });
+    writeFileSync(join(tool, 'bin', 'cadence.js'), '');
+    const recu: string[][] = [];
+    const { d } = deps();
+    const withSnapshot = { ...d, snapshot: { packageRoot: tempDir(), reexec: async (t: string, argv: string[]) => (recu.push([t, ...argv]), 0) } };
+    await orchestrate(['--resume', '--wave', 'vague-x', '--budget', '3M'], io(launch).io, withSnapshot);
+    await orchestrate(['--wave', 'vague-x', '--budget', '3M', '--resume'], io(launch).io, withSnapshot);
+    await orchestrate(['--resume', 'vague-x', '--answer', 'a:L1', 'texte --wave', '--drop', 'b:L2'], io(launch).io, withSnapshot);
+    expect(recu).toEqual([
+      [tool, '--resume', 'vague-x', '--budget', '3M'],
+      [tool, '--budget', '3M', '--resume', 'vague-x'],
+      [tool, '--resume', 'vague-x', '--answer', 'a:L1', 'texte --wave', '--drop', 'b:L2'],
+    ]);
   });
 });

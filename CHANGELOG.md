@@ -76,7 +76,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- `cadence orchestrate --resume` (L309, `docs/orchestrate.md`): no more silent resume of ANOTHER wave. `--resume --wave <id>` is a synonym of `--resume <id>` (two different ids are refused); `--resume` without a wave resumes the only unfinished wave of the folder, and when several are unfinished it lists them (id, status, launch date) and is refused, exit 2, with nothing written; `--resume` with lots to launch is refused. Seen on 24-10: `--resume --wave 2026-10-24-2030 --budget 3M` relaunched `2026-10-19-suite2`, a maritime wave, with no decision.
+- `cadence orchestrate --resume` (L309, `docs/orchestrate.md`): no more silent resume of ANOTHER wave. `--resume --wave <id>` is a synonym of `--resume <id>` (two different ids are refused); `--resume` without a wave resumes the only unfinished wave of the folder, and when several are unfinished it lists them (id, status, launch date) and is refused, exit 2, with nothing written; `--resume` with lots to launch is refused. Seen on 24-10: `--resume --wave 2026-10-24-2030 --budget 3M` relaunched `2026-10-19-suite2`, a maritime wave, with no decision. The resume that runs on the wave's snapshot (older code, which reads `--wave` as a plain name) is handed the chosen wave explicitly: `--wave <id>` is rewritten to `--resume <id>` in the argv it receives.
 
 ## [1.9.0] - 2026-10-24
 

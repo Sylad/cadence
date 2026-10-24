@@ -161,7 +161,7 @@ describe('L61 — instantané de la vague (<vague>/tool/)', () => {
     expect(await orchestrate(['--resume', '--budget', '1M'], ioOf(parent, env).io, s.deps)).toBe(0);
     expect(s.reexecs).toHaveLength(2);
     expect(s.reexecs[1].toolDir).toBe(join(parent, '.cadence/runs/2026-10-04-1412/tool'));
-    expect(s.reexecs[1].argv).toEqual(['--resume', '--budget', '1M']);
+    expect(s.reexecs[1].argv).toEqual(['--resume', '2026-10-04-1412', '--budget', '1M']);
     expect(s.reviews.join('')).not.toContain('GABARIT MODIFIE');
   });
 

@@ -28,6 +28,7 @@ cadence orchestrate --remove-worktree ccc:L29 [--abandon-commits]   # remove the
 cadence orchestrate --resume … a:L1                             # refused: a resume replays the lots of the wave, it launches none
 cadence orchestrate --resume … --dry-run                         # refused: a resume cannot be simulated, it writes the wave state and relaunches sessions
 # `--resume` without a wave resumes the only unfinished wave of the folder; with several, it lists them and is refused (exit 2): name one
+# a resume running on the wave's snapshot receives `--resume <wave>` in place of `--wave <wave>`, so an older snapshot cannot pick another wave
 cadence orchestrate --drop ccc:L29 [--wave <wave>]   # from another terminal: take a lot out of the running wave
 cadence orchestrate --stop-after-current [--wave <wave>]   # from another terminal: let the running sessions finish, start nothing else
 ```

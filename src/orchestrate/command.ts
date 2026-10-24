@@ -1167,6 +1167,25 @@ function singleUnfinished(launch: string): RunStore {
   return open[0];
 }
 
+/**
+ * L309 : l'instantané d'une vague antérieure relit `--wave <id>` comme un simple nom et `--resume` seul comme « la dernière vague non terminée » :
+ * on lui transmet la vague choisie en clair (`--resume <id>`, sans `--wave`), quel que soit le parseur qui la lira.
+ */
+export function resumeArgv(argv: string[], id: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const t = argv[i];
+    if (t === '--wave') i++;
+    else if (t === '--resume') {
+      out.push(t, id);
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith('-') && !LOT_LIKE.test(next)) i++;
+    } else if (t === '--answer') out.push(t, argv[++i] ?? '', argv[++i] ?? '');
+    else out.push(t);
+  }
+  return out;
+}
+
 async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, today: Day): Promise<number> {
   const store = typeof args.resume === 'string' ? RunStore.find(launch, args.resume) : singleUnfinished(launch);
   if (!store) throw new RafError(`vague inconnue : ${args.resume}`);
@@ -1174,7 +1193,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     // La reprise tourne sur l'instantané de la vague, jamais sur le dist/ courant ; une vague d'avant L61 n'en a pas.
     if (snapshotExists(store.dir)) {
       // Une vague d'avant L223 refuserait « projet:lot=+N » comme budget invalide : seul le lot visé justifie de la rejouer avec le dist/ courant.
-      if ((!args.lotBudgets.length || waveReadsLotBudget(store.dir)) && (!args.integrate.length || waveReadsIntegrate(store.dir)) && (!args.integrate.some((t) => t.replay) || waveReadsReplay(store.dir))) return deps.snapshot.reexec(toolDirOf(store.dir), argv, io.env, io);
+      if ((!args.lotBudgets.length || waveReadsLotBudget(store.dir)) && (!args.integrate.length || waveReadsIntegrate(store.dir)) && (!args.integrate.some((t) => t.replay) || waveReadsReplay(store.dir))) return deps.snapshot.reexec(toolDirOf(store.dir), resumeArgv(argv, store.id), io.env, io);
       io.err(`orchestrate : vague ${store.id} : son instantané ne connaît pas ${args.lotBudgets.length && !waveReadsLotBudget(store.dir) ? '--budget projet:lot=+N (antérieur à L223)' : `${args.integrate.some((t) => t.replay) && waveReadsIntegrate(store.dir) ? '--replay' : '--integrate'} (antérieur à L279)`} : reprise avec le dist/ et les gabarits courants`);
     } else {
       io.err(`orchestrate : vague ${store.id} sans instantané (antérieure à L61) : reprise avec le dist/ et les gabarits courants`);

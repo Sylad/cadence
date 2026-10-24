@@ -3457,9 +3457,10 @@ lots:
     created: 2026-10-24
   - id: L308
     title: "bibliothécaire (suites revue L306, AVANT L307) : une seule clé pour les docs hors dépôt — fusionner describedBy dans docs.articles existante (src/config.ts:538-566), migration de la clé et doc ; le « lot proposé » pour un document hors dépôt remonte au lead (proposals du lot, tableau de fin de vague), pas seulement dans le resume ; le brief ne demande plus de lire un document que la session ne peut pas lire (ou --add-dir du dépôt de ce document, en lecture) ; à la main, le skill lead passe la carte hors dépôt à l'agent ; repo absolu refusé ou résolu ; calcul des écarts docs.sync dédupliqué (cycle.ts:342 et :1864) ; docsFix non remis à false avant les questions (cycle.ts:1716) ; test R15 hors du /tmp commun ; README:61 ligne blanche ; docs/stabilite.md : doc-keeper et la clé rangés ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

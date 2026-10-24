@@ -3435,23 +3435,30 @@ lots:
     finished: 2026-10-24
   - id: L305
     title: "raf migrate (suites revue L284, AVANT de migrer un autre projet) : docs/perf/ventilation.py:83 lit .cadence/raf.yaml (repli docs/plan/raf.yaml) — read_plan('cadence') rend None depuis la migration ; docs/stabilite.md:17 et docs/fonctionnement.md:15 rétablis (mention du legacy réécrite à tort) et mis sous migrate.keep, avec test/ventilation-plan.test.ts ; chemins construits non détectés signalés non traités (pathlib Path('docs') / 'plan' / 'raf.yaml' — jobmail plan_public.py:31 —, join découpé sur plusieurs lignes) ; fichier texte non UTF-8 classé non traité (pas de U+FFFD à la réécriture) ; fichier > 2 Mio qui cite le chemin signalé non traité ; refus sans --dry-run : stdout ne prétend plus « mis à jour » avant le refus ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "conforme, avec 2 notes mineures (recouvrement des blocs non testé, test du refus étiqueté R5) — orchestré (vague 2026-10-24-1845, 2 passe(s) de correction)", commit: f7a88587dc5444fb3a01a82e41103f9f8c996b30 }
+    finished: 2026-10-24
   - id: L306
     title: "agent bibliothécaire générique (agents/doc-keeper.md du paquet) : pour un dépôt et un lot, lit le diff, la carte des docs du projet (docs.sync du cadence.yaml, README, docs/, CHANGELOG, Nouveautés) et dit quelles docs doivent changer, puis les met à jour (session d'écriture) ou les liste (lecture seule) ; orchestrate l'appelle quand docs.sync signale une doc en retard sur le lot (avant la revue), le lead à la main ; docs hors dépôt seulement par configuration (clé, absente par défaut, ex. dans le cadence.yaml du dossier parent : « tel projet est aussi décrit par tel fichier de tel dépôt » → le bibliothécaire propose un lot dans le plan de ce dépôt, sans l'écrire lui-même) ; rien de propre à un dossier dans le code (cadence sert aussi ailleurs) ; doc et tests — demande Sylvain 24-10"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "conforme, avec 5 notes mineures (repo absolu de describedBy mal joint, question du bibliothécaire reprise en correction ordinaire, lecture du document externe hors addDirs, recouvrement avec docs.articles, page de stabilité) — orchestré (vague 2026-10-24-1845, 1 passe(s) de correction)", commit: d17d56d559f541c8a6e05ebebe6d2d1c278d9b4f }
+    finished: 2026-10-24
   - id: L307
     title: "docs.sync dans chaque projet du dossier qui n'en a pas : le bibliothécaire (lecture seule) établit par projet la carte code → docs (README, docs/, CHANGELOG/Nouveautés) ; le lead la pose dans le cadence.yaml du projet (commit acquitté par raf ignore, ou lot du projet) et vérifie raf check ; pour nous : avatar-pandora, claude-code-codex, discotheque, evatosorus, finance-tracker, jobmail-assistant, ol-companion, warhammer40k, maritime-atlas (plan raf.py : via un lot maritime) ; et clé de docs hors dépôt dans ~/projects/developpeur/cadence.yaml pour les études de cas de claude-code-codex — demande Sylvain 24-10"
     status: todo
     estimate: 0.25
     after: [ L306 ]
+    created: 2026-10-24
+  - id: L308
+    title: "bibliothécaire (suites revue L306, AVANT L307) : une seule clé pour les docs hors dépôt — fusionner describedBy dans docs.articles existante (src/config.ts:538-566), migration de la clé et doc ; le « lot proposé » pour un document hors dépôt remonte au lead (proposals du lot, tableau de fin de vague), pas seulement dans le resume ; le brief ne demande plus de lire un document que la session ne peut pas lire (ou --add-dir du dépôt de ce document, en lecture) ; à la main, le skill lead passe la carte hors dépôt à l'agent ; repo absolu refusé ou résolu ; calcul des écarts docs.sync dédupliqué (cycle.ts:342 et :1864) ; docsFix non remis à false avant les questions (cycle.ts:1716) ; test R15 hors du /tmp commun ; README:61 ligne blanche ; docs/stabilite.md : doc-keeper et la clé rangés ; tests"
+    status: todo
+    estimate: 0.25
     created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

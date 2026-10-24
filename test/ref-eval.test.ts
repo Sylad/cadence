@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { ROLES, checkInventaire } from '../src/ref/check.js';
@@ -119,14 +119,46 @@ describe('cadence ref eval — rappel, précision, faux lu, tokens par page', ()
 
   it('R10 — les tokens par page sont la somme des usages lus divisée par les pages des cas lus', () => {
     const r = evaluer(ATTENDU, doc('lecture', ATTENDU.elements, { usage: { tokens: 3000 } }), ['--json']);
-    expect(r.json.tokens).toEqual({ total: 3000, pages: 2, par_page: 1500 });
+    expect(r.json.tokens).toEqual({ total: 3000, pages: 2, par_page: 1500, exclus: [] });
     expect(evaluer(ATTENDU, doc('lecture', ATTENDU.elements, { usage: { tokens: 3000 } })).out).toContain('tokens par page : 1500 (3000 sur 2 pages)');
   });
 
   it('R11 — sans usage dans la lecture, les tokens par page ne sont pas mesurés (pas de zéro inventé)', () => {
     const r = evaluer(ATTENDU, doc('lecture', ATTENDU.elements), ['--json']);
-    expect(r.json.tokens).toEqual({ total: null, pages: null, par_page: null });
+    expect(r.json.tokens).toEqual({ total: null, pages: null, par_page: null, exclus: [] });
     expect(evaluer(ATTENDU, doc('lecture', ATTENDU.elements)).out).toContain('tokens par page : non mesurés');
+  });
+
+  it('R11 — un attendu sans `pages` : le cas sort des tokens par page (ni tokens ni zéro page) et la sortie nomme l’exclusion', () => {
+    const { pages: _pages, ...sansPages } = ATTENDU;
+    const r = evaluer(sansPages, doc('lecture', ATTENDU.elements, { usage: { tokens: 3000 } }), ['--json']);
+    expect(r.json.tokens).toEqual({ total: null, pages: null, par_page: null, exclus: ['document'] });
+    const texte = evaluer(sansPages, doc('lecture', ATTENDU.elements, { usage: { tokens: 3000 } })).out;
+    expect(texte).toContain('tokens par page : non mesurés');
+    expect(texte).toContain('tokens par page : 1 cas sans `pages` exclus (document)');
+    // sans usage il n'y a rien à exclure
+    expect(evaluer(sansPages, doc('lecture', ATTENDU.elements)).out).not.toContain('exclus');
+  });
+
+  it('R11 — sur plusieurs cas, un cas sans `pages` n’entre ni dans les tokens ni dans les pages : la moyenne des autres reste juste', () => {
+    const dir = tempDir();
+    const { pages: _pages, ...sansPages } = ATTENDU;
+    for (const [nom, att, tokens] of [['a', ATTENDU, 3000], ['b', sansPages, 9000]] as const) {
+      mkdirSync(join(dir, 'att', nom), { recursive: true });
+      mkdirSync(join(dir, 'lec', nom), { recursive: true });
+      writeFileSync(join(dir, 'att', nom, 'attendu.json'), JSON.stringify(att));
+      writeFileSync(join(dir, 'lec', nom, 'lecture.json'), JSON.stringify(doc('lecture', ATTENDU.elements, { usage: { tokens } })));
+    }
+    const r = lancer([join(dir, 'att'), join(dir, 'lec'), '--json'], dir);
+    expect(r.json.tokens).toEqual({ total: 3000, pages: 2, par_page: 1500, exclus: ['b'] });
+    expect(lancer([join(dir, 'att'), join(dir, 'lec')], dir).out).toContain('tokens par page : 1 cas sans `pages` exclus (b)');
+  });
+
+  it('R11 — le modèle d’inventaire porte `pages`, le champ de l’attendu que ref eval lit, au moins la dernière page des éléments', () => {
+    const modele = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'templates', 'inventaire.json'), 'utf8'));
+    expect(Number.isInteger(modele.pages)).toBe(true);
+    expect(modele.pages).toBeGreaterThanOrEqual(Math.max(...modele.elements.map((e: Obj) => e.source.page)));
+    expect(checkInventaire(modele)).toEqual([]);
   });
 
   it('R12 — une lecture d’un autre document (slug ou empreinte) est refusée : jamais de mesure sur deux versions mêlées', () => {
@@ -172,7 +204,7 @@ describe('cadence ref eval — rappel, précision, faux lu, tokens par page', ()
     expect(r.code).toBe(0);
     expect(r.json.total).toMatchObject({ attendus: 6, justes: 5 });
     expect(r.json.cas.map((c: Obj) => [c.cas, c.lecture])).toEqual([['deux', false], ['un', true]]);
-    expect(r.json.tokens).toEqual({ total: 1000, pages: 2, par_page: 500 });
+    expect(r.json.tokens).toEqual({ total: 1000, pages: 2, par_page: 500, exclus: [] });
     expect(lancer([join(dir, 'corpus'), join(dir, 'lectures')], dir).out).toContain('sans lecture : deux');
   });
 

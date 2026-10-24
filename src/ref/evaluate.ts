@@ -32,13 +32,16 @@ export interface Tokens {
   total: number | null;
   pages: number | null;
   par_page: number | null;
+  /** Les cas lus avec un `usage` mais dont l'attendu n'a pas de `pages` : exclus des tokens par page (ni leurs tokens ni un zéro page ne comptent). */
+  exclus: string[];
 }
 
 export interface ResultatCas {
   cas: string;
   /** Faux quand aucune lecture n'existe pour ce cas : tout l'attendu est alors manqué. */
   lecture: boolean;
-  pages: number;
+  /** Le `pages` de l'attendu ; `null` quand l'attendu n'en porte pas. */
+  pages: number | null;
   tokens: number | null;
   types: Record<string, Compte>;
   pieges: Piege[];
@@ -167,7 +170,7 @@ export function evaluerCas(nom: string, attendu: Obj, lecture: Obj | null): Resu
     parPiege.set(e.piege, p);
   }
   const tokens = typeof lecture?.usage?.tokens === 'number' && lecture.usage.tokens >= 0 ? lecture.usage.tokens : null;
-  return { cas: nom, lecture: lecture !== null, pages: typeof attendu.pages === 'number' ? attendu.pages : 0, tokens, types, pieges: [...parPiege.values()] };
+  return { cas: nom, lecture: lecture !== null, pages: Number.isInteger(attendu.pages) && attendu.pages > 0 ? attendu.pages : null, tokens, types, pieges: [...parPiege.values()] };
 }
 
 function taux(c: Compte): Taux {
@@ -181,6 +184,7 @@ export function agreger(cas: ResultatCas[]): Evaluation {
   const pieges = new Map<string, Piege>();
   let tokens: number | null = null;
   let pages = 0;
+  const exclus: string[] = [];
   for (const r of cas) {
     for (const [t, c] of Object.entries(r.types)) {
       const a = (types[t] ??= compteVide());
@@ -195,7 +199,8 @@ export function agreger(cas: ResultatCas[]): Evaluation {
       a.trouves += p.trouves;
       pieges.set(p.piege, a);
     }
-    if (r.tokens !== null) {
+    if (r.tokens !== null && r.pages === null) exclus.push(r.cas);
+    else if (r.tokens !== null && r.pages !== null) {
       tokens = (tokens ?? 0) + r.tokens;
       pages += r.pages;
     }
@@ -206,7 +211,7 @@ export function agreger(cas: ResultatCas[]): Evaluation {
     total: taux(total),
     types: triee,
     pieges: [...pieges.values()],
-    tokens: tokens === null || pages === 0 ? { total: null, pages: null, par_page: null } : { total: tokens, pages, par_page: tokens / pages },
+    tokens: tokens === null || pages === 0 ? { total: null, pages: null, par_page: null, exclus } : { total: tokens, pages, par_page: tokens / pages, exclus },
     cas,
   };
 }
@@ -220,8 +225,9 @@ export function formatEvaluation(ev: Evaluation): string[] {
     `rappel : ${pct(t.rappel)} (${t.justes}/${t.attendus}) · précision : ${pct(t.precision)} (${t.justes}/${t.lus})`,
     `faux lu : ${pct(t.taux_faux_lu)} (${t.faux_lu}/${t.sures} sûrs)`,
     ev.tokens.par_page === null ? 'tokens par page : non mesurés' : `tokens par page : ${Number(ev.tokens.par_page.toFixed(1))} (${ev.tokens.total} sur ${ev.tokens.pages} pages)`,
-    'par type :',
   ];
+  if (ev.tokens.exclus.length > 0) lignes.push(`tokens par page : ${ev.tokens.exclus.length} cas sans \`pages\` exclus (${ev.tokens.exclus.join(', ')})`);
+  lignes.push('par type :');
   for (const [type, c] of Object.entries(ev.types)) lignes.push(`  ${type.padEnd(10)} rappel ${pct(c.rappel)} (${c.justes}/${c.attendus}) · précision ${pct(c.precision)} (${c.justes}/${c.lus}) · faux lu ${c.faux_lu}/${c.sures}`);
   if (ev.pieges.length > 0) {
     lignes.push('pièges :');

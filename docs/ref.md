@@ -120,7 +120,8 @@ Exit codes: **0** valid (summary on the standard output; « lecture valide » fo
 argument) or unreadable file (absent, a folder, empty, not JSON, UTF-8 BOM included): the reason goes to the error output. A
 duplicated JSON key is not detected (the last one wins, as with `JSON.parse`). An unknown key, at the root or in an element, is ignored.
 
-**Root**: `version` (1), `genre`, `document` `{ slug (kebab-case), sha256 (64 lowercase hex) }`, `elements` (non-empty array).
+**Root**: `version` (1), `genre`, `document` `{ slug (kebab-case), sha256 (64 lowercase hex) }`, `elements` (non-empty array), and, in an
+expected inventory, `pages` (the number of pages of the document, an integer ≥ 1; not checked here, read by `ref eval` for the tokens per page).
 
 **Every element**: `type` (`ecran`, `composant`, `etat`, `texte`, `jeton`, `table`, `gabarit`, `schema`, `lien`, `statut`, `silence`);
 `id` = `<slug of document>#<type>-<n>` (n ≥ 1, no leading zero; the slug is compared as it is, even invalid, and two elements never share an id);
@@ -226,8 +227,10 @@ covered by a `statut`, the `largeur_reference` of an `ecran`.
 - **faux lu** = read elements marked `lu` or `mesure` (« sûrs ») that are not juste, over the sûrs: an invented element, a wrong
   cell, a `lien` that confirms what the figure contradicts. An `incertain` element is never a faux lu (it lowers the precision);
 - **pièges**: an expected element carries `piege: "<name>"`; a piège is found when all its elements are juste (`✓ nom : 1/1`);
-- **tokens par page**: the `usage: { tokens }` of the reading divided by the `pages` of the expected document, for the cases that
-  have one; without `usage`, « non mesurés » (`null` in `--json`), never a zero.
+- **tokens par page**: the `usage: { tokens }` of the reading divided by the `pages` of the expected inventory (a root key of the
+  expected file, see the model), for the cases that have both; without `usage`, « non mesurés » (`null` in `--json`), never a zero.
+  A case whose expected inventory has **no `pages`** is left out of the figure, tokens and pages alike, and the output says so:
+  `tokens par page : N cas sans `pages` exclus (names)` (`tokens.exclus` in `--json`).
 
 The output is the totals, then one line per type present (in the order of the eleven types), then the pièges (`✓` all found, `✗`
 some missing) and, last, the cases without a reading. This one is a reading of the corpus that confirms a link the figure makes

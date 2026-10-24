@@ -2,6 +2,7 @@
   "version": 1,
   "genre": "inventaire",
   "document": { "slug": "exemple", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+  "pages": 5,
   "roles": {
     "titre": "titre d'un document, d'une page ou d'une section",
     "titre-panneau": "titre d'un panneau ou d'une fenêtre d'interface",

@@ -3284,9 +3284,10 @@ lots:
     created: 2026-10-24
   - id: L291
     title: "orchestrate testGate (suite de la revue L287) : les fichiers supprimés par le lot ne comptent pas comme code sans test (diff-tree --diff-filter=d ; un lot de code mort supprimé déclenchait une passe ≈ 65 k tokens) ; les dépôts voisins du lot (l.repos, comme hasWork) sont lus ; la porte ne joue pas quand le budget ne paie pas correction + revue courte (fixAffordable), avec avertissement ; R10 rendu capable d'échouer (retirer !l.testGate le fait rougir) ; doc : sur un lot léger la porte mène à une revue Opus ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L292
     title: "orchestrate précheck (suite de la revue L288) : les identifiants de lot du plan qui ne sont pas L<n> (Q-CAN5, B28.1, Q4/…) cités dans le titre ou le goal: comptent — mesure revue : 8 des 17 « oui » réels perdus (cadence:L68, maritime Q4/qa-expectations…), Q-CAN6 perdait son précheck ; le critère lit aussi goal: (L258) ; « review » cherché comme mot, pas dans qa-reviewer/review-small ; test B28.1 contre B28.10"
     status: doing

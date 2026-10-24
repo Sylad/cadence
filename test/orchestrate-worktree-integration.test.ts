@@ -4,6 +4,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs
 import { join } from 'node:path';
 import { sharedStateDir } from '../src/state.js';
 import { INTEGRATION_LOCK } from '../src/orchestrate/integrate.js';
+import { cadenceHome, liveSlots } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { branches, conflictWave, fake, inWorktree, lotOf, meeting, planOf, run, setup, sharedFile, store, subjects, writes } from './orchestrate-worktree-harness.js';
 import { tempDir } from './helpers.js';
@@ -38,6 +39,13 @@ describe('R4 / R22 — un lot qui dépend d\'un autre attend son intégration', 
     expect(seen.L1).not.toContain('a--L2');
     expect(seen.L2.endsWith('|true')).toBe(true);
     expect(f.calls.filter((c) => c.lot === 'L2')[0]!.cwd).not.toBe(f.calls.filter((c) => c.lot === 'L1')[0]!.cwd);
+  });
+  it('R4 — A rendu sur conflit : B est rendu « dépendance non prête dans la vague : L1 »', async () => {
+    const { parent, repo } = setup([{ title: 'a' }, { title: 'c' }, { title: 'b', after: ['L1'] }]);
+    const f = fake({ implement: sharedFile(repo) });
+    await run(parent, ['a:L1', 'a:L2', 'a:L3', '--max-sessions', '3'], f);
+    expect(store(parent).readLot('a', 'L3')!.outcome).toBe('dépendance non prête dans la vague : L1');
+    expect(branches(repo)).not.toContain('a--L3'); // B n'a jamais eu de worktree
   });
   it('R22 — intégration de A en conflit : A n\'est jamais ready, B est rendu « dépendance non prête dans la vague : L1 »', async () => {
     const { parent, repo } = setup([{ title: 'a' }, { title: 'c' }, { title: 'b', after: ['L1'] }]);
@@ -197,7 +205,13 @@ describe('R9 / R17 — verdict reporté ou revue courte après un rebase', () =>
       expect(() => git(repo, 'merge-base', '--is-ancestor', v.reporte!.de, 'main')).toThrow(); // l'ancien sha relu n'est plus dans la branche
     }
     expect(r.out).toMatch(/a:L\d verdict reporté : [0-9a-f]{7} → [0-9a-f]{7} \(patch-id identique\)/);
-    expect(f.calls.some((c) => c.kind === 'review-small')).toBe(false); // R17 : patch-id identique, aucune revue courte
+  });
+  it('R17 — patch-id identique : aucune revue jouée', async () => {
+    const { parent } = setup();
+    const f = fake({ implement: writes(meeting(2)) });
+    await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+    expect(f.calls.filter((c) => c.kind === 'review-small')).toHaveLength(0);
+    expect(f.calls.filter((c) => c.kind === 'review')).toHaveLength(2); // les revues d'origine, rien de plus
   });
   it('R9 — fast-forward pur : le sha du verdict est celui relu, aucune trace de report', async () => {
     const { parent, repo } = setup();
@@ -367,6 +381,37 @@ describe('R24 — la branche du lead n\'est jamais changée', () => {
     const { parent, repo } = await leadMoves((repo) => git(repo, 'checkout', '-q', '--detach'));
     for (const id of ['L1', 'L2']) expect(store(parent).readLot('a', id)!.outcome).toMatch(/le dépôt est sur HEAD détaché et non sur main/);
     expect(() => git(repo, 'symbolic-ref', 'HEAD')).toThrow();
+  });
+});
+
+describe('R10 — un lot qui attend le verrou ne retient aucun créneau de session', () => {
+  it('R10 — pendant l\'attente du verrou aucun créneau de session n\'est occupé', async () => {
+    const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }]);
+    const sleeper = spawn('sleep', ['60'], { stdio: 'ignore' });
+    const meet = meeting(2);
+    const slotsDuringWait: number[] = [];
+    const f = fake({
+      implement: async (cwd, brief) => {
+        await meet();
+        const lot = lotOf(brief);
+        if (lot === 'L1') writeFileSync(join(sharedStateDir(repo), INTEGRATION_LOCK), JSON.stringify({ pid: sleeper.pid, wave: 'autre-vague', started: '2026-10-24T00:00:00Z' }));
+        return claudeOut(workReport({ commits: [commitFile(cwd, `${lot}.txt`, `feat(${lot}): travail`)] }));
+      },
+      review: async () => {
+        // la revue rendue, le lot va attendre le verrou : on mesure les créneaux quand les deux lots y sont, puis le porteur disparaît
+        setTimeout(() => slotsDuringWait.push(liveSlots(cadenceHome()).length), 250);
+        setTimeout(() => sleeper.kill(), 450);
+        return claudeOut(reviewReport());
+      },
+    });
+    try {
+      const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f, { integrate: { waitMs: 8_000, pollMs: 20 } });
+      expect(r.code).toBe(0);
+      expect(slotsDuringWait.length).toBeGreaterThan(0);
+      expect(slotsDuringWait.every((n) => n === 0)).toBe(true);
+    } finally {
+      sleeper.kill();
+    }
   });
 });
 

@@ -24,6 +24,8 @@ export interface LiveWave {
   repos: string[];
   /** Plafond de sessions simultanées que cette vague s'applique (`--max-sessions`). */
   cap?: number;
+  /** Lots que la vague peut jouer à la fois (L279) : un par dépôt, ou un par lot quand les lots d'un dépôt jouent chacun dans leur worktree. Absent : le nombre de dépôts. */
+  lanes?: number;
   /** Heure de démarrage du processus : avec le pid, l'identité de la vague (un pid se réutilise). */
   start?: string;
 }
@@ -36,6 +38,7 @@ function readWave(file: string): LiveWave | null {
     const raw = JSON.parse(readFileSync(file, 'utf8'));
     const w: LiveWave = { pid: Number(raw.pid), wave: String(raw.wave), started: String(raw.started), cwd: String(raw.cwd), repos: Array.isArray(raw.repos) ? raw.repos.map(String) : [] };
     if (raw.cap !== undefined) w.cap = Number(raw.cap);
+    if (raw.lanes !== undefined) w.lanes = Number(raw.lanes);
     if (raw.start !== undefined) w.start = String(raw.start);
     return w;
   } catch {
@@ -61,12 +64,12 @@ export function liveWaves(home: string): LiveWave[] {
 
 /**
  * Les créneaux que le lead peut encore donner à des sous-agents : `total` moins, pour chaque vague vivante, le
- * plus petit de son plafond et du nombre de dépôts qu'elle tient encore (ses pas prennent un créneau et le
+ * plus petit de son plafond et du nombre de lots qu'elle joue à la fois — un par dépôt qu'elle tient encore, un par lot pour des lots en worktrees (ses pas prennent un créneau et le
  * rendent entre deux étapes : les sessions vivantes à l'instant ne disent pas ce que la vague va reprendre).
  * Une vague sans plafond connu compte pour `total`.
  */
 export function freeSlots(waves: LiveWave[], total: number, leadSessions = 0): number {
-  const held = waves.reduce((n, w) => n + Math.min(w.cap ?? total, w.repos.length), 0);
+  const held = waves.reduce((n, w) => n + Math.min(w.cap ?? total, w.lanes ?? w.repos.length), 0);
   return Math.max(0, total - held - leadSessions);
 }
 
@@ -165,12 +168,12 @@ export function registerWave(home: string, given: LiveWave): void {
   renameSync(`${file}.tmp`, file);
 }
 
-/** Met à jour la liste des dépôts tenus par la vague (un dépôt libéré en cours de vague n'y figure plus). */
-export function updateWaveRepos(home: string, pid: number, repos: string[]): void {
+/** Met à jour la liste des dépôts tenus par la vague (un dépôt libéré en cours de vague n'y figure plus) et, quand elle la donne, le nombre de lots qu'elle joue à la fois. */
+export function updateWaveRepos(home: string, pid: number, repos: string[], lanes?: number): void {
   const file = join(wavesDir(home), `${pid}.json`);
   const w = readWave(file);
   if (!w) return;
-  writeFileSync(`${file}.tmp`, JSON.stringify({ ...w, repos }));
+  writeFileSync(`${file}.tmp`, JSON.stringify({ ...w, repos, ...(lanes === undefined ? {} : { lanes }) }));
   renameSync(`${file}.tmp`, file);
 }
 

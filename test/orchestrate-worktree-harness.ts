@@ -19,6 +19,10 @@ export interface LotSpec {
   estimate?: number;
   after?: string[];
   visible?: boolean;
+  /** Dépôts voisins (clé de lot `repos:`), chemins relatifs au dépôt du projet. */
+  repos?: string[];
+  /** Sous-tâches du lot (`L1/t1`…). */
+  tasks?: string[];
 }
 
 /** Un dépôt `a` sous un dossier de lancement, des lots, un cadence.yaml (worktrees par défaut). */
@@ -31,7 +35,11 @@ export function setup(lots: LotSpec[] = [{ title: 'un' }, { title: 'deux' }], ya
   git(repo, 'config', 'user.name', 'T');
   git(repo, 'config', 'commit.gpgsign', 'false');
   const plan = Plan.create(join(repo, 'docs/plan/raf.yaml'), 'a', 'L', '2026-09-01');
-  for (const l of lots) plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 0.5, after: l.after, visible: l.visible });
+  for (const l of lots) {
+    const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 0.5, after: l.after, visible: l.visible });
+    if (l.repos) plan.setRepos(id, l.repos.map((path) => ({ path })));
+    for (const t of l.tasks ?? []) plan.addTask(id, t);
+  }
   plan.enableReview('2026-09-01');
   plan.save();
   writeFileSync(join(repo, 'cadence.yaml'), `orchestrate:\n  precheck: false\n${yaml.split('\n').filter(Boolean).map((l) => `  ${l}`).join('\n')}\n`);
@@ -115,4 +123,39 @@ export async function conflictWave() {
   const f = fake({ implement: sharedFile(repo) });
   const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
   return { parent, repo, f, r, dir: join(store(parent).dir, 'worktrees', 'a--L1'), branch: `cadence/${WAVE}/a--L1` };
+}
+
+/** Un dépôt voisin (non cadence) à côté du projet `a`, avec un commit. */
+export function neighbour(parent: string, name = 'voisin'): string {
+  const dir = join(parent, name);
+  mkdirSync(dir, { recursive: true });
+  git(dir, 'init', '-q', '-b', 'main');
+  git(dir, 'config', 'user.email', 't@example.com');
+  git(dir, 'config', 'user.name', 'T');
+  git(dir, 'config', 'commit.gpgsign', 'false');
+  writeFileSync(join(dir, 'README.md'), `# ${name}\n`);
+  git(dir, 'add', '--', 'README.md');
+  git(dir, 'commit', '-q', '-m', 'init');
+  return dir;
+}
+
+/**
+ * Un projet dont le plan est tenu par un autre outil (lecture seule pour raf, R21) : `start.sh` et `verdict.sh` écrivent dans le fichier du plan et notent, dans
+ * `$TOOL_LOG` (hors du dépôt), le dossier où ils ont été lancés et leurs arguments.
+ */
+export function setupForeign(titles = ['un', 'deux']) {
+  const parent = tempDir();
+  const repo = join(parent, 'a');
+  mkdirSync(join(repo, 'docs/plan'), { recursive: true });
+  git(repo, 'init', '-q', '-b', 'main');
+  git(repo, 'config', 'user.email', 't@example.com');
+  git(repo, 'config', 'user.name', 'T');
+  git(repo, 'config', 'commit.gpgsign', 'false');
+  writeFileSync(join(repo, 'docs/plan/taches.yaml'), `taches:\n${titles.map((t, i) => `- id: T${i + 1}\n  titre: ${t}\n  etat: prevu\n  effort: S\n`).join('')}`);
+  writeFileSync(join(repo, 'start.sh'), 'echo "start $1 $(pwd)" >> "$TOOL_LOG"\nsed -i "/^- id: $1\$/,/^- id/ s/etat: prevu/etat: en_cours/" docs/plan/taches.yaml\n');
+  writeFileSync(join(repo, 'verdict.sh'), 'echo "verdict $1 $(pwd) :: $2" >> "$TOOL_LOG"\necho "# verdict $1" >> docs/plan/taches.yaml\n');
+  writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: docs/plan/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, estimate: effort }\n  statuses: { todo: prevu, doing: en_cours, done: deploye }\n  estimates: { S: 0.5 }\norchestrate:\n  precheck: false\n  worktrees: true\n  start: sh start.sh {lot}\n  verdict: sh verdict.sh {lot} "{verdict}"\n');
+  git(repo, 'add', '--', 'docs/plan/taches.yaml', 'start.sh', 'verdict.sh', 'cadence.yaml');
+  git(repo, 'commit', '-q', '-m', 'chore: plan');
+  return { parent, repo };
 }

@@ -910,6 +910,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const repos = [...new Set(lots.flatMap(lotRepoPaths))];
   /** Libère un dépôt : son verrou et sa garde de push (L132 : dès que ses lots sont finis, pas à la fin de la vague). */
   const freed = new Set<string>();
+  /** Lots que la vague joue à la fois sur les dépôts qu'elle tient encore (un par dépôt, un par lot en worktree) : ce que le registre compte pour les créneaux libres. */
+  const lanes = () => groupLots(ctxs).filter((g) => g.every((c) => lotRepoPaths(c.lot).every((r) => !freed.has(r)))).reduce((n, g) => n + (g.every((c) => c.tree) ? g.length : 1), 0);
   const freeRepo = (r: string) => {
     freed.add(r);
     const file = join(sharedStateDir(r), REPO_LOCK);
@@ -917,7 +919,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     held.splice(0, held.length, ...held.filter((f) => f !== file));
     removePrePush(r, wave.id);
     try {
-      updateWaveRepos(home, process.pid, repos.filter((x) => !freed.has(x)));
+      updateWaveRepos(home, process.pid, repos.filter((x) => !freed.has(x)), lanes());
     } catch {
       // registre illisible : `--status` garde la liste de départ, le verrou est bien tombé
     }
@@ -1004,6 +1006,11 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   saveWave();
   const ctxs = contexts(lots, envs, wctx);
   planTrees(ctxs, store, wave.id, wctx.log);
+  try {
+    updateWaveRepos(home, process.pid, repos, lanes());
+  } catch {
+    // registre illisible : le décompte des créneaux libres reste celui des dépôts
+  }
 
   // Ctrl-C, SIGTERM : les sessions sont tuées en bloc, les étapes marquées interrompues, les verrous et hooks libérés.
   const forget = onTermination(async () => {

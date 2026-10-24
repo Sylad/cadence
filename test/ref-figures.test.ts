@@ -82,13 +82,28 @@ describe("index des figures d'un texte (L261)", () => {
     ]);
     expect(idx.unresolved).toEqual([]);
   });
-  it("R2 — une plage dont une figure manque ne produit un lien non résolu que pour celle-là ; une plage d'annexe « 1.B.1 to 1.B.3 » est développée", () => {
+  it("R2 — au milieu d'une plage, une figure absente n'est pas un lien non résolu (« code figures 11–20 ») ; ses bornes le restent ; une plage d'annexe « 1.B.1 to 1.B.3 » est développée", () => {
     const idx = indexText([
-      page(1, 'See Figures 2–4.', 'See Figures 1.B.1 to 1.B.3'),
+      page(1, 'See Figures 2–4.', 'See Figures 1.B.1 to 1.B.3', 'the code figures 11–20 give'),
       page(2, 'Figure 2 A', 'Figure 4 C', 'Figure 1.B.1 D', 'Figure 1.B.2 F', 'Figure 1.B.3 E'),
     ]);
-    expect(idx.unresolved).toEqual([{ label: 'Figure 3', page: 1, extrait: 'See Figures 2–4.' }]);
+    expect(idx.unresolved).toEqual([
+      { label: 'Figure 11', page: 1, extrait: 'the code figures 11–20 give' },
+      { label: 'Figure 20', page: 1, extrait: 'the code figures 11–20 give' },
+    ]);
     expect(idx.figures.map((f) => [f.label, f.citations.length])).toEqual([['Figure 2', 1], ['Figure 4', 1], ['Figure 1.B.1', 1], ['Figure 1.B.2', 1], ['Figure 1.B.3', 1]]);
+  });
+  it('R3 — le milieu d\'une plage cite la figure qui existe : « Figures 2–4 » cite la Figure 3 légendée', () => {
+    const idx = indexText([page(1, 'See Figures 2–4.'), page(2, 'Figure 2 A', 'Figure 3 B', 'Figure 4 C')]);
+    expect(idx.figures.map((f) => [f.label, f.citations.length])).toEqual([['Figure 2', 1], ['Figure 3', 1], ['Figure 4', 1]]);
+  });
+  it('R4 — bornes sans préfixe commun, plage décroissante ou de 50 numéros ou plus : les deux bornes seules, aucun numéro inventé', () => {
+    const idx = indexText([
+      page(1, 'Tables A3–1 and A3-2 here', 'tables 4.8–10 here', 'Figures 6 to 4 here', 'Figures 1 to 80 here', 'Figures 2 and 3 — 1995 here'),
+    ]);
+    expect(idx.unresolved.map((u) => u.label)).toEqual([
+      'Table A3', 'Table A3-2', 'Table 4.8', 'Figure 6', 'Figure 4', 'Figure 1', 'Figure 80', 'Figure 2', 'Figure 3', 'Figure 1995',
+    ]);
   });
   it("les numéros d'annexe des normes OMM gardent leur lettre : « Figure 1.B.1 » n'est pas la Figure 1", () => {
     const idx = indexText([

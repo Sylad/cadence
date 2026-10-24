@@ -108,25 +108,37 @@ function tocLines(page: PageText, lastPage: number): boolean[] {
 }
 
 const RANGE_ONLY = new RegExp(`^${RANGE}$`, 'i');
-/** Numéros d'une plage : « 4 » et « 6 » donnent 4, 5, 6 ; « 1.1 » et « 1.3 » donnent 1.1, 1.2, 1.3 ; sinon les deux bornes. */
-function expand(from: string, to: string): string[] {
+/** Un numéro cité ; `interior` : le milieu d'une plage développée, que le texte ne nomme pas (« 5 » dans « 4 to 6 »). */
+interface Named {
+  num: string;
+  interior: boolean;
+}
+const named = (num: string): Named => ({ num, interior: false });
+
+/**
+ * Numéros d'une plage : « 4 » et « 6 » donnent 4, 5, 6 ; « 1.1 » et « 1.3 » donnent 1.1, 1.2, 1.3. Les bornes sont nommées, le milieu non.
+ * Sinon les bornes seules : préfixes différents, plage décroissante, 50 numéros ou plus. Une borne nue après une borne à préfixe
+ * (« 4.8–10 », « A3–1 ») n'est pas une figure à part : seule la première est gardée.
+ */
+function expand(from: string, to: string): Named[] {
   const a = /^(.*\.)?(\d+)$/.exec(from);
   const b = /^(.*\.)?(\d+)$/.exec(to);
-  if (!a || !b || (a[1] ?? '') !== (b[1] ?? '')) return [from, to];
+  if (b && b[1] === undefined && (!a || a[1] !== undefined)) return [named(from)];
+  if (!a || !b || (a[1] ?? '') !== (b[1] ?? '')) return [named(from), named(to)];
   const [lo, hi] = [Number(a[2]), Number(b[2])];
-  if (hi < lo || hi - lo >= 50) return [from, to];
-  return Array.from({ length: hi - lo + 1 }, (_, i) => `${a[1] ?? ''}${lo + i}`);
+  if (hi < lo || hi - lo >= 50) return [named(from), named(to)];
+  return Array.from({ length: hi - lo + 1 }, (_, i) => ({ num: `${a[1] ?? ''}${lo + i}`, interior: i > 0 && i < hi - lo }));
 }
 
 /** Numéros nommés par une référence : le seul numéro au singulier ; au pluriel la liste, chaque plage (« 4 to 6 », « 2–4 ») développée quand ses bornes le permettent. */
-function numbersOf(head: string, list: string): string[] {
+function numbersOf(head: string, list: string): Named[] {
   const found = [...list.matchAll(NUMBER_ONLY)];
-  if (!PLURAL.test(head)) return found.slice(0, 1).map((m) => m[0]);
-  const out: string[] = [];
+  if (!PLURAL.test(head)) return found.slice(0, 1).map((m) => named(m[0]));
+  const out: Named[] = [];
   found.forEach((m, i) => {
     const prev = found[i - 1];
     if (prev && RANGE_ONLY.test(list.slice(prev.index + prev[0].length, m.index))) out.splice(out.length - 1, 1, ...expand(prev[0], m[0]));
-    else out.push(m[0]);
+    else out.push(named(m[0]));
   });
   return out;
 }
@@ -187,13 +199,14 @@ export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = n
       for (const m of l.text.matchAll(REFERENCE)) {
         // la légende ne se cite pas elle-même
         if (own && m.index === 0) continue;
-        for (const num of numbersOf(m[1]!, m[2]!)) {
+        for (const { num, interior } of numbersOf(m[1]!, m[2]!)) {
           const { label } = labelOf(m[1]!, num);
           if (seen.has(key(label))) continue;
           seen.add(key(label));
           const fig = figures.get(key(label));
           if (fig) fig.citations.push({ page: p.n, line, extrait: l.text.trim(), type: 'nommee' });
-          else unresolved.push({ label, page: p.n, extrait: l.text.trim() });
+          // le milieu d'une plage sans légende n'est pas un lien à résoudre : « code figures 11–20 » n'en désigne aucune
+          else if (!interior) unresolved.push({ label, page: p.n, extrait: l.text.trim() });
         }
       }
       const d = DEICTIC.exec(l.text);

@@ -3424,9 +3424,10 @@ lots:
     finished: 2026-10-24
   - id: L304
     title: "worktrees (suites revue L301, avant activation) : reprise d'une branche de vague passée (recoverTree) — refuser ou signaler au moment de la reprise un worktree conservé aux fichiers suivis modifiés (comme R11), une branche dont un commit touche le plan (au lieu d'aller jusqu'au conflit d'intégration), la branche d'un lot rendu À l'intégration dans sa vague (next: integrate) ; échec de git worktree move / branch -m journalisé, pas avalé (worktree.ts:226) ; doc : nom de branche cadence/<vague>/_--<lot> pour une vague à la racine, procédure d'intégration à la main écrite ; test sans la variable : une nouvelle vague laisse la branche conservée ; CHANGELOG [Unreleased] : un seul « ### Fixed » et un seul « ### Added » ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

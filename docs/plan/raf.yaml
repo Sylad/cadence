@@ -3166,6 +3166,7 @@ lots:
     estimate: 0.25
     created: 2026-10-23
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "compliant (1 mineur : la purge à 24 h n'est pas appliquée par la bande) — orchestré (vague 2026-10-24-1340, 0 passe(s) de correction)", commit: 9fca5aadffba66176d8522014dc36b69d0bccf7e }
   - id: L279
     title: "orchestrate : un worktree par lot dans une vague (git worktree add par lot, fusion par cherry-pick ou rebase au « prêt »), pour que deux lots indépendants d'un même dépôt avancent en parallèle dans la limite des créneaux ; verrou de dépôt adapté ; conflits rendus au lead ; tests. Vécu 23-10 : L261 (4 corrections) a bloqué la file cadence ; étude de faisabilité d'abord (spec)"
     status: doing

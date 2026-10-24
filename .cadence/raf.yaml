@@ -3514,6 +3514,7 @@ lots:
     review: { date: 2026-10-24, verdict: "conforme : 0 bloquant, 0 majeur, 1 mineur (libellé overBudget faux pour un lot repris jamais revu, cycle.ts:982 → L315) ; majeur précédent (pass/MAX_PASSES à la reprise) réglé par 84fdbe9 — revue Opus neuve, correction à la main après la vague 2026-10-24-2235", commit: 84fdbe932072469a5906dd207d72b4077764a18d }
     notes:
       - { date: 2026-10-24, text: "Non vérifié (revue) : après un SIGKILL entre planTrees (branche renommée) et la première sauvegarde du lot, une --resume trouverait la branche renommée sans resumedFrom et repasserait par le précheck ; état illisible de l'ancienne vague (autre dossier de lancement) non couvert par un test." }
+      - { date: 2026-10-24, text: "Essai 3 du mode worktree lancé le 24-10 au soir : L315 + L265, deux lots neufs (sans reprise), après L311 et L314 en service (b2e6273)." }
     finished: 2026-10-24
   - id: L312
     title: "perf (⚠ tendance deux fenêtres, tour du lead 24-10 soir, décision Sylvain) : tokens par lot en hausse à estimate 0.25 (médiane 150,0 k contre 116,6 k, +29 %) et 0.5 (440,6 k contre 318,7 k, +38 %) alors que la part conforme du premier coup monte (61 % contre 39 %) — ventiler la hausse par étape (precheck, implement, review/review-small, fix), par modèle et par projet sur les deux fenêtres ; recaler ce que la mesure justifie (budgets par catégorie de docs/orchestrate.md « Each lot also has its own budget », grille d'estimate de raf add et du brief du lead) et rien d'autre ; si la hausse vient d'une qualité achetée (revue Opus, passes de mineurs) et pas d'une estimate fausse, le conseil « l'estimate est mal calibrée » de cadence perf ne doit plus sortir seul : il cite l'étape qui porte la hausse ; mesure avant/après et conclusion en note ; tests"
@@ -3548,6 +3549,12 @@ lots:
     status: todo
     estimate: 0.05
     created: 2026-10-24
+  - id: L316
+    title: "Essai 3 mesuré du mode worktree (suite L310) : deux lots neufs et indépendants (L315 dans src/orchestrate, L265 dans src/ref) avec orchestrate.worktrees: true et CADENCE_EXPERIMENTAL_WORKTREES=1, après L311 et L314 en service (b2e6273) ; mesure : temps de mur contre somme des lots, intégrations automatiques (rebase, union CHANGELOG L314, verdict reporté ou revue courte), incidents ; conclusion en note (proposer l'activation par défaut à Sylvain, garder expérimental, ou corriger) ; config remise à false après l'essai sauf décision"
+    status: doing
+    estimate: 0.05
+    created: 2026-10-24
+    started: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

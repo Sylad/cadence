@@ -3366,9 +3366,10 @@ lots:
     finished: 2026-10-24
   - id: L297
     title: "orchestrate : une réponse donnée par --resume --answer à une question sur une règle « hypothèse » de la fiche passe cette règle en « sourcée » (source : réponse du lead, date, vague) avant la revue de fiche suivante ; tests. Vécu 24-10 : L279 rendu « fiche non conforme » pour R27 alors que la réponse était donnée (une vague perdue, sourcée à la main) — décision Sylvain 24-10"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L298
     title: "orchestrate : délai des étapes d'écriture (timeouts.work, 45 min fixes) proportionné à l'estimate et à la spec du lot, ou prolongé tant que la session commite ; à l'échéance, le travail non commité est signalé dans le tableau (fichiers, tests) au lieu d'un « échec » sec ; tests. Vécu 24-10 : implement de L279 (0,5 j + fiche) coupé à 45 min après 6 commits, 44 lignes vertes non commitées — décision Sylvain 24-10"
     status: todo

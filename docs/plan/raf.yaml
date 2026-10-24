@@ -3325,6 +3325,7 @@ lots:
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme, 0 bloquant, 0 majeur ; 2 notes mineures de documentation (phrase redondante de la clé precheck, tiret absent du paragraphe de détail de la ligne 220) — orchestré (vague 2026-10-24-1340, 0 passe(s) de correction)", commit: a3494af982dec1e62dea068c915b5ce1bed81d7f }
   - id: L296
     title: "orchestrate précheck : décider le critère du titre de L288 sur la mesure — il fait perdre 7 des 17 « oui » réels (L171, L68, Q-LBL3, Q-NOW5, Q4/dashboard-21-mesure-prod, Q4/qa-expectations, Q4/qa-expectations-nouveautes ; leurs titres ne citent rien) contre 33 % de prechecks évités (≈ 20 k tokens chacun) ; options : retirer le critère et faire le précheck de tout lot sans commit par le modèle local (hors quota) après mesure de concordance local/Sonnet sur les 17 « oui » et 20 « partiel » ; tests. Revue L292 24-10"
     status: todo

@@ -2449,8 +2449,8 @@ export async function runLot(c: LotCtx): Promise<void> {
       }
       if (!(await ensureTree(c))) return;
       l.startedSha = (await snapshot(wd(c), { remote: false })).head ?? undefined;
-      // Un lot repris de sa branche conservée (L311) n'a rien à faire contrôler : ses commits sont les siens. Il repart à la correction des constats de sa dernière revue, ou à la revue.
-      l.next = l.resumedFrom ? (l.constats.length ? 'fix' : firstReview(c)) : needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos, l.goal) ? 'precheck' : firstWrite(c);
+      // Un lot repris de sa branche conservée (L311) n'a rien à faire contrôler : ses commits sont les siens. Il repart à la correction des constats de sa dernière revue, à la revue s'il en a passé une sans constat, à l'écriture s'il n'a jamais été revu.
+      l.next = l.resumedFrom ? (l.constats.length ? 'fix' : l.resumedReviewed ? firstReview(c) : firstWrite(c)) : needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos, l.goal) ? 'precheck' : firstWrite(c);
       save(c);
     }
     while (l.next && !TERMINAL.has(l.status)) {

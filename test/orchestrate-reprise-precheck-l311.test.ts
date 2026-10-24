@@ -60,7 +60,7 @@ describe('R1 — un lot repris de sa branche ne repasse pas par le contrôle pr�
     expect(kinds[0]).toMatch(/^review/);
   });
 
-  it('R4 — un lot rendu avant sa première revue (aucune étape review, aucun constat) n\'est pas court-circuité : il retombe sur le chemin d\'un lot neuf', async () => {
+  it('R4 — un lot rendu avant sa première revue (aucune étape review, aucun constat) ne repasse pas par le contrôle préalable : il rejoue la chaîne d\'un lot neuf à partir de l\'écriture', async () => {
     const { parent } = await premiereVague();
     const file = join(new RunStore(parent, WAVE).dir, 'a--L2.json');
     const old = JSON.parse(readFileSync(file, 'utf8'));
@@ -68,8 +68,9 @@ describe('R1 — un lot repris de sa branche ne repasse pas par le contrôle pr�
     const f2 = fake();
     await run(parent, ['a:L2'], f2);
     const kinds = f2.calls.map((c) => c.kind);
-    expect(kinds[0]).toBe('precheck');
+    expect(kinds).not.toContain('precheck');
     expect(kinds).not.toContain('fix');
+    expect(kinds[0]).toBe('implement');
   });
 
   it('R3 — un lot neuf qui cite un autre lot passe toujours par le contrôle préalable', async () => {

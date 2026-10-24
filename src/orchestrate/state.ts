@@ -157,8 +157,10 @@ export interface LotState {
   baseline?: { sha: string; command?: string; failures: string[]; verified: boolean };
   /** Dossier où le Playwright d'une étape (ux, ou implement/fix d'un lot visible) a rangé captures et snapshots (dans le dossier de la vague, hors du dépôt). */
   uxCaptures?: string;
-  /** Vague d'où un lot déjà revu reprend sa branche conservée (L301, L311) : le lot repart de ses commits, sans contrôle préalable, à la correction des constats de sa dernière revue (ou à la revue s'il n'en a pas). */
+  /** Vague d'où le lot reprend sa branche conservée (L301, L311) : le lot repart de ses commits, sans contrôle préalable. */
   resumedFrom?: string;
+  /** Avec `resumedFrom` : le lot avait déjà été revu dans cette vague. Il repart alors à la correction des constats de sa dernière revue (ou à la revue s'il n'en a pas) ; sinon à l'écriture. */
+  resumedReviewed?: boolean;
   /** Constat du contrôle préalable (livrable en partie présent), joint au brief de la première implémentation. */
   precheck?: string;
   /** Verdict du contrôle préalable une fois lu (« oui » sans preuve = « partiel »), gardé au journal pour mesurer la part de « oui » (L288). Absent : pas de contrôle. */

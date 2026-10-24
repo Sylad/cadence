@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { docSyncSet } from './docsync.js';
 import { PLAN_DEFAULT, PLAN_LEGACY, readMigrateConfig } from './config.js';
@@ -70,7 +70,9 @@ export function planMigration(root: string): Migration {
   for (const file of candidates(root).sort()) {
     if (file === PLAN_LEGACY || file === PLAN_DEFAULT || isHistory(file)) continue;
     const path = join(root, file);
-    if (statSync(path).size > MAX_BYTES) continue;
+    // ni lien symbolique (sa cible est lue sous son propre nom), ni dossier (sous-module), ni fichier hors du commun
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.size > MAX_BYTES) continue;
     const buffer = readFileSync(path);
     const text = buffer.toString('utf8');
     if (!text.includes('docs/plan') && !/['"`]docs['"`]\s*,\s*['"`]plan['"`]/.test(text)) continue;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { run } from '../src/cli.js';
@@ -212,5 +212,14 @@ describe('raf migrate', () => {
     const r = raf(dir, 'migrate');
     expect(r.code).toBe(2);
     expect(r.err).toContain('blob.bin');
+  });
+
+  it('R12 — un lien symbolique vers un dossier suivi par git n\'est pas lu comme un fichier', () => {
+    const dir = legacyRepo(READERS);
+    symlinkSync('scripts', join(dir, 'lien'));
+    git(dir, 'add', 'lien');
+    const r = raf(dir, 'migrate');
+    expect(r.code).toBe(0);
+    expect(read(dir, 'scripts/plan-data.sh')).toContain('.cadence/raf.yaml');
   });
 });

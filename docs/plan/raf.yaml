@@ -3293,6 +3293,7 @@ lots:
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme, 3 notes mineures (0 bloquant, 0 majeur) : le code fait ce que le goal demande, mais il ne récupère aucun des « oui » perdus mesurés, et prompt-audit ne compte plus — orchestré (vague 2026-10-24-1240, 1 passe(s) de correction)", commit: cd3d4af0ecb0907a3f4c79ff4ac175047cc7e8b6 }
   - id: L293
     title: "cadence perf (suite de la revue L288) : la part de « oui » du précheck lit les journaux d'avant L288 (étape precheck + outcome « livrable déjà présent » = oui, champ precheck = partiel, sinon non) — n/d affiché malgré 170 prechecks ; un journal écrit depuis L288 sans precheckVerdict (rapport illisible, Sonnet en échec après le local) n'est plus compté « non » ; tests"
     status: todo

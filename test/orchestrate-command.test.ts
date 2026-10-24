@@ -420,7 +420,7 @@ describe('refus avant d\'agir (code 2)', () => {
   });
 
   it('--dry-run affiche --effort <niveau> dans la ligne de chaque passe, selon orchestrate.effort (L137)', async () => {
-    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const { parent, dirs } = parentWith({ a: [{ title: 'un, suite du constat de revue' }] });
     writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  effort: { precheck: low, implement: medium, fix: medium, review: high, ux: high }\n');
     git(dirs.a, 'add', 'cadence.yaml');
     git(dirs.a, 'commit', '-q', '-m', 'cfg');

@@ -22,6 +22,8 @@ export interface PJournal {
   visible?: boolean;
   /** Petit lot (champ `small` du journal) ; absent d'un journal ancien. */
   small?: boolean;
+  /** Verdict du précheck écrit dans le journal (`precheckVerdict`) ; absent d'un journal ancien. */
+  precheck?: string;
   steps: PStep[];
 }
 
@@ -46,5 +48,5 @@ export function writeJournal(runs: string, wave: string, project: string, lot: s
     const tokens = s.tokens !== undefined ? s.tokens ?? undefined : s.counted === undefined ? undefined : { input: 0, cacheWrite: 0, cacheRead: 0, output: 0, counted: s.counted };
     return { n, kind: s.kind, status: s.status ?? 'ok', ...(s.noModel ? {} : { model: s.model ?? 'sonnet' }), started: s.started, ended: s.ended, tokens, report, commits: [] };
   });
-  writeFileSync(join(dir, `${slug}.json`), JSON.stringify({ project, lot, visible: o.visible ?? false, ...(o.small === undefined ? {} : { small: o.small }), status: o.status ?? 'ready', ...(o.budget === undefined ? {} : { budget: o.budget }), steps }));
+  writeFileSync(join(dir, `${slug}.json`), JSON.stringify({ project, lot, visible: o.visible ?? false, ...(o.small === undefined ? {} : { small: o.small }), status: o.status ?? 'ready', ...(o.budget === undefined ? {} : { budget: o.budget }), ...(o.precheck === undefined ? {} : { precheckVerdict: o.precheck }), steps }));
 }

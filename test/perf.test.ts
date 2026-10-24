@@ -769,7 +769,7 @@ describe('cadence perf — sortie, erreurs, lecture seule', () => {
     const r = await cad(c.root, '--json');
     expect(r.out).toHaveLength(1);
     const data = JSON.parse(r.out[0]!);
-    expect(Object.keys(data)).toEqual(['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'tokens', 'delays', 'durations', 'cost', 'quality', 'orphans', 'warnings']);
+    expect(Object.keys(data)).toEqual(['since', 'today', 'windows', 'throughput', 'corrections', 'interventions', 'precheck', 'tokens', 'delays', 'durations', 'cost', 'quality', 'orphans', 'warnings']);
     expect(data.today).toBe(TODAY);
   });
 

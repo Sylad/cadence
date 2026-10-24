@@ -39,7 +39,7 @@ describe('étape spec : où elle s’insère', () => {
   });
 
   it('le contrôle préalable passe avant la spec', async () => {
-    const h = harness({ lots, script: { precheck: [() => claudeOut({ dejaPresent: 'non', preuves: [], resume: 'rien' })], spec: [spec()], implement: [impl], review: [ok] } });
+    const h = harness({ lots: [{ title: 'Un écran, suite du constat de revue', screen: 'page' as const }], script: { precheck: [() => claudeOut({ dejaPresent: 'non', preuves: [], resume: 'rien' })], spec: [spec()], implement: [impl], review: [ok] } });
     await runLot(h.lot('L1', screen, { precheck: true }));
     expect(kinds(h)).toEqual(['precheck', 'spec', 'implement', 'review']);
   });

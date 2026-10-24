@@ -109,7 +109,7 @@ export function harness(opts: { lots?: { title: string; visible?: boolean; scree
   const planRel = opts.planRel ?? 'docs/plan/raf.yaml';
   const planFile = join(repo, planRel);
   const plan = Plan.create(planFile, 'demo', 'L', '2026-09-01');
-  for (const l of opts.lots ?? [{ title: 'Un lot' }]) {
+  for (const l of opts.lots ?? [{ title: 'Un lot, suite du constat de revue' }]) {
     const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible || !!l.screen, screen: l.screen, spec: l.spec, quickwin: l.quickwin });
     if (l.status === 'doing') plan.setStatus(id, 'doing', '2026-10-01');
   }

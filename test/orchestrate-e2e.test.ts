@@ -25,7 +25,7 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
   const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'proj', 'L', '2026-09-01');
-  plan.add('Un lot', '2026-10-01', { visible: opts.visible });
+  plan.add('Un lot, suite du constat de revue', '2026-10-01', { visible: opts.visible });
   plan.save();
   // Le contrôle préalable (L77) a son propre test ; ailleurs il est coupé pour que les étapes attendues restent les mêmes.
   const yaml = opts.cadenceYaml ?? 'orchestrate:\n';

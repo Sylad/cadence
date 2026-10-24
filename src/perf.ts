@@ -122,6 +122,8 @@ export interface PerfResult {
   corrections: { medianPasses: Indicator; atLeast2: Indicator; firstTime: Indicator; causes: { current: CauseWindow; previous: CauseWindow } };
   /** `ux` : sessions qui voient l'application par lot visible (étape ux, et review-small d'un petit lot visible) ; `dedicatedUx` : part des lots visibles revus par au moins une étape ux dédiée (information, sans ⚠ ni jumeau). */
   interventions: { handedOut: Indicator & { count: { current: number | null; previous: number | null } }; ux: Indicator; dedicatedUx: Indicator };
+  /** Contrôle préalable (L288) : `yes` = part de « oui » parmi les lots rendus qui portent un verdict (information, sans ⚠ ni jumeau) ; `lots` = lots avec verdict. */
+  precheck: { yes: Indicator };
   tokens: TokensBlock;
   delays: DelaysBlock;
   /** Médiane de la durée de mur en minutes, par sorte d'étape ; `lots` = étapes. */
@@ -230,6 +232,7 @@ const DECISIONS = {
   atLeast2: 'la première écriture n\'est pas assez bonne : durcir la fiche ou le brief',
   firstTime: 'la première écriture n\'est pas assez bonne : durcir la fiche ou le brief',
   handedOut: 'la vague s\'arrête trop tôt ou le lead la rattrape à la main : revoir la fin de cycle',
+  precheck: 'le précheck livre peu de « oui » : le restreindre ou le confier au modèle local',
   ux: 'la revue d\'ergonomie coûte plus d\'un tour : renforcer la maquette',
   tokens: 'l\'estimate est mal calibrée : redécouper le lot ou recaler l\'estimate et les budgets',
   reviewShare: 'la revue pèse trop face à l\'écriture : alléger (seuil du lot léger, orchestrate.review.threshold)',
@@ -373,6 +376,11 @@ export function computePerf(input: PerfInput): PerfResult {
     const set = visibleRendered(w);
     return set.length === 0 ? null : set.filter((d) => d.j.steps.some((s) => s.kind === 'ux' && s.status === 'ok')).length / set.length;
   });
+  const prechecked = (w: Window) => rendered(w).filter((d) => d.j.precheck !== undefined);
+  const precheckYes = both(windows, (w) => {
+    const set = prechecked(w);
+    return set.length === 0 ? null : set.filter((d) => d.j.precheck === 'oui').length / set.length;
+  });
   const visibleCounts = both(windows, (w) => visibleRendered(w).length);
   const budgetCounts = both(windows, (w) => withBudget(w).length);
 
@@ -488,6 +496,7 @@ export function computePerf(input: PerfInput): PerfResult {
   const handed = mk(handedOut, lotsOf, 'up', twinEscaped, planNote);
   const interventions = { handedOut: { ...handed, count: handedCount }, ux: mk(ux, visibleCounts, 'up', twinEscaped), dedicatedUx: mk(dedicatedUx, visibleCounts, null, null) };
 
+  const precheck = { yes: mk(precheckYes, both(windows, (w) => prechecked(w).length), null, null) };
   const tokens: TokensBlock = { byEstimate, reviewShare: mk(reviewShare, both(windows, (w) => rendered(w).length), 'up', twinFirstTime) };
   const delays: DelaysBlock = {
     createdToDone: mk({ current: median(createdToDone.current), previous: median(createdToDone.previous) }, sizes(createdToDone), 'up', twinFirstTime, planNote),
@@ -526,7 +535,7 @@ export function computePerf(input: PerfInput): PerfResult {
     redDeliveries: mk(reds, deliveriesOf, 'up', 'throughput.delivered'),
     qaBlocking: mk(both(windows, blockingOf), both(windows, deliveredCount), 'up', twinEscaped, escapedNote),
   };
-  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, tokens, delays, durations, cost, quality, orphans, warnings: [] };
+  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, tokens, delays, durations, cost, quality, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
   for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${DECISIONS[key.decision]}`);
   if (bottleneck) result.warnings.push(bottleneck);
@@ -550,8 +559,8 @@ const LABELS: Record<Cause, string> = {
   'faux-constat': 'faux constat de revue',
 };
 
-/** Les treize premières lignes de `indicatorLines` sont celles de L225 (dont la part des lots visibles revus par une étape ux, L283) et les deux de qualité de livraison de L227 ; les suivantes sont celles de L226. */
-const LEGACY_LINES = 13;
+/** Les quatorze premières lignes de `indicatorLines` sont celles de L225 (dont la part des lots visibles revus par une étape ux, L283, et la part de « oui » du précheck, L288) et les deux de qualité de livraison de L227 ; les suivantes sont celles de L226. */
+const LEGACY_LINES = 14;
 
 type Kind = 'count' | 'rate' | 'share' | 'num' | 'tokens' | 'days' | 'min' | 'eur';
 interface Line {
@@ -580,6 +589,7 @@ function indicatorLines(r: PerfResult): [Line, Indicator][] {
     [{ label: 'lots terminés hors vague', kind: 'share', decision: 'handedOut' }, r.interventions.handedOut],
     [{ label: 'sessions ux par lot visible', kind: 'num', decision: 'ux' }, r.interventions.ux],
     [{ label: 'part des lots visibles revus par une étape ux', kind: 'share', decision: 'ux' }, r.interventions.dedicatedUx],
+    [{ label: 'part de « oui » du précheck', kind: 'share', decision: 'precheck' }, r.precheck.yes],
     [{ label: 'part conforme du premier coup', kind: 'share', decision: 'firstTime' }, r.corrections.firstTime],
     [{ label: 'défauts échappés', kind: 'count', decision: 'escaped' }, r.throughput.escaped],
     [{ label: 'livraisons rouges', kind: 'count', decision: 'redDeliveries' }, r.quality.redDeliveries],
@@ -690,6 +700,7 @@ export function renderPerf(r: PerfResult): string[] {
   section('Interventions du lead', ['lots terminés hors vague', 'sessions ux par lot visible', 'part des lots visibles revus par une étape ux']);
   const h = r.interventions.handedOut.count;
   out.push(`  lots rendus puis terminés hors vague : ${h.current ?? 'n/d'} (précédente ${h.previous ?? 'n/d'})`);
+  section('Contrôle préalable', ['part de « oui » du précheck']);
   out.push('', 'Tokens, délais et durées (médianes par lot ou par étape)');
   for (const l of lines.slice(LEGACY_LINES)) out.push(row(l));
   for (const wr of r.warnings.filter((x) => x.startsWith('⚠ goulot'))) out.push('', wr);

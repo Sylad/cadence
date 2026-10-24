@@ -135,6 +135,8 @@ export interface Journal {
   small: boolean;
   status: string;
   budget?: number;
+  /** Verdict du contrôle préalable (`precheckVerdict` du journal, L288) ; absent d'un journal ancien ou d'un lot sans contrôle. */
+  precheck?: 'oui' | 'partiel' | 'non';
   steps: JournalStep[];
   /** Une session implement a abouti (sous la borne `until` éventuelle). */
   implemented: boolean;
@@ -188,6 +190,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         small: !!rec.small,
         status: String(rec.status),
         ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
+        ...(rec.precheckVerdict === 'oui' || rec.precheckVerdict === 'partiel' || rec.precheckVerdict === 'non' ? { precheck: rec.precheckVerdict as 'oui' | 'partiel' | 'non' } : {}),
         steps: steps.map((s) => {
           const usage = usageOf(s.tokens);
           return { n: s.n, kind: s.kind, status: s.status, ...(typeof s.model === 'string' ? { model: s.model } : {}), ...(s.started ? { started: s.started } : {}), ...(s.ended ? { ended: s.ended } : {}), ...(typeof s.tokens?.counted === 'number' ? { counted: s.tokens.counted } : {}), ...(usage ? { usage } : {}) };

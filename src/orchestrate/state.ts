@@ -151,6 +151,8 @@ export interface LotState {
   uxCaptures?: string;
   /** Constat du contrôle préalable (livrable en partie présent), joint au brief de la première implémentation. */
   precheck?: string;
+  /** Verdict du contrôle préalable une fois lu (« oui » sans preuve = « partiel »), gardé au journal pour mesurer la part de « oui » (L288). Absent : pas de contrôle. */
+  precheckVerdict?: 'oui' | 'partiel' | 'non';
   /** Réponse de l'humain à une question, jointe au brief de la prochaine session puis effacée. */
   pendingAnswer?: string | null;
   verdict: string | null;

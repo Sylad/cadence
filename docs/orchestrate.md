@@ -213,7 +213,7 @@ what the lot asks for (another lot, or a correction, may have done it already). 
 with proofs), `partiel` or `non`: on `oui` no implementation session is opened and the lot is handed back
 (`livrable déjà présent : <résumé> (<preuves>)`) for the lead to drop or close it; on `partiel` the finding goes into the
 implementation brief and a warning; on `non` — or an unreadable report, which only adds a warning — the wave goes on. A
-lot that already has commits is never pre-checked (resuming it is legitimate). `orchestrate.precheck: false` turns it off.
+lot that already has commits is never pre-checked (resuming it is legitimate), and neither is a lot **whose title cites neither a finding nor an earlier lot** (L288): the pre-check runs only when the title contains `constat`, `revue`, `review` or `audit` (any case), or a whole lot id earlier than the lot (`L12` in the title of `L30`; `L30` itself, a later lot or `L120` for `L12` do not count; for a lot whose id is not `L<number>`, any other cited lot counts). Measured on 24-10: 13.4 M tokens (7.1 %) of pre-check for 10 `oui` and 20 `partiel` out of the sessions read, hence the restriction. The verdict the pre-check reached (`oui`, `partiel`, `non`; an unproven `oui` is recorded `partiel`) is kept in the lot's journal (`precheckVerdict`), and `cadence perf` prints the share of `oui` per window ([perf](perf.md)): change the key or the criterion, then compare the current window with the previous one. `orchestrate.precheck: false` turns it off.
 
 ## The spec step of a lot with `screen:`
 
@@ -608,7 +608,7 @@ News instruction (`cadence news new <lot>`, factual user-side text, a screenshot
 orchestrate:
   test: npm test                         # run by the orchestrator after a work step (optional)
   build: npm run build                   # run after the tests; both results go to the reviewer, who does not redo them (optional)
-  precheck: true                         # default: before the first implementation of a lot with no commit, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it, local runs it on claude-local (Ollama) with Sonnet as fallback
+  precheck: true                         # default: before the first implementation of a lot with no commit whose title cites a finding or an earlier lot, a read-only Sonnet session checks whether the deliverable is already in the repository (see below); false skips it, local runs it on claude-local (Ollama) with Sonnet as fallback
   accept: npx vitest run -c vitest.acceptation.config.ts   # accept step (see « The accept step »): the dedicated command that runs ONLY the acceptance tests of the lot (optional; without it the step is skipped with a warning)
   maquette: true                         # default: UX review of the mockup between spec and accept (see « The mockup review »); false skips it
   maquetteReviews: 3                     # default 3: how many reviews of the mockup per lot (integer ≥ 1); also the `spec` session budget of a lot with a screen

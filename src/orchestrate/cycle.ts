@@ -993,9 +993,23 @@ function badReport(c: LotCtx, step: StepState, e: unknown): null {
   return stop(c, 'failed', `${step.kind} : ${(e as Error).message}`);
 }
 
-/** Le contrôle préalable ne vaut que pour un lot sans commit : avec des commits, l'implémentation reprend légitimement. */
+/** Mots d'un titre qui disent que le lot reprend un constat : le livrable peut déjà exister. */
+const CITES_FINDING = /constat|revue|review|audit/i;
+
+/** Le titre cite un constat, ou un lot antérieur du plan (« L12 » pour le lot L30) : un autre lot a pu faire le travail. */
+function titleCitesPriorWork(title: string, lot: string): boolean {
+  if (CITES_FINDING.test(title)) return true;
+  const own = /^L(\d+)$/.exec(lot);
+  return [...title.matchAll(/(?<![\w-])L(\d+)(?!\w)/g)].some((m) => (own ? Number(m[1]) < Number(own[1]) : `L${m[1]}` !== lot));
+}
+
+/**
+ * Le contrôle préalable ne vaut que pour un lot sans commit (avec des commits, l'implémentation reprend légitimement) dont le
+ * titre cite un constat ou un lot antérieur (L288) : sans cela rien ne laisse croire qu'un autre lot l'a déjà livré, et le
+ * contrôle coûtait 7 % des tokens pour 10 « oui » sur 30 mesurés (audit du 24-10).
+ */
 export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: string, lot: string, repos: LotRepo[] = []): boolean {
-  return config.precheck && !hasWork(plan, { repo, repos, lot });
+  return config.precheck && !hasWork(plan, { repo, repos, lot }) && titleCitesPriorWork(plan.lot(lot).title, lot);
 }
 
 /**
@@ -1045,6 +1059,7 @@ async function precheck(c: LotCtx): Promise<void> {
   const proofs = rep.preuves.length ? ` (${rep.preuves.join(' ; ')})` : '';
   // « oui » sans preuve ne se vérifie pas : il vaut « partiel », l'implémentation part avec le constat.
   const unproven = rep.dejaPresent === 'oui' && rep.preuves.length === 0;
+  l.precheckVerdict = unproven ? 'partiel' : rep.dejaPresent;
   if (unproven) l.warnings.push('contrôle préalable : « oui » sans preuve, traité comme partiel');
   if (rep.dejaPresent === 'oui' && !unproven) {
     stop(c, 'handed-back', `livrable déjà présent : ${rep.resume.trim()}${proofs}`);

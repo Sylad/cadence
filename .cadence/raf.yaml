@@ -2746,7 +2746,7 @@ lots:
     quickwin: true
     created: 2026-10-16
     started: 2026-10-16
-    review: { date: 2026-10-16, verdict: "conforme (1 mineur noté), publication de 1.8.0 (évaluation du plugin, tag, push) laissée au lead — orchestré (vague 2026-10-16-2245, 1 passe(s) de correction)", commit: 353d838ba314c6d79545d0a5a4369806d2c5c037 }
+    review: { date: 2026-10-24, verdict: "conforme (revue courte Sonnet 24-10 du commit ebf7d28, préparé pour la release 1.9.0 : R14 lead-hold et R11 ressources-partagees lisent tout le CHANGELOG, plus seulement [Unreleased] ; aucun autre test lié à Unreleased)", commit: ebf7d28db76f7f2d44bf0f6da51d3cd0830528ac }
     finished: 2026-10-16
   - id: L236
     title: "Auto-vérification en fin de session implement et fix, avant la revue : une fois les tests verts, le brief impose une relecture du diff complet du lot contre la grille du code-reviewer (bug de code, dérive d'architecture, docs/architecture.md à jour, cas limites, un test par comportement changé), la correction immédiate de ce qu'elle trouve, puis un paragraphe « auto-vérification » dans le rapport de la session ; mesure : cadence corrections --classify du 10 au 17-10 = 356 passes dont 53 % bug de code et 19 % dérive d'architecture, spec floue 14 % seulement, part conforme du premier coup 37 % (cadence perf 17-10) ; cible : part conforme du premier coup au-dessus de 50 % sur la fenêtre suivante, tokens par lot stables (l'auto-vérification ne doit pas coûter une passe de revue)"

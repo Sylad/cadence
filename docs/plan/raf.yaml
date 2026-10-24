@@ -3403,9 +3403,10 @@ lots:
     created: 2026-10-24
   - id: L302
     title: "orchestrate (suite revue L297) : sourcer une règle de fiche après --answer ne reformate pas la fiche (doc.toString change [R2] en [ R2 ] sur les 17 fiches de docs/specs — garder le style de flux d'origine ou n'éditer que les lignes de la règle) ; une réponse qui supprime ou change la règle (« non, supprime R3 », « change en X ») ne la marque pas « sourcée » telle quelle : la règle est laissée à la session spec reprise, ou rendue au lead si la session ne la traite pas ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L303
     title: "worktrees (suites des revues L298–L300, avant activation) : rapport de coupure au délai étendu aux dépôts voisins (cycle.ts:723) ; refus tardif d'intégration : verdict de revue courte non dupliqué à la reprise (cycle.ts:2239/2202) ; test qui atteint le contrôle de branche de writeVerdict (cycle.ts:2101) ; branche retirée distinguée d'une branche sans branch.<nom>.base (command.ts:929) ; CHANGELOG : double « ### Fixed » de [Unreleased] ; tests"
     status: todo

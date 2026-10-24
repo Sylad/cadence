@@ -3231,9 +3231,10 @@ lots:
     finished: 2026-10-24
   - id: L287
     title: "orchestrate : porte mécanique « code modifié sans test » avant la revue Opus (diff du lot : fichiers de src/ changés sans fichier de test touché → passe de correction directe, sans session de revue) ; seuil et exceptions dans cadence.yaml ; tests. Audit 24-10 : test manquant = 32 % des majeurs de revue (224 sur 690), une passe ≈ 190 k tokens"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L288
     title: "orchestrate : précheck conditionnel (lot sans commit et dont le titre ne cite ni constat ni lot antérieur → pas de précheck) ou confié au modèle local ; mesure avant/après de la part de « oui ». Audit 24-10 : 13,4 M tokens (7,1 %) de précheck pour 10 « oui » et 20 « partiel »"
     status: todo

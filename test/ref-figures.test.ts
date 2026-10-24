@@ -71,6 +71,25 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.unresolved).toEqual([]);
     expect([...citedPages(idx, new Set([1]))]).toEqual([2]);
   });
+  it('R1 — les plages citent chaque figure : « Figures 2–4 » (demi-cadratin), « Figures 2, 4 to 6 », « Figures 1.1 to 1.3 », « Figs. 2 — 3 »', () => {
+    const idx = indexText([
+      page(1, 'See Figures 2–4.', 'See Figures 7, 9 to 11 now', 'Voir Figures 1.1 to 1.3', 'cf. Figs. 5 \u2014 6'),
+      page(2, 'Figure 2 A', 'Figure 3 B', 'Figure 4 C', 'Figure 7 D', 'Figure 9 E', 'Figure 10 F', 'Figure 11 G', 'Figure 1.1 H', 'Figure 1.2 I', 'Figure 1.3 J', 'Figure 5 K', 'Figure 6 L'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([
+      ['Figure 2', [1]], ['Figure 3', [1]], ['Figure 4', [1]], ['Figure 7', [2]], ['Figure 9', [2]], ['Figure 10', [2]], ['Figure 11', [2]],
+      ['Figure 1.1', [3]], ['Figure 1.2', [3]], ['Figure 1.3', [3]], ['Figure 5', [4]], ['Figure 6', [4]],
+    ]);
+    expect(idx.unresolved).toEqual([]);
+  });
+  it("R2 — une plage dont une figure manque ne produit un lien non résolu que pour celle-là ; une plage d'annexe « 1.B.1 to 1.B.3 » est développée", () => {
+    const idx = indexText([
+      page(1, 'See Figures 2–4.', 'See Figures 1.B.1 to 1.B.3'),
+      page(2, 'Figure 2 A', 'Figure 4 C', 'Figure 1.B.1 D', 'Figure 1.B.2 F', 'Figure 1.B.3 E'),
+    ]);
+    expect(idx.unresolved).toEqual([{ label: 'Figure 3', page: 1, extrait: 'See Figures 2–4.' }]);
+    expect(idx.figures.map((f) => [f.label, f.citations.length])).toEqual([['Figure 2', 1], ['Figure 4', 1], ['Figure 1.B.1', 1], ['Figure 1.B.2', 1], ['Figure 1.B.3', 1]]);
+  });
   it("les numéros d'annexe des normes OMM gardent leur lettre : « Figure 1.B.1 » n'est pas la Figure 1", () => {
     const idx = indexText([
       page(1, 'See Figure 1.D.5 and Figures 1.B.1 and 1.B.2.', 'Voir Table 12.B.3.'),

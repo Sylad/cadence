@@ -48,8 +48,10 @@ const WORDS: Record<string, { kind: FigureKind; word: string }> = {
   planches: { kind: 'planche', word: 'Planche' },
 };
 const NUMBER = String.raw`[A-Z]{0,2}[-.]?\d+(?:[.-](?:\d+|[A-Z](?![a-z])))*[a-z]?`;
-/** Ce qui sépare deux numéros d'une énumération au pluriel : « 2, 3 », « 2 and 3 », « 4 to 6 ». */
-const SEPARATOR = String.raw`(?:\s*,\s*(?:(?:and|et)\s+)?|\s+(?:and|et|to|à|&)\s+)`;
+/** Ce qui joint les deux bornes d'une plage : « 4 to 6 », « 4 à 6 », « 2–4 » (demi-cadratin ou cadratin). */
+const RANGE = String.raw`(?:\s+(?:to|à)\s+|\s*[–—]\s*)`;
+/** Ce qui sépare deux numéros d'une énumération au pluriel : « 2, 3 », « 2 and 3 », plus les plages. */
+const SEPARATOR = String.raw`(?:\s*,\s*(?:(?:and|et)\s+)?|\s+(?:and|et|&)\s+|${RANGE})`;
 const REFERENCE = new RegExp(String.raw`\b(Figures?|Figs?|Tables?|Tableaux|Tableau|Planches?)\.?\s+(${NUMBER}(?:${SEPARATOR}${NUMBER})*)(?![\w])`, 'gi');
 const PLURAL = /^(?:figures|figs|tables|tableaux|planches)$/i;
 const NUMBER_ONLY = new RegExp(NUMBER, 'g');
@@ -105,15 +107,28 @@ function tocLines(page: PageText, lastPage: number): boolean[] {
   return leaders.map((e) => e || contents);
 }
 
-/** Numéros nommés par une référence : le seul numéro au singulier ; au pluriel la liste, et « 4 to 6 » donne 4, 5, 6 quand ce sont des entiers. */
+const RANGE_ONLY = new RegExp(`^${RANGE}$`, 'i');
+/** Numéros d'une plage : « 4 » et « 6 » donnent 4, 5, 6 ; « 1.1 » et « 1.3 » donnent 1.1, 1.2, 1.3 ; sinon les deux bornes. */
+function expand(from: string, to: string): string[] {
+  const a = /^(.*\.)?(\d+)$/.exec(from);
+  const b = /^(.*\.)?(\d+)$/.exec(to);
+  if (!a || !b || (a[1] ?? '') !== (b[1] ?? '')) return [from, to];
+  const [lo, hi] = [Number(a[2]), Number(b[2])];
+  if (hi < lo || hi - lo >= 50) return [from, to];
+  return Array.from({ length: hi - lo + 1 }, (_, i) => `${a[1] ?? ''}${lo + i}`);
+}
+
+/** Numéros nommés par une référence : le seul numéro au singulier ; au pluriel la liste, chaque plage (« 4 to 6 », « 2–4 ») développée quand ses bornes le permettent. */
 function numbersOf(head: string, list: string): string[] {
-  const nums = list.match(NUMBER_ONLY) ?? [];
-  if (!PLURAL.test(head)) return nums.slice(0, 1);
-  const range = /^(\d+)\s+(?:to|à)\s+(\d+)$/i.exec(list.trim());
-  if (range && Number(range[2]) >= Number(range[1]) && Number(range[2]) - Number(range[1]) < 50) {
-    return Array.from({ length: Number(range[2]) - Number(range[1]) + 1 }, (_, i) => String(Number(range[1]) + i));
-  }
-  return nums;
+  const found = [...list.matchAll(NUMBER_ONLY)];
+  if (!PLURAL.test(head)) return found.slice(0, 1).map((m) => m[0]);
+  const out: string[] = [];
+  found.forEach((m, i) => {
+    const prev = found[i - 1];
+    if (prev && RANGE_ONLY.test(list.slice(prev.index + prev[0].length, m.index))) out.splice(out.length - 1, 1, ...expand(prev[0], m[0]));
+    else out.push(m[0]);
+  });
+  return out;
 }
 
 interface Candidate {

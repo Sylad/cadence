@@ -3446,6 +3446,7 @@ lots:
     estimate: 0.5
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme, avec 5 notes mineures (repo absolu de describedBy mal joint, question du bibliothécaire reprise en correction ordinaire, lecture du document externe hors addDirs, recouvrement avec docs.articles, page de stabilité) — orchestré (vague 2026-10-24-1845, 1 passe(s) de correction)", commit: d17d56d559f541c8a6e05ebebe6d2d1c278d9b4f }
   - id: L307
     title: "docs.sync dans chaque projet du dossier qui n'en a pas : le bibliothécaire (lecture seule) établit par projet la carte code → docs (README, docs/, CHANGELOG/Nouveautés) ; le lead la pose dans le cadence.yaml du projet (commit acquitté par raf ignore, ou lot du projet) et vérifie raf check ; pour nous : avatar-pandora, claude-code-codex, discotheque, evatosorus, finance-tracker, jobmail-assistant, ol-companion, warhammer40k, maritime-atlas (plan raf.py : via un lot maritime) ; et clé de docs hors dépôt dans ~/projects/developpeur/cadence.yaml pour les études de cas de claude-code-codex — demande Sylvain 24-10"
     status: todo

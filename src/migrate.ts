@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { docSyncSet } from './docsync.js';
 import { PLAN_DEFAULT, PLAN_LEGACY, readMigrateConfig } from './config.js';
@@ -17,6 +17,30 @@ const BUILT = /['"`]docs['"`]\s*\)?\s*[,/]\s*['"`]plan['"`]/;
 const OTHER = new RegExp(`docs/plan(?!/raf\\.yaml(?![\\w-]|\\.\\w))|${BUILT.source}`, 'g');
 
 const MAX_BYTES = 2 * 1024 * 1024;
+
+const BLOCK = 1024 * 1024;
+/** Le recouvrement entre deux blocs : un chemin construit (`'docs',\n  'plan'`) ne doit pas passer entre deux. */
+const OVERLAP = 4096;
+
+/** Un gros fichier cite-t-il le chemin ? Lu par blocs d'octets (latin1, un octet par caractère) : jamais décodé en une seule chaîne. */
+function citesPath(path: string): boolean {
+  const fd = openSync(path, 'r');
+  try {
+    const buf = Buffer.alloc(BLOCK + OVERLAP);
+    let kept = 0;
+    for (;;) {
+      const n = readSync(fd, buf, kept, BLOCK, null);
+      if (n === 0) return false;
+      const text = buf.toString('latin1', 0, kept + n);
+      if (text.includes('docs/plan') || BUILT.test(text)) return true;
+      const total = kept + n;
+      kept = Math.min(OVERLAP, total);
+      buf.copy(buf, 0, total - kept, total);
+    }
+  } finally {
+    closeSync(fd);
+  }
+}
 
 export interface Reader {
   file: string;
@@ -75,16 +99,18 @@ export function planMigration(root: string): Migration {
     // ni lien symbolique (sa cible est lue sous son propre nom), ni dossier (sous-module), ni fichier hors du commun
     const stat = lstatSync(path);
     if (!stat.isFile()) continue;
+    // un gros fichier n'est jamais lu en entier ni décodé : cherché par blocs, signalé s'il cite le chemin, ignoré sinon
+    if (stat.size > MAX_BYTES) {
+      if (!citesPath(path)) continue;
+      if (isKept(file)) result.kept.push(file);
+      else result.unhandled.push({ file, text: 'fichier de plus de 2 Mio qui cite le chemin : trop gros pour être réécrit' });
+      continue;
+    }
     const buffer = readFileSync(path);
     const text = buffer.toString('utf8');
     if (!text.includes('docs/plan') && !BUILT.test(text)) continue;
     if (isKept(file)) {
       result.kept.push(file);
-      continue;
-    }
-    // un gros fichier qui cite le chemin n'est pas lu ligne à ligne : signalé, jamais ignoré en silence
-    if (stat.size > MAX_BYTES) {
-      result.unhandled.push({ file, text: 'fichier de plus de 2 Mio qui cite le chemin : trop gros pour être réécrit' });
       continue;
     }
     if (buffer.includes(0)) {

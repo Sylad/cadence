@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, symlinkSync, truncateSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { run } from '../src/cli.js';
@@ -272,6 +272,23 @@ describe('raf migrate', () => {
     expect(r.err).toContain('2 Mio');
     expect(r.err).not.toContain('autre.log');
     expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(true);
+  });
+
+  it('R11 — un fichier de 600 Mio (non décodable en chaîne) est ignoré s\'il ne cite pas le chemin, signalé non traité s\'il le cite, sans planter', () => {
+    const dir = legacyRepo();
+    const taille = 600 * 1024 * 1024;
+    put(dir, 'data/muet.tif', '');
+    truncateSync(join(dir, 'data/muet.tif'), taille);
+    put(dir, 'data/cite.tif', '');
+    truncateSync(join(dir, 'data/cite.tif'), taille);
+    const fd = openSync(join(dir, 'data/cite.tif'), 'r+');
+    writeSync(fd, 'docs/plan/raf.yaml', taille - 100);
+    closeSync(fd);
+    const r = raf(dir, 'migrate', '--dry-run');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('data/cite.tif');
+    expect(r.err).toContain('2 Mio');
+    expect(r.err).not.toContain('muet.tif');
   });
 
   it('R5 — le refus sans --dry-run n\'affiche pas « lecteurs mis à jour » : rien n\'a été modifié', () => {

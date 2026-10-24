@@ -205,7 +205,7 @@ const sensitiveName = (name: string): boolean =>
 const TOKEN_SHAPES = /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{16,}|sk-[A-Za-z0-9_-]{16,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|npm_[A-Za-z0-9]{30,})\b/g;
 const BEARER = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 const URL_USERINFO = /(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi;
-// Une valeur entre guillemets jamais refermés (coupée par la borne de la sortie gardée, ou répartie sur plusieurs lignes) court jusqu'à la fin de la ligne.
+// Une valeur entre guillemets jamais refermés (sortie arrêtée en son milieu, ou répartie sur plusieurs lignes) court jusqu'à la fin de la ligne.
 const ASSIGNMENT = /([A-Za-z][A-Za-z0-9_.-]*)=("[^"]*(?:"|$)|'[^']*(?:'|$)|[^\s&"']+)/g;
 
 /** Masque ce qui ressemble à un secret (jeton connu, Bearer, identifiants d'URL, VAR=valeur ou paramètre d'URL au nom sensible) : motifs probables, pas une garantie. */

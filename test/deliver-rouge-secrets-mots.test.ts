@@ -10,7 +10,7 @@ describe('L294 — secrets du journal des livraisons rouges : noms en un mot, gu
     expect(maskSecrets('https://api.test/x?apikey=abc123&page=2')).toBe('https://api.test/x?apikey=***&page=2');
   });
 
-  it('R2 — une valeur entre guillemets jamais refermés (coupée par la borne de 8192, ou sur plusieurs lignes) est masquée jusqu\'à la fin de la ligne', () => {
+  it('R2 — une valeur entre guillemets jamais refermés (sortie arrêtée en son milieu, ou sur plusieurs lignes) est masquée jusqu\'à la fin de la ligne', () => {
     expect(maskSecrets('API_KEY="abc def ghi')).toBe('API_KEY=***');
     expect(maskSecrets("DB_PASSWORD='hunter 2")).toBe('DB_PASSWORD=***');
     expect(maskSecrets('GITHUBTOKEN="abc')).toBe('GITHUBTOKEN=***');

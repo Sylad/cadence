@@ -61,7 +61,8 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   values, `user:password@` in a URL, and any `NAME=value` (shell variable or URL query
   parameter) whose name has a word such as token, secret, password, key, auth, signature, or
   ends with one of token, secret, password, key, credential, signature (`APIKEY`, `ACCESSTOKEN`,
-  `GITHUBTOKEN`). A quoted value never closed (cut by the 8192 characters kept, or spread over
+  `GITHUBTOKEN`). If the 8192 characters kept cut the output, its first line is only a remainder (the name and the opening quote of a secret value may be gone) and is replaced by `***`.
+  A quoted value never closed (output stopped inside it, or spread over
   several lines) is masked up to the end of the line when its name is sensitive; behind an ordinary name
   (`MODE="a b API_KEY=x`) the content is scanned again, so a later secret is still masked (L294).
   This is a list of likely patterns, not a guarantee: a secret of another shape printed by a

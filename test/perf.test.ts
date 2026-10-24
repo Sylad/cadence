@@ -1181,7 +1181,58 @@ describe('cadence perf — fenêtres, ⚠ et décisions des nouveaux indicateurs
     plan(c.root, 'alpha', tokensCase(c, 100_000, 140_000).lots);
     const line = (await cad(c.root)).out.find((l) => l.startsWith('⚠ tokens par lot'))!;
     expect(line).toContain('100 k');
-    expect(line).toMatch(/→ l'estimate est mal calibrée : redécouper le lot ou recaler l'estimate et les budgets$/);
+    expect(line).toMatch(/→ l'estimate est mal calibrée : la hausse est portée par l'étape implement \(\+40 k par lot\) : redécouper le lot ou recaler l'estimate et les budgets$/);
+  });
+
+  /** n lots d'estimate 0.5 rendus le `day`, chacun avec les étapes données (kind → jetons comptés). */
+  const stepsCase = (c: Ctx, prefix: string, day: string, n: number, steps: Record<string, number>, extra: PStep[] = []): PLot[] =>
+    many(n, (i) => {
+      const id = `${prefix}${i}`;
+      lotJournal(c, day, id, { steps: [...Object.entries(steps).map(([kind, counted]) => ({ kind, counted, ended: at(day, '09:00:00') })), ...extra] });
+      return { id, finished: day, created: '2026-10-01', estimate: 0.5 };
+    });
+
+  it('L312 — la classe d\'estimate nomme l\'étape qui porte la hausse : la plus forte hausse de jetons par lot, en moyenne sur les lots de la classe', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...stepsCase(c, 'P', PREV, 5, { implement: 60_000, review: 40_000, fix: 10_000 }), ...stepsCase(c, 'C', CUR, 5, { implement: 100_000, review: 60_000, fix: 10_000 })]);
+    const { data } = await json(c.root);
+    expect(data.tokens.byEstimate['0.5']).toMatchObject({ warn: true, carrier: { kind: 'implement', delta: 40_000 } });
+  });
+
+  it('L312 — review et review-small comptent pour une seule étape : le passage de l\'une à l\'autre n\'est pas une hausse', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...stepsCase(c, 'P', PREV, 5, { implement: 60_000, review: 80_000 }), ...stepsCase(c, 'C', CUR, 5, { implement: 90_000, 'review-small': 100_000 })]);
+    const { data } = await json(c.root);
+    expect(data.tokens.byEstimate['0.5']).toMatchObject({ warn: true, carrier: { kind: 'implement', delta: 30_000 } });
+  });
+
+  it('L312 — une classe qui ne monte sur aucune étape (la médiane monte, la moyenne par étape baisse) n\'a pas d\'étape porteuse et garde le conseil sur l\'estimate', async () => {
+    const c = ctx();
+    const prev = [...doneLots(c, 'A', 4, PREV, '2026-10-01', 0.5, 100_000), ...doneLots(c, 'B', 1, PREV, '2026-10-01', 0.5, 2_000_000)];
+    plan(c.root, 'alpha', [...prev, ...doneLots(c, 'C', 5, CUR, '2026-10-01', 0.5, 200_000)]);
+    const r = await cad(c.root);
+    const { data } = await json(c.root);
+    expect(data.tokens.byEstimate['0.5']).toMatchObject({ warn: true, carrier: null });
+    expect(r.out.find((l) => l.startsWith('⚠ tokens par lot'))).toMatch(/→ l'estimate est mal calibrée : redécouper le lot ou recaler l'estimate et les budgets$/);
+  });
+
+  it('L312 — la part conforme du premier coup monte : le ⚠ dit une qualité payée à l\'étape qui porte la hausse, il ne conclut pas à une estimate fausse', async () => {
+    const c = ctx();
+    const fixPass: PStep[] = [{ kind: 'review', counted: 20_000, constats: ['un constat'], ended: at(PREV, '10:00:00') }, { kind: 'fix', counted: 20_000, ended: at(PREV, '11:00:00') }];
+    plan(c.root, 'alpha', [...stepsCase(c, 'P', PREV, 5, { implement: 60_000 }, fixPass), ...stepsCase(c, 'C', CUR, 5, { implement: 140_000 })]);
+    const { data } = await json(c.root);
+    const line = (await cad(c.root)).out.find((l) => l.startsWith('⚠ tokens par lot'))!;
+    expect(data.corrections.firstTime).toMatchObject({ previous: 0, current: 1 });
+    expect(line).toMatch(/→ la hausse est portée par l'étape implement \(\+80 k par lot\) alors que la part conforme du premier coup monte : de la qualité payée, pas une estimate fausse ; juger cette étape \(modèle, effort, passes\) avant de recaler l'estimate$/);
+    expect(line).not.toContain('mal calibrée');
+    expect(data.warnings.find((w: string) => w.startsWith('⚠ tokens par lot'))).toContain('de la qualité payée');
+  });
+
+  it('L312 — la qualité n\'a pas monté : le ⚠ cite l\'étape porteuse et garde le conseil de recaler l\'estimate', async () => {
+    const c = ctx();
+    plan(c.root, 'alpha', [...stepsCase(c, 'P', PREV, 5, { implement: 60_000, review: 40_000 }), ...stepsCase(c, 'C', CUR, 5, { implement: 60_000, review: 80_000 })]);
+    const line = (await cad(c.root)).out.find((l) => l.startsWith('⚠ tokens par lot'))!;
+    expect(line).toMatch(/→ l'estimate est mal calibrée : la hausse est portée par l'étape review \(\+40 k par lot\) : redécouper le lot ou recaler l'estimate et les budgets$/);
   });
 
   it('R12 — ⚠ sur la classe 0.5 sans ⚠ sur la classe 1', async () => {

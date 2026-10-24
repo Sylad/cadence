@@ -85,10 +85,17 @@ export interface CauseWindow {
   byReview: Record<string, number>;
 }
 
+/** L'étape qui porte la hausse des tokens d'une classe d'estimate (L312) : la sorte d'étape dont la somme des jetons par lot, en moyenne sur les lots de la classe, monte le plus d'une fenêtre à l'autre. */
+export interface Carrier {
+  kind: string;
+  /** Hausse en jetons par lot ; toujours positive. */
+  delta: number;
+}
+
 /** Les indicateurs de L226 : tokens par lot, délais, durées de mur. */
 export interface TokensBlock {
-  /** Par valeur exacte de l'estimate du plan (« 0.5 », « 1 »…) : médiane des tokens comptés par journal rendu ; `lots` = journaux. */
-  byEstimate: Record<string, Indicator>;
+  /** Par valeur exacte de l'estimate du plan (« 0.5 », « 1 »…) : médiane des tokens comptés par journal rendu ; `lots` = journaux. `carrier` : l'étape qui porte la hausse (L312). */
+  byEstimate: Record<string, Indicator & { carrier: Carrier | null }>;
   reviewShare: Indicator;
 }
 export interface DelaysBlock {
@@ -296,6 +303,20 @@ function causeWindow(passes: { pass: JournalPass; day: Day }[], w: Window, cache
   return { top, classified, unclassified, withoutFindings, unclassifiedShare: withFindings === 0 ? null : unclassified / withFindings, byReview };
 }
 
+/** La sorte d'étape sous laquelle la hausse se compte : `review` et `review-small` ne font qu'une (la taille du lot choisit l'une ou l'autre, `orchestrate.review.threshold` : le passage de l'une à l'autre n'est pas une hausse). */
+const carrierKind = (kind: string): string => (kind === 'review-small' ? 'review' : kind);
+
+/** L'étape qui porte la hausse (L312) : la sorte d'étape dont la moyenne des jetons par lot monte le plus ; null sans hausse nette du total par lot, ou sans lot dans l'une des fenêtres. */
+function carrierOf(current: Map<string, number>[], previous: Map<string, number>[]): Carrier | null {
+  if (current.length === 0 || previous.length === 0) return null;
+  const mean = (lots: Map<string, number>[], kind: string) => lots.reduce((sum, l) => sum + (l.get(kind) ?? 0), 0) / lots.length;
+  const kinds = new Set([...current, ...previous].flatMap((l) => [...l.keys()]));
+  const rises = [...kinds].map((kind) => ({ kind, delta: mean(current, kind) - mean(previous, kind) }));
+  const net = rises.reduce((sum, r) => sum + r.delta, 0);
+  const top = rises.sort((a, b) => b.delta - a.delta || a.kind.localeCompare(b.kind))[0];
+  return net > 0 && top && top.delta > 0 ? top : null;
+}
+
 export function computePerf(input: PerfInput): PerfResult {
   const { plans, cache, windows, today } = input;
   const hasPlans = plans.size > 0;
@@ -389,24 +410,27 @@ export function computePerf(input: PerfInput): PerfResult {
 
   // Tokens par estimate et part de revue (R2, R3)
   const twinFirstTime = 'corrections.firstTime';
-  const tokensByClass = (w: Window): Map<string, number[]> => {
-    const classes = new Map<string, number[]>();
+  const tokensByClass = (w: Window): Map<string, { total: number; kinds: Map<string, number> }[]> => {
+    const classes = new Map<string, { total: number; kinds: Map<string, number> }[]>();
     for (const d of rendered(w)) {
       const p = planLot(plans, d.j.project, d.j.lot);
       const counted = d.j.steps.filter((x) => x.counted !== undefined);
       if (!p || counted.length === 0) continue;
       // Un lot passé par la chaîne spec (écran ou back) coûte plus que le lot ordinaire de même estimate (mesuré le 12–18-10 : +150 k à l'estimate 0,5, +30 k à 1 ; 450 k est l'écart de budget, pas l'écart mesuré) : classe à part, sinon l'arrivée de ces lots dans une fenêtre passe pour un lot ordinaire plus lourd (L240).
       const key = `${p.estimate}${d.j.steps.some((x) => SPEC_CHAIN.has(x.kind)) ? '+spec' : ''}`;
-      classes.set(key, [...(classes.get(key) ?? []), counted.reduce((sum, x) => sum + x.counted!, 0)]);
+      const kinds = new Map<string, number>();
+      for (const x of counted) kinds.set(carrierKind(x.kind), (kinds.get(carrierKind(x.kind)) ?? 0) + x.counted!);
+      classes.set(key, [...(classes.get(key) ?? []), { total: counted.reduce((sum, x) => sum + x.counted!, 0), kinds }]);
     }
     return classes;
   };
   const byClass = both(windows, tokensByClass);
-  const byEstimate: Record<string, Indicator> = {};
+  const byEstimate: TokensBlock['byEstimate'] = {};
   const classKeys = [...new Set([...byClass.current.keys(), ...byClass.previous.keys()])].sort(byEstimateKey);
   for (const key of classKeys) {
-    const vals = both(windows, (w) => median((w === windows.current ? byClass.current : byClass.previous).get(key) ?? []));
-    byEstimate[key] = mk(vals, { current: byClass.current.get(key)?.length ?? 0, previous: byClass.previous.get(key)?.length ?? 0 }, 'up', twinFirstTime);
+    const lotsOfClass = both(windows, (w) => (w === windows.current ? byClass.current : byClass.previous).get(key) ?? []);
+    const vals = both(windows, (w) => median((w === windows.current ? lotsOfClass.current : lotsOfClass.previous).map((l) => l.total)));
+    byEstimate[key] = { ...mk(vals, { current: lotsOfClass.current.length, previous: lotsOfClass.previous.length }, 'up', twinFirstTime), carrier: carrierOf(lotsOfClass.current.map((l) => l.kinds), lotsOfClass.previous.map((l) => l.kinds)) };
   }
   const reviewShare = both(windows, (w) => {
     let review = 0;
@@ -537,7 +561,7 @@ export function computePerf(input: PerfInput): PerfResult {
   };
   const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, tokens, delays, durations, cost, quality, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
-  for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${DECISIONS[key.decision]}`);
+  for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${decisionOf(key, ind, result)}`);
   if (bottleneck) result.warnings.push(bottleneck);
   return result;
 }
@@ -616,6 +640,19 @@ function describe(ind: Indicator, kind: Kind): string {
   return `${value(ind.current, kind)} (précédente ${value(ind.previous, kind)}${ind.change === null ? '' : `, ${signed(ind.change)}`})`;
 }
 
+/**
+ * La décision d'un ⚠ (L312). Celle des tokens par lot cite l'étape qui porte la hausse : quand la part conforme du premier coup monte en même temps,
+ * la hausse est de la qualité payée à cette étape, plus une estimate fausse ; sinon l'estimate reste suspecte, avec l'étape.
+ */
+function decisionOf(line: Line, ind: Indicator, r: PerfResult): string {
+  const carrier = (ind as { carrier?: Carrier | null }).carrier;
+  if (line.decision !== 'tokens' || !carrier) return DECISIONS[line.decision];
+  const where = `la hausse est portée par l'étape ${carrier.kind} (+${value(carrier.delta, 'tokens')} par lot)`;
+  const { current, previous } = r.corrections.firstTime;
+  if (current !== null && previous !== null && current > previous) return `${where} alors que la part conforme du premier coup monte : de la qualité payée, pas une estimate fausse ; juger cette étape (modèle, effort, passes) avant de recaler l'estimate`;
+  return `l'estimate est mal calibrée : ${where} : redécouper le lot ou recaler l'estimate et les budgets`;
+}
+
 /** Les lignes que désigne le chemin `twin` d'un indicateur. */
 function twinsByPath(lines: [Line, Indicator][]): Map<string, [Line, Indicator]> {
   const at = (label: string) => lines.find(([l]) => l.label === label)!;
@@ -637,7 +674,7 @@ export function perfHeader(r: PerfResult): string[] {
   for (const [line, ind] of lines) {
     if (!ind.warn) continue;
     const twin = ind.twin ? byPath.get(ind.twin) : undefined;
-    header.push(`⚠ ${line.label} : ${describe(ind, line.kind)}${twin ? ` · ${twin[0].label} : ${describe(twin[1], twin[0].kind)}` : ''} → ${DECISIONS[line.decision]}`);
+    header.push(`⚠ ${line.label} : ${describe(ind, line.kind)}${twin ? ` · ${twin[0].label} : ${describe(twin[1], twin[0].kind)}` : ''} → ${decisionOf(line, ind, r)}`);
   }
   header.push(...r.warnings.filter((w) => w.startsWith('⚠ goulot')));
   return header;
@@ -681,7 +718,7 @@ export function renderPerf(r: PerfResult): string[] {
     if (twin) parts.push(`${twin[0].label} : ${describe(twin[1], twin[0].kind)}${twin[1].note && twin[1].current === null ? ` — ${twin[1].note}` : ''}`);
     if (extra) parts.push(`${extra[0].label} : ${describe(extra[1], extra[0].kind)}${extra[1].note ? ` — ${extra[1].note}` : ''}`);
     if (ind.note) parts.push(ind.note);
-    if (ind.warn) parts.push(`→ ${DECISIONS[line.decision]}`);
+    if (ind.warn) parts.push(`→ ${decisionOf(line, ind, r)}`);
     if (extra?.[1].warn) parts.push(`→ ${DECISIONS[extra[0].decision]}`);
     return parts.join(' · ');
   };

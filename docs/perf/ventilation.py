@@ -431,3 +431,41 @@ for label, names in (('cadence perf (tous les projets lus)', seen), ('sans les c
                     j[est] += (proj, lid) in journaled
         days = sum(e * v for e, v in c.items())
         print(f'  {w}: livrés={sum(c.values())} (journal {sum(j.values())}) soit {sum(c.values()) / DAYS[w]:.1f} par jour et {days:.0f} jours d\'estimate ; par estimate ≤0.25: {band(0, 0.25, c)} ({band(0, 0.25, j)}) · 0.5: {band(0.25, 0.5, c)} ({band(0.25, 0.5, j)}) · 0.75–1: {band(0.5, 1, c)} ({band(0.5, 1, j)}) · >1: {band(1, 99, c)} ({band(1, 99, j)})')
+
+
+# ---------------------------------------------------------------- tokens par étape, modèle et projet (L312)
+def mean(x):
+    return sum(x) / len(x) if x else None
+
+
+def total_of(L, pred):
+    return sum(s['counted'] or 0 for s in L['steps'] if pred(s))
+
+
+L236 = dt.datetime.fromisoformat('2026-10-17T12:08:00+00:00')  # auto-vérification en fin d'implement et de fix (commit 1985595)
+print('\n--- Q. classes 0.25 et 0.5 ordinaires : jetons par lot ventilés par sorte d\'étape, par modèle et par projet (moyenne sur les lots de la classe : les sommes par étape s\'additionnent), puis `implement` avant et après L236')
+for c in ('0.25', '0.5'):
+    xs = {w: [L for L in usable[w] if cls(L) == c] for w in WIN}
+    print(f' == classe {c} : lots {len(xs["prev"])} → {len(xs["cur"])}, médiane {k(med([L["tokens"] for L in xs["prev"]]))} → {k(med([L["tokens"] for L in xs["cur"]]))}, '
+          f'moyenne {k(mean([L["tokens"] for L in xs["prev"]]))} → {k(mean([L["tokens"] for L in xs["cur"]]))}, '
+          f'lots sans passe fix {sum(1 for L in xs["prev"] if L["fixes"] == 0)}/{len(xs["prev"])} → {sum(1 for L in xs["cur"] if L["fixes"] == 0)}/{len(xs["cur"])}')
+    for kind in KINDS:
+        row = [mean([total_of(L, lambda s: s['kind'] == kind) for L in xs[w]]) for w in WIN]
+        if any(row):
+            nst = [mean([sum(1 for s in L['steps'] if s['kind'] == kind) for L in xs[w]]) for w in WIN]
+            med_step = [med([s['counted'] for L in xs[w] for s in L['steps'] if s['kind'] == kind and s['counted'] is not None]) for w in WIN]
+            print(f'   étape {kind:13} par lot {k(row[0])} → {k(row[1])} (écart {(row[1] or 0) - (row[0] or 0):+.0f}) · étapes par lot {nst[0]:.2f} → {nst[1]:.2f} · médiane par étape {k(med_step[0])} → {k(med_step[1])}')
+    row = [mean([total_of(L, lambda s: s['kind'] in ('review', 'review-small')) for L in xs[w]]) for w in WIN]
+    print(f'   étape review + review-small (une seule étape pour `cadence perf`, L312) par lot {k(row[0])} → {k(row[1])} (écart {(row[1] or 0) - (row[0] or 0):+.0f})')
+    for m in sorted({s['model'] or '?' for w in WIN for L in xs[w] for s in L['steps']}):
+        row = [mean([total_of(L, lambda s: (s['model'] or '?') == m) for L in xs[w]]) for w in WIN]
+        print(f'   modèle {m:10} par lot {k(row[0])} → {k(row[1])}')
+    for p in projects:
+        row = [[L['tokens'] for L in xs[w] if L['proj'] == p] for w in WIN]
+        if any(row):
+            print(f'   projet {p:18} lots {len(row[0]):3} → {len(row[1]):3} · médiane {k(med(row[0]))} → {k(med(row[1]))}')
+    for label, keep in (('avant L236', lambda s: s['end'] < L236), ('après L236', lambda s: s['end'] >= L236)):
+        for proj in (None,) + tuple(projects):
+            v = [s['counted'] for w in WIN for L in xs[w] if proj in (None, L['proj']) for s in L['steps'] if s['kind'] == 'implement' and keep(s) and s['counted'] is not None]
+            if len(v) >= 5:
+                print(f'   implement {label} {proj or "tous projets":18} n={len(v):3} médiane {k(med(v))}')

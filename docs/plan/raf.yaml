@@ -3321,9 +3321,10 @@ lots:
     finished: 2026-10-24
   - id: L295
     title: "orchestrate précheck : un id L<n> suivi d'un tiret (« L53-L57 », « L12-bis ») compte de nouveau comme cité (régression de citesPriorWork, L61 perdait son précheck) ; test de plage Lx-Ly ; docs/orchestrate.md:611 (clé precheck) mentionne goal: et les ids non-L — revue L292"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-10-24
+    started: 2026-10-24
   - id: L296
     title: "orchestrate précheck : décider le critère du titre de L288 sur la mesure — il fait perdre 7 des 17 « oui » réels (L171, L68, Q-LBL3, Q-NOW5, Q4/dashboard-21-mesure-prod, Q4/qa-expectations, Q4/qa-expectations-nouveautes ; leurs titres ne citent rien) contre 33 % de prechecks évités (≈ 20 k tokens chacun) ; options : retirer le critère et faire le précheck de tout lot sans commit par le modèle local (hors quota) après mesure de concordance local/Sonnet sur les 17 « oui » et 20 « partiel » ; tests. Revue L292 24-10"
     status: todo

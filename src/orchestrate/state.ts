@@ -255,20 +255,26 @@ export class RunStore {
     return join(launchDir, '.cadence', 'runs');
   }
 
-  /** La dernière vague lancée (par date de lancement : un identifiant libre comme `ol-gains-1` ne se range pas par ordre alphabétique) ; avec `unfinished`, la dernière qui n'est pas terminée. */
-  static last(launchDir: string, opts: { unfinished?: boolean } = {}): RunStore | null {
+  /** Les vagues du dossier, la plus récente d'abord (par date de lancement : un identifiant libre comme `ol-gains-1` ne se range pas par ordre alphabétique). */
+  private static all(launchDir: string): { store: RunStore; wave: WaveState | null }[] {
     const base = RunStore.runsDir(launchDir);
-    if (!existsSync(base)) return null;
-    const stores = readdirSync(base)
+    if (!existsSync(base)) return [];
+    return readdirSync(base)
       .filter((n) => existsSync(join(base, n, 'wave.json')))
       .map((id) => new RunStore(launchDir, id))
       .map((store) => ({ store, wave: store.readWave() }))
       // lancement le plus récent d'abord ; à date égale (ou illisible), l'identifiant le plus grand
       .sort((a, b) => (b.wave?.created ?? '').localeCompare(a.wave?.created ?? '') || b.store.id.localeCompare(a.store.id));
-    for (const { store, wave } of stores) {
-      if (!opts.unfinished || wave?.status !== 'done') return store;
-    }
-    return null;
+  }
+
+  /** La dernière vague lancée. */
+  static last(launchDir: string): RunStore | null {
+    return RunStore.all(launchDir)[0]?.store ?? null;
+  }
+
+  /** Les vagues qui ne sont pas terminées (une vague illisible compte : elle n'est pas `done`), la plus récente d'abord (L309). */
+  static unfinished(launchDir: string): RunStore[] {
+    return RunStore.all(launchDir).filter((x) => x.wave?.status !== 'done').map((x) => x.store);
   }
 
   static find(launchDir: string, id: string): RunStore | null {

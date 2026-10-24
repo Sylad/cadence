@@ -651,9 +651,9 @@ describe('--status : créneaux libres et vague choisie (L141)', () => {
     const wave = (id: string, created: string, status: 'interrupted' | 'done') => new RunStore(parent, id).writeWave({ ...base, id, created, status });
     wave('ol-gains-1', '2026-10-07T09:00:00.000Z', 'interrupted');
     wave('2026-10-09-1253', '2026-10-09T12:53:00.000Z', 'interrupted');
-    expect(RunStore.last(parent, { unfinished: true })!.id).toBe('2026-10-09-1253');
+    expect(RunStore.unfinished(parent)[0].id).toBe('2026-10-09-1253');
     wave('2026-10-09-1253', '2026-10-09T12:53:00.000Z', 'done');
-    expect(RunStore.last(parent, { unfinished: true })!.id).toBe('ol-gains-1');
+    expect(RunStore.unfinished(parent)[0].id).toBe('ol-gains-1');
   });
 });
 

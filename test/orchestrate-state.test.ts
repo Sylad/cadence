@@ -64,7 +64,7 @@ describe('RunStore', () => {
     const b = new RunStore(dir, '2026-10-04-1412');
     b.writeWave({ ...wave('2026-10-04-1412'), status: 'done' });
     expect(RunStore.last(dir)?.id).toBe('2026-10-04-1412');
-    expect(RunStore.last(dir, { unfinished: true })?.id).toBe('2026-10-03-0900');
+    expect(RunStore.unfinished(dir)[0]?.id).toBe('2026-10-03-0900');
     expect(RunStore.last(tempDir())).toBeNull();
   });
 });

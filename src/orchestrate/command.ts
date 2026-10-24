@@ -244,6 +244,11 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     } else if (t.startsWith('-')) throw new RafError(`option inconnue : ${t}`);
     else a.lots.push(lotArg(t));
   }
+  // L309 : --wave <id> après un --resume sans valeur désigne la vague à reprendre ; sans cela le --resume reprenait en silence une AUTRE vague.
+  if (a.resume !== undefined && a.wave !== undefined) {
+    if (a.resume === true) a.resume = a.wave;
+    else if (a.resume !== a.wave) throw new RafError(`--resume ${a.resume} et --wave ${a.wave} désignent deux vagues : une seule (cadence orchestrate --resume <vague>)`);
+  }
   return a;
 }
 
@@ -640,6 +645,8 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.status !== undefined && (args.drop.length || args.stopAfterCurrent)) throw new RafError('--status ne se combine pas avec --drop / --stop-after-current');
   if (args.resume !== undefined && args.stopAfterCurrent) throw new RafError('--resume ne se combine pas avec --stop-after-current (il reprend la vague, il ne l\'arrête pas)');
   // L228 : la reprise n'a pas de simulation — elle relève le budget, réécrit wave.json et relance les sessions. Refusée ici, avant le réexec de l'instantané (une vague ancienne ne connaît pas ce refus).
+  // L309 : la reprise rejoue les lots de la vague ; des lots à lancer seraient ignorés en silence (--continue, lui, tire la suite du plan après la reprise : L147).
+  if (args.resume !== undefined && args.lots.length) throw new RafError('--resume ne se combine pas avec des lots à lancer (il reprend les lots de la vague ; --answer, --drop, --integrate, --replay et --budget projet:lot=+N nomment ceux qu\'ils visent)');
   if (args.resume !== undefined && args.dryRun) throw new RafError('--resume ne se combine pas avec --dry-run (la reprise écrit l\'état de la vague et relance les sessions, elle ne se simule pas)');
   if (args.lotBudgets.length && args.resume === undefined) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume");
   // L279 : --integrate rejoue une intégration rendue, donc une vague arrêtée ; --abandon-commits ne vaut qu'avec --remove-worktree.
@@ -1152,9 +1159,17 @@ function control(args: Args, io: OrchestrateIo): number {
   return 0;
 }
 
+/** La seule vague non terminée du dossier (L309) ; plusieurs : refus qui les liste, aucune : refus (jamais le choix silencieux de la plus récente). */
+function singleUnfinished(launch: string): RunStore {
+  const open = RunStore.unfinished(launch);
+  if (open.length === 0) throw new RafError('aucune vague à reprendre dans ce dossier');
+  if (open.length > 1) throw new RafError(`plusieurs vagues non terminées dans ce dossier, laquelle reprendre ?\n${open.map((s) => `  ${s.id} (${s.readWave()?.status ?? 'illisible'}, lancée ${s.readWave()?.created ?? '?'})`).join('\n')}\nreprise : cadence orchestrate --resume <vague>`);
+  return open[0];
+}
+
 async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, today: Day): Promise<number> {
-  const store = typeof args.resume === 'string' ? RunStore.find(launch, args.resume) : RunStore.last(launch, { unfinished: true });
-  if (!store) throw new RafError(typeof args.resume === 'string' ? `vague inconnue : ${args.resume}` : 'aucune vague à reprendre dans ce dossier');
+  const store = typeof args.resume === 'string' ? RunStore.find(launch, args.resume) : singleUnfinished(launch);
+  if (!store) throw new RafError(`vague inconnue : ${args.resume}`);
   if (deps.snapshot) {
     // La reprise tourne sur l'instantané de la vague, jamais sur le dist/ courant ; une vague d'avant L61 n'en a pas.
     if (snapshotExists(store.dir)) {

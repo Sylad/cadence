@@ -20,12 +20,14 @@ cadence orchestrate --continue [--until 18:00] [--priority cadence,maritime]   #
 cadence orchestrate --waits [--since 2026-10-12]   # time spent waiting for a session slot, per day and per wave (below)
 cadence orchestrate --status [<wave>]        # the live waves and the repositories they hold, then the table (default: the last wave of this folder)
 cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running (with an explicit `<wave>`: when that wave is no longer running)
-cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
+cadence orchestrate --resume [<wave> | --wave <wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
 cadence orchestrate --resume <wave> --budget maritime:B26.4=+300k   # replay a lot handed back for its budget, with the budget raised (below)
 cadence orchestrate --resume <wave> --integrate ccc:L29   # replay a lot handed back at the integration step of a worktree wave (« One worktree per lot », experimental)
 cadence orchestrate --resume <wave> --replay ccc:L29      # same, and also a lot handed back on a refused plan write (fiche notes) at the step it had reached
 cadence orchestrate --remove-worktree ccc:L29 [--abandon-commits]   # remove the kept worktree and branch of a lot (« One worktree per lot », experimental)
+cadence orchestrate --resume … a:L1                             # refused: a resume replays the lots of the wave, it launches none
 cadence orchestrate --resume … --dry-run                         # refused: a resume cannot be simulated, it writes the wave state and relaunches sessions
+# `--resume` without a wave resumes the only unfinished wave of the folder; with several, it lists them and is refused (exit 2): name one
 cadence orchestrate --drop ccc:L29 [--wave <wave>]   # from another terminal: take a lot out of the running wave
 cadence orchestrate --stop-after-current [--wave <wave>]   # from another terminal: let the running sessions finish, start nothing else
 ```

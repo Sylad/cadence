@@ -332,6 +332,40 @@ describe('R27 — --resume --integrate rejoue seul une intégration rendue', () 
     expect(l.outcome).toMatch(/^intégration impossible : le worktree du lot n'existe plus/);
     expect(g.calls).toHaveLength(0);
   });
+  it('R27 — deux lots du groupe rendus à l\'intégration, leurs worktrees retirés avec --abandon-commits, repris ensemble : aucun worktree recréé au sommet, lots rendus « commits abandonnés », aucun verdict', async () => {
+    const { parent, repo } = await dirtyLead();
+    git(repo, 'checkout', '--', 'base.txt');
+    for (const id of ['L1', 'L2']) expect((await run(parent, ['--remove-worktree', `a:${id}`, '--abandon-commits'], fake())).code).toBe(0);
+    expect(branches(repo)).toBe('');
+    const main = git(repo, 'rev-parse', 'main');
+    const g = fake();
+    const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1', '--integrate', 'a:L2'], g);
+    expect(r.code).toBe(1);
+    for (const id of ['L1', 'L2']) {
+      const l = store(parent).readLot('a', id)!;
+      expect(l.status).toBe('handed-back');
+      expect(l.next).toBe('integrate');
+      expect(l.outcome).toMatch(/commits abandonnés/);
+      expect(existsSync(treeOf(parent, id))).toBe(false);
+      expect(existsSync(join(repo, `${id}.txt`))).toBe(false);
+      expect(planOf(repo).lot(id).review).toBeUndefined();
+    }
+    expect(branches(repo)).toBe('');
+    expect(git(repo, 'rev-parse', 'main')).toBe(main);
+    expect(g.calls).toHaveLength(0);
+  });
+  it('R27 — branche du lot ramenée au sommet sans commit du lot (commits perdus) : jamais de verdict conforme à commit null, lot rendu à l\'intégration', async () => {
+    const { parent, repo } = await dirtyLead();
+    git(repo, 'checkout', '--', 'base.txt');
+    git(treeOf(parent, 'L1'), 'reset', '-q', '--hard', 'main');
+    const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], fake());
+    expect(r.code).toBe(1);
+    const l = store(parent).readLot('a', 'L1')!;
+    expect(l.status).toBe('handed-back');
+    expect(l.next).toBe('integrate');
+    expect(l.outcome).toMatch(/aucun commit du lot dans main/);
+    expect(planOf(repo).lot('L1').review).toBeUndefined();
+  });
   it('R27 — --integrate sur un lot rendu hors intégration (next null) : refus code 2 avec statut et étape cités, état de la vague inchangé', async () => {
     const { parent } = setup();
     const f = fake({ implement: async () => claudeOut(workReport({ commits: [] })) });

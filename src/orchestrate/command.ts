@@ -911,7 +911,7 @@ function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx:
 /**
  * Quels lots jouent dans un worktree (L279). Un groupe de lots du même dépôt (`groupLots`) y joue si `orchestrate.worktrees` est vrai, s'il a au moins deux lots,
  * si le dépôt est sur une branche et si aucun de ses lots n'a de dépôt voisin (`repos:`, R2) ; sinon les lots restent à la suite, avec un avertissement qui dit pourquoi.
- * Un lot dont la branche existe déjà (reprise, R11) retrouve son worktree quel que soit le groupe. La branche de départ est celle du dépôt du lead à cet instant,
+ * Un lot dont la branche existe déjà (reprise, R11) retrouve son worktree quel que soit le groupe ; un lot rendu à l'intégration dont la branche a disparu n'en reçoit pas. La branche de départ est celle du dépôt du lead à cet instant,
  * ou celle que la branche du lot a notée à sa création.
  */
 function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: string) => void, env: Record<string, string | undefined>): void {
@@ -925,6 +925,8 @@ function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: st
       const lotBr = lotBranch(wave, c.lot.project, c.lot.lot);
       const known = baseBranchOf(repo, lotBr);
       const base = known ?? branch;
+      // Un lot repris à l'intégration dont la branche n'existe plus (retirée par --remove-worktree --abandon-commits) n'a plus de commits à intégrer : pas de worktree recréé au sommet, `integrateLot` le rend.
+      if (c.lot.next === 'integrate' && !known) continue;
       if (((requested && !why) || (known && worktreesEnabled(c.config, env, true))) && base) c.tree = { dir: lotTreeDir(store.dir, c.lot.project, c.lot.lot), branch: lotBr, base, active: false };
     }
   }

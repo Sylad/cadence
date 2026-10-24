@@ -2193,7 +2193,7 @@ async function integrateLot(c: LotCtx): Promise<void> {
     transition(c, 'handed-back', why);
   };
   // Un lot repris à l'intégration dont le worktree a été retiré entre-temps (`--remove-worktree`) n'a plus rien à intégrer.
-  if (!c.tree?.active) return refuse("intégration impossible : le worktree du lot n'existe plus (retiré par --remove-worktree ?) : sa branche n'est plus là pour être intégrée");
+  if (!c.tree?.active) return refuse("intégration impossible : le worktree du lot n'existe plus (retiré par --remove-worktree ?) : commits abandonnés, sa branche n'est plus là pour être intégrée");
   const t = c.tree;
   const kept = `worktree conservé : ${t.dir}`;
   const waitMs = c.wave.integrate?.waitMs ?? INTEGRATE_WAIT_MS;
@@ -2246,6 +2246,8 @@ async function integrateLot(c: LotCtx): Promise<void> {
     if (reporte) c.wave.log(`${key} verdict reporté : ${reporte.de.slice(0, 7)} → ${reporte.vers.slice(0, 7)} (patch-id identique)`);
     // Le plan, sous le même verrou, après l'avance : un commit de plan seul au sommet de la branche du dépôt, `commit` = dernier commit de travail intégré (R23).
     const commit = lotWork(c.loadPlan(), l.repo, l.lot)[0]?.sha ?? null;
+    // Aucun commit de travail au sommet : il n'y a rien d'intégré, donc rien qu'un verdict conforme puisse couvrir.
+    if (commit === null) return refuse(`intégration impossible : aucun commit du lot dans ${t.base} (commits abandonnés ?) ; ${kept}`);
     const refusal = await writeVerdict(c, verdict, commit, reporte);
     if (refusal) return refuse(`écriture du plan refusée : ${refusal}`);
   } catch (e) {

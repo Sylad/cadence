@@ -471,7 +471,7 @@ nothing below applies and the wave behaves as before; any other value is refused
   created (a branch of that name that is not cadence's, a full disk, an `index.lock`) only that lot is handed back, with git's cause
   (`orchestrate : <project>:<lot> : worktree impossible : <cause>`); the other lots go on. Dependency folders ignored by git (`node_modules`…)
   are linked into the worktree like in the baseline worktree.
-- **Names, nothing stored.** The worktree is `.cadence/runs/<wave>/worktrees/<project>--<lot>`, the branch `cadence/<wave>/<project>--<lot>`; the
+- **Names, nothing stored.** The worktree is `.cadence/runs/<wave>/worktrees/<project>--<lot>` — or, when the wave was launched from the repository's own root (its run folder then lies inside the repository), `<CADENCE_HOME>/worktrees/<wave>-<hash of the run folder>/<project>--<lot>`, outside the repository (L301); the branch `cadence/<wave>/<project>--<lot>`; the
   branch the lots started from is noted in the git config of the lot's branch (`branch.<name>.cadence-base`), with the lot and the creation time.
   A resume finds them by their names. `LotState` gains no field: the integration step is the value `integrate` of the existing `next`.
 - **The plan is never written in a worktree.** Everything the program writes to the plan for a lot — `raf start`, the notes of the sheet's
@@ -521,7 +521,15 @@ nothing below applies and the wave behaves as before; any other value is refused
   fiche is replayed and counted once). `--replay` is refused for a lot handed back in any other way, with the same exit code and rules as `--integrate`. Refused (exit 2, before
   anything is written, like the other resume refusals): a lot unknown or named twice, also named by `--drop`, `--answer` or `--budget`, a lot that is not
   handed back at the integration step (`le lot n'est pas rendu à l'étape d'intégration (<status>, étape <step or aucune> : <cause>)`: a lot handed back for
-  review, tests or budget has `next` empty and takes the usual paths), and, like any resume, a repository with a modified tracked file.
+  review, tests or budget has `next` empty and takes the recovery path below), and, like any resume, a repository with a modified tracked file.
+- **A lot handed back outside the integration step** (non-compliant review, red tests, `HEAD` moved, plan touched, acceptance lock, quota…) keeps its worktree and its
+  branch `cadence/<wave>/<project>--<lot>` but is not replayed by `--resume`. Its recovery path (L301) is **a new wave of the same lot** (`cadence orchestrate <project>:<lot>`):
+  with the worktree mode on (`CADENCE_EXPERIMENTAL_WORKTREES=1`), the new wave looks for the **most recent** (creation time noted by cadence) recognised branch `cadence/<other wave>/<project>--<lot>`
+  of a past wave that carries unintegrated commits and started from the repository's current branch, renames it `cadence/<this wave>/<project>--<lot>` (git keeps the cadence config
+  with it), moves its worktree to this wave's folder and plays the lot there, so the sessions start from the work already done. The journal says it
+  (`orchestrate : <project>:<lot> : branche cadence/<wave>/… d'une vague précédente reprise (N commit(s) non intégré(s))`). Nothing is recovered when the branch is integrated,
+  started from another branch, is not cadence's, or belongs to a live wave; the lot then starts afresh as before. The lead may also integrate by hand: rebase the kept branch on
+  the repository's branch in its worktree, run the checks, `git merge --ff-only <branch>` from the repository, write the verdict, then `cadence orchestrate --remove-worktree <project>:<lot> [--wave <wave>]`.
 - **Nothing is deleted with unintegrated commits.** A worktree whose commits are all in the repository's branch is removed after the integration, by a guarded
   branch deletion (never `-D`). A lot handed back, dropped (`--drop`), failed or in conflict keeps its worktree and branch, and the journal gives the path
   (`orchestrate : <project>:<lot> : worktree conservé : <path> (branche <branch>)`). The final table, `cadence orchestrate --status` and `cadence lead tour`

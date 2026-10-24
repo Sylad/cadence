@@ -32,7 +32,7 @@ import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './st
 import { PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 import { advance, INTEGRATE_WAIT_MS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
-import { gitFailure, integrated, linkIgnored, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
+import { git, gitFailure, integrated, linkIgnored, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
 export const MAX_PASSES = 2;
@@ -126,10 +126,6 @@ const histPlan = (c: LotCtx): Plan => (wd(c) === c.lot.repo ? c.loadPlan() : pla
 
 const short = (c: { sha: string; subject: string }) => `${c.sha.slice(0, 7)} ${c.subject}`;
 
-function git(repo: string, ...args: string[]): string {
-  return execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-}
-
 function save(c: LotCtx): void {
   c.wave.store.writeLot(c.lot);
 }
@@ -159,11 +155,7 @@ function trackedPaths(s: Snapshot): string[] {
  */
 async function commitPlan(c: LotCtx, message: string, root = c.lot.repo): Promise<string | null> {
   const repo = root;
-  const plan = c.loadPlan();
-  const own = new Set([relative(repo, plan.path), ...plan.maintained]);
-  // Les acceptation.json (L173) rejoignent les fichiers que le cycle a le droit de commiter : il y pose le scellé et `vert: true`.
-  const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
-  const ownFile = (f: string) => own.has(f) || (f.startsWith(specDir) && isAcceptationFile(f));
+  const ownFile = planOwnFile(c, repo);
   const dirty = trackedPaths(await snapshot(repo, { remote: false }));
   if (dirty.length === 0) return null;
   const foreign = dirty.filter((f) => !ownFile(f));
@@ -1924,7 +1916,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
     save(c);
     return;
   }
-  if (!ux?.command || !ux.url || !seesApp(l, kind)) return reviewStep(c, kind);
+  if (!ux?.command || !ux.url || !seesApp(l, kind)) return (await reviewStep(c, kind))?.();
   // Une seule application à la fois dans le dépôt (L279, R16) : l'étape qui la lance attend celle d'un autre lot du dépôt, sans retenir de créneau de session ; les autres étapes ne passent pas ici.
   const appTurn = (await mutexFor(`app:${gitCommonDir(c.lot.repo)}`).acquire())!;
   const halt = halted(c.wave, l);
@@ -1934,6 +1926,7 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
     return;
   }
   let skipped = false;
+  let conclusion: Conclusion | undefined;
   c.wave.log(`${lotKey(l.project, l.lot)} · lancement de l'application (${ux.url})`);
   let app: Awaited<ReturnType<typeof startApp>>;
   try {
@@ -1952,16 +1945,21 @@ async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promis
         return;
       }
     } else if (l.uxNote?.startsWith('UX non vérifiée')) l.uxNote = undefined;
-    await reviewStep(c, kind);
+    conclusion = await reviewStep(c, kind);
   } finally {
     c.app = undefined;
     await app.stop();
     appTurn();
+    // La conclusion (l'intégration d'un lot en worktree : verrou, rebase, tests rejoués) vient une fois l'application arrêtée et son tour rendu.
     if (skipped && l.code) await conclude(c, l.code, noCommitNote(l));
   }
+  await conclusion?.();
 }
 
-async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promise<void> {
+/** Ce qu'une étape de revue laisse à faire une fois l'application arrêtée : conclure le lot. */
+type Conclusion = () => Promise<void>;
+
+async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promise<Conclusion | undefined> {
   const l = c.lot;
   const done = await session(c, kind);
   if (!done) return;
@@ -1980,8 +1978,8 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     l.constats = blockingConstats(rep, 'ux');
     save(c);
     // L'UX est la dernière étape (L221) : conforme, le lot conclut avec la revue de code ; sinon une correction (jamais une revue de code d'office), la revue de code et l'UX rejouée suivent.
-    if (summary.conforme) await conclude(c, l.code!, noCommitNote(l));
-    else toFix(c, l.constats, 'UX non conforme');
+    if (summary.conforme) return () => conclude(c, l.code!, noCommitNote(l));
+    toFix(c, l.constats, 'UX non conforme');
     return;
   }
   l.code = summary;
@@ -2031,7 +2029,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     if (uxAfterReview(c)) {
       l.next = 'ux';
       save(c);
-    } else await conclude(c, summary);
+    } else return () => conclude(c, summary);
     return;
   }
   const constats = blockingConstats(rep, 'code');
@@ -2129,12 +2127,21 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
   return null;
 }
 
+/**
+ * Les fichiers que le cycle a le droit de commiter dans `repo` : le plan, ce qui est tenu avec lui, et les acceptation.json (L173), où il pose le scellé et `vert: true`.
+ * Source commune de `commitPlan` et de `foreignDirty`.
+ */
+function planOwnFile(c: LotCtx, repo: string): (f: string) => boolean {
+  const plan = c.loadPlan();
+  const own = new Set([relative(repo, plan.path), ...plan.maintained]);
+  const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
+  return (f) => own.has(f) || (f.startsWith(specDir) && isAcceptationFile(f));
+}
+
 /** Les fichiers suivis modifiés du dépôt du projet qui ne sont ni le plan, ni ce qui est tenu avec lui, ni une acceptation : ce que `commitPlan` refuserait (R26). */
 function foreignDirty(c: LotCtx): string[] {
-  const plan = c.loadPlan();
-  const own = new Set([relative(c.lot.repo, plan.path), ...plan.maintained]);
-  const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
-  return trackedDirty(c.lot.repo).filter((f) => !own.has(f) && !(f.startsWith(specDir) && isAcceptationFile(f)));
+  const ownFile = planOwnFile(c, c.lot.repo);
+  return trackedDirty(c.lot.repo).filter((f) => !ownFile(f));
 }
 
 /** Pourquoi le dépôt du lead n'est plus celui que l'intégration a vu au départ : branche changée ou HEAD détaché (R24), fichier suivi modifié (R8). Null s'il est intact. */

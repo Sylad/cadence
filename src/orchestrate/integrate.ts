@@ -4,7 +4,7 @@ import { gitCommonDir } from '../git.js';
 import { sharedStateDir } from '../state.js';
 import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
 import { mutexFor } from './mutex.js';
-import { gitFailure } from './worktree.js';
+import { git, gitFailure, tryGit } from './worktree.js';
 
 /** Verrou d'intégration d'un dépôt (L279, R10) : dans l'état commun aux worktrees, au format du verrou d'orchestration, sous un autre nom. */
 export const INTEGRATION_LOCK = 'orchestrate-integration.lock';
@@ -51,18 +51,6 @@ export async function takeRepoWrite(repo: string, who: { wave: string }, o: { wa
     await sleep(pollMs);
   }
 }
-
-function git(cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-}
-
-const tryGit = (cwd: string, ...args: string[]): string | null => {
-  try {
-    return git(cwd, ...args);
-  } catch {
-    return null;
-  }
-};
 
 /** Branche courante du dépôt (`main`), null en HEAD détaché (R24). */
 export const repoBranch = (repo: string): string | null => tryGit(repo, 'symbolic-ref', '--short', '-q', 'HEAD') || null;

@@ -27,7 +27,7 @@ import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, rea
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
 import { repoBranch } from './integrate.js';
-import { baseBranchOf, keptLines, keptTrees, lotBranch, lotTreeDir, removeTree } from './worktree.js';
+import { baseBranchOf, keptLines, keptTrees, lotBranch, lotTreeDir, recoverTree, removeTree } from './worktree.js';
 import { schemaFor } from './schemas.js';
 import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
@@ -923,11 +923,15 @@ function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: st
     if (why) log(`orchestrate : ${basename(repo)} : worktrees demandés mais ${why} : lots joués à la suite`);
     for (const c of group) {
       const lotBr = lotBranch(wave, c.lot.project, c.lot.lot);
+      // Chemin de reprise d'un lot rendu hors intégration : sa branche d'une vague passée devient celle de cette vague (recoverTree), puis se retrouve comme une reprise (R11).
+      const dir = lotTreeDir(store.dir, c.lot.project, c.lot.lot, repo);
+      const recovered = !baseBranchOf(repo, lotBr) && c.lot.next !== 'integrate' && branch && worktreesEnabled(c.config, env, true) ? recoverTree(repo, lotBr, dir, branch) : null;
+      if (recovered) log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s)) : le lot repart de son travail`);
       const known = baseBranchOf(repo, lotBr);
       const base = known ?? branch;
       // Un lot repris à l'intégration dont la branche n'existe plus (retirée par --remove-worktree --abandon-commits) n'a plus de commits à intégrer : pas de worktree recréé au sommet, `integrateLot` le rend.
       if (c.lot.next === 'integrate' && !known) continue;
-      if (((requested && !why) || (known && worktreesEnabled(c.config, env, true))) && base) c.tree = { dir: lotTreeDir(store.dir, c.lot.project, c.lot.lot), branch: lotBr, base, active: false };
+      if (((requested && !why) || (known && worktreesEnabled(c.config, env, true))) && base) c.tree = { dir, branch: lotBr, base, active: false };
     }
   }
 }
@@ -1277,7 +1281,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   }
   // Les worktrees des lots repris suivent les mêmes gardes qu'un dépôt (R11) : un fichier suivi modifié refuse la reprise.
   for (const l of live) {
-    const dir = lotTreeDir(store.dir, l.project, l.lot);
+    const dir = lotTreeDir(store.dir, l.project, l.lot, l.repo);
     if (!existsSync(join(dir, '.git'))) continue;
     const d = await trackedDirty(dir);
     if (d.length) refusals.push(`${basename(dir)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
@@ -1294,7 +1298,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   const recovered = new Budget(0);
   // La session d'un lot en worktree a travaillé dans son worktree : c'est là que son journal se range.
   const workdirOf = (l: LotState): string => {
-    const dir = lotTreeDir(store.dir, l.project, l.lot);
+    const dir = lotTreeDir(store.dir, l.project, l.lot, l.repo);
     return existsSync(join(dir, '.git')) ? dir : l.repo;
   };
   for (const l of [...live, ...removed]) for (const s of l.steps) if (s.status === 'interrupted') countInterrupted(deps.claudeHome, workdirOf(l), s, recovered);
@@ -1341,7 +1345,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     // Un lot retiré garde son worktree et sa branche (R12) : le journal en donne le chemin.
     const branch = lotBranch(wave.id, l.project, l.lot);
     if (baseBranchOf(l.repo, branch)) {
-      const line = `orchestrate : ${k} : worktree conservé : ${lotTreeDir(store.dir, l.project, l.lot)} (branche ${branch})`;
+      const line = `orchestrate : ${k} : worktree conservé : ${lotTreeDir(store.dir, l.project, l.lot, l.repo)} (branche ${branch})`;
       io.out(line);
       store.journal(line);
     }

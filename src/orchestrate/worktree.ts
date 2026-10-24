@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { Plan } from '../plan.js';
@@ -11,7 +12,8 @@ export const WORKTREES_DIR = 'worktrees';
 /** Dossiers ignorés de sortie de build : jamais liés dans un worktree, une commande de tests qui y écrit toucherait le build du dépôt vivant. */
 const OUTPUT_DIRS = new Set(['dist', 'build', 'out', 'coverage', 'target', '.next', '.nuxt', '.output', '.angular', '.turbo', '.svelte-kit', '.parcel-cache']);
 
-function git(cwd: string, ...args: string[]): string {
+/** Une commande git dans `cwd`, sa sortie sans les blancs de bord ; lève si elle échoue. Commune à l'orchestration (worktrees, intégration, cycle). */
+export function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
@@ -22,7 +24,8 @@ export function gitFailure(e: unknown): string {
   return text.trim().replace(/\s*\n\s*/g, ' ');
 }
 
-const tryGit = (cwd: string, ...args: string[]): string | null => {
+/** Comme `git`, null quand la commande échoue. */
+export const tryGit = (cwd: string, ...args: string[]): string | null => {
   try {
     return git(cwd, ...args);
   } catch {
@@ -30,11 +33,31 @@ const tryGit = (cwd: string, ...args: string[]): string | null => {
   }
 };
 
-/** Branche du lot : `cadence/<vague>/<projet>--<lot>` (R14), le même nom à la reprise. */
-export const lotBranch = (wave: string, project: string, lot: string): string => `cadence/${wave}/${lotSlug(project, lot)}`;
+/** Branche du lot : `cadence/<vague>/<projet>--<lot>` (R14), le même nom à la reprise. Le projet d'une vague lancée à la racine du dépôt s'appelle `.` : git refuse un composant de branche qui commence par un point, il devient `_`. */
+export const lotBranch = (wave: string, project: string, lot: string): string => `cadence/${wave}/${lotSlug(project, lot).replace(/^\./, '_')}`;
 
-/** Dossier du worktree du lot : sous le dossier de la vague (R14). */
-export const lotTreeDir = (waveDir: string, project: string, lot: string): string => join(waveDir, WORKTREES_DIR, lotSlug(project, lot));
+/**
+ * Dossier du worktree du lot : sous le dossier de la vague (R14). Une vague lancée depuis la racine du dépôt a son dossier DANS le dépôt : le worktree
+ * irait alors sous son arbre ; avec `repo`, il part sous le dossier des worktrees de cadence (`<CADENCE_HOME>/worktrees/<vague>-<empreinte du dossier>/`), hors du dépôt.
+ */
+export function lotTreeDir(waveDir: string, project: string, lot: string, repo?: string): string {
+  const slug = lotSlug(project, lot);
+  if (repo && withinRepo(repo, waveDir)) return join(cadenceHome(), WORKTREES_DIR, `${basename(waveDir)}-${createHash('sha1').update(realOrSelf(waveDir)).digest('hex').slice(0, 8)}`, slug);
+  return join(waveDir, WORKTREES_DIR, slug);
+}
+
+const realOrSelf = (p: string): string => {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+};
+
+const withinRepo = (repo: string, path: string): boolean => {
+  const rel = relative(realOrSelf(repo), realOrSelf(path));
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+};
 
 /** Ce qu'il faut pour créer, retrouver ou retirer le worktree d'un lot. `lot` : « projet:lot », noté dans la config git de la branche. */
 export interface TreeSpec {
@@ -171,6 +194,34 @@ export function prepareTree(t: TreeSpec): { ok: true; reused: boolean } | { ok: 
     }
     return { ok: false, cause };
   }
+}
+
+/**
+ * Chemin de reprise d'un lot rendu hors intégration (revue non conforme, tests rouges, HEAD déplacé, plan touché, verrou d'acceptation : sa branche et son
+ * worktree sont conservés) : la nouvelle vague du même lot retrouve la branche `cadence/<vague>/<projet>--<lot>` LA PLUS RÉCENTE (date de création notée par cadence)
+ * d'une vague passée, reconnue, partie de la même branche `base` et qui porte des commits non intégrés. Elle est renommée au nom de la nouvelle vague
+ * (git emporte la config de cadence) et son worktree déplacé vers `dir` : le reste de l'orchestration, qui ne connaît que les noms de la vague, la voit
+ * comme la sienne. Rend la branche reprise, ou null (rien à reprendre, ou le renommage a échoué : rien n'a bougé). Jamais la branche d'une vague vivante.
+ */
+export function recoverTree(repo: string, branch: string, dir: string, base: string): { from: string; unintegrated: number } | null {
+  const slug = branch.split('/').slice(2).join('/');
+  const found = keptTrees(repo)
+    .filter((t) => t.branch !== branch && t.branch.split('/').slice(2).join('/') === slug && t.base === base && t.unintegrated > 0)
+    .sort((a, b) => b.created - a.created || (a.branch < b.branch ? 1 : -1))[0];
+  if (!found || branchSha(repo, branch) !== null) return null;
+  tryGit(repo, 'worktree', 'prune');
+  const moved = found.dir !== null && existsSync(found.dir);
+  try {
+    if (moved) {
+      mkdirSync(dirname(dir), { recursive: true });
+      git(repo, 'worktree', 'move', found.dir as string, dir);
+    }
+    git(repo, 'branch', '-m', found.branch, branch);
+  } catch {
+    if (moved && existsSync(dir) && !existsSync(found.dir as string)) tryGit(repo, 'worktree', 'move', dir, found.dir as string);
+    return null;
+  }
+  return { from: found.branch, unintegrated: found.unintegrated };
 }
 
 /** Les commits de la branche du lot déjà dans la branche du dépôt ? */

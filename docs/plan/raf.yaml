@@ -3242,6 +3242,7 @@ lots:
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "compliant (0 blocking, 0 major, 3 minor notes) — orchestré (vague 2026-10-24-1125, 2 passe(s) de correction)", commit: 90206051181bc64e340fe67e4058988bb40649dd }
   - id: L289
     title: "deliver : la raison d'une livraison rouge (L282) garde la dernière image d'une ligne réécrite par \\r (barre de progression) au lieu de 5 images de la barre, et masque les secrets probables (motifs jeton/clé/URL signée/VAR=valeur sensible) avant d'écrire deliveries-failed.log ; docs/deliver.md mentionne le risque ; tests. Revue L282 24-10"
     status: doing

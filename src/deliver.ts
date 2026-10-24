@@ -108,16 +108,9 @@ export const TIMED_OUT = 124;
 
 /** Sortie gardée d'une commande : de quoi retrouver ses dernières lignes. */
 const OUTPUT_KEPT = 8_192;
-/**
- * Les lignes de la sortie ; une ligne réécrite par \r (barre de progression) ne garde que sa dernière image non vide.
- * Si la borne a coupé la sortie, sa première ligne n'est qu'un reste : le nom et le guillemet d'une valeur secrète
- * ont pu partir avec le début, rien ne permettrait de la reconnaître. Elle est remplacée par `***`.
- */
-const outputTail = (text: string, cut: boolean): string[] =>
-  text
-    .split('\n')
-    .map((l, i) => (cut && i === 0 ? '***' : l))
-    .flatMap((l) => l.split('\r').filter((f) => f.trim() !== '').slice(-1));
+/** Les lignes de la sortie ; une ligne réécrite par \r (barre de progression) ne garde que sa dernière image non vide. */
+const outputTail = (text: string): string[] =>
+  text.split('\n').flatMap((l) => l.split('\r').filter((f) => f.trim() !== '').slice(-1));
 
 const codeText = (code: number) => (code === TIMED_OUT ? 'délai dépassé' : `code ${code}`);
 
@@ -204,13 +197,11 @@ export function realDeps(root: string, read: typeof readProcs = readProcs): Deli
     }
   };
   let output = '';
-  let cut = false;
   return {
-    lastOutput: () => outputTail(output, cut),
+    lastOutput: () => outputTail(output),
     exec: (cmd, env, timeoutMs) =>
       new Promise((resolve) => {
         output = '';
-        cut = false;
         const child = spawn('sh', ['-c', cmd], {
           cwd: root,
           env: { ...process.env, ...env },
@@ -222,9 +213,7 @@ export function realDeps(root: string, read: typeof readProcs = readProcs): Deli
         const relay = (from: NodeJS.ReadableStream, to: NodeJS.WriteStream) =>
           from.on('data', (chunk: Buffer) => {
             to.write(chunk);
-            const all = output + chunk.toString('utf8');
-            if (all.length > OUTPUT_KEPT) cut = true;
-            output = all.slice(-OUTPUT_KEPT);
+            output = (output + chunk.toString('utf8')).slice(-OUTPUT_KEPT);
           });
         relay(child.stdout!, process.stdout);
         relay(child.stderr!, process.stderr);

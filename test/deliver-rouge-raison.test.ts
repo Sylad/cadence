@@ -127,13 +127,14 @@ describe('deliver — raison et classe d\'une livraison rouge (L282)', () => {
     expect(d.lastOutput!()).toEqual([]);
   });
 
-  it('R9 — la borne de 8192 qui coupe une valeur secrète au milieu : le début de ligne coupé (nom et guillemet perdus) est masqué, la fin de la sortie reste lisible', async () => {
+  it('R9 — la borne de 8192 garde la fin de la sortie : plus de 8192 caractères d\'indicateur d\'attente (\\r) puis une vraie raison donnent cette raison (L282, L294)', async () => {
     const root = tempDir();
     mkdirSync(root, { recursive: true });
     const d = realDeps(root);
-    const cmd = String.raw`printf 'deploy failed: env API_KEY="'; head -c 9000 /dev/zero | tr '\0' S; printf -- '-tail-of-secret" region=eu\nError: exit 1\n'; exit 1`;
+    const cmd = String.raw`i=0; while [ $i -lt 400 ]; do printf '\r\033[K- Deploying site...'; i=$((i+1)); done; printf '\r\033[KX Deploy failed: quota exceeded\n'; exit 1`;
     expect(await d.exec(cmd, {}, 5_000)).toBe(1);
-    expect(d.lastOutput!()).toEqual(['***', 'Error: exit 1']);
+    // les séquences ANSI sont retirées plus tard, à l'écriture du journal
+    expect(d.lastOutput!().map((l) => l.replaceAll('\u001b[K', ''))).toEqual(['X Deploy failed: quota exceeded']);
     expect(await d.exec('echo court; exit 1', {}, 5_000)).toBe(1);
     expect(d.lastOutput!()).toEqual(['court']);
   });

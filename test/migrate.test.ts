@@ -274,6 +274,17 @@ describe('raf migrate', () => {
     expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(true);
   });
 
+  it('R11 — un fichier de plus de 2 Mio qui cite le chemin et que migrate.keep déclare est laissé tel quel, il ne bloque pas', () => {
+    const dir = legacyRepo({ ...READERS, 'cadence.yaml': 'migrate:\n  keep: ["mesures/**"]\n' });
+    const gros = `${'x'.repeat(3 * 1024 * 1024)}\ndocs/plan/raf.yaml\n`;
+    put(dir, 'mesures/gros.log', gros);
+    git(dir, 'add', 'mesures');
+    const r = raf(dir, 'migrate');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('mesures/gros.log');
+    expect(read(dir, 'mesures/gros.log')).toBe(gros);
+  });
+
   it('R11 — un fichier de 600 Mio (non décodable en chaîne) est ignoré s\'il ne cite pas le chemin, signalé non traité s\'il le cite, sans planter', () => {
     const dir = legacyRepo();
     const taille = 600 * 1024 * 1024;

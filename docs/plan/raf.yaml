@@ -3402,6 +3402,7 @@ lots:
     estimate: 0.5
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme, 3 notes mineures (reprise d'une branche rendue à l'intégration puis « commits abandonnés » côté ancienne vague ; échec du déplacement ou du renommage non journalisé ; intégration à la main d'une branche qui touche le plan non décrite) — orchestré (vague 2026-10-24-1700, 1 passe(s) de correction)", commit: 1efc26db1113ceb23c28cc2543c541b88070fa10 }
   - id: L302
     title: "orchestrate (suite revue L297) : sourcer une règle de fiche après --answer ne reformate pas la fiche (doc.toString change [R2] en [ R2 ] sur les 17 fiches de docs/specs — garder le style de flux d'origine ou n'éditer que les lignes de la règle) ; une réponse qui supprime ou change la règle (« non, supprime R3 », « change en X ») ne la marque pas « sourcée » telle quelle : la règle est laissée à la session spec reprise, ou rendue au lead si la session ne la traite pas ; tests"
     status: doing

@@ -106,6 +106,15 @@ describe('cadence ref corpus — le corpus synthétique à vérité connue (eval
     expect(ev.total.taux_faux_lu).toBe(0);
   });
 
+  it('R5 — la ligne d’un passage cité est la ligne de la page où l’extrait est dessiné (titre = ligne 1)', () => {
+    const liens = corpus.flatMap((c) => elements(c.nom, 'lien').map((l) => ({ c, l })));
+    expect(liens.length).toBe(3);
+    for (const { c, l } of liens) {
+      const lignes = textesDessines(c.html, l.passage.page);
+      expect(lignes[l.passage.ligne - 1], `${c.nom} : ligne ${l.passage.ligne}`).toContain(l.passage.extrait);
+    }
+  });
+
   it('R6 — texte ambigu levé par la figure : un lien precise dont la lecture ambiguë est dans le texte et la raison dans la figure', () => {
     const [lien] = elements('texte-ambigu-leve-par-figure', 'lien');
     expect(lien).toMatchObject({ constat: 'precise', piege: 'texte-ambigu-leve-par-figure' });

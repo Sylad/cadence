@@ -204,7 +204,7 @@ function pageProposal(): CasCorpus {
   inv.texte(2, { x: 90, y: 284, l: 70, h: 28 }, 'Waves', 'case_a_cocher');
   inv.texte(2, LEGENDE_PANNEAU, legendePanneau, 'legende');
   inv.texte(2, { x: 625, y: 54, l: 100, h: 28 }, 'Proposal', 'badge');
-  inv.add('lien', 2, panneau, { figure: legendePanneau, passage: { page: 1, ligne: 2, extrait: 'REQ-2 The panel shall list every active layer.' }, constat: 'confirme' });
+  inv.add('lien', 2, panneau, { figure: legendePanneau, passage: { page: 1, ligne: 3, extrait: 'REQ-2 The panel shall list every active layer.' }, constat: 'confirme' });
   inv.add('statut', 2, badge, { libelle: 'Proposal', couvre: [comp] }, true);
   const page1 = bloc(TITRE, '<h1>Requirements</h1>') + exigences.map((t, i) => bloc({ x: 60, y: 110 + i * 40, l: 696, h: 24 }, `<p>${t}</p>`)).join('');
   const page2 =

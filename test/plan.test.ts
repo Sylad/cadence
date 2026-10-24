@@ -7,7 +7,7 @@ import { tempDir } from './helpers.js';
 const T = '2026-09-28';
 
 function fresh(): Plan {
-  return Plan.create(join(tempDir(), 'docs/plan/raf.yaml'), 'demo');
+  return Plan.create(join(tempDir(), '.cadence/raf.yaml'), 'demo');
 }
 
 describe('Plan', () => {

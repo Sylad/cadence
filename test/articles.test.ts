@@ -76,7 +76,7 @@ function project(rules = [{ repo: '../codex', file: 'src/cas/demo.md' }]) {
   const dir = join(parent, 'demo');
   mkdirSync(dir);
   git(dir, 'init', '-q', '-b', 'main');
-  const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'demo', 'L', '2026-10-01');
+  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'demo', 'L', '2026-10-01');
   plan.add('Alertes', '2026-10-01', { public: 'Alertes météo plus claires' });
   plan.add('Cache interne', '2026-10-01', { public: 'Cache des tuiles' });
   plan.add('Refactor', '2026-10-01');
@@ -89,11 +89,11 @@ function project(rules = [{ repo: '../codex', file: 'src/cas/demo.md' }]) {
 describe('openArticleLots', () => {
   it('ouvre un lot « Article demo à rafraîchir » avec titres, article et sections en note, dépôt voisin déclaré', () => {
     const { dir, rules } = project();
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const r = openArticleLots({ plan, root: dir, rules, delivered: plan.lots(), publicTitle: (l) => l.public, sha: 'abcdef0123', today: '2026-10-09' });
     expect(r.opened).toEqual(['L4']);
     plan.save();
-    const lot = Plan.load(join(dir, 'docs/plan/raf.yaml')).lot('L4');
+    const lot = Plan.load(join(dir, '.cadence/raf.yaml')).lot('L4');
     expect(lot.title).toBe('Article demo à rafraîchir');
     expect(lot.status).toBe('todo');
     expect(lot.visible).toBe(false);
@@ -109,13 +109,13 @@ describe('openArticleLots', () => {
 
   it('sans titre public livré : rien à ouvrir', () => {
     const { dir, rules } = project();
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     expect(openArticleLots({ plan, root: dir, rules, delivered: [plan.lot('L3')], publicTitle: (l) => l.public, sha: 'abcdef0', today: '2026-10-09' }).opened).toEqual([]);
   });
 
   it('un lot de ce titre encore ouvert reçoit une note au lieu d\'un doublon', () => {
     const { dir, rules } = project();
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const args = { plan, root: dir, rules, publicTitle: (l: { public?: string }) => l.public, sha: 'abcdef0', today: '2026-10-09' };
     openArticleLots({ ...args, delivered: [plan.lot('L1')] });
     const r = openArticleLots({ ...args, delivered: [plan.lot('L2')] });
@@ -127,7 +127,7 @@ describe('openArticleLots', () => {
 
   it('le nom déclaré remplace le projet ; un fichier introuvable ouvre quand même le lot, avec le constat', () => {
     const { dir } = project();
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const r = openArticleLots({
       plan, root: dir, rules: [{ repo: '../codex', file: 'absent.md', name: 'Demo Pro' }], delivered: [plan.lot('L1')], publicTitle: (l) => l.public, sha: 'abcdef0', today: '2026-10-09',
     });
@@ -138,7 +138,7 @@ describe('openArticleLots', () => {
   it('deux articles de même nom dans deux dépôts voisins : un seul lot, qui déclare les deux dépôts', () => {
     const { parent, dir } = project();
     write(parent, 'site/cas/demo.md', ARTICLE);
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     const rules = [{ repo: '../codex', file: 'src/cas/demo.md' }, { repo: '../site', file: 'cas/demo.md' }];
     const r = openArticleLots({ plan, root: dir, rules, delivered: [plan.lot('L1')], publicTitle: (l) => l.public, sha: 'abcdef0', today: '2026-10-09' });
     expect(r.opened).toEqual(['L4']);
@@ -153,7 +153,7 @@ describe('openArticleLots', () => {
 
   it('plan en lecture seule : aucune écriture, la consigne est rendue', () => {
     const { dir, rules } = project();
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'), {
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'), {
       format: { lots: 'lots', fields: {}, statuses: { done: 'done', todo: 'todo' }, estimates: {} },
     });
     const r = openArticleLots({ plan, root: dir, rules, delivered: [plan.lot('L1')], publicTitle: (l) => l.public, sha: 'abcdef0', today: '2026-10-09' });
@@ -192,14 +192,14 @@ describe('deliver : articles à rafraîchir', () => {
     git(dir, 'push', '-q', '-u', 'origin', 'main');
     const out: string[] = [];
     const err: string[] = [];
-    const base = { root: dir, state: stateDir(dir), plan: Plan.load(join(dir, 'docs/plan/raf.yaml')), config: CONFIG, today: '2026-10-09', dryRun: false, args: [] as string[], out: (l: string) => out.push(l), err: (l: string) => err.push(l), articles, publicTitle: (l: { public?: string }) => l.public };
+    const base = { root: dir, state: stateDir(dir), plan: Plan.load(join(dir, '.cadence/raf.yaml')), config: CONFIG, today: '2026-10-09', dryRun: false, args: [] as string[], out: (l: string) => out.push(l), err: (l: string) => err.push(l), articles, publicTitle: (l: { public?: string }) => l.public };
     expect(await deliver(base, fakeDeps())).toBe(0);
     write(dir, 'src/a.ts', 'x');
     git(dir, 'add', '--', 'src/a.ts');
     commit(dir, 'feat(L1): alertes\n\nL3 aussi');
     git(dir, 'push', '-q');
     out.length = 0;
-    const code = await deliver({ ...base, plan: Plan.load(join(dir, 'docs/plan/raf.yaml')), ...over }, fakeDeps());
+    const code = await deliver({ ...base, plan: Plan.load(join(dir, '.cadence/raf.yaml')), ...over }, fakeDeps());
     return { dir, code, out: out.join('\n'), err: err.join('\n') };
   }
 
@@ -208,7 +208,7 @@ describe('deliver : articles à rafraîchir', () => {
     expect(code).toBe(0);
     expect(out).toContain('livré : L1');
     expect(out).toContain('article à rafraîchir : L4 « Article demo à rafraîchir »');
-    const lot = Plan.load(join(dir, 'docs/plan/raf.yaml')).lot('L4');
+    const lot = Plan.load(join(dir, '.cadence/raf.yaml')).lot('L4');
     expect(lot.notes[0].text).toContain('« Alertes météo plus claires »');
     expect(lot.notes[0].text).not.toContain('Refactor');
   });
@@ -216,7 +216,7 @@ describe('deliver : articles à rafraîchir', () => {
   it('sans docs.articles, ne touche pas au plan', async () => {
     const { dir, out } = await delivered(undefined);
     expect(out).not.toContain('article');
-    expect(Plan.load(join(dir, 'docs/plan/raf.yaml')).lots()).toHaveLength(3);
+    expect(Plan.load(join(dir, '.cadence/raf.yaml')).lots()).toHaveLength(3);
   });
 
   it('une livraison rouge n\'ouvre rien', async () => {
@@ -224,14 +224,14 @@ describe('deliver : articles à rafraîchir', () => {
       config: parseDeliverConfig('deliver:\n  ci: none\n  verify:\n    - command: "false"\n  verifyTimeout: 1\n', 'cadence.yaml'),
     });
     expect(code).toBe(1);
-    expect(Plan.load(join(dir, 'docs/plan/raf.yaml')).lots()).toHaveLength(3);
+    expect(Plan.load(join(dir, '.cadence/raf.yaml')).lots()).toHaveLength(3);
   });
 
   it('simulation : annonce, n\'écrit rien', async () => {
     const { dir, out } = await delivered([{ repo: '../codex', file: 'src/cas/demo.md' }], { dryRun: true });
     expect(out).toContain('Articles rafraîchis après une livraison verte');
     expect(out).toContain('../codex/src/cas/demo.md');
-    expect(Plan.load(join(dir, 'docs/plan/raf.yaml')).lots()).toHaveLength(3);
+    expect(Plan.load(join(dir, '.cadence/raf.yaml')).lots()).toHaveLength(3);
     expect(headSha(dir)).toBeTruthy();
   });
 });

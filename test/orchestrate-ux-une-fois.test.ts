@@ -174,8 +174,8 @@ describe('R9 — reprise d\'un état écrit avec l\'ancien aiguillage', () => {
     const plan = h.plan();
     plan.setStatus('L1', 'doing', '2026-10-04');
     plan.save();
-    git(h.repo, 'add', '--', 'docs/plan/raf.yaml');
-    git(h.repo, 'commit', '-q', '-m', 'plan: L1 démarré', '--', 'docs/plan/raf.yaml');
+    git(h.repo, 'add', '--', '.cadence/raf.yaml');
+    git(h.repo, 'commit', '-q', '-m', 'plan: L1 démarré', '--', '.cadence/raf.yaml');
     c.lot.status = 'implementing';
     c.lot.next = 'ux';
     await runLot(c);

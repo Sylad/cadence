@@ -9,7 +9,7 @@ import { tempDir } from './helpers.js';
 function project(parent: string, name: string, lots: { title: string; estimate?: number; after?: string[]; doing?: boolean; note?: string }[]) {
   const dir = join(parent, name);
   mkdirSync(dir);
-  const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
+  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), name, 'L', '2026-09-01');
   for (const l of lots) {
     const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, after: l.after });
     if (l.doing) plan.setStatus(id, 'doing', '2026-10-01');
@@ -82,7 +82,7 @@ describe('candidats', () => {
     const parent = tempDir();
     const dir = join(parent, 'ol');
     mkdirSync(dir);
-    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'ol', 'L', '2026-09-01');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'ol', 'L', '2026-09-01');
     plan.add('écran', '2026-10-01', { estimate: 0.5, visible: true, screen: 'page' });
     plan.add('sans écran', '2026-10-01', { estimate: 0.5 });
     plan.save();
@@ -94,7 +94,7 @@ describe('candidats', () => {
     const parent = tempDir();
     const dir = join(parent, 'ol');
     mkdirSync(dir);
-    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'ol', 'L', '2026-09-01');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'ol', 'L', '2026-09-01');
     plan.add('composant', '2026-10-01', { estimate: 0.5, visible: true, screen: 'component' });
     plan.add('parcours', '2026-10-01', { estimate: 0.5, visible: true, screen: 'journey' });
     plan.add('page', '2026-10-01', { estimate: 0.5, visible: true, screen: 'page' });

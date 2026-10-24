@@ -46,9 +46,9 @@ const many = <T>(n: number, f: (i: number) => T): T[] => Array.from({ length: n 
 interface PLot { id: string; status?: string; finished?: string; created?: string; estimate?: number; notes?: [string, string][] }
 function plan(root: string, name: string, lots: PLot[]): void {
   const dir = join(root, name);
-  mkdirSync(join(dir, 'docs', 'plan'), { recursive: true });
+  mkdirSync(join(dir, '.cadence'), { recursive: true });
   const body = lots.map((l) => [`  - id: ${l.id}`, '    title: "t"', `    status: ${l.status ?? 'done'}`, ...(l.estimate === undefined ? [] : [`    estimate: ${l.estimate}`]), ...(l.created ? [`    created: ${l.created}`] : []), ...(l.finished ? [`    finished: ${l.finished}`] : []), ...(l.notes ? ['    notes:', ...l.notes.map(([d, t]) => `      - { date: ${d}, text: ${JSON.stringify(t)} }`)] : [])].join('\n')).join('\n');
-  writeFileSync(join(dir, 'docs', 'plan', 'raf.yaml'), `version: 1\nproject: "${name}"\nprefix: L\nlots:\n${body}\n`);
+  writeFileSync(join(dir, '.cadence', 'raf.yaml'), `version: 1\nproject: "${name}"\nprefix: L\nlots:\n${body}\n`);
 }
 
 async function cad(cwd: string, ...args: string[]) {
@@ -345,9 +345,9 @@ describe('cadence perf — défauts échappés (R9)', () => {
     expect((await cad(c.root)).text).toContain('aucune note QA reconnue : convention à fixer (L227)');
   });
 
-  it('R9 — sur docs/plan/raf.yaml réel du dépôt, le décompte égale celui d\'une expression indépendante sur le texte des notes (n/d si zéro)', () => {
+  it('R9 — sur .cadence/raf.yaml réel du dépôt, le décompte égale celui d\'une expression indépendante sur le texte des notes (n/d si zéro)', () => {
     const repo = join(import.meta.dirname, '..');
-    const raw = parse(readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')) as { lots: { notes?: { text: string }[] }[] };
+    const raw = parse(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')) as { lots: { notes?: { text: string }[] }[] };
     const independent = raw.lots.flatMap((l) => l.notes ?? []).filter((n) => /^(?:\d\d-\d\d(?: \d\d:\d\d)? ?:? ?)?QA\b(?!.*(?:^|\s)(?:0|aucun) (?:bloquant|majeur)).*(?:bloquant|majeur)/s.test(String(n.text))).length;
     const real = planLoader(repo)().lots();
     expect(real.length).toBeGreaterThan(100);
@@ -553,7 +553,7 @@ describe('cadence perf — lecture des journaux et des plans', () => {
     journal(c, CUR);
     plan(c.root, 'alpha', [{ id: 'P1', finished: CUR }]);
     plan(c.root, 'cassé', []);
-    writeFileSync(join(c.root, 'cassé', 'docs', 'plan', 'raf.yaml'), 'version: 1\nlots: [pas\n un: yaml');
+    writeFileSync(join(c.root, 'cassé', '.cadence', 'raf.yaml'), 'version: 1\nlots: [pas\n un: yaml');
     const r = await json(c.root);
     expect(r.code).toBe(0);
     expect(r.err).toContain('perf : plan illisible, projet cassé sauté');
@@ -1295,7 +1295,7 @@ describe('cadence perf — jumeau de qualité, volume et JSON (R11, R13, R14, R1
 
   it('R17 — plan illisible : délais et coût n/d, tokens par estimate n/d, durées par étape servies', async () => {
     const c = full();
-    writeFileSync(join(c.root, 'alpha', 'docs', 'plan', 'raf.yaml'), 'version: [pas du yaml');
+    writeFileSync(join(c.root, 'alpha', '.cadence', 'raf.yaml'), 'version: [pas du yaml');
     const r = await json(c.root);
     expect(r.err.some((l) => l.includes('plan illisible'))).toBe(true);
     expect(r.data.delays.createdToDone.current).toBeNull();
@@ -1573,7 +1573,7 @@ describe('cadence perf — coût par lot livré (R8, R9, R10, R12)', () => {
 
   it('R17 — plan illisible : coût n/d', async () => {
     const { c } = await cost({ A0: [impl(usage(M))] });
-    writeFileSync(join(c.root, 'alpha', 'docs', 'plan', 'raf.yaml'), 'version: [pas du yaml');
+    writeFileSync(join(c.root, 'alpha', '.cadence', 'raf.yaml'), 'version: [pas du yaml');
     const r = await json(c.root);
     expect(r.data.cost.perDelivered.current).toBeNull();
   });

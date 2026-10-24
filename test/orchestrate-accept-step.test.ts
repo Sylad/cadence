@@ -407,7 +407,7 @@ describe('étape accept : la session', () => {
   });
 
   it('un dépôt sale après la session rend le lot', async () => {
-    const h = prepared({ accept: [(call) => { writeFileSync(join(call.opts.cwd, 'docs/plan/raf.yaml'), 'x'); return claudeOut(acceptReport()); }] });
+    const h = prepared({ accept: [(call) => { writeFileSync(join(call.opts.cwd, '.cadence/raf.yaml'), 'x'); return claudeOut(acceptReport()); }] });
     const c = h.lot('L1', screen, config);
     await runLot(c);
     expect(c.lot.status).toBe('handed-back');

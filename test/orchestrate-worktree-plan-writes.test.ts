@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const PLAN = 'docs/plan/raf.yaml';
+const PLAN = '.cadence/raf.yaml';
 
 describe('R2 — seuls les lots qui peuvent jouer ensemble passent en worktree', () => {
   it('R2 — dépôt en HEAD détaché : lots à la suite et avertissement', async () => {

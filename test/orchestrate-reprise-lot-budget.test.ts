@@ -33,11 +33,11 @@ function parentWith(projects: Record<string, { title: string; estimate?: number;
     git(dir, 'config', 'user.email', 't@example.com');
     git(dir, 'config', 'user.name', 'T');
     git(dir, 'config', 'commit.gpgsign', 'false');
-    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), name, 'L', '2026-09-01');
     for (const l of lots) plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 0.5, spec: l.spec });
     plan.save();
     writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
-    git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
     git(dir, 'commit', '-q', '-m', 'chore: plan');
     dirs[name] = dir;
   }
@@ -291,9 +291,9 @@ describe('R6 / R7 / R11 — vague, verdict, reprise sans option', () => {
   });
   it('R7 — lot repris puis revue conforme : verdict enregistré avec le sha relu', async () => {
     const r = await handedBack();
-    expect(Plan.load(join(r.dirs.a, 'docs/plan/raf.yaml')).lot('L1').review).toBeUndefined();
+    expect(Plan.load(join(r.dirs.a, '.cadence/raf.yaml')).lot('L1').review).toBeUndefined();
     await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+300k'], io(r.parent).io, r.f.deps);
-    const plan = Plan.load(join(r.dirs.a, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(r.dirs.a, '.cadence/raf.yaml'));
     expect(plan.lot('L1').review?.verdict).toContain('orchestré');
     expect(plan.lot('L1').review?.commit).toBe(git(r.dirs.a, 'log', '--grep=^fix(L1)', '-1', '--format=%H'));
     expect(git(r.dirs.a, 'log', '--format=%s', '-3')).toContain('revue de code enregistrée');
@@ -315,11 +315,11 @@ describe('R6 / R7 / R11 — vague, verdict, reprise sans option', () => {
     lot.outcome = "budget du lot atteint (1000 / 1000 tokens comptés, dérivé de l'estimate) : étape « spec » non jouée, à décider par le lead";
     store.writeLot(lot);
     store.writeWave({ ...store.readWave()!, status: 'done' });
-    const file = join(w.dirs.a, 'docs/plan/raf.yaml');
+    const file = join(w.dirs.a, '.cadence/raf.yaml');
     const plan = Plan.load(file);
     plan.note('L1', 'Revue de la fiche — mineur : nom vague', '2026-10-04');
     plan.save();
-    git(w.dirs.a, 'commit', '-q', '-m', 'plan: note', '--', 'docs/plan/raf.yaml');
+    git(w.dirs.a, 'commit', '-q', '-m', 'plan: note', '--', '.cadence/raf.yaml');
     const revue = () => Plan.load(file).lot('L1').notes.filter((n) => n.text.startsWith('Revue de la fiche'));
     expect(revue()).toHaveLength(1);
     const g = fakeDeps({
@@ -332,19 +332,19 @@ describe('R6 / R7 / R11 — vague, verdict, reprise sans option', () => {
   });
   it('R7 — lot repris : le plan ne contient qu\'un seul verdict enregistré pour le lot après la reprise', async () => {
     const r = await handedBack();
-    const file = join(r.dirs.a, 'docs/plan/raf.yaml');
+    const file = join(r.dirs.a, '.cadence/raf.yaml');
     const before = git(r.dirs.a, 'log', '--format=%s', '--grep=revue de code enregistrée').split('\n').filter(Boolean).length;
     expect(before).toBe(0); // rendu sur budget : aucune revue conforme, donc aucun verdict avant la reprise
     await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+300k'], io(r.parent).io, r.f.deps);
     expect(git(r.dirs.a, 'log', '--format=%s', '--grep=revue de code enregistrée').split('\n').filter(Boolean)).toHaveLength(1);
     expect(Plan.load(file).lot('L1').review?.verdict).toBeTruthy();
-    expect(git(r.dirs.a, 'status', '--porcelain', '--', 'docs/plan/raf.yaml')).toBe('');
+    expect(git(r.dirs.a, 'status', '--porcelain', '--', '.cadence/raf.yaml')).toBe('');
   });
   it('R7 — lot repris, revue non conforme : pas de verdict enregistré, le lot est rendu', async () => {
     const r = await handedBack();
     const f = fakeDeps({ review: costlyMajor, 'review-small': costlyMajor });
     await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+160k'], io(r.parent).io, f.deps);
-    expect(Plan.load(join(r.dirs.a, 'docs/plan/raf.yaml')).lot('L1').review).toBeUndefined();
+    expect(Plan.load(join(r.dirs.a, '.cadence/raf.yaml')).lot('L1').review).toBeUndefined();
     expect(r.lot().status).toBe('handed-back');
   });
   it('R11 — reprise sans option : un lot handed-back reste handed-back', async () => {

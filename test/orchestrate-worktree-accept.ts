@@ -24,7 +24,7 @@ export async function acceptWave() {
       implement: [green],
       review: [
         () => {
-          appendFileSync(join(h.repo, 'docs/plan/raf.yaml'), '# le lead édite son plan\n'); // fichier suivi modifié dans le dépôt du lead
+          appendFileSync(join(h.repo, '.cadence/raf.yaml'), '# le lead édite son plan\n'); // fichier suivi modifié dans le dépôt du lead
           return claudeOut(reviewReport());
         },
       ],

@@ -47,11 +47,11 @@ function project() {
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
-  const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'a', 'L', '2026-09-01');
+  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'a', 'L', '2026-09-01');
   plan.add('Un lot', '2026-10-01', { estimate: 1 });
   plan.add('Deux', '2026-10-01', { estimate: 1 });
   plan.save();
-  git(dir, 'add', '--', 'docs/plan/raf.yaml');
+  git(dir, 'add', '--', '.cadence/raf.yaml');
   git(dir, 'commit', '-q', '-m', 'chore: plan');
   return { parent, dir };
 }

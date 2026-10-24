@@ -12,9 +12,9 @@ const PREV = '2026-10-05';
 
 function project(root: string, name: string, failed: string): void {
   const dir = join(root, name);
-  mkdirSync(join(dir, 'docs', 'plan'), { recursive: true });
+  mkdirSync(join(dir, '.cadence'), { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
-  writeFileSync(join(dir, 'docs', 'plan', 'raf.yaml'), `version: 1\nproject: "${name}"\nprefix: L\nlots: []\n`);
+  writeFileSync(join(dir, '.cadence', 'raf.yaml'), `version: 1\nproject: "${name}"\nprefix: L\nlots: []\n`);
   mkdirSync(join(dir, '.git', 'cadence'), { recursive: true });
   writeFileSync(join(dir, '.git', 'cadence', 'deliveries-failed.log'), failed);
 }

@@ -36,14 +36,14 @@ function world(projects: Record<string, string[]>, neighbours: string[] = ['vois
   for (const [name, repos] of Object.entries(projects)) {
     const dir = join(parent, name);
     initRepo(dir);
-    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), name, 'L', '2026-09-01');
     plan.add('un lot', '2026-10-01', { estimate: 1 });
     plan.setStatus('L1', 'doing', '2026-10-01');
     plan.save();
-    const file = join(dir, 'docs/plan/raf.yaml');
+    const file = join(dir, '.cadence/raf.yaml');
     if (repos.length) writeFileSync(file, readFileSync(file, 'utf8').replace(/- id: L1\n/, `- id: L1\n    repos: [${repos.map((r) => JSON.stringify(r)).join(', ')}]\n`));
     writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
-    git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
     git(dir, 'commit', '-q', '-m', 'chore: plan');
     dirs[name] = dir;
   }
@@ -279,12 +279,12 @@ describe('verrou de dépôt libéré dès que ses lots sont finis (L132)', () =>
 
   it("un dépôt dont un lot reste à jouer garde son verrou (deux lots du même dépôt)", async () => {
     const { parent, dirs } = world({ a: [] }, []);
-    const file = join(dirs.a, 'docs/plan/raf.yaml');
+    const file = join(dirs.a, '.cadence/raf.yaml');
     const plan = Plan.load(file);
     plan.add('second', '2026-10-01', { estimate: 1 });
     plan.setStatus('L2', 'doing', '2026-10-01');
     plan.save();
-    git(dirs.a, 'add', '--', 'docs/plan/raf.yaml');
+    git(dirs.a, 'add', '--', '.cadence/raf.yaml');
     git(dirs.a, 'commit', '-q', '-m', 'chore: plan L2');
     const seen: boolean[] = [];
     const code = await orchestrate(['a:L1', 'a:L2'], io(parent).io, deps(({ args }) => {
@@ -319,11 +319,11 @@ describe('verrou de dépôt libéré dès que ses lots sont finis (L132)', () =>
 
   it("un lot rendu au lead sans avoir joué (dépendance en échec) libère aussi son dépôt", async () => {
     const { parent, dirs } = world({ a: [], b: [] }, []);
-    const plan = Plan.load(join(dirs.a, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dirs.a, '.cadence/raf.yaml'));
     plan.add('second', '2026-10-01', { estimate: 1, after: ['L1'] });
     plan.setStatus('L2', 'doing', '2026-10-01');
     plan.save();
-    git(dirs.a, 'add', '--', 'docs/plan/raf.yaml');
+    git(dirs.a, 'add', '--', '.cadence/raf.yaml');
     git(dirs.a, 'commit', '-q', '-m', 'chore: plan L2');
     const seen: { a: boolean; ahook: boolean; b: boolean }[] = [];
     const base = deps();

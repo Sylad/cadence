@@ -124,11 +124,11 @@ describe('condition de tirage — affichage (L219)', () => {
     const dir = gitRepo();
     writeFileSync(
       join(dir, 'cadence.yaml'),
-      'plan:\n  path: docs/plan/raf.yaml\n',
+      'plan:\n  path: .cadence/raf.yaml\n',
     );
-    mkdirSync(join(dir, 'docs/plan'), { recursive: true });
+    mkdirSync(join(dir, '.cadence'), { recursive: true });
     writeFileSync(
-      join(dir, 'docs/plan/raf.yaml'),
+      join(dir, '.cadence/raf.yaml'),
       `project: demo\nprefix: L\nlots:\n  - { id: S1, title: Spec un, status: done, spec: true, finished: 2026-09-20 }\n  - { id: S2, title: Spec deux, status: done, spec: true, finished: 2026-09-21 }\n  - { id: G, title: Lot à gate, status: todo, gate: { count: 8, spec: true } }\n  - { id: N, title: Lot libre, status: todo }\n${extra}`,
     );
     return dir;
@@ -157,10 +157,10 @@ describe('condition de tirage — affichage (L219)', () => {
 
   it('R3 — le plan n\'est pas réécrit par raf now', async () => {
     const dir = await repoWith();
-    const before = readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8');
+    const before = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
     await cad(dir, 'now');
     await cad(dir, 'session', 'start');
-    expect(readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')).toBe(before);
+    expect(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')).toBe(before);
   });
 
   it('R9 — raf show affiche le gate', async () => {
@@ -184,7 +184,7 @@ describe('condition de tirage — affichage (L219)', () => {
 
   it('R9 — session start : sans lot à condition, aucune section En attente (sortie identique à celle d\'avant)', async () => {
     const dir = await repoWith();
-    writeFileSync(join(dir, 'docs/plan/raf.yaml'), readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8').replace(', gate: { count: 8, spec: true }', ''));
+    writeFileSync(join(dir, '.cadence/raf.yaml'), readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8').replace(', gate: { count: 8, spec: true }', ''));
     const { out } = await cad(dir, 'session', 'start');
     expect(out).not.toContain('En attente');
   });
@@ -201,7 +201,7 @@ describe('condition de tirage — affichage (L219)', () => {
 
   it('R9 — lead tour : sans lot à condition, la ligne est identique à celle d\'avant', async () => {
     const dir = await repoWith();
-    writeFileSync(join(dir, 'docs/plan/raf.yaml'), readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8').replace(', gate: { count: 8, spec: true }', ''));
+    writeFileSync(join(dir, '.cadence/raf.yaml'), readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8').replace(', gate: { count: 8, spec: true }', ''));
     const { out } = await cad(dir, 'lead', 'tour');
     expect(out).not.toContain('attend');
     expect(JSON.parse((await cad(dir, 'lead', 'tour', '--json')).out)[0]).not.toHaveProperty('waiting');

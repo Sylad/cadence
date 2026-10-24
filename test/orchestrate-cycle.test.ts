@@ -39,8 +39,8 @@ function recordReview(h: ReturnType<typeof harness>, verdict: string, commit = g
   const plan = h.plan();
   plan.recordReview('L1', verdict, '2026-10-04', commit);
   plan.save();
-  git(h.repo, 'add', '--', 'docs/plan/raf.yaml');
-  git(h.repo, 'commit', '-q', '-m', 'plan: L1 revue', '--', 'docs/plan/raf.yaml');
+  git(h.repo, 'add', '--', '.cadence/raf.yaml');
+  git(h.repo, 'commit', '-q', '-m', 'plan: L1 revue', '--', '.cadence/raf.yaml');
 }
 
 describe('cycle nominal', () => {
@@ -709,10 +709,10 @@ describe('contrôles autour des sessions', () => {
       return claudeOut(workReport({ commits: [planned, b] }));
     };
     const h = harness({ script: { implement: [h0], review: [ok] } });
-    const planFile = join(h.repo, 'docs/plan/raf.yaml');
+    const planFile = join(h.repo, '.cadence/raf.yaml');
     writeFileSync(planFile, `${readFileSync(planFile, 'utf8')}# note\n`);
-    git(h.repo, 'add', '--', 'docs/plan/raf.yaml');
-    git(h.repo, 'commit', '-q', '-m', 'plan: L1 démarré', '--', 'docs/plan/raf.yaml');
+    git(h.repo, 'add', '--', '.cadence/raf.yaml');
+    git(h.repo, 'commit', '-q', '-m', 'plan: L1 démarré', '--', '.cadence/raf.yaml');
     planned = { sha: git(h.repo, 'rev-parse', 'HEAD'), sujet: 'plan: L1 démarré' };
     const c = h.lot('L1');
     await runLot(c);
@@ -1359,8 +1359,8 @@ describe('sous-tâches couvertes (L82)', () => {
     for (const t of tasks) plan.addTask('L1', t);
     for (const [t, st] of Object.entries(statuses)) plan.setStatus(`L1/${t}`, st, '2026-10-09');
     plan.save();
-    git(h.repo, 'add', '--', 'docs/plan/raf.yaml');
-    git(h.repo, 'commit', '-q', '-m', 'plan: L1 sous-tâches', '--', 'docs/plan/raf.yaml');
+    git(h.repo, 'add', '--', '.cadence/raf.yaml');
+    git(h.repo, 'commit', '-q', '-m', 'plan: L1 sous-tâches', '--', '.cadence/raf.yaml');
     return h;
   }
   const status = (h: ReturnType<typeof harness>, id: string) => h.plan().lot('L1').tasks.find((t) => t.id === id)?.status;
@@ -1484,7 +1484,7 @@ describe('plan en lecture seule', () => {
   it('démarre avec orchestrate.start, note le verdict avec orchestrate.verdict, commite seulement les fichiers du plan', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
     // le « plan » du projet est tenu par son propre outil : un script écrit dans le fichier du plan
-    const planRel = 'docs/plan/raf.yaml';
+    const planRel = '.cadence/raf.yaml';
     const tool = join(h.repo, 'tool.sh');
     writeFileSync(tool, `#!/bin/sh\necho "# $1 $2 $3" >> ${planRel}\n`, { mode: 0o755 });
     git(h.repo, 'add', '--', 'tool.sh');
@@ -1547,7 +1547,7 @@ describe('plan en lecture seule', () => {
       git(h.repo, 'commit', '-q', '-m', 'chore: fichiers');
       const c = h.lot('L1', { readOnlyPlan: true }, { start });
       c.loadPlan = () => {
-        const p = Plan.load(join(h.repo, 'docs/plan/raf.yaml'), { files: ['journal.ndjson'] });
+        const p = Plan.load(join(h.repo, '.cadence/raf.yaml'), { files: ['journal.ndjson'] });
         Object.defineProperty(p, 'readonly', { get: () => true });
         return p;
       };

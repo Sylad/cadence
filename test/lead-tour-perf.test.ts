@@ -21,9 +21,9 @@ function setup(o: { red?: string[]; green?: string[]; runs?: boolean; prices?: s
   if (o.prices !== undefined) writeFileSync(join(root, 'cadence.yaml'), o.prices);
   if (o.projects === false) return { root };
   const dir = join(root, 'alpha');
-  mkdirSync(join(dir, 'docs', 'plan'), { recursive: true });
+  mkdirSync(join(dir, '.cadence'), { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
-  writeFileSync(join(dir, 'docs', 'plan', 'raf.yaml'), 'version: 1\nproject: "alpha"\nprefix: L\nlots:\n  - id: L1\n    title: "t"\n    status: todo\n');
+  writeFileSync(join(dir, '.cadence', 'raf.yaml'), 'version: 1\nproject: "alpha"\nprefix: L\nlots:\n  - id: L1\n    title: "t"\n    status: todo\n');
   mkdirSync(join(dir, '.git', 'cadence'), { recursive: true });
   if (o.green) writeFileSync(join(dir, '.git', 'cadence', 'deliveries.log'), o.green.map((d) => `${d} abc\n`).join(''));
   if (o.red) writeFileSync(join(dir, '.git', 'cadence', 'deliveries-failed.log'), o.red.map((d) => `${d} def CI en échec\n`).join(''));
@@ -33,7 +33,7 @@ function setup(o: { red?: string[]; green?: string[]; runs?: boolean; prices?: s
 function qaPlan(dir: string, n = 10): void {
   const done = (prefix: string, day: string) => Array.from({ length: n }, (_, i) => `  - { id: ${prefix}${i}, title: t, status: done, finished: ${day} }`);
   const notes = [...days(4, CUR), ...days(2, PREV)].map((d) => `      - { date: ${d}, text: "QA 1 bloquant" }`);
-  writeFileSync(join(dir, 'docs', 'plan', 'raf.yaml'), ['version: 1', 'project: "alpha"', 'prefix: L', 'lots:', ...done('C', CUR), ...done('P', PREV), '  - id: Q', '    title: t', '    status: done', '    finished: 2026-10-01', '    notes:', ...notes].join('\n') + '\n');
+  writeFileSync(join(dir, '.cadence', 'raf.yaml'), ['version: 1', 'project: "alpha"', 'prefix: L', 'lots:', ...done('C', CUR), ...done('P', PREV), '  - id: Q', '    title: t', '    status: done', '    finished: 2026-10-01', '    notes:', ...notes].join('\n') + '\n');
 }
 const twoRed = { red: [...days(4, CUR), ...days(2, PREV)], green: [...days(6, CUR), ...days(8, PREV)] };
 
@@ -79,7 +79,7 @@ describe('cadence lead tour — en-tête perf (L227)', () => {
   it('R6 — une ligne d\'en-tête contient sa décision et la valeur du jumeau de qualité (VITE ET BIEN)', async () => {
     const c = setup();
     const done = (prefix: string, n: number, day: string) => Array.from({ length: n }, (_, i) => `  - { id: ${prefix}${i}, title: t, status: done, finished: ${day} }`);
-    writeFileSync(join(c.dir!, 'docs', 'plan', 'raf.yaml'), ['version: 1', 'project: "alpha"', 'prefix: L', 'lots:', ...done('E', 10, PREV), ...done('F', 6, CUR)].join('\n') + '\n');
+    writeFileSync(join(c.dir!, '.cadence', 'raf.yaml'), ['version: 1', 'project: "alpha"', 'prefix: L', 'lots:', ...done('E', 10, PREV), ...done('F', 6, CUR)].join('\n') + '\n');
     const warn = (await tour(c.root)).out[0]!;
     expect(warn).toBe('⚠ livrés : 6 (précédente 10, −40 %) · défauts échappés : n/d (précédente n/d) → le flux baisse : chercher le goulot avant d\'ajouter des lots');
   });

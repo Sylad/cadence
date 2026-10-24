@@ -16,7 +16,7 @@ function pushedRepo(): string {
   const origin = tempDir();
   git(origin, 'init', '-q', '--bare', '-b', 'main');
   const dir = gitRepo();
-  const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'demo', 'L', '2026-09-28');
+  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'demo', 'L', '2026-09-28');
   plan.add('Cache', '2026-09-28');
   plan.save();
   writeFileSync(join(dir, 'README.md'), 'demo\n');
@@ -67,7 +67,7 @@ function ctx(dir: string, over: Record<string, unknown> = {}) {
       root: dir,
       state: stateDir(dir),
       // Un test qui apporte son plan (autre fichier, autre format) n'a pas de plan à l'endroit par défaut.
-      plan: 'plan' in over ? (over.plan as Plan) : Plan.load(join(dir, 'docs/plan/raf.yaml')),
+      plan: 'plan' in over ? (over.plan as Plan) : Plan.load(join(dir, '.cadence/raf.yaml')),
       config: CONFIG,
       today: '2026-09-28',
       dryRun: false,
@@ -556,7 +556,7 @@ describe('deliver : script du projet (L2)', () => {
 
   it('(L15/t3) la portée décide des lots livrés : « chore(L1): … (L2) planifié » n\'annonce que L1', async () => {
     const dir = pushedRepo();
-    const file = join(dir, 'docs/plan/raf.yaml');
+    const file = join(dir, '.cadence/raf.yaml');
     expect(await deliver(ctx(dir, { config: SCRIPT, plan: Plan.load(file) }).c, fakeDeps().deps)).toBe(0);
     const plan = Plan.load(file);
     plan.add('Suite', '2026-09-28');
@@ -574,10 +574,10 @@ describe('deliver : script du projet (L2)', () => {
     const dir = pushedRepo();
     expect(await deliver(ctx(dir).c, fakeDeps().deps)).toBe(0);
     commit(dir, 'feat(L1): cache');
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
     plan.add('Suite', '2026-09-28');
     plan.save();
-    git(dir, 'add', 'docs/plan/raf.yaml');
+    git(dir, 'add', '.cadence/raf.yaml');
     commit(dir, 'plan: L1 terminé — mineur de relecture rattaché à L2');
     git(dir, 'push', '-q');
     const { c, out } = ctx(dir);
@@ -587,7 +587,7 @@ describe('deliver : script du projet (L2)', () => {
 
   it('plan en lecture seule : aucun lot en cours cité → aucune ligne de lots livrés', async () => {
     const dir = pushedRepo();
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'), { format: { lots: 'lots', fields: {}, statuses: {}, estimates: {} } });
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'), { format: { lots: 'lots', fields: {}, statuses: {}, estimates: {} } });
     expect(plan.lot('L1').status).toBe('todo');
     expect(await deliver(ctx(dir, { config: SCRIPT, plan }).c, fakeDeps().deps)).toBe(0);
     commit(dir, 'feat(L1): cache');
@@ -611,11 +611,11 @@ describe('deliver : script du projet (L2)', () => {
 
   it('plan en lecture seule : pas de conseil « raf done »', async () => {
     const dir = pushedRepo();
-    const path = join(dir, 'docs/plan/raf.yaml');
+    const path = join(dir, '.cadence/raf.yaml');
     writeFileSync(path, readFileSync(path, 'utf8').replace('status: todo', 'status: doing'));
     git(dir, 'commit', '-qam', 'plan: lot en cours');
     git(dir, 'push', '-q');
-    const plan = Plan.load(join(dir, 'docs/plan/raf.yaml'), { format: { lots: 'lots', fields: {}, statuses: {}, estimates: {} } });
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'), { format: { lots: 'lots', fields: {}, statuses: {}, estimates: {} } });
     expect(await deliver(ctx(dir, { config: SCRIPT, plan }).c, fakeDeps().deps)).toBe(0);
     commit(dir, 'feat(L1): cache');
     git(dir, 'push', '-q');

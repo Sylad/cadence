@@ -42,14 +42,14 @@ function parentWith(projects: Record<string, L[]>, parentYaml = 'resources: [ban
     const dir = join(parent, name);
     mkdirSync(dir, { recursive: true });
     for (const a of [['init', '-q', '-b', 'main'], ['config', 'user.email', 't@e.x'], ['config', 'user.name', 'T'], ['config', 'commit.gpgsign', 'false']]) git(dir, ...a);
-    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), name, 'L', '2026-09-01');
     for (const l of lots) {
       const id = plan.add(l.title, '2026-10-01', { estimate: 1, uses: l.uses, after: l.after });
       if (l.doing) plan.setStatus(id, 'doing', '2026-10-01');
     }
     plan.save();
     writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
-    git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
     git(dir, 'commit', '-q', '-m', 'chore: plan');
     dirs[name] = dir;
   }

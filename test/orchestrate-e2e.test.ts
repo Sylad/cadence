@@ -24,7 +24,7 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
-  const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'proj', 'L', '2026-09-01');
+  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'proj', 'L', '2026-09-01');
   plan.add('Un lot, suite du constat de revue', '2026-10-01', { visible: opts.visible });
   plan.save();
   // Le contrôle préalable (L77) a son propre test ; ailleurs il est coupé pour que les étapes attendues restent les mêmes.
@@ -69,7 +69,7 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     const [i, v] = s.calls();
     expect(i).toMatchObject({ kind: 'implement', lot: 'L1', model: 'sonnet', orchestrated: '2026-10-04-1412', resume: false, cwd: s.dir });
     expect(v).toMatchObject({ kind: 'review', model: 'opus', resume: false });
-    expect(Plan.load(join(s.dir, 'docs/plan/raf.yaml')).lot('L1').review?.commit).toBe(git(s.dir, 'log', '--format=%H', '--grep=feat(L1)', '-1'));
+    expect(Plan.load(join(s.dir, '.cadence/raf.yaml')).lot('L1').review?.commit).toBe(git(s.dir, 'log', '--format=%H', '--grep=feat(L1)', '-1'));
     const base = join(s.parent, '.cadence/runs/2026-10-04-1412/proj--L1');
     expect(JSON.parse(readFileSync(join(base, '1-implement.json'), 'utf8')).tokens.counted).toBe(115);
     expect(git(s.dir, 'status', '--porcelain')).toBe('');

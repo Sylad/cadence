@@ -30,7 +30,7 @@ function pushedRepo(): string {
   const origin = tempDir();
   git(origin, 'init', '-q', '--bare', '-b', 'main');
   const dir = gitRepo();
-  const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'demo', 'L', '2026-09-28');
+  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'demo', 'L', '2026-09-28');
   plan.add('Cache', '2026-09-28');
   plan.save();
   writeFileSync(join(dir, 'README.md'), 'demo\n');
@@ -57,7 +57,7 @@ describe('deliver : verrou impossible à poser', () => {
       sleep: async () => {},
       now: () => 0,
     };
-    const c = { root: dir, state, plan: Plan.load(join(dir, 'docs/plan/raf.yaml')), config, today: '2026-09-28', dryRun: false, args: [] as string[], out: () => {}, err: (l: string) => err.push(l) };
+    const c = { root: dir, state, plan: Plan.load(join(dir, '.cadence/raf.yaml')), config, today: '2026-09-28', dryRun: false, args: [] as string[], out: () => {}, err: (l: string) => err.push(l) };
     expect(await deliver(c, deps)).toBe(2);
     expect(err.join('\n')).toContain(`deliver : verrou ${lockPath(state)} : ${code}`);
     expect(execs).toEqual([]);

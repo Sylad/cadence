@@ -12,7 +12,7 @@ const SPECS = join(ROOT, 'docs', 'superpowers', 'specs');
 const fiche = parse(readFileSync(join(SPECS, '2026-10-11-etape-spec-back-fiche-exemple.yaml'), 'utf8')) as any;
 const design = readFileSync(join(SPECS, '2026-10-11-etape-spec-back-design.md'), 'utf8');
 const mesure = readFileSync(join(ROOT, 'docs', 'mesures', 'corrections-2026-10-10.md'), 'utf8');
-const plan = parse(readFileSync(join(ROOT, 'docs', 'plan', 'raf.yaml'), 'utf8')) as { lots: any[] };
+const plan = parse(readFileSync(join(ROOT, '.cadence', 'raf.yaml'), 'utf8')) as { lots: any[] };
 
 const ligne = (md: string, debut: string) => md.split('\n').find((l) => l.startsWith(debut)) ?? '';
 const ids = (liste: any[]) => liste.map((x) => x.id);

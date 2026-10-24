@@ -14,7 +14,7 @@ function pushedRepo(): string {
   const origin = tempDir();
   git(origin, 'init', '-q', '--bare', '-b', 'main');
   const dir = gitRepo();
-  const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'demo', 'L', '2026-09-28');
+  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'demo', 'L', '2026-09-28');
   plan.add('Cache', '2026-09-28');
   plan.save();
   writeFileSync(join(dir, 'README.md'), 'demo\n');
@@ -46,7 +46,7 @@ const SCRIPT = parseDeliverConfig('deliver:\n  script: ./livrer.sh\n', 'cadence.
 function ctx(dir: string, config = CONFIG) {
   const out: string[] = [];
   const err: string[] = [];
-  const c: DeliverCtx = { root: dir, state: stateDir(dir), plan: Plan.load(join(dir, 'docs/plan/raf.yaml')), config, today: '2026-10-16', dryRun: false, args: [], out: (l) => out.push(l), err: (l) => err.push(l) };
+  const c: DeliverCtx = { root: dir, state: stateDir(dir), plan: Plan.load(join(dir, '.cadence/raf.yaml')), config, today: '2026-10-16', dryRun: false, args: [], out: (l) => out.push(l), err: (l) => err.push(l) };
   return { c, out, err };
 }
 const red = (dir: string) => join(stateDir(dir), 'deliveries-failed.log');

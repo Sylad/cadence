@@ -36,7 +36,7 @@ export function setup(lots: LotSpec[] = [{ title: 'un' }, { title: 'deux' }], ya
   git(repo, 'config', 'user.email', 't@example.com');
   git(repo, 'config', 'user.name', 'T');
   git(repo, 'config', 'commit.gpgsign', 'false');
-  const plan = Plan.create(join(repo, 'docs/plan/raf.yaml'), 'a', 'L', '2026-09-01');
+  const plan = Plan.create(join(repo, '.cadence/raf.yaml'), 'a', 'L', '2026-09-01');
   for (const l of lots) {
     const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 0.5, after: l.after, visible: l.visible, spec: l.spec });
     if (l.repos) plan.setRepos(id, l.repos.map((path) => ({ path })));
@@ -47,7 +47,7 @@ export function setup(lots: LotSpec[] = [{ title: 'un' }, { title: 'deux' }], ya
   writeFileSync(join(repo, 'cadence.yaml'), `orchestrate:\n  precheck: false\n${yaml.split('\n').filter(Boolean).map((l) => `  ${l}`).join('\n')}\n`);
   writeFileSync(join(repo, 'base.txt'), 'base\n');
   for (const [f, text] of Object.entries(files)) writeFileSync(join(repo, f), text);
-  git(repo, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml', 'base.txt', ...Object.keys(files));
+  git(repo, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml', 'base.txt', ...Object.keys(files));
   git(repo, 'commit', '-q', '-m', 'chore: plan');
   return { parent, repo };
 }
@@ -89,7 +89,7 @@ export const branches = (repo: string) => git(repo, 'branch', '--list', 'cadence
 export const store = (parent: string) => new RunStore(parent, WAVE);
 export const subjects = (repo: string) => git(repo, 'log', '--format=%s', 'main').split('\n');
 export const inWorktree = (cwd: string) => cwd.includes('/worktrees/');
-export const planOf = (repo: string) => Plan.load(join(repo, 'docs/plan/raf.yaml'));
+export const planOf = (repo: string) => Plan.load(join(repo, '.cadence/raf.yaml'));
 
 /** Rendez-vous : chaque appel attend que `n` appels soient en cours (ou un délai de secours) ; prouve que les sessions se chevauchent. */
 export function meeting(n: number, safetyMs = 4000) {

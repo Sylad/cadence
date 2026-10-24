@@ -77,11 +77,11 @@ function parentWith(names: string[], lots = 1) {
     git(dir, 'config', 'user.email', 't@example.com');
     git(dir, 'config', 'user.name', 'T');
     git(dir, 'config', 'commit.gpgsign', 'false');
-    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), name, 'L', '2026-09-01');
     for (let i = 0; i < lots; i++) plan.add('lot', '2026-10-01', { estimate: 1 });
     plan.save();
     writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
-    git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
     git(dir, 'commit', '-q', '-m', 'chore: plan');
   }
   return parent;
@@ -289,11 +289,11 @@ describe('--drop d\'un lot en question (L79, revue)', () => {
 
   it('un lot qui dépend (after) d\'un lot en question retiré est rendu aussi, la vague finit « done »', async () => {
     const parent = parentWith(['a', 'b']);
-    const planFile = join(parent, 'a/docs/plan/raf.yaml');
+    const planFile = join(parent, 'a/.cadence/raf.yaml');
     const plan = Plan.load(planFile);
     plan.add('suite', '2026-10-01', { estimate: 1, after: ['L1'] });
     plan.save();
-    git(join(parent, 'a'), 'add', '--', 'docs/plan/raf.yaml');
+    git(join(parent, 'a'), 'add', '--', '.cadence/raf.yaml');
     git(join(parent, 'a'), 'commit', '-q', '-m', 'chore: plan L2');
     let store: RunStore | undefined;
     const claude: ClaudeFn = async (args, o) => {

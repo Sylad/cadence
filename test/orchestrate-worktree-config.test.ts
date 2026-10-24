@@ -39,7 +39,7 @@ describe('garde d\'activation — mode worktree expérimental', () => {
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/orchestrate\.worktrees: true est refusé.*EXPÉRIMENTAL.*L299, L300 et L301.*CADENCE_EXPERIMENTAL_WORKTREES=1/);
     expect(f.calls).toEqual([]);
-    expect(existsSync(join(repo, '.cadence'))).toBe(false);
+    expect(existsSync(join(repo, '.cadence/runs'))).toBe(false);
   });
 
   it('--dry-run dit la même chose', async () => {

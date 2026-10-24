@@ -380,12 +380,12 @@ describe('R23 — le verdict est écrit après l\'avance, dans un commit de plan
     const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], fake({ implement: writes(meeting(2)) }));
     expect(r.code).toBe(0);
     expect(subjects(repo)[0]).toMatch(/^plan: L\d revue de code enregistrée/);
-    expect(git(repo, 'show', '--name-only', '--format=', 'HEAD')).toBe('docs/plan/raf.yaml');
+    expect(git(repo, 'show', '--name-only', '--format=', 'HEAD')).toBe('.cadence/raf.yaml');
     for (const id of ['L1', 'L2']) {
       const v = planOf(repo).lot(id).review!;
       expect(git(repo, 'show', '-s', '--format=%s', v.commit!)).toBe(`feat(${id}): travail`);
       // aucun commit de travail ne touche le plan
-      expect(git(repo, 'log', '--format=%h', '--grep', `^feat(${id})`, '--', 'docs/plan/raf.yaml')).toBe('');
+      expect(git(repo, 'log', '--format=%h', '--grep', `^feat(${id})`, '--', '.cadence/raf.yaml')).toBe('');
     }
   });
   it('R23 — raf done après report : unreviewedWork vaut 0', async () => {
@@ -430,7 +430,7 @@ describe('R23 — le verdict est écrit après l\'avance, dans un commit de plan
     expect(first.next).toBe('integrate');
     expect(first.outcome).toBe('écriture du plan refusée : arbre du dépôt modifié (base.txt)');
     expect(planOf(repo).lot(first.lot).review).toBeUndefined(); // le plan n'a rien reçu : ni commit, ni modification laissée dans l'arbre
-    expect(git(repo, 'status', '--porcelain', '--', 'docs/plan/raf.yaml')).toBe('');
+    expect(git(repo, 'status', '--porcelain', '--', '.cadence/raf.yaml')).toBe('');
     // le lead nettoie, retire le hook, et nomme le lot
     git(repo, 'checkout', '--', 'base.txt');
     writeFileSync(hook, '#!/bin/sh\nexit 0\n', { mode: 0o755 });

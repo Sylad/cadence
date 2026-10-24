@@ -106,7 +106,7 @@ export interface Harness {
  */
 export function harness(opts: { lots?: { title: string; visible?: boolean; screen?: 'page' | 'component' | 'journey'; spec?: boolean; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number; templatesDir?: string; planRel?: string } = {}): Harness {
   const repo = gitRepo();
-  const planRel = opts.planRel ?? 'docs/plan/raf.yaml';
+  const planRel = opts.planRel ?? '.cadence/raf.yaml';
   const planFile = join(repo, planRel);
   const plan = Plan.create(planFile, 'demo', 'L', '2026-09-01');
   for (const l of opts.lots ?? [{ title: 'Un lot, suite du constat de revue' }]) {

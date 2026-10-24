@@ -113,10 +113,10 @@ describe('R1 — recoverTree refuse une branche que la reprise ne mènerait pas 
   it('R1 — un commit de la branche touche le plan : la branche n\'est pas reprise, intacte', () => {
     const { repo, parent } = setup();
     const old = oldBranch(repo, 'w1', 'L1', 1);
-    commitFile(old.dir, 'docs/plan/raf.yaml', 'feat(L1): plan');
+    commitFile(old.dir, '.cadence/raf.yaml', 'feat(L1): plan');
     const dir = lotTreeDir(join(parent, '.cadence', 'runs', 'w2'), 'a', 'L1');
-    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main', new Set(['docs/plan/raf.yaml']));
-    expect(got).toEqual({ from: old.branch, refused: expect.stringContaining('docs/plan/raf.yaml') });
+    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main', new Set(['.cadence/raf.yaml']));
+    expect(got).toEqual({ from: old.branch, refused: expect.stringContaining('.cadence/raf.yaml') });
     expect(existsSync(old.dir)).toBe(true);
     expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(old.branch);
   });
@@ -158,12 +158,12 @@ describe('R1 — recoverTree refuse une branche que la reprise ne mènerait pas 
 describe('R1 — plan touché : la reprise ne rejoue pas un commit de plan jusqu\'à un conflit d\'intégration', () => {
   it('R1 — la vague 1 rend le lot (plan touché), la vague 2 ne reprend pas sa branche et le dit', async () => {
     const { parent, repo } = setup();
-    const f1 = fake({ implement: async (cwd) => claudeOut(workReport({ commits: [commitFile(cwd, 'docs/plan/raf.yaml', 'feat(L1): plan')] })) });
+    const f1 = fake({ implement: async (cwd) => claudeOut(workReport({ commits: [commitFile(cwd, '.cadence/raf.yaml', 'feat(L1): plan')] })) });
     await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f1);
     expect(store(parent).readLot('a', 'L1')!.status).toBe('handed-back');
     const r = await run(parent, ['a:L1'], fake());
     expect(r.out).toContain('non reprise');
-    expect(r.out).toContain('docs/plan/raf.yaml');
+    expect(r.out).toContain('.cadence/raf.yaml');
     expect(r.out).not.toContain('une vague précédente reprise');
     expect(branches(repo)).toContain(`cadence/${WAVE}/a--L1`);
   });

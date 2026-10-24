@@ -20,10 +20,10 @@ function setup(o: { lots?: PLot[]; green?: string[]; red?: string[]; failedRaw?:
   mkdirSync(runs, { recursive: true });
   writeWave(runs, 'w1', '2026-10-01T08:00:00');
   const dir = join(root, 'alpha');
-  mkdirSync(join(dir, 'docs', 'plan'), { recursive: true });
+  mkdirSync(join(dir, '.cadence'), { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
   const body = (o.lots ?? []).map((l) => [`  - id: ${l.id}`, '    title: "t"', `    status: ${l.status ?? 'done'}`, ...(l.created ? [`    created: ${l.created}`] : []), ...(l.finished ? [`    finished: ${l.finished}`] : []), ...(l.notes ? ['    notes:', ...l.notes.map(([d, t]) => `      - { date: ${d}, text: ${JSON.stringify(t)} }`)] : [])].join('\n')).join('\n');
-  writeFileSync(join(dir, 'docs', 'plan', 'raf.yaml'), `version: 1\nproject: "alpha"\nprefix: L\nlots:\n${body || '  []'}\n`);
+  writeFileSync(join(dir, '.cadence', 'raf.yaml'), `version: 1\nproject: "alpha"\nprefix: L\nlots:\n${body || '  []'}\n`);
   mkdirSync(join(dir, '.git', 'cadence'), { recursive: true });
   if (o.green) writeFileSync(join(dir, '.git', 'cadence', 'deliveries.log'), o.green.map((d) => `${d} abc\n`).join(''));
   const failed = o.failedRaw ?? (o.red ? o.red.map((d) => `${d} def CI en échec\n`).join('') : undefined);

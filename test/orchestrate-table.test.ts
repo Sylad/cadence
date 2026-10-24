@@ -196,16 +196,16 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
 
   it('dépôt réel : un commit plan-seul cité par le lot, au milieu de ses étapes : la ligne donne le dernier commit de code', () => {
     const repo = gitRepo();
-    const plan = Plan.create(join(repo, 'docs/plan/raf.yaml'), 'demo', 'L', '2026-09-01');
+    const plan = Plan.create(join(repo, '.cadence/raf.yaml'), 'demo', 'L', '2026-09-01');
     for (const t of ['un', 'deux']) plan.add(t, '2026-10-01', { estimate: 1 });
     plan.save();
-    writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: docs/plan/raf.yaml\n');
-    git(repo, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: .cadence/raf.yaml\n');
+    git(repo, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
     git(repo, 'commit', '-q', '-m', 'chore: plan');
     const a1 = commitFile(repo, 'a.txt', 'feat(L1): premier code').sha;
     // Commit plan-seul qui cite L1 : lotWork l'écarte, les étapes le rapportent.
-    writeFileSync(join(repo, 'docs/plan/raf.yaml'), `${readFileSync(join(repo, 'docs/plan/raf.yaml'), 'utf8')}# note\n`);
-    git(repo, 'commit', '-q', '-m', 'plan: L1 démarré', '--', 'docs/plan/raf.yaml');
+    writeFileSync(join(repo, '.cadence/raf.yaml'), `${readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')}# note\n`);
+    git(repo, 'commit', '-q', '-m', 'plan: L1 démarré', '--', '.cadence/raf.yaml');
     const p1 = git(repo, 'rev-parse', 'HEAD');
     const a2 = commitFile(repo, 'a2.txt', 'feat(L1): dernier code').sha;
     const b1 = commitFile(repo, 'b.txt', 'feat(L2): code rendu').sha;
@@ -222,11 +222,11 @@ describe('renderTable : livrable jusqu\'à <sha> (L76)', () => {
 
   it('dépôt réel : L1 en échec a commité sans rapport, L2 prêt au-dessus, L3 rendu tout en haut : aucune ligne', () => {
     const repo = gitRepo();
-    const plan = Plan.create(join(repo, 'docs/plan/raf.yaml'), 'demo', 'L', '2026-09-01');
+    const plan = Plan.create(join(repo, '.cadence/raf.yaml'), 'demo', 'L', '2026-09-01');
     for (const t of ['un', 'deux', 'trois']) plan.add(t, '2026-10-01', { estimate: 1 });
     plan.save();
-    writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: docs/plan/raf.yaml\n');
-    git(repo, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: .cadence/raf.yaml\n');
+    git(repo, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
     git(repo, 'commit', '-q', '-m', 'chore: plan');
     commitFile(repo, 'a.txt', 'feat(L1): code sans rapport').sha;
     const b1 = commitFile(repo, 'b.txt', 'feat(L2): code revu').sha;

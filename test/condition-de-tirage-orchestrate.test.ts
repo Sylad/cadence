@@ -20,15 +20,15 @@ afterEach(() => {
 function projectWith(done: number, gateLine = '{ count: 8, spec: true }', extra = '', gStatus = 'todo') {
   const parent = tempDir();
   const dir = join(parent, 'a');
-  mkdirSync(join(dir, 'docs/plan'), { recursive: true });
+  mkdirSync(join(dir, '.cadence'), { recursive: true });
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
   const lots = Array.from({ length: done }, (_, i) => `  - { id: S${i + 1}, title: Spec ${i + 1}, status: done, spec: true, finished: 2026-09-20 }\n`).join('');
-  writeFileSync(join(dir, 'docs/plan/raf.yaml'), `project: a\nprefix: L\nlots:\n${lots}  - { id: G, title: Lot à gate, status: ${gStatus}, gate: ${gateLine} }\n${extra}`);
+  writeFileSync(join(dir, '.cadence/raf.yaml'), `project: a\nprefix: L\nlots:\n${lots}  - { id: G, title: Lot à gate, status: ${gStatus}, gate: ${gateLine} }\n${extra}`);
   writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
-  git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+  git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
   git(dir, 'commit', '-q', '-m', 'chore: plan');
   return { parent, dir };
 }
@@ -65,7 +65,7 @@ describe('condition de tirage — orchestrate (L219)', () => {
 
   it('R8 — refus avant l\'arbre sale et avant tout lancement de session', async () => {
     const { parent, dir } = projectWith(2);
-    writeFileSync(join(dir, 'docs/plan/raf.yaml'), `${readFileSync(join(dir, 'docs/plan/raf.yaml'), 'utf8')}# sale\n`);
+    writeFileSync(join(dir, '.cadence/raf.yaml'), `${readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8')}# sale\n`);
     const r = await launch(parent, ['a:G']);
     expect(r.code).toBe(2);
     expect(r.err).toContain('condition de tirage non remplie');

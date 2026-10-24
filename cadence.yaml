@@ -13,3 +13,30 @@ orchestrate:
   testGate:
     code: [src/**, 'bin/*.js', '!**/*.test.ts']
     tests: ['test/**']
+
+# Lecteurs de l'ancien emplacement du plan (l'ancien dossier du plan) que « raf migrate » laisse tels quels (L284) : ils décrivent ou testent le repli sur l'ancien emplacement
+# (les autres projets n'ont pas tous migré), ou datent d'avant le déplacement (fiches, conceptions, mesures).
+migrate:
+  keep:
+    - src/**
+    - scripts/mise-en-service.mjs
+    - templates/**
+    - agents/**
+    - skills/**
+    - README.md
+    - docs/raf.md
+    - docs/orchestrate.md
+    - docs/lead.md
+    - docs/session.md
+    - docs/specs/**
+    - docs/superpowers/**
+    - docs/mesures/**
+    - docs/perf/**
+    - test/migrate.test.ts
+    - test/plan-dossier-cache.test.ts
+    - test/check.test.ts
+    - test/lead-tour-perf.test.ts
+    - test/mise-en-service.test.ts
+    - test/orchestrate-command.test.ts          # le plan d'un autre outil, taches.yaml (plan: path)
+    - test/orchestrate-worktree-harness.ts
+    - test/orchestrate-worktree-plan-writes.test.ts

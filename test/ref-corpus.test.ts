@@ -113,6 +113,20 @@ describe('cadence ref corpus — le corpus synthétique à vérité connue (eval
     expect(elements('page-proposal', 'texte').some((t) => t.role === 'exigence' && t.source.page === 1)).toBe(true);
   });
 
+  it('R11 — le corpus porte des états (sur des composants du corpus, sur la page de leur composant) et un lien confirme, hors piège', () => {
+    const etats = corpus.flatMap((c) => elements(c.nom, 'etat').map((e) => ({ c: c.nom, e })));
+    expect(etats.map(({ e }) => e.nom)).toEqual(['selectionne', 'desactive']);
+    for (const { c, e } of etats) {
+      const cible = cas(c).inventaire.elements.find((x: Obj) => x.id === e.cible)!;
+      expect(cible.type).toBe('composant');
+      expect(e.source.page).toBe(cible.source.page);
+      expect(e.piege).toBeUndefined();
+    }
+    const confirmes = corpus.flatMap((c) => elements(c.nom, 'lien')).filter((l) => l.constat === 'confirme');
+    expect(confirmes).toHaveLength(1);
+    expect(text(cas('page-proposal').html)).toContain(confirmes[0]!.figure);
+  });
+
   it('R12 — scan bruité : le cas est marqué rastérisé et tous ses textes attendus sont issus d’un OCR', () => {
     const c = cas('scan-bruite');
     expect(c.scan).toBe(true);

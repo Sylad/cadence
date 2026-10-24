@@ -253,7 +253,7 @@ one per trap taken from a real defect, each with the inventory that is true of w
 | `table-en-image` | a code table rasterised at render time: its cells are not in the PDF text layer | `table` |
 | `gabarit-type-bufr` | BUFR section 1: ordered fields, mandatory or optional, format, bounds | `gabarit` |
 | `controle-translucide` | a white button at 25 % opacity on a striped gradient, next to an opaque one | `jeton` `opacite` |
-| `page-proposal` | page 1 requirements, page 2 a panel mock-up carrying a « Proposal » badge | `statut` |
+| `page-proposal` | page 1 requirements, page 2 a panel mock-up carrying a « Proposal » badge; two rows of the panel are drawn selected and greyed (`etat` `selectionne`, `desactive`), and the caption confirms the requirement (`lien` `confirme`) | `statut` |
 | `scan-bruite` | a station sheet rasterised, grainy and blurred: the PDF has no text layer, expected texts are `ocr` | `texte` (`ocr`) |
 
 Each case folder holds `document.html` (one 8.5×11 in `section.page` per page, deterministic), `attendu.json` (an inventory that

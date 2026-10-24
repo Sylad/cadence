@@ -220,6 +220,21 @@ describe('cadence ref eval — rappel, précision, faux lu, tokens par page', ()
     expect(checkInventaire(doc('lecture', lue))).toEqual([]);
     expect(r.json.types.texte).toMatchObject({ attendus: 1, lus: 1, justes: 0, faux_lu: 1, rappel: 0 });
   });
+  it('R20 — le corpus contre lui-même affiche une ligne par type, états compris : le rappel des composants et des états est mesurable', () => {
+    const dir = tempDir();
+    for (const c of buildCorpus()) {
+      for (const [d, f] of [['corpus', 'attendu.json'], ['lectures', 'lecture.json']] as const) {
+        mkdirSync(join(dir, d, c.nom), { recursive: true });
+        writeFileSync(join(dir, d, c.nom, f), JSON.stringify(c.inventaire));
+      }
+    }
+    const r = lancer([join(dir, 'corpus'), join(dir, 'lectures')], dir);
+    expect(r.out).toMatch(/^ {2}etat {7}rappel 100 % \(2\/2\) · précision 100 % \(2\/2\) · faux lu 0\/2$/m);
+    expect(r.out).toMatch(/^ {2}composant {2}rappel 100 %/m);
+    const json = lancer([join(dir, 'corpus'), join(dir, 'lectures'), '--json'], dir).json;
+    expect(json.types.etat).toMatchObject({ attendus: 2, justes: 2 });
+    expect(json.types.lien.attendus).toBe(3);
+  });
   it('R19 — un fichier contre un dossier (dans un sens ou dans l’autre) est refusé avec les combinaisons acceptées, jamais une lecture ignorée en silence', () => {
     const dir = tempDir();
     mkdirSync(join(dir, 'corpus', 'un'), { recursive: true });

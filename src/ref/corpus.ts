@@ -183,18 +183,33 @@ function pageProposal(): CasCorpus {
   const exigences = ['REQ-1 The map shall show the layer panel.', 'REQ-2 The panel shall list every active layer.'];
   const panneau: Boite = { x: 60, y: 160, l: 300, h: 420 };
   const badge: Boite = { x: 600, y: 50, l: 150, h: 36 };
+  const legendePanneau = 'Figure 1 — Layer panel';
+  const LEGENDE_PANNEAU: Boite = { x: 60, y: 592, l: 300, h: 24 };
   inv.texte(1, TITRE, 'Requirements', 'titre');
   exigences.forEach((t, i) => inv.texte(1, { x: 60, y: 110 + i * 40, l: 696, h: 24 }, t, 'exigence'));
   const ecran = inv.ecran(2);
   inv.texte(2, { x: 60, y: 50, l: 400, h: 40 }, 'Layer panel mock-up', 'titre');
   const comp = inv.add('composant', 2, panneau, { role: 'panneau', position: { x: Math.round(panneau.x * K), y: Math.round(panneau.y * K) }, taille: { l: Math.round(panneau.l * K), h: Math.round(panneau.h * K) }, contenu: 'Layers', ecran });
   inv.texte(2, { x: 80, y: 176, l: 100, h: 26 }, 'Layers', 'titre-panneau');
+  // deux lignes du panneau : « Wind » dessinée sélectionnée (fond bleu, bordure), « Waves » dessinée grisée (désactivée)
+  const wind: Boite = { x: 80, y: 230, l: 240, h: 36 };
+  const waves: Boite = { x: 80, y: 280, l: 240, h: 36 };
+  const ligne = (b: Boite, contenu: string) => inv.add('composant', 2, b, { role: 'case_a_cocher', position: { x: Math.round(b.x * K), y: Math.round(b.y * K) }, taille: { l: Math.round(b.l * K), h: Math.round(b.h * K) }, contenu, ecran });
+  const compWind = ligne(wind, 'Wind');
+  const compWaves = ligne(waves, 'Waves');
+  inv.add('etat', 2, wind, { nom: 'selectionne', cible: compWind });
+  inv.add('etat', 2, waves, { nom: 'desactive', cible: compWaves });
+  inv.texte(2, LEGENDE_PANNEAU, legendePanneau, 'legende');
+  inv.add('lien', 2, panneau, { figure: legendePanneau, passage: { page: 1, ligne: 2, extrait: 'REQ-2 The panel shall list every active layer.' }, constat: 'confirme' });
   inv.add('statut', 2, badge, { libelle: 'Proposal', couvre: [comp] }, true);
   const page1 = bloc(TITRE, '<h1>Requirements</h1>') + exigences.map((t, i) => bloc({ x: 60, y: 110 + i * 40, l: 696, h: 24 }, `<p>${t}</p>`)).join('');
   const page2 =
     bloc({ x: 60, y: 50, l: 400, h: 40 }, '<h1>Layer panel mock-up</h1>') +
     bloc(badge, '<span style="font-size:18px;font-weight:bold;color:#fff;line-height:36px">Proposal</span>', 'background:#e67e22;border-radius:18px;text-align:center') +
-    bloc(panneau, '<p style="font-size:20px;font-weight:bold;margin:16px 20px">Layers</p>', 'background:#f4f4f4;border:2px solid #333');
+    bloc(panneau, '<p style="font-size:20px;font-weight:bold;margin:16px 20px">Layers</p>', 'background:#f4f4f4;border:2px solid #333') +
+    bloc(wind, '<p style="font-size:16px;line-height:32px;padding-left:12px;color:#0b2a66">Wind</p>', 'background:#cfe3ff;border:2px solid #1e5fd0') +
+    bloc(waves, '<p style="font-size:16px;line-height:32px;padding-left:12px;color:#999">Waves</p>', 'background:#e6e6e6;border:2px solid #cfcfcf') +
+    bloc(LEGENDE_PANNEAU, `<p>${legendePanneau}</p>`);
   return fini(nom, 'Layer panel', [page1, page2], inv);
 }
 

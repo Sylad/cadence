@@ -404,6 +404,18 @@ describe('R23 — le verdict est écrit après l\'avance, dans un commit de plan
       expect(v.reporte.vers).not.toBe(git(repo, 'rev-parse', 'HEAD'));
     }
   });
+  it('L303 — le lead change de branche entre l\'avance et l\'écriture du plan : le contrôle de branche de writeVerdict rend le lot, aucun commit de plan', async () => {
+    const { parent, repo } = setup();
+    // un hook post-merge du lead passe sur une autre branche juste après l'avance : le premier contrôle de départ et le contrôle tardif sont déjà passés
+    writeFileSync(join(repo, '.git', 'hooks', 'post-merge'), '#!/bin/sh\ngit checkout -q -b autre\n', { mode: 0o755 });
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], fake({ implement: writes(meeting(2)) }));
+    expect(r.code).toBe(1);
+    const first = ['L1', 'L2'].map((id) => store(parent).readLot('a', id)!).find((l) => l.status === 'handed-back')!;
+    expect(first.next).toBe('integrate');
+    expect(first.outcome).toBe('écriture du plan refusée : dépôt sur autre et non main');
+    expect(planOf(repo).lot(first.lot).review).toBeUndefined();
+    expect(subjects(repo).some((s) => s.startsWith(`plan: ${first.lot} revue`))).toBe(false);
+  });
   it('R23 — arrêt entre l\'avance et l\'écriture du verdict puis --resume --integrate : verdict écrit une fois, au sha intégré, aucun second rebase', async () => {
     const { parent, repo } = setup();
     // un hook post-merge du lead salit un fichier suivi juste après l'avance : l'écriture du plan est refusée, le lot est rendu à l'étape d'intégration

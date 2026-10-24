@@ -237,10 +237,10 @@ regles:
     tests: ["R18 — nom vide : écart", "R18 — cible absente : écart", "R18 — nom « hors_ligne » (hors liste citée) : accepté"]
   - id: R19
     cas: [C5]
-    enonce: "texte porte libelle (chaîne non vide) et role (non vide : titre, bouton, message_erreur…)."
+    enonce: "texte porte libelle (chaîne non vide) et role, tiré de la liste fermée ROLES de src/ref/check.ts (titre, bouton, message_erreur, champ, carte, onglet, liste, unite…, chacun défini en une ligne dans templates/inventaire.json) ; un rôle hors liste est un écart citant la liste. Amendement L264 : la liste était « non vide, ouverte »."
     statut: sourcee
-    source: "design §2 : « texte : libellé, message ou unité verbatim, avec son rôle »"
-    tests: ["R19 — libelle vide : écart", "R19 — role absent : écart"]
+    source: "design §2 : « texte : libellé, message ou unité verbatim, avec son rôle (titre, bouton, message d'erreur) » ; décision du lead 24-10 (revue L264) : liste fermée mais large, car le rôle décide de l'identité d'un composant et de la justesse d'un texte dans ref eval"
+    tests: ["R19 — libelle vide : écart", "R19 — role absent : écart", "R19 — message_erreur (texte) et carte (composant) : acceptés, rôle hors liste : écart"]
   - id: R20
     cas: [C5]
     enonce: "jeton porte categorie (couleur, taille_police, espacement, rayon, opacite) et valeur (chaîne non vide, ou nombre fini) ; un jeton mesure porte aussi point (échantillonnage : { x, y } entiers ≥ 0, ou une zone { x, y, l, h } comme en R11) ; un contraste facultatif est { texte, fond, ratio } avec ratio entre 1 et 21."

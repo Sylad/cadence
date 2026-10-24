@@ -291,6 +291,12 @@ describe('cadence ref check (L263)', () => {
     for (const role of Object.keys(ROLES)) valide(doc([el('texte', (e) => (e.role = role))]));
     expect(ecarts(doc([el('texte', (e) => (e.role = 'toString'))]))).toContain('n\'est pas un rôle de la liste');
   });
+  it('R19 — la liste couvre la conception et un écran réel : message_erreur (texte) et carte (composant) sont acceptés, un rôle hors liste reste refusé', () => {
+    valide(doc([el('texte', (e) => (e.role = 'message_erreur'))]));
+    valide(doc([BASE.ecran!, el('composant', (e) => (e.role = 'carte'))]));
+    for (const role of ['titre', 'bouton', 'message_erreur', 'champ', 'carte', 'onglet', 'liste', 'unite', 'legende', 'menu', 'case_a_cocher', 'selecteur', 'icone', 'badge', 'info_bulle']) expect(Object.keys(ROLES)).toContain(role);
+    expect(ecarts(doc([el('texte', (e) => (e.role = 'message'))]))).toContain('elements[0].role : « message » n\'est pas un rôle de la liste');
+  });
   it('R17 — le modèle écrit la liste des rôles, avec une définition, et c\'est celle du schéma', () => {
     const modele = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'templates', 'inventaire.json'), 'utf8'));
     expect(modele.roles).toEqual(ROLES);

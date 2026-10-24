@@ -150,14 +150,26 @@ liste : …`), never a reading error counted later. The list is in `ROLES` of `s
 | Role | Definition |
 |---|---|
 | `titre` | title of a document, a page or a section |
+| `titre-panneau` | title of a panel or a window of an interface |
 | `paragraphe` | sentence or block of running text |
+| `legende` | text that names a figure, a table or a colour scale (« Figure 1 — … ») |
 | `etiquette-figure` | word or value written inside a figure (arrow, axis, curve, threshold) |
-| `legende` | text that names a figure or a table (« Figure 1 — … ») |
 | `exigence` | statement of one requirement in a list of requirements |
 | `ligne` | line of a record or a form, with no other function |
-| `titre-panneau` | title of a panel or a window of an interface |
+| `message_erreur` | message that reports an error or a refusal to the user |
+| `unite` | unit attached to a value (kt, hPa, m) |
+| `info_bulle` | short text shown on hover or focus of an element |
 | `bouton` | control one acts on (`composant`), or its label (`texte`) |
+| `champ` | area where a value is typed (`composant`), or its label (`texte`) |
+| `case_a_cocher` | two-state control, ticked or not, independent of the others |
+| `selecteur` | control that picks one value in a closed list (drop-down, radio buttons) |
+| `onglet` | entry of a bar that switches between views of the same level |
+| `menu` | list of actions or destinations that opens from a control |
+| `liste` | sequence of items of the same kind shown one under the other |
 | `panneau` | interface area that groups controls (`composant`) |
+| `carte` | map or chart display area (`composant`) |
+| `icone` | pictogram with no text that stands for an action or an object |
+| `badge` | pill or mark that qualifies an element (status, counter) |
 
 References (`ecran`, `cible`, `couvre`, flux nodes) are resolved on the whole list of ids, wherever the element is. Every slug and id
 deviation (R6/R9) is listed, none masks another; elsewhere a deviation can hide others (a non-object element only reports its

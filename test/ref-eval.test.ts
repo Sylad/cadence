@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { checkInventaire } from '../src/ref/check.js';
+import { ROLES, checkInventaire } from '../src/ref/check.js';
 import { buildCorpus } from '../src/ref/corpus.js';
 import { tempDir } from './helpers.js';
 
@@ -208,11 +208,17 @@ describe('cadence ref eval — rappel, précision, faux lu, tokens par page', ()
     let renommes = 0;
     for (const e of ambigu.elements) if (e.role === 'etiquette-figure') { e.role = 'label'; renommes++; }
     expect(renommes).toBe(3);
-    expect(checkInventaire(ambigu)).toContain("elements[2].role : « label » n'est pas un rôle de la liste : titre, paragraphe, etiquette-figure, legende, exigence, ligne, titre-panneau, bouton, panneau");
+    expect(checkInventaire(ambigu)).toContain("elements[2].role : « label » n'est pas un rôle de la liste : " + Object.keys(ROLES).join(', '));
     writeFileSync(join(dir, 'lectures', 'texte-ambigu-leve-par-figure', 'lecture.json'), JSON.stringify(ambigu));
     const r = lancer([join(dir, 'corpus'), join(dir, 'lectures')], dir);
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/lecture.*pas valide.*« label » n'est pas un rôle/s);
+  });
+  it('R18 — un rôle valide mais différent de l’attendu (paragraphe pour titre) est un faux lu : le texte est retrouvé, il n’est pas juste', () => {
+    const lue = ATTENDU.elements.map((e: Obj) => (e.type === 'texte' ? texte(1, 'Titre', { role: 'paragraphe' }) : e));
+    const r = evaluer(ATTENDU, doc('lecture', lue), ['--json']);
+    expect(checkInventaire(doc('lecture', lue))).toEqual([]);
+    expect(r.json.types.texte).toMatchObject({ attendus: 1, lus: 1, justes: 0, faux_lu: 1, rappel: 0 });
   });
   it('R19 — un fichier contre un dossier (dans un sens ou dans l’autre) est refusé avec les combinaisons acceptées, jamais une lecture ignorée en silence', () => {
     const dir = tempDir();

@@ -10,17 +10,29 @@ const CATEGORIES = ['couleur', 'taille_police', 'espacement', 'rayon', 'opacite'
 const DIRECTIONS = ['de_vers', 'bidirectionnel'];
 const CONSTATS = ['confirme', 'precise', 'contredit'];
 
-/** Le vocabulaire fermé des rôles d'un `texte` et d'un `composant` : le rôle décide de l'identité et de la justesse d'un élément, donc il est écrit ici, une ligne par rôle (repris dans templates/inventaire.json et docs/ref.md). */
+/** Le vocabulaire fermé des rôles d'un `texte` et d'un `composant` : le rôle décide de l'identité et de la justesse d'un élément, donc il est écrit ici, une ligne par rôle (repris dans templates/inventaire.json et docs/ref.md). Fermée mais large : celle de la conception (titre, bouton, message_erreur…), celle du corpus et celle d'un écran réel. */
 export const ROLES: Record<string, string> = {
   titre: "titre d'un document, d'une page ou d'une section",
-  paragraphe: 'phrase ou bloc de texte courant',
+  'titre-panneau': "titre d'un panneau ou d'une fenêtre d'interface",
+  paragraphe: "phrase ou bloc de texte courant",
+  legende: "texte qui désigne une figure, un tableau ou une échelle de couleurs (« Figure 1 — … »)",
   'etiquette-figure': "mot ou valeur écrit dans une figure (flèche, axe, courbe, seuil)",
-  legende: 'texte qui désigne une figure ou un tableau (« Figure 1 — … »)',
   exigence: "énoncé d'une exigence dans une liste d'exigences",
   ligne: "ligne d'un relevé ou d'un formulaire, sans autre fonction",
-  'titre-panneau': "titre d'un panneau ou d'une fenêtre d'interface",
+  message_erreur: "message qui signale une erreur ou un refus à l'utilisateur",
+  unite: "unité accolée à une valeur (kt, hPa, m)",
+  info_bulle: "texte court qui apparaît au survol ou au focus d'un élément",
   bouton: "contrôle sur lequel on agit (composant), ou son libellé (texte)",
+  champ: "zone où l'on saisit une valeur (composant), ou son libellé (texte)",
+  case_a_cocher: "contrôle à deux états, coché ou non, indépendant des autres",
+  selecteur: "contrôle qui fait choisir une valeur dans une liste fermée (liste déroulante, boutons radio)",
+  onglet: "entrée d'une barre qui bascule entre des vues de même niveau",
+  menu: "liste d'actions ou de destinations qui s'ouvre depuis un contrôle",
+  liste: "suite d'éléments de même nature affichés les uns sous les autres",
   panneau: "zone d'interface qui regroupe des contrôles (composant)",
+  carte: "zone d'affichage cartographique ou graphique (composant)",
+  icone: "pictogramme sans texte qui représente une action ou un objet",
+  badge: "pastille ou marque qui qualifie un élément (statut, compteur)",
 };
 
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);

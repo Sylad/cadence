@@ -3162,9 +3162,10 @@ lots:
     finished: 2026-10-23
   - id: L278
     title: "Correctifs et revues lancés à la main par le lead : budget et durée maximale déclarés (cadence lead hold --ttl l'indique, rien ne l'arrête) — au TTL échu, cadence lead tour et la bande le signalent en ⚠ et le skill lead dit de le reprendre ou de l'arrêter ; tests. Vécu 23-10 : correctif B28.6 plus de 5 h sur un créneau de 3"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-23
+    started: 2026-10-24
   - id: L279
     title: "orchestrate : un worktree par lot dans une vague (git worktree add par lot, fusion par cherry-pick ou rebase au « prêt »), pour que deux lots indépendants d'un même dépôt avancent en parallèle dans la limite des créneaux ; verrou de dépôt adapté ; conflits rendus au lead ; tests. Vécu 23-10 : L261 (4 corrections) a bloqué la file cadence ; étude de faisabilité d'abord (spec)"
     status: doing

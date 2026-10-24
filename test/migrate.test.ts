@@ -111,6 +111,17 @@ describe('raf migrate', () => {
     expect(r.err).toContain('scripts/journal.sh:1');
   });
 
+  it('R4 — un chemin construit avec l\'opérateur / de pathlib est un lecteur non traité', () => {
+    const dir = legacyRepo({
+      ...READERS,
+      'web/plan.py': 'PLAN = Path(__file__).parents[2] / "docs" / "plan" / "raf.yaml"\n',
+    });
+    const r = raf(dir, 'migrate');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('web/plan.py:1');
+    expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(true);
+  });
+
   it('R5 — un lecteur déclaré sous migrate.keep de cadence.yaml est laissé tel quel et ne bloque pas', () => {
     const dir = legacyRepo({
       ...READERS,
@@ -203,6 +214,17 @@ describe('raf migrate', () => {
     expect(r.code).toBe(0);
     expect(r.err).toBe('');
     expect(r.out).toContain('L1');
+  });
+
+  it('R11 — un fichier texte qui n\'est pas en UTF-8 est un lecteur non traité, jamais réécrit avec perte', () => {
+    const dir = legacyRepo();
+    const latin1 = Buffer.concat([Buffer.from('REM caf'), Buffer.from([0xe9]), Buffer.from(' docs/plan/raf.yaml\r\n')]);
+    writeFileSync(join(dir, 'run.bat'), latin1);
+    git(dir, 'add', 'run.bat');
+    const r = raf(dir, 'migrate');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('run.bat');
+    expect(readFileSync(join(dir, 'run.bat')).equals(latin1)).toBe(true);
   });
 
   it('R11 — un fichier binaire qui porte le chemin est un lecteur non traité', () => {

@@ -11,8 +11,10 @@ const HISTORY = ['**/CHANGELOG*', '**/*.ndjson', '.cadence/**'];
 
 /** Une référence à l'ancien emplacement que `raf migrate` sait réécrire : le chemin complet, pas suivi d'un nom plus long. */
 const REWRITABLE = /docs\/plan\/raf\.yaml(?![\w-]|\.\w)/g;
+/** Le chemin construit morceau par morceau : `'docs', 'plan'` (join) ou `'docs' / 'plan'` (pathlib). */
+const BUILT = /['"`]docs['"`]\s*[,/]\s*['"`]plan['"`]/;
 /** Toute autre façon de désigner docs/plan : un autre fichier du dossier, un dossier, un chemin construit morceau par morceau. */
-const OTHER = /docs\/plan(?!\/raf\.yaml(?![\w-]|\.\w))|['"`]docs['"`]\s*,\s*['"`]plan['"`]/;
+const OTHER = new RegExp(`docs/plan(?!/raf\\.yaml(?![\\w-]|\\.\\w))|${BUILT.source}`);
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
@@ -75,13 +77,17 @@ export function planMigration(root: string): Migration {
     if (!stat.isFile() || stat.size > MAX_BYTES) continue;
     const buffer = readFileSync(path);
     const text = buffer.toString('utf8');
-    if (!text.includes('docs/plan') && !/['"`]docs['"`]\s*,\s*['"`]plan['"`]/.test(text)) continue;
+    if (!text.includes('docs/plan') && !BUILT.test(text)) continue;
     if (isKept(file)) {
       result.kept.push(file);
       continue;
     }
     if (buffer.includes(0)) {
       result.unhandled.push({ file, text: 'fichier binaire : le chemin ne peut pas y être réécrit' });
+      continue;
+    }
+    if (!Buffer.from(text, 'utf8').equals(buffer)) {
+      result.unhandled.push({ file, text: 'fichier non UTF-8 : le réécrire en altérerait les octets' });
       continue;
     }
     const lines = text.split('\n');

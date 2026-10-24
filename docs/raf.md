@@ -154,7 +154,7 @@ rather than on the plan; it prints no legacy warning and never commits (review t
 - **`--dry-run`** prints the move and every file it would touch, with its number of references, and changes nothing.
 - **It refuses** (code 2, nothing moved or written) while a reader is *not handled*: a file that cites `docs/plan` in a way a text
   replacement cannot follow — another file of the folder (`docs/plan/journal.ndjson`), the folder itself, a path built piece by piece
-  (`join(root, 'docs', 'plan', 'raf.yaml')`), or a binary file. Each one is listed as `file:line`. Fix it by hand and run the command again, or
+  (`join(root, 'docs', 'plan', 'raf.yaml')`, `Path(...) / "docs" / "plan"`), a binary file, or a text file that is not UTF-8 (rewriting it would alter its bytes). Each one is listed as `file:line`. Fix it by hand and run the command again, or
   declare a file that cites the path without reading the plan (a fixture, a document about the old place) under `migrate.keep` in
   `cadence.yaml`: a list of paths or patterns (`*`, `**`, `?`, as `docs.sync`), whose matches are listed as left as they are.
 - **It refuses** when `docs/plan/raf.yaml` and `.cadence/raf.yaml` both exist, and when neither does.

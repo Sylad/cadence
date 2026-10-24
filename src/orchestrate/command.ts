@@ -565,7 +565,7 @@ function waveExists(wave: string, io: OrchestrateIo): number {
 }
 
 /**
- * `--remove-worktree projet:lot` (L279, R20) : seule commande qui retire un worktree conservé. Refus (code 2, rien retiré) tant qu'un commit du lot n'est ni
+ * `--remove-worktree projet:lot` (L279, R20) : seule commande qui retire un worktree conservé. Refus (code 2, rien retiré) pour le worktree d'une vague vivante (même avec `--abandon-commits`), et tant qu'un commit du lot n'est ni
  * intégré à la branche du dépôt ni confirmé abandonné par `--abandon-commits` ; un worktree entièrement intégré se retire sans option. `--wave` désigne la vague
  * quand plusieurs ont laissé un worktree pour ce lot.
  */
@@ -574,7 +574,7 @@ function removeWorktree(args: Args, io: OrchestrateIo): number {
   const key = `${t.project ?? basename(io.cwd)}:${t.lot}`;
   const projectDir = t.project ? resolve(io.cwd, t.project) : io.cwd;
   const repo = existsSync(projectDir) ? gitRoot(projectDir) : null;
-  const kept = repo ? keptTrees(repo).filter((k) => k.lot === key && (args.wave === undefined || k.wave === args.wave)) : [];
+  const kept = repo ? keptTrees(repo, { includeActive: true }).filter((k) => k.lot === key && (args.wave === undefined || k.wave === args.wave)) : [];
   if (!repo || kept.length === 0) {
     io.err(`orchestrate : ${key} : aucun worktree conservé`);
     return 2;
@@ -584,9 +584,14 @@ function removeWorktree(args: Args, io: OrchestrateIo): number {
     return 2;
   }
   const k = kept[0]!;
+  if (k.active) {
+    // une vague vivante joue encore ce lot (ses sessions travaillent dans ce dossier) : refus sans rien retirer, même avec --abandon-commits
+    io.err(`orchestrate : ${key} : la vague ${k.wave} est vivante et joue ce lot : worktree non retirable (arrêter la vague d'abord)`);
+    return 2;
+  }
   const gone = removeTree({ repo, dir: k.dir ?? '', branch: k.branch, base: k.base }, { abandon: args.abandonCommits });
   if (!gone.ok) {
-    io.err(gone.dirty ? `orchestrate : ${key} : fichiers suivis modifiés dans le worktree (${gone.dirty.join(', ')}), --abandon-commits pour les abandonner` : `orchestrate : ${key} : ${gone.unintegrated} commit(s) non intégré(s), --abandon-commits pour les abandonner`);
+    io.err(gone.dirty ? `orchestrate : ${key} : fichiers suivis modifiés dans le worktree (${gone.dirty.join(', ')}), --abandon-commits pour les abandonner` : gone.untracked ? `orchestrate : ${key} : fichiers non suivis dans le worktree (${gone.untracked.join(', ')}), --abandon-commits pour les abandonner` : `orchestrate : ${key} : ${gone.unintegrated} commit(s) non intégré(s), --abandon-commits pour les abandonner`);
     return 2;
   }
   io.out(`orchestrate : ${key} : worktree retiré (${gone.abandoned} commit(s) abandonné(s))`);

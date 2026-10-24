@@ -3,6 +3,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, rea
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { Plan } from '../plan.js';
 import { lotSlug } from './state.js';
+import { cadenceHome, liveWaves } from './registry.js';
 
 /** Un worktree par lot (L279) : nom du dossier de la vague où ils vivent, hors du dépôt du lead. */
 export const WORKTREES_DIR = 'worktrees';
@@ -194,10 +195,34 @@ export function trackedDirty(dir: string): string[] {
   return out.split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^.* -> /, ''));
 }
 
-export type Removal = { ok: true; abandoned: number } | { ok: false; unintegrated: number; dirty?: string[] };
+/**
+ * Fichiers non suivis et non ignorés d'un arbre (L279, correctif de revue) : `git worktree remove --force` les supprimerait. Les liens que cadence a posés
+ * (dépendances ignorées reliées au dépôt) sont des liens symboliques : ils ne comptent pas.
+ */
+export function untrackedFiles(dir: string): string[] {
+  let out = '';
+  try {
+    out = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch {
+    // arbre illisible : rien de connu
+  }
+  return out
+    .split('\n')
+    .filter((l) => l.startsWith('?? '))
+    .map((l) => l.slice(3).replace(/^"|"$/g, ''))
+    .filter((f) => {
+      try {
+        return !lstatSync(join(dir, f)).isSymbolicLink();
+      } catch {
+        return true;
+      }
+    });
+}
+
+export type Removal = { ok: true; abandoned: number } | { ok: false; unintegrated: number; dirty?: string[]; untracked?: string[] };
 
 /**
- * Retire le worktree et la branche d'un lot (R12). Sans `abandon`, seul un lot dont tous les commits sont dans la branche du dépôt, à l'arbre propre,
+ * Retire le worktree et la branche d'un lot (R12). Sans `abandon`, seul un lot dont tous les commits sont dans la branche du dépôt, à l'arbre propre (ni fichier suivi modifié, ni fichier non suivi non ignoré),
  * est retiré ; la branche part alors par une suppression gardée par son sha (jamais `-D`). Avec `abandon` (commande explicite du lead, R20),
  * les commits non intégrés sont abandonnés. Les liens vers le dépôt vivant ne sont pas suivis : seul le lien est supprimé.
  */
@@ -208,6 +233,8 @@ export function removeTree(t: TreeSpec, opts: { abandon?: boolean } = {}): Remov
     if (unintegrated > 0) return { ok: false, unintegrated };
     const dirty = existsSync(join(t.dir, '.git')) ? trackedDirty(t.dir) : [];
     if (dirty.length) return { ok: false, unintegrated: 0, dirty };
+    const untracked = existsSync(join(t.dir, '.git')) ? untrackedFiles(t.dir) : [];
+    if (untracked.length) return { ok: false, unintegrated: 0, untracked };
   }
   if (existsSync(t.dir)) {
     try {
@@ -237,13 +264,16 @@ export interface KeptTree {
   /** Instant de création (ms). */
   created: number;
   unintegrated: number;
+  /** Vrai quand une vague vivante (registre des vagues) joue encore ce lot : le worktree n'est pas « conservé » mais en service. */
+  active: boolean;
 }
 
 /**
  * Les worktrees de lot que le dépôt garde (R19) : toute branche `cadence/*` reconnue (la config git de cadence y est). Rien n'est stocké ailleurs :
  * un worktree retiré a perdu sa branche, un worktree conservé reste listé tant que personne ne le retire (R20).
  */
-export function keptTrees(repo: string): KeptTree[] {
+export function keptTrees(repo: string, opts: { includeActive?: boolean } = {}): KeptTree[] {
+  const live = new Set(liveWaves(cadenceHome()).map((w) => w.wave));
   const trees = registered(repo);
   const dirOf = new Map([...trees].filter(([, b]) => b).map(([p, b]) => [b as string, p]));
   const branches = (tryGit(repo, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/cadence/') ?? '').split('\n').filter(Boolean);
@@ -261,9 +291,11 @@ export function keptTrees(repo: string): KeptTree[] {
       dirExists: dir !== null && existsSync(dir),
       created: Number(config(repo, branch, 'created') ?? 0),
       unintegrated: unintegratedCommits(repo, branch, base),
+      active: live.has(branch.split('/')[1] ?? ''),
     });
   }
-  return out;
+  return opts.includeActive ? out : out.filter((t) => !t.active); // le worktree d'une vague vivante n'est pas « conservé » : il sert
+
 }
 
 /**

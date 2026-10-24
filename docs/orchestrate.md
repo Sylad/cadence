@@ -511,9 +511,11 @@ nothing below applies and the wave behaves as before; any other value is refused
 - **Nothing is deleted with unintegrated commits.** A worktree whose commits are all in the repository's branch is removed after the integration, by a guarded
   branch deletion (never `-D`). A lot handed back, dropped (`--drop`), failed or in conflict keeps its worktree and branch, and the journal gives the path
   (`orchestrate : <project>:<lot> : worktree conservé : <path> (branche <branch>)`). The final table, `cadence orchestrate --status` and `cadence lead tour`
-  list each kept worktree: repository, lot, age, number of unintegrated commits, path. Only the lead removes one:
+  list each kept worktree: repository, lot, age, number of unintegrated commits, path (the worktree of a lot a live wave still plays is not « kept »: it
+  is in use and not listed). Only the lead removes one:
   `cadence orchestrate --remove-worktree <project>:<lot> [--wave <wave>]` refuses (exit 2, nothing removed) while a commit is neither integrated nor
-  declared abandoned with `--abandon-commits`; a fully integrated worktree is removed without the option
+  declared abandoned with `--abandon-commits`, while the worktree holds a modified tracked file or an untracked file that is not ignored (the removal would delete it),
+  and, with or without `--abandon-commits`, while a live wave (the waves registry) still plays the lot; a fully integrated, clean worktree is removed without the option
   (`orchestrate : <project>:<lot> : worktree retiré (<n> commit(s) abandonné(s))`).
 - **Resume.** The worktree of each resumed lot is found again by its name (a worktree git still lists whose folder is gone is pruned and recreated on the
   existing branch) and is subject to the guards of a repository: a modified tracked file refuses the resume (exit 2, nothing written). The wave's lock

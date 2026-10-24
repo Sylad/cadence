@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { run as rafRun } from '../src/cli.js';
 import { sharedStateDir } from '../src/state.js';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
+import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, workReport } from './orchestrate-harness.js';
 import { branches, conflictWave, fake, lotOf, meeting, planOf, run, setup, store, subjects, until, WAVE, writes } from './orchestrate-worktree-harness.js';
 import { tempDir } from './helpers.js';
@@ -220,6 +221,36 @@ describe('R20 — retrait explicite d\'un worktree conservé', () => {
     expect(r.code).toBe(0);
     expect(r.out).toContain('orchestrate : a:L1 : worktree retiré (0 commit(s) abandonné(s))');
     expect(existsSync(dir)).toBe(false);
+  });
+  it('R20 — fichier non suivi non ignoré dans le worktree : refus code 2, fichier conservé, même sans commit non intégré', async () => {
+    const { parent, repo, dir, branch } = await conflictWave();
+    git(repo, 'merge', '-q', '-X', 'theirs', '--no-edit', branch); // plus aucun commit non intégré
+    writeFileSync(join(dir, 'new.txt'), 'travail en cours\n');
+    const r = await run(parent, ['--remove-worktree', 'a:L1'], fake());
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('fichiers non suivis dans le worktree (new.txt)');
+    expect(readFileSync(join(dir, 'new.txt'), 'utf8')).toBe('travail en cours\n');
+    expect(branches(repo)).toContain(branch);
+    rmSync(join(dir, 'new.txt'));
+    expect((await run(parent, ['--remove-worktree', 'a:L1'], fake())).code).toBe(0); // arbre propre : retiré
+  });
+  it('R20 — worktree d\'une vague vivante : refus code 2 même avec --abandon-commits, absent de la liste des conservés', async () => {
+    const { parent, repo, dir, branch } = await conflictWave();
+    registerWave(cadenceHome(), { pid: process.pid, wave: WAVE, started: '2026-10-04T14:12:00.000Z', cwd: parent, repos: [repo] });
+    try {
+      for (const extra of [[], ['--abandon-commits']]) {
+        const r = await run(parent, ['--remove-worktree', 'a:L1', ...extra], fake());
+        expect(r.code).toBe(2);
+        expect(r.err).toContain(`la vague ${WAVE} est vivante`);
+        expect(existsSync(dir)).toBe(true);
+        expect(branches(repo)).toContain(branch);
+      }
+      expect((await run(parent, ['--status', WAVE], fake())).out).not.toContain('worktrees de lot conservés');
+    } finally {
+      unregisterWave(cadenceHome(), process.pid);
+    }
+    expect((await run(parent, ['--status', WAVE], fake())).out).toContain('worktrees de lot conservés'); // la vague finie, il l'est de nouveau
+    expect((await run(parent, ['--remove-worktree', 'a:L1', '--abandon-commits'], fake())).code).toBe(0);
   });
   it('R20 — lot inconnu ou sans worktree : refus code 2', async () => {
     const { parent } = await conflictWave();

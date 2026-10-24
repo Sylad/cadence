@@ -197,10 +197,10 @@ regles:
     tests: ["R16 — deux lots à écran : une seule application lancée à la fois dans le dépôt", "R16 — le verrou d'application est par dépôt, pris seulement par les étapes qui lancent l'application : une étape sans application d'un autre lot n'attend pas ce verrou"]
   - id: R17
     cas: [C2]
-    enonce: "Après un rebase non fast-forward dont le patch-id du diff du lot diffère (conflit résolu, contexte modifié), une revue courte (review-small, Sonnet) du diff rebasé est jouée avant l'intégration : sans constat bloquant ni majeur, son verdict est enregistré au sha intégré et la branche avance ; un bloquant ou un majeur rend le lot au lead, la branche du dépôt est inchangée et le worktree est conservé."
+    enonce: "Après un rebase non fast-forward dont le patch-id du diff du lot diffère (conflit résolu, contexte modifié), une revue courte (review-small, Sonnet) du diff rebasé est jouée avant l'intégration : sans constat bloquant ni majeur, son verdict est enregistré au sha intégré et la branche avance ; un bloquant ou un majeur rend le lot au lead, la branche du dépôt est inchangée et le worktree est conservé. Cette revue prend toujours le gabarit review-small qui porte la consigne d'intégration, y compris pour un lot déjà passé par la passe des mineurs."
     statut: sourcee
     source: "réponse du lead du 24-10, validée par Sylvain : cas (2) « revue courte (review-small, Sonnet) du diff rebasé avant l'intégration ; un bloquant ou un majeur rend le lot au lead »"
-    tests: ["R17 — patch-id différent : une revue review-small est jouée sur le diff rebasé avant l'avance", "R17 — revue sans constat : verdict au sha intégré, branche avancée", "R17 — un constat bloquant ou majeur : lot rendu, branche du dépôt inchangée", "R17 — patch-id identique : aucune revue jouée"]
+    tests: ["R17 — patch-id différent : une revue review-small est jouée sur le diff rebasé avant l'avance", "R17 — revue sans constat : verdict au sha intégré, branche avancée", "R17 — un constat bloquant ou majeur : lot rendu, branche du dépôt inchangée", "R17 — patch-id identique : aucune revue jouée", "R17 — un lot passé par la passe des mineurs reçoit quand même le gabarit d'intégration (pas review-recheck)"]
   - id: R18
     cas: [C2]
     enonce: "La porte de `raf done` (src/audit.ts:261-269, src/plan.ts:551-556) reste INCHANGÉE. Le verdict reporté (R9) est enregistré avec `commit` = `vers`, le dernier commit de travail intégré (R23) : `unreviewed` retrouve ce commit parmi ceux du lot et n'en compte aucun après lui, donc `raf done` passe sans exception. La trace `reporte` ({ de, vers, patchId }) n'est qu'une information pour la relecture et le journal : la porte ne la lit pas. Un verdict resté au sha relu d'avant le rebase n'existe pas dans ce mode (le programme n'écrit jamais le verdict avant l'avance, R23) ; s'il était édité à la main, la porte le traiterait comme aujourd'hui (commit absent de l'historique : tous les commits du lot comptent, refus)."
@@ -215,10 +215,10 @@ regles:
     tests: ["R19 — orchestrate --status liste un worktree conservé avec dépôt, lot, âge et commits non intégrés", "R19 — cadence lead tour liste le même worktree", "R19 — aucun worktree conservé : aucune ligne ajoutée"]
   - id: R20
     cas: [C3]
-    enonce: "Seule une commande explicite du lead retire un worktree conservé (cadence orchestrate --remove-worktree <projet>:<lot>) : elle refuse (code 2, rien retiré) tant qu'un commit du lot n'est ni intégré à la branche du dépôt ni confirmé abandonné par l'option nommée --abandon-commits ; un worktree entièrement intégré se retire sans option."
+    enonce: "Seule une commande explicite du lead retire un worktree conservé (cadence orchestrate --remove-worktree <projet>:<lot>) : elle refuse (code 2, rien retiré) tant qu'un commit du lot n'est ni intégré à la branche du dépôt ni confirmé abandonné par l'option nommée --abandon-commits, tant que l'arbre porte un fichier suivi modifié ou un fichier non suivi non ignoré (le retrait le supprimerait), et, avec ou sans --abandon-commits, tant qu'une vague vivante (registre des vagues) joue encore le lot ; le worktree d'une vague vivante n'est pas listé comme conservé ; un worktree entièrement intégré et propre se retire sans option."
     statut: sourcee
     source: "réponse du lead (24-10) : « une commande explicite du lead les retire (refus tant qu'un commit n'est ni intégré ni confirmé abandonné par une option nommée) » ; les noms --remove-worktree et --abandon-commits sont ceux de la fiche (cf. choix)"
-    tests: ["R20 — commits non intégrés sans --abandon-commits : refus code 2, worktree et branche intacts", "R20 — avec --abandon-commits : worktree et branche retirés", "R20 — worktree entièrement intégré : retiré sans option", "R20 — lot inconnu ou sans worktree : refus code 2"]
+    tests: ["R20 — commits non intégrés sans --abandon-commits : refus code 2, worktree et branche intacts", "R20 — avec --abandon-commits : worktree et branche retirés", "R20 — worktree entièrement intégré : retiré sans option", "R20 — lot inconnu ou sans worktree : refus code 2", "R20 — fichier non suivi non ignoré dans le worktree : refus code 2, fichier conservé, même sans commit non intégré", "R20 — worktree d'une vague vivante : refus code 2 même avec --abandon-commits, absent de la liste des conservés"]
 
   - id: R21
     cas: [C1, C2]
@@ -313,6 +313,8 @@ contrats:
     sortie: "worktree et branche du lot retirés (code 0) ; journal « orchestrate : <projet>:<lot> : worktree retiré (<n> commit(s) abandonné(s)) »"
     erreurs:
       - { code: log error, message: "orchestrate : <projet>:<lot> : <n> commit(s) non intégré(s), --abandon-commits pour les abandonner" }
+      - { code: log error, message: "orchestrate : <projet>:<lot> : fichiers suivis modifiés / non suivis dans le worktree (<fichiers>), --abandon-commits pour les abandonner" }
+      - { code: log error, message: "orchestrate : <projet>:<lot> : la vague <vague> est vivante et joue ce lot : worktree non retirable (arrêter la vague d'abord)" }
       - { code: log error, message: "orchestrate : <projet>:<lot> : aucun worktree conservé" }
     regles: [R12, R20]
 

@@ -333,3 +333,33 @@ describe('brief : variable {{repos}}', () => {
     expect(reposText('write', 'L1', [{ rel: NB, path: '/x/gitops' }])).not.toContain('also contains');
   });
 });
+
+describe('L303 — rapport de coupure au délai, dépôts voisins', () => {
+  it('R1 — une étape d\'écriture coupée au délai dit aussi les commits et le travail non commité laissés dans le voisin, préfixés de son nom', async () => {
+    const nb = neighbour();
+    const cut: Handler = (call) => {
+      commitFile(call.opts.cwd, 'a.txt', 'feat(L1): côté projet');
+      commitFile(nb, 'chart.yaml', 'feat(L1): côté voisin');
+      writeFileSync(join(nb, 'chart.yaml'), 'modifié\nencore\n');
+      writeFileSync(join(nb, 'chart.test.ts'), 'it();\n');
+      return { code: 0, stdout: '', stderr: '', timedOut: true };
+    };
+    const h = harness({ script: { implement: [cut] } });
+    const c = h.lot('L1', { repos: [{ rel: NB, path: nb }] });
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('2 commits conservés');
+    expect(c.lot.outcome).toContain(`travail NON commité : 2 fichiers (${NB}: chart.yaml, ${NB}: chart.test.ts)`);
+    expect(c.lot.outcome).toContain(`dont 1 de test (${NB}: chart.test.ts)`);
+    expect(c.lot.outcome).toContain('2 lignes ajoutées');
+  });
+
+  it('R1 — coupée sans rien dans le projet mais avec du travail dans le voisin : rendu au lead, pas un échec sec', async () => {
+    const nb = neighbour();
+    const h = harness({ script: { implement: [() => { writeFileSync(join(nb, 'chart.yaml'), 'x\n'); return { code: 0, stdout: '', stderr: '', timedOut: true }; }] } });
+    const c = h.lot('L1', { repos: [{ rel: NB, path: nb }] });
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain(`${NB}: chart.yaml`);
+  });
+});

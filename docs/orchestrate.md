@@ -826,4 +826,5 @@ The limit is also **extended while the session commits**: at each deadline, if H
 the start), the session gets 15 more minutes, 8 times at most (2 h at the most after the proportioned limit); with no commit since,
 it is cut. A cut write step is no longer a bare « failure »: the table gives the commits kept, the files left **uncommitted**
 (with those that are tests, and the lines added) and says the work stays in the repository. A cut that left commits or files
-hands the lot back to the lead; a cut that left nothing is a failure.
+hands the lot back to the lead; a cut that left nothing is a failure. For a lot with neighbouring repositories (`repos:`, L303),
+the report counts the commits and the uncommitted files of each neighbour too, prefixed with its name (`../gitops: chart.yaml`).

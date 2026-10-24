@@ -713,15 +713,21 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
     step.status = 'failed';
     step.cause = outcome.cause;
     if (write && outcome.cause === 'délai dépassé') {
-      // L298 : le travail laissé par une étape d'écriture coupée au délai est signalé (commits, fichiers, tests), pas un « échec » sec.
-      const after = await snapshot(wd(c));
-      const files = dirtBetween(before, after);
-      const commits = before.head ? readCommits(wd(c), { range: `${before.head}..HEAD` }).length : 0;
+      // L298 : le travail laissé par une étape d'écriture coupée au délai est signalé (commits, fichiers, tests), pas un « échec » sec ; L303 : dans les dépôts voisins aussi.
+      const repos = [{ rel: '', path: wd(c), before }, ...neighbours.map((r, i) => ({ rel: r.rel, path: r.path, before: beforeOthers[i] }))];
+      const files: string[] = [];
+      let commits = 0;
       let numstat = '';
-      try {
-        numstat = git(wd(c), 'diff', '--numstat', 'HEAD');
-      } catch {
-        // pas de HEAD : aucune ligne comptée
+      for (const r of repos) {
+        const after = await snapshot(r.path);
+        files.push(...dirtBetween(r.before, after).map((f) => (r.rel ? `${r.rel}: ${f}` : f)));
+        if (r.before.head) commits += readCommits(r.path, { range: `${r.before.head}..HEAD` }).length;
+        try {
+          numstat += git(r.path, 'diff', '--numstat', 'HEAD');
+        } catch {
+          // pas de HEAD : aucune ligne comptée
+        }
+        numstat += '\n';
       }
       const report = cutReport({ minutes: Math.round(delay / 60_000), commits, files, numstat });
       step.cause = report;

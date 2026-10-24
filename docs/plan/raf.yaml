@@ -3214,9 +3214,10 @@ lots:
     created: 2026-10-24
   - id: L286
     title: "orchestrate : « hit your weekly limit » reconnu comme quota (isQuotaMessage, result.ts:75) → vague suspendue, pas de lot failed ; test sur le message réel. Audit 24-10 : 3 lots failed le 14-10"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-10-24
+    started: 2026-10-24
   - id: L287
     title: "orchestrate : porte mécanique « code modifié sans test » avant la revue Opus (diff du lot : fichiers de src/ changés sans fichier de test touché → passe de correction directe, sans session de revue) ; seuil et exceptions dans cadence.yaml ; tests. Audit 24-10 : test manquant = 32 % des majeurs de revue (224 sur 690), une passe ≈ 190 k tokens"
     status: todo

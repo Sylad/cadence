@@ -20,11 +20,20 @@ const FAKE = `#!/usr/bin/env node
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const brief = args[args.indexOf('-p') + 1];
-fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, cwd: process.cwd(), brief }) + '\\n');
+const lectureFile = /(\\S+\\/lectures\\/a\\.json)/.exec(brief)[1];
+fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, cwd: process.cwd(), brief, lecturePresente: fs.existsSync(lectureFile) }) + '\\n');
 const mode = process.env.FAKE_MODE || 'ok';
 const out = (o) => process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, session_id: 's-1', num_turns: 4, duration_ms: 10, result: '', usage: { input_tokens: 100, cache_creation_input_tokens: 400, cache_read_input_tokens: 9000, output_tokens: 500 }, ...o }));
 if (mode === 'quota') { out({ is_error: true, subtype: 'error', result: 'Claude usage limit reached | resets at 5pm' }); process.exit(0); }
-if (mode === 'coupure' && fs.readFileSync(process.env.FAKE_LOG, 'utf8').split('\\n').filter(Boolean).length === 1) process.kill(process.pid, 'SIGKILL');
+if (mode === 'coupure' && fs.readFileSync(process.env.FAKE_LOG, 'utf8').split('\\n').filter(Boolean).length === 1) {
+  // la session coupée a consommé des jetons (son journal) et laissé une lecture à moitié écrite
+  const dir = require('node:path').join(process.env.FAKE_HOME, 'projects', process.cwd().replace(/[^a-zA-Z0-9]/g, '-'));
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(require('node:path').join(dir, args[args.indexOf('--session-id') + 1] + '.jsonl'), JSON.stringify({ message: { id: 'm1', usage: { input_tokens: 10, cache_creation_input_tokens: 20, cache_read_input_tokens: 5000, output_tokens: 30 } } }) + '\\n');
+  fs.mkdirSync(require('node:path').dirname(lectureFile), { recursive: true });
+  fs.writeFileSync(lectureFile, '{ "a moitie');
+  process.kill(process.pid, 'SIGKILL');
+}
 if (mode === 'crash') { process.stderr.write('boom'); process.exit(1); }
 const file = /(\\S+\\/lectures\\/a\\.json)/.exec(brief)[1];
 const doc = JSON.parse(fs.readFileSync(file.replace('/lectures/a.json', '/document.json'), 'utf8'));
@@ -53,9 +62,9 @@ function setup(mode = 'ok', pages: FixturePage[] = NORME) {
   const cwd = join(base, 'work');
   mkdirSync(cwd);
   writeFileSync(join(cwd, 'cadence.yaml'), `references:\n  dir: ${refs}\n`);
-  const env = { RAF_TODAY: '2026-10-24', PATH: `${stubs}:${process.env.PATH}`, XDG_DATA_HOME: join(base, 'xdg'), CADENCE_CLAUDE_BIN: bin, FAKE_LOG: log, FAKE_MODE: mode } as NodeJS.ProcessEnv;
+  const env = { RAF_TODAY: '2026-10-24', PATH: `${stubs}:${process.env.PATH}`, XDG_DATA_HOME: join(base, 'xdg'), CADENCE_CLAUDE_BIN: bin, CLAUDE_CONFIG_DIR: join(base, 'claude-home'), FAKE_HOME: join(base, 'claude-home'), FAKE_LOG: log, FAKE_MODE: mode } as NodeJS.ProcessEnv;
   const pdf = writePdf(base, 'norme.pdf', pages);
-  const appels = (): { args: string[]; cwd: string; brief: string }[] => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const appels = (): { args: string[]; cwd: string; brief: string; lecturePresente: boolean }[] => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   return { base, refs, env, cwd, pdf, appels };
 }
 
@@ -178,21 +187,47 @@ describe('cadence ref analyse (L265)', () => {
     expect(pile.appels()).toHaveLength(1);
   });
 
-  it('R21 — le conseil du refus au plafond réussit : un autre slug, car les pages déjà rendues du slug refusé restent lues', async () => {
+  it('R21 — au plafond, le conseil est --sections sur le même slug, et il réussit : seules les pages de --sections (et leurs figures) sont lues', async () => {
     const s = setup('ok', pagesVides(25));
     const refus = await analyse(s);
     expect(refus.code).toBe(2);
     const conseil = /cadence ref analyse (\S+) --slug (\S+) --sections (\S+)/.exec(refus.err);
     expect(conseil).not.toBeNull();
-    expect(conseil![2]).not.toBe('norme');
-    const encore = await analyse(s, '--sections', conseil![3]!);
-    expect(encore.code).toBe(2);
+    expect(conseil![2]).toBe('norme');
     const out: string[] = [];
     const err: string[] = [];
     const code = await run(['ref', 'analyse', s.pdf, '--slug', conseil![2]!, '--sections', conseil![3]!], { cwd: s.cwd, env: s.env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-24T10:00:00') });
     expect(err.join('\n')).toBe('');
     expect(code).toBe(0);
     expect(s.appels()).toHaveLength(1);
+    expect(out.join('\n')).toContain('10 pages lues');
+    const brief = s.appels()[0]!.brief;
+    expect(brief).toContain('page-3.png');
+    expect(brief).toContain('page-12.png');
+    expect(brief).not.toContain('page-13.png');
+  });
+
+  it('R24 — les pages rendues par un add précédent ne sont pas lues quand --sections est donné, mais le sont sans --sections', async () => {
+    const s = setup('ok', pagesVides(31));
+    expect((await analyse(s, '--sections', '1-5')).code).toBe(0);
+    expect((await analyse(s, '--sections', '20-22')).code).toBe(0);
+    const brief = s.appels()[1]!.brief;
+    expect(brief).toContain('page-21.png');
+    expect(brief).not.toContain('page-3.png');
+    const sans = await analyse(s);
+    expect(sans.code).toBe(0);
+    expect(s.appels()[2]!.brief).toContain('page-3.png');
+    expect(s.appels()[2]!.brief).toContain('page-21.png');
+  });
+
+  it('R25 — sans --sections, un document analysé à plus de 20 pages rendues est refusé avec la commande --sections qui réussit', async () => {
+    const s = setup('ok', pagesVides(25));
+    expect((await analyse(s, '--sections', '1-25')).code).toBe(2);
+    const refus = await analyse(s);
+    expect(refus.code).toBe(2);
+    expect(refus.err).toContain('25 pages rendues');
+    expect(refus.err).toMatch(/--sections \S+/);
+    expect((await analyse(s, '--sections', '2-4')).code).toBe(0);
   });
 
   it('R22 — une lecture coupée par un signal sans rien écrire est relancée une fois en session neuve', async () => {
@@ -202,6 +237,15 @@ describe('cadence ref analyse (L265)', () => {
     expect(r.code).toBe(0);
     expect(s.appels()).toHaveLength(2);
     expect(existsSync(join(s.refs, 'norme', 'lectures', 'a.json'))).toBe(true);
+  });
+
+  it('R23 — une lecture relancée après coupure compte les jetons de la session coupée et efface sa lecture à moitié écrite', async () => {
+    const s = setup('coupure');
+    const r = await analyse(s);
+    expect(r.code).toBe(0);
+    expect(s.appels().map((a) => a.lecturePresente)).toEqual([false, false]);
+    expect(lectureOf(s).usage.tokens).toBe(1000 + 60);
+    expect(r.out).toContain('tokens : 1060');
   });
 
   it('R10 — le plafond est dit dans la sortie, à côté des pages lues', async () => {

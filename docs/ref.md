@@ -290,25 +290,28 @@ and carry the `slug` and `sha256` of the document that was read, never another (
 
 A session cut by a signal with nothing written is started again once in a fresh session (like a review); cut twice, it is a failure (exit 2).
 
-**Declared ceiling: 20 pages per reading** (`LECTURE_PAGES_MAX`, design §5 « Taille »). The pages read are the pages rendered by `add` (those of `--sections`, plus the pages of the figures they cite,
-plus those rendered by an earlier `add` of the same document). More than 20 is refused before any session (exit 2, the count and the command to choose fewer pages: `add` keeps the pages already rendered under a slug, so `--sections` only helps under another `--slug`), and so is a large document with no
-`--sections` (no page rendered); the pages `add` rendered stay. Splitting into several readings is not done here (lot 6 and after).
+**Declared ceiling: 20 pages per reading** (`LECTURE_PAGES_MAX`, design §5 « Taille »). With `--sections`, the pages read are those of `--sections` plus the pages of the figures they cite: the pages an
+earlier `add` of the same document rendered stay on disk but are **not** read, so choosing fewer pages with `--sections` works under the same slug. Without `--sections`, every rendered page is read (the whole document when it
+has 30 pages or fewer, else the pages an earlier `add` rendered). More than 20 pages to read is refused before any session (exit 2, the count and the command `cadence ref analyse <document> --slug <slug> --sections 3-12`), and so is a large document with no
+`--sections` and no page rendered. Splitting into several readings is not done here (lot 6 and after).
+
+A session cut by a signal and started again (see above) is counted in full: `usage.tokens` adds the tokens of the cut session (read back from its Claude Code journal, as `orchestrate` does) to those of the fresh one, and the half-written `lectures/a.json` of the cut session is removed before the fresh one starts.
 
 ```
 $ cadence ref analyse norme.pdf --sections 4-9
 norme : norme.pdf
 pages : 120
-rendues : 7 (4, 5, 7, 8, 9, 33, 34)
+rendues : 8 (4, 5, 6, 7, 8, 9, 33, 34)
 …
-norme : lecture unique (sonnet) — 7 pages lues (plafond d'une lecture : 20)
+norme : lecture unique (sonnet) — 8 pages lues (plafond d'une lecture : 20)
 lecture : ~/.local/share/cadence/references/norme/lectures/a.json
 éléments : 41 (mesure : 6, lu : 32, incertain : 3)
-tokens : 182000 (26000 par page, 7 pages lues)
+tokens : 182000 (22750 par page, 8 pages lues)
 question : Que veut dire « Figure 1 » ?
 ```
 
 The last line is one `question :` per question of the agent (a `contredit`, an `incertain`). Exit codes: **0** a valid reading, **1** a refused reading (no file, `ref check` deviations, wrong genre, wrong document: one
-`✗ <reason>` line then `N écart(s)` on the standard output, the file is left as written, no `usage` is added), **2** refusal (unknown `--model`, no page or more than 20, tool or file as for `add`, a session that
+`✗ <reason>` line then `N écart(s)` on the standard output, the file is left as written, no `usage` is added), **2** refusal (unknown `--model`, no page or more than 20 to read, tool or file as for `add`, a session that
 failed: `la session de lecture a échoué : <cause>`), **3** quota reached (message on the error output, no reading; run it again later). The tokens per page of the output divide by the pages **read**; `ref eval` divides by the `pages` of the expected inventory,
 the same number for a corpus case read whole.
 

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { RafError } from '../plan.js';
@@ -32,7 +33,7 @@ export function refCommand(rest: string[], values: { sections?: string; slug?: s
   }
   if (verb === 'analyse' && args.length === 1) {
     const claude = realClaude(io.env.CADENCE_CLAUDE_BIN || 'claude', io.env);
-    return analyse({ document: args[0]!, slug: values.slug, sections: values.sections, model: values.model, env: io.env, cwd: io.cwd, refsDir, configPath, now: io.now(), out: io.out, err: io.err, claude, agents: readAgents(AGENTS_DIR) });
+    return analyse({ document: args[0]!, slug: values.slug, sections: values.sections, model: values.model, env: io.env, cwd: io.cwd, refsDir, configPath, claudeHome: io.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), now: io.now(), out: io.out, err: io.err, claude, agents: readAgents(AGENTS_DIR) });
   }
   if (verb === 'measure' && args.length === 3) {
     measure({ slug: args[0]!, page: args[1]!, zone: args[2]!, quoi: values.quoi, largeur: values.largeur, env: io.env, refsDir, json: values.json === true, out: io.out });

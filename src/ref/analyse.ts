@@ -3,7 +3,8 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readOrchestrateConfig } from '../config.js';
 import { PACKAGE_ROOT } from '../orchestrate/snapshot.js';
-import { runSession, type AgentDef, type ClaudeFn, type Model } from '../orchestrate/launch.js';
+import { journalTokens, runSession, type AgentDef, type ClaudeFn, type Model } from '../orchestrate/launch.js';
+import { sumTokens } from '../orchestrate/result.js';
 import { RafError } from '../plan.js';
 import { add, type AddOptions } from './add.js';
 import { checkInventaire, readInventaire } from './check.js';
@@ -29,6 +30,8 @@ export interface AnalyseOptions extends Omit<AddOptions, 'out'> {
   model?: string;
   /** Chemin du cadence.yaml lu par les commandes de l'agent (`--config`) : celui de `references.dir`. */
   configPath: string;
+  /** Dossier de Claude Code (`CLAUDE_CONFIG_DIR`, sinon `~/.claude`) : le journal d'une session coupée y est relu pour compter ses jetons. */
+  claudeHome: string;
   claude: ClaudeFn;
   agents: Record<string, AgentDef>;
   out: (line: string) => void;
@@ -78,12 +81,10 @@ function ecartsDeLecture(lecture: unknown, doc: { slug: string; sha256: string }
 export async function analyse(o: AnalyseOptions): Promise<number> {
   const model = (o.model ?? 'sonnet') as Model;
   if (!ANALYSE_MODELS.includes(model)) throw new RafError(`ref analyse : --model invalide : « ${o.model} » (attendu : ${ANALYSE_MODELS.join(', ')})`);
-  const { slug, docDir, doc } = add({ document: o.document, slug: o.slug, sections: o.sections, env: o.env, cwd: o.cwd, refsDir: o.refsDir, now: o.now, out: o.out });
-  const pages = doc.pages.filter((p) => p.rendered).map((p) => p.n);
-  // `add` garde les pages déjà rendues du slug : choisir moins de pages ne réussit que sous un autre slug
-  const sections = `\n  choisir les pages à lire (les ${pages.length} pages rendues sous « ${slug} » restent lues) : cadence ref analyse ${o.document} --slug ${slug}-lecture --sections 3-12`;
+  const { slug, docDir, doc, lues: pages } = add({ document: o.document, slug: o.slug, sections: o.sections, env: o.env, cwd: o.cwd, refsDir: o.refsDir, now: o.now, out: o.out });
+  const sections = `\n  choisir les pages à lire : cadence ref analyse ${o.document} --slug ${slug} --sections 3-12`;
   if (pages.length === 0) throw new RafError(`ref analyse : aucune page rendue : rien à lire${sections}`);
-  if (pages.length > LECTURE_PAGES_MAX) throw new RafError(`ref analyse : ${pages.length} pages rendues, plafond d'une lecture : ${LECTURE_PAGES_MAX} pages${sections}`);
+  if (pages.length > LECTURE_PAGES_MAX) throw new RafError(`ref analyse : ${pages.length} pages ${o.sections === undefined ? 'rendues' : 'à lire (--sections et les figures qu\'elles citent)'}, plafond d'une lecture : ${LECTURE_PAGES_MAX} pages${sections}`);
 
   const file = join(docDir, 'lectures', 'a.json');
   rmSync(file, { force: true }); // une lecture d'un passage précédent ne passe jamais pour celle de celui-ci
@@ -103,7 +104,11 @@ export async function analyse(o: AnalyseOptions): Promise<number> {
       addDirs: [docDir],
       timeoutMs: config.timeouts.work,
     },
-    { claude: o.claude, agents: o.agents },
+    {
+      claude: o.claude,
+      agents: o.agents,
+      onRelaunch: () => rmSync(file, { force: true }), // la lecture à moitié écrite de la session coupée ne passe pas pour celle de la neuve
+    },
   );
   if (outcome.kind === 'quota') {
     o.err(`ref analyse : quota atteint, aucune lecture écrite : ${outcome.message}`);
@@ -127,7 +132,9 @@ export async function analyse(o: AnalyseOptions): Promise<number> {
   const problems = schema.length > 0 ? schema : ecartsDeLecture(lecture, doc);
   if (problems.length > 0) return refuse(problems);
 
-  const tokens = outcome.result.tokens.counted;
+  // les jetons de la session coupée (son journal) s'ajoutent à ceux de la relance, comme dans orchestrate
+  const cut = outcome.relaunched ? journalTokens(o.claudeHome, docDir, outcome.relaunched.sessionId) : null;
+  const tokens = cut ? sumTokens(cut.tokens, outcome.result.tokens).counted : outcome.result.tokens.counted;
   lecture.usage = { tokens, modele: model, session: outcome.result.sessionId };
   writeFileSync(file, `${JSON.stringify(lecture, null, 2)}\n`);
 

@@ -54,8 +54,11 @@ export interface AddOptions {
   out: (line: string) => void;
 }
 
-/** `cadence ref add` : enregistre un PDF, rend les pages visées, garde le texte positionné et les images, construit l'index des figures. Rend le dossier du document. */
-export function add(o: AddOptions): { slug: string; docDir: string; doc: StoredDocument } {
+/**
+ * `cadence ref add` : enregistre un PDF, rend les pages visées, garde le texte positionné et les images, construit l'index des figures. Rend le dossier du document
+ * et `lues`, les pages qu'une lecture doit lire : avec `--sections`, ces pages et celles des figures qu'elles citent (pas les pages rendues par un appel précédent) ; sans, toutes les pages rendues.
+ */
+export function add(o: AddOptions): { slug: string; docDir: string; doc: StoredDocument; lues: number[] } {
   // Les outils d'abord : sans eux, rien n'est lu ni écrit.
   const tools = requireTools(o.env);
   const file = resolve(o.cwd, o.document);
@@ -123,5 +126,6 @@ export function add(o: AddOptions): { slug: string; docDir: string; doc: StoredD
   o.out(`liens non résolus : ${index.unresolved.length}`);
   o.out(`dossier : ${docDir}`);
   if (ordered.length === 0) o.out(`aucune page rendue (grand document : seul l'index est construit) — cadence ref add ${o.document} --slug ${slug} --sections 3-5 pour rendre des pages`);
-  return { slug, docDir, doc };
+  const lues = o.sections === undefined ? ordered : [...new Set([...wanted, ...citedPages(index, new Set(wanted))])].sort((a, b) => a - b);
+  return { slug, docDir, doc, lues };
 }

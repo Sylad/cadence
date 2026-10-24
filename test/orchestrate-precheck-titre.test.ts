@@ -256,3 +256,25 @@ describe('cadence perf — part de « oui » du précheck (L288)', () => {
     expect(out.join('\n')).toContain('part de « oui » du précheck');
   });
 });
+
+describe('orchestrate — précheck de tout lot sans commit avec le modèle local (L296)', () => {
+  it('R22 — avec precheck: local, un lot sans commit dont le titre ne cite rien est pré-vérifié (le local ne coûte rien au quota)', () => {
+    const h = harness({ lots: [{ title: 'Premier' }, { title: 'orchestrate : afficher la durée des étapes' }] });
+    expect(needsPrecheck({ precheck: true, precheckLocal: true }, h.plan(), h.repo, 'L2')).toBe(true);
+    expect(needsPrecheck({ precheck: true }, h.plan(), h.repo, 'L2')).toBe(false);
+  });
+
+  it('R23 — precheck: local ne pré-vérifie pas un lot qui a des commits, et precheck: false coupe toujours', () => {
+    const h = harness({ lots: [{ title: 'Sans rapport' }] });
+    expect(needsPrecheck({ precheck: false, precheckLocal: false }, h.plan(), h.repo, 'L1')).toBe(false);
+    commitFile(h.repo, 'pre.txt', 'feat(L1): déjà là');
+    expect(needsPrecheck({ precheck: true, precheckLocal: true }, h.plan(), h.repo, 'L1')).toBe(false);
+  });
+
+  it('R24 — dans le cycle, le précheck local part pour un titre sans constat ni lot cité ; Sonnet ne se lance que pour confirmer un « oui »', async () => {
+    const h = harness({ lots: [{ title: 'Premier' }, { title: 'Afficher la durée des étapes' }], script: { precheck: [() => claudeOut(precheckReport({ dejaPresent: 'non' }))], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L2', {}, { precheck: true, precheckLocal: true }));
+    expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+    expect(h.calls[0].local).toBe(true);
+  });
+});

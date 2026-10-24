@@ -1022,10 +1022,12 @@ function citesPriorWork(text: string, lot: string, ids: string[]): boolean {
  * Le contrôle préalable ne vaut que pour un lot sans commit (avec des commits, l'implémentation reprend légitimement) dont le
  * titre ou le goal (clé `goal:` du plan, ou `goal` donné au lancement) cite un constat ou un autre lot (L288, L292) : sans cela
  * rien ne laisse croire qu'un autre lot l'a déjà livré, et le contrôle coûtait 7 % des tokens pour 10 « oui » sur 30 mesurés
- * (audit du 24-10).
+ * (audit du 24-10). Sur le modèle local (`precheck: local`, L296) le critère tombe : le titre faisait perdre 7 des 17 « oui »
+ * réels, et le contrôle ne coûte plus rien au quota (seul un « oui » est confirmé par Sonnet).
  */
-export function needsPrecheck(config: { precheck: boolean }, plan: Plan, repo: string, lot: string, repos: LotRepo[] = [], goal?: string): boolean {
+export function needsPrecheck(config: { precheck: boolean; precheckLocal?: boolean }, plan: Plan, repo: string, lot: string, repos: LotRepo[] = [], goal?: string): boolean {
   if (!config.precheck || hasWork(plan, { repo, repos, lot })) return false;
+  if (config.precheckLocal) return true;
   const l = plan.lot(lot);
   const text = [l.title, l.goal, goal].filter(Boolean).join('\n');
   return citesPriorWork(text, lot, plan.lots().map((x) => x.id));

@@ -3398,25 +3398,33 @@ lots:
     finished: 2026-10-24
   - id: L301
     title: "worktrees (suite revue L279, à faire avant activation) : lot rendu hors intégration (revue non conforme, tests rouges, HEAD déplacé, plan touché, verrou d'acceptation) — chemin de reprise : nouvelle vague du même lot qui retrouve sa branche cadence/<vague>/<lot> la plus récente (ou intégration à la main documentée) ; docs/orchestrate.md:517 « usual paths » corrigé ; mineurs de la revue : intégration après arrêt de l'application UX (cycle.ts:1891), worktree hors du dépôt quand la vague part de sa racine (lotTreeDir), foreignDirty/ownFile et git/tryGit dédupliqués, tests de waveReadsIntegrate/Replay ; tests"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "conforme, 3 notes mineures (reprise d'une branche rendue à l'intégration puis « commits abandonnés » côté ancienne vague ; échec du déplacement ou du renommage non journalisé ; intégration à la main d'une branche qui touche le plan non décrite) — orchestré (vague 2026-10-24-1700, 1 passe(s) de correction)", commit: 1efc26db1113ceb23c28cc2543c541b88070fa10 }
+    finished: 2026-10-24
   - id: L302
     title: "orchestrate (suite revue L297) : sourcer une règle de fiche après --answer ne reformate pas la fiche (doc.toString change [R2] en [ R2 ] sur les 17 fiches de docs/specs — garder le style de flux d'origine ou n'éditer que les lignes de la règle) ; une réponse qui supprime ou change la règle (« non, supprime R3 », « change en X ») ne la marque pas « sourcée » telle quelle : la règle est laissée à la session spec reprise, ou rendue au lead si la session ne la traite pas ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant (1 minor: CRLF mixte sur la ligne source insérée) — orchestré (vague 2026-10-24-1700, 0 passe(s) de correction)", commit: 56c7f1fe35754817b5fbd93b7f4ea7371ca12b2d }
+    finished: 2026-10-24
   - id: L303
     title: "worktrees (suites des revues L298–L300, avant activation) : rapport de coupure au délai étendu aux dépôts voisins (cycle.ts:723) ; refus tardif d'intégration : verdict de revue courte non dupliqué à la reprise (cycle.ts:2239/2202) ; test qui atteint le contrôle de branche de writeVerdict (cycle.ts:2101) ; branche retirée distinguée d'une branche sans branch.<nom>.base (command.ts:929) ; CHANGELOG : double « ### Fixed » de [Unreleased] ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant (1 minor: [Unreleased] still holds two « ### Fixed » and two « ### Added » headings, only the adjacent empty duplicate was removed) — orchestré (vague 2026-10-24-1700, 0 passe(s) de correction)", commit: 7f1625cd75d1d4bd8b247feffaad7a5c30b6a520 }
+    finished: 2026-10-24
+  - id: L304
+    title: "worktrees (suites revue L301, avant activation) : reprise d'une branche de vague passée (recoverTree) — refuser ou signaler au moment de la reprise un worktree conservé aux fichiers suivis modifiés (comme R11), une branche dont un commit touche le plan (au lieu d'aller jusqu'au conflit d'intégration), la branche d'un lot rendu À l'intégration dans sa vague (next: integrate) ; échec de git worktree move / branch -m journalisé, pas avalé (worktree.ts:226) ; doc : nom de branche cadence/<vague>/_--<lot> pour une vague à la racine, procédure d'intégration à la main écrite ; test sans la variable : une nouvelle vague laisse la branche conservée ; CHANGELOG [Unreleased] : un seul « ### Fixed » et un seul « ### Added » ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

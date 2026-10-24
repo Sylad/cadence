@@ -81,4 +81,6 @@ No indicator of produced volume (lines of code, commits, total tokens or euros o
 
 Both are judged like the other indicators (`⚠` above +25 %). For red deliveries the sample is the deliveries of the window, green and red (at least 5 per window); for blocking QA findings it is the plan lots `done` in the window (at least 5 per window). `--json` adds `quality: { redDeliveries, qaBlocking }` (Indicator format, `twin` `throughput.delivered` and `throughput.escaped`); every other key is unchanged, and `throughput.delivered.twin` stays `throughput.escaped`.
 
+**Red deliveries by class and project** (L282): when the current window holds at least one red delivery, `cadence perf` prints under the « Débit » section two lines, `livraisons rouges par classe (fenêtre courante)` and `livraisons rouges par projet`, each sorted by count (ties: refus, CI, déploiement, vérification, then `non classée` for lines written before the class existed). `--json` adds `quality.reds: { current, previous }`, each `{ total, byClass: { refus, ci, deploiement, verification, inconnue }, byProject: { <project>: { <class>: n } } }`; the other keys are unchanged. The reason itself (the last lines of the failing command's output) stays in `deliveries-failed.log`: read it there.
+
 `cadence lead tour` prints the `⚠` lines of `perf` as its **perf header** (see [lead tour](lead.md#lead-tour)).

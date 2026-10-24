@@ -5,7 +5,7 @@ import { addDays, diffDays, isDay, toDay, type Day } from './dates.js';
 import { gitCommonDir } from './git.js';
 import { findProjects } from './lead.js';
 import type { Lot } from './plan.js';
-import { readDeliveries, readFailedDeliveries } from './state.js';
+import { FAIL_CLASSES, readDeliveries, readFailedEntries, type FailClass, type FailedDelivery } from './state.js';
 
 /** Le lot d'un plan tel que `cadence perf` le lit. */
 export type PlanLot = Pick<Lot, 'id' | 'status' | 'created' | 'finished' | 'estimate' | 'notes'>;
@@ -105,6 +105,15 @@ export interface CostBlock {
   withoutJournal: { current: number; previous: number };
 }
 
+/** Les livraisons rouges d'une fenêtre ventilées (L282) ; `inconnue` : une ligne d'avant la classe. */
+export type RedClass = FailClass | 'inconnue';
+export interface RedBreakdown {
+  total: number;
+  byClass: Record<RedClass, number>;
+  /** Par projet, les seules classes présentes. */
+  byProject: Record<string, Partial<Record<RedClass, number>>>;
+}
+
 export interface PerfResult {
   since: string | null;
   today: Day;
@@ -118,7 +127,7 @@ export interface PerfResult {
   durations: Record<string, Indicator>;
   cost: CostBlock;
   /** La qualité de livraison (L227) : livraisons rouges (jumeau de « livrés ») et constats QA bloquants (jumeau des défauts échappés). */
-  quality: { redDeliveries: Indicator; qaBlocking: Indicator };
+  quality: { redDeliveries: Indicator; qaBlocking: Indicator; reds: { current: RedBreakdown; previous: RedBreakdown } };
   /** Lots de journal rendus dans les deux fenêtres qui n'ont pas de lot dans les plans du dossier (R15). */
   orphans: number;
   warnings: string[];
@@ -133,6 +142,8 @@ export interface PerfInput {
   deliveries?: Map<string, Day[]>;
   /** Jours de deliveries-failed.log par projet (L227) ; un projet absent compte 0 livraison rouge. */
   failedDeliveries?: Map<string, Day[]>;
+  /** Les mêmes livraisons rouges avec leur classe (L282) : de quoi les ventiler ; absent, la ventilation est vide. */
+  failures?: Map<string, FailedDelivery[]>;
   /** La grille de prix de cadence.yaml ; absente : coût n/d (R7). */
   prices?: PriceGrid | null;
   windows: Windows;
@@ -490,7 +501,21 @@ export function computePerf(input: PerfInput): PerfResult {
     if (!blockingRecognised || w.days === 0) return null;
     return [...plans.values()].flat().filter((l) => l.status === 'done' && l.finished !== undefined).reduce((sum, l) => sum + l.notes.filter((n) => isDay(n.date) && inWindow(n.date, w) && l.finished! <= n.date && isQaBlockingNote(n.text)).length, 0);
   };
+  const breakdown = (w: Window): RedBreakdown => {
+    const b: RedBreakdown = { total: 0, byClass: { refus: 0, ci: 0, deploiement: 0, verification: 0, inconnue: 0 }, byProject: {} };
+    for (const [project, entries] of input.failures ?? []) {
+      for (const e of entries.filter((x) => inWindow(x.day, w))) {
+        const cls: RedClass = e.cls ?? 'inconnue';
+        b.total += 1;
+        b.byClass[cls] += 1;
+        const p = (b.byProject[project] ??= {});
+        p[cls] = (p[cls] ?? 0) + 1;
+      }
+    }
+    return b;
+  };
   const quality = {
+    reds: both(windows, breakdown),
     redDeliveries: mk(reds, deliveriesOf, 'up', 'throughput.delivered'),
     qaBlocking: mk(both(windows, blockingOf), both(windows, deliveredCount), 'up', twinEscaped, escapedNote),
   };
@@ -600,6 +625,25 @@ export function perfHeader(r: PerfResult): string[] {
   return header;
 }
 
+const RED_LABELS: Record<RedClass, string> = { refus: 'refus avant action', ci: 'CI', deploiement: 'déploiement', verification: 'vérification', inconnue: 'non classée' };
+
+/** Deux lignes (par classe, par projet) des livraisons rouges de la fenêtre courante, la plus grosse d'abord ; aucune sans livraison rouge. */
+function redBreakdownLines(b: RedBreakdown): string[] {
+  if (b.total === 0) return [];
+  const order = (a: [string, number], c: [string, number]) => c[1] - a[1] || a[0].localeCompare(c[0]);
+  // À égalité, l'ordre des étapes de la livraison (refus, CI, déploiement, vérification), les lignes sans classe en dernier.
+  const rank = (k: RedClass) => (k === 'inconnue' ? FAIL_CLASSES.length : FAIL_CLASSES.indexOf(k));
+  const classes = (counts: Partial<Record<RedClass, number>>) =>
+    (Object.entries(counts) as [RedClass, number][]).filter(([, n]) => n > 0).sort((a, c) => c[1] - a[1] || rank(a[0]) - rank(c[0])).map(([k, n]) => [RED_LABELS[k], n] as [string, number]);
+  const byProject = Object.entries(b.byProject)
+    .map(([name, counts]) => [name, Object.values(counts).reduce((a, n) => a + n, 0), classes(counts)] as const)
+    .sort((a, c) => order([a[0], a[1]], [c[0], c[1]]));
+  return [
+    `  livraisons rouges par classe (fenêtre courante) : ${classes(b.byClass).map(([k, n]) => `${k} ${n}`).join(' · ')}`,
+    `  livraisons rouges par projet : ${byProject.map(([name, n, cl]) => `${name} ${n} (${cl.map(([k, c]) => `${k} ${c}`).join(', ')})`).join(' · ')}`,
+  ];
+}
+
 /** Le tableau en texte : chaque indicateur de vitesse sur la même ligne que son jumeau de qualité (R8). */
 export function renderPerf(r: PerfResult): string[] {
   const lines = indicatorLines(r);
@@ -628,6 +672,7 @@ export function renderPerf(r: PerfResult): string[] {
     for (const l of lines.filter(([x]) => labels.includes(x.label))) out.push(row(l));
   };
   section('Débit', ['prêts', 'rendus par jour', 'livrés', 'part des rendus sur budget', 'défauts échappés']);
+  out.push(...redBreakdownLines(r.quality.reds.current));
   section('Passes de correction', ['médiane de passes de correction par lot', 'part des lots à au moins 2 passes', 'part conforme du premier coup']);
   const c = r.corrections.causes.current;
   const top = c.top.map((t, i) => `${i + 1}. ${LABELS[t.cause]} ${t.passes} (${pct(t.share)})`).join(' · ');
@@ -674,12 +719,12 @@ export function readProjectDeliveries(parent: string, projects: string[]): Map<s
   return deliveries;
 }
 
-/** Les jours de livraison rouge de chaque projet du dossier, lus dans `<gitCommonDir>/cadence/deliveries-failed.log` (L227). Un projet sans journal compte 0 rouge ; un projet qui n'est pas un dépôt git est absent de la carte ; rien n'est créé. */
-export function readProjectFailedDeliveries(parent: string, projects: string[]): Map<string, Day[]> {
-  const failed = new Map<string, Day[]>();
+/** Les livraisons rouges (jour, classe, raison) de chaque projet du dossier, lues dans `<gitCommonDir>/cadence/deliveries-failed.log` (L227). Un projet sans journal compte 0 rouge ; un projet qui n'est pas un dépôt git est absent de la carte ; rien n'est créé. */
+export function readProjectFailedEntries(parent: string, projects: string[]): Map<string, FailedDelivery[]> {
+  const failed = new Map<string, FailedDelivery[]>();
   for (const name of projects) {
     try {
-      failed.set(name, readFailedDeliveries(join(gitCommonDir(join(parent, name)), 'cadence')));
+      failed.set(name, readFailedEntries(join(gitCommonDir(join(parent, name)), 'cadence')));
     } catch {
       // pas un dépôt git : aucune livraison rouge pour ce projet
     }

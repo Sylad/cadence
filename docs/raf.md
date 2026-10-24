@@ -156,7 +156,7 @@ rather than on the plan; it prints no legacy warning and never commits (review t
   replacement cannot follow — another file of the folder (`docs/plan/journal.ndjson`), the folder itself, a path built piece by piece
   (`join(root, 'docs', 'plan', 'raf.yaml')`, even split over several lines, `Path("docs") / "plan"`; reported at the line where it starts), a binary file, or a text file that is not UTF-8 (rewriting it would alter its bytes). Each one is listed as `file:line`. Fix it by hand and run the command again, or
   declare a file that cites the path without reading the plan (a fixture, a document about the old place) under `migrate.keep` in
-  `cadence.yaml`: a list of paths or patterns (`*`, `**`, `?`, as `docs.sync`), whose matches are listed as left as they are.
+  `cadence.yaml`: a list of paths or patterns (`*`, `**`, `?`, as `docs.sync`), whose matches are listed as left as they are. A document that names the legacy place next to the new one (a stability contract, a description of the fallback) belongs there too: a line citing both would otherwise be rewritten to cite `.cadence/raf.yaml` twice.
 - **It refuses** when `docs/plan/raf.yaml` and `.cadence/raf.yaml` both exist, and when neither does.
 - **It can be run again**: with the plan already at `.cadence/raf.yaml` (moved by hand, or by a first run that stopped), it only handles the
   readers that remain, and says `rien à migrer` when there is none.

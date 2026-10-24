@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { run } from '../src/cli.js';
+import { planMigration } from '../src/migrate.js';
 import { gitRepo, tempDir } from './helpers.js';
 
 const PLAN = 'project: demo\nprefix: L\nlots:\n  - { id: L1, title: Un lot, status: todo }\n';
@@ -267,5 +268,12 @@ describe('raf migrate', () => {
     const r = raf(dir, 'migrate');
     expect(r.code).toBe(0);
     expect(read(dir, 'scripts/plan-data.sh')).toContain('.cadence/raf.yaml');
+  });
+
+  it('R7 — cadence est entièrement migré : rejouer raf migrate sur ses propres sources ne trouve aucun lecteur à réécrire', () => {
+    const m = planMigration(process.cwd());
+    expect(m.readers).toEqual([]);
+    expect(m.unhandled).toEqual([]);
+    expect(m.move).toBeNull();
   });
 });

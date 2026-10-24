@@ -25,6 +25,8 @@ migrate:
     - skills/**
     - README.md
     - docs/raf.md
+    - docs/fonctionnement.md
+    - docs/stabilite.md
     - docs/orchestrate.md
     - docs/lead.md
     - docs/session.md
@@ -36,6 +38,7 @@ migrate:
     - test/plan-dossier-cache.test.ts
     - test/check.test.ts
     - test/lead-tour-perf.test.ts
+    - test/ventilation-plan.test.ts
     - test/mise-en-service.test.ts
     - test/orchestrate-command.test.ts          # le plan d'un autre outil, taches.yaml (plan: path)
     - test/orchestrate-worktree-harness.ts

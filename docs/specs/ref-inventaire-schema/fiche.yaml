@@ -225,10 +225,10 @@ regles:
     tests: ["R16 — largeur 0 : écart", "R16 — zones vide : écart", "R16 — pct.l = 120 : écart"]
   - id: R17
     cas: [C5]
-    enonce: "composant porte role, position { x, y } (entiers ≥ 0), taille { l, h } (entiers ≥ 1), contenu (texte, peut être vide) et ecran (id d'un élément ecran)."
+    enonce: "composant porte role (chaîne non vide, tirée de la liste fermée ROLES de R19), position { x, y } (entiers ≥ 0), taille { l, h } (entiers ≥ 1), contenu (texte, peut être vide) et ecran (id d'un élément ecran). Amendement L264 : le rôle d'un composant est pris dans la même liste fermée que celui d'un texte ; un rôle hors liste est un écart citant la liste."
     statut: sourcee
-    source: "design §2 : « composant : rôle, position, taille, contenu, écran parent »"
-    tests: ["R17 — role vide : écart", "R17 — taille.h = 0 : écart", "R17 — ecran absent : écart"]
+    source: "design §2 : « composant : rôle, position, taille, contenu, écran parent » ; décision du lead 24-10 (revue L264) : liste fermée de R19 commune aux textes et aux composants, le rôle décidant de l'identité d'un composant dans ref eval"
+    tests: ["R17 — role vide : écart", "R17 — role hors de la liste fermée : écart qui nomme la liste, pour un composant comme pour un texte", "R17 — taille.h = 0 : écart", "R17 — ecran absent : écart"]
   - id: R18
     cas: [C5]
     enonce: "etat porte nom (non vide : vide, chargement, erreur, sans_acces, selectionne… liste ouverte) et cible (id d'un composant ou d'un ecran)."

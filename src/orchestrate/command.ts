@@ -27,7 +27,7 @@ import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, rea
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
 import { repoBranch } from './integrate.js';
-import { baseBranchOf, keptLines, keptTrees, lotBranch, lotTreeDir, recoverTree, removeTree } from './worktree.js';
+import { baseBranchOf, keptLines, keptTrees, lotBranch, lotTreeDir, planFileSet, recoverTree, removeTree } from './worktree.js';
 import { schemaFor } from './schemas.js';
 import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
@@ -925,8 +925,9 @@ function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: st
       const lotBr = lotBranch(wave, c.lot.project, c.lot.lot);
       // Chemin de reprise d'un lot rendu hors intégration : sa branche d'une vague passée devient celle de cette vague (recoverTree), puis se retrouve comme une reprise (R11).
       const dir = lotTreeDir(store.dir, c.lot.project, c.lot.lot, repo);
-      const recovered = !baseBranchOf(repo, lotBr) && c.lot.next !== 'integrate' && branch && worktreesEnabled(c.config, env, true) ? recoverTree(repo, lotBr, dir, branch) : null;
-      if (recovered) log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s)) : le lot repart de son travail`);
+      const recovered = !baseBranchOf(repo, lotBr) && c.lot.next !== 'integrate' && branch && worktreesEnabled(c.config, env, true) ? recoverTree(repo, lotBr, dir, branch, planFileSet(c.loadPlan(), repo)) : null;
+      if (recovered && 'refused' in recovered) log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente non reprise : ${recovered.refused} ; le lot repart de zéro (à nettoyer à la main, ou intégration à la main documentée)`);
+      else if (recovered) log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s)) : le lot repart de son travail`);
       const known = baseBranchOf(repo, lotBr);
       const base = known ?? branch;
       // Un lot repris à l'intégration dont la branche n'existe plus (retirée par --remove-worktree --abandon-commits) n'a plus de commits à intégrer : pas de worktree recréé au sommet, `integrateLot` le rend.

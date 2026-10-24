@@ -202,8 +202,10 @@ export function prepareTree(t: TreeSpec): { ok: true; reused: boolean } | { ok: 
  * d'une vague passée, reconnue, partie de la même branche `base` et qui porte des commits non intégrés. Elle est renommée au nom de la nouvelle vague
  * (git emporte la config de cadence) et son worktree déplacé vers `dir` : le reste de l'orchestration, qui ne connaît que les noms de la vague, la voit
  * comme la sienne. Rend la branche reprise, ou null (rien à reprendre, ou le renommage a échoué : rien n'a bougé). Jamais la branche d'une vague vivante.
+ * Une branche que la reprise ne pourrait pas mener à l'intégration est refusée sans y toucher (`refused` dit pourquoi) : son worktree porte un fichier suivi modifié
+ * (R11 : comme `--resume`, la session n'y démarre pas), ou un de ses commits touche un fichier du plan (`planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme).
  */
-export function recoverTree(repo: string, branch: string, dir: string, base: string): { from: string; unintegrated: number } | null {
+export function recoverTree(repo: string, branch: string, dir: string, base: string, planFiles: ReadonlySet<string> = new Set()): { from: string; unintegrated: number } | { from: string; refused: string } | null {
   const slug = branch.split('/').slice(2).join('/');
   const found = keptTrees(repo)
     .filter((t) => t.branch !== branch && t.branch.split('/').slice(2).join('/') === slug && t.base === base && t.unintegrated > 0)
@@ -211,6 +213,10 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
   if (!found || branchSha(repo, branch) !== null) return null;
   tryGit(repo, 'worktree', 'prune');
   const moved = found.dir !== null && existsSync(found.dir);
+  const dirty = moved && existsSync(join(found.dir as string, '.git')) ? trackedDirty(found.dir as string) : [];
+  if (dirty.length) return { from: found.branch, refused: `son worktree porte des fichiers suivis modifiés (${dirty.join(', ')})` };
+  const touched = (tryGit(repo, 'log', '--name-only', '--format=', `refs/heads/${found.branch}`, '--not', `refs/heads/${base}`) ?? '').split('\n').find((f) => planFiles.has(f));
+  if (touched) return { from: found.branch, refused: `un de ses commits modifie le plan (${touched})` };
   try {
     if (moved) {
       mkdirSync(dirname(dir), { recursive: true });
@@ -222,6 +228,12 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
     return null;
   }
   return { from: found.branch, unintegrated: found.unintegrated };
+}
+
+/** Les fichiers du plan qu'une session ne doit pas toucher, relatifs au dépôt : le fichier de plan, la page Gantt et ce qui est généré avec (`plan.files`). */
+export function planFileSet(plan: Plan, repo: string): Set<string> {
+  const rel = relative(repo, plan.path);
+  return new Set([rel, join(dirname(rel), 'gantt.html'), ...plan.files]);
 }
 
 /** Les commits de la branche du lot déjà dans la branche du dépôt ? */

@@ -528,7 +528,9 @@ nothing below applies and the wave behaves as before; any other value is refused
   of a past wave that carries unintegrated commits and started from the repository's current branch, renames it `cadence/<this wave>/<project>--<lot>` (git keeps the cadence config
   with it), moves its worktree to this wave's folder and plays the lot there, so the sessions start from the work already done. The journal says it
   (`orchestrate : <project>:<lot> : branche cadence/<wave>/… d'une vague précédente reprise (N commit(s) non intégré(s))`). Nothing is recovered when the branch is integrated,
-  started from another branch, is not cadence's, or belongs to a live wave; the lot then starts afresh as before. The lead may also integrate by hand: rebase the kept branch on
+  started from another branch, is not cadence's, or belongs to a live wave; the lot then starts afresh as before. A branch whose worktree holds a modified tracked file (the same
+  guard as `--resume`), or one of whose commits modifies the plan or a file generated with it, is not recovered either (it would end in an integration conflict): the journal says why
+  (`… d'une vague précédente non reprise : <cause>`), the lot starts afresh and the kept branch stays untouched for the lead to clean or integrate by hand. The lead may also integrate by hand: rebase the kept branch on
   the repository's branch in its worktree, run the checks, `git merge --ff-only <branch>` from the repository, write the verdict, then `cadence orchestrate --remove-worktree <project>:<lot> [--wave <wave>]`.
 - **Nothing is deleted with unintegrated commits.** A worktree whose commits are all in the repository's branch is removed after the integration, by a guarded
   branch deletion (never `-D`). A lot handed back, dropped (`--drop`), failed or in conflict keeps its worktree and branch, and the journal gives the path

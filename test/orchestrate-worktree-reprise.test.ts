@@ -98,6 +98,56 @@ describe('R1 — recoverTree retrouve la branche la plus récente du lot', () =>
   });
 });
 
+describe('R1 — recoverTree refuse une branche que la reprise ne mènerait pas à l\'intégration', () => {
+  it('R1 — worktree avec un fichier suivi modifié : rien n\'est déplacé ni renommé, la raison est rendue', () => {
+    const { repo, parent } = setup();
+    const old = oldBranch(repo, 'w1', 'L1', 1);
+    writeFileSync(join(old.dir, 'w1-L1-0.txt'), 'modifié sans commit\n');
+    const dir = lotTreeDir(join(parent, '.cadence', 'runs', 'w2'), 'a', 'L1');
+    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main');
+    expect(got).toEqual({ from: old.branch, refused: expect.stringContaining('w1-L1-0.txt') });
+    expect(existsSync(old.dir)).toBe(true);
+    expect(existsSync(dir)).toBe(false);
+    expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(old.branch);
+  });
+  it('R1 — un commit de la branche touche le plan : la branche n\'est pas reprise, intacte', () => {
+    const { repo, parent } = setup();
+    const old = oldBranch(repo, 'w1', 'L1', 1);
+    commitFile(old.dir, 'docs/plan/raf.yaml', 'feat(L1): plan');
+    const dir = lotTreeDir(join(parent, '.cadence', 'runs', 'w2'), 'a', 'L1');
+    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main', new Set(['docs/plan/raf.yaml']));
+    expect(got).toEqual({ from: old.branch, refused: expect.stringContaining('docs/plan/raf.yaml') });
+    expect(existsSync(old.dir)).toBe(true);
+    expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(old.branch);
+  });
+  it('R1 — vague : un lot rendu avec du travail non commité n\'est pas repris, le journal le dit et la session ne démarre pas sur un arbre sale', async () => {
+    const { parent, repo } = setup();
+    const f1 = fake({ review: async (_cwd, brief) => claudeOut(lotOf(brief) === 'L1' ? nonConforme : reviewReport()) });
+    await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f1);
+    const dir = git(repo, 'worktree', 'list', '--porcelain').split('\n').find((l) => l.startsWith('worktree ') && l.includes('a--L1'))!.slice(9);
+    writeFileSync(join(dir, 'L1-implement.txt'), 'à moitié\n');
+    const f2 = fake();
+    const r = await run(parent, ['a:L1'], f2);
+    expect(r.out).toContain('non reprise');
+    expect(r.out).toContain('L1-implement.txt');
+    expect(r.out).not.toContain('une vague précédente reprise');
+  });
+});
+
+describe('R1 — plan touché : la reprise ne rejoue pas un commit de plan jusqu\'à un conflit d\'intégration', () => {
+  it('R1 — la vague 1 rend le lot (plan touché), la vague 2 ne reprend pas sa branche et le dit', async () => {
+    const { parent, repo } = setup();
+    const f1 = fake({ implement: async (cwd) => claudeOut(workReport({ commits: [commitFile(cwd, 'docs/plan/raf.yaml', 'feat(L1): plan')] })) });
+    await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f1);
+    expect(store(parent).readLot('a', 'L1')!.status).toBe('handed-back');
+    const r = await run(parent, ['a:L1'], fake());
+    expect(r.out).toContain('non reprise');
+    expect(r.out).toContain('docs/plan/raf.yaml');
+    expect(r.out).not.toContain('une vague précédente reprise');
+    expect(branches(repo)).toContain(`cadence/${WAVE}/a--L1`);
+  });
+});
+
 describe('R2 — le worktree d\'une vague lancée à la racine du dépôt est hors du dépôt', () => {
   it('R2 — lotTreeDir : vague dans le dépôt → sous le dossier des worktrees de cadence ; vague hors du dépôt → sous la vague', () => {
     const { repo, parent } = setup();

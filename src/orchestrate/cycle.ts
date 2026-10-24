@@ -32,7 +32,7 @@ import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './st
 import { PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 import { advance, INTEGRATE_WAIT_MS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
-import { git, gitFailure, integrated, linkIgnored, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
+import { git, gitFailure, integrated, linkIgnored, planFileSet, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
 export const MAX_PASSES = 2;
@@ -845,9 +845,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
  * ou « (fichier, non commité) », null sinon.
  */
 function planTouched(c: LotCtx, headBefore: string | null, after: Snapshot): string | null {
-  const plan = c.loadPlan();
-  const rel = relative(c.lot.repo, plan.path);
-  const files = new Set([rel, join(dirname(rel), 'gantt.html'), ...plan.files]);
+  const files = planFileSet(c.loadPlan(), c.lot.repo);
   if (headBefore && after.head && headBefore !== after.head) {
     for (const sha of git(wd(c), 'log', '--format=%H', `${headBefore}..${after.head}`).split('\n').filter(Boolean)) {
       const hit = changedFiles(wd(c), sha).find((f) => files.has(f));

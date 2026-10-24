@@ -3177,11 +3177,48 @@ lots:
     estimate: 0.5
     created: 2026-10-23
     started: 2026-10-24
+    notes:
+      - { date: 2026-10-24, text: "24-10 (lead) — rendu après 2 passes (revues : 3 M → 1 M → 2 M, constats différents à chaque revue : rapport, puis portée des seuils, puis CHANGELOG l.104 contredit, fiche R1 de L226 non amendée pour MIN_STEPS = 10, justification de MIN_STEPS contredite par les chiffres). Reprise à la main : fix Sonnet neuf sur les constats verbatim de la revue 7, puis revue Opus neuve." }
   - id: L281
     title: "deliver : CADENCE_DEPLOYED_FILE n'accepte qu'un sha hexadécimal — un script qui écrit HEAD ou un nom de branche voit sa révision résolue APRÈS le script, au commit d'un autre (mesuré : feat(L9) journalisé « sha déclaré par le script ») ; test (revue L277)"
     status: todo
     estimate: 0.1
     created: 2026-10-23
+  - id: L282
+    title: "deliver : deliveries-failed.log garde la raison de l'échec (dernières lignes de sortie du script, de la CI ou des contrôles, bornées) et une classe (refus avant action, CI, déploiement, vérification) ; cadence perf ventile les livraisons rouges par classe et par projet ; tests. Mesure 24-10 : 25 rouges sur 17–23-10 (14 maritime « livrer.sh code 1 »), cause illisible — décision Sylvain 24-10"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L283
+    title: "perf : « sessions ux par lot visible » compte aussi l'UX faite dans review-small d'un petit lot visible (seesApp) ; nouvel indicateur : part des lots visibles revus par une étape ux dédiée ; docs/perf.md et tests. Mesure 24-10 : 139 lots visibles sur 140 « petits » (≤ 0,5 j) → 0,0 affiché (−97 %), faux signal"
+    status: todo
+    estimate: 0.1
+    created: 2026-10-24
+  - id: L284
+    title: "plan à l'emplacement .cadence/raf.yaml (L246) dans les 9 projets : inventaire des lecteurs de docs/plan/raf.yaml par projet (outils plan-data, tests, CI, skills : avatar 4, codex 5, discotheque 1, evatosorus 4, finance 8, jobmail 3, ol 6, warhammer 4, cadence 37), procédure de migration rejouable (raf migrate ou script) et migration ; l'avertissement « ancien emplacement » imprimé à chaque appel raf entre dans le contexte de chaque session — décision Sylvain 24-10"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-24
+  - id: L285
+    title: "orchestrate : une session se termine dès son rapport structuré (StructuredOutput) au lieu d'attendre la fin de ses tâches de fond, et ses tokens sont comptés depuis son journal (segments après le rapport compris) ; étude de faisabilité d'abord (stream-json, variable de la CLI qui interdit les tâches de fond) ; tests. Audit 24-10 : 127 sessions ont attendu après leur rapport, 833 min perdues, 12,1 M tokens non comptés (6,4 %), launch.ts n'attend que close"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-24
+  - id: L286
+    title: "orchestrate : « hit your weekly limit » reconnu comme quota (isQuotaMessage, result.ts:75) → vague suspendue, pas de lot failed ; test sur le message réel. Audit 24-10 : 3 lots failed le 14-10"
+    status: todo
+    estimate: 0.1
+    created: 2026-10-24
+  - id: L287
+    title: "orchestrate : porte mécanique « code modifié sans test » avant la revue Opus (diff du lot : fichiers de src/ changés sans fichier de test touché → passe de correction directe, sans session de revue) ; seuil et exceptions dans cadence.yaml ; tests. Audit 24-10 : test manquant = 32 % des majeurs de revue (224 sur 690), une passe ≈ 190 k tokens"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L288
+    title: "orchestrate : précheck conditionnel (lot sans commit et dont le titre ne cite ni constat ni lot antérieur → pas de précheck) ou confié au modèle local ; mesure avant/après de la part de « oui ». Audit 24-10 : 13,4 M tokens (7,1 %) de précheck pour 10 « oui » et 20 « partiel »"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

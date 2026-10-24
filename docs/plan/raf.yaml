@@ -3169,8 +3169,8 @@ lots:
     review: { date: 2026-10-24, verdict: "compliant (1 mineur : la purge à 24 h n'est pas appliquée par la bande) — orchestré (vague 2026-10-24-1340, 0 passe(s) de correction)", commit: 9fca5aadffba66176d8522014dc36b69d0bccf7e }
     finished: 2026-10-24
   - id: L279
-    title: "orchestrate : un worktree par lot dans une vague (git worktree add par lot, fusion par cherry-pick ou rebase au « prêt »), pour que deux lots indépendants d'un même dépôt avancent en parallèle dans la limite des créneaux ; verrou de dépôt adapté ; conflits rendus au lead ; tests. Vécu 23-10 : L261 (4 corrections) a bloqué la file cadence ; étude de faisabilité d'abord (spec)"
-    status: doing
+    title: "orchestrate : un worktree par lot dans une vague (infrastructure, fusion par rebase + patch-id, verrou d'intégration, plan écrit seulement dans le checkout principal, reprises --integrate/--replay, worktrees conservés visibles) — livré EXPÉRIMENTAL et non activable sans CADENCE_EXPERIMENTAL_WORKTREES=1 (périmètre coupé par le lead 24-10 après deux revues non convergentes) ; activation après L299, L300, L301 ; tests. Vécu 23-10 : L261 (4 corrections) a bloqué la file cadence"
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-23
@@ -3197,6 +3197,9 @@ lots:
       - { date: 2026-10-24, text: "Hypothèses (fiche orchestrate-worktree-par-lot) — R25 : L'attente du verrou d'intégration est bornée à 10 minutes (une intégration dure un rebase et la relance des tests) ; au-delà, le lot est rendu au lead avec le… ; si faux : Si 10 minutes est trop court pour une suite de tests longue, des lots sont rendus à tort : seule la constante change (une ligne de config, aucune donnée)" }
       - { date: 2026-10-24, text: "Hypothèses (fiche orchestrate-worktree-par-lot) — R26 : Une écriture de plan du programme (R21) est précédée des mêmes gardes que l'avance de C2 : file en mémoire par dépôt puis verrou d'intégration (R10, attente bo… ; si faux : Si le lead doit pouvoir éditer le dépôt pendant une vague, le refus pour arbre sale rendrait à tort des lots à leur prochaine écriture de plan (notes, verdict)…" }
       - { date: 2026-10-24, text: "24-10 (lead) — implement coupé au délai de 45 min (vague 2026-10-24-1225) après 6 commits ; reste non commité (44 lignes, tsc et 3211 tests verts) commité par le lead ; revue Opus du lot entier à la main." }
+      - { date: 2026-10-24, text: "titre remplacé : « orchestrate : un worktree par lot dans une vague (git worktree add par lot, fusion par cherry-pick ou rebase au « prêt »), pour que deux lots indépendants d'un même dépôt avancent en parallèle dans la limite des créneaux ; verrou de dépôt adapté ; conflits rendus au lead ; tests. Vécu 23-10 : L261 (4 corrections) a bloqué la file cadence ; étude de faisabilité d'abord (spec) »" }
+    review: { date: 2026-10-24, verdict: "conforme (revue Opus ciblée 24-10 sur le périmètre coupé : mode par défaut identique octet pour octet avant/après, 296 lignes normalisées ; garde tenue au lancement, --dry-run, --continue, --resume, --integrate, --replay, variable ≠ 1 ; docs justes ; défauts du mode reportés à L299–L301)", commit: 6ab63204cf680e70bbc8f404cca500f33892d22b }
+    finished: 2026-10-24
   - id: L280
     title: "perf : recaler estimate et budgets des lots sur la mesure — tokens par lot +26 % sur deux fenêtres (0,25 j : 117→148 k ; 0,5 j : 327→412 k) pendant que la part conforme du premier coup passe de 37 à 59 % ; budgets par défaut d'orchestrate et seuils de cadence perf dérivés des fenêtres mesurées, étapes spec (1,3→4,2 min), maquette (4,5→7,1) et ux (6,5→8,5) expliquées ou bornées ; décision Sylvain 23-10"
     status: done

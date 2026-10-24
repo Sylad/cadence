@@ -39,13 +39,13 @@ describe('R1 — un lot rendu hors intégration reprend sa branche dans une nouv
     await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f1);
     expect(store(parent).readLot('a', 'L1')!.status).toBe('handed-back');
     expect(branches(repo)).toContain(`cadence/${WAVE}/a--L1`);
-    const f2 = fake({ implement: async (cwd) => {
-      expect(existsSync(join(cwd, 'L1-implement.txt'))).toBe(true); // le travail de la première vague est là
-      return claudeOut(workReport({ commits: [commitFile(cwd, 'L1-suite.txt', 'feat(L1): suite')] }));
+    const f2 = fake({ fix: async (cwd) => {
+      expect(existsSync(join(cwd, 'L1-implement.txt'))).toBe(true); // le travail de la première vague est là (L311 : le lot repart à la correction de sa revue)
+      return claudeOut(workReport({ commits: [commitFile(cwd, 'L1-suite.txt', 'fix(L1): suite')] }));
     } });
     const r = await run(parent, ['a:L1'], f2);
     expect(r.out).toContain(`orchestrate : a:L1 : branche cadence/${WAVE}/a--L1 d'une vague précédente reprise`);
-    expect(f2.calls.filter((c) => c.kind === 'implement').every((c) => inWorktree(c.cwd))).toBe(true);
+    expect(f2.calls.filter((c) => c.kind === 'fix').every((c) => inWorktree(c.cwd))).toBe(true);
     expect(new RunStore(parent, `${WAVE}-2`).readLot('a', 'L1')!.status).toBe('ready');
     expect(branches(repo)).toBe(''); // branche intégrée puis retirée, plus de branche de la vague passée
     expect(git(repo, 'ls-files')).toContain('L1-implement.txt');

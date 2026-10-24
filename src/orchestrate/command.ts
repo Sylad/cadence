@@ -939,7 +939,13 @@ function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: st
       const dir = lotTreeDir(store.dir, c.lot.project, c.lot.lot, repo);
       const recovered = !baseBranchOf(repo, lotBr) && c.lot.next !== 'integrate' && branch && worktreesEnabled(c.config, env, true) ? recoverTree(repo, lotBr, dir, branch, planFileSet(c.loadPlan(), repo)) : null;
       if (recovered && 'refused' in recovered) log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente non reprise : ${recovered.refused} ; le lot repart de zéro (à nettoyer à la main, ou intégration à la main documentée)`);
-      else if (recovered) log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s)) : le lot repart de son travail`);
+      else if (recovered) {
+        log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s)) : le lot repart de son travail`);
+        // L311 : le lot reprend les constats de sa dernière revue (état de la vague qui l'a rendu), il repart à leur correction.
+        const from = recovered.from.split('/')[1];
+        c.lot.resumedFrom = from;
+        c.lot.constats = new RunStore(store.launchDir, from).readLot(c.lot.project, c.lot.lot)?.constats ?? [];
+      }
       const known = baseBranchOf(repo, lotBr);
       const base = known ?? branch;
       // Un lot repris à l'intégration dont la branche n'existe plus (retirée par --remove-worktree --abandon-commits) n'a plus de commits à intégrer : pas de worktree recréé au sommet, `integrateLot` le rend.

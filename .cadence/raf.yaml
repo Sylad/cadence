@@ -3244,6 +3244,7 @@ lots:
     notes:
       - { date: 2026-10-24, text: "titre remplacé : « plan à l'emplacement .cadence/raf.yaml (L246) dans les 9 projets : inventaire des lecteurs de docs/plan/raf.yaml par projet (outils plan-data, tests, CI, skills : avatar 4, codex 5, discotheque 1, evatosorus 4, finance 8, jobmail 3, ol 6, warhammer 4, cadence 37), procédure de migration rejouable (raf migrate ou script) et migration ; l'avertissement « ancien emplacement » imprimé à chaque appel raf entre dans le contexte de chaque session — décision Sylvain 24-10 »" }
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "conforme : 2 notes mineures (chemins construits non détectés, fichiers > 2 Mio ignorés sans signalement) — orchestré (vague 2026-10-24-1750, 2 passe(s) de correction)", commit: 39332ca7898d5b22d63d86941e3b0f1ae1fb18f2 }
   - id: L285
     title: "orchestrate : les sessions de vague ne laissent plus de tâche de fond qui retient la sortie — env CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1 au lancement de claude -p (retire run_in_background de Bash et des sous-agents) et Monitor dans --disallowedTools ; ne PAS tuer sur StructuredOutput (coût réel seulement dans le message result) ; test du lancement ; mesure après : sessions dont la fin suit le StructuredOutput de plus d'1 min. Sources : code.claude.com/docs/en/headless.md, env-vars.md, permissions.md, agent-sdk/cost-tracking.md ; étude tmp/L285-etude-taches-de-fond-2026-10-24.md. Audit 24-10 : 127 sessions, 833 min, 12,1 M tokens non comptés"
     status: done

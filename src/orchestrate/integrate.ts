@@ -1,8 +1,10 @@
 import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gitCommonDir } from '../git.js';
 import { sharedStateDir } from '../state.js';
 import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
+import { mergeUnreleased } from './changelog-merge.js';
 import { mutexFor } from './mutex.js';
 import { git, gitFailure, tryGit } from './worktree.js';
 
@@ -58,24 +60,62 @@ export const repoBranch = (repo: string): string | null => tryGit(repo, 'symboli
 /** Point de départ de `rev` par rapport à la branche `base` : le dernier ancêtre commun. */
 export const mergeBase = (cwd: string, rev: string, base: string): string => git(cwd, 'merge-base', rev, `refs/heads/${base}`);
 
-export type Rebase = { kind: 'forwarded' } | { kind: 'rebased'; before: string; after: string } | { kind: 'conflict'; files: string[]; detail: string };
+export type Rebase = { kind: 'forwarded' } | { kind: 'rebased'; before: string; after: string; changelog: number } | { kind: 'conflict'; files: string[]; detail: string };
+
+const CHANGELOG = 'CHANGELOG.md';
+const REBASE_ENV = { ...process.env, GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true' };
+const run = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: REBASE_ENV });
+
+/**
+ * Résout le conflit en cours quand c'est le CHANGELOG seul et de l'ajout pur sous `[Unreleased]` (L314) : écrit l'union, l'ajoute à l'index. Faux, sans rien
+ * toucher, pour tout autre conflit (un autre fichier avec lui, une entrée de base modifiée, une étape de base absente).
+ */
+function resolveChangelog(work: string): boolean {
+  const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
+  if (files.length !== 1 || files[0] !== CHANGELOG) return false;
+  try {
+    // Pendant un rebase, l'étape 2 est la branche du dépôt (« ours »), l'étape 3 le commit du lot rejoué (« theirs »).
+    const merged = mergeUnreleased(run(work, 'show', `:1:${CHANGELOG}`), run(work, 'show', `:2:${CHANGELOG}`), run(work, 'show', `:3:${CHANGELOG}`));
+    if (merged === null) return false;
+    writeFileSync(join(work, CHANGELOG), merged);
+    run(work, 'add', '--', CHANGELOG);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Rebase le worktree `work` sur la branche `base` (R6). Une branche qui descend déjà du sommet de `base` n'a rien à rebaser (fast-forward pur : aucun sha ne
- * change). Un conflit — ou tout autre échec du rebase — est abandonné (`rebase --abort`) : la branche du lot et son arbre restent tels qu'avant, la
- * branche du dépôt n'a pas été touchée, personne ne résout le conflit à l'aveugle.
+ * change). Un conflit d'ajout pur dans le CHANGELOG est résolu par union à chaque commit qui le porte (L314, `changelog` les compte). Tout autre conflit — ou
+ * tout autre échec du rebase — est abandonné (`rebase --abort`) : la branche du lot et son arbre restent tels qu'avant, la branche du dépôt n'a pas été
+ * touchée, personne ne résout le conflit à l'aveugle.
  */
 export function rebaseOnto(work: string, base: string): Rebase {
   const before = git(work, 'rev-parse', 'HEAD');
   if (tryGit(work, 'merge-base', '--is-ancestor', `refs/heads/${base}`, 'HEAD') !== null) return { kind: 'forwarded' };
+  let changelog = 0;
   try {
-    execFileSync('git', ['rebase', `refs/heads/${base}`], { cwd: work, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true' } });
-  } catch (e) {
-    const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
-    tryGit(work, 'rebase', '--abort');
-    return { kind: 'conflict', files, detail: gitFailure(e) };
+    run(work, 'rebase', `refs/heads/${base}`);
+  } catch (first) {
+    let failure = first;
+    // Chaque tour règle le commit sur lequel le rebase s'est arrêté ; un lot ne porte pas des centaines de commits, la borne évite seulement une boucle sans fin.
+    for (let turn = 0; ; turn++) {
+      if (turn >= 200 || !resolveChangelog(work)) {
+        const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
+        tryGit(work, 'rebase', '--abort');
+        return { kind: 'conflict', files, detail: gitFailure(failure) };
+      }
+      changelog++;
+      try {
+        run(work, 'rebase', '--continue');
+        break;
+      } catch (e) {
+        failure = e;
+      }
+    }
   }
-  return { kind: 'rebased', before, after: git(work, 'rev-parse', 'HEAD') };
+  return { kind: 'rebased', before, after: git(work, 'rev-parse', 'HEAD'), changelog };
 }
 
 /**

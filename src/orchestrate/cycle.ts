@@ -2262,6 +2262,7 @@ async function integrateLot(c: LotCtx): Promise<void> {
       if (rebased.kind === 'conflict') {
         return refuse(`intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`} ; ${kept}`);
       }
+      if (rebased.kind === 'rebased' && rebased.changelog > 0) c.wave.log(`${key} CHANGELOG.md : conflit d'ajout pur résolu par union sous [Unreleased] (${rebased.changelog} commit(s))`);
       const tip = git(t.dir, 'rev-parse', 'HEAD');
       if (tip !== reviewed) {
         // Le rebase a changé les commits : tests et build rejoués au sommet rebasé, avant que la branche du dépôt ne bouge (R7).

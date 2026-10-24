@@ -511,7 +511,15 @@ nothing below applies and the wave behaves as before; any other value is refused
      fast-forward (the replayed checks and the short review can last) and right before the plan is written: a lead moved to another branch, or whose
      tree got dirty, in the meantime gets neither the fast-forward nor a plan commit, and the lot is handed back with `next: integrate` (L299);
   2. the lot's branch is rebased on the tip of the repository's branch (`git rebase`); a conflict is **aborted** (`git rebase --abort`), the lot
-     is handed back with the files in conflict, its worktree and branch untouched, and no session tries to resolve it;
+     is handed back with the files in conflict, its worktree and branch untouched, and no session tries to resolve it. **One exception** (L314): two
+     parallel lots that each add an entry under `## [Unreleased]` of `CHANGELOG.md` (what `docs.sync` imposes on every lot) always collide, so a commit
+     whose only conflicting file is `CHANGELOG.md` and whose conflict is a **pure addition** is resolved by the program: union per section, one title per
+     section (duplicated titles are merged), sections in the Keep a Changelog order (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, any
+     other title after), the entries of the repository's branch first, then those of the lot; the rest of the file follows the side that changed it. The
+     journal says `<project>:<lot> CHANGELOG.md : conflit d'ajout pur résolu par union sous [Unreleased] (<n> commit(s))`. Anything else — an entry that
+     was already there removed or reworded (a later commit of the lot rewriting its own entry included), free text under `[Unreleased]`, the rest of the
+     file changed on both sides, another file in conflict with it — aborts the rebase and hands the lot back as above. The rebased commits differ, so
+     steps 3 and 4 apply: tests replayed, and a short review since the patch-id changed;
   3. if the rebase changed the commits, the tests and the build (`orchestrate.test`, `orchestrate.build`) are run again at the rebased tip, a red that
      was not already red at the lot's base sha (L213) hands the lot back and leaves the repository's branch alone;
   4. the patch-id of the lot's diff (`git patch-id --stable`, work commits only) is compared before and after the rebase. **Same patch-id**: the

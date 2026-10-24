@@ -3300,6 +3300,7 @@ lots:
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "compliant — orchestré (vague 2026-10-24-1240, 0 passe(s) de correction)", commit: a1403d8b6cd88ca34df9050a42771ac3b8643cf2 }
   - id: L294
     title: "deliver (suite de la revue L289) : masquage des secrets dans deliveries-failed.log — noms en un seul mot (APIKEY, ACCESSTOKEN, GITHUBTOKEN) et valeur entre guillemets non fermés (coupée par la borne de 8192) masqués ; tests sur les cas mesurés"
     status: todo

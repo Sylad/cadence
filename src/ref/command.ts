@@ -1,11 +1,12 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { RafError } from '../plan.js';
 import { add } from './add.js';
 import { checkInventaire, readInventaire, summaryInventaire } from './check.js';
 import { buildCorpus } from './corpus.js';
-import { chargerPlaywright, rendre } from './corpus-render.js';
+import { chargerPlaywright, lancer, rendre } from './corpus-render.js';
 import { evaluer, formatEvaluation } from './evaluate.js';
 import { measure } from './measure.js';
 import { referencesDir } from './store.js';
@@ -55,14 +56,21 @@ export function refCommand(rest: string[], values: { sections?: string; slug?: s
 /** `ref corpus <dossier>` : un sous-dossier par piège (document.html, attendu.json, puis document.pdf et page-<n>.png sauf --sans-rendu). */
 async function corpus(dossier: string, sansRendu: boolean, io: Io): Promise<number> {
   if (existsSync(dossier)) throw new RafError(`ref corpus : ${dossier} existe déjà (un corpus n'est jamais mêlé à un autre : choisissez un dossier neuf)`);
-  const playwright = sansRendu ? null : chargerPlaywright(io.env, io.cwd);
+  const navigateur = sansRendu ? null : await lancer(chargerPlaywright(io.env, io.cwd));
   const cas = buildCorpus();
   for (const c of cas) {
     mkdirSync(join(dossier, c.nom), { recursive: true });
     writeFileSync(join(dossier, c.nom, 'document.html'), c.html);
     writeFileSync(join(dossier, c.nom, 'attendu.json'), `${JSON.stringify(c.inventaire, null, 2)}\n`);
   }
-  if (playwright) await rendre(playwright, dossier, cas);
+  if (navigateur) {
+    await rendre(navigateur, dossier, cas);
+    // `ref add` empreint le PDF, qui change à chaque rendu : l'attendu porte celle du PDF écrit
+    for (const c of cas) {
+      c.inventaire.document.sha256 = createHash('sha256').update(readFileSync(join(dossier, c.nom, 'document.pdf'))).digest('hex');
+      writeFileSync(join(dossier, c.nom, 'attendu.json'), `${JSON.stringify(c.inventaire, null, 2)}\n`);
+    }
+  }
   io.out(`corpus : ${cas.length} cas, ${cas.reduce((n, c) => n + c.pages, 0)} pages, ${cas.reduce((n, c) => n + c.inventaire.elements.length, 0)} éléments attendus dans ${dossier}${sansRendu ? ' (sans rendu : ni PDF ni PNG)' : ''}`);
   return 0;
 }

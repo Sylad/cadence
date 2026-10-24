@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { checkInventaire } from '../src/ref/check.js';
@@ -169,4 +169,35 @@ describe('cadence ref corpus — le corpus synthétique à vérité connue (eval
     expect(couche('table-en-image')).toContain('Cloud amount codes');
     expect(couche('table-en-image')).not.toContain('Overcast');
   }, 120_000);
+
+  it.skipIf(!process.env.CADENCE_PLAYWRIGHT)('R17 — le PDF de chaque cas a autant de pages que l’attendu (le scan ne s’ouvre pas sur une page blanche)', async () => {
+    const r = await corpusCmd([], { ...process.env });
+    expect(r.code, r.err).toBe(0);
+    for (const c of corpus) {
+      const info = execFileSync('pdfinfo', [join(r.dir, c.nom, 'document.pdf')], { encoding: 'utf8' });
+      expect(info.match(/^Pages:\s+(\d+)/m)?.[1], c.nom).toBe(String(c.pages));
+    }
+  }, 120_000);
+
+  it.skipIf(!process.env.CADENCE_PLAYWRIGHT)('R18 — après rendu, l’empreinte de l’attendu est celle du document.pdf écrit, celui que ref add enregistre', async () => {
+    const r = await corpusCmd([], { ...process.env });
+    expect(r.code, r.err).toBe(0);
+    for (const c of corpus) {
+      const attendu = JSON.parse(readFileSync(join(r.dir, c.nom, 'attendu.json'), 'utf8'));
+      expect(attendu.document.sha256, c.nom).toBe(createHash('sha256').update(readFileSync(join(r.dir, c.nom, 'document.pdf'))).digest('hex'));
+      expect(attendu.document.slug).toBe(`corpus-${c.nom}`);
+      expect(checkInventaire(attendu), c.nom).toEqual([]);
+    }
+  }, 120_000);
+
+  it('R19 — si Chromium ne se lance pas (paquet présent, navigateur absent), la commande est refusée (code 2) avant d’écrire quoi que ce soit', async () => {
+    const faux = tempDir();
+    writeFileSync(join(faux, 'package.json'), '{"name":"playwright","main":"index.js"}');
+    writeFileSync(join(faux, 'index.js'), "exports.chromium = { launch: async () => { throw new Error(\"browserType.launch: Executable doesn't exist\"); } };");
+    const r = await corpusCmd([], { CADENCE_PLAYWRIGHT: faux });
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/Executable doesn't exist/);
+    expect(r.err).toMatch(/playwright install chromium/);
+    expect(existsSync(r.dir)).toBe(false);
+  });
 });

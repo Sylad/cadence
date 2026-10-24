@@ -7,12 +7,12 @@ import type { CasCorpus } from './corpus.js';
 /** 816×1056 px CSS = 8,5×11 in ; à 200 dpi, 1700×2200 px : le repère des zones de l'inventaire. */
 const ECHELLE = 200 / 96;
 
-const BRUIT = `<svg width="0" height="0"><filter id="bruit" x="0" y="0" width="100%" height="100%">
+const BRUIT = `<svg style="position:absolute" width="0" height="0"><filter id="bruit" x="0" y="0" width="100%" height="100%">
 <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="t"/>
 <feColorMatrix in="t" type="matrix" values="0 0 0 0 .25  0 0 0 0 .25  0 0 0 0 .25  1.2 0 0 0 -.38" result="grain"/>
 <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="grain"/></feMerge></filter></svg>`;
 
-interface Navigateur {
+export interface Navigateur {
   newContext(o: object): Promise<{ newPage(): Promise<Page>; close(): Promise<void> }>;
   close(): Promise<void>;
 }
@@ -40,9 +40,17 @@ export function chargerPlaywright(env: NodeJS.ProcessEnv, cwd: string): { chromi
 
 export type Playwright = ReturnType<typeof chargerPlaywright>;
 
-/** Rend chaque cas dans `<dossier>/<nom>/` (le HTML et l'attendu y sont déjà). */
-export async function rendre(playwright: Playwright, dossier: string, cas: CasCorpus[]): Promise<void> {
-  const navigateur = await playwright.chromium.launch();
+/** Lance Chromium : un navigateur absent ou d'une autre version est un refus, avant que le moindre fichier soit écrit. */
+export async function lancer(playwright: Playwright): Promise<Navigateur> {
+  try {
+    return await playwright.chromium.launch();
+  } catch (e) {
+    throw new RafError(`ref corpus : Chromium ne se lance pas (${(e as Error).message.split('\n')[0]}) : installez-le avec npx playwright install chromium, ou ajoutez --sans-rendu`);
+  }
+}
+
+/** Rend chaque cas dans `<dossier>/<nom>/` (le HTML et l'attendu y sont déjà), puis ferme le navigateur. */
+export async function rendre(navigateur: Navigateur, dossier: string, cas: CasCorpus[]): Promise<void> {
   try {
     for (const c of cas) await rendreCas(navigateur, join(dossier, c.nom), c);
   } finally {

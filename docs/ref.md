@@ -228,12 +228,15 @@ one per trap taken from a real defect, each with the inventory that is true of w
 | `scan-bruite` | a station sheet rasterised, grainy and blurred: the PDF has no text layer, expected texts are `ocr` | `texte` (`ocr`) |
 
 Each case folder holds `document.html` (one 8.5×11 in `section.page` per page, deterministic), `attendu.json` (an inventory that
-passes `ref check`, slug `corpus-<case>`, `sha256` of the HTML, `pages`, zones in pixels at 200 dpi, `piege` on the trap elements), and,
+passes `ref check`, slug `corpus-<case>`, `sha256` of the `document.pdf` once rendered (of the HTML with `--sans-rendu`, which writes no PDF), `pages`, zones in pixels at 200 dpi, `piege` on the trap elements), and,
 unless `--sans-rendu`, `document.pdf` and `page-<n>.png` (1700×2200, 200 dpi) written by **Playwright** (Chromium). Texts of a table,
 a template or a schema belong to it and are not listed as `texte`; labels of a figure are. Playwright is not a dependency of cadence:
 install it (`npm i -D playwright`, `npx playwright install chromium`) or point `CADENCE_PLAYWRIGHT` to the folder of the package;
-without it the command exits **2** and writes nothing (`--sans-rendu` still writes HTML and expected files). An existing folder is
+without it, or when Chromium does not launch (`npx playwright install chromium` missing), the command exits **2** and writes nothing (`--sans-rendu` still writes HTML and expected files). An existing folder is
 refused (exit 2). The corpus is written where you say, not in `evals/`, which `claude plugin eval` reads as case folders.
+
+The PDF changes at every render, so the expected `sha256` is the one of the PDF just written: register it with the slug of the
+expected file (`cadence ref add tmp/corpus-ref/<case>/document.pdf --slug corpus-<case>`), or `ref eval` refuses the reading.
 
 ```
 $ cadence ref corpus tmp/corpus-ref

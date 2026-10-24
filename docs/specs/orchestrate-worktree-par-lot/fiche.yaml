@@ -60,7 +60,7 @@ cas:
       - { si: "l'arbre du dépôt (celui du lead) a des fichiers suivis modifiés au moment de l'avance", alors: "pas d'avance, lot rendu, branche du lot conservée", regles: [R8] }
       - { si: "le rebase est non vide et le patch-id du diff du lot est identique avant/après", alors: "verdict reporté au sha intégré, tracé (ancien sha relu, nouveau sha), sans nouvelle revue", regles: [R9] }
       - { si: "le rebase est non vide et le patch-id diffère (contexte modifié, conflit déjà résolu à la main)", alors: "revue courte du diff rebasé avant l'intégration ; un bloquant ou un majeur rend le lot au lead", regles: [R17] }
-      - { si: "raf done lit un verdict dont le sha n'est plus celui du dernier commit du lot", alors: "seul un verdict portant la trace d'un report par le programme est accepté ; tout autre reste refusé", regles: [R18] }
+      - { si: "raf done lit le verdict reporté écrit à l'intégration", alors: "la porte est inchangée : `vers` est le dernier commit de travail intégré, elle ne trouve aucun commit non relu ; la trace `reporte` est informative et n'ouvre aucune exception", regles: [R18] }
       - { si: "un autre lot s'intègre déjà", alors: "le lot attend le verrou d'intégration, sans bloquer les sessions des autres", regles: [R10] }
       - { si: "l'attente du verrou d'intégration dépasse la borne", alors: "lot rendu, worktree et branche conservés, branche du dépôt inchangée", regles: [R25] }
       - { si: "le dépôt du lead n'est plus sur la branche de départ de la vague", alors: "pas d'avance ni de changement de branche, lot rendu, branche du lot conservée", regles: [R24] }
@@ -78,11 +78,12 @@ cas:
     nominal:
       - "Pour chaque lot repris, le worktree et la branche déterministes du lot sont retrouvés et réutilisés tels quels (commits et arbre du lot intacts)."
       - "Un worktree enregistré par git mais dont le dossier a disparu est élagué puis recréé sur la branche existante."
-      - "Les lots rendus, avec worktree conservé, restent tels quels jusqu'à ce que le lead les règle (rebase à la main puis --resume, ou retrait)."
+      - "Les lots rendus, avec worktree conservé, restent tels quels jusqu'à ce que le lead les règle : un lot rendu à l'étape d'intégration n'est rejoué que si le lead le nomme (--resume <vague> --integrate <projet>:<lot>, R27), sinon il reste rendu ; ou retrait (R20)."
     alternatives:
       - { si: "le worktree du lot a un arbre sale que le cycle n'a pas laissé", alors: "même refus qu'un dépôt sale (code 2), avant toute écriture", regles: [R11] }
       - { si: "le lot est retiré par --drop", alors: "son worktree et sa branche sont conservés, une ligne dit où", regles: [R12] }
       - { si: "le lead consulte cadence orchestrate --status ou cadence lead tour", alors: "les worktrees conservés sont listés (dépôt, lot, âge, commits non intégrés)", regles: [R19] }
+      - { si: "le lead nomme un lot rendu à l'étape d'intégration avec --integrate", alors: "le lot est repris à l'intégration (rebase, contrôles, avance) ; un lot non rendu à cette étape, ou retiré par --drop, est refusé (code 2)", regles: [R27, R14, R25] }
       - { si: "le lead retire un worktree conservé", alors: "refus tant qu'un commit n'est ni intégré ni confirmé abandonné", regles: [R20] }
     resultat: "Une reprise ne perd ni commit ni worktree de lot, et ne laisse pas de worktree orphelin non signalé."
   - id: C4
@@ -180,8 +181,8 @@ regles:
     cas: [C1]
     enonce: "Le worktree et la branche d'un lot ont des noms déterministes (worktree : sous le dossier de la vague, hors du dépôt ; branche : cadence/<vague>/<slug du lot>) et rien d'autre n'est stocké : la reprise les retrouve par ces noms. Qu'un lot ait été rendu ou arrêté à l'étape d'intégration est dit par le champ existant `next` de LotState (valeur `integrate`, ajoutée à l'union StepKind de launch.ts:12 : une valeur, pas un champ), jamais par un champ nouveau."
     statut: hypothese
-    si_faux: "Si le schéma de nommage (dossier de la vague, slug) change, seuls les noms de fichiers git changent ; aucun champ n'est ajouté à l'état de la vague, qui reste inchangé (D4). Si `next` ne pouvait pas porter l'étape d'intégration, un champ serait nécessaire et la question reviendrait au lead ; or `next` est déjà relu à la reprise (state.ts:137) et seul stop() le remet à null (cycle.ts:123) : l'intégration pose `next: integrate` avant de rendre le lot et ne passe pas par stop() pour les causes reprenables (R25, R26, R24, R8)."
-    tests: ["R14 — le chemin du worktree se déduit de la vague et du lot, sans champ ajouté à l'état du lot", "R14 — l'état d'une vague écrit avant L279 se relit sans changement", "R14 — un lot rendu à l'intégration (verrou, arbre sale, branche du lead) garde next: integrate dans son état, et --resume le rejoue à cette étape"]
+    si_faux: "Si le schéma de nommage (dossier de la vague, slug) change, seuls les noms de fichiers git changent ; aucun champ n'est ajouté à l'état de la vague, qui reste inchangé (D4). Si `next` ne pouvait pas porter l'étape d'intégration, un champ serait nécessaire et la question reviendrait au lead ; or `next` est déjà relu à la reprise (state.ts:137) et seul stop() le remet à null (cycle.ts:123) : l'intégration pose `next: integrate` avant de rendre le lot et ne passe pas par stop() pour un rendu à l'intégration (R6, R7, R8, R17, R24, R25, R26) ; le rendu hors intégration reste celui de stop(), next null, donc non reprenable par --integrate (R27)."
+    tests: ["R14 — le chemin du worktree se déduit de la vague et du lot, sans champ ajouté à l'état du lot", "R14 — l'état d'une vague écrit avant L279 se relit sans changement", "R14 — un lot rendu à l'intégration (verrou, arbre sale, branche du lead, conflit, tests rouges) garde next: integrate dans son état, et seul --resume --integrate (R27) le rejoue à cette étape"]
   - id: R15
     cas: [C1]
     enonce: "Les sessions d'un lot en worktree n'écrivent que dans ce worktree : le dépôt du lead n'est modifié que par l'avance de C2 et par les commits de plan du programme (R21), et le contrôle « HEAD déplacé » (L214) et la détection de push s'appliquent à chaque worktree comme à un dépôt."
@@ -202,10 +203,10 @@ regles:
     tests: ["R17 — patch-id différent : une revue review-small est jouée sur le diff rebasé avant l'avance", "R17 — revue sans constat : verdict au sha intégré, branche avancée", "R17 — un constat bloquant ou majeur : lot rendu, branche du dépôt inchangée", "R17 — patch-id identique : aucune revue jouée"]
   - id: R18
     cas: [C2]
-    enonce: "La porte de `raf done` (verdict plus récent que le dernier commit du lot) accepte un verdict dont le sha a été reporté par le programme (R9) et seulement celui-là : l'acceptation exige la trace `reporte` écrite par l'intégration ; un verdict au sha ancien sans trace, ou dont la trace est incohérente (nouveau sha absent de l'historique, champ manquant), reste refusé comme aujourd'hui. Le report n'est jamais un verdict édité à la main (--force reste le seul contournement existant)."
+    enonce: "La porte de `raf done` (src/audit.ts:261-269, src/plan.ts:551-556) reste INCHANGÉE. Le verdict reporté (R9) est enregistré avec `commit` = `vers`, le dernier commit de travail intégré (R23) : `unreviewed` retrouve ce commit parmi ceux du lot et n'en compte aucun après lui, donc `raf done` passe sans exception. La trace `reporte` ({ de, vers, patchId }) n'est qu'une information pour la relecture et le journal : la porte ne la lit pas. Un verdict resté au sha relu d'avant le rebase n'existe pas dans ce mode (le programme n'écrit jamais le verdict avant l'avance, R23) ; s'il était édité à la main, la porte le traiterait comme aujourd'hui (commit absent de l'historique : tous les commits du lot comptent, refus)."
     statut: sourcee
-    source: "réponse du lead du 24-10 : « la porte de raf done doit accepter un verdict reporté par (1) et seulement celui-là : le report est tracé (champ ou note dédiés), jamais un verdict édité à la main » ; porte actuelle src/audit.ts:261-269 et src/plan.ts:551-556"
-    tests: ["R18 — verdict reporté avec trace : raf done passe", "R18 — verdict au sha ancien sans trace (historique réécrit) : raf done refuse avec le message existant", "R18 — trace dont le nouveau sha n'est pas dans l'historique du lot : refus", "R18 — un commit ajouté après le report : refus comme aujourd'hui, la trace ne couvre que le sha intégré"]
+    source: "src/audit.ts:261-269 (unreviewed : commit relu absent de l'historique du lot = revue rattachée à rien, tous les commits comptent ; commit présent = seuls les suivants comptent) et :215-217 (commits de plan seul écartés) ; réponse du lead du 24-10 : « le report est tracé (champ ou note dédiés), jamais un verdict édité à la main » (la trace, pas la porte, porte cette exigence)"
+    tests: ["R18 — verdict reporté, commit = dernier commit de travail intégré : unreviewedWork vaut 0 et raf done passe sans modification de la porte", "R18 — verdict à la main au sha d'avant le rebase (absent de l'historique) : raf done refuse avec le message existant", "R18 — un commit de travail ajouté après le report : refus comme aujourd'hui", "R18 — la trace `reporte` retirée du verdict : raf done passe encore (elle est informative)"]
   - id: R19
     cas: [C3]
     enonce: "Les worktrees de lot conservés restent visibles : cadence lead tour et cadence orchestrate --status listent chacun (dépôt, lot, âge, nombre de commits non intégrés, chemin) ; aucun n'est oublié silencieusement."
@@ -242,13 +243,13 @@ regles:
     enonce: "L'avance n'est tentée que si le dépôt du lead est encore sur la branche sur laquelle les lots sont partis (relevée au départ de la vague, relue à chaque intégration) ; s'il est en HEAD détaché ou sur une autre branche, le lot est rendu avec les deux noms de branche, sa branche est conservée, et le programme ne change jamais la branche du lead (aucun checkout, aucun ff sur une autre branche, aucun commit de plan : R21 et R26 appliquent la même garde avant d'écrire le plan)."
     statut: sourcee
     source: "src/orchestrate/cycle.ts:786-789 et :809-814 (la branche attendue est vérifiée, un HEAD déplacé rend le lot, sans réparation) ; réponse du lead : l'arbre du lead n'est jamais déplacé (R8, command.ts:361)"
-    tests: ["R24 — le lead passe sur une autre branche pendant la vague : lot rendu, aucune branche avancée, HEAD du lead inchangé", "R24 — HEAD détaché du lead à l'intégration : lot rendu", "R24 — le lead revient sur la branche de départ puis --resume : le lot s'intègre"]
+    tests: ["R24 — le lead passe sur une autre branche pendant la vague : lot rendu, aucune branche avancée, HEAD du lead inchangé", "R24 — HEAD détaché du lead à l'intégration : lot rendu", "R24 — le lead revient sur la branche de départ puis --resume --integrate <projet>:<lot> (R27) : le lot s'intègre ; --resume seul le laisse rendu"]
   - id: R25
     cas: [C2]
-    enonce: "L'attente du verrou d'intégration est bornée à 10 minutes (une intégration dure un rebase et la relance des tests) ; au-delà, le lot est rendu au lead avec le porteur du verrou (vague, pid), son worktree et sa branche sont conservés, la branche du dépôt est inchangée, et --resume le reprend à l'intégration : le lot est rendu avec next: integrate (R14), ce que --resume lit pour le rejouer à cette étape. La même borne et le même rendu valent pour l'attente du verrou par une écriture de plan (R26)."
+    enonce: "L'attente du verrou d'intégration est bornée à 10 minutes (une intégration dure un rebase et la relance des tests) ; au-delà, le lot est rendu au lead avec le porteur du verrou (vague, pid), son worktree et sa branche sont conservés, la branche du dépôt est inchangée, et le lot est rendu avec next: integrate (R14) ; il n'est rejoué que sur ordre du lead (--resume --integrate, R27), pas par un --resume simple. La même borne et le même rendu valent pour l'attente du verrou par une écriture de plan (R26)."
     statut: hypothese
     si_faux: "Si 10 minutes est trop court pour une suite de tests longue, des lots sont rendus à tort : seule la constante change (une ligne de config, aucune donnée)."
-    tests: ["R25 — verrou tenu plus que la borne : lot rendu, worktree conservé, branche du dépôt inchangée", "R25 — verrou libéré avant la borne : le lot s'intègre", "R25 — --resume d'un lot rendu sur le délai : repris à l'intégration (next: integrate) sans rejouer ses étapes"]
+    tests: ["R25 — verrou tenu plus que la borne : lot rendu, worktree conservé, branche du dépôt inchangée", "R25 — verrou libéré avant la borne : le lot s'intègre", "R25 — --resume --integrate d'un lot rendu sur le délai : repris à l'intégration (next: integrate) sans rejouer ses étapes"]
 
   - id: R26
     cas: [C1, C2]
@@ -256,6 +257,13 @@ regles:
     statut: hypothese
     si_faux: "Si le lead doit pouvoir éditer le dépôt pendant une vague, le refus pour arbre sale rendrait à tort des lots à leur prochaine écriture de plan (notes, verdict) ; il faudrait alors écrire le plan sans passer par l'arbre du lead (index à part), ce que la fiche ne prévoit pas : question au lead. Le fichier d'attendus QA (plan.maintained) reste du travail du lot s'il le modifie en worktree : il ne déclenche pas le rendu de R21."
     tests: ["R26 — fichier suivi hors plan modifié dans le checkout principal : écriture de plan refusée, lot rendu, rien commité", "R26 — le lead est sur une autre branche : écriture de plan refusée, lot rendu, aucun commit", "R26 — verrou tenu au-delà de la borne pendant une écriture de plan : lot rendu avec le porteur, reprise à l'étape atteinte", "R26 — trois lots écrivent le plan en même temps : trois commits de plan, aucun perdu, dans l'ordre de la file"]
+  - id: R27
+    cas: [C3]
+    enonce: "Un lot rendu (handed-back) à l'étape d'intégration (next: integrate, R14) n'est rejoué par la reprise que si le lead le nomme avec l'option --resume <vague> --integrate <projet:lot> ; ni --resume seul, ni --drop, --answer ou --budget ne le rejouent. Le lot repart du statut suspended, next: integrate, outcome null (comme un lot relevé par --budget, command.ts:1171-1178), avec son worktree et sa branche retrouvés (R11) ; l'intégration reprend (rebase, contrôles, avance, écriture du plan ; si la branche du lot est déjà contenue dans celle du dépôt, ces étapes sont sautées, R23). L'option est refusée (code 2, avant toute écriture, comme les autres refus de reprise) pour : un lot inconnu ou visé deux fois, un lot aussi visé par --drop, --answer ou --budget, un lot qui n'est pas rendu avec next: integrate (statut, étape et cause cités), un lot retiré par --drop (outcome DROPPED, next null). Les rendus hors intégration (revue, tests de la session, budget) gardent next null (stop(), cycle.ts:123) et ne sont pas concernés ; le rendu sur budget garde son chemin --budget. Le refus d'arbre sale du dépôt (command.ts:1118-1122) s'applique avant, sans exception. Un rendu pour conflit (R6), tests rouges (R7) ou revue courte (R17) est rejoué de la même façon, puisque le lead l'a nommé : l'intégration refait le rebase et les contrôles, et rend le lot de nouveau si le problème persiste ; le lead a alors résolu à la main dans le worktree (commit) ou accepte un nouveau rendu."
+    statut: hypothese
+    si_faux: "Si le lead préfère que --resume seul rejoue les lots rendus pour cause d'environnement (verrou, arbre sale, branche du lead : R8, R24, R25, R26) mais jamais ceux rendus pour conflit, tests rouges ou revue, seul le filtre de sélection change (pas de donnée) ; si le nom de l'option est autre, seul le libellé change. Aucun rejeu automatique n'a lieu dans les deux cas : la décision de reprendre reste au lead."
+    tests: ["R27 — lot rendu sur verrou d'intégration (next: integrate) puis --resume seul : il reste handed-back, rien n'est rejoué", "R27 — --resume --integrate sur ce lot : suspended puis intégré, ready", "R27 — --integrate sur un lot rendu hors intégration (next null) : refus code 2 avec statut et étape cités, état de la vague inchangé", "R27 — --integrate sur un lot retiré par --drop ou aussi visé par --drop, --answer, --budget : refus code 2", "R27 — --integrate avec un fichier suivi modifié dans le dépôt : refus d'arbre sale avant toute écriture", "R27 — lot rendu pour conflit (R6) puis --integrate sans que le lead ait rien changé : le conflit est constaté de nouveau, lot rendu de nouveau, branche du dépôt inchangée", "R27 — lot rendu sur arbre du lead sale (R8), arbre nettoyé, --integrate : le lot s'intègre"]
+
 contrats:
   - id: A1
     appel: commande cadence orchestrate
@@ -269,12 +277,15 @@ contrats:
     regles: [R1, R2, R3, R4, R5, R13, R14, R15, R16, R21, R26]
   - id: A2
     appel: commande cadence orchestrate --resume
-    entree: "<vague> [--drop projet:lot] [--answer …] [--budget …]"
-    sortie: "lots repris dans leurs worktrees retrouvés ; lot retiré par --drop : worktree conservé et chemin journalisé"
+    entree: "<vague> [--drop projet:lot] [--answer …] [--budget …] [--integrate projet:lot]"
+    sortie: "lots repris dans leurs worktrees retrouvés ; lot retiré par --drop : worktree conservé et chemin journalisé ; lot rendu à l'intégration nommé par --integrate : suspended puis repris à l'intégration (journal « <projet>:<lot> → suspended — intégration reprise (--resume --integrate) ») ; sans --integrate, un lot rendu à l'intégration reste rendu"
     erreurs:
       - { code: log error, message: "orchestrate : <dépôt> : arbre sale, <n> fichier(s) suivi(s) modifié(s) : <fichiers>" }
       - { code: log warn, message: "orchestrate : <projet>:<lot> : worktree conservé : <chemin> (branche <branche>)" }
-    regles: [R11, R12, R13, R14, R19]
+      - { code: log error, message: "orchestrate : --integrate <projet>:<lot> : le lot n'est pas rendu à l'étape d'intégration (<statut>, étape <étape ou aucune> : <cause ou sans cause>)" }
+      - { code: log error, message: "orchestrate : --integrate <projet>:<lot> : lot inconnu dans la vague <vague>" }
+      - { code: log error, message: "orchestrate : --integrate <projet>:<lot> : lot aussi retiré par --drop" }
+    regles: [R11, R12, R13, R14, R19, R25, R27]
   - id: A3
     appel: commande cadence orchestrate (intégration d'un lot prêt)
     entree: "la fin du cycle du lot dans son worktree (avant ready) ; verrou d'intégration du dépôt"
@@ -291,8 +302,8 @@ contrats:
     regles: [R6, R7, R8, R9, R10, R12, R14, R17, R21, R22, R23, R24, R25, R26]
   - id: A4
     appel: commande raf done
-    entree: "<lot> (porte de revue de code active) ; verdict du lot, éventuellement avec la trace `reporte` écrite par l'intégration"
-    sortie: "lot terminé quand le verdict couvre le dernier commit du lot, soit au sha relu, soit au sha intégré par un report tracé"
+    entree: "<lot> (porte de revue de code active) ; verdict du lot, éventuellement avec la trace informative `reporte` écrite par l'intégration"
+    sortie: "porte et sortie inchangées : lot terminé quand le verdict couvre le dernier commit du lot ; un verdict reporté désigne ce commit (`vers`), la trace n'est pas lue"
     erreurs:
       - { code: log error, message: "<lot> : la revue de code précède <n> commit(s) du lot, elle est à refaire — raf review <lot> \"verdict\" (--force pour passer outre)" }
     regles: [R18]
@@ -310,4 +321,4 @@ donnees:
   - { id: D2, objet: "verrou d'intégration du dépôt (fichier dans l'état commun aux worktrees, format OLock de lock.ts)", existant: false, modification: aucune, note: "même format que orchestrate.lock, autre nom ; vidé à la libération ou périmé si le porteur est mort" }
   - { id: D3, objet: "cadence.yaml : clé orchestrate.worktrees (booléen)", existant: false, modification: aucune, note: "clé nouvelle, absente = comportement actuel (R1)" }
   - { id: D4, objet: "état de vague et de lot (.cadence/runs/<vague>/*.json, LotState)", existant: true, modification: aucune, note: "format inchangé (R14), aucun champ ajouté : l'étape d'intégration est la valeur `integrate` du champ existant `next`, qu'aucun état écrit avant L279 ne contient, donc il se relit sans changement" }
-  - { id: D5, objet: "plan du projet : entrée de verdict de revue (review: { date, verdict, commit, repos? }, plan.recordReview, src/plan.ts:389)", existant: true, modification: ajout, decision: "réponse du lead du 24-10 (validée par Sylvain) : verdict reporté au sha intégré, « le report est tracé (champ ou note dédiés) » ; champ optionnel `reporte: { de, vers, patchId }` ajouté à l'entrée, absent des verdicts existants qui se relisent sans changement (R18)", note: "champ optionnel écrit par le seul programme à l'intégration, dans un commit de plan seul de la branche du dépôt, dans le checkout principal et après l'avance (R21, R23) ; `vers` = dernier commit de travail intégré ; la porte l'exige pour accepter un sha reporté" }
+  - { id: D5, objet: "plan du projet : entrée de verdict de revue (review: { date, verdict, commit, repos? }, plan.recordReview, src/plan.ts:389)", existant: true, modification: ajout, decision: "réponse du lead du 24-10 (validée par Sylvain) : verdict reporté au sha intégré, « le report est tracé (champ ou note dédiés) » ; champ optionnel `reporte: { de, vers, patchId }` ajouté à l'entrée, absent des verdicts existants qui se relisent sans changement (R18, la porte ne change pas)", note: "champ optionnel écrit par le seul programme à l'intégration, dans un commit de plan seul de la branche du dépôt, dans le checkout principal et après l'avance (R21, R23) ; `vers` = dernier commit de travail intégré ; purement informative : la porte de `raf done` ne la lit pas (R18)" }

@@ -32,7 +32,7 @@ import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './st
 import { PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 import { advance, INTEGRATE_WAIT_MS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
-import { git, gitFailure, integrated, linkIgnored, planFileSet, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
+import { branchExists, git, gitFailure, integrated, linkIgnored, lotBranch, planFileSet, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
 export const MAX_PASSES = 2;
@@ -2208,7 +2208,12 @@ async function integrateLot(c: LotCtx): Promise<void> {
     transition(c, 'handed-back', why);
   };
   // Un lot repris à l'intégration dont le worktree a été retiré entre-temps (`--remove-worktree`) n'a plus rien à intégrer.
-  if (!c.tree?.active) return refuse("intégration impossible : le worktree du lot n'existe plus (retiré par --remove-worktree ?) : commits abandonnés, sa branche n'est plus là pour être intégrée");
+  if (!c.tree?.active) {
+    // Une branche encore là mais sans sa clé `branch.<nom>.cadence-base` (supprimée à la main, config perdue) n'est pas une branche retirée : elle n'est pas rejouée, et rien n'est dit « abandonné ».
+    const br = lotBranch(c.wave.id, l.project, l.lot);
+    if (branchExists(l.repo, br)) return refuse(`intégration impossible : la branche ${br} existe mais n'est plus marquée comme worktree de cadence (branch.${br}.cadence-base absente) : rien n'est intégré ni retiré, à vérifier à la main`);
+    return refuse("intégration impossible : le worktree du lot n'existe plus (retiré par --remove-worktree ?) : commits abandonnés, sa branche n'est plus là pour être intégrée");
+  }
   const t = c.tree;
   const kept = `worktree conservé : ${t.dir}`;
   const waitMs = c.wave.integrate?.waitMs ?? INTEGRATE_WAIT_MS;

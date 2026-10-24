@@ -546,6 +546,8 @@ nothing below applies and the wave behaves as before; any other value is refused
   commit left to integrate: `--resume --integrate` creates no worktree for it at the repository's top (also when other lots of its group are resumed with it) and hands
   it back again, `next: integrate`, with the cause « commits abandonnés ». The review verdict is never written against a null `commit`: an integration that finds
   no commit of the lot in the repository's branch is handed back, nothing written in the plan.
+  A branch that is still there but lost its `branch.<name>.cadence-base` key (deleted by hand) is not a removed branch: the lot is handed back with a cause that
+  names the branch and the missing key, never « commits abandonnés », and nothing is integrated or removed (L303).
 - **Resume.** The worktree of each resumed lot is found again by its name (a worktree git still lists whose folder is gone is pruned and recreated on the
   existing branch) and is subject to the guards of a repository: a modified tracked file refuses the resume (exit 2, nothing written). The wave's lock
   stays one per repository, taken once and released when all the lots of the repository are finished and integrated or handed back; a second wave aiming at

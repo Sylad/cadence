@@ -332,6 +332,24 @@ describe('R27 — --resume --integrate rejoue seul une intégration rendue', () 
     expect(l.outcome).toMatch(/^intégration impossible : le worktree du lot n'existe plus/);
     expect(g.calls).toHaveLength(0);
   });
+  it('L303 — --integrate d\'un lot dont la branche existe encore mais a perdu sa clé branch.<nom>.cadence-base : dite autrement qu\'une branche retirée, rien n\'est touché', async () => {
+    const { parent, repo, branch } = await conflictWave();
+    git(repo, 'config', '--local', '--unset', `branch.${branch}.cadence-base`);
+    const tip = git(repo, 'rev-parse', branch);
+    const main = git(repo, 'rev-parse', 'main');
+    const g = fake();
+    const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], g);
+    expect(r.code).toBe(1);
+    const l = store(parent).readLot('a', 'L1')!;
+    expect(l.status).toBe('handed-back');
+    expect(l.next).toBe('integrate');
+    expect(l.outcome).toContain(`la branche ${branch} existe mais n'est plus marquée comme worktree de cadence (branch.${branch}.cadence-base absente)`);
+    expect(l.outcome).not.toContain('commits abandonnés');
+    expect(l.outcome).not.toContain('retiré par --remove-worktree');
+    expect(git(repo, 'rev-parse', branch)).toBe(tip);
+    expect(git(repo, 'rev-parse', 'main')).toBe(main);
+    expect(g.calls).toHaveLength(0);
+  });
   it('R27 — deux lots du groupe rendus à l\'intégration, leurs worktrees retirés avec --abandon-commits, repris ensemble : aucun worktree recréé au sommet, lots rendus « commits abandonnés », aucun verdict', async () => {
     const { parent, repo } = await dirtyLead();
     git(repo, 'checkout', '--', 'base.txt');

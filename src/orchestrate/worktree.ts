@@ -73,6 +73,9 @@ const config = (repo: string, branch: string, key: string): string | null => try
 /** La branche de départ du lot, notée dans la config git de sa branche à la création ; null si la branche n'est pas celle d'un worktree de cadence. */
 export const baseBranchOf = (repo: string, branch: string): string | null => config(repo, branch, 'base');
 
+/** La branche existe dans le dépôt (marquée ou non comme worktree de cadence). */
+export const branchExists = (repo: string, branch: string): boolean => branchSha(repo, branch) !== null;
+
 const branchSha = (repo: string, branch: string): string | null => tryGit(repo, 'rev-parse', '--verify', '-q', `refs/heads/${branch}^{commit}`);
 
 /** Les worktrees enregistrés par git : chemin → branche (null en HEAD détaché). */

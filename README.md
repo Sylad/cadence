@@ -22,6 +22,18 @@ raf add "My first lot" --estimate 1
 
 Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are, `raf done L1` when it is finished. A title gone stale after a change of scope is replaced with `raf title L1 "new title"` (any status, the old one is kept in a dated note). A lot that occupies a resource shared between projects says so with `raf add --uses banc` or `raf uses L1 banc`, the folder's `cadence.yaml` lists the resources (`resources: [banc]`), and `raf check` refuses a name that is not declared ([docs/raf.md](docs/raf.md#shared-resources-uses-and-resources)); `cadence lead hold <label>` / `lead release <label>` declare the sessions the lead starts by hand so that they are subtracted from the free slots of `orchestrate --status` and `lead tour` ([docs/lead.md](docs/lead.md#lead-hold-and-release)); `cadence lead tour` and `orchestrate --continue` list, next to the free slots, the ready lots whose resources no `doing` lot (in any project sharing them, at every `depth:` of the declaring `cadence.yaml`) or live wave holds (`--json`: `free`); the `lead` skill reads that list again each time an agent comes back or a lot is blocked, before waiting).
 
+## Install as a Claude Code plugin
+
+The repository is its own [Claude Code](https://claude.com/claude-code) plugin marketplace. In a Claude Code session:
+
+```
+/plugin marketplace add Sylad/cadence
+/plugin install cadence@cadence        # skills /cadence:session-start, session-close, deliver, lead + the three reviewer agents
+/plugin install cadence-hud@cadence    # the status band above the prompt
+```
+
+The two plugins are independent. `cadence@cadence` carries the rituals, which call the **`cadence` CLI** (`raf`, `session`, `deliver`, …): install it too with `npm install -g @sylad/cadence`, the plugin does not bring it. `cadence-hud` works without the CLI; only its per-project plan progress needs `cadence` on the `PATH`. Without the plugin, `cadence skills install` copies the skills and agents into the repository. Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence-hud.md).
+
 ## Where to read more
 
 | Page | What it covers |

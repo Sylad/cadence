@@ -204,6 +204,33 @@ describe('cadence ref corpus — le corpus synthétique à vérité connue (eval
     }
   }, 120_000);
 
+  // Les zones des textes d'une figure sont comptées en pixels de la page rendue : le décalage de la figure sur la page (60 px CSS, 170 px CSS) se perd facilement.
+  it.skipIf(!process.env.CADENCE_PLAYWRIGHT)('R20 — la zone attendue de chaque texte contient ce que le rendu dessine (mots et boîtes de pdftotext -bbox)', async () => {
+    const r = await corpusCmd([], { ...process.env });
+    expect(r.code, r.err).toBe(0);
+    const K = 200 / 72;
+    let verifies = 0;
+    for (const c of corpus) {
+      const bbox = execFileSync('pdftotext', ['-bbox', join(r.dir, c.nom, 'document.pdf'), '-'], { encoding: 'utf8' });
+      const pages = bbox.split('<page ').slice(1).map((pg) => [...pg.matchAll(/<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">(.*?)<\/word>/g)].map((m) => ({ b: [1, 2, 3, 4].map((i) => Number(m[i]) * K), mot: m[5]!.replace(/&amp;/g, '&') })));
+      for (const e of elements(c.nom, 'texte')) {
+        if (e.ocr) continue;
+        const mots: string[] = e.libelle.split(' ');
+        const page = pages[e.source.page - 1]!;
+        const debut = page.findIndex((_, i) => mots.every((m, j) => page[i + j]?.mot === m));
+        expect(debut, `${c.nom} : « ${e.libelle} » absent du rendu`).toBeGreaterThanOrEqual(0);
+        const dessine = page.slice(debut, debut + mots.length).map((w) => w.b);
+        const [x0, y0, x1, y1] = [Math.min(...dessine.map((b) => b[0]!)), Math.min(...dessine.map((b) => b[1]!)), Math.max(...dessine.map((b) => b[2]!)), Math.max(...dessine.map((b) => b[3]!))];
+        const z = e.source.zone;
+        const dedans = Math.max(0, Math.min(x1, z.x + z.l) - Math.max(x0, z.x)) * Math.max(0, Math.min(y1, z.y + z.h) - Math.max(y0, z.y));
+        // 85 % : la boîte de pdftotext suit les métriques de la police (quelques pixels au-dessus de la ligne), pas la boîte du bloc
+        expect(dedans / ((x1 - x0) * (y1 - y0)), `${c.nom} : « ${e.libelle} » dessiné en [${[x0, y0, x1, y1].map(Math.round)}], attendu en [${z.x},${z.y},${z.x + z.l},${z.y + z.h}]`).toBeGreaterThanOrEqual(0.85);
+        verifies++;
+      }
+    }
+    expect(verifies).toBeGreaterThanOrEqual(20);
+  }, 120_000);
+
   it('R19 — si Chromium ne se lance pas (paquet présent, navigateur absent), la commande est refusée (code 2) avant d’écrire quoi que ce soit', async () => {
     const faux = tempDir();
     writeFileSync(join(faux, 'package.json'), '{"name":"playwright","main":"index.js"}');

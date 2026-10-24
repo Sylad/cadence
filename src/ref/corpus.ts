@@ -84,8 +84,8 @@ function texteAmbigu(): CasCorpus {
   inv.texte(1, TITRE, 'Jet arrow annotation', 'titre');
   inv.texte(1, PARA, phrase, 'paragraphe');
   inv.texte(1, { x: 150, y: 270, l: 90, h: 34 }, '120 KT', 'etiquette-figure');
-  inv.texte(1, { x: 150, y: 350, l: 40, h: 20 }, 'tail', 'etiquette-figure');
-  inv.texte(1, { x: 620, y: 350, l: 50, h: 20 }, 'head', 'etiquette-figure');
+  inv.texte(1, { x: 148, y: 358, l: 26, h: 24 }, 'tail', 'etiquette-figure');
+  inv.texte(1, { x: 618, y: 358, l: 40, h: 24 }, 'head', 'etiquette-figure');
   inv.texte(1, LEGENDE, legende, 'legende');
   inv.add('lien', 1, FIGURE, {
     figure: legende,
@@ -109,8 +109,8 @@ function figureContredit(): CasCorpus {
 <text x="520" y="120" font-size="22" font-weight="bold">100 kt</text><text x="90" y="280" font-size="18">Jet speed</text></svg>`;
   inv.texte(1, TITRE, 'Turbulence reporting', 'titre');
   inv.texte(1, PARA, phrase, 'paragraphe');
-  inv.texte(1, { x: 560, y: 250, l: 100, h: 30 }, '100 kt', 'etiquette-figure');
-  inv.texte(1, { x: 90, y: 440, l: 100, h: 24 }, 'Jet speed', 'etiquette-figure');
+  inv.texte(1, { x: 578, y: 268, l: 68, h: 30 }, '100 kt', 'etiquette-figure');
+  inv.texte(1, { x: 148, y: 432, l: 84, h: 26 }, 'Jet speed', 'etiquette-figure');
   inv.texte(1, LEGENDE, legende, 'legende');
   inv.add('lien', 1, FIGURE, {
     figure: legende,

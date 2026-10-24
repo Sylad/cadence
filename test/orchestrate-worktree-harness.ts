@@ -76,10 +76,11 @@ export const writes = (before: () => Promise<unknown> | unknown = () => {}): Han
   return claudeOut(workReport({ commits: [commitFile(cwd, `${lot}.txt`, `feat(${lot}): travail`)] }));
 };
 
-export function run(parent: string, argv: string[], f: ReturnType<typeof fake>, extra: Partial<OrchestrateDeps> = {}) {
+/** `env` : variables en plus (ou `undefined` pour en retirer une) ; le harnais pose CADENCE_EXPERIMENTAL_WORKTREES=1 (le mode est expérimental, L299–L301). */
+export function run(parent: string, argv: string[], f: ReturnType<typeof fake>, extra: Partial<OrchestrateDeps> = {}, env: Record<string, string | undefined> = {}) {
   const out: string[] = [];
   const err: string[] = [];
-  const io: OrchestrateIo = { cwd: parent, env: { RAF_TODAY: '2026-10-04' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') };
+  const io: OrchestrateIo = { cwd: parent, env: Object.fromEntries(Object.entries({ RAF_TODAY: '2026-10-04', CADENCE_EXPERIMENTAL_WORKTREES: '1', ...env }).filter(([, v]) => v !== undefined)) as Record<string, string>, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') };
   const deps: OrchestrateDeps = { claude: f.claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, ...extra };
   return orchestrate(argv, io, deps).then((code) => ({ code, out: out.join('\n'), err: err.join('\n') }));
 }

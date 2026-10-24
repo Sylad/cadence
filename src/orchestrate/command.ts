@@ -306,6 +306,9 @@ function olderThanEffort(version: string): boolean {
   return a < 2 || (a === 2 && (b < 1 || (b === 1 && c < 284)));
 }
 
+/** Variable d'environnement qui lève le refus de `orchestrate.worktrees: true` (mode expérimental, L279 ; lots L299–L301). Posée par le harnais des tests du mode. */
+export const EXPERIMENTAL_WORKTREES_ENV = 'CADENCE_EXPERIMENTAL_WORKTREES';
+
 /** Préconditions : tout ce qui peut être refusé l'est ici, avant d'agir, sans verrou ni écriture. */
 async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
   const refusals: string[] = [];
@@ -326,6 +329,11 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       plan = env.loadPlan();
     } catch (e) {
       refusals.push(`${key} : ${(e as Error).message}`);
+      continue;
+    }
+    // L279 : le mode worktree est une infrastructure expérimentale, non activable tant que L299–L301 ne sont pas faits (refus avant d'agir, `--dry-run` compris).
+    if (env.config.worktrees && io.env[EXPERIMENTAL_WORKTREES_ENV] !== '1') {
+      refusals.push(`${key} : orchestrate.worktrees: true est refusé : le mode worktree par lot est EXPÉRIMENTAL et non activable tant que les lots L299, L300 et L301 ne sont pas faits (retirer la clé, ou poser ${EXPERIMENTAL_WORKTREES_ENV}=1 pour les tests du mode)`);
       continue;
     }
     if (info && olderThanEffort(info.version) && Object.values(env.config.effort).some((e) => e !== 'default')) {

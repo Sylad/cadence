@@ -3442,9 +3442,10 @@ lots:
     review: { date: 2026-10-24, verdict: "conforme, avec 2 notes mineures (recouvrement des blocs non testé, test du refus étiqueté R5) — orchestré (vague 2026-10-24-1845, 2 passe(s) de correction)", commit: f7a88587dc5444fb3a01a82e41103f9f8c996b30 }
   - id: L306
     title: "agent bibliothécaire générique (agents/doc-keeper.md du paquet) : pour un dépôt et un lot, lit le diff, la carte des docs du projet (docs.sync du cadence.yaml, README, docs/, CHANGELOG, Nouveautés) et dit quelles docs doivent changer, puis les met à jour (session d'écriture) ou les liste (lecture seule) ; orchestrate l'appelle quand docs.sync signale une doc en retard sur le lot (avant la revue), le lead à la main ; docs hors dépôt seulement par configuration (clé, absente par défaut, ex. dans le cadence.yaml du dossier parent : « tel projet est aussi décrit par tel fichier de tel dépôt » → le bibliothécaire propose un lot dans le plan de ce dépôt, sans l'écrire lui-même) ; rien de propre à un dossier dans le code (cadence sert aussi ailleurs) ; doc et tests — demande Sylvain 24-10"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-24
+    started: 2026-10-24
   - id: L307
     title: "docs.sync dans chaque projet du dossier qui n'en a pas : le bibliothécaire (lecture seule) établit par projet la carte code → docs (README, docs/, CHANGELOG/Nouveautés) ; le lead la pose dans le cadence.yaml du projet (commit acquitté par raf ignore, ou lot du projet) et vérifie raf check ; pour nous : avatar-pandora, claude-code-codex, discotheque, evatosorus, finance-tracker, jobmail-assistant, ol-companion, warhammer40k, maritime-atlas (plan raf.py : via un lot maritime) ; et clé de docs hors dépôt dans ~/projects/developpeur/cadence.yaml pour les études de cas de claude-code-codex — demande Sylvain 24-10"
     status: todo

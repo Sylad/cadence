@@ -24,6 +24,7 @@ fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, cwd: process.cwd(
 const mode = process.env.FAKE_MODE || 'ok';
 const out = (o) => process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, session_id: 's-1', num_turns: 4, duration_ms: 10, result: '', usage: { input_tokens: 100, cache_creation_input_tokens: 400, cache_read_input_tokens: 9000, output_tokens: 500 }, ...o }));
 if (mode === 'quota') { out({ is_error: true, subtype: 'error', result: 'Claude usage limit reached | resets at 5pm' }); process.exit(0); }
+if (mode === 'coupure' && fs.readFileSync(process.env.FAKE_LOG, 'utf8').split('\\n').filter(Boolean).length === 1) process.kill(process.pid, 'SIGKILL');
 if (mode === 'crash') { process.stderr.write('boom'); process.exit(1); }
 const file = /(\\S+\\/lectures\\/a\\.json)/.exec(brief)[1];
 const doc = JSON.parse(fs.readFileSync(file.replace('/lectures/a.json', '/document.json'), 'utf8'));
@@ -175,6 +176,32 @@ describe('cadence ref analyse (L265)', () => {
     const pile = setup('ok', pagesVides(20));
     expect((await analyse(pile)).code).toBe(0);
     expect(pile.appels()).toHaveLength(1);
+  });
+
+  it('R21 — le conseil du refus au plafond réussit : un autre slug, car les pages déjà rendues du slug refusé restent lues', async () => {
+    const s = setup('ok', pagesVides(25));
+    const refus = await analyse(s);
+    expect(refus.code).toBe(2);
+    const conseil = /cadence ref analyse (\S+) --slug (\S+) --sections (\S+)/.exec(refus.err);
+    expect(conseil).not.toBeNull();
+    expect(conseil![2]).not.toBe('norme');
+    const encore = await analyse(s, '--sections', conseil![3]!);
+    expect(encore.code).toBe(2);
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await run(['ref', 'analyse', s.pdf, '--slug', conseil![2]!, '--sections', conseil![3]!], { cwd: s.cwd, env: s.env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-24T10:00:00') });
+    expect(err.join('\n')).toBe('');
+    expect(code).toBe(0);
+    expect(s.appels()).toHaveLength(1);
+  });
+
+  it('R22 — une lecture coupée par un signal sans rien écrire est relancée une fois en session neuve', async () => {
+    const s = setup('coupure');
+    const r = await analyse(s);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(s.appels()).toHaveLength(2);
+    expect(existsSync(join(s.refs, 'norme', 'lectures', 'a.json'))).toBe(true);
   });
 
   it('R10 — le plafond est dit dans la sortie, à côté des pages lues', async () => {

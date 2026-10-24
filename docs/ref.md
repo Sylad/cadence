@@ -288,8 +288,10 @@ and carry the `slug` and `sha256` of the document that was read, never another (
 `{ tokens, modele, session }`, `tokens` being the input, cache-write and output tokens of the session (the count of the orchestrate budget; cache reads are left out), which the agent never writes — so that
 `ref eval` reads the tokens per page from the file.
 
+A session cut by a signal with nothing written is started again once in a fresh session (like a review); cut twice, it is a failure (exit 2).
+
 **Declared ceiling: 20 pages per reading** (`LECTURE_PAGES_MAX`, design §5 « Taille »). The pages read are the pages rendered by `add` (those of `--sections`, plus the pages of the figures they cite,
-plus those rendered by an earlier `add` of the same document). More than 20 is refused before any session (exit 2, the count and `--sections` to choose fewer), and so is a large document with no
+plus those rendered by an earlier `add` of the same document). More than 20 is refused before any session (exit 2, the count and the command to choose fewer pages: `add` keeps the pages already rendered under a slug, so `--sections` only helps under another `--slug`), and so is a large document with no
 `--sections` (no page rendered); the pages `add` rendered stay. Splitting into several readings is not done here (lot 6 and after).
 
 ```

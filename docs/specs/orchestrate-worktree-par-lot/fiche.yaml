@@ -47,13 +47,17 @@ cas:
       - "Le programme prend le verrou d'intégration du dépôt (un seul lot s'intègre à la fois ; attente bornée pour les autres)."
       - "Si la branche du dépôt n'a pas bougé depuis le départ du lot, la branche avance en fast-forward (aucun sha ne change)."
       - "Sinon la branche du lot est rebasée sur le sommet courant de la branche du dépôt, puis avance en fast-forward."
-      - "Les contrôles (tests, build) sont rejoués au sommet intégré quand le rebase a changé les commits ; verts, le lot est ready, vert au sommet."
+      - "Quand le rebase a changé les commits, le programme compare le patch-id stable du diff du lot avant et après (git patch-id --stable, diff cumulé de la base au sommet du lot)."
+      - "Patch-id identique : les tests et le build sont rejoués au sommet intégré ; verts, le verdict de revue est reporté au sha intégré, avec une trace qui cite l'ancien sha relu et le nouveau."
+      - "Patch-id différent : tests et build rejoués, puis une revue courte (review-small) du diff rebasé est jouée avant l'avance ; sans bloquant ni majeur, son verdict est enregistré au sha intégré."
       - "Le worktree et la branche du lot, propres et fusionnés, sont retirés ; une ligne de journal dit les shas intégrés."
     alternatives:
-      - { si: "le rebase rencontre un conflit", alors: "rebase abandonné, lot rendu au lead avec les fichiers en conflit, worktree et branche conservés", regles: [R6] }
+      - { si: "le rebase rencontre un conflit (non résolu automatiquement)", alors: "rebase abandonné, lot rendu au lead avec les fichiers en conflit, worktree et branche conservés ; aucune session ne résout le conflit", regles: [R6] }
       - { si: "les contrôles rejoués sont rouges au sommet intégré", alors: "la branche du dépôt n'avance pas, lot rendu avec les échecs", regles: [R7] }
       - { si: "l'arbre du dépôt (celui du lead) a des fichiers suivis modifiés au moment de l'avance", alors: "pas d'avance, lot rendu, branche du lot conservée", regles: [R8] }
-      - { si: "le sommet intégré diffère de celui que la revue a lu (rebase non vide)", alors: "le verdict est enregistré pour le sommet intégré, jamais pour le sha rebasé qu'il n'a pas relu sans le dire", regles: [R9] }
+      - { si: "le rebase est non vide et le patch-id du diff du lot est identique avant/après", alors: "verdict reporté au sha intégré, tracé (ancien sha relu, nouveau sha), sans nouvelle revue", regles: [R9] }
+      - { si: "le rebase est non vide et le patch-id diffère (contexte modifié, conflit déjà résolu à la main)", alors: "revue courte du diff rebasé avant l'intégration ; un bloquant ou un majeur rend le lot au lead", regles: [R17] }
+      - { si: "raf done lit un verdict dont le sha n'est plus celui du dernier commit du lot", alors: "seul un verdict portant la trace d'un report par le programme est accepté ; tout autre reste refusé", regles: [R18] }
       - { si: "un autre lot s'intègre déjà", alors: "le lot attend le verrou d'intégration, sans bloquer les sessions des autres", regles: [R10] }
     resultat: "La branche du dépôt reçoit les lots un par un, sur un historique linéaire ; aucun commit n'est perdu, aucun conflit n'est résolu à l'aveugle."
   - id: C3
@@ -117,11 +121,11 @@ regles:
     cas: [C2]
     enonce: "Un conflit au rebase d'intégration abandonne le rebase (git rebase --abort), ne touche pas la branche du dépôt, rend le lot au lead avec la liste des fichiers en conflit et conserve le worktree et la branche du lot tels qu'avant le rebase."
     statut: sourcee
-    source: "demande du lot : « conflits rendus au lead » ; principe coded : un lot qui laisse le dépôt dans un état douteux est rendu, jamais réparé à l'aveugle (cycle.ts:809-814)"
-    tests: ["R6 — deux lots modifient la même ligne : le second est handed-back avec le fichier en conflit", "R6 — après le conflit, la branche du dépôt est au même sha qu'avant et le worktree du lot est intact", "R6 — aucun rebase en cours dans le worktree après l'échec"]
+    source: "demande du lot : « conflits rendus au lead » ; réponse du lead du 24-10, cas (3) : rebase en conflit non résolu automatiquement rend le lot au lead, sans résolution par une session ; principe coded : un lot qui laisse le dépôt dans un état douteux est rendu, jamais réparé à l'aveugle (cycle.ts:809-814)"
+    tests: ["R6 — deux lots modifient la même ligne : le second est handed-back avec le fichier en conflit", "R6 — après le conflit, la branche du dépôt est au même sha qu'avant et le worktree du lot est intact", "R6 — aucun rebase en cours dans le worktree après l'échec", "R6 — aucune session n'est lancée pour résoudre le conflit"]
   - id: R7
     cas: [C2]
-    enonce: "Quand le rebase a changé les commits du lot, les commandes de test et de build du projet sont rejouées dans le worktree au sommet rebasé avant l'avance de la branche ; un rouge nouveau rend le lot et laisse la branche du dépôt intacte. Les rouges déjà présents au sha de base (baseline, L213) ne comptent pas."
+    enonce: "Quand le rebase a changé les commits du lot, les commandes de test et de build du projet sont rejouées (condition aussi du report, R9) dans le worktree au sommet rebasé avant l'avance de la branche ; un rouge nouveau rend le lot et laisse la branche du dépôt intacte. Les rouges déjà présents au sha de base (baseline, L213) ne comptent pas."
     statut: hypothese
     si_faux: "Si deux lots sans conflit textuel ne peuvent pas se casser mutuellement, la relance est du temps perdu et se retire ; si au contraire elle manque, un sommet intégré rouge n'est vu qu'à la livraison."
     tests: ["R7 — rebase non vide puis test rouge au sommet : branche du dépôt inchangée, lot rendu", "R7 — fast-forward pur : aucune relance des tests", "R7 — rouge présent au sha de base : ne rend pas le lot"]
@@ -133,10 +137,10 @@ regles:
     tests: ["R8 — arbre du lead modifié pendant la vague : lot rendu, fichiers listés, arbre inchangé", "R8 — arbre propre : branche avancée en fast-forward"]
   - id: R9
     cas: [C2]
-    enonce: "Le verdict d'un lot intégré est enregistré pour le sha intégré dans la branche du dépôt : après un rebase non vide, le programme ne laisse jamais au plan un sha de verdict qui n'existe pas dans l'historique de la branche, et le lot reste conforme tant que le diff du lot est inchangé."
-    statut: hypothese
-    si_faux: "Si le verdict doit rester lié au sha relu (pré-rebase), le plan garde un sha absent de la branche et la porte « commit postérieur à la revue » rend le lot ; voir la question sur le sha du verdict."
-    tests: ["R9 — après rebase non vide, le sha du verdict est dans l'historique de la branche du dépôt", "R9 — fast-forward pur : le sha du verdict est celui relu"]
+    enonce: "Après un rebase non fast-forward dont le patch-id stable du diff du lot est identique avant et après, ET dont les tests et le build passent sur le résultat intégré, le verdict de revue est reporté au sha intégré : le programme réécrit le sha du verdict et ajoute au verdict une trace `reporte` (ancien sha relu, nouveau sha, patch-id) ; la revue a relu exactement ce diff, aucune nouvelle revue n'est jouée. Un fast-forward pur ne change aucun sha : rien à reporter."
+    statut: sourcee
+    source: "réponse du lead du 24-10, validée par Sylvain : cas (1) « patch-id identique ET tests et build verts sur le résultat intégré → verdict reporté au sha intégré, avec une note qui cite l'ancien sha relu et le nouveau »"
+    tests: ["R9 — rebase non vide, patch-id identique, tests et build verts : verdict au sha intégré, trace avec ancien et nouveau sha", "R9 — fast-forward pur : le sha du verdict est celui relu, aucune trace de report", "R9 — patch-id identique mais build rouge : pas de report, lot rendu", "R9 — le patch-id est calculé commit par commit ou en diff cumulé de façon stable (git patch-id --stable) : même diff, contexte déplacé, même résultat"]
   - id: R10
     cas: [C2]
     enonce: "Les intégrations d'un dépôt sont sérialisées par un verrou propre au dépôt, pris dans l'état commun aux worktrees (celui de deliver), avec le même mécanisme (pid + heure de démarrage, périmé si le porteur est mort) que le verrou d'orchestration ; un lot qui attend ce verrou ne retient aucun créneau de session."
@@ -179,6 +183,18 @@ regles:
     statut: hypothese
     si_faux: "Si les ports de l'application sont choisis librement par lot, la sérialisation est un ralentissement inutile ; si elle manque, deux applications se disputent un port et l'étape UX échoue (lot rendu à tort)."
     tests: ["R16 — deux lots à écran : une seule application lancée à la fois dans le dépôt", "R16 — un lot sans écran n'est pas retardé par l'étape UX d'un autre"]
+  - id: R17
+    cas: [C2]
+    enonce: "Après un rebase non fast-forward dont le patch-id du diff du lot diffère (conflit résolu, contexte modifié), une revue courte (review-small, Sonnet) du diff rebasé est jouée avant l'intégration : sans constat bloquant ni majeur, son verdict est enregistré au sha intégré et la branche avance ; un bloquant ou un majeur rend le lot au lead, la branche du dépôt est inchangée et le worktree est conservé."
+    statut: sourcee
+    source: "réponse du lead du 24-10, validée par Sylvain : cas (2) « revue courte (review-small, Sonnet) du diff rebasé avant l'intégration ; un bloquant ou un majeur rend le lot au lead »"
+    tests: ["R17 — patch-id différent : une revue review-small est jouée sur le diff rebasé avant l'avance", "R17 — revue sans constat : verdict au sha intégré, branche avancée", "R17 — un constat bloquant ou majeur : lot rendu, branche du dépôt inchangée", "R17 — patch-id identique : aucune revue jouée"]
+  - id: R18
+    cas: [C2]
+    enonce: "La porte de `raf done` (verdict plus récent que le dernier commit du lot) accepte un verdict dont le sha a été reporté par le programme (R9) et seulement celui-là : l'acceptation exige la trace `reporte` écrite par l'intégration ; un verdict au sha ancien sans trace, ou dont la trace est incohérente (nouveau sha absent de l'historique, champ manquant), reste refusé comme aujourd'hui. Le report n'est jamais un verdict édité à la main (--force reste le seul contournement existant)."
+    statut: sourcee
+    source: "réponse du lead du 24-10 : « la porte de raf done doit accepter un verdict reporté par (1) et seulement celui-là : le report est tracé (champ ou note dédiés), jamais un verdict édité à la main » ; porte actuelle src/audit.ts:261-269 et src/plan.ts:551-556"
+    tests: ["R18 — verdict reporté avec trace : raf done passe", "R18 — verdict au sha ancien sans trace (historique réécrit) : raf done refuse avec le message existant", "R18 — trace dont le nouveau sha n'est pas dans l'historique du lot : refus", "R18 — un commit ajouté après le report : refus comme aujourd'hui, la trace ne couvre que le sha intégré"]
 
 contrats:
   - id: A1
@@ -202,16 +218,24 @@ contrats:
   - id: A3
     appel: commande cadence orchestrate (intégration d'un lot prêt)
     entree: "le lot passe à ready dans son worktree ; verrou d'intégration du dépôt"
-    sortie: "branche du dépôt avancée (fast-forward ou après rebase), lot ready, worktree et branche retirés ; journal « <projet>:<lot> intégré : <sha départ>..<sha intégré> »"
+    sortie: "branche du dépôt avancée (fast-forward ou après rebase), lot ready, worktree et branche retirés ; journal « <projet>:<lot> intégré : <sha départ>..<sha intégré> » ; après un rebase non vide à patch-id identique, verdict reporté et journal « <projet>:<lot> verdict reporté : <ancien sha relu> → <nouveau sha> (patch-id identique) »"
     erreurs:
       - { code: log warn, message: "<projet>:<lot> → handed-back — intégration impossible : conflit en rebasant <branche> sur <branche du dépôt> (fichiers : <liste>) ; worktree conservé : <chemin>" }
       - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : tests rouges au sommet intégré (<échecs>) ; branche du dépôt inchangée, worktree conservé : <chemin>" }
+      - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : revue courte du diff rebasé : <n> constat(s) bloquant(s) ou majeur(s) ; branche du dépôt inchangée, worktree conservé : <chemin>" }
       - { code: log warn, message: "<projet>:<lot> → handed-back — intégration refusée : arbre du dépôt modifié (<fichiers>) ; branche conservée : <branche>" }
-    regles: [R6, R7, R8, R9, R10, R12]
+    regles: [R6, R7, R8, R9, R10, R12, R17]
+  - id: A4
+    appel: commande raf done
+    entree: "<lot> (porte de revue de code active) ; verdict du lot, éventuellement avec la trace `reporte` écrite par l'intégration"
+    sortie: "lot terminé quand le verdict couvre le dernier commit du lot, soit au sha relu, soit au sha intégré par un report tracé"
+    erreurs:
+      - { code: log error, message: "<lot> : la revue de code précède <n> commit(s) du lot, elle est à refaire — raf review <lot> \"verdict\" (--force pour passer outre)" }
+    regles: [R18]
 
 donnees:
   - { id: D1, objet: "branche git cadence/<vague>/<slug> et worktree <dossier de la vague>/worktrees/<slug> (créés et retirés par le programme)", existant: false, modification: aucune, note: "objets git locaux, jamais poussés (hook pre-push de garde inchangé) ; nom déterministe, rien n'est stocké (R14)" }
   - { id: D2, objet: "verrou d'intégration du dépôt (fichier dans l'état commun aux worktrees, format OLock de lock.ts)", existant: false, modification: aucune, note: "même format que orchestrate.lock, autre nom ; vidé à la libération ou périmé si le porteur est mort" }
   - { id: D3, objet: "cadence.yaml : clé orchestrate.worktrees (booléen)", existant: false, modification: aucune, note: "clé nouvelle, absente = comportement actuel (R1)" }
   - { id: D4, objet: "état de vague et de lot (.cadence/runs/<vague>/*.json, LotState)", existant: true, modification: aucune, note: "format inchangé (R14) : un état écrit avant L279 se relit sans changement" }
-  - { id: D5, objet: "plan du projet (verdict de revue, plan.recordReview) commité sur la branche du lot puis intégré", existant: true, modification: aucune, note: "même format ; seul le sha enregistré peut changer après un rebase (R9), voir la question" }
+  - { id: D5, objet: "plan du projet : entrée de verdict de revue (review: { date, verdict, commit, repos? }, plan.recordReview, src/plan.ts:389)", existant: true, modification: ajout, decision: "réponse du lead du 24-10 (validée par Sylvain) : verdict reporté au sha intégré, « le report est tracé (champ ou note dédiés) » ; champ optionnel `reporte: { de, vers, patchId }` ajouté à l'entrée, absent des verdicts existants qui se relisent sans changement (R18)", note: "champ optionnel écrit par le seul programme à l'intégration ; la porte l'exige pour accepter un sha reporté" }

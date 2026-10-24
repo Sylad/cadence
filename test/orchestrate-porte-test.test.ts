@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { readOrchestrateConfig } from '../src/config.js';
 import { testGateMissing } from '../src/testgate.js';
 import { runLot } from '../src/orchestrate/cycle.js';
-import { tempDir } from './helpers.js';
-import { claudeOut, commitFile, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
+import { changedFiles } from '../src/git.js';
+import { gitRepo, tempDir } from './helpers.js';
+import { claudeOut, commitFile, git, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 import { docText } from './docs-text.js';
 
 const GATE = { code: ['*.ts'], tests: ['*.spec.ts'], except: [] as string[], threshold: 1 };
@@ -94,6 +95,9 @@ describe('porte « code modifié sans test » (L287)', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
     expect(c.lot.pass).toBe(1);
+    // Sans le drapeau « une seule fois », la porte rejouerait et avertirait (une passe de correction est déjà faite) : aucun avertissement de porte ici.
+    expect(c.lot.warnings.join('\n')).not.toContain('porte');
+    expect(c.lot.testGate).toBe(true);
   });
 
   it('R11 — sans testGate déclaré, le cycle est celui d\'avant', async () => {
@@ -141,6 +145,42 @@ describe('porte « code modifié sans test » (L287)', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['fix', 'review-small']);
     expect(c.lot.warnings.join('\n')).not.toContain('porte');
+  });
+
+  it('R16 — un fichier supprimé par le lot n\'est pas du code sans test : le lot de code mort supprimé ne déclenche pas de passe', async () => {
+    const h = harness({ script: { implement: [(call) => {
+      git(call.opts.cwd, 'rm', '-q', 'old.ts');
+      git(call.opts.cwd, 'commit', '-q', '-m', 'refactor(L1): supprime old.ts');
+      return claudeOut(workReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'refactor(L1): supprime old.ts' }] }));
+    }], review: [ok] } });
+    commitFile(h.repo, 'old.ts', 'chore: code mort');
+    await runLot(h.lot('L1', {}, { testGate: GATE }));
+    expect(kinds(h)).toEqual(['implement', 'review']);
+  });
+
+  it('R16b — changedFiles écarte les fichiers supprimés à la demande, les garde sinon (docs.sync les veut)', () => {
+    const dir = gitRepo();
+    commitFile(dir, 'old.ts', 'init');
+    commitFile(dir, 'keep.ts', 'init2');
+    git(dir, 'rm', '-q', 'old.ts');
+    writeFileSync(join(dir, 'keep.ts'), 'x\n');
+    git(dir, 'commit', '-q', '-am', 'rm');
+    const sha = git(dir, 'rev-parse', 'HEAD');
+    expect(changedFiles(dir, sha).sort()).toEqual(['keep.ts', 'old.ts']);
+    expect(changedFiles(dir, sha, { withoutDeleted: true })).toEqual(['keep.ts']);
+  });
+
+  it('R17 — le code commité dans un dépôt voisin du lot est lu par la porte, un test du voisin la lève', async () => {
+    const nb = gitRepo();
+    commitFile(nb, 'README.md', 'init');
+    const both = (extra: string[]): Handler => () => claudeOut(workReport({ commits: [commitFile(nb, 'chart.ts', 'feat(L1): voisin'), ...extra.map((f) => commitFile(nb, f, `feat(L1): ${f}`))] }));
+    const sans = harness({ script: { implement: [both([])], fix: [fix('t.spec.ts')], review: [ok] } });
+    await runLot(sans.lot('L1', { repos: [{ rel: '../voisin', path: nb }] }, { testGate: GATE }));
+    expect(kinds(sans)).toEqual(['implement', 'fix', 'review']);
+    expect(sans.calls[1].brief).toContain('chart.ts');
+    const avec = harness({ script: { implement: [both(['chart.spec.ts'])], review: [ok] } });
+    await runLot(avec.lot('L1', { repos: [{ rel: '../voisin', path: nb }] }, { testGate: GATE }));
+    expect(kinds(avec)).toEqual(['implement', 'review']);
   });
 
   it('R12 — docs/orchestrate.md et le README décrivent la porte et sa clé', () => {

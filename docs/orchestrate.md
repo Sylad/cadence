@@ -179,6 +179,10 @@ as one of the two correction passes, its brief names the files, and the gate pla
 test, the review goes ahead and judges it. It does not play during the minors pass, nor when a correction pass is already used (the gate's pass would take the last one and the review would arrive with none left to correct its majors),
 nor when the lot budget no longer pays the correction and the review after it (a warning says so each time; the review goes ahead). Absent key: no gate.
 
+The diff read is that of the lot's repository **and** of its neighbour repositories (`repos:`, same as the « work already present » check; patterns apply to each repository's own paths, so a test in a neighbour lifts the gate). Files a commit **deletes** do not count as code without a test (`git diff-tree --diff-filter=d`): a lot that removes dead code used to trigger a pass of about 65 k tokens for nothing. `docs.sync` still sees deleted files.
+
+On a light lot (see « Review sized to the lot »), the gate's correction pass is pass 1: the review that follows is therefore the full one (Opus), not the light one (Sonnet). A light lot that touches code without a test pays the correction **and** an Opus review.
+
 ```yaml
 orchestrate:
   testGate:

@@ -1770,10 +1770,15 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     toFix(c, red, 'tests rouges');
     return;
   }
-  // Porte « code modifié sans test » (L287) : le diff du lot, toutes sessions comprises, touche du code sans fichier de test → correction directe, sans session de revue. Une seule fois par lot, jamais pendant la passe des mineurs, ni quand la correction prendrait la dernière passe (la revue n'en aurait plus), ni quand le budget du lot ne paie plus la correction (la revue, elle, part toujours).
+  // Porte « code modifié sans test » (L287) : le diff du lot (son dépôt et ses voisins, fichiers supprimés exclus), toutes sessions comprises, touche du code sans fichier de test → correction directe, sans session de revue. Une seule fois par lot, jamais pendant la passe des mineurs, ni quand la correction prendrait la dernière passe (la revue n'en aurait plus), ni quand le budget du lot ne paie plus la correction (la revue, elle, part toujours).
   const gate = c.config.testGate;
   if (gate && !l.testGate && !minorsPass) {
-    const missing = testGateMissing(gate, filesOf(l.repo, lotWork(plan, l.repo, l.lot)));
+    // Le diff du lot : son dépôt et ses dépôts voisins (comme hasWork), sans les fichiers que le lot supprime (du code mort supprimé n'a pas de test à écrire).
+    const touched = new Set([
+      ...filesOf(l.repo, lotWork(plan, l.repo, l.lot), { withoutDeleted: true }),
+      ...(l.repos ?? []).flatMap((r) => [...filesOf(r.path, repoWork(plan, r, l.lot), { withoutDeleted: true })]),
+    ]);
+    const missing = testGateMissing(gate, touched);
     if (missing.length) {
       l.testGate = true;
       if (l.pass >= MAX_PASSES - 1) l.warnings.push(`porte « code sans test » non jouée : ${l.pass} passe(s) de correction déjà faite(s), la correction prendrait la dernière et la revue arriverait sans passe pour ses majeurs (${missing.join(', ')})`);

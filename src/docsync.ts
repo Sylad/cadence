@@ -31,9 +31,9 @@ export function docSyncSet(patterns: string[]): (file: string) => boolean {
   return (file) => yes.some((m) => m(file)) && !no.some((m) => m(file));
 }
 
-/** Fichiers modifiés par un ensemble de commits, sans doublon. */
-export function filesOf(root: string, commits: Commit[]): Set<string> {
-  return new Set(commits.flatMap((c) => changedFiles(root, c.sha)));
+/** Fichiers modifiés par un ensemble de commits, sans doublon ; `withoutDeleted` écarte les fichiers que les commits suppriment. */
+export function filesOf(root: string, commits: Commit[], opts: { withoutDeleted?: boolean } = {}): Set<string> {
+  return new Set(commits.flatMap((c) => changedFiles(root, c.sha, opts)));
 }
 
 /** Les règles que ces fichiers enfreignent : ils touchent `paths` sans qu'aucun `docs` ne soit parmi eux. */

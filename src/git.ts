@@ -103,10 +103,13 @@ export function syncIndexWithHead(cwd: string, file: string): void {
   if (same(['HEAD']) && !same(['--cached'])) stage(cwd, file);
 }
 
-/** Fichiers modifiés par un commit, relatifs à la racine du dépôt (noms accentués ou à espaces compris). */
-export function changedFiles(cwd: string, sha: string): string[] {
+/**
+ * Fichiers modifiés par un commit, relatifs à la racine du dépôt (noms accentués ou à espaces compris). `withoutDeleted` écarte ceux que
+ * le commit supprime (`--diff-filter=d`) : un fichier supprimé n'est plus du code à tester.
+ */
+export function changedFiles(cwd: string, sha: string, opts: { withoutDeleted?: boolean } = {}): string[] {
   // -z : noms séparés par NUL, jamais échappés ; quotepath=off en plus pour les sorties qui citeraient quand même.
-  return git(cwd, ['-c', 'core.quotepath=off', 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', sha]).split('\0').filter(Boolean);
+  return git(cwd, ['-c', 'core.quotepath=off', 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', ...(opts.withoutDeleted ? ['--diff-filter=d'] : []), sha]).split('\0').filter(Boolean);
 }
 
 /** Contenu d'un fichier à un commit (`<sha>^` pour l'état d'avant) ; null s'il n'existe pas à ce commit. */

@@ -3577,9 +3577,10 @@ lots:
     review: { date: 2026-10-25, verdict: "conforme : 3 mineurs (acquittement invisible en mode worktree expérimental, commentaire de porte périmé en cycle.ts:1889, acquittement valable pour tout le lot) ; suite à 3492 tests verts, typecheck propre — orchestré (vague 2026-10-25-0010, 0 passe(s) de correction)", commit: 3137d0dd235d836a5a87d853cc77efad4ec02295 }
   - id: L318
     title: "orchestrate reprise (suite revue L315) : resumedReviewed vaut vrai pour un lot rendu pour tests rouges sans aucune revue (command.ts:948 compte aussi les constats source 'tests') → overBudget affiche « après la dernière revue de la branche reprise » au lieu de « après l'implémentation » ; ne compter que les constats de revue ou les étapes review* ; test"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-25
+    started: 2026-10-25
   - id: L319
     title: "ref analyse (suites revue L265) : le refus au plafond (plus de 20 pages rendues) propose --sections alors que les pages rendues par un add précédent restent lues — un document analysé sans --sections est ensuite refusé à chaque appel ; lire seulement les pages de --sections (et leurs figures) quand l'option est donnée, ou le dire et proposer la bonne commande ; sur une lecture relancée après coupure, usage.tokens ajoute les jetons de la session coupée (journalTokens, comme orchestrate) et lectures/a.json est supprimé avant la relance ; exemple de sortie de docs/ref.md:299 recalculé ; tests"
     status: todo

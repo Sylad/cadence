@@ -122,6 +122,30 @@ describe('raf migrate', () => {
     expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(true);
   });
 
+  it('R4 — un join( découpé sur plusieurs lignes est un lecteur non traité, signalé à sa première ligne', () => {
+    const dir = legacyRepo({
+      ...READERS,
+      'src/multi.ts': "const plan = join(\n  root,\n  'docs',\n  'plan',\n  'raf.yaml',\n);\n",
+    });
+    const dry = raf(dir, 'migrate', '--dry-run');
+    expect(dry.code).toBe(2);
+    expect(dry.err).toContain('src/multi.ts:3');
+    const r = raf(dir, 'migrate');
+    expect(r.code).toBe(2);
+    expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(true);
+  });
+
+  it('R4 — Path("docs") / "plan" (parenthèse après docs) est un lecteur non traité', () => {
+    const dir = legacyRepo({
+      ...READERS,
+      'src/p.py': 'PLAN = Path("docs") / "plan" / "raf.yaml"\n',
+    });
+    const r = raf(dir, 'migrate');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('src/p.py:1');
+    expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(true);
+  });
+
   it('R5 — un lecteur déclaré sous migrate.keep de cadence.yaml est laissé tel quel et ne bloque pas', () => {
     const dir = legacyRepo({
       ...READERS,

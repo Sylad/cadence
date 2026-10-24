@@ -11,10 +11,10 @@ const HISTORY = ['**/CHANGELOG*', '**/*.ndjson', '.cadence/**'];
 
 /** Une référence à l'ancien emplacement que `raf migrate` sait réécrire : le chemin complet, pas suivi d'un nom plus long. */
 const REWRITABLE = /docs\/plan\/raf\.yaml(?![\w-]|\.\w)/g;
-/** Le chemin construit morceau par morceau : `'docs', 'plan'` (join) ou `'docs' / 'plan'` (pathlib). */
-const BUILT = /['"`]docs['"`]\s*[,/]\s*['"`]plan['"`]/;
+/** Le chemin construit morceau par morceau : `'docs', 'plan'` (join, éventuellement sur plusieurs lignes) ou `Path('docs') / 'plan'` (pathlib). */
+const BUILT = /['"`]docs['"`]\s*\)?\s*[,/]\s*['"`]plan['"`]/;
 /** Toute autre façon de désigner docs/plan : un autre fichier du dossier, un dossier, un chemin construit morceau par morceau. */
-const OTHER = new RegExp(`docs/plan(?!/raf\\.yaml(?![\\w-]|\\.\\w))|${BUILT.source}`);
+const OTHER = new RegExp(`docs/plan(?!/raf\\.yaml(?![\\w-]|\\.\\w))|${BUILT.source}`, 'g');
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
@@ -90,10 +90,15 @@ export function planMigration(root: string): Migration {
       result.unhandled.push({ file, text: 'fichier non UTF-8 : le réécrire en altérerait les octets' });
       continue;
     }
+    // le texte entier, pas ligne par ligne : un chemin construit peut s'étendre sur plusieurs lignes ; signalé à la ligne où il commence
     const lines = text.split('\n');
-    lines.forEach((l, i) => {
-      if (OTHER.test(l)) result.unhandled.push({ file, line: i + 1, text: l.trim().slice(0, 160) });
-    });
+    const seen = new Set<number>();
+    for (const m of text.matchAll(OTHER)) {
+      const line = text.slice(0, m.index).split('\n').length;
+      if (seen.has(line)) continue;
+      seen.add(line);
+      result.unhandled.push({ file, line, text: lines[line - 1]!.trim().slice(0, 160) });
+    }
     const count = text.match(REWRITABLE)?.length ?? 0;
     if (count > 0) result.readers.push({ file, count });
   }

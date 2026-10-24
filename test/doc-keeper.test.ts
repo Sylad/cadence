@@ -4,7 +4,7 @@ import { basename, dirname, join } from 'node:path';
 import { readAgents } from '../src/orchestrate/launch.js';
 import { readDescribedBy } from '../src/config.js';
 import { runLot } from '../src/orchestrate/cycle.js';
-import { gitRepo, tempDir } from './helpers.js';
+import { tempDir } from './helpers.js';
 import { claudeOut, commitFile, git, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 import { docText } from './docs-text.js';
 
@@ -135,14 +135,14 @@ describe('orchestrate appelle le bibliothécaire avant la revue (L306)', () => {
     expect(h.calls[2].brief).toContain('- src-a.txt changed, but none of README.md was touched');
   });
 
-  it('R13 — le bibliothécaire ne rejoue pas la porte de test ni ne passe pour une correction de revue : le brief nomme le lot et le rôle', async () => {
+  it('R13 — le brief du bibliothécaire n'est pas celui d'une correction de revue : il nomme le lot, la documentation et le préfixe docs(lot)', async () => {
     const h = harness({ script: { implement: [impl('src-a.txt')], fix: [keep()], review: [ok] } });
     withConfig(h);
     await runLot(h.lot('L1'));
     const brief = h.calls[1].brief;
     expect(brief).toContain('documentation');
     expect(brief).toContain('`L1`');
-    expect(brief).toContain('fix(L1)'.replace('fix', 'docs'));
+    expect(brief).toContain('docs(L1)');
     expect(brief).not.toContain('found the defects below');
   });
 

@@ -72,7 +72,7 @@ No indicator of produced volume (lines of code, commits, total tokens or euros o
 
 ## Delivery quality and the tour header (L227)
 
-`cadence deliver` appends one line `day sha reason` to `<git common dir>/cadence/deliveries-failed.log` for every failure after the lock is taken (script, CI, deploy or check; the reason is the first line of the failure message). A green delivery or a refusal before the lock writes nothing there; `deliveries.log` is unchanged. A failed write of that log leaves the exit code and the failure message of the delivery as they are and adds the warning `deliver : journal des livraisons rouges non écrit : <cause>` on the error output. An exception or a crash of `deliver` writes no line.
+`cadence deliver` appends one line `day sha [class] reason ⏎ line ⏎ line` to `<git common dir>/cadence/deliveries-failed.log` for every failure after the lock is taken (script, CI, deploy or check; the reason is the first line of the failure message, the class one of `refus`, `ci`, `deploiement`, `verification`, and up to 5 bounded lines of the failing command's output follow, see [deliver](deliver.md)). A green delivery or a refusal before the lock writes nothing there; `deliveries.log` is unchanged. A failed write of that log leaves the exit code and the failure message of the delivery as they are and adds the warning `deliver : journal des livraisons rouges non écrit : <cause>` on the error output. An exception or a crash of `deliver` writes no line.
 
 | Indicator | Reading | Twin | Decision it informs |
 |---|---|---|---|

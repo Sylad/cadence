@@ -43,6 +43,20 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   CI can only build what was pushed); no other delivery running (a lock whose
   process died is removed with a warning); with `ci: github`, `gh` installed and
   logged in.
+- **Red delivery log** (L282): a failure after the lock is taken appends one line to
+  `<git common dir>/cadence/deliveries-failed.log`: `day sha [class] reason ⏎ line ⏎ line`.
+  The class says where it broke: `refus` (the project script exited with code 2 — the
+  convention of `deliver` itself for « refused before acting »), `ci`, `deploiement`
+  (the project script with any other code, a deploy command, an unusable
+  `CADENCE_DEPLOYED_FILE`) or `verification`. The reason is the first line of the failure
+  message, followed by the **last 5 non-empty lines** (200 characters each, ANSI sequences
+  removed) of the output of the command that failed: the project script, the CI command, the
+  deploy command or the check command. A GitHub CI run or an URL check has no output of its
+  own, so no line follows. cadence now relays the output of those commands through itself
+  (same bytes on its own stdout and stderr, but the command no longer sees a terminal there,
+  so it may drop colours or progress bars). `cadence perf` reads classes and projects from it
+  ([perf](perf.md#delivery-quality-and-the-tour-header-l227)); a line written before L282
+  has no class and counts as « non classée ».
 - Every command is killed when it exceeds its budget (CI, `deployTimeout`, what is
   left of `verifyTimeout`) and reported as "délai dépassé". Killed means the
   whole tree, followed while the command runs: every 200 ms cadence lists the

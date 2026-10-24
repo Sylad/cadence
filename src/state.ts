@@ -179,9 +179,42 @@ export function appendDelivery(dir: string, day: Day, sha: string): void {
   appendFileSync(join(dir, 'deliveries.log'), `${day} ${sha}\n`);
 }
 
-/** Ajoute une livraison rouge (« jour sha raison ») à `deliveries-failed.log` ; la raison est la première ligne du message d'échec. */
-export function appendFailedDelivery(dir: string, day: Day, sha: string, reason: string): void {
-  appendFileSync(join(dir, 'deliveries-failed.log'), `${day} ${sha} ${reason.split('\n')[0]!.trim()}\n`);
+/** Classe d'une livraison rouge : où elle a cassé. `refus` : le script a refusé avant d'agir (code 2). */
+export const FAIL_CLASSES = ['refus', 'ci', 'deploiement', 'verification'] as const;
+export type FailClass = (typeof FAIL_CLASSES)[number];
+
+const TAIL_SEP = ' ⏎ ';
+const TAIL_LINES = 5;
+const LINE_MAX = 200;
+const REASON_MAX = 300;
+// eslint-disable-next-line no-control-regex
+const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u001f\u007f]/g;
+
+const clean = (line: string, max: number): string => {
+  const t = line.replace(ANSI, '').replace(CONTROL, ' ').replaceAll('⏎', ' ').trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+};
+
+/**
+ * Ajoute une livraison rouge à `deliveries-failed.log` : une ligne « jour sha [classe] raison ⏎ ligne ⏎ ligne ».
+ * La raison est la première ligne du message d'échec ; `tail` (sortie de la commande en échec) est borné à ses
+ * 5 dernières lignes non vides de 200 caractères, sans séquence ANSI.
+ */
+export function appendFailedDelivery(dir: string, day: Day, sha: string, reason: string, cls?: FailClass, tail: string[] = []): void {
+  const kept = tail.flatMap((l) => clean(l, LINE_MAX) || []).slice(-TAIL_LINES);
+  const head = `${day} ${sha} ${cls ? `[${cls}] ` : ''}${clean(reason.split('\n')[0]!, REASON_MAX)}`;
+  appendFileSync(join(dir, 'deliveries-failed.log'), `${[head, ...kept].join(TAIL_SEP)}\n`);
+}
+
+export interface FailedDelivery {
+  day: Day;
+  sha: string;
+  /** null : ligne d'avant la classe (L282) ou classe inconnue. */
+  cls: FailClass | null;
+  reason: string;
+  tail: string[];
 }
 
 export function lastDelivery(dir: string): string | null {
@@ -203,14 +236,27 @@ export function readDeliveries(dir: string): Day[] | null {
   }
 }
 
-/** Les jours de `deliveries-failed.log` (une ligne « jour sha raison » par livraison rouge), dans l'ordre du fichier ; une ligne illisible est ignorée, un fichier absent ou illisible donne aucune livraison rouge. Lecture seule : ne crée rien. */
-export function readFailedDeliveries(dir: string): Day[] {
+/** Les livraisons rouges de `deliveries-failed.log`, dans l'ordre du fichier ; une ligne illisible est ignorée, un fichier absent ou illisible donne aucune livraison rouge. Lecture seule : ne crée rien. */
+export function readFailedEntries(dir: string): FailedDelivery[] {
   try {
     return readFileSync(join(dir, 'deliveries-failed.log'), 'utf8')
       .split('\n')
-      .map((l) => l.split(' ')[0]!)
-      .filter(isDay);
+      .flatMap((line): FailedDelivery[] => {
+        const [head = '', ...tail] = line.split(TAIL_SEP);
+        const m = /^(\S+)(?: (\S+))?(?: (.*))?$/.exec(head);
+        if (!m || !isDay(m[1]!)) return [];
+        let reason = m[3] ?? '';
+        const c = /^\[(\w+)\] ?/.exec(reason);
+        const cls = c && (FAIL_CLASSES as readonly string[]).includes(c[1]!) ? (c[1] as FailClass) : null;
+        if (cls) reason = reason.slice(c![0].length);
+        return [{ day: m[1] as Day, sha: m[2] ?? '', cls, reason, tail }];
+      });
   } catch {
     return [];
   }
+}
+
+/** Les jours de `deliveries-failed.log` (une ligne par livraison rouge), dans l'ordre du fichier. */
+export function readFailedDeliveries(dir: string): Day[] {
+  return readFailedEntries(dir).map((e) => e.day);
 }

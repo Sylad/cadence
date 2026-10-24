@@ -59,7 +59,7 @@ describe('deliver — journal des livraisons rouges (L227)', () => {
     const code = await deliver(c, deps({ gh: () => [{ name: 'ci', status: 'completed', conclusion: 'failure' }] }));
     expect(code).toBe(1);
     expect(redLines(dir)).toHaveLength(1);
-    expect(redLines(dir)[0]).toMatch(new RegExp(`^2026-10-16 ${headSha(dir)} CI en échec`));
+    expect(redLines(dir)[0]).toMatch(new RegExp(`^2026-10-16 ${headSha(dir)} \\[ci\\] CI en échec`));
     expect(existsSync(join(stateDir(dir), 'deliveries.log'))).toBe(false);
   });
 
@@ -75,13 +75,13 @@ describe('deliver — journal des livraisons rouges (L227)', () => {
     expect(redLines(dir)).toHaveLength(3);
   });
 
-  it('R1 — la ligne rouge est « jour sha raison » avec la raison sur une seule ligne (message d\'échec multiligne tronqué à la première ligne)', async () => {
+  it('R1 — la ligne rouge est « jour sha [classe] raison » avec la raison sur une seule ligne (message d\'échec multiligne tronqué à la première ligne)', async () => {
     const dir = pushedRepo();
     const { c } = ctx(dir, parseDeliverConfig('deliver:\n  ci:\n    command: "echo a\\nb"\n  verify:\n    - command: "true"\n', 'cadence.yaml'));
     expect(await deliver(c, deps({ exec: () => 1 }))).toBe(1);
     const lines = redLines(dir);
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toBe(`2026-10-16 ${headSha(dir)} CI en échec (code 1) : echo a`);
+    expect(lines[0]).toBe(`2026-10-16 ${headSha(dir)} [ci] CI en échec (code 1) : echo a`);
   });
 
   it('R1 — livraison verte : aucune entrée rouge, deliveries.log reçoit sa ligne', async () => {

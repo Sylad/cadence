@@ -10,7 +10,7 @@ import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit }
 import { citedRefs } from './link.js';
 import { describeArticle, openArticleLots, type ArticleRule } from './articles.js';
 import { RafError, type Lot, type Plan } from './plan.js';
-import { appendDelivery, appendFailedDelivery, lastDelivery, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
+import { appendDelivery, appendFailedDelivery, type FailClass, lastDelivery, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
 
 export interface VerifyCheck {
   url?: string;
@@ -53,6 +53,8 @@ export interface DeliverDeps {
    * TIMED_OUT si elle a dépassé `timeoutMs` (elle est alors tuée, avec tous ses descendants).
    */
   exec: (cmd: string, env: Record<string, string>, timeoutMs: number) => number | Promise<number>;
+  /** Dernières lignes de sortie (stdout et stderr) de la dernière commande lancée par `exec`, vides si elle n'a rien écrit ; absent : la raison d'un échec ne les porte pas. */
+  lastOutput?: () => string[];
   /** Runs de la CI pour ce sha ; lève une erreur au message utile (stderr de gh). */
   gh: (sha: string) => GhRun[];
   /** Précondition de `ci: github` : message d'erreur si gh est absent ou non authentifié, null sinon. */
@@ -103,6 +105,10 @@ export const POLL_VERIFY = 10_000;
 const CI_OK = new Set(['success', 'skipped', 'neutral']);
 const GH_TIMEOUT = 60_000;
 export const TIMED_OUT = 124;
+
+/** Sortie gardée d'une commande : de quoi retrouver ses dernières lignes. */
+const OUTPUT_KEPT = 8_192;
+const outputTail = (text: string): string[] => text.split(/\r?\n|\r/).filter((l) => l.trim() !== '');
 
 const codeText = (code: number) => (code === TIMED_OUT ? 'délai dépassé' : `code ${code}`);
 
@@ -188,16 +194,27 @@ export function realDeps(root: string, read: typeof readProcs = readProcs): Deli
       throw new Error(String(err.stderr || err.message).trim().split('\n').slice(0, 3).join(' '));
     }
   };
+  let output = '';
   return {
+    lastOutput: () => outputTail(output),
     exec: (cmd, env, timeoutMs) =>
       new Promise((resolve) => {
+        output = '';
         const child = spawn('sh', ['-c', cmd], {
           cwd: root,
           env: { ...process.env, ...env },
-          stdio: ['ignore', 'inherit', 'inherit'],
+          // La sortie passe par cadence (recopiée à l'identique) pour que la raison d'un échec en garde la fin.
+          stdio: ['ignore', 'pipe', 'pipe'],
           // PAS de groupe détaché : la commande reste dans le groupe de premier plan et la session de cadence.
           // Ctrl-C et le raccrochage l'atteignent avec cadence, et /dev/tty reste là pour ssh, sudo, pinentry.
         });
+        const relay = (from: NodeJS.ReadableStream, to: NodeJS.WriteStream) =>
+          from.on('data', (chunk: Buffer) => {
+            to.write(chunk);
+            output = (output + chunk.toString('utf8')).slice(-OUTPUT_KEPT);
+          });
+        relay(child.stdout!, process.stdout);
+        relay(child.stderr!, process.stderr);
         const pid = child.pid;
         if (pid === undefined) {
           child.once('error', () => resolve(127));
@@ -343,11 +360,11 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
   }
   if (!taken) return refuse('une autre livraison vient de démarrer');
   try {
-    const fail = (msg: string) => {
+    const fail = (msg: string, cls: FailClass, tail: string[] = []) => {
       err(`deliver : ${msg}`);
       // Une livraison rouge s'inscrit au journal des rouges (perf) ; son écriture ne change ni le code ni le message d'échec.
       try {
-        appendFailedDelivery(ctx.state, ctx.today, sha, msg);
+        appendFailedDelivery(ctx.state, ctx.today, sha, msg, cls, tail);
       } catch (e) {
         err(`deliver : journal des livraisons rouges non écrit : ${(e as Error).message}`);
       }
@@ -363,31 +380,33 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
       try {
         writeFileSync(file, '');
         const code = await deps.exec(script, { ...env, CADENCE_DEPLOYED_FILE: file }, config.deployTimeout * 1000);
-        if (code !== 0) return fail(`script de livraison en échec (${codeText(code)}) : ${script}`);
+        // Code 2 : le script a refusé avant d'agir (même convention que deliver) ; tout autre échec est un déploiement qui a cassé.
+        if (code !== 0) return fail(`script de livraison en échec (${codeText(code)}) : ${script}`, code === 2 ? 'refus' : 'deploiement', deps.lastOutput?.());
         const text = readFileSync(file, 'utf8').trim();
         if (text !== '') {
           // Un sha seulement : HEAD ou une branche seraient résolus après le script, au commit d'un autre.
           declared = /^[0-9a-f]{7,40}$/i.test(text) ? resolveCommit(ctx.root, text) : null;
-          if (declared === null) return fail(`CADENCE_DEPLOYED_FILE : « ${text.split('\n')[0].slice(0, 80)} » n'est pas un sha de commit du dépôt (le script doit y écrire le sha hexadécimal qu'il a déployé, ni HEAD ni une branche, ou rien)`);
+          if (declared === null) return fail(`CADENCE_DEPLOYED_FILE : « ${text.split('\n')[0].slice(0, 80)} » n'est pas un sha de commit du dépôt (le script doit y écrire le sha hexadécimal qu'il a déployé, ni HEAD ni une branche, ou rien)`, 'deploiement');
         }
       } catch (e) {
-        return fail(`CADENCE_DEPLOYED_FILE illisible : ${(e as Error).message}`);
+        return fail(`CADENCE_DEPLOYED_FILE illisible : ${(e as Error).message}`, 'deploiement');
       } finally {
         rmSync(file, { force: true });
       }
     } else {
       const ci = await waitCi(ctx, deps, sha, env);
-      if (ci) return fail(ci);
+      // Seule une commande de CI a une sortie : pour `ci: github`, lastOutput serait celle d'une commande antérieure.
+      if (ci) return fail(ci, 'ci', typeof config.ci === 'object' ? deps.lastOutput?.() : []);
 
       for (const [i, cmd] of config.deploy.entries()) {
         out(`→ déploiement ${i + 1}/${config.deploy.length} : ${cmd}`);
         const code = await deps.exec(cmd, env, config.deployTimeout * 1000);
-        if (code !== 0) return fail(`déploiement en échec (${codeText(code)}) : ${cmd}`);
+        if (code !== 0) return fail(`déploiement en échec (${codeText(code)}) : ${cmd}`, 'deploiement', deps.lastOutput?.());
       }
     }
 
     const failed = await verifyAll(ctx, deps, sha, env);
-    if (failed) return fail(failed);
+    if (failed) return fail(failed.message, 'verification', failed.tail);
 
     // Ce qui est journalisé : le sha que le script déclare (CADENCE_DEPLOYED_FILE) l'emporte. Sans déclaration, hors vague, un script qui a commité
     // pendant la livraison (horodatage d'une entrée Nouveautés) a livré la nouvelle tête ; pendant une vague on ne devine plus qui a commité
@@ -508,13 +527,13 @@ export async function retryCheck(
 }
 
 /** Chaque vérification est réessayée jusqu'au délai commun ; message d'échec ou null. */
-async function verifyAll(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Record<string, string>): Promise<string | null> {
+async function verifyAll(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Record<string, string>): Promise<{ message: string; tail: string[] } | null> {
   const deadline = deps.now() + ctx.config.verifyTimeout * 1000;
   for (const [i, c] of ctx.config.verify.entries()) {
     const label = describeCheck(c, sha);
     ctx.out(`→ vérification ${i + 1}/${ctx.config.verify.length} : ${label}`);
     const reason = await retryCheck(c, deps, sha, env, deadline, () => deadline - deps.now());
-    if (reason !== null) return `vérification en échec après ${ctx.config.verifyTimeout} s : ${label} — ${reason}`;
+    if (reason !== null) return { message: `vérification en échec après ${ctx.config.verifyTimeout} s : ${label} — ${reason}`, tail: c.command !== undefined ? (deps.lastOutput?.() ?? []) : [] };
   }
   return null;
 }

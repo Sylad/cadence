@@ -3201,6 +3201,7 @@ lots:
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
+    review: { date: 2026-10-24, verdict: "compliant : aucun constat. Commit 8af400a, 123 fichiers et 3019 tests verts, typecheck propre, 5 choix d'interprétation relus et conformes au lot. — orchestré (vague 2026-10-24-1050, 0 passe(s) de correction)", commit: 8af400aca7b0902883340c528bfdc7c8a0a7d4d4 }
   - id: L284
     title: "plan à l'emplacement .cadence/raf.yaml (L246) dans les 9 projets : inventaire des lecteurs de docs/plan/raf.yaml par projet (outils plan-data, tests, CI, skills : avatar 4, codex 5, discotheque 1, evatosorus 4, finance 8, jobmail 3, ol 6, warhammer 4, cadence 37), procédure de migration rejouable (raf migrate ou script) et migration ; l'avertissement « ancien emplacement » imprimé à chaque appel raf entre dans le contexte de chaque session — décision Sylvain 24-10"
     status: todo

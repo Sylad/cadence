@@ -71,9 +71,9 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.unresolved).toEqual([]);
     expect([...citedPages(idx, new Set([1]))]).toEqual([2]);
   });
-  it('R1 — les plages citent chaque figure : « Figures 2–4 » (demi-cadratin), « Figures 2, 4 to 6 », « Figures 1.1 to 1.3 », « Figs. 2—3 »', () => {
+  it('R1 — les plages citent chaque figure : « Figures 2–4 » (demi-cadratin), « Figures 2, 4 to 6 », « Figures 1.1 to 1.3 », « Figs. 5 to 6 »', () => {
     const idx = indexText([
-      page(1, 'See Figures 2–4.', 'See Figures 7, 9 to 11 now', 'Voir Figures 1.1 to 1.3', 'cf. Figs. 5\u20146'),
+      page(1, 'See Figures 2–4.', 'See Figures 7, 9 to 11 now', 'Voir Figures 1.1 to 1.3', 'cf. Figs. 5 to 6'),
       page(2, 'Figure 2 A', 'Figure 3 B', 'Figure 4 C', 'Figure 7 D', 'Figure 9 E', 'Figure 10 F', 'Figure 11 G', 'Figure 1.1 H', 'Figure 1.2 I', 'Figure 1.3 J', 'Figure 5 K', 'Figure 6 L'),
     ]);
     expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([
@@ -121,6 +121,43 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([
       ['Figure 3-1', [1, 2]], ['Figure 3-2', [1, 2]], ['Figure 3-3', [1, 2]], ['Table A-1', [3]], ['Table A-2', [3]], ['Table A-3', [3]], ['Table A1', [4]], ['Table A2', [4]], ['Table A3', [4]],
     ]);
+    expect(idx.unresolved).toEqual([]);
+  });
+  it('R7 — une plage garde les zéros de tête de ses bornes et de son milieu : « Figures 01–03 » cite 01, 02, 03 et n\'invente ni Figure 1 ni Figure 3', () => {
+    const idx = indexText([
+      page(1, 'See Figures 01–03.', 'Tables 008 to 010 here'),
+      page(2, 'Figure 01 A', 'Figure 02 B', 'Figure 03 C', 'Figure 3 D', 'Table 008 E', 'Table 009 F', 'Table 010 G'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([
+      ['Figure 01', [1]], ['Figure 02', [1]], ['Figure 03', [1]], ['Figure 3', []], ['Table 008', [2]], ['Table 009', [2]], ['Table 010', [2]],
+    ]);
+    expect(idx.unresolved.map((u) => u.label)).toEqual(['Figure 3']);
+  });
+  it('R8 — un cadratin collé n\'est pas une plage, c\'est une incise : « Figures 2 and 3—10 stations », « Tables 2 and 3—2018 values »', () => {
+    const idx = indexText([
+      page(1, 'Figures 2 and 3—10 stations reported', 'see Tables 2 and 3—2018 values'),
+      page(2, 'Figure 2 A', 'Figure 3 B', 'Figure 7 C', 'Figure 10 D', 'Table 2 E', 'Table 3 F', 'Table 2018 G'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.length])).toEqual([
+      ['Figure 2', 1], ['Figure 3', 1], ['Figure 7', 0], ['Figure 10', 0], ['Table 2', 1], ['Table 3', 1], ['Table 2018', 0],
+    ]);
+    expect(idx.unresolved.filter((u) => u.page === 1)).toEqual([]);
+  });
+  it("R9 — le milieu d'une plage ne masque pas une citation explicite du même numéro sur la même ligne : « code figures 11–20; see also Figure 15 », « Figures 2–4 and Figure 3 » sans légende 3", () => {
+    const idx = indexText([
+      page(1, 'Figures 2–4 and Figure 3 here', 'the figures 11–20; see also Figure 15'),
+      page(2, 'Figure 2 A', 'Figure 4 B'),
+    ]);
+    expect(idx.unresolved.map((u) => [u.label, u.page, u.extrait])).toEqual([
+      ['Figure 3', 1, 'Figures 2–4 and Figure 3 here'],
+      ['Figure 11', 1, 'the figures 11–20; see also Figure 15'],
+      ['Figure 20', 1, 'the figures 11–20; see also Figure 15'],
+      ['Figure 15', 1, 'the figures 11–20; see also Figure 15'],
+    ]);
+  });
+  it('R9 — une figure légendée au milieu d\'une plage et citée aussi explicitement sur la ligne n\'est citée qu\'une fois par cette ligne', () => {
+    const idx = indexText([page(1, 'Figures 2–4 and Figure 3 here'), page(2, 'Figure 2 A', 'Figure 3 B', 'Figure 4 C')]);
+    expect(idx.figures.map((f) => f.citations.length)).toEqual([1, 1, 1]);
     expect(idx.unresolved).toEqual([]);
   });
   it("les numéros d'annexe des normes OMM gardent leur lettre : « Figure 1.B.1 » n'est pas la Figure 1", () => {

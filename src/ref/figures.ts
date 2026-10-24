@@ -48,8 +48,8 @@ const WORDS: Record<string, { kind: FigureKind; word: string }> = {
   planches: { kind: 'planche', word: 'Planche' },
 };
 const NUMBER = String.raw`[A-Z]{0,2}[-.]?\d+(?:[.-](?:\d+|[A-Z](?![a-z])))*[a-z]?`;
-/** Ce qui joint les deux bornes d'une plage : « 4 to 6 », « 4 à 6 », « 2–4 » (demi-cadratin ou cadratin collé aux numéros ; entouré d'espaces, c'est une incise de prose). */
-const RANGE = String.raw`(?:\s+(?:to|à)\s+|[–—])`;
+/** Ce qui joint les deux bornes d'une plage : « 4 to 6 », « 4 à 6 », « 2–4 » (demi-cadratin collé aux numéros). Un tiret entouré d'espaces ou un cadratin (« 3—10 stations ») est une incise de prose. */
+const RANGE = String.raw`(?:\s+(?:to|à)\s+|–)`;
 /** Ce qui sépare deux numéros d'une énumération au pluriel : « 2, 3 », « 2 and 3 », plus les plages. */
 const SEPARATOR = String.raw`(?:\s*,\s*(?:(?:and|et)\s+)?|\s+(?:and|et|&)\s+|${RANGE})`;
 const REFERENCE = new RegExp(String.raw`\b(Figures?|Figs?|Tables?|Tableaux|Tableau|Planches?)\.?\s+(${NUMBER}(?:${SEPARATOR}${NUMBER})*)(?![\w])`, 'gi');
@@ -119,7 +119,7 @@ const named = (num: string): Named => ({ num, interior: false });
 const TRAILING_DIGITS = /^(.*\D)?(\d+)$/;
 
 /**
- * Numéros d'une plage : « 4 » et « 6 » donnent 4, 5, 6 ; « 1.1 » et « 1.3 » donnent 1.1, 1.2, 1.3, de même « 3-1 »/« 3-3 » et « A1 »/« A3 ». Les bornes sont nommées, le milieu non.
+ * Numéros d'une plage : « 4 » et « 6 » donnent 4, 5, 6 (« 01 » et « 03 » donnent 01, 02, 03 : le zéro de tête de la première borne fixe la largeur) ; « 1.1 » et « 1.3 » donnent 1.1, 1.2, 1.3, de même « 3-1 »/« 3-3 » et « A1 »/« A3 ». Les bornes sont nommées, le milieu non.
  * Sinon les bornes seules : préfixes différents, plage décroissante, 50 numéros ou plus. Une borne nue après une borne à préfixe
  * (« 4.8–10 », « A3–1 ») n'est pas une figure à part : seule la première est gardée.
  */
@@ -130,7 +130,7 @@ function expand(from: string, to: string): Named[] {
   if (!a || !b || (a[1] ?? '') !== (b[1] ?? '')) return [named(from), named(to)];
   const [lo, hi] = [Number(a[2]), Number(b[2])];
   if (hi < lo || hi - lo >= 50) return [named(from), named(to)];
-  return Array.from({ length: hi - lo + 1 }, (_, i) => ({ num: `${a[1] ?? ''}${lo + i}`, interior: i > 0 && i < hi - lo }));
+  return Array.from({ length: hi - lo + 1 }, (_, i) => ({ num: `${a[1] ?? ''}${String(lo + i).padStart(a[2]!.length, '0')}`, interior: i > 0 && i < hi - lo }));
 }
 
 /** Numéros nommés par une référence : le seul numéro au singulier ; au pluriel la liste, chaque plage (« 4 to 6 », « 2–4 ») développée quand ses bornes le permettent. */
@@ -204,12 +204,14 @@ export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = n
         if (own && m.index === 0) continue;
         for (const { num, interior } of numbersOf(m[1]!, m[2]!)) {
           const { label } = labelOf(m[1]!, num);
+          const fig = figures.get(key(label));
+          // le milieu d'une plage sans légende n'est pas un lien à résoudre (« figures 11–20 » n'en désigne aucune) et ne masque pas
+          // une citation explicite du même numéro plus loin sur la ligne
+          if (interior && !fig) continue;
           if (seen.has(key(label))) continue;
           seen.add(key(label));
-          const fig = figures.get(key(label));
           if (fig) fig.citations.push({ page: p.n, line, extrait: l.text.trim(), type: 'nommee' });
-          // le milieu d'une plage sans légende n'est pas un lien à résoudre : « code figures 11–20 » n'en désigne aucune
-          else if (!interior) unresolved.push({ label, page: p.n, extrait: l.text.trim() });
+          else unresolved.push({ label, page: p.n, extrait: l.text.trim() });
         }
       }
       const d = DEICTIC.exec(l.text);

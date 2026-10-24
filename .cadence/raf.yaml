@@ -3066,12 +3066,15 @@ lots:
     finished: 2026-10-24
   - id: L265
     title: "ref (issue #14, 5/10) : agent reference-analyst et cadence ref analyse en lecture unique ; mesure de référence sur le corpus (rappel, faux lu, tokens par page, plafond déclaré)"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L264 ]
     created: 2026-10-23
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "conforme, 1 note mineure (jetons de la session coupée non comptés après une relance) — orchestré (vague 2026-10-24-essai-wt3, 1 passe(s) de correction)", commit: 9940fb62418e36029a155020cacf9952e20fe3ab, reporte: { de: 174a8f9171a5938eac7f77ba8ad3201749eb9455, vers: 9940fb62418e36029a155020cacf9952e20fe3ab, patchId: 50c2f069b26b277dfa518e02bdfab65af58b3ee0 } }
+    notes:
+      - { date: 2026-10-25, text: "Mineurs de revue : docs/ref.md:299 exemple de sortie faux (page 6 manquante, compte 7 au lieu de 8) ; suites observables en lot (refus au plafond qui boucle, tokens d'une relance)." }
+    finished: 2026-10-25
   - id: L266
     title: "ref (issue #14, 6/10) : double lecture indépendante, cadence ref diff, troisième regard ; mesure comparée à la lecture unique — POINT D'ARRÊT : les lots 7 à 10 ne partent que si H1 tient (faux lu et rappel precise nettement meilleurs), décision du lead notée sur l'issue"
     status: todo
@@ -3548,17 +3551,36 @@ lots:
     finished: 2026-10-24
   - id: L315
     title: "orchestrate overBudget : un lot repris de sa branche et jamais revu (resumedReviewed faux) est rendu avec la cause « tests rouges après la dernière revue de la branche reprise » au lieu de « après l'implémentation » (cycle.ts:982, revue L311) ; conditionner le libellé à resumedReviewed ; test des deux libellés"
-    status: doing
+    status: done
     estimate: 0.05
     created: 2026-10-24
     started: 2026-10-24
-    review: { date: 2026-10-24, verdict: "conforme : 0 bloquant, 0 majeur, 1 mineur (resumedReviewed vrai pour un lot rendu pour tests rouges sans revue, command.ts:948 → le libellé « branche reprise » revient dans ce cas) — orchestré (vague 2026-10-24-essai-wt3, 1 passe(s) de correction)", commit: 04ac7a6f85f620ea1c2c7f96f8b054e9c119fb94, reporte: { de: 19fb0755376c2e810989c44c2b28cb516dcbc153, vers: 04ac7a6f85f620ea1c2c7f96f8b054e9c119fb94, patchId: e2b6b53167e642cf8f8bbf802438238f7064251a } }
+    review: { date: 2026-10-25, verdict: "conforme : revue de la vague 2026-10-24-essai-wt3 conforme après 1 correction ; commit de doc 27f944d postérieur relu par le lead (une phrase de docs/orchestrate.md, conforme à overBudget cycle.ts:982) — écart docs.sync levé", commit: 27f944dd900434ba0a49fa76193b758a02a276f9 }
+    finished: 2026-10-25
   - id: L316
     title: "Essai 3 mesuré du mode worktree (suite L310) : deux lots neufs et indépendants (L315 dans src/orchestrate, L265 dans src/ref) avec orchestrate.worktrees: true et CADENCE_EXPERIMENTAL_WORKTREES=1, après L311 et L314 en service (b2e6273) ; mesure : temps de mur contre somme des lots, intégrations automatiques (rebase, union CHANGELOG L314, verdict reporté ou revue courte), incidents ; conclusion en note (proposer l'activation par défaut à Sylvain, garder expérimental, ou corriger) ; config remise à false après l'essai sauf décision"
     status: doing
     estimate: 0.05
     created: 2026-10-24
     started: 2026-10-24
+    notes:
+      - { date: 2026-10-25, text: "25-10 00 h (lead) — essai 3 (vague 2026-10-24-essai-wt3, deux lots neufs L315 + L265) : mur 38 min contre 49 min en série (11 + 38 ; gain 11 min, 22 %, borné par le lot long) ; deux intégrations AUTOMATIQUES sur un main qui a bougé entre les deux (5aca8fa..04ac7a6 puis f7cafce..9940fb6), deux verdicts reportés par patch-id identique, aucun conflit, aucune intervention du lead dans l'intégration ; suite 3482 verts au lead après l'essai. Incident hors worktree : la porte docs.sync a lancé une correction qui n'a rien commité et le lot est passé prêt avec un écart raf check (L319). BILAN des trois essais : parallèle réel (−45 %, −22 %), reprise de branche corrigée (L311), union CHANGELOG (L314), intégration et report de verdict éprouvés sans incident sur 3 lots. Recommandation du lead : proposer à Sylvain l'activation par défaut (décision à lui). Config remise à false en attendant." }
+    review: { date: 2026-10-25, verdict: "conforme : lot d'essai, commits de config seuls (bascule orchestrate.worktrees, remise à false cadence.yaml:12), aucun code ; mesure et bilan en note (lead)", commit: c3178afac128529b683d00f4faa0b45d9780643f }
+  - id: L317
+    title: "orchestrate : une correction lancée par la porte docs.sync (« documentation en retard », cycle.ts:1882) qui ne commite rien laisse passer le lot à la revue (« ⚠ fix sans nouveau commit ») et il finit prêt alors que raf check reste rouge (vécu essai 3, 24-10 : L315, cycle.ts sans doc) ; soit la session écrit la doc, soit l'écart est acquitté explicitement et motivé (raf docs-ok <lot> --reason, lu par docSyncIssues et par la porte) ; jamais prêt avec un écart docs.sync ouvert ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
+  - id: L318
+    title: "orchestrate reprise (suite revue L315) : resumedReviewed vaut vrai pour un lot rendu pour tests rouges sans aucune revue (command.ts:948 compte aussi les constats source 'tests') → overBudget affiche « après la dernière revue de la branche reprise » au lieu de « après l'implémentation » ; ne compter que les constats de revue ou les étapes review* ; test"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
+  - id: L319
+    title: "ref analyse (suites revue L265) : le refus au plafond (plus de 20 pages rendues) propose --sections alors que les pages rendues par un add précédent restent lues — un document analysé sans --sections est ensuite refusé à chaque appel ; lire seulement les pages de --sections (et leurs figures) quand l'option est donnée, ou le dire et proposer la bonne commande ; sur une lecture relancée après coupure, usage.tokens ajoute les jetons de la session coupée (journalTokens, comme orchestrate) et lectures/a.json est supprimé avant la relance ; exemple de sortie de docs/ref.md:299 recalculé ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

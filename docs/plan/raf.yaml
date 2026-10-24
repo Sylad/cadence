@@ -3183,42 +3183,50 @@ lots:
     finished: 2026-10-24
   - id: L281
     title: "deliver : CADENCE_DEPLOYED_FILE n'accepte qu'un sha hexadécimal — un script qui écrit HEAD ou un nom de branche voit sa révision résolue APRÈS le script, au commit d'un autre (mesuré : feat(L9) journalisé « sha déclaré par le script ») ; test (revue L277)"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-23
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "conforme : 0 bloquant, 0 majeur, 0 mineur (e17596e : regex /^[0-9a-f]{7,40}$/i avant resolveCommit, HEAD et noms de branche refusés, sha abrégé accepté, docs/deliver.md, SKILL.md et CHANGELOG à jour, tests R1 verts) — orchestré (vague 2026-10-24-1050, 0 passe(s) de correction)", commit: e17596efcde29b34d95ba8cedbad38828bf4b452 }
+    finished: 2026-10-24
   - id: L282
     title: "deliver : deliveries-failed.log garde la raison de l'échec (dernières lignes de sortie du script, de la CI ou des contrôles, bornées) et une classe (refus avant action, CI, déploiement, vérification) ; cadence perf ventile les livraisons rouges par classe et par projet ; tests. Mesure 24-10 : 25 rouges sur 17–23-10 (14 maritime « livrer.sh code 1 »), cause illisible — décision Sylvain 24-10"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant: 0 blocking, 0 major, 2 minor (suite 3010/3010 tests green, tsc clean) — orchestré (vague 2026-10-24-1050, 0 passe(s) de correction)", commit: 04d2e6f5c29e0243e5a2973a9b9af37e26f98277 }
+    finished: 2026-10-24
+    notes:
+      - { date: 2026-10-24, text: "24-10 (lead) — mineur 1 accepté en note : lastOutput lu à exit et non à close, perte des dernières lignes théorique (0/70 lignes perdues mesuré par la revue, Linux) ; mineur 2 → L289 (barre de progression \\r et secret possible dans la raison)." }
   - id: L283
     title: "perf : « sessions ux par lot visible » compte aussi l'UX faite dans review-small d'un petit lot visible (seesApp) ; nouvel indicateur : part des lots visibles revus par une étape ux dédiée ; docs/perf.md et tests. Mesure 24-10 : 139 lots visibles sur 140 « petits » (≤ 0,5 j) → 0,0 affiché (−97 %), faux signal"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant : aucun constat. Commit 8af400a, 123 fichiers et 3019 tests verts, typecheck propre, 5 choix d'interprétation relus et conformes au lot. — orchestré (vague 2026-10-24-1050, 0 passe(s) de correction)", commit: 8af400aca7b0902883340c528bfdc7c8a0a7d4d4 }
+    finished: 2026-10-24
   - id: L284
     title: "plan à l'emplacement .cadence/raf.yaml (L246) dans les 9 projets : inventaire des lecteurs de docs/plan/raf.yaml par projet (outils plan-data, tests, CI, skills : avatar 4, codex 5, discotheque 1, evatosorus 4, finance 8, jobmail 3, ol 6, warhammer 4, cadence 37), procédure de migration rejouable (raf migrate ou script) et migration ; l'avertissement « ancien emplacement » imprimé à chaque appel raf entre dans le contexte de chaque session — décision Sylvain 24-10"
     status: todo
     estimate: 0.5
     created: 2026-10-24
   - id: L285
-    title: "orchestrate : une session se termine dès son rapport structuré (StructuredOutput) au lieu d'attendre la fin de ses tâches de fond, et ses tokens sont comptés depuis son journal (segments après le rapport compris) ; étude de faisabilité d'abord (stream-json, variable de la CLI qui interdit les tâches de fond) ; tests. Audit 24-10 : 127 sessions ont attendu après leur rapport, 833 min perdues, 12,1 M tokens non comptés (6,4 %), launch.ts n'attend que close"
+    title: "orchestrate : les sessions de vague ne laissent plus de tâche de fond qui retient la sortie — env CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1 au lancement de claude -p (retire run_in_background de Bash et des sous-agents) et Monitor dans --disallowedTools ; ne PAS tuer sur StructuredOutput (coût réel seulement dans le message result) ; test du lancement ; mesure après : sessions dont la fin suit le StructuredOutput de plus d'1 min. Sources : code.claude.com/docs/en/headless.md, env-vars.md, permissions.md, agent-sdk/cost-tracking.md ; étude tmp/L285-etude-taches-de-fond-2026-10-24.md. Audit 24-10 : 127 sessions, 833 min, 12,1 M tokens non comptés"
     status: todo
     estimate: 0.5
     created: 2026-10-24
+    notes:
+      - { date: 2026-10-24, text: "titre remplacé : « orchestrate : une session se termine dès son rapport structuré (StructuredOutput) au lieu d'attendre la fin de ses tâches de fond, et ses tokens sont comptés depuis son journal (segments après le rapport compris) ; étude de faisabilité d'abord (stream-json, variable de la CLI qui interdit les tâches de fond) ; tests. Audit 24-10 : 127 sessions ont attendu après leur rapport, 833 min perdues, 12,1 M tokens non comptés (6,4 %), launch.ts n'attend que close »" }
   - id: L286
     title: "orchestrate : « hit your weekly limit » reconnu comme quota (isQuotaMessage, result.ts:75) → vague suspendue, pas de lot failed ; test sur le message réel. Audit 24-10 : 3 lots failed le 14-10"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant — orchestré (vague 2026-10-24-1050, 0 passe(s) de correction)", commit: 128035e2917664e9957cb2926a1d8999f1f4dab1 }
+    finished: 2026-10-24
   - id: L287
     title: "orchestrate : porte mécanique « code modifié sans test » avant la revue Opus (diff du lot : fichiers de src/ changés sans fichier de test touché → passe de correction directe, sans session de revue) ; seuil et exceptions dans cadence.yaml ; tests. Audit 24-10 : test manquant = 32 % des majeurs de revue (224 sur 690), une passe ≈ 190 k tokens"
     status: todo
@@ -3228,6 +3236,11 @@ lots:
     title: "orchestrate : précheck conditionnel (lot sans commit et dont le titre ne cite ni constat ni lot antérieur → pas de précheck) ou confié au modèle local ; mesure avant/après de la part de « oui ». Audit 24-10 : 13,4 M tokens (7,1 %) de précheck pour 10 « oui » et 20 « partiel »"
     status: todo
     estimate: 0.25
+    created: 2026-10-24
+  - id: L289
+    title: "deliver : la raison d'une livraison rouge (L282) garde la dernière image d'une ligne réécrite par \\r (barre de progression) au lieu de 5 images de la barre, et masque les secrets probables (motifs jeton/clé/URL signée/VAR=valeur sensible) avant d'écrire deliveries-failed.log ; docs/deliver.md mentionne le risque ; tests. Revue L282 24-10"
+    status: todo
+    estimate: 0.1
     created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

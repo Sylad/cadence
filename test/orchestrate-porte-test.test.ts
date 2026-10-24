@@ -121,6 +121,15 @@ describe('porte « code modifié sans test » (L287)', () => {
     expect(c.lot.warnings.join('\n')).toContain('2 passe(s)');
   });
 
+  it('R14b — une passe de correction déjà faite (tests rouges) : la correction de la porte prendrait la dernière, la revue arriverait sans passe restante → avertissement, la revue part', async () => {
+    const h = harness({ script: { implement: [impl('a.ts')], review: [ok] } });
+    const c = h.lot('L1', { pass: 1 }, { testGate: GATE });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.warnings.join('\n')).toContain('porte « code sans test » non jouée');
+    expect(c.lot.warnings.join('\n')).toContain('1 passe(s)');
+  });
+
   it('R15 — la passe des mineurs ne joue pas la porte : du code sans test y passe, la revue courte part', async () => {
     const h = harness({ script: { fix: [fix('b.ts')], 'review-small': [ok] } });
     const c = h.lot('L1', {}, { testGate: GATE });

@@ -1736,13 +1736,13 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     toFix(c, red, 'tests rouges');
     return;
   }
-  // Porte « code modifié sans test » (L287) : le diff du lot, toutes sessions comprises, touche du code sans fichier de test → correction directe, sans session de revue. Une seule fois par lot, jamais pendant la passe des mineurs, ni quand le budget du lot ne paie plus la correction (la revue, elle, part toujours).
+  // Porte « code modifié sans test » (L287) : le diff du lot, toutes sessions comprises, touche du code sans fichier de test → correction directe, sans session de revue. Une seule fois par lot, jamais pendant la passe des mineurs, ni quand la correction prendrait la dernière passe (la revue n'en aurait plus), ni quand le budget du lot ne paie plus la correction (la revue, elle, part toujours).
   const gate = c.config.testGate;
   if (gate && !l.testGate && !minorsPass) {
     const missing = testGateMissing(gate, filesOf(l.repo, lotWork(plan, l.repo, l.lot)));
     if (missing.length) {
       l.testGate = true;
-      if (l.pass >= MAX_PASSES) l.warnings.push(`porte « code sans test » non jouée : ${l.pass} passe(s) de correction déjà faite(s) (${missing.join(', ')})`);
+      if (l.pass >= MAX_PASSES - 1) l.warnings.push(`porte « code sans test » non jouée : ${l.pass} passe(s) de correction déjà faite(s), la correction prendrait la dernière et la revue arriverait sans passe pour ses majeurs (${missing.join(', ')})`);
       else if (!fixAffordable(l)) l.warnings.push(`porte « code sans test » non jouée : budget du lot (${lotSpent(l)} / ${l.budget} tokens comptés), il ne reste pas de quoi payer la correction et la revue qui la suit (${missing.join(', ')})`);
       else {
         toFix(c, [{ source: 'code', gravite: 'majeur', fichier: missing[0], texte: `code modifié sans test (orchestrate.testGate, vérifié par le programme) : ${missing.join(', ')} — aucun fichier de test touché par les commits du lot. Écris les tests de chaque règle modifiée, nommés d'après la règle (test d'abord), puis commite avec le lot cité.` }], 'code sans test');

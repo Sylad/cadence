@@ -206,8 +206,7 @@ orchestrate:
 the commits of the lot touch code without touching the document that describes it, the lot goes to a documentation pass
 before its review: a `fix` session launched with the `doc-keeper` agent (`agents/doc-keeper.md`) and its own brief
 (`fix-docs`), which lists the lines the program computed and asks for the documents to be brought up to date, nothing else. The
-pass counts as one of the two correction passes and plays once per lot: if the librarian touches no document, the review goes
-ahead and carries the gap as before (one major finding per line). It does not play during the minors pass, nor when a
+pass counts as one of the two correction passes and plays once per lot: if the librarian leaves the gap open — it commits no document, and has not acknowledged the gap with `raf docs-ok <lot> --reason "…"` (L317) — the lot is **handed back** (cause « documentation en retard (docs.sync) ») and the review does not play: a lot never ends ready while `raf check` reports a documentation gap. The same check runs at the end of the conforming review, for a lot whose librarian gate could not play (passes or budget used up). An acknowledged gap (`docs_ok:` on the lot, committed with the plan) is no gap: no pass, no finding in the review brief. It does not play during the minors pass, nor when a
 correction pass is already used (its pass would take the last one), nor when the lot budget no longer pays it and the review after
 it (a warning `bibliothécaire non appelé` says so each time; the review goes ahead). Without `docs.sync`, or with no gap: no pass.
 When the project's `cadence.yaml` declares `docs.articles` (the same key as the article refreshed after a delivery, see [news](news.md#an-article-elsewhere-that-follows-the-delivery)), the brief names those

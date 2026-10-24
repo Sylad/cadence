@@ -340,10 +340,19 @@ function checksText(c: LotCtx): string {
 /** La clé `docs` du cadence.yaml du projet de ce lot. */
 const docsConfig = (c: LotCtx) => readDocsConfig(histPlan(c).configFile ?? join(wd(c), 'cadence.yaml'));
 
-/** Écarts docs.sync des commits du lot (L143), calculés au moment de la demande : ni gardés ni écrits d'avance. */
+/** Écarts docs.sync des commits du lot (L143), calculés au moment de la demande : ni gardés ni écrits d'avance. Un écart acquitté et motivé (`raf docs-ok`, L317) n'en est plus un. */
 function docGaps(c: LotCtx): { sync: DocSyncRule[]; gaps: DocSyncGap[] } {
   const { sync } = docsConfig(c);
-  return { sync, gaps: sync.length ? docSyncGaps(sync, filesOf(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot))) : [] };
+  const plan = histPlan(c);
+  const acknowledged = !!plan.lots().find((x) => x.id === c.lot.lot)?.docsOk;
+  return { sync, gaps: sync.length && !acknowledged ? docSyncGaps(sync, filesOf(wd(c), lotWork(plan, wd(c), c.lot.lot))) : [] };
+}
+
+/** Cause du renvoi au lead d'un lot dont l'écart docs.sync est ouvert (L317), null sans écart. */
+function openDocGap(c: LotCtx): string | null {
+  const { gaps } = docGaps(c);
+  if (!gaps.length) return null;
+  return `documentation en retard (docs.sync) : ${gaps.flatMap((g) => g.touched).join(', ')} sans la documentation attendue, et aucun écart acquitté — écrire la documentation, ou \`raf docs-ok ${c.lot.lot} --reason "…"\` si elle reste vraie`;
 }
 
 /** Consigne docs.sync du brief de revue (L143). */
@@ -1816,6 +1825,14 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     stop(c, 'handed-back', `${kind} sans commit`);
     return;
   }
+  // L317 : la passe du bibliothécaire qui laisse l'écart ouvert (rien commité, ou autre chose que la documentation) ne passe pas à la revue : le lot ne finirait pas prêt, `raf check` resterait rouge.
+  if (docsPass) {
+    const open = openDocGap(c);
+    if (open) {
+      stop(c, 'handed-back', open);
+      return;
+    }
+  }
   if (headMoved) l.warnings.push(`${minorsPass ? 'passe des mineurs' : 'correction'} reprise sans nouveau commit : un commit d'une session précédente est relu par la revue`);
   else if (made === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
@@ -2091,6 +2108,12 @@ async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): Promise
   const verdict = `${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction${l.minorPass ? ` + passe des mineurs${minorNote}` : ''}${read})`;
   l.verdict = verdict;
   const newer = lotWork(plan, wd(c), l.lot)[0]?.sha ?? null;
+  // L317 : la porte du bibliothécaire peut ne pas avoir été jouée (passes ou budget épuisés) ; un écart docs.sync ouvert ne finit jamais prêt.
+  const gap = openDocGap(c);
+  if (gap) {
+    stop(c, 'handed-back', gap);
+    return;
+  }
   const moved = (code.head && newer !== null && git(wd(c), 'rev-parse', 'HEAD') !== code.head ? [''] : []).concat(
     neighbours.filter((r) => shas[r.rel] !== null && code.repoHeads?.[r.rel] && git(r.path, 'rev-parse', 'HEAD') !== code.repoHeads[r.rel]).map((r) => ` dans ${r.rel}`),
   );

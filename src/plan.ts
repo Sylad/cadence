@@ -72,6 +72,8 @@ export interface Lot {
   ux?: Verdict;
   /** Revue de code enregistrée par `raf review`. */
   review?: Verdict;
+  /** Écart `docs.sync` acquitté et motivé par `raf docs-ok` (L317) : le lot n'est plus compté en retard de documentation. Absent = aucun acquittement. */
+  docsOk?: { date: Day; reason: string };
   /** Condition de tirage (L219) : pas avant `count` lots done portant le critère. Absente sans champ `gate`. */
   gate?: Gate;
   /** Champs écrits à la main illisibles (dates mal formées…), remontés par check. */
@@ -487,6 +489,17 @@ export class Plan {
     this.lotNode(lotId).set('repos', node);
   }
 
+  /** Acquitte l'écart `docs.sync` d'un lot (L317) : clé `docs_ok: { date, reason }`, la raison est obligatoire. Jamais sur une sous-tâche. */
+  setDocsOk(ref: string, reason: string, today: Day): void {
+    this.writable();
+    if (ref.includes('/')) throw new RafError(`docs-ok se pose sur un lot, pas sur une sous-tâche : ${ref}`);
+    const why = reason.trim();
+    if (!why) throw new RafError('docs-ok exige une raison : raf docs-ok <lot> --reason "pourquoi la documentation reste telle quelle"');
+    const node = this.doc.createNode({ date: today, reason: why }) as YAMLMap;
+    node.flow = true;
+    this.lotNode(ref).set('docs_ok', node);
+  }
+
   /** Remplace les ressources partagées d'un lot de tout statut (clé `uses:` en flow, avant `created:`) ; sans nom, retire la clé. Jamais sur une sous-tâche. */
   setUses(ref: string, names: string[]): void {
     this.writable();
@@ -827,6 +840,8 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     else if (raw.spec !== false) problems.push(`spec : true ou false attendu (reçu « ${String(raw.spec)} »)`);
   }
   const gate = readGate(raw.gate, problems);
+  const okRaw = raw.docs_ok as Record<string, unknown> | undefined;
+  const docsOk = okRaw && typeof okRaw === 'object' && typeof okRaw.reason === 'string' && okRaw.reason.trim() !== '' ? { date: String(okRaw.date ?? ''), reason: okRaw.reason.trim() } : undefined;
   return {
     id: String(raw.id),
     title: String(raw.title ?? ''),
@@ -859,6 +874,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     ...(repoList(raw.repos).length ? { repos: repoList(raw.repos) } : {}),
     ...(asVerdict(raw.ux) ? { ux: asVerdict(raw.ux) } : {}),
     ...(asVerdict(raw.review) ? { review: asVerdict(raw.review) } : {}),
+    ...(docsOk ? { docsOk } : {}),
     problems,
   };
 }

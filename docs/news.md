@@ -150,6 +150,8 @@ to be reported as one **major** finding per line — a stale document is not lef
 memory of a sentence. Touching a document is what the program checks; whether its text is true is
 still the review's reading. The commits of neighbouring repositories (`repos:`) are not audited.
 
+A gap is closed by writing the document, or **acknowledged** when the documents really stay true: `raf docs-ok <lot> --reason "why"` (L317; the reason is required) writes a dated `docs_ok:` key on the lot, which `raf check`, `cadence lead tour` and `cadence orchestrate` all read. There is no silent third way: a lot with an open gap does not end ready in a wave.
+
 ### The librarian: `doc-keeper`
 
 `docs.sync` says *that* a document is behind; the `doc-keeper` agent (L306, `agents/doc-keeper.md`, generic: it knows no

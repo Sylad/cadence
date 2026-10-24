@@ -68,6 +68,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf list [--status todo|doing|done|dropped]
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot (ou citant un id inconnu) sans réécrire l'historique ; raf check --ignored les liste
+  raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
   raf gantt [-o .cadence/gantt.html]
   raf migrate [--dry-run]   déplace docs/plan/raf.yaml vers .cadence/raf.yaml (git mv) et réécrit les lecteurs du chemin dans le dépôt ; --dry-run les liste sans rien toucher ; refus tant qu'un lecteur n'est pas traité (migrate.keep de cadence.yaml pour ceux qui ne lisent pas le plan) ; rejouable
   raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
@@ -462,6 +463,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (lot.screen) io.out(`screen : ${lot.screen}`);
       if (lot.spec) io.out('spec : true');
       if (lot.uses) io.out(`uses : ${lot.uses.join(', ')}`);
+      if (lot.docsOk) io.out(`docs-ok : ${lot.docsOk.date} — ${lot.docsOk.reason}`);
       const gate = gateProgress(plan.lots(), lot);
       if (lot.gate && gate) io.out(lot.gate.invalid ? `gate : ${gateText(gate)}` : `gate : ${gate.n} lots ${gate.label} faits`);
       if (notes.length) {
@@ -500,6 +502,16 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       plan.acknowledge({ ...(bySha ? { sha: found.sha, subject: found.subject } : { subject: found.subject }), date: today, ...(values.reason ? { reason: values.reason } : {}) });
       plan.save();
       io.out(`${bySha ? short(found) : found.subject} acquitté`);
+      return 0;
+    }
+    case 'docs-ok': {
+      need(1, 'docs-ok <lot> --reason texte');
+      if (rest.length > 1) throw new RafError('un seul lot attendu ; la raison se passe par --reason "texte"');
+      const plan = loadPlan();
+      knownLot(plan, rest[0], 'docs-ok se pose sur un lot, pas sur une sous-tâche');
+      plan.setDocsOk(rest[0], values.reason ?? '', today);
+      plan.save();
+      io.out(`${rest[0]} : écart docs.sync acquitté`);
       return 0;
     }
     case 'check': {

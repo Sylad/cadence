@@ -201,12 +201,14 @@ export function hypothesesOf(root: string, configFile: string): Map<string, stri
 /**
  * Documentation en retard (L143, clé `docs.sync`) : un lot en cours — ou terminé à partir de `docs.since` — dont les commits de
  * travail touchent des chemins sans toucher le document que la règle désigne. Les commits de plan ne comptent pas.
+ * Un lot dont l'écart est acquitté et motivé (`raf docs-ok`, L317) n'est pas compté.
  */
 export function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): AuditIssue[] {
   const { sync, since } = readDocsConfig(plan.configFile ?? join(root, 'cadence.yaml'));
   if (!sync.length) return [];
   return plan
     .lots()
+    .filter((l) => !l.docsOk)
     .filter((l) => l.status === 'doing' || (l.status === 'done' && !!since && !!l.finished && l.finished >= since))
     .flatMap((l) => docSyncGaps(sync, filesOf(root, workCommits(plan, root, byLot.get(l.id) ?? []))).map((g) => ({ message: gapMessage(l.id, g) })));
 }

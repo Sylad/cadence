@@ -112,15 +112,15 @@ describe('orchestrate appelle le bibliothécaire avant la revue (L306)', () => {
     expect(kinds(b)).toEqual(['implement', 'review']);
   });
 
-  it('R12 — une seule fois par lot : un bibliothécaire qui ne touche pas la doc ne fait pas boucler, la revue part et porte l\'écart', async () => {
+  it('R12 — une seule fois par lot : un bibliothécaire qui ne touche pas la doc ne fait pas boucler, et le lot est rendu au lead sans revue (L317)', async () => {
     const h = harness({ script: { implement: [impl('src-a.txt')], fix: [keep('notes.txt')], review: [ok] } });
     withConfig(h);
     const c = h.lot('L1');
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    expect(kinds(h)).toEqual(['implement', 'fix']);
     expect(c.lot.pass).toBe(1);
     expect(c.lot.docsGate).toBe(true);
-    expect(h.calls[2].brief).toContain('- src-a.txt changed, but none of README.md was touched');
+    expect(c.lot.status).toBe('handed-back');
   });
 
   it('R13 — le brief du bibliothécaire n\'est pas celui d\'une correction de revue : il nomme le lot, la documentation et le préfixe docs(lot)', async () => {

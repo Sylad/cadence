@@ -72,7 +72,7 @@ export function parseSession(stdout: string, opts: { structured: boolean }): Ses
 
 /** Le message d'une session arrêtée par la limite d'usage (quota) ; l'heure de remise suit « | » quand elle est donnée. */
 export function isQuotaMessage(text: string): boolean {
-  return /usage limit|limit reached|rate limit|quota/i.test(text);
+  return /usage limit|limit reached|hit your .{0,20}limit|rate limit|quota/i.test(text);
 }
 
 /** Heure de remise (epoch s) lue dans « …limit reached|1759600000 », sinon null. */

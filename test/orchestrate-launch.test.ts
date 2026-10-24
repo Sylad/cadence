@@ -58,6 +58,12 @@ describe('parseSession (échantillon réel de claude -p --output-format json)', 
     expect(isQuotaMessage(r.result)).toBe(true);
     expect(isQuotaMessage('autre erreur')).toBe(false);
   });
+
+  it("L286 — « You've hit your weekly limit » (message réel de Claude Code) est un quota", () => {
+    expect(isQuotaMessage("You've hit your weekly limit · resets Oct 20, 5pm (Europe/Paris)")).toBe(true);
+    expect(isQuotaMessage("You've hit your session limit · resets 3pm")).toBe(true);
+    expect(isQuotaMessage('the weekly report is late')).toBe(false);
+  });
 });
 
 const spec: StepSpec = {
@@ -258,6 +264,15 @@ describe('runSession (lanceur injecté)', () => {
     expect(await mk({ code: 1, stdout: JSON.stringify(raw) })).toMatchObject({ kind: 'quota' });
     raw.result = 'autre';
     expect(await mk({ code: 1, stdout: JSON.stringify(raw) })).toMatchObject({ kind: 'failed', cause: expect.stringContaining('autre') });
+  });
+
+  it("L286 — « hit your weekly limit » suspend la vague (quota), le lot n'est pas failed", async () => {
+    const raw = JSON.parse(sample);
+    raw.is_error = true;
+    raw.result = "You've hit your weekly limit · resets Oct 20, 5pm (Europe/Paris)";
+    delete raw.structured_output;
+    const out = await runSession({ ...spec, agent: undefined }, { claude: async () => ({ code: 1, stdout: JSON.stringify(raw), stderr: '', timedOut: false }), agents: {} });
+    expect(out).toMatchObject({ kind: 'quota', message: expect.stringContaining('weekly limit') });
   });
 });
 

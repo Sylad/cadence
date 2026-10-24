@@ -60,6 +60,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence orchestrate` recognises the real « You've hit your weekly limit · resets … » message as a quota stop (L286, `docs/orchestrate.md`): the wave is suspended instead of the lot being marked failed (3 lots failed on 14-10 for this reason).
+
 ### Added
 
 - `cadence perf` counts the UX done in the `review-small` of a small visible lot (L283, `docs/perf.md`): « sessions ux par lot visible » read 0.0 although 139 of the 140 small lots of 24-10 were visible (their only ergonomics review is the `review-small` that sees the application; −97 %, a false signal). New line `part des lots visibles revus par une étape ux` (`interventions.dedicatedUx` in `--json`, information only: no `⚠`, no twin). The journal reader exposes `small`.

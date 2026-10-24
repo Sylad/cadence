@@ -3289,9 +3289,10 @@ lots:
     created: 2026-10-24
   - id: L292
     title: "orchestrate précheck (suite de la revue L288) : les identifiants de lot du plan qui ne sont pas L<n> (Q-CAN5, B28.1, Q4/…) cités dans le titre ou le goal: comptent — mesure revue : 8 des 17 « oui » réels perdus (cadence:L68, maritime Q4/qa-expectations…), Q-CAN6 perdait son précheck ; le critère lit aussi goal: (L258) ; « review » cherché comme mot, pas dans qa-reviewer/review-small ; test B28.1 contre B28.10"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L293
     title: "cadence perf (suite de la revue L288) : la part de « oui » du précheck lit les journaux d'avant L288 (étape precheck + outcome « livrable déjà présent » = oui, champ precheck = partiel, sinon non) — n/d affiché malgré 170 prechecks ; un journal écrit depuis L288 sans precheckVerdict (rapport illisible, Sonnet en échec après le local) n'est plus compté « non » ; tests"
     status: todo

@@ -3481,6 +3481,12 @@ lots:
     status: todo
     estimate: 0.1
     created: 2026-10-24
+  - id: L310
+    title: "Essai réel mesuré du mode worktree (L279, L299–L304) — décision Sylvain 24-10 : une vague de deux lots cadence indépendants (L309 dans src/orchestrate, L274 dans src/ref) avec orchestrate.worktrees: true et CADENCE_EXPERIMENTAL_WORKTREES=1 ; mesure : temps de mur de la vague contre somme des durées des lots, intégrations (rebase, patch-id, verdict reporté ou revue courte), incidents ; conclusion écrite en note (activer par défaut, garder expérimental, ou corriger) ; config remise à false après l'essai sauf décision"
+    status: doing
+    estimate: 0.1
+    created: 2026-10-24
+    started: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

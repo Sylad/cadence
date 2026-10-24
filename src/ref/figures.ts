@@ -55,8 +55,11 @@ const SEPARATOR = String.raw`(?:\s*,\s*(?:(?:and|et)\s+)?|\s+(?:and|et|&)\s+|${R
 const REFERENCE = new RegExp(String.raw`\b(Figures?|Figs?|Tables?|Tableaux|Tableau|Planches?)\.?\s+(${NUMBER}(?:${SEPARATOR}${NUMBER})*)(?![\w])`, 'gi');
 const PLURAL = /^(?:figures|figs|tables|tableaux|planches)$/i;
 const NUMBER_ONLY = new RegExp(NUMBER, 'g');
-/** Ce qui précède une référence qui n'en est pas une : « code figure 3 » des normes OMM est une valeur de code, pas une figure. */
-const CODE_FIGURE = /\bcode\s+$/i;
+/** Ce qui précède une référence qui n'en est pas une : « code figure 3 », « indicator figures 1 to 6 » des normes OMM sont des valeurs de code, pas des figures. */
+const CODE_FIGURE = /\b(?:code|indicator)\s+$/i;
+/** « code figure 17 » plus haut dans la même phrase (la phrase finit à un point, un point-virgule ou un deux-points suivi d'un blanc) : il porte une plage au demi-cadratin (« … over figures 20–49 »). */
+const CODE_FIGURE_IN_SENTENCE = /\bcode\s+figures?\b/i;
+const SENTENCE_END = /[.;:!?]\s/;
 /** « Figure n » en début de ligne, puis le séparateur éventuel (tiret, deux-points, point) et le reste de la ligne. */
 const CAPTION = new RegExp(String.raw`^(Figure|Fig|Table|Tableau|Planche)\.?\s+(${NUMBER})(?![\w])\s*([:.–—-])?\s*(.*)$`, 'i');
 /** Le reste d'une ligne qui n'est qu'une parenthèse fermée : « (in accordance with 4.3.11) ». */
@@ -66,6 +69,34 @@ const DEICTIC = /\b(as shown (?:below|above)|shown (?:below|above)|illustrated (
 const LEADER = /\.{4,}|(?:\.\s){4,}/;
 /** Numéro de page en fin de titre d'un sommaire sans points de conduite : « Figure 1 Titre 12 » (le titre est « Titre 12 », le numéro de la figure n'en est pas un). */
 const TRAILING_PAGE = /(?:^|\s)(\d{1,4})\s*$/;
+
+/** Lignes courantes du document : en-têtes et pieds de page, c'est-à-dire les deux premières et les deux dernières lignes d'une page, chiffres mis à part, qui reviennent sur trois pages au moins. */
+function runningLines(pages: PageText[]): (text: string) => boolean {
+  const normal = (text: string): string => text.trim().replace(/\d+/g, '#');
+  const pagesOf = new Map<string, number>();
+  for (const p of pages) for (const t of new Set([...p.lines.slice(0, 2), ...p.lines.slice(-2)].map((l) => normal(l.text)))) pagesOf.set(t, (pagesOf.get(t) ?? 0) + 1);
+  return (text) => (pagesOf.get(normal(text)) ?? 0) >= 3;
+}
+
+/**
+ * Dernière ligne de texte avant la ligne `i` de la page `pi`, sans les lignes courantes ni les lignes vides ; elle remonte sur la page
+ * qui précède immédiatement (numéro consécutif) : « code » peut finir une page, suivi de son pied de page et de l'en-tête de la suivante.
+ */
+function precedingText(pages: PageText[], pi: number, i: number, running: (text: string) => boolean): string {
+  let page = pages[pi]!;
+  for (let k = pi, j = i - 1; ; j--) {
+    if (j < 0) {
+      const prev = pages[k - 1];
+      if (!prev || prev.n !== page.n - 1) return '';
+      page = prev;
+      k--;
+      j = prev.lines.length - 1;
+      if (j < 0) continue;
+    }
+    const text = page.lines[j]!.text;
+    if (text.trim() !== '' && !running(text)) return text;
+  }
+}
 
 const labelOf = (word: string, num: string): { label: string; kind: FigureKind } => {
   const w = WORDS[word.toLowerCase()]!;
@@ -194,7 +225,8 @@ export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = n
   const figures = new Map<string, Figure>(chosen.map((c) => [key(c.label), { label: c.label, kind: c.kind, page: c.page, line: c.line, caption: c.text, box: c.box, regions: [], citations: [] }]));
   const captionLine = new Set(chosen.map((c) => `${c.page}:${c.line}`));
   const unresolved: Unresolved[] = [];
-  for (const p of pages) {
+  const running = runningLines(pages);
+  for (const [pi, p] of pages.entries()) {
     const captions = [...figures.values()].filter((f) => f.page === p.n);
     p.lines.forEach((l, i) => {
       if (toc.get(p.n)![i]) return;
@@ -205,8 +237,9 @@ export function indexText(pages: PageText[], imagePages: ReadonlySet<number> = n
         // la légende ne se cite pas elle-même
         if (own && m.index === 0) continue;
         // « code » peut finir la ligne précédente : l'extrait PDF coupe les lignes, pas le texte
-        const before = l.text.slice(0, m.index);
-        if (labelOf(m[1]!, '').kind === 'figure' && CODE_FIGURE.test(before.trim() === '' ? `${p.lines[i - 1]?.text ?? ''} ${before}` : before)) continue;
+        const head = l.text.slice(0, m.index);
+        const carried = head.trim() === '' ? `${precedingText(pages, pi, i, running)} ${head}` : head;
+        if (labelOf(m[1]!, '').kind === 'figure' && (CODE_FIGURE.test(carried) || (m[2]!.includes('–') && CODE_FIGURE_IN_SENTENCE.test(carried.split(SENTENCE_END).pop()!)))) continue;
         for (const { num, interior } of numbersOf(m[1]!, m[2]!)) {
           const { label } = labelOf(m[1]!, num);
           const fig = figures.get(key(label));

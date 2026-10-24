@@ -178,6 +178,44 @@ describe("index des figures d'un texte (L261)", () => {
     expect(idx.unresolved).toEqual([{ label: 'Figure 2', page: 2, extrait: 'Figure 2 Wind' }, { label: 'Figure 7', page: 2, extrait: 'Figure 7 Jets' }]);
   });
 
+  it("R11 — « indicator figures 1 to 6, 8 and 9 » (WMO-306 vol. I.1 p. 46) est une valeur de code : elle ne cite pas les vraies Figures 2, 3, 4", () => {
+    const idx = indexText([
+      page(1, 'The inclusion of groups with indicator figures 1 to 6, 8 and 9 shall be decided', 'Provided with indicator figure 0, 1, 2, etc.', 'see Figure 3 for the groups'),
+      page(2, 'Figure 2 Wind', 'Figure 3 Station model', 'Figure 4 Jets'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([['Figure 2', []], ['Figure 3', [3]], ['Figure 4', []]]);
+    expect(idx.unresolved.map((u) => u.label)).toEqual(['Figure 2', 'Figure 4']);
+  });
+
+  it("R12 — « code » porté par la phrase d'une plage au demi-cadratin : « code figure 17 … over figures 20–49 » n'invente ni Figure 20 ni Figure 49", () => {
+    const idx = indexText([
+      page(1, 'code figure 17 shall have precedence over figures 20–49.', 'code figure 17 has precedence; figures 2–4 follow', 'code figure 17 and see Figure 5', 'a code figure 3 and Figures 6, 8'),
+      page(2, 'Figure 2 Wind', 'Figure 3 Jets', 'Figure 4 Sea', 'Figure 5 Ice', 'Figure 6 Fog', 'Figure 8 Swell'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([['Figure 2', [2]], ['Figure 3', [2]], ['Figure 4', [2]], ['Figure 5', [3]], ['Figure 6', [4]], ['Figure 8', [4]]]);
+    expect(idx.unresolved).toEqual([]);
+  });
+
+  it("R13 — « code » en fin de la page précédente, avant son pied de page et l'en-tête de la suivante, précède la référence qui ouvre la page (WMO-306 vol. I.2 p. 1327)", () => {
+    const run = (n: number, ...lines: string[]): PageText => page(n, 'B/C10 – SHIP', ...lines, `I.2 – RegTradObs/BC10 — ${n}`);
+    const idx = indexText([
+      run(1, 'prose'),
+      run(2, 'values reported using code'),
+      run(3, 'figure 3 and 2 shall be used', 'see Figure 3 here'),
+      run(4, 'a code'),
+      run(6, 'Figure 7 shows'),
+      run(7, 'Figure 2 Wind', 'Figure 3 Station model', 'Figure 7 Jets'),
+    ]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.page)])).toEqual([['Figure 2', []], ['Figure 3', [3]], ['Figure 7', [6]]]);
+    expect(idx.unresolved.map((u) => u.label)).toEqual(['Figure 2']);
+  });
+
+  it("R14 — « code table n » reste une citation de la table : la garde du mot « code » ne vaut que pour les figures", () => {
+    const idx = indexText([page(1, 'the code table 2 gives the values', 'code Tables 3 and 4 apply', 'values of code', 'Table 5 applies'), page(2, 'Table 2 Codes', 'Table 3 Wind', 'Table 4 Sea', 'Table 5 Ice')]);
+    expect(idx.figures.map((f) => [f.label, f.citations.map((c) => c.line)])).toEqual([['Table 2', [1]], ['Table 3', [2]], ['Table 4', [2]], ['Table 5', [4]]]);
+    expect(idx.unresolved).toEqual([]);
+  });
+
   it('R1 — une plage dont la première borne finit par une lettre garde sa seconde borne nue : « Figures 2b to 3 » cite la Figure 2b et la Figure 3', () => {
     const idx = indexText([
       page(1, 'see Figures 2b to 3', 'and Figures 1.B to 2', 'then Figures 5b–6'),

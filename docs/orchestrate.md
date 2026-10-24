@@ -22,9 +22,9 @@ cadence orchestrate --status [<wave>]        # the live waves and the repositori
 cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running (with an explicit `<wave>`: when that wave is no longer running)
 cadence orchestrate --resume [<wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
 cadence orchestrate --resume <wave> --budget maritime:B26.4=+300k   # replay a lot handed back for its budget, with the budget raised (below)
-cadence orchestrate --resume <wave> --integrate ccc:L29   # replay a lot handed back at the integration step of a worktree wave (« One worktree per lot »)
+cadence orchestrate --resume <wave> --integrate ccc:L29   # replay a lot handed back at the integration step of a worktree wave (« One worktree per lot », experimental)
 cadence orchestrate --resume <wave> --replay ccc:L29      # same, and also a lot handed back on a refused plan write (fiche notes) at the step it had reached
-cadence orchestrate --remove-worktree ccc:L29 [--abandon-commits]   # remove the kept worktree and branch of a lot (« One worktree per lot »)
+cadence orchestrate --remove-worktree ccc:L29 [--abandon-commits]   # remove the kept worktree and branch of a lot (« One worktree per lot », experimental)
 cadence orchestrate --resume … --dry-run                         # refused: a resume cannot be simulated, it writes the wave state and relaunches sessions
 cadence orchestrate --drop ccc:L29 [--wave <wave>]   # from another terminal: take a lot out of the running wave
 cadence orchestrate --stop-after-current [--wave <wave>]   # from another terminal: let the running sessions finish, start nothing else
@@ -450,6 +450,11 @@ rollback, the older ones are removed only once they are more than 7 days old, co
 
 ## One worktree per lot (`orchestrate.worktrees`, L279)
 
+> **Experimental, not enabled.** This mode is infrastructure that two code reviews found defective at the core (lots L299, L300 and L301 of the plan
+> carry the fixes). Until they are done, `orchestrate.worktrees: true` is **refused** by `cadence orchestrate` (exit 2, before acting, `--dry-run`
+> included) with a message naming those lots, unless the environment variable `CADENCE_EXPERIMENTAL_WORKTREES=1` is set — which only the tests of the
+> mode do. The default mode (key absent or `false`) is unchanged. What follows describes the mode as built.
+
 By default a wave plays the lots of one repository one after the other, in the repository itself: a lot with four correction passes
 holds the whole queue. With `orchestrate: { worktrees: true }` in the project's `cadence.yaml`, two independent lots of the same repository
 play **at the same time**, each in its own `git worktree` on its own branch, within the session cap (`--max-sessions`). Absent or `false`,
@@ -707,7 +712,7 @@ orchestrate:
   spec: { dir: docs/specs }              # spec step (see « The spec step of a lot with screen: »): folder of the screen specs, relative to the repository (default docs/specs); render: the command the spec session runs to render the mockups at 1440 and 390 px (optional, Playwright otherwise)
   testGate: { code: [src/**] }           # code changed without a test goes to a correction pass before the review (see « Code changed without a test »); absent: no gate
   prodAccess: false                      # default: wave sessions get no access to production (see « Production access of the sessions »); true lifts it for this project
-  worktrees: false                       # default: one lot at a time per repository, in the repository itself; true plays independent lots of one repository in parallel, each in its own git worktree (see « One worktree per lot »)
+  worktrees: false                       # EXPERIMENTAL, true is refused until L299–L301 are done (CADENCE_EXPERIMENTAL_WORKTREES=1 lifts it, tests only); default: one lot at a time per repository, in the repository itself; true plays independent lots of one repository in parallel, each in its own git worktree (see « One worktree per lot »)
   effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, maquette, fiche, accept, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default

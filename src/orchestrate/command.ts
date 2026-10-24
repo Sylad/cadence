@@ -1056,6 +1056,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     await runPool(ctxs, cap, all, (c) => {
       // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.
       if (c.tree?.active && c.lot.status !== 'ready') wctx.log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : worktree conservé : ${c.tree.dir} (branche ${c.tree.branch})`);
+      // Un lot rendu à l'étape d'intégration (`next: integrate`) : la ligne donne la commande qui le reprend (L279, R27).
+      if (c.tree?.active && c.lot.status === 'handed-back' && c.lot.next === 'integrate') wctx.log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : rendu à l'intégration : reprise par cadence orchestrate --resume ${wctx.id} --integrate ${lotKey(c.lot.project, c.lot.lot)}`);
       // Un dépôt dont tous les lots de la vague (reprise comprise) sont prêts ou rendus peut être livré pendant que la vague continue ailleurs.
       if (wctx.incident) return;
       for (const r of lotRepoPaths(c.lot)) {

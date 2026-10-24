@@ -98,6 +98,10 @@ describe('R6 — un conflit au rebase d\'intégration est rendu au lead', () => 
     expect(a.outcome).toMatch(/^intégration impossible : conflit en rebasant cadence\/2026-10-04-1412\/a--L1 sur main \(fichiers : shared\.txt\) ; worktree conservé : .*worktrees\/a--L1$/);
     expect(r.out).toContain('a:L1 → handed-back — intégration impossible : conflit en rebasant');
   });
+  it('R6 — la sortie cite la commande qui reprend le lot rendu à l\'intégration', async () => {
+    const { r } = await conflict();
+    expect(r.out).toContain('orchestrate : a:L1 : rendu à l\'intégration : reprise par cadence orchestrate --resume 2026-10-04-1412 --integrate a:L1');
+  });
   it('R6 — après le conflit, la branche du dépôt est au même sha qu\'avant et le worktree du lot est intact', async () => {
     const { parent, repo } = await conflict();
     expect(subjects(repo).some((s) => s.startsWith('feat(L1)'))).toBe(false);

@@ -205,8 +205,8 @@ pass counts as one of the two correction passes and plays once per lot: if the l
 ahead and carries the gap as before (one major finding per line). It does not play during the minors pass, nor when a
 correction pass is already used (its pass would take the last one), nor when the lot budget no longer pays it and the review after
 it (a warning `bibliothécaire non appelé` says so each time; the review goes ahead). Without `docs.sync`, or with no gap: no pass.
-When the `cadence.yaml` of the folder above the repository declares `describedBy` for the project, the brief names those
-documents, forbids editing them and asks for a proposed lot in the report; the proposal (the `resume` of the librarian's report, when it starts with « lot proposé ») becomes a proposal of the lot, printed in the
+When the project's `cadence.yaml` declares `docs.articles` (the same key as the article refreshed after a delivery, see [news](news.md#an-article-elsewhere-that-follows-the-delivery)), the brief names those
+documents with the absolute path of their repository (`repo` relative to the project, or absolute), opens that repository to the pass for reading (`--add-dir`), forbids editing them and asks for a proposed lot in the report; the proposal (the `resume` of the librarian's report, when it starts with « lot proposé ») becomes a proposal of the lot, printed in the
 table at the end of the wave, and is the lead's to take into the plan of the other repository.
 
 **Effort level per pass** (L137). Each session is launched with `claude -p --effort <level>` (Claude Code 2.1.284; an

@@ -510,6 +510,9 @@ export function readDocsConfig(file: string): DocsConfig {
   } catch (e) {
     throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
   }
+  if ((raw as { describedBy?: unknown } | null)?.describedBy != null) {
+    throw new RafError(`${file} : describedBy n'existe plus (L308) : les documents hors dépôt se déclarent dans docs.articles, { repo, file } relatif au projet`);
+  }
   const d = (raw as { docs?: unknown } | null)?.docs;
   if (d == null) return none;
   const bad = (what: string) => new RafError(`${file} : docs.${what}`);
@@ -547,44 +550,6 @@ export function readDocsConfig(file: string): DocsConfig {
     });
   }
   return config;
-}
-
-/** Un document hors dépôt (L306) : « ce projet est aussi décrit par `file` du dépôt `repo` ». */
-export interface DescribedBy {
-  project: string;
-  /** Dépôt qui porte le document, relatif au dossier du cadence.yaml. */
-  repo: string;
-  /** Fichier décrivant le projet, relatif à ce dépôt. */
-  file: string;
-}
-
-/**
- * Clé `describedBy:` du cadence.yaml du dossier parent (L306), absente par défaut : les documents hors dépôt qui décrivent `project`.
- * Sans cette clé, le bibliothécaire (agents/doc-keeper.md) ne regarde que le dépôt du lot.
- */
-export function readDescribedBy(file: string, project: string): DescribedBy[] {
-  if (!existsSync(file)) return [];
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const d = (raw as { describedBy?: unknown } | null)?.describedBy;
-  if (d == null) return [];
-  const bad = (what: string) => new RafError(`${file} : describedBy${what}`);
-  if (!Array.isArray(d)) throw bad(' doit être une liste de { project, repo, file }');
-  const entries = d.map((r: unknown, i: number) => {
-    if (!isObject(r)) throw bad(`[${i}] doit être un objet { project, repo, file }`);
-    for (const k of Object.keys(r)) if (!['project', 'repo', 'file'].includes(k)) throw bad(`[${i}].${k} inconnu (attendu : project, repo, file)`);
-    const text = (key: 'project' | 'repo' | 'file') => {
-      const v = r[key];
-      if (typeof v !== 'string' || !v.trim()) throw bad(`[${i}].${key} : texte non vide attendu`);
-      return v.trim();
-    };
-    return { project: text('project'), repo: text('repo'), file: text('file') };
-  });
-  return entries.filter((e) => e.project === project);
 }
 
 export interface ReferencesConfig {

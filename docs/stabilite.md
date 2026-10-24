@@ -13,12 +13,12 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
   `skills`, `spec` (`cadence spec <lot> on|off` is `raf spec`; `check`, `qa`: exit **0** when the sheet is valid and the section is printed, **1** with violations, **2** on a missing or unreadable file or a wrong usage);
   their options and exit codes as the pages [raf](raf.md), [orchestrate](orchestrate.md), [deliver](deliver.md), [spec](spec.md), [news](news.md), [session](session.md), [lead](lead.md), [corrections](corrections.md) and [skills](skills.md) document them. A new command or option is a minor change.
 - **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`, `depth`, `lead` (`lead.ux`)
-  and the keys each of them takes. A key is not renamed nor removed, nor does its meaning change; a new key is a minor change.
+  and the keys each of them takes (`docs`: `sync`, `since`, `articles`; `docs.articles` names both the article refreshed after a delivery and the outside documents the `doc-keeper` agent proposes lots for). A key is not renamed nor removed, nor does its meaning change; a new key is a minor change.
 - **The plan file** (`.cadence/raf.yaml`, or the legacy `docs/plan/raf.yaml`): `project`, `prefix`, `since`, `ignore`, `lots` (with their
   fields, `tasks`, `notes`, `repos`) and `acknowledged`, and the plan formats `plan:` in `cadence.yaml` can read.
   The `version` key is kept in the file but ignored (`src/plan.ts` does not read it): it is not a schema version.
 - **The names of the skills** (`session-start`, `session-close`, `deliver`, `lead`) **and of the agents**
-  (`ux-reviewer`, `code-reviewer`, `qa-reviewer`).
+  (`ux-reviewer`, `code-reviewer`, `qa-reviewer`, `doc-keeper`).
 
 **Not guaranteed** (may change in any release)
 

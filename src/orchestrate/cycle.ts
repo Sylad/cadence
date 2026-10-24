@@ -6,8 +6,8 @@ import { basename, dirname, isAbsolute, join, posix, relative, resolve } from 'n
 import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
-import { readDescribedBy, readDocsConfig, type OrchestrateConfig } from '../config.js';
-import { describedByBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage } from '../docsync.js';
+import { readDocsConfig, type OrchestrateConfig } from '../config.js';
+import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
 import { changedFiles, gitCommonDir, readCommits, resolveCommit, type Commit } from '../git.js';
@@ -337,12 +337,19 @@ function checksText(c: LotCtx): string {
   return declared ? `${ran}\n${declared}` : ran;
 }
 
-/** Consigne docs.sync du brief de revue (L143) : calculée sur les commits du lot au moment de la revue, pas écrite d'avance. */
+/** La clé `docs` du cadence.yaml du projet de ce lot. */
+const docsConfig = (c: LotCtx) => readDocsConfig(histPlan(c).configFile ?? join(wd(c), 'cadence.yaml'));
+
+/** Écarts docs.sync des commits du lot (L143), calculés au moment de la demande : ni gardés ni écrits d'avance. */
+function docGaps(c: LotCtx): { sync: DocSyncRule[]; gaps: DocSyncGap[] } {
+  const { sync } = docsConfig(c);
+  return { sync, gaps: sync.length ? docSyncGaps(sync, filesOf(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot))) : [] };
+}
+
+/** Consigne docs.sync du brief de revue (L143). */
 function docsText(c: LotCtx): string {
-  const plan = histPlan(c);
-  const { sync } = readDocsConfig(plan.configFile ?? join(wd(c), 'cadence.yaml'));
-  if (!sync.length) return '';
-  return docSyncBrief(sync, docSyncGaps(sync, filesOf(wd(c), lotWork(plan, wd(c), c.lot.lot))));
+  const { sync, gaps } = docGaps(c);
+  return sync.length ? docSyncBrief(sync, gaps) : '';
 }
 
 /** Gabarit d'une étape : la passe des mineurs et la revue courte qui la suit ont chacune le leur. */
@@ -477,7 +484,7 @@ function briefFor(c: LotCtx, kind: SessionKind): string {
     if (kind === 'fix') {
       vars.commits = lotCommitLines(c);
       vars.constats = constatLines(l.constats);
-      if (l.docsFix) vars.elsewhere = describedByBrief(dirname(l.repo), readDescribedBy(join(dirname(l.repo), 'cadence.yaml'), basename(l.repo)));
+      if (l.docsFix) vars.elsewhere = articlesBrief(l.repo, docsConfig(c).articles ?? []);
     } else if (interrupted) {
       const mine = lotCommitLines(c);
       vars.commits = mine
@@ -638,7 +645,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       lot: lotKey(l.project, l.lot),
       permissionMode: c.config.permissionMode,
       prodAccess: c.config.prodAccess,
-      addDirs: [...c.config.addDirs, ...(playwright && write ? [playwrightDir(dirname(mcpConfig))] : []), tmpDir, ...neighbourDirs(l)],
+      addDirs: [...c.config.addDirs, ...(playwright && write ? [playwrightDir(dirname(mcpConfig))] : []), tmpDir, ...neighbourDirs(l), ...(kind === 'fix' && l.docsFix ? (docsConfig(c).articles ?? []).map((r) => articleRepoDir(l.repo, r)) : [])],
       nodeBin: l.node?.link,
       toolBin: toolBinOf(w.store.dir),
       tmpDir,
@@ -1713,7 +1720,6 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const docsPass = kind === 'fix' && l.docsFix === true;
   const done = await session(c, kind);
   if (!done) return;
-  l.docsFix = false; // la passe du bibliothécaire est jouée : la suite se décide sur son rapport
   l.minorFix = false; // la passe des mineurs est jouée : la suite se décide sur son rapport
   let rep: WorkReport;
   try {
@@ -1776,6 +1782,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     transition(c, 'question', questions[0]);
     return;
   }
+  l.docsFix = false; // la passe du bibliothécaire est jouée (une question la garde : la reprise rejoue son brief) : la suite se décide sur son rapport
   const dirt = dirtAfter(done);
   if (dirt.length) {
     stop(c, 'handed-back', `dépôt sale après ${kind} : ${dirt.join(', ')}`);
@@ -1864,9 +1871,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   // Bibliothécaire (L306) : docs.sync signale un document en retard sur les commits du lot → une passe doc-keeper avant la revue, une seule fois par lot, aux mêmes conditions de passe et de budget que la porte ci-dessus. Si elle ne touche pas le document, la revue part et porte l'écart (brief docs.sync, constat majeur).
   if (!l.docsGate && !minorsPass) {
-    const plan = histPlan(c);
-    const { sync } = readDocsConfig(plan.configFile ?? join(wd(c), 'cadence.yaml'));
-    const gaps = sync.length ? docSyncGaps(sync, filesOf(wd(c), lotWork(plan, wd(c), l.lot))) : [];
+    const { gaps } = docGaps(c);
     if (gaps.length) {
       l.docsGate = true;
       const late = gaps.flatMap((g) => g.touched).join(', ');

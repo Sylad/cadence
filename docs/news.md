@@ -166,25 +166,17 @@ out, then:
 review** (see « Librarian before the review » in [orchestrate](orchestrate.md)); the lead calls it by hand otherwise
 ([lead](lead.md)).
 
-A document **outside the repository** is the librarian's only when the configuration names it. The key `describedBy` is
-absent by default; it goes in the `cadence.yaml` of the folder above the repositories and says « this project is also
-described by this file of that repository »:
-
-```yaml
-describedBy:
-  - project: my-app             # the folder name of the project (the repository the lot is in)
-    repo: showcase-site         # a repository next to it, relative to the folder of this cadence.yaml
-    file: src/studies/my-app.mdx
-```
-
-The librarian then reads that file and, when the change makes it false, **proposes a lot** for the plan of that repository
+A document **outside the repository** is the librarian's only when the configuration names it, with the key that already
+names the project's article elsewhere, `docs.articles` (see below; absent by default): « this project is also described
+by this file of that repository ». The librarian reads that file (its repository is opened to the session for reading, and
+the brief gives its absolute path) and, when the change makes it false, **proposes a lot** for the plan of that repository
 (a title, then the file, the passage and the sentence to change) in the `resume` of its report, starting with
 « lot proposé ». It never edits that file and never writes to that plan: the lead decides whether the lot enters it.
 
 ### An article elsewhere that follows the delivery
 
 A case study that lives in a neighbouring repository (the project's article on a showcase site) goes stale
-the same way. `docs.articles` names it:
+the same way. `docs.articles` names it (`repo` absolute, or relative to the project):
 
 ```yaml
 docs:

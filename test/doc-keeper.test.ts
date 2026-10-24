@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { readAgents } from '../src/orchestrate/launch.js';
-import { readDescribedBy } from '../src/config.js';
+import { readDocsConfig } from '../src/config.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { tempDir } from './helpers.js';
 import { claudeOut, commitFile, git, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
@@ -44,8 +44,9 @@ describe('agent bibliothécaire (agents/doc-keeper.md, L306)', () => {
     expect(AGENT).toContain('explicit paths');
   });
 
-  it('R4 — un document hors dépôt : seulement par la configuration, et il propose un lot sans l\'écrire dans le plan', () => {
-    expect(AGENT).toContain('describedBy');
+  it('R4 — un document hors dépôt : seulement par la configuration (docs.articles), et il propose un lot sans l\'écrire dans le plan', () => {
+    expect(AGENT).toContain('docs.articles');
+    expect(AGENT).not.toContain('describedBy');
     expect(AGENT).toMatch(/never write[^.]*plan|never[^.]*raf add/i);
     expect(AGENT).toMatch(/propose/i);
   });
@@ -54,52 +55,39 @@ describe('agent bibliothécaire (agents/doc-keeper.md, L306)', () => {
     for (const mot of ['maritime', 'sladoire', 'developpeur', 'claude-code-codex', 'aetherwx', 'finance-tracker']) expect(AGENT.toLowerCase(), mot).not.toContain(mot);
   });
 
-  it('R6 — le README et la page orchestrate décrivent le bibliothécaire et la clé describedBy', () => {
+  it('R6 — le README et la page orchestrate décrivent le bibliothécaire et la clé docs.articles qu\'il partage avec la livraison', () => {
     const doc = docText();
     expect(doc).toContain('doc-keeper');
-    expect(doc).toContain('describedBy');
+    expect(doc).not.toContain('describedBy');
+    expect(readFileSync(join(root, 'docs', 'orchestrate.md'), 'utf8')).toContain('docs.articles');
     expect(readFileSync(join(root, 'CHANGELOG.md'), 'utf8')).toContain('L306');
   });
 });
 
-describe('describedBy : documents hors dépôt, par configuration (L306)', () => {
+describe('une seule clé pour les documents hors dépôt : docs.articles (L306, L308)', () => {
   const file = () => join(tempDir(), 'cadence.yaml');
 
   it('R7 — absente par défaut : fichier absent ou sans la clé, aucune entrée', () => {
     const f = file();
-    expect(readDescribedBy(f, 'cadence')).toEqual([]);
+    expect(readDocsConfig(f).articles).toBeUndefined();
     writeFileSync(f, 'priority: [cadence]\n');
-    expect(readDescribedBy(f, 'cadence')).toEqual([]);
+    expect(readDocsConfig(f).articles).toBeUndefined();
   });
 
-  it('R8 — « tel projet est aussi décrit par tel fichier de tel dépôt » : les entrées du projet, pas celles des autres', () => {
+  it('R8 — « ce projet est aussi décrit par tel fichier de tel dépôt » : les entrées de docs.articles du projet', () => {
     const f = file();
-    writeFileSync(f, 'describedBy:\n  - { project: cadence, repo: site, file: src/etudes/cadence.mdx }\n  - { project: autre, repo: site, file: src/etudes/autre.mdx }\n');
-    expect(readDescribedBy(f, 'cadence')).toEqual([{ project: 'cadence', repo: 'site', file: 'src/etudes/cadence.mdx' }]);
-    expect(readDescribedBy(f, 'inconnu')).toEqual([]);
+    writeFileSync(f, 'docs:\n  articles:\n    - { repo: ../site, file: src/etudes/cadence.mdx }\n');
+    expect(readDocsConfig(f).articles).toEqual([{ repo: '../site', file: 'src/etudes/cadence.mdx' }]);
   });
 
-  it('R9 — une entrée invalide est refusée avec le nom de la clé', () => {
+  it('R9 — l\'ancienne clé describedBy (jamais publiée) est refusée avec le chemin de migration vers docs.articles', () => {
     const f = file();
-    for (const [yaml, mot] of [
-      ['describedBy: oui', 'describedBy'],
-      ['describedBy: [oui]', 'describedBy[0]'],
-      ['describedBy: [{ project: a, repo: b }]', 'describedBy[0].file'],
-      ['describedBy: [{ project: a, repo: b, file: "" }]', 'describedBy[0].file'],
-      ['describedBy: [{ project: a, repo: b, file: c, nope: 1 }]', 'describedBy[0].nope'],
-    ] as const) {
-      writeFileSync(f, `${yaml}\n`);
-      expect(() => readDescribedBy(f, 'a'), yaml).toThrow(mot);
-    }
+    writeFileSync(f, 'describedBy:\n  - { project: a, repo: b, file: c }\n');
+    expect(() => readDocsConfig(f)).toThrow(/describedBy.*docs\.articles/);
   });
 });
 
 describe('orchestrate appelle le bibliothécaire avant la revue (L306)', () => {
-  const created: string[] = [];
-  afterEach(() => {
-    for (const f of created.splice(0)) rmSync(f, { force: true });
-  });
-
   it('R10 — docs.sync signale une doc en retard : une passe doc-keeper avec les écarts calculés, puis la revue', async () => {
     const h = harness({ script: { implement: [impl('src-a.txt')], fix: [keep()], review: [ok] } });
     withConfig(h);
@@ -161,26 +149,61 @@ describe('orchestrate appelle le bibliothécaire avant la revue (L306)', () => {
     expect(cb.lot.warnings.join('\n')).toContain('bibliothécaire non appelé');
   });
 
-  it('R15 — document hors dépôt déclaré dans le cadence.yaml du dossier parent : le brief le cite, interdit de l\'écrire et demande un lot proposé', async () => {
-    const h = harness({ script: { implement: [impl('src-a.txt')], fix: [keep()], review: [ok] } });
-    withConfig(h);
-    const parent = join(dirname(h.repo), 'cadence.yaml');
-    created.push(parent);
-    writeFileSync(parent, `describedBy:\n  - { project: ${basename(h.repo)}, repo: site, file: src/etudes/demo.mdx }\n`);
+  const ARTICLES = (repo: string) => `${SYNC}  articles:\n    - { repo: ${repo}, file: src/etudes/demo.mdx }\n`;
+
+  it('R15 — document hors dépôt déclaré dans docs.articles : le brief le cite avec son chemin absolu, interdit de l\'écrire et demande un lot proposé', async () => {
+    const parent = tempDir();
+    const h = harness({ parent, script: { implement: [impl('src-a.txt')], fix: [keep()], review: [ok] } });
+    withConfig(h, ARTICLES('../site'));
     await runLot(h.lot('L1'));
     const brief = h.calls[1].brief;
     expect(brief).toContain('src/etudes/demo.mdx');
-    expect(brief).toContain(join(dirname(h.repo), 'site'));
+    expect(brief).toContain(join(parent, 'site'));
     expect(brief).toContain('do not edit');
     expect(brief).toContain('proposed lot');
   });
 
-  it('R16 — sans clé describedBy, le brief ne parle d\'aucun document hors dépôt', async () => {
+  it('R16 — sans docs.articles, le brief ne parle d\'aucun document hors dépôt', async () => {
     const h = harness({ script: { implement: [impl('src-a.txt')], fix: [keep()], review: [ok] } });
     withConfig(h);
     await runLot(h.lot('L1'));
     expect(h.calls[1].brief).not.toContain('proposed lot');
-    expect(h.calls[1].brief).not.toContain('describedBy');
+    expect(h.calls[1].brief).not.toContain('outside this repository');
+  });
+
+  it('R21 — le brief ne demande pas de lire un document que la session ne peut pas lire : le dépôt du document est passé en --add-dir', async () => {
+    const parent = tempDir();
+    const h = harness({ parent, script: { implement: [impl('src-a.txt')], fix: [keep()], review: [ok] } });
+    withConfig(h, ARTICLES('../site'));
+    await runLot(h.lot('L1'));
+    const dirs = h.calls[1].args.flatMap((a, i, all) => (all[i - 1] === '--add-dir' ? [a] : []));
+    expect(dirs).toContain(join(parent, 'site'));
+    // Les autres passes (implémentation, revue) n'ont pas besoin du dépôt du document.
+    expect(h.calls[0].args.flatMap((a, i, all) => (all[i - 1] === '--add-dir' ? [a] : []))).not.toContain(join(parent, 'site'));
+  });
+
+  it('R22 — un dépôt donné en chemin absolu est résolu tel quel, pas collé au dossier du projet', async () => {
+    const site = tempDir();
+    const h = harness({ script: { implement: [impl('src-a.txt')], fix: [keep()], review: [ok] } });
+    withConfig(h, ARTICLES(site));
+    await runLot(h.lot('L1'));
+    expect(h.calls[1].brief).toContain(`(${site}, open to this session for reading)`);
+    expect(h.calls[1].args).toContain(site);
+  });
+
+  it('R23 — une question du bibliothécaire garde la passe doc-keeper : la reprise rejoue son brief, pas celui d\'une correction ordinaire', async () => {
+    const ask: Handler = () => claudeOut(workReport({ questions: ['Quel README ?'] }));
+    const h = harness({ script: { implement: [impl('src-a.txt')], fix: [ask] } });
+    withConfig(h);
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.questions).toEqual(['Quel README ?']);
+    expect(c.lot.docsFix).toBe(true);
+  });
+
+  it('R24 — les écarts docs.sync sont calculés au même endroit pour la porte du bibliothécaire et le brief de revue', () => {
+    const cycle = readFileSync(join(root, 'src', 'orchestrate', 'cycle.ts'), 'utf8');
+    expect(cycle.match(/docSyncGaps\(/g)).toHaveLength(1);
   });
 
   it('R17 — la passe des mineurs ne rappelle pas le bibliothécaire', async () => {
@@ -218,11 +241,21 @@ describe('le lead appelle le bibliothécaire à la main (L306)', () => {
   const skill = readFileSync(join(root, 'skills', 'lead', 'SKILL.md'), 'utf8');
   const point = skill.split('\n').find((l) => l.startsWith('0b.')) ?? '';
 
-  it('R20 — le skill lead fait lire la clé describedBy du cadence.yaml du dossier et passer ses entrées au bibliothécaire', () => {
+  it('R20 — le skill lead fait lire docs.articles du cadence.yaml du projet et passer la carte hors dépôt (chemins absolus) au bibliothécaire', () => {
     expect(point).not.toBe('');
-    expect(point).toContain('describedBy');
-    expect(point).toMatch(/`cadence\.yaml` of the folder above/);
+    expect(point).toContain('docs.articles');
+    expect(point).not.toContain('describedBy');
+    expect(point).toMatch(/absolute/);
     expect(point).toMatch(/entries/);
     expect(point).toMatch(/no entry/);
+  });
+
+  it('R25 — README sans ligne blanche perdue entre deux puces, docs/stabilite.md range doc-keeper et la clé', () => {
+    const readme = readFileSync(join(root, 'README.md'), 'utf8').split('\n');
+    const i = readme.findIndex((l) => l.startsWith('- **doc-keeper**'));
+    expect(readme[i - 1]).toMatch(/^- /);
+    const stab = readFileSync(join(root, 'docs', 'stabilite.md'), 'utf8');
+    expect(stab).toContain('doc-keeper');
+    expect(stab).toContain('docs.articles');
   });
 });

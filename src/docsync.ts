@@ -1,5 +1,5 @@
-import { join } from 'node:path';
-import type { DescribedBy } from './config.js';
+import { resolve } from 'node:path';
+import type { ArticleRule } from './articles.js';
 import { changedFiles, type Commit } from './git.js';
 
 /** Une paire de la clé `docs.sync` de cadence.yaml : si des commits touchent `paths`, ils touchent aussi un des `docs`. */
@@ -75,15 +75,18 @@ export function docSyncBrief(rules: DocSyncRule[], gaps: DocSyncGap[]): string {
   ].join('\n');
 }
 
+/** Dossier du dépôt qui porte un document hors dépôt : `repo` relatif à la racine du projet, ou absolu (résolu tel quel). */
+export const articleRepoDir = (root: string, rule: ArticleRule): string => resolve(root, rule.repo);
+
 /**
- * Consigne du bibliothécaire (L306) sur les documents hors dépôt : seulement ceux que la configuration déclare (`describedBy`, cadence.yaml du dossier parent).
- * Vide sans entrée. Le bibliothécaire ne les écrit pas : il propose un lot pour le plan de ce dépôt.
+ * Consigne du bibliothécaire (L306, L308) sur les documents hors dépôt : seulement ceux que la configuration déclare (`docs.articles` du cadence.yaml du projet).
+ * Vide sans entrée. Le dépôt du document est ouvert à la session en lecture (--add-dir) ; le bibliothécaire ne l'écrit pas : il propose un lot pour le plan de ce dépôt.
  */
-export function describedByBrief(parent: string, entries: DescribedBy[]): string {
-  if (!entries.length) return '';
+export function articlesBrief(root: string, rules: ArticleRule[]): string {
+  if (!rules.length) return '';
   return [
-    'Documents outside this repository, declared by the configuration (describedBy of the cadence.yaml of the folder above): the project is also described by',
-    ...entries.map((e) => `- \`${e.file}\` of the repository \`${e.repo}\` (${join(parent, e.repo)})`),
+    'Documents outside this repository, declared by the configuration (docs.articles of cadence.yaml): the project is also described by',
+    ...rules.map((r) => `- \`${r.file}\` of the repository \`${r.repo}\` (${articleRepoDir(root, r)}, open to this session for reading)`),
     'If the change makes one of them false or leaves it out, do not edit it and do not touch the plan of that repository: write a proposed lot (a title, then the file, the passage and the sentence to change) and put it in the "resume" of your report, starting with « lot proposé ». Read it to be exact; read it only.',
   ].join('\n');
 }

@@ -74,12 +74,17 @@ export function planMigration(root: string): Migration {
     const path = join(root, file);
     // ni lien symbolique (sa cible est lue sous son propre nom), ni dossier (sous-module), ni fichier hors du commun
     const stat = lstatSync(path);
-    if (!stat.isFile() || stat.size > MAX_BYTES) continue;
+    if (!stat.isFile()) continue;
     const buffer = readFileSync(path);
     const text = buffer.toString('utf8');
     if (!text.includes('docs/plan') && !BUILT.test(text)) continue;
     if (isKept(file)) {
       result.kept.push(file);
+      continue;
+    }
+    // un gros fichier qui cite le chemin n'est pas lu ligne à ligne : signalé, jamais ignoré en silence
+    if (stat.size > MAX_BYTES) {
+      result.unhandled.push({ file, text: 'fichier de plus de 2 Mio qui cite le chemin : trop gros pour être réécrit' });
       continue;
     }
     if (buffer.includes(0)) {

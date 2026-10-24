@@ -250,7 +250,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   if (command === 'migrate') {
     if (rest.length > 0) throw new RafError('usage : raf migrate [--dry-run]');
     const migration = planMigration(root);
-    for (const l of describeMigration(migration, !!values['dry-run'])) io.out(l);
+    // --dry-run décrit ce qui serait fait avant de refuser ; sans lui, un refus n'annonce rien de fait.
+    if (values['dry-run'] || migration.unhandled.length === 0) for (const l of describeMigration(migration, !!values['dry-run'])) io.out(l);
     if (migration.unhandled.length > 0) throw unhandledError(migration);
     if (!values['dry-run']) applyMigration(root, migration);
     return 0;

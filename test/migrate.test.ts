@@ -261,6 +261,28 @@ describe('raf migrate', () => {
     expect(r.err).toContain('blob.bin');
   });
 
+  it('R11 — un fichier de plus de 2 Mio qui cite le chemin est un lecteur non traité, un autre gros fichier est ignoré', () => {
+    const dir = legacyRepo();
+    put(dir, 'dump/gros.log', `${'x'.repeat(3 * 1024 * 1024)}\ndocs/plan/raf.yaml\n`);
+    put(dir, 'dump/autre.log', 'y'.repeat(3 * 1024 * 1024));
+    git(dir, 'add', 'dump');
+    const r = raf(dir, 'migrate');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('dump/gros.log');
+    expect(r.err).toContain('2 Mio');
+    expect(r.err).not.toContain('autre.log');
+    expect(existsSync(join(dir, 'docs/plan/raf.yaml'))).toBe(true);
+  });
+
+  it('R5 — le refus sans --dry-run n\'affiche pas « lecteurs mis à jour » : rien n\'a été modifié', () => {
+    const dir = legacyRepo({ ...READERS, 'docs/note.md': 'voir docs/plan/autre.yaml\n' });
+    const r = raf(dir, 'migrate');
+    expect(r.code).toBe(2);
+    expect(r.out).toBe('');
+    expect(r.err).toContain('aucun fichier modifié');
+    expect(r.err).toContain('docs/note.md:1');
+  });
+
   it('R12 — un lien symbolique vers un dossier suivi par git n\'est pas lu comme un fichier', () => {
     const dir = legacyRepo(READERS);
     symlinkSync('scripts', join(dir, 'lien'));

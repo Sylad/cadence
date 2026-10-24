@@ -1155,6 +1155,31 @@ describe('budget et quota', () => {
     expect(c.lot.outcome).toMatch(/^correction non jouée \(budget\) : tests rouges après l'implémentation, correction suivante non abordable : .*155000 réservés/);
   });
 
+  it("L315 — lot repris jamais revu (resumedReviewed faux) dont l'implémentation laisse les tests rouges : la cause dit « après l'implémentation »", async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: '2 failed', vert: false } })], fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE });
+    c.lot.resumedFrom = 'ancienne-vague';
+    c.lot.resumedReviewed = false;
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/^correction non jouée \(budget\) : tests rouges après l'implémentation, /);
+    expect(c.lot.outcome).not.toContain('branche reprise');
+  });
+
+  it("L315 — lot repris déjà revu (resumedReviewed vrai), tests rouges, correction non abordable : la cause dit « après la dernière revue de la branche reprise »", async () => {
+    const h = harness({ script: { fix: [fix('b.txt')] } });
+    const c = h.lot('L1', { budget: REVIEW_RESERVE });
+    c.lot.resumedFrom = 'ancienne-vague';
+    c.lot.resumedReviewed = true;
+    c.lot.next = 'fix';
+    c.lot.constats = [{ source: 'tests', gravite: 'majeur', description: 'npm test : 2 failed' } as never];
+    await runLot(c);
+    expect(kinds(h)).toEqual([]);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/^correction non jouée \(budget\) : tests rouges après la dernière revue de la branche reprise, /);
+  });
+
   it("L145 — passe fix refusée sans tests rouges : la cause ne parle pas de tests rouges", async () => {
     const h = harness({ script: { implement: [impl()], review: [major], fix: [fix('b.txt')] } });
     const c = h.lot('L1', { budget: REVIEW_RESERVE });

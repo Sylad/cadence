@@ -977,9 +977,9 @@ function overBudget(c: LotCtx, reserve = false): null {
   const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (${basis}), il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, ${basis})`;
   // Tests rouges après une écriture : la passe fix refusée aurait suivi, le lot revient sans revue (L145) — la cause le dit.
   const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
-  // Passe d'écriture qui vient d'être jouée, nommée d'après le compteur : l.pass - 1 passes de correction l'ont précédée (minorPass reste vrai après la passe des mineurs).
+  // Passe d'écriture qui vient d'être jouée, nommée d'après le compteur : l.pass - 1 passes de correction l'ont précédée (minorPass reste vrai après la passe des mineurs). Sans passe jouée, un lot repris déjà revu compte ses tests rouges depuis la revue de sa branche ; jamais revu (L315), c'est l'implémentation qui les a laissés.
   const played = l.pass - 1;
-  const after = l.minorPass && played === (l.minorPassAt ?? 0) ? 'la passe des mineurs' : played > 0 ? `la passe fix ${played}` : l.resumedFrom ? 'la dernière revue de la branche reprise' : "l'implémentation";
+  const after = l.minorPass && played === (l.minorPassAt ?? 0) ? 'la passe des mineurs' : played > 0 ? `la passe fix ${played}` : l.resumedFrom && l.resumedReviewed ? 'la dernière revue de la branche reprise' : "l'implémentation";
   const notPlayed = l.next === 'fix' ? 'correction non jouée (budget) : ' : '';
   const prefix = notPlayed + (red ? `tests rouges après ${after}, correction suivante non abordable : ` : '');
   const unreviewed = red ? ' ; le lot revient sans revue, avec ses constats' : '';

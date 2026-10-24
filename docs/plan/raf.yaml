@@ -3190,9 +3190,10 @@ lots:
     review: { date: 2026-10-24, verdict: "conforme : 0 bloquant, 0 majeur, 0 mineur (e17596e : regex /^[0-9a-f]{7,40}$/i avant resolveCommit, HEAD et noms de branche refusés, sha abrégé accepté, docs/deliver.md, SKILL.md et CHANGELOG à jour, tests R1 verts) — orchestré (vague 2026-10-24-1050, 0 passe(s) de correction)", commit: e17596efcde29b34d95ba8cedbad38828bf4b452 }
   - id: L282
     title: "deliver : deliveries-failed.log garde la raison de l'échec (dernières lignes de sortie du script, de la CI ou des contrôles, bornées) et une classe (refus avant action, CI, déploiement, vérification) ; cadence perf ventile les livraisons rouges par classe et par projet ; tests. Mesure 24-10 : 25 rouges sur 17–23-10 (14 maritime « livrer.sh code 1 »), cause illisible — décision Sylvain 24-10"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L283
     title: "perf : « sessions ux par lot visible » compte aussi l'UX faite dans review-small d'un petit lot visible (seesApp) ; nouvel indicateur : part des lots visibles revus par une étape ux dédiée ; docs/perf.md et tests. Mesure 24-10 : 139 lots visibles sur 140 « petits » (≤ 0,5 j) → 0,0 affiché (−97 %), faux signal"
     status: todo

@@ -3496,13 +3496,15 @@ lots:
     finished: 2026-10-24
   - id: L310
     title: "Essai réel mesuré du mode worktree (L279, L299–L304) — décision Sylvain 24-10 : une vague de deux lots cadence indépendants (L309 dans src/orchestrate, L274 dans src/ref) avec orchestrate.worktrees: true et CADENCE_EXPERIMENTAL_WORKTREES=1 ; mesure : temps de mur de la vague contre somme des durées des lots, intégrations (rebase, patch-id, verdict reporté ou revue courte), incidents ; conclusion écrite en note (activer par défaut, garder expérimental, ou corriger) ; config remise à false après l'essai sauf décision"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
     notes:
       - { date: 2026-10-24, text: "24-10 (lead) — essai 1 (vague 2026-10-24-essai-wt, L309 + L274 en worktrees) : temps de mur 49 min contre 89 min en série (gain 40 min, 45 %) ; deux worktrees créés à 0,5 s d'écart, aucune gêne mutuelle, main intact (seuls les commits de plan, R21), worktrees conservés listés au tableau. Les deux lots rendus non conformes pour des défauts de fond (L309 : 1 majeur table.ts:174 ; L274 : 1 majeur après 3 passes) → AUCUNE intégration éprouvée (rebase, patch-id, verdict reporté). Suite : reprendre L309 et L274 en worktree (branches cadence/2026-10-24-essai-wt/*, reprise L301) pour éprouver l'intégration ; config remise à false en attendant." }
       - { date: 2026-10-24, text: "24-10 (lead) — essai 2 (vague 2026-10-24-essai-wt2, reprise des branches conservées de l'essai 1) : reprise L301 OK (les deux branches retrouvées, renommées et déplacées, le lot repart de ses commits) ; L274 conforme après 2 corrections puis INTÉGRÉ par l'orchestrateur (rebase + fast-forward bc67c0b..781f363, verdict reporté par patch-id identique bd0a0dc → 781f363, R hybride) : intégration automatique éprouvée sur un cas réel ; L309 rendu en 3 min par le précheck de reprise (« livrable déjà présent » : ses propres commits) → L311 ; repris à la main dans son worktree (2 corrections Sonnet + revue Opus conforme) pendant que L274 tournait, puis intégré à la main : conflit CHANGELOG [Unreleased] (deux entrées ajoutées) → L314. Mur vague 44 min (L274 seul) ; L309 à la main en parallèle ~25 min. CONCLUSION : garder expérimental ; corriger L311 et L314, puis un essai 3 de deux lots neufs (sans reprise) avant de proposer l'activation par défaut à Sylvain. Config remise à false." }
+    review: { date: 2026-10-24, verdict: "conforme : lot d'essai, commits de config seuls (trois bascules orchestrate.worktrees, remise à false vérifiée cadence.yaml:12), aucun code ; mesure et conclusion en note (lead)", commit: 0b014b8aa32d689f29af4e3c10db137671e4d0f1 }
+    finished: 2026-10-24
   - id: L311
     title: "orchestrate worktrees : la reprise d'une branche conservée (L301) ne repasse pas par le précheck — les commits du lot lui-même lui font dire « livrable déjà présent » et le lot est rendu sans que le majeur de sa dernière revue soit corrigé (vécu essai 2 de L310, 24-10 : L309 rendu en 3 min, précheck local « oui » confirmé par Sonnet) ; un lot repris de sa branche repart à la correction avec les constats de sa dernière revue (ou à la revue s'il n'en a pas) ; tests"
     status: todo

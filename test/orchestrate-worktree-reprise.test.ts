@@ -6,7 +6,7 @@ import { waveReadsIntegrate, waveReadsReplay } from '../src/orchestrate/snapshot
 import { RunStore } from '../src/orchestrate/state.js';
 import { baseBranchOf, lotBranch, lotTreeDir, prepareTree, recoverTree } from '../src/orchestrate/worktree.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
-import { branches, fake, inWorktree, lotOf, planOf, run, setup, store, subjects, WAVE } from './orchestrate-worktree-harness.js';
+import { branches, conflictWave, fake, inWorktree, lotOf, planOf, run, setup, store, subjects, WAVE } from './orchestrate-worktree-harness.js';
 import { fakeApp } from './fake-app.js';
 import { tempDir } from './helpers.js';
 
@@ -120,6 +120,27 @@ describe('R1 — recoverTree refuse une branche que la reprise ne mènerait pas 
     expect(existsSync(old.dir)).toBe(true);
     expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(old.branch);
   });
+  it('R1 — git worktree move qui échoue (worktree verrouillé) : la reprise est refusée avec la cause de git, rien n\'est renommé', () => {
+    const { repo, parent } = setup();
+    const old = oldBranch(repo, 'w1', 'L1', 1);
+    git(repo, 'worktree', 'lock', old.dir);
+    const dir = lotTreeDir(join(parent, '.cadence', 'runs', 'w2'), 'a', 'L1');
+    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main');
+    expect(got).toEqual({ from: old.branch, refused: expect.stringMatching(/déplacement ou renommage.*lock/i) });
+    expect(existsSync(old.dir)).toBe(true);
+    expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(old.branch);
+  });
+  it('R1 — vague : l\'échec du renommage est dans le journal, le lot repart de zéro', async () => {
+    const { parent, repo } = setup();
+    const f1 = fake({ review: async (_cwd, brief) => claudeOut(lotOf(brief) === 'L1' ? nonConforme : reviewReport()) });
+    await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f1);
+    const dir = git(repo, 'worktree', 'list', '--porcelain').split('\n').find((l) => l.startsWith('worktree ') && l.includes('a--L1'))!.slice(9);
+    git(repo, 'worktree', 'lock', dir);
+    const r = await run(parent, ['a:L1'], fake());
+    expect(r.out).toContain('non reprise : déplacement ou renommage de la branche refusé');
+    expect(r.out).not.toContain('une vague précédente reprise');
+    expect(branches(repo)).toContain(`cadence/${WAVE}/a--L1`);
+  });
   it('R1 — vague : un lot rendu avec du travail non commité n\'est pas repris, le journal le dit et la session ne démarre pas sur un arbre sale', async () => {
     const { parent, repo } = setup();
     const f1 = fake({ review: async (_cwd, brief) => claudeOut(lotOf(brief) === 'L1' ? nonConforme : reviewReport()) });
@@ -145,6 +166,31 @@ describe('R1 — plan touché : la reprise ne rejoue pas un commit de plan jusqu
     expect(r.out).toContain('docs/plan/raf.yaml');
     expect(r.out).not.toContain('une vague précédente reprise');
     expect(branches(repo)).toContain(`cadence/${WAVE}/a--L1`);
+  });
+});
+
+describe('R1 — la reprise ne touche pas aux branches d\'un autre cas', () => {
+  it('R1 — lot rendu à l\'intégration (next: integrate) : la branche conservée d\'une autre vague n\'est pas renommée à la reprise de l\'intégration', async () => {
+    const { parent, repo, branch } = await conflictWave();
+    const rm = await run(parent, ['--remove-worktree', 'a:L1', '--abandon-commits'], fake());
+    expect(rm.code).toBe(0);
+    expect(branches(repo)).not.toContain(branch);
+    const other = oldBranch(repo, 'w0', 'L1', 1, Date.now() + 60_000); // une branche conservée du lot : c'est elle que recoverTree reprendrait
+    await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], fake());
+    expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(other.branch);
+    expect(existsSync(other.dir)).toBe(true);
+  });
+  it('R1 — sans CADENCE_EXPERIMENTAL_WORKTREES : une nouvelle vague du lot laisse la branche conservée de la vague passée où elle est', async () => {
+    const { parent, repo } = setup();
+    const f1 = fake({ review: async (_cwd, brief) => claudeOut(lotOf(brief) === 'L1' ? nonConforme : reviewReport()) });
+    await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f1);
+    expect(branches(repo)).toContain(`cadence/${WAVE}/a--L1`);
+    writeFileSync(join(repo, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
+    git(repo, 'add', '--', 'cadence.yaml');
+    git(repo, 'commit', '-q', '-m', 'chore: sans worktrees');
+    const r = await run(parent, ['a:L1'], fake(), {}, { CADENCE_EXPERIMENTAL_WORKTREES: undefined });
+    expect(r.out).not.toContain('d\'une vague précédente');
+    expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(`cadence/${WAVE}/a--L1`);
   });
 });
 

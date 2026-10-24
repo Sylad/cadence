@@ -204,9 +204,9 @@ export function prepareTree(t: TreeSpec): { ok: true; reused: boolean } | { ok: 
  * worktree sont conservés) : la nouvelle vague du même lot retrouve la branche `cadence/<vague>/<projet>--<lot>` LA PLUS RÉCENTE (date de création notée par cadence)
  * d'une vague passée, reconnue, partie de la même branche `base` et qui porte des commits non intégrés. Elle est renommée au nom de la nouvelle vague
  * (git emporte la config de cadence) et son worktree déplacé vers `dir` : le reste de l'orchestration, qui ne connaît que les noms de la vague, la voit
- * comme la sienne. Rend la branche reprise, ou null (rien à reprendre, ou le renommage a échoué : rien n'a bougé). Jamais la branche d'une vague vivante.
+ * comme la sienne. Rend la branche reprise, ou null (rien à reprendre). Jamais la branche d'une vague vivante.
  * Une branche que la reprise ne pourrait pas mener à l'intégration est refusée sans y toucher (`refused` dit pourquoi) : son worktree porte un fichier suivi modifié
- * (R11 : comme `--resume`, la session n'y démarre pas), ou un de ses commits touche un fichier du plan (`planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme).
+ * (R11 : comme `--resume`, la session n'y démarre pas), ou un de ses commits touche un fichier du plan (`planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme). Un `git worktree move` ou `git branch -m` qui échoue est refusé de même, avec la cause de git (le déplacement est défait).
  */
 export function recoverTree(repo: string, branch: string, dir: string, base: string, planFiles: ReadonlySet<string> = new Set()): { from: string; unintegrated: number } | { from: string; refused: string } | null {
   const slug = branch.split('/').slice(2).join('/');
@@ -226,9 +226,9 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
       git(repo, 'worktree', 'move', found.dir as string, dir);
     }
     git(repo, 'branch', '-m', found.branch, branch);
-  } catch {
+  } catch (e) {
     if (moved && existsSync(dir) && !existsSync(found.dir as string)) tryGit(repo, 'worktree', 'move', dir, found.dir as string);
-    return null;
+    return { from: found.branch, refused: `déplacement ou renommage de la branche refusé par git (${gitFailure(e)}), rien n'a bougé` };
   }
   return { from: found.branch, unintegrated: found.unintegrated };
 }

@@ -3137,10 +3137,11 @@ lots:
     finished: 2026-10-23
   - id: L274
     title: "ref add (suite L261) : citations au pluriel et plages — « Figures 2 and 3 », « Figures 2, 4 to 6 », « Figures 2–4 » (tiret demi-cadratin), « Figures 1.1 to 1.3 », « Figs. » — chaque figure citée, sans faux lien non résolu ; numéros d'annexe (Figure 1.B.1, Table 12.B.3 : 32 légendes de WMO-8 Vol I fusionnées en 4) ; tests sur fixtures — APRÈS le corpus d'évaluation (L264) pour mesurer"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L264 ]
     created: 2026-10-23
+    started: 2026-10-24
   - id: L275
     title: "ref add (suite L261) : pages sans couche texte signalées (recette scanned_pages de norme-etude : un PDF scanné de plus de 30 pages sort en 0 avec un index vide) ; figure sans citation et image sans légende listées en « lien non résolu » comme le dit le design ; échecs de pdftotext / pdftoppm / pdfimages / pdftohtml traduits en RafError ; tests — APRÈS L264"
     status: todo

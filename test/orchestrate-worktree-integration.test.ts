@@ -360,6 +360,18 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
     expect(subjects(repo).some((s) => s.startsWith(`feat(${lot})`))).toBe(false);
     expect(subjects(repo).some((s) => s.startsWith(`plan: ${lot} revue`))).toBe(false);
   });
+  it('L303 — refus tardif puis --resume --integrate : la revue courte est rejouée, mais son verdict n\'est écrit qu\'une fois dans celui du plan', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    expect(store(parent).readLot('a', lot)!.verdict).toContain('revue courte du diff rebasé');
+    git(repo, 'checkout', '-q', 'main');
+    const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }));
+    expect(again.err).toBe('');
+    expect(store(parent).readLot('a', lot)!.status).toBe('ready');
+    const verdict = planOf(repo).lot(lot).review!.verdict;
+    expect(verdict.split('revue courte du diff rebasé')).toHaveLength(2);
+    expect(verdict).toContain('seconde lecture');
+    expect(verdict).not.toContain('rebase sans dégât');
+  });
 });
 
 describe('R23 — le verdict est écrit après l\'avance, dans un commit de plan seul', () => {

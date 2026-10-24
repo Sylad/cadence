@@ -2189,6 +2189,9 @@ function handBackPlan(c: LotCtx, why: string): void {
   else stop(c, 'handed-back', why);
 }
 
+/** Ce qui sépare le verdict de la revue du lot de celui de sa revue courte du diff rebasé (R17). */
+const SHORT_REVIEW_TRACE = ' ; revue courte du diff rebasé (patch-id différent) : ';
+
 const minutesText = (ms: number): string => (ms % 60_000 === 0 ? `${ms / 60_000} minute${ms === 60_000 ? '' : 's'}` : `${Math.round(ms / 1000)} s`);
 
 /**
@@ -2211,7 +2214,8 @@ async function integrateLot(c: LotCtx): Promise<void> {
   const waitMs = c.wave.integrate?.waitMs ?? INTEGRATE_WAIT_MS;
   const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);
   if (!grant.ok) return refuse(`intégration refusée : verrou d'intégration tenu par ${grant.holder.wave} (pid ${grant.holder.pid}) depuis plus de ${minutesText(waitMs)} ; ${kept}`);
-  let verdict = l.verdict ?? '';
+  // Un refus tardif garde `l.verdict` avec la trace de la revue courte déjà jouée : reprise, elle est rejouée et remplace l'ancienne trace au lieu de s'y ajouter.
+  let verdict = (l.verdict ?? '').split(SHORT_REVIEW_TRACE)[0];
   let reporte: Reporte | undefined;
   let start = '';
   try {
@@ -2244,7 +2248,7 @@ async function integrateLot(c: LotCtx): Promise<void> {
           const short = await shortReview(c);
           if (short === null) return;
           if (short.refused) return refuse(`intégration refusée : revue courte du diff rebasé : ${short.refused} ; branche du dépôt inchangée, ${kept}`);
-          verdict = `${verdict} ; revue courte du diff rebasé (patch-id différent) : ${short.verdict}`;
+          verdict = `${verdict}${SHORT_REVIEW_TRACE}${short.verdict}`;
           l.verdict = verdict;
         }
       }

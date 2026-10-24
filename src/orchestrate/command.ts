@@ -941,10 +941,12 @@ function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: st
       if (recovered && 'refused' in recovered) log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente non reprise : ${recovered.refused} ; le lot repart de zéro (à nettoyer à la main, ou intégration à la main documentée)`);
       else if (recovered) {
         log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s)) : le lot repart de son travail`);
-        // L311 : le lot reprend les constats de sa dernière revue (état de la vague qui l'a rendu), il repart à leur correction.
-        const from = recovered.from.split('/')[1];
-        c.lot.resumedFrom = from;
-        c.lot.constats = new RunStore(store.launchDir, from).readLot(c.lot.project, c.lot.lot)?.constats ?? [];
+        // L311 : un lot déjà revu reprend les constats de sa dernière revue (état de la vague qui l'a rendu) et repart à leur correction. Un lot rendu avant sa première revue (ni étape review, ni constat) n'est pas marqué : il rejoue la chaîne d'un lot neuf (fiche, tests d'acceptation, implémentation).
+        const old = new RunStore(store.launchDir, recovered.from.split('/')[1]).readLot(c.lot.project, c.lot.lot);
+        if (old && (old.constats.length || old.steps.some((s) => s.kind.startsWith('review')))) {
+          c.lot.resumedFrom = recovered.from.split('/')[1];
+          c.lot.constats = old.constats;
+        }
       }
       const known = baseBranchOf(repo, lotBr);
       const base = known ?? branch;

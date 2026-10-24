@@ -3310,11 +3310,15 @@ lots:
     review: { date: 2026-10-24, verdict: "compliant — orchestré (vague 2026-10-24-1240, 0 passe(s) de correction)", commit: a1403d8b6cd88ca34df9050a42771ac3b8643cf2 }
     finished: 2026-10-24
   - id: L294
-    title: "deliver (suite de la revue L289) : masquage des secrets dans deliveries-failed.log — noms en un seul mot (APIKEY, ACCESSTOKEN, GITHUBTOKEN) et valeur entre guillemets non fermés (coupée par la borne de 8192) masqués ; tests sur les cas mesurés"
-    status: doing
+    title: "deliver (suite de la revue L289) : masquage des secrets dans deliveries-failed.log — noms en un seul mot (APIKEY, ACCESSTOKEN, GITHUBTOKEN) et suffixe pwd masqués ; périmètre coupé par le lead (24-10) : guillemets non fermés et première ligne tronquée par la borne non traités (la borne garde la fin de la sortie), raison dans docs/deliver.md ; tests"
+    status: done
     estimate: 0.1
     created: 2026-10-24
     started: 2026-10-24
+    notes:
+      - { date: 2026-10-24, text: "titre remplacé : « deliver (suite de la revue L289) : masquage des secrets dans deliveries-failed.log — noms en un seul mot (APIKEY, ACCESSTOKEN, GITHUBTOKEN) et valeur entre guillemets non fermés (coupée par la borne de 8192) masqués ; tests sur les cas mesurés »" }
+    review: { date: 2026-10-24, verdict: "conforme, 0 constat (revue Opus neuve 24-10 après périmètre coupé : masquage seulement élargi sur 33 cas comparés à avant 643ef3b, raison des rouges non dégradée, R9 rouge sur 5edc3b1 ; notes : doc des suffixes incomplète — passwd, credentials)", commit: af52aa6ee9950863fb210bcede895bfc7f41c101 }
+    finished: 2026-10-24
   - id: L295
     title: "orchestrate précheck : un id L<n> suivi d'un tiret (« L53-L57 », « L12-bis ») compte de nouveau comme cité (régression de citesPriorWork, L61 perdait son précheck) ; test de plage Lx-Ly ; docs/orchestrate.md:611 (clé precheck) mentionne goal: et les ids non-L — revue L292"
     status: todo

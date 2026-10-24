@@ -3570,25 +3570,35 @@ lots:
     finished: 2026-10-25
   - id: L317
     title: "orchestrate : une correction lancée par la porte docs.sync (« documentation en retard », cycle.ts:1882) qui ne commite rien laisse passer le lot à la revue (« ⚠ fix sans nouveau commit ») et il finit prêt alors que raf check reste rouge (vécu essai 3, 24-10 : L315, cycle.ts sans doc) ; soit la session écrit la doc, soit l'écart est acquitté explicitement et motivé (raf docs-ok <lot> --reason, lu par docSyncIssues et par la porte) ; jamais prêt avec un écart docs.sync ouvert ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
     review: { date: 2026-10-25, verdict: "conforme : 3 mineurs (acquittement invisible en mode worktree expérimental, commentaire de porte périmé en cycle.ts:1889, acquittement valable pour tout le lot) ; suite à 3492 tests verts, typecheck propre — orchestré (vague 2026-10-25-0010, 0 passe(s) de correction)", commit: 3137d0dd235d836a5a87d853cc77efad4ec02295 }
+    notes:
+      - { date: 2026-10-25, text: "Mineurs de revue : commentaire de la porte du bibliothécaire faux (cycle.ts:1889, la revue ne part plus) ; docs_ok vaut pour le lot entier sans lien avec un sha (choix de l'auteur, plan.ts:492) ; en mode worktree, docGaps lit l'acquittement par histPlan (cycle.ts:347) → repris dans L320." }
+    finished: 2026-10-25
   - id: L318
     title: "orchestrate reprise (suite revue L315) : resumedReviewed vaut vrai pour un lot rendu pour tests rouges sans aucune revue (command.ts:948 compte aussi les constats source 'tests') → overBudget affiche « après la dernière revue de la branche reprise » au lieu de « après l'implémentation » ; ne compter que les constats de revue ou les étapes review* ; test"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
     review: { date: 2026-10-25, verdict: "conforme : commit b72fe55, resumedReviewed ne compte plus que les constats `code` ou les étapes `review*` (command.ts:948), test L318 vert, docs/orchestrate.md et CHANGELOG à jour, 0 constat — orchestré (vague 2026-10-25-0010, 0 passe(s) de correction)", commit: b72fe55ba4d0f0b06bc88887ecc473522eac836a }
+    finished: 2026-10-25
   - id: L319
     title: "ref analyse (suites revue L265) : le refus au plafond (plus de 20 pages rendues) propose --sections alors que les pages rendues par un add précédent restent lues — un document analysé sans --sections est ensuite refusé à chaque appel ; lire seulement les pages de --sections (et leurs figures) quand l'option est donnée, ou le dire et proposer la bonne commande ; sur une lecture relancée après coupure, usage.tokens ajoute les jetons de la session coupée (journalTokens, comme orchestrate) et lectures/a.json est supprimé avant la relance ; exemple de sortie de docs/ref.md:299 recalculé ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
     review: { date: 2026-10-25, verdict: "compliant — orchestré (vague 2026-10-25-0010, 0 passe(s) de correction)", commit: 2d6bfdc1e56621b600d6565cc94e4908836876da }
+    finished: 2026-10-25
+  - id: L320
+    title: "orchestrate : mode worktree ACTIVÉ PAR DÉFAUT (décision Sylvain 25-10 après les essais L310 et L316 : −45 % et −22 % de mur, 3 intégrations automatiques sans incident) — retirer la garde CADENCE_EXPERIMENTAL_WORKTREES, défaut orchestrate.worktrees: true dans cadence (les autres projets gardent leur valeur jusqu'à décision), doc (docs/orchestrate.md « One worktree per lot », README, skill lead) et CHANGELOG ; vérifier avant que l'acquittement docs_ok de L317 est bien lu dans un worktree (docGaps via histPlan, cycle.ts:347, mineur de la revue L317) ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

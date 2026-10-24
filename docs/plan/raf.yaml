@@ -3238,9 +3238,10 @@ lots:
     review: { date: 2026-10-24, verdict: "conforme (3 mineurs en notes : R10 ne protège pas le drapeau « une fois par lot », passage en revue Opus d'un lot léger non documenté, titre de R12) — orchestré (vague 2026-10-24-1125, 2 passe(s) de correction)", commit: e180552bd9dd30797d49f7c4f0d3f6be5d6f520f }
   - id: L288
     title: "orchestrate : précheck conditionnel (lot sans commit et dont le titre ne cite ni constat ni lot antérieur → pas de précheck) ou confié au modèle local ; mesure avant/après de la part de « oui ». Audit 24-10 : 13,4 M tokens (7,1 %) de précheck pour 10 « oui » et 20 « partiel »"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-24
+    started: 2026-10-24
   - id: L289
     title: "deliver : la raison d'une livraison rouge (L282) garde la dernière image d'une ligne réécrite par \\r (barre de progression) au lieu de 5 images de la barre, et masque les secrets probables (motifs jeton/clé/URL signée/VAR=valeur sensible) avant d'écrire deliveries-failed.log ; docs/deliver.md mentionne le risque ; tests. Revue L282 24-10"
     status: doing

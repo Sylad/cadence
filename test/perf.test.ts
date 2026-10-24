@@ -1097,6 +1097,24 @@ describe('cadence perf — durée de mur par étape (R6)', () => {
     expect([data.durations.implement.current, data.durations.implement.previous]).toEqual([30, null]);
     expect([data.durations.fix.current, data.durations.fix.previous]).toEqual([null, 10]);
   });
+
+  it('L280 — durée de mur : le minimum est de 10 étapes par fenêtre, 9 étapes en hausse de 100 % ne lèvent pas de ⚠, 10 le lèvent', async () => {
+    const run = async (n: number) => {
+      const c = ctx();
+      plan(c.root, 'alpha', [{ id: 'A0' }, { id: 'A1' }]);
+      const steps = [
+        ...Array.from({ length: n }, () => stepAt('ux', PREV, '10:00:00', '10:10:00')),
+        ...Array.from({ length: n }, () => stepAt('ux', CUR, '10:00:00', '10:20:00')),
+      ];
+      lotJournal(c, PREV, 'A0', { steps: steps.slice(0, n) });
+      lotJournal(c, CUR, 'A1', { steps: steps.slice(n) });
+      return json(c.root);
+    };
+    const few = (await run(9)).data.durations.ux;
+    expect(few).toMatchObject({ warn: false, note: 'pas de tendance : échantillon', lots: { current: 9, previous: 9 } });
+    const enough = (await run(10)).data.durations.ux;
+    expect(enough).toMatchObject({ warn: true, note: null, current: 20, previous: 10 });
+  });
 });
 
 describe('cadence perf — fenêtres, ⚠ et décisions des nouveaux indicateurs (R1, R12)', () => {

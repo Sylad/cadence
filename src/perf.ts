@@ -29,6 +29,8 @@ export interface Windows {
 const DEGRADATION = 0.25;
 /** Sous ce nombre de lots dans l'une des deux fenêtres, pas de tendance (R13). */
 const MIN_SAMPLE = 5;
+/** Durées de mur : sous ce nombre d'étapes dans l'une des deux fenêtres, pas de tendance (L280). Mesuré sur 12–18-10 contre 05–11 et 17–23-10 contre 10–16 : une classe de moins de 10 étapes varie de plus de 25 % d'une fenêtre à l'autre (`accept` −61 % sur 7, `ux` +31 % sur 5). */
+const MIN_STEPS = 10;
 /** Goulot net (R19) : une cause pèse au moins cette part des passes classées, avec au moins MIN_CLASSIFIED passes classées. */
 const BOTTLENECK_SHARE = 0.5;
 const MIN_CLASSIFIED = 10;
@@ -228,7 +230,7 @@ const DECISIONS = {
 } as const;
 export type DecisionKey = keyof typeof DECISIONS;
 
-function indicator(current: number | null, previous: number | null, lots: { current: number; previous: number }, windows: Windows, dir: Direction | null, twin: string | null, nullNote: string | null = null): Indicator {
+function indicator(current: number | null, previous: number | null, lots: { current: number; previous: number }, windows: Windows, dir: Direction | null, twin: string | null, nullNote: string | null = null, minSample = MIN_SAMPLE): Indicator {
   const change = current !== null && previous !== null && previous !== 0 ? (current - previous) / previous : null;
   const worse = current !== null && previous !== null && dir !== null && (dir === 'down' ? current < previous : current > previous);
   const truncated = windows.current.truncated || windows.previous.truncated;
@@ -237,7 +239,7 @@ function indicator(current: number | null, previous: number | null, lots: { curr
   if (dir !== null && current !== null && previous !== null) {
     const degraded = worse && (previous === 0 || Math.abs(change!) > DEGRADATION + 1e-9);
     if (truncated) note = 'fenêtre tronquée';
-    else if (degraded && (lots.current < MIN_SAMPLE || lots.previous < MIN_SAMPLE)) note = 'pas de tendance : échantillon';
+    else if (degraded && (lots.current < minSample || lots.previous < minSample)) note = 'pas de tendance : échantillon';
     else if (degraded && previous === 0) note = 'pas de tendance : précédente nulle';
     else warn = degraded;
   }
@@ -356,7 +358,7 @@ export function computePerf(input: PerfInput): PerfResult {
   const visibleCounts = both(windows, (w) => visibleRendered(w).length);
   const budgetCounts = both(windows, (w) => withBudget(w).length);
 
-  const mk = (vals: { current: number | null; previous: number | null }, lots: { current: number; previous: number }, dir: Direction | null, twin: string | null, nullNote: string | null = null) => indicator(vals.current, vals.previous, lots, windows, dir, twin, nullNote);
+  const mk = (vals: { current: number | null; previous: number | null }, lots: { current: number; previous: number }, dir: Direction | null, twin: string | null, nullNote: string | null = null, minSample = MIN_SAMPLE) => indicator(vals.current, vals.previous, lots, windows, dir, twin, nullNote, minSample);
   const planNote = hasPlans ? null : 'plan illisible ou absent';
 
   // Tokens par estimate et part de revue (R2, R3)
@@ -412,7 +414,7 @@ export function computePerf(input: PerfInput): PerfResult {
   const wallKinds = [...new Set(walls.filter((x) => inWindow(x.day, windows.current) || inWindow(x.day, windows.previous)).map((x) => x.kind))].sort((a, b) => kindRank(a) - kindRank(b) || a.localeCompare(b));
   for (const kind of wallKinds) {
     const v = both(windows, (w) => wallsOf(kind, w));
-    durations[kind] = mk({ current: median(v.current), previous: median(v.previous) }, sizes(v), 'up', twinFirstTime);
+    durations[kind] = mk({ current: median(v.current), previous: median(v.previous) }, sizes(v), 'up', twinFirstTime, null, MIN_STEPS);
   }
 
   // Coût par lot livré (R8 à R10)

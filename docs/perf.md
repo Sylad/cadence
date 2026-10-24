@@ -19,7 +19,7 @@ one (the 7 days before). Every speed indicator is printed on the same line as it
 
 A line starts with `⚠` and ends with the decision it informs when its value is **worse than the previous window by more than 25 %**
 (a drop for the throughput and the share right the first time; a rise for passes, interventions and escaped defects). No `⚠`, and the line says
-why, when one window holds fewer than 5 lots for the indicator, when the previous value is zero, or when `--since` truncates a window.
+why, when one window holds fewer than 5 lots for the indicator (10 steps for a wall-time duration, L280), when the previous value is zero, or when `--since` truncates a window.
 A window with no lot for an indicator (no rendered lot for ready lots, no delivered lot for delivered, none at all for a window entirely before `--since`) gives `n/d` (`null` in JSON), never `0`. A **clear bottleneck** (one cause weighing at least half of the classified passes of the
 current window, with at least 10 classified passes) is flagged by a `⚠` even without a trend.
 
@@ -38,7 +38,7 @@ current window, with at least 10 classified passes) is flagged by a `⚠` even w
 
 ## Tokens, delays, wall time and cost (L226)
 
-The same two windows, the same `⚠` (more than 25 % worse, at least 5 lots or steps in each window, previous value not zero, no truncated window) and the same
+The same two windows, the same `⚠` (more than 25 % worse, at least 5 lots in each window, or 10 steps for a wall-time duration (L280: a class of fewer steps moves by more than 25 % from one window to the next, `docs/perf/recalage-2026-10-24.md`), previous value not zero, no truncated window) and the same
 quality twin (the share of lots right the first time) on the same line. A rise is the worse direction for each of them.
 
 | Indicator | Reading | Decision it informs |

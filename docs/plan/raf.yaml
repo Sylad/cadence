@@ -3361,6 +3361,16 @@ lots:
     started: 2026-10-24
     review: { date: 2026-10-24, verdict: "compliant : 2 minor notes (Sonnet fallback of the local check not stated as quota cost; R24 title promises more than it asserts), no fix required — orchestré (vague 2026-10-24-1340, 0 passe(s) de correction)", commit: 50d8365f59040c5538b98943deeaf830ba2bd310 }
     finished: 2026-10-24
+  - id: L297
+    title: "orchestrate : une réponse donnée par --resume --answer à une question sur une règle « hypothèse » de la fiche passe cette règle en « sourcée » (source : réponse du lead, date, vague) avant la revue de fiche suivante ; tests. Vécu 24-10 : L279 rendu « fiche non conforme » pour R27 alors que la réponse était donnée (une vague perdue, sourcée à la main) — décision Sylvain 24-10"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
+  - id: L298
+    title: "orchestrate : délai des étapes d'écriture (timeouts.work, 45 min fixes) proportionné à l'estimate et à la spec du lot, ou prolongé tant que la session commite ; à l'échéance, le travail non commité est signalé dans le tableau (fichiers, tests) au lieu d'un « échec » sec ; tests. Vécu 24-10 : implement de L279 (0,5 j + fiche) coupé à 45 min après 6 commits, 44 lignes vertes non commitées — décision Sylvain 24-10"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-24
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

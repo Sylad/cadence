@@ -57,6 +57,7 @@ raf gantt                         # .cadence/gantt.html (next to the plan)
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`) |
 | `raf todo <id> [--reason text]` | put a started lot back to `todo` (`doing` → `todo`, `started:` removed, dated note « remis en attente : reason »): refused when work commits cite the lot (plan-only and version commits do not count, as `raf commits`), when the lot is not `doing` (a `done` or `dropped` lot is reopened by hand), or on a sub-task; sub-tasks and other keys are left as they are |
+| `raf migrate [--dry-run]` | move `docs/plan/raf.yaml` to `.cadence/raf.yaml` and rewrite the readers of the old path in the repository, see [Moving the plan: `raf migrate`](#moving-the-plan-raf-migrate) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
 | `raf title <id> "new title"` | replace the title of a lot of any status (`done` included) and add a dated note « titre remplacé : « old title » »; `raf now`, `raf show`, `raf list`, `session start` and the proposals read the new one. Refused on an empty or identical title, an unknown lot or a sub-task |
 | `raf show <id> [--notes]` | one lot: status, dates, `goal : …` right after the title when the lot has a `goal:` (native key or `plan.fields.goal`, L272: the objective that replaces the title in the `orchestrate` briefs), `after`, public title, `screen` and `spec`, `uses : banc, passerelle` when the lot has `uses:`, dated notes in order, then the counted commits (as `raf commits`, neighbouring repositories included); `--notes` prints the notes alone |
@@ -129,7 +130,7 @@ then the legacy `docs/plan/raf.yaml`.
 - A project that still has `docs/plan/raf.yaml` (and no `.cadence/raf.yaml`) keeps working, read and written as before. Every command
   that loads the plan prints one line on **stderr** (standard output, `--json` included, is unchanged) with the move to do —
   `cd <repository root> && mkdir -p .cadence && git mv docs/plan/raf.yaml .cadence/raf.yaml` (`mv` outside a git repository or when git does not track the file, where `git mv` would fail; the root is spelled out, quoted if
-  needed, so the line runs as is from any folder and, under `session --all`, names its project). `raf` never moves the file itself. The line is not
+  needed, so the line runs as is from any folder and, under `session --all`, names its project). `raf` never moves the file itself on its own: `raf migrate` does it, with the readers of the path. The line is not
   printed when the path comes from `--file`, `RAF_FILE` or `plan:`.
 - When both files exist, `.cadence/raf.yaml` is read and a stderr warning says that `docs/plan/raf.yaml` is ignored; nothing is written
   or deleted.
@@ -139,6 +140,31 @@ then the legacy `docs/plan/raf.yaml`.
 - `raf gantt` writes `gantt.html` next to the plan, so `.cadence/gantt.html` by default.
 - `cadence lead tour`, `session --all` and `cadence orchestrate` recognise a project by `.cadence/raf.yaml`, `docs/plan/raf.yaml` or a
   `cadence.yaml` with `plan:`.
+
+## Moving the plan: `raf migrate`
+
+`raf migrate [--dry-run]` moves a legacy `docs/plan/raf.yaml` to `.cadence/raf.yaml` and updates what reads the old path, so the
+« ancien emplacement » line stops appearing in every session. It is the one command that works on the files of the repository
+rather than on the plan; it prints no legacy warning and never commits (review the result with `git status`, then commit).
+
+- **The plan** moves with `git mv` (`mv` outside a git repository, or when git does not track the file), `.cadence/` created if needed.
+- **The readers** are the files that cite `docs/plan/raf.yaml` — plan-data scripts, tests, CI workflows, skills, documentation: git's
+  tracked and not-ignored files (the whole folder, without `.git` and `node_modules`, outside a repository). Every occurrence is
+  rewritten to `.cadence/raf.yaml`. The history is not a reader and is left alone: `CHANGELOG*`, `*.ndjson` journals and `.cadence/`.
+- **`--dry-run`** prints the move and every file it would touch, with its number of references, and changes nothing.
+- **It refuses** (code 2, nothing moved or written) while a reader is *not handled*: a file that cites `docs/plan` in a way a text
+  replacement cannot follow — another file of the folder (`docs/plan/journal.ndjson`), the folder itself, a path built piece by piece
+  (`join(root, 'docs', 'plan', 'raf.yaml')`), or a binary file. Each one is listed as `file:line`. Fix it by hand and run the command again, or
+  declare a file that cites the path without reading the plan (a fixture, a document about the old place) under `migrate.keep` in
+  `cadence.yaml`: a list of paths or patterns (`*`, `**`, `?`, as `docs.sync`), whose matches are listed as left as they are.
+- **It refuses** when `docs/plan/raf.yaml` and `.cadence/raf.yaml` both exist, and when neither does.
+- **It can be run again**: with the plan already at `.cadence/raf.yaml` (moved by hand, or by a first run that stopped), it only handles the
+  readers that remain, and says `rien à migrer` when there is none.
+
+```yaml
+migrate:
+  keep: [docs/specs/**, test/legacy-plan.test.ts]   # cite docs/plan/raf.yaml without reading the plan
+```
 
 ## Plan file
 

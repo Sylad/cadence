@@ -571,3 +571,27 @@ export function readReferencesConfig(file: string): ReferencesConfig {
   if (typeof r.dir !== 'string' || r.dir.trim() === '') throw new RafError(`${file} : references.dir : chemin attendu`);
   return { dir: r.dir.trim() };
 }
+
+export interface MigrateConfig {
+  /** Motifs de chemins (comme docs.sync) des fichiers que `raf migrate` laisse tels quels : ils citent docs/plan/raf.yaml sans le lire. */
+  keep: string[];
+}
+
+/** Clé `migrate:` de cadence.yaml (L284) : `migrate.keep`. */
+export function readMigrateConfig(file: string): MigrateConfig {
+  const none: MigrateConfig = { keep: [] };
+  if (!existsSync(file)) return none;
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const m = (raw as { migrate?: unknown } | null)?.migrate;
+  if (m == null) return none;
+  if (!isObject(m)) throw new RafError(`${file} : migrate doit être un objet { keep }`);
+  for (const k of Object.keys(m)) if (k !== 'keep') throw new RafError(`${file} : migrate.${k} inconnu (attendu : keep)`);
+  if (m.keep == null) return none;
+  if (!Array.isArray(m.keep) || m.keep.some((x) => typeof x !== 'string' || !x.trim())) throw new RafError(`${file} : migrate.keep doit être une liste de chemins ou de motifs non vides`);
+  return { keep: m.keep.map((x: string) => x.trim()) };
+}

@@ -28,6 +28,7 @@ import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRu
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedEntries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
 import { refCommand } from './ref/command.js';
+import { applyMigration, describeMigration, planMigration, unhandledError } from './migrate.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
@@ -68,6 +69,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot (ou citant un id inconnu) sans réécrire l'historique ; raf check --ignored les liste
   raf gantt [-o .cadence/gantt.html]
+  raf migrate [--dry-run]   déplace docs/plan/raf.yaml vers .cadence/raf.yaml (git mv) et réécrit les lecteurs du chemin dans le dépôt ; --dry-run les liste sans rien toucher ; refus tant qu'un lecteur n'est pas traité (migrate.keep de cadence.yaml pour ceux qui ne lisent pas le plan) ; rejouable
   raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--goal "…"] [--dry-run] [--wave nom] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague] [--budget 1M] [--budget projet:lot=+300k] [--answer projet:lot "réponse"] [--drop projet:lot] ; --drop projet:lot [--wave vague] ; --stop-after-current [--wave vague] ; --waits [--since AAAA-MM-JJ]
                         mode worktree par lot (orchestrate.worktrees: true) : EXPÉRIMENTAL, NON ACTIVABLE (refusé, code 2) tant que L299, L300 et L301 ne sont pas faits, sauf CADENCE_EXPERIMENTAL_WORKTREES=1 (tests) ; ses options : --resume <vague> --integrate projet:lot (rejoue un lot rendu à l'intégration) · --resume <vague> --replay projet:lot (idem, et après une écriture de plan refusée) · --remove-worktree projet:lot [--abandon-commits] (retire le worktree et la branche conservés) ; la liste des worktrees conservés : orchestrate --status et lead tour
@@ -244,6 +246,15 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   if (command === 'corrections') return corrections(rest, values, io);
   if (command === 'perf') return perf(rest, values, today, io);
   if (command === 'ref') return refCommand(rest, values, root, io);
+  // Déplacer le plan ne lit pas le plan : pas d'avertissement « ancien emplacement » (L284).
+  if (command === 'migrate') {
+    if (rest.length > 0) throw new RafError('usage : raf migrate [--dry-run]');
+    const migration = planMigration(root);
+    for (const l of describeMigration(migration, !!values['dry-run'])) io.out(l);
+    if (migration.unhandled.length > 0) throw unhandledError(migration);
+    if (!values['dry-run']) applyMigration(root, migration);
+    return 0;
+  }
   // `spec` est aussi un verbe de raf (raf spec <lot> on|off, L186) : seuls check et qa vont à la fiche.
   if (command === 'spec' && (rest[0] === 'check' || rest[0] === 'qa')) return spec(rest, io);
   const reseal = command === 'spec' && rest[0] === 'reseal';

@@ -73,6 +73,8 @@ cas:
     alternatives:
       - { si: "le worktree du lot a un arbre sale que le cycle n'a pas laissé", alors: "même refus qu'un dépôt sale (code 2), avant toute écriture", regles: [R11] }
       - { si: "le lot est retiré par --drop", alors: "son worktree et sa branche sont conservés, une ligne dit où", regles: [R12] }
+      - { si: "le lead consulte cadence orchestrate --status ou cadence lead tour", alors: "les worktrees conservés sont listés (dépôt, lot, âge, commits non intégrés)", regles: [R19] }
+      - { si: "le lead retire un worktree conservé", alors: "refus tant qu'un commit n'est ni intégré ni confirmé abandonné", regles: [R20] }
     resultat: "Une reprise ne perd ni commit ni worktree de lot, et ne laisse pas de worktree orphelin non signalé."
   - id: C4
     titre: "Une seconde vague vise le dépôt pendant que la première y a des worktrees"
@@ -155,10 +157,10 @@ regles:
     tests: ["R11 — reprise avec worktree de lot sale : code 2, état de la vague inchangé", "R11 — reprise d'un lot suspendu : même chemin de worktree, mêmes commits", "R11 — worktree enregistré mais dossier disparu : élagué et recréé sur la branche existante"]
   - id: R12
     cas: [C3]
-    enonce: "Un worktree n'est retiré que par le programme et seulement quand sa branche est fusionnée dans celle du dépôt et son arbre propre ; un lot rendu, retiré par --drop, en échec ou en conflit garde son worktree et sa branche, et le journal en donne le chemin."
-    statut: hypothese
-    si_faux: "Si le retrait automatique des worktrees des lots rendus est préféré, des commits non intégrés du lot ne seraient plus que dans le reflog : action destructive, d'où le choix prudent (aucune suppression sans fusion)."
-    tests: ["R12 — lot ready intégré : worktree et branche retirés", "R12 — lot rendu : worktree et branche conservés et chemin journalisé", "R12 — branche non fusionnée : jamais supprimée (aucun -D)"]
+    enonce: "Le programme ne supprime jamais un worktree ou une branche de lot qui porte des commits non intégrés (lot rendu, retiré par --drop, en échec ou en conflit) : ils sont conservés et le journal en donne le chemin. Un worktree dont tous les commits sont intégrés à la branche du dépôt (arbre propre) est, lui, retiré automatiquement après l'intégration. Aucune suppression de branche forcée (-D)."
+    statut: sourcee
+    source: "réponse du lead (24-10) : aucune suppression automatique d'un worktree ou d'une branche de lot portant des commits non intégrés ; retrait automatique permis quand tous les commits sont intégrés"
+    tests: ["R12 — lot ready intégré : worktree et branche retirés", "R12 — lot rendu : worktree et branche conservés et chemin journalisé", "R12 — lot retiré par --drop avec commits non intégrés : worktree et branche conservés", "R12 — branche non fusionnée : jamais supprimée (aucun -D)"]
   - id: R13
     cas: [C4, C1]
     enonce: "Le verrou d'orchestration du dépôt reste pris une fois par vague, au dépôt du projet, et libéré par freeRepo quand tous ses lots sont finis ET intégrés ou rendus ; une seconde vague visant ce dépôt est refusée avant toute écriture avec le message existant, sans créer de worktree."
@@ -169,7 +171,7 @@ regles:
     cas: [C1]
     enonce: "Le worktree et la branche d'un lot ont des noms déterministes (worktree : sous le dossier de la vague, hors du dépôt ; branche : cadence/<vague>/<slug du lot>) et rien d'autre n'est stocké : la reprise les retrouve par ces noms."
     statut: hypothese
-    si_faux: "Si le chemin doit être mémorisé dans l'état du lot (LotState), c'est un changement de format de l'état de vague : voir la question sur le stockage."
+    si_faux: "Si le schéma de nommage (dossier de la vague, slug) change, seuls les noms de fichiers git changent ; aucun champ n'est ajouté à l'état de la vague, qui reste inchangé (D4)."
     tests: ["R14 — le chemin du worktree se déduit de la vague et du lot, sans champ ajouté à l'état du lot", "R14 — l'état d'une vague écrit avant L279 se relit sans changement"]
   - id: R15
     cas: [C1]
@@ -195,6 +197,18 @@ regles:
     statut: sourcee
     source: "réponse du lead du 24-10 : « la porte de raf done doit accepter un verdict reporté par (1) et seulement celui-là : le report est tracé (champ ou note dédiés), jamais un verdict édité à la main » ; porte actuelle src/audit.ts:261-269 et src/plan.ts:551-556"
     tests: ["R18 — verdict reporté avec trace : raf done passe", "R18 — verdict au sha ancien sans trace (historique réécrit) : raf done refuse avec le message existant", "R18 — trace dont le nouveau sha n'est pas dans l'historique du lot : refus", "R18 — un commit ajouté après le report : refus comme aujourd'hui, la trace ne couvre que le sha intégré"]
+  - id: R19
+    cas: [C3]
+    enonce: "Les worktrees de lot conservés restent visibles : cadence lead tour et cadence orchestrate --status listent chacun (dépôt, lot, âge, nombre de commits non intégrés, chemin) ; aucun n'est oublié silencieusement."
+    statut: sourcee
+    source: "réponse du lead (24-10) : « cadence lead tour et orchestrate --status listent les worktrees de lot conservés (dépôt, lot, âge, commits non intégrés) »"
+    tests: ["R19 — orchestrate --status liste un worktree conservé avec dépôt, lot, âge et commits non intégrés", "R19 — cadence lead tour liste le même worktree", "R19 — aucun worktree conservé : aucune ligne ajoutée"]
+  - id: R20
+    cas: [C3]
+    enonce: "Seule une commande explicite du lead retire un worktree conservé (cadence orchestrate --remove-worktree <projet>:<lot>) : elle refuse (code 2, rien retiré) tant qu'un commit du lot n'est ni intégré à la branche du dépôt ni confirmé abandonné par l'option nommée --abandon-commits ; un worktree entièrement intégré se retire sans option."
+    statut: sourcee
+    source: "réponse du lead (24-10) : « une commande explicite du lead les retire (refus tant qu'un commit n'est ni intégré ni confirmé abandonné par une option nommée) » ; les noms --remove-worktree et --abandon-commits sont ceux de la fiche (cf. choix)"
+    tests: ["R20 — commits non intégrés sans --abandon-commits : refus code 2, worktree et branche intacts", "R20 — avec --abandon-commits : worktree et branche retirés", "R20 — worktree entièrement intégré : retiré sans option", "R20 — lot inconnu ou sans worktree : refus code 2"]
 
 contrats:
   - id: A1
@@ -214,7 +228,7 @@ contrats:
     erreurs:
       - { code: log error, message: "orchestrate : <dépôt> : arbre sale, <n> fichier(s) suivi(s) modifié(s) : <fichiers>" }
       - { code: log warn, message: "orchestrate : <projet>:<lot> : worktree conservé : <chemin> (branche <branche>)" }
-    regles: [R11, R12, R13, R14]
+    regles: [R11, R12, R13, R14, R19]
   - id: A3
     appel: commande cadence orchestrate (intégration d'un lot prêt)
     entree: "le lot passe à ready dans son worktree ; verrou d'intégration du dépôt"
@@ -232,6 +246,14 @@ contrats:
     erreurs:
       - { code: log error, message: "<lot> : la revue de code précède <n> commit(s) du lot, elle est à refaire — raf review <lot> \"verdict\" (--force pour passer outre)" }
     regles: [R18]
+  - id: A5
+    appel: commande cadence orchestrate --remove-worktree
+    entree: "<projet>:<lot> [--abandon-commits]"
+    sortie: "worktree et branche du lot retirés (code 0) ; journal « orchestrate : <projet>:<lot> : worktree retiré (<n> commit(s) abandonné(s)) »"
+    erreurs:
+      - { code: log error, message: "orchestrate : <projet>:<lot> : <n> commit(s) non intégré(s), --abandon-commits pour les abandonner" }
+      - { code: log error, message: "orchestrate : <projet>:<lot> : aucun worktree conservé" }
+    regles: [R12, R20]
 
 donnees:
   - { id: D1, objet: "branche git cadence/<vague>/<slug> et worktree <dossier de la vague>/worktrees/<slug> (créés et retirés par le programme)", existant: false, modification: aucune, note: "objets git locaux, jamais poussés (hook pre-push de garde inchangé) ; nom déterministe, rien n'est stocké (R14)" }

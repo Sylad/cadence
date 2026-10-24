@@ -5,7 +5,7 @@ import { run } from '../src/cli.js';
 import { needsPrecheck, runLot } from '../src/orchestrate/cycle.js';
 import { commitFile, claudeOut, harness, precheckReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 import { gitRepo, tempDir } from './helpers.js';
-import { lotSlug } from '../src/orchestrate/state.js';
+import { lotSlug, PRECHECK_UNREADABLE } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
 import { writeJournal, writeWave } from './perf-helpers.js';
 
@@ -210,6 +210,33 @@ describe('cadence perf — part de « oui » du précheck (L288)', () => {
     const d = await json(c.root);
     expect(d.precheck.yes.lots.current).toBe(4);
     expect(d.precheck.yes.current).toBe(0.25);
+  });
+
+  it('R22 — un journal écrit depuis L288 dont le rapport du précheck était illisible (sans precheckVerdict, avertissement « illisible » gardé) n\'est pas compté « non » : il sort du dénominateur', async () => {
+    const c = ctx();
+    const unreadable = (warning: string) => {
+      const slug = `L${++seq}`;
+      writeJournal(c.runs, 'w1', 'alpha', slug, { status: 'ready', steps: [{ kind: 'precheck', ended: `${CUR}T08:00:00` }, { kind: 'implement', ended: `${CUR}T09:00:00` }] });
+      const file = join(c.runs, 'w1', `${lotSlug('alpha', slug)}.json`);
+      writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), warnings: [warning] }));
+    };
+    unreadable('contrôle préalable illisible, implémentation lancée : JSON invalide');
+    lot(c, CUR, 'oui', 'handed-back');
+    lot(c, CUR, 'non');
+    const d = await json(c.root);
+    expect(d.precheck.yes.lots.current).toBe(2);
+    expect(d.precheck.yes.current).toBe(0.5);
+    // Un autre avertissement ne change rien : le journal d'avant L288 sans verdict reste un « non ».
+    unreadable('contrôle préalable : rapport du modèle local illisible (x), repli sur Sonnet');
+    expect((await json(c.root)).precheck.yes.lots.current).toBe(3);
+  });
+
+  it('R22 — le cycle garde l\'avertissement d\'illisible au journal sans poser de verdict quand Sonnet rend un rapport illisible', async () => {
+    const h = harness({ lots: [{ title: 'Revue de L0' }], script: { precheck: [() => claudeOut('pas un rapport')], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', {}, { precheck: true });
+    await runLot(c);
+    expect(c.lot.precheckVerdict).toBeUndefined();
+    expect(c.lot.warnings.some((w) => w.startsWith(PRECHECK_UNREADABLE))).toBe(true);
   });
 
   it('R14 — l\'indicateur est une information : ni ⚠ ni jumeau, même quand la part de « oui » double', async () => {

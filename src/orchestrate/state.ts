@@ -168,6 +168,9 @@ export interface LotState {
   outcome: string | null;
 }
 
+/** Début de l'avertissement d'un rapport de précheck illisible (Sonnet) : le journal le garde, `cadence perf` s'en sert pour ne pas compter ce lot « non » (L293). */
+export const PRECHECK_UNREADABLE = 'contrôle préalable illisible, implémentation lancée';
+
 export interface NewLot {
   project: string;
   repo: string;

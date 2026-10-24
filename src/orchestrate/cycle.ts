@@ -28,7 +28,7 @@ import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, hypothesisNote, specText, type FicheParts } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
-import { lotKey, lotRepoPaths, neighbourDirs } from './state.js';
+import { PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
 export const MAX_PASSES = 2;
@@ -1062,7 +1062,7 @@ async function precheck(c: LotCtx): Promise<void> {
     try {
       rep = checkShape<PrecheckReport>(done.report, PRECHECK_SCHEMA);
     } catch (e) {
-      l.warnings.push(`contrôle préalable illisible, implémentation lancée : ${(e as Error).message}`);
+      l.warnings.push(`${PRECHECK_UNREADABLE} : ${(e as Error).message}`);
       l.next = firstWrite(c);
       save(c);
       return;

@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { PRECHECK_UNREADABLE } from './orchestrate/state.js';
 import { RafError } from './plan.js';
 
 /** Les causes d'une passe de correction (L165), dans l'ordre où le rapport les liste. */
@@ -150,11 +151,13 @@ export interface Journal {
 /**
  * Verdict du contrôle préalable d'un journal : `precheckVerdict` (L288) ; pour un journal d'avant, relu de ce qu'il garde : le lot
  * rendu « livrable déjà présent » est un « oui », celui qui porte le constat du précheck (`precheck`) un « partiel », tout autre
- * lot dont l'étape precheck a abouti un « non ». Sans étape precheck aboutie, aucun verdict.
+ * lot dont l'étape precheck a abouti un « non ». Sans étape precheck aboutie, aucun verdict ; de même pour un journal qui garde l'avertissement
+ * d'un rapport illisible (L293) : sans verdict lisible, le lot n'est pas un « non ».
  */
 function precheckVerdictOf(rec: Record<string, any>, steps: RawStep[]): 'oui' | 'partiel' | 'non' | undefined {
   if (rec.precheckVerdict === 'oui' || rec.precheckVerdict === 'partiel' || rec.precheckVerdict === 'non') return rec.precheckVerdict;
   if (!steps.some((s) => s.kind === 'precheck' && s.status === 'ok')) return undefined;
+  if (Array.isArray(rec.warnings) && rec.warnings.some((w) => typeof w === 'string' && w.startsWith(PRECHECK_UNREADABLE))) return undefined;
   if (typeof rec.outcome === 'string' && rec.outcome.startsWith('livrable déjà présent')) return 'oui';
   return typeof rec.precheck === 'string' && rec.precheck !== '' ? 'partiel' : 'non';
 }
@@ -192,6 +195,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         const findings = review?.report && !handled ? findingsOf(readJson(join(waveDir, name, review.report))) : [];
         return { key: `${wave}/${name}/${fix.n}`, project: rec.project, lot: rec.lot, visible: !!rec.visible, findings, commits: fix.commits ?? [], ...(fix.ended ? { fixEnded: fix.ended } : {}), ...(findings.length > 0 && review ? { reviewKind: review.kind } : {}) };
       });
+      const precheck = precheckVerdictOf(rec, steps);
       journals.push({
         wave,
         ...(waveCreated ? { waveCreated } : {}),
@@ -202,7 +206,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         small: !!rec.small,
         status: String(rec.status),
         ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
-        ...(precheckVerdictOf(rec, steps) ? { precheck: precheckVerdictOf(rec, steps) } : {}),
+        ...(precheck ? { precheck } : {}),
         steps: steps.map((s) => {
           const usage = usageOf(s.tokens);
           return { n: s.n, kind: s.kind, status: s.status, ...(typeof s.model === 'string' ? { model: s.model } : {}), ...(s.started ? { started: s.started } : {}), ...(s.ended ? { ended: s.ended } : {}), ...(typeof s.tokens?.counted === 'number' ? { counted: s.tokens.counted } : {}), ...(usage ? { usage } : {}) };

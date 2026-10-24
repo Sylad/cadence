@@ -7,7 +7,7 @@ tables drawn as pictures, message templates, figures of a norm (WMO, ICAO…). `
 turns such a document into files a session can read without losing the pictures. The whole
 design is in
 [`docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md`](superpowers/specs/2026-10-23-ref-documents-de-reference-design.md)
-(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) and **`cadence ref check`** with the inventory schema (lot 3 of 10).
+(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) **`cadence ref check`** with the inventory schema (lot 3 of 10), and **`cadence ref eval`** (lot 4 of 10, with the synthetic corpus `cadence ref corpus`).
 
 ## `cadence ref add <document.pdf> [--sections 3-5,9] [--slug name]`
 
@@ -176,3 +176,38 @@ ref : outil absent du PATH, à installer (rien n'est installé d'office) :
 ImageMagick is not called by either: `measure` decodes the rendered PNG pages itself. The rest of cadence depends on none of them.
 
 Exit codes: 0 done, 2 refusal (tool, file, option, slug, folder).
+
+## `cadence ref eval <attendu> <lecture> [--json]`
+
+Scores a reading against the inventory that is known to be true (the evaluation of the design, §« Mesure »). `attendu` is an
+inventory (`genre: "inventaire"`), `lecture` a reading or an inventory of the same document; both go through the checks of
+`ref check` first. Two folders work too: `attendu` holds `<cas>/attendu.json` (what `ref corpus` writes) and `lecture`
+`<cas>/lecture.json`; a case without a reading counts as read with nothing (recall 0) and is named under `sans lecture`.
+
+An element read is matched to an expected one **by type and identity**, never by id or zone (two independent readings number
+their elements their own way; case and blanks inside a text do not count): `texte` and `statut` by `libelle`, `composant` by
+`role` and `contenu`, `etat` by `nom` and the identity of its target, `jeton` by `categorie` and `valeur` (a colour is compared as
+written), `table` by `colonnes`, `gabarit` by `nom`, `schema` by the labels of its nodes, `lien` by `figure`, `silence` by
+`question`, `ecran` (one per document). An expected element is matched once. The matched element is **juste** if it also says the
+same thing: the `role` of a `texte`, the `lignes` of a `table`, the `champs` of a `gabarit` (name, mandatory, format, bounds, in
+order), the `flux` of a `schema`, the `constat` of a `lien` (the interpretation of a `precise` is not compared), the elements
+covered by a `statut`, the `largeur_reference` of an `ecran`.
+
+- **rappel** = juste / expected, **précision** = juste / read, both by type and overall;
+- **faux lu** = read elements marked `lu` or `mesure` (« sûrs ») that are not juste, over the sûrs: an invented element, a wrong
+  cell, a `lien` that confirms what the figure contradicts. An `incertain` element is never a faux lu (it lowers the precision);
+- **pièges**: an expected element carries `piege: "<name>"`; a piège is found when all its elements are juste (`✓ nom : 1/1`);
+- **tokens par page**: the `usage: { tokens }` of the reading divided by the `pages` of the expected document, for the cases that
+  have one; without `usage`, « non mesurés » (`null` in `--json`), never a zero.
+
+```
+$ cadence ref eval evals/ref/corpus lectures/
+7 cas · 48 éléments attendus · 46 lus
+rappel : 91.7 % (44/48) · précision : 95.7 % (44/46)
+faux lu : 2.2 % (1/45 sûrs)
+tokens par page : non mesurés
+```
+
+A reading whose `document.slug` or `document.sha256` differs from the expected one is refused (never a measure over two versions
+mixed). Exit codes: **0** done, **2** refusal (wrong call, file absent or unreadable, invalid reading, other document, folder with
+no `attendu.json`). `--json` prints one object: `total`, `types`, `pieges`, `tokens`, `cas`.

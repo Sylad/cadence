@@ -3,11 +3,13 @@ import type { Io } from '../cli.js';
 import { RafError } from '../plan.js';
 import { add } from './add.js';
 import { checkInventaire, readInventaire, summaryInventaire } from './check.js';
+import { evaluer, formatEvaluation } from './evaluate.js';
 import { measure } from './measure.js';
 import { referencesDir } from './store.js';
 
 const USAGE_ADD = 'usage : cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]';
 const USAGE_CHECK = 'usage : cadence ref check <inventaire.json | lecture.json>';
+const USAGE_EVAL = 'usage : cadence ref eval <attendu.json | dossier> <lecture.json | dossier> [--json]';
 const USAGE_MEASURE = 'usage : cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]';
 
 /** `cadence ref <sous-verbe> …` : les documents de référence (issue #14) ; `check` valide un inventaire ou une lecture. */
@@ -35,6 +37,12 @@ export function refCommand(rest: string[], values: { sections?: string; slug?: s
     io.out(summaryInventaire(inventaire as Record<string, unknown>));
     return 0;
   }
+  if (verb === 'eval' && args.length === 2) {
+    const ev = evaluer(resolve(io.cwd, args[0]!), resolve(io.cwd, args[1]!));
+    if (values.json === true) io.out(JSON.stringify(ev, null, 2));
+    else for (const l of formatEvaluation(ev)) io.out(l);
+    return 0;
+  }
   const others = (u: string) => u.replace('usage : ', '');
-  throw new RafError(verb === 'add' ? USAGE_ADD : verb === 'measure' ? USAGE_MEASURE : verb === 'check' ? USAGE_CHECK : `${USAGE_ADD}\n       ${others(USAGE_MEASURE)}\n       ${others(USAGE_CHECK)}`);
+  throw new RafError(verb === 'add' ? USAGE_ADD : verb === 'measure' ? USAGE_MEASURE : verb === 'check' ? USAGE_CHECK : verb === 'eval' ? USAGE_EVAL : `${USAGE_ADD}\n       ${others(USAGE_MEASURE)}\n       ${others(USAGE_CHECK)}\n       ${others(USAGE_EVAL)}`);
 }

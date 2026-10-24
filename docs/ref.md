@@ -218,10 +218,10 @@ covered by a `statut`, the `largeur_reference` of an `ecran`.
   have one; without `usage`, « non mesurés » (`null` in `--json`), never a zero.
 
 ```
-$ cadence ref eval evals/ref/corpus lectures/
-7 cas · 48 éléments attendus · 46 lus
-rappel : 91.7 % (44/48) · précision : 95.7 % (44/46)
-faux lu : 2.2 % (1/45 sûrs)
+$ cadence ref eval tmp/corpus-ref lectures/
+7 cas · 38 éléments attendus · 36 lus
+rappel : 89.5 % (34/38) · précision : 94.4 % (34/36)
+faux lu : 2.9 % (1/35 sûrs)
 tokens par page : non mesurés
 ```
 

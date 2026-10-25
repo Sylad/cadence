@@ -51,6 +51,7 @@ describe('skills install', () => {
     expect(installSkills(SKILLS_DIR, dest, false)).toEqual([
       { name: 'cadence-deliver', status: 'installed' },
       { name: 'cadence-lead', status: 'installed' },
+      { name: 'cadence-orchestrate', status: 'installed' },
       { name: 'cadence-session-close', status: 'installed' },
       { name: 'cadence-session-start', status: 'installed' },
     ]);

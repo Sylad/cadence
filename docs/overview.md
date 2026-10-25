@@ -51,7 +51,7 @@ The repository is its own [Claude Code](https://claude.com/claude-code) plugin m
 
 ```
 /plugin marketplace add Sylad/cadence
-/plugin install cadence@cadence        # skills /cadence:session-start, session-close, deliver, lead + the three reviewer agents
+/plugin install cadence@cadence        # skills /cadence:session-start, session-close, deliver, lead, orchestrate + the three reviewer agents
 /plugin install cadence-hud@cadence    # the status band above the prompt
 ```
 

@@ -10,7 +10,7 @@ As a plugin:
 ```
 
 gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver`,
-`/cadence:lead` and the `ux-reviewer`, `code-reviewer` and `qa-reviewer` agents. Or copy them into the
+`/cadence:lead`, `/cadence:orchestrate` and the `ux-reviewer`, `code-reviewer` and `qa-reviewer` agents. Or copy them into the
 repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 `.claude/agents/cadence-*.md`; `--dir` for another `.claude` folder,
 `--force` to overwrite local edits).
@@ -43,6 +43,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   subagents as the session cap at most (2 by default, `CADENCE_MAX_SESSIONS`), the ones it starts by hand declared with `cadence lead hold`, never two in the same repository. The whole flow is drawn in
   [docs/lead.md](lead.md); how a lot, a wave, the lead and the service of cadence itself fit together, in four figures, is in
   [docs/fonctionnement.md](fonctionnement.md).
+- **orchestrate**: the command line of a wave without going through `lead` — `cadence orchestrate <project>:<lot>[@<model>]` (a lot id with « / » kept as is, no `--lot` or `--model` option) and the resume with `--resume [--wave <wave>]`; the description triggers on « lancer une vague orchestrate ».
 - **ux-reviewer** (agent): captures at 1440 and 390 px, findings grounded in a
   named rule (Nielsen, WCAG 2.2 AA) or a measurement, ranked, turned into
   `raf add --parent` sub-tasks, and a one-line verdict for `raf ux`. It never

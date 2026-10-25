@@ -75,6 +75,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- Skill `orchestrate` (L335, `docs/skills.md`): the syntax of `cadence orchestrate` (`<project>:<lot>[@<model>]`, a lot id with « / » kept as is, resume by `--resume [--wave <wave>]`) is reachable without `/lead`. The plugin 1.10.0 eval of 2026-10-25 scored 0.00 on `orchestrate-id-avec-slash` with and without the plugin: three tries out of three invented `--lot` and `--model`, no skill was opened. The description of the new skill triggers on « lancer une vague orchestrate » and carries the command line.
+
 ### Fixed
 
 - The `deliver` skill says how to deliver a commit that is not `HEAD` (L334, `docs/deliver.md`): `git push origin <sha>:main`, then `cadence deliver --dry-run --sha <sha>` and `cadence deliver --sha <sha>`, with the reason — with `ci: github` the wait is for the run of that exact sha and GitHub only builds the tip of a push. The 1.10.0 evaluation scored the `deliver-sha` case 0.50 (3 runs out of 3 without the push of the sha: the skill only said « `--sha <rev>` to deliver a pushed commit »).

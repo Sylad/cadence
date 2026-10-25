@@ -19,6 +19,11 @@ describe('publish.yml', () => {
     expect(workflow).not.toMatch(/actions\/(checkout|setup-node)@v4/);
   });
 
+  it('récupère tout l\'historique, comme tests.yml (L336 : changelog.test.ts cherche les commits des lots sous le dernier tag)', () => {
+    const tests = readFileSync(join(root, '.github/workflows/tests.yml'), 'utf8');
+    for (const text of [workflow, tests]) expect(text).toMatch(/uses: actions\/checkout@v5\n[ \t]+with:\n(?:[ \t]+.*\n)*?[ \t]+fetch-depth: 0\n/);
+  });
+
   it('contrôle le tag contre package.json et les deux fichiers du plugin', () => {
     for (const file of ['package.json', '.claude-plugin/plugin.json', '.claude-plugin/marketplace.json']) {
       expect(workflow).toContain(file);

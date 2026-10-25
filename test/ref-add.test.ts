@@ -221,7 +221,7 @@ describe('cadence ref add (L261)', () => {
     expect(existsSync(refs)).toBe(false);
   });
 
-  it.each(['pdftotext', 'pdftoppm', 'pdfimages', 'pdftohtml'])("%s qui échoue : RafError qui nomme l'outil, le document et la raison, sortie 2, rien n'est écrit", (outil) => {
+  it.each(['pdftotext', 'pdftoppm', 'pdfimages', 'pdftohtml'])("%s qui échoue : RafError qui nomme l'outil, le document et la raison, sortie 2, le dossier du document n'est pas créé", (outil) => {
     const { base, refs, env, cwd } = setup();
     const bin = join(base, 'casses');
     mkdirSync(bin);
@@ -230,7 +230,19 @@ describe('cadence ref add (L261)', () => {
     const r = ref(cwd, { ...env, PATH: `${bin}:${env.PATH}` }, 'add', pdf, '--slug', 'norme');
     expect(r.code).toBe(2);
     expect(r.err).toContain(`ref : ${outil} a échoué sur ${pdf} (disque plein)`);
-    expect(existsSync(join(refs, 'norme', 'document.json'))).toBe(false);
+    expect(existsSync(join(refs, 'norme'))).toBe(false);
+  });
+
+  it("un outil qui échoue sur un document déjà ajouté ne touche pas son document.json", () => {
+    const { base, refs, env, cwd } = setup();
+    const pdf = writePdf(base, 'norme.pdf', NORME);
+    expect(ref(cwd, env, 'add', pdf, '--slug', 'norme').code).toBe(0);
+    const avant = readFileSync(join(refs, 'norme', 'document.json'), 'utf8');
+    const bin = join(base, 'casses');
+    mkdirSync(bin);
+    writeFileSync(join(bin, 'pdftohtml'), '#!/bin/sh\necho "Syntax Error: disque plein" >&2\nexit 1\n', { mode: 0o755 });
+    expect(ref(cwd, { ...env, PATH: `${bin}:${env.PATH}` }, 'add', pdf, '--slug', 'norme').code).toBe(2);
+    expect(readFileSync(join(refs, 'norme', 'document.json'), 'utf8')).toBe(avant);
   });
 
   it('refuse une page demandée hors du document et une plage mal écrite', () => {

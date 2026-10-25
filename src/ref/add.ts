@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { basename, extname, join, resolve } from 'node:path';
 import { RafError } from '../plan.js';
 import { attachRegions, citedPages, indexText, type Placed } from './figures.js';
@@ -83,16 +83,20 @@ export function add(o: AddOptions): { slug: string; docDir: string; doc: StoredD
   const rendered = new Set([...visees, ...citedPages(index, visees)]);
   const ordered = [...rendered].sort((a, b) => a - b);
 
-  renderPages(tools, file, ordered, join(docDir, 'pages'));
-  renderThumbnails(tools, file, total, join(docDir, 'thumbs'));
+  // lecture d'abord (pdftohtml n'écrit pas dans le dossier), écriture ensuite : un échec d'outil ne laisse pas un dossier à moitié rempli
+  const regions = new Map<number, ReturnType<typeof imageRegions>>();
+  for (const n of ordered) if (listed.some((i) => i.page === n)) regions.set(n, imageRegions(tools, file, n));
+  const created = !existsSync(docDir);
+  try {
+    renderPages(tools, file, ordered, join(docDir, 'pages'));
+    renderThumbnails(tools, file, total, join(docDir, 'thumbs'));
+    for (const n of regions.keys()) extractImages(tools, file, n, join(docDir, 'images'));
+  } catch (e) {
+    if (created) rmSync(docDir, { recursive: true, force: true });
+    throw e;
+  }
   const images: StoredImage[] = [];
   const placed: Placed[] = [];
-  const regions = new Map<number, ReturnType<typeof imageRegions>>();
-  for (const n of ordered) {
-    if (!listed.some((i) => i.page === n)) continue;
-    extractImages(tools, file, n, join(docDir, 'images'));
-    regions.set(n, imageRegions(tools, file, n));
-  }
   for (const img of listed) {
     const box = regions.get(img.page)?.[img.rank - 1];
     const stored: StoredImage = box && rendered.has(img.page) ? { page: img.page, file: `images/${imageFile(img.page, img.slot)}`, x: box.x, y: box.y, l: box.l, h: box.h } : { page: img.page, file: null, x: null, y: null, l: null, h: null };

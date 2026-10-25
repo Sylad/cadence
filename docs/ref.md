@@ -206,7 +206,7 @@ ref : outil absent du PATH, à installer (rien n'est installé d'office) :
 ImageMagick is not called by either: `measure` decodes the rendered PNG pages itself. The rest of cadence depends on none of them.
 
 A poppler tool that fails while `add` reads the document (`pdftotext`, `pdftoppm`, `pdfimages`, `pdftohtml`: non-zero exit, output too large, disk full)
-is a refusal too, naming the tool, the document and the reason: `ref : pdftotext a échoué sur doc.pdf (disque plein)`. Nothing is written in the folder of the document.
+is a refusal too, naming the tool, the document and the reason: `ref : pdftotext a échoué sur doc.pdf (disque plein)`. The folder of a new document is not left behind (an existing document keeps its `document.json`; `pdftohtml` is read before anything is written).
 
 Exit codes: 0 done, 2 refusal (tool, file, option, slug, folder, tool failure).
 

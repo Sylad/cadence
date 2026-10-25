@@ -40,6 +40,8 @@ export interface Task {
 
 export interface Lot {
   id: string;
+  /** Lot parent d'un sous-lot d'un plan tenu par un autre outil (clé mappée `parent`) ; absent sur un lot de premier niveau. */
+  parent?: string;
   title: string;
   status: Status;
   estimate: number;
@@ -208,6 +210,11 @@ export class Plan {
    */
   get hasPublicField(): boolean {
     return !this.settings.format || !!this.settings.format.fields.public || this.read().lots.some((l) => l.public !== undefined);
+  }
+
+  /** Un plan en lecture seule porte `visible` seulement si cadence.yaml le mappe (`plan.fields.visible`) ou si un lot l'écrit déjà sous ce nom. */
+  get hasVisibleField(): boolean {
+    return !this.settings.format || !!this.settings.format.fields.visible || this.read().lots.some((l) => l.visible);
   }
 
   get readonly(): boolean {
@@ -783,7 +790,7 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
       into.tasks.push({ id: lot.id.slice(into.id.length + 1), title: lot.title, status: lot.status });
       into.problems.push(...lot.problems.map((p) => `${lot.id} : ${p}`));
     } else {
-      lots.push(lot);
+      lots.push(parent ? { ...lot, parent } : lot);
     }
   }
   return lots;

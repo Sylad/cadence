@@ -15,7 +15,23 @@ export const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
 /** Titre d'un lot de revue UX planifiée : « Revue UX — <écran> ». */
 const UX_REVIEW_TITLE = /^revue ux\s+—/i;
 
-export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7): Issue[] {
+/** Ce que `check` doit savoir du plan pour ne pas conseiller une commande impossible (L321). */
+export interface PlanKind {
+  /** Plan tenu par un autre outil : aucune commande raf ne peut le corriger. */
+  readonly?: boolean;
+  /** Le plan porte le champ `visible` (toujours vrai pour un plan raf). */
+  hasVisibleField?: boolean;
+}
+
+/** Message de l'écart d'une revue UX sans `visible:` ; la correction dépend de qui tient le plan (L321). */
+function uxReviewMessage(lot: Lot, plan: PlanKind): string {
+  const head = `${lot.id} est une revue UX (« ${lot.title.slice(0, 60)} ») sans visible: — l'étape UX n'aurait pas lieu`;
+  if (!plan.readonly) return `${head} : poser visible: true dans le plan (raf visible ${lot.id} on, ou raf add --visible pour un nouveau lot)`;
+  if (plan.hasVisibleField === false) return `${head} : ce plan ne porte pas visible (cadence.yaml : plan.fields) — l'étape UX se déclenche par la configuration du projet, pas par le plan`;
+  return `${head} : poser visible: true dans le plan avec l'outil du projet (plan en lecture seule)`;
+}
+
+export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7, plan: PlanKind = {}): Issue[] {
   const issues: Issue[] = [];
   const ids = new Set(lots.map((l) => l.id));
 
@@ -32,7 +48,13 @@ export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7): Is
       issues.push({ kind: 'todo-with-commits', message: `${lot.id} a ${commits.length} commit(s) mais est encore todo — raf start ${lot.id}` });
     }
     if (lot.status === 'doing' && !recurring) {
-      const last = commits[0]?.day ?? lot.started;
+      // Un lot parent travaille par ses sous-lots (champ parent:, L321) : leur dernier commit, ou leur démarrage s'ils sont en cours, compte comme le sien.
+      const own: (Day | undefined)[] = [commits[0]?.day ?? lot.started];
+      for (const sub of lots) {
+        if (sub.parent !== lot.id) continue;
+        own.push(linked.byLot.get(sub.id)?.[0]?.day ?? (sub.status === 'doing' ? sub.started : undefined));
+      }
+      const last = own.filter((d): d is Day => !!d).sort().at(-1);
       if (last && diffDays(last, today) > idleDays) {
         issues.push({ kind: 'idle', message: `${lot.id} en cours sans commit depuis ${diffDays(last, today)} j (${lot.title})` });
       }
@@ -45,7 +67,7 @@ export function check(lots: Lot[], linked: Linked, today: Day, idleDays = 7): Is
     }
     // L271 : sans visible:, le lot ne passe par aucune étape UX d'orchestrate (precheck → implement → review) et la revue de l'écran n'a pas lieu.
     if (isOpen(lot.status) && UX_REVIEW_TITLE.test(lot.title) && !lot.visible) {
-      issues.push({ kind: 'ux-review-not-visible', message: `${lot.id} est une revue UX (« ${lot.title.slice(0, 60)} ») sans visible: — l'étape UX n'aurait pas lieu : poser visible: true dans le plan (raf visible ${lot.id} on, ou raf add --visible pour un nouveau lot)` });
+      issues.push({ kind: 'ux-review-not-visible', message: uxReviewMessage(lot, plan) });
     }
     for (const p of lot.problems) issues.push({ kind: 'bad-field', message: `${lot.id} : ${p}` });
     for (const d of lot.after) {

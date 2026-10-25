@@ -146,6 +146,14 @@ export interface PrecheckLot {
   sonnet: { minutes: number; tokens: number } | null;
 }
 
+/** Les escalades de modèle des lots rendus d'une fenêtre (L337) : lots escaladés et leur issue (`conforme` : la revue neuve l'était ; `rendu` : lot rendu malgré l'escalade ; `nonJouee` : budget du lot). */
+export interface EscalationCounts {
+  lots: number;
+  conforme: number;
+  rendu: number;
+  nonJouee: number;
+}
+
 export interface PerfResult {
   since: string | null;
   today: Day;
@@ -160,6 +168,8 @@ export interface PerfResult {
    * `lots` (une ligne par lot rendu de la fenêtre courante qui a une session de contrôle ou un verdict).
    */
   precheck: { yes: Indicator; verdicts: { current: PrecheckVerdicts; previous: PrecheckVerdicts }; cost: { current: PrecheckCost; previous: PrecheckCost }; lots: PrecheckLot[] };
+  /** Escalades de modèle (L337) : les lots terminés de chaque fenêtre dont le journal porte une escalade. */
+  escalations: { current: EscalationCounts; previous: EscalationCounts };
   tokens: TokensBlock;
   delays: DelaysBlock;
   /** Médiane de la durée de mur en minutes, par sorte d'étape ; `lots` = étapes. */
@@ -588,11 +598,18 @@ export function computePerf(input: PerfInput): PerfResult {
     redDeliveries: mk(reds, deliveriesOf, 'up', 'throughput.delivered'),
     qaBlocking: mk(both(windows, blockingOf), both(windows, deliveredCount), 'up', twinEscaped, escapedNote),
   };
-  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, tokens, delays, durations, cost, quality, orphans, warnings: [] };
+  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, escalations: both(windows, (w) => escalationCounts(rendered(w))), tokens, delays, durations, cost, quality, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
   for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${decisionOf(key, ind, result)}`);
   if (bottleneck) result.warnings.push(bottleneck);
   return result;
+}
+
+/** Les escalades de modèle des lots donnés (L337), par issue ; une escalade engagée dont le journal n'a pas d'issue (lot interrompu) n'est classée dans aucune. */
+function escalationCounts(set: Dated[]): EscalationCounts {
+  const escalated = set.filter((d) => d.j.escalation);
+  const by = (issue: 'conforme' | 'rendu' | 'non jouée') => escalated.filter((d) => d.j.escalation!.issue === issue).length;
+  return { lots: escalated.length, conforme: by('conforme'), rendu: by('rendu'), nonJouee: by('non jouée') };
 }
 
 const minutesOf = (s: JournalStep): number => {
@@ -813,6 +830,8 @@ export function renderPerf(r: PerfResult): string[] {
   out.push(`  lots rendus puis terminés hors vague : ${h.current ?? 'n/d'} (précédente ${h.previous ?? 'n/d'})`);
   section('Contrôle préalable', ['part de « oui » du précheck']);
   out.push(...precheckLines(r.precheck));
+  const e = r.escalations.current;
+  if (e.lots > 0) out.push('', 'Escalade de modèle', `  escalades de modèle : ${plural(e.lots, 'lot', 'lots')} · ${e.conforme} conforme · ${e.rendu} rendu malgré l'escalade · ${e.nonJouee} non jouée`);
   out.push('', 'Tokens, délais et durées (médianes par lot ou par étape)');
   for (const l of lines.slice(LEGACY_LINES)) out.push(row(l));
   for (const wr of r.warnings.filter((x) => x.startsWith('⚠ goulot'))) out.push('', wr);

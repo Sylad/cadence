@@ -140,6 +140,8 @@ export interface Journal {
   precheck?: 'oui' | 'partiel' | 'non';
   /** Le rapport du précheck local était illisible (avertissement du journal, L322) : son étape est `ok` mais le lot est reparti sur Sonnet ; absent sinon. */
   localUnreadable?: true;
+  /** Escalade de modèle du lot (`escalation` du journal, L337) ; absente d'un journal ancien ou d'un lot qui n'a pas escaladé. */
+  escalation?: { model: string; issue: 'conforme' | 'rendu' | 'non jouée' | null };
   steps: JournalStep[];
   /** Une session implement a abouti (sous la borne `until` éventuelle). */
   implemented: boolean;
@@ -198,6 +200,8 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         return { key: `${wave}/${name}/${fix.n}`, project: rec.project, lot: rec.lot, visible: !!rec.visible, findings, commits: fix.commits ?? [], ...(fix.ended ? { fixEnded: fix.ended } : {}), ...(findings.length > 0 && review ? { reviewKind: review.kind } : {}) };
       });
       const precheck = precheckVerdictOf(rec, steps);
+      const esc = rec.escalation;
+      const escalation = esc && typeof esc === 'object' && typeof esc.model === 'string' ? { model: esc.model, issue: esc.issue === 'conforme' || esc.issue === 'rendu' || esc.issue === 'non jouée' ? (esc.issue as 'conforme' | 'rendu' | 'non jouée') : null } : undefined;
       journals.push({
         wave,
         ...(waveCreated ? { waveCreated } : {}),
@@ -209,6 +213,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         status: String(rec.status),
         ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
         ...(precheck ? { precheck } : {}),
+        ...(escalation ? { escalation } : {}),
         ...(Array.isArray(rec.warnings) && (rec.warnings as unknown[]).some((w) => typeof w === 'string' && w.startsWith(LOCAL_PRECHECK_UNREADABLE)) ? { localUnreadable: true as const } : {}),
         steps: steps.map((s) => {
           const usage = usageOf(s.tokens);

@@ -3760,6 +3760,14 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-25
+  - id: L336
+    title: "CI : publish.yml et tests.yml récupèrent tout l'historique (actions/checkout fetch-depth: 0) — la publication de v1.10.0 (run 40224201879, 25-10) a échoué sur test/changelog.test.ts « un lot cité sous le dernier tag a au moins un commit dans ce tag » (ajouté le 24-10 par L274, après 1.9.0) : le checkout par défaut ne prend qu'un commit, git log ne voit aucun commit de lot ; reproduit sur un clone --depth 1 (rouge) contre un clone complet (vert)"
+    status: done
+    estimate: 0.05
+    created: 2026-10-25
+    started: 2026-10-25
+    review: { date: 2026-10-25, verdict: "conforme (lead : cause reproduite sur clone --depth 1 rouge / clone complet vert ; test de garde vérifié discriminant ; suite complète 3658 verte)", commit: 66dafe1ba1055e621f705df2c0ff73db4e05e0c0 }
+    finished: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

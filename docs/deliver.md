@@ -96,11 +96,14 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   argument), injectable so that the tests measure the kill, not the load of the machine.
   A Ctrl-C goes to the whole foreground group, so the command can die and its
   exit be processed before the signal addressed to cadence: while followed
-  processes are still alive after the command exits, cadence waits up to
+  processes are still alive after the command exits, or the command itself died
+  of a termination signal (SIGINT, SIGTERM, SIGHUP, or exited 128 plus one of
+  them: a `curl` killed by the Ctrl-C), cadence waits up to
   2 seconds more (`SIGNAL_PENDING_MS`, the `pendingMs` argument) for that signal,
   and plays the grace above if it comes. Without it a background child that
-  ignores Ctrl-C would survive. A command that leaves a daemon behind therefore
-  returns up to 2 seconds later. The termination listener is installed before
+  ignores Ctrl-C would survive, and a second Ctrl-C would kill cadence without
+  releasing the lock. A command that leaves a daemon behind, or that exits 130
+  without any signal coming, therefore returns up to 2 seconds later. The termination listener is installed before
   the command is spawned, so a Ctrl-C received while cadence first reads the
   process list is handled too, not killed by the default action.
   A delay overrun and `SIGTERM` give no grace: a script's own `trap` does not

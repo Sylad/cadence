@@ -1190,10 +1190,52 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
 
   it('(f) sans signal, un descendant resté vivant après la racine ne retient la commande que le temps d\'attente d\'un signal en attente (L329)', async () => {
     const t0 = Date.now();
-    const code = await realDeps(tempDir(), readProcs, 2_000, 600).exec('sleep 3 & sleep 0.6; exit 0', {}, 20_000); // 0,6 s : le suivi a relevé le sleep
+    const code = await realDeps(tempDir(), readProcs, 2_000, 600).exec('sleep 6 & sleep 0.6; exit 0', {}, 20_000); // 0,6 s : le suivi a relevé le sleep
     expect(code).toBe(0);
     expect(Date.now() - t0).toBeGreaterThanOrEqual(1_000); // 0,6 s de commande + 0,6 s d'attente, moins la marge des horloges
+    expect(Date.now() - t0).toBeLessThan(4_500); // l'attente est bornée : sans l'échéance, elle durerait jusqu'à la mort de `sleep 6` (marge large pour la charge)
   });
+
+  it('(g) Ctrl-C reçu après la sortie d\'une racine morte du signal, plus aucun processus suivi vivant : cadence meurt du signal, il n\'est pas jeté (L329)', async () => {
+    const logs = tempDir();
+    const probe = join(logs, 'probe-g.ts');
+    const src = (f: string) => JSON.stringify(join(process.cwd(), 'src', f));
+    writeFileSync(
+      probe,
+      `import { existsSync, readFileSync, writeFileSync } from 'node:fs';\n` +
+        `import { join } from 'node:path';\n` +
+        `import { realDeps } from ${src('deliver.ts')};\n` +
+        `import { readProcs } from ${src('proc.ts')};\n` +
+        `const logs = ${JSON.stringify(logs)};\n` +
+        `let sent = false;\n` +
+        // le SIGINT part à la première lecture où la racine a disparu : sa sortie est déjà traitée, le signal arrive après
+        `const read = () => {\n` +
+        `  const procs = readProcs();\n` +
+        `  const file = join(logs, 'root');\n` +
+        `  const pid = existsSync(file) ? Number(readFileSync(file, 'utf8').trim()) : 0;\n` +
+        `  if (!sent && pid > 1 && procs && !procs.has(pid)) {\n` +
+        `    sent = true;\n` +
+        `    process.kill(process.pid, 'SIGINT');\n` +
+        `  }\n` +
+        `  return procs;\n` +
+        `};\n` +
+        `await realDeps(logs, read, 1_000, 5_000).exec('echo $$ > root; sleep 0.5; exit 130', {}, 20_000);\n` +
+        `await new Promise((r) => setTimeout(r, 1_500));\n` +
+        `writeFileSync(join(logs, 'survived'), '');\n`,
+    );
+    const child = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
+    const ended = new Promise<NodeJS.Signals | null>((r) => child.on('exit', (_code, sig) => r(sig)));
+    try {
+      expect(await ended).toBe('SIGINT'); // sans l'attente, exec rend 130 et la sonde vit encore 1,5 s
+      expect(existsSync(join(logs, 'survived'))).toBe(false);
+    } finally {
+      try {
+        process.kill(-child.pid!, 'SIGKILL');
+      } catch {
+        // déjà mort
+      }
+    }
+  }, 120_000);
 
   it('(c) Ctrl-C : un descendant qui ignore SIGINT sous un parent vivant est tué à l’échéance de la grâce (~2 s) — un seul bump', async () => {
     const logs = tempDir();

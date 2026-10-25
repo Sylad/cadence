@@ -108,6 +108,8 @@ export const TIMED_OUT = 124;
 
 /** Sortie gardée d'une commande : de quoi retrouver ses dernières lignes. */
 const OUTPUT_KEPT = 8_192;
+/** Signaux que cadence écoute (proc.ts) : une racine qu'ils ont tuée laisse présager le même signal vers cadence. */
+const TERMINATION_SIGNALS = [constants.signals.SIGHUP, constants.signals.SIGINT, constants.signals.SIGTERM];
 /** Les lignes de la sortie ; une ligne réécrite par \r (barre de progression) ne garde que sa dernière image non vide. */
 const outputTail = (text: string): string[] =>
   text.split('\n').flatMap((l) => l.split('\r').filter((f) => f.trim() !== '').slice(-1));
@@ -282,12 +284,14 @@ export function realDeps(
           };
           // Un Ctrl-C part au groupe entier : la racine peut mourir et sa sortie être traitée avant que le SIGINT
           // adressé à cadence ne le soit. Retirer l'écoute à cet instant le perdrait (tracker.end jamais joué, un
-          // descendant qui ignore SIGINT survivrait) : tant que des processus suivis vivent, on attend le signal en
-          // route, au plus pendantMs.
+          // descendant qui ignore SIGINT survivrait, un second Ctrl-C tuerait cadence sans libérer le verrou) : on
+          // attend le signal en route, au plus pendantMs, tant que des processus suivis vivent OU que la racine est
+          // elle-même morte d'un signal de terminaison (ou sortie 128 + ce signal) — curl tué par le Ctrl-C.
+          const terminated = !timedOut && TERMINATION_SIGNALS.includes(result - 128);
           const deadline = Date.now() + pendingMs;
           const next = (): void => {
             if (ending) void ending.then(settle);
-            else if (tracker.alive().length === 0 || Date.now() >= deadline) settle();
+            else if ((!terminated && tracker.alive().length === 0) || Date.now() >= deadline) settle();
             else setTimeout(next, 20);
           };
           next();

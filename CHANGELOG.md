@@ -62,12 +62,20 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `doc-keeper` agent and `docs.articles` (also the documents of a neighbouring repository), called by `cadence orchestrate` before the review when `docs.sync` reports a gap | [1.9.0](#190---2026-10-24) |
 | `orchestrate.testGate`: a lot whose commits touch code without a test goes to a correction pass before the review | [1.9.0](#190---2026-10-24) |
 | `orchestrate.precheck: local` pre-checks every lot with no commit, whatever its title | [1.9.0](#190---2026-10-24) |
-| `orchestrate.worktrees`: the worktree mode, one git worktree per lot (experimental behind `CADENCE_EXPERIMENTAL_WORKTREES=1` in 1.9.0; the key alone since [Unreleased](#unreleased)), `--resume --integrate\|--replay`, `--remove-worktree` | [1.9.0](#190---2026-10-24) |
+| `orchestrate.worktrees`: the worktree mode, one git worktree per lot (experimental behind `CADENCE_EXPERIMENTAL_WORKTREES=1` in 1.9.0; the key alone since [1.10.0](#1100---2026-10-25)), `--resume --integrate\|--replay`, `--remove-worktree` | [1.9.0](#190---2026-10-24) |
 | `cadence deliver --sha <sha>` while a wave of the same repository runs, `CADENCE_DEPLOYED_FILE`, and the class and last lines of a red delivery in `deliveries-failed.log` | [1.9.0](#190---2026-10-24) |
+| `orchestrate.build` played by the gate of the wave before `orchestrate.test`; a red build hands the lot back as a « build » finding | [1.10.0](#1100---2026-10-25) |
+| `cadence lead tour` and `orchestrate --dry-run` flag a project without `orchestrate.test` (`porte de tests absente`, probable command, `noTest` in `lead tour --json`) | [1.10.0](#1100---2026-10-25) |
+| `cadence orchestrate --drop` and `--stop-after-current` obeyed during the wait for a session slot; `--resume` without a wave resumes the only unfinished one and refuses when several are | [1.10.0](#1100---2026-10-25) |
+| `cadence ref analyse <document.pdf>` (`--double`), `cadence ref diff`, and the `reference-analyst` and `reference-verifier` agents | [1.10.0](#1100---2026-10-25) |
+| `raf docs-ok <lot> --reason "…"`: acknowledges a `docs.sync` gap the lot leaves open | [1.10.0](#1100---2026-10-25) |
+| `cadence perf`: the pre-check measured per lot, the step that carries a rise of the tokens per lot, red deliveries classed from their text | [1.10.0](#1100---2026-10-25) |
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
 
 ## [Unreleased]
+
+## [1.10.0] - 2026-10-25
 
 ### Changed
 

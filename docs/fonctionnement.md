@@ -25,7 +25,7 @@ while a sub-task is open. A delivery is finished only when its effect checks pas
   <img alt="A lot without commits whose title cites a finding or another lot starts with a precheck (unless disabled), then by type through spec, mockup or sheet review and sealed acceptance tests, or straight to the implementation; then the UX pass if visible, the code review, corrections and an automatic raf review" src="fonctionnement-wave-light.svg">
 </picture>
 
-A lot without commits yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (its `goal:` counts like its title) starts with the **precheck** (unless `orchestrate.precheck: false`; a lot that already has commits, or whose title (or `goal:`) cites neither, is never pre-checked — L288; nor is a lot created after the last code commit of the repository, which has nothing to find — L322): is the deliverable already there? « Yes » hands the lot back
+A lot without commits yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (its `goal:` counts like its title) starts with the **precheck** (unless `orchestrate.precheck: false`; a lot that already has commits, or whose title (or `goal:`) cites neither, is never pre-checked — L288; nor is a lot created after the last code commit of the repository whose title and `goal:` cite no lot that already has commits of its own, which has nothing to find — L322): is the deliverable already there? « Yes » hands the lot back
 to the lead; « partial » passes what exists to the implementation. Then:
 
 - `screen: page` only: **spec** (mockup and screen sheet), **mockup review** (`ux-reviewer`, two

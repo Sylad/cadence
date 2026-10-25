@@ -584,7 +584,6 @@ function reviewModel(c: LotCtx, kind: SessionKind): Model {
   return c.lot.light && c.lot.pass === 0 && (kind === 'review' || kind === 'review-small') ? light : full;
 }
 
-/** Une session : budget et quota vérifiés avant, état écrit avant et après, journal gardé, contrôles du dépôt après. */
 /** Écarte le modèle local pour le reste de la vague (L322) : le premier échec suffit, les lots suivants n'attendent pas de le constater à leur tour. */
 function benchLocal(c: LotCtx, cause: string): void {
   c.wave.localOut ??= cause.slice(0, 200);
@@ -593,6 +592,7 @@ function benchLocal(c: LotCtx, cause: string): void {
 /** Rendu par `session(…, true)` quand l'étape locale n'a rien donné (Ollama éteint, délai, rapport sans structure) : l'appelant se replie sur Sonnet (L146). */
 const LOCAL_FAILED = Symbol('local-failed');
 
+/** Une session : budget et quota vérifiés avant, état écrit avant et après, journal gardé, contrôles du dépôt après. */
 async function session(c: LotCtx, kind: SessionKind, local: true): Promise<Done | null | typeof LOCAL_FAILED>;
 async function session(c: LotCtx, kind: SessionKind, local?: false): Promise<Done | null>;
 async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Done | null | typeof LOCAL_FAILED> {
@@ -1065,15 +1065,27 @@ const CITES_FINDING = /(?<![\w-])(?:constat\w*|revues?|reviews?|audits?)(?![\w-]
  */
 function citesPriorWork(text: string, lot: string, ids: string[]): boolean {
   if (CITES_FINDING.test(text)) return true;
-  if (/(?<![\w-])[a-z][\w-]*:L\d+(?!\w)/i.test(text)) return true;
+  const { ids: cited, foreign } = citedLots(text, lot, ids);
+  return foreign || cited.length > 0;
+}
+
+/**
+ * Les lots que le texte cite (même reconnaissance que `citesPriorWork`, L288/L292) : les identifiants du plan cités, et `foreign` quand il cite un lot d'un autre projet
+ * (`cadence:L68`, dont on ne lit pas les commits ici).
+ */
+function citedLots(text: string, lot: string, ids: string[]): { ids: string[]; foreign: boolean } {
+  const foreign = /(?<![\w-])[a-z][\w-]*:L\d+(?!\w)/i.test(text);
   const own = /^L(\d+)$/.exec(lot);
   const cited = (id: string) => new RegExp(`(?<![\\w.-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`).test(text);
-  return ids.some((id) => {
-    if (id === lot) return false;
-    const n = /^L(\d+)$/.exec(id);
-    if (own && n) return Number(n[1]) < Number(own[1]) && new RegExp(`(?<![\\w-])${id}(?!\\w)`).test(text);
-    return cited(id);
-  });
+  return {
+    foreign,
+    ids: ids.filter((id) => {
+      if (id === lot) return false;
+      const n = /^L(\d+)$/.exec(id);
+      if (own && n) return Number(n[1]) < Number(own[1]) && new RegExp(`(?<![\\w-])${id}(?!\\w)`).test(text);
+      return cited(id);
+    }),
+  };
 }
 
 /**
@@ -1096,8 +1108,11 @@ export function needsPrecheck(config: { precheck: boolean; precheckLocal?: boole
  * Rend la raison à écrire au journal, ou null quand le contrôle garde un sens. Le lot est daté par le commit qui a ajouté son id au plan, borné par sa clé `created` (une
  * migration ou un déplacement du plan ne rajeunit pas un vieux lot) ; le dernier commit de code est le dernier qui ne touche pas que le plan (`isPlanOnly`). Prudent : lot
  * qui travaille dans des dépôts voisins, id introuvable dans l'historique du plan, dépôt sans commit de code ou instants égaux → le contrôle reste.
+ * Le contrôle reste aussi quand le titre ou le goal (ou le goal donné au lancement) cite un lot qui a déjà ses propres commits, ou un lot d'un autre projet : une « suite de revue L<n> » écrite
+ * juste après le dernier correctif de L<n> liste des constats que les passes de correction de L<n> ont pu régler avant la création du lot (rejoué depuis le 24-10 : 5 lots sautés à tort,
+ * dont 2 avec un vrai « partiel »).
  */
-export function precheckNothingToFind(plan: Plan, root: string, lot: string, repos: LotRepo[] = []): string | null {
+export function precheckNothingToFind(plan: Plan, root: string, lot: string, repos: LotRepo[] = [], goal?: string): string | null {
   if (repos.length) return null;
   try {
     const rel = relative(root, plan.path);
@@ -1112,6 +1127,9 @@ export function precheckNothingToFind(plan: Plan, root: string, lot: string, rep
     const code = log.map((x) => x.split(' ')).find(([sha]) => !isPlanOnly(sha!, plan, root));
     if (!code) return null;
     if (createdAt <= Number(code[1])) return null;
+    const l = plan.lot(lot);
+    const { ids, foreign } = citedLots([l.title, l.goal, goal].filter(Boolean).join('\n'), lot, plan.lots().map((x) => x.id));
+    if (foreign || ids.some((id) => lotWork(plan, root, id).length > 0)) return null;
     return `lot créé après le dernier commit de code du dépôt (${code[0]!.slice(0, 7)}) : rien à retrouver`;
   } catch {
     return null;
@@ -1186,7 +1204,7 @@ async function precheck(c: LotCtx): Promise<void> {
 function precheckOrSkip(c: LotCtx): boolean {
   const plan = c.loadPlan();
   if (!needsPrecheck(c.config, plan, c.lot.repo, c.lot.lot, c.lot.repos, c.lot.goal)) return false;
-  const nothing = precheckNothingToFind(histPlan(c), wd(c), c.lot.lot, c.lot.repos);
+  const nothing = precheckNothingToFind(histPlan(c), wd(c), c.lot.lot, c.lot.repos, c.lot.goal);
   if (nothing) c.lot.warnings.push(`contrôle préalable sauté : ${nothing}`);
   return !nothing;
 }

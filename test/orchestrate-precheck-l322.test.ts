@@ -55,6 +55,43 @@ describe('L322 R1 — pas de précheck pour un lot créé après le dernier comm
     expect(precheckNothingToFind(h.plan(), h.repo, 'L9')).toBeNull();
   });
 
+  it('R1 — une « suite de revue L1 » créée après le dernier commit de code, alors que L1 a déjà ses commits, garde son précheck (ses constats ont pu être réglés par les corrections de L1)', () => {
+    const h = harness({ lots: [{ title: 'un' }, { title: 'suite de revue L1' }] });
+    lotCreatedLater(h);
+    commitFile(h.repo, 'a.txt', 'fix(L1): une correction');
+    expect(precheckNothingToFind(h.plan(), h.repo, 'L2')).toBeNull();
+  });
+
+  it('R1 — le goal donné au lancement compte comme le titre : il cite L1 qui a des commits, le précheck reste', () => {
+    const h = harness({ lots: [{ title: 'un' }, { title: 'deux' }] });
+    lotCreatedLater(h);
+    commitFile(h.repo, 'a.txt', 'fix(L1): une correction');
+    expect(precheckNothingToFind(h.plan(), h.repo, 'L2')).not.toBeNull();
+    expect(precheckNothingToFind(h.plan(), h.repo, 'L2', [], 'reprendre les constats de L1')).toBeNull();
+  });
+
+  it('R1 — un lot cité qui n\'a aucun commit de travail (un commit de plan ne compte pas) laisse le lot sauté', () => {
+    const h = harness({ lots: [{ title: 'un' }, { title: 'suite de revue L1' }] });
+    lotCreatedLater(h);
+    expect(precheckNothingToFind(h.plan(), h.repo, 'L2')!).toMatch(/créé après le dernier commit de code/);
+  });
+
+  it('R1 — un lot d\'un autre projet cité (cadence:L68) : on ne lit pas ses commits, le précheck reste', () => {
+    const h = harness({ lots: [{ title: 'un' }, { title: 'suite de cadence:L68' }] });
+    lotCreatedLater(h);
+    expect(precheckNothingToFind(h.plan(), h.repo, 'L2')).toBeNull();
+  });
+
+  it('R2 — le cycle garde la session precheck d\'une suite de revue dont le lot cité a des commits', async () => {
+    const h = harness({ lots: [{ title: 'un' }, { title: 'suite de revue L1' }], script: { precheck: [() => claudeOut(precheckReport())], implement: [impl], review: [ok] } });
+    lotCreatedLater(h);
+    commitFile(h.repo, 'a.txt', 'fix(L1): une correction');
+    const c = h.lot('L2', {}, { precheck: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+    expect(c.lot.warnings.join('\n')).not.toMatch(/contrôle préalable sauté/);
+  });
+
   it('R2 — le cycle saute la session precheck, le dit dans le journal du lot et ouvre l\'implémentation', async () => {
     const h = harness({ lots: [{ title: 'un, suite de la revue' }], script: { implement: [impl], review: [ok] } });
     lotCreatedLater(h);

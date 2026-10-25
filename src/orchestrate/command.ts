@@ -451,7 +451,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     if (l.specLot && env.config.fiche) steps.unshift({ kind: 'fiche', model: 'sonnet' });
     if (specStage) steps.unshift({ kind: 'spec', model: 'sonnet' });
     if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal)) {
-      const nothingToFind = precheckNothingToFind(env.loadPlan(), l.repo, l.lot, l.repos);
+      const nothingToFind = precheckNothingToFind(env.loadPlan(), l.repo, l.lot, l.repos, l.goal);
       if (nothingToFind) io.out(`  contrôle préalable sauté : ${nothingToFind}`);
       else steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
     }

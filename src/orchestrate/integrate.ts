@@ -68,14 +68,15 @@ const run = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd,
 
 /**
  * Résout le conflit en cours quand c'est le CHANGELOG seul et de l'ajout pur sous `[Unreleased]` (L314) : écrit l'union, l'ajoute à l'index. Faux, sans rien
- * toucher, pour tout autre conflit (un autre fichier avec lui, une entrée de base modifiée, une étape de base absente).
+ * toucher, pour tout autre conflit (un autre fichier avec lui, une entrée de base modifiée, une étape de base absente). `start` : le CHANGELOG au point de
+ * départ de la branche (L323), pour qu'un commit puisse réécrire l'entrée qu'un commit précédent du lot a ajoutée.
  */
-function resolveChangelog(work: string): boolean {
+function resolveChangelog(work: string, start: string | undefined): boolean {
   const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
   if (files.length !== 1 || files[0] !== CHANGELOG) return false;
   try {
     // Pendant un rebase, l'étape 2 est la branche du dépôt (« ours »), l'étape 3 le commit du lot rejoué (« theirs »).
-    const merged = mergeUnreleased(run(work, 'show', `:1:${CHANGELOG}`), run(work, 'show', `:2:${CHANGELOG}`), run(work, 'show', `:3:${CHANGELOG}`));
+    const merged = mergeUnreleased(run(work, 'show', `:1:${CHANGELOG}`), run(work, 'show', `:2:${CHANGELOG}`), run(work, 'show', `:3:${CHANGELOG}`), start);
     if (merged === null) return false;
     writeFileSync(join(work, CHANGELOG), merged);
     run(work, 'add', '--', CHANGELOG);
@@ -95,13 +96,14 @@ export function rebaseOnto(work: string, base: string): Rebase {
   const before = git(work, 'rev-parse', 'HEAD');
   if (tryGit(work, 'merge-base', '--is-ancestor', `refs/heads/${base}`, 'HEAD') !== null) return { kind: 'forwarded' };
   let changelog = 0;
+  const start = tryGit(work, 'show', `${mergeBase(work, 'HEAD', base)}:${CHANGELOG}`) ?? undefined;
   try {
     run(work, 'rebase', `refs/heads/${base}`);
   } catch (first) {
     let failure = first;
     // Chaque tour règle le commit sur lequel le rebase s'est arrêté ; un lot ne porte pas des centaines de commits, la borne évite seulement une boucle sans fin.
     for (let turn = 0; ; turn++) {
-      if (turn >= 200 || !resolveChangelog(work)) {
+      if (turn >= 200 || !resolveChangelog(work, start)) {
         const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
         tryGit(work, 'rebase', '--abort');
         return { kind: 'conflict', files, detail: gitFailure(failure) };

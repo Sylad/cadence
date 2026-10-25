@@ -514,9 +514,12 @@ nothing below applies and the wave behaves as before; any other value is refused
      parallel lots that each add an entry under `## [Unreleased]` of `CHANGELOG.md` (what `docs.sync` imposes on every lot) always collide, so a commit
      whose only conflicting file is `CHANGELOG.md` and whose conflict is a **pure addition** is resolved by the program: union per section, one title per
      section (duplicated titles are merged), sections in the Keep a Changelog order (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, any
-     other title after), the entries of the repository's branch first, then those of the lot; the rest of the file follows the side that changed it. The
+     other title after), the entries of the repository's branch first, then those of the lot; the rest of the file follows the side that changed it. **A lot may rewrite its own entry** (L323): an
+     entry of the replayed commit's parent that was not in the `CHANGELOG.md` at the branch's starting point (the merge-base with the repository's
+     branch) was added by an earlier commit of the same lot, so the replayed commit may reword or remove it — its version wins, the earlier one is dropped
+     from the repository's side — while an entry that was already there at the starting point, reworded, stays a conflict by hand. The
      journal says `<project>:<lot> CHANGELOG.md : conflit d'ajout pur résolu par union sous [Unreleased] (<n> commit(s))`. Anything else — an entry that
-     was already there removed or reworded (a later commit of the lot rewriting its own entry included), free text under `[Unreleased]`, the rest of the
+     was already there removed or reworded, free text under `[Unreleased]`, the rest of the
      file changed on both sides, another file in conflict with it — aborts the rebase and hands the lot back as above. The rebased commits differ, so
      steps 3 and 4 apply: tests replayed, and a short review since the patch-id changed;
   3. if the rebase changed the commits, the tests and the build (`orchestrate.test`, `orchestrate.build`) are run again at the rebased tip, a red that

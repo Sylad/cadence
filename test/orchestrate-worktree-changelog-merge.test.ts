@@ -184,3 +184,45 @@ describe('R4 — commit devenu vide', () => {
     expect(readFileSync(join(t.dir, 'CHANGELOG.md'), 'utf8')).toBe(log('### Added\n\n- base A\n- même\n'));
   });
 });
+
+// L323 — un lot réécrit SA PROPRE entrée dans un commit suivant : l'entrée de base absente du point de départ est la sienne, la version de theirs gagne.
+describe('R5 — l\'entrée du lot rejoué peut être modifiée ou retirée par un commit suivant', () => {
+  const START = BASE;
+  const lotBase = log('### Added\n\n- base A\n- entrée du lot\n');
+  const withMain = log('### Added\n\n- base A\n- entrée du lot\n- entrée de main\n');
+  it('R5 — une entrée ajoutée par le lot et réécrite par theirs : la version de theirs gagne, l\'entrée voisine de main reste', () => {
+    const theirs = log('### Added\n\n- base A\n- entrée du lot précisée\n');
+    expect(mergeUnreleased(lotBase, withMain, theirs, START)).toBe(log('### Added\n\n- base A\n- entrée de main\n- entrée du lot précisée\n'));
+  });
+  it('R5 — une entrée ajoutée par le lot et retirée par theirs : elle disparaît, celle de main reste', () => {
+    expect(mergeUnreleased(lotBase, withMain, BASE, START)).toBe(log('### Added\n\n- base A\n- entrée de main\n'));
+  });
+  it('R5 — une entrée présente au point de départ et modifiée reste un conflit à la main', () => {
+    const theirs = log('### Added\n\n- base A modifiée\n- entrée du lot\n');
+    expect(mergeUnreleased(lotBase, withMain, theirs, START)).toBeNull();
+  });
+  it('R5 — sans point de départ connu, une entrée de base modifiée reste un conflit', () => {
+    const theirs = log('### Added\n\n- base A\n- entrée du lot précisée\n');
+    expect(mergeUnreleased(lotBase, withMain, theirs)).toBeNull();
+  });
+  it('R5 — au rebase : deux commits du lot (le second précise l\'entrée du premier), une entrée voisine arrivée sur main', () => {
+    const repo = gitRepo();
+    writeFileSync(join(repo, 'CHANGELOG.md'), BASE);
+    git(repo, 'add', '--', 'CHANGELOG.md');
+    git(repo, 'commit', '-q', '-m', 'init');
+    const store = new RunStore(tempDir(), 'w1');
+    const t = { repo, dir: lotTreeDir(store.dir, 'p', 'L1'), branch: lotBranch('w1', 'p', 'L1'), base: 'main', lot: 'p:L1' };
+    expect(prepareTree(t).ok).toBe(true);
+    const put = (d: string, text: string, msg: string) => {
+      writeFileSync(join(d, 'CHANGELOG.md'), text);
+      git(d, 'add', '--', 'CHANGELOG.md');
+      git(d, 'commit', '-q', '-m', msg);
+    };
+    put(t.dir, lotBase, 'feat(L1): lot');
+    put(t.dir, log('### Added\n\n- base A\n- entrée du lot précisée\n'), 'fix(L1): précise');
+    put(repo, log('### Added\n\n- base A\n- entrée de main\n'), 'feat(L2): autre lot');
+    expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased', changelog: 2 });
+    expect(readFileSync(join(t.dir, 'CHANGELOG.md'), 'utf8')).toBe(log('### Added\n\n- base A\n- entrée de main\n- entrée du lot précisée\n'));
+    expect(git(t.dir, 'status', '--porcelain')).toBe('');
+  });
+});

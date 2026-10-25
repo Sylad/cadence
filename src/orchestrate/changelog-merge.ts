@@ -57,22 +57,31 @@ function pick(base: string, ours: string, theirs: string): string | null {
  * sections dans l'ordre de Keep a Changelog, les entrées de `ours` puis celles de `theirs` qui n'y sont pas déjà. Le reste du fichier suit le côté qui l'a
  * changé. Rend null quand ce n'est pas de l'ajout pur — une entrée de base retirée ou modifiée, du texte libre sous `[Unreleased]`, le reste du fichier
  * changé des deux côtés, pas de section `[Unreleased]` — : le conflit reste alors à la main.
+ *
+ * `start` est le CHANGELOG du point de départ de la branche rejouée (L323). Une entrée de `base` qui n'y était pas a été ajoutée par un commit précédent du
+ * lot lui-même : `theirs` peut la modifier ou la retirer, sa version gagne (l'ancienne est écartée de `ours`). Sans `start`, aucune entrée n'est au lot.
  */
-export function mergeUnreleased(base: string, ours: string, theirs: string): string | null {
+export function mergeUnreleased(base: string, ours: string, theirs: string, start?: string): string | null {
   const [b, o, t] = [split(base), split(ours), split(theirs)];
   if (!b || !o || !t) return null;
   const head = pick(b.head, o.head, t.head);
   const tail = pick(b.tail, o.tail, t.tail);
   const [bs, os, ts] = [sections(b.block), sections(o.block), sections(t.block)];
   if (head === null || tail === null || !bs || !os || !ts) return null;
+  const st = start === undefined ? null : split(start);
+  const startEntries = new Set([...(st ? (sections(st.block)?.values() ?? []) : [])].flat());
+  const own = new Set<string>(start === undefined || !st ? [] : [...bs.values()].flat().filter((e) => !startEntries.has(e)));
   for (const [title, entries] of bs) {
-    if (!onlyAdds(entries, os.get(title) ?? []) || !onlyAdds(entries, ts.get(title) ?? [])) return null;
+    const kept = entries.filter((e) => !own.has(e));
+    if (!onlyAdds(kept, (os.get(title) ?? []).filter((e) => !own.has(e))) || !onlyAdds(entries, os.get(title) ?? []) || !onlyAdds(kept, ts.get(title) ?? [])) {
+      return null;
+    }
   }
   const titles = [...new Set([...os.keys(), ...ts.keys()])];
   const rank = (s: string) => (SECTION_ORDER.includes(s) ? SECTION_ORDER.indexOf(s) : SECTION_ORDER.length);
   titles.sort((x, y) => rank(x) - rank(y));
   const body = titles.map((title) => {
-    const entries = [...new Set([...(os.get(title) ?? []), ...(ts.get(title) ?? [])])];
+    const entries = [...new Set([...(os.get(title) ?? []).filter((e) => !own.has(e)), ...(ts.get(title) ?? [])])];
     return `### ${title}\n\n${entries.join('\n')}\n`;
   });
   return `${head}\n\n${body.join('\n')}\n${tail}`;

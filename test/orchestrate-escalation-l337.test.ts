@@ -4,7 +4,7 @@ import { REVIEW_RESERVE, lotSpent, runLot } from '../src/orchestrate/cycle.js';
 import { renderTable } from '../src/orchestrate/table.js';
 import { claudeOut, commitFile, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 import { tempDir } from './helpers.js';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const impl: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a.txt')] }));
@@ -122,5 +122,16 @@ describe('escalade de modèle avant de rendre un lot (L337)', () => {
     const table = renderTable({ id: 'w1', consumed: 0, budget: 1, cacheRead: 0, status: 'done' } as never, [c.lot], { isAncestor: () => false, lotCommits: () => [] });
     expect(table.some((l) => /demo:L1 — escalade fable : .*conforme/.test(l))).toBe(true);
     expect(logs.some((l) => l.includes('escalade fable'))).toBe(true);
+  });
+});
+
+describe('L337 R11 — la documentation suit', () => {
+  const read = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
+
+  it('R11 — docs/orchestrate.md, docs/perf.md, le skill lead et le CHANGELOG décrivent l\'escalade', () => {
+    expect(read('docs/orchestrate.md')).toMatch(/orchestrate\.escalation[\s\S]*claude --model/);
+    expect(read('docs/perf.md')).toContain('escalades de modèle');
+    expect(read('skills/lead/SKILL.md')).toMatch(/rendu malgré l'escalade[\s\S]*arbitration/);
+    expect(read('CHANGELOG.md').split('## [1.11.0]')[0]).toContain('orchestrate.escalation');
   });
 });

@@ -183,6 +183,17 @@ orchestrate:
 
 `full` is also the model of the UX review and of the single pass of a small lot that is not light.
 
+**Model escalation before a lot is handed back (L337, `orchestrate.escalation`)**: on 2026-10-25 two lots (maritime I-CAD2, cadence L332) were handed back after two correction passes and taken up by hand on Sonnet/Opus, while the lead's rule (17-10, 22-10) was to play a stronger model first — a rule forgotten twice. The wave now plays it:
+
+```yaml
+orchestrate:
+  escalation: { model: fable }   # no default: absent = nothing changes
+```
+
+The name is passed as it stands to `claude --model` — no closed list `haiku|sonnet|opus`, and no default value, because the account may not have the model. When the review is still not compliant after the planned passes (`MAX_PASSES`, or `MAX_PASSES_CONVERGING` when it converges), or when the lot would be handed back « tests rouges » after them, the wave plays **one** correction and then **one** fresh code review, both on that model, before handing the lot back. The lot is handed back only if that escalated review is not compliant (`… ; rendu malgré l'escalade <model>`); the escalated correction that leaves the tests red hands it back without a review. A compliant escalated review ends the lot as any compliant review does (minors pass, UX review, `ready`). The UX review keeps its own rule: a lot handed back for a non-compliant UX review is not escalated. The escalation counts as a correction pass (`passes` of the table) and is played at most once per lot, a resume included (`escalation` in the lot's journal).
+
+The lot's budget is respected: the escalation needs what a correction and its review need (`REVIEW_RESERVE`, as for any correction pass). When the budget does not cover it, it is **not played** and the outcome says so (`escalade <model> non jouée (budget du lot …)`); the lot is handed back to the lead with its findings. The final table prints one line per escalated lot, `<project>:<lot> — escalade <model> : <outcome>` (compliant review, lot handed back despite the escalation — for the human or an arbitration of the lead —, not played), the wave log traces the three moments, and `cadence perf` counts the escalated lots of each window and their outcome (`docs/perf.md`). The price grid of `cadence perf` knows `sonnet`, `opus` and `haiku`: the cost of an escalated step on another model reads `n/d`.
+
 **Code changed without a test (L287)**: before any review session, the program checks the diff of the lot (every commit that
 cites it, all sessions included). If it touches code (`testGate.code`, minus `testGate.except`) without touching a single test
 file (`testGate.tests`), the lot goes straight to a correction pass — no review session is spent finding what a file list

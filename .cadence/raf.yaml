@@ -3750,6 +3750,16 @@ lots:
     notes:
       - { date: 2026-10-25, text: "Mineurs de la revue Opus (notes, aucun observable aujourd'hui) : (1) cycle.ts:196 build rouge au départ jamais mis en cache → rejoué à chaque passe (≤ ~6 builds, ~4 min sur maritime) ; (2) cycle.ts:1684 acceptProblems joue config.test sans build (seuls warhammer/ol ont accept:, leurs tests ne lisent pas dist) ; (3) cycle.ts:188 clé de cache de la ligne de base sans config.build. Re-vérifié par le lead le 25-10 à 8dfbc41 : tsc propre, vitest 3657 (+4 sautés), raf check propre." }
     finished: 2026-10-25
+  - id: L334
+    title: "skill deliver : livrer un sha qui n'est pas HEAD = pousser ce sha seul d'abord (git push origin <sha>:main) puis cadence deliver --dry-run --sha <sha> et cadence deliver --sha <sha>, avec la raison (ci: github attend le run de ce sha exact, GitHub ne construit que la pointe d'un push) — éval du plugin 1.10.0 du 25-10 : cas deliver-sha à 0,50 (3/3 essais sans le push du sha, le skill deliver ne dit que « --sha <rev> to deliver a pushed commit ») ; rejouer le cas (claude plugin eval . --case deliver-sha --trust-plugin --no-publish) jusqu'à 1,0"
+    status: todo
+    estimate: 0.1
+    created: 2026-10-25
+  - id: L335
+    title: "plugin : la syntaxe de cadence orchestrate (<projet>:<lot>[@modèle], id avec « / » gardé tel quel, reprise par --resume [--wave]) joignable sans /lead — éval du plugin 1.10.0 du 25-10 : cas orchestrate-id-avec-slash à 0,00 avec et sans le plugin (3/3 essais inventent --lot/--model, le modèle n'a ouvert aucun skill et la lecture des fichiers du plugin est refusée dans le bac à sable) ; un skill (ou la description d'un skill existant) qui se déclenche sur « lancer une vague orchestrate » et porte la ligne de commande ; rejouer le cas jusqu'à 1,0"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -184,8 +184,11 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
   };
 }
 
-/** Dépendances réelles : sh, gh, fetch, horloge. `read` : le relevé des processus du suivi (injectable pour les tests). */
-export function realDeps(root: string, read: typeof readProcs = readProcs): DeliverDeps {
+/**
+ * Dépendances réelles : sh, gh, fetch, horloge. `read` : le relevé des processus du suivi, `graceMs` : le délai de grâce
+ * après Ctrl-C ou raccrochage (injectables pour les tests : sous charge, une grâce de 2 s se mesure mal).
+ */
+export function realDeps(root: string, read: typeof readProcs = readProcs, graceMs: number = SIGNAL_GRACE_MS): DeliverDeps {
   const gh = (args: string[]) => {
     try {
       return execFileSync('gh', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: GH_TIMEOUT });
@@ -244,7 +247,7 @@ export function realDeps(root: string, read: typeof readProcs = readProcs): Deli
         // Terminaison en cours : exec ne rend pas la main avant qu'elle ne soit finie — sinon deliver libère
         // le verrou pendant la grâce, alors que des descendants tournent encore.
         let ending: Promise<void> | null = null;
-        const forget = onTermination((sig) => (ending = sig === 'SIGTERM' ? Promise.resolve(tree.kill()) : tree.end(SIGNAL_GRACE_MS)));
+        const forget = onTermination((sig) => (ending = sig === 'SIGTERM' ? Promise.resolve(tree.kill()) : tree.end(graceMs)));
         let timedOut = false;
         const timer = setTimeout(() => {
           timedOut = true;

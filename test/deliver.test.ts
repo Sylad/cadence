@@ -27,6 +27,40 @@ function pushedRepo(): string {
   return dir;
 }
 
+/**
+ * L325 : sonde lancée par vite-node qui appelle deliver avec un relevé enrobé qui note `tracked` quand le suivi voit l'enfant
+ * (fichier `child`) : le test envoie Ctrl-C quand le suivi connaît l'enfant, pas après un délai que la charge raccourcit.
+ * Le relevé est lu avant le scan qui adopte l'enfant, dans le même tour : à l'instant où `tracked` existe, il est suivi.
+ * Le premier relevé (celui du constructeur, sans scan) ne compte pas : sous charge il peut déjà voir l'enfant sans l'adopter.
+ * `graceMs` : le délai de grâce de la sonde (défaut : celui de cadence).
+ */
+function writeProbe(logs: string, dir: string, graceMs?: number): string {
+  const probe = join(logs, 'probe.ts');
+  const src = (f: string) => JSON.stringify(join(process.cwd(), 'src', f));
+  writeFileSync(
+    probe,
+    `import { existsSync, readFileSync, writeFileSync } from 'node:fs';\n` +
+      `import { join } from 'node:path';\n` +
+      `import { Plan } from ${src('plan.ts')};\n` +
+      `import { deliver, parseDeliverConfig, realDeps } from ${src('deliver.ts')};\n` +
+      `import { readProcs } from ${src('proc.ts')};\n` +
+      `import { sharedStateDir } from ${src('state.ts')};\n` +
+      `const dir = ${JSON.stringify(dir)}, logs = ${JSON.stringify(logs)};\n` +
+      `let reads = 0;\n` +
+      `const read = () => {\n` +
+      `  const procs = readProcs();\n` +
+      `  const file = join(logs, 'child');\n` +
+      `  const pid = existsSync(file) ? Number(readFileSync(file, 'utf8').trim()) : 0;\n` + // fichier absent ou à moitié écrit : pas de pid
+      `  if (reads++ > 0 && procs && pid > 1 && procs.has(pid)) writeFileSync(join(logs, 'tracked'), '');\n` +
+      `  return procs;\n` +
+      `};\n` +
+      `const config = parseDeliverConfig(readFileSync(join(dir, 'cadence.yaml'), 'utf8'), join(dir, 'cadence.yaml'));\n` +
+      `const ctx = { root: dir, state: sharedStateDir(dir), plan: Plan.load(join(dir, '.cadence/raf.yaml')), config, today: '2026-09-28', dryRun: false, args: [], out: () => {}, err: () => {} };\n` +
+      `process.exitCode = await deliver(ctx, realDeps(dir, read, ${graceMs === undefined ? 'undefined' : graceMs}));\n`,
+  );
+  return probe;
+}
+
 function fakeDeps(over: Partial<DeliverDeps> = {}) {
   let clock = 0;
   const execs: { cmd: string; env: Record<string, string> }[] = [];
@@ -919,12 +953,7 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
     git(dir, 'add', 'livrer.sh', 'cadence.yaml');
     commit(dir, 'chore: config');
     git(dir, 'push', '-q');
-    const probe = join(logs, 'probe.ts');
-    writeFileSync(
-      probe,
-      `import { run } from ${JSON.stringify(join(process.cwd(), 'src/cli.ts'))};\n` +
-        `process.exitCode = await run(['deliver'], { cwd: ${JSON.stringify(dir)}, env: process.env, out: () => {}, err: () => {}, now: () => new Date() });\n`,
-    );
+    const probe = writeProbe(logs, dir, 60_000); // la grâce ne court pas pendant que le test observe : il libère le trap lui-même
     const first = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
     const exited = new Promise<void>((r) => first.on('exit', () => r()));
     try {
@@ -932,6 +961,7 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
       const scriptPid = Number(readFileSync(join(logs, 'first'), 'utf8').trim());
       process.kill(-first.pid!, 'SIGINT'); // ce que fait le terminal
       expect(await until(() => existsSync(join(logs, 'trap')), 15_000)).toBe(true); // le trap tourne, cadence est encore là (grâce)
+      await pause(2_500); // au-delà de la grâce par défaut (2 s) : seule la grâce injectée garde cadence en vie ; la charge ne peut que rallonger l'attente
       expect(alive(first.pid!)).toBe(true);
       writeFileSync(join(logs, 'release'), '');
       await exited;
@@ -1011,33 +1041,7 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
 
   /** Première livraison dans un groupe à elle (le groupe de premier plan d'un terminal), lancée par vite-node. */
   function startFirst(logs: string, dir: string) {
-    const probe = join(logs, 'probe.ts');
-    // L325 : la sonde appelle deliver avec un relevé enrobé qui note `tracked` quand le suivi voit l'enfant (fichier
-    // `child`) : le test envoie Ctrl-C quand le suivi connaît l'enfant, pas après un délai que la charge raccourcit.
-    // Le relevé est lu avant le scan qui adopte l'enfant, dans le même tour : à l'instant où `tracked` existe, il est suivi.
-    // Le premier relevé (celui du constructeur, sans scan) ne compte pas : sous charge il peut déjà voir l'enfant sans l'adopter.
-    const src = (f: string) => JSON.stringify(join(process.cwd(), 'src', f));
-    writeFileSync(
-      probe,
-      `import { existsSync, readFileSync, writeFileSync } from 'node:fs';\n` +
-        `import { join } from 'node:path';\n` +
-        `import { Plan } from ${src('plan.ts')};\n` +
-        `import { deliver, parseDeliverConfig, realDeps } from ${src('deliver.ts')};\n` +
-        `import { readProcs } from ${src('proc.ts')};\n` +
-        `import { sharedStateDir } from ${src('state.ts')};\n` +
-        `const dir = ${JSON.stringify(dir)}, logs = ${JSON.stringify(logs)};\n` +
-        `let reads = 0;\n` +
-        `const read = () => {\n` +
-        `  const procs = readProcs();\n` +
-        `  const file = join(logs, 'child');\n` +
-        `  const pid = existsSync(file) ? Number(readFileSync(file, 'utf8').trim()) : 0;\n` + // fichier absent ou à moitié écrit : pas de pid
-        `  if (reads++ > 0 && procs && pid > 1 && procs.has(pid)) writeFileSync(join(logs, 'tracked'), '');\n` +
-        `  return procs;\n` +
-        `};\n` +
-        `const config = parseDeliverConfig(readFileSync(join(dir, 'cadence.yaml'), 'utf8'), join(dir, 'cadence.yaml'));\n` +
-        `const ctx = { root: dir, state: sharedStateDir(dir), plan: Plan.load(join(dir, '.cadence/raf.yaml')), config, today: '2026-09-28', dryRun: false, args: [], out: () => {}, err: () => {} };\n` +
-        `process.exitCode = await deliver(ctx, realDeps(dir, read));\n`,
-    );
+    const probe = writeProbe(logs, dir);
     const child = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
     const exited = new Promise<number>((r) => child.on('exit', () => r(Date.now())));
     const cleanup = () => {

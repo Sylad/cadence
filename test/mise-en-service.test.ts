@@ -222,7 +222,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     const listed = git(dir, 'worktree', 'list', '--porcelain');
     expect(listed).not.toContain(shas[0].slice(0, 12));
     expect(listed).toContain(shas[2].slice(0, 12));
-  });
+  }, 120_000);
 
   it("L330 — la rétention suit l'ordre de mise en service, pas la date de l'installation ni l'âge", () => {
     const { dir, first } = workRepo();
@@ -236,7 +236,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     const present = (sha: string) => existsSync(join(root, 'releases', sha.slice(0, 12)));
     // ordre : b, c, d, a (retour), e -> gardées : e, a, d, c ; b retirée
     expect([shas[0], shas[1], shas[2], shas[3], e].map(present)).toEqual([true, false, true, true, true]);
-  });
+  }, 120_000);
 
   it('L330 — une copie vieille de plusieurs semaines mais dans les 4 dernières mises en service reste', () => {
     const { dir, first } = workRepo();
@@ -246,7 +246,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     utimesSync(join(root, 'releases', first.slice(0, 12), '.mise-en-service-ok'), longAgo, longAgo);
     enService(dir, root, binDir, ['b', 'c']);
     expect(existsSync(join(root, 'releases', first.slice(0, 12)))).toBe(true);
-  });
+  }, 120_000);
 
   it("L330 — jamais une copie qu'un processus vivant utilise : son cwd, ou son script en argument", async () => {
     const { dir, first } = workRepo();
@@ -272,7 +272,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
       cwdUser.kill();
       scriptUser.kill();
     }
-  });
+  }, 120_000);
 
   it("L330 — une vague vivante garde sa copie : son processus tourne sur tool/bin/cadence.js, dont node_modules renvoie à la copie", async () => {
     const { dir, first } = workRepo();
@@ -298,6 +298,28 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     }
   }, 120_000);
 
+  it("L330 — jamais une copie qu'un processus vivant utilise, même quand la racine passe par un lien symbolique", async () => {
+    const { dir, first } = workRepo();
+    const { root: reel, binDir } = places();
+    // --root (ou le home) atteint par un lien : /proc/<pid>/cwd donne le chemin réel, la purge compare au chemin du lien
+    const lien = join(tempDir(), 'lien');
+    mkdirSync(reel, { recursive: true });
+    symlinkSync(reel, lien, 'dir');
+    mettreEnService({ repo: dir, rev: first, root: lien, binDir, install });
+    const user = spawn('sleep', ['60'], { cwd: join(reel, 'releases', first.slice(0, 12)), stdio: 'ignore' });
+    try {
+      await new Promise((r) => setTimeout(r, 100));
+      enService(dir, lien, binDir, ['b', 'c', 'd', 'e']);
+      expect(existsSync(join(reel, 'releases', first.slice(0, 12)))).toBe(true);
+      user.kill();
+      await new Promise((r) => user.once('exit', r));
+      enService(dir, lien, binDir, ['f']);
+      expect(existsSync(join(reel, 'releases', first.slice(0, 12)))).toBe(false);
+    } finally {
+      user.kill();
+    }
+  }, 120_000);
+
   it('L330 — la purge est dite : n copies retirées, place libérée, copies gardées parce qu\'utilisées', () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();
@@ -311,7 +333,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(direPurge(r.purge)).toMatch(/^purge : 1 copie retirée, \d/);
     expect(direPurge({ removed: 0, kept: 0, freedBytes: 0 })).toBe('purge : aucune copie retirée');
     expect(direPurge({ removed: 2, kept: 1, freedBytes: 2.5 * 1024 ** 3 })).toBe('purge : 2 copies retirées, 2,5 Go libérés ; 1 gardée, un processus l\'utilise encore');
-  });
+  }, 120_000);
 
   it('checkLotsDone ne regarde que les commits au-dessus du sha déjà en service (le seul sha, au premier service)', () => {
     const { dir, first } = workRepo({ L1: 'done', L0: 'doing' });

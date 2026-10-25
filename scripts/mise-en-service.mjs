@@ -158,9 +158,29 @@ export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defa
  */
 export function copiesUtilisees(releases) {
   const used = new Set();
+  const real = (path) => {
+    try {
+      return realpathSync(path);
+    } catch {
+      return path;
+    }
+  };
+  // /proc/<pid>/cwd et /proc/<pid>/exe donnent toujours le chemin réel : si `releases` (ou une copie) passe par un lien
+  // symbolique (--root, home), on compare aussi au chemin résolu, sinon le processus ne serait pas vu.
+  const roots = [...new Set([releases, real(releases)])];
+  let copies = [];
+  try {
+    copies = readdirSync(releases).map((name) => ({ name, path: real(join(releases, name)) }));
+  } catch {
+    /* dossier absent : rien à retenir */
+  }
   const noteDirect = (path) => {
-    const rel = path.startsWith(`${releases}/`) ? path.slice(releases.length + 1).split('/')[0] : undefined;
-    if (rel) used.add(rel);
+    for (const root of roots) {
+      if (path.startsWith(`${root}/`)) used.add(path.slice(root.length + 1).split('/')[0]);
+    }
+    for (const copy of copies) {
+      if (path === copy.path || path.startsWith(`${copy.path}/`)) used.add(copy.name);
+    }
   };
   const note = (path) => {
     if (!path.startsWith('/')) return;

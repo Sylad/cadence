@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { orchestrate, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { waveReadsControl } from '../src/orchestrate/snapshot.js';
-import { registerWave } from '../src/orchestrate/registry.js';
+import { acquireSlot, cadenceHome, liveSlots, registerWave } from '../src/orchestrate/registry.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import type { ClaudeFn } from '../src/orchestrate/launch.js';
@@ -149,6 +149,55 @@ describe('orchestrate --drop / --stop-after-current sur une vague vivante', () =
     expect(store.readWave()!.status).toBe('interrupted');
     expect(store.readLot('a', 'L1')!.status).toBe('suspended');
     expect(store.readLot('b', 'L1')!.status).toBe('suspended');
+  });
+
+  /** Vague d'un lot dont le seul créneau est tenu par une autre vague (`x`) : elle attend ; `ask` formule la demande une fois l'attente journalisée. */
+  async function waitingWave(ask: (parent: string) => Promise<number>) {
+    const parent = parentWith(['a']);
+    const home = cadenceHome();
+    const x = await acquireSlot(home, 1, { wave: 'x' });
+    const { d, calls } = deps(() => {});
+    d.slotPollMs = 10;
+    const r = io(parent);
+    const done = orchestrate(['a:L1', '--max-sessions', '1'], r.io, d);
+    try {
+      const t0 = Date.now();
+      while (!/en attente d'un créneau de session/.test(r.out.join('\n'))) {
+        if (Date.now() - t0 > 20_000) throw new Error("délai dépassé : le message d'attente de créneau");
+        await new Promise((res) => setTimeout(res, 10));
+      }
+      expect(await ask(parent)).toBe(0);
+      // L'attente s'interrompt d'elle-même : le créneau de `x` n'est PAS rendu avant la fin de la vague.
+      const code = await Promise.race([done, new Promise<string>((res) => setTimeout(() => res('toujours en attente'), 5_000))]);
+      expect(code).not.toBe('toujours en attente');
+      expect(calls).toEqual([]); // aucune session n'est partie
+      expect(liveSlots(home).map((s) => s.wave)).toEqual(['x']); // le créneau n'a jamais été pris
+      return { parent, code };
+    } finally {
+      x();
+      await done.catch(() => undefined);
+    }
+  }
+
+  it("L332 — --drop vise un lot qui attend un créneau : l'attente s'interrompt, le lot est rendu au lead sans prendre le créneau", async () => {
+    const { parent, code } = await waitingWave(async (p) => orchestrate(['--drop', 'a:L1'], io(p).io, deps(() => {}).d));
+    expect(code).toBe(1);
+    const store = RunStore.last(parent)!;
+    const lot = store.readLot('a', 'L1')!;
+    expect(lot.status).toBe('handed-back');
+    expect(lot.outcome).toMatch(/retiré de la vague \(--drop\)/);
+    expect(lot.steps).toEqual([]); // la session annoncée n'a pas eu lieu
+  });
+
+  it("L332 — --stop-after-current pendant l'attente d'un créneau : l'attente s'interrompt, vague interrupted reprenable, créneau jamais pris", async () => {
+    const { parent, code } = await waitingWave(async (p) => orchestrate(['--stop-after-current'], io(p).io, deps(() => {}).d));
+    expect(code).toBe(1);
+    const store = RunStore.last(parent)!;
+    expect(store.readWave()!.status).toBe('interrupted');
+    const lot = store.readLot('a', 'L1')!;
+    expect(lot.status).toBe('suspended');
+    expect(lot.outcome).toMatch(/arrêt demandé \(--stop-after-current\)/);
+    expect(lot.steps).toEqual([]);
   });
 
   it('L309 — la commande de reprise imprimée après --stop-after-current désigne la vague (id qui ressemble à un lot : suite2)', async () => {

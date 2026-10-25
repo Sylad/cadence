@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
+import { SlotAbandoned, acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { tempDir } from './helpers.js';
 
 const wave = (over = {}) => ({ pid: process.pid, wave: 'w1', started: 'x', cwd: '/p', repos: ['/p/a'], ...over });
@@ -60,6 +60,21 @@ describe('créneaux de sessions simultanées (L71)', () => {
     const r = await acquireSlot(home, 1, { wave: 'a', pollMs: 10 });
     expect(liveSlots(home).map((s) => s.wave)).toEqual(['a']);
     r();
+  });
+});
+
+describe('attente interrompue (L332)', () => {
+  it("R1 — acquireSlot lève SlotAbandoned dès que abandon() donne une raison, sans prendre de créneau", async () => {
+    const home = tempDir();
+    const x = await acquireSlot(home, 1, { wave: 'x' });
+    let ask = false;
+    const waiting = acquireSlot(home, 1, { wave: 'y', pollMs: 10, abandon: () => (ask ? 'raison' : null) });
+    const outcome = waiting.then(() => 'créneau pris', (e: unknown) => (e instanceof SlotAbandoned ? e.reason : 'autre erreur'));
+    await new Promise((r) => setTimeout(r, 50));
+    ask = true;
+    expect(await outcome).toBe('raison');
+    expect(liveSlots(home).map((s) => s.wave)).toEqual(['x']);
+    x();
   });
 });
 

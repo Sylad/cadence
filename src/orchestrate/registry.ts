@@ -198,6 +198,13 @@ const MAX_SLOT_INDEX = 64;
 /** Intervalle des rappels d'attente dans le journal. */
 const WAIT_REPORT_MS = 60_000;
 
+/** L'attente d'un créneau a été interrompue par `abandon` (L332) : aucun créneau n'a été pris, la session ne part pas. */
+export class SlotAbandoned extends Error {
+  constructor(readonly reason: string) {
+    super(`attente de créneau abandonnée : ${reason}`);
+  }
+}
+
 /**
  * Attend que le nombre de sessions vivantes, TOUTES vagues confondues et quel que soit l'index de leur créneau,
  * soit sous `cap` (le plafond de cette vague), puis prend le premier créneau libre (un pid mort est repris) et
@@ -208,11 +215,13 @@ const WAIT_REPORT_MS = 60_000;
  *
  * `onWait(holders, waitedMs)` : appelé quand on commence à attendre (0 ms), puis toutes les minutes.
  * `onGot(waitedMs)` : appelé à l'obtention, seulement si on a attendu.
+ * `abandon()` : relu avant chaque tentative (donc à chaque tour d'attente) ; une raison en retour interrompt l'attente
+ * par `SlotAbandoned`, sans prendre de créneau (L332 : `--drop` et `--stop-after-current` ne laissent pas un lot en attente).
  */
 export async function acquireSlot(
   home: string,
   cap: number,
-  opts: { wave: string; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number) => void; onGot?: (waitedMs: number) => void; now?: () => number },
+  opts: { wave: string; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number) => void; onGot?: (waitedMs: number) => void; abandon?: () => string | null; now?: () => number },
 ): Promise<() => void> {
   mkdirSync(slotsDir(home), { recursive: true });
   const now = opts.now ?? Date.now; // injectable : les tests pilotent l'horloge
@@ -221,6 +230,8 @@ export async function acquireSlot(
   const pollMs = opts.pollMs ?? 2000;
   const live = opts.slots ?? liveSlots; // injectable : les tests simulent une vague qui prend un créneau entre les deux comptées
   for (;;) {
+    const why = opts.abandon?.();
+    if (why) throw new SlotAbandoned(why);
     if (live(home).length < cap) {
       for (let k = 0; k < MAX_SLOT_INDEX; k++) {
         const file = join(slotsDir(home), `slot-${k}.lock`);

@@ -18,6 +18,7 @@ import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { SlotAbandoned } from './registry.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import { sumTokens, type Tokens } from './result.js';
@@ -689,7 +690,20 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
         save(c);
       },
     },
-  );
+  ).catch((e: unknown) => {
+    if (e instanceof SlotAbandoned) return e;
+    throw e;
+  });
+  if (outcome instanceof SlotAbandoned) {
+    // L332 : la demande est arrivée pendant l'attente d'un créneau. Une étape qui n'a pas démarré (aucun pid) n'a pas eu lieu : elle ne figure pas à l'état.
+    if (step.pid === undefined) l.steps.pop();
+    else {
+      step.status = 'failed';
+      step.cause = outcome.message;
+      step.ended = new Date().toISOString();
+    }
+    return outcome.reason === DROPPED ? stop(c, 'handed-back', DROPPED) : suspend(c, outcome.reason);
+  }
   step.ended = new Date().toISOString();
   const dir = w.store.lotDir(l.project, l.lot);
   const base = `${n}-${kind}`;

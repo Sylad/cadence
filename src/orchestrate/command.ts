@@ -22,7 +22,7 @@ import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specScreen, specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { precheckNothingToFind, Budget, DROPPED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
+import { precheckNothingToFind, Budget, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -1009,6 +1009,12 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     const free = await acquireSlot(home, cap, {
       wave: wave.id,
       pollMs: deps.slotPollMs,
+      // L332 : une demande écrite pendant l'attente (`--drop` de ce lot, `--stop-after-current`) l'interrompt ; la session ne part pas.
+      abandon: () => {
+        const ctl = store.control();
+        if (o.lot && ctl.drops.includes(o.lot)) return DROPPED;
+        return ctl.stopAfterCurrent ? STOP_REQUESTED : null;
+      },
       onWait: (h, ms) => wctx.log(`${o.lot ? `${o.lot} · ` : ''}en attente d'un créneau de session depuis ${duration(ms)} (${h.length}/${cap} en cours : ${[...new Set(h.map((x) => x.wave))].join(', ')})`),
       onGot: (ms) => wctx.log(`${o.lot ? `${o.lot} · ` : ''}créneau de session obtenu après ${duration(ms)} d'attente`),
     });

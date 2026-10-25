@@ -17,7 +17,8 @@ export const SIGNAL_GRACE_MS = 2_000;
 
 /**
  * Attente, après la sortie de la commande racine, d'un signal de terminaison encore en route vers cadence tant que des
- * processus suivis vivent : le terminal l'envoie au groupe entier, la racine peut être traitée la première.
+ * processus suivis vivent ou que la racine est morte d'un tel signal : le terminal l'envoie au groupe entier, la racine
+ * peut être traitée la première.
  */
 export const SIGNAL_PENDING_MS = 2_000;
 

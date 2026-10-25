@@ -3599,6 +3599,11 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-25
+  - id: L321
+    title: "check : deux faux écarts sur un plan à sous-lots ou en lecture seule (vus au tour /lead du 25-10 sur maritime) — (1) un lot parent en cours n'est pas « silencieux » tant qu'un de ses sous-lots (champ parent:) a un commit récent ou est actif (B28 signalé « sans commit depuis 27 j » alors que B28.6 a été livré le 24-10) ; (2) « revue UX sans visible: » ne propose pas raf visible sur un plan en lecture seule ; si son cadence.yaml ne mappe pas le champ visible, l'écart dit que ce plan ne porte pas visible (étape UX à déclencher par la config) au lieu d'une commande impossible ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

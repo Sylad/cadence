@@ -3654,9 +3654,10 @@ lots:
     started: 2026-10-25
   - id: L326
     title: "README de cadence concis et clair (règle Sylvain 25-10 : « faut pas fuir les gens avec le readme ») — page d'accueil : quoi et pour qui en 2-3 phrases, démarrage en 3 commandes, UN schéma simple, liens vers la doc ; le détail (TMPDIR, worktrees, options d'orchestrate, migrate…) va dans docs/ sans perte ; test readme-accueil : garde-fou de lisibilité (taille plus basse, lignes courtes, pas d'option détaillée) au lieu des seuls 12 ko ; agent doc-keeper : un lot qui change le fonctionnement écrit dans docs/, le README ne reçoit qu'un lien ; doc et CHANGELOG"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-25
+    started: 2026-10-25
   - id: L327
     title: "orchestrate : signaler un projet sans porte de tests — cadence lead tour et orchestrate --dry-run disent en une ligne qu'un projet n'a pas orchestrate.test (la vague ne lancera pas la suite, seule la revue le fera si elle le décide), avec la commande probable lue de package.json (scripts.test) / pyproject (pytest) / pom (mvn test) quand elle existe ; doc (docs/orchestrate.md, docs/lead.md) et CHANGELOG ; tests. Puis le lead déclare test/build dans chaque projet (un commit de config par projet, après vérification que la commande est verte). Suite de L324."
     status: todo

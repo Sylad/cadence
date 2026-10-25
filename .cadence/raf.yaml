@@ -3800,6 +3800,7 @@ lots:
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
+    review: { date: 2026-10-25, verdict: "compliant — orchestré (vague 2026-10-26-0100, 0 passe(s) de correction)", commit: 7eedd36ec345c1c70f7d61cc7466c43584fd17db }
   - id: L340
     title: "config cadence : escalade en Fable avant de rendre un lot (orchestrate.escalation de L337, dans le cadence.yaml de cadence)"
     status: done

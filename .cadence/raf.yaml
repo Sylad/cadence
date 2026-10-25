@@ -3158,10 +3158,11 @@ lots:
     finished: 2026-10-24
   - id: L275
     title: "ref add (suite L261) : pages sans couche texte signalées (recette scanned_pages de norme-etude : un PDF scanné de plus de 30 pages sort en 0 avec un index vide) ; figure sans citation et image sans légende listées en « lien non résolu » comme le dit le design ; échecs de pdftotext / pdftoppm / pdfimages / pdftohtml traduits en RafError ; tests — APRÈS L264"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L264 ]
     created: 2026-10-23
+    started: 2026-10-25
   - id: L276
     title: "cadence-hud : la bande affiche les sessions du lead inscrites par cadence lead hold (étiquette, âge, TTL restant) et la ligne des créneaux comme orchestrate --status (« sessions du lead : N · créneaux libres : X sur M »), même quand aucune vague ne tourne ; une session dont le TTL est échu disparaît ; README du plugin et tests (demande de Sylvain 23-10 : « un hub précis »)"
     status: done

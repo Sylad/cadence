@@ -3077,10 +3077,11 @@ lots:
     finished: 2026-10-25
   - id: L266
     title: "ref (issue #14, 6/10) : double lecture indépendante, cadence ref diff, troisième regard ; mesure comparée à la lecture unique — POINT D'ARRÊT : les lots 7 à 10 ne partent que si H1 tient (faux lu et rappel precise nettement meilleurs), décision du lead notée sur l'issue"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L265 ]
     created: 2026-10-23
+    started: 2026-10-25
   - id: L267
     title: "ref (issue #14, 7/10) : fiche — clés ref, references, ecartes dans cadence spec check ; cadence ref cover (couvre, oublie, écarte, cite un incertain en sourcee)"
     status: todo

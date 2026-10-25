@@ -3637,11 +3637,13 @@ lots:
     review: { date: 2026-10-25, verdict: "conforme (revue Opus neuve : start = point de départ de la branche lu avant le rebase, côté main jamais écrasé, cas réel L275 reproduit par le test de rebase R5 ; README raccourci sans perte, détails dans docs/orchestrate.md ; 2 mineurs en note) — rouge README de la vague corrigé en 69315e7", commit: 69315e707b6c0c29c0dd8f0bd5954d09b00e59cf }
     finished: 2026-10-25
   - id: L324
-    title: "orchestrate : porte de tests absente partout — aucun des 10 projets ne déclare orchestrate.test / orchestrate.build et orchestrate ne devine pas la commande, donc une vague ne lance jamais la suite elle-même (seule la revue la lance, si elle le décide) ; vu le 25-10 : L323 rendu prêt avec un test rouge (README > 12 ko) après une revue légère Sonnet qui n'a lancé que 12 fichiers. (1) cadence.yaml de cadence : test: npx vitest run, build: npx tsc --noEmit ; (2) cadence lead tour et orchestrate --dry-run signalent un projet sans orchestrate.test (une ligne, avec la commande probable lue de package.json / pyproject / pom quand elle existe) ; (3) doc (docs/orchestrate.md, docs/lead.md) et CHANGELOG ; tests. Les autres projets reçoivent leur commande par le lead, un commit de config par projet."
+    title: "orchestrate : porte de tests de cadence — cadence.yaml de cadence déclare test: npx vitest run et build: npx tsc --noEmit (aucun des 10 projets ne déclarait orchestrate.test, orchestrate ne devine pas la commande : une vague ne lançait jamais la suite elle-même ; vu le 25-10 : L323 rendu prêt avec un test rouge après une revue légère qui n'a lancé que 12 fichiers) ; la suite du chantier (signalement dans le tour et le dry-run, commande des autres projets) est L327"
     status: doing
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
+    notes:
+      - { date: 2026-10-25, text: "titre remplacé : « orchestrate : porte de tests absente partout — aucun des 10 projets ne déclare orchestrate.test / orchestrate.build et orchestrate ne devine pas la commande, donc une vague ne lance jamais la suite elle-même (seule la revue la lance, si elle le décide) ; vu le 25-10 : L323 rendu prêt avec un test rouge (README > 12 ko) après une revue légère Sonnet qui n'a lancé que 12 fichiers. (1) cadence.yaml de cadence : test: npx vitest run, build: npx tsc --noEmit ; (2) cadence lead tour et orchestrate --dry-run signalent un projet sans orchestrate.test (une ligne, avec la commande probable lue de package.json / pyproject / pom quand elle existe) ; (3) doc (docs/orchestrate.md, docs/lead.md) et CHANGELOG ; tests. Les autres projets reçoivent leur commande par le lead, un commit de config par projet. »" }
   - id: L325
     title: "tests deliver instables sous charge : deux tests différents ont expiré le 25-10 dans la suite complète (charge ~26 sur 32 cœurs) puis passent seuls — test/deliver.test.ts (a) « un enfant en arrière-plan qui ignore SIGINT … tué au plus tard à l'échéance de la grâce » (40 s, pause(600)) et :830 « SIGINT au groupe de premier plan » (attente de 2 s) ; avec orchestrate.test (L324) la vague lance la suite après chaque écriture, un faux rouge renverrait un lot en correction — rendre ces tests indépendants de la charge (conditions observables au lieu de délais, grâce injectable si besoin), mesurer sous charge (vitest parallèle + CPU chargé) ; tests"
     status: todo
@@ -3649,6 +3651,11 @@ lots:
     created: 2026-10-25
   - id: L326
     title: "README de cadence concis et clair (règle Sylvain 25-10 : « faut pas fuir les gens avec le readme ») — page d'accueil : quoi et pour qui en 2-3 phrases, démarrage en 3 commandes, UN schéma simple, liens vers la doc ; le détail (TMPDIR, worktrees, options d'orchestrate, migrate…) va dans docs/ sans perte ; test readme-accueil : garde-fou de lisibilité (taille plus basse, lignes courtes, pas d'option détaillée) au lieu des seuls 12 ko ; agent doc-keeper : un lot qui change le fonctionnement écrit dans docs/, le README ne reçoit qu'un lien ; doc et CHANGELOG"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
+  - id: L327
+    title: "orchestrate : signaler un projet sans porte de tests — cadence lead tour et orchestrate --dry-run disent en une ligne qu'un projet n'a pas orchestrate.test (la vague ne lancera pas la suite, seule la revue le fera si elle le décide), avec la commande probable lue de package.json (scripts.test) / pyproject (pytest) / pom (mvn test) quand elle existe ; doc (docs/orchestrate.md, docs/lead.md) et CHANGELOG ; tests. Puis le lead déclare test/build dans chaque projet (un commit de config par projet, après vérification que la commande est verte). Suite de L324."
     status: todo
     estimate: 0.25
     created: 2026-10-25

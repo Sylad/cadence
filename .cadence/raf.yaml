@@ -3660,9 +3660,10 @@ lots:
     started: 2026-10-25
   - id: L327
     title: "orchestrate : signaler un projet sans porte de tests — cadence lead tour et orchestrate --dry-run disent en une ligne qu'un projet n'a pas orchestrate.test (la vague ne lancera pas la suite, seule la revue le fera si elle le décide), avec la commande probable lue de package.json (scripts.test) / pyproject (pytest) / pom (mvn test) quand elle existe ; doc (docs/orchestrate.md, docs/lead.md) et CHANGELOG ; tests. Puis le lead déclare test/build dans chaque projet (un commit de config par projet, après vérification que la commande est verte). Suite de L324."
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-25
+    started: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

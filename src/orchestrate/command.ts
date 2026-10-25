@@ -450,9 +450,11 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     if (l.screen && env.config.maquette) steps.unshift({ kind: 'maquette', model: env.config.review.full });
     if (l.specLot && env.config.fiche) steps.unshift({ kind: 'fiche', model: 'sonnet' });
     if (specStage) steps.unshift({ kind: 'spec', model: 'sonnet' });
-    const nothingToFind = needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal) ? precheckNothingToFind(env.loadPlan(), l.repo, l.lot, l.repos) : null;
-    if (nothingToFind) io.out(`  contrôle préalable sauté : ${nothingToFind}`);
-    else if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal)) steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
+    if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal)) {
+      const nothingToFind = precheckNothingToFind(env.loadPlan(), l.repo, l.lot, l.repos);
+      if (nothingToFind) io.out(`  contrôle préalable sauté : ${nothingToFind}`);
+      else steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
+    }
     const { light, full } = env.config.review;
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
     else {

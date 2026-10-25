@@ -121,6 +121,31 @@ export interface RedBreakdown {
   byProject: Record<string, Partial<Record<RedClass, number>>>;
 }
 
+export interface PrecheckVerdicts {
+  oui: number;
+  partiel: number;
+  non: number;
+}
+
+/** Ce que coûte le contrôle préalable dans une fenêtre (L322) : durées de mur en minutes, tokens comptés au quota (le local n'en compte aucun). */
+export interface PrecheckCost {
+  /** Sessions sur le modèle local, dont celles en échec (repli sur Sonnet). */
+  local: { runs: number; failed: number; minutes: number };
+  /** Sessions Sonnet du contrôle : repli d'un échec local ou confirmation d'un « oui » local. */
+  sonnet: { runs: number; minutes: number; tokens: number };
+  /** Gain des « oui » : lots rendus sans implémentation, et ce que cette implémentation aurait coûté (médiane des étapes `implement` de la fenêtre ; null sans étape implement). */
+  avoided: { sessions: number; tokens: number | null };
+}
+
+/** Le contrôle préalable d'un lot rendu : verdict, session locale et session Sonnet (minutes, tokens) quand elles ont eu lieu. */
+export interface PrecheckLot {
+  project: string;
+  lot: string;
+  verdict: 'oui' | 'partiel' | 'non' | null;
+  local: { status: string; minutes: number } | null;
+  sonnet: { minutes: number; tokens: number } | null;
+}
+
 export interface PerfResult {
   since: string | null;
   today: Day;
@@ -129,8 +154,12 @@ export interface PerfResult {
   corrections: { medianPasses: Indicator; atLeast2: Indicator; firstTime: Indicator; causes: { current: CauseWindow; previous: CauseWindow } };
   /** `ux` : sessions qui voient l'application par lot visible (étape ux, et review-small d'un petit lot visible) ; `dedicatedUx` : part des lots visibles revus par au moins une étape ux dédiée (information, sans ⚠ ni jumeau). */
   interventions: { handedOut: Indicator & { count: { current: number | null; previous: number | null } }; ux: Indicator; dedicatedUx: Indicator };
-  /** Contrôle préalable (L288) : `yes` = part de « oui » parmi les lots rendus qui portent un verdict (information, sans ⚠ ni jumeau) ; `lots` = lots avec verdict. */
-  precheck: { yes: Indicator };
+  /**
+   * Contrôle préalable (L288) : `yes` = part de « oui » parmi les lots rendus qui portent un verdict (information, sans ⚠ ni jumeau) ; `lots` = lots avec verdict.
+   * L322 : `verdicts` (répartition oui / partiel / non des lots rendus de chaque fenêtre), `cost` (durée et tokens des sessions du contrôle, local et repli Sonnet, et gain des « oui »),
+   * `lots` (une ligne par lot rendu de la fenêtre courante qui a une session de contrôle ou un verdict).
+   */
+  precheck: { yes: Indicator; verdicts: { current: PrecheckVerdicts; previous: PrecheckVerdicts }; cost: { current: PrecheckCost; previous: PrecheckCost }; lots: PrecheckLot[] };
   tokens: TokensBlock;
   delays: DelaysBlock;
   /** Médiane de la durée de mur en minutes, par sorte d'étape ; `lots` = étapes. */
@@ -520,7 +549,7 @@ export function computePerf(input: PerfInput): PerfResult {
   const handed = mk(handedOut, lotsOf, 'up', twinEscaped, planNote);
   const interventions = { handedOut: { ...handed, count: handedCount }, ux: mk(ux, visibleCounts, 'up', twinEscaped), dedicatedUx: mk(dedicatedUx, visibleCounts, null, null) };
 
-  const precheck = { yes: mk(precheckYes, both(windows, (w) => prechecked(w).length), null, null) };
+  const precheck = { yes: mk(precheckYes, both(windows, (w) => prechecked(w).length), null, null), ...precheckMeasure(windows, rendered) };
   const tokens: TokensBlock = { byEstimate, reviewShare: mk(reviewShare, both(windows, (w) => rendered(w).length), 'up', twinFirstTime) };
   const delays: DelaysBlock = {
     createdToDone: mk({ current: median(createdToDone.current), previous: median(createdToDone.previous) }, sizes(createdToDone), 'up', twinFirstTime, planNote),
@@ -564,6 +593,49 @@ export function computePerf(input: PerfInput): PerfResult {
   for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${decisionOf(key, ind, result)}`);
   if (bottleneck) result.warnings.push(bottleneck);
   return result;
+}
+
+const minutesOf = (s: JournalStep): number => {
+  const from = Date.parse(s.started ?? '');
+  const to = Date.parse(s.ended ?? '');
+  return Number.isNaN(from) || Number.isNaN(to) || to < from ? 0 : (to - from) / 60_000;
+};
+
+/** Le contrôle préalable mesuré (L322) : répartition des verdicts, durée et tokens des sessions (local, Sonnet), gain des « oui », une ligne par lot de la fenêtre courante. */
+function precheckMeasure(windows: Windows, rendered: (w: Window) => Dated[]): Pick<PerfResult['precheck'], 'verdicts' | 'cost' | 'lots'> {
+  const verdicts = (w: Window): PrecheckVerdicts => {
+    const out = { oui: 0, partiel: 0, non: 0 };
+    for (const d of rendered(w)) if (d.j.precheck) out[d.j.precheck]++;
+    return out;
+  };
+  const cost = (w: Window): PrecheckCost => {
+    const set = rendered(w);
+    const steps = set.flatMap((d) => d.j.steps.filter((s) => s.kind === 'precheck'));
+    const local = steps.filter((s) => s.model === 'local');
+    const sonnet = steps.filter((s) => s.model !== 'local');
+    const implement = set.flatMap((d) => d.j.steps.filter((s) => s.kind === 'implement' && s.counted !== undefined).map((s) => s.counted!));
+    const avoided = set.filter((d) => d.j.precheck === 'oui' && d.j.status === 'handed-back').length;
+    const typical = median(implement);
+    return {
+      local: { runs: local.length, failed: local.filter((s) => s.status !== 'ok').length, minutes: local.reduce((n, s) => n + minutesOf(s), 0) },
+      sonnet: { runs: sonnet.length, minutes: sonnet.reduce((n, s) => n + minutesOf(s), 0), tokens: sonnet.reduce((n, s) => n + (s.counted ?? 0), 0) },
+      avoided: { sessions: avoided, tokens: avoided === 0 ? 0 : typical === null ? null : avoided * typical },
+    };
+  };
+  const lots = rendered(windows.current).flatMap((d): PrecheckLot[] => {
+    const steps = d.j.steps.filter((s) => s.kind === 'precheck');
+    if (steps.length === 0 && !d.j.precheck) return [];
+    const local = steps.find((s) => s.model === 'local');
+    const sonnet = steps.filter((s) => s.model !== 'local');
+    return [{
+      project: d.j.project,
+      lot: d.j.lot,
+      verdict: d.j.precheck ?? null,
+      local: local ? { status: local.status, minutes: minutesOf(local) } : null,
+      sonnet: sonnet.length ? { minutes: sonnet.reduce((n, s) => n + minutesOf(s), 0), tokens: sonnet.reduce((n, s) => n + (s.counted ?? 0), 0) } : null,
+    }];
+  });
+  return { verdicts: both(windows, verdicts), cost: both(windows, cost), lots };
 }
 
 /** Goulot net (R19) : une cause pèse au moins la moitié des passes classées de la fenêtre courante, avec au moins dix passes classées. */
@@ -738,12 +810,33 @@ export function renderPerf(r: PerfResult): string[] {
   const h = r.interventions.handedOut.count;
   out.push(`  lots rendus puis terminés hors vague : ${h.current ?? 'n/d'} (précédente ${h.previous ?? 'n/d'})`);
   section('Contrôle préalable', ['part de « oui » du précheck']);
+  out.push(...precheckLines(r.precheck));
   out.push('', 'Tokens, délais et durées (médianes par lot ou par étape)');
   for (const l of lines.slice(LEGACY_LINES)) out.push(row(l));
   for (const wr of r.warnings.filter((x) => x.startsWith('⚠ goulot'))) out.push('', wr);
   const noJournal = r.cost.withoutJournal.current + r.cost.withoutJournal.previous;
   if (noJournal > 0) out.push('', `${noJournal} lot(s) livré(s) sans journal`);
   if (r.orphans > 0) out.push('', `${r.orphans} lot(s) de journal sans plan`);
+  return out;
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+
+/** Le contrôle préalable de la fenêtre courante (L322) : répartition, coût local puis Sonnet, gain des « oui », une ligne par lot. Rien sans session de contrôle ni verdict. */
+function precheckLines(p: PerfResult['precheck']): string[] {
+  const v = p.verdicts.current;
+  const c = p.cost.current;
+  if (v.oui + v.partiel + v.non + c.local.runs + c.sonnet.runs === 0) return [];
+  const out = [`  précheck : oui ${v.oui} · partiel ${v.partiel} · non ${v.non}`];
+  if (c.local.runs > 0) out.push(`  précheck local : ${plural(c.local.runs, 'session', 'sessions')}, ${plural(c.local.failed, 'échec', 'échecs')}, ${num(Math.round(c.local.minutes))} min`);
+  if (c.sonnet.runs > 0) out.push(`  précheck Sonnet : ${plural(c.sonnet.runs, 'session', 'sessions')}, ${value(c.sonnet.tokens, 'tokens')} tokens, ${num(Math.round(c.sonnet.minutes))} min`);
+  if (c.avoided.sessions > 0) out.push(`  gain des « oui » : ${plural(c.avoided.sessions, "session d'implémentation évitée", "sessions d'implémentation évitées")}${c.avoided.tokens === null ? '' : ` (≈ ${value(c.avoided.tokens, 'tokens')} tokens)`}`);
+  for (const l of p.lots) {
+    const parts = [`${l.project}:${l.lot}`, l.verdict ?? 'sans verdict'];
+    if (l.local) parts.push(`local ${l.local.status === 'ok' ? 'ok' : 'échec'} ${num(Math.round(l.local.minutes))} min`);
+    if (l.sonnet) parts.push(`Sonnet ${num(Math.round(l.sonnet.minutes))} min, ${value(l.sonnet.tokens, 'tokens')} tokens`);
+    out.push(`    ${parts.join(' · ')}`);
+  }
   return out;
 }
 

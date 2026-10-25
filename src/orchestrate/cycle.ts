@@ -493,7 +493,12 @@ function briefFor(c: LotCtx, kind: SessionKind): string {
     if (kind === 'fix') {
       vars.commits = lotCommitLines(c);
       vars.constats = constatLines(l.constats);
-      if (l.docsFix) vars.elsewhere = articlesBrief(l.repo, docsConfig(c).articles ?? []);
+      if (l.docsFix) {
+        vars.elsewhere = articlesBrief(l.repo, docsConfig(c).articles ?? []);
+        vars.ack = wd(c) === l.repo
+          ? `run \`raf docs-ok ${l.lot} --reason "why the documentation stays true"\` (a reason is required), then commit the plan file alone (\`git add -- .cadence/raf.yaml\`, or the path of the plan; message \`chore(${l.lot}): docs-ok\`).`
+          : `this is a worktree, where only the program writes the plan: do not run \`raf docs-ok\` and do not touch the plan file. Make no commit and say under "choix" why the documentation stays true: the lot is handed back to the lead, who acknowledges it in the main checkout (\`raf docs-ok ${l.lot} --reason "…"\`).`;
+      }
     } else if (interrupted) {
       const mine = lotCommitLines(c);
       vars.commits = mine

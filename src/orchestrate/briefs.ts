@@ -32,6 +32,8 @@ export interface BriefVars {
   docs?: string;
   /** Consigne du bibliothécaire (L306) sur les documents hors dépôt déclarés par `describedBy` ; vide ailleurs et sans clé. */
   elsewhere?: string;
+  /** Façon d'acquitter l'écart docs.sync (L317) dans le brief du bibliothécaire : `raf docs-ok` + commit du plan dans le dépôt, mais le lead seul dans un worktree (le plan n'y est écrit que par le programme, L320) ; vide ailleurs. */
+  ack?: string;
   /** Consigne de l'étape spec (L171) : dossier, largeurs, commande de rendu, écarts de la passe précédente ; vide ailleurs. */
   spec?: string;
   /** Consigne de l'étape accept (L173) : fiche, maquette, commande dédiée, gabarit du lanceur, écarts de la passe précédente ; vide ailleurs. */
@@ -145,7 +147,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', ack: vars.ack ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

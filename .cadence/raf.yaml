@@ -3794,6 +3794,7 @@ lots:
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
+    review: { date: 2026-10-25, verdict: "compliant, 1 minor note — le seul commit (055e8d5) ajoute `escalations` et `quality` à la liste `--json` de docs/perf.md, avec un test qui compare les clés de la sortie à cette ligne ; les corrections de table.ts et cycle.ts étaient déjà dans L337 (d0f83dc) et sont couvertes par R12/R13 — orchestré (vague 2026-10-26-0100, 0 passe(s) de correction)", commit: b8c491d6fcbb7c1e3625d3633986507be8f47765, reporte: { de: 055e8d576848676a98665525b7f58493610def47, vers: b8c491d6fcbb7c1e3625d3633986507be8f47765, patchId: 914c15cbc44327253c71c1860f5358bb2bea2b14 } }
   - id: L339
     title: "CI : test instable test/orchestrate-worktree-integration.test.ts R23 « L303 — le lead change de branche entre l'avance et l'écriture du plan » — rouge sur le runner GitHub à la publication de v1.11.0 (run 40235075093, 1re tentative : « intégration refusée : le dépôt est su… » au lieu de « écriture du plan refusée : dépôt sur … »), vert à la 2e tentative et en local ; une course entre le contrôle de branche de l'intégration et celui de l'écriture du plan : rendre le test déterministe (ordre forcé, pas de minutage) sans affaiblir ce qu'il vérifie"
     status: doing

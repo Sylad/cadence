@@ -17,7 +17,7 @@ import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
-import { capturesText, headline, integrationText, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { capturesText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import { sumTokens, type Tokens } from './result.js';
@@ -84,6 +84,8 @@ export interface WaveCtx {
   dirtyRepos?: Map<string, string>;
   /** Parmi `dirtyRepos`, ceux laissés en HEAD déplacé par une session d'écriture (L214) : même file retenue, autre message. */
   movedRepos?: Set<string>;
+  /** Pourquoi le modèle local est écarté pour la suite de la vague (L322) : posé au premier échec d'une session locale, il envoie les lots suivants droit à Sonnet. */
+  localOut?: string;
   log: (line: string) => void;
   saveWave: () => void;
   /** Attente du verrou d'intégration du dépôt (L279, R25) : bornes par défaut INTEGRATE_WAIT_MS et INTEGRATE_POLL_MS ; réglables pour les tests. */
@@ -440,7 +442,7 @@ function avalOf(c: LotCtx, kind: SessionKind): string {
   return kind === 'review-small' && l.small && l.visible && screen ? `${text}\n${avalFicheText('ux', o)}` : text;
 }
 
-function briefFor(c: LotCtx, kind: SessionKind): string {
+function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
@@ -453,6 +455,7 @@ function briefFor(c: LotCtx, kind: SessionKind): string {
   }
   if (mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright) vars.shots = shotsText(playwrightDir(c.wave.store.lotDir(l.project, l.lot)));
   vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';
+  if (kind === 'precheck' && local) vars.lecture = localReading({ ...lot, goal: l.goal ?? lot.goal });
   if (kind === 'spec') {
     const reviewed = [...(l.ficheConstats ?? []), ...(l.maquetteConstats ?? [])];
     const written = ficheOf(c);
@@ -582,6 +585,11 @@ function reviewModel(c: LotCtx, kind: SessionKind): Model {
 }
 
 /** Une session : budget et quota vérifiés avant, état écrit avant et après, journal gardé, contrôles du dépôt après. */
+/** Écarte le modèle local pour le reste de la vague (L322) : le premier échec suffit, les lots suivants n'attendent pas de le constater à leur tour. */
+function benchLocal(c: LotCtx, cause: string): void {
+  c.wave.localOut ??= cause.slice(0, 200);
+}
+
 /** Rendu par `session(…, true)` quand l'étape locale n'a rien donné (Ollama éteint, délai, rapport sans structure) : l'appelant se replie sur Sonnet (L146). */
 const LOCAL_FAILED = Symbol('local-failed');
 
@@ -612,7 +620,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
 
   let brief: string;
   try {
-    brief = briefFor(c, kind);
+    brief = briefFor(c, kind, local);
   } catch (e) {
     step.status = 'failed';
     step.cause = (e as Error).message;
@@ -717,7 +725,9 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   }
   if (local && outcome.kind !== 'ok') {
     // Hors quota Anthropic : rien au budget (ni sortie, ni journal), et jamais d'arrêt du lot — Sonnet reprend le contrôle.
-    const cause = outcome.kind === 'failed' ? outcome.cause : outcome.message;
+    // Un appel d'outil écrit en texte (`<function=Bash>`) est une sortie sans structured_output : le local n'a pas tenu l'appel d'outils, inutile d'attendre un second tour.
+    const textCall = outcome.kind === 'failed' && outcome.stdout.includes('<function=');
+    const cause = textCall ? 'appel d\'outil écrit en texte, pas de structured_output' : outcome.kind === 'failed' ? outcome.cause : outcome.message;
     writeFileSync(join(dir, `${base}.json`), outcome.kind === 'failed' ? outcome.stdout : '');
     if (outcome.kind === 'failed') writeFileSync(join(dir, `${base}.err`), outcome.stderr);
     step.status = 'failed';
@@ -725,6 +735,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
     step.report = `${base}.json`;
     delete step.tokens;
     l.warnings.push(`contrôle préalable : modèle local sans résultat (${cause.slice(0, 200)}), repli sur Sonnet`);
+    benchLocal(c, cause);
     save(c);
     return LOCAL_FAILED;
   }
@@ -1081,6 +1092,32 @@ export function needsPrecheck(config: { precheck: boolean; precheckLocal?: boole
 }
 
 /**
+ * Un lot créé après le dernier commit de code du dépôt n'a rien à retrouver (L322) : tout ce que le dépôt contient date d'avant le lot, donc aucun autre lot ne l'a livré.
+ * Rend la raison à écrire au journal, ou null quand le contrôle garde un sens. Le lot est daté par le commit qui a ajouté son id au plan, borné par sa clé `created` (une
+ * migration ou un déplacement du plan ne rajeunit pas un vieux lot) ; le dernier commit de code est le dernier qui ne touche pas que le plan (`isPlanOnly`). Prudent : lot
+ * qui travaille dans des dépôts voisins, id introuvable dans l'historique du plan, dépôt sans commit de code ou instants égaux → le contrôle reste.
+ */
+export function precheckNothingToFind(plan: Plan, root: string, lot: string, repos: LotRepo[] = []): string | null {
+  if (repos.length) return null;
+  try {
+    const rel = relative(root, plan.path);
+    const idLine = `^\\s*- id: ["']?${lot.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}["']?\\s*$`;
+    const added = git(root, '-c', 'core.quotepath=off', 'log', '--follow', '--reverse', '--format=%ct', '-G', idLine, '--', rel).split('\n').find(Boolean);
+    if (!added) return null;
+    const created = plan.lot(lot).created;
+    const endOfCreated = created ? Date.parse(`${created}T23:59:59`) / 1000 : Infinity;
+    const createdAt = Math.min(Number(added), Number.isNaN(endOfCreated) ? Infinity : endOfCreated);
+    const log = git(root, 'log', '--format=%H %ct').split('\n').filter(Boolean);
+    const code = log.map((x) => x.split(' ')).find(([sha]) => !isPlanOnly(sha!, plan, root));
+    if (!code) return null;
+    if (createdAt <= Number(code[1])) return null;
+    return `lot créé après le dernier commit de code du dépôt (${code[0]!.slice(0, 7)}) : rien à retrouver`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Contrôle préalable (L77) : une session de lecture seule cherche si le livrable du lot est déjà dans le dépôt (fait par un
  * autre lot). « oui » rend le lot sans ouvrir d'implémentation ; « partiel » joint le constat au brief de l'implémentation.
  * Un rapport illisible ne bloque pas : avertissement, l'implémentation part.
@@ -1089,7 +1126,9 @@ async function precheck(c: LotCtx): Promise<void> {
   const l = c.lot;
   let rep: PrecheckReport | null = null;
   let localYes = false;
-  if (c.config.precheckLocal) {
+  if (c.config.precheckLocal && c.wave.localOut) {
+    l.warnings.push(`contrôle préalable : modèle local écarté pour la vague (${c.wave.localOut}), Sonnet directement`);
+  } else if (c.config.precheckLocal) {
     // Modèle local (L146) : un échec, un rapport illisible ou un « oui » (qui rendrait le lot sans implémentation) rend la main à Sonnet.
     const done = await session(c, 'precheck', true);
     if (!done) return;
@@ -1098,6 +1137,7 @@ async function precheck(c: LotCtx): Promise<void> {
         rep = checkShape<PrecheckReport>(done.report, PRECHECK_SCHEMA);
       } catch (e) {
         l.warnings.push(`contrôle préalable : rapport du modèle local illisible (${(e as Error).message}), repli sur Sonnet`);
+        benchLocal(c, `rapport illisible : ${(e as Error).message}`);
       }
       if (rep?.dejaPresent === 'oui') {
         localYes = true;
@@ -1139,6 +1179,15 @@ async function precheck(c: LotCtx): Promise<void> {
   }
   l.next = firstWrite(c);
   save(c);
+}
+
+/** Le lot passe-t-il par le contrôle préalable ? Un lot qui n'a rien à retrouver (L322) saute l'étape, et le journal du lot le dit. */
+function precheckOrSkip(c: LotCtx): boolean {
+  const plan = c.loadPlan();
+  if (!needsPrecheck(c.config, plan, c.lot.repo, c.lot.lot, c.lot.repos, c.lot.goal)) return false;
+  const nothing = precheckNothingToFind(histPlan(c), wd(c), c.lot.lot, c.lot.repos);
+  if (nothing) c.lot.warnings.push(`contrôle préalable sauté : ${nothing}`);
+  return !nothing;
 }
 
 /** Première session d'écriture d'un lot : la spec quand il déclare `screen:` ou `spec: true` et qu'aucune fiche n'est écrite, sinon l'implémentation. */
@@ -2482,7 +2531,7 @@ export async function runLot(c: LotCtx): Promise<void> {
       // La correction de départ est une passe comme les autres (toFix : l.pass, verdict, tableau, MAX_PASSES bornent le total, reprise comprise).
       if (l.resumedFrom && l.constats.length) toFix(c, l.constats, 'reprise de la branche');
       else {
-        l.next = l.resumedFrom ? (l.resumedReviewed ? firstReview(c) : firstWrite(c)) : needsPrecheck(c.config, c.loadPlan(), l.repo, l.lot, l.repos, l.goal) ? 'precheck' : firstWrite(c);
+        l.next = l.resumedFrom ? (l.resumedReviewed ? firstReview(c) : firstWrite(c)) : precheckOrSkip(c) ? 'precheck' : firstWrite(c);
         save(c);
       }
     }

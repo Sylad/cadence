@@ -34,6 +34,8 @@ export interface BriefVars {
   elsewhere?: string;
   /** Façon d'acquitter l'écart docs.sync (L317) dans le brief du bibliothécaire : `raf docs-ok` + commit du plan dans le dépôt, mais le lead seul dans un worktree (le plan n'y est écrit que par le programme, L320) ; vide ailleurs. */
   ack?: string;
+  /** Précheck (L322) : comment la session prend connaissance du lot ; absent, elle lit le plan elle-même (`PLAN_READING`). Le modèle local reçoit le lot dans le brief (`localReading`). */
+  lecture?: string;
   /** Consigne de l'étape spec (L171) : dossier, largeurs, commande de rendu, écarts de la passe précédente ; vide ailleurs. */
   spec?: string;
   /** Consigne de l'étape accept (L173) : fiche, maquette, commande dédiée, gabarit du lanceur, écarts de la passe précédente ; vide ailleurs. */
@@ -103,6 +105,26 @@ export function shotsText(captureDir: string): string {
   return `The Playwright server resolves a file name you give it against the repository, not against its output directory: a bare name such as page-home.png lands at the repository root. Give every screenshot, snapshot and trace the absolute path of the wave's capture directory, \`${captureDir}/\`, followed by the name (e.g. \`${captureDir}/page-home.png\`): the server allows it, and the repository stays clean. Never the \`--output-dir\` option (the server's launch argument, which a session cannot set).`;
 }
 
+/** Précheck : la session lit le lot dans le plan (Sonnet, qui a la place pour un plan de plusieurs centaines de ko). */
+export const PLAN_READING = 'Read the lot, its notes and sub-tasks in the plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`),';
+
+/**
+ * Précheck sur le modèle local (L322) : le lot est dans le brief et la session n'ouvre pas le plan. Un plan de 474 ko lu en entier remplissait la fenêtre de 64 k
+ * de qwen3-coder:30b (7 « Autocompact is thrashing » sur 32 lots, 23 au 25-10) ; les lectures du dépôt restent courtes pour la même raison.
+ */
+export function localReading(lot: { title: string; goal?: string; notes: { date?: string; text: string }[]; tasks: { id: string; title: string; status: string }[] }): string {
+  const notes = lot.notes.slice(-5).map((n) => `- ${n.date ? `${n.date} : ` : ''}${n.text.length > 1500 ? `${n.text.slice(0, 1500)} […]` : n.text}`);
+  const tasks = lot.tasks.map((t) => `- ${t.id} [${t.status}] ${t.title}`);
+  return [
+    'Here is the lot as written in the plan; do not open the plan file (hundreds of kB: it would fill your context window).',
+    `Title: ${lot.title}`,
+    ...(lot.goal ? [`Goal: ${lot.goal}`] : []),
+    ...(notes.length ? ['Notes:', ...notes] : []),
+    ...(tasks.length ? ['Sub-tasks:', ...tasks] : []),
+    'Keep every read small (`grep -n`, `git log --oneline -S`, a few dozen lines at a time, never a whole large file),',
+  ].join('\n');
+}
+
 /** Un gabarit : un par étape, plus les variantes (passe des mineurs, passe du bibliothécaire, revue courte qui suit la passe des mineurs). */
 export type BriefName = SessionKind | 'fix-minors' | 'fix-docs' | 'review-recheck' | 'spec-back' | 'accept-back';
 
@@ -147,7 +169,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', ack: vars.ack ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '' } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', ack: vars.ack ?? '', spec: vars.spec ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '', lecture: vars.lecture ?? PLAN_READING } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

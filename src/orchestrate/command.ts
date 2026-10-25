@@ -21,7 +21,7 @@ import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specScreen, specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { Budget, DROPPED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
+import { precheckNothingToFind, Budget, DROPPED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -450,7 +450,9 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     if (l.screen && env.config.maquette) steps.unshift({ kind: 'maquette', model: env.config.review.full });
     if (l.specLot && env.config.fiche) steps.unshift({ kind: 'fiche', model: 'sonnet' });
     if (specStage) steps.unshift({ kind: 'spec', model: 'sonnet' });
-    if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal)) steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
+    const nothingToFind = needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal) ? precheckNothingToFind(env.loadPlan(), l.repo, l.lot, l.repos) : null;
+    if (nothingToFind) io.out(`  contrôle préalable sauté : ${nothingToFind}`);
+    else if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal)) steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
     const { light, full } = env.config.review;
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
     else {

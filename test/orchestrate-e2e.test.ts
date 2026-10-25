@@ -233,6 +233,23 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     }
   });
 
+  it('--dry-run : un lot créé après le dernier commit de code n\'a pas d\'étape precheck, et le dit (L322)', async () => {
+    const on = setup({}, { precheck: true });
+    const plan = join(on.dir, '.cadence/raf.yaml');
+    writeFileSync(plan, readFileSync(plan, 'utf8').replace(/created: \d{4}-\d{2}-\d{2}/, 'created: 2099-01-01'));
+    execFileSync('git', ['commit', '-q', '--amend', '--no-edit', '--date', '2099-01-01T12:00:00Z', '--', '.cadence/raf.yaml'], { cwd: on.dir, env: { ...process.env, GIT_COMMITTER_DATE: '2099-01-01T12:00:00Z' } });
+    writeFileSync(join(on.dir, 'code.txt'), 'x');
+    git(on.dir, 'add', '--', 'code.txt');
+    git(on.dir, 'commit', '-q', '-m', 'feat: du code', '--', 'code.txt');
+    const r = await on.cli('proj:L1', '--dry-run');
+    try {
+      expect(r.out).toContain('contrôle préalable sauté : lot créé après le dernier commit de code');
+      expect(r.out).toContain('étapes : implement (sonnet) → review (opus)');
+    } finally {
+      removeDryRunBriefs(r.out);
+    }
+  });
+
   it('--dry-run : precheck: local montre l\'étape (local) et ses arguments claude-local, pas ceux de Sonnet (L146)', async () => {
     const on = setup({}, { precheck: 'local' });
     const r = await on.cli('proj:L1', '--dry-run');

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, sep } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -92,6 +92,32 @@ export function takeSnapshot(waveDir: string, packageRoot: string): string {
     symlinkSync(target, join(tool, 'bin', name));
   }
   return tool;
+}
+
+/**
+ * L330 : `<vague>/tool/node_modules` vise le `node_modules` de la copie qui a lancé la vague ; la purge de `npm run service`
+ * retire cette copie quand elle sort des versions gardées, et le lien reste pendu (la reprise planterait sur `yaml`).
+ * Si le lien ne se résout plus, on le refait vers le `node_modules` du paquet courant (la copie en service) et on le dit
+ * (message rendu) ; s'il est irréparable, `SnapshotRefusal` : un refus clair, pas une trace de pile. Rien à faire : undefined.
+ */
+export function repairSnapshotModules(waveDir: string, packageRoot: string): string | undefined {
+  const link = join(toolDirOf(waveDir), 'node_modules');
+  if (existsSync(join(link, 'yaml', 'package.json'))) return undefined;
+  let was = 'absent';
+  try {
+    was = readlinkSync(link);
+  } catch {
+    /* pas un lien (ou rien) : on le remplace quand même */
+  }
+  let modules: string;
+  try {
+    modules = resolveModulesDir(packageRoot);
+  } catch (e) {
+    throw new SnapshotRefusal(`le node_modules de l'instantané de la vague (${was}) ne se résout plus et celui du paquet courant non plus, reprise impossible : ${e instanceof Error ? e.message : e}`);
+  }
+  rmSync(link, { recursive: true, force: true });
+  symlinkSync(modules, link, 'dir');
+  return `instantané : node_modules (${was}) ne se résolvait plus, la copie qui l'avait lancé a été retirée de la mise en service ; relié à ${modules}`;
 }
 
 export const snapshotExists = (waveDir: string) => existsSync(join(toolDirOf(waveDir), 'bin', 'cadence.js'));

@@ -34,7 +34,7 @@ import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderTable, resumeCommand } from './table.js';
-import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, snapshotExists, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
+import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, repairSnapshotModules, snapshotExists, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -1192,7 +1192,21 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
       io.err(`orchestrate : vague ${store.id} : son nom ressemble à un lot, l'instantané ne saurait pas le relire comme une vague : reprise avec le dist/ et les gabarits courants`);
     } else if (snapshotExists(store.dir)) {
       // Une vague d'avant L223 refuserait « projet:lot=+N » comme budget invalide : seul le lot visé justifie de la rejouer avec le dist/ courant.
-      if ((!args.lotBudgets.length || waveReadsLotBudget(store.dir)) && (!args.integrate.length || waveReadsIntegrate(store.dir)) && (!args.integrate.some((t) => t.replay) || waveReadsReplay(store.dir))) return deps.snapshot.reexec(toolDirOf(store.dir), resumeArgv(argv, store.id), io.env, io);
+      if ((!args.lotBudgets.length || waveReadsLotBudget(store.dir)) && (!args.integrate.length || waveReadsIntegrate(store.dir)) && (!args.integrate.some((t) => t.replay) || waveReadsReplay(store.dir))) {
+        // L330 : la copie dont l'instantané lie le node_modules a pu être purgée par une mise en service ; on relie, on le journalise, ou on refuse proprement.
+        try {
+          const healed = repairSnapshotModules(store.dir, deps.snapshot.packageRoot);
+          if (healed) {
+            store.journal(healed);
+            io.err(`orchestrate : vague ${store.id} : ${healed}`);
+          }
+        } catch (e) {
+          if (!(e instanceof SnapshotRefusal)) throw e;
+          io.err(`orchestrate : vague ${store.id} : ${e.message}`);
+          return 2;
+        }
+        return deps.snapshot.reexec(toolDirOf(store.dir), resumeArgv(argv, store.id), io.env, io);
+      }
       io.err(`orchestrate : vague ${store.id} : son instantané ne connaît pas ${args.lotBudgets.length && !waveReadsLotBudget(store.dir) ? '--budget projet:lot=+N (antérieur à L223)' : `${args.integrate.some((t) => t.replay) && waveReadsIntegrate(store.dir) ? '--replay' : '--integrate'} (antérieur à L279)`} : reprise avec le dist/ et les gabarits courants`);
     } else {
       io.err(`orchestrate : vague ${store.id} sans instantané (antérieure à L61) : reprise avec le dist/ et les gabarits courants`);

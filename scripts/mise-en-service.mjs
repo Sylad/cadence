@@ -115,9 +115,10 @@ function replaceLink(target, link) {
 
 /**
  * Construit <sha> dans <root>/releases/<sha12> puis bascule <root>/service et les liens du bin-dir.
- * `install(dir)` (défaut : npm ci sans scripts puis tsc) est injectable pour les tests.
+ * `install(dir)` (défaut : npm ci sans scripts puis tsc) est injectable pour les tests, comme `inUse(releases)` (copies à ne pas
+ * retirer) et `launchDirs` (dossiers de lancement dont on lit les vagues non terminées, voir `copiesDesVaguesNonFinies`).
  */
-export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defaultBinDir(), install = installAndBuild, inUse = copiesUtilisees }) {
+export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defaultBinDir(), install = installAndBuild, inUse = copiesUtilisees, launchDirs = lanceursConnus(repo) }) {
   const sha = checkAccepted(repo, rev);
   const served = servedSha(root);
   const servedFull = served && existsSync(join(root, 'releases', served)) ? git(join(root, 'releases', served), 'rev-parse', 'HEAD') : undefined;
@@ -147,8 +148,100 @@ export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defa
   utimesSync(join(dir, COMPLETE), now, now);
   replaceLink(dir, join(root, 'service'));
   for (const [name, js] of [['raf', 'raf.js'], ['cadence', 'cadence.js']]) replaceLink(join(root, 'service', 'bin', js), join(binDir, name));
-  const purge = purger({ repo, releases, current: sha.slice(0, 12), inUse });
+  // La version est déjà en service : une purge qui échoue (droits, fichier tenu) est un avertissement, jamais un échec de la mise en service.
+  let purge;
+  try {
+    purge = purger({ repo, releases, current: sha.slice(0, 12), inUse: (r) => new Set([...inUse(r), ...copiesDesVaguesNonFinies(r, launchDirs)]) });
+  } catch (e) {
+    purge = { removed: 0, kept: 0, freedBytes: 0, error: e instanceof Error ? e.message : String(e) };
+  }
   return { sha, dir, fingerprint: fingerprint(dir), purge };
+}
+
+const real = (path) => {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+};
+
+/**
+ * Rend `note(path)` qui ajoute à `used` le nom de la copie de `releases` que `path` désigne (la copie elle-même ou un
+ * chemin dessous). /proc/<pid>/cwd et /proc/<pid>/exe donnent toujours le chemin réel : si `releases` (ou une copie) passe
+ * par un lien symbolique (--root, home), on compare aussi au chemin résolu, sinon le processus ne serait pas vu.
+ */
+function noteurDeCopies(releases, used) {
+  const roots = [...new Set([releases, real(releases)])];
+  let copies = [];
+  try {
+    copies = readdirSync(releases).map((name) => ({ name, path: real(join(releases, name)) }));
+  } catch {
+    /* dossier absent : rien à retenir */
+  }
+  return (path) => {
+    for (const root of roots) {
+      if (path.startsWith(`${root}/`)) used.add(path.slice(root.length + 1).split('/')[0]);
+    }
+    for (const copy of copies) {
+      if (path === copy.path || path.startsWith(`${copy.path}/`)) used.add(copy.name);
+    }
+  };
+}
+
+/** Dossiers de lancement connus : le dépôt, et le dossier de chaque vague que le registre de l'orchestrateur (waves/<pid>.json, vivante ou non) a gardé. */
+export function lanceursConnus(repo, env = process.env) {
+  const dirs = new Set([repo]);
+  const home = env.CADENCE_HOME || join(env.HOME || homedir(), '.cadence', 'orchestrate');
+  try {
+    for (const n of readdirSync(join(home, 'waves'))) {
+      if (!n.endsWith('.json')) continue;
+      try {
+        const cwd = JSON.parse(readFileSync(join(home, 'waves', n), 'utf8')).cwd;
+        if (typeof cwd === 'string' && cwd) dirs.add(cwd);
+      } catch {
+        /* fichier illisible : ignoré */
+      }
+    }
+  } catch {
+    /* pas de registre */
+  }
+  return [...dirs];
+}
+
+/**
+ * Copies visées par `tool/node_modules` de l'instantané d'une vague NON terminée (suspendue, interrompue, en cours) des
+ * dossiers de lancement donnés (`<dossier>/.cadence/runs/<vague>/`) : `orchestrate --resume` relance cet instantané, qui
+ * charge ses dépendances par ce lien. Seules les vagues de ces dossiers sont connues : le registre ne garde pas les vagues
+ * mortes, il n'y a pas de recherche sur tout le disque ; une vague d'ailleurs est réparée à la reprise (`--resume` relie le lien pendu).
+ */
+export function copiesDesVaguesNonFinies(releases, launchDirs) {
+  const used = new Set();
+  const note = noteurDeCopies(releases, used);
+  for (const launch of launchDirs) {
+    const runs = join(launch, '.cadence', 'runs');
+    let waves = [];
+    try {
+      waves = readdirSync(runs);
+    } catch {
+      continue;
+    }
+    for (const id of waves) {
+      try {
+        if (JSON.parse(readFileSync(join(runs, id, 'wave.json'), 'utf8')).status === 'done') continue;
+      } catch {
+        if (!existsSync(join(runs, id, 'wave.json'))) continue; // pas une vague
+        // wave.json illisible : une vague illisible n'est pas terminée, on la protège
+      }
+      try {
+        const modules = join(runs, id, 'tool', 'node_modules');
+        note(resolve(dirname(modules), readlinkSync(modules)));
+      } catch {
+        /* pas d'instantané, ou pas un lien */
+      }
+    }
+  }
+  return used;
 }
 
 /**
@@ -158,30 +251,7 @@ export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defa
  */
 export function copiesUtilisees(releases) {
   const used = new Set();
-  const real = (path) => {
-    try {
-      return realpathSync(path);
-    } catch {
-      return path;
-    }
-  };
-  // /proc/<pid>/cwd et /proc/<pid>/exe donnent toujours le chemin réel : si `releases` (ou une copie) passe par un lien
-  // symbolique (--root, home), on compare aussi au chemin résolu, sinon le processus ne serait pas vu.
-  const roots = [...new Set([releases, real(releases)])];
-  let copies = [];
-  try {
-    copies = readdirSync(releases).map((name) => ({ name, path: real(join(releases, name)) }));
-  } catch {
-    /* dossier absent : rien à retenir */
-  }
-  const noteDirect = (path) => {
-    for (const root of roots) {
-      if (path.startsWith(`${root}/`)) used.add(path.slice(root.length + 1).split('/')[0]);
-    }
-    for (const copy of copies) {
-      if (path === copy.path || path.startsWith(`${copy.path}/`)) used.add(copy.name);
-    }
-  };
+  const noteDirect = noteurDeCopies(releases, used);
   const note = (path) => {
     if (!path.startsWith('/')) return;
     noteDirect(path);
@@ -269,10 +339,11 @@ function purger({ repo, releases, current, inUse }) {
 }
 
 /** La phrase de la sortie : ce que la purge a retiré et la place rendue. */
-export function direPurge({ removed, kept, freedBytes }) {
+export function direPurge({ removed, kept, freedBytes, error }) {
+  if (error) return `avertissement : purge des anciennes copies interrompue (${error}) ; la nouvelle version est en service, les copies restantes seront reprises à la prochaine mise en service`;
   const unit = freedBytes >= 1024 ** 3 ? [1024 ** 3, 'Go'] : [1024 ** 2, 'Mo'];
   const size = `${(freedBytes / unit[0]).toFixed(1).replace('.', ',')} ${unit[1]}`;
-  const tail = kept ? ` ; ${kept} gardée${kept > 1 ? 's' : ''}, un processus l'utilise encore` : '';
+  const tail = kept ? ` ; ${kept} gardée${kept > 1 ? 's' : ''}, un processus ou une vague non terminée l'utilise encore` : '';
   if (!removed) return `purge : aucune copie retirée${tail}`;
   return `purge : ${removed} ${removed > 1 ? 'copies retirées' : 'copie retirée'}, ${size} libérés${tail}`;
 }
@@ -314,7 +385,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   }
   try {
     const r = mettreEnService({ repo, rev, ...(root && { root: resolve(root) }), ...(binDir && { binDir: resolve(binDir) }) });
-    console.log(`en service : ${r.sha.slice(0, 7)} dans ${r.dir}\nempreinte : ${r.fingerprint}\n${direPurge(r.purge)}`);
+    console.log(`en service : ${r.sha.slice(0, 7)} dans ${r.dir}\nempreinte : ${r.fingerprint}`);
+    (r.purge.error ? console.error : console.log)(direPurge(r.purge)); // une purge ratée : avertissement sur stderr, code de sortie 0 (la version est en service)
   } catch (e) {
     console.error(e instanceof Error ? e.message : String(e));
     process.exit(1);

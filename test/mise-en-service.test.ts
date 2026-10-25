@@ -1,9 +1,9 @@
-import { execFileSync, spawn } from 'node:child_process';
-import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { appendFileSync, chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { checkAccepted, checkLotsDone, direPurge, fingerprint, mettreEnService } from '../scripts/mise-en-service.mjs';
+import { checkAccepted, checkLotsDone, copiesDesVaguesNonFinies, direPurge, fingerprint, lanceursConnus, mettreEnService } from '../scripts/mise-en-service.mjs';
 import { takeSnapshot } from '../src/orchestrate/snapshot.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
@@ -43,11 +43,11 @@ const install = (dir: string) => {
 };
 
 /** Met en service un commit par nom (un fichier ajouté), dans l'ordre ; rend leurs shas. */
-const enService = (dir: string, root: string, binDir: string, names: string[]) =>
+const enService = (dir: string, root: string, binDir: string, names: string[], extra: Record<string, unknown> = {}) =>
   names.map((n) => {
     writeFileSync(join(dir, `${n}.txt`), n);
     const sha = commitAll(dir, `feat(L1): ${n}`, `${n}.txt`);
-    mettreEnService({ repo: dir, rev: sha, root, binDir, install });
+    mettreEnService({ repo: dir, rev: sha, root, binDir, install, ...extra });
     return sha;
   });
 
@@ -320,6 +320,100 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     }
   }, 120_000);
 
+  /** Une vague de `launch` : `<launch>/.cadence/runs/<id>/` avec son wave.json et, si `modules`, l'instantané dont tool/node_modules y renvoie. */
+  const faussVague = (launch: string, id: string, status: string, modules?: string) => {
+    const w = join(launch, '.cadence', 'runs', id);
+    mkdirSync(join(w, 'tool'), { recursive: true });
+    writeFileSync(join(w, 'wave.json'), JSON.stringify({ id, status }));
+    if (modules) symlinkSync(modules, join(w, 'tool', 'node_modules'), 'dir');
+  };
+
+  it("L330 — une vague non terminée sans processus vivant garde la copie que vise son tool/node_modules ; une vague terminée non", () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    const copieA = join(root, 'releases', first.slice(0, 12));
+    mkdirSync(join(copieA, 'node_modules'), { recursive: true });
+    const [second] = enService(dir, root, binDir, ['b']);
+    const copieB = join(root, 'releases', second.slice(0, 12));
+    mkdirSync(join(copieB, 'node_modules'), { recursive: true });
+    const launch = tempDir();
+    faussVague(launch, 'suspendue', 'suspended-budget', join(copieA, 'node_modules'));
+    faussVague(launch, 'finie', 'done', join(copieB, 'node_modules'));
+    const launchDirs = [launch];
+    // 5 mises en service de plus, aucun processus : A et B sortent des 4 gardées
+    enService(dir, root, binDir, ['c', 'd', 'e', 'f', 'g'], { launchDirs });
+    expect(existsSync(copieA)).toBe(true); // la vague suspendue en a encore besoin
+    expect(existsSync(copieB)).toBe(false); // la vague terminée n'en a plus besoin
+    // la vague se termine : la copie part à la mise en service suivante
+    writeFileSync(join(launch, '.cadence/runs/suspendue/wave.json'), JSON.stringify({ id: 'suspendue', status: 'done' }));
+    enService(dir, root, binDir, ['h'], { launchDirs });
+    expect(existsSync(copieA)).toBe(false);
+  }, 180_000);
+
+  it("L330 — copiesDesVaguesNonFinies : interrompue, suspendue et wave.json illisible comptent, terminée et dossier sans wave.json non ; lien pendu lu sans planter", () => {
+    const { root } = places();
+    const releases = join(root, 'releases');
+    for (const n of ['a', 'b', 'c', 'd', 'e']) mkdirSync(join(releases, n, 'node_modules'), { recursive: true });
+    const launch = tempDir();
+    faussVague(launch, 'v1', 'interrupted', join(releases, 'a', 'node_modules'));
+    faussVague(launch, 'v2', 'suspended-quota', join(releases, 'b', 'node_modules'));
+    faussVague(launch, 'v3', 'done', join(releases, 'c', 'node_modules'));
+    faussVague(launch, 'v4', 'x', join(releases, 'd', 'node_modules'));
+    writeFileSync(join(launch, '.cadence/runs/v4/wave.json'), '{pas du json');
+    mkdirSync(join(launch, '.cadence/runs/orphelin/tool'), { recursive: true });
+    symlinkSync(join(releases, 'e', 'node_modules'), join(launch, '.cadence/runs/orphelin/tool/node_modules'), 'dir');
+    rmSync(join(releases, 'b'), { recursive: true }); // lien pendu : lu sans être suivi, il ne plante pas (son nom est noté, la copie n'existe plus)
+    expect([...copiesDesVaguesNonFinies(releases, [launch, join(launch, 'absent')])].sort()).toEqual(['a', 'b', 'd']);
+  });
+
+  it("L330 — lanceursConnus : le dépôt et le dossier de chaque vague du registre (CADENCE_HOME), vivante ou non", () => {
+    const home = tempDir();
+    mkdirSync(join(home, 'waves'));
+    writeFileSync(join(home, 'waves', '1.json'), JSON.stringify({ pid: 1, wave: 'w', cwd: '/lanceur/un' }));
+    writeFileSync(join(home, 'waves', '2.json'), '{illisible');
+    expect(lanceursConnus('/depot', { CADENCE_HOME: home }).sort()).toEqual(['/depot', '/lanceur/un']);
+    expect(lanceursConnus('/depot', { CADENCE_HOME: join(home, 'absent') })).toEqual(['/depot']);
+  });
+
+  it("L330 — une purge qui échoue après la bascule est un avertissement : la version est en service, rien n'est lancé en erreur", () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    enService(dir, root, binDir, ['b', 'c', 'd']); // la purge n'a des candidats (donc ne lit les processus) qu'à la 5e version
+    writeFileSync(join(dir, 'e.txt'), 'e');
+    const second = commitAll(dir, 'feat(L1): e', 'e.txt');
+    const r = mettreEnService({ repo: dir, rev: second, root, binDir, install, inUse: () => { throw new Error('EACCES: permission denied, scandir'); } });
+    expect(r.purge).toMatchObject({ removed: 0, kept: 0, freedBytes: 0, error: expect.stringContaining('EACCES') });
+    expect(direPurge(r.purge)).toMatch(/^avertissement : purge des anciennes copies interrompue \(EACCES.*la nouvelle version est en service/);
+    expect(readlinkSync(join(root, 'service'))).toBe(r.dir);
+    expect(r.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+  }, 120_000);
+
+  it.skipIf(process.getuid?.() === 0)("L330 — la ligne de commande : une copie illisible à la purge (EACCES) donne un avertissement sur stderr, l'empreinte, le code de sortie 0 et le lien service basculé", () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    enService(dir, root, binDir, ['b', 'c', 'd']);
+    // npm et npx de substitution : pas de réseau ; la compilation est la vraie
+    const shim = tempDir();
+    writeFileSync(join(shim, 'npm'), `#!/bin/sh\nln -s '${join(REPO, 'node_modules')}' node_modules\n`, { mode: 0o755 });
+    writeFileSync(join(shim, 'npx'), `#!/bin/sh\nshift\nexec '${join(REPO, 'node_modules/.bin/tsc')}' "$@"\n`, { mode: 0o755 });
+    writeFileSync(join(dir, 'e.txt'), 'e');
+    const fifth = commitAll(dir, 'feat(L1): e', 'e.txt');
+    const oldest = join(root, 'releases', first.slice(0, 12));
+    chmodSync(oldest, 0o000);
+    try {
+      const r = spawnSync('node', [join(REPO, 'scripts/mise-en-service.mjs'), fifth, '--root', root, '--bin-dir', binDir, '--repo', dir], { encoding: 'utf8', env: { ...process.env, PATH: `${shim}:${process.env.PATH}`, CADENCE_HOME: join(tempDir(), 'home') } });
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain('empreinte : ');
+      expect(r.stderr).toContain('avertissement : purge des anciennes copies interrompue');
+      expect(git(join(root, 'service'), 'rev-parse', 'HEAD')).toBe(fifth);
+    } finally {
+      chmodSync(oldest, 0o755);
+    }
+  }, 180_000);
+
   it('L330 — la purge est dite : n copies retirées, place libérée, copies gardées parce qu\'utilisées', () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();
@@ -332,7 +426,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(r.purge.freedBytes).toBeGreaterThan(0);
     expect(direPurge(r.purge)).toMatch(/^purge : 1 copie retirée, \d/);
     expect(direPurge({ removed: 0, kept: 0, freedBytes: 0 })).toBe('purge : aucune copie retirée');
-    expect(direPurge({ removed: 2, kept: 1, freedBytes: 2.5 * 1024 ** 3 })).toBe('purge : 2 copies retirées, 2,5 Go libérés ; 1 gardée, un processus l\'utilise encore');
+    expect(direPurge({ removed: 2, kept: 1, freedBytes: 2.5 * 1024 ** 3 })).toBe('purge : 2 copies retirées, 2,5 Go libérés ; 1 gardée, un processus ou une vague non terminée l\'utilise encore');
   }, 120_000);
 
   it('checkLotsDone ne regarde que les commits au-dessus du sha déjà en service (le seul sha, au premier service)', () => {

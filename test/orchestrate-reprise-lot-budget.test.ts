@@ -541,6 +541,8 @@ describe('R14 — vague lancée avant L223 (instantané sans lotBudgets)', () =>
     mkdirSync(join(tool, 'bin'), { recursive: true });
     mkdirSync(join(tool, 'dist', 'orchestrate'), { recursive: true });
     writeFileSync(join(tool, 'bin', 'cadence.js'), '');
+    mkdirSync(join(tool, 'node_modules', 'yaml'), { recursive: true }); // un instantané a ses dépendances (L330 : la reprise vérifie le lien)
+    writeFileSync(join(tool, 'node_modules', 'yaml', 'package.json'), '{}');
     writeFileSync(join(tool, 'dist', 'orchestrate', 'command.js'), command);
     return tool;
   };

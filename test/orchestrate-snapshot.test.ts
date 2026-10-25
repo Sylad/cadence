@@ -165,6 +165,42 @@ describe('L61 — instantané de la vague (<vague>/tool/)', () => {
     expect(s.reviews.join('')).not.toContain('GABARIT MODIFIE');
   });
 
+  it("L330 — --resume d'une vague dont le node_modules de l'instantané ne se résout plus (copie purgée) le relie au paquet courant, le journalise et reprend", async () => {
+    const { parent } = project();
+    const s = setup();
+    const env = { CWD_FOR_TEST: parent };
+    expect(await orchestrate(['a:L1', 'a:L2', '--budget', '2000'], ioOf(parent, env).io, s.deps)).toBe(3);
+    const wave = join(parent, '.cadence/runs/2026-10-04-1412');
+    // la copie qui avait lancé la vague a été retirée : le lien est pendu
+    rmSync(join(wave, 'tool/node_modules'));
+    symlinkSync(join(tempDir(), 'releases-purgee', 'node_modules'), join(wave, 'tool/node_modules'), 'dir');
+    expect(existsSync(join(wave, 'tool/node_modules/yaml'))).toBe(false);
+    const r = ioOf(parent, env);
+    expect(await orchestrate(['--resume', '--budget', '1M'], r.io, s.deps)).toBe(0);
+    expect(s.reexecs).toHaveLength(2);
+    expect(existsSync(join(wave, 'tool/node_modules/yaml/package.json'))).toBe(true);
+    expect(realpathSync(join(wave, 'tool/node_modules'))).toBe(realpathSync(join(s.pkg, 'node_modules')));
+    expect(readFileSync(join(wave, 'journal.log'), 'utf8')).toMatch(/instantané : node_modules \(.*releases-purgee.*\) ne se résolvait plus/);
+    expect(r.err.join('\n')).toContain('relié à');
+  });
+
+  it("L330 — --resume dont le node_modules de l'instantané est pendu et que le paquet courant ne sait pas réparer : refus clair, code 2, rien relancé", async () => {
+    const { parent } = project();
+    const s = setup();
+    const env = { CWD_FOR_TEST: parent };
+    expect(await orchestrate(['a:L1', 'a:L2', '--budget', '2000'], ioOf(parent, env).io, s.deps)).toBe(3);
+    const wave = join(parent, '.cadence/runs/2026-10-04-1412');
+    rmSync(join(wave, 'tool/node_modules'));
+    symlinkSync(join(tempDir(), 'purgee'), join(wave, 'tool/node_modules'), 'dir');
+    // un paquet courant sans dépendances (un autre dossier : Node garde en cache la résolution de yaml depuis s.pkg)
+    const bare = tempDir();
+    writeFileSync(join(bare, 'package.json'), '{"name":"x"}\n');
+    const r = ioOf(parent, env);
+    expect(await orchestrate(['--resume', '--budget', '1M'], r.io, { ...s.deps, snapshot: { ...s.deps.snapshot!, packageRoot: bare } })).toBe(2);
+    expect(s.reexecs).toHaveLength(1);
+    expect(r.err.join('\n')).toMatch(/ne se résout plus.*reprise impossible/);
+  });
+
   it('--resume d\'une vague sans instantané : comportement actuel, avec un avertissement', async () => {
     const { parent } = project();
     const s = setup();

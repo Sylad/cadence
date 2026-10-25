@@ -104,6 +104,8 @@ describe('orchestrate --resume : une option ignorée est refusée (L309)', () =>
     const tool = toolDirOf(cible.dir);
     mkdirSync(join(tool, 'bin'), { recursive: true });
     writeFileSync(join(tool, 'bin', 'cadence.js'), '');
+    mkdirSync(join(tool, 'node_modules', 'yaml'), { recursive: true }); // un instantané a ses dépendances (L330 : la reprise vérifie le lien)
+    writeFileSync(join(tool, 'node_modules', 'yaml', 'package.json'), '{}');
     const recu: string[][] = [];
     const { d } = deps();
     const withSnapshot = { ...d, snapshot: { packageRoot: tempDir(), reexec: async (t: string, argv: string[]) => (recu.push([t, ...argv]), 0) } };

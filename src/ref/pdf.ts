@@ -49,7 +49,7 @@ function poppler(name: string, tools: ToolPaths, args: string[], file: string): 
     return exec(tools[name]!, args);
   } catch (e) {
     const err = e as { stderr?: string; message?: string };
-    const reason = String(err.stderr ?? '').split('\n').find((l) => l.trim() !== '') ?? String(err.message ?? '').split('\n')[0] ?? '';
+    const reason = String(err.stderr ?? '').split('\n').find((l) => l.trim() !== '' && !/^Syntax Warning/.test(l)) ?? String(err.message ?? '').split('\n')[0] ?? '';
     const clean = reason.replace(/^Syntax Error[^:]*: /, '').trim();
     throw new RafError(`ref : ${name} a échoué sur ${file}${clean ? ` (${clean})` : ''}`);
   }

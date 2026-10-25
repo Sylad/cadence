@@ -233,6 +233,17 @@ describe('cadence ref add (L261)', () => {
     expect(existsSync(join(refs, 'norme'))).toBe(false);
   });
 
+  it("pdftotext : les lignes « Syntax Warning » qui précèdent l'erreur ne cachent pas la cause", () => {
+    const { base, env, cwd } = setup();
+    const bin = join(base, 'casses');
+    mkdirSync(bin);
+    writeFileSync(join(bin, 'pdftotext'), '#!/bin/sh\necho "Syntax Warning: Invalid Font Weight" >&2\necho "Syntax Error: disque plein" >&2\nexit 1\n', { mode: 0o755 });
+    const pdf = writePdf(base, 'norme.pdf', NORME);
+    const r = ref(cwd, { ...env, PATH: `${bin}:${env.PATH}` }, 'add', pdf, '--slug', 'norme');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain(`ref : pdftotext a échoué sur ${pdf} (disque plein)`);
+  });
+
   it("un outil qui échoue sur un document déjà ajouté ne touche pas son document.json", () => {
     const { base, refs, env, cwd } = setup();
     const pdf = writePdf(base, 'norme.pdf', NORME);

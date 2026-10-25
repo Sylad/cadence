@@ -3655,11 +3655,14 @@ lots:
     docs_ok: { date: 2026-10-25, reason: "paramètre interne graceMs de realDeps, injectable pour les tests seulement : aucun comportement visible ne change, la doc de deliver (grâce de 2 s après Ctrl-C) reste vraie" }
   - id: L326
     title: "README de cadence concis et clair (règle Sylvain 25-10 : « faut pas fuir les gens avec le readme ») — page d'accueil : quoi et pour qui en 2-3 phrases, démarrage en 3 commandes, UN schéma simple, liens vers la doc ; le détail (TMPDIR, worktrees, options d'orchestrate, migrate…) va dans docs/ sans perte ; test readme-accueil : garde-fou de lisibilité (taille plus basse, lignes courtes, pas d'option détaillée) au lieu des seuls 12 ko ; agent doc-keeper : un lot qui change le fonctionnement écrit dans docs/, le README ne reçoit qu'un lien ; doc et CHANGELOG"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
     review: { date: 2026-10-25, verdict: "compliant: 0 blocking, 0 major, 3 minor notes (self-link in whats-new, a stale test title and audit.ts comment, README at 47 lines rather than the 36 announced) — orchestré (vague 2026-10-25-1107, 0 passe(s) de correction)", commit: a0ba93e1ea492ba35d2b93809552f13da29b4f12, reporte: { de: 32bbfb31cec22a3752f885332d17a069fd4c6d63, vers: a0ba93e1ea492ba35d2b93809552f13da29b4f12, patchId: 7756a0809e1725080474f2a4b92db29148cb45c4 } }
+    notes:
+      - { date: 2026-10-25, text: "25-10 (lead) : README relu par le lead — 2 035 o, 47 lignes : quoi et pour qui, 3 commandes, un schéma simple (une ligne de 7 étapes, le lead au-dessus), liens ; ancien contenu dans docs/overview.md, What's new dans docs/whats-new.md ; garde-fou 5 ko / 60 lignes / 160 car. Rendu une fois pour un faux rouge de charge à l'intégration (sommet rejoué seul : vert) puis intégré par --integrate. Mineurs en note : docs/whats-new.md:21 se renvoie à lui-même ; titre de test/release-1-0-0.test.ts:24 et commentaire src/audit.ts:99 parlent encore du What's new du README." }
+    finished: 2026-10-25
   - id: L327
     title: "orchestrate : signaler un projet sans porte de tests — cadence lead tour et orchestrate --dry-run disent en une ligne qu'un projet n'a pas orchestrate.test (la vague ne lancera pas la suite, seule la revue le fera si elle le décide), avec la commande probable lue de package.json (scripts.test) / pyproject (pytest) / pom (mvn test) quand elle existe ; doc (docs/orchestrate.md, docs/lead.md) et CHANGELOG ; tests. Puis le lead déclare test/build dans chaque projet (un commit de config par projet, après vérification que la commande est verte). Suite de L324."
     status: done

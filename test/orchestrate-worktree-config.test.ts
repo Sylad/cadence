@@ -102,9 +102,12 @@ describe('R4 — reprise sans variable (L320)', () => {
     writeFileSync(join(repo, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
     git(repo, 'add', '--', 'cadence.yaml');
     git(repo, 'commit', '-q', '-m', 'chore: sans worktrees');
-    const r = await run(parent, ['--resume', WAVE, '--budget', '5M'], fake(), {}, OLD_VAR);
+    const g = fake();
+    const r = await run(parent, ['--resume', WAVE, '--budget', '5M'], g, {}, OLD_VAR);
     expect(r.err).toBe('');
     expect(r.code).toBe(0);
+    expect(g.calls.length).toBeGreaterThan(0);
+    expect(g.calls.every((c) => c.cwd.includes('/worktrees/'))).toBe(true);
   });
 
   it('R4 — --resume --integrate et --resume --replay sans variable : acceptés (jamais le code 2 de l\'ancienne garde)', async () => {

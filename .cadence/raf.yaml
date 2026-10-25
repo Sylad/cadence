@@ -3617,9 +3617,10 @@ lots:
     finished: 2026-10-25
   - id: L322
     title: "précheck : moins de temps et de tokens perdus, même qualité (demande Sylvain 25-10) — mesuré du 23 au 25-10 : le précheck local échoue sur 10 lots sur 32 (7 « Autocompact is thrashing », fenêtre 64 k de qwen3-coder:30b ; 3 appels d'outils écrits en texte `<function=Bash>`, pas de structured_output), puis Sonnet refait tout ; et la part de « oui » du précheck est de 2 à 3 % sur deux fenêtres. (1) Mesurer avant de changer : par lot, durée et tokens du précheck (local et repli), part oui/partiel/non, gain des « oui » (sessions d'implémentation évitées) ; dans cadence perf. (2) Local fiable ou écarté vite : brief et outils réduits au strict nécessaire pour tenir dans la fenêtre (ou fenêtre plus grande si claude-local le permet), sortie sans structured_output ou appel d'outil en texte reconnue comme échec dès le premier tour (pas d'attente), et le local mis de côté pour la vague après un échec de ce type. (3) Pas de précheck là où il ne peut rien trouver : un lot créé après le dernier commit de code du dépôt (hors plan) n'a rien à retrouver, on saute le précheck et on le dit dans le journal. Garder : un « oui » local toujours confirmé par Sonnet ; le précheck reste pour les lots anciens. Doc (docs/orchestrate.md, précheck) et CHANGELOG ; tests."
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-25
+    started: 2026-10-25
   - id: L323
     title: "orchestrate, intégration en worktree : l'union du CHANGELOG (L314) accepte qu'un lot réécrive SA PROPRE entrée dans un commit suivant (passe fix qui précise l'entrée) — vu le 25-10 sur L275 : 2916c65 réécrit l'entrée ajoutée par 6045d7f, main a reçu l'entrée de L321 juste à côté, mergeUnreleased rend null (onlyAdds : entrée de base modifiée) et le lot est rendu « intégration impossible » ; règle : au rejeu d'un commit, une entrée de la base qui n'existait pas dans le CHANGELOG du point de départ de la branche (donc ajoutée par un commit précédent du même lot) peut être modifiée ou retirée par ce commit, sa version gagne ; toute autre entrée de base modifiée reste un conflit à la main ; tests sur ce cas (deux commits du lot, entrée voisine arrivée sur main) ; doc docs/orchestrate.md et CHANGELOG"
     status: todo

@@ -517,4 +517,16 @@ describe('skills install', () => {
     expect(json('package-lock.json').version).toBe(version);
     expect(json('package-lock.json').packages[''].version).toBe(version);
   });
+
+  it('L334 — le skill deliver livre un sha qui n\u2019est pas HEAD : push du sha seul, dry-run, livraison, et la raison', () => {
+    const skill = flat(readFileSync(join(SKILLS_DIR, 'deliver', 'SKILL.md'), 'utf8'));
+    const push = skill.indexOf('git push origin <sha>:main');
+    const dry = skill.indexOf('cadence deliver --dry-run --sha <sha>');
+    const deliver = skill.indexOf('cadence deliver --sha <sha>', dry);
+    expect(push).toBeGreaterThan(-1);
+    expect(dry).toBeGreaterThan(push);
+    expect(deliver).toBeGreaterThan(dry);
+    expect(skill).toContain('GitHub only builds the tip of a push');
+    expect(skill).toContain('waits for the run of that exact sha');
+  });
 });

@@ -32,9 +32,24 @@ writes that sha into the file named by `$CADENCE_DEPLOYED_FILE`: cadence logs it
 (a content that is not a hexadecimal commit sha — `HEAD` or a branch name included — fails the delivery; empty during a wave, the log keeps `$CADENCE_SHA` and a warning
 says the head moved).
 
-Its arguments go after `--`: `cadence deliver -- api frontend` (`--sha <rev>` to deliver a pushed
-commit other than HEAD). Ask the human (or the project's own
+Its arguments go after `--`: `cadence deliver -- api frontend` (`--sha <rev>` to deliver a commit
+other than HEAD, see « Delivering a commit that is not HEAD »). Ask the human (or the project's own
 delivery skill) which arguments this delivery needs; never guess them.
+
+## Delivering a commit that is not HEAD
+
+When HEAD holds work that must not ship and an earlier commit must, push **that sha alone** first,
+then deliver it:
+
+```sh
+git push origin <sha>:main
+cadence deliver --dry-run --sha <sha>
+cadence deliver --sha <sha>
+```
+
+The order matters. With `ci: github`, cadence waits for the run of that exact sha, and GitHub only
+builds the tip of a push: a sha that was never pushed as the tip has no run to wait for. Pushing HEAD
+instead would ship the unfinished work; never reset HEAD to get there.
 
 ## Where to run
 

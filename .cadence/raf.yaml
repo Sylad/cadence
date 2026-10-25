@@ -3752,18 +3752,24 @@ lots:
     finished: 2026-10-25
   - id: L334
     title: "skill deliver : livrer un sha qui n'est pas HEAD = pousser ce sha seul d'abord (git push origin <sha>:main) puis cadence deliver --dry-run --sha <sha> et cadence deliver --sha <sha>, avec la raison (ci: github attend le run de ce sha exact, GitHub ne construit que la pointe d'un push) — éval du plugin 1.10.0 du 25-10 : cas deliver-sha à 0,50 (3/3 essais sans le push du sha, le skill deliver ne dit que « --sha <rev> to deliver a pushed commit ») ; rejouer le cas (claude plugin eval . --case deliver-sha --trust-plugin --no-publish) jusqu'à 1,0"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-25
     started: 2026-10-25
-    review: { date: 2026-10-25, verdict: "conforme : le skill deliver dit maintenant comment livrer un sha qui n'est pas HEAD (push du sha seul, dry-run, livraison, raison) ; le rejeu de l'éval deliver-sha jusqu'à 1,0 n'est pas vérifié — orchestré (vague 2026-10-25-2330, 0 passe(s) de correction)", commit: 161fbe2a27d9afb1bfbae8671510dbd079a2d21f, reporte: { de: d6bf699a66d60a9c2195a230470ba22c94d2982b, vers: 161fbe2a27d9afb1bfbae8671510dbd079a2d21f, patchId: ef14bc00fd8863002533ac73ec484a0f90a1ddc2 } }
+    review: { date: 2026-10-25, verdict: "conforme (revue Opus neuve + contre-revue après 3e8480a : sha déjà distant, non-fast-forward jamais forcé, branche livrée ; aucun nouveau défaut)", commit: 3e8480aab707fb9b470165ed28cf652d28483232 }
+    finished: 2026-10-25
+    notes:
+      - { date: 2026-10-25, text: "Re-vérifié par le lead le 25-10 : tsc propre, vitest 3664 (+4 sautés) ; un rouge instable sous charge à la 1re passe, vert aux deux suivantes. Rejeu de l'éval deliver-sha à faire à la release 1.10.1." }
   - id: L335
     title: "plugin : la syntaxe de cadence orchestrate (<projet>:<lot>[@modèle], id avec « / » gardé tel quel, reprise par --resume [--wave]) joignable sans /lead — éval du plugin 1.10.0 du 25-10 : cas orchestrate-id-avec-slash à 0,00 avec et sans le plugin (3/3 essais inventent --lot/--model, le modèle n'a ouvert aucun skill et la lecture des fichiers du plugin est refusée dans le bac à sable) ; un skill (ou la description d'un skill existant) qui se déclenche sur « lancer une vague orchestrate » et porte la ligne de commande ; rejouer le cas jusqu'à 1,0"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
-    review: { date: 2026-10-25, verdict: "conforme, 2 notes mineures (exemple du skill identique au cas d'éval, test --model plus faible que son titre) — orchestré (vague 2026-10-25-2330, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: cb5a64a0801c8e47d97ffe4eb032599b2ada1640 }
+    review: { date: 2026-10-25, verdict: "conforme (revue Opus neuve : options toutes réelles ; mineur --status corrigé par le lead ; 3 notes : assertion --model non discriminante, exemple identique à la réponse de l'éval, renvoi cadence:lead après skills install)", commit: c6a531467d00a2c19023f8cf53f5afbccfd65399 }
+    finished: 2026-10-25
+    notes:
+      - { date: 2026-10-25, text: "Notes mineures de la revue Opus : test/skill-orchestrate.test.ts:30 (--model accepté sous toute forme), l'exemple du skill est la ligne que cherche l'éval (une variante n'est pas couverte), renvoi « cadence:lead » qui ne correspond à rien après cadence skills install (cadence-lead). Re-vérifié par le lead le 25-10 : vitest 3664, tsc propre." }
   - id: L336
     title: "CI : publish.yml et tests.yml récupèrent tout l'historique (actions/checkout fetch-depth: 0) — la publication de v1.10.0 (run 40224201879, 25-10) a échoué sur test/changelog.test.ts « un lot cité sous le dernier tag a au moins un commit dans ce tag » (ajouté le 24-10 par L274, après 1.9.0) : le checkout par défaut ne prend qu'un commit, git log ne voit aucun commit de lot ; reproduit sur un clone --depth 1 (rouge) contre un clone complet (vert)"
     status: done

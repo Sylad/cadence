@@ -156,6 +156,16 @@ describe('escalade de modèle avant de rendre un lot (L337)', () => {
     expect(logs.some((l) => l.includes("malgré l'escalade"))).toBe(false);
     expect(logs.some((l) => l.includes('escalade fable : session sans résultat'))).toBe(true);
   });
+
+  it('R14 — la revue courte d\'un petit lot visible (review-small) se joue aussi au modèle d\'escalade', async () => {
+    const small = { small: true, visible: true };
+    const h = harness({ script: { implement: [impl], 'review-small': [major, major, major, ok], fix: [fix('b.txt'), fix('c.txt'), fix('d.txt')] } });
+    const c = h.lot('L1', small, esc);
+    await runLot(c);
+    expect(kinds(h).slice(-2)).toEqual(['fix', 'review-small']);
+    expect(h.calls.slice(-2).map((x) => x.model)).toEqual(['fable', 'fable']);
+    expect(c.lot.escalation?.issue).toBe('conforme');
+  });
 });
 
 describe('L337 R11 — la documentation suit', () => {

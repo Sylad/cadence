@@ -3687,9 +3687,10 @@ lots:
     finished: 2026-10-25
   - id: L329
     title: "deliver : un Ctrl-C peut se perdre (défaut du produit trouvé par la revue de L325, 25-10) — (1) quand la sortie de la racine sh -c est traitée avant le SIGINT en attente, ending est encore null, settle() appelle forget() qui retire le dernier écouteur SIGINT (src/deliver.ts:256-262, src/proc.ts:36) : tree.end n'est jamais joué, deliver continue comme un échec simple (130) et l'enfant lancé avec & (qui ignore SIGINT) survit et bumpe ~60 s plus tard — mesuré 4/120 sous forte charge (test (a)) ; (2) onTermination est inscrit après spawn (deliver.ts:208 → :250) : un Ctrl-C pendant la lecture de /proc par TreeTracker tue cadence par l'action par défaut, sans nettoyer l'arbre — inscrire l'écoute avant spawn ; tests sous charge (le test (a) doit passer à 0 rouge à 2× la charge) ; doc docs/deliver.md et CHANGELOG"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-25
+    started: 2026-10-25
   - id: L330
     title: "mise en service : purge des anciennes copies — ~/.local/share/cadence/releases garde un worktree détaché par version mise en service, jamais retiré : 41 copies, 2,5 Go le 25-10 ; npm run service garde la version servie + les 3 précédentes (retour arrière, ordre de mise en service), retire les autres (git worktree remove + prune), jamais une copie qu'un processus utilise encore (cwd ou binaire d'un processus vivant) ; la purge est dite dans la sortie (n copies retirées, place libérée) ; doc (docs/stabilite.md ou la page de la mise en service) et CHANGELOG ; tests"
     status: todo

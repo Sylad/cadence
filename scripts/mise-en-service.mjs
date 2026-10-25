@@ -6,7 +6,7 @@
 // <bin-dir>/raf et <bin-dir>/cadence : liens vers <root>/service/bin/*.js.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -151,12 +151,36 @@ export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defa
   return { sha, dir, fingerprint: fingerprint(dir), purge };
 }
 
-/** Dossiers des copies dont un processus vivant utilise le dossier : son cwd, son binaire ou un argument de sa ligne de commande (`node …/bin/raf.js`). */
+/**
+ * Dossiers des copies dont un processus vivant dépend : son cwd, son binaire ou un argument de sa ligne de commande
+ * (`node …/bin/raf.js`), résolus par realpath ; et, pour chacun de ces chemins, le `node_modules` d'un dossier
+ * ancêtre qui est un lien (l'instantané d'une vague, `tool/node_modules`, renvoie à la copie qui l'a lancée).
+ */
 export function copiesUtilisees(releases) {
   const used = new Set();
-  const note = (path) => {
+  const noteDirect = (path) => {
     const rel = path.startsWith(`${releases}/`) ? path.slice(releases.length + 1).split('/')[0] : undefined;
     if (rel) used.add(rel);
+  };
+  const note = (path) => {
+    if (!path.startsWith('/')) return;
+    noteDirect(path);
+    try {
+      noteDirect(realpathSync(path));
+    } catch {
+      /* chemin disparu ou argument qui n'en est pas un */
+    }
+    for (let dir = dirname(path); dir !== dirname(dir); dir = dirname(dir)) {
+      try {
+        const modules = join(dir, 'node_modules');
+        if (lstatSync(modules).isSymbolicLink()) {
+          noteDirect(resolve(dir, readlinkSync(modules)));
+          noteDirect(realpathSync(modules));
+        }
+      } catch {
+        /* pas de node_modules ici */
+      }
+    }
   };
   let pids = [];
   try {

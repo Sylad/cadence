@@ -274,6 +274,30 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     }
   });
 
+  it("L330 — une vague vivante garde sa copie : son processus tourne sur tool/bin/cadence.js, dont node_modules renvoie à la copie", async () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    const copieA = join(root, 'releases', first.slice(0, 12));
+    mkdirSync(join(copieA, 'node_modules'), { recursive: true });
+    const tool = join(tempDir(), 'tool');
+    mkdirSync(join(tool, 'bin'), { recursive: true });
+    writeFileSync(join(tool, 'bin', 'cadence.js'), 'setTimeout(() => {}, 60000);\n');
+    symlinkSync(join(copieA, 'node_modules'), join(tool, 'node_modules'));
+    const wave = spawn('node', [join(tool, 'bin', 'cadence.js')], { stdio: 'ignore' });
+    try {
+      await new Promise((r) => setTimeout(r, 100));
+      enService(dir, root, binDir, ['b', 'c', 'd', 'e']);
+      expect(existsSync(copieA)).toBe(true);
+      wave.kill();
+      await new Promise((r) => wave.once('exit', r));
+      enService(dir, root, binDir, ['f']);
+      expect(existsSync(copieA)).toBe(false);
+    } finally {
+      wave.kill();
+    }
+  }, 120_000);
+
   it('L330 — la purge est dite : n copies retirées, place libérée, copies gardées parce qu\'utilisées', () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();

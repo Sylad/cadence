@@ -71,10 +71,13 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `raf docs-ok <lot> --reason "…"`: acknowledges a `docs.sync` gap the lot leaves open | [1.10.0](#1100---2026-10-25) |
 | `cadence perf`: the pre-check measured per lot, the step that carries a rise of the tokens per lot, red deliveries classed from their text | [1.10.0](#1100---2026-10-25) |
 | `orchestrate` skill: the command line of a wave (`<project>:<lot>[@<model>]`, ids with « / », `--resume [--wave]`) without `/lead` | [1.11.0](#1110---2026-10-25) |
+| `orchestrate.escalation: { model }`: one correction and one fresh review on a stronger model before a lot is handed back | [1.12.0](#1120---2026-10-25) |
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
 
 ## [Unreleased]
+
+## [1.12.0] - 2026-10-25
 
 ### Added
 

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.12.0**: `orchestrate.escalation: { model: fable }` plays one correction and one fresh review on that model before a wave hands a lot back; absent, nothing changes.
 - **1.11.0**: a new `orchestrate` skill gives the command line of a wave without `/lead`; the `deliver` skill says how to deliver a commit that is not `HEAD` (push that sha alone first, never forced).
 - **1.10.0**: the worktree mode of `cadence orchestrate` needs only the `orchestrate.worktrees` key and is on for cadence itself; the gate plays `orchestrate.build` before the tests, and `lead tour` flags a missing `orchestrate.test`.
   A lot waiting for a slot obeys `--drop` and `--stop-after-current`, the pre-check is back on Sonnet, `cadence perf` classes red deliveries, and the README is a short home page again.
@@ -29,6 +30,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.12.0**: a wave no longer hands a lot back after its planned correction passes without trying a stronger model, when the project asks for it (L337, `docs/orchestrate.md`). With `orchestrate.escalation: { model: <name> }` in `cadence.yaml` (no default: absent, nothing changes, since an account may not have the model; the name goes as it stands to `claude --model`), a review still not compliant after the planned passes — or tests still red — gets one more correction and one fresh review on that model; the lot is handed back only if that review is not compliant either. The final table says « escalade <model> » and its outcome, and `cadence perf` counts the escalations and how they ended. On 2026-10-25 two lots handed back after two passes had been taken up by hand on the ordinary models while the lead's rule was to escalate.
 
 **1.11.0**: the plugin eval of 1.10.0 found two gaps in the skills, both closed and replayed at 1.00. A new `orchestrate` skill (L335, `docs/skills.md`) carries the command line of `cadence orchestrate` — `<project>:<lot>[@<model>]`, a lot id with « / » kept as is, `--resume` with or without `--wave` — so that an agent reaches it without `/lead` instead of inventing `--lot` and `--model`. The `deliver` skill (L334, `docs/deliver.md`) says how to deliver a commit that is not `HEAD`: push that sha alone (`git push origin <sha>:main`), then `cadence deliver --dry-run --sha <sha>` and `cadence deliver --sha <sha>`, because with `ci: github` the wait is for the run of that exact sha and GitHub only builds the tip of a push; skip the push when the sha is already on a remote branch, and never force a push refused as non-fast-forward.
 

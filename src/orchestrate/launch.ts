@@ -202,7 +202,7 @@ export type SessionOutcome =
   | { kind: 'quota'; message: string; result?: SessionResult; tokens?: Tokens; sessionId?: string; firstStdout?: string; relaunched?: Relaunched }
   | { kind: 'failed'; cause: string; stdout: string; stderr: string; tokens?: Tokens; sessionId?: string; firstStdout?: string; relaunched?: Relaunched; /** Vrai quand la session a été coupée (signal, sortie vide), y compris après sa relance : ni un quota, ni un échec ordinaire. */ cut?: boolean };
 
-/** Étapes relancées à neuf après une coupure : celles en lecture seule, et `ref`, qui n'écrit que `lectures/a.json`, que le programme valide ensuite (une étape d'écriture ordinaire a pu laisser un travail à moitié fait). */
+/** Étapes relancées à neuf après une coupure : celles en lecture seule, et `ref`, qui n'écrit que sa lecture (`lectures/a.json` ou `b.json`, le troisième regard n'écrit rien), que le programme valide ensuite (une étape d'écriture ordinaire a pu laisser un travail à moitié fait). */
 const READ_ONLY: ReadonlySet<StepSpec['kind']> = new Set(['review', 'review-small', 'ux', 'precheck', 'maquette', 'fiche', 'ref']);
 
 /** Session tuée par un signal (code 128 + n : 143 SIGTERM, 137 SIGKILL…) sans rien écrire : la coupure, ni un quota (un message) ni un échec (une sortie). */

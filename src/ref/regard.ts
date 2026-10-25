@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { PACKAGE_ROOT } from '../orchestrate/snapshot.js';
 import type { Model } from '../orchestrate/launch.js';
 import type { Decision, Item } from './diff.js';
-import { decodePng, encodePng } from './png.js';
+import { decodePng, encodePng, type Raster } from './png.js';
 import { sessionDeRef, type SessionRef } from './session.js';
 
 type Obj = Record<string, any>;
@@ -35,11 +35,12 @@ export const REGARD_SCHEMA = {
 };
 
 /** Découpe la zone d'un élément (marge comprise, bornée à la page) dans `crops/regard-<numero>.png` ; null quand la page n'est pas rendue ou que la zone est hors d'elle. */
-function decouper(docDir: string, e: Obj, numero: number): string | null {
+function decouper(docDir: string, e: Obj, numero: number, pages: Map<number, Raster>): string | null {
   const page = join(docDir, 'pages', `page-${e.source.page}.png`);
   const z = e.source.zone as { x: number; y: number; l: number; h: number } | undefined;
   if (!existsSync(page) || !z) return null;
-  const r = decodePng(readFileSync(page), `page ${e.source.page}`);
+  if (!pages.has(e.source.page)) pages.set(e.source.page, decodePng(readFileSync(page), `page ${e.source.page}`)); // une page se décode une fois, quel que soit le nombre de ses éléments
+  const r = pages.get(e.source.page)!;
   const x0 = Math.max(0, z.x - MARGE_DECOUPE);
   const y0 = Math.max(0, z.y - MARGE_DECOUPE);
   const x1 = Math.min(r.width, z.x + z.l + MARGE_DECOUPE);
@@ -72,9 +73,10 @@ export type ResultatRegard = { kind: 'ok'; decisions: (Decision | undefined)[]; 
 export async function troisiemeRegard(o: RegardOptions): Promise<ResultatRegard> {
   for (const f of existsSync(join(o.docDir, 'crops')) ? readdirSync(join(o.docDir, 'crops')) : []) if (/^regard-\d+\.png$/.test(f)) rmSync(join(o.docDir, 'crops', f));
   const cadence = `node ${join(PACKAGE_ROOT, 'bin', 'cadence.js')}`;
+  const pages = new Map<number, Raster>();
   const blocs = o.seuls.map((item, i) => {
     const e = item.element;
-    const crop = decouper(o.docDir, e, i + 1);
+    const crop = decouper(o.docDir, e, i + 1, pages);
     return [
       `${i + 1}. ${POSE(e)}`,
       `   page : ${join(o.docDir, 'pages', `page-${e.source.page}.png`)}`,

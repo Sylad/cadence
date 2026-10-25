@@ -180,7 +180,7 @@ describe('R1 — la reprise ne touche pas aux branches d\'un autre cas', () => {
     expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(other.branch);
     expect(existsSync(other.dir)).toBe(true);
   });
-  it('R1 — sans CADENCE_EXPERIMENTAL_WORKTREES : une nouvelle vague du lot laisse la branche conservée de la vague passée où elle est', async () => {
+  it('R1 — sans orchestrate.worktrees : une nouvelle vague du lot laisse la branche conservée de la vague passée où elle est', async () => {
     const { parent, repo } = setup();
     const f1 = fake({ review: async (_cwd, brief) => claudeOut(lotOf(brief) === 'L1' ? nonConforme : reviewReport()) });
     await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f1);
@@ -188,7 +188,7 @@ describe('R1 — la reprise ne touche pas aux branches d\'un autre cas', () => {
     writeFileSync(join(repo, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
     git(repo, 'add', '--', 'cadence.yaml');
     git(repo, 'commit', '-q', '-m', 'chore: sans worktrees');
-    const r = await run(parent, ['a:L1'], fake(), {}, { CADENCE_EXPERIMENTAL_WORKTREES: undefined });
+    const r = await run(parent, ['a:L1'], fake());
     expect(r.out).not.toContain('d\'une vague précédente');
     expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(`cadence/${WAVE}/a--L1`);
   });

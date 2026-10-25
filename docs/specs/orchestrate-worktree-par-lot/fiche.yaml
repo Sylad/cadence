@@ -1,4 +1,4 @@
-# STATUT (24-10) : mode EXPÉRIMENTAL, NON ACTIVABLE (orchestrate.worktrees: true refusé sauf CADENCE_EXPERIMENTAL_WORKTREES=1, tests) tant que les lots L299, L300 et L301 ne sont pas faits ; les règles ci-dessous sont inchangées.
+# STATUT (25-10, L320) : mode ACTIVÉ PAR DÉFAUT dans le cadence.yaml de cadence (orchestrate.worktrees: true) ; la garde CADENCE_EXPERIMENTAL_WORKTREES est retirée ; les règles ci-dessous sont inchangées.
 sujet:
   id: orchestrate-worktree-par-lot
   titre: "orchestrate : un worktree par lot dans une vague — deux lots indépendants d'un même dépôt avancent en parallèle (étude de faisabilité)"

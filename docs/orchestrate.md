@@ -22,9 +22,9 @@ cadence orchestrate --status [<wave>]        # the live waves and the repositori
 cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running (with an explicit `<wave>`: when that wave is no longer running)
 cadence orchestrate --resume [--wave <wave> | <wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
 cadence orchestrate --resume --wave <wave> --budget maritime:B26.4=+300k   # replay a lot handed back for its budget, with the budget raised (below)
-cadence orchestrate --resume --wave <wave> --integrate ccc:L29   # replay a lot handed back at the integration step of a worktree wave (« One worktree per lot », experimental)
+cadence orchestrate --resume --wave <wave> --integrate ccc:L29   # replay a lot handed back at the integration step of a worktree wave (« One worktree per lot »)
 cadence orchestrate --resume --wave <wave> --replay ccc:L29      # same, and also a lot handed back on a refused plan write (fiche notes) at the step it had reached
-cadence orchestrate --remove-worktree ccc:L29 [--abandon-commits]   # remove the kept worktree and branch of a lot (« One worktree per lot », experimental)
+cadence orchestrate --remove-worktree ccc:L29 [--abandon-commits]   # remove the kept worktree and branch of a lot (« One worktree per lot »)
 cadence orchestrate --resume … a:L1                             # refused: a resume replays the lots of the wave, it launches none
 cadence orchestrate --resume … --dry-run                         # refused: a resume cannot be simulated, it writes the wave state and relaunches sessions
 # `--resume` without a wave resumes the only unfinished wave of the folder; with several, it lists them and is refused (exit 2): name one with `--resume --wave <wave>`
@@ -139,7 +139,7 @@ keeps its `/` (`maritime-atlas:Q4/accueil-4-ux12@haiku`); this holds for `--dry-
 same for the lot folder and the dry-run briefs); ids without `/` are unchanged.
 
 You choose the lots; the order is the order given (one queue per repository, as many repositories at the
-same time as the session cap allows — 2 by default; the experimental `orchestrate.worktrees: true` mode, refused without `CADENCE_EXPERIMENTAL_WORKTREES=1` (lots L299–L301 to do before activation), would play the lots of one repository in parallel, each in its own worktree — « One worktree per lot »). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
+same time as the session cap allows — 2 by default; the `orchestrate.worktrees: true` mode (on in cadence's own `cadence.yaml`, off where the key is absent) plays the lots of one repository in parallel, each in its own worktree — « One worktree per lot »). `@haiku|@sonnet|@opus` sets the model of the implementation and corrections of that
 lot (default Sonnet; reviews are Opus, except the light review below; Haiku only when you write it, for a mechanical lot). Run it
 in the background and read `--status`: it prints one line per transition and the final table.
 
@@ -466,10 +466,10 @@ rollback, the older ones are removed only once they are more than 7 days old, co
 
 ## One worktree per lot (`orchestrate.worktrees`, L279)
 
-> **Experimental, not enabled.** This mode is infrastructure that two code reviews found defective at the core (lots L299, L300 and L301 of the plan
-> carry the fixes). Until they are done, `orchestrate.worktrees: true` is **refused** by `cadence orchestrate` (exit 2, before acting, `--dry-run`
-> included) with a message naming those lots — on start **and on resume** (`--resume`, `--integrate`, `--replay`, `--continue`: a resumed lot whose configuration asks for worktrees, or whose `cadence/<wave>/…` branch is to be found again, is refused before anything is written: wave state, registry, git) — unless the environment variable `CADENCE_EXPERIMENTAL_WORKTREES=1` is set — which only the tests of the
-> mode do. The default mode (key absent or `false`) is unchanged. What follows describes the mode as built.
+> **On by default in cadence (L320, 2026-10-25).** After the trials L310 and L316 (−45 % and −22 % of wall time, three automatic integrations without incident) cadence's own
+> `cadence.yaml` sets `orchestrate.worktrees: true`. The key is the whole switch: the guard that refused it without `CADENCE_EXPERIMENTAL_WORKTREES=1` is gone and the variable is no longer read,
+> so a resumed wave (`--resume`, `--integrate`, `--replay`, `--continue`) needs nothing more than its configuration or its `cadence/<wave>/…` branch. The other projects keep the default (key absent
+> or `false`: one lot at a time, in the repository) until the lead decides otherwise.
 
 By default a wave plays the lots of one repository one after the other, in the repository itself: a lot with four correction passes
 holds the whole queue. With `orchestrate: { worktrees: true }` in the project's `cadence.yaml`, two independent lots of the same repository
@@ -549,7 +549,7 @@ nothing below applies and the wave behaves as before; any other value is refused
   review, tests or budget has `next` empty and takes the recovery path below), and, like any resume, a repository with a modified tracked file.
 - **A lot handed back outside the integration step** (non-compliant review, red tests, `HEAD` moved, plan touched, acceptance lock, quota…) keeps its worktree and its
   branch `cadence/<wave>/<project>--<lot>` but is not replayed by `--resume`. Its recovery path (L301) is **a new wave of the same lot** (`cadence orchestrate <project>:<lot>`):
-  with the worktree mode on (`CADENCE_EXPERIMENTAL_WORKTREES=1`), the new wave looks for the **most recent** (creation time noted by cadence) recognised branch `cadence/<other wave>/<project>--<lot>`
+  with the worktree mode on (`orchestrate.worktrees: true`), the new wave looks for the **most recent** (creation time noted by cadence) recognised branch `cadence/<other wave>/<project>--<lot>`
   of a past wave that carries unintegrated commits and started from the repository's current branch, renames it `cadence/<this wave>/<project>--<lot>` (git keeps the cadence config
   with it), moves its worktree to this wave's folder and plays the lot there, so the sessions start from the work already done. The journal says it
   (`orchestrate : <project>:<lot> : branche cadence/<wave>/… d'une vague précédente reprise (N commit(s) non intégré(s))`). Nothing is recovered when the branch is integrated,
@@ -557,8 +557,8 @@ nothing below applies and the wave behaves as before; any other value is refused
   guard as `--resume`), or one of whose commits modifies the plan or a file generated with it, is not recovered either (it would end in an integration conflict): the journal says why
   (`… d'une vague précédente non reprise : <cause>`), the lot starts afresh and the kept branch stays untouched for the lead to clean or integrate by hand. The same refusal, with git's own message as the cause,
   answers a `git worktree move` or `git branch -m` that fails (a locked worktree for instance): the move is undone and nothing is renamed. A lot handed back **at the integration step** (`next: integrate`) never takes this path: its
-  branch keeps its own wave's name and is replayed by `--resume --integrate`, so a kept branch of another wave is not renamed in its place. The recovery path needs the worktree mode on (`CADENCE_EXPERIMENTAL_WORKTREES=1`): without the
-  variable a new wave leaves every kept branch where it is. The branch of a lot of a wave started at the repository root (`.` as project) is `cadence/<wave>/_--<lot>` (the leading dot of the project becomes `_`).
+  branch keeps its own wave's name and is replayed by `--resume --integrate`, so a kept branch of another wave is not renamed in its place. The recovery path needs the worktree mode on (`orchestrate.worktrees: true`): without the
+  key a new wave leaves every kept branch where it is. The branch of a lot of a wave started at the repository root (`.` as project) is `cadence/<wave>/_--<lot>` (the leading dot of the project becomes `_`).
   **Integrating by hand** (a refused branch, or a lead who prefers to): in the kept worktree (`cadence orchestrate --status` lists it), (1) `git rebase <repository's branch>` and settle the conflicts; (2) run the project's tests and
   build there; (3) from the repository, `git merge --ff-only <branch>` (the branch of the repository must not have moved since the rebase: otherwise rebase again); (4) write the verdict of the lot in the plan (by
   the lead, never by a session); (5) `cadence orchestrate --remove-worktree <project>:<lot> [--wave <wave>]`, which removes the worktree and the branch now that all its commits are integrated.
@@ -760,7 +760,7 @@ orchestrate:
   spec: { dir: docs/specs }              # spec step (see « The spec step of a lot with screen: »): folder of the screen specs, relative to the repository (default docs/specs); render: the command the spec session runs to render the mockups at 1440 and 390 px (optional, Playwright otherwise)
   testGate: { code: [src/**] }           # code changed without a test goes to a correction pass before the review (see « Code changed without a test »); absent: no gate
   prodAccess: false                      # default: wave sessions get no access to production (see « Production access of the sessions »); true lifts it for this project
-  worktrees: false                       # EXPERIMENTAL, true is refused until L299–L301 are done (CADENCE_EXPERIMENTAL_WORKTREES=1 lifts it, tests only); default: one lot at a time per repository, in the repository itself; true plays independent lots of one repository in parallel, each in its own git worktree (see « One worktree per lot »)
+  worktrees: false                       # on in cadence's own cadence.yaml since L320; default: one lot at a time per repository, in the repository itself; true plays independent lots of one repository in parallel, each in its own git worktree (see « One worktree per lot »)
   effort: { review: xhigh }              # effort level per pass (see « Effort level per pass »): precheck, spec, maquette, fiche, accept, implement, fix, review, ux
   ux: http://localhost:4200              # a URL, a launch command, or { command, url, timeout? } — for the UX review (see below)
   permissionMode: auto                   # default

@@ -28,128 +28,101 @@ describe('R1 — orchestrate.worktrees', () => {
   });
 });
 
-// Statut expérimental (décision du lead, 24-10) : orchestrate.worktrees: true est refusé tant que L299–L301 ne sont pas faits, sauf CADENCE_EXPERIMENTAL_WORKTREES=1.
-describe('garde d\'activation — mode worktree expérimental', () => {
-  const NO_VAR = { CADENCE_EXPERIMENTAL_WORKTREES: undefined };
-
-  it('sans la variable, orchestrate.worktrees: true est refusé (code 2) avant d\'agir, en nommant L299, L300, L301', async () => {
-    const { parent, repo } = setup();
-    const f = fake();
-    const r = await run(parent, ['a:L1', 'a:L2'], f, {}, NO_VAR);
-    expect(r.code).toBe(2);
-    expect(r.err).toMatch(/orchestrate\.worktrees: true est refusé.*EXPÉRIMENTAL.*L299, L300 et L301.*CADENCE_EXPERIMENTAL_WORKTREES=1/);
-    expect(f.calls).toEqual([]);
-    expect(existsSync(join(repo, '.cadence/runs'))).toBe(false);
-  });
-
-  it('--dry-run dit la même chose', async () => {
-    const { parent } = setup();
-    const r = await run(parent, ['a:L1', 'a:L2', '--dry-run'], fake(), {}, NO_VAR);
-    expect(r.code).toBe(2);
-    expect(r.err).toMatch(/EXPÉRIMENTAL.*L299, L300 et L301/);
-  });
-
-  it('une valeur autre que 1 ne lève pas le refus', async () => {
-    const { parent } = setup();
-    const r = await run(parent, ['a:L1', 'a:L2', '--dry-run'], fake(), {}, { CADENCE_EXPERIMENTAL_WORKTREES: 'true' });
-    expect(r.code).toBe(2);
-  });
-
-  it('avec CADENCE_EXPERIMENTAL_WORKTREES=1, le mode est accepté', async () => {
-    const { parent } = setup();
-    const r = await run(parent, ['a:L1', 'a:L2', '--dry-run'], fake());
-    removeDryRunBriefs(r.out);
-    expect(r.err).not.toMatch(/EXPÉRIMENTAL/);
-    expect(r.code).toBe(0);
-  });
-
-  it('le défaut (clé absente ou false) est inchangé : accepté sans la variable', async () => {
-    for (const yaml of ['', 'worktrees: false\n']) {
-      const { parent } = setup([{ title: 'un' }, { title: 'deux' }], yaml);
-      const r = await run(parent, ['a:L1', 'a:L2', '--dry-run'], fake(), {}, NO_VAR);
-      removeDryRunBriefs(r.out);
-      expect(r.err).not.toMatch(/EXPÉRIMENTAL/);
-      expect(r.code).toBe(0);
-    }
-  });
-});
-
-// La garde vaut aussi à la reprise : --resume, --integrate et --replay ne contournent pas le refus (une seule décision, worktreesEnabled).
-describe('garde d\'activation — reprise', () => {
-  const NO_VAR = { CADENCE_EXPERIMENTAL_WORKTREES: undefined };
-  const RESUME = /orchestrate\.worktrees: true est refusé.*EXPÉRIMENTAL.*L299, L300 et L301.*CADENCE_EXPERIMENTAL_WORKTREES=1/;
+// L320 — le mode worktree est activé par la configuration seule : plus de garde expérimentale (CADENCE_EXPERIMENTAL_WORKTREES n'est plus lue).
+describe('R1 — activation par la configuration seule (L320)', () => {
+  const OLD_VAR = { CADENCE_EXPERIMENTAL_WORKTREES: undefined };
   const snapshot = (parent: string) => {
     const dir = store(parent).dir;
     return readdirSync(dir, { recursive: true }).map(String).filter((f) => f.endsWith('.json')).sort().map((f) => `${f}\n${readFileSync(join(dir, f), 'utf8')}`);
   };
 
-  it('vague par défaut suspendue au budget, worktrees: true commité ensuite, --resume sans la variable : code 2, aucun worktree, état inchangé', async () => {
-    const { parent, repo } = setup(undefined, '');
-    const first = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2', '--budget', '2000'], fake({ implement: writes(meeting(2)) }));
-    expect(first.code).toBe(3);
-    writeFileSync(join(repo, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  worktrees: true\n');
-    git(repo, 'add', '--', 'cadence.yaml');
-    git(repo, 'commit', '-q', '-m', 'chore: worktrees');
-    const before = snapshot(parent);
+  it('R1 — orchestrate.worktrees: true sans aucune variable : la vague est acceptée et chaque lot est joué dans son worktree', async () => {
+    const { parent } = setup();
     const f = fake();
-    const r = await run(parent, ['--resume', WAVE, '--budget', '5M'], f, {}, NO_VAR);
-    expect(r.code).toBe(2);
-    expect(r.err).toMatch(RESUME);
-    expect(f.calls).toEqual([]);
-    expect(existsSync(join(store(parent).dir, 'worktrees'))).toBe(false);
-    expect(branches(repo)).toBe('');
-    expect(snapshot(parent)).toEqual(before);
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f, {}, OLD_VAR);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(f.calls.filter((c) => c.kind === 'implement').every((c) => c.cwd.includes('/worktrees/'))).toBe(true);
   });
 
-  it('vague lancée avec la variable, reprise sans : code 2, worktrees et état inchangés', async () => {
-    const { parent, repo } = setup();
-    const first = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2', '--budget', '2000'], fake({ implement: writes(meeting(2)) }));
-    expect(first.code).toBe(3);
-    const before = snapshot(parent);
-    const branchesBefore = branches(repo);
-    const f = fake();
-    const r = await run(parent, ['--resume', WAVE, '--budget', '5M'], f, {}, NO_VAR);
-    expect(r.code).toBe(2);
-    expect(r.err).toMatch(RESUME);
-    expect(f.calls).toEqual([]);
-    expect(branches(repo)).toBe(branchesBefore);
-    expect(snapshot(parent)).toEqual(before);
+  it('R1 — --dry-run l\'accepte aussi, sans mention d\'un statut expérimental', async () => {
+    const { parent } = setup();
+    const r = await run(parent, ['a:L1', 'a:L2', '--dry-run'], fake(), {}, OLD_VAR);
+    removeDryRunBriefs(r.out);
+    expect(r.err).not.toMatch(/EXPÉRIMENTAL|CADENCE_EXPERIMENTAL_WORKTREES/);
+    expect(r.code).toBe(0);
   });
 
-  it('clé retirée après le lancement mais branche de lot à retrouver : refusé aussi, avec la branche nommée', async () => {
+  it('R1 — la variable CADENCE_EXPERIMENTAL_WORKTREES n\'est plus lue : à 0 ou à une autre valeur, le mode joue quand même', async () => {
+    for (const value of ['0', 'true']) {
+      const { parent } = setup();
+      const f = fake();
+      const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f, {}, { CADENCE_EXPERIMENTAL_WORKTREES: value });
+      expect(r.code).toBe(0);
+      expect(f.calls.filter((c) => c.kind === 'implement').every((c) => c.cwd.includes('/worktrees/'))).toBe(true);
+    }
+  });
+
+  it('R2 — le défaut des autres projets est inchangé : clé absente ou false, les lots restent à la suite dans le dépôt', async () => {
+    for (const yaml of ['', 'worktrees: false\n']) {
+      const { parent } = setup([{ title: 'un' }, { title: 'deux' }], yaml);
+      const f = fake();
+      const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f, {}, OLD_VAR);
+      expect(r.code).toBe(0);
+      expect(f.calls.some((c) => c.cwd.includes('/worktrees/'))).toBe(false);
+    }
+  });
+
+  it('R3 — le cadence.yaml de cadence active le mode (orchestrate.worktrees: true) ; la valeur par défaut du lecteur reste false', () => {
+    expect(readOrchestrateConfig(join(import.meta.dirname, '..', 'cadence.yaml')).worktrees).toBe(true);
+    expect(readOrchestrateConfig('/nope').worktrees).toBe(false);
+  });
+});
+
+// La reprise (--resume, --integrate, --replay) ne demande plus rien de plus que la configuration ou la branche du lot.
+describe('R4 — reprise sans variable (L320)', () => {
+  const OLD_VAR = { CADENCE_EXPERIMENTAL_WORKTREES: undefined };
+
+  it('R4 — vague suspendue au budget puis reprise sans variable : les lots reprennent dans leurs worktrees', async () => {
+    const { parent } = setup();
+    const first = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2', '--budget', '2000'], fake({ implement: writes(meeting(2)) }), {}, OLD_VAR);
+    expect(first.code).toBe(3);
+    const f = fake();
+    const r = await run(parent, ['--resume', WAVE, '--budget', '5M'], f, {}, OLD_VAR);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(f.calls.length).toBeGreaterThan(0);
+    expect(f.calls.every((c) => c.cwd.includes('/worktrees/'))).toBe(true);
+  });
+
+  it('R4 — clé retirée après le lancement mais branche de lot à retrouver : la reprise joue le lot dans sa branche, sans refus', async () => {
     const { parent, repo } = setup();
-    const first = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2', '--budget', '2000'], fake({ implement: writes(meeting(2)) }));
+    const first = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2', '--budget', '2000'], fake({ implement: writes(meeting(2)) }), {}, OLD_VAR);
     expect(first.code).toBe(3);
     writeFileSync(join(repo, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
     git(repo, 'add', '--', 'cadence.yaml');
     git(repo, 'commit', '-q', '-m', 'chore: sans worktrees');
-    const before = snapshot(parent);
-    const r = await run(parent, ['--resume', WAVE, '--budget', '5M'], fake(), {}, NO_VAR);
-    expect(r.code).toBe(2);
-    expect(r.err).toMatch(new RegExp(`la branche cadence/${WAVE}/a--L1 .*est refusé.*EXPÉRIMENTAL`));
-    expect(snapshot(parent)).toEqual(before);
+    const r = await run(parent, ['--resume', WAVE, '--budget', '5M'], fake(), {}, OLD_VAR);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
   });
 
-  it('--resume --integrate et --resume --replay sans la variable : code 2, état inchangé', async () => {
+  it('R4 — --resume --integrate et --resume --replay sans variable : acceptés (jamais le code 2 de l\'ancienne garde)', async () => {
     const { parent, f, r: first } = await conflictWave();
     expect(first.code).not.toBe(2);
     expect(f.calls.length).toBeGreaterThan(0);
-    const before = snapshot(parent);
     for (const opt of ['--integrate', '--replay']) {
-      const g = fake();
-      const r = await run(parent, ['--resume', WAVE, opt, 'a:L1'], g, {}, NO_VAR);
-      expect(r.code).toBe(2);
-      expect(r.err).toMatch(RESUME);
-      expect(g.calls).toEqual([]);
-      expect(snapshot(parent)).toEqual(before);
+      const r = await run(parent, ['--resume', WAVE, opt, 'a:L1'], fake(), {}, OLD_VAR);
+      expect(r.err).not.toMatch(/EXPÉRIMENTAL|CADENCE_EXPERIMENTAL_WORKTREES/);
+      expect(r.code).not.toBe(2);
     }
   });
 
-  it('défaut inchangé à la reprise : clé absente, pas de branche, la variable n\'est pas demandée', async () => {
+  it('R4 — défaut inchangé à la reprise : clé absente, pas de branche, pas de worktree', async () => {
     const { parent, repo } = setup(undefined, '');
-    const first = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2', '--budget', '2000'], fake({ implement: writes(meeting(2)) }), {}, NO_VAR);
+    const first = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2', '--budget', '2000'], fake({ implement: writes(meeting(2)) }), {}, OLD_VAR);
     expect(first.code).toBe(3);
-    const r = await run(parent, ['--resume', WAVE, '--budget', '5M'], fake(), {}, NO_VAR);
+    const r = await run(parent, ['--resume', WAVE, '--budget', '5M'], fake(), {}, OLD_VAR);
     expect(r.err).toBe('');
     expect(r.code).toBe(0);
     expect(existsSync(join(store(parent).dir, 'worktrees'))).toBe(false);

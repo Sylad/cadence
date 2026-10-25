@@ -69,6 +69,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- `cadence orchestrate`: the worktree mode (`orchestrate.worktrees: true`, one git worktree per lot, independent lots of one repository in parallel) is **on in cadence's own `cadence.yaml`** (L320, `docs/orchestrate.md`, after the trials L310 and L316: −45 % and −22 % of wall time, three automatic integrations without incident). The guard is gone: `CADENCE_EXPERIMENTAL_WORKTREES=1` is no longer read, on start nor on `--resume`, `--integrate`, `--replay`, `--continue`; the key is the whole switch. A project that does not set it keeps the default (`false`: one lot at a time in the repository).
+
 ### Added
 
 - `cadence ref analyse <document.pdf> [--sections …] [--slug …] [--model sonnet|opus|haiku]` and the `reference-analyst` agent (L265, issue #14 5/10, `docs/ref.md`): `add`, then one fresh session of the agent that looks at every page whole and every zone at full resolution, measures with `cadence ref measure` and writes `lectures/a.json`, a reading in the format of `templates/inventaire.json`. The program does not trust the report: it reads the file, checks it with `ref check`, refuses a reading of another document (slug, sha256) or of the wrong genre (exit 1), removes the file of an earlier run before the session, and writes the session's tokens in `usage` (what `ref eval` reads for the tokens per page). Declared ceiling: 20 pages per reading (more, or none rendered: refused before any session, exit 2; the advice names another `--slug`, since `add` keeps the pages already rendered under a slug); a session cut by a signal is started again once; quota: exit 3. The baseline measure on the synthetic corpus is described in `docs/mesures/ref-lecture-unique-2026-10-24.md`.

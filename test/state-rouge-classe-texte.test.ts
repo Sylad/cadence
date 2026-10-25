@@ -32,6 +32,24 @@ describe('L331 — classe des livraisons rouges d\'avant [cls], déduite du libe
     expect(classOf('vérification en échec après 120 s : GET https://x.dev — 503')).toEqual(['verification']);
   });
 
+  it('R7 — les libellés CADENCE_DEPLOYED_FILE de deliver (sha déclaré invalide, fichier illisible) sont des déploiements', () => {
+    expect(classOf(
+      'CADENCE_DEPLOYED_FILE : « HEAD » n\'est pas un sha de commit du dépôt (le script doit y écrire le sha hexadécimal qu\'il a déployé, ni HEAD ni une branche, ou rien)',
+      'CADENCE_DEPLOYED_FILE illisible : EACCES: permission denied',
+    )).toEqual(['deploiement', 'deploiement']);
+  });
+
+  it('R8 — « CI non terminée après N s » est de classe ci, quel que soit N', () => {
+    expect(classOf('CI non terminée après 1800 s', 'CI non terminée après 600 s')).toEqual(['ci', 'ci']);
+  });
+
+  it('R9 — « aucun run CI pour ce sha après N min » est de classe ci, quel que soit N', () => {
+    expect(classOf(
+      'aucun run CI pour ce sha après 5 min (le commit poussé est-il celui que la CI construit ?)',
+      'aucun run CI pour ce sha après 10 min (le commit poussé est-il celui que la CI construit ?)',
+    )).toEqual(['ci', 'ci']);
+  });
+
   it('R5 — un libellé inconnu reste sans classe, et le libellé doit commencer la raison', () => {
     expect(classOf('quelque chose a cassé', 'le script de livraison en échec (code 2) : x', '')).toEqual([null, null, null]);
   });

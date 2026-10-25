@@ -264,7 +264,7 @@ function classFromReason(reason: string): FailClass | null {
   const script = /^script de livraison en échec \((?:code (\d+)|[^)]*)\)/.exec(reason);
   if (script) return script[1] === '2' ? 'refus' : 'deploiement';
   if (/^(?:déploiement en échec|CADENCE_DEPLOYED_FILE )/.test(reason)) return 'deploiement';
-  if (/^(?:CI en échec|CI non terminée|gh run list en échec)/.test(reason)) return 'ci';
+  if (/^(?:CI en échec|CI non terminée|gh run list en échec|aucun run CI pour ce sha)/.test(reason)) return 'ci';
   if (/^vérification en échec/.test(reason)) return 'verification';
   return null;
 }

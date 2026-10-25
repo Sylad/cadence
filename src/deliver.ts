@@ -3,7 +3,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { constants } from 'node:os';
 import { join } from 'node:path';
 import { parse } from 'yaml';
-import { onTermination, readProcs, SIGNAL_GRACE_MS, TreeTracker } from './proc.js';
+import { onTermination, readProcs, SIGNAL_GRACE_MS, SIGNAL_PENDING_MS, TreeTracker } from './proc.js';
 import type { Day } from './dates.js';
 import { isPlanOnly } from './audit.js';
 import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
@@ -186,9 +186,15 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
 
 /**
  * Dépendances réelles : sh, gh, fetch, horloge. `read` : le relevé des processus du suivi, `graceMs` : le délai de grâce
- * après Ctrl-C ou raccrochage (injectables pour les tests : sous charge, une grâce de 2 s se mesure mal).
+ * après Ctrl-C ou raccrochage, `pendingMs` : l'attente d'un signal encore en route après la sortie de la racine
+ * (injectables pour les tests : sous charge, une grâce de 2 s se mesure mal).
  */
-export function realDeps(root: string, read: typeof readProcs = readProcs, graceMs: number = SIGNAL_GRACE_MS): DeliverDeps {
+export function realDeps(
+  root: string,
+  read: typeof readProcs = readProcs,
+  graceMs: number = SIGNAL_GRACE_MS,
+  pendingMs: number = SIGNAL_PENDING_MS,
+): DeliverDeps {
   const gh = (args: string[]) => {
     try {
       return execFileSync('gh', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: GH_TIMEOUT });
@@ -205,6 +211,18 @@ export function realDeps(root: string, read: typeof readProcs = readProcs, grace
     exec: (cmd, env, timeoutMs) =>
       new Promise((resolve) => {
         output = '';
+        // Écoute posée AVANT spawn : un Ctrl-C reçu pendant la première lecture du suivi (synchrone, dans le
+        // constructeur du TreeTracker) serait sinon traité par l'action par défaut, qui tue cadence sans nettoyer
+        // l'arbre. Le nettoyage ne tourne qu'au tour de boucle suivant, quand `tree` existe.
+        let tree: TreeTracker | null = null;
+        // Terminaison en cours : exec ne rend pas la main avant qu'elle ne soit finie — sinon deliver libère
+        // le verrou pendant la grâce, alors que des descendants tournent encore.
+        let ending: Promise<void> | null = null;
+        const forget = onTermination((sig) => {
+          if (!tree) return; // commande jamais lancée : rien à nettoyer
+          ending = sig === 'SIGTERM' ? Promise.resolve(tree.kill()) : tree.end(graceMs);
+          return ending;
+        });
         const child = spawn('sh', ['-c', cmd], {
           cwd: root,
           env: { ...process.env, ...env },
@@ -222,7 +240,10 @@ export function realDeps(root: string, read: typeof readProcs = readProcs, grace
         relay(child.stderr!, process.stderr);
         const pid = child.pid;
         if (pid === undefined) {
-          child.once('error', () => resolve(127));
+          child.once('error', () => {
+            forget();
+            resolve(127);
+          });
           return;
         }
         // L'arbre de la commande est suivi pendant toute son exécution (relevé périodique, pid + heure de
@@ -232,7 +253,7 @@ export function realDeps(root: string, read: typeof readProcs = readProcs, grace
         // qu'une seconde livraison prend le verrou libéré ou périmé. Ctrl-C et raccrochage : l'arbre a déjà
         // reçu le signal du terminal, un court délai de grâce laisse finir ses trap (et git son index.lock)
         // avant le kill ; SIGTERM (à cadence seul) et le délai : kill immédiat.
-        const tree = new TreeTracker(
+        tree = new TreeTracker(
           pid,
           read,
           () =>
@@ -244,26 +265,32 @@ export function realDeps(root: string, read: typeof readProcs = readProcs, grace
               'deliver : kill replié sur la commande racine faute de relevé des processus — des descendants ont pu survivre\n',
             ),
         );
-        // Terminaison en cours : exec ne rend pas la main avant qu'elle ne soit finie — sinon deliver libère
-        // le verrou pendant la grâce, alors que des descendants tournent encore.
-        let ending: Promise<void> | null = null;
-        const forget = onTermination((sig) => (ending = sig === 'SIGTERM' ? Promise.resolve(tree.kill()) : tree.end(graceMs)));
+        const tracker = tree;
         let timedOut = false;
         const timer = setTimeout(() => {
           timedOut = true;
-          tree.kill();
+          tracker.kill();
         }, Math.max(1_000, timeoutMs));
         child.once('exit', (code, signal) => {
           clearTimeout(timer);
-          tree.rootExited(); // son pid peut être repris : plus d'adoption tardive de la racine pendant la grâce
+          tracker.rootExited(); // son pid peut être repris : plus d'adoption tardive de la racine pendant la grâce
           const result = timedOut ? TIMED_OUT : signal ? 128 + (constants.signals[signal] ?? 0) : (code ?? 1);
           const settle = () => {
-            tree.stop();
+            tracker.stop();
             forget();
             resolve(result);
           };
-          if (ending) void ending.then(settle);
-          else settle();
+          // Un Ctrl-C part au groupe entier : la racine peut mourir et sa sortie être traitée avant que le SIGINT
+          // adressé à cadence ne le soit. Retirer l'écoute à cet instant le perdrait (tracker.end jamais joué, un
+          // descendant qui ignore SIGINT survivrait) : tant que des processus suivis vivent, on attend le signal en
+          // route, au plus pendantMs.
+          const deadline = Date.now() + pendingMs;
+          const next = (): void => {
+            if (ending) void ending.then(settle);
+            else if (tracker.alive().length === 0 || Date.now() >= deadline) settle();
+            else setTimeout(next, 20);
+          };
+          next();
         });
       }),
     gh: (sha) => JSON.parse(gh(['run', 'list', '--commit', sha, '--json', 'name,status,conclusion'])),

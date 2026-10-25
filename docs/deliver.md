@@ -94,6 +94,15 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   says so once on stderr.
   The 2 seconds are a constant of the real dependencies (`realDeps`, the `graceMs`
   argument), injectable so that the tests measure the kill, not the load of the machine.
+  A Ctrl-C goes to the whole foreground group, so the command can die and its
+  exit be processed before the signal addressed to cadence: while followed
+  processes are still alive after the command exits, cadence waits up to
+  2 seconds more (`SIGNAL_PENDING_MS`, the `pendingMs` argument) for that signal,
+  and plays the grace above if it comes. Without it a background child that
+  ignores Ctrl-C would survive. A command that leaves a daemon behind therefore
+  returns up to 2 seconds later. The termination listener is installed before
+  the command is spawned, so a Ctrl-C received while cadence first reads the
+  process list is handled too, not killed by the default action.
   A delay overrun and `SIGTERM` give no grace: a script's own `trap` does not
   get to finish there. The lock is held until the followed set is empty: when
   cadence dies of the signal it dies after the tree, and its stale lock, which

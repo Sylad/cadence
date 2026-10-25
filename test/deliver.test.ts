@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { deliver, parseDeliverConfig, realDeps, TIMED_OUT, type DeliverDeps, type GhRun } from '../src/deliver.js';
+import { readProcs } from '../src/proc.js';
 import { headSha } from '../src/git.js';
 import { Plan, type PlanFormat } from '../src/plan.js';
 import { appendDelivery, lastDelivery, readLock, sharedStateDir as stateDir, writeLock } from '../src/state.js';
@@ -32,9 +33,10 @@ function pushedRepo(): string {
  * (fichier `child`) : le test envoie Ctrl-C quand le suivi connaît l'enfant, pas après un délai que la charge raccourcit.
  * Le relevé est lu avant le scan qui adopte l'enfant, dans le même tour : à l'instant où `tracked` existe, il est suivi.
  * Le premier relevé (celui du constructeur, sans scan) ne compte pas : sous charge il peut déjà voir l'enfant sans l'adopter.
- * `graceMs` : le délai de grâce de la sonde (défaut : celui de cadence).
+ * `graceMs` : le délai de grâce de la sonde (défaut : celui de cadence). `pendingMs` : l'attente d'un signal en attente après la
+ * sortie de la racine (L329). `selfSigint` : la sonde s'envoie SIGINT pendant la première lecture du suivi (celle du constructeur).
  */
-function writeProbe(logs: string, dir: string, graceMs?: number): string {
+function writeProbe(logs: string, dir: string, graceMs?: number, pendingMs?: number, selfSigint = false): string {
   const probe = join(logs, 'probe.ts');
   const src = (f: string) => JSON.stringify(join(process.cwd(), 'src', f));
   writeFileSync(
@@ -49,6 +51,7 @@ function writeProbe(logs: string, dir: string, graceMs?: number): string {
       `let reads = 0;\n` +
       `const read = () => {\n` +
       `  const procs = readProcs();\n` +
+      (selfSigint ? `  if (reads === 0) process.kill(process.pid, 'SIGINT');\n` : '') +
       `  const file = join(logs, 'child');\n` +
       `  const pid = existsSync(file) ? Number(readFileSync(file, 'utf8').trim()) : 0;\n` + // fichier absent ou à moitié écrit : pas de pid
       `  if (reads++ > 0 && procs && pid > 1 && procs.has(pid)) writeFileSync(join(logs, 'tracked'), '');\n` +
@@ -56,7 +59,7 @@ function writeProbe(logs: string, dir: string, graceMs?: number): string {
       `};\n` +
       `const config = parseDeliverConfig(readFileSync(join(dir, 'cadence.yaml'), 'utf8'), join(dir, 'cadence.yaml'));\n` +
       `const ctx = { root: dir, state: sharedStateDir(dir), plan: Plan.load(join(dir, '.cadence/raf.yaml')), config, today: '2026-09-28', dryRun: false, args: [], out: () => {}, err: () => {} };\n` +
-      `process.exitCode = await deliver(ctx, realDeps(dir, read, ${graceMs === undefined ? 'undefined' : graceMs}));\n`,
+      `process.exitCode = await deliver(ctx, realDeps(dir, read, ${graceMs}, ${pendingMs}));\n`,
   );
   return probe;
 }
@@ -1059,10 +1062,11 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
   }
 
   /** Première livraison dans un groupe à elle (le groupe de premier plan d'un terminal), lancée par vite-node. */
-  function startFirst(logs: string, dir: string, graceMs?: number) {
-    const probe = writeProbe(logs, dir, graceMs);
+  function startFirst(logs: string, dir: string, graceMs?: number, pendingMs?: number, selfSigint = false) {
+    const probe = writeProbe(logs, dir, graceMs, pendingMs, selfSigint);
     const child = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
     const exited = new Promise<number>((r) => child.on('exit', () => r(Date.now())));
+    const ended = new Promise<NodeJS.Signals | null>((r) => child.on('exit', (_code, sig) => r(sig)));
     const cleanup = () => {
       try {
         process.kill(-child.pid!, 'SIGKILL');
@@ -1070,7 +1074,7 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
         // déjà mort
       }
     };
-    return { child, exited, cleanup };
+    return { child, exited, ended, cleanup };
   }
 
   it('(a) Ctrl-C : un enfant en arrière-plan qui ignore SIGINT, son shell mort, est tué au plus tard à l’échéance de la grâce — un seul bump', async () => {
@@ -1136,6 +1140,60 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
       first.cleanup();
     }
   }, 120_000);
+
+  const aliveP = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  it('(d) Ctrl-C reçu pendant la première lecture du suivi (avant toute écoute) : l\'arbre est nettoyé, cadence meurt du signal (L329)', async () => {
+    const logs = tempDir();
+    const dir = scriptRepo(logs, `  sleep 60 &\n  echo $! > '${logs}/child'\n  wait`);
+    const first = startFirst(logs, dir, 1_500, undefined, true);
+    try {
+      expect(await until(() => existsSync(join(logs, 'child')), 60_000)).toBe(true);
+      expect(await first.ended).toBe('SIGINT'); // morte du signal, après le nettoyage
+      const childPid = Number(readFileSync(join(logs, 'child'), 'utf8').trim());
+      expect(await until(() => !aliveP(childPid), 30_000)).toBe(true); // sans l'écoute posée avant spawn, cadence meurt d'emblée et l'enfant dort 60 s
+    } finally {
+      first.cleanup();
+    }
+  }, 120_000);
+
+  it('(e) Ctrl-C reçu après le traitement de la sortie de la racine : l\'enfant qui ignore SIGINT est tué quand même — un seul bump (L329)', async () => {
+    const logs = tempDir();
+    // le script sort dès que le suivi connaît l'enfant ; le SIGINT n'arrive qu'après, et à cadence seule : l'ordre perdant de la course
+    const dir = scriptRepo(
+      logs,
+      `  sh -c "echo \\$\\$ > '${logs}/child'; sleep 60; echo bumped >> '${logs}/bumps'" &\n  while [ ! -e '${logs}/tracked' ]; do sleep 0.05; done`,
+    );
+    const first = startFirst(logs, dir, 1_000, 30_000);
+    try {
+      expect(await until(() => existsSync(join(logs, 'tracked')), 60_000)).toBe(true);
+      const scriptPid = Number(readFileSync(join(logs, 'first'), 'utf8').trim());
+      expect(await until(() => !aliveP(scriptPid), 30_000)).toBe(true);
+      await pause(400); // la sortie de la racine est traitée, aucun SIGINT n'est encore arrivé
+      process.kill(first.child.pid!, 'SIGINT');
+      expect(await first.ended).toBe('SIGINT');
+      const childPid = Number(readFileSync(join(logs, 'child'), 'utf8').trim());
+      expect(await until(() => !aliveP(childPid), 30_000)).toBe(true);
+      expect(await cad(dir)).toBe(0);
+      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
+    } finally {
+      first.cleanup();
+    }
+  }, 120_000);
+
+  it('(f) sans signal, un descendant resté vivant après la racine ne retient la commande que le temps d\'attente d\'un signal en attente (L329)', async () => {
+    const t0 = Date.now();
+    const code = await realDeps(tempDir(), readProcs, 2_000, 600).exec('sleep 3 & sleep 0.6; exit 0', {}, 20_000); // 0,6 s : le suivi a relevé le sleep
+    expect(code).toBe(0);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(1_000); // 0,6 s de commande + 0,6 s d'attente, moins la marge des horloges
+  });
 
   it('(c) Ctrl-C : un descendant qui ignore SIGINT sous un parent vivant est tué à l’échéance de la grâce (~2 s) — un seul bump', async () => {
     const logs = tempDir();

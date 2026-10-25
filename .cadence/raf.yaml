@@ -3695,11 +3695,14 @@ lots:
     finished: 2026-10-25
   - id: L330
     title: "mise en service : purge des anciennes copies — ~/.local/share/cadence/releases garde un worktree détaché par version mise en service, jamais retiré : 41 copies, 2,5 Go le 25-10 ; npm run service garde la version servie + les 3 précédentes (retour arrière, ordre de mise en service), retire les autres (git worktree remove + prune), jamais une copie qu'un processus utilise encore (cwd ou binaire d'un processus vivant) ; la purge est dite dans la sortie (n copies retirées, place libérée) ; doc (docs/stabilite.md ou la page de la mise en service) et CHANGELOG ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
-    review: { date: 2026-10-25, verdict: "conforme après 2 corrections mineures (délai des tests L330, racine via un lien symbolique) — orchestré (vague 2026-10-25-1345, 2 passe(s) de correction)", commit: c602572ddb865b5c0bcf810d2446ec896f0c71a6, reporte: { de: c43470ebb36796b3f30b9d7baa1c559b4c8a77e8, vers: c602572ddb865b5c0bcf810d2446ec896f0c71a6, patchId: 6f4b716ddae9c65a32a246b80596bfb4615ea76d } }
+    review: { date: 2026-10-25, verdict: "conforme (revue Opus neuve et re-vérif après 035d9d4 : copie servie jamais retirée, copie d'une vague vivante gardée, --resume répare un lien node_modules pendu (essayé sur une copie de 2026-10-15-1915), purge ratée = avertissement ; suite 3587 verts ; 1 mineur en note)", commit: 035d9d43a5ec7ac01bb103b41e8877a6de4881a9 }
+    notes:
+      - { date: 2026-10-25, text: "25-10 (lead) : revue Opus neuve après la vague → majeur (une vague suspendue perdait sa copie après 3 mises en service, --resume plantait : vague 2026-10-15-1915 déjà cassée sur le disque) ; décision du lead : (a) --resume relie un tool/node_modules pendu à la copie servie (ligne de journal) ou refuse proprement (code 2) — la vraie protection ; (b) la purge garde les copies des vagues non terminées des dossiers connus (dépôt + registre ; les vagues du dossier parent du lead ne sont pas couvertes, (a) les protège) ; purge ratée = avertissement → 035d9d4. Re-vérif : réparation essayée sur une copie de 2026-10-15-1915 (lien réécrit, cadence --help repart). Mineur en note : un processus lancé par ~/.local/bin est attribué à la nouvelle copie (ne mord qu'après 4 mises en service pendant sa vie)." }
+    finished: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

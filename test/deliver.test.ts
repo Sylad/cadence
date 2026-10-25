@@ -61,6 +61,15 @@ function writeProbe(logs: string, dir: string, graceMs?: number): string {
   return probe;
 }
 
+/** Vrai si le processus a au moins un enfant vivant (pgrep). */
+function hasChild(pid: number): boolean {
+  try {
+    return execFileSync('pgrep', ['-P', String(pid)], { encoding: 'utf8' }).trim().length > 0;
+  } catch {
+    return false; // pgrep sort 1 sans enfant
+  }
+}
+
 function fakeDeps(over: Partial<DeliverDeps> = {}) {
   let clock = 0;
   const execs: { cmd: string; env: Record<string, string> }[] = [];
@@ -842,9 +851,12 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
       // le sh du script note son pid, dort, puis « bumpe » : ce qu'ont fait deux livraisons concurrentes le 04-10.
       // L325 : le sommeil (60 s) dépasse le test, aucune fenêtre ne dépend de la charge : un SIGINT non propagé laisse le script
       // vivant (`survived`) ; seule la première exécution dort (marqueur `first`), la seconde bumpe tout de suite.
+      // Le signal part quand le suivi a adopté le script (`child`, sonde `tracked`) et que le script a forké son `sleep` : avant,
+      // cadence n'a pas encore enregistré son arrêt (onTermination, après le relevé de /proc) et le signal pourrait le tuer
+      // au lieu de lui faire tuer le script ; un shell qui reçoit le signal juste avant de forker le `sleep` peut aussi survivre.
       writeFileSync(
         join(dir, 'livrer.sh'),
-        `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then\n  echo done > '${logs}/first'\n  echo $$ >> '${logs}/pids'\n  sleep 60\nfi\necho bumped >> '${logs}/log'\n`,
+        `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then\n  echo done > '${logs}/first'\n  echo $$ >> '${logs}/pids'\n  echo $$ > '${logs}/child'\n  sleep 60\nfi\necho bumped >> '${logs}/log'\n`,
         { mode: 0o755 },
       );
       writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  script: ./livrer.sh\n');
@@ -852,18 +864,14 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
       commit(dir, 'chore: config');
       git(dir, 'push', '-q');
 
-      const probe = join(logs, 'probe.ts');
-      writeFileSync(
-        probe,
-        `import { run } from ${JSON.stringify(join(process.cwd(), 'src/cli.ts'))};\n` +
-          `process.exitCode = await run(['deliver'], { cwd: ${JSON.stringify(dir)}, env: process.env, out: () => {}, err: () => {}, now: () => new Date() });\n`,
-      );
+      const probe = writeProbe(logs, dir);
       // groupe à lui, comme un terminal donne le sien à la commande de premier plan
       const first = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
       const exited = new Promise<void>((r) => first.on('exit', () => r()));
       try {
-        expect(await until(() => existsSync(join(logs, 'pids')), 60_000)).toBe(true); // vite-node démarre lentement sous charge
+        expect(await until(() => existsSync(join(logs, 'tracked')), 60_000)).toBe(true); // vite-node démarre lentement sous charge ; script suivi
         const scriptPid = Number(readFileSync(join(logs, 'pids'), 'utf8').trim());
+        expect(await until(() => hasChild(scriptPid), 30_000)).toBe(true); // son `sleep` est forké
         process.kill(-first.pid!, sig); // ce que fait le terminal : tout le groupe de premier plan
         await exited;
         // borne large : la condition observée est la mort du script, pas un délai tenu sous charge
@@ -1051,8 +1059,8 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
   }
 
   /** Première livraison dans un groupe à elle (le groupe de premier plan d'un terminal), lancée par vite-node. */
-  function startFirst(logs: string, dir: string) {
-    const probe = writeProbe(logs, dir);
+  function startFirst(logs: string, dir: string, graceMs?: number) {
+    const probe = writeProbe(logs, dir, graceMs);
     const child = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
     const exited = new Promise<number>((r) => child.on('exit', () => r(Date.now())));
     const cleanup = () => {
@@ -1111,7 +1119,7 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
         return false;
       }
     };
-    const first = startFirst(logs, dir);
+    const first = startFirst(logs, dir, 60_000); // la grâce ne court pas pendant que le test observe : `refused` libère l'enfant, le test n'attend pas 2 s de grâce
     try {
       expect(await until(() => existsSync(join(logs, 'tracked')), 60_000)).toBe(true); // trap posé (écrit avant `child`) et script suivi
       const scriptPid = Number(readFileSync(join(logs, 'first'), 'utf8').trim());

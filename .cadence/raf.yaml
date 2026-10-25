@@ -3740,6 +3740,11 @@ lots:
     finished: 2026-10-25
     notes:
       - { date: 2026-10-25, text: "Re-vérifié par le lead le 25-10 à 5536892 : tsc propre, vitest 3653 (+4 sautés), raf check propre. Rendu par la vague (non conforme après 2 passes), repris à la main : fix Sonnet neuf + revue Opus neuve ×2 (recette du 15-10)." }
+  - id: L333
+    title: "orchestrate : la porte de la vague joue orchestrate.build AVANT orchestrate.test (aujourd'hui tests puis build, src/orchestrate/cycle.ts:1790) — le 25-10, trois projets (claude-code-codex L41, evatosorus L36, avatar-pandora L38) ont dû écrire « test: astro build && npm test » parce que leurs tests e2e lisent le dist que seul le build produit (13 tests sur 15 rouges sans dist) : le build est joué deux fois à chaque passe ; un build rouge rend le lot sans lancer les tests (constat « build » seul) ; la ligne de base L213 (test rejoué au sha de départ) joue aussi le build d'abord dans son worktree, sinon le départ sans dist excuserait à tort ou rougirait tout ; doc docs/orchestrate.md et CHANGELOG ; tests ; puis retirer le build en double des trois cadence.yaml n'est PAS dans ce lot (un lot par projet ensuite)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

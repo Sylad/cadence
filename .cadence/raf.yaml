@@ -3681,6 +3681,11 @@ lots:
     started: 2026-10-25
     review: { date: 2026-10-25, verdict: "compliant (1 minor note: redExcerpt confond lignes « - » d'une sortie brute et liste de tests nommés) — orchestré (vague 2026-10-25-1150, 0 passe(s) de correction)", commit: ecfb4170db3bccb8a21d0565ea2da7a415e1bcab }
     finished: 2026-10-25
+  - id: L329
+    title: "deliver : un Ctrl-C peut se perdre (défaut du produit trouvé par la revue de L325, 25-10) — (1) quand la sortie de la racine sh -c est traitée avant le SIGINT en attente, ending est encore null, settle() appelle forget() qui retire le dernier écouteur SIGINT (src/deliver.ts:256-262, src/proc.ts:36) : tree.end n'est jamais joué, deliver continue comme un échec simple (130) et l'enfant lancé avec & (qui ignore SIGINT) survit et bumpe ~60 s plus tard — mesuré 4/120 sous forte charge (test (a)) ; (2) onTermination est inscrit après spawn (deliver.ts:208 → :250) : un Ctrl-C pendant la lecture de /proc par TreeTracker tue cadence par l'action par défaut, sans nettoyer l'arbre — inscrire l'écoute avant spawn ; tests sous charge (le test (a) doit passer à 0 rouge à 2× la charge) ; doc docs/deliver.md et CHANGELOG"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

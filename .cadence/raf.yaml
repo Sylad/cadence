@@ -3790,9 +3790,10 @@ lots:
     finished: 2026-10-25
   - id: L338
     title: "orchestrate (suite de L337) : la ligne « escalade <modèle> » du tableau suit l'état du lot — un lot rendu après une revue escaladée conforme (UX non conforme, intégration refusée) ne doit pas dire « lot rendu prêt », un lot en cours ou suspendu pendant son escalade ne doit pas dire « rendu malgré l'escalade » (src/orchestrate/table.ts:202) ; vérifier aussi qu'une session escaladée en échec ou coupée (modèle absent du compte, claude --model qui échoue) est classée « échec » et non « rendu » dans le tableau, le journal et cadence perf (src/orchestrate/cycle.ts:145) ; tests ; docs/perf.md : clés escalations et quality dans la liste de --json"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-25
+    started: 2026-10-25
   - id: L339
     title: "CI : test instable test/orchestrate-worktree-integration.test.ts R23 « L303 — le lead change de branche entre l'avance et l'écriture du plan » — rouge sur le runner GitHub à la publication de v1.11.0 (run 40235075093, 1re tentative : « intégration refusée : le dépôt est su… » au lieu de « écriture du plan refusée : dépôt sur … »), vert à la 2e tentative et en local ; une course entre le contrôle de branche de l'intégration et celui de l'écriture du plan : rendre le test déterministe (ordre forcé, pas de minutage) sans affaiblir ce qu'il vérifie"
     status: todo

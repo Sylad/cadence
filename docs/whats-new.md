@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.12.1**: the escalation line of the final table follows the lot's state (a lot withdrawn or failed during its escalation no longer reads « en cours »), and a test that raced on the GitHub runner is deterministic.
 - **1.12.0**: `orchestrate.escalation: { model: fable }` plays one correction and one fresh review on that model before a wave hands a lot back; absent, nothing changes.
 - **1.11.0**: a new `orchestrate` skill gives the command line of a wave without `/lead`; the `deliver` skill says how to deliver a commit that is not `HEAD` (push that sha alone first, never forced).
 - **1.10.0**: the worktree mode of `cadence orchestrate` needs only the `orchestrate.worktrees` key and is on for cadence itself; the gate plays `orchestrate.build` before the tests, and `lead tour` flags a missing `orchestrate.test`.
@@ -30,6 +31,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.12.1**: fixes after 1.12.0. The « escalade » line of the final table follows the lot's state (L338): a lot handed back or failed during its escalation before the model's verdict (`--resume --drop`, step exception, incident of the repository) reads « engagée, lot rendu avant le verdict du modèle » instead of « en cours », and only an escalated session that returned nothing (model unavailable to the account, cut, timeout) counts as `échec` in the table and in `cadence perf`, whose `--json` key list in `docs/perf.md` now names `escalations` and `quality`. Two tests of the worktree integration that raced on the order in which two lots take the integration lock — one of them failed the first publication run of 1.11.0 — now force that order (L339).
 
 **1.12.0**: a wave no longer hands a lot back after its planned correction passes without trying a stronger model, when the project asks for it (L337, `docs/orchestrate.md`). With `orchestrate.escalation: { model: <name> }` in `cadence.yaml` (no default: absent, nothing changes, since an account may not have the model; the name goes as it stands to `claude --model`), a review still not compliant after the planned passes — or tests still red — gets one more correction and one fresh review on that model; the lot is handed back only if that review is not compliant either. The final table says « escalade <model> » and its outcome, and `cadence perf` counts the escalations and how they ended. On 2026-10-25 two lots handed back after two passes had been taken up by hand on the ordinary models while the lead's rule was to escalate.
 

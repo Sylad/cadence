@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.12.1] - 2026-10-26
+
 ### Fixed
 
 - `cadence orchestrate` escalation line (L338, `docs/orchestrate.md`): a lot handed back or failed during its escalation without a verdict (withdrawn by `--resume --drop`, step exception, incident of the repository) no longer reads `en cours`: the line says the lot was handed back before the model's verdict. Only an escalated session that returned nothing (empty output, launch error, cut, timeout) is recorded `échec`; a withdrawal or an incident is no longer counted against the model in `cadence perf`. `docs/perf.md` gives the `· e en échec` segment of the escalation line.

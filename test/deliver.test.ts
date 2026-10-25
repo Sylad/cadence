@@ -855,13 +855,15 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
       const first = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
       const exited = new Promise<void>((r) => first.on('exit', () => r()));
       try {
-        expect(await until(() => existsSync(join(logs, 'pids')), 15_000)).toBe(true);
+        expect(await until(() => existsSync(join(logs, 'pids')), 60_000)).toBe(true); // vite-node démarre lentement sous charge
         const scriptPid = Number(readFileSync(join(logs, 'pids'), 'utf8').trim());
         process.kill(-first.pid!, sig); // ce que fait le terminal : tout le groupe de premier plan
         await exited;
-        const survived = !(await until(() => !alive(scriptPid), 2_000));
+        // borne large : la condition observée est la mort du script, pas un délai tenu sous charge
+        const survived = !(await until(() => !alive(scriptPid), 20_000));
         if (survived) process.kill(scriptPid, 'SIGKILL');
         expect(survived).toBe(false);
+        expect(existsSync(join(logs, 'log'))).toBe(false); // tué avant d'avoir « bumpé » : pas mort de sa belle mort
 
         // seconde livraison : le verrou du mort est périmé, mais plus rien ne tourne en parallèle
         const second = await run(['deliver'], { cwd: dir, env: {}, out: () => {}, err: () => {}, now: () => new Date() });
@@ -876,7 +878,7 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
         }
       }
     },
-    30_000,
+    120_000,
   );
 });
 

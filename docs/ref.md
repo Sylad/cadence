@@ -302,12 +302,18 @@ seul (B) : composant p.1 : bouton|Layers
 
 `--out` writes the reconciled inventory (genre `inventaire`, valid for `ref check`). Exit codes: **0** reconciled, **1** too many unpaired elements, **2** refusal (wrong call, unreadable or invalid file, not a reading, two documents, bad `--seuil`).
 
-## `cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug name] [--model sonnet|opus|haiku] [--model-b sonnet|opus|haiku] [--seuil 30] [--unique]`
+## `cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug name] [--model sonnet|opus|haiku] [--model-b sonnet|opus|haiku] [--seuil 30] [--double]`
 
-The whole chain (design §3): `add`, then **two independent readings**, `ref diff` by program, a **third look** at what only one reading carries, and the reconciled inventory.
-`--unique` keeps the **single reading** of lot 5 (`add`, one session, `lectures/a.json`), which is the baseline the double reading is measured against (design §« Mesure »).
+The chain: `add`, then **one reading** (one session of the [`reference-analyst`](../agents/reference-analyst.md) agent, `lectures/a.json`), checked by the program. `--double` adds the **double reading** of the design (§3): two independent readings, `ref diff` by program,
+a **third look** at what only one reading carries, and the reconciled inventory.
 
-**Two readings.** Two fresh sessions of the [`reference-analyst`](../agents/reference-analyst.md) agent (`claude -p`, the review effort and the permission mode of `orchestrate` in `cadence.yaml`, a working directory that is the
+**The double reading is an option, not the default, because its measurement did not show a gain.** On the synthetic corpus (7 cases, one draw per case) it gives the same recall as the single reading (83 %), a **higher** rate of false « read » (50.7 % against 37.7 % for reading A alone), the same
+three misses and **2.8 times the tokens** (63 250 per page against 22 375), with errors that are correlated between the two readings (hypothesis H1 not met). The design is explicit: a version that raises the rate of false « read » or lowers the recall of the `precise` links does not ship as the default.
+`--model-b` and `--seuil` are accepted with `--double` only (exit 2 otherwise). The figures and their limits: [`docs/mesures/ref-double-lecture-2026-10-25.md`](mesures/ref-double-lecture-2026-10-25.md) (« Lecture des chiffres », conclusion at the end).
+
+**Single reading (default).** One fresh session of `reference-analyst`, on `--model` (default `sonnet`), writes `lectures/a.json`; the program reads the file itself (below). The `lectures/b.json` and `inventaire.json` of an earlier `--double` pass are removed first: they would not match the new `a.json`.
+
+**Two readings (`--double`).** Two fresh sessions of the [`reference-analyst`](../agents/reference-analyst.md) agent (`claude -p`, the review effort and the permission mode of `orchestrate` in `cadence.yaml`, a working directory that is the
 document folder) run together: reading **A** on `--model` (default `sonnet`), reading **B** on `--model-b` (default `opus`: another model decorrelates the errors, hypothesis H1). Each agent looks at every rendered page whole,
 then every zone at full resolution, measures with `cadence ref measure`, copies every text verbatim, links every figure to the passages that cite it (`confirme`, `precise`, `contredit`), writes what the document does not show as a `silence`,
 marks `incertain` (with its cause) what it cannot read for sure, and writes **`<references.dir>/<slug>/lectures/a.json`** (resp. `b.json`): a reading (`genre: "lecture"`) in the format of
@@ -331,7 +337,7 @@ and output tokens of the session (the count of the orchestrate budget; cache rea
 The result is **`<references.dir>/<slug>/inventaire.json`**: `genre: "inventaire"`, valid for `ref check`, ids renumbered, `usage` = `{ tokens, lectures: { a, b, regard } }` (the total of the three sessions and each one's tokens and model, what `ref eval` reads for the tokens per page)
 and `reconciliation` = the counts, the unpaired ratio and, for each element the third look ruled on, `{ lecture, id (in its reading), verdict, raison }`.
 
-A session cut by a signal with nothing written is started again once in a fresh session (like a review); cut twice, it is a failure (exit 2). With `--unique` the single reading is written to `lectures/a.json` and checked as above; `--model-b` and `--seuil` are refused with it (exit 2).
+A session cut by a signal with nothing written is started again once in a fresh session (like a review); cut twice, it is a failure (exit 2). Without `--double` the single reading is written to `lectures/a.json` and checked as above; `--model-b` and `--seuil` are refused then (exit 2).
 
 **Declared ceiling: 20 pages per reading** (`LECTURE_PAGES_MAX`, design §5 « Taille »). With `--sections`, the pages read are those of `--sections` plus the pages of the figures they cite: the pages an
 earlier `add` of the same document rendered stay on disk but are **not** read, so choosing fewer pages with `--sections` works under the same slug. Without `--sections`, every rendered page is read (the whole document when it
@@ -341,7 +347,7 @@ has 30 pages or fewer, else the pages an earlier `add` rendered). More than 20 p
 A session cut by a signal and started again is counted in full: its tokens (read back from its Claude Code journal, as `orchestrate` does) are added to those of the fresh one, and the half-written reading of the cut session is removed before the fresh one starts.
 
 ```
-$ cadence ref analyse norme.pdf --sections 4-9
+$ cadence ref analyse norme.pdf --sections 4-9 --double
 norme : norme.pdf
 pages : 120
 rendues : 8 (4, 5, 6, 7, 8, 9, 33, 34)
@@ -359,12 +365,12 @@ question : Que veut dire « Figure 1 » ?
 The last lines are one `question :` per distinct question of the agents (a `contredit`, an `incertain`). Exit codes: **0** done, **1** a refused reading (no file, `ref check` deviations, wrong genre, wrong document: one
 `✗ lecture A : <reason>` line per deviation then `N écart(s)` on the standard output, the file is left as written, no `usage` is added) or too many unpaired elements, or the third look discarding every element (all of them were carried by one reading only: nothing is left to write, no inventory, the readings stay, a question to the lead), **2** refusal (unknown `--model` or `--model-b`, no page or more than 20 to read, tool or file as for `add`, a session that
 failed: `la session de lecture a échoué : <cause>`), **3** quota reached (message on the error output, no inventory; the readings already written stay; run it again later). The tokens per page of the output divide by the pages **read**; `ref eval` divides by the `pages` of the expected inventory,
-the same number for a corpus case read whole. With `--unique` the output is the one of lot 5: `<slug> : lecture unique (<model>) — …`, `lecture : <file>`, `éléments : …`, `tokens : …`.
+the same number for a corpus case read whole. Without `--double` the output is the one of lot 5: `<slug> : lecture unique (<model>) — …`, `lecture : <file>`, `éléments : …`, `tokens : …`.
 
 ### Reference measure on the corpus
 
 `docs/mesures/ref-lecture-unique-2026-10-24.md` states what the single reading is measured on and with which commands (recall, false « read », tokens per page against the corpus of `ref corpus`, the declared ceiling), and what was measured.
-The double reading is measured the same way, `ref eval` on `inventaire.json` instead of `lectures/a.json`, and compared with that baseline: `docs/mesures/ref-double-lecture-2026-10-25.md` (hypothesis H1, the stopping point of lot 6).
+The double reading is measured the same way, `ref eval` on `inventaire.json` instead of `lectures/a.json`, and compared with that baseline: `docs/mesures/ref-double-lecture-2026-10-25.md` (hypothesis H1, the stopping point of lot 6: not met, which is why `--double` is an option).
 
 ## `cadence ref corpus <dossier> [--sans-rendu]`
 

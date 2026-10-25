@@ -71,7 +71,7 @@ function setup(mode = 'ok', pages: FixturePage[] = NORME) {
 async function analyse(s: ReturnType<typeof setup>, ...argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await run(['ref', 'analyse', s.pdf, '--slug', 'norme', '--unique', ...argv], { cwd: s.cwd, env: s.env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-24T10:00:00') });
+  const code = await run(['ref', 'analyse', s.pdf, '--slug', 'norme', ...argv], { cwd: s.cwd, env: s.env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-24T10:00:00') });
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
@@ -196,7 +196,7 @@ describe('cadence ref analyse (L265)', () => {
     expect(conseil![2]).toBe('norme');
     const out: string[] = [];
     const err: string[] = [];
-    const code = await run(['ref', 'analyse', s.pdf, '--slug', conseil![2]!, '--sections', conseil![3]!, '--unique'], { cwd: s.cwd, env: s.env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-24T10:00:00') });
+    const code = await run(['ref', 'analyse', s.pdf, '--slug', conseil![2]!, '--sections', conseil![3]!], { cwd: s.cwd, env: s.env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-24T10:00:00') });
     expect(err.join('\n')).toBe('');
     expect(code).toBe(0);
     expect(s.appels()).toHaveLength(1);

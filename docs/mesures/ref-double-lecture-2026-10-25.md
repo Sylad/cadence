@@ -9,7 +9,7 @@ Date : 25 octobre 2026. Version mesurée : `b08a6f6` (`feat(L266): cadence ref a
 ```
 cadence ref corpus tmp/mesure/corpus                      # 7 cas, 8 pages, 47 éléments attendus (Playwright)
 mkdir tmp/mesure/docs-lus && cp tmp/mesure/corpus/<cas>/document.pdf tmp/mesure/docs-lus/<cas>.pdf
-cadence ref analyse tmp/mesure/docs-lus/<cas>.pdf --slug corpus-<cas>     # double lecture ; --seuil 100 pour les cas refusés à 30 %
+cadence ref analyse tmp/mesure/docs-lus/<cas>.pdf --slug corpus-<cas> --double     # double lecture (`--double` : au moment de la mesure c'était le défaut) ; --seuil 100 pour les cas refusés à 30 %
 # trois jeux, un cas par sous-dossier (<cas>/lecture.json) : lectures/a.json, lectures/b.json, inventaire.json
 cadence ref eval tmp/mesure/corpus tmp/mesure/jeu-a        # A seule = une lecture unique en sonnet
 cadence ref eval tmp/mesure/corpus tmp/mesure/jeu-b        # B seule = une lecture unique en opus
@@ -94,3 +94,9 @@ Même compte que la mesure de référence (entrée + écriture de cache + sortie
 - **La justesse des jetons** : tant que `ref eval` compte comme faux `lu` un jeton mesuré juste mais non attendu, le faux `lu` global dépend du nombre de couleurs mesurées, pas de la justesse des lectures. Une comparaison plus fidèle attend les jetons dans le corpus, ou un compte « mesuré et juste, non attendu » à part.
 - **Un autre modèle pour B** (`haiku`, ou `sonnet` avec une consigne différente) et **un autre troisième regard** (opus, ou un verdict qui exige une mesure) ne sont pas essayés. Le premier est une option (`--model-b`) ; le second une modification de l'agent.
 - **Le plafond de 20 pages** n'est toujours pas mesuré (le corpus n'a pas de cas de plus de 2 pages).
+
+## Décision (25 octobre 2026, le lead)
+
+**H1 n'est pas tenue** (faux `lu` 50,7 % contre 37,7 % en lecture unique, même rappel, 2,8 fois les tokens, erreurs corrélées) : les lots 7 à 10 (L267 à L270) sont abandonnés. Le design dit qu'une version qui fait monter le taux de faux `lu` ou baisser le rappel des liens `precise` ne sort pas : **le défaut de
+`cadence ref analyse` reste la lecture unique** (celui de L265). La double lecture, la réconciliation (`cadence ref diff`) et le troisième regard restent disponibles sur option, `--double`, que `docs/ref.md` documente comme une option dont la mesure n'a pas montré de gain. Ce que cette page ne tranche pas (la variance sur un seul tirage, la justesse des jetons, un autre modèle pour B,
+un seuil absolu) reste ouvert.

@@ -87,7 +87,12 @@ function setup(o: { a?: Obj[]; b?: Obj[]; decisions?: Obj[]; mode?: string; page
   return { base, refs, env, cwd, pdf, appels, dir: join(refs, 'norme') };
 }
 
+/** `cadence ref analyse --double` (la double lecture est une option : le défaut est la lecture unique, `analyseAvec(s, [])`). */
 async function analyse(s: ReturnType<typeof setup>, ...argv: string[]) {
+  return analyseAvec(s, ['--double', ...argv]);
+}
+
+async function analyseAvec(s: ReturnType<typeof setup>, argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
   const code = await run(['ref', 'analyse', s.pdf, '--slug', 'norme', ...argv], { cwd: s.cwd, env: s.env, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-25T10:00:00') });
@@ -306,9 +311,9 @@ describe('cadence ref analyse en double lecture (L266)', () => {
     expect(existsSync(join(s.dir, 'inventaire.json'))).toBe(false);
   });
 
-  it('R18 — --unique garde la lecture unique de L265 : une session, lectures/a.json, pas d\'inventaire ; --model-b et --seuil n\'y ont pas de sens', async () => {
+  it('R18 — sans --double, une seule lecture (le défaut) : une session, lectures/a.json, pas d\'inventaire ; --model-b et --seuil n\'ont de sens qu\'avec --double', async () => {
     const s = setup();
-    const r = await analyse(s, '--unique');
+    const r = await analyseAvec(s, []);
     expect(r.code).toBe(0);
     expect(s.appels()).toHaveLength(1);
     expect(r.out).toContain('norme : lecture unique (sonnet)');
@@ -316,11 +321,24 @@ describe('cadence ref analyse en double lecture (L266)', () => {
     expect(existsSync(join(s.dir, 'inventaire.json'))).toBe(false);
     for (const opt of ['--model-b', '--seuil']) {
       const t = setup();
-      const x = await analyse(t, '--unique', opt, opt === '--seuil' ? '20' : 'opus');
+      const x = await analyseAvec(t, [opt, opt === '--seuil' ? '20' : 'opus']);
       expect(x.code).toBe(2);
       expect(x.err).toContain(opt);
+      expect(x.err).toContain('--double');
       expect(t.appels()).toHaveLength(0);
     }
+  });
+
+  it('R23 — la lecture unique lancée après une double lecture supprime lectures/b.json et inventaire.json du passage précédent : aucun ne passe pour celui de celui-ci', async () => {
+    const s = setup();
+    expect((await analyse(s)).code).toBe(0);
+    expect(existsSync(join(s.dir, 'lectures', 'b.json'))).toBe(true);
+    expect(existsSync(join(s.dir, 'inventaire.json'))).toBe(true);
+    const r = await analyseAvec(s, []);
+    expect(r.code).toBe(0);
+    expect(existsSync(join(s.dir, 'lectures', 'b.json'))).toBe(false);
+    expect(existsSync(join(s.dir, 'inventaire.json'))).toBe(false);
+    expect(lire(join(s.dir, 'lectures', 'a.json')).usage.session).toBe('s-reference-analyst-sonnet');
   });
 
   it('R19 — le plafond de 20 pages vaut pour chaque lecture : refusé avant toute session', async () => {

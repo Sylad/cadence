@@ -71,12 +71,12 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   the format of `templates/inventaire.json`, validated by `cadence ref check`; what it cannot read for sure is
   `incertain` with its cause, what the document does not show is a `silence`. Its tools are `Read`, `Write`, `Bash`,
   `Grep`, `Glob`: it writes only its reading, never the tokens (the program counts them), never an expected inventory, and it never opens
-  another file of `lectures/` (L266: `cadence ref analyse` launches it twice, readings A and B, which must stay independent).
-  `cadence ref analyse` launches it ([ref](ref.md#cadence-ref-analyse-documentpdf---sections-3-59---slug-name---model-sonnetopushaiku---model-b-sonnetopushaiku---seuil-30---unique)).
+  another file of `lectures/` (L266: with `--double`, `cadence ref analyse` launches it twice, readings A and B, which must stay independent).
+  `cadence ref analyse` launches it ([ref](ref.md#cadence-ref-analyse-documentpdf---sections-3-59---slug-name---model-sonnetopushaiku---model-b-sonnetopushaiku---seuil-30---double)).
 - **reference-verifier** (agent, L266): the third look of `cadence ref analyse`. It receives only the elements that one of the two readings wrote and the
   other did not, each with the rendered page and a crop of its zone, and answers `confirme` or `ecarte` with a reason, measuring with
   `cadence ref measure` rather than by eye and never guessing (what it cannot tell is `ecarte`). Its tools are `Read` and `Bash`: it writes nothing and never sees the readings
-  ([ref](ref.md#cadence-ref-analyse-documentpdf---sections-3-59---slug-name---model-sonnetopushaiku---model-b-sonnetopushaiku---seuil-30---unique)).
+  ([ref](ref.md#cadence-ref-analyse-documentpdf---sections-3-59---slug-name---model-sonnetopushaiku---model-b-sonnetopushaiku---seuil-30---double)).
 - **qa-reviewer** (agent): any web app (read-only like `ux-reviewer`: same tool list, no `Edit`, no `Write`); given a repository and a base URL (and
   optionally a lot id, to walk only the pages it touched — those that call the
   changed endpoints, those of the screens it changed, the pages that consume the services the lot changed,

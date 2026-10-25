@@ -27,11 +27,11 @@ export const ANALYSE_SCHEMA = {
 
 export interface AnalyseOptions extends Omit<AddOptions, 'out'> {
   model?: string;
-  /** Modèle de la lecture B (défaut `opus` : un autre modèle que la lecture A décorrèle les erreurs, H1). */
+  /** Modèle de la lecture B (défaut `opus`), avec `double` seulement. */
   modelB?: string;
-  /** Une seule lecture (la ligne de base de la mesure), sans lecture B, sans réconciliation. */
-  unique?: boolean;
-  /** Part d'éléments non appariés (pour cent) au-delà de laquelle la réconciliation est refusée ; défaut 30. */
+  /** La double lecture (option : sa mesure n'a pas montré de gain, `docs/mesures/ref-double-lecture-2026-10-25.md`) ; sans elle, une seule lecture. */
+  double?: boolean;
+  /** Part d'éléments non appariés (pour cent) au-delà de laquelle la réconciliation est refusée ; défaut 30, avec `double` seulement. */
   seuil?: string;
   /** Chemin du cadence.yaml lu par les commandes de l'agent (`--config`) : celui de `references.dir`. */
   configPath: string;
@@ -128,9 +128,9 @@ async function lireUne(c: Contexte, nom: Nom, model: Model): Promise<Lue> {
 const confiancesDe = (lecture: Obj): string => ['mesure', 'lu', 'incertain'].map((c) => [c, (lecture.elements as { confiance: string }[]).filter((e) => e.confiance === c).length] as const).filter(([, n]) => n > 0).map(([c, n]) => `${c} : ${n}`).join(', ');
 
 /**
- * `cadence ref analyse` : la chaîne — add, puis deux lectures indépendantes (deux sessions de l'agent `reference-analyst`, A et B, modèles possiblement
- * différents), `ref diff` (réconciliation par le programme), le troisième regard sur ce qu'une seule lecture porte, l'inventaire écrit avec les jetons
- * posés dans `usage` ; `--unique` : une seule lecture (la ligne de base). Rend le code de sortie : 0 fait, 1 lecture refusée ou trop d'éléments non
+ * `cadence ref analyse` : la chaîne — add, puis UNE lecture (une session de l'agent `reference-analyst`, `lectures/a.json`) ; avec `--double`, deux lectures
+ * indépendantes (A et B, modèles possiblement différents), `ref diff` (réconciliation par le programme), le troisième regard sur ce qu'une seule lecture
+ * porte, l'inventaire écrit avec les jetons posés dans `usage` (la double lecture n'a pas montré de gain : c'est une option, pas le défaut). Rend le code de sortie : 0 fait, 1 lecture refusée ou trop d'éléments non
  * appariés ou aucun élément gardé par le troisième regard, 3 quota ; une session en échec ou un refus d'entrée (modèle, plafond, aucune page) lève une `RafError` (code 2).
  */
 export async function analyse(o: AnalyseOptions): Promise<number> {
@@ -138,8 +138,8 @@ export async function analyse(o: AnalyseOptions): Promise<number> {
   const modelB = (o.modelB ?? 'opus') as Model;
   if (!ANALYSE_MODELS.includes(model)) throw new RafError(`ref analyse : --model invalide : « ${o.model} » (attendu : ${ANALYSE_MODELS.join(', ')})`);
   if (!ANALYSE_MODELS.includes(modelB)) throw new RafError(`ref analyse : --model-b invalide : « ${o.modelB} » (attendu : ${ANALYSE_MODELS.join(', ')})`);
-  if (o.unique && o.modelB !== undefined) throw new RafError('ref analyse : --model-b n\'a pas de sens avec --unique (une seule lecture, pas de lecture B)');
-  if (o.unique && o.seuil !== undefined) throw new RafError('ref analyse : --seuil n\'a pas de sens avec --unique (une seule lecture, rien à réconcilier)');
+  if (!o.double && o.modelB !== undefined) throw new RafError('ref analyse : --model-b n\'a de sens qu\'avec --double (une seule lecture, pas de lecture B)');
+  if (!o.double && o.seuil !== undefined) throw new RafError('ref analyse : --seuil n\'a de sens qu\'avec --double (une seule lecture, rien à réconcilier)');
   const seuil = parseSeuil(o.seuil, 'ref analyse');
   const { slug, docDir, doc, lues: pages } = add({ document: o.document, slug: o.slug, sections: o.sections, env: o.env, cwd: o.cwd, refsDir: o.refsDir, now: o.now, out: o.out });
   const sections = `\n  choisir les pages à lire : cadence ref analyse ${o.document} --slug ${slug} --sections 3-12`;
@@ -152,7 +152,10 @@ export async function analyse(o: AnalyseOptions): Promise<number> {
     return 1;
   };
 
-  if (o.unique) {
+  if (!o.double) {
+    // les fichiers d'une double lecture précédente ne passent pas pour ceux de ce passage : leur `usage.lectures.a` ne serait plus celui de `a.json`
+    rmSync(join(docDir, 'lectures', 'b.json'), { force: true });
+    rmSync(join(docDir, 'inventaire.json'), { force: true });
     const r = await lireUne(c, 'a', model);
     if (r.kind === 'quota') {
       o.err(`ref analyse : quota atteint, aucune lecture écrite : ${r.message}`);

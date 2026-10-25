@@ -39,8 +39,20 @@ export interface HtmlRegion extends Box {
 
 const px = (pt: number): number => Math.round(pt * SCALE);
 
-function exec(file: string, args: string[], cwd?: string): string {
-  return execFileSync(file, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 512, env: { ...process.env, LC_ALL: 'C' } });
+function exec(file: string, args: string[]): string {
+  return execFileSync(file, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 512, env: { ...process.env, LC_ALL: 'C' } });
+}
+
+/** Lance un outil poppler ; son échec (code non nul, sortie trop grosse, sortie illisible) devient une RafError qui le nomme, avec la raison. */
+function poppler(name: string, tools: ToolPaths, args: string[], file: string): string {
+  try {
+    return exec(tools[name]!, args);
+  } catch (e) {
+    const err = e as { stderr?: string; message?: string };
+    const reason = String(err.stderr ?? '').split('\n').find((l) => l.trim() !== '') ?? String(err.message ?? '').split('\n')[0] ?? '';
+    const clean = reason.replace(/^Syntax Error[^:]*: /, '').trim();
+    throw new RafError(`ref : ${name} a échoué sur ${file}${clean ? ` (${clean})` : ''}`);
+  }
 }
 
 /** Nombre de pages ; un PDF chiffré, abîmé ou sans page est refusé avec la raison. */
@@ -64,7 +76,7 @@ const unescapeXml = (s: string): string => s.replace(/&lt;/g, '<').replace(/&gt;
 
 /** Texte positionné de tout le document (`pdftotext -bbox-layout` : mots regroupés en lignes), en pixels de la page rendue. */
 export function textLayout(tools: ToolPaths, file: string): PageText[] {
-  const xml = exec(tools.pdftotext!, ['-bbox-layout', file, '-']);
+  const xml = poppler('pdftotext', tools, ['-bbox-layout', file, '-'], file);
   const pages: PageText[] = [];
   for (const chunk of xml.split('<page ').slice(1)) {
     const head = chunk.slice(0, chunk.indexOf('>'));
@@ -86,7 +98,7 @@ export function listImages(tools: ToolPaths, file: string): ListedImage[] {
   const out: ListedImage[] = [];
   const slots = new Map<number, number>();
   const ranks = new Map<number, number>();
-  for (const row of exec(tools.pdfimages!, ['-list', file]).split('\n').slice(2)) {
+  for (const row of poppler('pdfimages', tools, ['-list', file], file).split('\n').slice(2)) {
     const c = row.trim().split(/\s+/);
     if (c.length < 5) continue;
     const page = Number(c[0]);
@@ -103,7 +115,7 @@ export function listImages(tools: ToolPaths, file: string): ListedImage[] {
 /** Rend les pages à 200 dpi dans `dir/page-<n>.png`. */
 export function renderPages(tools: ToolPaths, file: string, pages: number[], dir: string): void {
   mkdirSync(dir, { recursive: true });
-  for (const n of pages) exec(tools.pdftoppm!, ['-r', String(DPI), '-png', '-singlefile', '-f', String(n), '-l', String(n), file, join(dir, `page-${n}`)]);
+  for (const n of pages) poppler('pdftoppm', tools, ['-r', String(DPI), '-png', '-singlefile', '-f', String(n), '-l', String(n), file, join(dir, `page-${n}`)], file);
 }
 
 /** Résolution des vignettes de toutes les pages (à parcourir pour repérer les planches d'un document sans texte). */
@@ -112,13 +124,13 @@ export const THUMB_DPI = 40;
 /** Vignettes basse résolution de toutes les pages dans `dir/page-<n>.png`. */
 export function renderThumbnails(tools: ToolPaths, file: string, total: number, dir: string): void {
   mkdirSync(dir, { recursive: true });
-  for (let n = 1; n <= total; n++) exec(tools.pdftoppm!, ['-r', String(THUMB_DPI), '-png', '-singlefile', '-f', String(n), '-l', String(n), file, join(dir, `page-${n}`)]);
+  for (let n = 1; n <= total; n++) poppler('pdftoppm', tools, ['-r', String(THUMB_DPI), '-png', '-singlefile', '-f', String(n), '-l', String(n), file, join(dir, `page-${n}`)], file);
 }
 
 /** Extrait les images d'une page dans `dir/p<page>-<slot sur 3 chiffres>.png`. */
 export function extractImages(tools: ToolPaths, file: string, page: number, dir: string): void {
   mkdirSync(dir, { recursive: true });
-  exec(tools.pdfimages!, ['-png', '-f', String(page), '-l', String(page), file, join(dir, `p${page}`)]);
+  poppler('pdfimages', tools, ['-png', '-f', String(page), '-l', String(page), file, join(dir, `p${page}`)], file);
 }
 
 export const imageFile = (page: number, slot: number): string => `p${page}-${String(slot).padStart(3, '0')}.png`;
@@ -127,7 +139,7 @@ export const imageFile = (page: number, slot: number): string => `p${page}-${Str
 export function imageRegions(tools: ToolPaths, file: string, page: number): HtmlRegion[] {
   const work = mkdtempSync(join(tmpdir(), 'cadence-ref-'));
   try {
-    exec(tools.pdftohtml!, ['-xml', '-q', '-nodrm', '-zoom', String(SCALE), '-f', String(page), '-l', String(page), file, join(work, 'p')]);
+    poppler('pdftohtml', tools, ['-xml', '-q', '-nodrm', '-zoom', String(SCALE), '-f', String(page), '-l', String(page), file, join(work, 'p')], file);
     const xml = readFileSync(join(work, 'p.xml'), 'utf8');
     return [...xml.matchAll(/<image ([^>]*)\/>/g)].map((m) => ({ page, x: Number(attr(m[1]!, 'left')), y: Number(attr(m[1]!, 'top')), l: Number(attr(m[1]!, 'width')), h: Number(attr(m[1]!, 'height')) }));
   } finally {

@@ -221,6 +221,18 @@ describe('cadence ref add (L261)', () => {
     expect(existsSync(refs)).toBe(false);
   });
 
+  it.each(['pdftotext', 'pdftoppm', 'pdfimages', 'pdftohtml'])("%s qui échoue : RafError qui nomme l'outil, le document et la raison, sortie 2, rien n'est écrit", (outil) => {
+    const { base, refs, env, cwd } = setup();
+    const bin = join(base, 'casses');
+    mkdirSync(bin);
+    writeFileSync(join(bin, outil), '#!/bin/sh\necho "Syntax Error: disque plein" >&2\nexit 1\n', { mode: 0o755 });
+    const pdf = writePdf(base, 'norme.pdf', NORME);
+    const r = ref(cwd, { ...env, PATH: `${bin}:${env.PATH}` }, 'add', pdf, '--slug', 'norme');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain(`ref : ${outil} a échoué sur ${pdf} (disque plein)`);
+    expect(existsSync(join(refs, 'norme', 'document.json'))).toBe(false);
+  });
+
   it('refuse une page demandée hors du document et une plage mal écrite', () => {
     const { base, env, cwd } = setup();
     const pdf = writePdf(base, 'norme.pdf', NORME);

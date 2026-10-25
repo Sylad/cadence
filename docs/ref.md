@@ -205,7 +205,10 @@ ref : outil absent du PATH, à installer (rien n'est installé d'office) :
 (`poppler-utils`, `imagemagick`, `tesseract-ocr`.) `add` does not call ImageMagick or tesseract, `measure` calls tesseract (and only for the text); both check all the tools at the first call, as the design asks.
 ImageMagick is not called by either: `measure` decodes the rendered PNG pages itself. The rest of cadence depends on none of them.
 
-Exit codes: 0 done, 2 refusal (tool, file, option, slug, folder).
+A poppler tool that fails while `add` reads the document (`pdftotext`, `pdftoppm`, `pdfimages`, `pdftohtml`: non-zero exit, output too large, disk full)
+is a refusal too, naming the tool, the document and the reason: `ref : pdftotext a échoué sur doc.pdf (disque plein)`. Nothing is written in the folder of the document.
+
+Exit codes: 0 done, 2 refusal (tool, file, option, slug, folder, tool failure).
 
 ## `cadence ref eval <attendu> <lecture> [--json]`
 

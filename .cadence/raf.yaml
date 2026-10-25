@@ -3607,6 +3607,7 @@ lots:
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
+    review: { date: 2026-10-25, verdict: "compliant : aucun écart ; `tsc --noEmit` passe ; 37 tests verts sur check-faux-ecarts et check, 113 sur audit et lead tour (suite complète non relancée, délai dépassé) — orchestré (vague 2026-10-25-0848, 0 passe(s) de correction)", commit: 36c4bf94a3b32c66972bd2fe70928077bbc7d9be, reporte: { de: 097e430d17e9c6a94d139a95a0c45f8b99570038, vers: 36c4bf94a3b32c66972bd2fe70928077bbc7d9be, patchId: 2f5acbf2eb6ad0aae0070f37c872ea725b16faf7 } }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { precheckNothingToFind, runLot } from '../src/orchestrate/cycle.js';
+import { AGENTS_DIR } from '../src/skills.js';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { claudeOut, commitFile, git, harness, precheckReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 
@@ -138,6 +139,12 @@ describe('L322 R3 — le local fiable, ou écarté vite', () => {
     expect(local).toContain('un lot à contrôler');
     expect(local).toMatch(/do not open the plan file/i);
     expect(local).not.toMatch(/Read the lot, its notes and sub-tasks in the plan/);
+  });
+
+  it('R5 — le prompt de l\'agent precheck-reader ne demande pas de lire le plan : il le laisse au brief (sinon le local reçoit deux ordres contraires)', () => {
+    const prompt = readFileSync(join(AGENTS_DIR, 'precheck-reader.md'), 'utf8');
+    expect(prompt).not.toMatch(/read the lot in the plan/i);
+    expect(prompt).toMatch(/brief tells you how to get the lot/);
   });
 
   it('R5 — le brief de Sonnet reste celui d\'avant : il lit le plan lui-même', async () => {

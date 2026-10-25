@@ -64,7 +64,7 @@ const normTexte = (v: unknown): string => String(v ?? '').normalize('NFC').repla
 const noms = (xs: unknown, cle: string): string[] => (Array.isArray(xs) ? xs.map((x) => norm((x as Obj)?.[cle])) : []);
 
 /** Ce qui désigne un élément, indépendamment de son id, de sa zone et de sa confiance : deux lectures indépendantes numérotent à leur façon. */
-function identite(e: Obj, parId: Map<string, Obj>): string {
+export function identite(e: Obj, parId: Map<string, Obj>): string {
   const cible = (id: unknown): string => {
     const t = typeof id === 'string' ? parId.get(id) : undefined;
     return t ? `${t.type}:${identite(t, new Map())}` : '?';
@@ -96,7 +96,7 @@ function identite(e: Obj, parId: Map<string, Obj>): string {
 }
 
 /** Ce que l'élément affirme une fois retrouvé : une identité juste avec une affirmation fausse est un faux lu, pas un rappel. */
-function affirmation(e: Obj, parId: Map<string, Obj>): string {
+export function affirmation(e: Obj, parId: Map<string, Obj>): string {
   switch (e.type) {
     case 'ecran':
       return String(e.largeur_reference);

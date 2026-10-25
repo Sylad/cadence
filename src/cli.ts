@@ -80,6 +80,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   cadence perf [dossier] [--since date] [--json]   tableau de bord du workflow, sans modèle : deux fenêtres (7 derniers jours contre les 7 précédents) lues dans dossier/.cadence/runs et les plans, chaque vitesse à côté de sa qualité, ⚠ au-delà de 25 % de dégradation ; tokens par lot selon l'estimate, part de la revue, délais création → done → livraison, durée de mur par étape, coût en euros par lot livré (grille cadence.yaml perf.prices) ; --since est un jour qui tronque les fenêtres
   cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]   enregistre un document de référence hors du dépôt (references.dir de cadence.yaml, sinon $XDG_DATA_HOME/cadence/references) : pages rendues à 200 dpi, texte positionné, images incluses, index des figures et des passages qui les citent ; exige poppler, ImageMagick et tesseract (outil absent nommé avec sa commande, code 2)
   cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug nom] [--model sonnet|opus|haiku]   la chaîne en lecture unique : add, puis une session neuve de l'agent reference-analyst qui lit chaque page puis chaque zone, mesure par ref measure et écrit lectures/a.json (genre lecture, schéma de ref check) ; le programme relit le fichier (ref check, document et genre) et y pose usage.tokens ; plafond déclaré : 20 pages par lecture ; code 1 lecture refusée, 2 refus (plafond, modèle, session en échec), 3 quota
+  cadence ref diff <lecture-a.json> <lecture-b.json> [--out inventaire.json] [--seuil 30]   réconcilie deux lectures du même document (même slug et même empreinte) : concordant → un élément lu ou mesuré, divergent → incertain avec les deux versions, seul (une lecture) → incertain en attente du troisième regard ; silences réunis ; au-delà de 30 % d'éléments non appariés (--seuil, en pour cent) code 1 et rien d'écrit ; --out écrit l'inventaire
   cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]   mesure une zone d'une page rendue (pixels de la page) : couleurs (point, moyenne, dominantes), contraste WCAG 2.2, boîtes, mots OCR tesseract et taille de police estimée ; valeurs ramenées à 1440 px de large, tolérance déclarée
   cadence ref check <inventaire.json | lecture.json>   valide un inventaire ou une lecture (schéma version 1, modèle templates/inventaire.json) : une ligne « ✗ chemin : raison » par écart puis « N écart(s) » sur la sortie standard (code 1), le résumé par type sinon (code 0) ; fichier absent, vide ou illisible : code 2 ; n'appelle aucun outil système
   cadence ref eval <attendu.json | dossier> <lecture.json | dossier> [--json]   note une lecture contre l'inventaire attendu (vérité connue) : rappel et précision par type, faux lu (éléments sûrs et faux), pièges trouvés, tokens par page (usage.tokens de la lecture) ; lecture d'un autre document refusée (code 2) ; sur dossiers, un cas par sous-dossier (attendu.json / lecture.json)
@@ -192,6 +193,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       slug: { type: 'string' },
       quoi: { type: 'string' },
       'sans-rendu': { type: 'boolean' },
+      out: { type: 'string' },
+      seuil: { type: 'string' },
+      'model-b': { type: 'string' },
+      unique: { type: 'boolean' },
       largeur: { type: 'string' },
       until: { type: 'string' },
       help: { type: 'boolean', short: 'h' },

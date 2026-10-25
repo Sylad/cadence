@@ -7,7 +7,7 @@ tables drawn as pictures, message templates, figures of a norm (WMO, ICAO…). `
 turns such a document into files a session can read without losing the pictures. The whole
 design is in
 [`docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md`](superpowers/specs/2026-10-23-ref-documents-de-reference-design.md)
-(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) **`cadence ref check`** with the inventory schema (lot 3 of 10), **`cadence ref eval`** (lot 4 of 10, with the synthetic corpus `cadence ref corpus`) and **`cadence ref analyse`** (lot 5 of 10: the `reference-analyst` agent, one single reading).
+(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) **`cadence ref check`** with the inventory schema (lot 3 of 10), **`cadence ref eval`** (lot 4 of 10, with the synthetic corpus `cadence ref corpus`) **`cadence ref analyse`** (lot 5 of 10: the `reference-analyst` agent, one single reading) and **`cadence ref diff`** with the double reading (lot 6 of 10).
 
 ## `cadence ref add <document.pdf> [--sections 3-5,9] [--slug name]`
 
@@ -275,6 +275,32 @@ opacity are exactly the traps of those cases.
 A reading whose `document.slug` or `document.sha256` differs from the expected one is refused (never a measure over two versions
 mixed). Exit codes: **0** done, **2** refusal (wrong call, file absent or unreadable, invalid reading, other document, folder with
 no `attendu.json`). `--json` prints one object: `total`, `types`, `pieges`, `tokens`, `cas`.
+
+## `cadence ref diff <lecture-a.json> <lecture-b.json> [--out inventaire.json] [--seuil 30]`
+
+Reconciles **two readings of the same document** (design §3, step 3), by program, without any session. Both files must pass `ref check`, be of genre `lecture`, and carry the same `slug` **and** `sha256` (a reconciliation over two
+versions of a document is refused, exit 2). Elements are paired **by type, page, identity and zone overlap**; the identity is what designates an element whatever its id, zone and confidence (the same notion as `ref eval`: the
+text of a `texte`, role and content of a `composant`, figure of a `lien`…), since two independent readings number their ids their own way:
+
+| Paired as | When | Result |
+|---|---|---|
+| **concordant** | same identity and same affirmation (the role of a text, the verdict of a link, the cells of a table…) | one element, `mesure` if either reading measured it, else `lu`; a doubt of one reading (`incertain`) stays a doubt, with its cause |
+| **divergent** | same identity but another affirmation, or another identity on the same zone (overlap ≥ 50 %, same type and page: `120 KT` read `120 kt`) | one `incertain` element whose cause holds both versions: `lectures divergentes — libelle : A « 120 KT » ≠ B « 120 kt »`; neither is chosen |
+| **seul** | carried by one reading only | `incertain` (`lu dans la lecture B seulement, troisième regard non fait`) until the third look rules on it (see `ref analyse`) |
+| **silence** | a question, in either reading | gathered (one question once), never sent to a third look and not counted below: a silence is not a reading that someone else contradicts |
+
+More than **30 %** of the paired-or-single elements unpaired (silences left out, `--seuil` changes it, in percent) means the two readings do not describe the same document: no reconciliation, the question goes to the lead (exit 1, nothing written).
+The ids of the result are renumbered `<slug>#<type>-<n>` (reading A in its order, then what B alone carries) and the references (`composant.ecran`, `etat.cible`, `statut.couvre`) follow; an element that referred to a discarded one is discarded with it.
+
+```
+$ cadence ref diff a.json b.json --out inventaire.json
+concordants : 31 · divergents : 2 · seuls : 3 (A : 1, B : 2) · silences : 9
+non appariés : 8.3 % (seuil 30 %)
+divergent : texte p.2 : libelle : A « 120 KT » ≠ B « 120 kt »
+seul (B) : composant p.1 : bouton|Layers
+```
+
+`--out` writes the reconciled inventory (genre `inventaire`, valid for `ref check`). Exit codes: **0** reconciled, **1** too many unpaired elements, **2** refusal (wrong call, unreadable or invalid file, not a reading, two documents, bad `--seuil`).
 
 ## `cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug name] [--model sonnet|opus|haiku]`
 

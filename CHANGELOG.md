@@ -77,6 +77,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `docs/perf.md` (L338): the key list of `cadence perf --json` names `escalations` (L337) and `quality` (L227); the `escalade` line of the final table, the `échec` class of an escalated session and the `escalations` count of `cadence perf` were checked against the lot state (tests R12/R13, L337).
+
 ## [1.12.0] - 2026-10-25
 
 ### Added

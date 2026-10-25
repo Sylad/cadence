@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { tempDir } from './helpers.js';
@@ -45,5 +45,17 @@ describe('L337 R10 — cadence perf compte les escalades et leur issue', () => {
     expect(text).toMatch(/escalades de modèle : 4 lots · 1 conforme · 1 rendu malgré l'escalade · 1 non jouée · 1 en échec/);
     const none = (await perf(ctx([['L4', { steps: [step(CUR)] }]]))).join('\n');
     expect(none).not.toContain('escalades de modèle');
+  });
+});
+
+describe('L338 — docs/perf.md liste les clés de --json', () => {
+  it('chaque clé de premier niveau de la sortie --json est dans la liste de docs/perf.md', async () => {
+    const root = ctx([['L1', { steps: [step(CUR)] }]]);
+    const keys = Object.keys(JSON.parse((await perf(root, '--json')).join('\n')));
+    const line = readFileSync(join(__dirname, '..', 'docs', 'perf.md'), 'utf8').split('\n').find((l) => l.startsWith('- **`--json`**')) ?? '';
+    const listed = line.slice(line.indexOf('{'), line.indexOf('}`; ') + 1);
+    expect(keys).toContain('escalations');
+    expect(keys).toContain('quality');
+    for (const k of keys) expect(listed, k).toMatch(new RegExp(`[ ,]${k}[:,} ]`));
   });
 });

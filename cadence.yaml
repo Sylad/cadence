@@ -8,6 +8,9 @@ docs:
 
 # Porte « code modifié sans test » (L287) : le code du paquet sans fichier de test touché part en correction avant la revue.
 orchestrate:
+  # Escalade (L340, cadence L337 / 1.12.0) : avant de rendre un lot encore non conforme après ses passes, la vague joue
+  # une correction et une revue neuve en Fable (règle du lead depuis le 17-10, oubliée deux fois à la main).
+  escalation: { model: fable }
   # Porte de tests (L324, 25-10) : la vague lance la suite et le typecheck après chaque écriture ; un rouge part en correction au lieu d'arriver dans main.
   test: npx vitest run
   build: npx tsc --noEmit

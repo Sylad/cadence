@@ -3648,11 +3648,15 @@ lots:
     finished: 2026-10-25
   - id: L325
     title: "tests deliver instables sous charge : deux tests différents ont expiré le 25-10 dans la suite complète (charge ~26 sur 32 cœurs) puis passent seuls — test/deliver.test.ts (a) « un enfant en arrière-plan qui ignore SIGINT … tué au plus tard à l'échéance de la grâce » (40 s, pause(600)) et :830 « SIGINT au groupe de premier plan » (attente de 2 s) ; avec orchestrate.test (L324) la vague lance la suite après chaque écriture, un faux rouge renverrait un lot en correction — rendre ces tests indépendants de la charge (conditions observables au lieu de délais, grâce injectable si besoin), mesurer sous charge (vitest parallèle + CPU chargé) ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
     docs_ok: { date: 2026-10-25, reason: "paramètre interne graceMs de realDeps, injectable pour les tests seulement : aucun comportement visible ne change, la doc de deliver (grâce de 2 s après Ctrl-C) reste vraie" }
+    notes:
+      - { date: 2026-10-25, text: "25-10 (lead) : rendu par la vague 2026-10-25-1150 (revue non conforme après 2 passes : course SIGINT avant adoption, 5/15) ; reprise à la main : fix Sonnet a10094e + 05f6ed4, revue Opus neuve (18/18 à la charge visée ; à 2× : (b) et L19 encore liés au temps + défaut produit Ctrl-C perdu → L329), fix f04ec88, re-vérif : 0/28 pour L19, L20, (b), (c) à charge 41–70 sur 32 cœurs ; (a) 5/28 = signature du Ctrl-C perdu, porté par L329. Intégré à la main (rebase, CHANGELOG résolu : entrées de L326/L328 gardées + version finale de L325), suite 3570 verts au lead." }
+    review: { date: 2026-10-25, verdict: "conforme (revue Opus neuve et re-vérif après f04ec88 : tests Ctrl-C/SIGINT/SIGHUP de deliver attendent l'adoption par le suivi, grâce injectée là où le verrou est surveillé ; 0/28 rouges à charge 41–70 pour L19, L20, (b), (c) ; (a) relève du défaut produit L329) — intégré à la main, suite 3570 verts et tsc propre au lead", commit: e25aebaf46f7dd848dc22c2d530984744a3e2dbe }
+    finished: 2026-10-25
   - id: L326
     title: "README de cadence concis et clair (règle Sylvain 25-10 : « faut pas fuir les gens avec le readme ») — page d'accueil : quoi et pour qui en 2-3 phrases, démarrage en 3 commandes, UN schéma simple, liens vers la doc ; le détail (TMPDIR, worktrees, options d'orchestrate, migrate…) va dans docs/ sans perte ; test readme-accueil : garde-fou de lisibilité (taille plus basse, lignes courtes, pas d'option détaillée) au lieu des seuls 12 ko ; agent doc-keeper : un lot qui change le fonctionnement écrit dans docs/, le README ne reçoit qu'un lien ; doc et CHANGELOG"
     status: done

@@ -3675,11 +3675,12 @@ lots:
     finished: 2026-10-25
   - id: L328
     title: "orchestrate : (1) précheck repassé sur Sonnet dans cadence (orchestrate.precheck: true) — mesure du 25-10 : le local plante sur ~1 lot sur 3 depuis le 23-10 et, quand il répond, a dit « oui » à tort sur L275, L326 et L327 (Sonnet : non / partiel) pour 2 à 3 min chacun ; Sonnet tranche en ~16 s pour ~20 k tokens ; (2) intégration en worktree : un rouge au sommet intégré est relancé une fois avant de rendre le lot (le 25-10, L326 rendu pour un rouge de charge pendant que L325 tournait : le même sommet rejoué seul est vert, 3559 tests) — rouge deux fois = rendu ; (3) le refus nomme les tests rouges (l'extrait était vide : « npx vitest run en échec (code 1) : ») ; doc (docs/orchestrate.md) et CHANGELOG ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
     review: { date: 2026-10-25, verdict: "compliant (1 minor note: redExcerpt confond lignes « - » d'une sortie brute et liste de tests nommés) — orchestré (vague 2026-10-25-1150, 0 passe(s) de correction)", commit: ecfb4170db3bccb8a21d0565ea2da7a415e1bcab }
+    finished: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

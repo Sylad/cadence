@@ -3659,6 +3659,7 @@ lots:
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
+    review: { date: 2026-10-25, verdict: "compliant: 0 blocking, 0 major, 3 minor notes (self-link in whats-new, a stale test title and audit.ts comment, README at 47 lines rather than the 36 announced) — orchestré (vague 2026-10-25-1107, 0 passe(s) de correction)", commit: a0ba93e1ea492ba35d2b93809552f13da29b4f12, reporte: { de: 32bbfb31cec22a3752f885332d17a069fd4c6d63, vers: a0ba93e1ea492ba35d2b93809552f13da29b4f12, patchId: 7756a0809e1725080474f2a4b92db29148cb45c4 } }
   - id: L327
     title: "orchestrate : signaler un projet sans porte de tests — cadence lead tour et orchestrate --dry-run disent en une ligne qu'un projet n'a pas orchestrate.test (la vague ne lancera pas la suite, seule la revue le fera si elle le décide), avec la commande probable lue de package.json (scripts.test) / pyproject (pytest) / pom (mvn test) quand elle existe ; doc (docs/orchestrate.md, docs/lead.md) et CHANGELOG ; tests. Puis le lead déclare test/build dans chaque projet (un commit de config par projet, après vérification que la commande est verte). Suite de L324."
     status: done

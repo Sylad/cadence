@@ -3648,9 +3648,10 @@ lots:
     finished: 2026-10-25
   - id: L325
     title: "tests deliver instables sous charge : deux tests différents ont expiré le 25-10 dans la suite complète (charge ~26 sur 32 cœurs) puis passent seuls — test/deliver.test.ts (a) « un enfant en arrière-plan qui ignore SIGINT … tué au plus tard à l'échéance de la grâce » (40 s, pause(600)) et :830 « SIGINT au groupe de premier plan » (attente de 2 s) ; avec orchestrate.test (L324) la vague lance la suite après chaque écriture, un faux rouge renverrait un lot en correction — rendre ces tests indépendants de la charge (conditions observables au lieu de délais, grâce injectable si besoin), mesurer sous charge (vitest parallèle + CPU chargé) ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-25
+    started: 2026-10-25
   - id: L326
     title: "README de cadence concis et clair (règle Sylvain 25-10 : « faut pas fuir les gens avec le readme ») — page d'accueil : quoi et pour qui en 2-3 phrases, démarrage en 3 commandes, UN schéma simple, liens vers la doc ; le détail (TMPDIR, worktrees, options d'orchestrate, migrate…) va dans docs/ sans perte ; test readme-accueil : garde-fou de lisibilité (taille plus basse, lignes courtes, pas d'option détaillée) au lieu des seuls 12 ko ; agent doc-keeper : un lot qui change le fonctionnement écrit dans docs/, le README ne reçoit qu'un lien ; doc et CHANGELOG"
     status: todo

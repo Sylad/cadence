@@ -1057,22 +1057,33 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
 
   it('(b) Ctrl-C : le verrou reste tenu pendant la grâce, même après la sortie du script — une seconde livraison est refusée, un seul bump', async () => {
     const logs = tempDir();
-    // le script sort après son trap (0,3 s) ; son enfant en arrière-plan (SIGINT ignoré) bumpe ~1 s après Ctrl-C, dans la grâce
+    // le script sort après son trap (0,3 s) ; son enfant en arrière-plan (SIGINT ignoré) ne bumpe qu'une fois la seconde
+    // livraison refusée (fichier `refused`), toujours dans la grâce : aucune durée fixe, la charge ne décale rien
     const dir = scriptRepo(
       logs,
-      `  trap 'sleep 0.3; exit 130' INT\n  sh -c "sleep 1.4; echo bumped >> '${logs}/bumps'" &\n  while :; do wait; done`,
+      `  trap 'sleep 0.3; exit 130' INT\n  sh -c "while [ ! -e '${logs}/refused' ]; do sleep 0.05; done; echo bumped >> '${logs}/bumps'" &\n  while :; do wait; done`,
     );
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
     const first = startFirst(logs, dir);
     try {
       expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
       await pause(400);
-      const t = Date.now();
+      const scriptPid = Number(readFileSync(join(logs, 'first'), 'utf8').trim());
       process.kill(-first.child.pid!, 'SIGINT');
-      await pause(Math.max(0, t + 600 - Date.now())); // le trap est fini, le script est sorti ; l'enfant vit encore
+      expect(await until(() => !alive(scriptPid), 10_000)).toBe(true); // le trap est fini, le script est sorti ; l'enfant vit encore
       const second = await cad(dir);
       expect(second).toBe(2); // verrou vivant : refusée
+      writeFileSync(join(logs, 'refused'), '');
       await first.exited;
-      await pause(1_500);
+      expect(await until(() => lines(join(logs, 'bumps')).length > 0, 5_000)).toBe(true);
+      await pause(500);
       expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
     } finally {
       first.cleanup();

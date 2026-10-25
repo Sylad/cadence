@@ -376,6 +376,10 @@ stops the accidental access, not a deliberate workaround; making the file unread
 the project's own `test`, `build` and `ux.command`, which the program launches. A lot that really needs the cluster is run in a
 project with `orchestrate.prodAccess: true`: the restriction is lifted for all its sessions (default `false`).
 
+**Cadence's own pre-check runs on Sonnet (L328, 2026-10-25).** `cadence.yaml` sets `orchestrate.precheck: true`, no longer `local`. Measured on 25 October: the local
+model failed on about one lot in three since 23 October and, when it answered, said `oui` wrongly on L275, L326 and L327 (Sonnet: `non` / `partiel`), 2 to 3 minutes each;
+Sonnet decides in about 16 s for about 20 k tokens.
+
 `orchestrate.precheck: local` (L146) runs the pre-check on the local model of the dev machine instead of Sonnet: the
 orchestrator launches `claude-local` with the same brief, the `precheck-reader` prompt and tools, no quota used and nothing counted in the
 lot's budget (the step shows `local` as its model). `claude-local` is **not shipped with cadence**: it is a personal wrapper (a script on the `PATH`, `qwen3-coder:30b` by default) around
@@ -525,7 +529,12 @@ nothing below applies and the wave behaves as before; any other value is refused
      file changed on both sides, another file in conflict with it — aborts the rebase and hands the lot back as above. The rebased commits differ, so
      steps 3 and 4 apply: tests replayed, and a short review since the patch-id changed;
   3. if the rebase changed the commits, the tests and the build (`orchestrate.test`, `orchestrate.build`) are run again at the rebased tip, a red that
-     was not already red at the lot's base sha (L213) hands the lot back and leaves the repository's branch alone;
+     was not already red at the lot's base sha (L213) hands the lot back and leaves the repository's branch alone. **A red is played once more before the lot is
+     handed back** (L328): on 2026-10-25 L326 was handed back for a load-induced red while L325 was running, and the same tip replayed alone was green (3559
+     tests). Green the second time: the lot goes on, the journal says `<project>:<lot> tests rouges au sommet intégré, relancés une fois (…)` and the lot
+     gets a warning `rouge au sommet intégré, vert à la relance`. Red twice: handed back with the result of the second run. **The refusal names the red
+     tests** (up to ten, then `… (+n)`), or the end of the output when the runner's output names none; it used to quote only `npx vitest run en échec
+     (code 1) :`;
   4. the patch-id of the lot's diff (`git patch-id --stable`, work commits only) is compared before and after the rebase. **Same patch-id**: the
      reviewed diff is the integrated diff, the verdict is **carried over** to the integrated sha, with a `reporte: { de, vers, patchId }` trace in the plan
      (and in the journal: `<project>:<lot> verdict reporté : <old sha> → <new sha> (patch-id identique)`); no new review. **Different patch-id** (context

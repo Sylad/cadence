@@ -154,6 +154,39 @@ describe('R7 — tests et build rejoués au sommet rebasé', () => {
     expect(subjects(repo).filter((s) => s.startsWith('feat('))).toHaveLength(1);
     expect(subjects(repo)[0]).toMatch(/^plan: L\d revue de code enregistrée/);
   });
+  it('L328 R2 — rouge au sommet intégré une seule fois (charge) : relancé, vert la seconde fois, le lot est intégré et la relance est tracée', async () => {
+    const mark = join(tempDir(), 'deja-rouge-une-fois');
+    process.env.FLAKY_MARK = mark;
+    const flaky = 'if [ -f L1.txt ] && [ -f L2.txt ] && [ ! -f "$FLAKY_MARK" ]; then touch "$FLAKY_MARK"; echo "FAIL rouge-de-charge"; exit 1; fi\n';
+    const { parent } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true\ntest: sh check.sh', { 'check.sh': flaky });
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], fake({ implement: writes(meeting(2)) }));
+    expect(r.code).toBe(0);
+    expect(existsSync(mark)).toBe(true); // le rouge a bien eu lieu
+    for (const id of ['L1', 'L2']) expect(store(parent).readLot('a', id)!.status).toBe('ready');
+    expect(r.out).toMatch(/a:L\d tests rouges au sommet intégré, relancés une fois/);
+    const warned = ['L1', 'L2'].map((id) => store(parent).readLot('a', id)!).filter((l) => l.warnings.some((w) => /rouge au sommet intégré, vert à la relance/.test(w)));
+    expect(warned).toHaveLength(1);
+  });
+  it('L328 R2 — rouge les deux fois : lot rendu, branche du dépôt inchangée, une seule relance', async () => {
+    const log = join(tempDir(), 'runs.log');
+    process.env.CHECK_LOG = log;
+    const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true\ntest: sh check.sh', { 'check.sh': 'if [ -f L1.txt ] && [ -f L2.txt ]; then echo combo >> "$CHECK_LOG"; fi\n' + CHECK });
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], fake({ implement: writes(meeting(2)) }));
+    expect(r.code).toBe(1);
+    const red = ['L1', 'L2'].map((id) => store(parent).readLot('a', id)!).filter((l) => l.status === 'handed-back');
+    expect(red).toHaveLength(1);
+    expect(red[0].outcome).toMatch(/^intégration refusée : tests rouges au sommet intégré/);
+    expect(subjects(repo).filter((s) => s.startsWith('feat('))).toHaveLength(1);
+    // le sommet qui contient les deux lots est joué deux fois : le contrôle, puis une seule relance
+    expect(readFileSync(log, 'utf8').split('\n').filter((x) => x === 'combo')).toHaveLength(2);
+  });
+  it('L328 R3 — le refus nomme les tests rouges (la sortie du dernier essai), pas seulement la commande', async () => {
+    process.env.CHECK_LOG = join(tempDir(), 'checks.log');
+    const { parent } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true\ntest: sh check.sh', { 'check.sh': CHECK });
+    await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], fake({ implement: writes(meeting(2)) }));
+    const red = ['L1', 'L2'].map((id) => store(parent).readLot('a', id)!).filter((l) => l.status === 'handed-back');
+    expect(red[0].outcome).toContain('FAIL combo-des-deux-lots');
+  });
   it('R7 — fast-forward pur : aucune relance des tests', async () => {
     const log = join(tempDir(), 'checks.log');
     process.env.CHECK_LOG = log;

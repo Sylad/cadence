@@ -1795,6 +1795,38 @@ async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promi
   }
 }
 
+/**
+ * Contrôles du sommet intégré (L328) : un rouge est relancé une fois avant de rendre le lot. Le 25-10, L326 a été rendu pour un rouge de charge (L325 tournait en même
+ * temps) alors que le même sommet rejoué seul était vert. Rouge deux fois = rendu, avec le résultat de la seconde passe ; vert à la relance = une alerte sur le lot et une ligne du journal.
+ */
+async function integratedChecks(c: LotCtx, key: string): Promise<{ red: Constat[]; runs: CheckRun[] }> {
+  const first: Constat[] = [];
+  let runs: CheckRun[] = [];
+  await programChecks(c, first, runs);
+  if (!first.length) return { red: first, runs };
+  c.wave.log(`${key} tests rouges au sommet intégré, relancés une fois (${first.map(redExcerpt).join(' ; ')})`);
+  const red: Constat[] = [];
+  runs = [];
+  await programChecks(c, red, runs);
+  if (!red.length) c.lot.warnings.push(`rouge au sommet intégré, vert à la relance (charge de la machine ?) : ${first.map(redExcerpt).join(' ; ')}`);
+  return { red, runs };
+}
+
+const EXCERPT_LINES = 10;
+
+/**
+ * Le constat rouge d'un contrôle, en une ligne pour le motif d'un refus (L328) : la commande, puis les tests rouges nommés quand le constat les liste (« - nom »),
+ * sinon la fin de la sortie. La première ligne seule laissait « npx vitest run en échec (code 1) : » sans un nom de test.
+ */
+export function redExcerpt(k: Constat): string {
+  const [head, ...rest] = k.texte.split('\n');
+  const lines = rest.map((x) => x.trim()).filter(Boolean);
+  const named = lines.filter((x) => x.startsWith('- '));
+  const shown = named.length ? named.slice(0, EXCERPT_LINES) : lines.slice(-EXCERPT_LINES);
+  const more = named.length > EXCERPT_LINES ? [`… (+${named.length - EXCERPT_LINES})`] : [];
+  return [head.replace(/\s*:$/, ''), ...shown, ...more].join(' ; ');
+}
+
 /** Étape d'écriture (implémentation, correction) : contrôles, puis étape suivante décidée. */
 async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const l = c.lot;
@@ -2362,12 +2394,10 @@ async function integrateLot(c: LotCtx): Promise<void> {
       const tip = git(t.dir, 'rev-parse', 'HEAD');
       if (tip !== reviewed) {
         // Le rebase a changé les commits : tests et build rejoués au sommet rebasé, avant que la branche du dépôt ne bouge (R7).
-        const red: Constat[] = [];
-        const runs: CheckRun[] = [];
-        await programChecks(c, red, runs);
+        const { red, runs } = await integratedChecks(c, key);
         l.checks = runs.length ? { head: tip, runs } : undefined;
         save(c);
-        if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map((k) => k.texte.split('\n')[0]).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
+        if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map(redExcerpt).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
         const before = patchId(t.dir, mergeBase(t.dir, reviewed, t.base), reviewed);
         const after = patchId(t.dir, t.base, 'HEAD');
         if (before !== '' && before === after) {

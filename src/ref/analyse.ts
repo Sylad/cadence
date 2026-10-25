@@ -131,7 +131,7 @@ const confiancesDe = (lecture: Obj): string => ['mesure', 'lu', 'incertain'].map
  * `cadence ref analyse` : la chaîne — add, puis deux lectures indépendantes (deux sessions de l'agent `reference-analyst`, A et B, modèles possiblement
  * différents), `ref diff` (réconciliation par le programme), le troisième regard sur ce qu'une seule lecture porte, l'inventaire écrit avec les jetons
  * posés dans `usage` ; `--unique` : une seule lecture (la ligne de base). Rend le code de sortie : 0 fait, 1 lecture refusée ou trop d'éléments non
- * appariés, 3 quota ; une session en échec ou un refus d'entrée (modèle, plafond, aucune page) lève une `RafError` (code 2).
+ * appariés ou aucun élément gardé par le troisième regard, 3 quota ; une session en échec ou un refus d'entrée (modèle, plafond, aucune page) lève une `RafError` (code 2).
  */
 export async function analyse(o: AnalyseOptions): Promise<number> {
   const model = (o.model ?? 'sonnet') as Model;
@@ -206,6 +206,13 @@ export async function analyse(o: AnalyseOptions): Promise<number> {
     regard = r;
   }
   const inv = assembler(la.lecture, lb.lecture, rec, regard !== undefined);
+  if (inv.elements.length === 0) {
+    // tout ce que les lectures portent n'était porté que par une seule d'entre elles et le troisième regard l'a écarté : rien à écrire, ce n'est pas un défaut de cadence
+    o.out(`${slug} : double lecture (A ${model}, B ${modelB}) — ${pagesLues(pages.length)} (plafond d'une lecture : ${LECTURE_PAGES_MAX})`);
+    o.out(`réconciliation : ${compteRec}`);
+    o.out(`le troisième regard a écarté tous les éléments : aucun inventaire — question au lead (les lectures restent dans ${join(docDir, 'lectures')}, \`cadence ref diff\` les compare)`);
+    return 1;
+  }
   // la réconciliation ne produit que des éléments déjà valides : un écart ici est un défaut de cadence, jamais une lecture à refuser
   const problems = checkInventaire(inv);
   if (problems.length > 0) throw new RafError(`ref analyse : l'inventaire réconcilié est invalide (défaut de cadence) : ${problems[0]}`);

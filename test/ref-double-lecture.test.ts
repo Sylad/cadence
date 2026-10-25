@@ -337,4 +337,30 @@ describe('cadence ref analyse en double lecture (L266)', () => {
     expect(r.out.match(/question : Que veut dire Figure 1 \?/g)).toHaveLength(1);
     expect(existsSync(join(s.dir, 'crops')) ? readdirSync(join(s.dir, 'crops')) : []).toEqual([]);
   });
+
+  it('R21 — un numéro répété garde son premier verdict valide (pas le premier tout court : un verdict sans raison est une absence de réponse)', async () => {
+    const s = setup({ b: [...COMMUN, texte(5, 'Premier', 1300), texte(6, 'Second', 1600)], decisions: [
+      { numero: 1, verdict: 'confirme', raison: ' ' }, { numero: 1, verdict: 'ecarte', raison: 'rien de tel' }, { numero: 1, verdict: 'confirme', raison: 'trop tard' },
+      { numero: 2, verdict: 'confirme', raison: 'écrit tel quel' }, { numero: 2, verdict: 'ecarte', raison: 'contredit' },
+    ] });
+    expect((await analyse(s, '--seuil', '50')).code).toBe(0);
+    const inv = lire(join(s.dir, 'inventaire.json'));
+    expect(inv.elements.find((e: Obj) => e.libelle === 'Premier')).toBeUndefined();
+    expect(inv.elements.find((e: Obj) => e.libelle === 'Second').confiance).toBe('lu');
+    expect(inv.reconciliation.regard.map((v: Obj) => [v.id, v.verdict, v.raison])).toEqual([['norme#texte-5', 'ecarte', 'rien de tel'], ['norme#texte-6', 'confirme', 'écrit tel quel']]);
+  });
+
+  it('R22 — tous les éléments sont d\'une seule lecture et le troisième regard les écarte tous : code 1, la question au lead, aucun inventaire, jamais « défaut de cadence »', async () => {
+    const autre = { source: { page: 2, zone: { x: 100, y: 100, l: 200, h: 40 } } };
+    const s = setup({ a: [texte(1, 'X', 100)], b: [texte(1, 'Y', 100, autre)], decisions: [{ numero: 1, verdict: 'ecarte', raison: 'rien' }, { numero: 2, verdict: 'ecarte', raison: 'rien' }] });
+    const r = await analyse(s, '--seuil', '100');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('a écarté tous les éléments');
+    expect(r.out).toContain('question au lead');
+    expect(r.out).not.toContain('défaut de cadence');
+    expect(existsSync(join(s.dir, 'inventaire.json'))).toBe(false);
+    expect(existsSync(join(s.dir, 'lectures', 'a.json'))).toBe(true);
+    expect(existsSync(join(s.dir, 'lectures', 'b.json'))).toBe(true);
+  });
 });

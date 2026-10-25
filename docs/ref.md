@@ -351,13 +351,13 @@ lectures : ~/.local/share/cadence/references/norme/lectures/a.json, ~/.local/sha
 réconciliation : concordants 31 · divergents 2 · seuls 3 · silences 9 — non appariés 8.3 % (seuil 30 %)
 troisième regard (sonnet) : 2 confirmés, 1 écarté, 0 sans réponse
 inventaire : ~/.local/share/cadence/references/norme/inventaire.json
-éléments : 36 (mesure : 6, lu : 26, incertain : 4)
+éléments : 44 (mesure : 6, lu : 27, incertain : 11)
 tokens : 520000 (65000 par page, 8 pages lues) — A : 190000, B : 250000, troisième regard : 80000
 question : Que veut dire « Figure 1 » ?
 ```
 
 The last lines are one `question :` per distinct question of the agents (a `contredit`, an `incertain`). Exit codes: **0** done, **1** a refused reading (no file, `ref check` deviations, wrong genre, wrong document: one
-`✗ lecture A : <reason>` line per deviation then `N écart(s)` on the standard output, the file is left as written, no `usage` is added) or too many unpaired elements, **2** refusal (unknown `--model` or `--model-b`, no page or more than 20 to read, tool or file as for `add`, a session that
+`✗ lecture A : <reason>` line per deviation then `N écart(s)` on the standard output, the file is left as written, no `usage` is added) or too many unpaired elements, or the third look discarding every element (all of them were carried by one reading only: nothing is left to write, no inventory, the readings stay, a question to the lead), **2** refusal (unknown `--model` or `--model-b`, no page or more than 20 to read, tool or file as for `add`, a session that
 failed: `la session de lecture a échoué : <cause>`), **3** quota reached (message on the error output, no inventory; the readings already written stay; run it again later). The tokens per page of the output divide by the pages **read**; `ref eval` divides by the `pages` of the expected inventory,
 the same number for a corpus case read whole. With `--unique` the output is the one of lot 5: `<slug> : lecture unique (<model>) — …`, `lecture : <file>`, `éléments : …`, `tokens : …`.
 

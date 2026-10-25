@@ -3077,13 +3077,15 @@ lots:
     finished: 2026-10-25
   - id: L266
     title: "ref (issue #14, 6/10) : double lecture indépendante, cadence ref diff, troisième regard ; mesure comparée à la lecture unique — POINT D'ARRÊT : les lots 7 à 10 ne partent que si H1 tient (faux lu et rappel precise nettement meilleurs), décision du lead notée sur l'issue"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L265 ]
     created: 2026-10-23
     started: 2026-10-25
     notes:
       - { date: 2026-10-25, text: "25-10 (lead) — point d'arrêt H1 : NON tenue (faux lu 50,7 % vs 37,7 %, rappel 83 % = 83 %, ×2,8 tokens ; erreurs corrélées). Décision du lead : L267–L270 abandonnés ; la double lecture reste une option (--double), la lecture unique redevient le défaut (design : une version qui fait monter le faux lu ne sort pas) ; correction des constats de la revue (concordant perdu en silence, mineurs) avant done ; décision notée sur l'issue #14." }
+    review: { date: 2026-10-25, verdict: "conforme (revue Opus neuve et re-vérif après 195dc6d : réconciliation — un élément apparié tient par l'une de ses deux versions, incertain avec la cause si une seule tient, une question fusionnée garde ses alias ; lecture unique par défaut partout, --double en option avec la mesure ; suite 3631 verts ; note : un statut peut citer deux fois la même question dans couvre, cas forcé) — point d'arrêt H1 non tenu, L267–L270 abandonnés", commit: 195dc6de256c8b3b988c9833dda3ae1ce5f2da3d }
+    finished: 2026-10-25
   - id: L267
     title: "ref (issue #14, 7/10) : fiche — clés ref, references, ecartes dans cadence spec check ; cadence ref cover (couvre, oublie, écarte, cite un incertain en sourcee)"
     status: dropped

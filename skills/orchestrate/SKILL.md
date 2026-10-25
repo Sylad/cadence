@@ -36,4 +36,4 @@ cadence orchestrate --resume --wave <wave>       # a named wave (required when s
 cadence orchestrate --resume --wave <wave> --answer <project>:<lot> "reply"
 ```
 
-`--resume` takes no lot: it replays the lots of the wave. `cadence orchestrate --status` lists the waves and where each is.
+`--resume` takes no lot: it replays the lots of the wave. `cadence orchestrate --status` shows the live waves of the machine and the table of the folder's latest wave; `--resume` with no wave lists the unfinished ones when there are several.

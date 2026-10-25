@@ -10,6 +10,7 @@ import { Budget, REVIEW_RESERVE, countInterrupted, isNonQuestion, lotSpent, runL
 import { runPool } from '../src/orchestrate/pool.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir, readAgents } from '../src/orchestrate/launch.js';
+import { SlotAbandoned } from '../src/orchestrate/registry.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { createServer } from 'node:http';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -1235,6 +1236,51 @@ describe('budget et quota', () => {
 
 describe('revue coupée (L256)', () => {
   const cut: Handler = () => ({ code: 143, stdout: '', stderr: 'Terminated', timedOut: false });
+
+  it("L332 — la relance d'une session coupée attend un créneau et voit une demande d'arrêt : la session coupée est gardée (id, sortie d'erreur, jetons à l'étape et à la vague), la cause dit que la relance n'a pas eu lieu", async () => {
+    let first = '';
+    const h = harness({ script: { implement: [impl()], review: [(call) => {
+      first = call.args[call.args.indexOf('--session-id') + 1];
+      call.opts.onSpawn?.(4242);
+      const dir = projectLogDir(h.wave.claudeHome!, call.opts.cwd);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${first}.jsonl`), JSON.stringify({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 7, cache_creation_input_tokens: 1000, cache_read_input_tokens: 0, output_tokens: 3 } } }));
+      return { code: 143, stdout: '', stderr: 'Terminated', timedOut: false };
+    }, () => {
+      throw new SlotAbandoned('arrêt demandé (--stop-after-current)'); // la relance attendait un créneau (claude du lanceur : acquireSlot)
+    }] } });
+    h.wave.claudeHome = tempDir();
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'review']);
+    const step = c.lot.steps[1];
+    expect(step.status).toBe('failed');
+    expect(step.sessionId).toBe(first); // la session neuve n'a jamais démarré
+    expect(step.tokens!.counted).toBe(1010);
+    expect(h.wave.budget.consumed).toBeGreaterThanOrEqual(1010);
+    expect(lotSpent(c.lot)).toBe(h.wave.budget.consumed);
+    expect(step.cause).toBe("coupée (code 143, sortie vide), relance en session neuve non faite : attente de créneau abandonnée : arrêt demandé (--stop-after-current)");
+    expect(c.lot.warnings.some((w) => /review coupée \(code 143, sortie vide\) : sa relance en session neuve n'a pas eu lieu/.test(w))).toBe(true);
+    expect(readFileSync(join(h.store.dir, 'demo--L1', '2-review.first.err'), 'utf8')).toBe('Terminated');
+    expect(c.lot.status).toBe('suspended');
+  });
+
+  it("L332 — la relance de mise en forme (--resume) abandonnée garde la sortie et les jetons de la première session", async () => {
+    const noStructure = (call: Parameters<Handler>[0]) => {
+      call.opts.onSpawn?.(4243);
+      return { code: 0, stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'texte libre', session_id: 'first-session', num_turns: 1, duration_ms: 1, usage: { input_tokens: 4, cache_creation_input_tokens: 100, cache_read_input_tokens: 0, output_tokens: 6 } }), stderr: 'warn', timedOut: false };
+    };
+    const h = harness({ script: { implement: [impl()], review: [noStructure, () => { throw new SlotAbandoned('retiré de la vague (--drop)'); }] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    const step = c.lot.steps[1];
+    expect(step.status).toBe('failed');
+    expect(step.tokens!.counted).toBe(110);
+    expect(step.cause).toMatch(/relance de mise en forme non faite : attente de créneau abandonnée : retiré de la vague/);
+    expect(readFileSync(join(h.store.dir, 'demo--L1', '2-review.first.err'), 'utf8')).toBe('warn');
+    expect(readFileSync(join(h.store.dir, 'demo--L1', '2-review.first.json'), 'utf8')).toContain('texte libre');
+    expect(c.lot.status).toBe('handed-back');
+  });
 
   it('R5 — revue coupée puis réussie : le lot est prêt, la relance est signalée, la session coupée est comptée au budget et sa sortie d\'erreur gardée', async () => {
     let first = '';

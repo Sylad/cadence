@@ -6,6 +6,7 @@ import { parse } from 'yaml';
 import type { Effort } from '../config.js';
 import { RafError } from '../plan.js';
 import { sandboxEnv } from './sandbox.js';
+import { SlotAbandoned } from './registry.js';
 import { killMarked, SESSION_MARK_VAR, TreeTracker } from '../proc.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
@@ -250,7 +251,11 @@ export async function runSession(
     const relaunched: Relaunched = { sessionId: spec.sessionId, cause: `code ${out.code}, sortie vide`, stderr: out.stderr };
     const fresh = randomUUID();
     deps.onRelaunch?.(fresh); // l'appelant l'enregistre AVANT le lancement : un signal pendant la relance retrouve la session neuve
-    const again = await launch(buildArgs({ ...spec, sessionId: fresh }, deps.agents));
+    // Relance qui doit attendre un créneau et voit une demande d'arrêt (L332) : la session coupée ne se perd pas avec l'abandon.
+    const again = await launch(buildArgs({ ...spec, sessionId: fresh }, deps.agents)).catch((e: unknown) => {
+      if (e instanceof SlotAbandoned) e.after = { relaunched };
+      throw e;
+    });
     const next = classify(again);
     if (next.kind === 'ok') return { ...next, relaunched };
     const tail = { ...next, sessionId: next.sessionId ?? fresh, relaunched };
@@ -259,7 +264,12 @@ export async function runSession(
   const missing = first.kind === 'failed' && !out.timedOut && out.code === 0 ? lacksStructuredOutput(out.stdout) : null;
   if (!missing) return first;
   const spentFirst = first.kind === 'failed' ? first.tokens : undefined;
-  const second = classify(await launch(buildRetryArgs(spec, missing.sessionId, deps.agents)));
+  const second = classify(
+    await launch(buildRetryArgs(spec, missing.sessionId, deps.agents)).catch((e: unknown) => {
+      if (e instanceof SlotAbandoned) e.after = { formatting: { stdout: out.stdout, stderr: out.stderr, ...(spentFirst ? { tokens: spentFirst } : {}), sessionId: missing.sessionId } };
+      throw e;
+    }),
+  );
   const total = (t?: Tokens): Tokens | undefined => (spentFirst && t ? sumTokens(spentFirst, t) : (t ?? spentFirst));
   if (second.kind === 'ok') return { kind: 'ok', result: { ...second.result, tokens: total(second.result.tokens)!, formattingRetry: true }, firstStdout: out.stdout };
   const tokens = total(second.tokens);

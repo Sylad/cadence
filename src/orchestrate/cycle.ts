@@ -698,9 +698,37 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
     // L332 : la demande est arrivée pendant l'attente d'un créneau. Une étape qui n'a pas démarré (aucun pid) n'a pas eu lieu : elle ne figure pas à l'état.
     if (step.pid === undefined) l.steps.pop();
     else {
+      // Une session de l'étape a déjà tourné (le pid est le sien) et c'est son lancement SUIVANT qui attendait un créneau (relance d'une session coupée, relance de mise en forme) :
+      // sa sortie, son identifiant et ses jetons sont gardés, la cause dit ce qui n'a pas eu lieu.
+      const dir = w.store.lotDir(l.project, l.lot);
+      const base = `${n}-${kind}`;
+      const after = outcome.after;
+      const spentOf = (sessionId: string): Tokens | null => (w.claudeHome ? (journalTokens(w.claudeHome, wd(c), sessionId)?.tokens ?? null) : null);
+      let tokens: Tokens | null = null;
+      let cause = outcome.message;
+      if (after?.relaunched) {
+        const cutRun = after.relaunched;
+        tokens = spentOf(cutRun.sessionId);
+        step.sessionId = cutRun.sessionId; // la session neuve n'a jamais démarré : l'étape est celle de la session coupée
+        writeFileSync(join(dir, `${base}.first.err`), cutRun.stderr);
+        cause = `coupée (${cutRun.cause}), relance en session neuve non faite : ${outcome.message}`;
+        l.warnings.push(`${kind} coupée (${cutRun.cause}) : sa relance en session neuve n'a pas eu lieu, ${outcome.message}`);
+      } else if (after?.formatting) {
+        const first = after.formatting;
+        tokens = first.tokens ?? (first.sessionId ? spentOf(first.sessionId) : null);
+        if (first.sessionId) step.sessionId = first.sessionId;
+        writeFileSync(join(dir, `${base}.first.json`), first.stdout);
+        writeFileSync(join(dir, `${base}.first.err`), first.stderr);
+        cause = `sortie sans structured_output, relance de mise en forme non faite : ${outcome.message}`;
+      }
+      if (tokens && !local) {
+        step.tokens = tokens;
+        w.budget.add(tokens);
+      }
       step.status = 'failed';
-      step.cause = outcome.message;
+      step.cause = cause;
       step.ended = new Date().toISOString();
+      w.saveWave();
     }
     return outcome.reason === DROPPED ? stop(c, 'handed-back', DROPPED) : suspend(c, outcome.reason);
   }

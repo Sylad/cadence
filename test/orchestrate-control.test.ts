@@ -200,6 +200,72 @@ describe('orchestrate --drop / --stop-after-current sur une vague vivante', () =
     expect(lot.steps).toEqual([]);
   });
 
+  /** Revue coupée (143, sortie vide) à son premier passage ; `onCut` s'exécute pendant ce passage, la session coupée toujours détenue. */
+  function cutReviewDeps(onCut: () => Promise<void> | void) {
+    const { d, calls } = deps(() => {});
+    const inner = d.claude;
+    let cuts = 0;
+    d.claude = async (args, o) => {
+      if (kindOf(args) === 'review' && cuts++ === 0) {
+        calls.push({ cwd: o.cwd, kind: 'review' });
+        o.onSpawn?.(process.pid);
+        await onCut();
+        return { code: 143, stdout: '', stderr: 'Terminated', timedOut: false };
+      }
+      return inner(args, o);
+    };
+    d.slotPollMs = 10;
+    return { d, calls };
+  }
+
+  it("L332 — créneau libre et demande déjà posée : la relance d'une revue coupée se fait, la demande d'arrêt s'applique ensuite", async () => {
+    const parent = parentWith(['a']);
+    const { d, calls } = cutReviewDeps(async () => {
+      expect(await orchestrate(['--stop-after-current'], io(parent).io, d)).toBe(0); // posée AVANT la relance, le créneau est libre
+    });
+    const r = io(parent);
+    await orchestrate(['a:L1', '--max-sessions', '2'], r.io, d);
+    expect(calls.map((c) => c.kind)).toEqual(['implement', 'review', 'review']); // la relance a eu lieu
+    const lot = RunStore.last(parent)!.readLot('a', 'L1')!;
+    const review = lot.steps.find((s) => s.kind === 'review')!;
+    expect(review.status).toBe('ok');
+    expect(lot.warnings.some((w) => /review relancée en session neuve après une coupure/.test(w))).toBe(true);
+    expect(r.out.join('\n')).not.toMatch(/attente de créneau abandonnée/);
+  });
+
+  it("L332 — la relance d'une revue coupée doit vraiment attendre un créneau et voit --stop-after-current : étape en échec, session coupée gardée, relance non faite", async () => {
+    const parent = parentWith(['a']);
+    const home = cadenceHome();
+    let x: (() => void) | undefined;
+    const { d, calls } = cutReviewDeps(async () => {
+      // Une autre vague prend le créneau pendant que la revue tourne : la relance devra attendre.
+      x = await acquireSlot(home, 2, { wave: 'x' });
+    });
+    const r = io(parent);
+    const done = orchestrate(['a:L1', '--max-sessions', '1'], r.io, d);
+    try {
+      const t0 = Date.now();
+      while (!/en attente d'un créneau de session/.test(r.out.join('\n'))) {
+        if (Date.now() - t0 > 20_000) throw new Error("délai dépassé : le message d'attente de créneau");
+        await new Promise((res) => setTimeout(res, 10));
+      }
+      expect(await orchestrate(['--stop-after-current'], io(parent).io, d)).toBe(0);
+      const code = await Promise.race([done, new Promise<string>((res) => setTimeout(() => res('toujours en attente'), 5_000))]);
+      expect(code).not.toBe('toujours en attente');
+    } finally {
+      x?.();
+      await done.catch(() => undefined);
+    }
+    expect(calls.map((c) => c.kind)).toEqual(['implement', 'review']); // la relance n'est pas partie
+    const store = RunStore.last(parent)!;
+    const lot = store.readLot('a', 'L1')!;
+    const review = lot.steps.find((s) => s.kind === 'review')!;
+    expect(review.status).toBe('failed');
+    expect(review.cause).toMatch(/^coupée \(code 143, sortie vide\), relance en session neuve non faite : attente de créneau abandonnée : arrêt demandé/);
+    expect(lot.status).toBe('suspended');
+    expect(store.readWave()!.status).toBe('interrupted');
+  });
+
   it('L309 — la commande de reprise imprimée après --stop-after-current désigne la vague (id qui ressemble à un lot : suite2)', async () => {
     const parent = parentWith(['a']);
     let printed = '';

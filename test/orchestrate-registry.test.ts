@@ -78,6 +78,41 @@ describe('attente interrompue (L332)', () => {
   });
 });
 
+describe("attente interrompue : seulement une VRAIE attente (L332, correctif)", () => {
+  it("R2 — créneau libre et demande déjà posée : le créneau est pris, abandon() n'est pas même consultée", async () => {
+    const home = tempDir();
+    let asked = 0;
+    const free = await acquireSlot(home, 1, { wave: 'y', abandon: () => (asked++, 'raison') });
+    expect(asked).toBe(0);
+    expect(liveSlots(home).map((s) => s.wave)).toEqual(['y']);
+    free();
+  });
+
+  it("R2 — pas de créneau libre et demande déjà posée : l'attente commence, la demande l'interrompt aussitôt (sans attendre un tour), aucun créneau pris", async () => {
+    const home = tempDir();
+    const x = await acquireSlot(home, 1, { wave: 'x' });
+    const waits: number[] = [];
+    const e = await acquireSlot(home, 1, { wave: 'y', pollMs: 10_000, abandon: () => 'raison', onWait: (_h, ms) => waits.push(ms) }).then(() => null, (err: unknown) => err);
+    expect(e).toBeInstanceOf(SlotAbandoned);
+    expect((e as SlotAbandoned).reason).toBe('raison');
+    expect(liveSlots(home).map((s) => s.wave)).toEqual(['x']);
+    x();
+  });
+
+  it("R2 — pendant une vraie attente, la demande est relue avant chaque tentative : un créneau libéré en même temps que la demande arrive n'est pas pris", async () => {
+    const home = tempDir();
+    const x = await acquireSlot(home, 1, { wave: 'x' });
+    let ask = false;
+    const waiting = acquireSlot(home, 1, { wave: 'y', pollMs: 20, abandon: () => (ask ? 'raison' : null) });
+    const outcome = waiting.then(() => 'créneau pris', (err: unknown) => (err instanceof SlotAbandoned ? err.reason : 'autre erreur'));
+    await new Promise((r) => setTimeout(r, 50));
+    ask = true;
+    x(); // le créneau se libère en même temps que la demande arrive
+    expect(await outcome).toBe('raison');
+    expect(liveSlots(home)).toEqual([]);
+  });
+});
+
 describe('plafond réellement global (L71/t2)', () => {
   const held = (home: string, k: number, pid = process.ppid, extra = {}) => {
     mkdirSync(join(home, 'slots'), { recursive: true });

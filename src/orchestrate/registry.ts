@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import type { Tokens } from './result.js';
 import { processStart } from '../proc.js';
 import { gitCommonDir } from '../git.js';
 import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState } from './state.js';
@@ -198,8 +199,21 @@ const MAX_SLOT_INDEX = 64;
 /** Intervalle des rappels d'attente dans le journal. */
 const WAIT_REPORT_MS = 60_000;
 
+/**
+ * Ce qu'une session déjà vécue laisse derrière elle quand son lancement suivant (relance de mise en forme, relance après coupure)
+ * est abandonné à l'attente d'un créneau : la sortie de cette session, ses jetons, son identifiant (L332).
+ */
+export interface SlotAbandonedAfter {
+  /** Session coupée (code 143, sortie vide) dont la relance en session neuve n'a pas eu lieu. */
+  relaunched?: { sessionId: string; cause: string; stderr: string };
+  /** Session sans `structured_output` dont la relance de mise en forme (`--resume`) n'a pas eu lieu. */
+  formatting?: { stdout: string; stderr: string; tokens?: Tokens; sessionId?: string };
+}
+
 /** L'attente d'un créneau a été interrompue par `abandon` (L332) : aucun créneau n'a été pris, la session ne part pas. */
 export class SlotAbandoned extends Error {
+  /** Renseigné par `runSession` quand une session précédente de l'étape a déjà tourné : sa sortie et ses jetons ne se perdent pas. */
+  after?: SlotAbandonedAfter;
   constructor(readonly reason: string) {
     super(`attente de créneau abandonnée : ${reason}`);
   }
@@ -215,8 +229,10 @@ export class SlotAbandoned extends Error {
  *
  * `onWait(holders, waitedMs)` : appelé quand on commence à attendre (0 ms), puis toutes les minutes.
  * `onGot(waitedMs)` : appelé à l'obtention, seulement si on a attendu.
- * `abandon()` : relu avant chaque tentative (donc à chaque tour d'attente) ; une raison en retour interrompt l'attente
- * par `SlotAbandoned`, sans prendre de créneau (L332 : `--drop` et `--stop-after-current` ne laissent pas un lot en attente).
+ * `abandon()` : relu seulement pendant une VRAIE attente, c'est-à-dire une fois qu'une première tentative n'a pas trouvé de créneau libre,
+ * puis à chaque tour ; une raison en retour interrompt l'attente par `SlotAbandoned`, sans prendre de créneau (L332 : `--drop` et
+ * `--stop-after-current` ne laissent pas un lot en attente). Un créneau libre est toujours pris, même si une demande est déjà posée :
+ * la relance d'une session coupée n'est pas une attente, la demande d'arrêt s'applique ensuite.
  */
 export async function acquireSlot(
   home: string,
@@ -229,9 +245,12 @@ export async function acquireSlot(
   let reportedAt: number | null = null;
   const pollMs = opts.pollMs ?? 2000;
   const live = opts.slots ?? liveSlots; // injectable : les tests simulent une vague qui prend un créneau entre les deux comptées
-  for (;;) {
+  const checkAbandon = () => {
     const why = opts.abandon?.();
     if (why) throw new SlotAbandoned(why);
+  };
+  for (;;) {
+    if (reportedAt !== null) checkAbandon(); // pas à la première tentative : un créneau libre est pris même si une demande est posée
     if (live(home).length < cap) {
       for (let k = 0; k < MAX_SLOT_INDEX; k++) {
         const file = join(slotsDir(home), `slot-${k}.lock`);
@@ -245,6 +264,7 @@ export async function acquireSlot(
         break;
       }
     }
+    if (reportedAt === null) checkAbandon(); // la première tentative a échoué : l'attente commence, la demande déjà posée l'interrompt sans attendre un tour
     if (reportedAt === null || now() - reportedAt >= (opts.reportMs ?? WAIT_REPORT_MS)) {
       reportedAt = now();
       opts.onWait?.(live(home), reportedAt - t0);

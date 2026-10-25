@@ -157,6 +157,57 @@ describe('escalade de modèle avant de rendre un lot (L337)', () => {
     expect(logs.some((l) => l.includes('escalade fable : session sans résultat'))).toBe(true);
   });
 
+  it('L338 R15 — une escalade sans issue sur un lot rendu ou en échec n\'est jamais « en cours » (retrait --resume --drop, exception d\'étape)', () => {
+    const h = harness();
+    const line = (over: Record<string, unknown>) => {
+      const c = h.lot('L1', over as never);
+      const table = renderTable({ id: 'w1', consumed: 0, budget: 1, cacheRead: 0, status: 'done' } as never, [c.lot], { isAncestor: () => false, lotCommits: () => [] });
+      return table.filter((l) => l.startsWith('demo:L1 — escalade fable')).join('\n');
+    };
+    for (const status of ['handed-back', 'failed']) {
+      for (const stage of ['fix', 'done']) {
+        const text = line({ status, escalation: { model: 'fable', stage } });
+        expect(text, `${status}/${stage}`).not.toContain('en cours');
+        expect(text, `${status}/${stage}`).not.toContain("malgré l'escalade");
+        expect(text, `${status}/${stage}`).not.toContain('sans résultat');
+        expect(text, `${status}/${stage}`).toContain('lot rendu avant le verdict du modèle');
+      }
+    }
+    expect(line({ status: 'fixing', escalation: { model: 'fable', stage: 'fix' } })).toContain('en cours');
+  });
+
+  it('L338 R16 — un retrait (--drop) pendant l\'escalade : lot rendu, escalade sans issue (pas « échec »), tableau sans « en cours »', async () => {
+    const h = harness({ script: { implement: [impl], review: [major, major, () => { h.store.requestDrop('demo:L1'); return claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }], verdict: 'non conforme' })); }], fix: [fix('b.txt'), fix('c.txt'), fix('d.txt')] } });
+    const logs: string[] = [];
+    h.wave.log = (line: string) => logs.push(line);
+    const c = h.lot('L1', {}, esc);
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('retiré de la vague');
+    expect(c.lot.escalation?.model).toBe('fable');
+    expect(c.lot.escalation?.issue).toBeUndefined();
+    expect(logs.some((l) => l.includes('session sans résultat'))).toBe(false);
+    const table = renderTable({ id: 'w1', consumed: 0, budget: 1, cacheRead: 0, status: 'done' } as never, [c.lot], { isAncestor: () => false, lotCommits: () => [] });
+    const text = table.filter((l) => l.startsWith('demo:L1 — escalade fable')).join('\n');
+    expect(text).not.toContain('en cours');
+    expect(text).not.toContain('sans résultat');
+  });
+
+  it('L338 R17 — une exception d\'étape pendant l\'escalade met le lot en échec sans dire « en cours » ni « session sans résultat »', async () => {
+    const boom: Handler = () => {
+      throw new Error('boom');
+    };
+    const h = harness({ script: { implement: [impl], review: [major, major, major], fix: [fix('b.txt'), fix('c.txt'), boom] } });
+    const c = h.lot('L1', {}, esc);
+    await runLot(c);
+    const table = renderTable({ id: 'w1', consumed: 0, budget: 1, cacheRead: 0, status: 'done' } as never, [c.lot], { isAncestor: () => false, lotCommits: () => [] });
+    const text = table.filter((l) => l.startsWith('demo:L1 — escalade fable')).join('\n');
+    expect(c.lot.status).toBe('failed');
+    expect(c.lot.outcome).toBe('erreur : boom');
+    expect(c.lot.escalation?.issue).toBeUndefined(); // une exception n'est pas une session sans résultat du modèle
+    expect(text).not.toContain('en cours');
+  });
+
   it('R14 — la revue courte d\'un petit lot visible (review-small) se joue aussi au modèle d\'escalade', async () => {
     const small = { small: true, visible: true };
     const h = harness({ script: { implement: [impl], 'review-small': [major, major, major, ok], fix: [fix('b.txt'), fix('c.txt'), fix('d.txt')] } });

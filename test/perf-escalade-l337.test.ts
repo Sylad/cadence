@@ -46,6 +46,10 @@ describe('L337 R10 — cadence perf compte les escalades et leur issue', () => {
     const none = (await perf(ctx([['L4', { steps: [step(CUR)] }]]))).join('\n');
     expect(none).not.toContain('escalades de modèle');
   });
+  it('L338 — un lot retiré (--drop) pendant son escalade, sans issue, est compté parmi les lots mais pas « en échec »', async () => {
+    const data = JSON.parse((await perf(ctx([['L7', { status: 'handed-back', escalation: { model: 'fable', stage: 'fix' }, steps: [step(CUR)] }]]), '--json')).join('\n'));
+    expect(data.escalations.current).toEqual({ lots: 1, conforme: 0, rendu: 0, nonJouee: 0, echec: 0 });
+  });
 });
 
 describe('L338 — docs/perf.md liste les clés de --json', () => {

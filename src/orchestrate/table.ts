@@ -30,7 +30,11 @@ const ESCALATION_TEXT = {
 /** La ligne « escalade » d'un lot : l'issue de l'escalade, lue avec l'état du lot (le tableau sert aussi à `--status` et à une vague suspendue). */
 function escalationText(l: LotState): string {
   const e = l.escalation!;
-  if (!e.issue) return e.stage === 'fix' ? 'en cours (une correction puis une revue neuve à ce modèle)' : 'engagée, pas encore tranchée';
+  if (!e.issue) {
+    // Sans issue : l'escalade a été engagée, personne ne l'a tranchée. « en cours » ne se dit que d'un lot qui tourne : un lot retiré (--drop), en échec ou rendu avant le verdict du modèle n'est pas vivant.
+    if (l.status === 'handed-back' || l.status === 'failed') return 'engagée, lot rendu avant le verdict du modèle (retrait, incident ou erreur : voir la ligne du lot), le modèle ne l\'a pas jugé';
+    return e.stage === 'fix' ? 'en cours (une correction puis une revue neuve à ce modèle)' : 'engagée, pas encore tranchée';
+  }
   if (e.issue !== 'conforme') return ESCALATION_TEXT[e.issue];
   if (l.status === 'ready') return 'revue neuve conforme, lot rendu prêt';
   if (l.status === 'handed-back' || l.status === 'failed') return 'revue neuve conforme, lot rendu pour un autre motif (voir la ligne du lot)';

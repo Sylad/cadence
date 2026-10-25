@@ -140,11 +140,20 @@ function transition(c: LotCtx, status: LotState['status'], outcome?: string): vo
   c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} → ${status}${outcome ? ` — ${outcome}` : ''}`);
 }
 
-const stop = (c: LotCtx, status: 'handed-back' | 'failed', outcome: string): null => {
+/** Une session jouée au modèle d'escalade (L337) : la correction escaladée et la revue neuve qui la suit. L'UX, la fiche, le précheck… gardent leur modèle. */
+const escalatedSession = (c: LotCtx, kind: SessionKind): boolean =>
+  c.lot.escalation?.stage === 'fix' && (kind === 'fix' || kind === 'review' || kind === 'review-small');
+
+/**
+ * Rend ou échoue le lot. `noResult` : la session escaladée n'a rien rendu (sortie vide, erreur de lancement, coupure, délai) — seul cas où l'escalade est dite
+ * « en échec » (L338) : le modèle n'a pas jugé le lot. Un retrait (--drop) ou un incident du dépôt pendant l'escalade laisse l'escalade sans issue : ce n'est pas
+ * un échec du modèle et `cadence perf` ne le compte pas contre lui.
+ */
+const stop = (c: LotCtx, status: 'handed-back' | 'failed', outcome: string, noResult = false): null => {
   c.lot.next = null;
   const e = c.lot.escalation;
-  if (e && !e.issue) {
-    // Le lot s'arrête alors que l'escalade était engagée et sans verdict (L337) : une session escaladée a échoué ou été coupée, le modèle n'a pas jugé le lot. `toFix` pose `rendu` avant de rendre un lot sur un verdict.
+  if (e && !e.issue && noResult) {
+    // Une session escaladée a échoué ou été coupée (L337) : le modèle n'a pas jugé le lot. `toFix` pose `rendu` avant de rendre un lot sur un verdict.
     e.stage = 'done';
     e.issue = 'échec';
     c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · escalade ${e.model} : session sans résultat, le lot n'a pas été jugé par ce modèle`);
@@ -826,9 +835,9 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       }
       const report = cutReport({ minutes: Math.round(delay / 60_000), commits, files, numstat });
       step.cause = report;
-      return stop(c, files.length || commits ? 'handed-back' : 'failed', `délai dépassé : ${kind} ${report}`);
+      return stop(c, files.length || commits ? 'handed-back' : 'failed', `délai dépassé : ${kind} ${report}`, escalatedSession(c, kind));
     }
-    return stop(c, 'failed', outcome.cut ? `coupure : ${kind} ${outcome.cause}` : `échec : ${kind} sans résultat : ${outcome.cause}`);
+    return stop(c, 'failed', outcome.cut ? `coupure : ${kind} ${outcome.cause}` : `échec : ${kind} sans résultat : ${outcome.cause}`, escalatedSession(c, kind));
   }
   if (outcome.kind === 'quota') {
     if (outcome.firstStdout !== undefined) writeFileSync(join(dir, `${base}.first.json`), outcome.firstStdout);

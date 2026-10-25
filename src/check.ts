@@ -27,7 +27,7 @@ export interface PlanKind {
 function uxReviewMessage(lot: Lot, plan: PlanKind): string {
   const head = `${lot.id} est une revue UX (« ${lot.title.slice(0, 60)} ») sans visible: — l'étape UX n'aurait pas lieu`;
   if (!plan.readonly) return `${head} : poser visible: true dans le plan (raf visible ${lot.id} on, ou raf add --visible pour un nouveau lot)`;
-  if (plan.hasVisibleField === false) return `${head} : ce plan ne porte pas visible (cadence.yaml : plan.fields) — l'étape UX se déclenche par la configuration du projet, pas par le plan`;
+  if (plan.hasVisibleField === false) return `${head} : ce plan ne porte pas visible : mapper le champ dans cadence.yaml (plan.fields.visible) si l'outil du projet l'écrit ; sans ce champ, la revue d'ergonomie de cet écran se fait hors orchestrate`;
   return `${head} : poser visible: true dans le plan avec l'outil du projet (plan en lecture seule)`;
 }
 

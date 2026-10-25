@@ -75,10 +75,12 @@ const REVUE_UX = `taches:
 `;
 
 describe('revue UX sans visible: sur un plan en lecture seule (L321)', () => {
-  it('R4 — sans champ visible mappé, l’écart dit que le plan ne porte pas visible et renvoie à la config, sans commande raf', () => {
+  it('R4 — sans champ visible mappé, l’écart dit que le plan ne porte pas visible, nomme plan.fields.visible et la revue hors orchestrate, sans commande raf', () => {
     const [msg] = ecartsDe(REVUE_UX, '', '2026-10-25').filter((m) => m.startsWith('R1 '));
     expect(msg).toContain('ne porte pas visible');
-    expect(msg).toContain('configuration');
+    expect(msg).toContain('plan.fields.visible');
+    expect(msg).toContain('hors orchestrate');
+    expect(msg).not.toContain('configuration du projet');
     expect(msg).not.toContain('raf visible');
     expect(msg).not.toContain('raf add');
   });

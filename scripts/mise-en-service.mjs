@@ -25,8 +25,8 @@ const gitOk = (repo, ...args) => {
 /** Posé à la fin d'une installation réussie : sans lui, le dossier de la version n'est pas servi. */
 const COMPLETE = '.mise-en-service-ok';
 
-/** Une version plus ancienne que ça (et ni en service ni la précédente) peut partir : l'instantané d'une vague pointe sur son node_modules. */
-const RETENTION_MS = 7 * 24 * 3600 * 1000;
+/** Versions gardées en plus de celle qui est servie : les 3 mises en service juste avant elle (retour en arrière). */
+const KEPT_BEFORE = 3;
 
 export const defaultRoot = () => join(homedir(), '.local', 'share', 'cadence');
 export const defaultBinDir = () => join(homedir(), '.local', 'bin');
@@ -117,7 +117,7 @@ function replaceLink(target, link) {
  * Construit <sha> dans <root>/releases/<sha12> puis bascule <root>/service et les liens du bin-dir.
  * `install(dir)` (défaut : npm ci sans scripts puis tsc) est injectable pour les tests.
  */
-export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defaultBinDir(), install = installAndBuild }) {
+export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defaultBinDir(), install = installAndBuild, inUse = copiesUtilisees }) {
   const sha = checkAccepted(repo, rev);
   const served = servedSha(root);
   const servedFull = served && existsSync(join(root, 'releases', served)) ? git(join(root, 'releases', served), 'rev-parse', 'HEAD') : undefined;
@@ -142,34 +142,95 @@ export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defa
       throw new Error(`mise en service interrompue, rien n'a changé : ${e instanceof Error ? e.message : e}`);
     }
   }
-  // le délai de rétention court depuis la sortie du service, pas depuis l'installation : une version restée longtemps
-  // en service a pu lancer une vague qui tourne encore
-  if (served && served !== sha.slice(0, 12)) {
-    try {
-      const now = new Date();
-      utimesSync(join(releases, served, COMPLETE), now, now);
-    } catch {
-      /* version sortante absente : rien à protéger */
-    }
-  }
+  // le marqueur date la dernière mise en service de la version (pas son installation) : l'ordre de mise en service décide de la rétention
+  const now = new Date();
+  utimesSync(join(dir, COMPLETE), now, now);
   replaceLink(dir, join(root, 'service'));
   for (const [name, js] of [['raf', 'raf.js'], ['cadence', 'cadence.js']]) replaceLink(join(root, 'service', 'bin', js), join(binDir, name));
-  // la version précédente reste (retour en arrière) ; les autres partent une fois vieilles seulement : l'instantané d'une
-  // vague en cours lie son node_modules à celui de la version qui l'a lancée, qu'on ne retire pas sous ses pieds
-  for (const old of readdirSync(releases)) {
-    if (old === sha.slice(0, 12) || old === served) continue;
-    let age = Infinity;
-    try {
-      age = Date.now() - statSync(join(releases, old, COMPLETE)).mtimeMs;
-    } catch {
-      /* sans marqueur : installation interrompue, sans vague possible dessus */
+  const purge = purger({ repo, releases, current: sha.slice(0, 12), inUse });
+  return { sha, dir, fingerprint: fingerprint(dir), purge };
+}
+
+/** Dossiers des copies dont un processus vivant utilise le dossier : son cwd, son binaire ou un argument de sa ligne de commande (`node …/bin/raf.js`). */
+export function copiesUtilisees(releases) {
+  const used = new Set();
+  const note = (path) => {
+    const rel = path.startsWith(`${releases}/`) ? path.slice(releases.length + 1).split('/')[0] : undefined;
+    if (rel) used.add(rel);
+  };
+  let pids = [];
+  try {
+    pids = readdirSync('/proc').filter((n) => /^\d+$/.test(n));
+  } catch {
+    return used; // pas de /proc (hors Linux) : rien à détecter
+  }
+  for (const pid of pids) {
+    for (const link of ['cwd', 'exe']) {
+      try {
+        note(readlinkSync(join('/proc', pid, link)));
+      } catch {
+        /* processus disparu ou illisible */
+      }
     }
-    if (age < RETENTION_MS) continue;
-    gitOk(repo, 'worktree', 'remove', '--force', join(releases, old));
-    rmSync(join(releases, old), { recursive: true, force: true });
+    try {
+      for (const arg of readFileSync(join('/proc', pid, 'cmdline'), 'utf8').split('\0')) note(arg);
+    } catch {
+      /* idem */
+    }
+  }
+  return used;
+}
+
+/** Place occupée par un dossier (blocs alloués, liens non suivis). */
+function diskUsage(path) {
+  const st = lstatSync(path);
+  let total = st.blocks * 512;
+  if (st.isDirectory()) for (const name of readdirSync(path)) total += diskUsage(join(path, name));
+  return total;
+}
+
+/**
+ * Garde la version servie et les KEPT_BEFORE mises en service avant elle (ordre du marqueur), retire les autres
+ * (git worktree remove + prune) sauf celles qu'un processus vivant utilise. Les dossiers sans marqueur (installation
+ * interrompue) ne comptent pas parmi les versions gardées.
+ */
+function purger({ repo, releases, current, inUse }) {
+  const dated = [];
+  const incomplete = [];
+  for (const name of readdirSync(releases)) {
+    if (!lstatSync(join(releases, name)).isDirectory()) continue;
+    try {
+      dated.push({ name, at: statSync(join(releases, name, COMPLETE)).mtimeMs });
+    } catch {
+      incomplete.push(name);
+    }
+  }
+  dated.sort((x, y) => (x.name === current ? -1 : y.name === current ? 1 : y.at - x.at || x.name.localeCompare(y.name)));
+  const candidates = [...dated.slice(1 + KEPT_BEFORE).map((v) => v.name), ...incomplete];
+  const used = candidates.length ? inUse(releases) : new Set();
+  const purge = { removed: 0, kept: 0, freedBytes: 0 };
+  for (const name of candidates) {
+    if (used.has(name)) {
+      purge.kept++;
+      continue;
+    }
+    const path = join(releases, name);
+    purge.freedBytes += diskUsage(path);
+    gitOk(repo, 'worktree', 'remove', '--force', path);
+    rmSync(path, { recursive: true, force: true });
+    purge.removed++;
   }
   gitOk(repo, 'worktree', 'prune');
-  return { sha, dir, fingerprint: fingerprint(dir) };
+  return purge;
+}
+
+/** La phrase de la sortie : ce que la purge a retiré et la place rendue. */
+export function direPurge({ removed, kept, freedBytes }) {
+  const unit = freedBytes >= 1024 ** 3 ? [1024 ** 3, 'Go'] : [1024 ** 2, 'Mo'];
+  const size = `${(freedBytes / unit[0]).toFixed(1).replace('.', ',')} ${unit[1]}`;
+  const tail = kept ? ` ; ${kept} gardée${kept > 1 ? 's' : ''}, un processus l'utilise encore` : '';
+  if (!removed) return `purge : aucune copie retirée${tail}`;
+  return `purge : ${removed} ${removed > 1 ? 'copies retirées' : 'copie retirée'}, ${size} libérés${tail}`;
 }
 
 function installAndBuild(dir) {
@@ -209,7 +270,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   }
   try {
     const r = mettreEnService({ repo, rev, ...(root && { root: resolve(root) }), ...(binDir && { binDir: resolve(binDir) }) });
-    console.log(`en service : ${r.sha.slice(0, 7)} dans ${r.dir}\nempreinte : ${r.fingerprint}`);
+    console.log(`en service : ${r.sha.slice(0, 7)} dans ${r.dir}\nempreinte : ${r.fingerprint}\n${direPurge(r.purge)}`);
   } catch (e) {
     console.error(e instanceof Error ? e.message : String(e));
     process.exit(1);

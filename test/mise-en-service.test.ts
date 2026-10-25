@@ -1,9 +1,9 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { checkAccepted, checkLotsDone, fingerprint, mettreEnService } from '../scripts/mise-en-service.mjs';
+import { checkAccepted, checkLotsDone, direPurge, fingerprint, mettreEnService } from '../scripts/mise-en-service.mjs';
 import { takeSnapshot } from '../src/orchestrate/snapshot.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
@@ -41,6 +41,15 @@ const install = (dir: string) => {
   symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), 'dir');
   execFileSync(join(REPO, 'node_modules/.bin/tsc'), ['-p', 'tsconfig.build.json'], { cwd: dir, stdio: 'pipe' });
 };
+
+/** Met en service un commit par nom (un fichier ajouté), dans l'ordre ; rend leurs shas. */
+const enService = (dir: string, root: string, binDir: string, names: string[]) =>
+  names.map((n) => {
+    writeFileSync(join(dir, `${n}.txt`), n);
+    const sha = commitAll(dir, `feat(L1): ${n}`, `${n}.txt`);
+    mettreEnService({ repo: dir, rev: sha, root, binDir, install });
+    return sha;
+  });
 
 const places = () => ({ root: join(tempDir(), 'share'), binDir: join(tempDir(), 'bin') });
 
@@ -174,26 +183,13 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(git(dir, 'worktree', 'list')).not.toContain(second.slice(0, 12));
   });
 
-  it('met à jour : la nouvelle version prend service/, la précédente reste pour un retour en arrière, les plus anciennes partent', () => {
+  it('met à jour : la nouvelle version prend service/ et la précédente reste pour un retour en arrière', () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();
     mettreEnService({ repo: dir, rev: first, root, binDir, install });
-    const shas = [first];
-    for (const n of ['b', 'c']) {
-      writeFileSync(join(dir, `${n}.txt`), n);
-      shas.push(commitAll(dir, `feat(L1): ${n}`, `${n}.txt`));
-      mettreEnService({ repo: dir, rev: shas.at(-1)!, root, binDir, install });
-    }
-    expect(git(join(root, 'service'), 'rev-parse', 'HEAD')).toBe(shas[2]);
-    expect(existsSync(join(root, 'releases', shas[1].slice(0, 12)))).toBe(true);
-    // la plus ancienne n'est retirée qu'une fois vieille : une vague lancée dessus garde ses dépendances (voir plus bas)
-    const old = join(root, 'releases', shas[0].slice(0, 12));
-    expect(existsSync(old)).toBe(true);
-    const longAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000);
-    utimesSync(join(old, '.mise-en-service-ok'), longAgo, longAgo);
-    writeFileSync(join(dir, 'd.txt'), 'd');
-    mettreEnService({ repo: dir, rev: commitAll(dir, 'feat(L1): d', 'd.txt'), root, binDir, install });
-    expect(existsSync(old)).toBe(false);
+    const shas = [first, ...enService(dir, root, binDir, ['b'])];
+    expect(git(join(root, 'service'), 'rev-parse', 'HEAD')).toBe(shas[1]);
+    expect(existsSync(join(root, 'releases', shas[0].slice(0, 12)))).toBe(true);
   });
 
   it("deux mises en service après le lancement d'une vague ne lui retirent pas ses dépendances (instantané lié au node_modules de la version)", () => {
@@ -216,18 +212,81 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(existsSync(join(tool, 'node_modules', 'yaml', 'package.json'))).toBe(true);
   });
 
-  it("une version restée longtemps en service garde ses 7 jours à partir de sa sortie du service (la vague lancée depuis elle)", () => {
+  it('L330 — garde la version servie et les 3 précédentes, retire les autres (worktree remove + prune)', () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();
     mettreEnService({ repo: dir, rev: first, root, binDir, install });
-    const v1 = join(root, 'releases', first.slice(0, 12));
-    const longAgo = new Date(Date.now() - 10 * 24 * 3600 * 1000);
-    utimesSync(join(v1, '.mise-en-service-ok'), longAgo, longAgo);
-    for (const n of ['b', 'c']) {
-      writeFileSync(join(dir, `${n}.txt`), n);
-      mettreEnService({ repo: dir, rev: commitAll(dir, `feat(L1): ${n}`, `${n}.txt`), root, binDir, install });
+    const shas = [first, ...enService(dir, root, binDir, ['b', 'c', 'd', 'e', 'f'])];
+    const present = (sha: string) => existsSync(join(root, 'releases', sha.slice(0, 12)));
+    expect(shas.map(present)).toEqual([false, false, true, true, true, true]);
+    const listed = git(dir, 'worktree', 'list', '--porcelain');
+    expect(listed).not.toContain(shas[0].slice(0, 12));
+    expect(listed).toContain(shas[2].slice(0, 12));
+  });
+
+  it("L330 — la rétention suit l'ordre de mise en service, pas la date de l'installation ni l'âge", () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    const shas = [first, ...enService(dir, root, binDir, ['b', 'c', 'd'])];
+    // retour en arrière sur la plus ancienne : elle redevient la servie, donc la plus récente de l'ordre ; la plus ancienne par l'ordre part ensuite
+    mettreEnService({ repo: dir, rev: shas[0], root, binDir, install });
+    expect(git(join(root, 'service'), 'rev-parse', 'HEAD')).toBe(shas[0]);
+    const [e] = enService(dir, root, binDir, ['e']);
+    const present = (sha: string) => existsSync(join(root, 'releases', sha.slice(0, 12)));
+    // ordre : b, c, d, a (retour), e -> gardées : e, a, d, c ; b retirée
+    expect([shas[0], shas[1], shas[2], shas[3], e].map(present)).toEqual([true, false, true, true, true]);
+  });
+
+  it('L330 — une copie vieille de plusieurs semaines mais dans les 4 dernières mises en service reste', () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    const longAgo = new Date(Date.now() - 60 * 24 * 3600 * 1000);
+    utimesSync(join(root, 'releases', first.slice(0, 12), '.mise-en-service-ok'), longAgo, longAgo);
+    enService(dir, root, binDir, ['b', 'c']);
+    expect(existsSync(join(root, 'releases', first.slice(0, 12)))).toBe(true);
+  });
+
+  it("L330 — jamais une copie qu'un processus vivant utilise : son cwd, ou son script en argument", async () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    const second = enService(dir, root, binDir, ['b'])[0];
+    const cwdUser = spawn('sleep', ['60'], { cwd: join(root, 'releases', first.slice(0, 12)), stdio: 'ignore' });
+    const scriptUser = spawn('node', ['-e', 'setTimeout(() => {}, 60000)', join(root, 'releases', second.slice(0, 12), 'bin', 'raf.js')], { stdio: 'ignore' });
+    try {
+      await new Promise((r) => setTimeout(r, 100));
+      const rest = enService(dir, root, binDir, ['c', 'd', 'e', 'f']);
+      expect(existsSync(join(root, 'releases', first.slice(0, 12)))).toBe(true);
+      expect(existsSync(join(root, 'releases', second.slice(0, 12)))).toBe(true);
+      expect(existsSync(join(root, 'releases', rest[0].slice(0, 12)))).toBe(true);
+      cwdUser.kill();
+      scriptUser.kill();
+      await new Promise((r) => cwdUser.once('exit', r));
+      await new Promise((r) => scriptUser.once('exit', r));
+      enService(dir, root, binDir, ['g']);
+      expect(existsSync(join(root, 'releases', first.slice(0, 12)))).toBe(false);
+      expect(existsSync(join(root, 'releases', second.slice(0, 12)))).toBe(false);
+    } finally {
+      cwdUser.kill();
+      scriptUser.kill();
     }
-    expect(existsSync(v1)).toBe(true);
+  });
+
+  it('L330 — la purge est dite : n copies retirées, place libérée, copies gardées parce qu\'utilisées', () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    mettreEnService({ repo: dir, rev: first, root, binDir, install });
+    enService(dir, root, binDir, ['b', 'c', 'd']);
+    writeFileSync(join(dir, 'e.txt'), 'e');
+    const r = mettreEnService({ repo: dir, rev: commitAll(dir, 'feat(L1): e', 'e.txt'), root, binDir, install });
+    expect(r.purge.removed).toBe(1);
+    expect(r.purge.kept).toBe(0);
+    expect(r.purge.freedBytes).toBeGreaterThan(0);
+    expect(direPurge(r.purge)).toMatch(/^purge : 1 copie retirée, \d/);
+    expect(direPurge({ removed: 0, kept: 0, freedBytes: 0 })).toBe('purge : aucune copie retirée');
+    expect(direPurge({ removed: 2, kept: 1, freedBytes: 2.5 * 1024 ** 3 })).toBe('purge : 2 copies retirées, 2,5 Go libérés ; 1 gardée, un processus l\'utilise encore');
   });
 
   it('checkLotsDone ne regarde que les commits au-dessus du sha déjà en service (le seul sha, au premier service)', () => {

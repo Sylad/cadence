@@ -466,8 +466,11 @@ npm run service -- <sha>   # [--root dir] [--bin-dir dir] [--repo dir]
 
 The script refuses a sha that is not an ancestor of HEAD, and a sha whose commits (since the one in service; only the sha itself the first time)
 cite a lot whose status is not `done` (`plan:` commits are ignored); a lot `dropped` is let through when every one of its commits is undone by a `git revert` present under the sha (L207), and still blocks when one is not. It builds the new copy aside (`npm ci --ignore-scripts`, then `tsc`) and switches
-`service` and the two links only once the build succeeded (atomic renames): a failed install changes nothing. The previous copy is kept for a
-rollback, the older ones are removed only once they are more than 7 days old, counted from the day they left service (a wave's snapshot links its `node_modules` to the copy that launched it). The first run is also what installs the links in `~/.local/bin`. It prints the fingerprint of the copy
+`service` and the two links only once the build succeeded (atomic renames): a failed install changes nothing. It then purges the old copies (L330): it keeps the copy in service and the **3 put in service before it**
+(a rollback is `npm run service -- <old sha>`; the order is the order of the puts in service, not the install date or the age), and removes the others (`git worktree remove`, then `prune`) —
+except a copy that a live process still uses (its working directory, its binary or an argument of its command line under the copy, read in `/proc`), which stays and is said. The output ends with the purge:
+`purge : 37 copies retirées, 2,3 Go libérés` (`aucune copie retirée` when there was nothing to remove, `; 1 gardée, un processus l'utilise encore` for a copy spared). The copies grew without bound before (41 copies, 2.5 GB on 2026-10-25).
+A wave's snapshot links its `node_modules` to the copy that launched it, which is not seen as « used »: do not put in service more than 3 times while a wave launched from the oldest copy still runs (the rule used to wait 7 days). The first run is also what installs the links in `~/.local/bin`. It prints the fingerprint of the copy
 (bin, dist, package.json).
 
 ## One worktree per lot (`orchestrate.worktrees`, L279)

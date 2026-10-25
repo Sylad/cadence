@@ -144,10 +144,10 @@ const stop = (c: LotCtx, status: 'handed-back' | 'failed', outcome: string): nul
   c.lot.next = null;
   const e = c.lot.escalation;
   if (e && !e.issue) {
-    // Le lot est rendu ou échoué alors que l'escalade était engagée (L337) : elle n'a pas suffi.
+    // Le lot s'arrête alors que l'escalade était engagée et sans verdict (L337) : une session escaladée a échoué ou été coupée, le modèle n'a pas jugé le lot. `toFix` pose `rendu` avant de rendre un lot sur un verdict.
     e.stage = 'done';
-    e.issue = 'rendu';
-    c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · escalade ${e.model} : lot rendu malgré l'escalade`);
+    e.issue = 'échec';
+    c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · escalade ${e.model} : session sans résultat, le lot n'a pas été jugé par ce modèle`);
   }
   transition(c, status, outcome);
   return null;
@@ -2106,6 +2106,10 @@ function toFix(c: LotCtx, constats: Constat[], what: string): void {
     const esc = c.config.escalation;
     // Escalade (L337) : une seule fois, pour une revue de code non conforme ou des tests rouges (l'UX garde sa règle) ; déjà engagée, le lot est rendu.
     if (l.escalation) {
+      if (!l.escalation.issue) {
+        l.escalation.issue = 'rendu';
+        c.wave.log(`${lotKey(l.project, l.lot)} · escalade ${l.escalation.model} : lot rendu malgré l'escalade`);
+      }
       stop(c, 'handed-back', `${text} ; ${l.escalation.issue === 'conforme' ? `escalade ${l.escalation.model} déjà jouée` : `rendu malgré l'escalade ${l.escalation.model}`}`);
       return;
     }

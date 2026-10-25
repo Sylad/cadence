@@ -123,6 +123,39 @@ describe('escalade de modèle avant de rendre un lot (L337)', () => {
     expect(table.some((l) => /demo:L1 — escalade fable : .*conforme/.test(l))).toBe(true);
     expect(logs.some((l) => l.includes('escalade fable'))).toBe(true);
   });
+
+  it('R12 — la ligne « escalade » du tableau suit l\'état du lot : en cours, conforme puis rendu pour un autre motif, session sans résultat', async () => {
+    const h = harness();
+    const line = (over: Record<string, unknown>) => {
+      const c = h.lot('L1', over as never);
+      const table = renderTable({ id: 'w1', consumed: 0, budget: 1, cacheRead: 0, status: 'done' } as never, [c.lot], { isAncestor: () => false, lotCommits: () => [] });
+      return table.filter((l) => l.startsWith('demo:L1 — escalade fable')).join('\n');
+    };
+    const running = line({ status: 'reviewing', escalation: { model: 'fable', stage: 'fix' } });
+    expect(running).toContain('en cours');
+    expect(running).not.toContain("malgré l'escalade");
+    const conformeThenUx = line({ status: 'handed-back', outcome: 'UX non conforme après 3 passe(s) de correction', escalation: { model: 'fable', stage: 'done', issue: 'conforme' } });
+    expect(conformeThenUx).toContain('revue neuve conforme');
+    expect(conformeThenUx).not.toContain('lot rendu prêt');
+    expect(conformeThenUx).toContain('pour un autre motif');
+    expect(line({ status: 'ready', escalation: { model: 'fable', stage: 'done', issue: 'conforme' } })).toContain('lot rendu prêt');
+    const failed = line({ status: 'failed', escalation: { model: 'fable', stage: 'done', issue: 'échec' } });
+    expect(failed).toContain('sans résultat');
+    expect(failed).not.toContain("malgré l'escalade");
+  });
+
+  it('R13 — une session escaladée en échec (modèle indisponible) n\'est pas « rendu malgré l\'escalade » : issue « échec », ni dans le journal', async () => {
+    const down: Handler = () => ({ code: 1, stdout: '', stderr: 'unknown model fable', timedOut: false });
+    const h = harness({ script: { implement: [impl], review: [major, major, major], fix: [fix('b.txt'), fix('c.txt'), down] } });
+    const logs: string[] = [];
+    h.wave.log = (line: string) => logs.push(line);
+    const c = h.lot('L1', {}, esc);
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(c.lot.escalation).toMatchObject({ model: 'fable', issue: 'échec' });
+    expect(logs.some((l) => l.includes("malgré l'escalade"))).toBe(false);
+    expect(logs.some((l) => l.includes('escalade fable : session sans résultat'))).toBe(true);
+  });
 });
 
 describe('L337 R11 — la documentation suit', () => {

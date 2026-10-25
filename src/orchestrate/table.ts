@@ -21,7 +21,21 @@ export const LABEL: Record<LotState['status'], string> = {
 };
 
 /** L'issue d'une escalade de modèle (L337), telle que le tableau la dit. */
-const ESCALATION_TEXT = { conforme: 'revue neuve conforme, lot rendu prêt', rendu: "lot rendu malgré l'escalade : à l'humain ou à un arbitrage", 'non jouée': 'non jouée, le budget du lot ne la couvrait pas' } as const;
+const ESCALATION_TEXT = {
+  rendu: "lot rendu malgré l'escalade : à l'humain ou à un arbitrage",
+  'non jouée': 'non jouée, le budget du lot ne la couvrait pas',
+  échec: "session escaladée sans résultat : le modèle n'a pas jugé le lot (est-il accessible à ce compte ?), reprise par le lead",
+} as const;
+
+/** La ligne « escalade » d'un lot : l'issue de l'escalade, lue avec l'état du lot (le tableau sert aussi à `--status` et à une vague suspendue). */
+function escalationText(l: LotState): string {
+  const e = l.escalation!;
+  if (!e.issue) return e.stage === 'fix' ? 'en cours (une correction puis une revue neuve à ce modèle)' : 'engagée, pas encore tranchée';
+  if (e.issue !== 'conforme') return ESCALATION_TEXT[e.issue];
+  if (l.status === 'ready') return 'revue neuve conforme, lot rendu prêt';
+  if (l.status === 'handed-back' || l.status === 'failed') return 'revue neuve conforme, lot rendu pour un autre motif (voir la ligne du lot)';
+  return 'revue neuve conforme, le lot poursuit sa fin ordinaire';
+}
 
 function review(l: LotState): string {
   if (!l.code) return '—';
@@ -199,7 +213,7 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
   }
   for (const l of lots) {
     if (l.goal) out.push(`${l.project}:${l.lot} — objectif donné : ${l.goal}`);
-    if (l.escalation) out.push(`${l.project}:${l.lot} — escalade ${l.escalation.model} : ${ESCALATION_TEXT[l.escalation.issue ?? 'rendu']}`);
+    if (l.escalation) out.push(`${l.project}:${l.lot} — escalade ${l.escalation.model} : ${escalationText(l)}`);
     if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);
     if (l.uxCaptures) out.push(`${l.project}:${l.lot} — captures Playwright : ${l.uxCaptures}`);
     for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);

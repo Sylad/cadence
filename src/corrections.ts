@@ -141,7 +141,7 @@ export interface Journal {
   /** Le rapport du précheck local était illisible (avertissement du journal, L322) : son étape est `ok` mais le lot est reparti sur Sonnet ; absent sinon. */
   localUnreadable?: true;
   /** Escalade de modèle du lot (`escalation` du journal, L337) ; absente d'un journal ancien ou d'un lot qui n'a pas escaladé. */
-  escalation?: { model: string; issue: 'conforme' | 'rendu' | 'non jouée' | null };
+  escalation?: { model: string; issue: 'conforme' | 'rendu' | 'non jouée' | 'échec' | null };
   steps: JournalStep[];
   /** Une session implement a abouti (sous la borne `until` éventuelle). */
   implemented: boolean;
@@ -201,7 +201,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
       });
       const precheck = precheckVerdictOf(rec, steps);
       const esc = rec.escalation;
-      const escalation = esc && typeof esc === 'object' && typeof esc.model === 'string' ? { model: esc.model, issue: esc.issue === 'conforme' || esc.issue === 'rendu' || esc.issue === 'non jouée' ? (esc.issue as 'conforme' | 'rendu' | 'non jouée') : null } : undefined;
+      const escalation = esc && typeof esc === 'object' && typeof esc.model === 'string' ? { model: esc.model, issue: esc.issue === 'conforme' || esc.issue === 'rendu' || esc.issue === 'non jouée' || esc.issue === 'échec' ? (esc.issue as 'conforme' | 'rendu' | 'non jouée' | 'échec') : null } : undefined;
       journals.push({
         wave,
         ...(waveCreated ? { waveCreated } : {}),

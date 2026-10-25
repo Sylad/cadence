@@ -29,19 +29,20 @@ describe('L337 R10 — cadence perf compte les escalades et leur issue', () => {
     ['L1', { escalation: { model: 'fable', stage: 'done', issue: 'conforme' }, steps: [step(CUR), step(CUR, 'fix', 'fable')] }],
     ['L2', { status: 'handed-back', escalation: { model: 'fable', stage: 'done', issue: 'rendu' }, steps: [step(CUR), step(CUR, 'fix', 'fable')] }],
     ['L3', { status: 'handed-back', escalation: { model: 'fable', stage: 'done', issue: 'non jouée' }, steps: [step(CUR)] }],
+    ['L6', { status: 'failed', escalation: { model: 'fable', stage: 'done', issue: 'échec' }, steps: [step(CUR)] }],
     ['L4', { steps: [step(CUR)] }],
     ['L5', { escalation: { model: 'opus', stage: 'done', issue: 'conforme' }, steps: [step(PREV)] }],
   ];
 
   it('R10 — les lots escaladés de chaque fenêtre, par issue', async () => {
     const data = JSON.parse((await perf(ctx(defs()), '--json')).join('\n'));
-    expect(data.escalations.current).toEqual({ lots: 3, conforme: 1, rendu: 1, nonJouee: 1 });
-    expect(data.escalations.previous).toEqual({ lots: 1, conforme: 1, rendu: 0, nonJouee: 0 });
+    expect(data.escalations.current).toEqual({ lots: 4, conforme: 1, rendu: 1, nonJouee: 1, echec: 1 });
+    expect(data.escalations.previous).toEqual({ lots: 1, conforme: 1, rendu: 0, nonJouee: 0, echec: 0 });
   });
 
   it('R10 — le rapport lisible dit le nombre d\'escalades et leur issue, rien sans escalade', async () => {
     const text = (await perf(ctx(defs()))).join('\n');
-    expect(text).toMatch(/escalades de modèle : 3 lots · 1 conforme · 1 rendu malgré l'escalade · 1 non jouée/);
+    expect(text).toMatch(/escalades de modèle : 4 lots · 1 conforme · 1 rendu malgré l'escalade · 1 non jouée · 1 en échec/);
     const none = (await perf(ctx([['L4', { steps: [step(CUR)] }]]))).join('\n');
     expect(none).not.toContain('escalades de modèle');
   });

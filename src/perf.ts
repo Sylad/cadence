@@ -146,12 +146,13 @@ export interface PrecheckLot {
   sonnet: { minutes: number; tokens: number } | null;
 }
 
-/** Les escalades de modèle des lots rendus d'une fenêtre (L337) : lots escaladés et leur issue (`conforme` : la revue neuve l'était ; `rendu` : lot rendu malgré l'escalade ; `nonJouee` : budget du lot). */
+/** Les escalades de modèle des lots rendus d'une fenêtre (L337) : lots escaladés et leur issue (`conforme` : la revue neuve l'était ; `rendu` : lot rendu malgré l'escalade ; `nonJouee` : budget du lot ; `echec` : une session escaladée n'a rien rendu, le modèle n'a pas jugé le lot). */
 export interface EscalationCounts {
   lots: number;
   conforme: number;
   rendu: number;
   nonJouee: number;
+  echec: number;
 }
 
 export interface PerfResult {
@@ -608,8 +609,8 @@ export function computePerf(input: PerfInput): PerfResult {
 /** Les escalades de modèle des lots donnés (L337), par issue ; une escalade engagée dont le journal n'a pas d'issue (lot interrompu) n'est classée dans aucune. */
 function escalationCounts(set: Dated[]): EscalationCounts {
   const escalated = set.filter((d) => d.j.escalation);
-  const by = (issue: 'conforme' | 'rendu' | 'non jouée') => escalated.filter((d) => d.j.escalation!.issue === issue).length;
-  return { lots: escalated.length, conforme: by('conforme'), rendu: by('rendu'), nonJouee: by('non jouée') };
+  const by = (issue: 'conforme' | 'rendu' | 'non jouée' | 'échec') => escalated.filter((d) => d.j.escalation!.issue === issue).length;
+  return { lots: escalated.length, conforme: by('conforme'), rendu: by('rendu'), nonJouee: by('non jouée'), echec: by('échec') };
 }
 
 const minutesOf = (s: JournalStep): number => {
@@ -831,7 +832,7 @@ export function renderPerf(r: PerfResult): string[] {
   section('Contrôle préalable', ['part de « oui » du précheck']);
   out.push(...precheckLines(r.precheck));
   const e = r.escalations.current;
-  if (e.lots > 0) out.push('', 'Escalade de modèle', `  escalades de modèle : ${plural(e.lots, 'lot', 'lots')} · ${e.conforme} conforme · ${e.rendu} rendu malgré l'escalade · ${e.nonJouee} non jouée`);
+  if (e.lots > 0) out.push('', 'Escalade de modèle', `  escalades de modèle : ${plural(e.lots, 'lot', 'lots')} · ${e.conforme} conforme · ${e.rendu} rendu malgré l'escalade · ${e.nonJouee} non jouée · ${e.echec} en échec`);
   out.push('', 'Tokens, délais et durées (médianes par lot ou par étape)');
   for (const l of lines.slice(LEGACY_LINES)) out.push(row(l));
   for (const wr of r.warnings.filter((x) => x.startsWith('⚠ goulot'))) out.push('', wr);

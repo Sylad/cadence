@@ -77,7 +77,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- Skill `orchestrate` (L335, `docs/skills.md`): the syntax of `cadence orchestrate` (`<project>:<lot>[@<model>]`, a lot id with « / » kept as is, resume by `--resume [--wave <wave>]`) is reachable without `/lead`. The plugin 1.10.0 eval of 2026-10-25 scored 0.00 on `orchestrate-id-avec-slash` with and without the plugin: three tries out of three invented `--lot` and `--model`, no skill was opened. The description of the new skill triggers on « lancer une vague orchestrate » and carries the command line.
+- Skill `orchestrate` (L335, `docs/skills.md`): the syntax of `cadence orchestrate` (`<project>:<lot>[@<model>]`, a lot id with « / » kept as is, resume by `--resume [--wave <wave>]`) is reachable without `/lead`. The plugin 1.10.0 eval of 2026-10-25 scored 0.00 on `orchestrate-id-avec-slash` with and without the plugin: three tries out of three invented `--lot` and `--model`, no skill was opened. The description of the new skill triggers on « lancer une vague orchestrate » and carries the command line. Replayed with the skill (`claude plugin eval . --case orchestrate-id-avec-slash --trust-plugin --no-publish`, run 2026-10-25T20-25-18Z, 3 runs per arm): 1.00 with the plugin, 0.00 without (Δ +1.00).
 
 ### Fixed
 

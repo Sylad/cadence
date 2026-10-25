@@ -839,9 +839,16 @@ describe('deliver : Ctrl-C et raccrochage (revue L19)', () => {
     async (sig) => {
       const logs = tempDir();
       const dir = pushedRepo();
-      // le sh du script note son pid, dort, puis « bumpe » : ce qu'ont fait deux livraisons concurrentes le 04-10
-      writeFileSync(join(dir, 'cadence.yaml'), `deliver:\n  script: sh -c 'echo $$ >> "${logs}/pids"; sleep 3; echo bumped >> "${logs}/log"'\n`);
-      git(dir, 'add', 'cadence.yaml');
+      // le sh du script note son pid, dort, puis « bumpe » : ce qu'ont fait deux livraisons concurrentes le 04-10.
+      // L325 : le sommeil (60 s) dépasse le test, aucune fenêtre ne dépend de la charge : un SIGINT non propagé laisse le script
+      // vivant (`survived`) ; seule la première exécution dort (marqueur `first`), la seconde bumpe tout de suite.
+      writeFileSync(
+        join(dir, 'livrer.sh'),
+        `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then\n  echo done > '${logs}/first'\n  echo $$ >> '${logs}/pids'\n  sleep 60\nfi\necho bumped >> '${logs}/log'\n`,
+        { mode: 0o755 },
+      );
+      writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  script: ./livrer.sh\n');
+      git(dir, 'add', 'livrer.sh', 'cadence.yaml');
       commit(dir, 'chore: config');
       git(dir, 'push', '-q');
 
@@ -943,12 +950,14 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
   it('SIGINT au groupe de premier plan : le trap du script a le temps de finir (délai de grâce), puis plus aucun descendant ni livraison concurrente', async () => {
     const logs = tempDir();
     const dir = pushedRepo();
-    // L325 : aucune durée fixe. Le script note `armed` une fois son trap posé (le test envoie SIGINT à ce moment, pas
-    // après un délai) ; son trap attend la fin de l'observation (`release`, écrit par le test dès qu'il voit
-    // `trap-start`) au lieu de dormir un temps que la charge allongerait ; le sommeil du script (60 s) dépasse le test.
+    // L325 : aucune durée fixe. Le script pose son trap puis note son pid dans `child` : la sonde écrit `tracked` quand le suivi
+    // l'a adopté, et le test envoie SIGINT à ce moment seulement (le trap est posé, et la racine `sh -c` qui meurt du signal
+    // ne peut plus laisser le script orphelin et inconnu du suivi) ; son trap attend la fin de l'observation (`release`,
+    // écrit par le test dès qu'il voit `trap-start`) au lieu de dormir un temps que la charge allongerait ; le sommeil
+    // du script (60 s) dépasse le test.
     writeFileSync(
       join(dir, 'livrer.sh'),
-      `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then\n  echo $$ > '${logs}/first'\n  trap 'echo trap-start >> "${logs}/trap"; while [ ! -e "${logs}/release" ]; do sleep 0.05; done; echo trap-done >> "${logs}/trap"; exit 130' INT\n  : > '${logs}/armed'\n  sleep 60\n  ( sh -c "echo bumped >> '${logs}/bumps'" )\nelse\n  echo bumped >> '${logs}/bumps'\nfi\n`,
+      `#!/bin/sh\nif [ ! -e '${logs}/first' ]; then\n  echo $$ > '${logs}/first'\n  trap 'echo trap-start >> "${logs}/trap"; while [ ! -e "${logs}/release" ]; do sleep 0.05; done; echo trap-done >> "${logs}/trap"; exit 130' INT\n  echo $$ > '${logs}/child'\n  sleep 60\n  ( sh -c "echo bumped >> '${logs}/bumps'" )\nelse\n  echo bumped >> '${logs}/bumps'\nfi\n`,
       { mode: 0o755 },
     );
     writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  script: ./livrer.sh\n');
@@ -959,10 +968,10 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
     const first = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
     const exited = new Promise<void>((r) => first.on('exit', () => r()));
     try {
-      expect(await until(() => existsSync(join(logs, 'armed')), 60_000)).toBe(true); // vite-node démarre lentement sous charge
+      expect(await until(() => existsSync(join(logs, 'tracked')), 60_000)).toBe(true); // vite-node démarre lentement sous charge ; trap posé et script suivi
       const scriptPid = Number(readFileSync(join(logs, 'first'), 'utf8').trim());
       process.kill(-first.pid!, 'SIGINT'); // ce que fait le terminal
-      expect(await until(() => existsSync(join(logs, 'trap')), 15_000)).toBe(true); // le trap tourne, cadence est encore là (grâce)
+      expect(await until(() => existsSync(join(logs, 'trap')), 30_000)).toBe(true); // le trap tourne, cadence est encore là (grâce)
       await pause(2_500); // au-delà de la grâce par défaut (2 s) : seule la grâce injectée garde cadence en vie ; la charge ne peut que rallonger l'attente
       expect(alive(first.pid!)).toBe(true);
       writeFileSync(join(logs, 'release'), '');
@@ -1092,7 +1101,7 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
     // livraison refusée (fichier `refused`), toujours dans la grâce : aucune durée fixe, la charge ne décale rien
     const dir = scriptRepo(
       logs,
-      `  trap 'sleep 0.3; exit 130' INT\n  sh -c "while [ ! -e '${logs}/refused' ]; do sleep 0.05; done; echo bumped >> '${logs}/bumps'" &\n  while :; do wait; done`,
+      `  trap 'sleep 0.3; exit 130' INT\n  echo $$ > '${logs}/child'\n  sh -c "while [ ! -e '${logs}/refused' ]; do sleep 0.05; done; echo bumped >> '${logs}/bumps'" &\n  while :; do wait; done`,
     );
     const alive = (pid: number) => {
       try {
@@ -1104,41 +1113,51 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
     };
     const first = startFirst(logs, dir);
     try {
-      expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
-      await pause(400);
+      expect(await until(() => existsSync(join(logs, 'tracked')), 60_000)).toBe(true); // trap posé (écrit avant `child`) et script suivi
       const scriptPid = Number(readFileSync(join(logs, 'first'), 'utf8').trim());
       process.kill(-first.child.pid!, 'SIGINT');
-      expect(await until(() => !alive(scriptPid), 10_000)).toBe(true); // le trap est fini, le script est sorti ; l'enfant vit encore
+      expect(await until(() => !alive(scriptPid), 30_000)).toBe(true); // le trap est fini, le script est sorti ; l'enfant vit encore
       const second = await cad(dir);
       expect(second).toBe(2); // verrou vivant : refusée
       writeFileSync(join(logs, 'refused'), '');
       await first.exited;
-      expect(await until(() => lines(join(logs, 'bumps')).length > 0, 5_000)).toBe(true);
-      await pause(500);
+      expect(await until(() => lines(join(logs, 'bumps')).length > 0, 30_000)).toBe(true);
+      await pause(500); // absence d'un second bump : une attente ne peut que la rendre plus vraie, jamais fausse
       expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
     } finally {
       first.cleanup();
     }
-  }, 30_000);
+  }, 120_000);
 
   it('(c) Ctrl-C : un descendant qui ignore SIGINT sous un parent vivant est tué à l’échéance de la grâce (~2 s) — un seul bump', async () => {
     const logs = tempDir();
-    // le script attend son enfant (trap posé : il ne meurt pas du signal) ; l'enfant ignore SIGINT et bumperait à 8 s
-    const dir = scriptRepo(logs, `  trap 'echo int' INT\n  sh -c "trap '' INT; sleep 8; echo bumped >> '${logs}/bumps'"`);
+    // le script attend son enfant (trap posé : il ne meurt pas du signal) ; l'enfant ignore SIGINT, note son pid dans `child`
+    // (après avoir posé son `trap ''` : quand la sonde le voit suivi, il ignore déjà le signal) et dormirait 60 s
+    const dir = scriptRepo(logs, `  trap 'echo int' INT\n  sh -c "trap '' INT; echo \\$\\$ > '${logs}/child'; sleep 60; echo bumped >> '${logs}/bumps'"`);
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
     const first = startFirst(logs, dir);
     try {
-      expect(await until(() => existsSync(join(logs, 'first')), 15_000)).toBe(true);
-      await pause(400);
+      expect(await until(() => existsSync(join(logs, 'tracked')), 60_000)).toBe(true); // vite-node démarre lentement sous charge ; l'enfant est suivi
+      const childPid = Number(readFileSync(join(logs, 'child'), 'utf8').trim());
       const t = Date.now();
       process.kill(-first.child.pid!, 'SIGINT');
       const end = await first.exited;
-      expect(end - t).toBeGreaterThanOrEqual(1_800); // la grâce entière
-      expect(end - t).toBeLessThan(6_000); // mais pas la fin de l'enfant (8 s) : 4 s de marge pour la charge, la grâce seule en prend ~2
+      expect(end - t).toBeGreaterThanOrEqual(1_800); // la grâce entière (la charge ne peut que la rallonger)
+      // Borne haute large, seule de la suite : c'est la règle testée. Sans la mise à mort à l'échéance, cadence attendrait
+      // la fin de l'enfant (60 s) ; 45 s de marge pour la charge, la grâce seule en prend ~2.
+      expect(end - t).toBeLessThan(45_000);
+      expect(await until(() => !alive(childPid), 30_000)).toBe(true); // l'enfant est mort, il n'a pas fini son sommeil
       expect(await cad(dir)).toBe(0);
-      await pause(Math.max(0, t + 8_000 - Date.now()) + 1_500); // jusqu'après le bump qu'aurait fait l'enfant
-      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
+      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']); // seulement la seconde livraison
     } finally {
       first.cleanup();
     }
-  }, 30_000);
+  }, 120_000);
 });

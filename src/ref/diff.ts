@@ -29,6 +29,8 @@ export interface Item {
   detail?: string;
   /** La réponse du troisième regard (`seul`), posée par l'appelant avant `assembler`. */
   decision?: Decision;
+  /** Les silences réunis dans celui-ci (la même question posée par l'autre lecture, ou une seconde fois) : `a:<id>` ou `b:<id>`, pour que les renvois d'un statut à l'un d'eux suivent. */
+  alias?: string[];
 }
 
 export interface Reconciliation {
@@ -115,13 +117,18 @@ export function reconcilier(a: Obj, b: Obj, seuil: number = SEUIL_NON_APPARIES):
   const ordered: Item[] = [];
   for (const e of a.elements as Obj[]) if (e.type !== 'silence') ordered.push(items.get(e)!);
   for (const e of b.elements as Obj[]) if (e.type !== 'silence' && !pairedB.has(e)) ordered.push({ statut: 'seul', element: e, b: e, lecture: 'b' });
-  const vues = new Set<string>();
+  const vues = new Map<string, Item>();
   for (const [e, lecture] of [...(a.elements as Obj[]).map((e) => [e, 'a'] as const), ...(b.elements as Obj[]).map((e) => [e, 'b'] as const)]) {
     if (e.type !== 'silence') continue;
     const k = identite(e, new Map());
-    if (vues.has(k)) continue;
-    vues.add(k);
-    ordered.push({ statut: 'silence', element: e, ...(lecture === 'a' ? { a: e } : { b: e }) });
+    const deja = vues.get(k);
+    if (deja) {
+      (deja.alias ??= []).push(`${lecture}:${e.id}`); // un statut peut couvrir ce silence-ci : son renvoi suit le silence réuni
+      continue;
+    }
+    const item: Item = { statut: 'silence', element: e, ...(lecture === 'a' ? { a: e } : { b: e }) };
+    vues.set(k, item);
+    ordered.push(item);
   }
 
   const compte = (s: Item['statut']) => ordered.filter((i) => i.statut === s).length;
@@ -162,6 +169,7 @@ export function assembler(a: Obj, b: Obj, rec: Reconciliation, regard = false): 
   for (const en of entrees) {
     if (en.item.a) proprietaire.set(`a:${en.item.a.id}`, en);
     if (en.item.b) proprietaire.set(`b:${en.item.b.id}`, en);
+    for (const k of en.item.alias ?? []) proprietaire.set(k, en);
   }
   const versionsDe = (en: Entree): ('a' | 'b')[] => (['a', 'b'] as const).filter((v) => en.item[v] !== undefined);
   const cible = (v: 'a' | 'b', id: string): Entree | undefined => proprietaire.get(`${v}:${id}`);

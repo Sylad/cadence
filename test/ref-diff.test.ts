@@ -235,6 +235,33 @@ describe('cadence ref diff : réconciliation de deux lectures (L266)', () => {
     expect(inv.elements[1].confiance).toBe('incertain');
     expect(checkInventaire(inv)).toEqual([]);
   });
+
+  it('R19 — un statut qui couvre un silence posé par les deux lectures est concordant et sans doute : le silence réuni est un élément gardé, rien n\'a été écarté', () => {
+    const a = lecture([texte(1, 'Layers', 100), silence(1, 'Quelle couleur ?'), statut(1, ['doc#silence-1'])]);
+    const b = lecture([texte(1, 'Layers', 100), silence(4, 'Quelle couleur ?'), statut(2, ['doc#silence-4'])]);
+    const rec = reconcilier(a, b);
+    expect(rec.items.map((i) => i.statut)).toEqual(['concordant', 'concordant', 'silence']);
+    const inv = assembler(a, b, rec);
+    const st = inv.elements.find((e: Obj) => e.type === 'statut')!;
+    expect(st.confiance).toBe('lu');
+    expect(st.cause).toBeUndefined();
+    expect(st.couvre).toEqual([inv.elements.find((e: Obj) => e.type === 'silence')!.id]);
+    expect(checkInventaire(inv)).toEqual([]);
+  });
+
+  it('R20 — un statut que B seule porte et qui couvre le silence des deux lectures n\'est pas perdu : confirmé par le troisième regard, il couvre le silence réuni', () => {
+    const quatre = [texte(1, 'Layers', 100), texte(2, 'Wind', 400), texte(3, 'Waves', 700), texte(4, 'Tides', 1000)];
+    const a = lecture([...quatre, silence(1, 'Quelle couleur ?')]);
+    const b = lecture([...quatre, silence(4, 'Quelle couleur ?'), statut(2, ['doc#silence-4'])]);
+    const rec = reconcilier(a, b);
+    const seul = rec.items.find((i) => i.statut === 'seul')!;
+    expect(seul.element.type).toBe('statut');
+    seul.decision = { verdict: 'confirme', raison: 'badge lisible' };
+    const inv = assembler(a, b, rec, true);
+    expect(inv.elements.map((e: Obj) => e.id)).toEqual(['doc#texte-1', 'doc#texte-2', 'doc#texte-3', 'doc#texte-4', 'doc#statut-1', 'doc#silence-1']);
+    expect(inv.elements.find((e: Obj) => e.type === 'statut').couvre).toEqual(['doc#silence-1']);
+    expect(checkInventaire(inv)).toEqual([]);
+  });
 });
 
 describe('cadence ref diff <a> <b> (L266)', () => {

@@ -7,7 +7,7 @@ tables drawn as pictures, message templates, figures of a norm (WMO, ICAO…). `
 turns such a document into files a session can read without losing the pictures. The whole
 design is in
 [`docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md`](superpowers/specs/2026-10-23-ref-documents-de-reference-design.md)
-(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) **`cadence ref check`** with the inventory schema (lot 3 of 10), **`cadence ref eval`** (lot 4 of 10, with the synthetic corpus `cadence ref corpus`) **`cadence ref analyse`** (lot 5 of 10: the `reference-analyst` agent, one single reading) and **`cadence ref diff`** with the double reading (lot 6 of 10).
+(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) **`cadence ref check`** with the inventory schema (lot 3 of 10), **`cadence ref eval`** (lot 4 of 10, with the synthetic corpus `cadence ref corpus`) **`cadence ref analyse`** (lot 5 of 10: the `reference-analyst` agent, one single reading) and **`cadence ref diff`** with the double reading (lot 6 of 10). **The series stops at lot 6**: the stopping point of the double reading (hypothesis H1) was not met, so lots 7 to 10 are dropped and the double reading stays an option, `--double` ([measurement and conclusion](mesures/ref-double-lecture-2026-10-25.md)).
 
 ## `cadence ref add <document.pdf> [--sections 3-5,9] [--slug name]`
 
@@ -290,7 +290,7 @@ text of a `texte`, role and content of a `composant`, figure of a `lien`…), si
 | **silence** | a question, in either reading | gathered (one question once), never sent to a third look and not counted below: a silence is not a reading that someone else contradicts |
 
 More than **30 %** of the paired-or-single elements unpaired (silences left out, `--seuil` changes it, in percent) means the two readings do not describe the same document: no reconciliation, the question goes to the lead (exit 1, nothing written).
-The ids of the result are renumbered `<slug>#<type>-<n>` (reading A in its order, then what B alone carries) and the references (`composant.ecran`, `etat.cible`, `statut.couvre`) follow; an element that referred to a discarded one is discarded with it.
+The ids of the result are renumbered `<slug>#<type>-<n>` (reading A in its order, then what B alone carries) and the references (`composant.ecran`, `etat.cible`, `statut.couvre`) follow; an element that referred to a discarded one is discarded with it, **except a paired element** (both readings carry it): it holds while one of its two versions points to a kept element, and is then `incertain` with the cause when only one version does; it is discarded only when both versions point to discarded elements (see `ref analyse`, « Reconciliation »).
 
 ```
 $ cadence ref diff a.json b.json --out inventaire.json

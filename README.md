@@ -39,7 +39,7 @@ The two plugins are independent. `cadence@cadence` carries the rituals, which ca
 | Page | What it covers |
 |---|---|
 | [docs/raf.md](docs/raf.md) | the plan: commands, plan file, foreign plan formats, Gantt |
-| [docs/orchestrate.md](docs/orchestrate.md) | waves of sessions: budgets, spec, accept and review steps, neighbouring repositories, one worktree per lot (`orchestrate.worktrees: true`, on in cadence's own `cadence.yaml`, off by default elsewhere; `--integrate`, `--replay`, `--remove-worktree` belong to it, and a new wave of a lot handed back recovers its branch, skips the pre-check and resumes at the correction of its last review; at the integration, a pure-addition conflict in `CHANGELOG.md` (a lot rewriting its own earlier entry included) is resolved by union per section, any other conflict is handed back) |
+| [docs/orchestrate.md](docs/orchestrate.md) | waves of sessions: budgets, spec, accept and review steps, neighbouring repositories, one worktree per lot (`orchestrate.worktrees: true`, on in cadence's own `cadence.yaml`, off by default elsewhere; `--integrate`, `--replay`, `--remove-worktree`; recovery of a handed-back lot's branch and the `CHANGELOG.md` union at the integration are described there) |
 | [docs/deliver.md](docs/deliver.md) | delivery: wait for CI, deploy, verify the effect |
 | [docs/spec.md](docs/spec.md) | the screen and back-end sheets, `cadence spec check\|qa\|reseal` |
 | [docs/lead.md](docs/lead.md) | the lead workflow and `cadence lead tour` |

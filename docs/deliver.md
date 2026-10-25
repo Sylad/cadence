@@ -92,6 +92,8 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   is still failing when the kill comes (the last listing is not trusted after
   1 second): only the command is killed, its descendants survive, and cadence
   says so once on stderr.
+  The 2 seconds are a constant of the real dependencies (`realDeps`, the `graceMs`
+  argument), injectable so that the tests measure the kill, not the load of the machine.
   A delay overrun and `SIGTERM` give no grace: a script's own `trap` does not
   get to finish there. The lock is held until the followed set is empty: when
   cadence dies of the signal it dies after the tree, and its stale lock, which

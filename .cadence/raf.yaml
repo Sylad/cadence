@@ -3601,11 +3601,12 @@ lots:
     finished: 2026-10-25
   - id: L320
     title: "orchestrate : mode worktree ACTIVÉ PAR DÉFAUT (décision Sylvain 25-10 après les essais L310 et L316 : −45 % et −22 % de mur, 3 intégrations automatiques sans incident) — retirer la garde CADENCE_EXPERIMENTAL_WORKTREES, défaut orchestrate.worktrees: true dans cadence (les autres projets gardent leur valeur jusqu'à décision), doc (docs/orchestrate.md « One worktree per lot », README, skill lead) et CHANGELOG ; vérifier avant que l'acquittement docs_ok de L317 est bien lu dans un worktree (docGaps via histPlan, cycle.ts:347, mineur de la revue L317) ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
-    review: { date: 2026-10-25, verdict: "conforme — 0 bloquant, 0 majeur, 3 mineurs (notes : tableau « Available since » du CHANGELOG, commentaire du test docs-ok, test deliver (b) encore lié à la grâce de 2 s) — orchestré (vague 2026-10-25-0848, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: dd332a8df73253e1b28da4984c083de860cecde1 }
+    review: { date: 2026-10-25, verdict: "conforme (revue Opus neuve après la vague 2026-10-25-0848 : garde CADENCE_EXPERIMENTAL_WORKTREES retirée des 4 sites, reprise de branche liée à la clé, docs_ok lu via histPlan en worktree ; mineurs de la vague corrigés en 5ec1464 et ccdd7a0 — ligne « Available since » vraie contre v1.9.0) — test deliver (b) jugé non instable (22/22 sous charge) ; deliver (a) hors lot a expiré une fois sous charge 26, à suivre", commit: 5ec14648006160eb719b36567576cb8e44c53de2 }
+    finished: 2026-10-25
   - id: L321
     title: "check : deux faux écarts sur un plan à sous-lots ou en lecture seule (vus au tour /lead du 25-10 sur maritime) — (1) un lot parent en cours n'est pas « silencieux » tant qu'un de ses sous-lots (champ parent:) a un commit récent ou est actif (B28 signalé « sans commit depuis 27 j » alors que B28.6 a été livré le 24-10) ; (2) « revue UX sans visible: » ne propose pas raf visible sur un plan en lecture seule ; si son cadence.yaml ne mappe pas le champ visible, l'écart dit que ce plan ne porte pas visible (étape UX à déclencher par la config) au lieu d'une commande impossible ; tests"
     status: doing

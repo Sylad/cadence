@@ -62,7 +62,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `doc-keeper` agent and `docs.articles` (also the documents of a neighbouring repository), called by `cadence orchestrate` before the review when `docs.sync` reports a gap | [1.9.0](#190---2026-10-24) |
 | `orchestrate.testGate`: a lot whose commits touch code without a test goes to a correction pass before the review | [1.9.0](#190---2026-10-24) |
 | `orchestrate.precheck: local` pre-checks every lot with no commit, whatever its title | [1.9.0](#190---2026-10-24) |
-| `orchestrate.worktrees: true`: the worktree mode, one git worktree per lot (no environment variable: the key is the whole switch), `--resume --integrate\|--replay`, `--remove-worktree` | [1.9.0](#190---2026-10-24) |
+| `orchestrate.worktrees`: the worktree mode, one git worktree per lot (experimental behind `CADENCE_EXPERIMENTAL_WORKTREES=1` in 1.9.0; the key alone since [Unreleased](#unreleased)), `--resume --integrate\|--replay`, `--remove-worktree` | [1.9.0](#190---2026-10-24) |
 | `cadence deliver --sha <sha>` while a wave of the same repository runs, `CADENCE_DEPLOYED_FILE`, and the class and last lines of a red delivery in `deliveries-failed.log` | [1.9.0](#190---2026-10-24) |
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.

@@ -28,12 +28,12 @@ function write(file: string, text: string): void {
 }
 
 /** Un dépôt dont le plan est tenu par un autre outil (lecture seule), puis les écarts de `raf check` au jour donné. */
-function ecartsDe(taches: string, fields: string, today: string): string[] {
+function ecartsDe(taches: string, fields: string, today: string, commitDeSousLot = true): string[] {
   const dir = gitRepo();
   write(join(dir, 'cadence.yaml'), CONFIG(fields));
   write(join(dir, 'suivi/taches.yaml'), taches);
   commit(dir, 'chore: plan', '2026-09-01T09:00:00');
-  commit(dir, 'feat(B28.6): sous-lot livré', '2026-10-24T10:00:00');
+  if (commitDeSousLot) commit(dir, 'feat(B28.6): sous-lot livré', '2026-10-24T10:00:00');
   const cfg = readPlanConfig(join(dir, 'cadence.yaml'), dir)!;
   const plan = Plan.load(join(dir, cfg.path!), cfg.settings);
   return audit(plan, dir, join(dir, 'news'), today).map((i) => i.message);
@@ -57,8 +57,19 @@ describe('lot parent en cours et sous-lots (L321)', () => {
     expect(ecarts.filter((m) => m.includes('sans commit'))).toEqual([]);
   });
 
-  it('R2 — un lot parent dont un sous-lot est en cours (actif, démarré récemment) n’est pas signalé', () => {
-    const ecarts = ecartsDe(PARENT_ET_SOUS_LOT('en_cours', 'en_cours'), '', '2026-10-30');
+  it('R2 — un lot parent dont un sous-lot est en cours depuis hier SANS aucun commit n’est pas signalé (c\'est la date de démarrage du sous-lot qui compte)', () => {
+    const sansCommit = `taches:
+- id: B28
+  titre: Gros chantier
+  etat: en_cours
+  demarre_le: '2026-09-27'
+- id: B28.7
+  titre: Septième morceau
+  etat: en_cours
+  demarre_le: '2026-10-29'
+  parent: B28
+`;
+    const ecarts = ecartsDe(sansCommit, '', '2026-10-30', false);
     expect(ecarts.filter((m) => m.startsWith('B28 '))).toEqual([]);
   });
 

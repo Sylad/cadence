@@ -114,8 +114,9 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   a process that leaves the tree before cadence first sees it (a daemon's
   double fork, `setsid`, `nohup … &` from a shell that exits, all within less
   than 200 ms), a process of another user that cadence may not signal (`sudo`),
-  a background process still running when the command returns normally (it is
-  neither waited for nor killed), and everything if cadence itself is killed
+  a background process still running when the command returns normally (cadence
+  waits up to 2 seconds for a signal on its way, see above, then carries on
+  without killing it), and everything if cadence itself is killed
   with `SIGKILL` (`kill -9`, the OOM killer).
   Where the process list cannot be read (no `/proc` and `ps` failing), cadence
   can only kill the root command (`sh`): it leads no group of its own, since it

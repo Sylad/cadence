@@ -181,6 +181,8 @@ export interface LotState {
 }
 
 /** Début de l'avertissement d'un rapport de précheck illisible (Sonnet) : le journal le garde, `cadence perf` s'en sert pour ne pas compter ce lot « non » (L293). */
+/** Avertissement d'un rapport du précheck local illisible : l'étape reste `ok`, le lot se replie sur Sonnet (L322, lu par `cadence perf` pour compter l'échec du local). */
+export const LOCAL_PRECHECK_UNREADABLE = 'contrôle préalable : rapport du modèle local illisible';
 export const PRECHECK_UNREADABLE = 'contrôle préalable illisible, implémentation lancée';
 
 export interface NewLot {

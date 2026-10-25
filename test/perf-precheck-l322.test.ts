@@ -65,6 +65,30 @@ describe('L322 R7 — cadence perf mesure le précheck', () => {
     expect(data.precheck.cost.current.avoided).toEqual({ sessions: 1, tokens: 200000 });
   });
 
+  it('R7 — un rapport local illisible est un échec du local, même si son étape finit ok (repli sur Sonnet) ; un « oui » local confirmé par Sonnet n\'en est pas un', async () => {
+    const c = ctx();
+    lots(c, [
+      ['L1', { precheck: 'non', warnings: ['contrôle préalable : rapport du modèle local illisible (structured_output de mauvaise forme), repli sur Sonnet'], steps: [pre('local', '08:00:00', '08:03:00'), pre('sonnet', '08:03:00', '08:05:00', { counted: 20000 }), impl(1000)] }],
+      ['L2', { precheck: 'oui', status: 'handed-back', warnings: ['contrôle préalable : « oui » du modèle local, confirmé par Sonnet'], steps: [pre('local', '09:00:00', '09:02:00'), pre('sonnet', '09:02:00', '09:03:00', { counted: 15000 })] }],
+      ['L3', { precheck: 'non', steps: [pre('local', '10:00:00', '10:02:00'), impl(1000)] }],
+    ]);
+    const data = JSON.parse((await perf(c.root, '--json')).join('\n'));
+    expect(data.precheck.cost.current.local).toEqual({ runs: 3, failed: 1, minutes: 7 });
+    expect(data.precheck.lots.find((l: { lot: string }) => l.lot === 'L1').local.status).toBe('illisible');
+    expect(data.precheck.lots.find((l: { lot: string }) => l.lot === 'L2').local.status).toBe('ok');
+    const text = (await perf(c.root)).join('\n');
+    expect(text).toContain('précheck local : 3 sessions, 1 échec, 7 min');
+    expect(text).toContain('alpha:L1 · non · local échec 3 min · Sonnet 2 min, 20 k tokens');
+    expect(text).toContain('alpha:L3 · non · local ok 2 min');
+  });
+
+  it('R7 — le tableau écrit n/d pour le gain en tokens quand la fenêtre n\'a aucune implémentation', async () => {
+    const c = ctx();
+    lots(c, [['L1', { precheck: 'oui', status: 'handed-back', steps: [pre('local', '08:00:00', '08:05:00')] }]]);
+    const text = (await perf(c.root)).join('\n');
+    expect(text).toContain('gain des « oui » : 1 session d\'implémentation évitée (gain en tokens : n/d)');
+  });
+
   it('R7 — sans aucune implémentation dans la fenêtre, le gain en tokens est n/d (null), jamais 0', async () => {
     const c = ctx();
     lots(c, [['L1', { precheck: 'oui', status: 'handed-back', steps: [pre('local', '08:00:00', '08:05:00')] }]]);

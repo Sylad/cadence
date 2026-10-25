@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { precheckNothingToFind, runLot } from '../src/orchestrate/cycle.js';
+import { Plan } from '../src/plan.js';
+import { gitRepo } from './helpers.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { claudeOut, commitFile, git, harness, precheckReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
@@ -77,6 +79,38 @@ describe('L322 R1 — pas de précheck pour un lot créé après le dernier comm
     const c = h.lot('L1', {}, { precheck: true });
     await runLot(c);
     expect(kinds(h)).toEqual(['precheck', 'implement', 'review']);
+  });
+});
+
+describe('L322 R1 — plan renommé dans l\'historique (`docs/plan/raf.yaml` → `.cadence/raf.yaml`, après un `raf migrate`)', () => {
+  /** Commit daté (committer et auteur) : `git log --format=%ct` lit la date du committer. */
+  const commitAt = (repo: string, day: string, message: string, ...paths: string[]) => {
+    const env = { ...process.env, GIT_COMMITTER_DATE: `${day}T12:00:00Z`, GIT_AUTHOR_DATE: `${day}T12:00:00Z` };
+    if (paths.length) execFileSync('git', ['add', '--', ...paths], { cwd: repo });
+    execFileSync('git', ['commit', '-q', '-m', message], { cwd: repo, env });
+  };
+
+  it('R1 — le lot ajouté après le renommage du plan et après le dernier commit de code est sauté ; un lot plus ancien garde son précheck', () => {
+    const repo = gitRepo();
+    const legacy = 'docs/plan/raf.yaml';
+    mkdirSync(join(repo, 'docs/plan'), { recursive: true });
+    const old = join(repo, legacy);
+    const first = Plan.create(old, 'demo', 'L', '2026-09-01');
+    first.add('ancien', '2026-09-01', { estimate: 1 });
+    first.save();
+    commitAt(repo, '2026-09-01', 'chore: plan', legacy);
+    mkdirSync(join(repo, '.cadence'), { recursive: true });
+    git(repo, 'mv', legacy, '.cadence/raf.yaml');
+    commitAt(repo, '2026-09-02', 'chore: raf migrate'); // le renommage est déjà indexé par `git mv`
+    writeFileSync(join(repo, 'code.txt'), 'du code\n');
+    commitAt(repo, '2026-09-03', 'feat: du code', 'code.txt');
+    const plan = Plan.load(join(repo, '.cadence/raf.yaml'));
+    plan.add('récent', '2099-01-01', { estimate: 1 });
+    plan.save();
+    commitAt(repo, '2099-01-01', 'plan: L2', '.cadence/raf.yaml');
+
+    expect(precheckNothingToFind(Plan.load(join(repo, '.cadence/raf.yaml')), repo, 'L2')).toMatch(/créé après le dernier commit de code/);
+    expect(precheckNothingToFind(Plan.load(join(repo, '.cadence/raf.yaml')), repo, 'L1')).toBeNull();
   });
 });
 

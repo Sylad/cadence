@@ -29,7 +29,7 @@ import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, answerAltersRule, hypothesisNote, LEAD_SOURCE, ruleIdsSourcedByLead, sourceRules, specText, type FicheParts } from './spec.js';
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
-import { PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
+import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 import { advance, INTEGRATE_WAIT_MS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
 import { branchExists, git, gitFailure, integrated, linkIgnored, lotBranch, planFileSet, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
@@ -1102,7 +1102,8 @@ export function precheckNothingToFind(plan: Plan, root: string, lot: string, rep
   try {
     const rel = relative(root, plan.path);
     const idLine = `^\\s*- id: ["']?${lot.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}["']?\\s*$`;
-    const added = git(root, '-c', 'core.quotepath=off', 'log', '--follow', '--reverse', '--format=%ct', '-G', idLine, '--', rel).split('\n').find(Boolean);
+    // Pas de `--reverse` : avec `--follow`, git 2.43 ne rend rien sur un fichier renommé (`raf migrate`) ; le plus ancien est la dernière ligne.
+    const added = git(root, '-c', 'core.quotepath=off', 'log', '--follow', '--format=%ct', '-G', idLine, '--', rel).split('\n').filter(Boolean).pop();
     if (!added) return null;
     const created = plan.lot(lot).created;
     const endOfCreated = created ? Date.parse(`${created}T23:59:59`) / 1000 : Infinity;
@@ -1136,7 +1137,7 @@ async function precheck(c: LotCtx): Promise<void> {
       try {
         rep = checkShape<PrecheckReport>(done.report, PRECHECK_SCHEMA);
       } catch (e) {
-        l.warnings.push(`contrôle préalable : rapport du modèle local illisible (${(e as Error).message}), repli sur Sonnet`);
+        l.warnings.push(`${LOCAL_PRECHECK_UNREADABLE} (${(e as Error).message}), repli sur Sonnet`);
         benchLocal(c, `rapport illisible : ${(e as Error).message}`);
       }
       if (rep?.dejaPresent === 'oui') {

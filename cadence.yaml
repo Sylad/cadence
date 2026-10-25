@@ -41,6 +41,7 @@ migrate:
     - docs/perf/**
     - test/migrate.test.ts
     - test/plan-dossier-cache.test.ts
+    - test/orchestrate-precheck-l322.test.ts
     - test/check.test.ts
     - test/lead-tour-perf.test.ts
     - test/ventilation-plan.test.ts

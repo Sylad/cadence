@@ -613,11 +613,13 @@ function precheckMeasure(windows: Windows, rendered: (w: Window) => Dated[]): Pi
     const steps = set.flatMap((d) => d.j.steps.filter((s) => s.kind === 'precheck'));
     const local = steps.filter((s) => s.model === 'local');
     const sonnet = steps.filter((s) => s.model !== 'local');
+    // Un échec du local = une étape qui n'a pas fini `ok`, ou finie `ok` mais au rapport illisible (docs/perf.md : « ended without a usable report »).
+    const unusable = new Set(set.filter((d) => d.j.localUnreadable).flatMap((d) => d.j.steps.filter((s) => s.kind === 'precheck' && s.model === 'local')));
     const implement = set.flatMap((d) => d.j.steps.filter((s) => s.kind === 'implement' && s.counted !== undefined).map((s) => s.counted!));
     const avoided = set.filter((d) => d.j.precheck === 'oui' && d.j.status === 'handed-back').length;
     const typical = median(implement);
     return {
-      local: { runs: local.length, failed: local.filter((s) => s.status !== 'ok').length, minutes: local.reduce((n, s) => n + minutesOf(s), 0) },
+      local: { runs: local.length, failed: local.filter((s) => s.status !== 'ok' || unusable.has(s)).length, minutes: local.reduce((n, s) => n + minutesOf(s), 0) },
       sonnet: { runs: sonnet.length, minutes: sonnet.reduce((n, s) => n + minutesOf(s), 0), tokens: sonnet.reduce((n, s) => n + (s.counted ?? 0), 0) },
       avoided: { sessions: avoided, tokens: avoided === 0 ? 0 : typical === null ? null : avoided * typical },
     };
@@ -631,7 +633,7 @@ function precheckMeasure(windows: Windows, rendered: (w: Window) => Dated[]): Pi
       project: d.j.project,
       lot: d.j.lot,
       verdict: d.j.precheck ?? null,
-      local: local ? { status: local.status, minutes: minutesOf(local) } : null,
+      local: local ? { status: local.status === 'ok' && d.j.localUnreadable ? 'illisible' : local.status, minutes: minutesOf(local) } : null,
       sonnet: sonnet.length ? { minutes: sonnet.reduce((n, s) => n + minutesOf(s), 0), tokens: sonnet.reduce((n, s) => n + (s.counted ?? 0), 0) } : null,
     }];
   });
@@ -830,7 +832,7 @@ function precheckLines(p: PerfResult['precheck']): string[] {
   const out = [`  précheck : oui ${v.oui} · partiel ${v.partiel} · non ${v.non}`];
   if (c.local.runs > 0) out.push(`  précheck local : ${plural(c.local.runs, 'session', 'sessions')}, ${plural(c.local.failed, 'échec', 'échecs')}, ${num(Math.round(c.local.minutes))} min`);
   if (c.sonnet.runs > 0) out.push(`  précheck Sonnet : ${plural(c.sonnet.runs, 'session', 'sessions')}, ${value(c.sonnet.tokens, 'tokens')} tokens, ${num(Math.round(c.sonnet.minutes))} min`);
-  if (c.avoided.sessions > 0) out.push(`  gain des « oui » : ${plural(c.avoided.sessions, "session d'implémentation évitée", "sessions d'implémentation évitées")}${c.avoided.tokens === null ? '' : ` (≈ ${value(c.avoided.tokens, 'tokens')} tokens)`}`);
+  if (c.avoided.sessions > 0) out.push(`  gain des « oui » : ${plural(c.avoided.sessions, "session d'implémentation évitée", "sessions d'implémentation évitées")}${c.avoided.tokens === null ? ' (gain en tokens : n/d)' : ` (≈ ${value(c.avoided.tokens, 'tokens')} tokens)`}`);
   for (const l of p.lots) {
     const parts = [`${l.project}:${l.lot}`, l.verdict ?? 'sans verdict'];
     if (l.local) parts.push(`local ${l.local.status === 'ok' ? 'ok' : 'échec'} ${num(Math.round(l.local.minutes))} min`);

@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { PRECHECK_UNREADABLE } from './orchestrate/state.js';
+import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE } from './orchestrate/state.js';
 import { RafError } from './plan.js';
 
 /** Les causes d'une passe de correction (L165), dans l'ordre où le rapport les liste. */
@@ -138,6 +138,8 @@ export interface Journal {
   budget?: number;
   /** Verdict du contrôle préalable (`precheckVerdict` du journal, L288) ; absent d'un journal ancien ou d'un lot sans contrôle. */
   precheck?: 'oui' | 'partiel' | 'non';
+  /** Le rapport du précheck local était illisible (avertissement du journal, L322) : son étape est `ok` mais le lot est reparti sur Sonnet ; absent sinon. */
+  localUnreadable?: true;
   steps: JournalStep[];
   /** Une session implement a abouti (sous la borne `until` éventuelle). */
   implemented: boolean;
@@ -207,6 +209,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         status: String(rec.status),
         ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
         ...(precheck ? { precheck } : {}),
+        ...(Array.isArray(rec.warnings) && (rec.warnings as unknown[]).some((w) => typeof w === 'string' && w.startsWith(LOCAL_PRECHECK_UNREADABLE)) ? { localUnreadable: true as const } : {}),
         steps: steps.map((s) => {
           const usage = usageOf(s.tokens);
           return { n: s.n, kind: s.kind, status: s.status, ...(typeof s.model === 'string' ? { model: s.model } : {}), ...(s.started ? { started: s.started } : {}), ...(s.ended ? { ended: s.ended } : {}), ...(typeof s.tokens?.counted === 'number' ? { counted: s.tokens.counted } : {}), ...(usage ? { usage } : {}) };

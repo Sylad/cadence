@@ -3763,6 +3763,7 @@ lots:
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
+    review: { date: 2026-10-25, verdict: "conforme, 2 notes mineures (exemple du skill identique au cas d'éval, test --model plus faible que son titre) — orchestré (vague 2026-10-25-2330, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: cb5a64a0801c8e47d97ffe4eb032599b2ada1640 }
   - id: L336
     title: "CI : publish.yml et tests.yml récupèrent tout l'historique (actions/checkout fetch-depth: 0) — la publication de v1.10.0 (run 40224201879, 25-10) a échoué sur test/changelog.test.ts « un lot cité sous le dernier tag a au moins un commit dans ce tag » (ajouté le 24-10 par L274, après 1.9.0) : le checkout par défaut ne prend qu'un commit, git log ne voit aucun commit de lot ; reproduit sur un clone --depth 1 (rouge) contre un clone complet (vert)"
     status: done

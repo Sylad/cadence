@@ -112,7 +112,7 @@ export interface CostBlock {
   withoutJournal: { current: number; previous: number };
 }
 
-/** Les livraisons rouges d'une fenêtre ventilées (L282) ; `inconnue` : une ligne d'avant la classe. */
+/** Les livraisons rouges d'une fenêtre ventilées (L282) ; `inconnue` : une ligne sans classe écrite dont le libellé n'est pas reconnu (L331). */
 export type RedClass = FailClass | 'inconnue';
 export interface RedBreakdown {
   count: number;

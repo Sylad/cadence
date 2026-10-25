@@ -191,6 +191,9 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
   try {
     git(l.repo, 'worktree', 'add', '--detach', '-f', dir, sha);
     links.push(...linkIgnored(l.repo, dir));
+    // Le build d'abord, comme dans la porte (L333) : les tests lisent ce qu'il produit (`dist`), le départ sans lui rougirait tout. Un build rouge au départ
+    // ne dit rien des tests : pas de ligne de base, l'appelant garde les tests pour rouges.
+    if (c.config.build && (await sh(c, c.config.build, 30 * 60_000, {}, dir)).code !== 0) return null;
     const r = await sh(c, command, 30 * 60_000, {}, dir);
     const failures = r.code === 0 ? [] : failedTests(r.output);
     l.baseline = { sha, command, failures, verified: true };
@@ -1817,12 +1820,12 @@ async function acceptGreen(c: LotCtx): Promise<Constat | null> {
 type CheckRun = NonNullable<LotState['checks']>['runs'][number];
 
 /**
- * Les contrôles du programme (`orchestrate.test` puis `orchestrate.build`), joués dans `wd(c)` : chaque résultat est ajouté à `runs`, chaque rouge NOUVEAU à `red`
- * (un test déjà rouge au sha de départ n'en est pas un, L213). S'arrête au premier rouge. Après une écriture (work) et, au sommet rebasé, avant l'avance de la branche du dépôt (R7).
+ * Les contrôles du programme (`orchestrate.build` puis `orchestrate.test`, L333 : les tests e2e lisent le `dist` que seul le build produit), joués dans `wd(c)` : chaque résultat est ajouté à `runs`, chaque rouge NOUVEAU à `red`
+ * (un test déjà rouge au sha de départ n'en est pas un, L213). S'arrête au premier rouge : un build rouge rend le lot sans lancer les tests. Après une écriture (work) et, au sommet rebasé, avant l'avance de la branche du dépôt (R7).
  */
 async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<void> {
   const l = c.lot;
-  for (const [label, command] of [['tests', c.config.test], ['build', c.config.build]] as const) {
+  for (const [label, command] of [['build', c.config.build], ['tests', c.config.test]] as const) {
     if (!command) continue;
     const r = await sh(c, command);
     const run: CheckRun = { label, command, code: r.code };

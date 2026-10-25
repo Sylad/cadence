@@ -15,8 +15,10 @@ export type SessionKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small'
 /** Les étapes d'un lot : ses sessions, plus l'intégration à la branche du dépôt (L279, R14), que le programme joue seul : elle ne passe par aucune table de sessions (schéma, gabarit, modèle). */
 export type StepKind = SessionKind | 'integrate';
 export type Model = 'sonnet' | 'opus' | 'haiku';
-/** Modèle d'une étape : celui de Claude, ou `local` (claude-local → Ollama, L146). */
-export type StepModel = Model | 'local';
+/** Un nom de modèle libre (L337) : l'escalade passe le nom tel quel à `claude --model`, sans liste fermée. */
+export type AnyModel = Model | (string & {});
+/** Modèle d'une étape : celui de Claude (ou le nom libre de l'escalade), ou `local` (claude-local → Ollama, L146). */
+export type StepModel = AnyModel | 'local';
 
 export interface StepSpec {
   /** Une étape d'une vague, ou `ref` : la lecture de `cadence ref analyse`, lancée hors vague par la même mécanique de session. */
@@ -24,7 +26,7 @@ export interface StepSpec {
   /** Identifiant de la session (uuid), passé à `claude --session-id` : son journal se retrouve sans deviner. */
   sessionId: string;
   brief: string;
-  model: Model;
+  model: AnyModel;
   /** Niveau d'effort de la passe (`--effort`, L137). Absent ou `default` : pas de drapeau. */
   effort?: Effort;
   /** Schéma JSON de la sortie structurée de l'étape. */

@@ -126,6 +126,11 @@ export interface LotState {
   status: LotStatus;
   /** Passes de correction faites. */
   pass: number;
+  /**
+   * Escalade de modèle (L337, `orchestrate.escalation`) : posée quand les passes prévues sont épuisées. `stage` : `fix` entre la décision et la revue (la correction et la revue neuve jouent au `model`),
+   * `done` une fois cette revue lue ou l'escalade écartée. `issue` : `conforme` (la revue escaladée l'est), `rendu` (le lot est rendu malgré l'escalade), `non jouée` (le budget du lot ne la couvrait pas).
+   */
+  escalation?: { model: string; stage: 'fix' | 'done'; issue?: 'conforme' | 'rendu' | 'non jouée' };
   /** Bloquants+majeurs de chaque revue de code non conforme, dans l'ordre : une passe de plus si ça baisse jusqu'à un seul (L205). */
   reviewCounts?: number[];
   /** Vrai une fois la porte « code modifié sans test » jouée (L287) : elle ne se rejoue pas, que la correction ait ajouté un test ou non. */

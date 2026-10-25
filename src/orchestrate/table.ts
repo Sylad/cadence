@@ -20,6 +20,9 @@ export const LABEL: Record<LotState['status'], string> = {
   suspended: 'suspendu',
 };
 
+/** L'issue d'une escalade de modèle (L337), telle que le tableau la dit. */
+const ESCALATION_TEXT = { conforme: 'revue neuve conforme, lot rendu prêt', rendu: "lot rendu malgré l'escalade : à l'humain ou à un arbitrage", 'non jouée': 'non jouée, le budget du lot ne la couvrait pas' } as const;
+
 function review(l: LotState): string {
   if (!l.code) return '—';
   const fixes = l.pass === 0 ? '' : ` après ${l.pass} correction${l.pass > 1 ? 's' : ''}`;
@@ -196,6 +199,7 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
   }
   for (const l of lots) {
     if (l.goal) out.push(`${l.project}:${l.lot} — objectif donné : ${l.goal}`);
+    if (l.escalation) out.push(`${l.project}:${l.lot} — escalade ${l.escalation.model} : ${ESCALATION_TEXT[l.escalation.issue ?? 'rendu']}`);
     if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);
     if (l.uxCaptures) out.push(`${l.project}:${l.lot} — captures Playwright : ${l.uxCaptures}`);
     for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);

@@ -19,7 +19,7 @@ import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
-import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
+import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type AnyModel, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
 import { sumTokens, type Tokens } from './result.js';
 import { cutReport, EXTENSION_MS, MAX_EXTENSIONS, workTimeoutMs } from './timeouts.js';
@@ -142,6 +142,13 @@ function transition(c: LotCtx, status: LotState['status'], outcome?: string): vo
 
 const stop = (c: LotCtx, status: 'handed-back' | 'failed', outcome: string): null => {
   c.lot.next = null;
+  const e = c.lot.escalation;
+  if (e && !e.issue) {
+    // Le lot est rendu ou échoué alors que l'escalade était engagée (L337) : elle n'a pas suffi.
+    e.stage = 'done';
+    e.issue = 'rendu';
+    c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · escalade ${e.model} : lot rendu malgré l'escalade`);
+  }
   transition(c, status, outcome);
   return null;
 };
@@ -586,8 +593,10 @@ function halted(w: WaveCtx, lot?: LotState): string | null {
 }
 
 /** Modèle d'une revue (L108) : la revue légère d'un lot léger tant qu'aucune correction n'a eu lieu, sinon la revue complète (UX comprise). */
-function reviewModel(c: LotCtx, kind: SessionKind): Model {
+function reviewModel(c: LotCtx, kind: SessionKind): AnyModel {
   const { light, full } = c.config.review;
+  // Escalade (L337) : la revue neuve qui suit la correction escaladée se joue au modèle de l'escalade ; l'UX garde le sien.
+  if (c.lot.escalation?.stage === 'fix' && (kind === 'review' || kind === 'review-small')) return c.lot.escalation.model;
   return c.lot.light && c.lot.pass === 0 && (kind === 'review' || kind === 'review-small') ? light : full;
 }
 
@@ -612,7 +621,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est jouée dès que le code est à relire (sauf tests rouges après une écriture, cf. REVIEW_RESERVE), la passe fix réserve son coût.
   if (write && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
-  const model: StepModel = kind === 'spec' || kind === 'accept' || kind === 'fiche' ? 'sonnet' : write ? l.model : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
+  const model: StepModel = kind === 'spec' || kind === 'accept' || kind === 'fiche' ? 'sonnet' : write ? (kind === 'fix' && l.escalation?.stage === 'fix' ? l.escalation.model : l.model) : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
   const before = await snapshot(wd(c));
   const neighbours = l.repos ?? [];
@@ -665,7 +674,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       kind,
       sessionId,
       brief,
-      model: local ? 'sonnet' : (model as Model),
+      model: local ? 'sonnet' : (model as AnyModel),
       effort,
       local,
       schema: schemaFor(kind),
@@ -2093,8 +2102,25 @@ function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const converging = what === 'revue non conforme' && counts.length >= 2 && counts[counts.length - 1] === 1 && counts[counts.length - 1] < counts[counts.length - 2];
   const cap = converging ? MAX_PASSES_CONVERGING : MAX_PASSES;
   if (l.pass >= cap) {
-    stop(c, 'handed-back', `${what} après ${l.pass} passe(s) de correction`);
-    return;
+    const text = `${what} après ${l.pass} passe(s) de correction`;
+    const esc = c.config.escalation;
+    // Escalade (L337) : une seule fois, pour une revue de code non conforme ou des tests rouges (l'UX garde sa règle) ; déjà engagée, le lot est rendu.
+    if (l.escalation) {
+      stop(c, 'handed-back', `${text} ; ${l.escalation.issue === 'conforme' ? `escalade ${l.escalation.model} déjà jouée` : `rendu malgré l'escalade ${l.escalation.model}`}`);
+      return;
+    }
+    if (!esc || (what !== 'revue non conforme' && what !== 'tests rouges')) {
+      stop(c, 'handed-back', text);
+      return;
+    }
+    if (!fixAffordable(l)) {
+      l.escalation = { model: esc.model, stage: 'done', issue: 'non jouée' };
+      c.wave.log(`${lotKey(l.project, l.lot)} · escalade ${esc.model} non jouée : budget du lot (${lotSpent(l)} / ${l.budget} tokens comptés)`);
+      stop(c, 'handed-back', `${text} ; escalade ${esc.model} non jouée (budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés, il ne reste pas de quoi payer la correction et la revue)`);
+      return;
+    }
+    l.escalation = { model: esc.model, stage: 'fix' };
+    c.wave.log(`${lotKey(l.project, l.lot)} · escalade ${esc.model} : ${what} après ${l.pass} passe(s), une correction puis une revue neuve`);
   }
   l.pass += 1;
   l.next = 'fix';
@@ -2190,6 +2216,14 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   }
   l.code = summary;
   const w = c.wave;
+  if (l.escalation?.stage === 'fix') {
+    // La revue neuve de l'escalade (L337) est lue : conforme, le lot reprend sa fin ordinaire ; sinon toFix le rend.
+    l.escalation.stage = 'done';
+    if (summary.conforme) {
+      l.escalation.issue = 'conforme';
+      w.log(`${lotKey(l.project, l.lot)} · escalade ${l.escalation.model} : revue conforme`);
+    }
+  }
   if (l.small && l.visible) {
     // La passe unique d'un petit lot porte aussi l'ergonomie : son verdict vaut pour les deux. Sur un lot non petit, le verdict UX reste celui de l'agent UX.
     l.ux = summary;

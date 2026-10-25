@@ -324,6 +324,11 @@ export interface OrchestrateConfig {
    * un lot léger déclenche quand même une correction puis une revue `full`.
    */
   review: { threshold: number; light: ReviewModel; full: ReviewModel };
+  /**
+   * Escalade de modèle (L337) : quand la revue reste non conforme après les passes prévues (ou que les tests restent rouges), la vague joue UNE correction puis UNE revue neuve
+   * avec ce modèle avant de rendre le lot. `model` est passé tel quel à `claude --model` (pas de liste fermée : le compte n'a pas forcément tous les modèles). Absent : pas d'escalade.
+   */
+  escalation?: { model: string };
   /** Niveau d'effort (`claude -p --effort`) de chaque passe (L137). `default` : pas de `--effort`, le niveau de la session. `review` vaut aussi pour `review-small`. */
   effort: Record<EffortStep, Effort>;
   permissionMode: string;
@@ -341,7 +346,7 @@ const MODELS = ['haiku', 'sonnet', 'opus'] as const;
 export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
@@ -445,6 +450,13 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
       if (!MODELS.includes(m as ReviewModel)) throw bad(`review.${k} : ${MODELS.join(', ')} attendu`);
       config.review[k] = m as ReviewModel;
     }
+  }
+  if (o.escalation != null) {
+    if (!isObject(o.escalation)) throw bad('escalation doit être un objet { model }');
+    for (const k of Object.keys(o.escalation)) if (k !== 'model') throw bad(`escalation.${k} inconnu (attendu : model)`);
+    const m = o.escalation.model;
+    if (typeof m !== 'string' || !m.trim()) throw bad('escalation.model : nom de modèle non vide attendu (passé tel quel à claude --model)');
+    config.escalation = { model: m.trim() };
   }
   if (o.effort != null) {
     if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, spec, maquette, fiche, accept, implement, fix, review, ux }');

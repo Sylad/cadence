@@ -3082,32 +3082,46 @@ lots:
     after: [ L265 ]
     created: 2026-10-23
     started: 2026-10-25
+    notes:
+      - { date: 2026-10-25, text: "25-10 (lead) — point d'arrêt H1 : NON tenue (faux lu 50,7 % vs 37,7 %, rappel 83 % = 83 %, ×2,8 tokens ; erreurs corrélées). Décision du lead : L267–L270 abandonnés ; la double lecture reste une option (--double), la lecture unique redevient le défaut (design : une version qui fait monter le faux lu ne sort pas) ; correction des constats de la revue (concordant perdu en silence, mineurs) avant done ; décision notée sur l'issue #14." }
   - id: L267
     title: "ref (issue #14, 7/10) : fiche — clés ref, references, ecartes dans cadence spec check ; cadence ref cover (couvre, oublie, écarte, cite un incertain en sourcee)"
-    status: todo
+    status: dropped
     estimate: 0.5
     spec: true
     after: [ L266 ]
     created: 2026-10-23
+    finished: 2026-10-25
+    notes:
+      - { date: 2026-10-25, text: "abandonné : point d'arrêt H1 de L266 (25-10, décision du lead) : la double lecture ne baisse pas le faux lu (50,7 % contre 37,7 % en lecture unique), rappel inchangé (83 %), coût ×2,8 ; erreurs corrélées entre les deux lectures (docs/mesures/ref-double-lecture-2026-10-25.md) — chantier ref arrêté après le lot 6, à rouvrir seulement sur une nouvelle mesure (corpus avec jetons attendus, variance mesurée)" }
   - id: L268
     title: "ref (issue #14, 8/10) : étape ref dans orchestrate — champ refs du lot (raf add --ref), questions, réutilisation par empreinte, couverture après spec / fiche"
-    status: todo
+    status: dropped
     estimate: 0.5
     spec: true
     after: [ L267 ]
     created: 2026-10-23
+    finished: 2026-10-25
+    notes:
+      - { date: 2026-10-25, text: "abandonné : point d'arrêt H1 de L266 (25-10, décision du lead) : la double lecture ne baisse pas le faux lu (50,7 % contre 37,7 % en lecture unique), rappel inchangé (83 %), coût ×2,8 ; erreurs corrélées entre les deux lectures (docs/mesures/ref-double-lecture-2026-10-25.md) — chantier ref arrêté après le lot 6, à rouvrir seulement sur une nouvelle mesure (corpus avec jetons attendus, variance mesurée)" }
   - id: L269
     title: "ref (issue #14, 9/10) : cadence ref compare (proportions ±10 %, ΔE 5) et son tableau dans la consigne de ux-reviewer (conformité) ; tests sur captures décalées ou recolorées d'un écart connu"
-    status: todo
+    status: dropped
     estimate: 0.5
     after: [ L268 ]
     created: 2026-10-23
+    finished: 2026-10-25
+    notes:
+      - { date: 2026-10-25, text: "abandonné : point d'arrêt H1 de L266 (25-10, décision du lead) : la double lecture ne baisse pas le faux lu (50,7 % contre 37,7 % en lecture unique), rappel inchangé (83 %), coût ×2,8 ; erreurs corrélées entre les deux lectures (docs/mesures/ref-double-lecture-2026-10-25.md) — chantier ref arrêté après le lot 6, à rouvrir seulement sur une nouvelle mesure (corpus avec jetons attendus, variance mesurée)" }
   - id: L270
     title: "ref (issue #14, 10/10) : corpus public WMO (passages où la figure précise le texte, cités par URL et sha256, téléchargés à l'évaluation, jamais commités) ; contrôle local privé par chemin, hors dépôt"
-    status: todo
+    status: dropped
     estimate: 0.5
     after: [ L269 ]
     created: 2026-10-23
+    finished: 2026-10-25
+    notes:
+      - { date: 2026-10-25, text: "abandonné : point d'arrêt H1 de L266 (25-10, décision du lead) : la double lecture ne baisse pas le faux lu (50,7 % contre 37,7 % en lecture unique), rappel inchangé (83 %), coût ×2,8 ; erreurs corrélées entre les deux lectures (docs/mesures/ref-double-lecture-2026-10-25.md) — chantier ref arrêté après le lot 6, à rouvrir seulement sur une nouvelle mesure (corpus avec jetons attendus, variance mesurée)" }
   - id: L271
     title: "orchestrate : un lot de revue UX planifiée (« Revue UX — <écran> ») sans visible: passe par precheck → implement → review sans aucune étape UX (finance L32 le 23-10 : la session n'a traité que la note du lot, la revue de l'écran n'a pas eu lieu) — le faire passer par l'ux-reviewer (titre « Revue UX — » ou clé dédiée), ou raf check signale un lot « Revue UX » non visible ; tests"
     status: done

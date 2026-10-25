@@ -447,7 +447,7 @@ describe('R23 — le verdict est écrit après l\'avance, dans un commit de plan
   it('L303 — le lead change de branche entre l\'avance et l\'écriture du plan : le contrôle de branche de writeVerdict rend le lot, aucun commit de plan', async () => {
     const { parent, repo } = setup();
     // un hook post-merge du lead passe sur une autre branche juste après l'avance : le premier contrôle de départ et le contrôle tardif sont déjà passés
-    // une session à la fois : L1 va de l'avance à l'écriture du plan refusée avant que L2 ne démarre. En parallèle, l'intégration de L2 pouvait voir la branche déjà changée par le hook de L1 (« intégration refusée ») avant l'écriture du plan de L1.
+    // une session à la fois : L1 va de l'avance à l'écriture du plan refusée avant que L2 ne démarre. En parallèle, L2 pouvait prendre le verrou d'intégration avant L1 : c'est alors L1 qui recevait « intégration refusée » (la branche changée par le hook de L2), et non l'écriture du plan refusée.
     writeFileSync(join(repo, '.git', 'hooks', 'post-merge'), '#!/bin/sh\ngit checkout -q -b autre\n', { mode: 0o755 });
     const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '1'], fake({ implement: writes() }));
     expect(r.code).toBe(1);
@@ -463,12 +463,12 @@ describe('R23 — le verdict est écrit après l\'avance, dans un commit de plan
     // un hook post-merge du lead salit un fichier suivi juste après l'avance : l'écriture du plan est refusée, le lot est rendu à l'étape d'intégration
     const hook = join(repo, '.git', 'hooks', 'post-merge');
     writeFileSync(hook, '#!/bin/sh\necho sale >> base.txt\n', { mode: 0o755 });
-    const f = fake({ implement: writes(meeting(2)) });
-    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+    // une session à la fois : L1 passe seul de l'avance à l'écriture du plan refusée ; avec deux sessions, L2 pouvait prendre le verrou d'intégration avant L1 et c'est L1 qui recevait « intégration refusée »
+    const f = fake({ implement: writes() });
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '1'], f);
     expect(r.code).toBe(1);
-    const stopped = ['L1', 'L2'].map((id) => store(parent).readLot('a', id)!).filter((l) => l.status === 'handed-back');
-    expect(stopped.length).toBeGreaterThan(0);
-    const first = stopped[0];
+    const first = store(parent).readLot('a', 'L1')!;
+    expect(first.status).toBe('handed-back');
     expect(first.next).toBe('integrate');
     expect(first.outcome).toBe('écriture du plan refusée : arbre du dépôt modifié (base.txt)');
     expect(planOf(repo).lot(first.lot).review).toBeUndefined(); // le plan n'a rien reçu : ni commit, ni modification laissée dans l'arbre

@@ -81,7 +81,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- The `deliver` skill says how to deliver a commit that is not `HEAD` (L334, `docs/deliver.md`): `git push origin <sha>:main`, then `cadence deliver --dry-run --sha <sha>` and `cadence deliver --sha <sha>`, with the reason — with `ci: github` the wait is for the run of that exact sha and GitHub only builds the tip of a push. The 1.10.0 evaluation scored the `deliver-sha` case 0.50 (3 runs out of 3 without the push of the sha: the skill only said « `--sha <rev>` to deliver a pushed commit »).
+- The `deliver` skill says how to deliver a commit that is not `HEAD` (L334, `docs/deliver.md`): `git push origin <sha>:main`, then `cadence deliver --dry-run --sha <sha>` and `cadence deliver --sha <sha>`, with the reason — with `ci: github` the wait is for the run of that exact sha and GitHub only builds the tip of a push; the push is skipped when the sha is already on a remote branch, and a push refused as non-fast-forward is never forced (the sha is not deliverable that way: stop and ask). The 1.10.0 evaluation scored the `deliver-sha` case 0.50 (3 runs out of 3 without the push of the sha: the skill only said « `--sha <rev>` to deliver a pushed commit »).
 
 ## [1.10.0] - 2026-10-25
 

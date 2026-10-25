@@ -165,7 +165,7 @@ cadence deliver --sha 6b0d9aa -- api                                  # an earli
 ```
 
 `--sha` (any mode) delivers a pushed commit other than `HEAD` — for a CI that
-builds each service only on the commit that touched it. To deliver an earlier commit while `HEAD` holds work that must not ship, push that sha alone first (`git push origin <sha>:main`), then `cadence deliver --dry-run --sha <sha>` and `cadence deliver --sha <sha>`: with `ci: github` the wait is for the run of that exact sha, and GitHub only builds the tip of a push (L334, the `deliver` skill says so). `allowDirty` suits a
+builds each service only on the commit that touched it. To deliver an earlier commit while `HEAD` holds work that must not ship, push that sha alone first (`git push origin <sha>:main`), then `cadence deliver --dry-run --sha <sha>` and `cadence deliver --sha <sha>`: with `ci: github` the wait is for the run of that exact sha, and GitHub only builds the tip of a push (L334, the `deliver` skill says so). The push goes to the branch delivered (`main` here); skip it when the sha is already on a remote branch, and when it is refused as non-fast-forward never force it (that would rewind the remote branch): the sha is not deliverable that way, stop and ask. `allowDirty` suits a
 working tree shared by several sessions when the delivery starts from a pushed
 sha and never from local files; without it a modified tree is refused. `--sha`
 itself never reads the working tree: a tracked file modified outside the delivered

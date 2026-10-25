@@ -51,6 +51,14 @@ The order matters. With `ci: github`, cadence waits for the run of that exact sh
 builds the tip of a push: a sha that was never pushed as the tip has no run to wait for. Pushing HEAD
 instead would ship the unfinished work; never reset HEAD to get there.
 
+The push targets the branch being delivered (`main` here). Two cases where it does not apply:
+
+- The sha is already on a remote branch: skip the push, it is useless. A sha that was pushed earlier has a CI run
+  only if it was the tip of a push; if it never was, no run exists to wait for.
+- The push is refused as non-fast-forward (the sha is not a descendant of `origin/main`, or `origin/main`
+  has moved past it): **never force it**, `--force` would rewind the remote branch. The sha cannot be delivered
+  that way: stop and ask the human.
+
 ## Where to run
 
 Every `cadence` / `raf` command works on the git repository of the current directory. When the

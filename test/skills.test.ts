@@ -529,5 +529,11 @@ describe('skills install', () => {
     expect(deliver).toBeGreaterThan(dry);
     expect(skill).toContain('GitHub only builds the tip of a push');
     expect(skill).toContain('waits for the run of that exact sha');
+    expect(skill).toContain('already on a remote branch: skip the push');
+    expect(skill).toContain('refused as non-fast-forward');
+    expect(skill).toContain('never force it');
+    expect(skill).toContain('stop and ask the human');
+    expect(skill).toContain('only if it was the tip of a push');
+    expect(skill).toContain('the branch being delivered (`main` here)');
   });
 });

@@ -3730,6 +3730,11 @@ lots:
     finished: 2026-10-25
     notes:
       - { date: 2026-10-25, text: "Re-vérifié par le lead le 25-10 à 3c9429e : tsc propre, vitest 3640 (+4 sautés), raf check propre. Sur les vrais journaux (revue) : 19 rouges de la fenêtre = déploiement 13, CI 6, 0 non classée." }
+  - id: L332
+    title: "orchestrate : un lot qui attend un créneau de session ignore --drop et --stop-after-current — mesuré le 25-10 (vague 2026-10-25-2130, avatar-pandora:L38) : « retrait demandé » et « arrêt demandé » journalisés, puis « en attente d'un créneau depuis 5, 6 min… » continue, il a fallu tuer le processus ; acquireSlot (src/orchestrate/registry.ts:215, appelé par le ClaudeFn de src/orchestrate/command.ts:1008) boucle sans relire les demandes de la vague : l'attente doit s'interrompre dès qu'un --drop vise ce lot (lot rendu au lead, comme un lot non commencé) ou qu'un --stop-after-current vise la vague (vague interrupted, reprenable), sans prendre le créneau ; tests (attente interrompue par chacune des deux demandes, créneau jamais pris) ; doc docs/orchestrate.md et CHANGELOG"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

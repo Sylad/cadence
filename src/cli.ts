@@ -18,7 +18,7 @@ import { invalidResource, Plan, RafError, SCREENS, STATUSES, type Lot, type Scre
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
-import { findProjects, leadTour, readLeadUx, tourFreeLine, tourLine, tourWorktreeLines } from './lead.js';
+import { findProjects, leadTour, readLeadUx, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
 import { configuredCap, expiredHoldLines, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
@@ -230,6 +230,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       for (const r of rows) io.out(tourLine(r));
       // les worktrees de lot que des vagues ont conservés : aucun n'est oublié en silence (L279, R19)
       for (const l of tourWorktreeLines(rows, io.now().getTime())) io.out(l);
+      // un projet sans orchestrate.test : la vague ne lancera pas la suite (L327)
+      for (const l of tourNoTestLines(rows)) io.out(l);
       // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
       const [slots] = liveLines(configuredCap(io.env), io.now());
       if (slots) io.out(slots);

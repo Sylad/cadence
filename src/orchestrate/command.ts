@@ -17,6 +17,7 @@ import { acquireSlot, cadenceHome, expiredHolds, freeSlots, liveHolds, liveSlots
 import { headline, loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { readWaits, renderWaits } from './waits.js';
 import { acceptationFile, acceptText } from './accept.js';
+import { noTestGate, noTestText } from './no-test.js';
 import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specScreen, specText } from './spec.js';
@@ -428,6 +429,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
   const agents = agentsOf(deps);
   io.out(`vague ${id} — simulation, rien n'est lancé (budget ${budget} tokens comptés)`);
   const repos = [...new Set(lots.map((l) => l.repo))];
+  const noTestSaid = new Set<string>();
   for (const l of lots) {
     const env = projectEnv(l.repo);
     const lot = env.loadPlan().lot(l.lot);
@@ -462,6 +464,9 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       if (l.visible && env.config.ux) steps.push({ kind: 'ux', model: full }); // L221 : l'UX est jouée une fois, après la revue de code conforme
     }
     io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.light ? ` — revue légère (${light}, pas de passe des mineurs ; un bloquant ou un majeur → correction puis revue ${full})` : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
+    const noTest = noTestSaid.has(l.repo) ? null : noTestGate(l.repo);
+    noTestSaid.add(l.repo);
+    if (noTest) io.out(`  ${basename(l.repo)} · ${noTestText(noTest)}`);
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus (${MAX_PASSES_CONVERGING} si la revue converge), en session neuve`);
     io.out(l.light ? '  revue conforme avec mineurs : pas de passe des mineurs, ils sont rendus en notes' : '  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, lotSlug(l.project, l.lot), 'playwright');

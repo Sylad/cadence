@@ -31,6 +31,8 @@ async function parent() {
   await cad(alpha, 'init', '--project', 'alpha', '--no-hook');
   await cad(alpha, 'add', 'Cache');
   await cad(alpha, 'add', 'Export, un titre assez long pour être tronqué à soixante caractères, au moins');
+  // les deux projets déclarent orchestrate.test : la ligne « porte de tests absente » (L327) a ses propres tests
+  writeFileSync(join(alpha, 'cadence.yaml'), 'orchestrate:\n  test: npm test\n');
   git(alpha, 'add', '.');
   commit(alpha, 'chore: plan', '2026-09-20T09:00:00');
   await cad(alpha, 'start', 'L1');
@@ -43,7 +45,7 @@ async function parent() {
   const beta = join(root, 'beta');
   mkdirSync(join(beta, 'suivi'), { recursive: true });
   for (const a of [['init', '-q', '-b', 'main'], ['config', 'user.email', 't@e.x'], ['config', 'user.name', 'T'], ['config', 'commit.gpgsign', 'false']]) git(beta, ...a);
-  writeFileSync(join(beta, 'cadence.yaml'), 'plan:\n  path: suivi/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat }\n  statuses: { todo: prevu, doing: en_cours, done: livre }\n');
+  writeFileSync(join(beta, 'cadence.yaml'), 'plan:\n  path: suivi/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat }\n  statuses: { todo: prevu, doing: en_cours, done: livre }\norchestrate:\n  test: npm test\n');
   writeFileSync(join(beta, 'suivi/taches.yaml'), 'taches:\n  - { id: T1, titre: Premier, etat: livre }\n  - { id: T2, titre: Second, etat: prevu }\n');
   git(beta, 'add', '.');
   commit(beta, 'chore: suivi', '2026-09-28T09:00:00');

@@ -12,6 +12,7 @@ import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { readNext, sharedStateDir, stateDir } from './state.js';
 import { freeLine, readyFree, type FreeLot } from './ready-free.js';
 import { cadenceHome } from './orchestrate/registry.js';
+import { noTestGate, noTestText, type NoTestGate } from './orchestrate/no-test.js';
 import { KEPT_TITLE, keptLine, keptTrees, type KeptTree } from './orchestrate/worktree.js';
 
 /** Clé `lead.ux` du cadence.yaml du dossier parent (L197) : qui pose le verdict UX (`raf ux`) d'un lot visible. `human` (défaut) : l'humain ; `lead` : le lead, l'humain n'étant consulté qu'en cas de doute. */
@@ -81,6 +82,8 @@ export interface TourRow {
   repo: string[];
   /** Worktrees de lot conservés par une vague (L279, R19) ; absent quand il n'y en a aucun. */
   worktrees?: KeptTree[];
+  /** Le projet ne déclare pas `orchestrate.test` (L327) : la vague ne lancera pas la suite ; absent quand il le déclare. */
+  noTest?: NoTestGate;
 }
 
 const empty = (project: string): TourRow => ({ project, doing: [], drift: [], notes: [], next: null, progress: { done: 0, doing: 0, todo: 0, added7: 0 }, repo: [] });
@@ -157,6 +160,8 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     if (lockStatus(sharedStateDir(root))?.live) row.repo.push('livraison en cours');
     const kept = keptTrees(root);
     if (kept.length) row.worktrees = kept;
+    const noTest = noTestGate(root);
+    if (noTest) row.noTest = noTest;
   } catch (e) {
     return { ...empty(row.project), error: (e instanceof Error ? e.message : String(e)).split('\n')[0]! };
   }
@@ -207,6 +212,11 @@ export function tourFreeLine(rows: TourRow[]): string | null {
 export function tourWorktreeLines(rows: TourRow[], now = Date.now()): string[] {
   const lines = rows.flatMap((r) => (r.worktrees ?? []).map((t) => keptLine(r.project, t, now)));
   return lines.length ? [KEPT_TITLE, ...lines] : [];
+}
+
+/** Une ligne par projet sans `orchestrate.test` (L327) : la vague ne lancera pas la suite ; rien quand tous le déclarent. */
+export function tourNoTestLines(rows: TourRow[]): string[] {
+  return rows.filter((r) => r.noTest).map((r) => `${r.project} · ${noTestText(r.noTest!)}`);
 }
 
 const DRIFT_SHOWN = 2;

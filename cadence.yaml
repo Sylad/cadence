@@ -13,8 +13,8 @@ orchestrate:
   build: npx tsc --noEmit
   # Mode worktree (L279) : un worktree par lot ; activé par défaut le 25-10 (L320, décision Sylvain après les essais L310 et L316 : −45 % et −22 % de mur, 3 intégrations automatiques).
   worktrees: true
-  # Précheck sur le modèle local (claude-local, hors quota) pour tout lot sans commit ; un « oui » local est confirmé par Sonnet (L146, L296 de cadence, 24-10).
-  precheck: local
+  # Précheck sur Sonnet (L328, 25-10) : le local (claude-local) plantait sur ~1 lot sur 3 et disait « oui » à tort ; Sonnet tranche en ~16 s.
+  precheck: true
   testGate:
     code: [src/**, 'bin/*.js', '!**/*.test.ts']
     tests: ['test/**']

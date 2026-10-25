@@ -3652,6 +3652,7 @@ lots:
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
+    docs_ok: { date: 2026-10-25, reason: "paramètre interne graceMs de realDeps, injectable pour les tests seulement : aucun comportement visible ne change, la doc de deliver (grâce de 2 s après Ctrl-C) reste vraie" }
   - id: L326
     title: "README de cadence concis et clair (règle Sylvain 25-10 : « faut pas fuir les gens avec le readme ») — page d'accueil : quoi et pour qui en 2-3 phrases, démarrage en 3 commandes, UN schéma simple, liens vers la doc ; le détail (TMPDIR, worktrees, options d'orchestrate, migrate…) va dans docs/ sans perte ; test readme-accueil : garde-fou de lisibilité (taille plus basse, lignes courtes, pas d'option détaillée) au lieu des seuls 12 ko ; agent doc-keeper : un lot qui change le fonctionnement écrit dans docs/, le README ne reçoit qu'un lien ; doc et CHANGELOG"
     status: doing
@@ -3660,11 +3661,20 @@ lots:
     started: 2026-10-25
   - id: L327
     title: "orchestrate : signaler un projet sans porte de tests — cadence lead tour et orchestrate --dry-run disent en une ligne qu'un projet n'a pas orchestrate.test (la vague ne lancera pas la suite, seule la revue le fera si elle le décide), avec la commande probable lue de package.json (scripts.test) / pyproject (pytest) / pom (mvn test) quand elle existe ; doc (docs/orchestrate.md, docs/lead.md) et CHANGELOG ; tests. Puis le lead déclare test/build dans chaque projet (un commit de config par projet, après vérification que la commande est verte). Suite de L324."
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
     review: { date: 2026-10-25, verdict: "compliant (c7c6bd8 : 3 minor notes, no blocking or major finding; the interpretation choices of the author hold against the lot) — orchestré (vague 2026-10-25-1107, 0 passe(s) de correction)", commit: c7c6bd8080883246bf0da5f64eaf65e68728eb32 }
+    notes:
+      - { date: 2026-10-25, text: "25-10 (lead) : effet vérifié sur le vrai tour (9 projets sans porte signalés ; commande probable seulement pour jobmail, les autres n'ont pas de package.json à la racine — backend/, frontend/ : déclaration à la main par le lead, un lot par projet). Mineurs de la revue gardés en note : lignes « porte absente » écrites sous le bloc des worktrees conservés sans séparation (cli.ts:232) ; test/orchestrate-porte-absente.test.ts:126 toContain('a') ne peut pas échouer ; no-test.ts:22 détecte pytest sur toute mention du mot dans pyproject." }
+    finished: 2026-10-25
+  - id: L328
+    title: "orchestrate : (1) précheck repassé sur Sonnet dans cadence (orchestrate.precheck: true) — mesure du 25-10 : le local plante sur ~1 lot sur 3 depuis le 23-10 et, quand il répond, a dit « oui » à tort sur L275, L326 et L327 (Sonnet : non / partiel) pour 2 à 3 min chacun ; Sonnet tranche en ~16 s pour ~20 k tokens ; (2) intégration en worktree : un rouge au sommet intégré est relancé une fois avant de rendre le lot (le 25-10, L326 rendu pour un rouge de charge pendant que L325 tournait : le même sommet rejoué seul est vert, 3559 tests) — rouge deux fois = rendu ; (3) le refus nomme les tests rouges (l'extrait était vide : « npx vitest run en échec (code 1) : ») ; doc (docs/orchestrate.md) et CHANGELOG ; tests"
+    status: doing
+    estimate: 0.25
+    created: 2026-10-25
+    started: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

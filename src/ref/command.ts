@@ -17,7 +17,7 @@ import { measure } from './measure.js';
 import { referencesDir } from './store.js';
 
 const USAGE_ADD = 'usage : cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]';
-const USAGE_ANALYSE = 'usage : cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug nom] [--model sonnet|opus|haiku]';
+const USAGE_ANALYSE = 'usage : cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug nom] [--model sonnet|opus|haiku] [--model-b sonnet|opus|haiku] [--seuil 30] [--unique]';
 const USAGE_CHECK = 'usage : cadence ref check <inventaire.json | lecture.json>';
 const USAGE_DIFF = 'usage : cadence ref diff <lecture-a.json> <lecture-b.json> [--out inventaire.json] [--seuil 30]';
 const USAGE_EVAL = 'usage : cadence ref eval <attendu.json | dossier> <lecture.json | dossier> [--json]';
@@ -35,7 +35,7 @@ export function refCommand(rest: string[], values: { sections?: string; slug?: s
   }
   if (verb === 'analyse' && args.length === 1) {
     const claude = realClaude(io.env.CADENCE_CLAUDE_BIN || 'claude', io.env);
-    return analyse({ document: args[0]!, slug: values.slug, sections: values.sections, model: values.model, env: io.env, cwd: io.cwd, refsDir, configPath, claudeHome: io.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), now: io.now(), out: io.out, err: io.err, claude, agents: readAgents(AGENTS_DIR) });
+    return analyse({ document: args[0]!, slug: values.slug, sections: values.sections, model: values.model, modelB: values['model-b'], unique: values.unique === true, seuil: values.seuil, env: io.env, cwd: io.cwd, refsDir, configPath, claudeHome: io.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), now: io.now(), out: io.out, err: io.err, claude, agents: readAgents(AGENTS_DIR) });
   }
   if (verb === 'measure' && args.length === 3) {
     measure({ slug: args[0]!, page: args[1]!, zone: args[2]!, quoi: values.quoi, largeur: values.largeur, env: io.env, refsDir, json: values.json === true, out: io.out });

@@ -18,6 +18,7 @@ Follow the brief you are given. It names the document folder, the pages that wer
 8. **Write the reading** to the file of the brief, in the format of `templates/inventaire.json` but with `genre: "lecture"`, the `document` `slug` and `sha256` of `document.json` (copy them, never retype them), and no `pages` key. Every id is `<slug>#<type>-<n>`. Then run `cadence ref check` on it, with the command of the brief, until it passes: a reading that does not pass is not a result.
 
 - Never write `usage`, tokens or costs in the reading: the program that launched you counts them. Never write the `sha256` of another file than `document.json`.
+- Never open another file of `lectures/` than the one you write: another reader may have written its own reading of the same document, and a reading made with the other in hand is not independent, so it measures nothing.
 - Read only the document folder named in the brief and the model. Never look for, open or use an expected inventory, an answer key or a test corpus: the reading is yours alone, and a reading made with the answer in hand measures nothing.
 - You write only the reading file: no other file, no commit, no change in the repository. Do not push, deliver, run `raf start|done|note|review|ux`, or launch subagents.
 - A question a human must settle (a figure that contradicts its text, an element you cannot read) goes in `questions` of your report, as well as in the reading (`contredit`, `incertain`, `silence`).

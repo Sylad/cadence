@@ -224,14 +224,16 @@ function lireLecture(path: string): Obj {
   return doc;
 }
 
+/** `--seuil` : une part en pour cent (0 à 100) rendue en fraction ; absent, le seuil de la conception. */
+export function parseSeuil(text: string | undefined, commande: string): number {
+  if (text === undefined) return SEUIL_NON_APPARIES;
+  if (!/^\d+(\.\d+)?$/.test(text) || Number(text) > 100) throw new RafError(`${commande} : --seuil invalide : « ${text} » (une part en pour cent, de 0 à 100)`);
+  return Number(text) / 100;
+}
+
 /** `ref diff <a> <b> [--out inventaire.json] [--seuil 30]` : 0 réconcilié, 1 trop d'éléments non appariés (rien d'écrit), 2 fichier ou appel refusé. */
 export function diffLectures(o: { a: string; b: string; seuil?: string; out?: string; log: (line: string) => void }): number {
-  let seuil = SEUIL_NON_APPARIES;
-  if (o.seuil !== undefined) {
-    const n = Number(o.seuil);
-    if (!/^\d+(\.\d+)?$/.test(o.seuil) || n > 100) throw new RafError(`ref diff : --seuil invalide : « ${o.seuil} » (une part en pour cent, de 0 à 100)`);
-    seuil = n / 100;
-  }
+  const seuil = parseSeuil(o.seuil, 'ref diff');
   const a = lireLecture(o.a);
   const b = lireLecture(o.b);
   if (a.document.slug !== b.document.slug) throw new RafError(`ref diff : les deux lectures ne sont pas du même document : slug ${a.document.slug} et ${b.document.slug}`);

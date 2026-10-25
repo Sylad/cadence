@@ -1,14 +1,13 @@
-import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readOrchestrateConfig } from '../config.js';
 import { PACKAGE_ROOT } from '../orchestrate/snapshot.js';
-import { journalTokens, runSession, type AgentDef, type ClaudeFn, type Model } from '../orchestrate/launch.js';
-import { sumTokens } from '../orchestrate/result.js';
+import type { AgentDef, ClaudeFn, Model } from '../orchestrate/launch.js';
 import { RafError } from '../plan.js';
 import { add, type AddOptions } from './add.js';
 import { checkInventaire, readInventaire } from './check.js';
-import { readDocument } from './store.js';
+import { assembler, parseSeuil, reconcilier, type Reconciliation } from './diff.js';
+import { troisiemeRegard } from './regard.js';
+import { sessionDeRef } from './session.js';
 
 /** Plafond déclaré d'une lecture : au plus 20 pages rendues lues d'un coup (design §5, « Taille »). Au-delà, `--sections` en choisit moins. */
 export const LECTURE_PAGES_MAX = 20;
@@ -28,6 +27,12 @@ export const ANALYSE_SCHEMA = {
 
 export interface AnalyseOptions extends Omit<AddOptions, 'out'> {
   model?: string;
+  /** Modèle de la lecture B (défaut `opus` : un autre modèle que la lecture A décorrèle les erreurs, H1). */
+  modelB?: string;
+  /** Une seule lecture (la ligne de base de la mesure), sans lecture B, sans réconciliation. */
+  unique?: boolean;
+  /** Part d'éléments non appariés (pour cent) au-delà de laquelle la réconciliation est refusée ; défaut 30. */
+  seuil?: string;
   /** Chemin du cadence.yaml lu par les commandes de l'agent (`--config`) : celui de `references.dir`. */
   configPath: string;
   /** Dossier de Claude Code (`CLAUDE_CONFIG_DIR`, sinon `~/.claude`) : le journal d'une session coupée y est relu pour compter ses jetons. */
@@ -38,7 +43,7 @@ export interface AnalyseOptions extends Omit<AddOptions, 'out'> {
   err: (line: string) => void;
 }
 
-/** Consigne de la lecture : tout ce que l'agent a besoin de savoir, rien de l'attendu d'un corpus. */
+/** Consigne de la lecture : tout ce que l'agent a besoin de savoir, rien de l'attendu d'un corpus, rien d'une autre lecture. */
 function brief(o: { slug: string; docDir: string; pages: number[]; file: string; configPath: string }): string {
   const cadence = `node ${join(PACKAGE_ROOT, 'bin', 'cadence.js')}`;
   const config = `--config ${o.configPath}`;
@@ -56,7 +61,7 @@ function brief(o: { slug: string; docDir: string; pages: number[]; file: string;
     `- mesurer une zone (pixels de la page rendue) : ${cadence} ref measure ${o.slug} <page> <page | x,y | x,y,l,h> --quoi couleurs|contraste|boites|texte ${config}`,
     `- valider la lecture, jusqu'à ce qu'elle passe : ${cadence} ref check ${o.file}`,
     '',
-    `Ne lis que ce dossier, le modèle et les pages ci-dessus ; n'écris que ${o.file}. Les jetons ne sont pas à écrire : le programme les compte.`,
+    `Ne lis que ce dossier, le modèle et les pages ci-dessus, et aucun autre fichier de ${join(o.docDir, 'lectures')} que le tien : une autre lecture du même document peut s'y trouver, la tienne doit être la seule que tu connais ; n'écris que ${o.file}. Les jetons ne sont pas à écrire : le programme les compte.`,
   ].join('\n');
 }
 
@@ -73,77 +78,156 @@ function ecartsDeLecture(lecture: unknown, doc: { slug: string; sha256: string }
   return out;
 }
 
+type Obj = Record<string, any>;
+type Nom = 'a' | 'b';
+interface Contexte {
+  o: AnalyseOptions;
+  slug: string;
+  docDir: string;
+  doc: { slug: string; sha256: string };
+  pages: number[];
+}
+type Lue = { kind: 'ok'; lecture: Obj; file: string; usage: { tokens: number; modele: Model; session: string }; questions: string[] } | { kind: 'quota'; message: string } | { kind: 'refus'; problems: string[] };
+
+/** Une lecture : une session neuve de `reference-analyst` qui écrit `lectures/<nom>.json`, relue par le programme (ref check, genre, document) ; les jetons de la session y sont posés dans `usage`. */
+async function lireUne(c: Contexte, nom: Nom, model: Model): Promise<Lue> {
+  const file = join(c.docDir, 'lectures', `${nom}.json`);
+  rmSync(file, { force: true }); // une lecture d'un passage précédent ne passe jamais pour celle de celui-ci
+  const r = await sessionDeRef({
+    agent: 'reference-analyst',
+    brief: brief({ slug: c.slug, docDir: c.docDir, pages: c.pages, file, configPath: c.o.configPath }),
+    model,
+    schema: ANALYSE_SCHEMA,
+    slug: c.slug,
+    docDir: c.docDir,
+    configPath: c.o.configPath,
+    claudeHome: c.o.claudeHome,
+    claude: c.o.claude,
+    agents: c.o.agents,
+    onRelaunch: () => rmSync(file, { force: true }), // la lecture à moitié écrite de la session coupée ne passe pas pour celle de la neuve
+    echec: 'la session de lecture a échoué',
+  });
+  if (r.kind === 'quota') return r;
+  if (!existsSync(file)) return { kind: 'refus', problems: [`aucune lecture écrite : ${file}`] };
+  let lecture: Obj;
+  try {
+    lecture = readInventaire(file) as Obj;
+  } catch (e) {
+    return { kind: 'refus', problems: [(e as Error).message] };
+  }
+  const schema = checkInventaire(lecture);
+  const problems = schema.length > 0 ? schema : ecartsDeLecture(lecture, c.doc);
+  if (problems.length > 0) return { kind: 'refus', problems };
+  const usage = { tokens: r.tokens, modele: model, session: r.session };
+  lecture.usage = usage;
+  writeFileSync(file, `${JSON.stringify(lecture, null, 2)}\n`);
+  const structured = r.structured as { questions?: unknown } | undefined;
+  return { kind: 'ok', lecture, file, usage, questions: Array.isArray(structured?.questions) ? structured.questions.map(String) : [] };
+}
+
+const confiancesDe = (lecture: Obj): string => ['mesure', 'lu', 'incertain'].map((c) => [c, (lecture.elements as { confiance: string }[]).filter((e) => e.confiance === c).length] as const).filter(([, n]) => n > 0).map(([c, n]) => `${c} : ${n}`).join(', ');
+
 /**
- * `cadence ref analyse` : la chaîne en lecture unique — add, une session de l'agent `reference-analyst`, validation de sa lecture par le
- * programme, jetons posés dans `usage`. Rend le code de sortie : 0 lecture valide, 1 lecture refusée, 3 quota ; une session en échec ou un
- * refus d'entrée (modèle, plafond, aucune page) lève une `RafError` (code 2).
+ * `cadence ref analyse` : la chaîne — add, puis deux lectures indépendantes (deux sessions de l'agent `reference-analyst`, A et B, modèles possiblement
+ * différents), `ref diff` (réconciliation par le programme), le troisième regard sur ce qu'une seule lecture porte, l'inventaire écrit avec les jetons
+ * posés dans `usage` ; `--unique` : une seule lecture (la ligne de base). Rend le code de sortie : 0 fait, 1 lecture refusée ou trop d'éléments non
+ * appariés, 3 quota ; une session en échec ou un refus d'entrée (modèle, plafond, aucune page) lève une `RafError` (code 2).
  */
 export async function analyse(o: AnalyseOptions): Promise<number> {
   const model = (o.model ?? 'sonnet') as Model;
+  const modelB = (o.modelB ?? 'opus') as Model;
   if (!ANALYSE_MODELS.includes(model)) throw new RafError(`ref analyse : --model invalide : « ${o.model} » (attendu : ${ANALYSE_MODELS.join(', ')})`);
+  if (!ANALYSE_MODELS.includes(modelB)) throw new RafError(`ref analyse : --model-b invalide : « ${o.modelB} » (attendu : ${ANALYSE_MODELS.join(', ')})`);
+  if (o.unique && o.modelB !== undefined) throw new RafError('ref analyse : --model-b n\'a pas de sens avec --unique (une seule lecture, pas de lecture B)');
+  if (o.unique && o.seuil !== undefined) throw new RafError('ref analyse : --seuil n\'a pas de sens avec --unique (une seule lecture, rien à réconcilier)');
+  const seuil = parseSeuil(o.seuil, 'ref analyse');
   const { slug, docDir, doc, lues: pages } = add({ document: o.document, slug: o.slug, sections: o.sections, env: o.env, cwd: o.cwd, refsDir: o.refsDir, now: o.now, out: o.out });
   const sections = `\n  choisir les pages à lire : cadence ref analyse ${o.document} --slug ${slug} --sections 3-12`;
   if (pages.length === 0) throw new RafError(`ref analyse : aucune page rendue : rien à lire${sections}`);
   if (pages.length > LECTURE_PAGES_MAX) throw new RafError(`ref analyse : ${pages.length} pages ${o.sections === undefined ? 'rendues' : 'à lire (--sections et les figures qu\'elles citent)'}, plafond d'une lecture : ${LECTURE_PAGES_MAX} pages${sections}`);
-
-  const file = join(docDir, 'lectures', 'a.json');
-  rmSync(file, { force: true }); // une lecture d'un passage précédent ne passe jamais pour celle de celui-ci
-  const config = readOrchestrateConfig(o.configPath);
-  const outcome = await runSession(
-    {
-      kind: 'ref',
-      sessionId: randomUUID(),
-      brief: brief({ slug, docDir, pages, file, configPath: o.configPath }),
-      model,
-      effort: config.effort.review,
-      schema: ANALYSE_SCHEMA,
-      agent: 'reference-analyst',
-      cwd: docDir,
-      wave: `ref-${slug}`,
-      permissionMode: config.permissionMode,
-      addDirs: [docDir],
-      timeoutMs: config.timeouts.work,
-    },
-    {
-      claude: o.claude,
-      agents: o.agents,
-      onRelaunch: () => rmSync(file, { force: true }), // la lecture à moitié écrite de la session coupée ne passe pas pour celle de la neuve
-    },
-  );
-  if (outcome.kind === 'quota') {
-    o.err(`ref analyse : quota atteint, aucune lecture écrite : ${outcome.message}`);
-    return 3;
-  }
-  if (outcome.kind === 'failed') throw new RafError(`ref analyse : la session de lecture a échoué : ${outcome.cause}`);
-
-  const refuse = (problems: string[]): number => {
-    for (const p of problems) o.out(`✗ ${p}`);
+  const c: Contexte = { o, slug, docDir, doc, pages };
+  const refuse = (problems: string[], prefixe = ''): number => {
+    for (const p of problems) o.out(`✗ ${prefixe}${p}`);
     o.out(`${problems.length} écart(s)`);
     return 1;
   };
-  if (!existsSync(file)) return refuse([`aucune lecture écrite : ${file}`]);
-  let lecture: Record<string, any>;
-  try {
-    lecture = readInventaire(file) as Record<string, any>;
-  } catch (e) {
-    return refuse([(e as Error).message]);
+
+  if (o.unique) {
+    const r = await lireUne(c, 'a', model);
+    if (r.kind === 'quota') {
+      o.err(`ref analyse : quota atteint, aucune lecture écrite : ${r.message}`);
+      return 3;
+    }
+    if (r.kind === 'refus') return refuse(r.problems);
+    o.out(`${slug} : lecture unique (${model}) — ${pagesLues(pages.length)} (plafond d'une lecture : ${LECTURE_PAGES_MAX})`);
+    o.out(`lecture : ${r.file}`);
+    o.out(`éléments : ${r.lecture.elements.length} (${confiancesDe(r.lecture)})`);
+    o.out(`tokens : ${r.usage.tokens} (${Math.round(r.usage.tokens / pages.length)} par page, ${pagesLues(pages.length)})`);
+    for (const q of r.questions) o.out(`question : ${q}`);
+    return 0;
   }
-  const schema = checkInventaire(lecture);
-  const problems = schema.length > 0 ? schema : ecartsDeLecture(lecture, doc);
-  if (problems.length > 0) return refuse(problems);
 
-  // les jetons de la session coupée (son journal) s'ajoutent à ceux de la relance, comme dans orchestrate
-  const cut = outcome.relaunched ? journalTokens(o.claudeHome, docDir, outcome.relaunched.sessionId) : null;
-  const tokens = cut ? sumTokens(cut.tokens, outcome.result.tokens).counted : outcome.result.tokens.counted;
-  lecture.usage = { tokens, modele: model, session: outcome.result.sessionId };
-  writeFileSync(file, `${JSON.stringify(lecture, null, 2)}\n`);
+  const inventaire = join(docDir, 'inventaire.json');
+  rmSync(inventaire, { force: true }); // l'inventaire d'un passage précédent ne passe jamais pour celui de celui-ci
+  // deux sessions qui ne se voient pas : lancées ensemble, chacune écrit sa lecture ; un échec n'interrompt pas l'autre
+  const [ra, rb] = await Promise.allSettled([lireUne(c, 'a', model), lireUne(c, 'b', modelB)]);
+  for (const r of [ra, rb]) if (r.status === 'rejected') throw r.reason;
+  const [a, b] = [ra, rb].map((r) => (r as PromiseFulfilledResult<Lue>).value);
+  const lues = [['A', a!], ['B', b!]] as const;
+  for (const [nom, r] of lues) {
+    if (r.kind === 'quota') {
+      o.err(`ref analyse : quota atteint (lecture ${nom}), aucune réconciliation : ${r.message}`);
+      return 3;
+    }
+  }
+  const refus = lues.flatMap(([nom, r]) => (r.kind === 'refus' ? r.problems.map((p) => `lecture ${nom} : ${p}`) : []));
+  if (refus.length > 0) return refuse(refus);
+  const [la, lb] = [a, b] as [Lue & { kind: 'ok' }, Lue & { kind: 'ok' }];
 
-  const confiances = ['mesure', 'lu', 'incertain'].map((c) => [c, (lecture.elements as { confiance: string }[]).filter((e) => e.confiance === c).length] as const).filter(([, n]) => n > 0);
-  o.out(`${slug} : lecture unique (${model}) — ${pagesLues(pages.length)} (plafond d'une lecture : ${LECTURE_PAGES_MAX})`);
-  o.out(`lecture : ${file}`);
-  o.out(`éléments : ${lecture.elements.length} (${confiances.map(([c, n]) => `${c} : ${n}`).join(', ')})`);
-  o.out(`tokens : ${tokens} (${Math.round(tokens / pages.length)} par page, ${pagesLues(pages.length)})`);
-  const structured = outcome.result.structured as { questions?: unknown } | undefined;
-  for (const q of Array.isArray(structured?.questions) ? structured.questions : []) o.out(`question : ${String(q)}`);
+  const rec: Reconciliation = reconcilier(la.lecture, lb.lecture, seuil);
+  const pct = (x: number): string => `${Number((x * 100).toFixed(1))} %`;
+  const compteRec = `concordants ${rec.concordants} · divergents ${rec.divergents} · seuls ${rec.seuls} · silences ${rec.silences}`;
+  if (rec.refuse) {
+    o.out(`${slug} : double lecture (A ${model}, B ${modelB}) — ${pagesLues(pages.length)} (plafond d'une lecture : ${LECTURE_PAGES_MAX})`);
+    o.out(`réconciliation : ${compteRec} — non appariés ${pct(rec.ratio!)} (seuil ${pct(seuil)})`);
+    o.out(`plus de ${pct(seuil)} d'éléments non appariés (${rec.nonApparies} sur ${rec.concordants + rec.divergents + rec.seuls}) : les deux lectures ne décrivent pas le même document — question au lead, aucune réconciliation (les lectures restent dans ${join(docDir, 'lectures')}, \`cadence ref diff\` les compare)`);
+    return 1;
+  }
+
+  const seuls = rec.items.filter((i) => i.statut === 'seul');
+  let regard: { tokens: number; session: string; questions: string[] } | undefined;
+  if (seuls.length > 0) {
+    const r = await troisiemeRegard({ seuls, model, slug, docDir, configPath: o.configPath, claudeHome: o.claudeHome, claude: o.claude, agents: o.agents });
+    if (r.kind === 'quota') {
+      o.err(`ref analyse : quota atteint pendant le troisième regard, aucun inventaire écrit (les lectures A et B sont gardées) : ${r.message}`);
+      return 3;
+    }
+    seuls.forEach((item, i) => (item.decision = r.decisions[i]));
+    regard = r;
+  }
+  const inv = assembler(la.lecture, lb.lecture, rec, regard !== undefined);
+  // la réconciliation ne produit que des éléments déjà valides : un écart ici est un défaut de cadence, jamais une lecture à refuser
+  const problems = checkInventaire(inv);
+  if (problems.length > 0) throw new RafError(`ref analyse : l'inventaire réconcilié est invalide (défaut de cadence) : ${problems[0]}`);
+
+  const tokens = la.usage.tokens + lb.usage.tokens + (regard?.tokens ?? 0);
+  inv.usage = {
+    tokens,
+    lectures: { a: { tokens: la.usage.tokens, modele: model }, b: { tokens: lb.usage.tokens, modele: modelB }, ...(regard ? { regard: { tokens: regard.tokens, modele: model } } : {}) },
+  };
+  const verdicts = seuls.flatMap((item) => (item.decision ? [{ lecture: item.lecture!, id: item.element.id as string, verdict: item.decision.verdict, raison: item.decision.raison }] : []));
+  inv.reconciliation = { concordants: rec.concordants, divergents: rec.divergents, seuls: rec.seuls, silences: rec.silences, non_apparies: rec.ratio, regard: verdicts };
+  writeFileSync(inventaire, `${JSON.stringify(inv, null, 2)}\n`);
+
+  const confirmes = verdicts.filter((v) => v.verdict === 'confirme').length;
+  const ecartes = verdicts.length - confirmes;
+  o.out(`${slug} : double lecture (A ${model}, B ${modelB}) — ${pagesLues(pages.length)} (plafond d'une lecture : ${LECTURE_PAGES_MAX})`);
+  o.out(`lectures : ${la.file}, ${lb.file}`);
+  o.out(`réconciliation : ${compteRec} — non appariés ${rec.ratio === null ? 'n/a' : pct(rec.ratio)} (seuil ${pct(seuil)})`);
+  if (regard) o.out(`troisième regard (${model}) : ${confirmes} confirmé${confirmes > 1 ? 's' : ''}, ${ecartes} écarté${ecartes > 1 ? 's' : ''}, ${seuls.length - verdicts.length} sans réponse`);
+  o.out(`inventaire : ${inventaire}`);
+  o.out(`éléments : ${inv.elements.length} (${confiancesDe(inv)})`);
+  o.out(`tokens : ${tokens} (${Math.round(tokens / pages.length)} par page, ${pagesLues(pages.length)}) — A : ${la.usage.tokens}, B : ${lb.usage.tokens}${regard ? `, troisième regard : ${regard.tokens}` : ''}`);
+  for (const q of new Set([...la.questions, ...lb.questions, ...(regard?.questions ?? [])])) o.out(`question : ${q}`);
   return 0;
 }

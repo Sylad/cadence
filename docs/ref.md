@@ -302,29 +302,43 @@ seul (B) : composant p.1 : bouton|Layers
 
 `--out` writes the reconciled inventory (genre `inventaire`, valid for `ref check`). Exit codes: **0** reconciled, **1** too many unpaired elements, **2** refusal (wrong call, unreadable or invalid file, not a reading, two documents, bad `--seuil`).
 
-## `cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug name] [--model sonnet|opus|haiku]`
+## `cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug name] [--model sonnet|opus|haiku] [--model-b sonnet|opus|haiku] [--seuil 30] [--unique]`
 
-The whole chain **in a single reading** (the baseline that the double reading of the next lots is measured against, design §« Mesure »): `add`, then **one fresh session** of the
-[`reference-analyst`](../agents/reference-analyst.md) agent (`claude -p`, model `sonnet` unless `--model` says otherwise, the review effort and the permission mode of `orchestrate`
-in `cadence.yaml`, a working directory that is the document folder), then the program checks what the session wrote. The agent looks at every rendered page whole, then every zone at full resolution, measures
-with `cadence ref measure`, copies every text verbatim, links every figure to the passages that cite it (`confirme`, `precise`, `contredit`), writes what the document does not show as a `silence`,
-marks `incertain` (with its cause) what it cannot read for sure, and writes **`<references.dir>/<slug>/lectures/a.json`**: a reading (`genre: "lecture"`) in the format of
-[`templates/inventaire.json`](../templates/inventaire.json), validated by `cadence ref check` before it hands back. The brief names the document folder, the rendered pages, the file to write, the model and the two commands; it never names an expected inventory or a corpus,
-and the agent is told never to look for one. The session needs `claude` on the `PATH` (or `CADENCE_CLAUDE_BIN`) and the system tools of `ref add`.
+The whole chain (design §3): `add`, then **two independent readings**, `ref diff` by program, a **third look** at what only one reading carries, and the reconciled inventory.
+`--unique` keeps the **single reading** of lot 5 (`add`, one session, `lectures/a.json`), which is the baseline the double reading is measured against (design §« Mesure »).
 
-**The program does not trust the report.** Once the session is back it reads `lectures/a.json` itself: the file must exist (the one of an earlier run is removed before the session starts), pass `ref check`, be a `lecture`
-and carry the `slug` and `sha256` of the document that was read, never another (a reading of two versions mixed is refused). Then it writes **`usage`** into the file —
-`{ tokens, modele, session }`, `tokens` being the input, cache-write and output tokens of the session (the count of the orchestrate budget; cache reads are left out), which the agent never writes — so that
-`ref eval` reads the tokens per page from the file.
+**Two readings.** Two fresh sessions of the [`reference-analyst`](../agents/reference-analyst.md) agent (`claude -p`, the review effort and the permission mode of `orchestrate` in `cadence.yaml`, a working directory that is the
+document folder) run together: reading **A** on `--model` (default `sonnet`), reading **B** on `--model-b` (default `opus`: another model decorrelates the errors, hypothesis H1). Each agent looks at every rendered page whole,
+then every zone at full resolution, measures with `cadence ref measure`, copies every text verbatim, links every figure to the passages that cite it (`confirme`, `precise`, `contredit`), writes what the document does not show as a `silence`,
+marks `incertain` (with its cause) what it cannot read for sure, and writes **`<references.dir>/<slug>/lectures/a.json`** (resp. `b.json`): a reading (`genre: "lecture"`) in the format of
+[`templates/inventaire.json`](../templates/inventaire.json), validated by `cadence ref check` before it hands back. The two briefs are the same text, the file to write apart; neither names the other reading, an expected inventory or a corpus,
+and the agent is told never to open another file of `lectures/`. The sessions need `claude` on the `PATH` (or `CADENCE_CLAUDE_BIN`) and the system tools of `ref add`.
 
-A session cut by a signal with nothing written is started again once in a fresh session (like a review); cut twice, it is a failure (exit 2).
+**The program does not trust the reports.** For each reading it reads the file itself: it must exist (the ones of an earlier run, `a.json`, `b.json` and `inventaire.json`, are removed before the sessions start), pass `ref check`, be a `lecture`
+and carry the `slug` and `sha256` of the document that was read, never another (a reading of two versions mixed is refused). It then writes **`usage`** into each reading, `{ tokens, modele, session }`, `tokens` being the input, cache-write
+and output tokens of the session (the count of the orchestrate budget; cache reads are left out), which the agent never writes.
+
+**Reconciliation.** [`ref diff`](#cadence-ref-diff-lecture-ajson-lecture-bjson---out-inventairejson---seuil-30) pairs the two readings. More than 30 % of unpaired elements (`--seuil`, in percent): no reconciliation, exit 1, the question to the lead
+(the two readings stay in `lectures/`, `cadence ref diff` compares them again). Otherwise:
+
+- **concordant** elements become one `lu` (or `mesure`) element; **divergent** ones are `incertain` with both versions in the cause, **never chosen**;
+- the elements **only one reading carries** go to the **third look**: one session of the [`reference-verifier`](../agents/reference-verifier.md) agent (read-only: `Read` and `Bash` to measure; same model as reading A) that sees **only those elements**, each with the
+  rendered page and a **crop** of its zone (`crops/regard-<n>.png`, the zone and 24 px around it; no crop when the page is not rendered, the brief then says so), and answers `confirme` or `ecarte` with a reason. **Confirmed**: the element keeps its confidence
+  (`mesure` stays `mesure`, `lu` stays `lu`, a doubt stays a doubt); **discarded**: it disappears, with what only held through it (a state of a discarded component, a badge that covers nothing any more). A verdict without a reason, an unknown verdict or a number that is not
+  in the list counts as **no answer**: the element stays `incertain` (`troisième regard sans réponse`), never a `lu` by default. No element carried by one reading only: no third look, no session;
+- the **silences** of both readings are gathered, once per question, and never sent to a third look.
+
+The result is **`<references.dir>/<slug>/inventaire.json`**: `genre: "inventaire"`, valid for `ref check`, ids renumbered, `usage` = `{ tokens, lectures: { a, b, regard } }` (the total of the three sessions and each one's tokens and model, what `ref eval` reads for the tokens per page)
+and `reconciliation` = the counts, the unpaired ratio and, for each element the third look ruled on, `{ lecture, id (in its reading), verdict, raison }`.
+
+A session cut by a signal with nothing written is started again once in a fresh session (like a review); cut twice, it is a failure (exit 2). With `--unique` the single reading is written to `lectures/a.json` and checked as above; `--model-b` and `--seuil` are refused with it (exit 2).
 
 **Declared ceiling: 20 pages per reading** (`LECTURE_PAGES_MAX`, design §5 « Taille »). With `--sections`, the pages read are those of `--sections` plus the pages of the figures they cite: the pages an
 earlier `add` of the same document rendered stay on disk but are **not** read, so choosing fewer pages with `--sections` works under the same slug. Without `--sections`, every rendered page is read (the whole document when it
 has 30 pages or fewer, else the pages an earlier `add` rendered). More than 20 pages to read is refused before any session (exit 2, the count and the command `cadence ref analyse <document> --slug <slug> --sections 3-12`), and so is a large document with no
-`--sections` and no page rendered. Splitting into several readings is not done here (lot 6 and after).
+`--sections` and no page rendered. Splitting into several pairs of readings is not done here.
 
-A session cut by a signal and started again (see above) is counted in full: `usage.tokens` adds the tokens of the cut session (read back from its Claude Code journal, as `orchestrate` does) to those of the fresh one, and the half-written `lectures/a.json` of the cut session is removed before the fresh one starts.
+A session cut by a signal and started again is counted in full: its tokens (read back from its Claude Code journal, as `orchestrate` does) are added to those of the fresh one, and the half-written reading of the cut session is removed before the fresh one starts.
 
 ```
 $ cadence ref analyse norme.pdf --sections 4-9
@@ -332,21 +346,25 @@ norme : norme.pdf
 pages : 120
 rendues : 8 (4, 5, 6, 7, 8, 9, 33, 34)
 …
-norme : lecture unique (sonnet) — 8 pages lues (plafond d'une lecture : 20)
-lecture : ~/.local/share/cadence/references/norme/lectures/a.json
-éléments : 41 (mesure : 6, lu : 32, incertain : 3)
-tokens : 182000 (22750 par page, 8 pages lues)
+norme : double lecture (A sonnet, B opus) — 8 pages lues (plafond d'une lecture : 20)
+lectures : ~/.local/share/cadence/references/norme/lectures/a.json, ~/.local/share/cadence/references/norme/lectures/b.json
+réconciliation : concordants 31 · divergents 2 · seuls 3 · silences 9 — non appariés 8.3 % (seuil 30 %)
+troisième regard (sonnet) : 2 confirmés, 1 écarté, 0 sans réponse
+inventaire : ~/.local/share/cadence/references/norme/inventaire.json
+éléments : 36 (mesure : 6, lu : 26, incertain : 4)
+tokens : 520000 (65000 par page, 8 pages lues) — A : 190000, B : 250000, troisième regard : 80000
 question : Que veut dire « Figure 1 » ?
 ```
 
-The last line is one `question :` per question of the agent (a `contredit`, an `incertain`). Exit codes: **0** a valid reading, **1** a refused reading (no file, `ref check` deviations, wrong genre, wrong document: one
-`✗ <reason>` line then `N écart(s)` on the standard output, the file is left as written, no `usage` is added), **2** refusal (unknown `--model`, no page or more than 20 to read, tool or file as for `add`, a session that
-failed: `la session de lecture a échoué : <cause>`), **3** quota reached (message on the error output, no reading; run it again later). The tokens per page of the output divide by the pages **read**; `ref eval` divides by the `pages` of the expected inventory,
-the same number for a corpus case read whole.
+The last lines are one `question :` per distinct question of the agents (a `contredit`, an `incertain`). Exit codes: **0** done, **1** a refused reading (no file, `ref check` deviations, wrong genre, wrong document: one
+`✗ lecture A : <reason>` line per deviation then `N écart(s)` on the standard output, the file is left as written, no `usage` is added) or too many unpaired elements, **2** refusal (unknown `--model` or `--model-b`, no page or more than 20 to read, tool or file as for `add`, a session that
+failed: `la session de lecture a échoué : <cause>`), **3** quota reached (message on the error output, no inventory; the readings already written stay; run it again later). The tokens per page of the output divide by the pages **read**; `ref eval` divides by the `pages` of the expected inventory,
+the same number for a corpus case read whole. With `--unique` the output is the one of lot 5: `<slug> : lecture unique (<model>) — …`, `lecture : <file>`, `éléments : …`, `tokens : …`.
 
 ### Reference measure on the corpus
 
 `docs/mesures/ref-lecture-unique-2026-10-24.md` states what the single reading is measured on and with which commands (recall, false « read », tokens per page against the corpus of `ref corpus`, the declared ceiling), and what was measured.
+The double reading is measured the same way, `ref eval` on `inventaire.json` instead of `lectures/a.json`, and compared with that baseline: `docs/mesures/ref-double-lecture-2026-10-25.md` (hypothesis H1, the stopping point of lot 6).
 
 ## `cadence ref corpus <dossier> [--sans-rendu]`
 

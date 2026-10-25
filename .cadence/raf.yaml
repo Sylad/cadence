@@ -3756,6 +3756,7 @@ lots:
     estimate: 0.1
     created: 2026-10-25
     started: 2026-10-25
+    review: { date: 2026-10-25, verdict: "conforme : le skill deliver dit maintenant comment livrer un sha qui n'est pas HEAD (push du sha seul, dry-run, livraison, raison) ; le rejeu de l'éval deliver-sha jusqu'à 1,0 n'est pas vérifié — orchestré (vague 2026-10-25-2330, 0 passe(s) de correction)", commit: 161fbe2a27d9afb1bfbae8671510dbd079a2d21f, reporte: { de: d6bf699a66d60a9c2195a230470ba22c94d2982b, vers: 161fbe2a27d9afb1bfbae8671510dbd079a2d21f, patchId: ef14bc00fd8863002533ac73ec484a0f90a1ddc2 } }
   - id: L335
     title: "plugin : la syntaxe de cadence orchestrate (<projet>:<lot>[@modèle], id avec « / » gardé tel quel, reprise par --resume [--wave]) joignable sans /lead — éval du plugin 1.10.0 du 25-10 : cas orchestrate-id-avec-slash à 0,00 avec et sans le plugin (3/3 essais inventent --lot/--model, le modèle n'a ouvert aucun skill et la lecture des fichiers du plugin est refusée dans le bac à sable) ; un skill (ou la description d'un skill existant) qui se déclenche sur « lancer une vague orchestrate » et porte la ligne de commande ; rejouer le cas jusqu'à 1,0"
     status: doing

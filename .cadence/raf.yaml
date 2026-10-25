@@ -3780,11 +3780,14 @@ lots:
     finished: 2026-10-25
   - id: L337
     title: "orchestrate : escalade de modèle avant de rendre un lot — clé orchestrate.escalation: { model: <nom> } (absente = comportement actuel, rien ne change ; le nom est passé tel quel à claude --model, pas de liste fermée haiku|sonnet|opus) : quand la revue reste non conforme après les passes prévues (MAX_PASSES, ou MAX_PASSES_CONVERGING quand elle converge), la vague joue UNE correction puis UNE revue neuve avec ce modèle avant de rendre le lot ; rendu seulement si cette revue escaladée n'est pas conforme ; vaut aussi pour un lot rendu « tests rouges » après ses passes ; budget du lot respecté (escalade non jouée et dite si le budget ne la couvre pas) ; tableau final « escalade <modèle> », journal, et cadence perf compte les escalades et leur issue ; doc docs/orchestrate.md, skill lead (lot rendu malgré l'escalade = l'humain ou un arbitrage), CHANGELOG ; tests. Constat du 25-10 : maritime I-CAD2 et cadence L332, rendus après 2 passes, repris à la main en Sonnet/Opus alors que la règle du lead (17-10, 22-10) était Fable — oubli répété ; le compte pro n'a peut-être pas Fable, d'où une clé sans valeur par défaut"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-25
     started: 2026-10-25
     review: { date: 2026-10-25, verdict: "compliant, 3 minor notes — orchestré (vague 2026-10-26-0015, 1 passe(s) de correction)", commit: eb897a7e956608824aebb4e2fa32977032d7d9fc }
+    notes:
+      - { date: 2026-10-25, text: "Re-vérifié par le lead le 25-10 : tsc propre, vitest 3679 (+4 sautés), raf check propre. Vague : conforme après 1 correction (2 revues Opus). Mineur en note : docs/perf.md:41, la liste des clés de --json n'a ni escalations ni quality." }
+    finished: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

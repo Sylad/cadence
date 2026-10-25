@@ -5,7 +5,7 @@ import { Plan } from '../src/plan.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { fake, inWorktree, lotOf, run, setup, type Handler } from './orchestrate-worktree-harness.js';
 
-// L320 — l'acquittement docs_ok (raf docs-ok, L317) posé par la session DANS le worktree du lot est lu par la porte docs.sync.
+// L320 — l'acquittement docs_ok (raf docs-ok, L317) posé par le lead dans le checkout principal AVANT la vague est lu par la porte docs.sync pour un lot joué dans un worktree ; la session du worktree n'écrit jamais le plan (sa consigne le lui interdit, elle nomme le lead).
 const SYNC = 'docs:\n  sync:\n    - paths: [src-*.txt]\n      docs: [README.md]\n';
 
 /** L1 touche src-a.txt sans la doc ; L2 est indépendant. */

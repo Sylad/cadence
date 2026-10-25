@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readOrchestrateConfig } from '../src/config.js';
 import { removeDryRunBriefs, tempDir } from './helpers.js';
@@ -31,10 +31,6 @@ describe('R1 — orchestrate.worktrees', () => {
 // L320 — le mode worktree est activé par la configuration seule : plus de garde expérimentale (CADENCE_EXPERIMENTAL_WORKTREES n'est plus lue).
 describe('R1 — activation par la configuration seule (L320)', () => {
   const OLD_VAR = { CADENCE_EXPERIMENTAL_WORKTREES: undefined };
-  const snapshot = (parent: string) => {
-    const dir = store(parent).dir;
-    return readdirSync(dir, { recursive: true }).map(String).filter((f) => f.endsWith('.json')).sort().map((f) => `${f}\n${readFileSync(join(dir, f), 'utf8')}`);
-  };
 
   it('R1 — orchestrate.worktrees: true sans aucune variable : la vague est acceptée et chaque lot est joué dans son worktree', async () => {
     const { parent } = setup();

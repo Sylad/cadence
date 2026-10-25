@@ -22,8 +22,8 @@ describe('release 1.0.0 (L164)', () => {
   })
 
   it('le README garde la ligne 1.0.0 dans « What’s new » et la page docs/whats-new.md son paragraphe', () => {
-    const readme = read('README.md')
-    expect(readme.slice(readme.indexOf("## What's new"))).toMatch(/\*\*1\.0\.0\*\*: the first major release/)
+    const whatsNew = read('docs/whats-new.md')
+    expect(whatsNew.slice(whatsNew.indexOf('## In two lines'))).toMatch(/\*\*1\.0\.0\*\*: the first major release/)
     expect(read('docs/whats-new.md')).toMatch(/\*\*1\.0\.0\*\*: the first major release/)
   })
 

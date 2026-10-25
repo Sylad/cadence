@@ -2,7 +2,30 @@
 
 # What's new, version by version
 
-The long form of the README's « What's new » (the README keeps two lines per version). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+## In two lines
+
+- **1.9.0**: the plan lives at `.cadence/raf.yaml` (`raf migrate`); `cadence ref` reads reference documents; `doc-keeper` agent, `orchestrate.testGate`, `cadence lead hold` shown by `cadence-hud`.
+- **1.8.0**: `cadence perf` shows the speed of the workflow next to its quality (cost in euros per delivered lot, red deliveries, blocking QA findings), and `cadence lead tour` opens with a perf header.
+- **1.7.0**: `cadence orchestrate` no longer replays `accept` on a green sealed acceptation and refuses `--resume --dry-run`; `spec reseal --porteur` accepts a sheet amended by a delivered lot; the README becomes a short home page.
+- **1.6.0**: the mockup review sweeps everything in its first report and runs up to `orchestrate.maquetteReviews` times (3 by default); the acceptance lock names the first offending commit.
+- **1.5.1**: publishes 1.5.0 (tagged, never published): one UX review per lot, replay of a lot handed back for its budget, a self-check list in the briefs, a `tests.yml` workflow.
+- **1.5.0**: `gate: { count: N, … }` makes a lot wait for N done lots of a kind; `raf todo <id>` puts a started lot without work commits back to `todo`.
+- **1.4.0**: `cadence spec reseal` accepts a sheet amended by the lot's commits; wave budgets recalibrated; a `git checkout` in a session no longer stops the wave.
+- **1.3.0**: the spec step narrows to `screen: page`; `cadence spec reseal … --porteur` re-seals an unstable test; `cadence orchestrate --waits`; a third correction pass when the review converges.
+- **1.2.0**: the spec step reaches lots without a screen (`spec: true`), `orchestrate.accept` may be a list of runners, `lead.ux: lead`, and the code in service is a separate worktree.
+- **1.1.0**: the spec step of `cadence orchestrate`: screen sheet, reviewed mockup, red locked acceptance tests, and briefs that carry rule → test → green.
+- **1.0.0**: the first major release, a stable contract that follows semantic versioning; the [stability page](stabilite.md) lists what is guaranteed.
+
+<details>
+<summary>Older versions (0.10.0 to 0.28.0)</summary>
+
+Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [CHANGELOG.md](../CHANGELOG.md): `cadence-hud` (0.12.0 to 0.25.0), `cadence orchestrate --continue` and `--status --watch`, `cadence lead tour`, `hook.autostart`, `docs.sync` and `docs.articles`, neighbouring repositories, `raf ignore`.
+
+</details>
+
+## Version by version
+
+The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
 
 **1.9.0**: the default plan is `.cadence/raf.yaml`, a hidden folder git versions and `docs/` never publishes (L246), and `raf migrate [--dry-run]` moves a legacy plan and the readers of the old path (L284, L305); `raf title`, `raf visible`, `uses:` resources shown by `lead tour` and the lot `goal:` (L244, L273, L251–L253, L258). `cadence ref add|measure|check|corpus|eval` registers reference documents outside the repository, measures a rendered zone, validates the inventory schema and scores a reading against a known truth (L261–L264). In `cadence orchestrate`: the `doc-keeper` agent and `docs.articles` (L306, L308), the mechanical `orchestrate.testGate` before the review (L287), `precheck: local` on every lot with no commit (L296), a write-step time limit proportioned to the lot (L298), sessions that no longer hold their slot after their report (L285), the real weekly-limit message recognised (L286), and an experimental worktree mode with `--resume --integrate|--replay` and `--remove-worktree` (L279, L299–L304). `cadence lead hold|release` counts the lead's hand-started sessions, an expired one is flagged by `lead tour`, `--status` and the `cadence-hud` band (0.5.0; L255, L276, L278). `cadence deliver --sha` is accepted while a wave runs (L277), `CADENCE_DEPLOYED_FILE` names the deployed sha (L277, L281) and `deliveries-failed.log` keeps the class and last lines of a red delivery, secrets masked (L282, L289, L294). `cadence perf` breaks red deliveries down and counts the `review-small` UX (L282, L283). Details: [CHANGELOG.md](../CHANGELOG.md).
 

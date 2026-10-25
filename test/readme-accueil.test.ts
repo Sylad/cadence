@@ -19,8 +19,8 @@ const lignesIntro = (texte: string): string[] => {
 };
 
 describe('README en page d’accueil (L232)', () => {
-  it('R1 — le README tient en moins de 12 ko (il en pesait 208 101) et la mesure avant/après est écrite', () => {
-    expect(statSync(join(root, 'README.md')).size).toBeLessThan(12 * 1024);
+  it('R1 — le README tient en moins de 5 ko (il en pesait 208 101, puis 11 800 après L232) et la mesure avant/après est écrite', () => {
+    expect(statSync(join(root, 'README.md')).size).toBeLessThan(5 * 1024);
     const m = read('docs/mesures/readme-accueil-2026-10-16.md');
     expect(m).toContain('208 101');
   });
@@ -38,7 +38,7 @@ describe('README en page d’accueil (L232)', () => {
 
   it('R2 — le compte des lignes d’introduction rougit quand l’introduction dépasse 5 lignes (mutation d’une copie du README)', () => {
     const base = lignesIntro(readme).length;
-    const mute = readme.replace('\n<picture>', '\n' + Array.from({ length: 6 }, (_, i) => `Une ligne de plus, numéro ${i}.`).join('\n') + '\n\n<picture>');
+    const mute = readme.replace('\n## Start', '\n' + Array.from({ length: 6 }, (_, i) => `Une ligne de plus, numéro ${i}.`).join('\n') + '\n\n## Start');
     expect(mute).not.toBe(readme);
     expect(lignesIntro(mute).length).toBe(base + 6);
     expect(lignesIntro(mute).length).toBeGreaterThan(5);
@@ -59,9 +59,13 @@ describe('README en page d’accueil (L232)', () => {
     expect(DOC_PAGES).toEqual(expect.arrayContaining(PAGES.map((p) => `docs/${p}.md`)));
   });
 
-  it('R5 — « What’s new » : deux lignes par version au plus, avec renvoi au CHANGELOG', () => {
-    const debut = readme.indexOf("## What's new");
-    const section = readme.slice(debut, readme.indexOf('\n## ', debut + 5) === -1 ? undefined : readme.indexOf('\n## ', debut + 5));
+  it('R5 — « What’s new » : le README renvoie à docs/whats-new.md, où chaque version tient en deux lignes au plus, avec renvoi au CHANGELOG', () => {
+    expect(readme).not.toContain("## What's new");
+    expect(readme).toContain('docs/whats-new.md');
+    const page = read('docs/whats-new.md');
+    const debut = page.indexOf('## In two lines');
+    expect(debut).toBeGreaterThan(-1);
+    const section = page.slice(debut, page.indexOf('\n## ', debut + 5) === -1 ? undefined : page.indexOf('\n## ', debut + 5));
     const versions = section.split('\n').filter((l) => /^- \*\*\d+\.\d+\.\d+\*\*/.test(l));
     expect(versions.length).toBeGreaterThanOrEqual(8);
     for (const v of versions) expect(v.length, v.slice(0, 40)).toBeLessThanOrEqual(2 * 100 + 40);
@@ -69,8 +73,7 @@ describe('README en page d’accueil (L232)', () => {
     expect(section).toMatch(/\*\*1\.6\.0\*\*/);
   });
 
-  it('R6 — les sections longues sont repliables (<details>) et le contenu d’avant n’est pas perdu', () => {
-    expect(readme).toContain('<details>');
+  it('R6 — le contenu d’avant L232 n’est pas perdu (README + docs/)', () => {
     // README d’avant L232, figé (test/fixtures/readme-avant-L232.json) : chaque titre et chaque phrase-clé se retrouve dans README + docs/*.md
     const avant: { titres: string[]; phrases: string[] } = JSON.parse(read('test/fixtures/readme-avant-L232.json'));
     expect(avant.titres.length).toBeGreaterThanOrEqual(30);
@@ -125,5 +128,49 @@ describe('README en page d’accueil (L232)', () => {
     const y = read('.github/workflows/tests.yml');
     expect(y).toContain('scripts/check-links.mjs');
     expect(execFileSync('node', [join(root, 'scripts/check-links.mjs')], { cwd: root, encoding: 'utf8' })).toMatch(/0 lien cassé/);
+  });
+
+  // L326 (règle de Sylvain, 25-10 : « faut pas fuir les gens avec le readme ») : le README est une page d'accueil lisible, pas une référence.
+  const sansCode = (texte: string): string => texte.replace(/```[\s\S]*?```/g, '');
+
+  it('R10 — lisibilité : le README tient en 60 lignes, aucune ligne de texte ne dépasse 160 caractères, un seul schéma', () => {
+    const lignes = readme.split('\n');
+    expect(lignes.length).toBeLessThanOrEqual(60);
+    for (const l of lignes.filter((x) => !x.trim().startsWith('<'))) expect(l.length, l.slice(0, 50)).toBeLessThanOrEqual(160);
+    expect(readme.match(/<picture>/g)?.length).toBe(1);
+  });
+
+  it('R10 — lisibilité : aucune option détaillée dans le README (TMPDIR, worktrees, clés de configuration, drapeaux, migrate)', () => {
+    const texte = sansCode(readme);
+    for (const mot of ['TMPDIR', 'worktree', 'cadence.yaml', 'raf migrate', 'raf title', 'lead hold', 'docs.sync']) expect(texte, mot).not.toContain(mot);
+    expect(texte).not.toMatch(/\s--[a-z]|orchestrate\.(?!md)/);
+  });
+
+  it('R10 — lisibilité : le contrôle rougit sur un README trop long, trop large ou chargé d’options (mutation d’une copie)', () => {
+    const trop = (t: string) => t.split('\n').length > 60 || t.split('\n').some((l) => !l.trim().startsWith('<') && l.length > 160) || /TMPDIR|\s--[a-z]|orchestrate\.(?!md)/.test(sansCode(t));
+    expect(trop(readme)).toBe(false);
+    expect(trop(readme + '\n'.repeat(61))).toBe(true);
+    expect(trop(readme + '\n' + 'x'.repeat(161))).toBe(true);
+    expect(trop(readme + '\nUse `TMPDIR` for it.')).toBe(true);
+    expect(trop(readme + '\nRun orchestrate --dry-run first.')).toBe(true);
+    expect(trop(readme + '\nSet orchestrate.worktrees in the config.')).toBe(true);
+  });
+
+  it('R11 — rien du README d’avant L326 n’est perdu : chaque titre et chaque phrase-clé de son contenu se retrouve dans docs/', () => {
+    const avant: { titres: string[]; phrases: string[] } = JSON.parse(read('test/fixtures/readme-avant-L326.json'));
+    expect(avant.titres.length).toBeGreaterThanOrEqual(3);
+    expect(avant.phrases.length).toBeGreaterThanOrEqual(20);
+    const texte = readdirSync(join(root, 'docs')).filter((f: string) => f.endsWith('.md')).map((f: string) => read(`docs/${f}`)).join('\n');
+    const plat = texte.replace(/\s+/g, ' ');
+    const titres = new Set([...texte.matchAll(/^#{1,6} (.*)$/gm)].map((m) => m[1].trim()));
+    for (const t of avant.titres) expect(titres.has(t), `titre perdu : ${t}`).toBe(true);
+    for (const f of avant.phrases) expect(plat.includes(f.replace(/\s+/g, ' ')), `phrase perdue : ${f.slice(0, 60)}`).toBe(true);
+  });
+
+  it('R12 — l’agent doc-keeper écrit dans docs/ ; le README ne reçoit qu’un lien', () => {
+    const agent = read('agents/doc-keeper.md');
+    expect(agent).toMatch(/README[^\n]*(only a link|a link only)/i);
+    expect(agent).toMatch(/behaviour[^\n]*docs\//);
+    expect(read('docs/news.md')).toMatch(/README[^\n]*(only a link|a link only)/i);
   });
 });

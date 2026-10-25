@@ -24,6 +24,6 @@ describe('livrer au fil de l\'eau — skill lead et documentation (L277)', () =>
   })
 
   it('R9 — le README mentionne la livraison pendant la vague', () => {
-    expect(read('README.md')).toMatch(/while (the|a) wave (is )?runs?/)
+    expect(read('docs/overview.md')).toMatch(/while (the|a) wave (is )?runs?/)
   })
 })

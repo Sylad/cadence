@@ -164,6 +164,10 @@ out, then:
 - **read-only session** (no write tool, or a brief that says so): changes nothing and lists, document by document, the
   passage to write.
 
+**Where it writes** (L326): a lot that changes how the tool works is written in the pages of `docs/`, in full.
+The README is a short home page: it receives only a link to that page, never the detail (an option, a key, a path, a flag).
+The test `readme-accueil` holds the README to that (size, short lines, no detailed option).
+
 `cadence orchestrate` calls it by itself when `docs.sync` reports a document behind the commits of the lot, **before the
 review** (see « Librarian before the review » in [orchestrate](orchestrate.md)); the lead calls it by hand otherwise
 ([lead](lead.md)).

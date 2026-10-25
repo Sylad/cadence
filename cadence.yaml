@@ -29,6 +29,7 @@ migrate:
     - agents/**
     - skills/**
     - README.md
+    - docs/overview.md
     - docs/raf.md
     - docs/fonctionnement.md
     - docs/stabilite.md

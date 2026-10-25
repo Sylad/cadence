@@ -250,8 +250,8 @@ describe('le lead appelle le bibliothécaire à la main (L306)', () => {
     expect(point).toMatch(/no entry/);
   });
 
-  it('R25 — README sans ligne blanche perdue entre deux puces, docs/stabilite.md range doc-keeper et la clé', () => {
-    const readme = readFileSync(join(root, 'README.md'), 'utf8').split('\n');
+  it('R25 — overview.md (le détail du README, L326) sans ligne blanche perdue entre deux puces, docs/stabilite.md range doc-keeper et la clé', () => {
+    const readme = readFileSync(join(root, 'docs', 'overview.md'), 'utf8').split('\n');
     const i = readme.findIndex((l) => l.startsWith('- **doc-keeper**'));
     expect(readme[i - 1]).toMatch(/^- /);
     const stab = readFileSync(join(root, 'docs', 'stabilite.md'), 'utf8');

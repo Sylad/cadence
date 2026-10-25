@@ -44,7 +44,7 @@ describe('documentation — livraisons rouges et en-tête perf (L227)', () => {
   });
 
   it('R12 — le README cite les livraisons rouges et l\'en-tête perf du tour', () => {
-    const readme = read('README.md');
+    const readme = read('docs/overview.md');
     expect(readme).toMatch(/red deliveries/);
     expect(readme).toMatch(/perf header/);
     expect(read('docs/perf.md')).toMatch(/deliveries-failed\.log/);

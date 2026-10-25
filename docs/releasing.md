@@ -7,11 +7,11 @@ A version exists in three places and is published in two; a release does all of 
 1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and write the version's section of
    `CHANGELOG.md` (`## [x.y.z] - date`, what changes for the user, lots cited), in **one commit that holds
-   only those files** (the version fields and the CHANGELOG, nothing else in the manifests, the « What's new »
-   section of the README, the one place of it a release rewrites, and `docs/whats-new.md`, its long form: add the version there too). Such a commit is
+   only those files** (the version fields and the CHANGELOG, nothing else in the manifests, `docs/whats-new.md`: add the version to its « In two lines » list and its
+   long form (the README no longer carries a « What's new » section, L326)). Such a commit is
    exempt from the code-review gate like a plan commit: it closes the lot after its review, and `raf check`
    does not ask for a new one (nor does it count it as a commit without a lot). The « What's new »
-   summary is ordered by version, a number known only at the release and shared by several lots: write it
+   summary (`docs/whats-new.md`) is ordered by version, a number known only at the release and shared by several lots: write it
    in that commit, not before the review. A commit that touches any other file
    — or another field of a manifest, or a dependency in `package-lock.json` — is work like any other and has
    to be reviewed.

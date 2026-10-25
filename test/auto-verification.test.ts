@@ -78,12 +78,12 @@ describe('auto-vérification en fin de session (L236)', () => {
 
   it('R8 — docs/orchestrate.md, le README et le CHANGELOG décrivent l\'auto-vérification (L236)', () => {
     expect(read('../docs/orchestrate.md')).toMatch(/Auto-verification once the tests are green \(L236\)/);
-    expect(read('../README.md')).toContain('L236');
+    expect(read('../docs/overview.md')).toContain('L236'); // le détail est parti du README (L326)
     expect(read('../CHANGELOG.md')).toMatch(/auto-verification[^\n]*\(L236[,)]/i);
   });
 
   it('R9 — le README et le CHANGELOG disent que fix ne relit que ses commits de correction', () => {
-    const readme = read('../README.md').split('\n').find((l) => l.includes('**auto-verification**'))!;
+    const readme = read('../docs/overview.md').split('\n').find((l) => l.includes('**auto-verification**'))!;
     expect(readme).toContain('of its fix commits, in `fix`');
     const log = read('../CHANGELOG.md').split('\n').find((l) => /^- Auto-verification at the end/.test(l))!;
     expect(log).toContain('of its fix commits, in `fix`');

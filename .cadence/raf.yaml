@@ -3722,9 +3722,10 @@ lots:
     finished: 2026-10-25
   - id: L331
     title: "perf : classer les livraisons rouges d'avant L282 d'après leur texte — le 25-10 les 19 rouges de la fenêtre courante (maritime 11, warhammer 5, ol 2, finance 1, toutes du 17 au 23-10) sont « non classée » car écrites avant la classe [cls] ; readFailedEntries (src/state.ts:263) déduit la classe d'une ligne sans [cls] depuis le libellé que deliver écrit lui-même (src/deliver.ts:420 « script de livraison en échec (code 2) » → refus, autre code → deploiement ; :440 « déploiement en échec » → deploiement ; :487/:517 « CI en échec » et « gh run list en échec » → ci ; :572 « vérification en échec » → verification), sinon reste inconnue ; jamais réécrire le fichier ; tests sur les libellés réels (dont la ligne maritime livrer.sh) ; doc docs/perf.md et CHANGELOG"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-25
+    started: 2026-10-25
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

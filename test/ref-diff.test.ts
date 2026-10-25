@@ -171,6 +171,70 @@ describe('cadence ref diff : réconciliation de deux lectures (L266)', () => {
     expect(e.confiance).toBe('incertain');
     expect(e.cause).toBe('flou');
   });
+
+  it('R9 bis — un seul incertain confirmé par le troisième regard garde son doute et sa cause : un doute reste un doute', () => {
+    const a = lecture([texte(1, 'Layers', 100)]);
+    const b = lecture([texte(1, 'Layers', 100), texte(2, 'Doute', 500, { confiance: 'incertain', cause: 'texte flou' })]);
+    const rec = reconcilier(a, b, 1);
+    rec.items.filter((i) => i.statut === 'seul')[0]!.decision = { verdict: 'confirme', raison: 'lisible sur la découpe' };
+    const e = assembler(a, b, rec, true).elements.find((x: Obj) => x.libelle === 'Doute')!;
+    expect(e.confiance).toBe('incertain');
+    expect(e.cause).toBe('texte flou');
+  });
+
+  it('R16 — un concordant dont la version A renvoie à un écran écarté reste, rattaché d\'après la version B : incertain, avec la cause du rattachement (l\'identité d\'un composant ignore son écran)', () => {
+    const petit = { source: { page: 1, zone: { x: 0, y: 0, l: 800, h: 600 } } };
+    // A découpe un second écran à tort et y rattache le composant ; B le rattache à l'écran 1, que les deux lectures portent
+    const a = lecture([ecran(1), ecran(2, petit), composant(3, 'Layers', 100, 'doc#ecran-2')]);
+    const b = lecture([ecran(1), composant(2, 'Layers', 100, 'doc#ecran-1')]);
+    const rec = reconcilier(a, b, 1);
+    expect(rec.items.map((i) => i.statut)).toEqual(['concordant', 'seul', 'concordant']);
+    const seul = rec.items.find((i) => i.statut === 'seul')!;
+    expect(seul.element.type).toBe('ecran');
+    seul.decision = { verdict: 'ecarte', raison: 'un seul écran dessiné' };
+    const inv = assembler(a, b, rec, true);
+    expect(inv.elements.map((e: Obj) => e.type)).toEqual(['ecran', 'composant']);
+    const [ec, co] = inv.elements as Obj[];
+    expect(co.ecran).toBe(ec!.id);
+    expect(co.confiance).toBe('incertain');
+    expect(co.cause).toMatch(/lecture A.*écarté.*lecture B/);
+    expect(checkInventaire(inv)).toEqual([]);
+  });
+
+  it('R17 — le même cas côté B : la version B renvoie à l\'écran écarté, l\'élément reste, rattaché d\'après la version A, avec sa cause', () => {
+    const petit = { source: { page: 1, zone: { x: 0, y: 0, l: 800, h: 600 } } };
+    const a = lecture([ecran(1), composant(2, 'Layers', 100, 'doc#ecran-1')]);
+    const b = lecture([ecran(1), ecran(2, petit), composant(3, 'Layers', 100, 'doc#ecran-2')]);
+    const rec = reconcilier(a, b, 1);
+    rec.items.find((i) => i.statut === 'seul')!.decision = { verdict: 'ecarte', raison: 'un seul écran dessiné' };
+    const inv = assembler(a, b, rec, true);
+    const co = inv.elements.find((e: Obj) => e.type === 'composant')!;
+    expect(co.ecran).toBe(inv.elements.find((e: Obj) => e.type === 'ecran')!.id);
+    expect(co.confiance).toBe('incertain');
+    expect(co.cause).toMatch(/lecture B.*écarté.*lecture A/);
+    expect(checkInventaire(inv)).toEqual([]);
+  });
+
+  it('R18 — quand les deux versions d\'un élément apparié renvoient à un élément écarté, il disparaît ; un statut dont la version A ne couvre plus rien reste par la version B', () => {
+    // A : Alpha seul, B : Beta seul ; l'état est lu des deux côtés (même zone) mais vise un composant différent : divergent, les deux versions visent un écarté
+    const a = lecture([ecran(1), composant(2, 'Alpha', 100, 'doc#ecran-1'), etat(1, 'doc#composant-2')]);
+    const b = lecture([ecran(1), composant(2, 'Beta', 500, 'doc#ecran-1'), etat(1, 'doc#composant-2')]);
+    const rec = reconcilier(a, b, 1);
+    expect(rec.items.map((i) => i.statut)).toEqual(['concordant', 'seul', 'divergent', 'seul']);
+    for (const i of rec.items.filter((x) => x.statut === 'seul')) i.decision = { verdict: 'ecarte', raison: 'absent' };
+    expect(assembler(a, b, rec, true).elements.map((e: Obj) => e.type)).toEqual(['ecran']);
+    // le statut concorde (il couvre un écran des deux côtés) ; la lecture A le rattache à l'écran 2, seul et écarté
+    const petit = { source: { page: 1, zone: { x: 0, y: 0, l: 800, h: 600 } } };
+    const c = lecture([ecran(1), ecran(2, petit), statut(1, ['doc#ecran-2'])]);
+    const d = lecture([ecran(1), statut(1, ['doc#ecran-1'])]);
+    const r2 = reconcilier(c, d, 1);
+    r2.items.find((i) => i.statut === 'seul')!.decision = { verdict: 'ecarte', raison: 'un seul écran dessiné' };
+    const inv = assembler(c, d, r2, true);
+    expect(inv.elements.map((e: Obj) => e.type)).toEqual(['ecran', 'statut']);
+    expect(inv.elements[1].couvre).toEqual([inv.elements[0].id]);
+    expect(inv.elements[1].confiance).toBe('incertain');
+    expect(checkInventaire(inv)).toEqual([]);
+  });
 });
 
 describe('cadence ref diff <a> <b> (L266)', () => {

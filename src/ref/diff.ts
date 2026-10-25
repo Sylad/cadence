@@ -151,33 +151,42 @@ function confianceConcordant(ea: Obj, eb: Obj): { confiance: string; cause?: str
  * L'inventaire réconcilié (genre « inventaire »), ids renumérotés `<slug>#<type>-<n>` et renvois suivis. Un divergent est `incertain` avec les deux
  * versions ; un seul écarté par le troisième regard disparaît (avec ce qui ne tient plus sans lui), un seul confirmé garde sa confiance (un doute
  * reste un doute), un seul sans décision reste `incertain` : `regard` dit si le troisième regard a eu lieu (sa cause le dit).
+ * Un élément apparié tient tant que l'une de ses deux versions renvoie à des éléments gardés (la lecture A d'abord) : quand l'autre version renvoyait à un
+ * élément écarté, il est gardé, rattaché d'après la version qui tient, et `incertain` avec la cause du rattachement ; il disparaît quand aucune ne tient.
  */
 export function assembler(a: Obj, b: Obj, rec: Reconciliation, regard = false): Obj {
-  type Entree = { item: Item; supprimee: boolean };
+  /** `version` : la lecture dont les renvois sont suivis (la lecture A d'abord) ; absente quand l'élément disparaît. */
+  type Entree = { item: Item; supprimee: boolean; version?: 'a' | 'b' };
   const entrees: Entree[] = rec.items.map((item) => ({ item, supprimee: item.statut === 'seul' && item.decision?.verdict === 'ecarte' }));
   const proprietaire = new Map<string, Entree>();
   for (const en of entrees) {
     if (en.item.a) proprietaire.set(`a:${en.item.a.id}`, en);
     if (en.item.b) proprietaire.set(`b:${en.item.b.id}`, en);
   }
-  const cote = (en: Entree): 'a' | 'b' => (en.item.a ? 'a' : 'b');
-  const cible = (en: Entree, id: string): Entree | undefined => proprietaire.get(`${cote(en)}:${id}`);
-  // ce qui renvoie à un élément écarté ne tient plus : un point fixe, un écarté pouvant en entraîner d'autres
+  const versionsDe = (en: Entree): ('a' | 'b')[] => (['a', 'b'] as const).filter((v) => en.item[v] !== undefined);
+  const cible = (v: 'a' | 'b', id: string): Entree | undefined => proprietaire.get(`${v}:${id}`);
+  const vivant = (v: 'a' | 'b', id: string): boolean => {
+    const t = cible(v, id);
+    return t !== undefined && !t.supprimee;
+  };
+  /** Une version tient quand ses renvois tiennent : tous pour un composant ou un état, au moins un pour un statut. */
+  const tient = (en: Entree, v: 'a' | 'b'): boolean => {
+    const element = en.item[v]!;
+    const ids = renvois(element);
+    const vivants = ids.filter((id) => vivant(v, id)).length;
+    return ids.length === 0 || (element.type === 'statut' ? vivants > 0 : vivants === ids.length);
+  };
+  // ce qui renvoie à un élément écarté ne tient plus : un point fixe, un écarté pouvant en entraîner d'autres. Un élément apparié tient dès que l'une de
+  // ses deux versions tient (la lecture A d'abord) : la lecture B peut le rattacher à un écran conservé quand A le rattache à un écran écarté.
   for (let change = true; change; ) {
     change = false;
     for (const en of entrees) {
       if (en.supprimee) continue;
-      const vivants = renvois(en.item.element).filter((id) => {
-        const t = cible(en, id);
-        return t !== undefined && !t.supprimee;
-      });
-      if (vivants.length === 0 && renvois(en.item.element).length > 0) {
+      const v = versionsDe(en).find((x) => tient(en, x));
+      if (v === undefined) {
         en.supprimee = true;
         change = true;
-      } else if (en.item.element.type !== 'statut' && vivants.length < renvois(en.item.element).length) {
-        en.supprimee = true;
-        change = true;
-      }
+      } else en.version = v;
     }
   }
   const compteur = new Map<string, number>();
@@ -191,11 +200,14 @@ export function assembler(a: Obj, b: Obj, rec: Reconciliation, regard = false): 
   }
   const elements = entrees.filter((en) => !en.supprimee).map((en) => {
     const { item } = en;
+    const v = en.version!;
     const e: Obj = { ...item.element, id: nouvelId.get(en)! };
-    const id = (ancien: string): string => nouvelId.get(cible(en, ancien)!)!;
-    if (e.type === 'composant') e.ecran = id(e.ecran);
-    if (e.type === 'etat') e.cible = id(e.cible);
-    if (e.type === 'statut') e.couvre = (e.couvre as string[]).filter((x) => { const t = cible(en, x); return t !== undefined && !t.supprimee; }).map(id);
+    const id = (ancien: string): string => nouvelId.get(cible(v, ancien)!)!;
+    // les renvois sont ceux de la version qui tient (pour un élément apparié, parfois celle de la lecture B)
+    const source = item[v]!;
+    if (e.type === 'composant') e.ecran = id(source.ecran);
+    if (e.type === 'etat') e.cible = id(source.cible);
+    if (e.type === 'statut') e.couvre = (source.couvre as string[]).filter((x) => vivant(v, x)).map(id);
     const doute = (cause: string) => {
       e.confiance = 'incertain';
       e.cause = cause;
@@ -210,6 +222,13 @@ export function assembler(a: Obj, b: Obj, rec: Reconciliation, regard = false): 
     } else if (item.statut === 'seul' && item.decision?.verdict !== 'confirme') {
       const base = `lu dans la lecture ${lectureLabel(item.lecture!)} seulement, troisième regard ${regard ? 'sans réponse' : 'non fait'}`;
       doute(item.element.confiance === 'incertain' ? `${base} ; ${item.element.cause}` : base);
+    }
+    // les deux lectures ne le rattachent plus au même élément : l'une renvoyait à un élément écarté par le troisième regard, l'élément est gardé
+    // par l'autre (il est lu, ou mesuré, par les deux) mais son rattachement n'est plus qu'une lecture : un doute, avec sa cause
+    const autre = v === 'a' ? 'b' : 'a';
+    if (item.a && item.b && !tient(en, autre)) {
+      const note = `rattachement : la lecture ${lectureLabel(autre)} le rattachait à un élément écarté par le troisième regard, rattaché d'après la lecture ${lectureLabel(v)}`;
+      doute(e.confiance === 'incertain' ? `${e.cause} ; ${note}` : note);
     }
     return e;
   });

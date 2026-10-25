@@ -108,9 +108,9 @@ describe('deliver — raison et classe d\'une livraison rouge (L282)', () => {
 
   it('R7 — journal historique « jour sha raison » (sans classe) : lu avec une classe inconnue, ses jours comptés comme avant', () => {
     const dir = tempDir();
-    writeFileSync(join(dir, 'deliveries-failed.log'), '2026-10-10 abc CI en échec : ci\nn importe quoi\n2026-10-11 def [ci] CI en échec ⏎ a ⏎ b\n2026-10-12 ghi [bizarre] x\n');
+    writeFileSync(join(dir, 'deliveries-failed.log'), '2026-10-10 abc livraison annulée à la main\nn importe quoi\n2026-10-11 def [ci] CI en échec ⏎ a ⏎ b\n2026-10-12 ghi [bizarre] x\n');
     expect(readFailedEntries(dir)).toEqual([
-      { day: '2026-10-10', sha: 'abc', cls: null, reason: 'CI en échec : ci', tail: [] },
+      { day: '2026-10-10', sha: 'abc', cls: null, reason: 'livraison annulée à la main', tail: [] },
       { day: '2026-10-11', sha: 'def', cls: 'ci', reason: 'CI en échec', tail: ['a', 'b'] },
       { day: '2026-10-12', sha: 'ghi', cls: null, reason: '[bizarre] x', tail: [] },
     ]);

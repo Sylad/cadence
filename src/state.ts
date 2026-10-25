@@ -234,7 +234,7 @@ export function appendFailedDelivery(dir: string, day: Day, sha: string, reason:
 export interface FailedDelivery {
   day: Day;
   sha: string;
-  /** null : ligne d'avant la classe (L282) ou classe inconnue. */
+  /** null : ligne d'avant la classe (L282) dont le libellé n'est pas reconnu, ou classe inconnue. */
   cls: FailClass | null;
   reason: string;
   tail: string[];
@@ -259,6 +259,16 @@ export function readDeliveries(dir: string): Day[] | null {
   }
 }
 
+/** Classe d'une ligne écrite avant la classe [cls] (L282), déduite du libellé que `deliver` écrit lui-même ; null si le libellé n'est pas l'un des siens. */
+function classFromReason(reason: string): FailClass | null {
+  const script = /^script de livraison en échec \((?:code (\d+)|[^)]*)\)/.exec(reason);
+  if (script) return script[1] === '2' ? 'refus' : 'deploiement';
+  if (/^(?:déploiement en échec|CADENCE_DEPLOYED_FILE )/.test(reason)) return 'deploiement';
+  if (/^(?:CI en échec|CI non terminée|gh run list en échec)/.test(reason)) return 'ci';
+  if (/^vérification en échec/.test(reason)) return 'verification';
+  return null;
+}
+
 /** Les livraisons rouges de `deliveries-failed.log`, dans l'ordre du fichier ; une ligne illisible est ignorée, un fichier absent ou illisible donne aucune livraison rouge. Lecture seule : ne crée rien. */
 export function readFailedEntries(dir: string): FailedDelivery[] {
   try {
@@ -270,8 +280,10 @@ export function readFailedEntries(dir: string): FailedDelivery[] {
         if (!m || !isDay(m[1]!)) return [];
         let reason = m[3] ?? '';
         const c = /^\[(\w+)\] ?/.exec(reason);
-        const cls = c && (FAIL_CLASSES as readonly string[]).includes(c[1]!) ? (c[1] as FailClass) : null;
-        if (cls) reason = reason.slice(c![0].length);
+        const written = c && (FAIL_CLASSES as readonly string[]).includes(c[1]!) ? (c[1] as FailClass) : null;
+        if (written) reason = reason.slice(c![0].length);
+        // Sans [cls] écrit : le fichier n'est jamais réécrit, la classe se déduit du libellé à la lecture.
+        const cls = written ?? (c ? null : classFromReason(reason));
         return [{ day: m[1] as Day, sha: m[2] ?? '', cls, reason, tail }];
       });
   } catch {

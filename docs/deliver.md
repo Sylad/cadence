@@ -69,7 +69,8 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   This is a list of likely patterns, not a guarantee: a secret of another shape printed by a
   command can still land in the log, which stays local (`<git common dir>/cadence/`). `cadence perf` reads classes and projects from it
   ([perf](perf.md#delivery-quality-and-the-tour-header-l227)); a line written before L282
-  has no class and counts as « non classée ».
+  has no `[class]`: it is read by its wording (the one `deliver` writes itself, see
+  [perf](perf.md#delivery-quality-and-the-tour-header-l227)) and counts as « non classée » only when the wording is not recognised. The file is never rewritten.
 - Every command is killed when it exceeds its budget (CI, `deployTimeout`, what is
   left of `verifyTimeout`) and reported as "délai dépassé". Killed means the
   whole tree, followed while the command runs: every 200 ms cadence lists the

@@ -3691,6 +3691,7 @@ lots:
     estimate: 0.25
     created: 2026-10-25
     started: 2026-10-25
+    review: { date: 2026-10-25, verdict: "conforme : 0 bloquant, 0 majeur, 2 notes mineures (docs/deliver.md:117 parle encore d'un processus d'arrière-plan « jamais attendu » ; deux entrées de CHANGELOG pour un même lot non publié). Les tests (d) à (g) échouent tous contre l'ancien code, et (a) passe 32 fois sur 32 sous une charge de 40 à 73. — orchestré (vague 2026-10-25-1345, 2 passe(s) de correction)", commit: e0933e373b9a7e5cc722cbee188a5860fabad42a, reporte: { de: 1a90d8a69d5544340f04509643a19f1cb23d2d0d, vers: e0933e373b9a7e5cc722cbee188a5860fabad42a, patchId: 9bae36e5e8e310939f6ed9ffe66280117eed24a0 } }
   - id: L330
     title: "mise en service : purge des anciennes copies — ~/.local/share/cadence/releases garde un worktree détaché par version mise en service, jamais retiré : 41 copies, 2,5 Go le 25-10 ; npm run service garde la version servie + les 3 précédentes (retour arrière, ordre de mise en service), retire les autres (git worktree remove + prune), jamais une copie qu'un processus utilise encore (cwd ou binaire d'un processus vivant) ; la purge est dite dans la sortie (n copies retirées, place libérée) ; doc (docs/stabilite.md ou la page de la mise en service) et CHANGELOG ; tests"
     status: doing

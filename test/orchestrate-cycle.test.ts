@@ -6,7 +6,7 @@ import { renderTable } from '../src/orchestrate/table.js';
 import { Plan } from '../src/plan.js';
 import { coveredTasks } from '../src/audit.js';
 import { TEMPLATES_DIR } from '../src/orchestrate/briefs.js';
-import { Budget, REVIEW_RESERVE, countInterrupted, isNonQuestion, lotSpent, runLot } from '../src/orchestrate/cycle.js';
+import { Budget, DROPPED, REVIEW_RESERVE, countInterrupted, isNonQuestion, lotSpent, runLot } from '../src/orchestrate/cycle.js';
 import { runPool } from '../src/orchestrate/pool.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
 import { projectLogDir, readAgents } from '../src/orchestrate/launch.js';
@@ -1280,6 +1280,38 @@ describe('revue coupée (L256)', () => {
     expect(readFileSync(join(h.store.dir, 'demo--L1', '2-review.first.err'), 'utf8')).toBe('warn');
     expect(readFileSync(join(h.store.dir, 'demo--L1', '2-review.first.json'), 'utf8')).toContain('texte libre');
     expect(c.lot.status).toBe('handed-back');
+  });
+
+  it("L332 — créneau abandonné avant le départ de l'étape (--stop-after-current) d'un lot porteur d'une réponse du lead : la réponse reste en attente, la reprise la joue dans le brief", async () => {
+    const h = harness({ script: { implement: [() => { throw new SlotAbandoned('arrêt demandé (--stop-after-current)'); }, impl()] } });
+    const c = h.lot('L1');
+    c.lot.pendingAnswer = 'SQLite';
+    await runLot(c);
+    expect(c.lot.status).toBe('suspended');
+    expect(c.lot.next).toBe('implement');
+    expect(c.lot.steps).toEqual([]); // l'étape n'a pas eu lieu
+    expect(c.lot.pendingAnswer).toBe('SQLite');
+    expect(h.store.readLot('demo', 'L1')!.pendingAnswer).toBe('SQLite'); // et sur disque, d'où --resume la relit
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'implement', 'review']);
+    expect(h.calls[1].brief).toContain('Answer from the human to your earlier question: SQLite');
+    expect(c.lot.pendingAnswer).toBeNull(); // consommée par la session qui a vraiment démarré
+  });
+
+  it("L332 — créneau abandonné par --drop d'un lot porteur d'une réponse du lead : la sortie du lot dit que la réponse n'a pas été jouée", async () => {
+    const h = harness({ script: { implement: [() => { throw new SlotAbandoned(DROPPED); }] } });
+    const c = h.lot('L1');
+    c.lot.pendingAnswer = 'SQLite';
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toBe(`${DROPPED} ; la réponse du lead (« SQLite ») n'a pas été jouée`);
+  });
+
+  it("L332 — créneau abandonné par --drop sans réponse en attente : la sortie reste celle du retrait seul", async () => {
+    const h = harness({ script: { implement: [() => { throw new SlotAbandoned(DROPPED); }] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.outcome).toBe(DROPPED);
   });
 
   it('R5 — revue coupée puis réussie : le lot est prêt, la relance est signalée, la session coupée est comptée au budget et sa sortie d\'erreur gardée', async () => {

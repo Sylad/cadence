@@ -563,6 +563,9 @@ export const STOP_REQUESTED = 'arrêt demandé (--stop-after-current)';
 const dropped = (c: LotCtx): boolean => c.wave.store.control().drops.includes(lotKey(c.lot.project, c.lot.lot));
 export const DROPPED = 'retiré de la vague (--drop)';
 
+/** Mention de la réponse du lead restée en attente : un lot rendu sans que la session l'ait lue le dit (comme overBudget). */
+const unplayedAnswer = (l: LotState): string => (l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '');
+
 /** Pourquoi plus aucune session ne doit partir (incident, quota, budget), sinon null. */
 function halted(w: WaveCtx, lot?: LotState): string | null {
   if (w.store.control().stopAfterCurrent) return STOP_REQUESTED;
@@ -599,7 +602,7 @@ async function session(c: LotCtx, kind: SessionKind, local?: false): Promise<Don
 async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Done | null | typeof LOCAL_FAILED> {
   const w = c.wave;
   const l = c.lot;
-  if (dropped(c)) return stop(c, 'handed-back', DROPPED);
+  if (dropped(c)) return stop(c, 'handed-back', DROPPED + unplayedAnswer(l));
   const halt = halted(w, l);
   if (halt) return suspend(c, halt);
   const write = kind === 'implement' || kind === 'fix' || kind === 'spec' || kind === 'accept';
@@ -630,6 +633,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   const mcpConfig = writeMcpConfig(w.store.lotDir(l.project, l.lot), kind, l.visible, l.small, !!l.screen);
   const playwright = !!mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright;
   if (playwright) l.uxCaptures = join(dirname(mcpConfig), 'playwright');
+  const answerInBrief = l.pendingAnswer; // gardée pour la rendre si la session ne part jamais (créneau abandonné, L332)
   l.pendingAnswer = null; // la réponse est dans le brief : elle ne repart pas avec la session suivante
   const tmpDir = w.store.tmpDir(l.project, l.lot); // TMPDIR de la session, aussi en --add-dir : hors du cwd, un Write y serait refusé en `claude -p`
   // Délai (L298) : l'étape d'écriture est proportionnée à l'estimate et à la fiche du lot, puis prolongée à chaque échéance où elle a commité.
@@ -696,8 +700,11 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   });
   if (outcome instanceof SlotAbandoned) {
     // L332 : la demande est arrivée pendant l'attente d'un créneau. Une étape qui n'a pas démarré (aucun pid) n'a pas eu lieu : elle ne figure pas à l'état.
-    if (step.pid === undefined) l.steps.pop();
-    else {
+    // Rien de ce que le brief a consommé n'a servi : la réponse du lead (retirée de pendingAnswer avant le lancement) revient, la reprise rejoue l'étape avec elle.
+    if (step.pid === undefined) {
+      l.steps.pop();
+      l.pendingAnswer = answerInBrief;
+    } else {
       // Une session de l'étape a déjà tourné (le pid est le sien) et c'est son lancement SUIVANT qui attendait un créneau (relance d'une session coupée, relance de mise en forme) :
       // sa sortie, son identifiant et ses jetons sont gardés, la cause dit ce qui n'a pas eu lieu.
       const dir = w.store.lotDir(l.project, l.lot);
@@ -730,7 +737,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       step.ended = new Date().toISOString();
       w.saveWave();
     }
-    return outcome.reason === DROPPED ? stop(c, 'handed-back', DROPPED) : suspend(c, outcome.reason);
+    return outcome.reason === DROPPED ? stop(c, 'handed-back', DROPPED + unplayedAnswer(l)) : suspend(c, outcome.reason);
   }
   step.ended = new Date().toISOString();
   const dir = w.store.lotDir(l.project, l.lot);

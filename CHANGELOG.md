@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-10-26
+
 ### Added
 
 - `cadence config set <key> <value> --all [--dry-run] [--depth n]` (L342, `docs/lead.md`): sets or changes a key in the `cadence.yaml` of every project of the folder (the ones `lead tour` lists), comments and order kept, creates a config lot quoting the key in each (`raf add` + `raf start`), commits with explicit paths, never pushes, lists what it did and what it skipped (dirty files, key already set, read-only plan), and stops on a project whose config does not read back with cadence's own loaders.

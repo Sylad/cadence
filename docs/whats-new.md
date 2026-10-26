@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.13.0**: `cadence release` prepares the version commit; `cadence config set --all` sets one key in every project; waves share the machine between sessions, reserve a budget for the escalation and tolerate the lead's delivery push.
 - **1.12.1**: the escalation line of the final table follows the lot's state (a lot withdrawn or failed during its escalation no longer reads « en cours »), and a test that raced on the GitHub runner is deterministic.
 - **1.12.0**: `orchestrate.escalation: { model: fable }` plays one correction and one fresh review on that model before a wave hands a lot back; absent, nothing changes.
 - **1.11.0**: a new `orchestrate` skill gives the command line of a wave without `/lead`; the `deliver` skill says how to deliver a commit that is not `HEAD` (push that sha alone first, never forced).
@@ -31,6 +32,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.13.0**: a lead of several projects loses less time on what is not the lot's fault. `cadence release patch|minor|major` (L341, `docs/releasing.md`) prepares the version commit (versions, CHANGELOG, checks of `docs/whats-new.md`) and prints the publication steps in order, without publishing anything. `cadence config set <key> <value> --all` (L342, `docs/lead.md`) sets one key in the `cadence.yaml` of every project of the folder, comments and order kept, with a config lot and a commit per project. In a wave, every session and the test gate get their share of the machine (`CADENCE_TEST_WORKERS`, cores ÷ session cap, L350), so suites no longer time out under the load of their neighbours; the lot's budget keeps a share for the escalation when `orchestrate.escalation` is declared (L349), so the escalation can actually play; the lead's own push of a ready lot during a wave no longer stops a running lot (L352, guards tested by L353); the `implement` brief asks for a real walkthrough of what was delivered and lists the human's decisions found in the notes of the lot and its parent (L344). Two tests of cadence that turned red only inside a wave are deterministic again (L355, L356).
 
 **1.12.1**: fixes after 1.12.0. The « escalade » line of the final table follows the lot's state (L338): a lot handed back or failed during its escalation before the model's verdict (`--resume --drop`, step exception, incident of the repository) reads « engagée, lot rendu avant le verdict du modèle » instead of « en cours », and only an escalated session that returned nothing (model unavailable to the account, cut, timeout) counts as `échec` in the table and in `cadence perf`, whose `--json` key list in `docs/perf.md` now names `escalations` and `quality`. Two tests of the worktree integration that raced on the order in which two lots take the integration lock — one of them failed the first publication run of 1.11.0 — now force that order (L339).
 

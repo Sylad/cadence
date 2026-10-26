@@ -50,6 +50,17 @@ export function failedTests(output: string): string[] {
   return [...found].sort();
 }
 
+/** Fichiers de test qui ne se chargent pas (vitest « FAIL  a.test.ts [ a.test.ts ] »), triés, sans doublon : les échecs que `failedTests` laisse de côté faute de test à nommer. */
+export function unloadedSuites(output: string): string[] {
+  const found = new Set<string>();
+  for (const raw of output.replace(ANSI, '').split('\n')) {
+    if (!FILE_LOAD_FAIL.test(raw)) continue;
+    const name = raw.replace(/^\s*FAIL\s+/, '').replace(/\s+\[[^\]]*\]\s*$/, '').trim();
+    if (name) found.add(name);
+  }
+  return [...found].sort();
+}
+
 /** Échecs d'après le lot qui n'étaient pas rouges au départ (`nouveaux`) et ceux qui l'étaient déjà (`existants`). */
 export function compareBaseline(now: string[], base: string[]): { nouveaux: string[]; existants: string[] } {
   const was = new Set(base);

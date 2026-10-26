@@ -79,7 +79,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- `cadence verify --gate --sha <sha> [--project <dir>]` (L348, `docs/deliver.md`, `skills/lead`): replays the project's gate (`orchestrate.build`, then `orchestrate.test`) at a sha in a throwaway worktree whose untracked dependencies are linked from the main tree, prints green or red with the failing tests, and removes the worktree. The dependencies are the ones of the new `orchestrate.worktreeDeps` list of `cadence.yaml`, or, when it is absent, the same ignored folders as the worktrees of a wave. The lead skill uses it at the « re-verify » point. Seen on 26-10: the re-verification of a lot in a bare worktree gave nine red suites that only missed their dependencies, and was redone in the shared tree.
+- `cadence verify --gate --sha <sha> [--project <dir>]` (L348, `docs/deliver.md`, `skills/lead`): replays the project's gate (`orchestrate.build`, then `orchestrate.test`) at a sha in a throwaway worktree whose untracked dependencies are linked from the main tree, prints green or red with the failing tests, and removes the worktree. The dependencies are the ones of the new `orchestrate.worktreeDeps` list of `cadence.yaml`, or, when it is absent, the same ignored folders as the worktrees of a wave. The lead skill uses it at the « re-verify » point. Seen on 26-10: the re-verification of a lot in a bare worktree gave nine red suites that only missed their dependencies, and was redone in the shared tree. A signal received by cadence kills the running command and removes the worktree; test files that do not load are named in the report.
 
 ### Changed
 

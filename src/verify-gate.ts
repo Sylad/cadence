@@ -3,7 +3,8 @@ import { lstatSync, mkdtempSync, rmSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { OrchestrateConfig } from './config.js';
-import { failedTests, hasUnnamedFailure } from './orchestrate/baseline.js';
+import { onTermination } from './proc.js';
+import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
 import { git, gitFailure, linkDeclared, linkIgnored } from './orchestrate/worktree.js';
 
 /** Délai de chaque commande de la porte : celui du rejeu de la ligne de base de la vague. */
@@ -17,8 +18,19 @@ interface Ran {
   output: string;
 }
 
-/** Une commande `sh -c` dans `cwd`, sortie standard et d'erreur réunies ; au délai, tout son groupe de processus est tué. */
-function sh(cmd: string, cwd: string, timeoutMs: number): Promise<Ran> {
+function killGroup(pgid: number): void {
+  try {
+    process.kill(-pgid, 'SIGKILL');
+  } catch {
+    // groupe déjà vide
+  }
+}
+
+/**
+ * Une commande `sh -c` dans `cwd`, sortie standard et d'erreur réunies ; au délai, tout son groupe de processus est tué.
+ * `group` reçoit le groupe en cours : le nettoyage d'un signal reçu par cadence le tue avant de retirer le worktree.
+ */
+function sh(cmd: string, cwd: string, timeoutMs: number, group: { pgid?: number }): Promise<Ran> {
   return new Promise((resolve) => {
     const child = spawn('sh', ['-c', cmd], { cwd, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const pgid = child.pid;
@@ -26,19 +38,17 @@ function sh(cmd: string, cwd: string, timeoutMs: number): Promise<Ran> {
       child.once('error', (e) => resolve({ code: 127, output: e.message }));
       return;
     }
+    group.pgid = pgid;
     let output = '';
     for (const stream of [child.stdout, child.stderr]) stream.on('data', (d: Buffer) => (output += d.toString()));
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      try {
-        process.kill(-pgid, 'SIGKILL');
-      } catch {
-        // groupe déjà vide
-      }
+      killGroup(pgid);
     }, timeoutMs);
     child.once('close', (code) => {
       clearTimeout(timer);
+      group.pgid = undefined;
       resolve({ code: timedOut ? 124 : (code ?? 1), output: timedOut ? `${output}\ndélai dépassé (${Math.round(timeoutMs / 60_000)} min)` : output });
     });
   });
@@ -73,6 +83,23 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
   }
   const dir = mkdtempSync(join(tmpdir(), 'cadence-verify-'));
   const links: string[] = [];
+  const group: { pgid?: number } = {};
+  const cleanup = (): void => {
+    if (group.pgid !== undefined) killGroup(group.pgid);
+    for (const k of links) if (lstatSync(k, { throwIfNoEntry: false })?.isSymbolicLink()) unlinkSync(k);
+    try {
+      git(repo, 'worktree', 'remove', '--force', dir);
+    } catch {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    try {
+      git(repo, 'worktree', 'prune');
+    } catch {
+      // rien à élaguer
+    }
+  };
+  // Ctrl-C, SIGTERM ou raccrochage reçu par cadence : la commande est tuée et le worktree retiré avant de mourir du signal.
+  const forget = onTermination(cleanup);
   try {
     try {
       git(repo, 'worktree', 'add', '--detach', '-f', dir, sha);
@@ -89,33 +116,27 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
     }
     let red = 0;
     for (const step of steps) {
-      const r = await sh(step.cmd, dir, ctx.timeoutMs ?? GATE_TIMEOUT_MS);
+      const r = await sh(step.cmd, dir, ctx.timeoutMs ?? GATE_TIMEOUT_MS, group);
       if (r.code === 0) {
         out(`✓ ${step.name} (${step.cmd})`);
         continue;
       }
       red++;
       out(`✗ ${step.name} (${step.cmd}) — code ${r.code}`);
-      const names = step.name === 'tests' ? failedTests(r.output) : [];
+      const tests = step.name === 'tests';
+      const names = tests ? failedTests(r.output) : [];
+      const unloaded = tests ? unloadedSuites(r.output) : [];
       for (const n of names) out(`  - ${n}`);
-      if (names.length === 0 || hasUnnamedFailure(r.output)) {
-        if (names.length) out('  (au moins un échec que la sortie ne rattache à aucun test)');
+      for (const n of unloaded) out(`  - ${n} (ne se charge pas)`);
+      if (names.length + unloaded.length === 0 || hasUnnamedFailure(r.output)) {
+        if (names.length + unloaded.length) out('  (au moins un échec que la sortie ne rattache à aucun test)');
         if (r.output.trim()) for (const l of r.output.trimEnd().split('\n').slice(-TAIL_LINES)) out(`  | ${l}`);
       }
     }
     out(red === 0 ? `verify --gate ${short} : vert` : `verify --gate ${short} : rouge (${red} étape${red > 1 ? 's' : ''} sur ${steps.length})`);
     return red === 0 ? 0 : 1;
   } finally {
-    for (const k of links) if (lstatSync(k, { throwIfNoEntry: false })?.isSymbolicLink()) unlinkSync(k);
-    try {
-      git(repo, 'worktree', 'remove', '--force', dir);
-    } catch {
-      rmSync(dir, { recursive: true, force: true });
-    }
-    try {
-      git(repo, 'worktree', 'prune');
-    } catch {
-      // rien à élaguer
-    }
+    forget();
+    cleanup();
   }
 }

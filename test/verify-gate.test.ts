@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readOrchestrateConfig } from '../src/config.js';
 import { verifyGate } from '../src/verify-gate.js';
-import { cleanupTempDirs, gitRepo } from './helpers.js';
+import { cleanupTempDirs, gitRepo, tempDir } from './helpers.js';
 
 afterEach(cleanupTempDirs);
 
@@ -131,6 +131,75 @@ describe('verifyGate : la porte rejouée au sha dans un worktree jetable (L348)'
   });
 });
 
+describe('verifyGate : délai, noms des suites, signal (L348)', () => {
+  it('au délai : tout le groupe est tué, code 124 et rouge, worktree retiré', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: "sleep 30"\n');
+    const lines: string[] = [];
+    const t0 = Date.now();
+    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), out: (l) => lines.push(l), timeoutMs: 300 });
+    expect(Date.now() - t0).toBeLessThan(10_000);
+    expect(code).toBe(1);
+    expect(lines.join('\n')).toContain('code 124');
+    expect(lines.join('\n')).toContain('délai dépassé');
+    expect(leftovers(repo)).toBe(1);
+  });
+
+  it('les suites qui ne se chargent pas sont nommées une à une', async () => {
+    const { repo, sha } = project(`orchestrate:\n  test: "printf ' FAIL  test/a.test.ts [ test/a.test.ts ]\\\\n FAIL  test/b.test.ts [ test/b.test.ts ]\\\\n Test Files  2 failed (2)\\\\n'; exit 1"\n`);
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(1);
+    expect(r.text).toContain('- test/a.test.ts');
+    expect(r.text).toContain('- test/b.test.ts');
+  });
+
+  it.each(['SIGINT', 'SIGTERM'] as const)('%s reçu par cadence : la commande de la porte meurt et le worktree est retiré', async (sig) => {
+    const { repo, sha } = project('orchestrate:\n  test: "echo $$ > pid.txt; exec sleep 30"\n');
+    const probe = join(tempDir(), 'probe.ts');
+    writeFileSync(
+      probe,
+      `import { verifyGate } from ${JSON.stringify(join(process.cwd(), 'src/verify-gate.ts'))};\n` +
+        `import { readOrchestrateConfig } from ${JSON.stringify(join(process.cwd(), 'src/config.ts'))};\n` +
+        `process.exitCode = await verifyGate({ repo: ${JSON.stringify(repo)}, sha: ${JSON.stringify(sha)}, config: readOrchestrateConfig(${JSON.stringify(join(repo, 'cadence.yaml'))}), out: (l) => console.log(l) });\n`,
+    );
+    const child = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
+    let said = '';
+    child.stdout!.on('data', (d: Buffer) => (said += d.toString()));
+    const exited = new Promise<NodeJS.Signals | null>((r) => child.on('exit', (_c, s) => r(s)));
+    const wait = async (ok: () => boolean, ms: number) => {
+      const t0 = Date.now();
+      while (!ok() && Date.now() - t0 < ms) await new Promise((r) => setTimeout(r, 50));
+      return ok();
+    };
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    let cmdPid = 0;
+    try {
+      const pidFile = () => readdirSync(tmpdir()).map((n) => join(tmpdir(), n, 'pid.txt')).find((f) => f.includes('cadence-verify-') && existsSync(f));
+      expect(await wait(() => !!pidFile() && readFileSync(pidFile()!, 'utf8').trim() !== '', 20_000)).toBe(true);
+      cmdPid = Number(readFileSync(pidFile()!, 'utf8').trim());
+      process.kill(child.pid!, sig);
+      expect(await exited).toBe(sig);
+      expect(await wait(() => !alive(cmdPid), 3_000)).toBe(true);
+      expect(leftovers(repo)).toBe(1);
+      expect(said).not.toContain('vert');
+    } finally {
+      for (const pid of [child.pid!, cmdPid]) {
+        try {
+          if (pid) process.kill(pid, 'SIGKILL');
+        } catch {
+          // déjà mort
+        }
+      }
+    }
+  }, 40_000);
+});
+
 describe('cadence verify --gate (L348)', () => {
   const io = (cwd: string) => {
     const lines: string[] = [];
@@ -171,6 +240,14 @@ describe('cadence verify --gate (L348)', () => {
     const c = io(parent);
     expect(await run(['verify', '--gate', '--project', 'absent', '--sha', 'HEAD'], c.io)).toBe(2);
     expect(c.lines.join('\n')).toContain('absent');
+  });
+
+  it('--project qui n\'a pas son propre dépôt git (simple sous-dossier) : code 2 qui le dit', async () => {
+    const parent = gitRepo();
+    mkdirSync(join(parent, 'app'));
+    const c = io(parent);
+    expect(await run(['verify', '--gate', '--project', 'app', '--sha', 'HEAD'], c.io)).toBe(2);
+    expect(c.lines.join('\n')).toContain('propre dépôt git');
   });
 
   it('--gate refuse --retry (il ne vaut que pour deliver.verify)', async () => {

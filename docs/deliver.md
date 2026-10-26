@@ -305,7 +305,8 @@ verify --gate 6b0d9aa : rouge (1 étape sur 2)
 ```
 
 Both commands always run, even when the first is red, so the report is whole. A red step lists the failing
-tests the output names (the same reading as the wave's baseline); with none identifiable, the last 10 lines of the output.
+tests the output names (the same reading as the wave's baseline) and the test files that do not load (`- test/a.test.ts (ne se charge pas)`, the typical sign of a missing dependency); with none identifiable, the last 10 lines of the output.
+Each command has 30 minutes (then its whole process group is killed, code 124). Ctrl-C, SIGTERM or a hangup received by cadence kills the running command and removes the worktree before cadence dies.
 `--sha` is required (the moving head of a wave is not a sha to re-verify) and `--retry` does not apply. Exit code:
 **0** green · **1** red · **2** nothing to replay (neither `orchestrate.build` nor `orchestrate.test`), unknown sha or a worktree that cannot be made.
 Each command has 30 minutes. The Node of the `.nvmrc` is not selected here: the commands run with the `PATH` of the caller.

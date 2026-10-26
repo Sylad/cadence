@@ -61,6 +61,30 @@ export function unloadedSuites(output: string): string[] {
   return [...found].sort();
 }
 
+/** Sortie sans les séquences de couleur du lanceur. */
+export const stripAnsi = (s: string): string => s.replace(ANSI, '');
+
+/**
+ * jest : le fichier de chaque « ● Suite › test » et de chaque ligne « FAIL projet fichier » (nom rouge à part entière avec displayName), celui de la dernière ligne `FAIL fichier` qui le précède dans la même sortie (L354). Un test jest ne porte pas son fichier dans son nom ;
+ * sans cette lecture on ne saurait pas quel fichier rejouer pour lui, ni si le rejeu l'a couvert.
+ */
+export function jestTestFiles(output: string): Map<string, string> {
+  const files = new Map<string, string>();
+  let file: string | null = null;
+  for (const raw of stripAnsi(output).split('\n')) {
+    const f = /^\s*(PASS|FAIL)\b(.*)$/.exec(raw);
+    if (f) {
+      // « FAIL src/a.test.ts », « FAIL src/a.test.ts (6.21 s) » (jest ajoute la durée au-delà de 5 s : un fichier lent sous charge) ou « FAIL projet src/a.test.ts » (displayName) : le fichier est le dernier mot. Toute autre ligne PASS/FAIL ne désigne aucun fichier : ne pas garder le précédent.
+      const last = f[1] === 'FAIL' ? f[2].replace(/\s*\([^)]*\)\s*$/, '').trim().split(/\s+/).pop() ?? '' : '';
+      file = /^[^\s|]+\.\w+$/.test(last) ? last : null;
+      if (file) files.set(clean(f[2]), file); // « FAIL projet fichier » est lui-même un nom rouge (failedTests) : son fichier est le sien
+    }
+    const t = /^\s*●\s+(.+)$/.exec(raw);
+    if (t && file) files.set(clean(t[1]), file);
+  }
+  return files;
+}
+
 /** Échecs d'après le lot qui n'étaient pas rouges au départ (`nouveaux`) et ceux qui l'étaient déjà (`existants`). */
 export function compareBaseline(now: string[], base: string[]): { nouveaux: string[]; existants: string[] } {
   const was = new Set(base);

@@ -3937,6 +3937,8 @@ lots:
     after: [ L350 ]
     created: 2026-10-26
     started: 2026-10-26
+    notes:
+      - { date: 2026-10-26, text: "26-10 (lead, arbitrage après 3 passes Fable) : restreindre le rejeu seul aux portes à lanceur UNIQUE — orchestrate.testReplay refusé à la lecture de cadence.yaml quand orchestrate.test est une porte composée (&&, ||, sous-shells) ; pas de prise en charge des portes composées dans ce lot ; les constats restants sur les portes composées tombent avec cette restriction" }
   - id: L355
     title: "test/orchestrate-snapshot.test.ts : 2 tests rouges dans l'environnement d'une session de vague (même au sha de départ), verts dans un shell — trouver la dépendance à l'environnement de la vague et rendre le test hermétique ; il a rendu L346 malgré l'escalade le 26-10"
     status: done
@@ -3978,6 +3980,8 @@ lots:
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
+    notes:
+      - { date: 2026-10-26, text: "26-10 (lead, arbitrage après escalade) : R5 lance un node -e qui importe un .ts — avec engines >=22.18 (lot Node minimal, décision de Sylvain) il passe tel quel ; à défaut, le lancer via vite-node. Rejouer après le lot Node minimal." }
   - id: L361
     title: "orchestrate : un lot dont la porte du PROGRAMME est verte (checks tests code 0) et dont la session rapporte vert:false avec nouveauxEchecs vide (que des echecsDeBase) part quand même en correction puis en escalade « tests rouges » — il doit aller à la revue sans passe de correction, comme le dit docs/orchestrate.md ; test ; constat L354 et L346 du 26-10 (escalade Fable jouée pour rien)"
     status: done
@@ -3999,6 +4003,26 @@ lots:
     status: todo
     estimate: 0.25
     after: [ L343 ]
+    created: 2026-10-26
+  - id: L364
+    title: "intégration en mode worktree : quand l'avance rapide de main est refusée parce que main a bougé pendant l'intégration (commit de plan du lead, autre lot), refaire le rebase et les tests au nouveau sommet (une ou deux fois) au lieu de rendre le lot ; journal « main a avancé pendant l'intégration, rebase rejoué » ; test ; constat L347 du 26-10 (« Not possible to fast-forward », commit de clôture de L361 par le lead au même moment)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-26
+  - id: L365
+    title: "Node minimal : engines.node >=22.18 (Node 20 n'est plus maintenu depuis avril 2026 ; 22.18 exécute les .ts sans outil, ce dont les tests dépendent) ; CI tests.yml en matrice Node 22 et 24 ; CHANGELOG « Changed » avec avertissement explicite ; docs/stabilite.md : la version minimale de Node suit les LTS maintenues ; publication en version MINEURE avec avertissement (décision de Sylvain du 26-10) ; R5 de L360 passe alors sans contournement"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-26
+  - id: L366
+    title: "verrou d'acceptation : un lot d'écran clos à la main (raf done) avec acceptation-<lot>.json à vert: false bloque toutes les vagues suivantes du dépôt (« verrou des tests d'acceptation … premier commit fautif » sur des lots qui n'y touchent pas) — (1) cadence spec green <lot> : lance la commande d'acceptation du lot clos et, verte, pose vert: true comme le cycle (commit cité) ; (2) raf done d'un lot à vert: false avertit, refuse sans --force ; (3) le dry-run signale à l'avance une acceptation rouge d'un lot clos ; doc, CHANGELOG, tests. Issue GitHub #18"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-26
+  - id: L367
+    title: "couverture d'un document de référence : (1) chaque élément de inventaire.json a un id stable (page/zone/élément) ; (2) agent planificateur (propose seulement) : lit l'inventaire et le plan, propose des lots citant les ids couverts, faisable ou bloqué (donnée ou service manquant nommé), dépendances ; (3) cadence ref coverage <inventaire.json> (programme, sans modèle) : éléments sans lot, sans lot fait et sans exclusion écrite avec sa raison, code 1 s'il en reste ; (4) le brief du spec-writer porte les ids de son lot et justifie chaque élément non pris, le ux-reviewer les vérifie sur l'écran fini ; doc, CHANGELOG, tests. Issue GitHub #19"
+    status: todo
+    estimate: 1
     created: 2026-10-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

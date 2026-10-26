@@ -3958,11 +3958,12 @@ lots:
     created: 2026-10-26
   - id: L359
     title: "cadence release : l'étape 7 imprimée omet « claude plugin marketplace update cadence » avant « claude plugin update cadence@cadence » (sans elle le plugin installé reste à l'ancienne version) et « /reload-plugins » ; constat de la publication 1.13.0 (26-10)"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "compliant (1 commit 932a56c : étape 7 imprimée en trois lignes, marketplace update, plugin update, /reload-plugins ; 1 note mineure : la branche marketplace sans nom n'a pas de test) — orchestré (vague 2026-10-26-1500, 0 passe(s) de correction)", commit: be09796bfb7d3cba288efb53999d66aa77fb3764, reporte: { de: 932a56c94a29e8b6060495808e64b016a914331b, vers: be09796bfb7d3cba288efb53999d66aa77fb3764, patchId: 9f2d2e023a9c106f60e23eafa93a04037f5be25e } }
+    finished: 2026-10-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

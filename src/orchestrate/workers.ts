@@ -24,11 +24,11 @@ export function testWorkersText(n: number): string {
 
 /**
  * Le fichier à rejouer seul pour un test rouge : « fichier > suite > test » (vitest), « fichier::test » (pytest), « fichier » seul (jest : `FAIL src/a.test.ts`).
- * Null quand le nom n'en désigne aucun (rien à rejouer seul) : y compris le « Suite › test » de jest, que `isJestTest` rattache aux fichiers FAIL de la même sortie.
+ * En espace de travail le nom est précédé de « |paquet| » : ce n'est pas une partie du chemin. Null quand le nom n'en désigne aucun (rien à rejouer seul) : y compris le « Suite › test » de jest, que `isJestTest` rattache aux fichiers FAIL de la même sortie.
  */
 export function replayFile(test: string): string | null {
   const head = test.includes('::') ? test.split('::')[0] : test.includes(' > ') ? test.split(' > ')[0] : /^\S+$/.test(test.trim()) ? test : '';
-  const file = head.trim();
+  const file = head.trim().replace(/^\|[^|\s]*\|\s+/, ''); // espace de travail vitest : « |paquet|  src/a.test.ts »
   return /^\S.*\.\w+$/.test(file) ? file : null;
 }
 

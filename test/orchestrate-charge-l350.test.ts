@@ -238,6 +238,18 @@ describe('L350 R4 — un test rouge de la porte est rejoué seul avant d\'être 
     expect(replayFile('src/a.test.ts')).toBe('src/a.test.ts'); // jest : « FAIL src/a.test.ts », le fichier seul
     expect(replayFile('Suite › charge')).toBeNull(); // jest : « ● Suite › test », sans fichier (rattaché aux FAIL fichier de la sortie par le rejeu)
   });
+  it('R4 — espace de travail vitest : le préfixe « |projet| » n\'est pas une partie du chemin à rejouer', () => {
+    expect(replayFile('|pa|  src/a.test.js > casse')).toBe('src/a.test.js');
+    expect(replayFile('|pa| src/a.test.js > suite > casse')).toBe('src/a.test.js');
+  });
+  it('R4 — un rejeu seul qui n\'exécute aucun test (« No test files found », code 0) ne vaut pas vert : le rouge reste compté', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const test = `f() { [ -f a.txt ] || exit 0; [ -f b.txt ] && exit 0; if [ -n "$1" ]; then echo 'No test files found, exiting with code 0'; exit 0; fi; echo ' FAIL  |pa|  src/a.test.js > casse'; exit 1; }; f "$@"`;
+    const c = h.lot('L1', {}, { test });
+    await runLot(c);
+    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
+    expect(c.lot.instables ?? []).toEqual([]);
+  });
   it('R4 — un chemin à espaces ou caractères de shell est quoté pour le rejeu', () => {
     expect(shellArg('test/a.test.ts')).toBe('test/a.test.ts');
     expect(shellArg("test/a b's.test.ts")).toBe("'test/a b'\\''s.test.ts'");

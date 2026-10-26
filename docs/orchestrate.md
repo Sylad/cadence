@@ -860,7 +860,12 @@ the `.nvmrc` again for every live lot and refuses it like at start if it can no 
 The file is read trimmed (`22`, `v22`, `22.22`, `v22.22.3`); the highest matching version installed under
 `$NVM_DIR/versions/node` (default `~/.nvm/versions/node`) **that has an executable `bin/node`** is used: a higher
 version with an empty or broken `bin` is skipped for a lower valid one (and `--dry-run` says so); if none is valid
-the lot is refused. Only the sessions' environment changes,
+the lot is refused. The same `PATH` goes to every command the program
+launches itself — `orchestrate.test`, `orchestrate.build` (the baseline run at the start sha included), `start`, the acceptance
+runs and `verdict` — so the gate judges the lot under the Node the session wrote it for, not under the one the wave was
+started with. `--dry-run` adds `⚠ .nvmrc 24 ≠ node du PATH v20.20.2 : …` under the lot when `orchestrate.test` or
+`orchestrate.build` is declared and the `node` the `PATH` resolves does not match the `.nvmrc` (nothing is printed without a
+gate, without a `node` on the `PATH`, or when they match). Only the environment of the sessions and of these commands changes,
 never the orchestrator's own. No `.nvmrc` → nothing changes. A `.nvmrc` that cannot be resolved (`lts/*`, an
 alias, a version not installed) refuses the lot before anything is started (exit 2), naming the requested
 version and the folder searched — there is no silent fallback to the default Node. `--dry-run` prints

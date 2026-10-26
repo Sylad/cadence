@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { parse } from 'yaml';
 import { toolBinOf, withoutLaunchVars } from './snapshot.js';
 import { randomUUID } from 'node:crypto';
-import { basename, dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
+import { basename, delimiter, dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
@@ -252,9 +252,18 @@ async function againstBaseline(c: LotCtx, command: string, output: string): Prom
 const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g, '\\$&');
 
 /** Commande du projet, asynchrone : la boucle d'événements reste libre (délai de l'autre créneau, signaux). Son groupe est tué au délai et au signal. */
+/**
+ * PATH des commandes que le programme lance lui-même (porte, ligne de base, démarrage, acceptation, verdict) : le même que celui des sessions,
+ * le lien `node-bin/<version>` du .nvmrc du lot en tête (L351). Sans .nvmrc, rien : le PATH hérité reste tel quel.
+ */
+function nodePath(c: LotCtx): { PATH?: string } {
+  const link = c.lot.node?.link;
+  return link ? { PATH: [toolBinOf(c.wave.store.dir), link, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {};
+}
+
 function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000, env: Record<string, string> = {}, cwd = wd(c)): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
-    const child = spawn('sh', ['-c', command], { cwd, env: { ...withoutLaunchVars(process.env), ...(c.wave.testWorkers ? { [TEST_WORKERS_ENV]: String(c.wave.testWorkers) } : {}), ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawn('sh', ['-c', command], { cwd, env: { ...withoutLaunchVars(process.env), ...nodePath(c), ...(c.wave.testWorkers ? { [TEST_WORKERS_ENV]: String(c.wave.testWorkers) } : {}), ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const pid = child.pid;
     if (pid === undefined) {
       child.once('error', (e) => resolve({ code: 127, output: String(e.message) }));

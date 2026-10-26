@@ -1331,6 +1331,38 @@ describe('Node du projet (.nvmrc)', () => {
     expect((await run(parent, ['a:L1', '--wave', 'w1'], f.deps, { NVM_DIR: nvm })).code).toBe(0);
   });
 
+  describe('--dry-run : .nvmrc différent du Node du PATH (L351)', () => {
+    const dry = async (declared: Record<string, string> | null, pathNode: string | null, nvmrc = '24') => {
+      const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+      writeFileSync(join(dirs.a, '.nvmrc'), nvmrc);
+      if (declared) {
+        writeFileSync(join(dirs.a, 'cadence.yaml'), `orchestrate:\n  precheck: false\n${Object.entries(declared).map(([k, v]) => `  ${k}: '${v}'`).join('\n')}\n`);
+        git(dirs.a, 'commit', '-q', '-am', 'chore: porte');
+      }
+      const f = fakeDeps();
+      f.deps.pathNode = () => pathNode;
+      const r = await run(parent, ['a:L1', '--dry-run'], f.deps, { NVM_DIR: fakeNvm(['v20.20.2', 'v24.1.0']) });
+      removeDryRunBriefs(r.out.join('\n'));
+      return r.out.filter((l) => l.includes('PATH'));
+    };
+
+    it("R4 — une porte déclarée et un Node du PATH hors .nvmrc : le dry-run le signale, avec les deux versions", async () => {
+      const lines = await dry({ test: 'npm test' }, 'v20.20.2');
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain('.nvmrc 24');
+      expect(lines[0]).toContain('v20.20.2');
+      expect(lines[0]).toContain('v24.1.0');
+    });
+    it('R5 — orchestrate.build seul est aussi une porte', async () => {
+      expect(await dry({ build: 'npm run build' }, 'v20.20.2')).toHaveLength(1);
+    });
+    it('R6 — aucun avertissement sans porte déclarée, ni quand le Node du PATH correspond, ni sans node dans le PATH', async () => {
+      expect(await dry(null, 'v20.20.2')).toEqual([]);
+      expect(await dry({ test: 'npm test' }, 'v24.3.0')).toEqual([]);
+      expect(await dry({ test: 'npm test' }, null)).toEqual([]);
+    });
+  });
+
   it('--dry-run : une ligne node par lot avec .nvmrc, rien sans', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
     writeFileSync(join(dirs.a, '.nvmrc'), '22');

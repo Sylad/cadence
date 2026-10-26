@@ -59,6 +59,8 @@ export interface OrchestrateDeps {
   claudeHome?: string;
   /** Création du dossier de liens Node d'une vague ; défaut `linkNodeBin` (injectable pour simuler un échec). */
   linkNode?: typeof linkNodeBin;
+  /** Version du `node` que trouve le PATH du programme (L351), null s'il n'y en a pas ; défaut : `node --version` ; injectable pour les tests. */
+  pathNode?: () => string | null;
   /**
    * Instantané d'une vague (L61) : au vrai lancement, le paquet est copié dans `<vague>/tool/` et le processus se relance
    * depuis cette copie. Absent (tests, processus déjà relancé) : la vague tourne sur le paquet courant, sans copie.
@@ -437,6 +439,22 @@ function waveId(io: OrchestrateIo, requested: string | undefined, launch: string
   return id;
 }
 
+/** Version du `node` que le PATH donné résout (`node --version`), null s'il n'y en a pas ou s'il ne répond pas. */
+function pathNodeVersion(env: Record<string, string | undefined>): string | null {
+  try {
+    return execFileSync('node', ['--version'], { env: { ...process.env, ...env }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000 }).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** La version (`v24.1.0`) commence-t-elle par ce que demande le .nvmrc (`24`, `v24`, `24.1`) ? */
+function matchesNvmrc(version: string, wanted: string): boolean {
+  const v = version.replace(/^v/, '');
+  const w = wanted.replace(/^v/, '');
+  return v === w || v.startsWith(`${w}.`);
+}
+
 function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budget: number, id: string): void {
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-orchestrate-'));
   const agents = agentsOf(deps);
@@ -458,6 +476,9 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const sk = l.node.skipped;
       const skipped = sk?.length ? ` ; ${sk.join(', ')} ${sk.length > 1 ? 'écartées' : 'écartée'} : pas de node exécutable` : '';
       io.out(`  node : ${l.node.version} (.nvmrc ${l.node.wanted}${skipped})`);
+      const gate = env.config.test || env.config.build;
+      const onPath = gate ? (deps.pathNode ?? (() => pathNodeVersion(io.env)))() : null;
+      if (onPath && !matchesNvmrc(onPath, l.node.wanted)) io.out(`  ⚠ .nvmrc ${l.node.wanted} ≠ node du PATH ${onPath} : la porte et les autres commandes du programme tournent sous ${l.node.version} (lien node-bin en tête du PATH), pas sous ${onPath}`);
     }
     const steps: { kind: 'precheck' | 'spec' | 'maquette' | 'fiche' | 'accept' | 'implement' | 'ux' | 'review' | 'review-small'; model: StepModel }[] = [{ kind: 'implement', model: l.model }];
     const specStage = !!(l.screen || l.specLot);

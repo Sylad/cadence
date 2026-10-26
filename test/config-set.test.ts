@@ -185,4 +185,22 @@ describe('cadence config set --all (L342)', () => {
     expect(r.out).toContain('groupe/gamma');
     expect(readFileSync(join(g, 'cadence.yaml'), 'utf8')).toContain('build: x');
   });
+  it('R12 — le commentaire de l\'ancienne valeur d\'un projet ne passe pas dans un autre projet', () => {
+    const parent = tempDir();
+    project(parent, 'alpha', { 'cadence.yaml': 'orchestrate:\n  escalation: { model: x } # commentaire propre à alpha\n' });
+    const b = project(parent, 'beta', { 'cadence.yaml': 'orchestrate:\n  worktrees: true\n' });
+    const r = cadence(parent, 'config', 'set', 'orchestrate.escalation', '{ model: fable }', '--all');
+    expect(r.code).toBe(0);
+    expect(readFileSync(join(b, 'cadence.yaml'), 'utf8')).toBe('orchestrate:\n  worktrees: true\n  escalation: { model: fable }\n');
+  });
+
+  it('R13 — lancée dans un projet seul (sans sous-projet), elle traite ce projet, comme lead tour', () => {
+    const parent = tempDir();
+    const a = project(parent, 'alpha', { 'cadence.yaml': COMMENTED });
+    const r = cadence(a, 'config', 'set', 'orchestrate.build', 'npx tsc --noEmit', '--all');
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/alpha.*L1/);
+    expect(readFileSync(join(a, 'cadence.yaml'), 'utf8')).toContain('build: npx tsc --noEmit');
+    expect(git(a, 'rev-list', '--count', 'HEAD').trim()).toBe('2');
+  });
 });

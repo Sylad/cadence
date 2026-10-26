@@ -1,12 +1,12 @@
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { isNode, isScalar, parse, parseDocument, type Document } from 'yaml';
 import { defaultPlan, readDocsConfig, readHookConfig, readMigrateConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readReferencesConfig, readSessionConfig } from './config.js';
 import type { Day } from './dates.js';
 import { parseDeliverConfig } from './deliver.js';
 import { commitPaths, dirtyPaths, gitRoot } from './git.js';
-import { findProjects } from './lead.js';
+import { findProjects, isProject } from './lead.js';
 import { Plan, RafError, type PlanSettings } from './plan.js';
 
 const KEY = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/;
@@ -67,7 +67,7 @@ export function setKey(text: string, key: string, value: Document): string | nul
   if (doc.errors.length > 0) throw new RafError(doc.errors[0]!.message.split('\n')[0]!);
   const path = key.split('.');
   const old = doc.getIn(path, true);
-  const next = value.contents;
+  const next = value.clone().contents; // une copie par projet : le commentaire de l'ancienne valeur ne passe pas au projet suivant
   if (JSON.stringify(doc.getIn(path)) === JSON.stringify(value.toJS())) return null;
   if (isScalar(old) && isScalar(next)) old.value = next.value; // la même case : son commentaire de fin de ligne reste
   else {
@@ -89,7 +89,8 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
   if (value.errors.length > 0 || value.contents == null) throw new RafError(`valeur illisible en YAML : ${valueText} — ${value.errors[0]?.message.split('\n')[0] ?? 'vide'}`);
   const shown = valueText.trim().replace(/\s+/g, ' ');
 
-  const projects = findProjects(parent, opts.depth);
+  let projects = findProjects(parent, opts.depth);
+  if (projects.length === 0 && isProject(parent)) projects = [parent]; // comme lead tour : sans sous-projet, le dossier lui-même s'il en est un
   if (projects.length === 0) return { lines: [`aucun projet sous ${parent} (.cadence/raf.yaml, docs/plan/raf.yaml ou cadence.yaml avec plan:)`], code: 0 };
 
   const lines: string[] = [];
@@ -97,7 +98,7 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
   let skipped = 0;
   let stopped = false;
   for (const [i, dir] of projects.entries()) {
-    const name = relative(parent, dir).split('\\').join('/');
+    const name = relative(parent, dir).split('\\').join('/') || basename(dir);
     const skip = (why: string) => {
       skipped++;
       lines.push(`– ${name} · sauté : ${why}`);

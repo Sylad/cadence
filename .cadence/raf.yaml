@@ -3850,11 +3850,12 @@ lots:
       - { date: 2026-10-26, text: "mineurs de revue non repris (26-10) : note sans date d'un plan tenu par un autre outil → « -  (B28): … » sans date (decisions.ts:26) ; R9 ne vérifie pas « aucune ligne vide de plus » ; décisions du lot répétées dans le brief (objective() les reprend déjà : jusqu'à 2,4 k caractères en double, 43 k sur 61 lots) — à reprendre si cadence perf montre le coût" }
   - id: L345
     title: "orchestrate : nom de modèle libre partout — @<modèle> d'un lot et orchestrate.review (light, full) passent le nom tel quel à claude --model, comme escalation.model ; les alias haiku|sonnet|opus gardent leur sens ; le dry-run avertit (sans refuser) pour un nom hors des alias connus ; doc (orchestrate, cadence.yaml), CHANGELOG, tests. Issue GitHub #16 : @fable refusé (« modèle inconnu »), alors que l'escalade l'accepte"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
-    review: { date: 2026-10-26, verdict: "compliant — orchestré (vague 2026-10-26-1500, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: edc816cd170674e434725e909885dea7ad7742d4 }
+    review: { date: 2026-10-26, verdict: "conforme — relu par le lead après la revue légère : @<modèle> et review.light/full acceptent un nom libre ([\\w.-]+), alias gardés, avertissement du dry-run hors alias ; suite complète verte sur main (171 fichiers, 3820 tests, tsc)", commit: edc816cd170674e434725e909885dea7ad7742d4 }
+    finished: 2026-10-26
   - id: L346
     title: "plan.onWrite dans cadence.yaml : commande lancée par raf (add, start, done, note, ux, review, public…) et par orchestrate après chaque écriture du plan, dont les fichiers produits entrent dans le même commit que le plan (chemins déclarés, ex. plan.onWrite: { command: npm run plan, files: [frontend/public/plan-data/plan.json] }) ; échec de la commande = écriture refusée et dite, plan inchangé ; générique ; doc, CHANGELOG, tests ; puis la clé posée dans finance-tracker, ol-companion, warhammer40k (lots de config). Constat du 26-10 : plan.json de finance régénéré à la main sans --news, CI « Plan publié à jour » rouge, livraison relancée"
     status: doing

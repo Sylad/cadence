@@ -82,6 +82,38 @@ describe('push du lead pendant la vague (L352)', () => {
     expect(h.wave.incident).toBeNull();
     expect(logs.some((l) => /push du lead \(livraison du plan\) toléré/.test(l))).toBe(true);
   });
+
+  it('R6 — un push forcé qui rembobine main vers un ancêtre de HEAD reste un incident', async () => {
+    const { h, c } = scenario(
+      (cwd, ready) => git(cwd, 'push', '-q', '-f', 'origin', `${ready}~1:main`),
+      (repo, ready) => git(repo, 'push', '-q', 'origin', `${ready}:main`),
+    );
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(h.wave.incident).toMatch(/push détecté/);
+  });
+
+  it('R7 — un push quand un lot de la vague est illisible dans le plan reste un incident', async () => {
+    const { h, c } = scenario((cwd, ready) => git(cwd, 'push', '-q', 'origin', `${ready}:main`));
+    // un lot de la vague que le plan ne connaît pas : ses commits ne peuvent pas être lus
+    h.store.writeLot({ ...h.lot('L1').lot, lot: 'L9', status: 'doing' });
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(h.wave.incident).toMatch(/push détecté/);
+  });
+
+  it('R8 — un commit qui ne cite aucun lot passe : la garde ne vise que les lots de la vague pas prêts', async () => {
+    const { h, c, logs } = scenario(
+      (cwd) => git(cwd, 'push', '-q', 'origin', 'HEAD:main'),
+      (repo, ready) => {
+        git(repo, 'push', '-q', 'origin', `${ready}:main`);
+        commitFile(repo, 'sans-lot.txt', 'chore: sans lot');
+      },
+    );
+    await runLot(c);
+    expect(h.wave.incident).toBeNull();
+    expect(logs.some((l) => /push du lead \(livraison du plan\) toléré/.test(l))).toBe(true);
+  });
 });
 
 /** Un commit qui ne touche que le plan. */

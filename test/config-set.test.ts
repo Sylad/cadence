@@ -273,6 +273,14 @@ describe('config set — report décalé et clés lues par lead / orchestrate (L
     expect((parseDocument(out).toJS() as { orchestrate: Record<string, unknown> }).orchestrate).toEqual({ test: 'x', note: 'b' });
   });
 
+  it('un décalage qui déplace un commentaire sans changer les données ne passe pas le report : la clé reste sous orchestrate, le commentaire de la section suivante au-dessus de docs', () => {
+    const text = 'orchestrate: # la porte\n  test: x\n# section docs (L143)\ndocs:\n  sync:\n    paths: [src/**,\n      bin/*.js]\n';
+    const out = setKey(text, 'orchestrate.build', parseDocument('npx tsc --noEmit'))!;
+    const lines = out.split('\n');
+    expect(lines[lines.indexOf('# section docs (L143)') + 1]).toBe('docs:');
+    expect((parseDocument(out).toJS() as { orchestrate: Record<string, unknown> }).orchestrate.build).toBe('npx tsc --noEmit');
+  });
+
   it('une valeur de lead.ux, depth ou priority que le chargeur refuse arrête le passage, rien n\'est écrit', () => {
     for (const [key, value, message] of [['lead.ux', 'bogus', /lead\.ux/], ['depth', '0', /depth/], ['priority', '[]', /priority/]] as const) {
       const parent = tempDir();

@@ -111,8 +111,14 @@ function onlyChangedLines(original: string, baseline: string, changed: string): 
   while (head < b.length && head < c.length && b[head] === c[head]) head++;
   let tail = 0;
   while (tail < b.length - head && tail < c.length - head && b[b.length - 1 - tail] === c[c.length - 1 - tail]) tail++;
+  // Les lignes reportées doivent être celles que yaml a écrites au même endroit : un commentaire que yaml a déplacé d'une ligne (compensé par une liste regroupée) ne se reporte pas.
+  const sameComments = (from: number, n: number, ofB: number) => Array.from({ length: n }, (_, k) => commentOf(o[from + k]!) === commentOf(b[ofB + k]!)).every(Boolean);
+  if (!sameComments(0, head, 0) || !sameComments(o.length - tail, tail, b.length - tail)) return changed;
   return [...o.slice(0, head), ...c.slice(head, c.length - tail), ...o.slice(o.length - tail)].join('\n');
 }
+
+/** Le commentaire d'une ligne (à partir du premier `#` en début de ligne ou après un blanc), '' sans commentaire ; une erreur sur un `#` de chaîne ne coûte que l'écriture entière. */
+const commentOf = (line: string) => /(^|\s)#.*$/.exec(line)?.[0].trim() ?? '';
 
 /**
  * `cadence config set <clé> <valeur> --all` (L342) : pose la même clé dans le cadence.yaml de chaque projet de `parent` (ceux que `lead tour` connaît),

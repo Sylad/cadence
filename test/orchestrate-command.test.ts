@@ -1820,6 +1820,40 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
     }
   });
 
+  it('L344 R6 — --dry-run sur un plan tenu par un autre outil (parent: mappé) : la décision écrite dans la note du lot parent atteint les briefs implement et fix', async () => {
+    const parent = mappedPlan(true);
+    const file = join(parent, 'a/docs/suivi/taches.yaml');
+    writeFileSync(
+      file,
+      [
+        'taches:',
+        '- id: B28',
+        '  titre: Lot parent',
+        '  etat: en_cours',
+        '  notes:',
+        '  - { date: "2026-10-22", text: "décision de Sylvain (22-10) : « champs exclus » = champs non remplis, pas retirés" }',
+        '  - { date: "2026-10-23", text: "revue de la vague : conforme" }',
+        '- id: B28.8',
+        `  titre: ${STALE}`,
+        '  etat: en_cours',
+        '  parent: B28',
+        `  objectif: ${GOAL}`,
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(join(parent, 'a/cadence.yaml'), 'plan:\n  path: docs/suivi/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, goal: objectif, parent: parent }\n  statuses: { doing: en_cours }\norchestrate:\n  precheck: false\n');
+    git(join(parent, 'a'), 'commit', '-qam', 'chore: parent et sous-lot');
+    const dry = await run(parent, ['a:B28.8', '--dry-run']);
+    expect(dry.code).toBe(0);
+    const briefs = dryBriefs(dry.out.join('\n'));
+    const withDecision = briefs.filter((b) => b.includes('Decisions to respect'));
+    expect(withDecision.length).toBeGreaterThanOrEqual(1);
+    for (const b of withDecision) {
+      expect(b).toContain('- 2026-10-22 (B28): décision de Sylvain (22-10) : « champs exclus »');
+      expect(b).not.toContain('(B28): revue de la vague');
+    }
+  });
+
   it('R3 — sans --goal, la clé goal: du lot remplace le titre ; --goal l\'emporte sur la clé', async () => {
     const { parent } = withGoalKey('Objectif de la clé');
     const byKey = await run(parent, ['a:L1', '--dry-run']);

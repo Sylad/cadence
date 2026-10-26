@@ -4031,6 +4031,7 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "conforme, 2 mineurs en notes (rollback de spec green sans test ; acceptation.json sale non refusé) — orchestré (vague 2026-10-26-1950, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 72114116ef427e2671026ca714d1c20a0ea36e8e }
   - id: L367
     title: "couverture d'un document de référence : (1) chaque élément de inventaire.json a un id stable (page/zone/élément) ; (2) agent planificateur (propose seulement) : lit l'inventaire et le plan, propose des lots citant les ids couverts, faisable ou bloqué (donnée ou service manquant nommé), dépendances ; (3) cadence ref coverage <inventaire.json> (programme, sans modèle) : éléments sans lot, sans lot fait et sans exclusion écrite avec sa raison, code 1 s'il en reste ; (4) le brief du spec-writer porte les ids de son lot et justifie chaque élément non pris, le ux-reviewer les vérifie sur l'écran fini ; doc, CHANGELOG, tests. Issue GitHub #19"
     status: doing

@@ -3864,9 +3864,10 @@ lots:
       - { date: 2026-10-26, text: "26-10 (lead) — réponse à la question de la vague 1125 : ne pas poser plan.onWrite dans finance-tracker, ol-companion et warhammer40k ; le lead la posera lui-même avec cadence config set après la publication de la version et la mise à jour du cadence installé. Terminer le lot sans cette partie et le dire dans le CHANGELOG / la doc si elle l'annonce." }
   - id: L347
     title: "lead tour et session start : une note de clôture qui cite un lot déjà done (ou dropped) est signalée « note périmée : L217 done le 24-10 » à côté de la note, au lieu d'être relayée telle quelle ; session-close propose de réécrire la note ; générique ; doc, tests. Constat du 26-10 : la note d'ol-companion « L217 à faire » a fait demander L217, livré deux jours plus tôt"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-26
+    started: 2026-10-26
   - id: L348
     title: "cadence verify --sha <sha> [--project p] : rejoue la porte du projet (orchestrate.test puis build) au sha dans un worktree jetable dont les dépendances non suivies (.venv, node_modules… liste dans cadence.yaml, orchestrate.worktreeDeps, ou la même que celle des worktrees de vague si elle existe) sont liées depuis l'arbre principal ; rend vert/rouge avec les suites en échec ; retire le worktree ; le skill lead l'emploie au point « re-vérifier » ; générique ; doc, tests. Constat du 26-10 : la re-vérification de B28.8 dans un worktree nu a donné 9 suites rouges dues aux dépendances absentes, refaite dans l'arbre partagé"
     status: todo

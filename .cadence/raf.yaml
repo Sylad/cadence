@@ -3880,7 +3880,7 @@ lots:
     finished: 2026-10-26
   - id: L350
     title: "porte de tests sous charge — part de machine par session : CADENCE_TEST_WORKERS = max(1, cœurs ÷ plafond de sessions) dans l'environnement des sessions et de la porte, consigne des gabarits (implement, fix, mineurs, bibliothécaire) aux lanceurs de tests (vitest --maxWorkers avec --minWorkers=1, jest --maxWorkers, pytest -n) ; le rejeu seul des rouges est RETIRÉ de ce lot (code, doc, CHANGELOG, tests) et part dans L354 — décision de Sylvain du 26-10 (portes composées : le fichier ajouté n'atteint que le dernier lanceur) ; doc, CHANGELOG, tests"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
@@ -3888,6 +3888,7 @@ lots:
       - { date: 2026-10-26, text: "26-10 (lead) : rendu deux fois faute de budget alors qu'il converge (1 bloquant + 3 majeurs → 1 majeur) ; reprise avec budget neuf" }
       - { date: 2026-10-26, text: "titre remplacé : « porte de tests sous charge : (1) un test rouge de la porte (orchestrate.test, ligne de base comprise) absent de la ligne de base est rejoué SEUL deux fois avant d'être compté ; s'il passe, il est noté « instable sous charge » (table, journal, cadence perf) et ne déclenche pas de passe de correction ; (2) chaque session reçoit sa part de la machine : CADENCE_TEST_WORKERS = max(1, cœurs ÷ plafond de sessions), passée dans l'environnement des sessions et de la porte, et les gabarits (implement, fix, porte) disent aux lanceurs de tests de la respecter (vitest --maxWorkers, jest --maxWorkers, pytest -n) ; doc, CHANGELOG, tests. Constat du 26-10 : 32 cœurs, plafond 4, vitest à 31 workers par suite : corrections vides de L344 (11 min), L342 (9), L349 (7), B28.12 (4), toutes « test qui passe seul » ; revue de L155 en délai dépassé »" }
     review: { date: 2026-10-26, verdict: "conforme : part de machine calculée, posée dans les sessions et la porte, consigne dans les 4 gabarits, doc et CHANGELOG à jour, rejeu seul retiré à l'identique du sha de départ ; aucun constat — orchestré (vague 2026-10-26-1345, 3 passe(s) de correction)", commit: d0d30a8ff0aed5d141afe7742b02ab3f7080fdfb, reporte: { de: b0394b08ace8882e644ba02214de027ba672eaaa, vers: d0d30a8ff0aed5d141afe7742b02ab3f7080fdfb, patchId: f2b2baa44323dfa0b6fac22db5a932c452f121ea } }
+    finished: 2026-10-26
   - id: L351
     title: "orchestrate : la porte (orchestrate.test, orchestrate.build, ligne de base comprise) et les autres commandes lancées par le programme tournent avec le même environnement Node que les sessions (lien node-bin/<version> du .nvmrc en tête du PATH) ; le dry-run signale un .nvmrc différent du Node du PATH quand une porte est déclarée ; doc, CHANGELOG, tests. Issue GitHub #17 : Node 24 demandé par .nvmrc, vague lancée sous Node 20, la porte échoue quoi que fasse le lot, passes de correction vides puis escalade pour rien"
     status: todo

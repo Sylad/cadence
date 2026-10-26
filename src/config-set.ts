@@ -85,7 +85,16 @@ export function setKey(text: string, key: string, value: Document): string | nul
   }
   const full = doc.toString({ lineWidth: 0 });
   const kept = onlyChangedLines(text, baseline, full);
-  return JSON.stringify(parse(kept)) === JSON.stringify(parse(full)) ? kept : full; // un report mal aligné change le sens du fichier : l'écriture entière de yaml
+  return readsAs(kept, full) ? kept : full; // un report mal aligné change le sens du fichier : l'écriture entière de yaml
+}
+
+/** Les deux textes sont le même document YAML ; un texte qui ne se lit pas (clés en double d'un report mal aligné) n'est pas le même. */
+function readsAs(text: string, expected: string): boolean {
+  try {
+    return JSON.stringify(parse(text)) === JSON.stringify(parse(expected));
+  } catch {
+    return false;
+  }
 }
 
 /**

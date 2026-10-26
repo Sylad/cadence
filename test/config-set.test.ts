@@ -267,6 +267,12 @@ describe('config set — report décalé et clés lues par lead / orchestrate (L
     expect(doc.lead).toEqual({ ux: 'lead' });
   });
 
+  it('un report qui ferait des clés en double (la ligne remplacée tombe entre les deux décalages) rend l\'écriture entière, lisible', () => {
+    const text = 'orchestrate: # la porte\n  test: x\n  note: a\ndocs:\n  sync:\n    paths: [src/**,\n      bin/*.js]\n';
+    const out = setKey(text, 'orchestrate.note', parseDocument('b'))!;
+    expect((parseDocument(out).toJS() as { orchestrate: Record<string, unknown> }).orchestrate).toEqual({ test: 'x', note: 'b' });
+  });
+
   it('une valeur de lead.ux, depth ou priority que le chargeur refuse arrête le passage, rien n\'est écrit', () => {
     for (const [key, value, message] of [['lead.ux', 'bogus', /lead\.ux/], ['depth', '0', /depth/], ['priority', '[]', /priority/]] as const) {
       const parent = tempDir();

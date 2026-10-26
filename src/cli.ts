@@ -1024,7 +1024,12 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
     return 0;
   }
   plan.note(cite, `test d'acceptation rescellé${livre ? ` (lot livré ${lotId}, ` : ' ('}${norm}, ${r.ficheAmendee ? `fiche amendée en ${r.ficheAmendee}` : 'fiche inchangée'}) : ${reason.trim()}`, ctx.today);
-  plan.save();
+  try {
+    plan.save();
+  } catch (e) {
+    // Le rescellé est commité (sha) : seul le plan est refusé (plan.onWrite en échec), il reste inchangé et la note n'est pas écrite ; dire « écriture refusée » seul laisserait croire que rien n'a été fait.
+    throw new RafError(`spec reseal : le rescellé a eu lieu (commit ${sha}) mais la note du lot n’a pas été écrite, le plan est inchangé — ${(e as Error).message} — relancer la commande dit « rien à resceller » : ajouter la note à la main (raf note ${cite}) une fois le plan réparé`);
+  }
   // La note du lot rejoint le dépôt dans la foulée (un dépôt sale arrêterait la vague suivante) ; un plan hors du dépôt ou non suivi reste à la main du lead.
   const planRel = relative(repo, plan.path);
   const produced = plan.produced;

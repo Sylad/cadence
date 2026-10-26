@@ -182,6 +182,22 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     expect(git(repo, 'status', '--porcelain').trim()).toBe('');
   });
 
+  it('L346 — plan.onWrite en échec : le rescellé commité est dit, la note n’est pas écrite, le plan reste inchangé', () => {
+    const { repo, a } = avecPlan();
+    writeFileSync(join(repo, 'cadence.yaml'), "plan:\n  onWrite: { command: 'exit 9', files: [plan.json] }\n");
+    commitPaths(repo, 'chore: onWrite', 'cadence.yaml');
+    writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'le test contredit la fiche');
+    const sha = git(repo, 'rev-parse', '--short', 'HEAD').trim();
+    expect(git(repo, 'log', '-1', '--format=%s').trim()).toMatch(/^test\(L1\): acceptation rescellée/);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain(`le rescellé a eu lieu (commit ${sha})`);
+    expect(r.err).toContain('plan.onWrite');
+    expect(r.err).toContain('la note du lot n’a pas été écrite');
+    expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).not.toContain('rescellé');
+    expect(git(repo, 'status', '--porcelain').trim()).toBe('');
+  });
+
   it('un plan tenu par un autre outil (lecture seule) : le rescellé réussit, la note du lot reste à la main du lead', () => {
     const { repo, a } = avecPlan();
     writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: .cadence/raf.yaml\n  lots: lots\n');

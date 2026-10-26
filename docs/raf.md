@@ -234,6 +234,7 @@ plan:
   `hook.autostart: start` pre-commit). A produced file that is not tracked yet is added. `raf` itself never commits: for its commands, `git add` the plan and the produced files together.
 - A command that fails (non-zero code, cannot start, time limit) **refuses the write**: the plan and the declared files are put back as they were, the command stops with
   `plan.onWrite en échec (<command>, code 7) : <last lines of its output> — écriture refusée, plan inchangé`, and in a wave the lot is handed back with that message. With `hook.autostart: start`, the pre-commit hook says `démarrage automatique refusé : plan.onWrite en échec …`, the lot stays todo and the commit goes through without the plan (never the « raf start fait par le hook » line).
+  `cadence spec reseal` commits the reseal before writing its note: if `plan.onWrite` then fails, the error says `le rescellé a eu lieu (commit <sha>) mais la note du lot n’a pas été écrite` (exit 2, plan unchanged); running the command again answers « rien à resceller », so add the note by hand with `raf note` once the generator works.
 - A read-only plan (kept by another tool) never runs the command: the project's tool owns the write.
 
 Until the file is declared, such a commit is reported as a "commit without a

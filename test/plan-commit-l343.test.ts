@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readPlanConfig } from '../src/config.js';
 import { commitMsgHook, commitMsgRefusal, leadAnswerMessage, planCommitMessage } from '../src/plan-commit.js';
@@ -153,6 +153,23 @@ describe('R5 — un refus du hook ne laisse pas le plan indexé, et le message d
     const r = await run(parent, ['a:L1', '--dry-run'], fake());
     removeDryRunBriefs(r.out);
     expect(r.out).toMatch(/✗ message de plan refusé par le hook commit-msg : « docs\(L1\): règle R3 sourcée .*subject-case/);
+  });
+  it('R5 — avec plan.onWrite (L346), un commit de plan refusé défait aussi le fichier produit encore non suivi, au lieu d\'échouer sur « pathspec did not match »', async () => {
+    // Premier plan publié : public/plan.json n'est pas encore au dépôt. `git restore --source=HEAD` sur lui échouerait et laisserait le plan modifié.
+    const { parent, repo } = setup([{ title: 'un' }]);
+    writeFileSync(join(repo, 'cadence.yaml'), "plan:\n  onWrite: { command: 'mkdir -p public && wc -l < .cadence/raf.yaml > public/plan.json', files: [public/plan.json] }\norchestrate:\n  precheck: false\n  worktrees: false\n");
+    git(repo, 'add', '--', 'cadence.yaml');
+    git(repo, 'commit', '-q', '-m', 'chore: onWrite');
+    hookConventionnel(repo, 'defaut');
+    const plan = readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8');
+    await run(parent, ['a:L1'], fake());
+    const lot = store(parent).readLot('a', 'L1')!;
+    expect(lot.status).toBe('failed');
+    expect(lot.outcome).not.toContain('pathspec');
+    expect(lot.outcome).toContain('type-enum');
+    expect(git(repo, 'status', '--porcelain', '--untracked-files=no')).toBe('');
+    expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).toBe(plan);
+    expect(existsSync(join(repo, 'public/plan.json'))).toBe(false);
   });
 });
 

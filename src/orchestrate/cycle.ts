@@ -11,7 +11,7 @@ import { PLAN_ACTIONS, leadAnswerMessage, planCommitMessage } from '../plan-comm
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
-import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, type Commit } from '../git.js';
+import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, restorePaths, type Commit } from '../git.js';
 import { blockingLots, gitCommitsIn } from './table.js';
 import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
@@ -224,7 +224,8 @@ async function commitPlan(c: LotCtx, message: string, root = c.lot.repo, before:
     // Ce que le lead avait modifié sans commiter (raf add, raf note pendant la session) est remis, pas effacé.
     git(repo, 'restore', '--staged', '--', ...dirty);
     const own = dirty.filter((f) => !before.has(f));
-    if (own.length) git(repo, 'restore', '--worktree', '--source=HEAD', '--', ...own);
+    // restorePaths : un fichier de plan.onWrite (L346) pas encore au dépôt est retiré, `git restore --source=HEAD` échouerait sur lui (pathspec) et laisserait le plan modifié.
+    if (own.length) restorePaths(repo, own);
     for (const [f, text] of before) {
       if (!dirty.includes(f)) continue;
       if (text === null) rmSync(join(repo, f), { force: true });

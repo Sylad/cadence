@@ -30,7 +30,7 @@ A version exists in three places and is published in two; a release does all of 
    while an existing one is left alone. If the package is on npm but the release is still missing, re-run the job;
    the by-hand fallback is `gh release create v<version> --title v<version> --notes-file <the section of CHANGELOG.md> --verify-tag`.
 
-`.github/workflows/tests.yml` runs the type-check and the test suite on the same runner image, Node 24 and `npm ci` as the publish job, and never publishes: start it with `gh workflow run tests.yml --ref <branch>` or by pushing a `diag/**` branch, to see on the runner what a red publish run saw.
+`.github/workflows/tests.yml` runs the type-check and the test suite on the same runner image and `npm ci` as the publish job, in a matrix of Node 22 and 24 (the minimum `engines.node` allows, and the Node the publish job uses), and never publishes: start it with `gh workflow run tests.yml --ref <branch>` or by pushing a `diag/**` branch, to see on the runner what a red publish run saw.
 
 The Claude Code plugin is read from the repository, so pushing `main` is what updates it; npm is what
 `npx @sylad/cadence` and a global install read, and only the tag publishes there. A missing tag, or a red

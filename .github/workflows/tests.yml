@@ -1,4 +1,4 @@
-# Diagnostic de la suite sur le runner GitHub, sans rien publier : même image, même Node 24, même identité git
+# Diagnostic de la suite sur le runner GitHub, sans rien publier : même image, Node 22 (le minimal, engines.node) et Node 24 (celui de publish.yml), même identité git
 # et même npm ci que le job de publish.yml. Lancement à la main (workflow_dispatch) ou par un push sur une branche diag/**.
 name: tests
 
@@ -13,6 +13,10 @@ permissions:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -22,7 +26,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           registry-url: https://registry.npmjs.org
 
       # Comme publish.yml, pour que npm soit le même.

@@ -31,5 +31,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 - The wording of the briefs and of the instructions inside the skills and the agents.
 - The **format of the sheets** (`fiche.yaml`: the screen sheet `templates/fiche.yaml`, the back-end sheet `templates/fiche-back.yaml`, the mixed sheet) and so the invariants `cadence spec check` enforces: experimental while the next bricks of the spec step (S3–S6) still reshape it, a sheet that passes today may be refused by a later release. The `spec` commands and their exit codes are guaranteed, the keys they read are not yet.
 
+**Node**: `engines.node` is `>=22.18` (the first Node that runs `.ts` files without a tool, which the test suite relies on). The minimum Node version follows the maintained LTS lines: when a Node line leaves maintenance, cadence raises its minimum in a **minor** release, announced under *Changed* in the [CHANGELOG](../CHANGELOG.md) with an explicit warning. Node 20, out of maintenance since April 2026, is no longer supported.
+
 There is no schema version and no migration: a file written by an earlier release keeps working, and a key a
 release adds is optional.

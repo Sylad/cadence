@@ -150,6 +150,21 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     expect(git(dir, 'status', '--porcelain').stdout).toBe('');
   });
 
+  it('start (L346) : plan.onWrite en échec — le refus est dit, le lot reste todo, le commit part sans le plan et sans message de démarrage', () => {
+    const { dir, env } = project('start');
+    writeFileSync(join(dir, 'cadence.yaml'), "hook:\n  autostart: start\nplan:\n  onWrite: { command: 'echo nope >&2; exit 5', files: [] }\n");
+    git(dir, 'add', 'cadence.yaml');
+    expect(spawnSync('git', ['commit', '-qm', 'chore: onWrite'], { cwd: dir, env, encoding: 'utf8' }).status).toBe(0);
+    const plan = planText(dir);
+    const r = work(dir, env, 'feat(L1): a');
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain('plan.onWrite en échec');
+    expect(r.stderr).not.toContain('fait par le hook');
+    expect(planText(dir)).toBe(plan);
+    expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.split('\n').filter(Boolean)).toEqual(['src.txt']);
+    expect(raf(dir, 'show', 'L1').out).toContain('todo');
+  });
+
   it('start : un lot déjà en cours, un commit sans lot ou du plan seul ne touchent pas au plan', () => {
     const { dir, env } = project('start');
     const plan = planText(dir);

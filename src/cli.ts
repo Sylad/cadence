@@ -776,11 +776,16 @@ function preCommit(load: (() => Plan) | null, mode: 'warn' | 'refuse' | 'start' 
       io.err(`raf: plan modifié non commité : démarrage automatique sauté (hook.autostart: start), raf start ${todo.join(' ')} à la main`);
       return 0;
     }
-    for (const id of todo) {
-      plan.setStatus(id, 'doing', today, {});
-      io.err(`raf: ${id} était todo — raf start ${id} fait par le hook, plan inclus dans ce commit`);
+    for (const id of todo) plan.setStatus(id, 'doing', today, {});
+    try {
+      plan.save();
+    } catch (e) {
+      if (!(e instanceof RafError)) throw e;
+      // plan.onWrite en échec (L346) : le plan est resté tel quel, le commit part sans lui et le dit.
+      io.err(`raf: démarrage automatique refusé : ${e.message} ; raf start ${todo.join(' ')} à la main`);
+      return 0;
     }
-    plan.save();
+    for (const id of todo) io.err(`raf: ${id} était todo — raf start ${id} fait par le hook, plan inclus dans ce commit`);
     stage(root, file);
     for (const f of plan.produced) stage(root, f);
   } catch {

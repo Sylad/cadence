@@ -257,3 +257,19 @@ export function commitPaths(root: string, paths: string[], message: string): str
   }
   return tryGit(root, ['rev-parse', '--short', 'HEAD']) ?? '';
 }
+
+/** Un fichier SUIVI est-il modifié (indexé ou non) ? Les fichiers non suivis ne comptent pas : un commit à chemins explicites ne les embarque pas. */
+export function hasTrackedChanges(cwd: string): boolean {
+  return git(cwd, ['status', '--porcelain', '--untracked-files=no']).trim() !== '';
+}
+
+/** Le tag existe-t-il (local) ? */
+export function tagExists(cwd: string, tag: string): boolean {
+  return git(cwd, ['tag', '--list', tag]).trim() !== '';
+}
+
+/** Branche courante, ou null sur un HEAD détaché. */
+export function currentBranch(cwd: string): string | null {
+  const name = git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+  return name === 'HEAD' ? null : name;
+}

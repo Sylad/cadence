@@ -29,6 +29,7 @@ import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRu
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedEntries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
 import { refCommand } from './ref/command.js';
+import { release } from './release.js';
 import { applyMigration, describeMigration, planMigration, unhandledError } from './migrate.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
 import { readHudContext } from './hud-context.js';
@@ -87,6 +88,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   cadence ref check <inventaire.json | lecture.json>   valide un inventaire ou une lecture (schéma version 1, modèle templates/inventaire.json) : une ligne « ✗ chemin : raison » par écart puis « N écart(s) » sur la sortie standard (code 1), le résumé par type sinon (code 0) ; fichier absent, vide ou illisible : code 2 ; n'appelle aucun outil système
   cadence ref eval <attendu.json | dossier> <lecture.json | dossier> [--json]   note une lecture contre l'inventaire attendu (vérité connue) : rappel et précision par type, faux lu (éléments sûrs et faux), pièges trouvés, tokens par page (usage.tokens de la lecture) ; lecture d'un autre document refusée (code 2) ; sur dossiers, un cas par sous-dossier (attendu.json / lecture.json)
   cadence ref corpus <dossier> [--sans-rendu]   écrit le corpus synthétique à vérité connue (7 pièges : texte ambigu levé par une figure, figure qui contredit, table en image, gabarit BUFR, contrôle translucide, page Proposal, scan bruité) : par cas document.html et attendu.json, puis document.pdf et page-<n>.png (1700×2200) rendus par Playwright (CADENCE_PLAYWRIGHT = dossier du paquet) ; dossier existant ou Playwright introuvable : code 2
+  cadence release patch|minor|major [--dry-run]   prépare le commit de version (package.json, package-lock.json, plugin.json, marketplace.json, CHANGELOG.md) sans commiter ni publier ; imprime les étapes du lead et vérifie docs/whats-new.md : refus sur un arbre sale, un [Unreleased] vide ou une version déjà taguée
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -270,6 +272,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   if (command === 'corrections') return corrections(rest, values, io);
   if (command === 'perf') return perf(rest, values, today, io);
   if (command === 'ref') return refCommand(rest, values, root, io);
+  // Prépare le commit de version : écrit les fichiers de version, ne commite ni ne publie rien (L341).
+  if (command === 'release') return release(rest, !!values['dry-run'], root, today, io.out);
   // Déplacer le plan ne lit pas le plan : pas d'avertissement « ancien emplacement » (L284).
   if (command === 'migrate') {
     if (rest.length > 0) throw new RafError('usage : raf migrate [--dry-run]');

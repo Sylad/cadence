@@ -13,7 +13,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref', 'config'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref', 'config', 'release'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -39,6 +39,9 @@ if (tool === 'raf') {
   cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]
                     mesure une zone d'une page rendue : couleurs, contraste WCAG 2.2, boîtes, mots OCR et taille de police estimée,
                     ramenés à 1440 px de large, tolérance déclarée
+  cadence release patch|minor|major [--dry-run]
+                    prépare le commit de version (fichiers de version, CHANGELOG) sans rien commiter ni publier ;
+                    imprime les étapes du lead dans l'ordre et vérifie docs/whats-new.md
   cadence verify [--retry secondes] [--sha rév]
                     rejoue les vérifications d'effet (deliver.verify) hors livraison, une passe, en parallèle ;
                     code 0 tout vert, 1 un effet rouge, 2 rien à vérifier ; « session start » la lance aussi

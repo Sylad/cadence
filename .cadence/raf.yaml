@@ -3918,10 +3918,11 @@ lots:
     finished: 2026-10-26
   - id: L354
     title: "porte de tests : rejeu seul d'un rouge avant de le compter, activé SEULEMENT quand le projet déclare une commande de rejeu explicite (ex. orchestrate.testReplay: \"npx vitest run --maxWorkers=$CADENCE_TEST_WORKERS --minWorkers=1 {files}\") ; sans elle, pas de rejeu et rien n'est tenu pour instable ; un rejeu où le test n'a pas tourné compte rouge ; le relecteur reçoit les noms des instables ; reprendre le travail de la branche de L350 (tag l350-rejeu-seul-26-10, commits a4362dc→28a8414) et les constats de ses revues (portes composées, :: avant >, checksText) ; doc, CHANGELOG, tests. Décision de Sylvain du 26-10 (coupe de L350)"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L350 ]
     created: 2026-10-26
+    started: 2026-10-26
   - id: L355
     title: "test/orchestrate-snapshot.test.ts : 2 tests rouges dans l'environnement d'une session de vague (même au sha de départ), verts dans un shell — trouver la dépendance à l'environnement de la vague et rendre le test hermétique ; il a rendu L346 malgré l'escalade le 26-10"
     status: done

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, realpathSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { orchestrate, realOrchestrateDeps, type OrchestrateDeps } from '../src/orchestrate/command.js';
 import { spawnSync } from 'node:child_process';
@@ -325,5 +326,13 @@ describe('(L61/t4) raf et cadence de l\'instantané', () => {
     expect(await orchestrate(['a:L1'], ioOf(parent, { CWD_FOR_TEST: parent }).io, deps)).toBe(0);
     expect(envs.length).toBeGreaterThan(0);
     for (const e of envs) expect(e.PATH.split(':')[0]).toBe(join(wave, 'tool/bin'));
+  });
+});
+
+describe('L355 — hermétique à l\'environnement de la session qui lance la suite', () => {
+  it('R1 — un paquet sans node_modules ne résout pas « yaml » même si le shell appelant pose NODE_PATH', () => {
+    const lone = tempDir();
+    writeFileSync(join(lone, 'package.json'), '{"name":"x"}\n');
+    expect(() => createRequire(join(lone, 'package.json')).resolve('yaml')).toThrow();
   });
 });

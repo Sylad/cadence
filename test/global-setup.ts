@@ -35,6 +35,10 @@ export default function setup(): () => void {
   if (stale.length) {
     console.warn(`[tests] ${stale.length} racine(s) temporaire(s) d'un run interrompu supprimée(s) : ${stale.join(', ')}`);
   }
+  // L355 : NODE_PATH (posé par une session de vague, jamais par un shell) fait résoudre « yaml » depuis n'importe quel paquet jetable :
+  // les tests « yaml introuvable » du fichier orchestrate-snapshot passaient au vert dans un shell et au rouge en session. Les workers héritent de l'environnement nettoyé.
+  const nodePath = process.env.NODE_PATH;
+  delete process.env.NODE_PATH;
   const root = mkdtempSync(join(realTmp, ROOT_PREFIX));
   writeFileSync(join(root, PID_FILE), pidFileText());
   // os.tmpdir() lit TMPDIR sous POSIX mais TEMP puis TMP sous win32 : on pose les trois.
@@ -46,6 +50,7 @@ export default function setup(): () => void {
   process.env.CADENCE_TEST_PACKAGE = buildThrowawayPackage(root);
   process.env.CADENCE_TEST_REAL_TMP = realTmp;
   return () => {
+    if (nodePath !== undefined) process.env.NODE_PATH = nodePath;
     for (const n of names) {
       if (previous[n] === undefined) delete process.env[n];
       else process.env[n] = previous[n];

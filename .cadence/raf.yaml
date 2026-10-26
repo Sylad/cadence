@@ -3854,9 +3854,10 @@ lots:
     created: 2026-10-26
   - id: L346
     title: "plan.onWrite dans cadence.yaml : commande lancée par raf (add, start, done, note, ux, review, public…) et par orchestrate après chaque écriture du plan, dont les fichiers produits entrent dans le même commit que le plan (chemins déclarés, ex. plan.onWrite: { command: npm run plan, files: [frontend/public/plan-data/plan.json] }) ; échec de la commande = écriture refusée et dite, plan inchangé ; générique ; doc, CHANGELOG, tests ; puis la clé posée dans finance-tracker, ol-companion, warhammer40k (lots de config). Constat du 26-10 : plan.json de finance régénéré à la main sans --news, CI « Plan publié à jour » rouge, livraison relancée"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-26
+    started: 2026-10-26
   - id: L347
     title: "lead tour et session start : une note de clôture qui cite un lot déjà done (ou dropped) est signalée « note périmée : L217 done le 24-10 » à côté de la note, au lieu d'être relayée telle quelle ; session-close propose de réécrire la note ; générique ; doc, tests. Constat du 26-10 : la note d'ol-companion « L217 à faire » a fait demander L217, livré deux jours plus tôt"
     status: todo

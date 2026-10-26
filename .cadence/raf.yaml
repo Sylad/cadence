@@ -3872,11 +3872,12 @@ lots:
     created: 2026-10-26
   - id: L349
     title: "budget de lot : réserver l'escalade quand orchestrate.escalation est déclarée — la correction et la revue escaladées (mesurées sur les escalades jouées depuis L337, sinon une estimation déclarée et documentée) s'ajoutent au budget dérivé de l'estimate, comme les 155 k de la dernière passe ; le dry-run affiche le budget avec sa part d'escalade ; cadence perf compte les escalades non jouées faute de budget ; doc (orchestrate.md, le tableau des budgets), CHANGELOG, tests. Constat du 26-10 : L341 (494 k / 600 k) et L342 (572 k / 600 k) rendus avec « escalade fable non jouée (budget) » — l'escalade ajoutée par L337 n'a jamais reçu de budget, elle ne joue donc que sur les lots qui ont consommé peu, l'inverse de son but"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "compliant, 2 minor notes (stale estimate wording, inexact fix formula in orchestrate.md:81) — orchestré (vague 2026-10-26-1230, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (c46821e) n'a changé que l'emplacement des deux entrées L349 du CHANGELOG, sous « [Unreleased] / Fixed » à la suite de L342 ; le code, les tests et la doc du lot sont identiques à la version revue", commit: 9fedf74c688ef43a9ba1b74372fdf21d9fc26f9e }
+    finished: 2026-10-26
   - id: L350
     title: "porte de tests sous charge : (1) un test rouge de la porte (orchestrate.test, ligne de base comprise) absent de la ligne de base est rejoué SEUL deux fois avant d'être compté ; s'il passe, il est noté « instable sous charge » (table, journal, cadence perf) et ne déclenche pas de passe de correction ; (2) chaque session reçoit sa part de la machine : CADENCE_TEST_WORKERS = max(1, cœurs ÷ plafond de sessions), passée dans l'environnement des sessions et de la porte, et les gabarits (implement, fix, porte) disent aux lanceurs de tests de la respecter (vitest --maxWorkers, jest --maxWorkers, pytest -n) ; doc, CHANGELOG, tests. Constat du 26-10 : 32 cœurs, plafond 4, vitest à 31 workers par suite : corrections vides de L344 (11 min), L342 (9), L349 (7), B28.12 (4), toutes « test qui passe seul » ; revue de L155 en délai dépassé"
     status: doing

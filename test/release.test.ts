@@ -378,6 +378,30 @@ describe('cadence release — docs/whats-new.md', () => {
     expect(r.out).toMatch(/ligne de « In two lines » mal placée/);
   });
 
+  it('R10 — le paragraphe long placé hors de « Version by version » (sous la ligne courte, avant l’introduction, en tête du fichier) est signalé', () => {
+    const para = '**1.2.4**: the long paragraph.\n\n';
+    const without = WHATS_NEW_DONE.replace(para, '');
+    const variants = {
+      'sous la ligne courte': without.replace('- **1.2.3**: the old release.\n', `- **1.2.3**: the old release.\n\n${para}`),
+      'avant l’introduction': without.replace('Intro of the long form.\n\n', `${para}Intro of the long form.\n\n`),
+      'en tête du fichier': `${para}${without}`,
+    };
+    for (const [where, text] of Object.entries(variants)) {
+      const dir = project({ whatsNew: text });
+      const r = release(dir, 'patch');
+      expect(r.code, where).toBe(1);
+      expect(r.out, where).toMatch(/paragraphe long (manquant|mal placé)/);
+      expect(r.out, where).not.toMatch(/les deux formes de 1\.2\.4 sont là/);
+    }
+  });
+
+  it('R10 — une ligne courte placée dans « Version by version » n’est pas la ligne de « In two lines »', () => {
+    const text = WHATS_NEW_DONE.replace('- **1.2.4**: a short line.\n', '').replace('**1.2.4**: the long paragraph.', '- **1.2.4**: a short line.\n\n**1.2.4**: the long paragraph.');
+    const r = release(project({ whatsNew: text }), 'patch');
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/ligne de « In two lines » manquante/);
+  });
+
   it('R10 — --dry-run n’échoue pas pour des formes qui ne peuvent pas encore exister, il dit où elles iront', () => {
     const dir = project();
     const r = release(dir, 'patch', '--dry-run');
@@ -411,5 +435,55 @@ describe('cadence release — générique', () => {
     const r = release(dir, 'patch');
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/package\.json/);
+  });
+});
+
+describe('cadence release — le plugin du marketplace', () => {
+  const side = (dir: string) => json(dir, '.claude-plugin/marketplace.json').plugins;
+
+  it('R13 — le plugin du marketplace est celui qui porte le nom de plugin.json ; les autres gardent leur version', () => {
+    const dir = project();
+    release(dir, 'patch');
+    expect(side(dir).map((p: { name: string; version: string }) => [p.name, p.version])).toEqual([['acme', '1.2.4'], ['acme-side', '0.5.0']]);
+  });
+
+  it('R13 — sans plugin.json, le plugin du marketplace est celui qui était à la version du paquet', () => {
+    const dir = project();
+    execFileSync('git', ['rm', '-q', '.claude-plugin/plugin.json'], { cwd: dir });
+    commit(dir, 'chore: sans plugin.json');
+    release(dir, 'patch');
+    expect(side(dir).map((p: { name: string; version: string }) => [p.name, p.version])).toEqual([['acme', '1.2.4'], ['acme-side', '0.5.0']]);
+  });
+
+  it('R13 — un nom de plugin.json absent du marketplace se replie sur le plugin à la version du paquet', () => {
+    const dir = project();
+    writeFileSync(join(dir, '.claude-plugin/plugin.json'), PLUGIN.replace('"acme"', '"renamed"'));
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    commit(dir, 'chore: plugin renommé');
+    release(dir, 'patch');
+    expect(side(dir).map((p: { name: string; version: string }) => [p.name, p.version])).toEqual([['acme', '1.2.4'], ['acme-side', '0.5.0']]);
+  });
+
+  it('R13 — aucun plugin ne porte le nom ni la version : refus qui le dit, rien n’est écrit', () => {
+    const dir = project();
+    writeFileSync(join(dir, '.claude-plugin/plugin.json'), PLUGIN.replace('"acme"', '"renamed"'));
+    writeFileSync(join(dir, '.claude-plugin/marketplace.json'), MARKETPLACE.replace('"version": "1.2.3"', '"version": "1.0.0"'));
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    commit(dir, 'chore: marketplace décalé');
+    const r = release(dir, 'patch');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/n'a pas de plugin « renamed »/);
+    expect(json(dir, 'package.json').version).toBe('1.2.3');
+  });
+
+  it('R13 — sans plugin.json et sans plugin à la version du paquet : refus « à la version »', () => {
+    const dir = project();
+    execFileSync('git', ['rm', '-q', '.claude-plugin/plugin.json'], { cwd: dir });
+    writeFileSync(join(dir, '.claude-plugin/marketplace.json'), MARKETPLACE.replace('"version": "1.2.3"', '"version": "1.0.0"'));
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    commit(dir, 'chore: marketplace décalé');
+    const r = release(dir, 'patch');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/à la version 1\.2\.3/);
   });
 });

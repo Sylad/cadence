@@ -1803,7 +1803,7 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
     expect(briefs.join('\n')).toContain('sous-tâche conservée');
   });
 
-  it('L344 R8 — --dry-run : les briefs implement et fix portent les décisions de l\'humain écrites dans les notes du lot, pas les autres', async () => {
+  it('L344 R8 — --dry-run : le brief implement porte les décisions de l\'humain écrites dans les notes du lot, pas les autres', async () => {
     const { parent, dirs } = withGoalKey();
     const plan = Plan.load(join(dirs.a, 'docs/plan/raf.yaml'));
     plan.note('L1', 'décision de Sylvain (22-10) : « champs exclus » = champs non remplis', '2026-10-22');
@@ -1820,7 +1820,7 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
     }
   });
 
-  it('L344 R6 — --dry-run sur un plan tenu par un autre outil (parent: mappé) : la décision écrite dans la note du lot parent atteint les briefs implement et fix', async () => {
+  it('L344 R6 — --dry-run sur un plan tenu par un autre outil (parent: mappé) : la décision écrite dans la note du lot parent atteint le brief implement', async () => {
     const parent = mappedPlan(true);
     const file = join(parent, 'a/docs/suivi/taches.yaml');
     writeFileSync(

@@ -35,7 +35,7 @@ import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, fi
 import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
 import { decisionsText, humanDecisions } from './decisions.js';
 import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
-import { advance, INTEGRATE_WAIT_MS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
+import { advance, baseMoved, INTEGRATE_WAIT_MS, MAX_REPLAYS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
 import { branchExists, git, gitFailure, integrated, linkIgnored, lotBranch, planFileSet, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
 
@@ -2628,38 +2628,52 @@ async function integrateLot(c: LotCtx): Promise<void> {
     start = git(l.repo, 'rev-parse', `refs/heads/${t.base}`);
     // Une branche déjà contenue dans celle du dépôt (arrêt entre l'avance et l'écriture du verdict) : ni rebase ni avance, seul le plan reste à écrire (R23).
     if (!integrated(l.repo, t.branch, t.base)) {
+      // Le verdict de départ et le commit relu servent à chaque tour : un rebase rejoué repart d'eux, pas des traces ni du sommet du tour précédent.
+      const opening = verdict;
       const reviewed = l.code?.head ?? git(t.dir, 'rev-parse', 'HEAD');
-      const rebased = rebaseOnto(t.dir, t.base);
-      if (rebased.kind === 'conflict') {
-        return refuse(`intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`} ; ${kept}`);
-      }
-      if (rebased.kind === 'rebased' && rebased.changelog > 0) c.wave.log(`${key} CHANGELOG.md : conflit d'ajout pur résolu par union sous [Unreleased] (${rebased.changelog} commit(s))`);
-      if (rebased.kind === 'rebased' && rebased.moved > 0) c.wave.log(`${key} CHANGELOG.md : ${rebased.moved} entrée(s) du lot replacée(s) sous [Unreleased], une publication a eu lieu pendant la branche`);
-      const tip = git(t.dir, 'rev-parse', 'HEAD');
-      if (tip !== reviewed) {
-        // Le rebase a changé les commits : tests et build rejoués au sommet rebasé, avant que la branche du dépôt ne bouge (R7).
-        const { red, runs } = await integratedChecks(c, key);
-        l.checks = runs.length ? { head: tip, runs } : undefined;
-        save(c);
-        if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map(redExcerpt).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
-        const before = patchId(t.dir, mergeBase(t.dir, reviewed, t.base), reviewed);
-        const after = patchId(t.dir, t.base, 'HEAD');
-        if (before !== '' && before === after) {
-          const vers = lotWork(histPlan(c), t.dir, l.lot)[0]?.sha ?? tip;
-          reporte = { de: reviewed, vers, patchId: before };
-        } else {
-          // Le diff du lot n'est plus celui qui a été relu (contexte modifié, conflit résolu) : une revue courte du diff rebasé avant l'avance (R17).
-          const short = await shortReview(c);
-          if (short === null) return;
-          if (short.refused) return refuse(`intégration refusée : revue courte du diff rebasé : ${short.refused} ; branche du dépôt inchangée, ${kept}`);
-          verdict = `${verdict}${SHORT_REVIEW_TRACE}${short.verdict}`;
-          l.verdict = verdict;
+      for (let replays = 0; ; replays++) {
+        verdict = opening;
+        reporte = undefined;
+        const rebased = rebaseOnto(t.dir, t.base);
+        if (rebased.kind === 'conflict') {
+          return refuse(`intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`} ; ${kept}`);
+        }
+        if (rebased.kind === 'rebased' && rebased.changelog > 0) c.wave.log(`${key} CHANGELOG.md : conflit d'ajout pur résolu par union sous [Unreleased] (${rebased.changelog} commit(s))`);
+        if (rebased.kind === 'rebased' && rebased.moved > 0) c.wave.log(`${key} CHANGELOG.md : ${rebased.moved} entrée(s) du lot replacée(s) sous [Unreleased], une publication a eu lieu pendant la branche`);
+        const tip = git(t.dir, 'rev-parse', 'HEAD');
+        if (tip !== reviewed) {
+          // Le rebase a changé les commits : tests et build rejoués au sommet rebasé, avant que la branche du dépôt ne bouge (R7).
+          const { red, runs } = await integratedChecks(c, key);
+          l.checks = runs.length ? { head: tip, runs } : undefined;
+          save(c);
+          if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map(redExcerpt).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
+          const before = patchId(t.dir, mergeBase(t.dir, reviewed, t.base), reviewed);
+          const after = patchId(t.dir, t.base, 'HEAD');
+          if (before !== '' && before === after) {
+            const vers = lotWork(histPlan(c), t.dir, l.lot)[0]?.sha ?? tip;
+            reporte = { de: reviewed, vers, patchId: before };
+          } else {
+            // Le diff du lot n'est plus celui qui a été relu (contexte modifié, conflit résolu) : une revue courte du diff rebasé avant l'avance (R17).
+            const short = await shortReview(c);
+            if (short === null) return;
+            if (short.refused) return refuse(`intégration refusée : revue courte du diff rebasé : ${short.refused} ; branche du dépôt inchangée, ${kept}`);
+            verdict = `${verdict}${SHORT_REVIEW_TRACE}${short.verdict}`;
+            l.verdict = verdict;
+          }
+        }
+        // Les contrôles rejoués et la revue courte ont pu durer : le lead a pu changer de branche ou salir son arbre depuis le contrôle du départ (R24, R8).
+        const late = leadMoved(l.repo, t.base);
+        if (late) return refuse(`intégration refusée : ${late} ; branche du dépôt inchangée, ${kept}`);
+        try {
+          advance(l.repo, t.branch);
+          break;
+        } catch (e) {
+          // L364 : un commit est tombé sur la branche du dépôt pendant le rebase, les contrôles ou la revue courte (plan du lead, autre lot) : l'avance n'est plus une avance rapide.
+          if (!baseMoved(l.repo, t.branch, t.base)) throw e;
+          if (replays >= MAX_REPLAYS) return refuse(`intégration refusée : ${t.base} a encore avancé après ${MAX_REPLAYS} rebases rejoués ; branche du dépôt inchangée par le lot, ${kept}`);
+          c.wave.log(`${key} ${t.base} a avancé pendant l'intégration, rebase rejoué (${replays + 1}/${MAX_REPLAYS})`);
         }
       }
-      // Les contrôles rejoués et la revue courte ont pu durer : le lead a pu changer de branche ou salir son arbre depuis le contrôle du départ (R24, R8).
-      const late = leadMoved(l.repo, t.base);
-      if (late) return refuse(`intégration refusée : ${late} ; branche du dépôt inchangée, ${kept}`);
-      advance(l.repo, t.branch);
     }
     const end = git(l.repo, 'rev-parse', `refs/heads/${t.base}`);
     if (end !== start) c.wave.log(`${key} intégré : ${start.slice(0, 7)}..${end.slice(0, 7)}`);

@@ -550,6 +550,11 @@ nothing below applies and the wave behaves as before; any other value is refused
      (`arbre du dépôt modifié (<files>)`): the program never changes the lead's branch or tree. The check is made again right before the
      fast-forward (the replayed checks and the short review can last) and right before the plan is written: a lead moved to another branch, or whose
      tree got dirty, in the meantime gets neither the fast-forward nor a plan commit, and the lot is handed back with `next: integrate` (L299);
+     **When the repository's branch itself moved** during that time (a plan commit of the lead, another lot closed by hand), the fast-forward is no longer
+     possible: instead of handing the lot back, the program replays steps 2 to 5 at the new tip (rebase, replayed checks, verdict carry-over or short
+     review, fast-forward), at most **twice**, and logs `<project>:<lot> main a avancé pendant l'intégration, rebase rejoué (n/2)`. A branch that moves again
+     after the second replay hands the lot back with `intégration refusée : main a encore avancé après 2 rebases rejoués`, `next: integrate`, nothing of
+     the lot in the repository's branch (L364);
   2. the lot's branch is rebased on the tip of the repository's branch (`git rebase`); a conflict is **aborted** (`git rebase --abort`), the lot
      is handed back with the files in conflict, its worktree and branch untouched, and no session tries to resolve it. **One exception** (L314): two
      parallel lots that each add an entry under `## [Unreleased]` of `CHANGELOG.md` (what `docs.sync` imposes on every lot) always collide, so a commit

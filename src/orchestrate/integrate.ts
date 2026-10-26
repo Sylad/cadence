@@ -13,6 +13,8 @@ export const INTEGRATION_LOCK = 'orchestrate-integration.lock';
 /** Attente du verrou d'intégration (R25) : une intégration dure un rebase et la relance des tests. */
 export const INTEGRATE_WAIT_MS = 10 * 60_000;
 export const INTEGRATE_POLL_MS = 1_000;
+/** Rebases rejoués quand la branche du dépôt avance pendant l'intégration (L364) : au-delà, le lot est rendu. */
+export const MAX_REPLAYS = 2;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -151,3 +153,7 @@ export function patchId(cwd: string, from: string, to: string): string {
 export function advance(repo: string, branch: string): void {
   git(repo, 'merge', '--ff-only', '--quiet', `refs/heads/${branch}`);
 }
+
+/** Vrai quand la branche du dépôt n'est plus un ancêtre de celle du lot : elle a avancé depuis le rebase, l'avance rapide est impossible (L364). */
+export const baseMoved = (repo: string, branch: string, base: string): boolean =>
+  tryGit(repo, 'merge-base', '--is-ancestor', `refs/heads/${base}`, `refs/heads/${branch}`) === null;

@@ -16,7 +16,7 @@ import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
-import { replayFile, shellArg, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
+import { isJestTest, replayFile, shellArg, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
@@ -1881,7 +1881,9 @@ async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promi
       red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) : ${left.length} test(s) rouge(s) qui ne l'étaient pas au sha de départ :\n${left.map((t) => `- ${t}`).join('\n')}${vs.existants ? `\n(${vs.existants} autre(s) test(s) déjà rouge(s) au sha de départ : à ne pas corriger)` : ''}${alone}` });
       return;
     }
-    red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}${alone}` });
+    // Des instables sont écartés : la sortie de la suite entière les montre encore en FAIL, le constat ne nomme que ceux qui restent rouges.
+    const shown = unstable.length ? `${still.length} test(s) rouge(s) après rejeu seul :\n${still.map((t) => `- ${t}`).join('\n')}` : r.output.trim().split('\n').slice(-40).join('\n');
+    red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${shown}${alone}` });
     return;
   }
 }
@@ -1897,9 +1899,9 @@ async function replayAlone(c: LotCtx, command: string, names: string[]): Promise
   let red = names;
   const unstable: string[] = [];
   for (let i = 0; i < REPLAYS; i++) {
-    const replayable = red.filter((n) => replayFile(n));
-    if (!replayable.length) break;
-    const files = [...new Set(replayable.map((n) => replayFile(n)!))];
+    const files = [...new Set(red.map((n) => replayFile(n)).filter((f): f is string => f !== null))];
+    if (!files.length) break;
+    const replayable = red.filter((n) => replayFile(n) || isJestTest(n));
     const r = await sh(c, `${command} ${files.map(shellArg).join(' ')}`);
     const failing = r.code === 0 ? [] : hasUnnamedFailure(r.output) || !failedTests(r.output).length ? replayable : replayable.filter((n) => failedTests(r.output).includes(n));
     const passed = replayable.filter((n) => !failing.includes(n));

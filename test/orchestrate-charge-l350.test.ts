@@ -86,6 +86,7 @@ describe('L350 R3 — les gabarits disent aux lanceurs de tests de la respecter'
       expect(brief, kind).toMatch(/vitest[^\n]*--maxWorkers/);
       expect(brief, kind).toMatch(/jest[^\n]*--maxWorkers/);
       expect(brief, kind).toMatch(/pytest[^\n]*-n/);
+      expect(brief, kind).toMatch(/vitest run --minWorkers=1 --maxWorkers=/); // vitest 2 refuse --maxWorkers seul sous le minimum par défaut (cœurs)
     }
   });
   it('R3 — le brief réel d\'une session de la vague porte la part calculée', async () => {
@@ -152,12 +153,13 @@ describe('L350 R4 — un test rouge de la porte est rejoué seul avant d\'être 
     const log = LOG();
     const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
     // b.test.ts rouge partout ; a.test.ts rouge seulement dans la suite entière
-    const test = `f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo "$@" >> ${log}; echo " FAIL  test/b.test.ts > autre"; exit 1; fi; echo " FAIL  test/a.test.ts > charge"; echo " FAIL  test/b.test.ts > autre"; exit 1; }; f`;
+    // « charge » est posé par une variable : le nom complet ne figure pas dans le texte de la commande, que le brief de correction reprend.
+    const test = `n=charge; f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo "$@" >> ${log}; echo " FAIL  test/b.test.ts > autre"; exit 1; fi; echo " FAIL  test/a.test.ts > $n"; echo " FAIL  test/b.test.ts > autre"; exit 1; }; f`;
     const c = h.lot('L1', {}, { test });
     await runLot(c);
     const brief = h.calls[1].brief;
     expect(brief).toContain('test/b.test.ts > autre');
-    expect(brief).not.toContain('- test/a.test.ts > charge');
+    expect(brief).not.toContain('test/a.test.ts > charge');
     expect(c.lot.instables).toEqual(['test/a.test.ts > charge']);
   });
   it('R4 — un rouge déjà présent à la ligne de base n\'est pas rejoué (déjà exclu du compte)', async () => {
@@ -186,11 +188,55 @@ describe('L350 R4 — un test rouge de la porte est rejoué seul avant d\'être 
     const review = h.calls.find((x) => x.kind === 'review')!;
     expect(review.brief).toMatch(/green.*rouge\(s\) sous charge|green.*red under load/i);
   });
+  it('R4 — ligne de base non vide : tous les nouveaux rouges sont instables, la porte passe et les rouges déjà présents restent « déjà rouges » pour le relecteur', async () => {
+    const log = LOG();
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const test = `f() { case "$PWD" in *cadence-baseline*) echo ' FAIL  test/old.test.ts > ancien'; exit 1;; esac; if [ -n "$1" ]; then echo "$@" >> ${log}; exit 0; fi; echo ' FAIL  test/old.test.ts > ancien'; echo ' FAIL  test/a.test.ts > charge'; exit 1; }; f "$@"`;
+    const c = h.lot('L1', {}, { test });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual(['test/a.test.ts']); // seul le nouveau est rejoué
+    expect(c.lot.instables).toEqual(['test/a.test.ts > charge']);
+    const review = h.calls.find((x) => x.kind === 'review')!;
+    expect(review.brief).toMatch(/already red at the start sha/);
+    expect(review.brief).not.toMatch(/RED, exit code 1\s*$/m);
+  });
+  it('R4 — ligne de base non vide : deux nouveaux rouges, un seul reste rouge au rejeu : la correction ne liste que celui-là et compte l\'ancien à part', async () => {
+    const log = LOG();
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const test = `n=charge; f() { case "$PWD" in *cadence-baseline*) echo ' FAIL  test/old.test.ts > ancien'; exit 1;; esac; if [ -n "$1" ]; then echo "$@" >> ${log}; echo ' FAIL  test/b.test.ts > autre'; exit 1; fi; echo ' FAIL  test/old.test.ts > ancien'; echo " FAIL  test/a.test.ts > $n"; echo ' FAIL  test/b.test.ts > autre'; exit 1; }; f "$@"`;
+    const c = h.lot('L1', {}, { test });
+    await runLot(c);
+    const brief = h.calls[1].brief;
+    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
+    expect(brief).toContain('- test/b.test.ts > autre');
+    expect(brief).not.toContain('test/a.test.ts > charge');
+    expect(brief).toContain('1 autre(s) test(s) déjà rouge(s)');
+    expect(c.lot.instables).toEqual(['test/a.test.ts > charge']);
+  });
+  it('R4 — jest : « FAIL fichier » et « ● Suite › test » sont rejoués seuls (par le fichier), verts rejoués : instables', async () => {
+    const log = LOG();
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const test = `f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo "$@" >> ${log}; exit 0; fi; echo 'FAIL src/a.test.ts'; echo '  ● Suite › charge'; exit 1; }; f "$@"`;
+    const c = h.lot('L1', {}, { test });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual(['src/a.test.ts']);
+    expect(c.lot.instables).toEqual(['Suite › charge', 'src/a.test.ts']);
+  });
+  it('R4 — jest : rouge aussi rejoué seul, la correction a lieu', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const test = `[ -f a.txt ] || exit 0; [ -f b.txt ] && exit 0; echo 'FAIL src/a.test.ts'; echo '  ● Suite › charge'; exit 1`;
+    await runLot(h.lot('L1', {}, { test }));
+    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
+  });
   it('R4 — les cibles de rejeu : fichier de vitest (« fichier > suite > test ») et de pytest (« fichier::test »), rien pour un nom sans fichier', () => {
     expect(replayFile('test/a.test.ts > suite > cas')).toBe('test/a.test.ts');
     expect(replayFile('tests/test_a.py::test_x[1-2]')).toBe('tests/test_a.py');
     expect(replayFile('cas sans fichier')).toBeNull();
     expect(replayFile('a > b')).toBeNull();
+    expect(replayFile('src/a.test.ts')).toBe('src/a.test.ts'); // jest : « FAIL src/a.test.ts », le fichier seul
+    expect(replayFile('Suite › charge')).toBeNull(); // jest : « ● Suite › test », sans fichier (rattaché aux FAIL fichier de la sortie par le rejeu)
   });
   it('R4 — un chemin à espaces ou caractères de shell est quoté pour le rejeu', () => {
     expect(shellArg('test/a.test.ts')).toBe('test/a.test.ts');

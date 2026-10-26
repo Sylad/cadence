@@ -546,7 +546,20 @@ type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapsho
 export const lotSpent = (l: LotState): number => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
 
 /** Le lot a dépensé son propre budget (L78) : il ne compte plus que sur le lead, la vague garde le sien pour les autres. */
-const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) >= l.budget;
+const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) >= l.budget - heldForEscalation(l);
+
+/**
+ * Coût réservé à l'escalade de modèle (L349) : une correction puis une revue neuve complète, jouées au modèle d'escalade. `lotBudget` l'ajoute au budget dérivé de
+ * l'estimate quand `orchestrate.escalation` est déclarée, comme REVIEW_RESERVE paie la dernière passe : sans elle, l'escalade (L337) ne jouait que sur les lots
+ * qui avaient peu consommé (cadence L341 494 k / 600 k et L342 572 k / 600 k, rendus « escalade fable non jouée (budget) »). ESTIMATION, aucune mesure : aucune
+ * escalade n'a été jouée depuis L337 (le seul journal qui en porte une, cadence L342, l'a laissée non jouée). Elle est déduite des journaux `.cadence/runs` du
+ * 2026-10-26 (823 passes fix : p90 67 k ; 1 009 revues complètes : p90 109 k), soit 176 k, arrondis à 175 k, au nombre de tokens comptés du modèle des passes
+ * (le comptage ne distingue pas le tarif du modèle). À remesurer sur les premières escalades jouées (`cadence perf`, « Escalade de modèle »).
+ */
+export const ESCALATION_RESERVE = 175_000;
+
+/** Part du budget que les passes ordinaires doivent laisser à l'escalade : retenue tant que l'escalade n'est pas engagée (ou écartée), libérée ensuite. */
+const heldForEscalation = (l: LotState): number => (l.escalation ? 0 : (l.escalationReserve ?? 0));
 
 /**
  * Coût réservé à une passe de correction et à la revue courte qui la suit (L145, étendu L218). Réserve fixe de 155 k tokens comptés :
@@ -575,8 +588,8 @@ export function budgetStep(l: LotState): SessionKind | null {
   return step && step !== 'integrate' && WRITE_STEPS.includes(step) ? step : null;
 }
 
-/** Le budget du lot paie-t-il la passe de correction et la revue courte qui la suit ? Sans budget de lot : toujours. */
-const fixAffordable = (l: LotState): boolean => l.budget === undefined || lotSpent(l) + REVIEW_RESERVE < l.budget;
+/** Le budget du lot paie-t-il la passe de correction et la revue courte qui la suit ? Sans budget de lot : toujours. La part de l'escalade (L349) n'est pas à dépenser, sauf pour décider l'escalade elle-même (`escalating`). */
+const fixAffordable = (l: LotState, escalating = false): boolean => l.budget === undefined || lotSpent(l) + REVIEW_RESERVE < l.budget - (escalating ? 0 : heldForEscalation(l));
 
 /** Cause d'une suspension demandée par `--stop-after-current` (L79). */
 export const STOP_REQUESTED = 'arrêt demandé (--stop-after-current)';
@@ -2160,7 +2173,7 @@ function toFix(c: LotCtx, constats: Constat[], what: string): void {
       stop(c, 'handed-back', text);
       return;
     }
-    if (!fixAffordable(l)) {
+    if (!fixAffordable(l, true)) {
       l.escalation = { model: esc.model, stage: 'done', issue: 'non jouée' };
       c.wave.log(`${lotKey(l.project, l.lot)} · escalade ${esc.model} non jouée : budget du lot (${lotSpent(l)} / ${l.budget} tokens comptés)`);
       stop(c, 'handed-back', `${text} ; escalade ${esc.model} non jouée (budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés, il ne reste pas de quoi payer la correction et la revue)`);

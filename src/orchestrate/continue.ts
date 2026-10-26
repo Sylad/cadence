@@ -85,13 +85,16 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
       continue;
     }
     let specDir = 'docs/specs';
+    let escalating = false;
     try {
-      specDir = projectEnv(dir).config.spec.dir;
+      const config = projectEnv(dir).config;
+      specDir = config.spec.dir;
+      escalating = !!config.escalation;
     } catch {
       // configuration illisible : le dossier par défaut
     }
     for (const lot of ready) {
-      if (o.exclude.has(`${project}:${lot.id}`) || decisionPending(lot) || lotBudget(lot.estimate, specScreen(dir, specDir, lot) ? 'screen' : lot.spec ? 'spec' : undefined) > o.remaining) continue;
+      if (o.exclude.has(`${project}:${lot.id}`) || decisionPending(lot) || lotBudget(lot.estimate, specScreen(dir, specDir, lot) ? 'screen' : lot.spec ? 'spec' : undefined, escalating) > o.remaining) continue;
       out.push({ project, dir, lot });
     }
   }

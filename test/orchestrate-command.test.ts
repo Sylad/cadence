@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { lotSlug } from '../src/orchestrate/state.js';
+import { ESCALATION_RESERVE } from '../src/orchestrate/cycle.js';
 import { lotBudget, lotBudgetBasis, orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
@@ -1411,6 +1412,31 @@ describe('budget par lot (L78, recalibré L194)', () => {
 
   it("R1 — lotBudgetBasis cite 450000 pour les étapes spec", () => {
     expect(lotBudgetBasis(0.5, 'spec')).toContain('plus 450000 pour les étapes spec');
+  });
+
+  it("R5 — lotBudget ajoute la part de l'escalade (ESCALATION_RESERVE) au budget dérivé de l'estimate, à l'écran et à la fiche comme à l'ordinaire", () => {
+    expect(ESCALATION_RESERVE).toBeGreaterThan(0);
+    expect(lotBudget(0.5, undefined, true)).toBe(600_000 + ESCALATION_RESERVE);
+    expect(lotBudget(2, undefined, true)).toBe(1_140_000 + ESCALATION_RESERVE);
+    expect(lotBudget(0.5, 'spec', true)).toBe(lotBudget(0.5, 'spec') + ESCALATION_RESERVE);
+    expect(lotBudget(0.5, 'screen', true)).toBe(lotBudget(0.5, 'screen') + ESCALATION_RESERVE);
+    expect(lotBudget(0.5, undefined, false)).toBe(600_000);
+  });
+
+  it("R5 — --dry-run affiche le budget avec sa part d'escalade quand orchestrate.escalation est déclarée, et rien de plus sinon", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'avec', estimate: 0.5 }], b: [{ title: 'sans', estimate: 0.5 }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  escalation:\n    model: fable\n');
+    git(dirs.a, 'commit', '-qam', 'chore: escalade');
+    const r = io(parent);
+    await orchestrate(['a:L1', 'b:L1', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      expect(text).toContain(`budget du lot : ${600_000 + ESCALATION_RESERVE} tokens comptés (base : ${lotBudgetBasis(0.5, undefined, 'fable')})`);
+      expect(lotBudgetBasis(0.5, undefined, 'fable')).toContain(`plus ${ESCALATION_RESERVE} réservés à l'escalade fable`);
+      expect(text).toContain("budget du lot : 600000 tokens comptés (base : plancher d'un lot jusqu'à 0,5 j)");
+    } finally {
+      removeDryRunBriefs(text);
+    }
   });
 
   it("R3 — lotBudgetBasis d'un lot ≤ 0,5 j cite toujours le plancher", () => {

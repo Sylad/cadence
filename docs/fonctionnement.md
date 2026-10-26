@@ -87,6 +87,7 @@ The budget a wave gives a lot is derived from its estimate, measured on the runs
 | `screen: page` | 1.3 M at least, or the ordinary budget + 450 k if that is more |
 | `spec: true` | ordinary budget + 450 k |
 | fix pass and short review | 155 k reserved |
+| escalation (`orchestrate.escalation` declared, L349) | + 175 k reserved (estimate: one correction and one fresh review on the escalation model) |
 
 The final review is always played; the budget bounds the writing passes. A `screen: component` or
 `screen: journey` lot takes the ordinary budget, unless its sheet already exists: it then gets the

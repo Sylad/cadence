@@ -23,7 +23,7 @@ import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specScreen, specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { precheckNothingToFind, Budget, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
+import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -100,7 +100,12 @@ export const SPEC_STAGE_ALLOCATION = 450_000;
 export type SpecStage = 'screen' | 'spec';
 
 /** Base mesurée d'un budget, pour `--dry-run` : l'estimate (et l'étape spec) d'où il sort. */
-export function lotBudgetBasis(estimate: number, stage?: SpecStage): string {
+export function lotBudgetBasis(estimate: number, stage?: SpecStage, escalationModel?: string): string {
+  const base = ordinaryBasis(estimate, stage);
+  return escalationModel ? `${base}, plus ${ESCALATION_RESERVE} réservés à l'escalade ${escalationModel}` : base;
+}
+
+function ordinaryBasis(estimate: number, stage?: SpecStage): string {
   if (stage === 'screen' && lotBudget(estimate, stage) === SCREEN_LOT_BUDGET) return "p90 mesuré du total d'un lot à écran, étapes spec, maquette et accept comprises";
   const ordinary = lotBudget(estimate);
   const basis = estimate <= 0.5 ? "plancher d'un lot jusqu'à 0,5 j" : estimate <= 1 ? "p90 mesuré du total d'un lot de 0,5 à 1 j" : Math.round(estimate * LOT_BUDGET_PER_DAY) <= LOT_BUDGET_ONE_DAY ? `plancher de ${LOT_BUDGET_ONE_DAY} au-delà d'un jour, l'estimate × ${LOT_BUDGET_PER_DAY} ne le dépasse pas encore` : `${LOT_BUDGET_PER_DAY} par jour, p90 mesuré du total au-delà d'un jour`;
@@ -108,8 +113,10 @@ export function lotBudgetBasis(estimate: number, stage?: SpecStage): string {
   return `${ordinary} dérivés de l'estimate (${basis}), plus ${SPEC_STAGE_ALLOCATION} pour les étapes spec, ${stage === 'screen' ? 'maquette' : 'fiche'} et accept`;
 }
 
-/** Budget d'un lot, dérivé de son estimate et de sa catégorie : empêche quelques lots d'avaler le budget de la vague au détriment des autres. Un lot à `screen:` vaut le total mesuré d'un lot à écran (L194) ; un lot à `spec: true` y ajoute l'allocation de son étape (L191). */
-export const lotBudget = (estimate: number, stage?: SpecStage): number => {
+/** Budget d'un lot, dérivé de son estimate et de sa catégorie : empêche quelques lots d'avaler le budget de la vague au détriment des autres. Un lot à `screen:` vaut le total mesuré d'un lot à écran (L194) ; un lot à `spec: true` y ajoute l'allocation de son étape (L191) ; `escalation` (orchestrate.escalation déclarée) y ajoute la part de l'escalade (L349). */
+export const lotBudget = (estimate: number, stage?: SpecStage, escalation = false): number => lotBaseBudget(estimate, stage) + (escalation ? ESCALATION_RESERVE : 0);
+
+const lotBaseBudget = (estimate: number, stage?: SpecStage): number => {
   const ordinary = estimate <= 0.5 ? LOT_BUDGET_FLOOR : Math.max(LOT_BUDGET_ONE_DAY, Math.round(estimate * LOT_BUDGET_PER_DAY));
   if (stage === 'screen') return Math.max(SCREEN_LOT_BUDGET, ordinary + SPEC_STAGE_ALLOCATION);
   return ordinary + (stage === 'spec' ? SPEC_STAGE_ALLOCATION : 0);
@@ -396,7 +403,9 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.estimate = lot.estimate;
     state.light = lot.estimate <= env.config.review.threshold;
-    state.budget = lotBudget(lot.estimate, screen ? 'screen' : lot.spec ? 'spec' : undefined);
+    const escalating = !!env.config.escalation;
+    state.budget = lotBudget(lot.estimate, screen ? 'screen' : lot.spec ? 'spec' : undefined, escalating);
+    if (escalating) state.escalationReserve = ESCALATION_RESERVE;
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
     if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };
     lots.push(state);
@@ -437,7 +446,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     if (l.goal) io.out(`  objectif donné : ${l.goal} (à la place du titre dans les briefs)`);
-    io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, l.screen ? 'screen' : l.specLot ? 'spec' : undefined)})`);
+    io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, l.screen ? 'screen' : l.specLot ? 'spec' : undefined, l.escalationReserve ? env.config.escalation?.model : undefined)})`);
     const mine = lots.filter((o) => o.repo === l.repo);
     const together = env.config.worktrees && mine.length > 1 && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
     io.out(together ? `  file ${basename(l.repo)} · en parallèle des autres lots du dépôt, dans son worktree (cadence/${id}/${lotSlug(l.project, l.lot)}, créé à la prise du créneau)` : `  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);

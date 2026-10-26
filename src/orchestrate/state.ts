@@ -123,6 +123,8 @@ export interface LotState {
   dependsOn?: string[];
   /** Plafond des tokens comptés par les sessions de ce lot, dérivé de l'estimate (L78), plus l'allocation de l'étape spec pour un lot à écran (L191). Absent : seul le budget de la vague borne. */
   budget?: number;
+  /** Part de `budget` réservée à l'escalade de modèle (L349, `ESCALATION_RESERVE`), posée au lancement quand `orchestrate.escalation` est déclarée. Les passes ordinaires ne la dépensent pas ; l'escalade engagée la libère. Absente : rien de réservé (lot d'une vague antérieure, ou sans escalade). */
+  escalationReserve?: number;
   status: LotStatus;
   /** Passes de correction faites. */
   pass: number;

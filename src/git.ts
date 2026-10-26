@@ -238,3 +238,22 @@ export function addedTimes(dir: string): Map<string, number> {
   }
   return times;
 }
+
+/** Chemins parmi `paths` (relatifs à la racine) que git voit modifiés, stagés ou non suivis. */
+export function dirtyPaths(root: string, paths: string[]): string[] {
+  const out = git(root, ['-c', 'core.quotepath=off', 'status', '--porcelain', '-z', '--', ...paths]);
+  return out.split('\0').filter(Boolean).map((l) => l.slice(3));
+}
+
+/** Commit de `paths` seuls (à chemin explicite : le reste de l'index n'y entre pas). Rend le sha court. Lève l'erreur de git (hook refusé compris). */
+export function commitPaths(root: string, paths: string[], message: string): string {
+  git(root, ['add', '--', ...paths]);
+  try {
+    git(root, ['commit', '-q', '-m', message, '--', ...paths]);
+  } catch (e) {
+    tryGit(root, ['reset', '-q', '--', ...paths]);
+    const err = e as { stderr?: string; stdout?: string; message: string };
+    throw new Error((err.stderr || err.stdout || err.message).trim().split('\n')[0]);
+  }
+  return tryGit(root, ['rev-parse', '--short', 'HEAD']) ?? '';
+}

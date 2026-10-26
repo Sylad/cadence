@@ -13,7 +13,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref', 'config'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -52,6 +52,10 @@ if (tool === 'raf') {
   cadence lead tour [dossier] [--idle 3] [--json]
                     le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier courant
                     s'il est lui-même un projet ; une première ligne « cadence.yaml · ✗ erreur » si priority: est illisible
+  cadence config set <clé> <valeur> --all [--dry-run] [--depth n]
+                    pose la même clé dans le cadence.yaml de chaque projet du dossier (ceux de lead tour), commentaires et ordre gardés,
+                    avec un lot de config qui la cite et un commit à chemin explicite par projet ; ne pousse pas ;
+                    s'arrête sur une config qui ne se relit pas
   cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--since date] [--json]
                     la mesure des passes de correction des vagues (dossier/.cadence/runs) : lots à ≥1 et ≥2 corrections,
                     par projet, visibles ou non, passes par cause ; --classify les classe par Ollama (hors quota)

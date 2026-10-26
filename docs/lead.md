@@ -125,6 +125,22 @@ only wants the list of the documents to change (L306). A document outside the re
 of the project's `cadence.yaml`, never guessed: the lead reads that key itself and puts its entries in the brief with the absolute path of each repository (the subagent is given read access to it), because the agent examines no outside document the brief does not name. The agent proposes a lot for the plan of that repository, in the `resume` of its
 report, and the lead decides whether to add it (`raf add` in that repository). The agent never writes to that plan.
 
+## config set --all
+
+`cadence config set <key> <value> --all [--dry-run] [--depth n]` (L342) applies the same change to the `cadence.yaml` of every project the lead knows: it is run from the parent folder and takes the projects `lead tour` lists (same `--depth` / `depth:` rule). It replaces the chain the lead used to type by hand in 8 or 9 projects (a test gate, a duplicate build, the Fable escalation).
+
+```
+cadence config set orchestrate.escalation '{ model: fable }' --all --dry-run
+cadence config set orchestrate.build 'npx tsc --noEmit' --all
+```
+
+- `<key>` is a dotted path (`orchestrate.escalation`); `<value>` is read as YAML, so `true`, a command, or a flow mapping like `{ model: fable }` all work. A key already at that value is left alone.
+- The file is edited with comments and key order kept (a new key goes at the end of its parent; a value replaced in place keeps its end-of-line comment; the spaces before an end-of-line comment come back as a single one). A project with no `cadence.yaml` gets one.
+- In each project it creates a **config lot** that quotes the key (`config cadence.yaml : <key> = <value>`, estimate 0.05), as `raf add` then `raf start` would, and commits `cadence.yaml` and the plan file with explicit paths (`chore(L12): cadence.yaml — <key> = <value>`): nothing else in the index or the working tree goes in. The lot is left `doing`: closing it (`raf done`) stays the lead's step. **Nothing is pushed.**
+- The new text is read back with cadence's own config loaders (plan, news, hook, perf, session, orchestrate, docs, references, migrate, deliver) before anything is written. A `cadence.yaml` that does not read back — before the change or after it — **stops the run** (exit code 1) at that project, with nothing written there; the projects after it are named `non traités`. A commit the repository refuses (a hook) stops it the same way, the two files put back as they were.
+- A project is **skipped**, with the reason, when: it is not its own git repository; the key is already at that value; the key cannot be set in its file (a plain value in the way); `cadence.yaml` or the plan file has uncommitted changes (the explicit-path commit would take them); or its plan is read-only (kept by another tool: no lot can be created here, so the change is left to the project's own tool).
+- `--dry-run` prints the same lines, prefixed `+ … serait fait`, and writes and commits nothing. The last line counts what was done and skipped. Without `--all` the command refuses (run `raf`/an editor inside the project for a single one).
+
 ## lead tour
 
 `cadence lead tour [folder] [--idle 3] [--depth n] [--json]` is the lead's morning table, with no model in

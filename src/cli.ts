@@ -18,7 +18,8 @@ import { invalidResource, Plan, RafError, SCREENS, STATUSES, type Lot, type Scre
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
-import { findProjects, leadTour, readLeadUx, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
+import { configSet } from './config-set.js';
+import { findProjects, readDepth, leadTour, readLeadUx, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
 import { configuredCap, expiredHoldLines, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
@@ -70,6 +71,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot (ou citant un id inconnu) sans réécrire l'historique ; raf check --ignored les liste
   raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
   raf gantt [-o .cadence/gantt.html]
+  cadence config set <clé> <valeur> --all [--dry-run] [--depth n]   pose la même clé dans le cadence.yaml de chaque projet du dossier (ceux de lead tour), commentaires et ordre gardés, un lot de config qui la cite (raf add + start) et un commit à chemin explicite par projet ; ne pousse pas ; liste ce qui est fait et sauté (dépôt sale, déjà posée, plan en lecture seule) ; s'arrête sur une config qui ne se relit pas
   raf migrate [--dry-run]   déplace docs/plan/raf.yaml vers .cadence/raf.yaml (git mv) et réécrit les lecteurs du chemin dans le dépôt ; --dry-run les liste sans rien toucher ; refus tant qu'un lecteur n'est pas traité (migrate.keep de cadence.yaml pour ceux qui ne lisent pas le plan) ; rejouable
   raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--goal "…"] [--dry-run] [--wave nom] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; --status [vague] [--watch [--interval s]] ; --resume [vague | --wave vague] [--budget 1M] [--budget projet:lot=+300k] [--answer projet:lot "réponse"] [--drop projet:lot] ; --drop projet:lot [--wave vague] ; --stop-after-current [--wave vague] ; --waits [--since AAAA-MM-JJ]
@@ -207,7 +209,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     io.out(HELP);
     return 0;
   }
-  if (command !== 'session' && !(command === 'lead' && !values.all) && (values.all || values.depth !== undefined)) throw new RafError(`${values.all ? '--all' : '--depth'} ne va qu'avec session start ou session close`);
+  if (command !== 'session' && command !== 'config' && !(command === 'lead' && !values.all) && (values.all || values.depth !== undefined)) throw new RafError(`${values.all ? '--all' : '--depth'} ne va qu'avec session start ou session close`);
   const today: Day = io.env.RAF_TODAY ?? toDay(io.now());
   if (!isDay(today)) throw new RafError(`RAF_TODAY invalide : ${today} (attendu AAAA-MM-JJ)`);
   const root = gitRoot(io.cwd) ?? io.cwd;
@@ -254,6 +256,16 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
     }
     return 0;
+  }
+  // Poser une clé dans le cadence.yaml de chaque projet du dossier (L342) : ne lit ni le plan ni le cadence.yaml du dossier courant.
+  if (command === 'config') {
+    if (rest[0] !== 'set' || rest.length !== 3) throw new RafError('usage : cadence config set <clé> <valeur> --all [--dry-run] [--depth n]');
+    if (!values.all) throw new RafError('config set demande --all : la commande s\'applique aux projets du dossier courant (lancer la commande dans le projet visé pour un seul)');
+    if (values.depth !== undefined && !(Number.isInteger(Number(values.depth)) && Number(values.depth) >= 1)) throw new RafError(`--depth invalide : ${values.depth} (un entier ≥ 1)`);
+    const parent = resolve(io.cwd);
+    const result = configSet(parent, rest[1], rest[2], { dryRun: values['dry-run'], depth: values.depth === undefined ? readDepth(parent) : Number(values.depth) }, today);
+    for (const l of result.lines) io.out(l);
+    return result.code;
   }
   if (command === 'corrections') return corrections(rest, values, io);
   if (command === 'perf') return perf(rest, values, today, io);

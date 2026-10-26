@@ -2,7 +2,8 @@
 
 # Releasing
 
-A version exists in three places and is published in two; a release does all of it, in this order:
+A version exists in three places and is published in two; a release does all of it, in this order.
+`cadence release patch|minor|major [--dry-run]` (L341) prepares step 1 and prints steps 2 to 5 in order; it publishes nothing.
 
 1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and write the version's section of
@@ -35,6 +36,41 @@ The Claude Code plugin is read from the repository, so pushing `main` is what up
 `npx @sylad/cadence` and a global install read, and only the tag publishes there. A missing tag, or a red
 publish run, leaves npm behind without any other error — 0.3.0 and 0.4.0 were never published — hence
 step 5.
+
+## `cadence release`
+
+```sh
+cadence release minor --dry-run   # says what it would write and prints the steps; writes nothing
+cadence release minor             # writes the version files, checks docs/whats-new.md, prints the steps
+```
+
+It computes the next `x.y.z` from `package.json` and writes it, **only the version fields**, in `package.json`,
+`package-lock.json` (the root and `packages[""]`), `.claude-plugin/plugin.json` and the `.claude-plugin/marketplace.json`
+plugin that carries the name of `plugin.json` (the other plugins of the marketplace keep their own version); a file that does
+not exist is skipped. In `CHANGELOG.md` the `## [Unreleased]` section becomes `## [x.y.z] - <date>` and **an empty
+`## [Unreleased]` is kept above it** (without it, the `CHANGELOG.md` union of the worktree mode of `cadence orchestrate`, L314,
+has nowhere to put the next lots' entries).
+
+It refuses, with exit code 2 and nothing written:
+
+- a tracked file modified (an untracked file does not count: the commit names its paths);
+- an `[Unreleased]` section that is missing or holds nothing but sub-section titles;
+- a version already tagged (`v<x.y.z>`);
+- a `package-lock.json` that is not at the version of `package.json`, or whose dependencies differ from those of `package.json`
+  (a `npm install` would move them: commit that apart, before the release);
+- a version in `package.json` that is not `x.y.z`.
+
+`docs/whats-new.md` is **not written by the command** (the two forms are prose, written by hand or by a session): it checks that
+both are there and in their place, and says where to write what is missing. The « In two lines » line of the version is the
+first of the list and at most 240 characters; the long paragraph is the first of « Version by version », right after its
+introduction (the newest version first, as the file is read). Exit code 1 when a form is missing, misplaced or too long: the
+version files are written, the commit is not ready. With `--dry-run` the forms cannot exist yet, so the command only says where they go.
+
+It prints the lead's steps, in order, and runs none: the `git add` of exactly the files of the version commit and the commit,
+`npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script), `git tag v<x.y.z>`, `git push origin <branch> v<x.y.z>`,
+`gh run watch`, `npm view <package> version` (not for a private package) and `claude plugin update <plugin>@<marketplace>`
+(only with a `.claude-plugin/plugin.json`). The 2026-10-25 releases (1.10.0 to 1.12.1) were this chain done four times by hand,
+once with the long paragraph inserted at the wrong place of `docs/whats-new.md`.
 
 ## Evaluating the plugin (before a release)
 

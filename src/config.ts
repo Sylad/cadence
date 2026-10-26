@@ -279,6 +279,11 @@ export interface OrchestrateConfig {
   /** Commande de build du projet, lancée par l'orchestrateur après les tests, et dont le résultat est passé au relecteur. */
   build?: string;
   /**
+   * Dépendances non suivies à relier dans un worktree jetable de `cadence verify --gate` (L348), chemins relatifs au dépôt (`node_modules`, `.venv`, `front/node_modules`…).
+   * Absente : les dossiers ignorés de tout niveau, comme pour les worktrees de vague.
+   */
+  worktreeDeps?: string[];
+  /**
    * Commande dédiée de l'étape accept (L173, spec etape-spec S5) : ne lance QUE les tests d'acceptation du lot (config du lanceur
    * `*.acceptation.config.*` qui lit `CADENCE_ACCEPTATION`, chemin de l'acceptation-<lot>.json du lot, aussi substitué à `{acceptation}`).
    * Une LISTE de commandes (L189, spec etape-spec-back B4) pour un projet à plusieurs lanceurs (front Vitest, back Jest) : chacune ne prend que les
@@ -348,7 +353,7 @@ export type EffortStep = (typeof EFFORT_STEPS)[number];
 
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'worktreeDeps', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
@@ -381,6 +386,11 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     if (o[k] == null) continue;
     if (typeof o[k] !== 'string' || !(o[k] as string).trim()) throw bad(`${k} : commande non vide attendue`);
     config[k] = (o[k] as string).trim();
+  }
+  if (o.worktreeDeps != null) {
+    const deps = o.worktreeDeps;
+    if (!Array.isArray(deps) || !deps.length || deps.some((x) => typeof x !== 'string' || !x.trim() || isAbsolute(x) || x.split(/[\\/]/).includes('..'))) throw bad('worktreeDeps : liste de chemins relatifs au dépôt, sans « .. » (node_modules, .venv…)');
+    config.worktreeDeps = deps.map((x: string) => x.trim().replace(/\/$/, ''));
   }
   if (o.maquette != null) {
     if (typeof o.maquette !== 'boolean') throw bad('maquette : true ou false attendu');

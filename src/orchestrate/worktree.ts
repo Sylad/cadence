@@ -141,9 +141,22 @@ export function mirrorNodeModules(repo: string, dir: string, name: string, links
  * fichier ignoré le plus haut ; son parent doit exister dans le worktree (sinon rien où le relier). Rend les liens créés.
  */
 export function linkIgnored(repo: string, dir: string): string[] {
-  const links: string[] = [];
   const ignored = git(repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.startsWith('.cadence') && !f.split('/').some((p) => OUTPUT_DIRS.has(p)));
-  for (const name of ignored) {
+  return linkNames(repo, dir, ignored);
+}
+
+/**
+ * Relie dans le worktree `dir` les dépendances que le dépôt vivant déclare (`orchestrate.worktreeDeps`, L348), par leur chemin relatif. Celles qui n'existent pas
+ * dans le dépôt vivant ne sont pas liées et sont rendues dans `missing`. Rend aussi les liens créés.
+ */
+export function linkDeclared(repo: string, dir: string, names: readonly string[]): { links: string[]; missing: string[] } {
+  const present = names.filter((n) => lstatSync(join(repo, n), { throwIfNoEntry: false }));
+  return { links: linkNames(repo, dir, present), missing: names.filter((n) => !present.includes(n)) };
+}
+
+function linkNames(repo: string, dir: string, names: readonly string[]): string[] {
+  const links: string[] = [];
+  for (const name of names) {
     const to = join(dir, name);
     if (existsSync(to) || !existsSync(dirname(to))) continue;
     if (basename(name) === 'node_modules' && lstatSync(join(repo, name)).isDirectory()) {

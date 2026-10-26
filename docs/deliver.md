@@ -273,3 +273,39 @@ everything is green, the red effects and the summary otherwise. It is a fact lik
 the others: it never changes the exit code, and an unreachable network shows up
 as red lines ("erreur réseau") without blocking the session. No section for a
 project without `deliver.verify`.
+
+## verify --gate: replay the project's gate at a sha (L348)
+
+`cadence verify` above replays the *effect* of a delivery. `cadence verify --gate --sha <sha>`
+replays the *gate* of the project, `orchestrate.build` then `orchestrate.test` of `cadence.yaml`
+(the order of the wave's gate: the tests read what the build produces), at one commit, for the
+lead's re-verification (« the lead re-verifies itself », skill `lead`). It never touches the shared
+tree, which holds the lots still running.
+
+```sh
+cadence verify --gate --sha 6b0d9aa                  # in the project
+cadence verify --gate --sha 6b0d9aa --project app    # from the parent folder, the project `app` (its own git repository)
+```
+
+It adds a throwaway worktree of the sha under the OS temporary folder (`cadence-verify-…`), links
+the **untracked dependencies** of the main tree into it, runs the commands there, and removes the worktree
+whatever the result. A bare worktree has no `node_modules` or `.venv`: on 26-10 the re-verification of a lot
+in one gave nine red suites that were only missing dependencies. Which dependencies:
+
+- `orchestrate.worktreeDeps: [node_modules, .venv, front/node_modules]` in `cadence.yaml`: those paths, relative to the repository
+  (no absolute path, no `..`); one that does not exist in the main tree is reported and skipped;
+- absent: the same folders as the worktrees of a wave (the ignored folders of every level, `node_modules`, `.venv`…; build outputs such as `dist` excluded). The
+  workspace links of a `node_modules` are made again towards the worktree, so the code run is the sha's.
+
+```
+✓ build (npx tsc --noEmit)
+✗ tests (npx vitest run) — code 1
+  - test/a.test.ts > R3 — …
+verify --gate 6b0d9aa : rouge (1 étape sur 2)
+```
+
+Both commands always run, even when the first is red, so the report is whole. A red step lists the failing
+tests the output names (the same reading as the wave's baseline); with none identifiable, the last 10 lines of the output.
+`--sha` is required (the moving head of a wave is not a sha to re-verify) and `--retry` does not apply. Exit code:
+**0** green · **1** red · **2** nothing to replay (neither `orchestrate.build` nor `orchestrate.test`), unknown sha or a worktree that cannot be made.
+Each command has 30 minutes. The Node of the `.nvmrc` is not selected here: the commands run with the `PATH` of the caller.

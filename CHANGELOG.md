@@ -77,6 +77,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence verify --gate --sha <sha> [--project <dir>]` (L348, `docs/deliver.md`, `skills/lead`): replays the project's gate (`orchestrate.build`, then `orchestrate.test`) at a sha in a throwaway worktree whose untracked dependencies are linked from the main tree, prints green or red with the failing tests, and removes the worktree. The dependencies are the ones of the new `orchestrate.worktreeDeps` list of `cadence.yaml`, or, when it is absent, the same ignored folders as the worktrees of a wave. The lead skill uses it at the « re-verify » point. Seen on 26-10: the re-verification of a lot in a bare worktree gave nine red suites that only missed their dependencies, and was redone in the shared tree.
+
 ### Changed
 
 - `cadence orchestrate` accepts any model name where it took only `haiku|sonnet|opus` (L345, `docs/orchestrate.md`, GitHub issue #16): `@<model>` of a lot (`cadence orchestrate project:L12@fable`, which was refused with « modèle inconnu ») and `orchestrate.review.light` / `full` pass the name as it stands to `claude --model`, like `orchestrate.escalation.model`. The three aliases keep their meaning; `--dry-run` warns (`⚠ modèle « <name> » hors des alias …`), without refusing, for a name outside them. An empty `review.light` / `full` is still refused.

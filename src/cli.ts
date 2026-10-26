@@ -9,6 +9,7 @@ import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps, shellQuote } from './deliver.js';
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
+import { verifyGate } from './verify-gate.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { gitRoot, isTracked, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
@@ -90,6 +91,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   cadence ref corpus <dossier> [--sans-rendu]   écrit le corpus synthétique à vérité connue (7 pièges : texte ambigu levé par une figure, figure qui contredit, table en image, gabarit BUFR, contrôle translucide, page Proposal, scan bruité) : par cas document.html et attendu.json, puis document.pdf et page-<n>.png (1700×2200) rendus par Playwright (CADENCE_PLAYWRIGHT = dossier du paquet) ; dossier existant ou Playwright introuvable : code 2
   cadence release patch|minor|major [--dry-run]   prépare le commit de version (package.json, package-lock.json, plugin.json, marketplace.json, CHANGELOG.md) sans commiter ni publier ; imprime les étapes du lead et vérifie docs/whats-new.md : refus sur un arbre sale, un [Unreleased] vide ou une version déjà taguée
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
+  cadence verify --gate --sha rév [--project dossier]   rejoue la porte du projet (orchestrate.build puis orchestrate.test) au sha dans un worktree jetable aux dépendances reliées (orchestrate.worktreeDeps), puis le retire : 0 vert, 1 rouge avec les tests en échec, 2 rien à rejouer
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
 Un commit appartient à un lot quand son message cite l'identifiant : « feat(L3): … », « L3/t1 ».
@@ -185,6 +187,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       'dry-run': { type: 'boolean' },
       sha: { type: 'string' },
       retry: { type: 'string' },
+      gate: { type: 'boolean' },
       clear: { type: 'boolean' },
       ignored: { type: 'boolean' },
       notes: { type: 'boolean' },
@@ -622,6 +625,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return deliver(ctx, realDeps(root));
     }
     case 'verify': {
+      if (values.gate) return verifyGateCommand(values, io);
       if (!gitRoot(io.cwd)) throw new RafError('verify : à lancer dans un dépôt git');
       if (!existsSync(configPath)) throw new RafError(`pas de configuration : ${configPath} (voir « cadence.yaml » dans docs/deliver.md du paquet @sylad/cadence)`);
       const retry = values.retry === undefined ? 0 : Number(values.retry);
@@ -1156,6 +1160,21 @@ function perf(rest: string[], values: { since?: string; json?: boolean }, today:
     io.err(`raf: ${e.message}`);
     return 1;
   }
+}
+
+/** `verify --gate --sha rév [--project dossier]` (L348) : la porte du projet rejouée au sha ; `--project` est un sous-dossier du dossier courant qui a son propre dépôt. */
+async function verifyGateCommand(values: { sha?: string; project?: string; retry?: string; config?: string }, io: Io): Promise<number> {
+  if (values.sha === undefined) throw new RafError('verify --gate : --sha obligatoire (le sha à re-vérifier, jamais la tête mouvante d\'une vague)');
+  if (values.retry !== undefined) throw new RafError('verify --gate : --retry ne va qu\'à verify seul (deliver.verify)');
+  const dir = values.project === undefined ? io.cwd : resolve(io.cwd, values.project);
+  if (values.project !== undefined && !existsSync(dir)) throw new RafError(`verify --gate : --project ${values.project} : dossier introuvable sous ${io.cwd}`);
+  const top = gitRoot(dir);
+  if (!top) throw new RafError('verify --gate : à lancer dans un dépôt git (ou --project vers le dossier d\'un projet)');
+  if (values.project !== undefined && realpathSync(top) !== realpathSync(dir)) throw new RafError(`verify --gate : ${values.project} n'a pas son propre dépôt git (dépôt parent : ${top})`);
+  const configPath = resolve(io.cwd, values.config ?? join(top, 'cadence.yaml'));
+  const sha = resolveCommit(top, values.sha);
+  if (!sha) throw new RafError(`verify --gate : --sha ${values.sha} : commit introuvable dans ${top}`);
+  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), out: io.out });
 }
 
 /** `session start|close --all [--depth n]` : la commande jouée dans chaque projet sous le dossier courant, une section par projet. */

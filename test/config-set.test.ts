@@ -317,4 +317,35 @@ describe('cadence config set avec plan.onWrite (L346)', () => {
     expect(git(a, 'rev-parse', 'HEAD')).toBe(head);
     expect(git(a, 'status', '--porcelain').trim()).toBe('');
   });
+  const refuse = (dir: string) => {
+    const hook = join(dir, '.git/hooks/pre-commit');
+    writeFileSync(hook, '#!/bin/sh\necho refusé >&2\nexit 1\n');
+    chmodSync(hook, 0o755);
+  };
+  it('R5 — commit refusé (hook) : un fichier produit suivi retrouve sa version commitée, un fichier produit non suivi disparaît', () => {
+    const parent = tempDir();
+    const a = project(parent, 'alpha', { 'cadence.yaml': ONWRITE, 'public/plan.json': 'ancien\n' });
+    const b = project(parent, 'beta', { 'cadence.yaml': ONWRITE });
+    refuse(a);
+    refuse(b);
+    const ra = cadence(parent, 'config', 'set', 'orchestrate.escalation', '{ model: fable }', '--all');
+    expect(ra.code).toBe(1);
+    expect(ra.out).toMatch(/alpha.*arrêt.*commit/);
+    expect(readFileSync(join(a, 'public/plan.json'), 'utf8')).toBe('ancien\n');
+    expect(git(a, 'status', '--porcelain').trim()).toBe('');
+    const rb = cadence(join(parent, 'beta'), 'config', 'set', 'orchestrate.escalation', '{ model: fable }', '--all');
+    expect(rb.code).toBe(1);
+    expect(existsSync(join(b, 'public/plan.json'))).toBe(false);
+    expect(git(b, 'status', '--porcelain').trim()).toBe('');
+  });
+  it('R5 — un fichier de plan.onWrite modifié et non commité fait sauter le projet', () => {
+    const parent = tempDir();
+    const a = project(parent, 'alpha', { 'cadence.yaml': ONWRITE, 'public/plan.json': 'ancien\n' });
+    writeFileSync(join(a, 'public/plan.json'), 'à la main\n');
+    const head = git(a, 'rev-parse', 'HEAD');
+    const r = cadence(parent, 'config', 'set', 'orchestrate.escalation', '{ model: fable }', '--all');
+    expect(r.code, r.out + r.err).toBe(0);
+    expect(r.out).toMatch(/alpha.*sauté.*public\/plan\.json/);
+    expect(git(a, 'rev-parse', 'HEAD')).toBe(head);
+  });
 });

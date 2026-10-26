@@ -11,10 +11,12 @@ import { FIELDS, Plan, RafError, STATUSES, type Field, type PlanFormat, type Pla
 export interface PlanConfig {
   /** Chemin du plan, relatif à la racine du dépôt. */
   path?: string;
+  /** Commande qui crée un lot dans un plan en lecture seule (`plan.add`) : `{title}` y est remplacé par le titre, entre guillemets. */
+  add?: string;
   settings: PlanSettings;
 }
 
-const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates'];
+const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add'];
 const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates'];
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -81,7 +83,8 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   if (p.files != null) settings.files = list(p.files);
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
   if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
-  return { ...(p.path != null ? { path: String(p.path) } : {}), settings };
+  if (p.add != null && (typeof p.add !== 'string' || !p.add.includes('{title}'))) throw bad('add doit être une commande qui contient {title}');
+  return { ...(p.path != null ? { path: String(p.path) } : {}), ...(p.add != null ? { add: String(p.add) } : {}), settings };
 }
 
 export const PLAN_DEFAULT = '.cadence/raf.yaml';

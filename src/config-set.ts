@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
@@ -10,6 +11,9 @@ import { findProjects, isProject } from './lead.js';
 import { Plan, RafError, type PlanSettings } from './plan.js';
 
 const KEY = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/;
+
+/** Un argument de shell entre apostrophes. */
+const shellQuote = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
 
 /** Estimation du lot de config : une ligne de configuration, pas une journée. */
 const ESTIMATE = 0.05;
@@ -142,8 +146,8 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
     }
     // Le plan : lu avec la config modifiée (une clé plan: posée peut le déplacer) ; un plan tenu par un autre outil ne se modifie pas d'ici.
     const found = planOf(text, dir);
-    if (found.readonly) {
-      skip(`plan en lecture seule (tenu par un autre outil) : créer le lot de config avec l'outil du projet, puis poser ${key}`);
+    if (found.readonly && !found.add) {
+      skip(`plan en lecture seule (tenu par un autre outil) sans commande de création : nommer plan.add dans son cadence.yaml, ou créer le lot de config avec l'outil du projet puis poser ${key}`);
       continue;
     }
     const planPath = found.path ?? defaultPlan(dir).path;
@@ -172,13 +176,21 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
     };
     try {
       writeFileSync(configFile, text);
-      const plan = Plan.load(planPath, { ...found.settings, config: configFile });
-      const id = plan.add(`config cadence.yaml : ${key} = ${shown}`, today, { estimate: ESTIMATE });
-      plan.setStatus(id, 'doing', today);
-      plan.save();
-      const sha = commitPaths(dir, ['cadence.yaml', planRel], `chore(${id}): cadence.yaml — ${key} = ${shown}`);
+      const title = `config cadence.yaml : ${key} = ${shown}`;
+      let id: string;
+      if (found.add) {
+        // La commande du plan crée le lot (et l'ouvre, si son outil le veut) : l'identifiant est le premier mot de sa sortie qui ressemble à un id de lot.
+        const out = execSync(found.add.replaceAll('{title}', shellQuote(title)), { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        id = /\b[A-Za-z]+-?\d+(?:\.\d+)?\b/.exec(out)?.[0] ?? '';
+      } else {
+        const plan = Plan.load(planPath, { ...found.settings, config: configFile });
+        id = plan.add(title, today, { estimate: ESTIMATE });
+        plan.setStatus(id, 'doing', today);
+        plan.save();
+      }
+      const sha = commitPaths(dir, ['cadence.yaml', planRel], `chore${id ? `(${id})` : ''}: cadence.yaml — ${key} = ${shown}`);
       done++;
-      lines.push(`✓ ${name} · ${id} · ${key} = ${shown} · commit ${sha}`);
+      lines.push(`✓ ${name} · ${id || 'lot de config'} · ${key} = ${shown} · commit ${sha}`);
     } catch (e) {
       restore();
       stop(`lot ou commit impossible, fichiers remis en l'état (${(e as Error).message.split('\n')[0]})`);
@@ -190,7 +202,7 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
 }
 
 /** Où est le plan et est-il en lecture seule, d'après le texte de config modifié. */
-function planOf(text: string, root: string): { readonly: boolean; path?: string; settings: PlanSettings } {
+function planOf(text: string, root: string): { readonly: boolean; path?: string; add?: string; settings: PlanSettings } {
   const c = inTemp(text, (file) => readPlanConfig(file, root));
-  return { readonly: !!c?.settings.format, ...(c?.path ? { path: resolve(root, c.path) } : {}), settings: c?.settings ?? {} };
+  return { readonly: !!c?.settings.format, ...(c?.path ? { path: resolve(root, c.path) } : {}), ...(c?.add ? { add: c.add } : {}), settings: c?.settings ?? {} };
 }

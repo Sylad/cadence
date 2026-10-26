@@ -243,6 +243,7 @@ plan:
     notes: note
     repos: depots               # the lot's neighbouring repositories (a list of paths and/or { path, cite }, or one of them)
     parent: parent
+  add: 'mytool add {title}'      # optional: the command that creates a lot here (L342: `cadence config set --all` uses it; {title} is replaced by the quoted title)
   statuses:                     # raf status: their states
     todo: [prevu, specifie]
     doing: [en_cours, teste]

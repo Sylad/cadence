@@ -203,4 +203,26 @@ describe('cadence config set --all (L342)', () => {
     expect(readFileSync(join(a, 'cadence.yaml'), 'utf8')).toContain('build: npx tsc --noEmit');
     expect(git(a, 'rev-list', '--count', 'HEAD').trim()).toBe('2');
   });
+
+  it('R14 — un plan en lecture seule qui nomme sa commande de création (plan.add) reçoit son lot de config par cette commande, commité avec cadence.yaml', () => {
+    const parent = tempDir();
+    const yaml = "plan:\n  path: taches.yaml\n  lots: taches\n  add: 'node add.mjs {title}'\n";
+    const script = "import{appendFileSync}from'node:fs';appendFileSync('taches.yaml','  - { id: T2, title: '+JSON.stringify(process.argv[2])+', status: doing }\\n');console.log('créé T2');\n";
+    const ro = project(parent, 'autre-outil', { 'cadence.yaml': yaml, 'taches.yaml': 'taches:\n  - { id: T1, title: x, status: todo }\n', 'add.mjs': script });
+    const r = cadence(parent, 'config', 'set', 'orchestrate.build', 'npx tsc --noEmit', '--all');
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/autre-outil.*T2/);
+    expect(readFileSync(join(ro, 'taches.yaml'), 'utf8')).toContain('orchestrate.build');
+    const last = git(ro, 'log', '-1', '--format=%s', '--name-only').trim().split('\n');
+    expect(last[0]).toMatch(/^chore\(T2\): .*orchestrate\.build/);
+    expect(last.slice(1).filter(Boolean).sort()).toEqual(['cadence.yaml', 'taches.yaml']);
+    expect(git(ro, 'status', '--porcelain')).toBe('');
+  });
+
+  it('R15 — un plan en lecture seule sans plan.add est sauté en nommant la clé plan.add', () => {
+    const parent = tempDir();
+    project(parent, 'autre-outil', { 'cadence.yaml': 'plan:\n  path: taches.yaml\n  lots: taches\n', 'taches.yaml': 'taches:\n  - { id: T1, title: x, status: todo }\n' });
+    const r = cadence(parent, 'config', 'set', 'orchestrate.build', 'x', '--all');
+    expect(r.out).toMatch(/autre-outil.*sauté.*lecture seule.*plan\.add/);
+  });
 });

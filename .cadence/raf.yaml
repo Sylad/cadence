@@ -3968,9 +3968,10 @@ lots:
     finished: 2026-10-26
   - id: L360
     title: "test/orchestrate-snapshot.test.ts encore rouge (2 à 3 tests) DANS une session de vague après L355 (NODE_PATH ignoré) : la cause n'était pas seulement NODE_PATH — faire relever par une session l'environnement exact d'une session de vague (env complet, cwd, HOME, PATH) et reproduire hors vague, puis rendre le test hermétique ; L346 et L354 l'ont vu rouge le 26-10 alors que la porte du programme était verte"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-26
+    started: 2026-10-26
   - id: L361
     title: "orchestrate : un lot dont la porte du PROGRAMME est verte (checks tests code 0) et dont la session rapporte vert:false avec nouveauxEchecs vide (que des echecsDeBase) part quand même en correction puis en escalade « tests rouges » — il doit aller à la revue sans passe de correction, comme le dit docs/orchestrate.md ; test ; constat L354 et L346 du 26-10 (escalade Fable jouée pour rien)"
     status: doing

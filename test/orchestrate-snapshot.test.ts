@@ -12,6 +12,7 @@ import { Plan } from '../src/plan.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { claudeOut, commitFile, git, harness, kindOf, precheckReport, reviewReport, workReport } from './orchestrate-harness.js';
 import { removeDryRunBriefs, tempDir } from './helpers.js';
+import { yamlResolvedFrom } from './tmp-hygiene.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -334,5 +335,11 @@ describe('L355 — hermétique à l\'environnement de la session qui lance la su
     const lone = tempDir();
     writeFileSync(join(lone, 'package.json'), '{"name":"x"}\n');
     expect(() => createRequire(join(lone, 'package.json')).resolve('yaml')).toThrow();
+  });
+
+  it('R2 — un paquet jetable de la racine privée ne résout pas « yaml » : sinon l\'échec nomme le fichier qui le fournit', () => {
+    const lone = tempDir();
+    writeFileSync(join(lone, 'package.json'), '{"name":"x"}\n');
+    expect(yamlResolvedFrom(lone), `« yaml » se résout depuis ${lone} (NODE_PATH=${process.env.NODE_PATH ?? ''}, HOME=${process.env.HOME ?? ''})`).toBeUndefined();
   });
 });

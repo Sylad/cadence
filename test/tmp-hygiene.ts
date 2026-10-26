@@ -60,11 +60,22 @@ function restoreRights(dir: string): void {
   }
 }
 
+/** Fichier qui fournit « yaml » à un module placé dans `dir`, ou undefined s'il ne se résout pas. */
+export function yamlResolvedFrom(dir: string): string | undefined {
+  try {
+    return createRequire(join(dir, 'x.json')).resolve('yaml');
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Premier dossier de `candidates` où la racine privée de la suite peut vivre : il existe, et « yaml » ne s'y résout pas.
- * Node remonte les dossiers parents en cherchant node_modules : un TMPDIR sous un dépôt installé (celui d'une session de vague,
- * `<dépôt>/.cadence/runs/…`) faisait résoudre « yaml » depuis tout paquet jetable, et les tests « yaml introuvable » de
- * orchestrate-snapshot passaient au vert dans un shell, au rouge en session. Aucun candidat propre : erreur qui les nomme.
+ * Garde, pas cause établie : Node remonte les dossiers parents en cherchant node_modules, donc un TMPDIR sous un dépôt installé
+ * ferait résoudre « yaml » depuis tout paquet jetable et fausserait les tests « yaml introuvable » de orchestrate-snapshot.
+ * Les TMPDIR relevés des sessions de vague (docs/mesures/orchestrate-snapshot-session-2026-10-26.md) étaient propres : la cause
+ * des rouges du 26-10 n'est pas prouvée, et le test « R2 » de ce fichier nomme le fichier fautif s'il revient.
+ * Aucun candidat propre : erreur qui les nomme.
  */
 export function pickRootBase(candidates: string[]): string {
   const seen: string[] = [];
@@ -74,11 +85,9 @@ export function pickRootBase(candidates: string[]): string {
     } catch {
       continue; // absent : sauté
     }
-    try {
-      seen.push(`${dir} (« yaml » s'y résout : ${createRequire(join(dir, 'x.json')).resolve('yaml')})`);
-    } catch {
-      return dir;
-    }
+    const found = yamlResolvedFrom(dir);
+    if (found === undefined) return dir;
+    seen.push(`${dir} (« yaml » s'y résout : ${found})`);
   }
   throw new Error(`Aucun dossier temporaire d'où « yaml » ne se résout pas : les tests « yaml introuvable » seraient faussés. Écartés : ${seen.join(' ; ') || 'aucun dossier existant'}.`);
 }

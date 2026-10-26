@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { decisionsText, humanDecisions } from '../src/orchestrate/decisions.js';
+import { hypothesisNote } from '../src/orchestrate/spec.js';
 import { WORK_SCHEMA } from '../src/orchestrate/schemas.js';
 import type { Lot } from '../src/plan.js';
 
@@ -91,5 +92,30 @@ describe('décisions de l\'humain dans le brief (L344)', () => {
     const [d] = humanDecisions(lot('L9', [{ date: '2026-10-22', text: long }]));
     expect(d!.text.length).toBeLessThan(1700);
     expect(d!.text.startsWith('décision de Sylvain')).toBe(true);
+  });
+
+  it('R12 — une hypothèse de fiche posée par le programme (« Hypothèses (fiche …) — ») n\'est pas une décision, même quand elle parle de l\'utilisateur', () => {
+    const l = lot('L9', [{ date: '2026-10-24', text: hypothesisNote('ecran-pin', "R3 : l'utilisateur voit le bandeau d'échec quand le PIN est refusé") }, decision]);
+    expect(humanDecisions(l).map((d) => d.text)).toEqual([decision.text]);
+  });
+
+  it('R13 — un mineur de revue noté par le programme (« Revue de la fiche — mineur : ») n\'est pas une décision, même « validé par le lead »', () => {
+    const l = lot('L9', [{ date: '2026-10-24', text: 'Revue de la fiche — mineur : docs/specs/x/fiche.yaml:12 — libellé validé par le lead à reformuler' }, decision]);
+    expect(humanDecisions(l).map((d) => d.text)).toEqual([decision.text]);
+  });
+
+  it('R14 — « titre remplacé : « … » » cite l\'ancien titre, périmé : ce n\'est pas une décision', () => {
+    const l = lot('L9', [{ date: '2026-10-24', text: 'titre remplacé : « champs exclus selon la décision de Sylvain »' }, decision]);
+    expect(humanDecisions(l).map((d) => d.text)).toEqual([decision.text]);
+  });
+
+  it('R15 — « remis en attente » (avec ou sans raison) n\'est pas une décision', () => {
+    const l = lot('L9', [{ date: '2026-10-24', text: 'remis en attente : le lead demande de livrer L8 d\'abord' }, { date: '2026-10-24', text: 'remis en attente' }, decision]);
+    expect(humanDecisions(l).map((d) => d.text)).toEqual([decision.text]);
+  });
+
+  it('R16 — « abandonné : … » n\'est pas une décision', () => {
+    const l = lot('L9', [{ date: '2026-10-24', text: 'abandonné : Sylvain a refusé la migration, lot sans objet' }, decision]);
+    expect(humanDecisions(l).map((d) => d.text)).toEqual([decision.text]);
   });
 });

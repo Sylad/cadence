@@ -14,12 +14,20 @@ const MAX_TEXT = 1500;
 const WHO = /\b(sylvain|humain|human|lead|utilisateur|user)\b/i;
 const DECIDED = /(décision|décid|tranch|valid|arbitr|demand|veut|voulu|exig|refus|interdi|decision|decided|approved|asked|wants|required|refused)/i;
 
-const isDecision = (text: string): boolean => WHO.test(text) && DECIDED.test(text);
+/**
+ * Les notes que le programme écrit lui-même, reconnues à leur préfixe : une hypothèse de fiche (`hypothesisNote`, spec.ts : un choix que personne
+ * n'a validé), un mineur de revue (`noteMinors`, cycle.ts), un titre remplacé (plan.ts : l'ancien titre, périmé), une remise en attente (plan.ts) ou
+ * un abandon (cli.ts `drop --reason`). Elles citent souvent l'utilisateur ou le lead sans porter aucune décision de l'humain.
+ */
+const PROGRAM_NOTE = /^(Hypothèses \(fiche |Revue de [^\n]{1,60}? — mineur : |titre remplacé : |remis en attente(\s*:|$)|abandonné : )/;
+
+const isDecision = (text: string): boolean => !PROGRAM_NOTE.test(text) && WHO.test(text) && DECIDED.test(text);
 
 /**
  * Les décisions de l'humain écrites dans les notes d'un lot et de son parent (le parent d'abord), dans l'ordre du plan. Le texte est
  * celui de la note, coupé à `MAX_TEXT` : la date et la citation restent celles de l'humain, jamais reformulées (L344, B28.8 du 26-10 :
- * « champs exclus » lu contre la décision du 22-10). Les notes de revue, de mesure ou de relevé, qui ne nomment personne, sont ignorées.
+ * « champs exclus » lu contre la décision du 22-10). Les notes de revue, de mesure ou de relevé, qui ne nomment personne, sont ignorées, comme celles que le programme
+ * écrit lui-même (`PROGRAM_NOTE`), même quand leur contenu cite l'utilisateur ou le lead.
  */
 export function humanDecisions(lot: Lot, parent?: Lot): Decision[] {
   return [parent, lot].flatMap((l) =>

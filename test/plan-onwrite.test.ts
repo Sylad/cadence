@@ -55,6 +55,15 @@ describe('R1 — la clé plan.onWrite se lit et se valide', () => {
     expect(read("plan:\n  onWrite: { command: make, files: ['../hors.json'] }\n")).toThrow(/plan\.onWrite\.files.*hors du dépôt/);
     expect(read('plan:\n  onWrite: make\n')).toThrow(/plan\.onWrite doit être un objet/);
   });
+  it('R1 — un dossier déclaré dans files est refusé en nommant la clé, raf add ne plante plus en EISDIR', () => {
+    const dir = project(config('mkdir -p pub', '[pub]'));
+    mkdirSync(join(dir, 'pub'));
+    expect(() => readPlanConfig(join(dir, 'cadence.yaml'))).toThrow(/plan\.onWrite\.files « pub » est un dossier/);
+    const r = cadence(dir, 'add', 'x');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain('plan.onWrite.files « pub » est un dossier');
+    expect(r.err).not.toContain('EISDIR');
+  });
   it('R1 — les fichiers produits sont tenus avec le plan (maintained), sans doublon avec plan.files', () => {
     const dir = project(`plan:\n  files: [${OUT}]\n  onWrite: { command: 'true', files: [${OUT}, public/autre.json] }\n`);
     const plan = Plan.load(join(dir, PLAN), readPlanConfig(join(dir, 'cadence.yaml'))!.settings);

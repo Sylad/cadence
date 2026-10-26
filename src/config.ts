@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { isDay, type Day } from './dates.js';
@@ -59,6 +59,7 @@ function readOnWrite(v: unknown, cwd: string, bad: (what: string) => RafError): 
   const files = list(v.files).map((f) => {
     const rel = posix.normalize(f.trim().replace(/\\/g, '/'));
     if (rel === '.' || rel === '..' || rel.startsWith('../') || isAbsolute(rel)) throw bad(`onWrite.files « ${f} » est hors du dépôt`);
+    if (existsSync(resolve(cwd, rel)) && statSync(resolve(cwd, rel)).isDirectory()) throw bad(`onWrite.files « ${f} » est un dossier (déclarer les fichiers produits, pas leur dossier)`);
     return rel;
   });
   return { command: v.command, files, cwd };

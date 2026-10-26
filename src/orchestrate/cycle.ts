@@ -566,7 +566,7 @@ export const heldForEscalation = (l: LotState): number => (l.escalation ? 0 : (l
  * (« 6000 / 160999 tokens comptés, 175000 retenus pour l'escalade sur 335999 »), sinon un refus dans cette part contredirait ses propres chiffres ; sans
  * part retenue, le texte d'avant (« 6000 / 335999 tokens comptés »).
  */
-export const budgetCount = (l: LotState): string => {
+const budgetCount = (l: LotState): string => {
   const held = heldForEscalation(l);
   return `${lotSpent(l)} / ${(l.budget ?? 0) - held} tokens comptés${held ? `, ${held} retenus pour l'escalade sur ${l.budget}` : ''}`;
 };
@@ -1126,9 +1126,7 @@ function overBudget(c: LotCtx, reserve = false): null {
   // Une réponse du lead encore en attente n'a pas été consommée : elle ne doit pas se perdre sans qu'on le dise.
   const answer = l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '';
   const basis = hasSpecStage(l) ? 'estimate et étape spec' : "dérivé de l'estimate";
-  const held = heldForEscalation(l);
-  const count = held ? `${lotSpent(l)} / ${l.budget! - held} tokens comptés (${held} retenus pour l'escalade sur ${l.budget}, ${basis})` : `${lotSpent(l)} / ${l.budget} tokens comptés (${basis})`;
-  const why = reserve ? `budget du lot : ${count}, il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${budgetCount(l)}, ${basis})`;
+  const why = reserve ? `budget du lot : ${budgetCount(l)} (${basis}), il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${budgetCount(l)}, ${basis})`;
   // Tests rouges après une écriture : la passe fix refusée aurait suivi, le lot revient sans revue (L145) — la cause le dit.
   const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
   // Passe d'écriture qui vient d'être jouée, nommée d'après le compteur : l.pass - 1 passes de correction l'ont précédée (minorPass reste vrai après la passe des mineurs). Sans passe jouée, un lot repris déjà revu compte ses tests rouges depuis la revue de sa branche ; jamais revu (L315), c'est l'implémentation qui les a laissés.

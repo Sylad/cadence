@@ -65,7 +65,7 @@ describe('budget de lot : la part de l\'escalade est réservée (L349)', () => {
     const budget = before2ndFix + REVIEW_RESERVE + ESCALATION_RESERVE - 1;
     const c = h.lot('L1', { budget, escalationReserve: ESCALATION_RESERVE }, esc);
     await runLot(c);
-    expect(c.lot.outcome).toContain(`budget du lot : ${before2ndFix} / ${budget - ESCALATION_RESERVE} tokens comptés (${ESCALATION_RESERVE} retenus pour l'escalade sur ${budget}, dérivé de l'estimate)`);
+    expect(c.lot.outcome).toContain(`budget du lot : ${before2ndFix} / ${budget - ESCALATION_RESERVE} tokens comptés, ${ESCALATION_RESERVE} retenus pour l'escalade sur ${budget} (dérivé de l'estimate)`);
     expect(c.lot.outcome).toContain(`(${REVIEW_RESERVE} réservés)`);
   });
 

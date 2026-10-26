@@ -3941,6 +3941,7 @@ lots:
     started: 2026-10-26
     notes:
       - { date: 2026-10-26, text: "26-10 (lead, arbitrage après 3 passes Fable) : restreindre le rejeu seul aux portes à lanceur UNIQUE — orchestrate.testReplay refusé à la lecture de cadence.yaml quand orchestrate.test est une porte composée (&&, ||, sous-shells) ; pas de prise en charge des portes composées dans ce lot ; les constats restants sur les portes composées tombent avec cette restriction" }
+    review: { date: 2026-10-26, verdict: "conforme — 2 mineurs (ligne ⚠ « déjà rouges » absente quand tous les nouveaux rouges sont instables ; exemple du CHANGELOG qui cite un rejeu de porte composée désormais refusé), aucune sous-tâche — orchestré (vague 2026-10-26-1950, 4 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (d3411895) laisse le patch du lot identique (git range-diff : « = »), et les changements de main (boucle de rebase rejoué de L364 dans integrateLot, MAX_REPLAYS/baseMoved) ne touchent ni programChecks, ni replayAlone, ni checksText, ni la garde de work() ; l'entrée CHANGELOG reste sous [Unreleased]", commit: b9c27a271bb6e71c6d27432676f7ffe217cdaa1f }
   - id: L355
     title: "test/orchestrate-snapshot.test.ts : 2 tests rouges dans l'environnement d'une session de vague (même au sha de départ), verts dans un shell — trouver la dépendance à l'environnement de la vague et rendre le test hermétique ; il a rendu L346 malgré l'escalade le 26-10"
     status: done

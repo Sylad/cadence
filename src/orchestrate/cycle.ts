@@ -17,6 +17,7 @@ import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
+import { replayFile, shellArg, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
@@ -81,6 +82,8 @@ export interface WaveCtx {
   /** Gabarits des briefs, lus une fois au début de la vague (et à sa reprise) : modifier un fichier en cours de vague ne change rien. */
   templates: Templates;
   quota: { hit: boolean; message?: string };
+  /** Part de la machine de chaque session (L350) : posée en CADENCE_TEST_WORKERS dans les sessions et la porte, et dite aux gabarits. Absent (vague construite à la main) : rien n'est posé. */
+  testWorkers?: number;
   /** Push ou revue qui a modifié le dépôt : la vague s'arrête. */
   incident: string | null;
   /** Dépôts salis par une revue (L133) → lot en cause : les lots qui restent dans leur file sont suspendus, ceux des autres dépôts continuent. */
@@ -251,7 +254,7 @@ const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g, '\\$&
 /** Commande du projet, asynchrone : la boucle d'événements reste libre (délai de l'autre créneau, signaux). Son groupe est tué au délai et au signal. */
 function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000, env: Record<string, string> = {}, cwd = wd(c)): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
-    const child = spawn('sh', ['-c', command], { cwd, env: { ...withoutLaunchVars(process.env), ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawn('sh', ['-c', command], { cwd, env: { ...withoutLaunchVars(process.env), ...(c.wave.testWorkers ? { [TEST_WORKERS_ENV]: String(c.wave.testWorkers) } : {}), ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const pid = child.pid;
     if (pid === undefined) {
       child.once('error', (e) => resolve({ code: 127, output: String(e.message) }));
@@ -356,7 +359,7 @@ function checksText(c: LotCtx): string {
   const declared = b && !b.verified && b.failures.length ? `The author reports ${b.failures.length} test(s) already red at the start sha${b.sha ? ` ${b.sha.slice(0, 7)}` : ''}, before this lot (not verified by the program):\n${b.failures.map((t) => `- ${t}`).join('\n')}\nThey are not defects of this lot, do not report them as findings; a failing test outside this list is still a finding.` : '';
   const k = c.lot.checks;
   if (!k?.runs.length || k.head !== git(wd(c), 'rev-parse', 'HEAD')) return declared;
-  const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? 'green' : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`}`);
+  const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? (r.instables?.length ? `green; ${r.instables.length} test(s) red under load in the whole suite, green when replayed alone, not defects: ${r.instables.join(' ; ')}` : 'green') : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`}`);
   const ran = [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
   return declared ? `${ran}\n${declared}` : ran;
 }
@@ -464,12 +467,15 @@ function avalOf(c: LotCtx, kind: SessionKind): string {
   return kind === 'review-small' && l.small && l.visible && screen ? `${text}\n${avalFicheText('ux', o)}` : text;
 }
 
+/** Consigne de la part de machine de la session (L350) ; vide quand la vague n'en a pas calculé. */
+const workersText = (c: LotCtx): string => (c.wave.testWorkers ? testWorkersText(c.wave.testWorkers) : '');
+
 function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   const plan = c.loadPlan();
   const l = c.lot;
   const lot = plan.lot(l.lot);
   const tmpDir = c.wave.store.tmpDir(l.project, l.lot);
-  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
+  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), workers: kind === 'implement' || kind === 'fix' ? workersText(c) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = newsText(l.lot, pwDir);
@@ -721,6 +727,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       prodAccess: c.config.prodAccess,
       addDirs: [...c.config.addDirs, ...(playwright && write ? [playwrightDir(dirname(mcpConfig))] : []), tmpDir, ...neighbourDirs(l), ...(kind === 'fix' && l.docsFix ? (docsConfig(c).articles ?? []).map((r) => articleRepoDir(l.repo, r)) : [])],
       nodeBin: l.node?.link,
+      testWorkers: w.testWorkers,
       toolBin: toolBinOf(w.store.dir),
       tmpDir,
       mcpConfig,
@@ -1913,13 +1920,60 @@ async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promi
       if (!l.warnings.includes(note)) l.warnings.push(note);
       continue;
     }
+    // Un rouge absent de la ligne de base est rejoué SEUL avant d'être compté (L350) : sous charge, des tests qui passent seuls rougissent ensemble.
+    const named = vs.kind === 'new' ? vs.nouveaux : label === 'tests' && !hasUnnamedFailure(r.output) ? failedTests(r.output) : [];
+    const { red: still, unstable } = named.length ? await replayAlone(c, command, named) : { red: [] as string[], unstable: [] as string[] };
+    if (unstable.length) noteUnstable(c, unstable);
+    if (unstable.length && !still.length) {
+      run.instables = unstable;
+      if (vs.kind === 'new' && vs.existants) run.dejaRouges = vs.existants;
+      else run.code = 0;
+      continue;
+    }
+    const alone = unstable.length ? `\n(${unstable.length} test(s) rouge(s) sous charge, verts rejoués seuls : instables, à ne pas corriger)` : '';
     if (vs.kind === 'new') {
-      red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) : ${vs.nouveaux.length} test(s) rouge(s) qui ne l'étaient pas au sha de départ :\n${vs.nouveaux.map((t) => `- ${t}`).join('\n')}${vs.existants ? `\n(${vs.existants} autre(s) test(s) déjà rouge(s) au sha de départ : à ne pas corriger)` : ''}` });
+      const left = vs.nouveaux.filter((t) => !unstable.includes(t));
+      red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) : ${left.length} test(s) rouge(s) qui ne l'étaient pas au sha de départ :\n${left.map((t) => `- ${t}`).join('\n')}${vs.existants ? `\n(${vs.existants} autre(s) test(s) déjà rouge(s) au sha de départ : à ne pas corriger)` : ''}${alone}` });
       return;
     }
-    red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
+    red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}${alone}` });
     return;
   }
+}
+
+/** Rejeux d'un test rouge de la porte, seul (L350) : rouge aux deux, il est compté. */
+const REPLAYS = 2;
+
+/**
+ * Rejoue SEULS (la commande de la porte, suivie des fichiers de ces tests) les tests rouges d'une suite entière (L350). Le 26-10, vitest à 31 workers par suite sur une machine à 4 sessions rougissait des tests
+ * qui passaient seuls : quatre corrections vides (4 à 11 min chacune). Un test vert à un rejeu est `unstable` ; rouge aux `REPLAYS` rejeux, ou sans fichier désignable (rien à rejouer seul), il reste dans `red`.
+ */
+async function replayAlone(c: LotCtx, command: string, names: string[]): Promise<{ red: string[]; unstable: string[] }> {
+  let red = names;
+  const unstable: string[] = [];
+  for (let i = 0; i < REPLAYS; i++) {
+    const replayable = red.filter((n) => replayFile(n));
+    if (!replayable.length) break;
+    const files = [...new Set(replayable.map((n) => replayFile(n)!))];
+    const r = await sh(c, `${command} ${files.map(shellArg).join(' ')}`);
+    const failing = r.code === 0 ? [] : hasUnnamedFailure(r.output) || !failedTests(r.output).length ? replayable : replayable.filter((n) => failedTests(r.output).includes(n));
+    const passed = replayable.filter((n) => !failing.includes(n));
+    unstable.push(...passed);
+    red = red.filter((n) => !passed.includes(n));
+  }
+  return { red, unstable };
+}
+
+/** Trace des tests instables sous charge (L350) : le lot (`instables`, journal et `cadence perf`), un avertissement du lot (tableau de fin de vague) et une ligne du journal de la vague. */
+function noteUnstable(c: LotCtx, tests: string[]): void {
+  const l = c.lot;
+  const fresh = tests.filter((t) => !(l.instables ?? []).includes(t));
+  if (!fresh.length) return;
+  l.instables = [...(l.instables ?? []), ...fresh];
+  const text = `${fresh.length} test(s) instable(s) sous charge (rouge(s) dans la suite, vert(s) rejoué(s) seul(s)), pas de passe de correction : ${fresh.join(' ; ')}`;
+  l.warnings.push(text);
+  c.wave.log(`${lotKey(l.project, l.lot)} · ${text}`);
+  save(c);
 }
 
 /**

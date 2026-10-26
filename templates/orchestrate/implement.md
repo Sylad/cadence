@@ -45,4 +45,5 @@ Give your final report as the structured output, not as free text. If the plan i
 {{commits}}
 {{reponse}}
 Browser (Playwright): if a Playwright MCP server is available in this session (only in an orchestrated wave: a brief delegated by hand has none), the orchestrator launched it with its own output directory, in the orchestrator's run directory outside the repository. {{shots}} If no such server is available, do not install or start one; if you use the Playwright CLI, write its outputs under the OS temp directory (or the temporary folder the project's CLAUDE.md names), never inside the repository, which must stay clean.
+{{workers}}
 {{tmp}}

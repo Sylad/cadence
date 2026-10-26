@@ -7,6 +7,7 @@ import type { Effort } from '../config.js';
 import { RafError } from '../plan.js';
 import { sandboxEnv } from './sandbox.js';
 import { SlotAbandoned } from './registry.js';
+import { TEST_WORKERS_ENV } from './workers.js';
 import { killMarked, SESSION_MARK_VAR, TreeTracker } from '../proc.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
@@ -44,6 +45,8 @@ export interface StepSpec {
   extend?: LaunchOpts['extend'];
   /** Dossier `bin` d'un Node (`.nvmrc` du projet) : mis en tête du PATH de la session, jamais de l'orchestrateur. */
   nodeBin?: string;
+  /** Part de la machine de la session (L350) : posée en CADENCE_TEST_WORKERS ; absent, rien n'est posé. */
+  testWorkers?: number;
   /** `<vague>/tool/bin` : `raf` et `cadence` de l'instantané, en tête du PATH de la session (avant le Node du projet). */
   toolBin?: string;
   /** Fichier de configuration MCP de l'étape (écrit par l'orchestrateur) : passé avec `--strict-mcp-config`, seuls ses serveurs sont chargés. */
@@ -243,7 +246,7 @@ export async function runSession(
 ): Promise<SessionOutcome> {
   const sandbox = sandboxEnv(!!spec.prodAccess);
   const launch = (args: string[]) =>
-    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...NO_BACKGROUND_ENV, ...sandbox.set, ...(spec.tmpDir ? { TMPDIR: spec.tmpDir } : {}), ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, extend: spec.extend, onSpawn: deps.onSpawn, lot: spec.lot });
+    deps.claude(args, { local: spec.local, cwd: spec.cwd, unset: sandbox.unset, env: { CADENCE_ORCHESTRATED: spec.wave, ...(spec.testWorkers ? { [TEST_WORKERS_ENV]: String(spec.testWorkers) } : {}), ...NO_BACKGROUND_ENV, ...sandbox.set, ...(spec.tmpDir ? { TMPDIR: spec.tmpDir } : {}), ...(spec.nodeBin || spec.toolBin ? { PATH: [spec.toolBin, spec.nodeBin, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {}) }, timeoutMs: spec.timeoutMs, extend: spec.extend, onSpawn: deps.onSpawn, lot: spec.lot });
   const epoch = killEpoch;
   const out = await launch(spec.local ? buildLocalArgs(spec, deps.agents) : buildArgs(spec, deps.agents));
   const first = classify(out);

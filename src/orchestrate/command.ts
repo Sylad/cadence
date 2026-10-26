@@ -1,7 +1,8 @@
 import { gateProgress, gateText } from '../audit.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { availableParallelism, homedir, tmpdir } from 'node:os';
+import { testWorkersFrom } from './workers.js';
 import { basename, join, resolve } from 'node:path';
 import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, type OrchestrateConfig } from '../config.js';
 import { isDay, toDay, type Day } from '../dates.js';
@@ -63,6 +64,8 @@ export interface OrchestrateDeps {
    * depuis cette copie. Absent (tests, processus déjà relancé) : la vague tourne sur le paquet courant, sans copie.
    */
   snapshot?: SnapshotDeps;
+  /** Cœurs de la machine (L350) : de quoi calculer la part de chaque session ; défaut `availableParallelism()`, injectable pour les tests. */
+  cores?: () => number;
   /** Attente du verrou d'intégration du dépôt (L279, R25) : défauts 10 minutes et 1 s ; réglable pour les tests. */
   integrate?: { waitMs?: number; pollMs?: number };
 }
@@ -1044,6 +1047,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     wave.budget = budget.limit;
     store.writeWave(wave);
   };
+  // Part de la machine de chaque session (L350) : recalculée à chaque (re)prise, le plafond peut avoir changé.
+  wave.testWorkers = testWorkersFrom(io.env, (deps.cores ?? availableParallelism)(), cap);
   const wctx: WaveCtx = {
     id: wave.id,
     store,
@@ -1053,6 +1058,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     today,
     claudeHome: deps.claudeHome,
     templates,
+    testWorkers: wave.testWorkers,
     quota: { hit: false },
     incident: null,
     log: (line) => {

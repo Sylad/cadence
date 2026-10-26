@@ -139,6 +139,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     put(MARKETPLACE, edit(MARKETPLACE, [[new RegExp(`("name":\\s*"${escape(String(own.name))}"[^{}]*?"version":\\s*")([^"]*)(")`), `de version pour le plugin « ${own.name} »`]]));
   }
 
+  if (!existsSync(join(root, CHANGELOG))) throw new RafError(`release : ${CHANGELOG} n'existe pas — la release renomme sa section [Unreleased], il faut donc un ${CHANGELOG} qui en porte une`);
   const changelog = readFileSync(join(root, CHANGELOG), 'utf8');
   const { before, body, after } = splitUnreleased(changelog);
   if (!hasEntries(body)) throw new RafError(`release : la section [Unreleased] est vide dans ${CHANGELOG} — rien à publier ; y écrire ce qui change pour l'utilisateur (lots cités)`);

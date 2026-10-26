@@ -223,6 +223,16 @@ describe('cadence release — le CHANGELOG', () => {
     expect(r.err).toMatch(/\[Unreleased\]/);
   });
 
+  it('R4 — un dépôt sans CHANGELOG.md est refusé en le disant (code 2, pas de trace de pile), rien n’est écrit', () => {
+    const dir = project();
+    git(dir, 'rm', '-q', 'CHANGELOG.md');
+    commit(dir, 'chore: no changelog');
+    const r = release(dir, 'patch');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/CHANGELOG\.md/);
+    expect(json(dir, 'package.json').version).toBe('1.2.3');
+  });
+
   it('R4 — un [Unreleased] vide ne tombe pas sur l’entrée de la version précédente', () => {
     const dir = project({ changelog: CHANGELOG.replace(/### Added\n\n- A new thing \(L7\)\.\n\n/, '') });
     expect(release(dir, 'patch').code).toBe(2);

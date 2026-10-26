@@ -305,6 +305,18 @@ describe('L360 — la racine temporaire ne dépend pas de l\'endroit où TMPDIR 
     expect(() => pickRootBase([dirty])).toThrow(new RegExp(`yaml.*${dirty.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
   });
 
+  it('R5 — un NODE_PATH qui fournit « yaml » n\'écarte aucun candidat : seuls les node_modules des dossiers parents comptent', () => {
+    const np = withYaml();
+    const clean = tempDir();
+    const module = join(dirname(fileURLToPath(import.meta.url)), 'tmp-hygiene.ts');
+    const code = `import(${JSON.stringify(module)}).then((m) => console.log(m.pickRootBase([${JSON.stringify(clean)}])))`;
+    const out = execFileSync(process.execPath, ['-e', code], {
+      env: { ...process.env, NODE_PATH: join(np, 'node_modules') },
+      encoding: 'utf8',
+    });
+    expect(out.trim()).toBe(clean);
+  });
+
   it('R4 — un candidat absent est sauté', () => {
     const clean = tempDir();
     expect(pickRootBase([join(clean, 'absent'), clean])).toBe(clean);

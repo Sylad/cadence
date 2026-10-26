@@ -1,4 +1,4 @@
-import { chmodSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { hostname } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
@@ -60,12 +60,22 @@ function restoreRights(dir: string): void {
   }
 }
 
-/** Fichier qui fournit « yaml » à un module placé dans `dir`, ou undefined s'il ne se résout pas. */
+/**
+ * Fichier qui fournit « yaml » à un module placé dans `dir` par les node_modules de `dir` et de ses dossiers parents,
+ * ou undefined s'il ne s'y trouve pas. Les chemins globaux (NODE_PATH, ~/.node_modules…) sont figés au démarrage du processus
+ * et ne dépendent pas de `dir` : on ne les teste pas.
+ */
 export function yamlResolvedFrom(dir: string): string | undefined {
-  try {
-    return createRequire(join(dir, 'x.json')).resolve('yaml');
-  } catch {
-    return undefined;
+  for (let d = resolve(dir); ; d = dirname(d)) {
+    const modules = join(d, 'node_modules');
+    if (basename(d) !== 'node_modules' && existsSync(join(modules, 'yaml'))) {
+      try {
+        return createRequire(join(modules, 'x.json')).resolve('yaml');
+      } catch {
+        // dossier yaml inutilisable : pas un fournisseur
+      }
+    }
+    if (dirname(d) === d) return undefined;
   }
 }
 

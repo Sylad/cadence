@@ -1966,8 +1966,8 @@ async function replayAlone(c: LotCtx, command: string, names: string[], cwd = wd
     if (!files.length) break;
     const replayable = red.filter((n) => replayFile(n) || isJestTest(n));
     const r = await sh(c, `${command} ${files.map(shellArg).join(' ')}`, undefined, undefined, cwd);
-    // Un rejeu qui n'exécute aucun test (filtre sans fichier, `passWithNoTests`) sort en 0 sans rien prouver : il ne vaut pas vert.
-    const failing = r.code === 0 && !NO_TEST_RAN.test(r.output) ? [] : hasUnnamedFailure(r.output) || !failedTests(r.output).length ? replayable : replayable.filter((n) => failedTests(r.output).includes(n));
+    // Seul un rejeu qui sort en 0 en ayant exécuté des tests vaut vert. Un rejeu en échec ne conclut rien pour un test qu'il ne nomme pas : sur une porte composée (`a && b`) les fichiers n'atteignent que le dernier lanceur, un premier lanceur qui rougit coupe avant lui. Un rejeu sans test exécuté (filtre sans fichier, `passWithNoTests`) sort en 0 sans rien prouver.
+    const failing = r.code === 0 && !NO_TEST_RAN.test(r.output) ? [] : replayable;
     const passed = replayable.filter((n) => !failing.includes(n));
     unstable.push(...passed);
     red = red.filter((n) => !passed.includes(n));

@@ -147,20 +147,18 @@ describe('L350 R4 — un test rouge de la porte est rejoué seul avant d\'être 
     expect(replaysBeforeFix).toBe(2); // deux rejeux, pas trois
     expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
     expect(h.calls[1].brief).toContain('test/a.test.ts > charge');
-    expect(c.lot.instables).toEqual(['test/b.test.ts > autre']); // b ne rougit pas aux rejeux (la sortie n'y nomme que a) : instable, a reste compté
+    expect(c.lot.instables ?? []).toEqual([]); // b n'est pas nommé par les rejeux en échec : non conclu, il reste rouge avec a
   });
-  it('R4 — deux rouges, un seul reste rouge au rejeu : la correction ne liste que celui-là, l\'autre est noté instable', async () => {
+  it('R4 — porte composée : un test que le rejeu n\'a pas nommé dans une sortie en échec reste rouge, il n\'est pas excusé en instable', async () => {
     const log = LOG();
     const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
-    // b.test.ts rouge partout ; a.test.ts rouge seulement dans la suite entière
-    // « charge » est posé par une variable : le nom complet ne figure pas dans le texte de la commande, que le brief de correction reprend.
-    const test = `n=charge; f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo "$@" >> ${log}; echo " FAIL  test/b.test.ts > autre"; exit 1; fi; echo " FAIL  test/a.test.ts > $n"; echo " FAIL  test/b.test.ts > autre"; exit 1; }; f`;
+    // `(backend) && (frontend F)` : les fichiers ajoutés n'atteignent que le dernier lanceur, le backend rejoue sa suite entière, rougit encore et `&&` coupe avant le frontend.
+    const test = `n=regression; f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo "$@" >> ${log}; echo " FAIL  test/b.test.ts > charge"; exit 1; fi; echo " FAIL  test/f.test.ts > $n"; echo " FAIL  test/b.test.ts > charge"; exit 1; }; f`;
     const c = h.lot('L1', {}, { test });
     await runLot(c);
-    const brief = h.calls[1].brief;
-    expect(brief).toContain('test/b.test.ts > autre');
-    expect(brief).not.toContain('test/a.test.ts > charge');
-    expect(c.lot.instables).toEqual(['test/a.test.ts > charge']);
+    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
+    expect(h.calls[1].brief).toContain('test/f.test.ts > regression');
+    expect(c.lot.instables ?? []).toEqual([]);
   });
   it('R4 — un rouge déjà présent à la ligne de base n\'est pas rejoué (déjà exclu du compte)', async () => {
     const log = LOG();
@@ -228,7 +226,7 @@ describe('L350 R4 — un test rouge de la porte est rejoué seul avant d\'être 
     expect(review.brief).toMatch(/already red at the start sha/);
     expect(review.brief).not.toMatch(/RED, exit code 1\s*$/m);
   });
-  it('R4 — ligne de base non vide : deux nouveaux rouges, un seul reste rouge au rejeu : la correction ne liste que celui-là et compte l\'ancien à part', async () => {
+  it('R4 — ligne de base non vide : deux nouveaux rouges, le rejeu en échec n\'en nomme qu\'un : les deux restent rouges (non conclu), l\'ancien est compté à part', async () => {
     const log = LOG();
     const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
     const test = `n=charge; f() { case "$PWD" in *cadence-baseline*) echo ' FAIL  test/old.test.ts > ancien'; exit 1;; esac; if [ -n "$1" ]; then echo "$@" >> ${log}; echo ' FAIL  test/b.test.ts > autre'; exit 1; fi; echo ' FAIL  test/old.test.ts > ancien'; echo " FAIL  test/a.test.ts > $n"; echo ' FAIL  test/b.test.ts > autre'; exit 1; }; f "$@"`;
@@ -237,9 +235,9 @@ describe('L350 R4 — un test rouge de la porte est rejoué seul avant d\'être 
     const brief = h.calls[1].brief;
     expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
     expect(brief).toContain('- test/b.test.ts > autre');
-    expect(brief).not.toContain('test/a.test.ts > charge');
+    expect(brief).toContain('- test/a.test.ts > charge');
     expect(brief).toContain('1 autre(s) test(s) déjà rouge(s)');
-    expect(c.lot.instables).toEqual(['test/a.test.ts > charge']);
+    expect(c.lot.instables ?? []).toEqual([]);
   });
   it('R4 — jest : « FAIL fichier » et « ● Suite › test » sont rejoués seuls (par le fichier), verts rejoués : instables', async () => {
     const log = LOG();

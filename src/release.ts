@@ -219,7 +219,11 @@ function steps(p: Planned, files: string[], branch: string): string[] {
     `git push origin ${branch} ${tag}    (le tag lance le workflow de publication)`,
     'gh run watch    (jusqu\'à la fin du run de publication)',
     ...(p.isPrivate || p.packageName === '' ? [] : [`npm view ${p.packageName} version    (doit répondre ${p.version})`]),
-    ...(p.pluginName ? [`claude plugin update ${p.pluginName}${p.marketplaceName ? `@${p.marketplaceName}` : ''}    (le plugin se lit depuis le dépôt poussé)`] : []),
+    ...(p.pluginName ? [
+      ...(p.marketplaceName ? [`claude plugin marketplace update ${p.marketplaceName}    (sans elle, le plugin installé reste à l'ancienne version)`] : []),
+      `claude plugin update ${p.pluginName}${p.marketplaceName ? `@${p.marketplaceName}` : ''}    (le plugin se lit depuis le dépôt poussé)`,
+      '/reload-plugins    (dans la session Claude Code ouverte, pour charger la nouvelle version)',
+    ] : []),
   ];
   return out.map((s, i) => `  ${i + 1}. ${s}`);
 }

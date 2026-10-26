@@ -79,6 +79,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `cadence release` (L359, `docs/releasing.md`): the last printed step now updates the plugin completely. It prints `claude plugin marketplace update <marketplace>` before `claude plugin update <plugin>@<marketplace>` (without the first the installed plugin stayed at the old version, seen at the 1.13.0 release on 26-10) and `/reload-plugins` after it.
 - `cadence orchestrate` runs the gate under the project's Node (L351, `docs/orchestrate.md`, GitHub issue #17): `orchestrate.test`, `orchestrate.build` (baseline run included) and the other commands the program launches (`start`, acceptance runs, `verdict`) now get the same `PATH` as the sessions, with the `node-bin/<version>` link of the `.nvmrc` first. Before, a wave started under Node 20 with a `.nvmrc` asking for 24 failed the gate whatever the lot did, then burned empty fix passes and escalated for nothing. `--dry-run` warns when a gate is declared and the `.nvmrc` does not match the Node of the `PATH`.
 
 ## [1.13.0] - 2026-10-26

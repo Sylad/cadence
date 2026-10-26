@@ -71,8 +71,10 @@ version files are written, the commit is not ready. `--dry-run` reads the forms 
 
 It prints the lead's steps, in order, and runs none: the `git add` of exactly the files of the version commit and the commit,
 `npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script), `git tag v<x.y.z>`, `git push origin <branch> v<x.y.z>`,
-`gh run watch`, `npm view <package> version` (not for a private package) and `claude plugin update <plugin>@<marketplace>`
-(only with a `.claude-plugin/plugin.json`). The 2026-10-25 releases (1.10.0 to 1.12.1) were this chain done four times by hand,
+`gh run watch`, `npm view <package> version` (not for a private package) and, only with a `.claude-plugin/plugin.json`,
+the plugin update: `claude plugin marketplace update <marketplace>` first (without it the installed plugin stays at the old
+version; skipped when the marketplace has no name), then `claude plugin update <plugin>@<marketplace>`, then `/reload-plugins`
+in the open Claude Code session. The 2026-10-25 releases (1.10.0 to 1.12.1) were this chain done four times by hand,
 once with the long paragraph inserted at the wrong place of `docs/whats-new.md`.
 
 ## Evaluating the plugin (before a release)

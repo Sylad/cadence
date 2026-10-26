@@ -287,7 +287,7 @@ describe('cadence release — rien n’est publié', () => {
     expect(git(dir, 'tag', '--list')).toBe('');
   });
 
-  it('R9 — elle imprime les étapes du lead dans l’ordre : commit, éval --trust-plugin, tag, push, run publish, npm view, plugin', () => {
+  it('R9 — elle imprime les étapes du lead dans l’ordre : commit, éval --trust-plugin, tag, push, run publish, npm view, marketplace update, plugin update, /reload-plugins', () => {
     const dir = project({ whatsNew: WHATS_NEW_DONE });
     const r = release(dir, 'patch');
     expect(r.code).toBe(0);
@@ -299,7 +299,9 @@ describe('cadence release — rien n’est publié', () => {
       'git push origin main v1.2.4',
       'gh run watch',
       `npm view ${NAME} version`,
+      'claude plugin marketplace update acme-market',
       'claude plugin update acme@acme-market',
+      '/reload-plugins',
     ];
     let at = -1;
     for (const step of order) {

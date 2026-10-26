@@ -41,7 +41,7 @@ describe('parcours mesuré d\'un nouvel utilisateur (L357)', () => {
   });
 
   it('Rapport — rien de propre à notre dossier : aucun chemin ni nom de nos projets', () => {
-    expect(md()).not.toMatch(/sylvain_ladoire|developpeur\/|maritime|aetherwx/i);
+    expect(md()).not.toMatch(/sylvain_ladoire|developpeur\/|maritime|aetherwx|mini-blue|sylva@/i);
   });
 
   it('Rapport — ce qui n\'a pas pu être joué est dit, pas inventé', () => {

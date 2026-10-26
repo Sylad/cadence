@@ -3860,9 +3860,10 @@ lots:
     created: 2026-10-26
   - id: L349
     title: "budget de lot : réserver l'escalade quand orchestrate.escalation est déclarée — la correction et la revue escaladées (mesurées sur les escalades jouées depuis L337, sinon une estimation déclarée et documentée) s'ajoutent au budget dérivé de l'estimate, comme les 155 k de la dernière passe ; le dry-run affiche le budget avec sa part d'escalade ; cadence perf compte les escalades non jouées faute de budget ; doc (orchestrate.md, le tableau des budgets), CHANGELOG, tests. Constat du 26-10 : L341 (494 k / 600 k) et L342 (572 k / 600 k) rendus avec « escalade fable non jouée (budget) » — l'escalade ajoutée par L337 n'a jamais reçu de budget, elle ne joue donc que sur les lots qui ont consommé peu, l'inverse de son but"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-26
+    started: 2026-10-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-10-26
+
 ### Added
 
 - `docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md` (L357): the measured walk of a new user on a WSL Ubuntu with no Node, no Claude Code and no cadence (install, plugin, two projects, `lead tour`, a first wave, `deliver --dry-run`), with the nine snags met — command, message, time lost — eight of them turned into a lot to write; the wave itself stopped at `Not logged in` and is listed as not played.

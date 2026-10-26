@@ -67,7 +67,7 @@ Write the two forms of the new version in `docs/whats-new.md` **before** running
 both are there and in their place, and says where to write what is missing. The « In two lines » line of the version is the
 first of the list and at most 240 characters; the long paragraph is the first of « Version by version », right after its
 introduction (the newest version first, as the file is read). Exit code 1 when a form is missing, misplaced or too long: the
-version files are written, the commit is not ready. With `--dry-run` the forms cannot exist yet, so the command only says where they go.
+version files are written, the commit is not ready. `--dry-run` reads the forms the same way (nothing is written) and exits 1 on the same findings, so the forms can be checked before the real run.
 
 It prints the lead's steps, in order, and runs none: the `git add` of exactly the files of the version commit and the commit,
 `npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script), `git tag v<x.y.z>`, `git push origin <branch> v<x.y.z>`,

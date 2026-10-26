@@ -83,14 +83,23 @@ interface Planned {
   hasEvalScript: boolean;
 }
 
+/** Un échec de git (hors dépôt, dépôt sans commit) est un refus, pas une trace de pile. */
+const inGit = <T>(what: string, f: () => T): T => {
+  try {
+    return f();
+  } catch (e) {
+    throw new RafError(`release : ${what} impossible (${((e as Error).message.split('\n').find((l) => /^fatal|^error/i.test(l)) ?? (e as Error).message).trim()}) — la commande se lance dans un dépôt git qui a au moins un commit`);
+  }
+};
+
 /** Calcule tous les fichiers de la release SANS rien écrire : un refus laisse l'arbre intact. */
 function plan(root: string, bump: Bump, today: Day): Planned {
   if (!existsSync(join(root, PACKAGE))) throw new RafError(`release : ${PACKAGE} introuvable dans ${root}`);
   const pkg = readJson(root, PACKAGE);
   const current = String(pkg.version ?? '');
   const version = nextVersion(current, bump);
-  if (hasTrackedChanges(root, [WHATS_NEW])) throw new RafError(`release : l'arbre de travail a des fichiers suivis modifiés (hors ${WHATS_NEW}, que le commit de version embarque) — le commit de version ne tient que les fichiers de version ; les commiter ou les remiser d'abord`);
-  if (tagExists(root, `v${version}`)) throw new RafError(`release : la version ${version} est déjà taguée (v${version}) — rien à préparer`);
+  if (inGit('la lecture de l\'état git', () => hasTrackedChanges(root, [WHATS_NEW]))) throw new RafError(`release : l'arbre de travail a des fichiers suivis modifiés (hors ${WHATS_NEW}, que le commit de version embarque) — le commit de version ne tient que les fichiers de version ; les commiter ou les remiser d'abord`);
+  if (inGit('la lecture des tags', () => tagExists(root, `v${version}`))) throw new RafError(`release : la version ${version} est déjà taguée (v${version}) — rien à préparer`);
 
   const writes = new Map<string, string>();
   const files: string[] = [];
@@ -98,16 +107,17 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     writes.set(file, text);
     files.push(file);
   };
-  const edit = (file: string, edits: Array<[RegExp, string]>): string => {
+  const edit = (file: string, edits: Array<[RegExp | ((text: string) => RegExp), string]>): string => {
     let text = readFileSync(join(root, file), 'utf8');
-    for (const [pattern, label] of edits) {
-      const next = swap(text, pattern, version);
+    for (const [spec, label] of edits) {
+      const next = swap(text, typeof spec === 'function' ? spec(text) : spec, version);
       if (next === null) throw new RafError(`release : ${file} n'a pas ${label} à mettre à jour`);
       text = next;
     }
     return text;
   };
-  const topVersion = /^(  "version":\s*")([^"]*)(")/m;
+  // Le champ de tête du fichier, à l'indentation du fichier (deux espaces, quatre, tabulation) : celle de sa première clé.
+  const topVersion = (text: string) => new RegExp(`^(${escape(/^\{[ \t]*\r?\n([ \t]+)"/.exec(text)?.[1] ?? '  ')}"version":\\s*")([^"]*)(")`, 'm');
 
   put(PACKAGE, edit(PACKAGE, [[topVersion, 'de champ "version"']]));
 
@@ -118,7 +128,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     }
     const drift = lockDrift(pkg, lock);
     if (drift.length > 0) throw new RafError(`release : ${LOCK} n'est pas à jour des dépendances de ${PACKAGE}, un \`npm install\` les ferait bouger — à commiter à part avant la release :\n  ${drift.join('\n  ')}`);
-    const edits: Array<[RegExp, string]> = [[topVersion, 'de champ "version"']];
+    const edits: Array<[RegExp | ((text: string) => RegExp), string]> = [[topVersion, 'de champ "version"']];
     if (lock.packages?.['']) edits.push([/("packages":\s*\{\s*"":\s*\{[^{}]*?"version":\s*")([^"]*)(")/, 'de version pour la racine de packages']);
     put(LOCK, edit(LOCK, edits));
   }
@@ -136,7 +146,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     const entries: Json[] = Array.isArray(market.plugins) ? market.plugins : [];
     const own = entries.find((p) => pluginName !== null && p?.name === pluginName) ?? entries.find((p) => p?.version === current);
     if (!own) throw new RafError(`release : ${MARKETPLACE} n'a pas de plugin ${pluginName ? `« ${pluginName} »` : `à la version ${current}`} à mettre à jour`);
-    put(MARKETPLACE, edit(MARKETPLACE, [[new RegExp(`("name":\\s*"${escape(String(own.name))}"[^{}]*?"version":\\s*")([^"]*)(")`), `de version pour le plugin « ${own.name} »`]]));
+    put(MARKETPLACE, edit(MARKETPLACE, [[new RegExp(`("name":\\s*"${escape(String(own.name))}"(?:[^{}]|\\{[^{}]*\\})*?"version":\\s*")([^"]*)(")`), `de version pour le plugin « ${own.name} »`]]));
   }
 
   if (!existsSync(join(root, CHANGELOG))) throw new RafError(`release : ${CHANGELOG} n'existe pas — la release renomme sa section [Unreleased], il faut donc un ${CHANGELOG} qui en porte une`);
@@ -223,7 +233,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
   const whatsNewPath = join(root, WHATS_NEW);
   const hasWhatsNew = existsSync(whatsNewPath);
   const files = hasWhatsNew ? [...p.files, WHATS_NEW] : p.files;
-  const branch = currentBranch(root) ?? 'main';
+  const branch = inGit('la lecture de la branche', () => currentBranch(root)) ?? 'main';
 
   out(`${dryRun ? 'release (--dry-run, rien n\'est écrit)' : 'release'} : ${p.current} → ${p.version}`);
   for (const f of p.files) out(`  ${dryRun ? 'écrirait' : 'écrit'} : ${f}${f === 'CHANGELOG.md' ? ` ([Unreleased] → [${p.version}] - ${today}, une section [Unreleased] vide au-dessus)` : ' (version)'}`);
@@ -231,16 +241,14 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
 
   let ready = true;
   if (hasWhatsNew) {
-    if (dryRun) {
-      out(`  ${WHATS_NEW} : à écrire à la main ou par une session — la ligne de « In two lines » (≤ ${SHORT_LINE_MAX} caractères) en tête de la liste, le paragraphe long juste après l’introduction de « Version by version » ; la commande ne les écrit pas et les vérifiera`);
-    } else {
-      const issues = whatsNewIssues(readFileSync(whatsNewPath, 'utf8'), p.version);
-      if (issues.length === 0) out(`  ${WHATS_NEW} : les deux formes de ${p.version} sont là`);
-      else {
-        ready = false;
-        for (const i of issues) out(`  ${i}`);
-        out('  le commit de version n\'est pas prêt : écrire ces formes (à la main ou par une session), puis suivre les étapes ci-dessous sans relancer la commande (elle changerait encore la version)');
-      }
+    const issues = whatsNewIssues(readFileSync(whatsNewPath, 'utf8'), p.version);
+    if (issues.length === 0) out(`  ${WHATS_NEW} : les deux formes de ${p.version} sont là`);
+    else {
+      ready = false;
+      for (const i of issues) out(`  ${i}`);
+      out(dryRun
+        ? '  le commit de version ne serait pas prêt : écrire ou déplacer ces formes (à la main ou par une session) avant de lancer la commande'
+        : '  le commit de version n\'est pas prêt : écrire ces formes (à la main ou par une session), puis suivre les étapes ci-dessous sans relancer la commande (elle changerait encore la version)');
     }
   }
 

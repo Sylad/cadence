@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { commit, gitRepo } from './helpers.js';
+import { commit, gitRepo, tempDir } from './helpers.js';
 
 const NAME = 'acme-tool';
 const LOCK_ROOT = { name: NAME, version: '1.2.3', dependencies: { yaml: '^2.5.0' }, devDependencies: { vitest: '^2.0.0' } };
@@ -270,7 +270,7 @@ describe('cadence release — les refus', () => {
 
 describe('cadence release — rien n’est publié', () => {
   it('R7 — --dry-run décrit tout et n’écrit rien', () => {
-    const dir = project();
+    const dir = project({ whatsNew: null });
     const r = release(dir, 'minor', '--dry-run');
     expect(r.code).toBe(0);
     expect(r.out).toContain('1.2.3 → 1.3.0');
@@ -412,12 +412,75 @@ describe('cadence release — docs/whats-new.md', () => {
     expect(r.out).toMatch(/ligne de « In two lines » manquante/);
   });
 
-  it('R10 — --dry-run n’échoue pas pour des formes qui ne peuvent pas encore exister, il dit où elles iront', () => {
+  it('R10 — --dry-run relit les formes déjà écrites : bien placées il le dit (0), mal placées ou absentes il sort en 1 sans rien écrire', () => {
+    const ok = project({ whatsNew: WHATS_NEW_DONE });
+    const good = release(ok, 'patch', '--dry-run');
+    expect(good.code).toBe(0);
+    expect(good.out).toMatch(/les deux formes de 1\.2\.4 sont là/);
+
+    const misplaced = WHATS_NEW_DONE.replace('**1.2.4**: the long paragraph.\n\n', '').replace('\n## Version by version', '\n**1.2.4**: the long paragraph.\n\n## Version by version');
+    const dir = project({ whatsNew: misplaced });
+    const bad = release(dir, 'patch', '--dry-run');
+    expect(bad.code).toBe(1);
+    expect(bad.out).toMatch(/paragraphe long/);
+    expect(json(dir, 'package.json').version).toBe('1.2.3');
+
+    const none = release(project(), 'patch', '--dry-run');
+    expect(none.code).toBe(1);
+    expect(none.out).toMatch(/ligne de « In two lines » manquante/);
+  });
+});
+
+describe('cadence release — mises en forme et dépôts atypiques', () => {
+  const reindent = (text: string, unit: string) => JSON.stringify(JSON.parse(text), null, unit) + '\n';
+  it('R12 — un package.json, un lock et un plugin.json indentés par tabulations ou 4 espaces sont mis à jour', () => {
+    for (const unit of ['\t', '    ']) {
+      const dir = project();
+      for (const f of ['package.json', 'package-lock.json', '.claude-plugin/plugin.json']) writeFileSync(join(dir, f), reindent(read(dir, f), unit));
+      git(dir, 'commit', '-qam', 'chore: indent');
+      const r = release(dir, 'patch');
+      expect(r.err, JSON.stringify(unit)).toBe('');
+      expect(json(dir, 'package.json').version).toBe('1.2.4');
+      expect(json(dir, 'package-lock.json').version).toBe('1.2.4');
+      expect(json(dir, 'package-lock.json').packages[''].version).toBe('1.2.4');
+      expect(json(dir, '.claude-plugin/plugin.json').version).toBe('1.2.4');
+    }
+  });
+
+  it('R12 — un plugin du marketplace dont source est un objet placé avant version est mis à jour, les autres gardent leur version', () => {
     const dir = project();
-    const r = release(dir, 'patch', '--dry-run');
-    expect(r.code).toBe(0);
-    expect(r.out).toMatch(/docs\/whats-new\.md/);
-    expect(r.out).toMatch(/à écrire/);
+    const market = JSON.parse(read(dir, '.claude-plugin/marketplace.json'));
+    market.plugins[0] = { name: 'acme', source: { source: 'github', repo: 'acme/acme' }, version: '1.2.3' };
+    writeFileSync(join(dir, '.claude-plugin/marketplace.json'), JSON.stringify(market, null, 2) + '\n');
+    git(dir, 'commit', '-qam', 'chore: source objet');
+    const r = release(dir, 'patch');
+    expect(r.err).toBe('');
+    const after = json(dir, '.claude-plugin/marketplace.json');
+    expect(after.plugins[0].version).toBe('1.2.4');
+    expect(after.plugins[1].version).toBe('0.5.0');
+  });
+
+  it('R12 — hors dépôt git, la commande refuse (code 2) au lieu d’une trace de pile, sans rien écrire', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'package.json'), PACKAGE);
+    writeFileSync(join(dir, 'CHANGELOG.md'), CHANGELOG);
+    const r = release(dir, 'patch');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/release : /);
+    expect(json(dir, 'package.json').version).toBe('1.2.3');
+  });
+
+  it('R9 — sans script eval:plugin, pas d’étape d’éval ; un paquet private n’a pas d’étape npm view', () => {
+    const pkg = JSON.parse(PACKAGE);
+    delete pkg.scripts;
+    pkg.private = true;
+    const dir = project({ lock: LOCK });
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
+    git(dir, 'commit', '-qam', 'chore: private');
+    const r = release(dir, 'patch');
+    expect(r.out).toContain('git tag v1.2.4');
+    expect(r.out).not.toMatch(/eval:plugin/);
+    expect(r.out).not.toMatch(/npm view/);
   });
 });
 

@@ -4054,6 +4054,22 @@ lots:
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "conforme : R3 lit la section qui porte l'entrée L365 (vert avant et après le commit de version, rouge sur 4 mutations) ; aucun autre test ne lit [Unreleased] seul (23 fichiers CHANGELOG verts au commit de version)", commit: 7a4c47ae414530b3fc6e631df4299facb496fe0e }
     finished: 2026-10-26
+  - id: L369
+    title: "intégration en mode worktree : un conflit d'ajout dans CHANGELOG.md (deux lots ajoutent chacun leur entrée) est résolu par le programme (union, une entrée finale par lot, prise au sommet de la branche du lot) au lieu de rendre le lot ; jamais d'entrées intermédiaires empilées (cas L360 du 26-10 : 4 entrées contradictoires) ; vu 4 fois le 26-10 (L354 L360 L366 L367)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-26
+  - id: L370
+    title: "cadence orchestrate --integrate accepte un lot rendu pour son budget (ou une revue non conforme) dont le lead a fait corriger puis revoir le travail hors vague (raf review conforme plus récent que son dernier commit) : rebase, revue courte, avance ; aujourd'hui refusé (« pas rendu à l'étape d'intégration »), le lead intègre à la main (L367 du 26-10)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-26
+  - id: L371
+    title: "raf done dans le dépôt cadence n'a pas commité le plan (26-10, L365 : plan resté modifié, mise en service refusée) : établir si c'est voulu (réglage) ou un défaut, et le dire dans le message de raf done ; aligner avec plan.commit"
+    status: todo
+    estimate: 0.25
+    quickwin: true
+    created: 2026-10-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

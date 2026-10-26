@@ -13,6 +13,8 @@ orchestrate:
   escalation: { model: fable }
   # Porte de tests (L324, 25-10) : la vague lance la suite et le typecheck après chaque écriture ; un rouge part en correction au lieu d'arriver dans main.
   test: npx vitest run
+  # Rejeu seul d'un rouge avant qu'il compte (L354) : mise-en-service.test.ts rouge puis vert à la relance sous charge le 26-10 (intégration de L364).
+  testReplay: npx vitest run --minWorkers=1 --maxWorkers=$CADENCE_TEST_WORKERS {files}
   build: npx tsc --noEmit
   # Mode worktree (L279) : un worktree par lot ; activé par défaut le 25-10 (L320, décision Sylvain après les essais L310 et L316 : −45 % et −22 % de mur, 3 intégrations automatiques).
   worktrees: true

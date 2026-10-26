@@ -12,6 +12,7 @@ import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { readNext, sharedStateDir, stateDir } from './state.js';
 import { freeLine, readyFree, type FreeLot } from './ready-free.js';
 import { cadenceHome } from './orchestrate/registry.js';
+import { staleNotes, staleText } from './stale-notes.js';
 import { noTestGate, noTestText, type NoTestGate } from './orchestrate/no-test.js';
 import { KEPT_TITLE, keptLine, keptTrees, type KeptTree } from './orchestrate/worktree.js';
 
@@ -72,6 +73,8 @@ export interface TourRow {
   doing: { id: string; /** commits liés au lot, comme raf now (0 compris) */ commits: number; silentDays?: number; /** ni `started`, ni commit, ni note : le lot le plus silencieux */ noActivity?: true }[];
   drift: string[];
   notes: string[];
+  /** Lots déjà finis que les notes de clôture citent (« L217 done le 24-10 », L347) ; absent quand aucune note n'est périmée. */
+  staleNotes?: string[];
   next: { id: string; title: string } | null;
   /** Lots en attente d'une condition de tirage (L219) ; absent quand aucun lot n'en porte. */
   waiting?: string[];
@@ -143,6 +146,8 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     });
     row.drift = audit(plan, root, join(root, 'docs/nouveautes'), today).map((i) => `${i.warning ? '⚠' : '✗'} ${i.message}`);
     row.notes = readNext(stateDir(root))?.lines ?? [];
+    const stale = [...new Set(staleNotes(row.notes, lots).flatMap((n) => n.stale))];
+    if (stale.length) row.staleNotes = stale;
     const counted = lots.filter((l) => l.status !== 'dropped' && l.every === undefined);
     row.progress = {
       done: counted.filter((l) => l.status === 'done').length,
@@ -228,7 +233,7 @@ export function tourLine(r: TourRow): string {
   const drift = r.drift.length
     ? `${r.drift.length} (${r.drift.slice(0, DRIFT_SHOWN).join(' ; ')}${r.drift.length > DRIFT_SHOWN ? ' ; …' : ''})`
     : 'aucune';
-  const notes = r.notes.length ? truncate(r.notes.join(' / '), NOTES_MAX) : 'aucune';
+  const notes = r.notes.length ? `${truncate(r.notes.join(' / '), NOTES_MAX)}${r.staleNotes ? ` ${staleText(r.staleNotes)}` : ''}` : 'aucune';
   const next = r.next ? `${r.next.id} ${truncate(r.next.title, TITLE_MAX)}` : 'aucun';
   return [r.project, `en cours ${doing}`, `dérive ${drift}`, `notes : ${notes}`, `prochain ${next}`, ...(r.waiting?.length ? [`attend ${r.waiting.join(', ')}`] : []), `dépôt ${r.repo.length ? r.repo.join(', ') : 'propre'}`].join(' · ');
 }

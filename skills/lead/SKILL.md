@@ -44,7 +44,7 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
 
 Run `cadence lead tour` from the parent folder (one command, no subagent, no model: it reads the same
 facts as `cadence session start` for every project). It prints one line per project — lots in progress with their commit count
-(`0 commit` included; `silencieux Nj` when idle for more than three days), drift, notes from the last close, the next ready lot,
+(`0 commit` included; `silencieux Nj` when idle for more than three days), drift, notes from the last close (a `⚠ note périmée : L217 done le 24-10` beside a note means it quotes a lot already finished: relay it as stale, never ask for that lot), the next ready lot,
 repository state — and exits 0 even when a project is in error (its line says so). `--json` gives the same
 content. Read the lines yourself; open a project's own `cadence session start` only for the one you need to
 look at closer.

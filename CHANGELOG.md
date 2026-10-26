@@ -85,6 +85,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Changed
 
 - `cadence orchestrate` accepts any model name where it took only `haiku|sonnet|opus` (L345, `docs/orchestrate.md`, GitHub issue #16): `@<model>` of a lot (`cadence orchestrate project:L12@fable`, which was refused with « modèle inconnu ») and `orchestrate.review.light` / `full` pass the name as it stands to `claude --model`, like `orchestrate.escalation.model`. The three aliases keep their meaning; `--dry-run` warns (`⚠ modèle « <name> » hors des alias …`), without refusing, for a name outside them. An empty `review.light` / `full` is still refused.
+- `cadence lead tour` and `cadence session start|close` flag a stale close note (L347, `docs/session.md`, `docs/lead.md`): a note that quotes a lot already `done` or `dropped` is shown with `⚠ note périmée : L217 done le 24-10` beside it instead of being relayed as it stands (`--json`: `staleNotes` on the tour row); `session close` lists those notes under « Notes de la dernière clôture à réécrire » without changing its verdict, and the `session-close`, `session-start` and `lead` skills rewrite or ignore them. Seen on 26-10: ol-companion's note « L217 à faire » made the lead ask for L217, delivered two days before.
 
 ### Fixed
 

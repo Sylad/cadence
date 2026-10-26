@@ -6,6 +6,7 @@ import { diffDays, maxDay, type Day } from './dates.js';
 import { repoStatus, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import type { Lot, Plan } from './plan.js';
+import { staleNoteLines, staleNotes, staleText } from './stale-notes.js';
 import { lockAlive, readLock, readNext, readSessionMark, writeSessionMark } from './state.js';
 
 export interface SessionCtx {
@@ -127,7 +128,7 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   out(`${plan.project} — reprise du ${today}`);
 
   const next = readNext(ctx.state);
-  if (next) section(out, `Notes de la dernière clôture (${next.date})`, next.lines.map((l) => `- ${l}`));
+  if (next) section(out, `Notes de la dernière clôture (${next.date})`, staleNoteLines(next.lines, lots).map((l) => `- ${l}`));
 
   const lock = lockStatus(ctx.shared);
   if (lock) out(`\n${lock.line}`);
@@ -185,6 +186,12 @@ export function sessionClose(ctx: SessionCtx, opts: { since?: string }): number 
     commits.push(`${recent.orphans.length} commit(s) sans lot :`, ...recent.orphans.map((c) => `  ${short(c)}`));
   }
   section(out, `Commits de la période (${window.label})`, commits.length ? commits : ['(aucun)']);
+
+  const next = readNext(ctx.state);
+  if (next) {
+    const stale = staleNotes(next.lines, plan.lots()).filter((n) => n.stale.length);
+    section(out, `Notes de la dernière clôture à réécrire (${next.date})`, stale.map((n) => `${n.line} ${staleText(n.stale)} — cadence session next les remplace`));
+  }
 
   const quiet = plan.lots().filter((l) => l.status === 'doing' && !isRecurring(l) && !recent.byLot.has(l.id));
   section(out, 'Lots en cours', quiet.map((l) => `${l.id}  ${l.title} — aucun commit sur la période : ${plan.readonly ? "le fermer ou l'annoter avec l'outil du projet" : 'raf done ou raf note'}`));

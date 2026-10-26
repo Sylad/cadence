@@ -34,7 +34,8 @@ three most useful items across projects and wait. With a project named, work in 
    - **Effects in production** ("Effets en production"): a red `✗` line is the first thing to say —
      a delivered feature that no longer works outranks any new lot; re-run `cadence verify` to confirm
      (a network blip also shows as red).
-   - **Notes from the last close**, if any.
+   - **Notes from the last close**, if any. A note followed by `⚠ note périmée : L217 done le 24-10`
+     quotes a lot already finished: say it is stale, do not propose that lot.
    - **Project facts** ("Faits propres au projet"), when the project plugs its own morning script in
      (`session.start` in `cadence.yaml`): summarise what bears on today's choice — deadlines, the
      project's own planning, documentation drift — and leave the rest.

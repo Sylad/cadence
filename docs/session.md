@@ -42,6 +42,14 @@ loop over the sub-folders. A project that is not the root of its own git reposit
 (and exit 2) instead of the parent repository's plan. `--all` and `--depth` are refused outside `session` (`--depth` is also read by `cadence lead tour`),
 and `--all` refuses `--file`, `--config` and `RAF_FILE`: each project reads its own plan. For a one-line-per-project overview, `cadence lead tour`.
 
+A note that quotes a lot already `done` or `dropped` is not relayed as it stands (L347): `session start`
+prints it with the lot beside it, `- L217 à faire ⚠ note périmée : L217 done le 24-10` (`dropped` the same
+way; the date is the lot's `finished`, left out when it has none; an id is read whole, so `L2` is not found in
+`L217`). `session close` lists those notes under `Notes de la dernière clôture à réécrire` — nothing
+changes in the verdict — and the `session-close` skill offers to rewrite them with `cadence session next`.
+Generic: the check reads the ids of the project's plan, whatever their form. A note that
+quotes no finished lot is shown unchanged.
+
 `cadence session next` without a line refuses (exit 2) and leaves the notes of the
 last close as they are — it used to erase them silently; erasing is `--clear`.
 

@@ -158,7 +158,7 @@ beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second 
 |---|---|
 | `en cours` | ids of the lots in progress, each with its number of commits (`0 commit` included: a close note on a lot without commit is not « done, `raf done` forgotten »); then `aucune activité` when it has no activity at all, `silencieux Nj` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |
 | `dérive` | the gaps `raf check` reports (a lot whose commits leave a document behind, [`docs.sync`](news.md#documentation-that-follows-the-code), included), counted and the first two shown |
-| `notes` | the notes left by the last `session close`, joined with ` / ` and cut at 120 characters |
+| `notes` | the notes left by the last `session close`, joined with ` / ` and cut at 120 characters; when one quotes a lot already `done` or `dropped` (L347), ` ⚠ note périmée : L217 done le 24-10` follows (not cut) — relay it as stale, never as work to do (`--json`: `staleNotes`, absent when none is stale) |
 | `prochain` | the first ready lot (quick wins first) — id and title cut at 60 characters; a lot whose [`gate`](raf.md#plan-file) is not met is not ready |
 | `attend` | only when a lot waits on its `gate`: `attend L190` |
 | `dépôt` | `non commité` (modified or untracked files), `non poussé` (commits ahead of the upstream), `livraison en cours` (live delivery lock); `propre` otherwise |

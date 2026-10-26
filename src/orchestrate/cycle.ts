@@ -562,6 +562,16 @@ export const ESCALATION_RESERVE = 175_000;
 export const heldForEscalation = (l: LotState): number => (l.escalation ? 0 : (l.escalationReserve ?? 0));
 
 /**
+ * Compteur du lot face au budget de ses passes ordinaires, pour les messages de refus (L349) : la part retenue pour l'escalade en est déduite et nommée
+ * (« 6000 / 160999 tokens comptés, 175000 retenus pour l'escalade sur 335999 »), sinon un refus dans cette part contredirait ses propres chiffres ; sans
+ * part retenue, le texte d'avant (« 6000 / 335999 tokens comptés »).
+ */
+export const budgetCount = (l: LotState): string => {
+  const held = heldForEscalation(l);
+  return `${lotSpent(l)} / ${(l.budget ?? 0) - held} tokens comptés${held ? `, ${held} retenus pour l'escalade sur ${l.budget}` : ''}`;
+};
+
+/**
  * Coût réservé à une passe de correction et à la revue courte qui la suit (L145, étendu L218). Réserve fixe de 155 k tokens comptés :
  * p90 d'une passe fix (65 k) plus p90 d'une revue courte Opus (88 k), arrondi. Mesure faite le 2026-10-15 sur les journaux
  * `.cadence/runs` (523 fichiers de lot) : 497 passes fix Sonnet, médiane 45 k, p90 65 k, max 124 k ; 272 revues courtes Opus,
@@ -1116,7 +1126,9 @@ function overBudget(c: LotCtx, reserve = false): null {
   // Une réponse du lead encore en attente n'a pas été consommée : elle ne doit pas se perdre sans qu'on le dise.
   const answer = l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '';
   const basis = hasSpecStage(l) ? 'estimate et étape spec' : "dérivé de l'estimate";
-  const why = reserve ? `budget du lot : ${lotSpent(l)} / ${l.budget} tokens comptés (${basis}), il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${lotSpent(l)} / ${l.budget} tokens comptés, ${basis})`;
+  const held = heldForEscalation(l);
+  const count = held ? `${lotSpent(l)} / ${l.budget! - held} tokens comptés (${held} retenus pour l'escalade sur ${l.budget}, ${basis})` : `${lotSpent(l)} / ${l.budget} tokens comptés (${basis})`;
+  const why = reserve ? `budget du lot : ${count}, il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${budgetCount(l)}, ${basis})`;
   // Tests rouges après une écriture : la passe fix refusée aurait suivi, le lot revient sans revue (L145) — la cause le dit.
   const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
   // Passe d'écriture qui vient d'être jouée, nommée d'après le compteur : l.pass - 1 passes de correction l'ont précédée (minorPass reste vrai après la passe des mineurs). Sans passe jouée, un lot repris déjà revu compte ses tests rouges depuis la revue de sa branche ; jamais revu (L315), c'est l'implémentation qui les a laissés.
@@ -2101,7 +2113,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     if (missing.length) {
       l.testGate = true;
       if (l.pass >= MAX_PASSES - 1) l.warnings.push(`porte « code sans test » non jouée : ${l.pass} passe(s) de correction déjà faite(s), la correction prendrait la dernière et la revue arriverait sans passe pour ses majeurs (${missing.join(', ')})`);
-      else if (!fixAffordable(l)) l.warnings.push(`porte « code sans test » non jouée : budget du lot (${lotSpent(l)} / ${l.budget} tokens comptés), il ne reste pas de quoi payer la correction et la revue qui la suit (${missing.join(', ')})`);
+      else if (!fixAffordable(l)) l.warnings.push(`porte « code sans test » non jouée : budget du lot (${budgetCount(l)}), il ne reste pas de quoi payer la correction et la revue qui la suit (${missing.join(', ')})`);
       else {
         toFix(c, [{ source: 'code', gravite: 'majeur', fichier: missing[0], texte: `code modifié sans test (orchestrate.testGate, vérifié par le programme) : ${missing.join(', ')} — aucun fichier de test touché par les commits du lot. Écris les tests de chaque règle modifiée, nommés d'après la règle (test d'abord), puis commite avec le lot cité.` }], 'code sans test');
         return;
@@ -2115,7 +2127,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
       l.docsGate = true;
       const late = gaps.flatMap((g) => g.touched).join(', ');
       if (l.pass >= MAX_PASSES - 1) l.warnings.push(`bibliothécaire non appelé : ${l.pass} passe(s) de correction déjà faite(s), sa passe prendrait la dernière et la revue arriverait sans passe pour ses majeurs (${late})`);
-      else if (!fixAffordable(l)) l.warnings.push(`bibliothécaire non appelé : budget du lot (${lotSpent(l)} / ${l.budget} tokens comptés), il ne reste pas de quoi payer sa passe et la revue qui la suit (${late})`);
+      else if (!fixAffordable(l)) l.warnings.push(`bibliothécaire non appelé : budget du lot (${budgetCount(l)}), il ne reste pas de quoi payer sa passe et la revue qui la suit (${late})`);
       else {
         l.docsFix = true;
         toFix(c, gaps.map((g) => ({ source: 'code', gravite: 'majeur', fichier: g.touched[0], texte: gapMessage(l.lot, g) })), 'documentation en retard');

@@ -716,7 +716,9 @@ budget derived from the estimate (600 k becomes 775 k, 750 k becomes 925 k, 1.3 
 **estimate**: no escalation had been played when it was written (the only journal carrying one, L342, left it not played), so it is the p90 of a fix pass (67 k over 823 passes) plus the p90 of a full
 review (109 k over 1 009), 176 k rounded down; to be remeasured on the first escalations played (`cadence perf`). Until the escalation engages, the ordinary passes
 do not spend that share: an implementation or a fix stops 175 k short of the budget, and the escalation itself needs only what a correction and its review need (`REVIEW_RESERVE`) from the full budget. Once engaged
-(or ruled out), the share is released. A lot of a wave started before L349, or in a project without `escalation`, has no share.
+(or ruled out), the share is released. The refusals and warnings that quote the budget (« correction non jouée (budget) », « budget du lot atteint », the « code sans test » gate, the
+librarian) count the lot against the budget of its ordinary passes and name the share: `6000 / 160999 tokens comptés, 175000 retenus pour l'escalade sur 335999`, never
+`6000 / 335999` with 155 k said to be missing. A lot of a wave started before L349, or in a project without `escalation`, has no share.
 Exception: when the tests are red after a write pass, the lot goes to a fix pass without a review; if that fix pass is
 refused for lack of budget the lot is handed back to the lead without a review, with its findings, and the cause names
 the red tests: the pass it names is the one whose tests were red, counted by its number (« la passe fix 2 », « l'implémentation »), and « la passe des mineurs » appears only when that pass was the one played. The wave budget stays for the others. When the budget (or the usage limit) is reached no new session starts, the running ones

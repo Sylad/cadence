@@ -48,4 +48,31 @@ describe('parcours mesuré d\'un nouvel utilisateur (L357)', () => {
     expect(md()).toMatch(/## Non joué/);
     expect(md()).toMatch(/Not logged in/);
   });
+
+  it('Rapport — A7 ne dit pas que la doc tait la session `claude -p` : elle ne dit pas qu\'il doit être connecté', () => {
+    const a7 = lignesTable('Accrocs').find((l) => l.startsWith('| A7 '))!;
+    expect(a7).not.toMatch(/ni le README ni/);
+    expect(a7).toMatch(/connecté/);
+  });
+
+  it('Rapport — A8 oppose `raf now` et le tour à `raf commits`, pas le tour à `raf now`', () => {
+    const a8 = lignesTable('Accrocs').find((l) => l.startsWith('| A8 '))!;
+    expect(a8).not.toMatch(/le tour disait `0 commit` avant/);
+    expect(a8).toMatch(/le tour/);
+    expect(a8).toMatch(/`raf commits/);
+  });
+
+  it('Rapport — « Rejouer » ne promet pas une remise à zéro que la commande ne fait pas', () => {
+    const rejouer = md().split(/^## /m).find((s) => s.startsWith('Rejouer'))!;
+    expect(rejouer).toMatch(/\.npmrc/);
+    expect(rejouer).toMatch(/Node/);
+    expect(rejouer).not.toMatch(/&& npm uninstall -g/);
+  });
+
+  it('CHANGELOG — le nombre de lots annoncés est celui du rapport (A6 sans lot)', () => {
+    const lots = lignesTable('Accrocs').filter((l) => !/\| lot : aucun/.test(l)).length;
+    const mots = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    const ligne = readFileSync(join(root, 'CHANGELOG.md'), 'utf8').split('\n').find((l) => l.includes('(L357)'))!;
+    expect(ligne).toContain(`${mots[lots]} of them turned into a lot`);
+  });
 });

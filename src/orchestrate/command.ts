@@ -19,7 +19,7 @@ import { acquireSlot, cadenceHome, expiredHolds, freeSlots, liveHolds, liveSlots
 import { decisionsText, humanDecisions } from './decisions.js';
 import { headline, loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { readWaits, renderWaits } from './waits.js';
-import { acceptationFile, acceptText } from './accept.js';
+import { acceptationFile, acceptText, redAcceptations } from './accept.js';
 import { noTestGate, noTestText } from './no-test.js';
 import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
@@ -512,6 +512,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
   io.out(`vague ${id} — simulation, rien n'est lancé (budget ${budget} tokens comptés)`);
   const repos = [...new Set(lots.map((l) => l.repo))];
   const noTestSaid = new Set<string>();
+  const redSaid = new Set<string>();
   for (const l of lots) {
     const env = projectEnv(l.repo);
     const lot = env.loadPlan().lot(l.lot);
@@ -556,6 +557,14 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const noTest = noTestSaid.has(l.repo) ? null : noTestGate(l.repo);
     noTestSaid.add(l.repo);
     if (noTest) io.out(`  ${basename(l.repo)} · ${noTestText(noTest)}`);
+    if (!redSaid.has(l.repo)) {
+      redSaid.add(l.repo);
+      // L366 : l'acceptation à vert: false d'un lot clos à la main verrouille ses tests pour tous les lots du dépôt, sans que ce lot y ait touché.
+      const closed = new Set(env.loadPlan().lots().filter((x) => x.status === 'done').map((x) => x.id));
+      for (const red of redAcceptations(l.repo, env.config.spec.dir)) {
+        if (closed.has(red.lot)) io.out(`  ⚠ ${basename(l.repo)} · acceptation rouge d'un lot clos : ${red.lot} (${red.path}, vert: false) — le verrou des tests d'acceptation peut bloquer les lots de la vague ; cadence spec green ${red.lot}`);
+      }
+    }
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus (${MAX_PASSES_CONVERGING} si la revue converge), en session neuve`);
     io.out(l.light ? '  revue conforme avec mineurs : pas de passe des mineurs, ils sont rendus en notes' : '  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, lotSlug(l.project, l.lot), 'playwright');

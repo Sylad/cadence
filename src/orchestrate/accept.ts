@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, posix } from 'node:path';
 import { parse } from 'yaml';
@@ -189,6 +189,66 @@ export function resealAcceptation(repo: string, path: string, test: string, reas
   doc.resceaux = [...journal, { test: norm, raison: reason.trim(), date: today, avant, apres, ...(porteur ? { porteur } : {}), ...(ficheAmendee ? { ficheAmendee } : {}) }];
   writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
   return { avant, apres, lot: a.lot, ...(ficheAmendee ? { ficheAmendee } : {}) };
+}
+
+/** Les acceptations de `dir` à `vert: false` au HEAD : leur chemin et le lot qu'elles portent. Un fichier illisible n'en est pas une. */
+export function redAcceptations(repo: string, dir: string): { path: string; lot: string }[] {
+  const out: { path: string; lot: string }[] = [];
+  for (const path of listAcceptations(repo, dir).sort()) {
+    try {
+      const a = parseAcceptation(readFileSync(join(repo, path), 'utf8'));
+      if (typeof a !== 'string' && !a.vert) out.push({ path, lot: a.lot });
+    } catch {
+      // illisible ou absent de l'arbre de travail : le verrou en parle, pas ce signalement
+    }
+  }
+  return out;
+}
+
+/**
+ * La commande dédiée (`orchestrate.accept`) lancée à la main, sous les mêmes règles que le cycle (`runAccept`) : chaque commande dont la racine contient un fichier listé,
+ * `{acceptation}` substitué, `CADENCE_ACCEPTATION` et `CADENCE_ACCEPTATION_ROOT` posés. Un fichier listé sous la racine d'aucune commande est rendu (`orphans`) sans rien lancer.
+ */
+export function runAcceptation(repo: string, json: string, accept: string | string[] | undefined): { runs: { command: string; code: number; output: string }[]; orphans: string[] } {
+  const abs = join(repo, json);
+  const doc = parseAcceptation(readFileSync(abs, 'utf8'));
+  const plan = planAcceptRuns(acceptCommands(accept), typeof doc === 'string' ? [] : doc.fichiers, !isAcceptList(accept));
+  if (plan.orphans.length) return { runs: [], orphans: plan.orphans };
+  const runs = plan.runs.map((r) => {
+    const done = spawnSync('sh', ['-c', r.command.replaceAll('{acceptation}', abs)], { cwd: repo, encoding: 'utf8', timeout: 30 * 60_000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, CADENCE_ACCEPTATION: abs, CADENCE_ACCEPTATION_ROOT: r.root || '.' } });
+    return { command: r.command, code: done.status ?? 1, output: `${done.stdout ?? ''}${done.stderr ?? ''}${done.error ? done.error.message : ''}` };
+  });
+  return { runs, orphans: [] };
+}
+
+/**
+ * `cadence spec green` (L366) : la commande d'acceptation vient de passer au vert sur les tests tels qu'ils sont. Ceux qu'un lot mené à la main a mis au point
+ * après le commit rouge ont une empreinte scellée périmée : le verrou les signalerait encore à chaque lot suivant. Chaque empreinte différente est refaite et
+ * journalisée dans `resceaux` (comme `spec reseal`, sans fiche amendée) ; le commit qui pose `vert: true` devient ainsi le commit rouge. Rend les tests rescellés.
+ * L'appelant s'est assuré que les tests listés sont commités (l'empreinte rescellée est celle de l'arbre de travail) ; un test absent est refusé.
+ */
+export function resealForGreen(repo: string, path: string, today: string): string[] {
+  const file = join(repo, path);
+  const a = parseAcceptation(readFileSync(file, 'utf8'));
+  if (typeof a === 'string') throw new Error(`${path} : ${a}`);
+  const fichiers = a.fichiers.map((f) => posix.normalize(f));
+  const absents = fichiers.filter((f) => !existsSync(join(repo, f)));
+  if (absents.length) throw new Error(`test(s) listé(s) absent(s) de ${path} : ${absents.join(', ')}`);
+  const doc = JSON.parse(readFileSync(file, 'utf8')) as Obj;
+  const empreintes = isObj(doc.empreintes) ? (doc.empreintes as Record<string, string>) : {};
+  const journal = Array.isArray(doc.resceaux) ? doc.resceaux : [];
+  const refaits = fichiers.filter((f) => empreintes[f] !== git(repo, 'hash-object', '--', f).trim());
+  for (const f of refaits) {
+    const apres = git(repo, 'hash-object', '--', f).trim();
+    journal.push({ test: f, raison: 'cadence spec green : tests mis au point après le commit rouge, acceptation verte sur ces tests', date: today, avant: empreintes[f] ?? '', apres });
+    empreintes[f] = apres;
+  }
+  if (refaits.length) {
+    doc.empreintes = empreintes;
+    doc.resceaux = journal;
+    writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
+  }
+  return refaits;
 }
 
 /** Pose `vert: true` dans le fichier (le cycle, jamais une session) ; le commit est à faire. */

@@ -168,3 +168,29 @@ describe('cadence spec reseal : le chemin du lead pour un test scellé faux (L20
     for (const [name, text] of [['README', docText()], ['CHANGELOG', read('CHANGELOG.md')], ['skill', read('skills/lead/SKILL.md')], ['docs/lead.md', read('docs/lead.md')]] as const) expect(text, name).toContain('--porteur')
   })
 })
+
+// L366 : un lot clos à la main avec acceptation-<lot>.json à vert: false verrouille les vagues suivantes ; spec reseal ne le débloque pas
+// (il exige un lot doing, ou vert: true avec --porteur), le chemin du lead est cadence spec green.
+describe('cadence spec green : le chemin du lead pour un lot clos à vert: false (L366)', () => {
+  const pages = () => [['skill', read('skills/lead/SKILL.md')], ['docs/lead.md', read('docs/lead.md')], ['docs/spec.md', read('docs/spec.md')]] as const
+
+  it('est décrit par le skill lead, docs/lead.md et docs/spec.md, avec le cas qu\'il couvre (vert: false, lot clos)', () => {
+    for (const [name, text] of pages()) {
+      expect(text, name).toContain('cadence spec green')
+      expect(text, name).toContain('vert: false')
+    }
+  })
+
+  it('le passage « verrou des tests d\'acceptation » du skill lead et de docs/lead.md mène à spec green, pas seulement à spec reseal', () => {
+    for (const [name, text] of [['skill', read('skills/lead/SKILL.md')], ['docs/lead.md', read('docs/lead.md')]] as const) {
+      const passage = text.split('\n').filter((l) => l.includes("verrou des tests d'acceptation") || l.includes('cadence spec reseal'))
+      expect(passage.length, name).toBeGreaterThan(0)
+      expect(passage.some((l) => l.includes('cadence spec green')), `${name} : la ligne du verrou cite spec green`).toBe(true)
+    }
+  })
+
+  it('la liste des sous-commandes spec (docs/overview.md, docs/fonctionnement.md) cite green', () => {
+    expect(read('docs/overview.md')).toContain('`cadence spec check\\|qa\\|reseal\\|green`')
+    expect(read('docs/fonctionnement.md')).toContain('cadence spec green')
+  })
+})

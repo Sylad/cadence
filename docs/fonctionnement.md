@@ -100,7 +100,8 @@ The final review is always played; the budget bounds the writing passes. A `scre
 - Never two sessions in the same repository at the same time. (The worktree mode, `orchestrate.worktrees: true` — on in cadence's own `cadence.yaml`, off where the key is absent — lets two independent lots of one repository play at once, each in its own worktree — [docs/orchestrate.md](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279).)
 - A session cannot ask the human anything: it stops and reports, and the lead brings the question back.
 - A sealed acceptance test that contradicts its sheet is corrected by the lead with
-  `cadence spec reseal <lot> <test> --reason "…"`, never by editing `acceptation.json`.
+  `cadence spec reseal <lot> <test> --reason "…"`, never by editing `acceptation.json`; a lot closed by hand
+  and left at `vert: false` is put back to green with `cadence spec green <lot>` (L366).
 - Deliveries and the `raf ux` / `raf review` verdicts belong to the lead, one project at a time.
 
 See also the [orchestrate](orchestrate.md#orchestrate) page and the

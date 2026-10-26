@@ -21,6 +21,8 @@ export const PLAN_ACTIONS = {
   minors: (label: string) => `mineurs de la revue de ${label} notés`,
   reviewRecorded: 'revue de code enregistrée',
   reviewNoted: 'revue de code notée',
+  /** `spec green` (L366) : jamais la liste des tests rescellés, elle va dans le corps du commit (header-max-length de commitlint). */
+  specGreen: 'acceptation verte, vert: true posé par cadence spec green',
   resealed: (norm: string) => `test d'acceptation rescellé (${norm})`,
   /** En minuscule : `subject-case` de config-conventional refuse une majuscule initiale (L343). */
   leadAnswer: (ids: string[]) => `${ids.length > 1 ? 'règles' : 'règle'} ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead`,

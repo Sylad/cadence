@@ -29,7 +29,7 @@ import { cadenceHome, liveWaves, openLotsIn, openWavesIn, waveLotsIn, type OpenW
 import { blockingLots, LABEL, resumeCommand } from './orchestrate/table.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedEntries, renderPerf, type PerfResult } from './perf.js';
-import { findAcceptation, parseAcceptation, resealAcceptation } from './orchestrate/accept.js';
+import { findAcceptation, parseAcceptation, redAcceptations, resealAcceptation, resealForGreen, runAcceptation, setVert } from './orchestrate/accept.js';
 import { refCommand } from './ref/command.js';
 import { release } from './release.js';
 import { applyMigration, describeMigration, planMigration, unhandledError } from './migrate.js';
@@ -292,6 +292,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   // `spec` est aussi un verbe de raf (raf spec <lot> on|off, L186) : seuls check et qa vont à la fiche.
   if (command === 'spec' && (rest[0] === 'check' || rest[0] === 'qa')) return spec(rest, io);
   const reseal = command === 'spec' && rest[0] === 'reseal';
+  const green = command === 'spec' && rest[0] === 'green';
   // --all balaie les sous-dossiers : il ne lit ni le plan ni le cadence.yaml du dossier courant.
   if (command === 'session' && (values.all || values.depth !== undefined)) return sessionAll(rest, values, io);
   // cadence.yaml peut dire où est le plan et, s'il est tenu par un autre outil, comment le lire.
@@ -374,6 +375,22 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         if (pub) refuseLongTitle(pub, lot?.public ? '' : ' — titre de la Nouveauté reprise par le site : corriger l\'entrée ou poser raf public');
       }
       // Le plan ne lit pas git : lui dire combien de commits du lot sa revue ne couvre pas quand elle est exigée.
+      // Un lot clos avec une acceptation à vert: false bloque les vagues suivantes du dépôt (verrou des tests d'acceptation, L366).
+      if (status === 'done' && !rest[0].includes('/')) {
+        const repo = gitRoot(root) ?? root;
+        let dir: string | null = null;
+        try {
+          dir = readOrchestrateConfig(configPath).spec.dir;
+        } catch {
+          // un cadence.yaml illisible ne doit pas empêcher de clore un lot : `cadence check` en parle
+        }
+        const red = dir === null ? undefined : redAcceptations(repo, dir).find((a) => a.lot === rest[0]);
+        if (red) {
+          const text = `${rest[0]} : ${red.path} est à vert: false — clos ainsi, le lot bloquerait les vagues suivantes du dépôt (verrou des tests d'acceptation) ; cadence spec green ${rest[0]} lance la commande d'acceptation et pose vert: true`;
+          if (!values.force) throw new RafError(`${text} (--force pour passer outre)`);
+          io.err(`avertissement : ${text}`);
+        }
+      }
       const unreviewed = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? unreviewedWork(plan, root, rest[0]) : 0;
       plan.setStatus(rest[0], status, today, { force: values.force, unreviewed });
       if (command === 'drop' && values.reason) plan.note(rest[0], `abandonné : ${values.reason}`, today);
@@ -450,6 +467,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'spec': {
+      if (green) return specGreen(rest.slice(1), { root, loadPlan, configPath, today }, io);
       if (reseal) return specReseal(rest.slice(1), values.reason, values.porteur, { root, loadPlan, configPath, today }, io);
       if (rest.length !== 2 || (rest[1] !== 'on' && rest[1] !== 'off')) throw new RafError('usage : raf spec <id> on|off (ou cadence spec check|qa <fiche.yaml>)');
       const plan = loadPlan();
@@ -918,7 +936,7 @@ const git = (cwd: string, args: string[]): string => execFileSync('git', args, {
 const shellPath = (p: string): string => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replace(/'/g, "'\\''")}'`);
 
 /** Le refus de `spec reseal` devant des vagues non terminées (L238) : chaque vague (vivante ou arrêtée), son dossier de lancement, ses lots, et pour chaque vague arrêtée UNE commande à lancer telle quelle (un `--drop` par lot ouvert du dépôt, y compris ceux en file qui ne sont pas en cours au plan : `--resume` relance toute la vague avec les lots non retirés, et un lot en file reprendrait le verrou, L239). */
-function openWavesRefusal(open: OpenWave[]): string {
+function openWavesRefusal(open: OpenWave[], command: 'spec reseal' | 'spec green'): string {
   const lines = open.map((w) => {
     const where = [w.live ? 'vivante' : 'arrêtée', ...(w.live && w.pid !== undefined ? [`pid ${w.pid}`] : []), ...(w.launchDir ? [`lancée depuis ${w.launchDir}`] : [])].join(', ');
     return `  - vague ${w.wave} (${where}) : ${w.lots.length ? [...w.lots.map((l) => `${l.key} (${l.status})`), ...w.others.map((l) => `${l.key} (${l.status}, pas en cours au plan)`)].join(', ') : 'lots illisibles'}`;
@@ -929,9 +947,9 @@ function openWavesRefusal(open: OpenWave[]): string {
       : `  cd ${shellPath(w.launchDir)} && ${resumeCommand(w.wave, ...[...w.lots, ...w.others].flatMap((l) => ['--drop', l.key]))}`,
   );
   return [
-    `spec reseal : refusé — ${open.length > 1 ? `${open.length} vagues non terminées gardent` : 'une vague non terminée garde'} ouvert au moins un lot en cours de ce dépôt (un rescellé commité maintenant lui serait rendu comme « premier commit fautif » à la reprise de la vague) :`,
+    `${command} : refusé — ${open.length > 1 ? `${open.length} vagues non terminées gardent` : 'une vague non terminée garde'} ouvert au moins un lot en cours de ce dépôt (${command === 'spec green' ? 'le commit de spec green posé' : 'un rescellé commité'} maintenant lui serait rendu comme « premier commit fautif » à la reprise de la vague) :`,
     ...lines,
-    'Marche à suivre : clore chacun de ces lots dans sa vague (attendre les vivantes, retirer les lots des arrêtées), puis relancer le rescellé :',
+    `Marche à suivre : clore chacun de ces lots dans sa vague (attendre les vivantes, retirer les lots des arrêtées), puis relancer ${command === 'spec green' ? 'spec green' : 'le rescellé'} :`,
     ...how,
   ].join('\n');
 }
@@ -958,10 +976,74 @@ function withHolder(open: OpenWave[], holder: { wave: string; pid: number }, rep
   return [{ wave: holder.wave, launchDir: reg?.cwd ?? '', live: true, pid: holder.pid, lots: keys.map((key) => ({ key, status: 'ouvert' })), others: [] }, ...open];
 }
 
-function specReseal(args: string[], reason: string | undefined, porteur: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
-  if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche" [--porteur <lot en cours>, pour un lot livré]');
-  if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec reseal refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
-  // Comme `deliver` : la vague tient le verrou du dépôt tant qu'un de ses lots y travaille (état illisible : on refuse) ; un commit du lead en pleine passe ferait signaler au lot suivant un écart qui n'est pas le sien.
+/**
+ * `cadence spec green <lot>` (L366) : un lot mené ou clos à la main (raf done) dont l'acceptation est restée à `vert: false` bloque toutes les vagues suivantes du dépôt.
+ * Lance la commande dédiée (`orchestrate.accept`) comme le cycle ; verte, rescelle les tests mis au point depuis le commit rouge (`resealForGreen`), pose `vert: true` et commite le seul fichier, en citant le lot. Rouge : rien n'est changé, code 1.
+ */
+function specGreen(args: string[], ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
+  if (args.length !== 1) throw new RafError('usage : cadence spec green <lot>');
+  if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec green refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
+  refuseWhileWaveHolds(ctx, 'spec green');
+  const lotId = args[0]!;
+  const plan = ctx.loadPlan();
+  const lot = plan.lot(lotId);
+  if (lot.status === 'todo') throw new RafError(`${lotId} n'est pas commencé (todo) : il n'a rien livré dont l'acceptation puisse passer au vert`);
+  const repo = gitRoot(ctx.root) ?? ctx.root;
+  const config = readOrchestrateConfig(ctx.configPath);
+  if (!config.accept) throw new RafError(`orchestrate.accept absent de ${ctx.configPath} : sans la commande dédiée, il n'y a rien à lancer pour ${lotId}`);
+  const json = findAcceptation(repo, config.spec.dir, lotId);
+  if (!json) throw new RafError(`${lotId} : aucune acceptation sous ${config.spec.dir} (le lot n'a pas passé l'étape accept)`);
+  const doc = parseAcceptation(readFileSync(join(repo, json), 'utf8'));
+  if (typeof doc === 'string') throw new RafError(`${json} : ${doc}`);
+  if (doc.vert) {
+    io.out(`${lotId} : ${json} est déjà vert, rien à faire`);
+    return 0;
+  }
+  const open = unfinishedWaves(ctx.root, repo, plan);
+  if (open.length) throw new RafError(openWavesRefusal(open, 'spec green'));
+  const dirty = git(repo, ['status', '--porcelain', '-z', '--', ...doc.fichiers]).split('\0').filter(Boolean).map((l) => l.slice(3));
+  if (dirty.length) throw new RafError(`${lotId} : test(s) listé(s) modifié(s) sans être commités : ${dirty.join(', ')} — les commiter (en citant ${lotId}) avant de poser vert: true`);
+  const { runs, orphans } = runAcceptation(repo, json, config.accept);
+  if (orphans.length) throw new RafError(`fichiers listés dans ${json} sous la racine d'aucune commande de orchestrate.accept : ${orphans.join(', ')}`);
+  const failed = runs.filter((r) => r.code !== 0);
+  if (failed.length) {
+    io.err(`${lotId} : tests d'acceptation encore rouges (${failed.map((r) => `${r.command}, code ${r.code}`).join(' ; ')}), ${json} reste à vert: false`);
+    for (const r of failed) io.err(r.output.trim().split('\n').slice(-40).join('\n'));
+    return 1;
+  }
+  const before = readFileSync(join(repo, json), 'utf8');
+  let resceles: string[];
+  try {
+    resceles = resealForGreen(repo, json, ctx.today);
+  } catch (e) {
+    throw new RafError(`${lotId} : ${(e as Error).message}`);
+  }
+  setVert(repo, json);
+  try {
+    git(repo, ['add', '--', json]);
+    // Le sujet reste court et fixe (le gabarit `plan.commit` du projet s'il y en a un, comme tout commit écrit par cadence, L343) ; les tests rescellés, sans borne, vont dans le corps, une ligne chacun.
+    const template = readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit;
+    const subject = template ? planCommitMessage(template, { lot: lotId, action: PLAN_ACTIONS.specGreen }) : `chore(${lotId}): ${PLAN_ACTIONS.specGreen}`;
+    const body = resceles.length ? ['empreintes rescellées (tests mis au point depuis le commit rouge) :', ...resceles.map((f) => `- ${f}`)].join('\n') : null;
+    git(repo, ['commit', '-q', '-m', subject, ...(body ? ['-m', body] : []), '--', json]);
+  } catch (e) {
+    // Atomique, comme le rescellé : un commit refusé (hook pre-commit, ...) laisse le fichier tel qu'avant.
+    writeFileSync(join(repo, json), before);
+    try {
+      git(repo, ['reset', '-q', '--', json]);
+    } catch {
+      // rien d'indexé : rien à défaire
+    }
+    const out = e as { stderr?: string; stdout?: string; message: string };
+    throw new RafError(`spec green : le commit a échoué, ${json} est revenu tel qu'avant la commande — ${(out.stderr || out.stdout || out.message).trim().split('\n').slice(-5).join(' | ')}`);
+  }
+  io.out(`${lotId} : ${json} → vert: true, commit ${git(repo, ['rev-parse', '--short', 'HEAD']).trim()}${resceles.length ? ` ; empreintes rescellées (tests mis au point depuis le commit rouge) : ${resceles.join(', ')}` : ''}`);
+  return 0;
+}
+
+/** Un commit du lead en pleine passe ferait signaler au lot suivant un écart qui n'est pas le sien : tant qu'une vague tient le verrou du dépôt, `spec reseal` et `spec green` refusent. */
+function refuseWhileWaveHolds(ctx: { root: string; loadPlan: () => Plan }, command: 'spec reseal' | 'spec green'): void {
+  // Comme `deliver` : la vague tient le verrou du dépôt tant qu'un de ses lots y travaille (état illisible : on refuse).
   // Le refus est UN message : la vague vivante qui tient le verrou (à attendre) et les vagues arrêtées du dépôt, avec leurs dossiers et leurs commandes (L238).
   const orchestrating = waveHolding(ctx.root);
   if (orchestrating) {
@@ -972,8 +1054,14 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
     } catch {
       // plan illisible : le verrou seul motive le refus, la vague qui le tient est nommée
     }
-    throw new RafError(openWavesRefusal(withHolder(open, orchestrating, repo)));
+    throw new RafError(openWavesRefusal(withHolder(open, orchestrating, repo), command));
   }
+}
+
+function specReseal(args: string[], reason: string | undefined, porteur: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
+  if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche" [--porteur <lot en cours>, pour un lot livré]');
+  if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec reseal refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
+  refuseWhileWaveHolds(ctx, 'spec reseal');
   const [lotId, test] = args as [string, string];
   const plan = ctx.loadPlan();
   const lot = plan.lot(lotId);
@@ -995,7 +1083,7 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   // Une vague non terminée (arrêtée sur une question ou le quota) garde ouverts des lots que son `--resume` rejouera : un rescellé commité entre-temps serait rendu à l'un d'eux comme « premier commit fautif » (L238).
   // Le verrou du rescellé couvre tous les lots ouverts du dépôt, pas seulement le porteur : on refuse dès qu'un lot DE CE DÉPÔT, encore en cours au plan, reste ouvert dans une vague non terminée.
   const open = unfinishedWaves(ctx.root, repo, plan);
-  if (open.length) throw new RafError(openWavesRefusal(open));
+  if (open.length) throw new RafError(openWavesRefusal(open, 'spec reseal'));
   const before = { json: readFileSync(join(repo, json), 'utf8'), test: existsSync(join(repo, test)) ? readFileSync(join(repo, test), 'utf8') : '' };
   let r: { avant: string; apres: string; ficheAmendee?: string };
   try {

@@ -169,7 +169,7 @@ describe('R3 bis — chemin mal déclaré et commande qui ne finit pas', () => {
 describe('R4 — orchestrate lance la commande et commite ses fichiers avec le plan', () => {
   const withOnWrite = (command: string | ((parent: string) => string), worktrees = false) => {
     const { parent, repo } = setup([{ title: 'un' }], `worktrees: ${worktrees}\n`);
-    writeFileSync(join(repo, 'cadence.yaml'), `${config(typeof command === 'string' ? command : command(parent))}orchestrate:\n  precheck: false\n`);
+    writeFileSync(join(repo, 'cadence.yaml'), `${config(typeof command === 'string' ? command : command(parent))}orchestrate:\n  precheck: false\n  worktrees: ${worktrees}\n`);
     gitIn(repo, 'add', '--', 'cadence.yaml');
     gitIn(repo, 'commit', '-q', '-m', 'chore: onWrite');
     return { parent, repo };

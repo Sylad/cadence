@@ -81,10 +81,11 @@ export function yamlResolvedFrom(dir: string): string | undefined {
 
 /**
  * Premier dossier de `candidates` où la racine privée de la suite peut vivre : il existe, et « yaml » ne s'y résout pas.
- * Garde, pas cause établie : Node remonte les dossiers parents en cherchant node_modules, donc un TMPDIR sous un dépôt installé
- * ferait résoudre « yaml » depuis tout paquet jetable et fausserait les tests « yaml introuvable » de orchestrate-snapshot.
- * Les TMPDIR relevés des sessions de vague (docs/mesures/orchestrate-snapshot-session-2026-10-26.md) étaient propres : la cause
- * des rouges du 26-10 n'est pas prouvée, et le test « R2 » de ce fichier nomme le fichier fautif s'il revient.
+ * Node remonte les dossiers parents en cherchant node_modules : un TMPDIR sous un dossier qui a node_modules/yaml fait résoudre « yaml »
+ * depuis tout paquet jetable et donne exactement les trois rouges « yaml introuvable » de orchestrate-snapshot vus en session de vague le 26-10
+ * (reproduit hors vague, seul mécanisme qui donne cette signature : docs/mesures/orchestrate-snapshot-session-2026-10-26.md). Le TMPDIR
+ * sale de ces sessions n'a pas été vu lui-même (supprimé avec la vague) : la garde couvre le mécanisme au départ de la suite, pas un
+ * node_modules écrit dans TMPDIR pendant le run ; le test « R2 » de test/orchestrate-snapshot.test.ts nomme alors le fichier fautif.
  * Aucun candidat propre : erreur qui les nomme.
  */
 export function pickRootBase(candidates: string[]): string {

@@ -33,7 +33,7 @@ export default function setup(): () => void {
   // les tests « yaml introuvable » du fichier orchestrate-snapshot passaient au vert dans un shell et au rouge en session. Les workers héritent de l'environnement nettoyé.
   const nodePath = process.env.NODE_PATH;
   delete process.env.NODE_PATH;
-  // L360 : garde contre un TMPDIR sous un dépôt installé (node_modules/yaml dans un dossier parent) — cause possible, non prouvée, des rouges du 26-10. Sans candidat propre, la suite refuse de partir.
+  // L360 : un TMPDIR sous un dossier qui a node_modules/yaml donne les trois rouges « yaml introuvable » du 26-10 (reproduit hors vague, docs/mesures/orchestrate-snapshot-session-2026-10-26.md) : écarté. Sans candidat propre, la suite refuse de partir.
   const realTmp = pickRootBase([...new Set([tmpdir(), '/tmp', '/var/tmp'])]);
   // Un run précédent interrompu (Ctrl-C, kill, OOM) a laissé sa racine : on le dit, une ligne, puis on la supprime.
   const stale = removeStaleRoots(realTmp);

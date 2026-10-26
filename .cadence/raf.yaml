@@ -3822,6 +3822,7 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "conforme : les cinq correctifs de la passe sont en place et testés (41/41), le motif marketplace tient sur le fichier réel du dépôt, rien à signaler — orchestré (vague 2026-10-26-0930, 3 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : aucun constat après le rebase", commit: 087878d39e74eeb6183f800f45d54ba19edfcbeb }
   - id: L342
     title: "appliquer une même modification de config aux projets d'un dossier : commande (ex. cadence config set <clé> <valeur> --all [--dry-run]) qui pose ou modifie une clé de cadence.yaml dans chaque projet du dossier parent (ceux que lead tour connaît), en gardant les commentaires et l'ordre du fichier, crée dans chaque projet un lot de config qui cite la clé (raf add + start, ou la commande du plan quand il est en lecture seule, nommée par cadence.yaml), commite à chemin explicite, et s'arrête sur un projet dont la config ne se relit pas (validation par le chargeur de config de cadence) ; ne pousse pas ; liste ce qu'elle a fait et ce qu'elle a sauté ; générique ; doc et tests. Constat du 25-10 : trois fois la même chaîne à la main dans 8 à 9 projets (porte de tests, build en double, escalade Fable)"
     status: done

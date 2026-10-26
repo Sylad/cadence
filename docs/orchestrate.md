@@ -490,6 +490,18 @@ except a copy that is still needed, which stays and is said: a copy that a live 
 The waves that count are those of the launch folders the script knows (`<folder>/.cadence/runs/<wave>/wave.json`): the repository itself and the working directory of every wave the orchestrator's registry still lists (`~/.cadence/orchestrate/waves/<pid>.json`; the registry drops a dead wave when another registers, so it does not know suspended waves by itself). There is no search over the whole disk: a suspended wave launched from another folder is not protected here, and `--resume` repairs its snapshot instead (above). A wave never marked `done` keeps its copy until it is, or until its folder is removed. A failure of the purge (unreadable copy, busy file) once `service` and the links have switched is a warning on the error output (`avertissement : purge des anciennes copies interrompue …`): the new version is in service, the fingerprint is printed, the exit code is 0, the next put in service tries again. The first run is also what installs the links in `~/.local/bin`. It prints the fingerprint of the copy
 (bin, dist, package.json).
 
+## The subject of the plan commits (`plan.commit`, L343)
+
+The commits the program writes for the plan in a wave (`plan: <lot> démarré (orchestrate <wave>)`, `… revue de code enregistrée`, `… revue de code notée`, `… hypothèses de la fiche <sujet> notées`, `… mineurs de la revue de <revue> notés`) take the template of the `plan.commit` key of `cadence.yaml`
+(`{lot}`, `{action}`, `{vague}`; the same key sets the plan commit of `cadence spec reseal`; absent, the subject is unchanged — keys and rules in [docs/raf.md](raf.md#the-subject-of-the-plan-commits-plancommit-l343)).
+A project whose `commit-msg` hook enforces Conventional Commits sets for instance `plan: { commit: 'chore({lot}): {action} (orchestrate {vague})' }`.
+
+`--dry-run` plays every one of those subjects, for each lot, through the repository's **real** `commit-msg` hook, as git would run it (`git rev-parse --git-path hooks/commit-msg`: `core.hooksPath` and husky included; a hook that is not executable is skipped by git and here), and prints under the lot:
+
+- `messages de plan : 5 message(s) acceptés par le hook commit-msg du dépôt (<hook>)` when none is refused;
+- `✗ message de plan refusé par le hook commit-msg : « <subject> » — <what the hook said>` for each one refused, then the advice to set `plan.commit`: without it the lot would fail on its first plan commit, before any session. The dry-run still exits 0 (it simulates, it does not gate);
+- nothing when the repository has no `commit-msg` hook and no `plan.commit` is set.
+
 ## One worktree per lot (`orchestrate.worktrees`, L279)
 
 > **On by default in cadence (L320, 2026-10-25).** After the trials L310 and L316 (−45 % and −22 % of wall time, three automatic integrations without incident) cadence's own

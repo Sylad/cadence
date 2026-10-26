@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { availableParallelism, homedir, tmpdir } from 'node:os';
 import { testWorkersFrom } from './workers.js';
 import { basename, join, resolve } from 'node:path';
-import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, type OrchestrateConfig } from '../config.js';
+import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
+import { PLAN_ACTIONS, commitMsgHook, commitMsgRefusal, planCommitMessage } from '../plan-commit.js';
 import { isDay, toDay, type Day } from '../dates.js';
 import { gitRoot, hooksDir } from '../git.js';
 import { onTermination } from '../proc.js';
@@ -453,6 +454,20 @@ function matchesNvmrc(version: string, wanted: string): boolean {
   return v === w || v.startsWith(`${w}.`);
 }
 
+/** Les messages de commit de plan que la vague écrirait pour ce lot, passés au hook commit-msg réel du dépôt : un refus se lit ici, avant une vague payante (L343). */
+function planMessageLines(repo: string, lot: string, wave: string): string[] {
+  const template = readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit;
+  const messages = [...new Set([PLAN_ACTIONS.started, PLAN_ACTIONS.hypotheses('<sujet>'), PLAN_ACTIONS.minors('<revue>'), PLAN_ACTIONS.reviewRecorded, PLAN_ACTIONS.reviewNoted].map((action) => planCommitMessage(template, { lot, action, wave })))];
+  const hook = commitMsgHook(repo);
+  if (!hook) return template ? [`  messages de plan : « ${messages[0]} » (gabarit plan.commit ; aucun hook commit-msg dans ce dépôt)`] : [];
+  const refused = messages.map((m) => ({ m, why: commitMsgRefusal(repo, m) })).filter((r) => r.why !== null);
+  if (!refused.length) return [`  messages de plan : ${messages.length} message(s) acceptés par le hook commit-msg du dépôt (${hook})${template ? ' — gabarit plan.commit' : ''}`];
+  return [
+    ...refused.map((r) => `  ✗ message de plan refusé par le hook commit-msg : « ${r.m} » — ${r.why}`),
+    `  ✗ le lot échouerait au premier commit de plan, avant toute session : régler plan.commit dans cadence.yaml (gabarit avec {lot}, {action}, {vague})`,
+  ];
+}
+
 function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budget: number, id: string): void {
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-orchestrate-'));
   const agents = agentsOf(deps);
@@ -499,6 +514,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     for (const m of new Set(steps.map((s) => s.model))) {
       if (m !== 'local' && !MODEL_ALIASES.includes(m)) io.out(`  ⚠ modèle « ${m} » hors des alias ${MODEL_ALIASES.join(', ')} : passé tel quel à claude --model (un nom que le compte ne connaît pas fait échouer la session)`);
     }
+    for (const line of planMessageLines(l.repo, l.lot, id)) io.out(line);
     const noTest = noTestSaid.has(l.repo) ? null : noTestGate(l.repo);
     noTestSaid.add(l.repo);
     if (noTest) io.out(`  ${basename(l.repo)} · ${noTestText(noTest)}`);

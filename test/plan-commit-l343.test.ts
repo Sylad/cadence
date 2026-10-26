@@ -1,0 +1,146 @@
+import { describe, expect, it } from 'vitest';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { readPlanConfig } from '../src/config.js';
+import { commitMsgHook, commitMsgRefusal, planCommitMessage } from '../src/plan-commit.js';
+import { runLot } from '../src/orchestrate/cycle.js';
+import { run as cadence } from '../src/cli.js';
+import { gitRepo, removeDryRunBriefs, tempDir } from './helpers.js';
+import { commitFile, git, harness, reviewReport, workReport, claudeOut, type Handler } from './orchestrate-harness.js';
+import { fake, run, setup } from './orchestrate-worktree-harness.js';
+import { ecritAcceptation } from './accept-helpers.js';
+import { sealAcceptation } from '../src/orchestrate/accept.js';
+
+// L343 — le message des commits de plan est réglable (plan.commit) et le dry-run le passe au hook commit-msg réel du dépôt (issue #15).
+
+const yaml = (commit: string) => `plan:\n  commit: ${JSON.stringify(commit)}\n`;
+const config = (text: string) => {
+  const f = join(tempDir(), 'cadence.yaml');
+  writeFileSync(f, text);
+  return () => readPlanConfig(f);
+};
+
+/** Un hook commit-msg qui refuse tout sujet commençant par « plan: » comme le fait commitlint config-conventional (type-enum). */
+function hookConventionnel(repo: string, via: 'defaut' | 'husky'): string {
+  const body = '#!/bin/sh\nif head -n1 "$1" | grep -q "^plan:"; then echo "✖   type must be one of [build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test] [type-enum]" >&2; exit 1; fi\n';
+  const dir = via === 'husky' ? join(repo, '.husky/_') : join(repo, '.git/hooks');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'commit-msg'), body);
+  chmodSync(join(dir, 'commit-msg'), 0o755);
+  if (via === 'husky') git(repo, 'config', 'core.hooksPath', '.husky/_');
+  return join(dir, 'commit-msg');
+}
+
+const impl: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a.txt')] }));
+const ok: Handler = () => claudeOut(reviewReport());
+
+describe('R1 — plan.commit : le gabarit est lu et validé', () => {
+  it('R1 — absent, aucun gabarit ; posé, il est lu tel quel', () => {
+    expect(config('plan:\n  project: x\n')()?.commit).toBeUndefined();
+    expect(config(yaml('chore({lot}): {action}'))()?.commit).toBe('chore({lot}): {action}');
+  });
+  it('R1 — un gabarit sans {lot}, vide, sur deux lignes ou avec un mot inconnu est refusé', () => {
+    expect(config(yaml('chore: {action}'))).toThrow(/plan\.commit doit contenir \{lot\}/);
+    expect(config(yaml(' '))).toThrow(/plan\.commit est vide/);
+    expect(config(yaml('chore({lot}):\n{action}'))).toThrow(/une ligne/);
+    expect(config(yaml('chore({lot}): {actoin}'))).toThrow(/\{actoin\} inconnu/);
+    expect(config('plan:\n  commit: 3\n')).toThrow(/plan\.commit doit être un gabarit/);
+  });
+});
+
+describe('R2 — le message : défaut inchangé, gabarit avec lot, action, vague', () => {
+  it('R2 — sans gabarit, les messages d\'avant, en vague et hors vague', () => {
+    expect(planCommitMessage(undefined, { lot: 'L17', action: 'démarré', wave: 'w1' })).toBe('plan: L17 démarré (orchestrate w1)');
+    expect(planCommitMessage(undefined, { lot: 'L17', action: "test d'acceptation rescellé (t.ts)" })).toBe("plan: L17 test d'acceptation rescellé (t.ts)");
+  });
+  it('R2 — le gabarit remplace {lot}, {action} et {vague}', () => {
+    expect(planCommitMessage('chore({lot}): {action} [{vague}]', { lot: 'L17', action: 'démarré', wave: 'w1' })).toBe('chore(L17): démarré [w1]');
+  });
+  it('R2 — hors vague, le groupe entre parenthèses qui porte {vague} disparaît au lieu de laisser « (orchestrate ) »', () => {
+    expect(planCommitMessage('chore({lot}): {action} (orchestrate {vague})', { lot: 'L17', action: 'rescellé' })).toBe('chore(L17): rescellé');
+  });
+  it('R2 — un $& ou $1 dans une action reste littéral', () => {
+    expect(planCommitMessage('chore({lot}): {action}', { lot: 'L1', action: 'cout $& $1' })).toBe('chore(L1): cout $& $1');
+  });
+});
+
+describe('R3 — le gabarit s\'applique à tous les commits de plan écrits par cadence', () => {
+  it('R3 — la vague : démarrage et revue enregistrée portent le gabarit du projet', async () => {
+    const h = harness({ script: { implement: [impl], review: [ok] } });
+    writeFileSync(join(h.repo, 'cadence.yaml'), yaml('chore({lot}): plan {action}'));
+    await runLot(h.lot('L1'));
+    const sujets = git(h.repo, 'log', '--format=%s').split('\n');
+    expect(sujets).toContain('chore(L1): plan démarré');
+    expect(sujets).toContain('chore(L1): plan revue de code enregistrée');
+    expect(sujets.filter((s) => s.startsWith('plan:'))).toEqual([]);
+  });
+  it('R3 — la vague sans gabarit garde le message d\'avant', async () => {
+    const h = harness({ script: { implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1'));
+    expect(git(h.repo, 'log', '--format=%s')).toContain('plan: L1 démarré (orchestrate w1)');
+  });
+  it('R3 — spec reseal : le commit de la note du lot porte le gabarit', () => {
+    const repo = gitRepo();
+    const a = ecritAcceptation(repo);
+    const cli = (...argv: string[]) => cadence(argv, { cwd: repo, env: { RAF_TODAY: '2026-10-12' }, out: () => {}, err: () => {}, now: () => new Date('2026-10-12T10:00:00') });
+    cli('init', '--project', 'demo');
+    cli('add', 'Lot un');
+    cli('start', 'L1');
+    writeFileSync(join(repo, 'cadence.yaml'), yaml('chore({lot}): {action}'));
+    git(repo, 'add', '--', 'cadence.yaml', a.test, a.json, '.cadence');
+    git(repo, 'commit', '-q', '-m', 'test(L1): base');
+    sealAcceptation(repo, a.json);
+    git(repo, 'add', '--', a.json);
+    git(repo, 'commit', '-q', '-m', 'test(L1): scellée');
+    writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+    expect(cli('spec', 'reseal', 'L1', a.test, '--reason', 'le test contredit la fiche')).toBe(0);
+    expect(git(repo, 'log', '-1', '--format=%s')).toBe(`chore(L1): test d'acceptation rescellé (${a.test})`);
+  });
+});
+
+describe('R4 — le dry-run passe chaque message au hook commit-msg réel du dépôt', () => {
+  it('R4 — le hook est trouvé par core.hooksPath (husky) comme dans .git/hooks, et absent sans hook', () => {
+    const none = gitRepo();
+    expect(commitMsgHook(none)).toBeNull();
+    const a = gitRepo();
+    expect(commitMsgHook(a)).toBeNull();
+    const path = hookConventionnel(a, 'defaut');
+    expect(commitMsgHook(a)).toBe(path);
+    const b = gitRepo();
+    expect(commitMsgHook(b)).toBeNull();
+    const husky = hookConventionnel(b, 'husky');
+    expect(commitMsgHook(b)).toBe(husky);
+  });
+  it('R4 — un message refusé rend ce que le hook a dit, un message accepté rend null', () => {
+    const repo = gitRepo();
+    hookConventionnel(repo, 'husky');
+    expect(commitMsgRefusal(repo, 'plan: L17 démarré (orchestrate w1)')).toContain('type-enum');
+    expect(commitMsgRefusal(repo, 'chore(L17): démarré')).toBeNull();
+  });
+  it('R4 — le dry-run nomme le message que le hook refuserait, avec le gabarit par défaut', async () => {
+    const { parent, repo } = setup([{ title: 'un' }]);
+    hookConventionnel(repo, 'husky');
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/✗ message de plan refusé par le hook commit-msg : « plan: L1 démarré \(orchestrate [^)]+\) » — .*type-enum/);
+    expect(r.out).toContain('plan.commit');
+  });
+  it('R4 — avec un gabarit accepté par le hook, le dry-run le dit et ne refuse rien', async () => {
+    const { parent, repo } = setup([{ title: 'un' }]);
+    hookConventionnel(repo, 'husky');
+    writeFileSync(join(repo, 'cadence.yaml'), `${readFileSync(join(repo, 'cadence.yaml'), 'utf8')}${yaml('chore({lot}): {action}')}`);
+    git(repo, 'commit', '-q', '-am', 'chore: gabarit');
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.err).toBe('');
+    expect(r.out).not.toContain('✗ message de plan');
+    expect(r.out).toMatch(/messages de plan : 5 message\(s\) acceptés par le hook commit-msg/);
+  });
+  it('R4 — sans hook, rien de plus dans le dry-run quand le gabarit est celui d\'avant', async () => {
+    const { parent } = setup([{ title: 'un' }]);
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).not.toContain('messages de plan');
+  });
+});

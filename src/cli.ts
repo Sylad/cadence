@@ -11,6 +11,7 @@ import { deliver, parseDeliverConfig, realDeps, shellQuote } from './deliver.js'
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { verifyGate } from './verify-gate.js';
 import { ganttData, renderGantt } from './gantt.js';
+import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
 import { dirtyPaths, gitRoot, isTracked, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
@@ -1040,7 +1041,7 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
       // Les fichiers de plan.onWrite (L346) partent avec la note : la commande a tourné à l'écriture du plan.
       const withPlan = [planRel, ...(produced.length ? dirtyPaths(repo, produced) : [])];
       git(repo, ['add', '--', ...withPlan]);
-      git(repo, ['commit', '-q', '-m', `plan: ${cite} test d'acceptation rescellé (${norm})`, '--', ...withPlan]);
+      git(repo, ['commit', '-q', '-m', planCommitMessage(readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit, { lot: cite, action: PLAN_ACTIONS.resealed(norm) }), '--', ...withPlan]);
     } catch (e) {
       // Le rescellé est fait (commit ${sha}) : on ne le défait pas, on dit où en est la note, au lieu d'une pile d'appels.
       const out = e as { stderr?: string; stdout?: string; message: string };

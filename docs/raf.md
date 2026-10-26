@@ -142,6 +142,25 @@ then the legacy `docs/plan/raf.yaml`.
 - `cadence lead tour`, `session --all` and `cadence orchestrate` recognise a project by `.cadence/raf.yaml`, `docs/plan/raf.yaml` or a
   `cadence.yaml` with `plan:`.
 
+## The subject of the plan commits: `plan.commit` (L343)
+
+`cadence orchestrate` (the lot started, the code review recorded or noted, the hypotheses and minors of a lot noted) and `cadence spec reseal` (the lot's note) commit
+the plan on their own. Their subject has always been `plan: <lot> <action> (orchestrate <wave>)` (`plan: <lot> <action>` outside a wave), which a `commit-msg` hook
+that enforces Conventional Commits (commitlint with `config-conventional`, husky) refuses: `plan` is not one of its types, the lot failed before any session and the next one
+was handed back with the plan left staged (GitHub issue #15). `plan.commit` in `cadence.yaml` sets the subject of **all** of them:
+
+```yaml
+plan:
+  commit: 'chore({lot}): {action} (orchestrate {vague})'
+```
+
+- `{lot}` is required (a commit must cite its lot); `{action}` is what was done (`démarré`, `revue de code enregistrée`, `revue de code notée`, `hypothèses de la fiche <sujet> notées`, `mineurs de la revue de <revue> notés`, `test d'acceptation rescellé (<test>)`);
+  `{vague}` is the wave id. A word between braces that is none of these, an empty template or one on several lines is refused when the config is read.
+- Outside a wave (`spec reseal`) there is no wave: the parenthesised group that holds `{vague}` is dropped, so the template above gives `chore(L17): test d'acceptation rescellé (…)`.
+- Absent, the subject is the one above, unchanged. The key needs `plan:` to be an object (`plan: .cadence/raf.yaml` as a plain path has nowhere to put it: write `plan: { path: …, commit: … }`).
+- The `test(<lot>): …` and `chore(<lot>): …` commits of the cycle (acceptation sealed, `vert: true` set) and the work commits are already Conventional and are not templated.
+- `cadence orchestrate … --dry-run` runs every plan subject of each lot through the repository's real `commit-msg` hook (found as git finds it: `core.hooksPath` and husky included) and names the one it would refuse — see [docs/orchestrate.md](orchestrate.md#the-subject-of-the-plan-commits-plancommit-l343).
+
 ## Moving the plan: `raf migrate`
 
 `raf migrate [--dry-run]` moves a legacy `docs/plan/raf.yaml` to `.cadence/raf.yaml` and updates what reads the old path, so the
@@ -269,6 +288,7 @@ plan:
     repos: depots               # the lot's neighbouring repositories (a list of paths and/or { path, cite }, or one of them)
     parent: parent
   add: 'mytool add {title}'      # optional: the command that creates a lot here (L342: `cadence config set --all` uses it; {title} is replaced by the quoted title)
+  commit: 'chore({lot}): {action}'   # optional (L343): the subject of the plan commits cadence writes — see « The subject of the plan commits » below
   statuses:                     # raf status: their states
     todo: [prevu, specifie]
     doing: [en_cours, teste]

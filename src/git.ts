@@ -122,7 +122,7 @@ export function fileAt(cwd: string, rev: string, file: string): string | null {
   }
 }
 
-function tryGit(cwd: string, args: string[]): string | null {
+export function tryGit(cwd: string, args: string[]): string | null {
   try {
     return git(cwd, args).trim();
   } catch {

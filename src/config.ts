@@ -6,6 +6,7 @@ import type { ArticleRule } from './articles.js';
 import type { DocSyncRule } from './docsync.js';
 import { DEFAULT_TEST_PATTERNS, type TestGateConfig } from './testgate.js';
 import { gitRoot } from './git.js';
+import { planCommitProblem } from './plan-commit.js';
 import { FIELDS, Plan, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
 export interface PlanConfig {
@@ -13,10 +14,12 @@ export interface PlanConfig {
   path?: string;
   /** Commande qui crée un lot dans un plan en lecture seule (`plan.add`) : `{title}` y est remplacé par le titre, entre guillemets. */
   add?: string;
+  /** Gabarit du message des commits de plan écrits par cadence (`plan.commit`, L343) : {lot}, {action}, {vague}. Absent : le message d'avant. */
+  commit?: string;
   settings: PlanSettings;
 }
 
-const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite'];
+const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite', 'commit'];
 const ON_WRITE_KEYS = ['command', 'files'];
 const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates'];
 
@@ -100,7 +103,11 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
   if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
   if (p.add != null && (typeof p.add !== 'string' || !p.add.includes('{title}'))) throw bad('add doit être une commande qui contient {title}');
-  return { ...(p.path != null ? { path: String(p.path) } : {}), ...(p.add != null ? { add: String(p.add) } : {}), settings };
+  if (p.commit != null) {
+    const problem = typeof p.commit === 'string' ? planCommitProblem(p.commit) : 'doit être un gabarit de message';
+    if (problem) throw bad(`commit ${problem}`);
+  }
+  return { ...(p.path != null ? { path: String(p.path) } : {}), ...(p.add != null ? { add: String(p.add) } : {}), ...(p.commit != null ? { commit: String(p.commit) } : {}), settings };
 }
 
 export const PLAN_DEFAULT = '.cadence/raf.yaml';

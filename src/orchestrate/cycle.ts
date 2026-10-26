@@ -6,7 +6,8 @@ import { basename, delimiter, dirname, isAbsolute, join, posix, relative, resolv
 import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
-import { readDocsConfig, type OrchestrateConfig } from '../config.js';
+import { readDocsConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
+import { PLAN_ACTIONS, planCommitMessage } from '../plan-commit.js';
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
@@ -172,6 +173,11 @@ function trackedPaths(s: Snapshot): string[] {
   return s.tracked.map((l) => l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, ''));
 }
 
+/** Le message d'un commit de plan de la vague : le gabarit `plan.commit` du projet (L343), à défaut le message d'avant. */
+function planMessage(c: LotCtx, action: string): string {
+  return planCommitMessage(readPlanConfig(join(c.lot.repo, 'cadence.yaml'), c.lot.repo)?.commit, { lot: c.lot.lot, action, wave: c.wave.id });
+}
+
 /**
  * Commit d'entretien du plan, chemins explicites. Rend un message d'arbre sale quand autre chose que le plan a bougé.
  * Dans le dépôt du projet (`root` par défaut) : jamais dans un worktree de lot (R21). Les commits de TRAVAIL du cycle (scellé et `vert: true` de l'acceptation)
@@ -314,7 +320,7 @@ async function startLot(c: LotCtx): Promise<string | null> {
       plan.setStatus(c.lot.lot, 'doing', c.wave.today);
       plan.save();
     }
-    const dirty = await commitPlan(c, `plan: ${c.lot.lot} démarré (orchestrate ${c.wave.id})`);
+    const dirty = await commitPlan(c, planMessage(c, PLAN_ACTIONS.started));
     if (dirty) return dirty;
   }
   return null;
@@ -1630,7 +1636,7 @@ async function noteHypotheses(c: LotCtx, lines: string[], sujet: string): Promis
     if (!fresh.length) return null;
     for (const t of fresh) plan.note(l.lot, t, c.wave.today);
     plan.save();
-    return commitPlan(c, `plan: ${l.lot} hypothèses de la fiche ${sujet} notées (orchestrate ${c.wave.id})`);
+    return commitPlan(c, planMessage(c, PLAN_ACTIONS.hypotheses(sujet)));
   });
   if (dirty) {
     handBackPlan(c, `${HYPOTHESES_HANDBACK}${dirty}`);
@@ -1658,7 +1664,7 @@ async function noteMinors(c: LotCtx, rep: ReviewReport, label: string): Promise<
     if (!fresh.length) return null;
     for (const t of fresh) plan.note(c.lot.lot, t, c.wave.today);
     plan.save();
-    return commitPlan(c, `plan: ${c.lot.lot} mineurs de la revue de ${label} notés (orchestrate ${c.wave.id})`);
+    return commitPlan(c, planMessage(c, PLAN_ACTIONS.minors(label)));
   });
   if (dirty) {
     handBackPlan(c, `${MINORS_HANDBACK}${label} : ${dirty}`);
@@ -2452,7 +2458,7 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
       if (e instanceof RafError) return e.message;
       throw e;
     }
-    const dirty = await commitPlan(c, `plan: ${l.lot} revue de code enregistrée (orchestrate ${c.wave.id})`);
+    const dirty = await commitPlan(c, planMessage(c, PLAN_ACTIONS.reviewRecorded));
     if (dirty) return dirty;
   } else {
     for (const k of covered) propose(c, `[sous-tâche clore] ${l.lot}/${k.task} — couverte par ${k.sha.slice(0, 7)}, revue conforme : à clore avant raf done`);
@@ -2463,7 +2469,7 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
     const r = await sh(c, c.config.verdict.replaceAll('{lot}', l.lot).replaceAll('{verdict}', shEscape(text)), undefined, undefined, l.repo);
     if (r.code !== 0) l.warnings.push(`orchestrate.verdict en échec (code ${r.code}) : le lead reporte le verdict`);
     else {
-      const dirty = await commitPlan(c, `plan: ${l.lot} revue de code notée (orchestrate ${c.wave.id})`);
+      const dirty = await commitPlan(c, planMessage(c, PLAN_ACTIONS.reviewNoted));
       if (dirty) return dirty;
     }
   }

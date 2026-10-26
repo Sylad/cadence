@@ -3841,6 +3841,7 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "conforme : les constats mineurs traités le sont bien ([Lnn/tn] exclu par PROGRAM_NOTE et testé par R17, titres --dry-run corrigés), sans régression — orchestré (vague 2026-10-26-0930, 3 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que l'emplacement de l'entrée L344 dans le CHANGELOG, qui est correct, et aucun nouveau défaut.", commit: 326bc60bd61fba7a1edb569b073b20944b9efcd2 }
   - id: L345
     title: "orchestrate : nom de modèle libre partout — @<modèle> d'un lot et orchestrate.review (light, full) passent le nom tel quel à claude --model, comme escalation.model ; les alias haiku|sonnet|opus gardent leur sens ; le dry-run avertit (sans refuser) pour un nom hors des alias connus ; doc (orchestrate, cadence.yaml), CHANGELOG, tests. Issue GitHub #16 : @fable refusé (« modèle inconnu »), alors que l'escalade l'accepte"
     status: todo

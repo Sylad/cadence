@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readPlanConfig } from '../src/config.js';
 import { Plan } from '../src/plan.js';
+import { planFileSet } from '../src/orchestrate/worktree.js';
 import { gitRepo, tempDir, NO_BACKGROUND_GIT } from './helpers.js';
 import { fake, run as orchestrate, setup, store, subjects } from './orchestrate-worktree-harness.js';
 import { git as gitIn } from './orchestrate-harness.js';
@@ -163,4 +164,15 @@ describe('R4 — orchestrate lance la commande et commite ses fichiers avec le p
       expect(lot.outcome).toContain('plan.onWrite');
     });
   }
+});
+
+describe('R9 — une session qui touche un fichier de plan.onWrite dans son worktree voit son lot rendu', () => {
+  it('R9 — planFileSet compte les fichiers produits par plan.onWrite avec le plan et plan.files', () => {
+    const dir = project(config(GENERATE));
+    const plan = Plan.load(join(dir, PLAN), { files: ['docs/gen.md'], onWrite: { command: GENERATE, files: [OUT] } });
+    const set = planFileSet(plan, dir);
+    expect(set.has(OUT)).toBe(true);
+    expect(set.has('docs/gen.md')).toBe(true);
+    expect(set.has(PLAN)).toBe(true);
+  });
 });

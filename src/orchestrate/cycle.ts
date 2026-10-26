@@ -178,12 +178,33 @@ function planMessage(c: LotCtx, action: string): string {
   return planCommitMessage(readPlanConfig(join(c.lot.repo, 'cadence.yaml'), c.lot.repo)?.commit, { lot: c.lot.lot, action, wave: c.wave.id });
 }
 
+/** Le contenu des fichiers du plan déjà modifiés, non commités, avant une écriture de cadence (null : absent du disque) : ce qu'un commit refusé remet (`commitPlan`). */
+type PlanBefore = Map<string, string | null>;
+
+/**
+ * Ce que le lead a modifié dans le plan sans commiter, pris AVANT que cadence n'écrive : les fichiers suivis modifiés que `commitPlan` accepte (le plan, ce qui est
+ * tenu avec lui, les acceptation.json), avec leur contenu. Un commit de plan refusé (hook) les remet tels quels au lieu de les ramener à HEAD (L343).
+ */
+function planBefore(c: LotCtx, repo = c.lot.repo): PlanBefore {
+  const ownFile = planOwnFile(c, repo);
+  const kept: PlanBefore = new Map();
+  for (const f of trackedDirty(repo).filter(ownFile)) {
+    try {
+      kept.set(f, readFileSync(join(repo, f), 'utf8'));
+    } catch {
+      kept.set(f, null);
+    }
+  }
+  return kept;
+}
+
 /**
  * Commit d'entretien du plan, chemins explicites. Rend un message d'arbre sale quand autre chose que le plan a bougé.
  * Dans le dépôt du projet (`root` par défaut) : jamais dans un worktree de lot (R21). Les commits de TRAVAIL du cycle (scellé et `vert: true` de l'acceptation)
  * se font, eux, dans `wd(c)`, sur la branche du lot.
+ * `before` : ce que le lead avait modifié sans commiter avant l'écriture (`planBefore`) ; un commit refusé le remet, et ramène à HEAD ce que cadence seule a écrit.
  */
-async function commitPlan(c: LotCtx, message: string, root = c.lot.repo): Promise<string | null> {
+async function commitPlan(c: LotCtx, message: string, root = c.lot.repo, before: PlanBefore = new Map()): Promise<string | null> {
   const repo = root;
   const ownFile = planOwnFile(c, repo);
   // Les fichiers de plan.onWrite (L346) entrent même non suivis : le premier plan publié n'est pas encore au dépôt.
@@ -196,8 +217,16 @@ async function commitPlan(c: LotCtx, message: string, root = c.lot.repo): Promis
   try {
     git(repo, 'commit', '-q', '-m', message, '--', ...dirty);
   } catch (e) {
-    // Commit refusé (hook commit-msg…, L343) : le plan n'a pas à rester indexé ni modifié, le lot suivant y verrait un dépôt sale et serait rendu.
-    git(repo, 'restore', '--staged', '--worktree', '--source=HEAD', '--', ...dirty);
+    // Commit refusé (hook commit-msg…, L343) : le plan n'a pas à rester indexé ni modifié par cadence, le lot suivant y verrait un dépôt sale et serait rendu.
+    // Ce que le lead avait modifié sans commiter (raf add, raf note pendant la session) est remis, pas effacé.
+    git(repo, 'restore', '--staged', '--', ...dirty);
+    const own = dirty.filter((f) => !before.has(f));
+    if (own.length) git(repo, 'restore', '--worktree', '--source=HEAD', '--', ...own);
+    for (const [f, text] of before) {
+      if (!dirty.includes(f)) continue;
+      if (text === null) rmSync(join(repo, f), { force: true });
+      else writeFileSync(join(repo, f), text);
+    }
     throw e;
   }
   return null;
@@ -1640,9 +1669,10 @@ async function noteHypotheses(c: LotCtx, lines: string[], sujet: string): Promis
     const have = new Set(plan.lot(l.lot).notes.map((n) => n.text));
     const fresh = texts.filter((t) => !have.has(t));
     if (!fresh.length) return null;
+    const before = planBefore(c);
     for (const t of fresh) plan.note(l.lot, t, c.wave.today);
     plan.save();
-    return commitPlan(c, planMessage(c, PLAN_ACTIONS.hypotheses(sujet)));
+    return commitPlan(c, planMessage(c, PLAN_ACTIONS.hypotheses(sujet)), c.lot.repo, before);
   });
   if (dirty) {
     handBackPlan(c, `${HYPOTHESES_HANDBACK}${dirty}`);
@@ -1668,9 +1698,10 @@ async function noteMinors(c: LotCtx, rep: ReviewReport, label: string): Promise<
     const have = new Set(plan.lot(c.lot.lot).notes.map((n) => n.text));
     const fresh = [...new Set(texts)].filter((t) => !have.has(t));
     if (!fresh.length) return null;
+    const before = planBefore(c);
     for (const t of fresh) plan.note(c.lot.lot, t, c.wave.today);
     plan.save();
-    return commitPlan(c, planMessage(c, PLAN_ACTIONS.minors(label)));
+    return commitPlan(c, planMessage(c, PLAN_ACTIONS.minors(label)), c.lot.repo, before);
   });
   if (dirty) {
     handBackPlan(c, `${MINORS_HANDBACK}${label} : ${dirty}`);
@@ -2455,6 +2486,7 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
   if (!plan.readonly) {
     // Déjà écrit et commité au même sha (reprise de l'intégration, R23) : une seule fois.
     if (c.tree && commit !== null && plan.lot(l.lot).review?.commit === commit && !covered.length && !trackedDirty(l.repo).includes(relative(l.repo, plan.path))) return null;
+    const before = planBefore(c);
     plan.recordReview(l.lot, verdict, c.wave.today, commit, neighbours.length ? shas : undefined, reporte);
     for (const k of covered) plan.setStatus(`${l.lot}/${k.task}`, 'done', c.wave.today);
     if (covered.length) l.warnings.push(`sous-tâches closes (couvertes par des commits qui les citent, revue conforme) : ${covered.map((k) => `${l.lot}/${k.task} (${k.sha.slice(0, 7)})`).join(', ')}`);
@@ -2464,7 +2496,7 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
       if (e instanceof RafError) return e.message;
       throw e;
     }
-    const dirty = await commitPlan(c, planMessage(c, PLAN_ACTIONS.reviewRecorded));
+    const dirty = await commitPlan(c, planMessage(c, PLAN_ACTIONS.reviewRecorded), l.repo, before);
     if (dirty) return dirty;
   } else {
     for (const k of covered) propose(c, `[sous-tâche clore] ${l.lot}/${k.task} — couverte par ${k.sha.slice(0, 7)}, revue conforme : à clore avant raf done`);
@@ -2472,10 +2504,11 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
   if (plan.readonly && c.config.verdict) {
     // La trace d'un verdict reporté va dans le texte, le seul endroit où l'outil du projet la lit (R23).
     const text = reporte ? `${verdict} ; verdict reporté : ${reporte.de.slice(0, 7)} → ${reporte.vers.slice(0, 7)} (patch-id identique)` : verdict;
+    const before = planBefore(c);
     const r = await sh(c, c.config.verdict.replaceAll('{lot}', l.lot).replaceAll('{verdict}', shEscape(text)), undefined, undefined, l.repo);
     if (r.code !== 0) l.warnings.push(`orchestrate.verdict en échec (code ${r.code}) : le lead reporte le verdict`);
     else {
-      const dirty = await commitPlan(c, planMessage(c, PLAN_ACTIONS.reviewNoted));
+      const dirty = await commitPlan(c, planMessage(c, PLAN_ACTIONS.reviewNoted), l.repo, before);
       if (dirty) return dirty;
     }
   }

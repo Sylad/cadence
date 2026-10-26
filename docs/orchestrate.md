@@ -503,7 +503,7 @@ A project whose `commit-msg` hook enforces Conventional Commits sets for instanc
 - for a lot with a spec stage, what the measure used: `fiche du lot : docs/specs/<sujet>/fiche.yaml (hypothèses R1, R2)`, or `fiche du lot pas encore écrite : mesure avec le sujet le plus long de docs/specs (<sujet>) et <n> règle(s)`;
 - nothing when the repository has no `commit-msg` hook and no `plan.commit` is set.
 
-When a plan commit is refused all the same (a hook of the project, a header too long), the plan files are restored to `HEAD` and unstaged before the lot fails, so the next lot of the wave does not find a dirty repository and is not handed back.
+When a plan commit is refused all the same (a hook of the project, a header too long), the plan files are unstaged and what cadence wrote is undone before the lot fails, so the next lot of the wave does not find a dirty repository and is not handed back. What the lead had changed in the plan without committing before cadence wrote (a `raf add` or `raf note` in the project repository during a session: the plan files, the files maintained with them, the `acceptation.json`) is put back as it was, not erased: those files stay modified, as before the commit, and only the content cadence added (the hypotheses notes, the review record) is gone.
 
 ## One worktree per lot (`orchestrate.worktrees`, L279)
 

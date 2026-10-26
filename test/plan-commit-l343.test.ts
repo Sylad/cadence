@@ -6,8 +6,9 @@ import { commitMsgHook, commitMsgRefusal, leadAnswerMessage, planCommitMessage }
 import { runLot } from '../src/orchestrate/cycle.js';
 import { run as cadence } from '../src/cli.js';
 import { gitRepo, removeDryRunBriefs, tempDir } from './helpers.js';
-import { commitFile, git, harness, reviewReport, workReport, claudeOut, type Handler } from './orchestrate-harness.js';
-import { fake, run, setup } from './orchestrate-worktree-harness.js';
+import { commitFile, git, harness, reviewReport, specReport, workReport, claudeOut, type Handler } from './orchestrate-harness.js';
+import { fake, planOf, run, setup, store, until } from './orchestrate-worktree-harness.js';
+import { ecritBack } from './spec-helpers.js';
 import { ecritAcceptation } from './accept-helpers.js';
 import { sealAcceptation } from '../src/orchestrate/accept.js';
 
@@ -106,6 +107,37 @@ describe('R5 — un refus du hook ne laisse pas le plan indexé, et le message d
     await runLot(c);
     expect(c.lot.status).toBe('failed');
     expect(git(h.repo, 'status', '--porcelain', '--untracked-files=no')).toBe('');
+  });
+  it('R5 — un commit de plan refusé garde ce que le lead avait modifié dans le plan sans commiter : seule l\'écriture de cadence est défaite', async () => {
+    // Deux lots en worktree (le dépôt du lead reste libre) : pendant la session spec de L1, le lead note le plan sans commiter (raf note) ; le commit
+    // des hypothèses de la fiche, écrit après la session, est refusé par le hook (header-max-length). Le scénario de l'issue #15.
+    const { parent, repo } = setup([{ title: 'un', spec: true }, { title: 'deux' }]);
+    const dir = join(repo, '.git/hooks');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'commit-msg'), '#!/bin/sh\nif head -n1 "$1" | grep -q "hypothèses"; then echo "✖   header must not be longer than 100 characters [header-max-length]" >&2; exit 1; fi\n');
+    chmodSync(join(dir, 'commit-msg'), 0o755);
+    const home = process.env.CADENCE_HOME;
+    process.env.CADENCE_HOME = tempDir();
+    let lead = '';
+    try {
+      const f: ReturnType<typeof fake> = fake({
+        spec: async (cwd) => {
+          await until(() => f.calls.some((k) => k.lot === 'L2')); // L2 a déjà écrit son raf start
+          const plan = planOf(repo);
+          plan.note('L1', 'note du lead pendant la session', '2026-10-04');
+          plan.save();
+          lead = readFileSync(plan.path, 'utf8');
+          return claudeOut(specReport({ fiche: ecritBack(cwd) }));
+        },
+      });
+      await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+    } finally {
+      process.env.CADENCE_HOME = home;
+    }
+    expect(store(parent).readLot('a', 'L1')!.status).toBe('failed');
+    expect(lead).toContain('note du lead pendant la session');
+    expect(git(repo, 'diff', '--cached', '--name-only')).toBe('');
+    expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).toBe(lead); // la note du lead est là, les notes d'hypothèses de cadence n'y sont plus
   });
   it('R5 — le sujet de la réponse du lead commence en minuscule, comme l\'exige subject-case de config-conventional', () => {
     expect(leadAnswerMessage('L1', ['R3'], 'w1')).toBe('docs(L1): règle R3 sourcée par la réponse du lead (orchestrate w1)');

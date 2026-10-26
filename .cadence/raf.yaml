@@ -3818,11 +3818,12 @@ lots:
     finished: 2026-10-25
   - id: L341
     title: "cadence release patch|minor|major : prépare le commit de version selon docs/releasing.md — version dans package.json (+ package-lock.json, seuls les champs de version, refus si une dépendance bouge), .claude-plugin/plugin.json et marketplace.json ; [Unreleased] du CHANGELOG renommé en [x.y.z] - date avec une section [Unreleased] vide gardée au-dessus (sinon la fusion de CHANGELOG du mode worktree rend null) ; rien n'est publié par la commande (tag, éval du plugin et push restent des étapes du lead, que la commande imprime dans l'ordre : eval avec --trust-plugin, tag, push, attente du run publish, npm view, mise à jour du plugin) ; refus sur un arbre sale, un [Unreleased] vide ou une version déjà taguée ; --dry-run ; les deux formes de docs/whats-new.md (ligne ≤ 240 caractères et paragraphe long) restent écrites à la main ou par une session, la commande dit où et vérifie leur présence ; générique (aucun nom de projet du dossier) ; doc docs/releasing.md, CHANGELOG ; tests. Constat du 25-10 : la même chaîne faite 4 fois à la main (1.10.0 → 1.12.1), dont une fois le paragraphe long inséré au mauvais endroit de whats-new.md"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "conforme : les cinq correctifs de la passe sont en place et testés (41/41), le motif marketplace tient sur le fichier réel du dépôt, rien à signaler — orchestré (vague 2026-10-26-0930, 3 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : aucun constat après le rebase", commit: 087878d39e74eeb6183f800f45d54ba19edfcbeb }
+    finished: 2026-10-26
   - id: L342
     title: "appliquer une même modification de config aux projets d'un dossier : commande (ex. cadence config set <clé> <valeur> --all [--dry-run]) qui pose ou modifie une clé de cadence.yaml dans chaque projet du dossier parent (ceux que lead tour connaît), en gardant les commentaires et l'ordre du fichier, crée dans chaque projet un lot de config qui cite la clé (raf add + start, ou la commande du plan quand il est en lecture seule, nommée par cadence.yaml), commite à chemin explicite, et s'arrête sur un projet dont la config ne se relit pas (validation par le chargeur de config de cadence) ; ne pousse pas ; liste ce qu'elle a fait et ce qu'elle a sauté ; générique ; doc et tests. Constat du 25-10 : trois fois la même chaîne à la main dans 8 à 9 projets (porte de tests, build en double, escalade Fable)"
     status: done
@@ -3838,11 +3839,14 @@ lots:
     created: 2026-10-26
   - id: L344
     title: "implement : parcours réel et décisions de l'humain avant la revue — (1) le brief demande, une fois les tests verts, de jouer ce qui est livré comme un utilisateur : la commande dans un dépôt jetable en suivant la doc écrite par le lot, ou l'écran dans chacun de ses états (échec compris, à la position où l'action a lieu) avec capture ; ce qui casse se corrige dans la même session, et le rapport le dit sous « parcours réel » ; (2) le précheck extrait des notes du lot et de son parent les décisions de l'humain (date, citation) et le brief d'implémentation les reçoit sous « décisions à respecter » ; une interprétation qui s'en écarte devient une question, jamais un choix fait ; générique ; doc, tests des gabarits. Constat du 26-10 : 3 majeurs de revue sur 3 lots non conformes (L341 commande impossible dans son propre parcours, B28.8 « champs exclus » contre la décision du 22-10, finance L151 bandeau d'échec hors de vue) n'étaient pas visibles en relisant le diff. Mesure de l'effet : part conforme du premier coup de cadence perf sur deux fenêtres"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "conforme : les constats mineurs traités le sont bien ([Lnn/tn] exclu par PROGRAM_NOTE et testé par R17, titres --dry-run corrigés), sans régression — orchestré (vague 2026-10-26-0930, 3 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que l'emplacement de l'entrée L344 dans le CHANGELOG, qui est correct, et aucun nouveau défaut.", commit: 326bc60bd61fba7a1edb569b073b20944b9efcd2 }
+    finished: 2026-10-26
+    notes:
+      - { date: 2026-10-26, text: "mineurs de revue non repris (26-10) : note sans date d'un plan tenu par un autre outil → « -  (B28): … » sans date (decisions.ts:26) ; R9 ne vérifie pas « aucune ligne vide de plus » ; décisions du lot répétées dans le brief (objective() les reprend déjà : jusqu'à 2,4 k caractères en double, 43 k sur 61 lots) — à reprendre si cadence perf montre le coût" }
   - id: L345
     title: "orchestrate : nom de modèle libre partout — @<modèle> d'un lot et orchestrate.review (light, full) passent le nom tel quel à claude --model, comme escalation.model ; les alias haiku|sonnet|opus gardent leur sens ; le dry-run avertit (sans refuser) pour un nom hors des alias connus ; doc (orchestrate, cadence.yaml), CHANGELOG, tests. Issue GitHub #16 : @fable refusé (« modèle inconnu »), alors que l'escalade l'accepte"
     status: todo

@@ -187,6 +187,24 @@ describe('cadence perf — fenêtres et débit', () => {
     expect(data.throughput.onBudget.current).toBeCloseTo(2 / 3);
   });
 
+  it("R5 — L349 : un modèle d'escalade identique à celui d'étapes ordinaires ne sort pas ces étapes du compte", async () => {
+    const c = ctx();
+    // Escalade sur opus, modèle aussi de la revue complète : 400 k sonnet + 300 k de revue opus + 200 k de correction opus = 900 k pour 775 k de budget.
+    writeJournal(c.runs, 'w1', 'alpha', 'A', { budget: 775_000, escalationReserve: 175_000, escalation: { model: 'opus', stage: 'done', issue: 'rendu' }, steps: [{ kind: 'implement', model: 'sonnet', counted: 400_000, ended: at(CUR) }, { kind: 'review', model: 'opus', counted: 300_000, ended: at(CUR) }, { kind: 'fix', model: 'opus', counted: 200_000, ended: at(CUR) }] });
+    // Sans escalade engagée, des revues opus ordinaires se comptent contre le budget moins la part : 700 k pour 600 k.
+    writeJournal(c.runs, 'w1', 'alpha', 'B', { budget: 775_000, escalationReserve: 175_000, steps: [{ kind: 'implement', model: 'sonnet', counted: 400_000, ended: at(CUR) }, { kind: 'review', model: 'opus', counted: 300_000, ended: at(CUR) }] });
+    const { data } = await json(c.root);
+    expect(data.throughput.onBudget.current).toBe(0);
+  });
+
+  it("R5 — L349 : une fois l'escalade engagée la part est libérée, le lot se compte contre son budget entier", async () => {
+    const c = ctx();
+    // 600 k ordinaires + 150 k d'escalade fable + 20 k de mineurs sonnet = 770 k <= 775 k : le lot a tenu son budget.
+    writeJournal(c.runs, 'w1', 'alpha', 'A', { budget: 775_000, escalationReserve: 175_000, escalation: { model: 'fable', stage: 'done', issue: 'conforme' }, steps: [{ kind: 'implement', counted: 600_000, ended: at(CUR) }, { kind: 'fix', model: 'fable', counted: 150_000, ended: at(CUR) }, { kind: 'fix', model: 'sonnet', counted: 20_000, ended: at(CUR) }] });
+    const { data } = await json(c.root);
+    expect(data.throughput.onBudget.current).toBe(1);
+  });
+
   it('R5 — un journal sans budget n\'entre pas au dénominateur', async () => {
     const c = ctx();
     journal(c, CUR, { budget: 100, counted: 50 });

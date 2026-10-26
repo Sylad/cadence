@@ -308,9 +308,14 @@ describe('L360 — la racine temporaire ne dépend pas de l\'endroit où TMPDIR 
   it('R5 — un NODE_PATH qui fournit « yaml » n\'écarte aucun candidat : seuls les node_modules des dossiers parents comptent', () => {
     const np = withYaml();
     const clean = tempDir();
-    const module = join(dirname(fileURLToPath(import.meta.url)), 'tmp-hygiene.ts');
-    const code = `import(${JSON.stringify(module)}).then((m) => console.log(m.pickRootBase([${JSON.stringify(clean)}])))`;
-    const out = execFileSync(process.execPath, ['-e', code], {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const script = join(tempDir(), 'pick-root-base.ts');
+    writeFileSync(
+      script,
+      `import { pickRootBase } from ${JSON.stringify(join(here, 'tmp-hygiene.ts'))};\n` +
+        `process.stdout.write(pickRootBase([process.argv[2]!]));\n`,
+    );
+    const out = execFileSync(resolve(here, '../node_modules/.bin/vite-node'), [script, clean], {
       env: { ...process.env, NODE_PATH: join(np, 'node_modules') },
       encoding: 'utf8',
     });

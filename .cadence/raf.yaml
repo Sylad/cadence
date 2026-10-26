@@ -3835,9 +3835,10 @@ lots:
     created: 2026-10-26
   - id: L344
     title: "implement : parcours réel et décisions de l'humain avant la revue — (1) le brief demande, une fois les tests verts, de jouer ce qui est livré comme un utilisateur : la commande dans un dépôt jetable en suivant la doc écrite par le lot, ou l'écran dans chacun de ses états (échec compris, à la position où l'action a lieu) avec capture ; ce qui casse se corrige dans la même session, et le rapport le dit sous « parcours réel » ; (2) le précheck extrait des notes du lot et de son parent les décisions de l'humain (date, citation) et le brief d'implémentation les reçoit sous « décisions à respecter » ; une interprétation qui s'en écarte devient une question, jamais un choix fait ; générique ; doc, tests des gabarits. Constat du 26-10 : 3 majeurs de revue sur 3 lots non conformes (L341 commande impossible dans son propre parcours, B28.8 « champs exclus » contre la décision du 22-10, finance L151 bandeau d'échec hors de vue) n'étaient pas visibles en relisant le diff. Mesure de l'effet : part conforme du premier coup de cadence perf sur deux fenêtres"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-26
+    started: 2026-10-26
   - id: L345
     title: "orchestrate : nom de modèle libre partout — @<modèle> d'un lot et orchestrate.review (light, full) passent le nom tel quel à claude --model, comme escalation.model ; les alias haiku|sonnet|opus gardent leur sens ; le dry-run avertit (sans refuser) pour un nom hors des alias connus ; doc (orchestrate, cadence.yaml), CHANGELOG, tests. Issue GitHub #16 : @fable refusé (« modèle inconnu »), alors que l'escalade l'accepte"
     status: todo

@@ -3816,6 +3816,16 @@ lots:
     started: 2026-10-25
     review: { date: 2026-10-25, verdict: "conforme (lead : clé d'une ligne lue sans erreur par cadence orchestrate --dry-run)", commit: ed3baf539c3a7c2b7a658ae405f7d73816408862 }
     finished: 2026-10-25
+  - id: L341
+    title: "cadence release patch|minor|major : prépare le commit de version selon docs/releasing.md — version dans package.json (+ package-lock.json, seuls les champs de version, refus si une dépendance bouge), .claude-plugin/plugin.json et marketplace.json ; [Unreleased] du CHANGELOG renommé en [x.y.z] - date avec une section [Unreleased] vide gardée au-dessus (sinon la fusion de CHANGELOG du mode worktree rend null) ; rien n'est publié par la commande (tag, éval du plugin et push restent des étapes du lead, que la commande imprime dans l'ordre : eval avec --trust-plugin, tag, push, attente du run publish, npm view, mise à jour du plugin) ; refus sur un arbre sale, un [Unreleased] vide ou une version déjà taguée ; --dry-run ; les deux formes de docs/whats-new.md (ligne ≤ 240 caractères et paragraphe long) restent écrites à la main ou par une session, la commande dit où et vérifie leur présence ; générique (aucun nom de projet du dossier) ; doc docs/releasing.md, CHANGELOG ; tests. Constat du 25-10 : la même chaîne faite 4 fois à la main (1.10.0 → 1.12.1), dont une fois le paragraphe long inséré au mauvais endroit de whats-new.md"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-26
+  - id: L342
+    title: "appliquer une même modification de config aux projets d'un dossier : commande (ex. cadence config set <clé> <valeur> --all [--dry-run]) qui pose ou modifie une clé de cadence.yaml dans chaque projet du dossier parent (ceux que lead tour connaît), en gardant les commentaires et l'ordre du fichier, crée dans chaque projet un lot de config qui cite la clé (raf add + start, ou la commande du plan quand il est en lecture seule, nommée par cadence.yaml), commite à chemin explicite, et s'arrête sur un projet dont la config ne se relit pas (validation par le chargeur de config de cadence) ; ne pousse pas ; liste ce qu'elle a fait et ce qu'elle a sauté ; générique ; doc et tests. Constat du 25-10 : trois fois la même chaîne à la main dans 8 à 9 projets (porte de tests, build en double, escalade Fable)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -96,7 +96,7 @@ describe('push du lead pendant la vague (L352)', () => {
   it('R7 — un push quand un lot de la vague est illisible dans le plan reste un incident', async () => {
     const { h, c } = scenario((cwd, ready) => git(cwd, 'push', '-q', 'origin', `${ready}:main`));
     // un lot de la vague que le plan ne connaît pas : ses commits ne peuvent pas être lus
-    h.store.writeLot({ ...h.lot('L1').lot, lot: 'L9', status: 'doing' });
+    h.store.writeLot({ ...h.lot('L1').lot, lot: 'L9', status: 'implementing' });
     await runLot(c);
     expect(c.lot.status).toBe('failed');
     expect(h.wave.incident).toMatch(/push détecté/);

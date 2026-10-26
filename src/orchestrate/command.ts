@@ -23,7 +23,7 @@ import { acceptationFile, acceptText } from './accept.js';
 import { noTestGate, noTestText } from './no-test.js';
 import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
-import { specScreen, specText } from './spec.js';
+import { costlyHypotheses, specScreen, specText } from './spec.js';
 import { fichesDuDossier } from '../spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
 import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
@@ -456,30 +456,32 @@ function matchesNvmrc(version: string, wanted: string): boolean {
 }
 
 /**
- * Ce avec quoi le dry-run mesure les messages de la fiche d'un lot à étape spec (L343) : la fiche du lot quand elle est déjà écrite (son sujet, ses règles
- * `hypothese`), sinon le sujet le plus long du dossier des fiches et autant de règles que la fiche du dossier qui en porte le plus. Un sujet de 7 caractères
- * (« <sujet> ») faisait accepter un message que `header-max-length` refuse avec un sujet réel.
+ * Ce avec quoi le dry-run mesure les messages de la fiche d'un lot à étape spec (L343) : la fiche du lot quand elle est déjà écrite (son sujet pour les hypothèses
+ * notées, ses hypothèses coûteuses pour la réponse du lead, qui ne source que les règles posées en question — `costlyHypotheses` — et n'est pas commitée sans elles),
+ * sinon le sujet le plus long du dossier des fiches et autant de règles coûteuses que la fiche du dossier qui en porte le plus (1 au moins). Un sujet de 7 caractères
+ * (« <sujet> ») faisait accepter un message que `header-max-length` refuse avec un sujet réel ; toutes les hypothèses d'une fiche (13) faisaient refuser une réponse qui n'en cite que les coûteuses.
  */
 function ficheMeasure(repo: string, dir: string, lot: string): { sujet: string; regles: string[]; line: string } {
   const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-  const hypotheses = (doc: Record<string, unknown>): string[] => (Array.isArray(doc.regles) ? doc.regles : []).filter(isObj).filter((r) => r.statut === 'hypothese').map((r) => String(r.id));
+  const costly = (doc: Record<string, unknown>): string[] => costlyHypotheses(doc).map((x) => x.id);
   const fiches = fichesDuDossier(repo, dir);
   const mine = fiches.find(({ doc }) => (isObj(doc.sujet) && doc.sujet.lot === lot) || (isObj(doc.ecran) && doc.ecran.lot === lot));
   if (mine) {
     const sujet = isObj(mine.doc.sujet) && typeof mine.doc.sujet.id === 'string' ? mine.doc.sujet.id : mine.name;
-    const regles = hypotheses(mine.doc);
-    return { sujet, regles: regles.length ? regles : ['R3'], line: `  fiche du lot : ${dir}/${mine.name}/fiche.yaml (${regles.length ? `hypothèses ${regles.join(', ')}` : 'aucune hypothèse : réponse du lead mesurée avec 1 règle'})` };
+    const regles = costly(mine.doc);
+    const about = regles.length ? `réponse du lead mesurée avec ${regles.length > 1 ? 'les règles coûteuses' : 'la règle coûteuse'} ${regles.join(', ')}` : 'aucune hypothèse coûteuse : pas de réponse du lead à commiter';
+    return { sujet, regles, line: `  fiche du lot : ${dir}/${mine.name}/fiche.yaml (${about})` };
   }
-  if (!fiches.length) return { sujet: '<sujet>', regles: ['R3'], line: `  aucune fiche dans ${dir} : les messages de la fiche sont mesurés avec « <sujet> » (7 caractères) et 1 règle ; un sujet réel plus long peut dépasser une limite du hook` };
+  if (!fiches.length) return { sujet: '<sujet>', regles: ['R1'], line: `  aucune fiche dans ${dir} : les messages de la fiche sont mesurés avec « <sujet> » (7 caractères) et 1 règle ; un sujet réel plus long peut dépasser une limite du hook` };
   const sujet = fiches.map((f) => f.name).reduce((a, b) => (b.length > a.length ? b : a));
-  const n = Math.max(1, ...fiches.map((f) => hypotheses(f.doc).length));
-  return { sujet, regles: Array.from({ length: n }, (_, i) => `R${i + 1}`), line: `  fiche du lot pas encore écrite : mesure avec le sujet le plus long de ${dir} (${sujet}) et ${n} règle(s)` };
+  const n = Math.max(1, ...fiches.map((f) => costly(f.doc).length));
+  return { sujet, regles: Array.from({ length: n }, (_, i) => `R${i + 1}`), line: `  fiche du lot pas encore écrite : mesure avec le sujet le plus long de ${dir} (${sujet}) et ${n} règle(s) coûteuse(s) pour la réponse du lead` };
 }
 
 /**
  * Les messages de commit de plan que la vague écrirait pour ce lot, passés au hook commit-msg réel du dépôt : un refus se lit ici, avant une vague payante (L343).
  * Les messages de la fiche (hypothèses, mineurs de sa revue, réponse du lead) ne sont joués que pour un lot à étape spec, avec un sujet de longueur réelle (`ficheMeasure`) ;
- * les hypothèses ne sont notées que pour un lot `spec: true` sans écran (`settleHypotheses`).
+ * les hypothèses ne sont notées que pour un lot `spec: true` sans écran (`settleHypotheses`), la réponse du lead n'est commitée que pour une hypothèse coûteuse (`sourceAnsweredRules`).
  */
 function planMessageLines(repo: string, l: LotState, wave: string, dir: string): string[] {
   const template = readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit;
@@ -491,7 +493,7 @@ function planMessageLines(repo: string, l: LotState, wave: string, dir: string):
     actions.push(PLAN_ACTIONS.minors('la fiche'));
   }
   const planMessages = actions.map((action) => planCommitMessage(template, { lot: l.lot, action, wave }));
-  const messages = [...new Set(measure ? planMessages.concat(leadAnswerMessage(l.lot, measure.regles, wave)) : planMessages)];
+  const messages = [...new Set(measure?.regles.length ? planMessages.concat(leadAnswerMessage(template, l.lot, measure.regles, wave)) : planMessages)];
   const hook = commitMsgHook(repo);
   if (!hook) return template ? [`  messages de plan : « ${messages[0]} » (gabarit plan.commit ; aucun hook commit-msg dans ce dépôt)`] : [];
   const refused = messages.map((m) => ({ m, why: commitMsgRefusal(repo, m) })).filter((r) => r.why !== null);

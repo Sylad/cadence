@@ -173,9 +173,12 @@ function trackedPaths(s: Snapshot): string[] {
   return s.tracked.map((l) => l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, ''));
 }
 
+/** Le gabarit `plan.commit` du projet (L343), undefined sans. */
+const planTemplate = (c: LotCtx): string | undefined => readPlanConfig(join(c.lot.repo, 'cadence.yaml'), c.lot.repo)?.commit;
+
 /** Le message d'un commit de plan de la vague : le gabarit `plan.commit` du projet (L343), à défaut le message d'avant. */
 function planMessage(c: LotCtx, action: string): string {
-  return planCommitMessage(readPlanConfig(join(c.lot.repo, 'cadence.yaml'), c.lot.repo)?.commit, { lot: c.lot.lot, action, wave: c.wave.id });
+  return planCommitMessage(planTemplate(c), { lot: c.lot.lot, action, wave: c.wave.id });
 }
 
 /** Le contenu des fichiers du plan déjà modifiés, non commités, avant une écriture de cadence (null : absent du disque) : ce qu'un commit refusé remet (`commitPlan`). */
@@ -1532,7 +1535,7 @@ function sourceAnsweredRules(c: LotCtx): boolean {
     const ids = sourceRules(wd(c), fiche, l.specAskedRules, `${LEAD_SOURCE}, ${c.wave.today}, vague ${c.wave.id}`);
     if (!ids.length) return false;
     git(wd(c), 'add', '--', fiche);
-    git(wd(c), 'commit', '-q', '-m', leadAnswerMessage(l.lot, ids, c.wave.id), '--', fiche);
+    git(wd(c), 'commit', '-q', '-m', leadAnswerMessage(planTemplate(c), l.lot, ids, c.wave.id), '--', fiche);
     return false;
   } catch (e) {
     stop(c, 'handed-back', `réponse du lead non reportée dans la fiche ${fiche} : ${(e as Error).message.split('\n')[0]}`);

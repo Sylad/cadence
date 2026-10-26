@@ -8,6 +8,8 @@ import { tryGit } from './git.js';
 export const PLAN_COMMIT_WAVE = 'plan: {lot} {action} (orchestrate {vague})';
 /** Gabarit par défaut hors vague (`spec reseal`) : pas de vague à citer. */
 export const PLAN_COMMIT_PLAIN = 'plan: {lot} {action}';
+/** Gabarit par défaut du commit de la fiche sourcée par la réponse du lead : type `docs`, déjà conventionnel (L343). */
+export const LEAD_ANSWER_COMMIT = 'docs({lot}): {action} (orchestrate {vague})';
 
 /** Les mots que le gabarit `plan.commit` de cadence.yaml peut employer. */
 export const PLAN_COMMIT_FIELDS = ['lot', 'action', 'vague'] as const;
@@ -20,11 +22,13 @@ export const PLAN_ACTIONS = {
   reviewRecorded: 'revue de code enregistrée',
   reviewNoted: 'revue de code notée',
   resealed: (norm: string) => `test d'acceptation rescellé (${norm})`,
+  /** En minuscule : `subject-case` de config-conventional refuse une majuscule initiale (L343). */
+  leadAnswer: (ids: string[]) => `${ids.length > 1 ? 'règles' : 'règle'} ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead`,
 };
 
-/** Le message du commit de la fiche sourcée par la réponse du lead : sujet en minuscule, `subject-case` de config-conventional refuse une majuscule initiale (L343). */
-export function leadAnswerMessage(lot: string, ids: string[], wave: string): string {
-  return `docs(${lot}): ${ids.length > 1 ? 'règles' : 'règle'} ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead (orchestrate ${wave})`;
+/** Le message du commit de la fiche sourcée par la réponse du lead : le gabarit `plan.commit` du projet comme tout commit écrit par cadence, à défaut `docs(<lot>): …` (L343). */
+export function leadAnswerMessage(template: string | undefined, lot: string, ids: string[], wave: string): string {
+  return planCommitMessage(template ?? LEAD_ANSWER_COMMIT, { lot, action: PLAN_ACTIONS.leadAnswer(ids), wave });
 }
 
 /** Valide le gabarit `plan.commit` ; rend la raison du refus, null s'il est bon. */

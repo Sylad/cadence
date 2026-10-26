@@ -8,7 +8,7 @@ import { run as cadence } from '../src/cli.js';
 import { gitRepo, removeDryRunBriefs, tempDir } from './helpers.js';
 import { commitFile, git, harness, reviewReport, specReport, workReport, claudeOut, type Handler } from './orchestrate-harness.js';
 import { fake, planOf, run, setup, store, until } from './orchestrate-worktree-harness.js';
-import { ecritBack } from './spec-helpers.js';
+import { ecrit, ecritBack } from './spec-helpers.js';
 import { ecritAcceptation } from './accept-helpers.js';
 import { sealAcceptation } from '../src/orchestrate/accept.js';
 
@@ -140,8 +140,8 @@ describe('R5 — un refus du hook ne laisse pas le plan indexé, et le message d
     expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).toBe(lead); // la note du lead est là, les notes d'hypothèses de cadence n'y sont plus
   });
   it('R5 — le sujet de la réponse du lead commence en minuscule, comme l\'exige subject-case de config-conventional', () => {
-    expect(leadAnswerMessage('L1', ['R3'], 'w1')).toBe('docs(L1): règle R3 sourcée par la réponse du lead (orchestrate w1)');
-    expect(leadAnswerMessage('L1', ['R3', 'R5'], 'w1')).toBe('docs(L1): règles R3, R5 sourcées par la réponse du lead (orchestrate w1)');
+    expect(leadAnswerMessage(undefined, 'L1', ['R3'], 'w1')).toBe('docs(L1): règle R3 sourcée par la réponse du lead (orchestrate w1)');
+    expect(leadAnswerMessage(undefined, 'L1', ['R3', 'R5'], 'w1')).toBe('docs(L1): règles R3, R5 sourcées par la réponse du lead (orchestrate w1)');
   });
   it('R5 — le dry-run passe aussi le message de la réponse du lead au hook et nomme le refus', async () => {
     const { parent, repo } = setup([{ title: 'un', spec: true }]);
@@ -149,6 +149,7 @@ describe('R5 — un refus du hook ne laisse pas le plan indexé, et le message d
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'commit-msg'), '#!/bin/sh\nif head -n1 "$1" | grep -q "sourcée"; then echo "✖   subject must not be sentence-case [subject-case]" >&2; exit 1; fi\n');
     chmodSync(join(dir, 'commit-msg'), 0o755);
+    ecritFiche(repo, 'court', 'L1', ['R3'], ['R3']);
     const r = await run(parent, ['a:L1', '--dry-run'], fake());
     removeDryRunBriefs(r.out);
     expect(r.out).toMatch(/✗ message de plan refusé par le hook commit-msg : « docs\(L1\): règle R3 sourcée .*subject-case/);
@@ -210,37 +211,63 @@ function hookLongueur(repo: string): void {
   chmodSync(join(dir, 'commit-msg'), 0o755);
 }
 const SUJET_LONG = 'orchestrate-budget-correction-et-reprise'; // 40 caractères : « plan: L1 hypothèses de la fiche … notées (orchestrate 2026-10-04-1412) » en fait 109
-const ficheBack = (sujet: string, lot: string, hypotheses: string[]) => `sujet:\n  id: ${sujet}\n  lot: ${lot}\nregles:\n${hypotheses.map((id) => `  - id: ${id}\n    statut: hypothese\n    texte: x\n`).join('')}`;
-function ecritFiche(repo: string, sujet: string, lot: string, hypotheses: string[]): void {
+const COUT = 'Si faux, une migration du stockage serait à écrire.'; // un choix coûteux à défaire : la vague pose la question, la réponse du lead source la règle (L297)
+const ficheBack = (sujet: string, lot: string, hypotheses: string[], couteuses: string[]) =>
+  `sujet:\n  id: ${sujet}\n  lot: ${lot}\nregles:\n${hypotheses.map((id) => `  - id: ${id}\n    statut: hypothese\n    texte: x\n${couteuses.includes(id) ? `    si_faux: ${JSON.stringify(COUT)}\n` : ''}`).join('')}`;
+/** Une fiche du dossier des specs, commitée : `hypotheses` ses règles `hypothese`, `couteuses` celles d'entre elles que la réponse du lead sourcerait. */
+function ecritFiche(repo: string, sujet: string, lot: string, hypotheses: string[], couteuses: string[] = []): void {
   mkdirSync(join(repo, 'docs/specs', sujet), { recursive: true });
-  writeFileSync(join(repo, 'docs/specs', sujet, 'fiche.yaml'), ficheBack(sujet, lot, hypotheses));
+  writeFileSync(join(repo, 'docs/specs', sujet, 'fiche.yaml'), ficheBack(sujet, lot, hypotheses, couteuses));
   git(repo, 'add', '--', `docs/specs/${sujet}/fiche.yaml`);
   git(repo, 'commit', '-q', '-m', `docs(${lot}): fiche ${sujet}`);
 }
 
 describe('R6 — le dry-run mesure les messages de la fiche avec un sujet de longueur réelle, pas « <sujet> »', () => {
-  it('R6 — la fiche du lot est écrite : son sujet et ses hypothèses font le message des hypothèses et celui de la réponse du lead', async () => {
+  it('R6 — la fiche du lot est écrite : son sujet fait le message des hypothèses, ses hypothèses coûteuses celui de la réponse du lead', async () => {
     const { parent, repo } = setup([{ title: 'un', spec: true }]);
     hookLongueur(repo);
-    ecritFiche(repo, SUJET_LONG, 'L1', ['R1', 'R2']);
+    ecritFiche(repo, SUJET_LONG, 'L1', ['R1', 'R2'], ['R1']);
     const r = await run(parent, ['a:L1', '--dry-run'], fake());
     removeDryRunBriefs(r.out);
     expect(r.out).toMatch(new RegExp(`✗ message de plan refusé par le hook commit-msg : « plan: L1 hypothèses de la fiche ${SUJET_LONG} notées \\(orchestrate [^)]+\\) » — .*header-max-length`));
-    expect(r.out).toContain(`fiche du lot : docs/specs/${SUJET_LONG}/fiche.yaml (hypothèses R1, R2)`);
+    expect(r.out).toContain(`fiche du lot : docs/specs/${SUJET_LONG}/fiche.yaml (réponse du lead mesurée avec la règle coûteuse R1)`);
     expect(r.out).not.toContain('<sujet>');
-    // la réponse du lead est mesurée avec les hypothèses de la fiche, pas avec une règle R3 inventée
+    // la réponse du lead ne cite que les règles coûteuses, celles que la vague pose en question : ni R2 ni une règle R3 inventée
+    expect(r.out).not.toContain('R2 sourcées');
     expect(r.out).not.toContain('règle R3');
   });
-  it('R6 — la fiche du lot n\'est pas encore écrite : le sujet le plus long du dossier des fiches sert de mesure, et le dry-run le dit', async () => {
+  it('R6 — la fiche du lot est écrite sans hypothèse coûteuse : aucune réponse du lead à commiter, le dry-run ne la joue pas et le dit', async () => {
     const { parent, repo } = setup([{ title: 'un', spec: true }]);
     hookLongueur(repo);
-    ecritFiche(repo, 'court', 'L9', ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']); // 6 règles : « docs(L1): règles R1, …, R6 sourcées par la réponse du lead (orchestrate 2026-10-04-1412) » en fait 101
+    ecritFiche(repo, 'court', 'L1', ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13']); // 13 hypothèses, aucune coûteuse (perf-tableau-de-bord)
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).not.toContain('✗ message de plan');
+    expect(r.out).toMatch(/messages de plan : 5 message\(s\) acceptés/);
+    expect(r.out).toContain('fiche du lot : docs/specs/court/fiche.yaml (aucune hypothèse coûteuse : pas de réponse du lead à commiter)');
+  });
+  it('R6 — la fiche du lot n\'est pas encore écrite : le sujet le plus long du dossier et le plus d\'hypothèses coûteuses d\'une fiche servent de mesure, et le dry-run le dit', async () => {
+    const { parent, repo } = setup([{ title: 'un', spec: true }]);
+    hookLongueur(repo);
+    const six = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'];
+    ecritFiche(repo, 'court', 'L9', [...six, 'R7', 'R8'], six); // 6 coûteuses : « docs(L1): règles R1, …, R6 sourcées par la réponse du lead (orchestrate 2026-10-04-1412) » en fait 101
     ecritFiche(repo, SUJET_LONG, 'L8', ['R1']);
     const r = await run(parent, ['a:L1', '--dry-run'], fake());
     removeDryRunBriefs(r.out);
     expect(r.out).toMatch(new RegExp(`✗ message de plan refusé par le hook commit-msg : « plan: L1 hypothèses de la fiche ${SUJET_LONG} notées`));
     expect(r.out).toMatch(/✗ message de plan refusé par le hook commit-msg : « docs\(L1\): règles R1, R2, R3, R4, R5, R6 sourcées par la réponse du lead/);
-    expect(r.out).toContain(`fiche du lot pas encore écrite : mesure avec le sujet le plus long de docs/specs (${SUJET_LONG}) et 6 règle(s)`);
+    expect(r.out).not.toMatch(/R7, R8 sourcées/);
+    expect(r.out).toContain(`fiche du lot pas encore écrite : mesure avec le sujet le plus long de docs/specs (${SUJET_LONG}) et 6 règle(s) coûteuse(s) pour la réponse du lead`);
+  });
+  it('R6 — la fiche du lot n\'est pas encore écrite et aucune fiche du dossier ne porte d\'hypothèse coûteuse : la réponse du lead est mesurée avec 1 règle, pas avec toutes les hypothèses', async () => {
+    const { parent, repo } = setup([{ title: 'un', spec: true }]);
+    hookLongueur(repo);
+    ecritFiche(repo, 'court', 'L9', ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13']);
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).not.toContain('✗ message de plan');
+    expect(r.out).toMatch(/messages de plan : 6 message\(s\) acceptés/);
+    expect(r.out).toContain('fiche du lot pas encore écrite : mesure avec le sujet le plus long de docs/specs (court) et 1 règle(s) coûteuse(s) pour la réponse du lead');
   });
   it('R6 — un lot sans étape spec ne joue pas les messages de la fiche : un sujet long dans le dossier ne le fait pas refuser', async () => {
     const { parent, repo } = setup([{ title: 'un' }]);
@@ -259,5 +286,38 @@ describe('R6 — le dry-run mesure les messages de la fiche avec un sujet de lon
     removeDryRunBriefs(r.out);
     expect(r.out).not.toContain('✗ message de plan');
     expect(r.out).toContain('aucune fiche dans docs/specs : les messages de la fiche sont mesurés avec « <sujet> » (7 caractères) et 1 règle ; un sujet réel plus long peut dépasser une limite du hook');
+  });
+});
+
+describe('R7 — le commit de la réponse du lead porte aussi le gabarit plan.commit : le conseil du dry-run (régler plan.commit) vaut pour lui', () => {
+  it('R7 — le gabarit fait le sujet, l\'action est « règle(s) … sourcée(s) par la réponse du lead » ; sans gabarit, le défaut docs(<lot>) est inchangé', () => {
+    expect(leadAnswerMessage('chore({lot}): {action}', 'L1', ['R3', 'R5'], 'w1')).toBe('chore(L1): règles R3, R5 sourcées par la réponse du lead');
+    expect(leadAnswerMessage('chore({lot}): {action} (orchestrate {vague})', 'L1', ['R3'], 'w1')).toBe('chore(L1): règle R3 sourcée par la réponse du lead (orchestrate w1)');
+    expect(leadAnswerMessage(undefined, 'L1', ['R3'], 'w1')).toBe('docs(L1): règle R3 sourcée par la réponse du lead (orchestrate w1)');
+  });
+  it('R7 — la vague : la fiche sourcée par la réponse du lead est commitée avec le gabarit du projet', async () => {
+    const fiche = 'docs/specs/prochain-match/fiche.yaml';
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' as const }], script: { spec: [(call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd, { fiche: (d: any) => { d.regles[2].si_faux = COUT; } }) })), () => claudeOut(specReport({ fiche }))], implement: [impl], review: [ok] } });
+    writeFileSync(join(h.repo, 'cadence.yaml'), yaml('chore({lot}): plan {action}'));
+    const c = h.lot('L1', { visible: true, screen: 'page' as const });
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    c.lot.questions = [];
+    c.lot.pendingAnswer = 'confirmé, garder R3';
+    await runLot(c);
+    expect(git(h.repo, 'log', '--format=%s', '--', fiche).split('\n')[0]).toBe('chore(L1): plan règle R3 sourcée par la réponse du lead');
+  });
+  it('R7 — le dry-run joue la réponse du lead avec le gabarit : un gabarit sans vague fait accepter ce que le hook refusait', async () => {
+    const { parent, repo } = setup([{ title: 'un', spec: true }]);
+    hookLongueur(repo);
+    const six = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'];
+    ecritFiche(repo, SUJET_LONG, 'L1', six, six);
+    writeFileSync(join(repo, 'cadence.yaml'), `${readFileSync(join(repo, 'cadence.yaml'), 'utf8')}plan:\n  commit: 'docs({lot}): {action}'\n`);
+    git(repo, 'add', '--', 'cadence.yaml');
+    git(repo, 'commit', '-q', '-m', 'chore(L1): plan.commit');
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).not.toContain('✗ message de plan');
+    expect(r.out).toMatch(/messages de plan : 6 message\(s\) acceptés par le hook commit-msg du dépôt \(.*\) — gabarit plan.commit/);
   });
 });

@@ -154,12 +154,12 @@ plan:
   commit: 'chore({lot}): {action} (orchestrate {vague})'
 ```
 
-- `{lot}` is required (a commit must cite its lot); `{action}` is what was done (`démarré`, `revue de code enregistrée`, `revue de code notée`, `hypothèses de la fiche <sujet> notées`, `mineurs de la revue de <revue> notés`, `test d'acceptation rescellé (<test>)`);
+- `{lot}` is required (a commit must cite its lot); `{action}` is what was done (`démarré`, `revue de code enregistrée`, `revue de code notée`, `hypothèses de la fiche <sujet> notées`, `mineurs de la revue de <revue> notés`, `règles R1, R2 sourcées par la réponse du lead`, `test d'acceptation rescellé (<test>)`);
   `{vague}` is the wave id. A word between braces that is none of these, an empty template or one on several lines is refused when the config is read.
 - Outside a wave (`spec reseal`) there is no wave: the parenthesised group that holds `{vague}` is dropped, so the template above gives `chore(L17): test d'acceptation rescellé (…)`.
 - Absent, the subject is the one above, unchanged. The key needs `plan:` to be an object (`plan: .cadence/raf.yaml` as a plain path has nowhere to put it: write `plan: { path: …, commit: … }`).
-- The `test(<lot>): …`, `chore(<lot>): …` and `docs(<lot>): …` commits of the cycle (acceptation sealed, `vert: true` set, lead answer recorded in the fiche) and the work commits are already Conventional and are not templated.
-- `cadence orchestrate … --dry-run` runs every plan subject each lot would write through the repository's real `commit-msg` hook (found as git finds it: `core.hooksPath` and husky included), the sheet subjects measured with a subject of real length (the lot's sheet, or the longest of the folder), and names the one it would refuse — see [docs/orchestrate.md](orchestrate.md#the-subject-of-the-plan-commits-plancommit-l343).
+- The commit of the fiche sourced by the lead's answer takes the template too (its default, `docs(<lot>): règle R3 sourcée par la réponse du lead (orchestrate <wave>)`, is already Conventional but can exceed `header-max-length` with several rules and a wave id). The `test(<lot>): …` and `chore(<lot>): …` commits of the cycle (acceptation sealed, `vert: true` set) and the work commits are already Conventional and are not templated.
+- `cadence orchestrate … --dry-run` runs every plan subject each lot would write through the repository's real `commit-msg` hook (found as git finds it: `core.hooksPath` and husky included), the sheet subjects measured with a subject of real length (the lot's sheet, or the longest of the folder) and the lead's answer with the costly hypotheses it would source, and names the one it would refuse — see [docs/orchestrate.md](orchestrate.md#the-subject-of-the-plan-commits-plancommit-l343).
 
 ## Moving the plan: `raf migrate`
 

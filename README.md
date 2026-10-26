@@ -38,6 +38,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 - [docs/orchestrate.md](docs/orchestrate.md): waves of sessions and their budgets.
 - [docs/deliver.md](docs/deliver.md): wait for the CI, deploy, verify the effect.
 - [docs/spec.md](docs/spec.md): screen and back-end sheets.
+- [docs/ref.md](docs/ref.md): reference documents (specs, norms, mock-ups) and the coverage of their elements by the lots.
 - [docs/lead.md](docs/lead.md): the lead workflow.
 - [docs/overview.md](docs/overview.md): the longer introduction and the map of every page.
 - [docs/fonctionnement.md](docs/fonctionnement.md): how it all works, in four figures.

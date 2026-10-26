@@ -21,6 +21,9 @@ const DECIDED = /(décision|décid|tranch|valid|arbitr|demand|veut|voulu|exig|re
  */
 const PROGRAM_NOTE = /^(\[[^\]\n]{1,40}\] )?(Hypothèses \(fiche |Revue de [^\n]{1,60}? — mineur : |titre remplacé : |remis en attente(\s*:|$)|abandonné : )/;
 
+/** Une note que le programme écrit (`PROGRAM_NOTE`) ou posée sur une sous-tâche (`[L5/T2] …`) : ce n'est pas le lead qui l'a écrite sur le lot. */
+export const isProgramNote = (text: string): boolean => PROGRAM_NOTE.test(text) || /^\[[^\]\n]{1,40}\] /.test(text);
+
 const isDecision = (text: string): boolean => !PROGRAM_NOTE.test(text) && WHO.test(text) && DECIDED.test(text);
 
 /**

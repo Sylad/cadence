@@ -382,3 +382,47 @@ describe('cadence ref analyse en double lecture (L266)', () => {
     expect(existsSync(join(s.dir, 'lectures', 'b.json'))).toBe(true);
   });
 });
+
+describe('ids stables d\'une relecture de ref analyse (L367)', () => {
+  // « Intrus » s'insère en tête de la relecture : l'agent numérote par ordre, les ids glisseraient
+  const RELUE = [texte(1, 'Intrus', 1300), texte(2, 'Layers', 100), texte(3, 'Wind', 400), texte(4, 'Waves', 700), texte(5, 'Tides', 1000)];
+  const exclusions = [{ id: 'norme#texte-2', raison: 'décor' }];
+  const attendu = [['norme#texte-5', 'Intrus'], ['norme#texte-1', 'Layers'], ['norme#texte-2', 'Wind'], ['norme#texte-3', 'Waves'], ['norme#texte-4', 'Tides']];
+  const ecrireExclusions = (file: string) => writeFileSync(file, JSON.stringify({ ...lire(file), exclusions }));
+
+  it('R4 — la lecture unique relue (le défaut) garde les ids de la lecture précédente et ses exclusions : ref coverage lit ces ids', async () => {
+    const s = setup();
+    expect((await analyseAvec(s, [])).code).toBe(0);
+    ecrireExclusions(join(s.dir, 'lectures', 'a.json'));
+    s.env.FAKE_A = JSON.stringify(RELUE);
+    expect((await analyseAvec(s, [])).code).toBe(0);
+    const a = lire(join(s.dir, 'lectures', 'a.json'));
+    expect(a.elements.map((e: Obj) => [e.id, e.libelle])).toEqual(attendu);
+    expect(a.exclusions).toEqual(exclusions);
+    expect(checkInventaire(a)).toEqual([]);
+  });
+
+  it('R4 — la lecture unique relue après une double lecture reprend les ids de l\'inventaire que le passage supprime', async () => {
+    const s = setup();
+    expect((await analyse(s)).code).toBe(0);
+    ecrireExclusions(join(s.dir, 'inventaire.json'));
+    s.env.FAKE_A = JSON.stringify(RELUE);
+    expect((await analyseAvec(s, [])).code).toBe(0);
+    expect(existsSync(join(s.dir, 'inventaire.json'))).toBe(false);
+    const a = lire(join(s.dir, 'lectures', 'a.json'));
+    expect(a.elements.map((e: Obj) => [e.id, e.libelle])).toEqual(attendu);
+    expect(a.exclusions).toEqual(exclusions);
+  });
+
+  it('R4 — la double lecture relue reprend les ids et les exclusions de l\'inventaire précédent', async () => {
+    const s = setup();
+    expect((await analyse(s)).code).toBe(0);
+    ecrireExclusions(join(s.dir, 'inventaire.json'));
+    s.env.FAKE_A = JSON.stringify(RELUE);
+    s.env.FAKE_B = JSON.stringify(RELUE);
+    expect((await analyse(s)).code).toBe(0);
+    const inv = lire(join(s.dir, 'inventaire.json'));
+    expect(inv.elements.map((e: Obj) => [e.id, e.libelle])).toEqual(attendu);
+    expect(inv.exclusions).toEqual(exclusions);
+  });
+});

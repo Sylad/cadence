@@ -7,7 +7,7 @@ tables drawn as pictures, message templates, figures of a norm (WMO, ICAO…). `
 turns such a document into files a session can read without losing the pictures. The whole
 design is in
 [`docs/superpowers/specs/2026-10-23-ref-documents-de-reference-design.md`](superpowers/specs/2026-10-23-ref-documents-de-reference-design.md)
-(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) **`cadence ref check`** with the inventory schema (lot 3 of 10), **`cadence ref eval`** (lot 4 of 10, with the synthetic corpus `cadence ref corpus`) **`cadence ref analyse`** (lot 5 of 10: the `reference-analyst` agent, one single reading) and **`cadence ref diff`** with the double reading (lot 6 of 10). **The series stops at lot 6**: the stopping point of the double reading (hypothesis H1) was not met, so lots 7 to 10 are dropped and the double reading stays an option, `--double` ([measurement and conclusion](mesures/ref-double-lecture-2026-10-25.md)).
+(issue #14); this page describes what is delivered so far: **`cadence ref add`** (lot 1 of 10), **`cadence ref measure`** (lot 2 of 10) **`cadence ref check`** with the inventory schema (lot 3 of 10), **`cadence ref coverage`** (the coverage of the document by the lots of the plan), **`cadence ref eval`** (lot 4 of 10, with the synthetic corpus `cadence ref corpus`) **`cadence ref analyse`** (lot 5 of 10: the `reference-analyst` agent, one single reading) and **`cadence ref diff`** with the double reading (lot 6 of 10). **The series stops at lot 6**: the stopping point of the double reading (hypothesis H1) was not met, so lots 7 to 10 are dropped and the double reading stays an option, `--double` ([measurement and conclusion](mesures/ref-double-lecture-2026-10-25.md)).
 
 ## `cadence ref add <document.pdf> [--sections 3-5,9] [--slug name]`
 
@@ -290,7 +290,7 @@ text of a `texte`, role and content of a `composant`, figure of a `lien`…), si
 | **silence** | a question, in either reading | gathered (one question once), never sent to a third look and not counted below: a silence is not a reading that someone else contradicts |
 
 More than **30 %** of the paired-or-single elements unpaired (silences left out, `--seuil` changes it, in percent) means the two readings do not describe the same document: no reconciliation, the question goes to the lead (exit 1, nothing written).
-The ids of the result are renumbered `<slug>#<type>-<n>` (reading A in its order, then what B alone carries) and the references (`composant.ecran`, `etat.cible`, `statut.couvre`) follow; an element that referred to a discarded one is discarded with it, **except a paired element** (both readings carry it): it holds while one of its two versions points to a kept element, and is then `incertain` with the cause when only one version does; it is discarded only when both versions point to discarded elements (see `ref analyse`, « Reconciliation »).
+The ids of the result are renumbered `<slug>#<type>-<n>` (reading A in its order, then what B alone carries), except that an element read again keeps the id it had in the inventory `--out` replaces (see `ref coverage`) and the references (`composant.ecran`, `etat.cible`, `statut.couvre`) follow; an element that referred to a discarded one is discarded with it, **except a paired element** (both readings carry it): it holds while one of its two versions points to a kept element, and is then `incertain` with the cause when only one version does; it is discarded only when both versions point to discarded elements (see `ref analyse`, « Reconciliation »).
 
 ```
 $ cadence ref diff a.json b.json --out inventaire.json
@@ -334,7 +334,7 @@ and output tokens of the session (the count of the orchestrate budget; cache rea
   in the list counts as **no answer**: the element stays `incertain` (`troisième regard sans réponse`), never a `lu` by default. No element carried by one reading only: no third look, no session;
 - the **silences** of both readings are gathered, once per question, and never sent to a third look.
 
-The result is **`<references.dir>/<slug>/inventaire.json`**: `genre: "inventaire"`, valid for `ref check`, ids renumbered, `usage` = `{ tokens, lectures: { a, b, regard } }` (the total of the three sessions and each one's tokens and model, what `ref eval` reads for the tokens per page)
+The result is **`<references.dir>/<slug>/inventaire.json`**: `genre: "inventaire"`, valid for `ref check`, ids renumbered (an element already in the previous `inventaire.json` keeps its id), `usage` = `{ tokens, lectures: { a, b, regard } }` (the total of the three sessions and each one's tokens and model, what `ref eval` reads for the tokens per page)
 and `reconciliation` = the counts, the unpaired ratio and, for each element the third look ruled on, `{ lecture, id (in its reading), verdict, raison }`.
 
 A session cut by a signal with nothing written is started again once in a fresh session (like a review); cut twice, it is a failure (exit 2). Without `--double` the single reading is written to `lectures/a.json` and checked as above; `--model-b` and `--seuil` are refused then (exit 2).
@@ -371,6 +371,64 @@ the same number for a corpus case read whole. Without `--double` the output is t
 
 `docs/mesures/ref-lecture-unique-2026-10-24.md` states what the single reading is measured on and with which commands (recall, false « read », tokens per page against the corpus of `ref corpus`, the declared ceiling), and what was measured.
 The double reading is measured the same way, `ref eval` on `inventaire.json` instead of `lectures/a.json`, and compared with that baseline: `docs/mesures/ref-double-lecture-2026-10-25.md` (hypothesis H1, the stopping point of lot 6: not met, which is why `--double` is an option).
+
+## `cadence ref coverage <inventaire.json>`
+
+Answers one question without a model: **what of the reference document is covered by a lot?** (L367, GitHub issue #19). It takes the
+inventory of `ref analyse --double` / `ref diff --out`, or the reading `lectures/a.json` that `ref analyse` writes by default (a reading carries
+the same elements and ids). Each element has an **id** `<slug>#<type>-<n>`, and the id **stays the element's address from one reading of the
+document to the next**: `ref diff --out` reads the inventory it replaces, and every `ref analyse` (single reading or `--double`) reads what it replaces
+(the `inventaire.json` of the document, else its `lectures/a.json`); they give an element read again (same type, same page, same identity, the zone that overlaps most)
+its old id, the references (`ecran`, `cible`, `couvre`) following; a new element takes a number above the highest of its type, a number of a vanished
+element is never reused, so a lot that quotes `doc#texte-3` keeps pointing at the same element when one is inserted before it. The written `exclusions`
+come along. (`ref diff` on two readings that were never reconciled before, or a `ref analyse` of a document with no valid previous file, numbers by order.) `ref check` refuses two elements with the same id, and
+`source` says the page and zone of the element. A lot **covers** an element by quoting its id in its title, its goal (`goal:`) or a note
+the lead wrote on it; the sub-tasks' notes and the notes the program writes itself (title replaced, minors of a review, hypotheses, put back on hold) do not count.
+
+```
+$ cadence ref coverage inventaire.json
+✗ exemple#texte-3 (texte p.1 zone 120,600,240,64 « Valider ») : aucun lot, aucune exclusion écrite
+✗ exemple#composant-1 (composant p.2 zone 80,40,300,60 « Layers ») : lot non fait (L12 doing)
+✗ exemple#texte-5 (texte p.1 zone 10,10,90,20 « Aide ») : justifié non pris par la fiche de L12 : service absent, sans exclusion écrite
+3 élément(s) sans lot fait ni exclusion écrite sur 11
+$ echo $?
+1
+```
+
+An element is **covered** when a lot **done** quotes its id and its sheet does not justify it as not taken, or when the file carries a **written exclusion** with its reason:
+
+```json
+"exclusions": [{ "id": "exemple#texte-7", "raison": "décor du document, pas du produit" }]
+```
+
+A line `<id> : <reason>` in `sujet.perimetre.hors_perimetre` of the sheet of a lot (`docs/specs/<sujet>/fiche.yaml`, `sujet.lot`) is how the spec-writer justifies an element it
+does not take: that lot does not cover it, it stays a gap until the lead writes its exclusion or another done lot quotes it. (A justification written
+only in the report, or in a sheet with no back part, is not read: the lead removes the id from the lot or writes the exclusion.)
+
+`exclusions` is a key of the root of the file (`ref check` ignores it, as it ignores any unknown key). An exclusion without a
+reason, or of an id that is not in the file, excludes nothing and is listed (`✗ exclusions[0].raison : …`). A lot `dropped` covers
+nothing, a lot `todo` or `doing` is named in the line of the element but does not cover it. **The exclusions are written in a file that `ref analyse`
+replaces** (`references.dir` is outside the repository): before it removes or rewrites `inventaire.json`, `lectures/a.json` or `lectures/b.json`, `ref analyse` copies the
+`exclusions` they carry into `exclusions-<date>.json` next to them and says so (`attention : …`); `ref analyse --double` and `ref diff --out` carry those of the inventory they replace into the new one (an id that no
+longer exists is then listed by this command).
+
+Exit codes: **0** every element is covered (`couverture complète : N éléments (n par un lot fait, k exclus avec leur raison)`), **1** at
+least one is not (the `✗` lines, then the count, **on the standard output**), **2** wrong call, unreadable file, a file that does not pass `ref check` or no plan. It launches no model and no system tool, reads the plan like `raf` does (`cadence.yaml` `plan:`) and the sheets under `orchestrate.spec.dir`, and writes nothing.
+
+### Planning the coverage: the `reference-planner` agent
+
+The lead runs `cadence ref coverage` to see the gaps, then has the [`reference-planner`](../agents/reference-planner.md) agent read the inventory
+and the plan. It **only proposes**: lots that cite the ids they cover, each **feasible** or **blocked** (`bloque_par` names the missing datum or
+service, never « missing information »), what each depends on, the elements it would exclude and the silences that are questions for a human. It creates
+no lot and writes no file; the lead creates the lots (`raf add "… exemple#texte-3 …"`) and writes the exclusions. Run
+`cadence ref coverage` again until it exits 0.
+
+### Briefs of a wave
+
+When the title, the goal or a note of a lot quotes ids of an inventory, `cadence orchestrate` puts them in two briefs (and in `--dry-run`): the
+**spec-writer** takes each into its sheet (the field, rule or state that shows it quotes the id in its `source`) and **justifies each element it does not
+take** (`<id> : <reason>` under « choix » of its report, and in `perimetre.hors_perimetre` when the sheet has a back part); the **ux-reviewer**
+checks each of them on the finished screen and reports a missing or different one as a finding naming its id. A small visible lot has no `ux` pass: its single `review-small` pass carries the same instruction and checks the ids on the finished screen. A lot that quotes no id has the same briefs as before.
 
 ## `cadence ref corpus <dossier> [--sans-rendu]`
 

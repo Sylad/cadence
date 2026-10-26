@@ -31,6 +31,7 @@ import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRu
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedEntries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, redAcceptations, resealAcceptation, resealForGreen, runAcceptation, setVert } from './orchestrate/accept.js';
 import { refCommand } from './ref/command.js';
+import { coverageCommand } from './ref/coverage.js';
 import { release } from './release.js';
 import { applyMigration, describeMigration, planMigration, unhandledError } from './migrate.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
@@ -88,6 +89,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   cadence ref diff <lecture-a.json> <lecture-b.json> [--out inventaire.json] [--seuil 30]   réconcilie deux lectures du même document (même slug et même empreinte) : concordant → un élément lu ou mesuré, divergent → incertain avec les deux versions, seul (une lecture) → incertain en attente du troisième regard ; silences réunis ; au-delà de 30 % d'éléments non appariés (--seuil, en pour cent) code 1 et rien d'écrit ; --out écrit l'inventaire
   cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]   mesure une zone d'une page rendue (pixels de la page) : couleurs (point, moyenne, dominantes), contraste WCAG 2.2, boîtes, mots OCR tesseract et taille de police estimée ; valeurs ramenées à 1440 px de large, tolérance déclarée
   cadence ref check <inventaire.json | lecture.json>   valide un inventaire ou une lecture (schéma version 1, modèle templates/inventaire.json) : une ligne « ✗ chemin : raison » par écart puis « N écart(s) » sur la sortie standard (code 1), le résumé par type sinon (code 0) ; fichier absent, vide ou illisible : code 2 ; n'appelle aucun outil système
+  cadence ref coverage <inventaire.json>   couverture d'un document de référence, sans modèle : les éléments qu'aucun lot fait ne couvre (lot qui cite l'id) et qu'aucune exclusion écrite avec sa raison (clé « exclusions » de l'inventaire) ne justifie, une ligne ✗ chacun ; code 1 s'il en reste, 0 sinon, 2 pour un appel mal formé ou un fichier qui n'est pas un inventaire valide
   cadence ref eval <attendu.json | dossier> <lecture.json | dossier> [--json]   note une lecture contre l'inventaire attendu (vérité connue) : rappel et précision par type, faux lu (éléments sûrs et faux), pièges trouvés, tokens par page (usage.tokens de la lecture) ; lecture d'un autre document refusée (code 2) ; sur dossiers, un cas par sous-dossier (attendu.json / lecture.json)
   cadence ref corpus <dossier> [--sans-rendu]   écrit le corpus synthétique à vérité connue (7 pièges : texte ambigu levé par une figure, figure qui contredit, table en image, gabarit BUFR, contrôle translucide, page Proposal, scan bruité) : par cas document.html et attendu.json, puis document.pdf et page-<n>.png (1700×2200) rendus par Playwright (CADENCE_PLAYWRIGHT = dossier du paquet) ; dossier existant ou Playwright introuvable : code 2
   cadence release patch|minor|major [--dry-run]   prépare le commit de version (package.json, package-lock.json, plugin.json, marketplace.json, CHANGELOG.md) sans commiter ni publier ; imprime les étapes du lead et vérifie docs/whats-new.md : refus sur un arbre sale, un [Unreleased] vide ou une version déjà taguée
@@ -276,7 +278,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   }
   if (command === 'corrections') return corrections(rest, values, io);
   if (command === 'perf') return perf(rest, values, today, io);
-  if (command === 'ref') return refCommand(rest, values, root, io);
+  if (command === 'ref' && rest[0] !== 'coverage') return refCommand(rest, values, root, io);
   // Prépare le commit de version : écrit les fichiers de version, ne commite ni ne publie rien (L341).
   if (command === 'release') return release(rest, !!values['dry-run'], root, today, io.out);
   // Déplacer le plan ne lit pas le plan : pas d'avertissement « ancien emplacement » (L284).
@@ -307,6 +309,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const planPath = resolve(io.cwd, values.file ?? io.env.RAF_FILE ?? (planConfig?.path !== undefined ? resolve(root, planConfig.path) : fallback!.path));
   if (fallback?.legacy && !installing) (io.notice ?? io.err)(legacyPlanLine(root, fallback.legacy));
   const loadPlan = () => Plan.load(planPath, { ...planConfig?.settings, config: configPath });
+  // `ref coverage` lit le plan (les lots faits qui citent les éléments) : il passe après le choix du plan, les autres `ref` n'y touchent pas (L367).
+  if (command === 'ref') return coverageCommand(rest.slice(1), loadPlan, io, { repo: root, specDir: readOrchestrateConfig(configPath).spec.dir });
   const newsDir = resolve(io.cwd, values.dir ?? join(root, 'docs/nouveautes'));
   // Limite DÉCLARÉE (news.publicTitleMax) : sans clé, seul « raf check » avertit ; avec, la pose d'un titre public est refusée.
   const refuseLongTitle = (text: string, hint = '') => {

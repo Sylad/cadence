@@ -1,11 +1,11 @@
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PACKAGE_ROOT } from '../orchestrate/snapshot.js';
 import type { AgentDef, ClaudeFn, Model } from '../orchestrate/launch.js';
 import { RafError } from '../plan.js';
 import { add, type AddOptions } from './add.js';
 import { checkInventaire, readInventaire } from './check.js';
-import { assembler, parseSeuil, reconcilier, type Reconciliation } from './diff.js';
+import { assembler, parseSeuil, precedentDe, reconcilier, reprendreIds, type Reconciliation } from './diff.js';
 import { troisiemeRegard } from './regard.js';
 import { sessionDeRef } from './session.js';
 
@@ -86,6 +86,8 @@ interface Contexte {
   docDir: string;
   doc: { slug: string; sha256: string };
   pages: number[];
+  /** L'inventaire ou la lecture A que ce passage remplace, du même document : les ids de ses éléments relus sont gardés (lu avant toute suppression). */
+  precedent?: Obj;
 }
 type Lue = { kind: 'ok'; lecture: Obj; file: string; usage: { tokens: number; modele: Model; session: string }; questions: string[] } | { kind: 'quota'; message: string } | { kind: 'refus'; problems: string[] };
 
@@ -118,6 +120,7 @@ async function lireUne(c: Contexte, nom: Nom, model: Model): Promise<Lue> {
   const schema = checkInventaire(lecture);
   const problems = schema.length > 0 ? schema : ecartsDeLecture(lecture, c.doc);
   if (problems.length > 0) return { kind: 'refus', problems };
+  if (nom === 'a') reprendreIds(lecture, c.precedent); // la lecture A porte les ids que les lots citent ; B est réconciliée et renumérotée par `assembler`
   const usage = { tokens: r.tokens, modele: model, session: r.session };
   lecture.usage = usage;
   writeFileSync(file, `${JSON.stringify(lecture, null, 2)}\n`);
@@ -126,6 +129,30 @@ async function lireUne(c: Contexte, nom: Nom, model: Model): Promise<Lue> {
 }
 
 const confiancesDe = (lecture: Obj): string => ['mesure', 'lu', 'incertain'].map((c) => [c, (lecture.elements as { confiance: string }[]).filter((e) => e.confiance === c).length] as const).filter(([, n]) => n > 0).map(([c, n]) => `${c} : ${n}`).join(', ');
+
+/** Les fichiers d'un document que ce passage supprime ou réécrit, et où le lead a pu écrire ses `exclusions` (relatifs au dossier du document). */
+const FICHIERS_REMPLACES = ['inventaire.json', 'lectures/a.json', 'lectures/b.json'];
+
+/**
+ * Les `exclusions` écrites à la main dans les fichiers que ce passage va remplacer sont gardées à côté (`exclusions-<date>.json`, une clé par fichier) et
+ * dites au lead : `references.dir` est hors du dépôt, rien d'autre ne les retrouverait. Sans exclusion écrite, rien n'est écrit ni dit.
+ */
+function garderExclusions(docDir: string, now: Date, out: (line: string) => void): void {
+  const gardees: Record<string, unknown[]> = {};
+  for (const nom of FICHIERS_REMPLACES) {
+    try {
+      const x = (JSON.parse(readFileSync(join(docDir, nom), 'utf8')) as { exclusions?: unknown }).exclusions;
+      if (Array.isArray(x) && x.length > 0) gardees[nom] = x;
+    } catch {
+      // absent ou illisible : il n'y a rien à garder
+    }
+  }
+  const noms = Object.keys(gardees);
+  if (noms.length === 0) return;
+  const file = join(docDir, `exclusions-${now.toISOString().replace(/[:.]/g, '-')}.json`);
+  writeFileSync(file, `${JSON.stringify(gardees, null, 2)}\n`);
+  out(`attention : ${Object.values(gardees).reduce((n, x) => n + x.length, 0)} exclusion(s) écrite(s) dans ${noms.join(', ')}, remplacé(s) par ce passage : gardée(s) dans ${file}`);
+}
 
 /**
  * `cadence ref analyse` : la chaîne — add, puis UNE lecture (une session de l'agent `reference-analyst`, `lectures/a.json`) ; avec `--double`, deux lectures
@@ -145,12 +172,16 @@ export async function analyse(o: AnalyseOptions): Promise<number> {
   const sections = `\n  choisir les pages à lire : cadence ref analyse ${o.document} --slug ${slug} --sections 3-12`;
   if (pages.length === 0) throw new RafError(`ref analyse : aucune page rendue : rien à lire${sections}`);
   if (pages.length > LECTURE_PAGES_MAX) throw new RafError(`ref analyse : ${pages.length} pages ${o.sections === undefined ? 'rendues' : 'à lire (--sections et les figures qu\'elles citent)'}, plafond d'une lecture : ${LECTURE_PAGES_MAX} pages${sections}`);
-  const c: Contexte = { o, slug, docDir, doc, pages };
+  // avant de supprimer ou de réécrire quoi que ce soit : l'inventaire, sinon la lecture A du passage précédent, donne ses ids à celui-ci
+  const precedent = precedentDe(join(docDir, 'inventaire.json'), join(docDir, 'lectures', 'a.json'));
+  const c: Contexte = { o, slug, docDir, doc, pages, precedent };
   const refuse = (problems: string[], prefixe = ''): number => {
     for (const p of problems) o.out(`✗ ${prefixe}${p}`);
     o.out(`${problems.length} écart(s)`);
     return 1;
   };
+
+  garderExclusions(docDir, o.now, o.out);
 
   if (!o.double) {
     // les fichiers d'une double lecture précédente ne passent pas pour ceux de ce passage : leur `usage.lectures.a` ne serait plus celui de `a.json`
@@ -208,7 +239,7 @@ export async function analyse(o: AnalyseOptions): Promise<number> {
     seuls.forEach((item, i) => (item.decision = r.decisions[i]));
     regard = r;
   }
-  const inv = assembler(la.lecture, lb.lecture, rec, regard !== undefined);
+  const inv = assembler(la.lecture, lb.lecture, rec, regard !== undefined, precedent);
   if (inv.elements.length === 0) {
     // tout ce que les lectures portent n'était porté que par une seule d'entre elles et le troisième regard l'a écarté : rien à écrire, ce n'est pas un défaut de cadence
     o.out(`${slug} : double lecture (A ${model}, B ${modelB}) — ${pagesLues(pages.length)} (plafond d'une lecture : ${LECTURE_PAGES_MAX})`);

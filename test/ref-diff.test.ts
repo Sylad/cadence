@@ -323,4 +323,50 @@ describe('cadence ref diff <a> <b> (L266)', () => {
     expect(await run(['ref', 'diff', join(faux, 'a.json')], { cwd: faux, env: process.env, out: () => undefined, err: (l) => err.push(l), now: () => new Date() })).toBe(2);
     expect(err.join('\n')).toContain('usage : cadence ref diff');
   });
+
+  it('R16 (L367) — --out sur un inventaire valide déjà écrit : un élément relu garde son id, un élément inséré prend un numéro neuf et les exclusions écrites passent dans le nouvel inventaire', async () => {
+    const base = setup(
+      lecture([texte(1, 'Layers', 100), texte(2, 'Valider', 400), texte(3, 'Annuler', 700)]),
+      lecture([texte(1, 'Layers', 100), texte(2, 'Valider', 400), texte(3, 'Annuler', 700)]),
+    );
+    const out = join(base, 'inventaire.json');
+    expect((await diff(base, '--out', out)).code).toBe(0);
+    const exclusions = [{ id: 'doc#texte-3', raison: 'décor' }];
+    writeFileSync(out, JSON.stringify({ ...JSON.parse(readFileSync(out, 'utf8')), exclusions }));
+    // « Intrus » s'insère en tête : la numérotation par ordre ferait glisser « Valider » et « Annuler »
+    const intrus = texte(1, 'Intrus', 1300);
+    for (const [nom, rest] of [['a.json', [texte(2, 'Layers', 100), texte(3, 'Valider', 400), texte(4, 'Annuler', 700)]], ['b.json', [texte(2, 'Layers', 100), texte(3, 'Valider', 400), texte(4, 'Annuler', 700)]]] as const) {
+      writeFileSync(join(base, nom), JSON.stringify(lecture([intrus, ...rest])));
+    }
+    expect((await diff(base, '--out', out)).code).toBe(0);
+    const inv = JSON.parse(readFileSync(out, 'utf8'));
+    expect(inv.elements.map((e: Obj) => [e.id, e.libelle])).toEqual([['doc#texte-4', 'Intrus'], ['doc#texte-1', 'Layers'], ['doc#texte-2', 'Valider'], ['doc#texte-3', 'Annuler']]);
+    expect(inv.exclusions).toEqual(exclusions);
+  });
+});
+
+describe('ids stables d\'un inventaire relu (L367)', () => {
+  const lire = (elements: Obj[]) => lecture(elements);
+  const precedent = (elements: Obj[], o: Obj = {}): Obj => ({ version: 1, genre: 'inventaire', document: { slug: 'doc', sha256: SHA }, elements, ...o });
+  it('R1 — un élément relu garde l\'id de l\'inventaire précédent, un élément inséré avant prend un numéro neuf et aucun numéro n\'est réutilisé', () => {
+    const avant = precedent([texte(1, 'Layers', 100), texte(2, 'Valider', 400), texte(3, 'Annuler', 700)]);
+    // « Intrus » s'insère avant « Valider » et « Layers » a disparu : la numérotation par ordre glisserait
+    const a = lire([texte(1, 'Intrus', 50, { source: { page: 1, zone: zone(50) } }), texte(2, 'Valider', 400), texte(3, 'Annuler', 700)]);
+    const b = lire([texte(4, 'Intrus', 51), texte(5, 'Valider', 401), texte(6, 'Annuler', 701)]);
+    const inv = assembler(a, b, reconcilier(a, b), false, avant);
+    expect(inv.elements.map((e: Obj) => [e.id, e.libelle])).toEqual([['doc#texte-4', 'Intrus'], ['doc#texte-2', 'Valider'], ['doc#texte-3', 'Annuler']]);
+    expect(checkInventaire(inv)).toEqual([]);
+  });
+  it('R1 — sans inventaire précédent, ou d\'un autre document, la numérotation est celle de l\'ordre', () => {
+    const a = lire([texte(1, 'Layers', 100), texte(2, 'Wind', 400)]);
+    const b = lire([texte(7, 'Wind', 402), texte(9, 'Layers', 101)]);
+    expect(ids(assembler(a, b, reconcilier(a, b), false, precedent([texte(5, 'Wind', 400)], { document: { slug: 'autre', sha256: SHA } })))).toEqual(['doc#texte-1', 'doc#texte-2']);
+  });
+  it('R3 — les exclusions écrites de l\'inventaire précédent passent dans le nouveau', () => {
+    const a = lire([texte(1, 'Layers', 100)]);
+    const b = lire([texte(4, 'Layers', 101)]);
+    const exclusions = [{ id: 'doc#texte-1', raison: 'décor' }];
+    expect(assembler(a, b, reconcilier(a, b), false, precedent([texte(1, 'Layers', 100)], { exclusions })).exclusions).toEqual(exclusions);
+    expect(assembler(a, b, reconcilier(a, b)).exclusions).toBeUndefined();
+  });
 });

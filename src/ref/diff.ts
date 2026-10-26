@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { RafError } from '../plan.js';
 import { TYPES, checkInventaire, readInventaire } from './check.js';
 import { affirmation, identite } from './evaluate.js';
@@ -155,13 +155,16 @@ function confianceConcordant(ea: Obj, eb: Obj): { confiance: string; cause?: str
 }
 
 /**
- * L'inventaire réconcilié (genre « inventaire »), ids renumérotés `<slug>#<type>-<n>` et renvois suivis. Un divergent est `incertain` avec les deux
+ * L'inventaire réconcilié (genre « inventaire »), ids `<slug>#<type>-<n>` (renumérotés, sauf pour un élément de `precedent`) et renvois suivis. Un divergent est `incertain` avec les deux
  * versions ; un seul écarté par le troisième regard disparaît (avec ce qui ne tient plus sans lui), un seul confirmé garde sa confiance (un doute
  * reste un doute), un seul sans décision reste `incertain` : `regard` dit si le troisième regard a eu lieu (sa cause le dit).
  * Un élément apparié tient tant que l'une de ses deux versions renvoie à des éléments gardés (la lecture A d'abord) : quand l'autre version renvoyait à un
  * élément écarté, il est gardé, rattaché d'après la version qui tient, et `incertain` avec la cause du rattachement ; il disparaît quand aucune ne tient.
+ * `precedent` : l'inventaire que ce passage remplace, du même document. Un élément relu (même type, même page, même identité, zone qui recouvre le plus)
+ * y garde son id ; un élément neuf prend un numéro au-dessus du plus grand de son type, jamais celui d'un élément disparu : un lot qui cite un id
+ * continue de viser le même élément, et les `exclusions` écrites passent dans le nouvel inventaire.
  */
-export function assembler(a: Obj, b: Obj, rec: Reconciliation, regard = false): Obj {
+export function assembler(a: Obj, b: Obj, rec: Reconciliation, regard = false, precedent?: Obj): Obj {
   /** `version` : la lecture dont les renvois sont suivis (la lecture A d'abord) ; absente quand l'élément disparaît. */
   type Entree = { item: Item; supprimee: boolean; version?: 'a' | 'b' };
   const entrees: Entree[] = rec.items.map((item) => ({ item, supprimee: item.statut === 'seul' && item.decision?.verdict === 'ecarte' }));
@@ -197,15 +200,7 @@ export function assembler(a: Obj, b: Obj, rec: Reconciliation, regard = false): 
       } else en.version = v;
     }
   }
-  const compteur = new Map<string, number>();
-  const nouvelId = new Map<Entree, string>();
-  for (const en of entrees) {
-    if (en.supprimee) continue;
-    const type = en.item.element.type as string;
-    const n = (compteur.get(type) ?? 0) + 1;
-    compteur.set(type, n);
-    nouvelId.set(en, `${a.document.slug}#${type}-${n}`);
-  }
+  const nouvelId = idsStables(entrees, a, b, precedent);
   const elements = entrees.filter((en) => !en.supprimee).map((en) => {
     const { item } = en;
     const v = en.version!;
@@ -240,7 +235,44 @@ export function assembler(a: Obj, b: Obj, rec: Reconciliation, regard = false): 
     }
     return e;
   });
-  return { version: 1, genre: 'inventaire', document: { slug: a.document.slug, sha256: a.document.sha256 }, elements };
+  const exclusions = memeDocument(precedent, a) ? precedent!.exclusions : undefined;
+  return { version: 1, genre: 'inventaire', document: { slug: a.document.slug, sha256: a.document.sha256 }, elements, ...(exclusions !== undefined ? { exclusions } : {}) };
+}
+
+const memeDocument = (precedent: Obj | undefined, a: Obj): boolean => (precedent?.genre === 'inventaire' || precedent?.genre === 'lecture') && precedent.document?.slug === a.document.slug && Array.isArray(precedent.elements);
+
+/** Les ids du nouvel inventaire : ceux de `precedent` pour les éléments relus, des numéros neufs pour les autres (ordre de l'inventaire, numérotation par type). */
+function idsStables<E extends { item: Item; supprimee: boolean }>(entrees: E[], a: Obj, b: Obj, precedent: Obj | undefined): Map<E, string> {
+  const slug = a.document.slug as string;
+  const anciens: Obj[] = memeDocument(precedent, a) ? (precedent!.elements as Obj[]) : [];
+  const parAncien = new Map<string, Obj>(anciens.map((e) => [e.id, e]));
+  const parA = new Map<string, Obj>((a.elements as Obj[]).map((e) => [e.id, e]));
+  const parB = new Map<string, Obj>((b.elements as Obj[]).map((e) => [e.id, e]));
+  const reprise = new Set<Obj>();
+  const nouvelId = new Map<E, string>();
+  for (const en of entrees.filter((x) => !x.supprimee)) {
+    const e = en.item.element;
+    const par = en.item.a ? parA : parB;
+    const libres = anciens.filter((p) => !reprise.has(p) && p.type === e.type && p.source?.page === e.source?.page && identite(p, parAncien) === identite(e, par));
+    const ancien = libres.reduce<Obj | undefined>((best, c) => (best === undefined || recouvrement(e, c) > recouvrement(e, best) ? c : best), undefined);
+    if (ancien) {
+      reprise.add(ancien);
+      nouvelId.set(en, ancien.id);
+    }
+  }
+  const compteur = new Map<string, number>();
+  for (const e of anciens) {
+    const n = Number(String(e.id).slice(String(e.id).lastIndexOf('-') + 1));
+    compteur.set(e.type, Math.max(compteur.get(e.type) ?? 0, Number.isInteger(n) ? n : 0));
+  }
+  for (const en of entrees) {
+    if (en.supprimee || nouvelId.has(en)) continue;
+    const type = en.item.element.type as string;
+    const n = (compteur.get(type) ?? 0) + 1;
+    compteur.set(type, n);
+    nouvelId.set(en, `${slug}#${type}-${n}`);
+  }
+  return nouvelId;
 }
 
 function lireLecture(path: string): Obj {
@@ -256,6 +288,52 @@ export function parseSeuil(text: string | undefined, commande: string): number {
   if (text === undefined) return SEUIL_NON_APPARIES;
   if (!/^\d+(\.\d+)?$/.test(text) || Number(text) > 100) throw new RafError(`${commande} : --seuil invalide : « ${text} » (une part en pour cent, de 0 à 100)`);
   return Number(text) / 100;
+}
+
+/**
+ * Ce qu'un passage de `ref analyse` remplace et dont il reprend les ids : l'inventaire du dossier du document, sinon sa lecture `lectures/a.json`
+ * (une lecture unique ou la lecture A d'une double), du moment qu'elle est valide ; sinon rien.
+ */
+export function precedentDe(inventaire: string, lecture: string): Obj | undefined {
+  const inv = inventairePrecedent(inventaire);
+  if (inv) return inv;
+  if (!existsSync(lecture)) return undefined;
+  try {
+    const doc = readInventaire(lecture) as Obj;
+    return doc.genre === 'lecture' && checkInventaire(doc).length === 0 ? doc : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Une lecture seule (`ref analyse` sans `--double`) numérote ses éléments par son propre ordre : ceux qui relisent un élément de `precedent` (même règle
+ * que `assembler`) reprennent son id, les renvois suivent, et les `exclusions` écrites passent dans la lecture. Sans `precedent` du même document, rien ne change.
+ */
+export function reprendreIds(lecture: Obj, precedent: Obj | undefined): void {
+  if (!memeDocument(precedent, lecture)) return;
+  const elements = lecture.elements as Obj[];
+  const entrees = elements.map((e) => ({ item: { statut: 'concordant', element: e, a: e } as Item, supprimee: false }));
+  const nouvelId = idsStables(entrees, lecture, lecture, precedent);
+  const ancienVersNeuf = new Map<string, string>(entrees.map((en) => [en.item.element.id as string, nouvelId.get(en)!]));
+  for (const e of elements) {
+    if (e.type === 'composant') e.ecran = ancienVersNeuf.get(e.ecran) ?? e.ecran;
+    if (e.type === 'etat') e.cible = ancienVersNeuf.get(e.cible) ?? e.cible;
+    if (e.type === 'statut') e.couvre = (e.couvre as string[]).map((id) => ancienVersNeuf.get(id) ?? id);
+  }
+  for (const e of elements) e.id = ancienVersNeuf.get(e.id)!;
+  if (precedent!.exclusions !== undefined) lecture.exclusions = precedent!.exclusions;
+}
+
+/** L'inventaire que `--out` va remplacer, s'il en est un de valide ; sinon rien (un fichier illisible ou d'une autre forme n'est pas un inventaire précédent). */
+export function inventairePrecedent(path: string): Obj | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    const doc = readInventaire(path) as Obj;
+    return doc.genre === 'inventaire' && checkInventaire(doc).length === 0 ? doc : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** `ref diff <a> <b> [--out inventaire.json] [--seuil 30]` : 0 réconcilié, 1 trop d'éléments non appariés (rien d'écrit), 2 fichier ou appel refusé. */
@@ -278,6 +356,6 @@ export function diffLectures(o: { a: string; b: string; seuil?: string; out?: st
     o.log(`plus de ${pct(seuil)} d'éléments non appariés (${rec.nonApparies} sur ${rec.concordants + rec.divergents + rec.seuls}) : les deux lectures ne décrivent pas le même document — question au lead, aucune réconciliation`);
     return 1;
   }
-  if (o.out !== undefined) writeFileSync(o.out, `${JSON.stringify(assembler(a, b, rec), null, 2)}\n`);
+  if (o.out !== undefined) writeFileSync(o.out, `${JSON.stringify(assembler(a, b, rec, false, inventairePrecedent(o.out)), null, 2)}\n`);
   return 0;
 }

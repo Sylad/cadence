@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readAgents } from '../src/orchestrate/launch.js';
@@ -288,6 +288,27 @@ describe('cadence ref analyse (L265)', () => {
     expect(r.out).toContain('aucune lecture');
   });
 
+  it('R25 — les exclusions écrites d\'un passage précédent ne sont pas perdues : gardées dans exclusions-<date>.json, dites au lead', async () => {
+    const s = setup();
+    const dir = join(s.refs, 'norme');
+    mkdirSync(join(dir, 'lectures'), { recursive: true });
+    const exclusions = [{ id: 'norme#texte-1', raison: 'décor du document' }];
+    writeFileSync(join(dir, 'inventaire.json'), JSON.stringify({ version: 1, genre: 'inventaire', exclusions }));
+    writeFileSync(join(dir, 'lectures', 'a.json'), JSON.stringify({ version: 1, genre: 'lecture', exclusions: [{ id: 'norme#texte-1', raison: 'autre' }] }));
+    const r = await analyse(s);
+    expect(r.code).toBe(0);
+    const fichier = readdirSync(dir).filter((f) => /^exclusions-\d{4}-\d\d-\d\dT[\d-]+Z\.json$/.test(f));
+    expect(fichier).toHaveLength(1);
+    const gardees = JSON.parse(readFileSync(join(dir, fichier[0]!), 'utf8'));
+    expect(gardees).toEqual({ 'inventaire.json': exclusions, 'lectures/a.json': [{ id: 'norme#texte-1', raison: 'autre' }] });
+    expect(r.out).toContain(`attention : 2 exclusion(s) écrite(s) dans inventaire.json, lectures/a.json, remplacé(s) par ce passage : gardée(s) dans ${join(dir, fichier[0]!)}`);
+    expect(existsSync(join(dir, 'inventaire.json'))).toBe(false);
+  });
+  it('R25 — sans exclusion écrite, rien n\'est gardé ni dit', async () => {
+    const s = setup();
+    const r = await analyse(s);
+    expect(r.out).not.toContain('exclusion');
+  });
   it('R14 — la lecture d\'un passage précédent ne passe jamais pour celle du suivant', async () => {
     const s = setup();
     expect((await analyse(s)).code).toBe(0);

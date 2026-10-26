@@ -74,6 +74,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   `Grep`, `Glob`: it writes only its reading, never the tokens (the program counts them), never an expected inventory, and it never opens
   another file of `lectures/` (L266: with `--double`, `cadence ref analyse` launches it twice, readings A and B, which must stay independent).
   `cadence ref analyse` launches it ([ref](ref.md#cadence-ref-analyse-documentpdf---sections-3-59---slug-name---model-sonnetopushaiku---model-b-sonnetopushaiku---seuil-30---double)).
+- **reference-planner** (agent, L367): reads an inventory and the plan, starts from `cadence ref coverage`, and **proposes** lots that cite the ids they cover, each feasible or blocked (the missing datum or service named) with its dependencies. Its tools are `Read`, `Grep`, `Glob` and `Bash`: it creates no lot and writes no file, the lead decides ([ref](ref.md#planning-the-coverage-the-reference-planner-agent)).
 - **reference-verifier** (agent, L266): the third look of `cadence ref analyse`. It receives only the elements that one of the two readings wrote and the
   other did not, each with the rendered page and a crop of its zone, and answers `confirme` or `ecarte` with a reason, measuring with
   `cadence ref measure` rather than by eye and never guessing (what it cannot tell is `ecarte`). Its tools are `Read` and `Bash`: it writes nothing and never sees the readings

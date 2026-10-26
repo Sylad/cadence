@@ -563,15 +563,23 @@ describe('R25 — l\'attente du verrou d\'intégration est bornée', () => {
     writeFileSync(file, JSON.stringify({ pid: sleeper.pid, wave: 'autre-vague', started: '2026-10-24T00:00:00Z' }));
     return { file, pid: sleeper.pid!, stop: () => sleeper.kill() };
   }
+  /** Une porte que le test ouvre : L2 n'avance pas (donc ne s'intègre pas) avant que le porteur du verrou existe — plus de course sur le temps. */
+  function gate() {
+    let open: () => void = () => {};
+    const opened = new Promise<void>((r) => (open = r));
+    return { open, opened };
+  }
   it('R25 — verrou tenu plus que la borne : lot rendu, worktree conservé, branche du dépôt inchangée', async () => {
     const { parent, repo } = setup();
     let h: ReturnType<typeof holder> | undefined;
-    const meet = meeting(2);
+    const porte = gate();
     const f = fake({
       implement: async (cwd, brief) => {
-        await meet();
         const lot = lotOf(brief);
-        if (lot === 'L1') h = holder(repo); // les deux lots ont commencé : le porteur arrive maintenant
+        if (lot === 'L1') {
+          h = holder(repo); // le porteur arrive avant que L2 ne puisse s'intégrer
+          porte.open();
+        } else await porte.opened;
         return claudeOut(workReport({ commits: [commitFile(cwd, `${lot}.txt`, `feat(${lot}): travail`)] }));
       },
     });
@@ -615,12 +623,14 @@ describe('R25 — l\'attente du verrou d\'intégration est bornée', () => {
   it('R25 — --resume --integrate d\'un lot rendu sur le délai : repris à l\'intégration (next: integrate) sans rejouer ses étapes', async () => {
     const { parent } = setup();
     let h: ReturnType<typeof holder> | undefined;
-    const meet = meeting(2);
+    const porte = gate();
     const f = fake({
       implement: async (cwd, brief) => {
-        await meet();
         const lot = lotOf(brief);
-        if (lot === 'L1') h = holder(cwd);
+        if (lot === 'L1') {
+          h = holder(cwd);
+          porte.open();
+        } else await porte.opened;
         return claudeOut(workReport({ commits: [commitFile(cwd, `${lot}.txt`, `feat(${lot}): travail`)] }));
       },
     });

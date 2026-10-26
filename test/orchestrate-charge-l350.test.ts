@@ -1,11 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { runLot } from '../src/orchestrate/cycle.js';
-import { replayFile, shellArg, testWorkers, testWorkersFrom, testWorkersText, TEST_WORKERS_ENV } from '../src/orchestrate/workers.js';
+import { testWorkers, testWorkersFrom, testWorkersText, TEST_WORKERS_ENV } from '../src/orchestrate/workers.js';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { claudeOut, commitFile, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
-import { fake, meeting, run, setup, store, writes } from './orchestrate-worktree-harness.js';
+import { fake, run, setup, store } from './orchestrate-worktree-harness.js';
 import { tempDir } from './helpers.js';
 
 const impl = (): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }));
@@ -102,205 +102,39 @@ describe('L350 R3 — les gabarits disent aux lanceurs de tests de la respecter'
   });
 });
 
-describe('L350 R4 — un test rouge de la porte est rejoué seul avant d\'être compté', () => {
-  const LOG = () => join(tempDir(), 'rejeux.log');
-  /** Rouge dans la suite entière, `f` rejoué avec un fichier : `ALONE` décide (« vert » ou « rouge »). */
-  const gate = (log: string, alone: 'vert' | 'rouge') =>
-    `f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo "$@" >> ${log}; ${alone === 'vert' ? 'exit 0' : 'echo " FAIL  test/a.test.ts > charge"; exit 1'}; fi; echo " FAIL  test/a.test.ts > charge"; echo " FAIL  test/b.test.ts > autre"; exit 1; }; f`;
+describe('L350 R4 — pas de rejeu seul : un rouge de la porte est compté tel quel (le rejeu part dans L354)', () => {
+  const LOG = () => join(tempDir(), 'appels.log');
+  /** Journalise chaque appel de la porte avec ses arguments ; rouge nommé dès que le lot a écrit. */
+  const gate = (log: string) => `f() { echo "args:$#" >> ${log}; [ -f a.txt ] || exit 0; [ -f b.txt ] && exit 0; echo " FAIL  test/a.test.ts > charge"; exit 1; }; f "$@"`;
 
-  it('R4 — rouge dans la suite, vert rejoué seul : pas de passe de correction, le lot va en revue, noté « instable sous charge »', async () => {
-    const log = LOG();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, { test: gate(log, 'vert') });
-    await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'review']);
-    expect(c.lot.status).toBe('ready');
-    expect(c.lot.instables).toEqual(['test/a.test.ts > charge', 'test/b.test.ts > autre']);
-    expect(c.lot.warnings.some((w) => /instable\(s\) sous charge.*test\/a\.test\.ts > charge/.test(w))).toBe(true);
-  });
-  it('R4 — rejeu SEUL : la commande de la porte reçoit les fichiers des tests rouges, une seule fois quand le premier rejeu est vert', async () => {
-    const log = LOG();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    await runLot(h.lot('L1', {}, { test: gate(log, 'vert') }));
-    expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual(['test/a.test.ts test/b.test.ts']);
-  });
-  it('R4 — rouge aussi au premier rejeu, vert au second : toujours instable (deux rejeux au plus)', async () => {
-    const log = LOG();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const test = `f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo "$@" >> ${log}; [ "$(wc -l < ${log})" -ge 2 ] && exit 0; echo " FAIL  test/a.test.ts > charge"; exit 1; fi; echo " FAIL  test/a.test.ts > charge"; exit 1; }; f`;
-    const c = h.lot('L1', {}, { test });
-    await runLot(c);
-    expect(readFileSync(log, 'utf8').trim().split('\n')).toHaveLength(2);
-    expect(kinds(h)).toEqual(['implement', 'review']);
-    expect(c.lot.instables).toEqual(['test/a.test.ts > charge']);
-  });
-  it('R4 — rouge à la suite et aux deux rejeux : compté, la passe de correction a lieu et ne liste que lui', async () => {
-    const log = LOG();
-    let replaysBeforeFix = -1;
-    const fixing: Handler = (call) => {
-      replaysBeforeFix = readFileSync(log, 'utf8').trim().split('\n').length;
-      return fix('b.txt')(call);
-    };
-    const h = harness({ script: { implement: [impl()], fix: [fixing], review: [ok] } });
-    const c = h.lot('L1', {}, { test: `${gate(log, 'rouge')}` });
-    await runLot(c);
-    expect(replaysBeforeFix).toBe(2); // deux rejeux, pas trois
-    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
-    expect(h.calls[1].brief).toContain('test/a.test.ts > charge');
-    expect(c.lot.instables ?? []).toEqual([]); // b n'est pas nommé par les rejeux en échec : non conclu, il reste rouge avec a
-  });
-  it('R4 — porte composée : un test que le rejeu n\'a pas nommé dans une sortie en échec reste rouge, il n\'est pas excusé en instable', async () => {
+  it('R4 — un test rouge nommé dans la suite entière part en correction sans être rejoué : la porte n\'est jamais appelée avec un fichier', async () => {
     const log = LOG();
     const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
-    // `(backend) && (frontend F)` : les fichiers ajoutés n'atteignent que le dernier lanceur, le backend rejoue sa suite entière, rougit encore et `&&` coupe avant le frontend.
-    const test = `n=regression; f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo "$@" >> ${log}; echo " FAIL  test/b.test.ts > charge"; exit 1; fi; echo " FAIL  test/f.test.ts > $n"; echo " FAIL  test/b.test.ts > charge"; exit 1; }; f`;
-    const c = h.lot('L1', {}, { test });
-    await runLot(c);
-    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
-    expect(h.calls[1].brief).toContain('test/f.test.ts > regression');
-    expect(c.lot.instables ?? []).toEqual([]);
-  });
-  it('R4 — un rouge déjà présent à la ligne de base n\'est pas rejoué (déjà exclu du compte)', async () => {
-    const log = LOG();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    // Au sha de départ le test est rouge, seul compris (vraiment déjà rouge) ; dans le lot, un rejeu seul écrirait dans le journal.
-    const test = `f() { case "$PWD" in *cadence-baseline*) echo " FAIL  test/a.test.ts > ancien"; exit 1;; esac; if [ -n "$1" ]; then echo "$@" >> ${log}; exit 0; fi; echo " FAIL  test/a.test.ts > ancien"; exit 1; }; f "$@"`;
-    const c = h.lot('L1', {}, { test });
-    await runLot(c);
-    expect(existsSync(log)).toBe(false);
-    expect(c.lot.status).toBe('ready');
-  });
-  it('R4 — ligne de base comprise : un rouge de la ligne de base vert rejoué seul au sha de départ n\'excuse pas le lot, le même test rouge seul dans le lot est corrigé', async () => {
-    const log = LOG();
-    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
-    // Au sha de départ : a.test.ts rouge dans la suite entière (charge), vert rejoué seul. Dans le lot : rouge partout (vraie régression).
-    const test = `f() { case "$PWD" in *cadence-baseline*) if [ -n "$1" ]; then echo "base $PWD $@" >> ${log}; exit 0; fi; echo ' FAIL  test/a.test.ts > charge'; exit 1;; esac; [ -f b.txt ] && exit 0; if [ -n "$1" ]; then echo "lot $@" >> ${log}; fi; echo ' FAIL  test/a.test.ts > charge'; exit 1; }; f "$@"`;
-    const c = h.lot('L1', {}, { test });
+    const c = h.lot('L1', {}, { test: gate(log) });
     await runLot(c);
     expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
     expect(h.calls[1].brief).toContain('test/a.test.ts > charge');
-    expect(c.lot.baseline?.failures).toEqual([]);
-    expect(c.lot.instables ?? []).toEqual([]);
-    const lines = readFileSync(log, 'utf8').trim().split('\n');
-    expect(lines[0]).toMatch(/^base \S*cadence-baseline\S* test\/a\.test\.ts$/); // rejoué seul, dans le worktree jetable du sha de départ
-    expect(lines.filter((l) => l.startsWith('lot '))).toEqual(['lot test/a.test.ts', 'lot test/a.test.ts']);
+    expect(new Set(readFileSync(log, 'utf8').trim().split('\n'))).toEqual(new Set(['args:0']));
+    expect((c.lot as { instables?: unknown }).instables).toBeUndefined();
+    expect(c.lot.warnings.some((w) => /instable/.test(w))).toBe(false);
   });
-  it('R4 — ligne de base comprise : rouge aux deux rejeux seuls au sha de départ, le test reste « déjà rouge » et n\'est pas corrigé', async () => {
+  it('R4 — un rouge de la ligne de base n\'est pas rejoué seul au sha de départ : il est retenu « déjà rouge » tel quel', async () => {
     const log = LOG();
     const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const test = `f() { case "$PWD" in *cadence-baseline*) [ -n "$1" ] && echo "base $@" >> ${log}; echo ' FAIL  test/a.test.ts > ancien'; exit 1;; esac; echo ' FAIL  test/a.test.ts > ancien'; exit 1; }; f "$@"`;
+    const test = `f() { case "$PWD" in *cadence-baseline*) echo "base:$#" >> ${log};; esac; echo ' FAIL  test/a.test.ts > ancien'; exit 1; }; f "$@"`;
     const c = h.lot('L1', {}, { test });
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(c.lot.status).toBe('ready');
     expect(c.lot.baseline?.failures).toEqual(['test/a.test.ts > ancien']);
-    expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual(['base test/a.test.ts', 'base test/a.test.ts']);
+    expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual(['base:0']);
   });
-  it('R4 — un échec sans nom de fichier (rien à rejouer seul) est compté comme avant', async () => {
-    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
-    const c = h.lot('L1', {}, { test: `[ ! -f a.txt ] || [ -f b.txt ] || { echo ' FAIL  cas sans fichier'; exit 1; }` });
-    await runLot(c);
-    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
-  });
-  it('R4 — l\'instabilité est une ligne du journal de la vague et le contrôle du relecteur la dit verte', async () => {
-    const log = LOG();
-    const lines: string[] = [];
+  it('R4 — le contrôle passé au relecteur ne parle pas de tests « red under load »', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
-    h.wave.log = (l) => lines.push(l);
-    const c = h.lot('L1', {}, { test: gate(log, 'vert') });
-    await runLot(c);
-    expect(lines.some((l) => /instable\(s\) sous charge/.test(l))).toBe(true);
+    await runLot(h.lot('L1', {}, { test: 'true' }));
     const review = h.calls.find((x) => x.kind === 'review')!;
-    expect(review.brief).toMatch(/green.*rouge\(s\) sous charge|green.*red under load/i);
-  });
-  it('R4 — ligne de base non vide : tous les nouveaux rouges sont instables, la porte passe et les rouges déjà présents restent « déjà rouges » pour le relecteur', async () => {
-    const log = LOG();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const test = `f() { case "$PWD" in *cadence-baseline*) echo ' FAIL  test/old.test.ts > ancien'; exit 1;; esac; if [ -n "$1" ]; then echo "$@" >> ${log}; exit 0; fi; echo ' FAIL  test/old.test.ts > ancien'; echo ' FAIL  test/a.test.ts > charge'; exit 1; }; f "$@"`;
-    const c = h.lot('L1', {}, { test });
-    await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'review']);
-    expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual(['test/a.test.ts']); // seul le nouveau est rejoué
-    expect(c.lot.instables).toEqual(['test/a.test.ts > charge']);
-    const review = h.calls.find((x) => x.kind === 'review')!;
-    expect(review.brief).toMatch(/already red at the start sha/);
-    expect(review.brief).not.toMatch(/RED, exit code 1\s*$/m);
-  });
-  it('R4 — ligne de base non vide : deux nouveaux rouges, le rejeu en échec n\'en nomme qu\'un : les deux restent rouges (non conclu), l\'ancien est compté à part', async () => {
-    const log = LOG();
-    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
-    const test = `n=charge; f() { case "$PWD" in *cadence-baseline*) echo ' FAIL  test/old.test.ts > ancien'; exit 1;; esac; if [ -n "$1" ]; then echo "$@" >> ${log}; echo ' FAIL  test/b.test.ts > autre'; exit 1; fi; echo ' FAIL  test/old.test.ts > ancien'; echo " FAIL  test/a.test.ts > $n"; echo ' FAIL  test/b.test.ts > autre'; exit 1; }; f "$@"`;
-    const c = h.lot('L1', {}, { test });
-    await runLot(c);
-    const brief = h.calls[1].brief;
-    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
-    expect(brief).toContain('- test/b.test.ts > autre');
-    expect(brief).toContain('- test/a.test.ts > charge');
-    expect(brief).toContain('1 autre(s) test(s) déjà rouge(s)');
-    expect(c.lot.instables ?? []).toEqual([]);
-  });
-  it('R4 — jest : « FAIL fichier » et « ● Suite › test » sont rejoués seuls (par le fichier), verts rejoués : instables', async () => {
-    const log = LOG();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const test = `f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo "$@" >> ${log}; exit 0; fi; echo 'FAIL src/a.test.ts'; echo '  ● Suite › charge'; exit 1; }; f "$@"`;
-    const c = h.lot('L1', {}, { test });
-    await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'review']);
-    expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual(['src/a.test.ts']);
-    expect(c.lot.instables).toEqual(['Suite › charge', 'src/a.test.ts']);
-  });
-  it('R4 — jest : rouge aussi rejoué seul, la correction a lieu', async () => {
-    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
-    const test = `[ -f a.txt ] || exit 0; [ -f b.txt ] && exit 0; echo 'FAIL src/a.test.ts'; echo '  ● Suite › charge'; exit 1`;
-    await runLot(h.lot('L1', {}, { test }));
-    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
-  });
-  it('R4 — les cibles de rejeu : fichier de vitest (« fichier > suite > test ») et de pytest (« fichier::test »), rien pour un nom sans fichier', () => {
-    expect(replayFile('test/a.test.ts > suite > cas')).toBe('test/a.test.ts');
-    expect(replayFile('tests/test_a.py::test_x[1-2]')).toBe('tests/test_a.py');
-    expect(replayFile('cas sans fichier')).toBeNull();
-    expect(replayFile('a > b')).toBeNull();
-    expect(replayFile('src/a.test.ts')).toBe('src/a.test.ts'); // jest : « FAIL src/a.test.ts », le fichier seul
-    expect(replayFile('Suite › charge')).toBeNull(); // jest : « ● Suite › test », sans fichier (rattaché aux FAIL fichier de la sortie par le rejeu)
-  });
-  it('R4 — espace de travail vitest : le préfixe « |projet| » n\'est pas une partie du chemin à rejouer', () => {
-    expect(replayFile('|pa|  src/a.test.js > casse')).toBe('src/a.test.js');
-    expect(replayFile('|pa| src/a.test.js > suite > casse')).toBe('src/a.test.js');
-  });
-  it('R4 — un rejeu seul qui n\'exécute aucun test (« No test files found », code 0) ne vaut pas vert : le rouge reste compté', async () => {
-    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
-    const test = `f() { [ -f a.txt ] || exit 0; [ -f b.txt ] && exit 0; if [ -n "$1" ]; then echo 'No test files found, exiting with code 0'; exit 0; fi; echo ' FAIL  |pa|  src/a.test.js > casse'; exit 1; }; f "$@"`;
-    const c = h.lot('L1', {}, { test });
-    await runLot(c);
-    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
-    expect(c.lot.instables ?? []).toEqual([]);
-  });
-  it('R4 — un rejeu seul vert dont la sortie cite « No test files found » hors ligne de fin (titre d\'un test lent) vaut vert : instable', async () => {
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const test = `f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo ' ✓ R4 — un rejeu sans test (« No test files found », code 0) 428ms'; echo ' Tests  1 passed (1)'; exit 0; fi; echo ' FAIL  test/a.test.js > casse'; exit 1; }; f "$@"`;
-    const c = h.lot('L1', {}, { test });
-    await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'review']);
-    expect(c.lot.instables).toEqual(['test/a.test.js > casse']);
-  });
-  it('R4 — un chemin à espaces ou caractères de shell est quoté pour le rejeu', () => {
-    expect(shellArg('test/a.test.ts')).toBe('test/a.test.ts');
-    expect(shellArg("test/a b's.test.ts")).toBe("'test/a b'\\''s.test.ts'");
-  });
-});
-
-describe('L350 R5 — la porte de la vague et de l\'intégration', () => {
-  it('R5 — au sommet intégré, un rouge de charge rejoué seul n\'est plus un rouge : pas de relance de toute la suite', async () => {
-    const mark = join(tempDir(), 'suite-entiere');
-    process.env.CHARGE_MARK = mark;
-    const check = `f() { if [ -n "$1" ]; then exit 0; fi; if [ -f L1.txt ] && [ -f L2.txt ]; then echo x >> "$CHARGE_MARK"; echo " FAIL  test/a.test.ts > charge"; exit 1; fi; exit 0; }; f "$@"\n`;
-    const { parent } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true\ntest: sh check.sh', { 'check.sh': check });
-    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], fake({ implement: writes(meeting(2)) }));
-    delete process.env.CHARGE_MARK;
-    expect(r.code).toBe(0);
-    expect(r.out).not.toMatch(/relancés une fois/);
-    expect(readFileSync(mark, 'utf8').trim().split('\n')).toHaveLength(1); // le rouge de charge a eu lieu une seule fois : la suite entière n'a pas été relancée
-    expect(['L1', 'L2'].map((id) => store(parent).readLot('a', id)!.status)).toEqual(['ready', 'ready']);
+    expect(review.brief).toContain('(tests): green');
+    expect(review.brief).not.toMatch(/red under load|replayed alone/);
   });
 });
 

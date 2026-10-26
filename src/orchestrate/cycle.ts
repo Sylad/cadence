@@ -17,7 +17,7 @@ import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
-import { isJestTest, replayFile, shellArg, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
+import { TEST_WORKERS_ENV, testWorkersText } from './workers.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
@@ -199,8 +199,8 @@ const startSha = (c: LotCtx): string | undefined => lotStartHead(wd(c), lotWork(
  * Échecs des tests au sha de départ du lot (L213) : la commande est rejouée dans un worktree jetable de ce sha, hors du dépôt,
  * avec des liens vers les dossiers ignorés de tout niveau (node_modules, .venv… ; `dist` et les autres sorties de build exclus, une commande
  * de tests qui y écrit toucherait le build du lot) pour que les dépendances s'y trouvent. Les `node_modules` sont recréés entrée par entrée
- * pour que les paquets de workspace résolvent dans le worktree (`mirrorNodeModules`). Un rouge nommé y est rejoué seul (L350) avant d'être retenu.
- * Null quand le worktree ne peut être monté : l'appelant garde alors les tests pour rouges.
+ * pour que les paquets de workspace résolvent dans le worktree (`mirrorNodeModules`). Null quand le worktree ne peut être monté :
+ * l'appelant garde alors les tests pour rouges.
  */
 async function baselineFailures(c: LotCtx, command: string): Promise<string[] | null> {
   const l = c.lot;
@@ -216,12 +216,7 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
     // ne dit rien des tests : pas de ligne de base, l'appelant garde les tests pour rouges.
     if (c.config.build && (await sh(c, c.config.build, 30 * 60_000, {}, dir)).code !== 0) return null;
     const r = await sh(c, command, 30 * 60_000, {}, dir);
-    // Ligne de base comprise (L350) : un rouge du sha de départ est rejoué seul dans le même worktree avant d'être retenu. Sous charge, un test
-    // qui passe seul au départ rougirait ici et excuserait une vraie régression du lot (« déjà rouge au départ »). Un échec sans nom reste tel quel.
-    const found = r.code === 0 ? [] : failedTests(r.output);
-    const named = found.length && !hasUnnamedFailure(r.output) ? found : [];
-    const { red: failures, unstable } = named.length ? await replayAlone(c, command, named, dir) : { red: found, unstable: [] as string[] };
-    if (unstable.length) c.wave.log(`${lotKey(l.project, l.lot)} · ligne de base ${sha.slice(0, 7)} : ${unstable.length} test(s) rouge(s) sous charge, vert(s) rejoué(s) seul(s), non retenu(s) comme déjà rouge(s) : ${unstable.join(' ; ')}`);
+    const failures = r.code === 0 ? [] : failedTests(r.output);
     l.baseline = { sha, command, failures, verified: true };
     save(c);
     return failures;
@@ -364,7 +359,7 @@ function checksText(c: LotCtx): string {
   const declared = b && !b.verified && b.failures.length ? `The author reports ${b.failures.length} test(s) already red at the start sha${b.sha ? ` ${b.sha.slice(0, 7)}` : ''}, before this lot (not verified by the program):\n${b.failures.map((t) => `- ${t}`).join('\n')}\nThey are not defects of this lot, do not report them as findings; a failing test outside this list is still a finding.` : '';
   const k = c.lot.checks;
   if (!k?.runs.length || k.head !== git(wd(c), 'rev-parse', 'HEAD')) return declared;
-  const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? (r.instables?.length ? `green; ${r.instables.length} test(s) red under load in the whole suite, green when replayed alone, not defects: ${r.instables.join(' ; ')}` : 'green') : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`}`);
+  const runs = k.runs.map((r) => `- \`${r.command}\` (${r.label}): ${r.code === 0 ? 'green' : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`}`);
   const ran = [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
   return declared ? `${ran}\n${declared}` : ran;
 }
@@ -1925,66 +1920,13 @@ async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promi
       if (!l.warnings.includes(note)) l.warnings.push(note);
       continue;
     }
-    // Un rouge absent de la ligne de base est rejoué SEUL avant d'être compté (L350) : sous charge, des tests qui passent seuls rougissent ensemble.
-    const named = vs.kind === 'new' ? vs.nouveaux : label === 'tests' && !hasUnnamedFailure(r.output) ? failedTests(r.output) : [];
-    const { red: still, unstable } = named.length ? await replayAlone(c, command, named) : { red: [] as string[], unstable: [] as string[] };
-    if (unstable.length) noteUnstable(c, unstable);
-    if (unstable.length && !still.length) {
-      run.instables = unstable;
-      if (vs.kind === 'new' && vs.existants) run.dejaRouges = vs.existants;
-      else run.code = 0;
-      continue;
-    }
-    const alone = unstable.length ? `\n(${unstable.length} test(s) rouge(s) sous charge, verts rejoués seuls : instables, à ne pas corriger)` : '';
     if (vs.kind === 'new') {
-      const left = vs.nouveaux.filter((t) => !unstable.includes(t));
-      red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) : ${left.length} test(s) rouge(s) qui ne l'étaient pas au sha de départ :\n${left.map((t) => `- ${t}`).join('\n')}${vs.existants ? `\n(${vs.existants} autre(s) test(s) déjà rouge(s) au sha de départ : à ne pas corriger)` : ''}${alone}` });
+      red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) : ${vs.nouveaux.length} test(s) rouge(s) qui ne l'étaient pas au sha de départ :\n${vs.nouveaux.map((t) => `- ${t}`).join('\n')}${vs.existants ? `\n(${vs.existants} autre(s) test(s) déjà rouge(s) au sha de départ : à ne pas corriger)` : ''}` });
       return;
     }
-    // Des instables sont écartés : la sortie de la suite entière les montre encore en FAIL, le constat ne nomme que ceux qui restent rouges.
-    const shown = unstable.length ? `${still.length} test(s) rouge(s) après rejeu seul :\n${still.map((t) => `- ${t}`).join('\n')}` : r.output.trim().split('\n').slice(-40).join('\n');
-    red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${shown}${alone}` });
+    red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${r.output.trim().split('\n').slice(-40).join('\n')}` });
     return;
   }
-}
-
-/** Sortie d'un lanceur qui n'a trouvé aucun test à rejouer : la ligne de fin du lanceur (vitest « No test files found, exiting with code », jest « No tests found, exiting with code », pytest « no tests ran in »), en début de ligne — pas ces mots cités dans le titre ou la sortie d'un test. */
-const NO_TEST_RAN = /^\W*(?:no test files? found, exiting with code|no tests? found, exiting with code|no tests ran in)\b/im;
-
-/** Rejeux d'un test rouge de la porte, seul (L350) : rouge aux deux, il est compté. */
-const REPLAYS = 2;
-
-/**
- * Rejoue SEULS (la commande de la porte, suivie des fichiers de ces tests, dans `cwd` : le worktree du lot, ou celui de la ligne de base) les tests rouges d'une suite entière (L350). Le 26-10, vitest à 31 workers par suite sur une machine à 4 sessions rougissait des tests
- * qui passaient seuls : quatre corrections vides (4 à 11 min chacune). Un test vert à un rejeu est `unstable` ; rouge aux `REPLAYS` rejeux, ou sans fichier désignable (rien à rejouer seul), il reste dans `red`.
- */
-async function replayAlone(c: LotCtx, command: string, names: string[], cwd = wd(c)): Promise<{ red: string[]; unstable: string[] }> {
-  let red = names;
-  const unstable: string[] = [];
-  for (let i = 0; i < REPLAYS; i++) {
-    const files = [...new Set(red.map((n) => replayFile(n)).filter((f): f is string => f !== null))];
-    if (!files.length) break;
-    const replayable = red.filter((n) => replayFile(n) || isJestTest(n));
-    const r = await sh(c, `${command} ${files.map(shellArg).join(' ')}`, undefined, undefined, cwd);
-    // Seul un rejeu qui sort en 0 en ayant exécuté des tests vaut vert. Un rejeu en échec ne conclut rien pour un test qu'il ne nomme pas : sur une porte composée (`a && b`) les fichiers n'atteignent que le dernier lanceur, un premier lanceur qui rougit coupe avant lui. Un rejeu sans test exécuté (filtre sans fichier, `passWithNoTests`) sort en 0 sans rien prouver.
-    const failing = r.code === 0 && !NO_TEST_RAN.test(r.output) ? [] : replayable;
-    const passed = replayable.filter((n) => !failing.includes(n));
-    unstable.push(...passed);
-    red = red.filter((n) => !passed.includes(n));
-  }
-  return { red, unstable };
-}
-
-/** Trace des tests instables sous charge (L350) : le lot (`instables`, journal et `cadence perf`), un avertissement du lot (tableau de fin de vague) et une ligne du journal de la vague. */
-function noteUnstable(c: LotCtx, tests: string[]): void {
-  const l = c.lot;
-  const fresh = tests.filter((t) => !(l.instables ?? []).includes(t));
-  if (!fresh.length) return;
-  l.instables = [...(l.instables ?? []), ...fresh];
-  const text = `${fresh.length} test(s) instable(s) sous charge (rouge(s) dans la suite, vert(s) rejoué(s) seul(s)), pas de passe de correction : ${fresh.join(' ; ')}`;
-  l.warnings.push(text);
-  c.wave.log(`${lotKey(l.project, l.lot)} · ${text}`);
-  save(c);
 }
 
 /**

@@ -6,7 +6,7 @@ import { run } from '../src/cli.js';
 import { readPlanConfig } from '../src/config.js';
 import { Plan } from '../src/plan.js';
 import { gitRepo, tempDir, NO_BACKGROUND_GIT } from './helpers.js';
-import { fake, run as orchestrate, setup, subjects } from './orchestrate-worktree-harness.js';
+import { fake, run as orchestrate, setup, store, subjects } from './orchestrate-worktree-harness.js';
 import { git as gitIn } from './orchestrate-harness.js';
 
 // L346 — plan.onWrite : une commande du projet lancée après chaque écriture du plan, ses fichiers commités avec le plan.
@@ -124,9 +124,9 @@ describe('R3 — une commande en échec refuse l\'écriture et le dit', () => {
 });
 
 describe('R4 — orchestrate lance la commande et commite ses fichiers avec le plan', () => {
-  const withOnWrite = (command: string) => {
-    const { parent, repo } = setup([{ title: 'un' }], 'worktrees: false\n');
-    writeFileSync(join(repo, 'cadence.yaml'), `${config(command)}orchestrate:\n  precheck: false\n`);
+  const withOnWrite = (command: string | ((parent: string) => string), worktrees = false) => {
+    const { parent, repo } = setup([{ title: 'un' }], `worktrees: ${worktrees}\n`);
+    writeFileSync(join(repo, 'cadence.yaml'), `${config(typeof command === 'string' ? command : command(parent))}orchestrate:\n  precheck: false\n`);
     gitIn(repo, 'add', '--', 'cadence.yaml');
     gitIn(repo, 'commit', '-q', '-m', 'chore: onWrite');
     return { parent, repo };
@@ -147,4 +147,20 @@ describe('R4 — orchestrate lance la commande et commite ses fichiers avec le p
     expect(readFileSync(join(repo, PLAN), 'utf8')).toBe(before);
     expect(subjects(repo).some((s) => s.startsWith('plan: L1 démarré'))).toBe(false);
   });
+  for (const worktrees of [false, true]) {
+    it(`R4 — échec au démarrage (worktrees: ${worktrees}) : le lot est rendu (handed-back), pas en échec`, async () => {
+      const { parent } = withOnWrite('echo nope >&2; exit 5', worktrees);
+      await orchestrate(parent, ['a:L1'], fake());
+      const lot = store(parent).readLot('a', 'L1')!;
+      expect(lot.status).toBe('handed-back');
+      expect(lot.outcome).toContain('plan.onWrite');
+    });
+    it(`R4 — échec à l'enregistrement de la revue (worktrees: ${worktrees}) : le lot est rendu (handed-back), pas en échec`, async () => {
+      const { parent } = withOnWrite((p) => `test -e ${p}/marqueur && exit 5; touch ${p}/marqueur`, worktrees);
+      await orchestrate(parent, ['a:L1'], fake());
+      const lot = store(parent).readLot('a', 'L1')!;
+      expect(lot.status).toBe('handed-back');
+      expect(lot.outcome).toContain('plan.onWrite');
+    });
+  }
 });

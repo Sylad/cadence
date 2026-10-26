@@ -14,7 +14,7 @@ import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolv
 import { blockingLots, gitCommitsIn } from './table.js';
 import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
-import { isOpen, type Plan } from '../plan.js';
+import { isOpen, RafError, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { TEST_WORKERS_ENV, testWorkersText } from './workers.js';
@@ -2446,7 +2446,12 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
     plan.recordReview(l.lot, verdict, c.wave.today, commit, neighbours.length ? shas : undefined, reporte);
     for (const k of covered) plan.setStatus(`${l.lot}/${k.task}`, 'done', c.wave.today);
     if (covered.length) l.warnings.push(`sous-tâches closes (couvertes par des commits qui les citent, revue conforme) : ${covered.map((k) => `${l.lot}/${k.task} (${k.sha.slice(0, 7)})`).join(', ')}`);
-    plan.save();
+    try {
+      plan.save();
+    } catch (e) {
+      if (e instanceof RafError) return e.message;
+      throw e;
+    }
     const dirty = await commitPlan(c, `plan: ${l.lot} revue de code enregistrée (orchestrate ${c.wave.id})`);
     if (dirty) return dirty;
   } else {
@@ -2490,8 +2495,19 @@ function leadMoved(repo: string, base: string): string | null {
   return dirty.length ? `arbre du dépôt modifié (${dirty.join(', ')})` : null;
 }
 
+/** Un refus d'écrire le plan par Plan.save() (plan.onWrite en échec, L346) est la cause d'un lot rendu, pas une erreur du lot. */
+async function refusal(write: () => Promise<string | null>): Promise<string | null> {
+  try {
+    return await write();
+  } catch (e) {
+    if (e instanceof RafError) return e.message;
+    throw e;
+  }
+}
+
 /** Une écriture de plan du programme (R21, R26) : sous la file et le verrou du dépôt, le dépôt encore sur la branche de départ, aucun fichier suivi modifié hors plan. Rend la cause du refus, null si l'écriture a eu lieu. Hors worktree, rien ne change. */
-async function planWrite(c: LotCtx, write: () => Promise<string | null>): Promise<string | null> {
+async function planWrite(c: LotCtx, doWrite: () => Promise<string | null>): Promise<string | null> {
+  const write = () => refusal(doWrite);
   if (!c.tree) return write();
   const l = c.lot;
   const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);

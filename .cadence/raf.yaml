@@ -3963,6 +3963,7 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "conforme : les corrections (anonymisation A6, A7, A8, « Rejouer », décompte des lots dans le CHANGELOG) sont faites et testées ; restent 2 notes mineures de rédaction — orchestré (vague 2026-10-26-1950, 0 passe(s) de correction + passe des mineurs)", commit: fb27b322fb9bae3c4b3d951d1d34a9b6eea7cc46 }
   - id: L358
     title: "README : démarrage « lead multi-projets » en 10 minutes (installation, dossier parent, raf init, /lead, première vague), schéma simple, le détail dans docs/ ; modèles de tickets GitHub (bug, demande) ; d'après le parcours mesuré sur mini-blue"
     status: todo

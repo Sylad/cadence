@@ -213,6 +213,29 @@ plan:
   files: [frontend/public/plan-data/plan.json]
 ```
 
+### Regenerate the published copy on every write (`plan.onWrite`, L346)
+
+Declaring the published file is not enough when it is generated: a hand-regenerated
+`plan.json` that drifts from the plan (a flag forgotten) turns the project's
+« published plan up to date » check red. `plan.onWrite` makes the program run the
+generator itself, after **every** write of the plan:
+
+```yaml
+plan:
+  onWrite: { command: npm run plan, files: [frontend/public/plan-data/plan.json] }
+```
+
+- `command` runs through `sh -c` at the repository root (the folder of `cadence.yaml`, whatever folder `raf` is run from), with a
+  2-minute limit. It runs after `raf add|start|done|drop|todo|note|did|title|uses|public|screen|visible|spec|ux|review|ignore|docs-ok`, after the writes of `cadence orchestrate`
+  (start of the lot, notes of the review and of the sheet, review recorded), after the plan note of `cadence spec reseal`, after `cadence deliver` opens an article lot, and after the config lot
+  of `cadence config set --all`. There is one code path for all of them, so a new command that writes the plan gets it for free.
+- `files` (optional list, relative to the repository, never outside it) are the files the command produces. They are **kept with the plan**, like `plan.files`: a commit that touches only
+  them and the plan is plan upkeep, and they go **in the same commit as the plan** everywhere the program commits the plan (`cadence orchestrate`, `cadence config set`, `cadence spec reseal`, the
+  `hook.autostart: start` pre-commit). A produced file that is not tracked yet is added. `raf` itself never commits: for its commands, `git add` the plan and the produced files together.
+- A command that fails (non-zero code, cannot start, time limit) **refuses the write**: the plan and the declared files are put back as they were, the command stops with
+  `plan.onWrite en échec (<command>, code 7) : <last lines of its output> — écriture refusée, plan inchangé`, and in a wave the lot is handed back with that message.
+- A read-only plan (kept by another tool) never runs the command: the project's tool owns the write.
+
 Until the file is declared, such a commit is reported as a "commit without a
 lot" when it cites none, and counts as work on the lots it cites.
 

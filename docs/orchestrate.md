@@ -522,7 +522,7 @@ nothing below applies and the wave behaves as before; any other value is refused
   read-only plan (`plan:` in `cadence.yaml`) gets `orchestrate.start` and `orchestrate.verdict` run in that checkout, never in the worktree; a plan
   outside the repository is read and written in place, without a commit. The lots' branches carry work commits only (the acceptance seal and
   `vert: true` are work of the lot), so a plan conflict at the rebase cannot happen. A session that modifies the plan file, a file generated with it
-  (`plan.files`, the Gantt page) in its worktree — committed or not — gets its lot handed back, naming the file and the commit.
+  (`plan.files`, the files of `plan.onWrite`, the Gantt page) in its worktree — committed or not — gets its lot handed back, naming the file and the commit.
   Before each of these writes the program checks that the repository is still on the branch the lots started from, that no tracked file other than the
   plan is modified in the project's checkout, and takes the lock; a refusal hands the lot back with the cause
   (`écriture du plan refusée : arbre du dépôt modifié (<files>)`, `dépôt sur <branch> et non <start branch>`, `verrou tenu par <wave> (pid <pid>)`), writes
@@ -892,7 +892,11 @@ folder whenever Playwright was loaded for the lot, even if no `ux` step ran
 
 Without `start`, a read-only plan's `todo` lot is refused (start it with the project's tool); without
 `verdict`, the review verdict stays in the wave's state and you report it. Only the plan's files
-(`plan.path`, `plan.files`, the QA expectations file) are committed from those commands; anything else dirty stops the lot (`.cadence/runs/`, `.cadence/corrections.json` and `.playwright-mcp/` excepted, as above).
+(`plan.path`, `plan.files`, the files of `plan.onWrite`, the QA expectations file) are committed from those commands; anything else dirty stops the lot (`.cadence/runs/`, `.cadence/corrections.json` and `.playwright-mcp/` excepted, as above).
+
+### `plan.onWrite`: the published plan follows every write (L346)
+
+When `cadence.yaml` declares `plan.onWrite: { command, files }` ([raf](raf.md#regenerate-the-published-copy-on-every-write-planonwrite-l346)), the wave runs `command` at the repository root after each write of the plan it makes (start of the lot, notes of the sheet and of the review, review recorded), and the produced `files` go into the same `plan: …` commit as the plan, even when they were not tracked yet. If the command fails the write is refused: the plan is put back, nothing is committed, and the lot is handed back naming `plan.onWrite en échec`.
 
 ### Time limit of a write step (L298)
 

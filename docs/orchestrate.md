@@ -545,6 +545,11 @@ nothing below applies and the wave behaves as before; any other value is refused
      branch) was added by an earlier commit of the same lot, so the replayed commit may reword or remove it — its version wins, the earlier one is dropped
      from the repository's side — while an entry that was already there at the starting point, reworded, stays a conflict by hand. The
      journal says `<project>:<lot> CHANGELOG.md : conflit d'ajout pur résolu par union sous [Unreleased] (<n> commit(s))`. Anything else — an entry that
+     **A release during the branch's life** (L362): when the repository's branch was released after the lot's branch was cut, its `## [Unreleased]` became
+     `## [x.y.z]` and git, merging without conflict, files the lot's entries under that published version. After the rebase the program moves the entries of
+     the lot (those in its `[Unreleased]` and not in the `CHANGELOG.md` of the starting point) that landed in the published part, and were not already
+     there on the repository's branch, back under the repository's `## [Unreleased]`, in a commit of its own (`docs: CHANGELOG — les entrées du lot replacées
+     sous [Unreleased] …`); the journal says `<project>:<lot> CHANGELOG.md : <n> entrée(s) du lot replacée(s) sous [Unreleased], …`.
      was already there removed or reworded, free text under `[Unreleased]`, the rest of the
      file changed on both sides, another file in conflict with it — aborts the rebase and hands the lot back as above. The rebased commits differ, so
      steps 3 and 4 apply: tests replayed, and a short review since the patch-id changed;

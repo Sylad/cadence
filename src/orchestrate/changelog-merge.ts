@@ -1,6 +1,8 @@
 /** Ordre des sections de Keep a Changelog ; un titre inconnu vient après, dans l'ordre où il apparaît. */
 const SECTION_ORDER = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'];
 
+const rank = (s: string) => (SECTION_ORDER.includes(s) ? SECTION_ORDER.indexOf(s) : SECTION_ORDER.length);
+
 type Sections = Map<string, string[]>;
 type Split = { head: string; block: string[]; tail: string };
 
@@ -78,11 +80,47 @@ export function mergeUnreleased(base: string, ours: string, theirs: string, star
     }
   }
   const titles = [...new Set([...os.keys(), ...ts.keys()])];
-  const rank = (s: string) => (SECTION_ORDER.includes(s) ? SECTION_ORDER.indexOf(s) : SECTION_ORDER.length);
   titles.sort((x, y) => rank(x) - rank(y));
   const body = titles.map((title) => {
     const entries = [...new Set([...(os.get(title) ?? []).filter((e) => !own.has(e)), ...(ts.get(title) ?? [])])];
     return `### ${title}\n\n${entries.join('\n')}\n`;
   });
   return `${head}\n\n${body.join('\n')}\n${tail}`;
+}
+
+/** Entrées du bloc `[Unreleased]` de `text`, par section ; null sans bloc ou avec du texte hors entrée. */
+function unreleasedEntries(text: string): Sections | null {
+  const s = split(text);
+  return s ? sections(s.block) : null;
+}
+
+/**
+ * Replace sous `[Unreleased]` les entrées du lot qu'une publication de la branche a laissées sous une version (L362). `lotTip` : le CHANGELOG du sommet du lot
+ * avant le rebase, `start` celui de son point de départ — une entrée de `[Unreleased]` du premier absente du second est au lot — et `main` celui de la
+ * branche du dépôt : une entrée déjà dans sa partie publiée n'a pas été glissée là par le rebase, elle reste. `rebased` : le CHANGELOG après le rebase.
+ * Rend le texte corrigé et le nombre d'entrées déplacées, ou null quand il n'y a rien à déplacer (ou que le fichier n'a pas la forme attendue).
+ */
+export function moveToUnreleased(rebased: string, lotTip: string, start: string, main: string): { text: string; moved: number } | null {
+  const [r, mainSplit] = [split(rebased), split(main)];
+  const [tip, was] = [unreleasedEntries(lotTip), unreleasedEntries(start)];
+  const [now, published] = [sections(r?.block ?? []), mainSplit ? mainSplit.tail : ''];
+  if (!r || !tip || !was || !now) return null;
+  const known = new Set([...was.values()].flat());
+  let tail = r.tail;
+  let moved = 0;
+  const added = new Map<string, string[]>();
+  for (const [title, entries] of tip) {
+    for (const e of entries) {
+      if (known.has(e) || published.includes(e) || (now.get(title) ?? []).includes(e) || !tail.includes(e)) continue;
+      tail = tail.replace(`${e}\n`, '');
+      added.set(title, [...(added.get(title) ?? []), e]);
+      moved++;
+    }
+  }
+  if (moved === 0) return null;
+  tail = tail.replace(/^### .+\n\n(\n|$)/gm, '');
+  for (const [title, entries] of added) now.set(title, [...(now.get(title) ?? []), ...entries]);
+  const titles = [...now.keys()].sort((x, y) => rank(x) - rank(y));
+  const body = titles.map((title) => `### ${title}\n\n${(now.get(title) ?? []).join('\n')}\n`);
+  return { text: `${r.head}\n\n${body.join('\n')}\n${tail}`, moved };
 }

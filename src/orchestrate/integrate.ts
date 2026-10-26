@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gitCommonDir } from '../git.js';
 import { sharedStateDir } from '../state.js';
 import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
-import { mergeUnreleased } from './changelog-merge.js';
+import { mergeUnreleased, moveToUnreleased } from './changelog-merge.js';
 import { mutexFor } from './mutex.js';
 import { git, gitFailure, tryGit } from './worktree.js';
 
@@ -60,7 +60,7 @@ export const repoBranch = (repo: string): string | null => tryGit(repo, 'symboli
 /** Point de départ de `rev` par rapport à la branche `base` : le dernier ancêtre commun. */
 export const mergeBase = (cwd: string, rev: string, base: string): string => git(cwd, 'merge-base', rev, `refs/heads/${base}`);
 
-export type Rebase = { kind: 'forwarded' } | { kind: 'rebased'; before: string; after: string; changelog: number } | { kind: 'conflict'; files: string[]; detail: string };
+export type Rebase = { kind: 'forwarded' } | { kind: 'rebased'; before: string; after: string; changelog: number; moved: number } | { kind: 'conflict'; files: string[]; detail: string };
 
 const CHANGELOG = 'CHANGELOG.md';
 const REBASE_ENV = { ...process.env, GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true' };
@@ -84,6 +84,22 @@ function resolveChangelog(work: string, start: string | undefined): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Après un rebase réussi : les entrées que le lot a ajoutées sous `[Unreleased]` et qu'une publication de la branche a laissées sous la version publiée
+ * (git les y range sans conflit quand le bloc a été renommé) sont remises sous le `[Unreleased]` de la branche, dans un commit à part (L362). Rend leur nombre.
+ */
+function moveOwnEntries(work: string, base: string, before: string, start: string | undefined): number {
+  if (start === undefined) return 0;
+  const [tip, main] = [tryGit(work, 'show', `${before}:${CHANGELOG}`), tryGit(work, 'show', `refs/heads/${base}:${CHANGELOG}`)];
+  if (tip === null || main === null || !existsSync(join(work, CHANGELOG))) return 0;
+  const fixed = moveToUnreleased(readFileSync(join(work, CHANGELOG), 'utf8'), tip, start, main);
+  if (!fixed) return 0;
+  writeFileSync(join(work, CHANGELOG), fixed.text);
+  run(work, 'add', '--', CHANGELOG);
+  run(work, 'commit', '--no-verify', '-q', '-m', 'docs: CHANGELOG — les entrées du lot replacées sous [Unreleased] (une publication a eu lieu pendant la branche)');
+  return fixed.moved;
 }
 
 /**
@@ -117,7 +133,8 @@ export function rebaseOnto(work: string, base: string): Rebase {
       }
     }
   }
-  return { kind: 'rebased', before, after: git(work, 'rev-parse', 'HEAD'), changelog };
+  const moved = moveOwnEntries(work, base, before, start);
+  return { kind: 'rebased', before, after: git(work, 'rev-parse', 'HEAD'), changelog, moved };
 }
 
 /**

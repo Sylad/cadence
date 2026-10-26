@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { rebaseOnto } from '../src/orchestrate/integrate.js';
-import { mergeUnreleased } from '../src/orchestrate/changelog-merge.js';
+import { mergeUnreleased, moveToUnreleased } from '../src/orchestrate/changelog-merge.js';
 import { lotBranch, lotTreeDir, prepareTree } from '../src/orchestrate/worktree.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { git } from './orchestrate-harness.js';
@@ -103,7 +103,7 @@ describe('R4 — au rebase d\'intégration', () => {
   it('R4 — deux lots ajoutent une entrée : le rebase réussit, l\'union est commitée, aucun rebase en cours', () => {
     const { t } = setup();
     const r = rebaseOnto(t.dir, 'main');
-    expect(r).toMatchObject({ kind: 'rebased', changelog: 1 });
+    expect(r).toMatchObject({ kind: 'rebased', changelog: 1, moved: 0 });
     expect(readFileSync(join(t.dir, 'CHANGELOG.md'), 'utf8')).toBe(
       log('### Added\n\n- base A\n- entrée de main\n- entrée du lot\n\n### Fixed\n\n- correctif de main\n'),
     );
@@ -224,5 +224,46 @@ describe('R5 — l\'entrée du lot rejoué peut être modifiée ou retirée par 
     expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased', changelog: 2 });
     expect(readFileSync(join(t.dir, 'CHANGELOG.md'), 'utf8')).toBe(log('### Added\n\n- base A\n- entrée de main\n- entrée du lot précisée\n'));
     expect(git(t.dir, 'status', '--porcelain')).toBe('');
+  });
+});
+
+// L362 — une publication sur main pendant la vie de la branche : [Unreleased] de main est devenu [1.1.0], celui de la branche contient encore les entrées publiées.
+describe('R6 — les entrées du lot vont sous le [Unreleased] de main, pas sous la version publiée', () => {
+  const PUBLISHED = (unreleasedBody: string) =>
+    `# Changelog\n\nintro\n\n## [Unreleased]\n\n${unreleasedBody}## [1.1.0] - 2026-02-01\n\n### Added\n\n- base A\n\n## [1.0.0] - 2026-01-01\n\n### Added\n\n- première version\n`;
+  function setup(lotChangelog: string) {
+    const repo = gitRepo();
+    writeFileSync(join(repo, 'CHANGELOG.md'), log('### Added\n\n- base A\n', '## [1.0.0] - 2026-01-01\n\n### Added\n\n- première version\n'));
+    git(repo, 'add', '--', 'CHANGELOG.md');
+    git(repo, 'commit', '-q', '-m', 'init');
+    const store = new RunStore(tempDir(), 'w1');
+    const t = { repo, dir: lotTreeDir(store.dir, 'p', 'L1'), branch: lotBranch('w1', 'p', 'L1'), base: 'main', lot: 'p:L1' };
+    expect(prepareTree(t).ok).toBe(true);
+    writeFileSync(join(t.dir, 'CHANGELOG.md'), lotChangelog);
+    writeFileSync(join(t.dir, 'x.txt'), 'x\n');
+    git(t.dir, 'add', '--', 'CHANGELOG.md', 'x.txt');
+    git(t.dir, 'commit', '-q', '-m', 'feat(L1): lot');
+    writeFileSync(join(repo, 'CHANGELOG.md'), PUBLISHED(''));
+    git(repo, 'add', '--', 'CHANGELOG.md');
+    git(repo, 'commit', '-q', '-m', 'release 1.1.0');
+    return t;
+  }
+  const lotLog = (body: string) => log(body, '## [1.0.0] - 2026-01-01\n\n### Added\n\n- première version\n');
+  const text = (t: { dir: string }) => readFileSync(join(t.dir, 'CHANGELOG.md'), 'utf8');
+  it('R6 — entrée ajoutée dans une section existante, voisine d\'une entrée publiée : sous [Unreleased], la version publiée garde la sienne', () => {
+    const t = setup(lotLog('### Added\n\n- base A\n- entrée du lot\n'));
+    expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased', moved: 1 });
+    expect(text(t)).toBe(PUBLISHED('### Added\n\n- entrée du lot\n\n'));
+  });
+  it('R6 — entrée ajoutée sous une nouvelle section : sous [Unreleased] aussi', () => {
+    const t = setup(lotLog('### Added\n\n- base A\n\n### Fixed\n\n- correctif du lot\n'));
+    expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased', moved: 1 });
+    expect(text(t)).toBe(PUBLISHED('### Fixed\n\n- correctif du lot\n\n'));
+  });
+  it('R6 — une entrée du lot absente de [Unreleased] et déjà dans la partie publiée de main reste où elle est', () => {
+    const lotTip = lotLog('### Added\n\n- base A\n- déjà publiée\n');
+    const start = lotLog('### Added\n\n- base A\n');
+    const rebased = PUBLISHED('').replace('- base A\n', '- base A\n- déjà publiée\n');
+    expect(moveToUnreleased(rebased, lotTip, start, rebased)).toBeNull();
   });
 });

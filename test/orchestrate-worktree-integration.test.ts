@@ -635,7 +635,8 @@ describe('R25 — l\'attente du verrou d\'intégration est bornée', () => {
       },
     });
     try {
-      await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f, { integrate: { waitMs: 150, pollMs: 20 } });
+      // La borne couvre aussi les écritures de plan du départ des lots (raf start, sous le même verrou) : sous charge, un git de 150 ms y rendrait L2 avant son implémentation.
+      await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f, { integrate: { waitMs: 1_500, pollMs: 20 } });
     } finally {
       h?.stop();
     }

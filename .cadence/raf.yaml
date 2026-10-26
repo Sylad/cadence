@@ -3854,6 +3854,7 @@ lots:
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "compliant — orchestré (vague 2026-10-26-1500, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: edc816cd170674e434725e909885dea7ad7742d4 }
   - id: L346
     title: "plan.onWrite dans cadence.yaml : commande lancée par raf (add, start, done, note, ux, review, public…) et par orchestrate après chaque écriture du plan, dont les fichiers produits entrent dans le même commit que le plan (chemins déclarés, ex. plan.onWrite: { command: npm run plan, files: [frontend/public/plan-data/plan.json] }) ; échec de la commande = écriture refusée et dite, plan inchangé ; générique ; doc, CHANGELOG, tests ; puis la clé posée dans finance-tracker, ol-companion, warhammer40k (lots de config). Constat du 26-10 : plan.json de finance régénéré à la main sans --news, CI « Plan publié à jour » rouge, livraison relancée"
     status: doing

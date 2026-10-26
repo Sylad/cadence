@@ -19,14 +19,22 @@ export function testWorkersFrom(env: Record<string, string | undefined>, cores: 
 
 /** Consigne des gabarits implement, fix, passe des mineurs et passe du bibliothécaire : les lanceurs de tests respectent la part de la session. */
 export function testWorkersText(n: number): string {
-  return `Machine share: the program splits the machine between the sessions of the wave, and yours gets \`${TEST_WORKERS_ENV}=${n}\` (cores ÷ session cap, in your environment and in the program's test gate). Every test runner you launch respects it: \`vitest run --maxWorkers=$${TEST_WORKERS_ENV}\`, \`jest --maxWorkers=$${TEST_WORKERS_ENV}\`, \`pytest -n $${TEST_WORKERS_ENV}\` (pytest-xdist), and the same option of any other runner; never the default (all the cores of the machine for each session at once: tests that pass alone then fail together, on timeouts). A test that fails in the whole suite and passes when run alone is a load failure, not a defect to fix.`;
+  return `Machine share: the program splits the machine between the sessions of the wave, and yours gets \`${TEST_WORKERS_ENV}=${n}\` (cores ÷ session cap, in your environment and in the program's test gate). Every test runner you launch respects it: \`vitest run --minWorkers=1 --maxWorkers=$${TEST_WORKERS_ENV}\` (vitest 2 refuses \`--maxWorkers\` alone: its default minimum is the core count), \`jest --maxWorkers=$${TEST_WORKERS_ENV}\`, \`pytest -n $${TEST_WORKERS_ENV}\` (pytest-xdist), and the same option of any other runner; never the default (all the cores of the machine for each session at once: tests that pass alone then fail together, on timeouts). A test that fails in the whole suite and passes when run alone is a load failure, not a defect to fix.`;
 }
 
-/** Le fichier à rejouer seul pour un test rouge : « fichier > suite > test » (vitest, jest), « fichier::test » (pytest). Null quand le nom n'en désigne aucun (rien à rejouer seul). */
+/**
+ * Le fichier à rejouer seul pour un test rouge : « fichier > suite > test » (vitest), « fichier::test » (pytest), « fichier » seul (jest : `FAIL src/a.test.ts`).
+ * Null quand le nom n'en désigne aucun (rien à rejouer seul) : y compris le « Suite › test » de jest, que `isJestTest` rattache aux fichiers FAIL de la même sortie.
+ */
 export function replayFile(test: string): string | null {
-  const head = test.includes('::') ? test.split('::')[0] : test.includes(' > ') ? test.split(' > ')[0] : '';
+  const head = test.includes('::') ? test.split('::')[0] : test.includes(' > ') ? test.split(' > ')[0] : /^\S+$/.test(test.trim()) ? test : '';
   const file = head.trim();
   return /^\S.*\.\w+$/.test(file) ? file : null;
+}
+
+/** Un test de jest sans fichier (« Suite › test », ligne `●`) : il se rejoue avec les fichiers FAIL de la même sortie. */
+export function isJestTest(test: string): boolean {
+  return test.includes(' › ');
 }
 
 /** Un argument de commande sans risque pour `sh -c` : tel quel s'il est simple, entre apostrophes sinon. */

@@ -233,7 +233,7 @@ plan:
   them and the plan is plan upkeep, and they go **in the same commit as the plan** everywhere the program commits the plan (`cadence orchestrate`, `cadence config set`, `cadence spec reseal`, the
   `hook.autostart: start` pre-commit). A produced file that is not tracked yet is added. `raf` itself never commits: for its commands, `git add` the plan and the produced files together.
 - A command that fails (non-zero code, cannot start, time limit) **refuses the write**: the plan and the declared files are put back as they were, the command stops with
-  `plan.onWrite en échec (<command>, code 7) : <last lines of its output> — écriture refusée, plan inchangé`, and in a wave the lot is handed back with that message.
+  `plan.onWrite en échec (<command>, code 7) : <last lines of its output> — écriture refusée, plan inchangé`, and in a wave the lot is handed back with that message. With `hook.autostart: start`, the pre-commit hook says `démarrage automatique refusé : plan.onWrite en échec …`, the lot stays todo and the commit goes through without the plan (never the « raf start fait par le hook » line).
 - A read-only plan (kept by another tool) never runs the command: the project's tool owns the write.
 
 Until the file is declared, such a commit is reported as a "commit without a

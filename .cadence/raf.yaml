@@ -3876,6 +3876,7 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "conforme (1 note mineure : un processus d'arrière-plan qui garde la sortie retarde la fin de la commande jusqu'au délai) — orchestré (vague 2026-10-26-1700, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme", commit: 607af88cbc445532050a6796493170ad48407758 }
   - id: L349
     title: "budget de lot : réserver l'escalade quand orchestrate.escalation est déclarée — la correction et la revue escaladées (mesurées sur les escalades jouées depuis L337, sinon une estimation déclarée et documentée) s'ajoutent au budget dérivé de l'estimate, comme les 155 k de la dernière passe ; le dry-run affiche le budget avec sa part d'escalade ; cadence perf compte les escalades non jouées faute de budget ; doc (orchestrate.md, le tableau des budgets), CHANGELOG, tests. Constat du 26-10 : L341 (494 k / 600 k) et L342 (572 k / 600 k) rendus avec « escalade fable non jouée (budget) » — l'escalade ajoutée par L337 n'a jamais reçu de budget, elle ne joue donc que sur les lots qui ont consommé peu, l'inverse de son but"
     status: done

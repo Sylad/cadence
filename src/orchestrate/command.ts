@@ -24,6 +24,7 @@ import { noTestGate, noTestText } from './no-test.js';
 import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specScreen, specText } from './spec.js';
+import { fichesDuDossier } from '../spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
 import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
@@ -454,17 +455,52 @@ function matchesNvmrc(version: string, wanted: string): boolean {
   return v === w || v.startsWith(`${w}.`);
 }
 
-/** Les messages de commit de plan que la vague écrirait pour ce lot, passés au hook commit-msg réel du dépôt : un refus se lit ici, avant une vague payante (L343). */
-function planMessageLines(repo: string, lot: string, wave: string): string[] {
+/**
+ * Ce avec quoi le dry-run mesure les messages de la fiche d'un lot à étape spec (L343) : la fiche du lot quand elle est déjà écrite (son sujet, ses règles
+ * `hypothese`), sinon le sujet le plus long du dossier des fiches et autant de règles que la fiche du dossier qui en porte le plus. Un sujet de 7 caractères
+ * (« <sujet> ») faisait accepter un message que `header-max-length` refuse avec un sujet réel.
+ */
+function ficheMeasure(repo: string, dir: string, lot: string): { sujet: string; regles: string[]; line: string } {
+  const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+  const hypotheses = (doc: Record<string, unknown>): string[] => (Array.isArray(doc.regles) ? doc.regles : []).filter(isObj).filter((r) => r.statut === 'hypothese').map((r) => String(r.id));
+  const fiches = fichesDuDossier(repo, dir);
+  const mine = fiches.find(({ doc }) => (isObj(doc.sujet) && doc.sujet.lot === lot) || (isObj(doc.ecran) && doc.ecran.lot === lot));
+  if (mine) {
+    const sujet = isObj(mine.doc.sujet) && typeof mine.doc.sujet.id === 'string' ? mine.doc.sujet.id : mine.name;
+    const regles = hypotheses(mine.doc);
+    return { sujet, regles: regles.length ? regles : ['R3'], line: `  fiche du lot : ${dir}/${mine.name}/fiche.yaml (${regles.length ? `hypothèses ${regles.join(', ')}` : 'aucune hypothèse : réponse du lead mesurée avec 1 règle'})` };
+  }
+  if (!fiches.length) return { sujet: '<sujet>', regles: ['R3'], line: `  aucune fiche dans ${dir} : les messages de la fiche sont mesurés avec « <sujet> » (7 caractères) et 1 règle ; un sujet réel plus long peut dépasser une limite du hook` };
+  const sujet = fiches.map((f) => f.name).reduce((a, b) => (b.length > a.length ? b : a));
+  const n = Math.max(1, ...fiches.map((f) => hypotheses(f.doc).length));
+  return { sujet, regles: Array.from({ length: n }, (_, i) => `R${i + 1}`), line: `  fiche du lot pas encore écrite : mesure avec le sujet le plus long de ${dir} (${sujet}) et ${n} règle(s)` };
+}
+
+/**
+ * Les messages de commit de plan que la vague écrirait pour ce lot, passés au hook commit-msg réel du dépôt : un refus se lit ici, avant une vague payante (L343).
+ * Les messages de la fiche (hypothèses, mineurs de sa revue, réponse du lead) ne sont joués que pour un lot à étape spec, avec un sujet de longueur réelle (`ficheMeasure`) ;
+ * les hypothèses ne sont notées que pour un lot `spec: true` sans écran (`settleHypotheses`).
+ */
+function planMessageLines(repo: string, l: LotState, wave: string, dir: string): string[] {
   const template = readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit;
-  const messages = [...new Set([PLAN_ACTIONS.started, PLAN_ACTIONS.hypotheses('<sujet>'), PLAN_ACTIONS.minors('<revue>'), PLAN_ACTIONS.reviewRecorded, PLAN_ACTIONS.reviewNoted].map((action) => planCommitMessage(template, { lot, action, wave })).concat(leadAnswerMessage(lot, ['R3'], wave)))];
+  const specStage = !!(l.screen || l.specLot);
+  const measure = specStage ? ficheMeasure(repo, dir, l.lot) : null;
+  const actions = [PLAN_ACTIONS.started, PLAN_ACTIONS.reviewRecorded, PLAN_ACTIONS.reviewNoted];
+  if (measure) {
+    if (l.specLot && !l.screen) actions.push(PLAN_ACTIONS.hypotheses(measure.sujet));
+    actions.push(PLAN_ACTIONS.minors('la fiche'));
+  }
+  const planMessages = actions.map((action) => planCommitMessage(template, { lot: l.lot, action, wave }));
+  const messages = [...new Set(measure ? planMessages.concat(leadAnswerMessage(l.lot, measure.regles, wave)) : planMessages)];
   const hook = commitMsgHook(repo);
   if (!hook) return template ? [`  messages de plan : « ${messages[0]} » (gabarit plan.commit ; aucun hook commit-msg dans ce dépôt)`] : [];
   const refused = messages.map((m) => ({ m, why: commitMsgRefusal(repo, m) })).filter((r) => r.why !== null);
-  if (!refused.length) return [`  messages de plan : ${messages.length} message(s) acceptés par le hook commit-msg du dépôt (${hook})${template ? ' — gabarit plan.commit' : ''}`];
+  const about = measure ? [measure.line] : [];
+  if (!refused.length) return [`  messages de plan : ${messages.length} message(s) acceptés par le hook commit-msg du dépôt (${hook})${template ? ' — gabarit plan.commit' : ''}`, ...about];
   return [
     ...refused.map((r) => `  ✗ message de plan refusé par le hook commit-msg : « ${r.m} » — ${r.why}`),
-    `  ✗ le lot échouerait au premier commit de plan, avant toute session : régler plan.commit dans cadence.yaml (gabarit avec {lot}, {action}, {vague})`,
+    ...about,
+    `  ✗ le lot échouerait au premier commit de plan refusé, avant ou pendant ses sessions : régler plan.commit dans cadence.yaml (gabarit avec {lot}, {action}, {vague})`,
   ];
 }
 
@@ -514,7 +550,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     for (const m of new Set(steps.map((s) => s.model))) {
       if (m !== 'local' && !MODEL_ALIASES.includes(m)) io.out(`  ⚠ modèle « ${m} » hors des alias ${MODEL_ALIASES.join(', ')} : passé tel quel à claude --model (un nom que le compte ne connaît pas fait échouer la session)`);
     }
-    for (const line of planMessageLines(l.repo, l.lot, id)) io.out(line);
+    for (const line of planMessageLines(l.repo, l, id, env.config.spec.dir)) io.out(line);
     const noTest = noTestSaid.has(l.repo) ? null : noTestGate(l.repo);
     noTestSaid.add(l.repo);
     if (noTest) io.out(`  ${basename(l.repo)} · ${noTestText(noTest)}`);

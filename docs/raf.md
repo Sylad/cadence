@@ -159,7 +159,7 @@ plan:
 - Outside a wave (`spec reseal`) there is no wave: the parenthesised group that holds `{vague}` is dropped, so the template above gives `chore(L17): test d'acceptation rescellé (…)`.
 - Absent, the subject is the one above, unchanged. The key needs `plan:` to be an object (`plan: .cadence/raf.yaml` as a plain path has nowhere to put it: write `plan: { path: …, commit: … }`).
 - The `test(<lot>): …`, `chore(<lot>): …` and `docs(<lot>): …` commits of the cycle (acceptation sealed, `vert: true` set, lead answer recorded in the fiche) and the work commits are already Conventional and are not templated.
-- `cadence orchestrate … --dry-run` runs every plan subject of each lot through the repository's real `commit-msg` hook (found as git finds it: `core.hooksPath` and husky included) and names the one it would refuse — see [docs/orchestrate.md](orchestrate.md#the-subject-of-the-plan-commits-plancommit-l343).
+- `cadence orchestrate … --dry-run` runs every plan subject each lot would write through the repository's real `commit-msg` hook (found as git finds it: `core.hooksPath` and husky included), the sheet subjects measured with a subject of real length (the lot's sheet, or the longest of the folder), and names the one it would refuse — see [docs/orchestrate.md](orchestrate.md#the-subject-of-the-plan-commits-plancommit-l343).
 
 ## Moving the plan: `raf migrate`
 

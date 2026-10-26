@@ -112,7 +112,7 @@ describe('R5 — un refus du hook ne laisse pas le plan indexé, et le message d
     expect(leadAnswerMessage('L1', ['R3', 'R5'], 'w1')).toBe('docs(L1): règles R3, R5 sourcées par la réponse du lead (orchestrate w1)');
   });
   it('R5 — le dry-run passe aussi le message de la réponse du lead au hook et nomme le refus', async () => {
-    const { parent, repo } = setup([{ title: 'un' }]);
+    const { parent, repo } = setup([{ title: 'un', spec: true }]);
     const dir = join(repo, '.git/hooks');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'commit-msg'), '#!/bin/sh\nif head -n1 "$1" | grep -q "sourcée"; then echo "✖   subject must not be sentence-case [subject-case]" >&2; exit 1; fi\n');
@@ -160,12 +160,72 @@ describe('R4 — le dry-run passe chaque message au hook commit-msg réel du dé
     removeDryRunBriefs(r.out);
     expect(r.err).toBe('');
     expect(r.out).not.toContain('✗ message de plan');
-    expect(r.out).toMatch(/messages de plan : 6 message\(s\) acceptés par le hook commit-msg/);
+    expect(r.out).toMatch(/messages de plan : 3 message\(s\) acceptés par le hook commit-msg/); // un lot sans étape spec n'écrit ni hypothèses, ni mineurs de fiche, ni réponse du lead
   });
   it('R4 — sans hook, rien de plus dans le dry-run quand le gabarit est celui d\'avant', async () => {
     const { parent } = setup([{ title: 'un' }]);
     const r = await run(parent, ['a:L1', '--dry-run'], fake());
     removeDryRunBriefs(r.out);
     expect(r.out).not.toContain('messages de plan');
+  });
+});
+
+/** Un hook commit-msg qui applique `header-max-length` (100) de config-conventional, comme commitlint. */
+function hookLongueur(repo: string): void {
+  const dir = join(repo, '.git/hooks');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'commit-msg'), '#!/bin/sh\nif [ "$(head -n1 "$1" | LC_ALL=C.UTF-8 awk \'{ print length($0) }\')" -gt 100 ]; then echo "✖   header must not be longer than 100 characters, current length is $(head -n1 "$1" | LC_ALL=C.UTF-8 awk \'{ print length($0) }\') [header-max-length]" >&2; exit 1; fi\n');
+  chmodSync(join(dir, 'commit-msg'), 0o755);
+}
+const SUJET_LONG = 'orchestrate-budget-correction-et-reprise'; // 40 caractères : « plan: L1 hypothèses de la fiche … notées (orchestrate 2026-10-04-1412) » en fait 109
+const ficheBack = (sujet: string, lot: string, hypotheses: string[]) => `sujet:\n  id: ${sujet}\n  lot: ${lot}\nregles:\n${hypotheses.map((id) => `  - id: ${id}\n    statut: hypothese\n    texte: x\n`).join('')}`;
+function ecritFiche(repo: string, sujet: string, lot: string, hypotheses: string[]): void {
+  mkdirSync(join(repo, 'docs/specs', sujet), { recursive: true });
+  writeFileSync(join(repo, 'docs/specs', sujet, 'fiche.yaml'), ficheBack(sujet, lot, hypotheses));
+  git(repo, 'add', '--', `docs/specs/${sujet}/fiche.yaml`);
+  git(repo, 'commit', '-q', '-m', `docs(${lot}): fiche ${sujet}`);
+}
+
+describe('R6 — le dry-run mesure les messages de la fiche avec un sujet de longueur réelle, pas « <sujet> »', () => {
+  it('R6 — la fiche du lot est écrite : son sujet et ses hypothèses font le message des hypothèses et celui de la réponse du lead', async () => {
+    const { parent, repo } = setup([{ title: 'un', spec: true }]);
+    hookLongueur(repo);
+    ecritFiche(repo, SUJET_LONG, 'L1', ['R1', 'R2']);
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).toMatch(new RegExp(`✗ message de plan refusé par le hook commit-msg : « plan: L1 hypothèses de la fiche ${SUJET_LONG} notées \\(orchestrate [^)]+\\) » — .*header-max-length`));
+    expect(r.out).toContain(`fiche du lot : docs/specs/${SUJET_LONG}/fiche.yaml (hypothèses R1, R2)`);
+    expect(r.out).not.toContain('<sujet>');
+    // la réponse du lead est mesurée avec les hypothèses de la fiche, pas avec une règle R3 inventée
+    expect(r.out).not.toContain('règle R3');
+  });
+  it('R6 — la fiche du lot n\'est pas encore écrite : le sujet le plus long du dossier des fiches sert de mesure, et le dry-run le dit', async () => {
+    const { parent, repo } = setup([{ title: 'un', spec: true }]);
+    hookLongueur(repo);
+    ecritFiche(repo, 'court', 'L9', ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']); // 6 règles : « docs(L1): règles R1, …, R6 sourcées par la réponse du lead (orchestrate 2026-10-04-1412) » en fait 101
+    ecritFiche(repo, SUJET_LONG, 'L8', ['R1']);
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).toMatch(new RegExp(`✗ message de plan refusé par le hook commit-msg : « plan: L1 hypothèses de la fiche ${SUJET_LONG} notées`));
+    expect(r.out).toMatch(/✗ message de plan refusé par le hook commit-msg : « docs\(L1\): règles R1, R2, R3, R4, R5, R6 sourcées par la réponse du lead/);
+    expect(r.out).toContain(`fiche du lot pas encore écrite : mesure avec le sujet le plus long de docs/specs (${SUJET_LONG}) et 6 règle(s)`);
+  });
+  it('R6 — un lot sans étape spec ne joue pas les messages de la fiche : un sujet long dans le dossier ne le fait pas refuser', async () => {
+    const { parent, repo } = setup([{ title: 'un' }]);
+    hookLongueur(repo);
+    ecritFiche(repo, SUJET_LONG, 'L8', ['R1']);
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).not.toContain('✗ message de plan');
+    expect(r.out).toMatch(/messages de plan : 3 message\(s\) acceptés/);
+    expect(r.out).not.toContain('fiche du lot');
+  });
+  it('R6 — sans aucune fiche dans le dépôt, le dry-run mesure avec « <sujet> » et prévient que la mesure est courte', async () => {
+    const { parent, repo } = setup([{ title: 'un', spec: true }]);
+    hookLongueur(repo);
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).not.toContain('✗ message de plan');
+    expect(r.out).toContain('aucune fiche dans docs/specs : les messages de la fiche sont mesurés avec « <sujet> » (7 caractères) et 1 règle ; un sujet réel plus long peut dépasser une limite du hook');
   });
 });

@@ -326,6 +326,34 @@ describe('cadence release — docs/whats-new.md', () => {
     expect(r.out).toMatch(/docs\/whats-new\.md : les deux formes de 1\.2\.4 sont là/);
   });
 
+  it('R10 — les formes écrites dans whats-new.md AVANT la commande (fichier suivi modifié) ne font pas un arbre sale : elles sont relues', () => {
+    const dir = project();
+    writeFileSync(join(dir, 'docs/whats-new.md'), WHATS_NEW_DONE);
+    expect(git(dir, 'status', '--porcelain')).toContain('docs/whats-new.md');
+    const r = release(dir, 'patch');
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/docs\/whats-new\.md : les deux formes de 1\.2\.4 sont là/);
+    expect(json(dir, 'package.json').version).toBe('1.2.4');
+  });
+
+  it('R10 — whats-new.md modifié avec un paragraphe mal placé : relu, signalé, code 1 (pas « arbre sale »)', () => {
+    const dir = project();
+    const misplaced = WHATS_NEW_DONE.replace(/\*\*1\.2\.4\*\*: the long paragraph\.\n\n(\*\*1\.2\.3\*\*: [^\n]*\n)/, '$1\n**1.2.4**: the long paragraph.\n');
+    writeFileSync(join(dir, 'docs/whats-new.md'), misplaced);
+    const r = release(dir, 'patch');
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/paragraphe long mal placé/);
+  });
+
+  it('R10 — un autre fichier suivi modifié reste un arbre sale même si whats-new.md l’est aussi', () => {
+    const dir = project();
+    writeFileSync(join(dir, 'docs/whats-new.md'), WHATS_NEW_DONE);
+    writeFileSync(join(dir, 'CHANGELOG.md'), `${CHANGELOG}\nextra\n`);
+    const r = release(dir, 'patch');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/fichiers suivis modifiés/);
+  });
+
   it('R10 — une ligne de plus de 240 caractères est signalée', () => {
     const long = WHATS_NEW_DONE.replace('a short line.', 'x'.repeat(260));
     const dir = project({ whatsNew: long });

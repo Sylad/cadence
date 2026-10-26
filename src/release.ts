@@ -89,7 +89,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
   const pkg = readJson(root, PACKAGE);
   const current = String(pkg.version ?? '');
   const version = nextVersion(current, bump);
-  if (hasTrackedChanges(root)) throw new RafError('release : l\'arbre de travail a des fichiers suivis modifiés — le commit de version ne tient que les fichiers de version ; les commiter ou les remiser d\'abord');
+  if (hasTrackedChanges(root, [WHATS_NEW])) throw new RafError(`release : l'arbre de travail a des fichiers suivis modifiés (hors ${WHATS_NEW}, que le commit de version embarque) — le commit de version ne tient que les fichiers de version ; les commiter ou les remiser d'abord`);
   if (tagExists(root, `v${version}`)) throw new RafError(`release : la version ${version} est déjà taguée (v${version}) — rien à préparer`);
 
   const writes = new Map<string, string>();
@@ -234,7 +234,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
       else {
         ready = false;
         for (const i of issues) out(`  ${i}`);
-        out('  le commit de version n\'est pas prêt : écrire ces formes (à la main ou par une session), puis relancer les étapes ci-dessous');
+        out('  le commit de version n\'est pas prêt : écrire ces formes (à la main ou par une session), puis suivre les étapes ci-dessous sans relancer la commande (elle changerait encore la version)');
       }
     }
   }

@@ -53,12 +53,14 @@ has nowhere to put the next lots' entries).
 
 It refuses, with exit code 2 and nothing written:
 
-- a tracked file modified (an untracked file does not count: the commit names its paths);
+- a tracked file modified, `docs/whats-new.md` excepted (an untracked file does not count: the commit names its paths);
 - an `[Unreleased]` section that is missing or holds nothing but sub-section titles;
 - a version already tagged (`v<x.y.z>`);
 - a `package-lock.json` that is not at the version of `package.json`, or whose dependencies differ from those of `package.json`
   (a `npm install` would move them: commit that apart, before the release);
 - a version in `package.json` that is not `x.y.z`.
+
+Write the two forms of the new version in `docs/whats-new.md` **before** running the command: the file may be modified (it is the one tracked file allowed to be, since the version commit holds it) and the command then reads the forms it finds. Run after the forms are written, it exits 0; if it exits 1 the version files are already written, so fix `docs/whats-new.md` by hand and do not run the command again (it would bump once more).
 
 `docs/whats-new.md` is **not written by the command** (the two forms are prose, written by hand or by a session): it checks that
 both are there and in their place, and says where to write what is missing. The « In two lines » line of the version is the

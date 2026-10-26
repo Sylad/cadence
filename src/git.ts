@@ -258,9 +258,9 @@ export function commitPaths(root: string, paths: string[], message: string): str
   return tryGit(root, ['rev-parse', '--short', 'HEAD']) ?? '';
 }
 
-/** Un fichier SUIVI est-il modifié (indexé ou non) ? Les fichiers non suivis ne comptent pas : un commit à chemins explicites ne les embarque pas. */
-export function hasTrackedChanges(cwd: string): boolean {
-  return git(cwd, ['status', '--porcelain', '--untracked-files=no']).trim() !== '';
+/** Un fichier SUIVI est-il modifié (indexé ou non) ? Les fichiers non suivis ne comptent pas : un commit à chemins explicites ne les embarque pas. `except` : chemins qu'on ne compte pas. */
+export function hasTrackedChanges(cwd: string, except: string[] = []): boolean {
+  return git(cwd, ['status', '--porcelain', '--untracked-files=no', '--', '.', ...except.map((f) => `:(exclude)${f}`)]).trim() !== '';
 }
 
 /** Le tag existe-t-il (local) ? */

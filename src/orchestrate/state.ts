@@ -25,6 +25,8 @@ export interface WaveState {
   pid: number;
   /** "projet:lot", dans l'ordre donné. */
   lots: string[];
+  /** Part de la machine de chaque session (L350) : CADENCE_TEST_WORKERS, cœurs ÷ plafond de sessions ; absent d'une vague d'avant L350. */
+  testWorkers?: number;
 }
 
 export interface StepState {
@@ -157,8 +159,10 @@ export interface LotState {
   ux?: ReviewSummary;
   uxNote?: string;
   /** Contrôles lancés par le programme (tests, build) au `head` indiqué, passés au relecteur tant que HEAD n'a pas bougé. */
-  checks?: { head: string; runs: { label: 'tests' | 'build'; command: string; code: number; /** Tests rouges dont tous les échecs l'étaient déjà au sha de départ (L213) : nombre d'échecs, pas un défaut du lot. */ dejaRouges?: number }[] };
+  checks?: { head: string; runs: { label: 'tests' | 'build'; command: string; code: number; /** Tests rouges dans la suite entière mais verts rejoués seuls (L350) : la porte les a écartés, le code est alors 0. */ instables?: string[]; /** Tests rouges dont tous les échecs l'étaient déjà au sha de départ (L213) : nombre d'échecs, pas un défaut du lot. */ dejaRouges?: number }[] };
   /** Ligne de base des tests (L213) : échecs déjà présents au sha de départ du lot, listés à part dans le tableau de fin de vague. `verified` : rejoués par le programme à ce sha ; sinon annoncés par la session, non vérifiés. */
+  /** Tests « instables sous charge » (L350) : rouges dans la suite de la porte, verts rejoués seuls ; jamais comptés, jamais corrigés. Journal du lot et `cadence perf`. */
+  instables?: string[];
   baseline?: { sha: string; command?: string; failures: string[]; verified: boolean };
   /** Dossier où le Playwright d'une étape (ux, ou implement/fix d'un lot visible) a rangé captures et snapshots (dans le dossier de la vague, hors du dépôt). */
   uxCaptures?: string;
@@ -205,7 +209,7 @@ export interface NewLot {
 }
 
 export function newLot(o: NewLot): LotState {
-  return { ...o, status: 'queued', pass: 0, next: null, steps: [], constats: [], verdict: null, uxVerdict: null, questions: [], choix: [], answers: [], proposals: [], warnings: [], outcome: null };
+  return { ...o, status: 'queued', pass: 0, next: null, steps: [], constats: [], verdict: null, uxVerdict: null, questions: [], choix: [], answers: [], proposals: [], warnings: [], instables: undefined, outcome: null };
 }
 
 /** Un lot fini ne travaille plus dans son dépôt : prêt, rendu ou échoué. */

@@ -142,6 +142,8 @@ export interface Journal {
   localUnreadable?: true;
   /** Escalade de modèle du lot (`escalation` du journal, L337) ; absente d'un journal ancien ou d'un lot qui n'a pas escaladé. */
   escalation?: { model: string; issue: 'conforme' | 'rendu' | 'non jouée' | 'échec' | null };
+  /** Tests rouges dans la suite de la porte mais verts rejoués seuls (`instables` du journal, L350) ; absent d'un journal ancien ou d'un lot sans test instable. */
+  instables?: string[];
   steps: JournalStep[];
   /** Une session implement a abouti (sous la borne `until` éventuelle). */
   implemented: boolean;
@@ -214,6 +216,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
         ...(precheck ? { precheck } : {}),
         ...(escalation ? { escalation } : {}),
+        ...(Array.isArray(rec.instables) && (rec.instables as unknown[]).some((t) => typeof t === 'string') ? { instables: (rec.instables as unknown[]).filter((t): t is string => typeof t === 'string') } : {}),
         ...(Array.isArray(rec.warnings) && (rec.warnings as unknown[]).some((w) => typeof w === 'string' && w.startsWith(LOCAL_PRECHECK_UNREADABLE)) ? { localUnreadable: true as const } : {}),
         steps: steps.map((s) => {
           const usage = usageOf(s.tokens);

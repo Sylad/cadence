@@ -3974,11 +3974,12 @@ lots:
     started: 2026-10-26
   - id: L361
     title: "orchestrate : un lot dont la porte du PROGRAMME est verte (checks tests code 0) et dont la session rapporte vert:false avec nouveauxEchecs vide (que des echecsDeBase) part quand même en correction puis en escalade « tests rouges » — il doit aller à la revue sans passe de correction, comme le dit docs/orchestrate.md ; test ; constat L354 et L346 du 26-10 (escalade Fable jouée pour rien)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
-    review: { date: 2026-10-26, verdict: "compliant — orchestré (vague 2026-10-26-1700, 0 passe(s) de correction)", commit: 63f3c35c0890cdb71addcce1846c686824feebaa, reporte: { de: b12b806a6c7d60ecc59fdbaa277b6dd07110e93e, vers: 63f3c35c0890cdb71addcce1846c686824feebaa, patchId: f11a20ba48b951503de6813638b4fa742a06dc25 } }
+    review: { date: 2026-10-26, verdict: "conforme — relu par le lead après la revue légère : porte du programme verte + session vert:false sans nouvel échec → avertissement, pas de rouge ; suite complète verte sur main (171 fichiers, 3823 tests, tsc)", commit: 63f3c35c0890cdb71addcce1846c686824feebaa }
+    finished: 2026-10-26
   - id: L362
     title: "intégration en mode worktree : l'union du CHANGELOG range sous la version publiée les entrées d'un lot dont la branche est née avant la publication (son [Unreleased] devient [x.y.z] sur main) — les placer sous le [Unreleased] de main ; test ; constat L346 du 26-10 (intégration refusée, test changelog rouge au sommet, entrée déplacée à la main par le lead)"
     status: todo

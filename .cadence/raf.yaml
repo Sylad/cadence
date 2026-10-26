@@ -3828,6 +3828,41 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
+  - id: L343
+    title: "orchestrate et raf : message des commits de plan réglable dans cadence.yaml (gabarit avec lot, action, vague ; défaut inchangé), appliqué à TOUS les commits de plan écrits par cadence (orchestrate, raf, spec reseal…) ; le dry-run passe chaque message au hook commit-msg réel du dépôt (core.hooksPath compris, husky) et nomme celui qui serait refusé ; doc, CHANGELOG, tests. Issue GitHub #15 : commitlint config-conventional refuse « plan: L17 démarré (orchestrate …) », le lot échoue avant toute session et le suivant est rendu (plan resté indexé)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-26
+  - id: L344
+    title: "implement : parcours réel et décisions de l'humain avant la revue — (1) le brief demande, une fois les tests verts, de jouer ce qui est livré comme un utilisateur : la commande dans un dépôt jetable en suivant la doc écrite par le lot, ou l'écran dans chacun de ses états (échec compris, à la position où l'action a lieu) avec capture ; ce qui casse se corrige dans la même session, et le rapport le dit sous « parcours réel » ; (2) le précheck extrait des notes du lot et de son parent les décisions de l'humain (date, citation) et le brief d'implémentation les reçoit sous « décisions à respecter » ; une interprétation qui s'en écarte devient une question, jamais un choix fait ; générique ; doc, tests des gabarits. Constat du 26-10 : 3 majeurs de revue sur 3 lots non conformes (L341 commande impossible dans son propre parcours, B28.8 « champs exclus » contre la décision du 22-10, finance L151 bandeau d'échec hors de vue) n'étaient pas visibles en relisant le diff. Mesure de l'effet : part conforme du premier coup de cadence perf sur deux fenêtres"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-26
+  - id: L345
+    title: "orchestrate : nom de modèle libre partout — @<modèle> d'un lot et orchestrate.review (light, full) passent le nom tel quel à claude --model, comme escalation.model ; les alias haiku|sonnet|opus gardent leur sens ; le dry-run avertit (sans refuser) pour un nom hors des alias connus ; doc (orchestrate, cadence.yaml), CHANGELOG, tests. Issue GitHub #16 : @fable refusé (« modèle inconnu »), alors que l'escalade l'accepte"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-26
+  - id: L346
+    title: "plan.onWrite dans cadence.yaml : commande lancée par raf (add, start, done, note, ux, review, public…) et par orchestrate après chaque écriture du plan, dont les fichiers produits entrent dans le même commit que le plan (chemins déclarés, ex. plan.onWrite: { command: npm run plan, files: [frontend/public/plan-data/plan.json] }) ; échec de la commande = écriture refusée et dite, plan inchangé ; générique ; doc, CHANGELOG, tests ; puis la clé posée dans finance-tracker, ol-companion, warhammer40k (lots de config). Constat du 26-10 : plan.json de finance régénéré à la main sans --news, CI « Plan publié à jour » rouge, livraison relancée"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-26
+  - id: L347
+    title: "lead tour et session start : une note de clôture qui cite un lot déjà done (ou dropped) est signalée « note périmée : L217 done le 24-10 » à côté de la note, au lieu d'être relayée telle quelle ; session-close propose de réécrire la note ; générique ; doc, tests. Constat du 26-10 : la note d'ol-companion « L217 à faire » a fait demander L217, livré deux jours plus tôt"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-26
+  - id: L348
+    title: "cadence verify --sha <sha> [--project p] : rejoue la porte du projet (orchestrate.test puis build) au sha dans un worktree jetable dont les dépendances non suivies (.venv, node_modules… liste dans cadence.yaml, orchestrate.worktreeDeps, ou la même que celle des worktrees de vague si elle existe) sont liées depuis l'arbre principal ; rend vert/rouge avec les suites en échec ; retire le worktree ; le skill lead l'emploie au point « re-vérifier » ; générique ; doc, tests. Constat du 26-10 : la re-vérification de B28.8 dans un worktree nu a donné 9 suites rouges dues aux dépendances absentes, refaite dans l'arbre partagé"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-26
+  - id: L349
+    title: "budget de lot : réserver l'escalade quand orchestrate.escalation est déclarée — la correction et la revue escaladées (mesurées sur les escalades jouées depuis L337, sinon une estimation déclarée et documentée) s'ajoutent au budget dérivé de l'estimate, comme les 155 k de la dernière passe ; le dry-run affiche le budget avec sa part d'escalade ; cadence perf compte les escalades non jouées faute de budget ; doc (orchestrate.md, le tableau des budgets), CHANGELOG, tests. Constat du 26-10 : L341 (494 k / 600 k) et L342 (572 k / 600 k) rendus avec « escalade fable non jouée (budget) » — l'escalade ajoutée par L337 n'a jamais reçu de budget, elle ne joue donc que sur les lots qui ont consommé peu, l'inverse de son but"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

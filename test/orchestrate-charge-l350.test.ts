@@ -250,6 +250,14 @@ describe('L350 R4 — un test rouge de la porte est rejoué seul avant d\'être 
     expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
     expect(c.lot.instables ?? []).toEqual([]);
   });
+  it('R4 — un rejeu seul vert dont la sortie cite « No test files found » hors ligne de fin (titre d\'un test lent) vaut vert : instable', async () => {
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const test = `f() { [ -f a.txt ] || exit 0; if [ -n "$1" ]; then echo ' ✓ R4 — un rejeu sans test (« No test files found », code 0) 428ms'; echo ' Tests  1 passed (1)'; exit 0; fi; echo ' FAIL  test/a.test.js > casse'; exit 1; }; f "$@"`;
+    const c = h.lot('L1', {}, { test });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.instables).toEqual(['test/a.test.js > casse']);
+  });
   it('R4 — un chemin à espaces ou caractères de shell est quoté pour le rejeu', () => {
     expect(shellArg('test/a.test.ts')).toBe('test/a.test.ts');
     expect(shellArg("test/a b's.test.ts")).toBe("'test/a b'\\''s.test.ts'");

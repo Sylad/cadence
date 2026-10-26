@@ -1943,8 +1943,8 @@ async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promi
   }
 }
 
-/** Sortie d'un lanceur qui n'a trouvé aucun test à rejouer (vitest « No test files found », jest/pytest « No tests found »/« no tests ran »). */
-const NO_TEST_RAN = /no test files? found|no tests? found|no tests ran/i;
+/** Sortie d'un lanceur qui n'a trouvé aucun test à rejouer : la ligne de fin du lanceur (vitest « No test files found, exiting with code », jest « No tests found, exiting with code », pytest « no tests ran in »), en début de ligne — pas ces mots cités dans le titre ou la sortie d'un test. */
+const NO_TEST_RAN = /^\W*(?:no test files? found, exiting with code|no tests? found, exiting with code|no tests ran in)\b/im;
 
 /** Rejeux d'un test rouge de la porte, seul (L350) : rouge aux deux, il est compté. */
 const REPLAYS = 2;

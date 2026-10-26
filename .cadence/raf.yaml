@@ -3986,6 +3986,7 @@ lots:
     started: 2026-10-26
     notes:
       - { date: 2026-10-26, text: "26-10 (lead, arbitrage après escalade) : R5 lance un node -e qui importe un .ts — avec engines >=22.18 (lot Node minimal, décision de Sylvain) il passe tel quel ; à défaut, le lancer via vite-node. Rejouer après le lot Node minimal." }
+    review: { date: 2026-10-26, verdict: "conforme (2 notes mineures : repli silencieux du TMPDIR écarté, test R1/R2 en double) — orchestré (vague 2026-10-26-1950, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme", commit: bd44731f7b989b8369eeb193b29eda60d0fd28bf }
   - id: L361
     title: "orchestrate : un lot dont la porte du PROGRAMME est verte (checks tests code 0) et dont la session rapporte vert:false avec nouveauxEchecs vide (que des echecsDeBase) part quand même en correction puis en escalade « tests rouges » — il doit aller à la revue sans passe de correction, comme le dit docs/orchestrate.md ; test ; constat L354 et L346 du 26-10 (escalade Fable jouée pour rien)"
     status: done

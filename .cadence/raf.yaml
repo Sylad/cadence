@@ -3870,9 +3870,10 @@ lots:
     started: 2026-10-26
   - id: L348
     title: "cadence verify --sha <sha> [--project p] : rejoue la porte du projet (orchestrate.test puis build) au sha dans un worktree jetable dont les dépendances non suivies (.venv, node_modules… liste dans cadence.yaml, orchestrate.worktreeDeps, ou la même que celle des worktrees de vague si elle existe) sont liées depuis l'arbre principal ; rend vert/rouge avec les suites en échec ; retire le worktree ; le skill lead l'emploie au point « re-vérifier » ; générique ; doc, tests. Constat du 26-10 : la re-vérification de B28.8 dans un worktree nu a donné 9 suites rouges dues aux dépendances absentes, refaite dans l'arbre partagé"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-26
+    started: 2026-10-26
   - id: L349
     title: "budget de lot : réserver l'escalade quand orchestrate.escalation est déclarée — la correction et la revue escaladées (mesurées sur les escalades jouées depuis L337, sinon une estimation déclarée et documentée) s'ajoutent au budget dérivé de l'estimate, comme les 155 k de la dernière passe ; le dry-run affiche le budget avec sa part d'escalade ; cadence perf compte les escalades non jouées faute de budget ; doc (orchestrate.md, le tableau des budgets), CHANGELOG, tests. Constat du 26-10 : L341 (494 k / 600 k) et L342 (572 k / 600 k) rendus avec « escalade fable non jouée (budget) » — l'escalade ajoutée par L337 n'a jamais reçu de budget, elle ne joue donc que sur les lots qui ont consommé peu, l'inverse de son but"
     status: done

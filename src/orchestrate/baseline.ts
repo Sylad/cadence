@@ -69,10 +69,10 @@ export function compareBaseline(now: string[], base: string[]): { nouveaux: stri
 
 /**
  * Un échec que la sortie ne rattache à aucun test : erreur non gérée (vitest « Unhandled Errors », promesse rejetée), fichier de spec qui ne se charge plus (jest « Test suite failed to run », vitest « FAIL  a.test.ts [ a.test.ts ] » : le FAIL de fichier existait peut-être au départ), seuil de
- * couverture non atteint. Comparer les seuls noms lus le masquerait derrière d'anciens échecs : l'appelant garde les tests pour rouges.
+ * couverture non atteint. `loadFailsNamed` : l'appelant nomme déjà les fichiers qui ne se chargent pas (`unloadedSuites`), ils ne comptent plus comme échec sans nom. Comparer les seuls noms lus le masquerait derrière d'anciens échecs : l'appelant garde les tests pour rouges.
  */
-export function hasUnnamedFailure(output: string): boolean {
+export function hasUnnamedFailure(output: string, loadFailsNamed = false): boolean {
   const text = output.replace(ANSI, '');
-  if (text.split('\n').some((l) => FILE_LOAD_FAIL.test(l))) return true;
+  if (!loadFailsNamed && text.split('\n').some((l) => FILE_LOAD_FAIL.test(l))) return true;
   return /Unhandled (?:Errors?|Rejections?)|Test suite failed to run|caught \d+ unhandled|coverage threshold|Coverage for \w+ \([\d.]+%\) does not meet/i.test(text);
 }

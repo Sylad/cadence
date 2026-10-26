@@ -309,4 +309,4 @@ tests the output names (the same reading as the wave's baseline) and the test fi
 Each command has 30 minutes (then its whole process group is killed, code 124). Ctrl-C, SIGTERM or a hangup received by cadence kills the running command and removes the worktree before cadence dies.
 `--sha` is required (the moving head of a wave is not a sha to re-verify) and `--retry` does not apply. Exit code:
 **0** green · **1** red · **2** nothing to replay (neither `orchestrate.build` nor `orchestrate.test`), unknown sha or a worktree that cannot be made.
-Each command has 30 minutes. The Node of the `.nvmrc` is not selected here: the commands run with the `PATH` of the caller.
+The Node of the `.nvmrc` is not selected here, and `CADENCE_TEST_WORKERS` is not set: the commands run with the environment of the caller (`PATH` included), so a re-verification run during a wave should export the session's `CADENCE_TEST_WORKERS` itself, or vitest takes every core.

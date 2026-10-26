@@ -150,6 +150,27 @@ describe('verifyGate : délai, noms des suites, signal (L348)', () => {
     expect(r.code).toBe(1);
     expect(r.text).toContain('- test/a.test.ts');
     expect(r.text).toContain('- test/b.test.ts');
+    expect(r.text).not.toContain('aucun test');
+    expect(r.text).not.toContain('  | ');
+  });
+
+  it('une commande qui laisse un processus en arrière-plan : il est tué à la fin de la commande', async () => {
+    const pidFile = join(tempDir(), 'bg.pid');
+    const { repo, sha } = project(`orchestrate:\n  test: "sleep 30 >/dev/null 2>&1 & echo $! > ${pidFile}"\n`);
+    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), out: () => {} });
+    expect(code).toBe(0);
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    const alive = () => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const t0 = Date.now();
+    while (alive() && Date.now() - t0 < 3000) await new Promise((r) => setTimeout(r, 50));
+    expect(alive()).toBe(false);
   });
 
   it.each(['SIGINT', 'SIGTERM'] as const)('%s reçu par cadence : la commande de la porte meurt et le worktree est retiré', async (sig) => {

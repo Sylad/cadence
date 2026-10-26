@@ -48,6 +48,7 @@ function sh(cmd: string, cwd: string, timeoutMs: number, group: { pgid?: number 
     }, timeoutMs);
     child.once('close', (code) => {
       clearTimeout(timer);
+      killGroup(pgid); // ce que la commande a laissé en arrière-plan ne survit pas à elle
       group.pgid = undefined;
       resolve({ code: timedOut ? 124 : (code ?? 1), output: timedOut ? `${output}\ndélai dépassé (${Math.round(timeoutMs / 60_000)} min)` : output });
     });
@@ -128,7 +129,7 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
       const unloaded = tests ? unloadedSuites(r.output) : [];
       for (const n of names) out(`  - ${n}`);
       for (const n of unloaded) out(`  - ${n} (ne se charge pas)`);
-      if (names.length + unloaded.length === 0 || hasUnnamedFailure(r.output)) {
+      if (names.length + unloaded.length === 0 || hasUnnamedFailure(r.output, true)) {
         if (names.length + unloaded.length) out('  (au moins un échec que la sortie ne rattache à aucun test)');
         if (r.output.trim()) for (const l of r.output.trimEnd().split('\n').slice(-TAIL_LINES)) out(`  | ${l}`);
       }

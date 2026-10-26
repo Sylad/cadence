@@ -10,7 +10,8 @@ import { readDocsConfig, type OrchestrateConfig } from '../config.js';
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
-import { changedFiles, gitCommonDir, readCommits, resolveCommit, type Commit } from '../git.js';
+import { changedFiles, gitCommonDir, isAncestor, readCommits, resolveCommit, type Commit } from '../git.js';
+import { blockingLots, gitCommitsIn } from './table.js';
 import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, type Plan } from '../plan.js';
@@ -20,7 +21,7 @@ import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type AnyModel, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
-import { cleanPlaywrightOutput, pushed, snapshot, type Snapshot } from './guard.js';
+import { cleanPlaywrightOutput, pushed, remoteAdvances, snapshot, type Snapshot } from './guard.js';
 import { sumTokens, type Tokens } from './result.js';
 import { cutReport, EXTENSION_MS, MAX_EXTENSIONS, workTimeoutMs } from './timeouts.js';
 import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
@@ -871,10 +872,12 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   const others: Others = neighbours.map((repo, i) => ({ repo, before: beforeOthers[i], after: afterOthers[i] }));
   step.headAfter = after.head ?? undefined;
   // Le dépôt du projet d'abord, puis chaque voisin : mêmes contrôles, l'incident nomme le dépôt voisin.
-  const watched = [{ where: '', path: wd(c), before, after }, ...others.map((o) => ({ where: ` dans ${o.repo.rel}`, path: o.repo.path, before: o.before, after: o.after }))];
+  const watched = [{ where: '', path: wd(c), repo: c.lot.repo, before, after }, ...others.map((o) => ({ where: ` dans ${o.repo.rel}`, path: o.repo.path, repo: o.repo.path, before: o.before, after: o.after }))];
   // Les incidents d'abord, dans TOUS les dépôts surveillés (projet et voisins) : un push ou un hook de garde supprimé où que ce soit arrête la vague, avant tout traitement d'un HEAD déplacé ou d'un lot rendu (L214).
-  for (const { where, before: b, after: a } of watched) {
-    if (pushed(b, a)) {
+  for (const { where, repo, before: b, after: a } of watched) {
+    const delivered = pushed(b, a) ? leadDelivery(c, repo, b, a) : null;
+    if (delivered) w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} : push du lead (livraison ${delivered.length ? `de ${delivered.join(', ')}` : 'du plan'}) toléré${where}`);
+    else if (pushed(b, a)) {
       step.status = 'failed';
       step.cause = `push détecté${where}`;
       w.incident = `push détecté${where} pendant ${lotKey(l.project, l.lot)} (${kind})`;
@@ -986,6 +989,35 @@ function headStranded(path: string, b: Snapshot, a: Snapshot): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Le push du lead pour livrer un lot prêt de la vague (L352) : `git push origin <sha>:main`, le chemin « livrable jusqu'à <sha> » du skill lead.
+ * Toléré quand chaque branche distante qui a bougé avance en avant (ou est créée) vers un sha ancêtre du HEAD du dépôt et que ce sha ne contient aucun
+ * commit d'un lot de la vague qui n'est pas prêt (la garde de `deliver --sha`, `blockingLots`) : ne restent que des commits de lots prêts ou du plan.
+ * Renvoie les lots prêts livrés (vide : du plan seulement) ; null pour tout autre push, qui reste un incident — dont une branche supprimée, un push
+ * forcé, un sha hors de l'histoire de HEAD ou des commits d'un lot en cours ou illisibles.
+ */
+function leadDelivery(c: LotCtx, repo: string, before: Snapshot, after: Snapshot): string[] | null {
+  const moved = remoteAdvances(before, after);
+  if (!moved) return null;
+  const lots = c.wave.store.lots().filter((x) => lotKey(x.project, x.lot) !== lotKey(c.lot.project, c.lot.lot));
+  const here = [c.lot, ...lots].filter((x) => x.repo === repo || (x.repos ?? []).some((r) => r.path === repo));
+  const delivered = new Set<string>();
+  for (const { from, to } of moved) {
+    if (!isAncestor(repo, to, 'HEAD') || (from !== null && !isAncestor(repo, from, to))) return null;
+    const { blocking, unreadable } = blockingLots(here, repo, to);
+    if (blocking.length > 0 || unreadable.length > 0) return null;
+    for (const x of here) {
+      if (x.status !== 'ready') continue;
+      try {
+        if (gitCommitsIn(x, repo).some((k) => isAncestor(repo, k, to) && (from === null || !isAncestor(repo, k, from)))) delivered.add(lotKey(x.project, x.lot));
+      } catch {
+        return null;
+      }
+    }
+  }
+  return [...delivered];
 }
 
 /** Incident du LOT (L133) : la revue a laissé des traces (captures, commit), ni push ni garde supprimée — les lots des autres dépôts continuent. */

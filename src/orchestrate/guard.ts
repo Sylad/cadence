@@ -302,3 +302,26 @@ export function pushed(before: Snapshot, after: Snapshot): boolean {
   if (before.upstreamRef !== null && before.upstreamRef === after.upstreamRef && before.upstream !== after.upstream) return true;
   return before.remote !== null && after.remote !== null && before.remote !== after.remote;
 }
+
+/** Une branche du dépôt distant qui a bougé pendant une session : `from` null pour une branche créée. */
+export interface RemoteAdvance {
+  ref: string;
+  from: string | null;
+  to: string;
+}
+
+const heads = (remote: string): Map<string, string> => new Map(remote.split('\n').flatMap((l) => (/^[0-9a-f]{40}\t\S+$/.test(l) ? [[l.slice(41), l.slice(0, 40)] as const] : [])));
+
+/**
+ * Les branches distantes qui ont avancé ou été créées entre `before` et `after` (L352). null quand le détail n'est pas lisible
+ * (un `ls-remote` manquant), quand une branche a disparu ou quand rien n'a bougé sur le distant : seul un push qui ne fait
+ * qu'avancer ou créer des branches peut être celui du lead.
+ */
+export function remoteAdvances(before: Snapshot, after: Snapshot): RemoteAdvance[] | null {
+  if (before.remote === null || after.remote === null) return null;
+  const was = heads(before.remote);
+  const now = heads(after.remote);
+  if ([...was.keys()].some((ref) => !now.has(ref))) return null;
+  const moved = [...now].filter(([ref, sha]) => was.get(ref) !== sha).map(([ref, to]) => ({ ref, from: was.get(ref) ?? null, to }));
+  return moved.length > 0 ? moved : null;
+}

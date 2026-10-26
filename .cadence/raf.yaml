@@ -3925,6 +3925,7 @@ lots:
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "compliant — orchestré (vague 2026-10-26-1345, 0 passe(s) de correction)", commit: 6a920e653ce2bc3affd5f3843a31e56505791f75, reporte: { de: 5399fdec900b34f787d77b40f6afb215ff6f17f6, vers: 6a920e653ce2bc3affd5f3843a31e56505791f75, patchId: 936c75e47a71c2fbc307b2acf46843e63971ffca } }
   - id: L356
     title: "test R25 de test/orchestrate-worktree-integration.test.ts (--resume --integrate d'un lot rendu sur le délai) : rouge sous charge 3 fois le 26-10, vert seul — le rendre déterministe (promesses libérées par le test plutôt que délais, comme L155 R16)"
     status: done

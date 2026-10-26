@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-10-26
+
 1.14.0 was tagged but never reached npm: its publication stopped on a red test. 1.14.1 carries what 1.14.0 brought.
 
 ### Fixed

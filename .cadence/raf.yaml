@@ -3858,6 +3858,8 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
+    notes:
+      - { date: 2026-10-26, text: "26-10 (lead) — réponse à la question de la vague 1125 : ne pas poser plan.onWrite dans finance-tracker, ol-companion et warhammer40k ; le lead la posera lui-même avec cadence config set après la publication de la version et la mise à jour du cadence installé. Terminer le lot sans cette partie et le dire dans le CHANGELOG / la doc si elle l'annonce." }
   - id: L347
     title: "lead tour et session start : une note de clôture qui cite un lot déjà done (ou dropped) est signalée « note périmée : L217 done le 24-10 » à côté de la note, au lieu d'être relayée telle quelle ; session-close propose de réécrire la note ; générique ; doc, tests. Constat du 26-10 : la note d'ol-companion « L217 à faire » a fait demander L217, livré deux jours plus tôt"
     status: todo
@@ -3880,6 +3882,8 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
+    notes:
+      - { date: 2026-10-26, text: "26-10 (lead) : rendu deux fois faute de budget alors qu'il converge (1 bloquant + 3 majeurs → 1 majeur) ; reprise avec budget neuf" }
   - id: L351
     title: "orchestrate : la porte (orchestrate.test, orchestrate.build, ligne de base comprise) et les autres commandes lancées par le programme tournent avec le même environnement Node que les sessions (lien node-bin/<version> du .nvmrc en tête du PATH) ; le dry-run signale un .nvmrc différent du Node du PATH quand une porte est déclarée ; doc, CHANGELOG, tests. Issue GitHub #17 : Node 24 demandé par .nvmrc, vague lancée sous Node 20, la porte échoue quoi que fasse le lot, passes de correction vides puis escalade pour rien"
     status: todo
@@ -3888,11 +3892,14 @@ lots:
     created: 2026-10-26
   - id: L352
     title: "orchestrate : la détection de push ne coupe plus un lot quand le push est celui du lead pour livrer un lot prêt de la vague — le sha poussé est un ancêtre de HEAD et ne contient que des commits de lots prêts (ou du plan), c'est-à-dire le chemin « livrable jusqu'à <sha> » que le skill lead prescrit ; tout autre push reste un incident ; le journal dit « push du lead (livraison de <lot>) toléré » ; doc (orchestrate, skill lead), CHANGELOG, tests. Constat du 26-10 : le skill demande git push origin <sha>:main pendant la vague, le programme a tué maritime B28.9 en implémentation (26 min, 306 k) au même moment"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
-    review: { date: 2026-10-26, verdict: "compliant (1 mineur) — orchestré (vague 2026-10-26-1125, 0 passe(s) de correction)", commit: f168af18fc2b51db7b207c3806999a8511aab721 }
+    review: { date: 2026-10-26, verdict: "conforme avec une suite — revue Opus neuve du lead (26-10) : comportement juste (push forcé, sha inconnu, branche supprimée restent incidents) ; majeur : gardes push forcé et lot illisible sans test (mutation : suite verte) → L353 ; mineur : la doc dit « seulement des lots prêts » alors qu'un commit sans lot passe", commit: f168af18fc2b51db7b207c3806999a8511aab721 }
+    finished: 2026-10-26
+    tasks:
+      - { id: t1, title: "Tests L352 : un push forcé qui rembobine main vers un ancêtre de HEAD (git push -f origin <ready>~1:main) et un lot de la vague illisible dans le plan restent des incidents — retirer l'une ou l'autre garde (cycle.ts:1008, 1010) laisse aujourd'hui toute la suite verte ; et docs/orchestrate.md:703, CHANGELOG, skill lead : dire « aucun commit d'un lot de la vague non prêt » (un commit sans lot passe) ou refuser aussi ces commits", status: todo }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

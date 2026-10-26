@@ -130,6 +130,27 @@ describe('R2 — budget relevé', () => {
     expect(out.out.join('\n')).toContain('a:L1 → suspended — budget relevé de 750000 à 1149000 (--resume --budget)');
     expect(r.lot().warnings.join('\n')).toContain('budget relevé de 750000 à 1149000');
   });
+  it("R2 — L349 : le relèvement garde la part d'escalade retenue, N reste la marge des passes ordinaires", async () => {
+    const r = await handedBack();
+    const lot = r.lot();
+    lot.escalationReserve = 175_000;
+    r.store.writeLot(lot);
+    const spent = lot.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
+    const out = io(r.parent);
+    await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+200k'], out.io, r.f.deps);
+    expect(r.lot().budget).toBe(spent + 200_000 + 175_000);
+    expect(out.out.join('\n')).toContain(`budget relevé de 600000 à ${spent + 375_000}`);
+  });
+  it("R2 — L349 : l'escalade déjà engagée ne laisse aucune part, le budget relevé est consommé + N", async () => {
+    const r = await handedBack();
+    const lot = r.lot();
+    lot.escalationReserve = 175_000;
+    lot.escalation = { model: 'fable', stage: 'done' };
+    r.store.writeLot(lot);
+    const spent = lot.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
+    await orchestrate(['--resume', WAVE, '--budget', 'a:L1=+200k'], io(r.parent).io, r.f.deps);
+    expect(r.lot().budget).toBe(spent + 200_000);
+  });
   it("R2 — le budget d'un lot non visé n'est pas modifié", async () => {
     const w = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
     const f = fakeDeps({ review: costlyMajor });

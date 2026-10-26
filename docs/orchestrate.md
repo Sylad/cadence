@@ -74,7 +74,7 @@ The review and UX briefs carry it too, on a line `Goal of the lot (it takes prec
 `correction non jouée (budget)` or `budget du lot atteint` kept its findings but not its budget, and a plain `--resume` does not replay a
 finished lot. `--budget maritime:B26.4=+300k` (the project may be left out when only one project carries the lot; the option is
 repeatable for several lots, and `--budget 1M` still raises the wave's budget — the `=` tells them apart) puts the lot back in play:
-its budget becomes **what its sessions already counted plus N** (849 k spent of 750 k, `=+300k`: 1 149 000), its outcome is cleared,
+its budget becomes **what its sessions already counted plus N** (849 k spent of 750 k, `=+300k`: 1 149 000; when the lot still holds the share of the escalation (L349) it is added on top, so N stays the margin of the ordinary passes), its outcome is cleared,
 and the step that was not played (`fix`, `implement`, `spec` or `accept` — the only ones a lot budget bounds; a review is never handed
 back for it) runs in a **new session** (never `claude --resume` on the earlier one) with the findings the lot kept, then the normal cycle
 goes on: review, verdict recorded with the sha re-read and the plan committed. Nothing is recorded twice, since a lot handed back for

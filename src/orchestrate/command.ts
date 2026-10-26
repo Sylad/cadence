@@ -23,7 +23,7 @@ import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { specScreen, specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
+import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -1258,7 +1258,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     else if (lotFinished(matches[0])) refusals.push(`--drop ${lotKey(matches[0].project, matches[0].lot)} : le lot est déjà fini (${matches[0].status})`);
     else drops.push(lotKey(matches[0].project, matches[0].lot));
   }
-  // --resume --budget projet:lot=+N (L223) : un lot rendu sur budget est remis en jeu avec son budget relevé. Il subit ensuite les gardes d'un lot vivant.
+  // --resume --budget projet:lot=+N (L223) : un lot rendu sur budget est remis en jeu avec son budget relevé (N reste la marge des passes ordinaires : la part de l'escalade encore retenue, L349, s'y ajoute). Il subit ensuite les gardes d'un lot vivant.
   const raised = new Map<LotState, { from: number; to: number; step: SessionKind }>();
   const answered = args.answers.map((a) => lots.filter((x) => x.lot === a.lot && (a.project ? x.project === a.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
   const dropped = args.drop.map((d) => lots.filter((x) => x.lot === d.lot && (d.project ? x.project === d.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
@@ -1276,7 +1276,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     else if (answered.includes(l)) refusals.push(`--budget ${key} : lot aussi visé par --answer`);
     else if (!budgetStep(l)) refusals.push(`--budget ${key} : le lot n'est pas rendu sur budget avec une étape d'écriture à rejouer (${l.status}${l.status === 'handed-back' ? `, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'}` : ''})`);
     else if (budgetStep(l) === 'fix' && b.raise <= REVIEW_RESERVE) refusals.push(`--budget ${key}=+${b.text} : un fix ne part qu'au-dessus de ${REVIEW_RESERVE} tokens de réserve`);
-    else raised.set(l, { from: l.budget ?? lotSpent(l), to: lotSpent(l) + b.raise, step: budgetStep(l)! });
+    else raised.set(l, { from: l.budget ?? lotSpent(l), to: lotSpent(l) + b.raise + heldForEscalation(l), step: budgetStep(l)! });
   }
   // --resume --integrate projet:lot (L279, R27) : un lot rendu à l'étape d'intégration (next: integrate) n'est rejoué que si le lead le nomme. Ni --resume seul, ni --drop, --answer ou --budget ne le rejouent.
   const integ: LotState[] = [];

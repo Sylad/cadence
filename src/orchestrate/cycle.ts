@@ -559,7 +559,7 @@ const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) 
 export const ESCALATION_RESERVE = 175_000;
 
 /** Part du budget que les passes ordinaires doivent laisser à l'escalade : retenue tant que l'escalade n'est pas engagée (ou écartée), libérée ensuite. */
-const heldForEscalation = (l: LotState): number => (l.escalation ? 0 : (l.escalationReserve ?? 0));
+export const heldForEscalation = (l: LotState): number => (l.escalation ? 0 : (l.escalationReserve ?? 0));
 
 /**
  * Coût réservé à une passe de correction et à la revue courte qui la suit (L145, étendu L218). Réserve fixe de 155 k tokens comptés :

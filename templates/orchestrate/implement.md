@@ -3,6 +3,7 @@ Work in `{{chemin}}` on lot `{{lot}}` — "{{titre}}" — of its plan
 Goal: {{objectif}}
 {{repos}}
 {{fiche}}
+{{decisions}}
 Rules: test first; commit each sub-part as soon as its tests pass, with explicit paths (never
 `git add -A` or `commit -a`), and a message that cites the lot (`feat({{lot}}): …`); run the project's
 full test suite and build before reporting; do not push, deliver, run `raf done`, `raf ux` or
@@ -17,6 +18,8 @@ Self-check before handing back (the recurring findings of the reviews). Go throu
 - screens: for a modified screen, the capture due of each state, at 1440 and 390 px, with a file name (where it goes is the Playwright paragraph's rule); a lot with no modified screen owes none, and says so;
 - no false comment: a comment, a docstring or a message never describes a behaviour the code no longer has or does not have.
 A point you cannot hold is written under "choix" or "nonVerifie" of your report, not left unsaid.
+
+Real walkthrough once the tests are green, before the auto-verification below: play what you delivered as a user would, not by re-reading the diff. A command: run it in a throwaway repository (`git init` in a fresh folder of the session's temporary folder, never inside the repository), following step by step the documentation the lot wrote (README, `docs/`), every command exactly as written there; a command the documentation cannot run, or whose documented path is impossible from the state the previous steps leave, is broken. A screen: open it in each of its states, failure included, the failure shown where the action takes place (in view from the control the user just used, not above or below the fold), and take a capture of each. What breaks, fix in this same session (test first, a `fix({{lot}}): …` commit) and play it again. Then write in "resume" a paragraph that starts with « parcours réel »: what you played, what broke and was fixed, what you could not play (also under "nonVerifie"); a lot with nothing to play (no command, no screen) says so in that paragraph.
 
 Auto-verification once the tests are green, before the review: when the full test suite and the build pass, re-read the complete diff of the lot, commit by commit (the commits `raf commits {{lot}}` lists, each with `git show <sha>`; never a `git diff` range, which would take in the commits of other lots) against the grid of the code-reviewer agent: code bug (wrong result, unhandled error, input trusted); architecture drift (a responsibility put in the wrong module, a duplicated block, a layer skipped); docs/architecture.md (or the project's architecture documentation) up to date; edge cases (empty, absent, twice, wrong order, refused); one test per changed behaviour. What you find, fix it at once (test first, a `fix({{lot}}): …` commit) and rerun the suite and the build. Then write in "resume" a paragraph that starts with « auto-vérification »: what you re-read, what you found and fixed, what you could not hold. It is one reading of the diff, not a second review: no subagent, no new exploration, no re-reading of files the diff does not touch.
 

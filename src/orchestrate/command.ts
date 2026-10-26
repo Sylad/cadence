@@ -14,6 +14,7 @@ import { pidAlive, sharedStateDir } from '../state.js';
 import { findProjects, isProject as isLeadProject } from '../lead.js';
 import { freeLine, readyFree } from '../ready-free.js';
 import { acquireSlot, cadenceHome, expiredHolds, freeSlots, liveHolds, liveSlots, liveWaves, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
+import { decisionsText, humanDecisions } from './decisions.js';
 import { headline, loadTemplates, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { readWaits, renderWaits } from './waits.js';
 import { acceptationFile, acceptText } from './accept.js';
@@ -472,6 +473,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, lotSlug(l.project, l.lot), 'playwright');
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
     const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '' };
+    vars.decisions = decisionsText(humanDecisions(lot, lot.parent ? env.loadPlan().lots().find((x) => x.id === lot.parent) : undefined));
     if (specStage) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, back: !!l.specLot });
     if (l.screen && env.config.maquette) vars.maquette = maquetteText({ fiche: `${env.config.spec.dir}/<écran>/fiche.yaml`, passes: 0, max: env.config.maquetteReviews });
     if (l.specLot && env.config.fiche) vars.fiche = ficheReviewText({ fiche: `${env.config.spec.dir}/<sujet>/fiche.yaml`, passes: 0 });

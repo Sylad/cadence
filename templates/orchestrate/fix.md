@@ -2,6 +2,7 @@ Work in `{{chemin}}` on lot `{{lot}}` — "{{titre}}" — of its plan. A fresh r
 of this lot found the defects below; fix them, and nothing else.
 {{repos}}
 {{fiche}}
+{{decisions}}
 Commits of the lot so far:
 {{commits}}
 

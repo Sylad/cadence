@@ -80,6 +80,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - `cadence config set <key> <value> --all [--dry-run] [--depth n]` (L342, `docs/lead.md`): sets or changes a key in the `cadence.yaml` of every project of the folder (the ones `lead tour` lists), comments and order kept, creates a config lot quoting the key in each (`raf add` + `raf start`), commits with explicit paths, never pushes, lists what it did and what it skipped (dirty files, key already set, read-only plan), and stops on a project whose config does not read back with cadence's own loaders.
+- `cadence orchestrate` briefs (L344, `docs/orchestrate.md`): the `implement` brief asks, once the tests are green, for a real walkthrough of what was delivered, played as a user (a command in a throwaway repository following the documentation the lot wrote; a screen in each state, failure included and shown where the action takes place, with a capture), fixed in the same session and reported under « parcours réel » in `"resume"`. The notes of the lot and of its parent that record a decision of the human (who decided, with date and text as written) reach the `implement` and `fix` briefs (and `--dry-run`) under « Decisions to respect »: a departing interpretation is a question, never a choice. Seen on 26-10: three major review findings on three lots that re-reading the diff did not show.
 
 ### Fixed
 

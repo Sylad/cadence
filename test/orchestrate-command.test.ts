@@ -1803,6 +1803,23 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
     expect(briefs.join('\n')).toContain('sous-tâche conservée');
   });
 
+  it('L344 R8 — --dry-run : les briefs implement et fix portent les décisions de l\'humain écrites dans les notes du lot, pas les autres', async () => {
+    const { parent, dirs } = withGoalKey();
+    const plan = Plan.load(join(dirs.a, 'docs/plan/raf.yaml'));
+    plan.note('L1', 'décision de Sylvain (22-10) : « champs exclus » = champs non remplis', '2026-10-22');
+    plan.note('L1', 'revue de la vague : conforme', '2026-10-23');
+    plan.save();
+    git(dirs.a, 'commit', '-qam', 'chore: notes');
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    const briefs = dryBriefs(r.out.join('\n'));
+    const withDecision = briefs.filter((b) => b.includes('Decisions to respect'));
+    expect(withDecision.length).toBeGreaterThanOrEqual(1);
+    for (const b of withDecision) {
+      expect(b).toContain('2026-10-22 (L1): décision de Sylvain');
+      expect(b).not.toContain('- 2026-10-23 (L1): revue de la vague');
+    }
+  });
+
   it('R3 — sans --goal, la clé goal: du lot remplace le titre ; --goal l\'emporte sur la clé', async () => {
     const { parent } = withGoalKey('Objectif de la clé');
     const byKey = await run(parent, ['a:L1', '--dry-run']);

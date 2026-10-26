@@ -3959,9 +3959,10 @@ lots:
     finished: 2026-10-26
   - id: L357
     title: "parcours d'un nouvel utilisateur sur mini-blue (WSL Ubuntu vierge de cadence) : installer le paquet npm publié et le plugin Claude Code, créer un dossier de deux petits projets (raf init dans chacun, cadence.yaml minimal), lead tour, une première vague orchestrate d'un lot jouet, deliver --dry-run ; noter chaque accroc (commande, message, temps perdu) et en faire la liste des lots ; rien de propre à notre dossier ; rapport dans docs/ (parcours mesuré)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-26
+    started: 2026-10-26
   - id: L358
     title: "README : démarrage « lead multi-projets » en 10 minutes (installation, dossier parent, raf init, /lead, première vague), schéma simple, le détail dans docs/ ; modèles de tickets GitHub (bug, demande) ; d'après le parcours mesuré sur mini-blue"
     status: todo

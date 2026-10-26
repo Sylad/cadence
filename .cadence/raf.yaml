@@ -3934,7 +3934,7 @@ lots:
     finished: 2026-10-26
   - id: L354
     title: "porte de tests : rejeu seul d'un rouge avant de le compter, activé SEULEMENT quand le projet déclare une commande de rejeu explicite (ex. orchestrate.testReplay: \"npx vitest run --maxWorkers=$CADENCE_TEST_WORKERS --minWorkers=1 {files}\") ; sans elle, pas de rejeu et rien n'est tenu pour instable ; un rejeu où le test n'a pas tourné compte rouge ; le relecteur reçoit les noms des instables ; reprendre le travail de la branche de L350 (tag l350-rejeu-seul-26-10, commits a4362dc→28a8414) et les constats de ses revues (portes composées, :: avant >, checksText) ; doc, CHANGELOG, tests. Décision de Sylvain du 26-10 (coupe de L350)"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L350 ]
     created: 2026-10-26
@@ -3942,6 +3942,7 @@ lots:
     notes:
       - { date: 2026-10-26, text: "26-10 (lead, arbitrage après 3 passes Fable) : restreindre le rejeu seul aux portes à lanceur UNIQUE — orchestrate.testReplay refusé à la lecture de cadence.yaml quand orchestrate.test est une porte composée (&&, ||, sous-shells) ; pas de prise en charge des portes composées dans ce lot ; les constats restants sur les portes composées tombent avec cette restriction" }
     review: { date: 2026-10-26, verdict: "conforme — 2 mineurs (ligne ⚠ « déjà rouges » absente quand tous les nouveaux rouges sont instables ; exemple du CHANGELOG qui cite un rejeu de porte composée désormais refusé), aucune sous-tâche — orchestré (vague 2026-10-26-1950, 4 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (d3411895) laisse le patch du lot identique (git range-diff : « = »), et les changements de main (boucle de rebase rejoué de L364 dans integrateLot, MAX_REPLAYS/baseMoved) ne touchent ni programChecks, ni replayAlone, ni checksText, ni la garde de work() ; l'entrée CHANGELOG reste sous [Unreleased]", commit: b9c27a271bb6e71c6d27432676f7ffe217cdaa1f }
+    finished: 2026-10-26
   - id: L355
     title: "test/orchestrate-snapshot.test.ts : 2 tests rouges dans l'environnement d'une session de vague (même au sha de départ), verts dans un shell — trouver la dépendance à l'environnement de la vague et rendre le test hermétique ; il a rendu L346 malgré l'escalade le 26-10"
     status: done
@@ -3960,11 +3961,12 @@ lots:
     finished: 2026-10-26
   - id: L357
     title: "parcours d'un nouvel utilisateur sur mini-blue (WSL Ubuntu vierge de cadence) : installer le paquet npm publié et le plugin Claude Code, créer un dossier de deux petits projets (raf init dans chacun, cadence.yaml minimal), lead tour, une première vague orchestrate d'un lot jouet, deliver --dry-run ; noter chaque accroc (commande, message, temps perdu) et en faire la liste des lots ; rien de propre à notre dossier ; rapport dans docs/ (parcours mesuré)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "conforme : les corrections (anonymisation A6, A7, A8, « Rejouer », décompte des lots dans le CHANGELOG) sont faites et testées ; restent 2 notes mineures de rédaction — orchestré (vague 2026-10-26-1950, 0 passe(s) de correction + passe des mineurs)", commit: fb27b322fb9bae3c4b3d951d1d34a9b6eea7cc46 }
+    finished: 2026-10-26
   - id: L358
     title: "README : démarrage « lead multi-projets » en 10 minutes (installation, dossier parent, raf init, /lead, première vague), schéma simple, le détail dans docs/ ; modèles de tickets GitHub (bug, demande) ; d'après le parcours mesuré sur mini-blue"
     status: todo
@@ -3981,13 +3983,14 @@ lots:
     finished: 2026-10-26
   - id: L360
     title: "test/orchestrate-snapshot.test.ts encore rouge (2 à 3 tests) DANS une session de vague après L355 (NODE_PATH ignoré) : la cause n'était pas seulement NODE_PATH — faire relever par une session l'environnement exact d'une session de vague (env complet, cwd, HOME, PATH) et reproduire hors vague, puis rendre le test hermétique ; L346 et L354 l'ont vu rouge le 26-10 alors que la porte du programme était verte"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
     notes:
       - { date: 2026-10-26, text: "26-10 (lead, arbitrage après escalade) : R5 lance un node -e qui importe un .ts — avec engines >=22.18 (lot Node minimal, décision de Sylvain) il passe tel quel ; à défaut, le lancer via vite-node. Rejouer après le lot Node minimal." }
     review: { date: 2026-10-26, verdict: "conforme (2 notes mineures : repli silencieux du TMPDIR écarté, test R1/R2 en double) — orchestré (vague 2026-10-26-1950, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme", commit: bd44731f7b989b8369eeb193b29eda60d0fd28bf }
+    finished: 2026-10-26
   - id: L361
     title: "orchestrate : un lot dont la porte du PROGRAMME est verte (checks tests code 0) et dont la session rapporte vert:false avec nouveauxEchecs vide (que des echecsDeBase) part quand même en correction puis en escalade « tests rouges » — il doit aller à la revue sans passe de correction, comme le dit docs/orchestrate.md ; test ; constat L354 et L346 du 26-10 (escalade Fable jouée pour rien)"
     status: done
@@ -4012,11 +4015,12 @@ lots:
     created: 2026-10-26
   - id: L364
     title: "intégration en mode worktree : quand l'avance rapide de main est refusée parce que main a bougé pendant l'intégration (commit de plan du lead, autre lot), refaire le rebase et les tests au nouveau sommet (une ou deux fois) au lieu de rendre le lot ; journal « main a avancé pendant l'intégration, rebase rejoué » ; test ; constat L347 du 26-10 (« Not possible to fast-forward », commit de clôture de L361 par le lead au même moment)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "compliant — orchestré (vague 2026-10-26-1950, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: d5389772a22c7b9f5bddd25ccdcd59150c9bd62b }
+    finished: 2026-10-26
   - id: L365
     title: "Node minimal : engines.node >=22.18 (Node 20 n'est plus maintenu depuis avril 2026 ; 22.18 exécute les .ts sans outil, ce dont les tests dépendent) ; CI tests.yml en matrice Node 22 et 24 ; CHANGELOG « Changed » avec avertissement explicite ; docs/stabilite.md : la version minimale de Node suit les LTS maintenues ; publication en version MINEURE avec avertissement (décision de Sylvain du 26-10) ; R5 de L360 passe alors sans contournement"
     status: done
@@ -4027,18 +4031,20 @@ lots:
     finished: 2026-10-26
   - id: L366
     title: "verrou d'acceptation : un lot d'écran clos à la main (raf done) avec acceptation-<lot>.json à vert: false bloque toutes les vagues suivantes du dépôt (« verrou des tests d'acceptation … premier commit fautif » sur des lots qui n'y touchent pas) — (1) cadence spec green <lot> : lance la commande d'acceptation du lot clos et, verte, pose vert: true comme le cycle (commit cité) ; (2) raf done d'un lot à vert: false avertit, refuse sans --force ; (3) le dry-run signale à l'avance une acceptation rouge d'un lot clos ; doc, CHANGELOG, tests. Issue GitHub #18"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "conforme, 2 mineurs en notes (rollback de spec green sans test ; acceptation.json sale non refusé) — orchestré (vague 2026-10-26-1950, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 72114116ef427e2671026ca714d1c20a0ea36e8e }
+    finished: 2026-10-26
   - id: L367
     title: "couverture d'un document de référence : (1) chaque élément de inventaire.json a un id stable (page/zone/élément) ; (2) agent planificateur (propose seulement) : lit l'inventaire et le plan, propose des lots citant les ids couverts, faisable ou bloqué (donnée ou service manquant nommé), dépendances ; (3) cadence ref coverage <inventaire.json> (programme, sans modèle) : éléments sans lot, sans lot fait et sans exclusion écrite avec sa raison, code 1 s'il en reste ; (4) le brief du spec-writer porte les ids de son lot et justifie chaque élément non pris, le ux-reviewer les vérifie sur l'écran fini ; doc, CHANGELOG, tests. Issue GitHub #19"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "conforme (revue Opus neuve du lead après correction 8e43acd hors vague) : petit lot visible → ids vérifiés par la passe review-small ; 3 mineurs notés (garderExclusions resauve, nonPris d'une fiche d'écran, lot visible sans orchestrate.ux sans consigne d'ids)", commit: a66fdc8455a5dc92c373fde9e1ea9a7f130687cc }
+    finished: 2026-10-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

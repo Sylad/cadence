@@ -3824,9 +3824,10 @@ lots:
     started: 2026-10-26
   - id: L342
     title: "appliquer une même modification de config aux projets d'un dossier : commande (ex. cadence config set <clé> <valeur> --all [--dry-run]) qui pose ou modifie une clé de cadence.yaml dans chaque projet du dossier parent (ceux que lead tour connaît), en gardant les commentaires et l'ordre du fichier, crée dans chaque projet un lot de config qui cite la clé (raf add + start, ou la commande du plan quand il est en lecture seule, nommée par cadence.yaml), commite à chemin explicite, et s'arrête sur un projet dont la config ne se relit pas (validation par le chargeur de config de cadence) ; ne pousse pas ; liste ce qu'elle a fait et ce qu'elle a sauté ; générique ; doc et tests. Constat du 25-10 : trois fois la même chaîne à la main dans 8 à 9 projets (porte de tests, build en double, escalade Fable)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-26
+    started: 2026-10-26
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

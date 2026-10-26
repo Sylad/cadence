@@ -65,10 +65,11 @@ function readsBack(text: string, root: string): string | null {
   }
 }
 
-/** Le texte de cadence.yaml avec `key` posée à `value` (commentaires, ordre et style de la valeur gardés) ; null quand la clé a déjà cette valeur. */
+/** Le texte de cadence.yaml avec `key` posée à `value` (le reste du fichier est gardé tel quel : seules les lignes de la clé changent) ; null quand la clé a déjà cette valeur. */
 export function setKey(text: string, key: string, value: Document): string | null {
   const doc = parseDocument(text);
   if (doc.errors.length > 0) throw new RafError(doc.errors[0]!.message.split('\n')[0]!);
+  const baseline = doc.toString({ lineWidth: 0 });
   const path = key.split('.');
   const old = doc.getIn(path, true);
   const next = value.clone().contents; // une copie par projet : le commentaire de l'ancienne valeur ne passe pas au projet suivant
@@ -78,7 +79,24 @@ export function setKey(text: string, key: string, value: Document): string | nul
     if (isNode(old) && isNode(next)) next.comment = old.comment;
     doc.setIn(path, next);
   }
-  return doc.toString({ lineWidth: 0 });
+  return onlyChangedLines(text, baseline, doc.toString({ lineWidth: 0 }));
+}
+
+/**
+ * La réécriture de yaml normalise tout le fichier (`[a, b]` devient `[ a, b ]`, les espaces avant un commentaire de fin de ligne) :
+ * seules les lignes que la pose de la clé a changées (`baseline` → `changed`, deux écritures de yaml) sont reportées dans le texte d'origine.
+ * Quand yaml a aussi changé le nombre de lignes du fichier non modifié, le report n'est pas sûr : l'écriture entière de yaml est rendue.
+ */
+function onlyChangedLines(original: string, baseline: string, changed: string): string {
+  const o = original.split('\n');
+  const b = baseline.split('\n');
+  const c = changed.split('\n');
+  if (o.length !== b.length) return changed;
+  let head = 0;
+  while (head < b.length && head < c.length && b[head] === c[head]) head++;
+  let tail = 0;
+  while (tail < b.length - head && tail < c.length - head && b[b.length - 1 - tail] === c[c.length - 1 - tail]) tail++;
+  return [...o.slice(0, head), ...c.slice(head, c.length - tail), ...o.slice(o.length - tail)].join('\n');
 }
 
 /**

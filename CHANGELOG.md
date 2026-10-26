@@ -84,6 +84,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - `cadence config set` (L342, `docs/lead.md`): a comment of one project's old value is no longer written into the next project; run inside a project with no sub-project it takes that project, as `lead tour` does; a read-only plan that names its creation command with the new `plan.add` key of `cadence.yaml` gets its config lot from that command instead of being skipped.
+- `cadence config set` (L342, `docs/lead.md`): only the lines of the key change in `cadence.yaml` — inline lists (`[a, b]`), flow mappings and the spaces before an end-of-line comment elsewhere in the file are no longer rewritten, so the per-project commits show the key alone.
 
 ## [1.12.1] - 2026-10-26
 

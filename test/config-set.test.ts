@@ -3,6 +3,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
+import { setKey } from '../src/config-set.js';
+import { parseDocument } from 'yaml';
 import { gitRepo, tempDir, NO_BACKGROUND_GIT } from './helpers.js';
 
 const git = (dir: string, ...args: string[]) => execFileSync('git', [...NO_BACKGROUND_GIT, ...args], { cwd: dir, encoding: 'utf8' });
@@ -46,7 +48,7 @@ describe('cadence config set --all (L342)', () => {
     expect(r.code).toBe(0);
     for (const dir of [a, b]) {
       const text = readFileSync(join(dir, 'cadence.yaml'), 'utf8');
-      expect(text).toContain('orchestrate:\n  # la porte de tests\n  test: npx vitest run # la suite\n  worktrees: true\n  escalation: { model: fable }\n');
+      expect(text).toContain('orchestrate:\n  # la porte de tests\n  test: npx vitest run   # la suite\n  worktrees: true\n  escalation: { model: fable }\n');
       expect(text.startsWith('# En-tête du projet\n')).toBe(true);
       expect(text.indexOf('orchestrate:')).toBeLessThan(text.indexOf('docs:'));
       const plan = readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8');
@@ -232,5 +234,25 @@ describe('cadence config set --all (L342)', () => {
     const r = cadence(parent, 'config', 'set', 'orchestrate.build', 'x', '--all');
     expect(r.code).toBe(1);
     expect(r.out).toMatch(/autre-outil.*arrêt.*\{title\}/);
+  });
+});
+
+describe('config set — le fichier hors de la clé est gardé (L342)', () => {
+  const INLINE = '# projet\nplan:\n  files: [a, b]   # fichiers\norchestrate:\n  escalation: { model: fable }\n  note: x\ndocs:\n  sync:\n    paths: [src/x.ts]\n';
+
+  it('une clé posée ne touche aucune autre ligne : les listes et mappings en ligne gardent leur style', () => {
+    const out = setKey(INLINE, 'orchestrate.build', parseDocument('npx tsc'))!;
+    expect(out).toBe(INLINE.replace('  note: x\n', '  note: x\n  build: npx tsc\n'));
+  });
+
+  it('une valeur remplacée ne change que sa ligne', () => {
+    const out = setKey(INLINE, 'orchestrate.note', parseDocument('y'))!;
+    expect(out).toBe(INLINE.replace('note: x', 'note: y'));
+  });
+
+  it('une clé dans une section absente est ajoutée en fin de fichier, le reste intact', () => {
+    const out = setKey(INLINE, 'hook.cmd', parseDocument('ls'))!;
+    expect(out.startsWith(INLINE)).toBe(true);
+    expect(out).toContain('hook:\n  cmd: ls');
   });
 });

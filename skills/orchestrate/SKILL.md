@@ -18,7 +18,7 @@ cadence orchestrate finance-tracker:L41 cadence:L18@haiku --budget 1.5M
 ```
 
 - One positional argument per lot: `<project>:<lot>`, then `@<model>` to give that lot a model (`@haiku`, `@sonnet`,
-  `@opus`). The project is what comes before the **first `:`**, the model what comes after the **last `@`**.
+  `@opus`, or any model name the account has, such as `@fable`, passed as it stands to `claude --model`; `--dry-run` warns for a name outside the three aliases). The project is what comes before the **first `:`**, the model what comes after the **last `@`**.
 - **A lot id may contain « / »** (sub-tasks of a plan kept read-only by another tool, `Q4/accueil-4-ux12`): write it as is, never escape
   it, never replace it, never split it. Quote the whole argument only if the shell needs it.
 - There is no `--lot` and no `--model`: the lot and its model are always in the same argument, `<project>:<lot>@<model>`.

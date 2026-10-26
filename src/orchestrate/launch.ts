@@ -16,7 +16,9 @@ export type SessionKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small'
 /** Les étapes d'un lot : ses sessions, plus l'intégration à la branche du dépôt (L279, R14), que le programme joue seul : elle ne passe par aucune table de sessions (schéma, gabarit, modèle). */
 export type StepKind = SessionKind | 'integrate';
 export type Model = 'sonnet' | 'opus' | 'haiku';
-/** Un nom de modèle libre (L337) : l'escalade passe le nom tel quel à `claude --model`, sans liste fermée. */
+/** Les alias que `claude --model` comprend sans connaître le compte : tout autre nom est passé tel quel (L345) et le dry-run en avertit. */
+export const MODEL_ALIASES: readonly string[] = ['haiku', 'sonnet', 'opus'];
+/** Un nom de modèle libre (L337, L345) : l'escalade, `@<modèle>` d'un lot et `orchestrate.review` passent le nom tel quel à `claude --model`, sans liste fermée. */
 export type AnyModel = Model | (string & {});
 /** Modèle d'une étape : celui de Claude (ou le nom libre de l'escalade), ou `local` (claude-local → Ollama, L146). */
 export type StepModel = AnyModel | 'local';

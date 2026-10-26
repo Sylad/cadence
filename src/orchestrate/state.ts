@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { gitCommonDir, gitRoot } from '../git.js';
-import type { Model, SessionKind, StepKind, StepModel } from './launch.js';
+import type { AnyModel, SessionKind, StepKind, StepModel } from './launch.js';
 import type { Screen } from '../plan.js';
 import type { Tokens } from './result.js';
 
@@ -115,7 +115,7 @@ export interface LotState {
   specAskedRules?: string[];
   /** Lot léger (estimate ≤ orchestrate.review.threshold, L108) : une revue légère, pas de passe des mineurs. Absent : lot ordinaire. */
   light?: boolean;
-  model: Model;
+  model: AnyModel;
   readOnlyPlan: boolean;
   /** Dépôts voisins du lot (clé de lot `repos:`, L62), résolus au lancement : chemin déclaré et racine git. Absent : le dépôt du projet seul. */
   repos?: { rel: string; path: string; cite?: string }[];
@@ -204,7 +204,7 @@ export interface NewLot {
   small: boolean;
   screen?: Screen;
   specLot?: true;
-  model: Model;
+  model: AnyModel;
   readOnlyPlan: boolean;
 }
 

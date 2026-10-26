@@ -107,7 +107,7 @@ describe('arguments', () => {
     expect(parseOrchestrateArgs(['--status', '2026-10-04-1412']).status).toBe('2026-10-04-1412');
     expect(parseOrchestrateArgs(['--resume', '--budget', '1M', '--answer', 'ol:L22', 'SQLite'])).toMatchObject({ resume: true, budget: 1_000_000, answers: [{ project: 'ol', lot: 'L22', text: 'SQLite' }] });
     expect(parseOrchestrateArgs(['--resume', 'L3']).lots).toEqual([{ project: undefined, lot: 'L3', model: undefined }]);
-    expect(() => parseOrchestrateArgs(['a:L1@gpt'])).toThrow(/modèle inconnu/);
+    expect(parseOrchestrateArgs(['a:L1@gpt']).lots).toEqual([{ project: 'a', lot: 'L1', model: 'gpt' }]); // L345 : nom libre, plus de « modèle inconnu »
     expect(() => parseOrchestrateArgs(['--parallel'])).toThrow(/option inconnue/);
   });
   it('L201 — le projet d\'un lot peut être un chemin (projet imbriqué de lead tour --depth) : groupe/gamma:L1', () => {
@@ -132,7 +132,7 @@ describe('arguments', () => {
       expect(parseOrchestrateArgs(['--resume', id])).toMatchObject({ lots: [{ lot: id.split(':')[1] }], resume: true });
     }
     expect(parseOrchestrateArgs(['--status', '2026-10-04-1412']).status).toBe('2026-10-04-1412');
-    expect(() => parseOrchestrateArgs(['a:Q4/x@gpt'])).toThrow(/modèle inconnu/);
+    expect(parseOrchestrateArgs(['a:Q4/x@gpt']).lots).toEqual([{ project: 'a', lot: 'Q4/x', model: 'gpt' }]);
   });
   it('budget', () => {
     expect([parseBudget('1500000'), parseBudget('1.5M'), parseBudget('800k'), parseBudget('2M')]).toEqual([1_500_000, 1_500_000, 800_000, 2_000_000]);
@@ -205,6 +205,43 @@ describe('refus avant d\'agir (code 2)', () => {
         expect(b).not.toContain('/playwright/');
         expect(b).not.toMatch(/\{\{/);
       }
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
+  it('L345 R1 — @fable (nom hors alias, avec tiret et point) est accepté et passé tel quel à claude --model ; R3 — le dry-run avertit sans refuser, pas pour un alias', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    writeFileSync(join(parent, 'a/cadence.yaml'), 'orchestrate:\n  precheck: false\n  review: { light: opus }\n');
+    git(join(parent, 'a'), 'add', '--', 'cadence.yaml');
+    git(join(parent, 'a'), 'commit', '-qm', 'chore: config');
+    const libre = await run(parent, ['a:L1@claude-fable-5.1', '--dry-run']);
+    const alias = await run(parent, ['a:L1@opus', '--dry-run']);
+    try {
+      expect(libre.code).toBe(0);
+      expect(libre.err.join('\n')).toBe('');
+      const out = libre.out.join('\n');
+      expect(out).toMatch(/implement : claude [^\n]*--model claude-fable-5\.1/);
+      expect(out).toContain('⚠ modèle « claude-fable-5.1 » hors des alias haiku, sonnet, opus : passé tel quel à claude --model');
+      expect(alias.code).toBe(0);
+      expect(alias.out.join('\n')).not.toContain('hors des alias');
+    } finally {
+      removeDryRunBriefs(libre.out.join('\n'));
+      removeDryRunBriefs(alias.out.join('\n'));
+    }
+  });
+
+  it('L345 R2 — orchestrate.review.light et full acceptent un nom libre : la revue le reçoit tel quel, le dry-run avertit (une fois par nom)', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    writeFileSync(join(parent, 'a/cadence.yaml'), 'orchestrate:\n  precheck: false\n  review: { light: fable, full: fable }\n');
+    git(join(parent, 'a'), 'add', '--', 'cadence.yaml');
+    git(join(parent, 'a'), 'commit', '-qm', 'chore: config');
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      expect(r.code).toBe(0);
+      const out = r.out.join('\n');
+      expect(out).toMatch(/review : claude [^\n]*--model fable/);
+      expect(out.match(/⚠ modèle « fable » hors des alias/g)).toHaveLength(1);
     } finally {
       removeDryRunBriefs(r.out.join('\n'));
     }

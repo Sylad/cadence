@@ -26,7 +26,7 @@ import { specScreen, specText } from './spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
 import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
-import { buildArgs, buildLocalArgs, killSessions, mcpServersFor, readAgents, realClaude, type AgentDef, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
+import { buildArgs, buildLocalArgs, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
 import { repoBranch } from './integrate.js';
@@ -130,7 +130,7 @@ const lotBaseBudget = (estimate: number, stage?: SpecStage): number => {
 export const DEFAULT_MAX_SESSIONS = 2;
 
 export interface Args {
-  lots: { project?: string; lot: string; model?: Model }[];
+  lots: { project?: string; lot: string; model?: AnyModel }[];
   dryRun: boolean;
   status?: string | true;
   /** `--waits` : l'attente de créneau de session par jour et par vague, lue dans les journaux ; `--since` écarte les vagues d'avant. */
@@ -182,15 +182,13 @@ export function parseMaxSessions(text: string, what = '--max-sessions'): number 
 }
 
 // une vague (2026-10-04-1412) n'a ni « : » ni « / » : leur présence désigne un lot, quel que soit son motif (R-M7/ux-1)
-const LOT_LIKE = /^(?:[\w.-]+(?:\/[\w.-]+)*:[\w.-][\w./-]*|[\w.-]+\/[\w./-]*|[A-Za-z]+\d+)(?:@\w+)?$/;
-const MODELS = ['sonnet', 'opus', 'haiku'];
+const LOT_LIKE = /^(?:[\w.-]+(?:\/[\w.-]+)*:[\w.-][\w./-]*|[\w.-]+\/[\w./-]*|[A-Za-z]+\d+)(?:@[\w.-]+)?$/;
 
-function lotArg(text: string): { project?: string; lot: string; model?: Model } {
+function lotArg(text: string): { project?: string; lot: string; model?: AnyModel } {
   // le premier « : » sépare le projet du lot, un « @ » final le modèle ; le lot garde ses « / » (L120), le projet peut être un chemin depuis le dossier (`groupe/gamma`, projet imbriqué de lead tour --depth, L201)
-  const m = /^(?:([\w.-]+(?:\/[\w.-]+)*):)?([\w.-][\w./-]*?)(?:@(\w+))?$/.exec(text);
-  if (!m) throw new RafError(`lot invalide : ${text} (projet:lot, lot, projet:lot@haiku)`);
-  if (m[3] && !MODELS.includes(m[3])) throw new RafError(`modèle inconnu : @${m[3]} (attendu : ${MODELS.join(', ')})`);
-  return { project: m[1], lot: m[2], model: m[3] as Model | undefined };
+  const m = /^(?:([\w.-]+(?:\/[\w.-]+)*):)?([\w.-][\w./-]*?)(?:@([\w.-]+))?$/.exec(text);
+  if (!m) throw new RafError(`lot invalide : ${text} (projet:lot, lot, projet:lot@haiku ; @ suivi d'un alias ou d'un nom de modèle)`);
+  return { project: m[1], lot: m[2], model: m[3] };
 }
 
 /** `projet:lot=+200k`, `lot=+0.3M` (L223) : le « = » distingue le relèvement d'un lot du budget de la vague. */
@@ -271,7 +269,7 @@ interface Target {
   projectDir: string;
   repo: string;
   lot: string;
-  model: Model;
+  model: AnyModel;
 }
 
 /** Ce qu'un projet fournit à l'orchestrateur : sa configuration et la lecture de son plan (comme le CLI). */
@@ -498,6 +496,9 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       if (l.visible && env.config.ux) steps.push({ kind: 'ux', model: full }); // L221 : l'UX est jouée une fois, après la revue de code conforme
     }
     io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.light ? ` — revue légère (${light}, pas de passe des mineurs ; un bloquant ou un majeur → correction puis revue ${full})` : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
+    for (const m of new Set(steps.map((s) => s.model))) {
+      if (m !== 'local' && !MODEL_ALIASES.includes(m)) io.out(`  ⚠ modèle « ${m} » hors des alias ${MODEL_ALIASES.join(', ')} : passé tel quel à claude --model (un nom que le compte ne connaît pas fait échouer la session)`);
+    }
     const noTest = noTestSaid.has(l.repo) ? null : noTestGate(l.repo);
     noTestSaid.add(l.repo);
     if (noTest) io.out(`  ${basename(l.repo)} · ${noTestText(noTest)}`);

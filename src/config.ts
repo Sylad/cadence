@@ -326,7 +326,8 @@ export interface OrchestrateConfig {
    * (modèle `light`), sans passe des mineurs ; les autres, la chaîne complète (modèle `full`). Un bloquant ou un majeur sur
    * un lot léger déclenche quand même une correction puis une revue `full`.
    */
-  review: { threshold: number; light: ReviewModel; full: ReviewModel };
+  /** `light` et `full` : un alias (haiku, sonnet, opus) ou un nom de modèle libre, passé tel quel à `claude --model` (L345). */
+  review: { threshold: number; light: string; full: string };
   /**
    * Escalade de modèle (L337) : quand la revue reste non conforme après les passes prévues (ou que les tests restent rouges), la vague joue UNE correction puis UNE revue neuve
    * avec ce modèle avant de rendre le lot. `model` est passé tel quel à `claude --model` (pas de liste fermée : le compte n'a pas forcément tous les modèles). Absent : pas d'escalade.
@@ -345,8 +346,6 @@ export type Effort = (typeof EFFORTS)[number];
 export const EFFORT_STEPS = ['precheck', 'spec', 'maquette', 'fiche', 'accept', 'implement', 'fix', 'review', 'ux'] as const;
 export type EffortStep = (typeof EFFORT_STEPS)[number];
 
-const MODELS = ['haiku', 'sonnet', 'opus'] as const;
-export type ReviewModel = (typeof MODELS)[number];
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
 const ORCH_KEYS = ['start', 'verdict', 'test', 'build', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
@@ -450,8 +449,8 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     for (const k of ['light', 'full'] as const) {
       const m = o.review[k];
       if (m == null) continue;
-      if (!MODELS.includes(m as ReviewModel)) throw bad(`review.${k} : ${MODELS.join(', ')} attendu`);
-      config.review[k] = m as ReviewModel;
+      if (typeof m !== 'string' || !m.trim()) throw bad(`review.${k} : nom de modèle non vide attendu (haiku, sonnet, opus ou un nom passé tel quel à claude --model)`);
+      config.review[k] = m.trim();
     }
   }
   if (o.escalation != null) {

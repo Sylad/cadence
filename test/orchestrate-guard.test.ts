@@ -158,7 +158,8 @@ describe('cadence.yaml : orchestrate', () => {
     expect(read('orchestrate:\n  review: { threshold: 0 }\n')().review.threshold).toBe(0);
     expect(read('orchestrate:\n  review: { threshold: -1 }\n')).toThrow(/review\.threshold/);
     expect(read('orchestrate:\n  review: { threshold: vite }\n')).toThrow(/review\.threshold/);
-    expect(read('orchestrate:\n  review: { light: gpt }\n')).toThrow(/review\.light/);
+    expect(read('orchestrate:\n  review: { light: gpt, full: claude-fable-5.1 }\n')().review).toMatchObject({ light: 'gpt', full: 'claude-fable-5.1' }); // L345 : nom libre
+    expect(read('orchestrate:\n  review: { light: \' \' }\n')).toThrow(/review\.light/);
     expect(read('orchestrate:\n  review: { full: 3 }\n')).toThrow(/review\.full/);
     expect(read('orchestrate:\n  review: { seuil: 1 }\n')).toThrow(/review\.seuil inconnu/);
     expect(read('orchestrate:\n  review: oui\n')).toThrow(/review doit être un objet/);

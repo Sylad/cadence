@@ -77,6 +77,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- `cadence orchestrate` accepts any model name where it took only `haiku|sonnet|opus` (L345, `docs/orchestrate.md`, GitHub issue #16): `@<model>` of a lot (`cadence orchestrate project:L12@fable`, which was refused with « modèle inconnu ») and `orchestrate.review.light` / `full` pass the name as it stands to `claude --model`, like `orchestrate.escalation.model`. The three aliases keep their meaning; `--dry-run` warns (`⚠ modèle « <name> » hors des alias …`), without refusing, for a name outside them. An empty `review.light` / `full` is still refused.
+
 ### Fixed
 
 - `cadence release` (L359, `docs/releasing.md`): the last printed step now updates the plugin completely. It prints `claude plugin marketplace update <marketplace>` before `claude plugin update <plugin>@<marketplace>` (without the first the installed plugin stayed at the old version, seen at the 1.13.0 release on 26-10) and `/reload-plugins` after it.

@@ -1888,6 +1888,9 @@ async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promi
   }
 }
 
+/** Sortie d'un lanceur qui n'a trouvé aucun test à rejouer (vitest « No test files found », jest/pytest « No tests found »/« no tests ran »). */
+const NO_TEST_RAN = /no test files? found|no tests? found|no tests ran/i;
+
 /** Rejeux d'un test rouge de la porte, seul (L350) : rouge aux deux, il est compté. */
 const REPLAYS = 2;
 
@@ -1903,7 +1906,8 @@ async function replayAlone(c: LotCtx, command: string, names: string[]): Promise
     if (!files.length) break;
     const replayable = red.filter((n) => replayFile(n) || isJestTest(n));
     const r = await sh(c, `${command} ${files.map(shellArg).join(' ')}`);
-    const failing = r.code === 0 ? [] : hasUnnamedFailure(r.output) || !failedTests(r.output).length ? replayable : replayable.filter((n) => failedTests(r.output).includes(n));
+    // Un rejeu qui n'exécute aucun test (filtre sans fichier, `passWithNoTests`) sort en 0 sans rien prouver : il ne vaut pas vert.
+    const failing = r.code === 0 && !NO_TEST_RAN.test(r.output) ? [] : hasUnnamedFailure(r.output) || !failedTests(r.output).length ? replayable : replayable.filter((n) => failedTests(r.output).includes(n));
     const passed = replayable.filter((n) => !failing.includes(n));
     unstable.push(...passed);
     red = red.filter((n) => !passed.includes(n));

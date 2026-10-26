@@ -199,8 +199,8 @@ const startSha = (c: LotCtx): string | undefined => lotStartHead(wd(c), lotWork(
  * Échecs des tests au sha de départ du lot (L213) : la commande est rejouée dans un worktree jetable de ce sha, hors du dépôt,
  * avec des liens vers les dossiers ignorés de tout niveau (node_modules, .venv… ; `dist` et les autres sorties de build exclus, une commande
  * de tests qui y écrit toucherait le build du lot) pour que les dépendances s'y trouvent. Les `node_modules` sont recréés entrée par entrée
- * pour que les paquets de workspace résolvent dans le worktree (`mirrorNodeModules`). Null quand le worktree ne peut être monté :
- * l'appelant garde alors les tests pour rouges.
+ * pour que les paquets de workspace résolvent dans le worktree (`mirrorNodeModules`). Un rouge nommé y est rejoué seul (L350) avant d'être retenu.
+ * Null quand le worktree ne peut être monté : l'appelant garde alors les tests pour rouges.
  */
 async function baselineFailures(c: LotCtx, command: string): Promise<string[] | null> {
   const l = c.lot;
@@ -216,7 +216,13 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
     // ne dit rien des tests : pas de ligne de base, l'appelant garde les tests pour rouges.
     if (c.config.build && (await sh(c, c.config.build, 30 * 60_000, {}, dir)).code !== 0) return null;
     const r = await sh(c, command, 30 * 60_000, {}, dir);
-    const failures = r.code === 0 ? [] : failedTests(r.output);
+    // Ligne de base comprise (L350) : un rouge du sha de départ est rejoué seul dans le même worktree avant d'être retenu. Sous charge, un test
+    // qui passe seul au départ rougirait ici et excuserait une vraie régression du lot (« déjà rouge au départ »). Un échec sans nom reste tel quel.
+    const found = r.code === 0 ? [] : failedTests(r.output);
+    const named = found.length && !hasUnnamedFailure(r.output) ? found : [];
+    const { red, unstable } = named.length ? await replayAlone(c, command, named, dir) : { red: found, unstable: [] as string[] };
+    if (unstable.length) c.wave.log(`${lotKey(l.project, l.lot)} · ligne de base ${sha.slice(0, 7)} : ${unstable.length} test(s) rouge(s) sous charge, vert(s) rejoué(s) seul(s), non retenu(s) comme déjà rouge(s) : ${unstable.join(' ; ')}`);
+    const failures = found.filter((t) => red.includes(t));
     l.baseline = { sha, command, failures, verified: true };
     save(c);
     return failures;
@@ -1950,17 +1956,17 @@ const NO_TEST_RAN = /^\W*(?:no test files? found, exiting with code|no tests? fo
 const REPLAYS = 2;
 
 /**
- * Rejoue SEULS (la commande de la porte, suivie des fichiers de ces tests) les tests rouges d'une suite entière (L350). Le 26-10, vitest à 31 workers par suite sur une machine à 4 sessions rougissait des tests
+ * Rejoue SEULS (la commande de la porte, suivie des fichiers de ces tests, dans `cwd` : le worktree du lot, ou celui de la ligne de base) les tests rouges d'une suite entière (L350). Le 26-10, vitest à 31 workers par suite sur une machine à 4 sessions rougissait des tests
  * qui passaient seuls : quatre corrections vides (4 à 11 min chacune). Un test vert à un rejeu est `unstable` ; rouge aux `REPLAYS` rejeux, ou sans fichier désignable (rien à rejouer seul), il reste dans `red`.
  */
-async function replayAlone(c: LotCtx, command: string, names: string[]): Promise<{ red: string[]; unstable: string[] }> {
+async function replayAlone(c: LotCtx, command: string, names: string[], cwd = wd(c)): Promise<{ red: string[]; unstable: string[] }> {
   let red = names;
   const unstable: string[] = [];
   for (let i = 0; i < REPLAYS; i++) {
     const files = [...new Set(red.map((n) => replayFile(n)).filter((f): f is string => f !== null))];
     if (!files.length) break;
     const replayable = red.filter((n) => replayFile(n) || isJestTest(n));
-    const r = await sh(c, `${command} ${files.map(shellArg).join(' ')}`);
+    const r = await sh(c, `${command} ${files.map(shellArg).join(' ')}`, undefined, undefined, cwd);
     // Un rejeu qui n'exécute aucun test (filtre sans fichier, `passWithNoTests`) sort en 0 sans rien prouver : il ne vaut pas vert.
     const failing = r.code === 0 && !NO_TEST_RAN.test(r.output) ? [] : hasUnnamedFailure(r.output) || !failedTests(r.output).length ? replayable : replayable.filter((n) => failedTests(r.output).includes(n));
     const passed = replayable.filter((n) => !failing.includes(n));

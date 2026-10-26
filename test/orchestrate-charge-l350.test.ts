@@ -165,11 +165,38 @@ describe('L350 R4 — un test rouge de la porte est rejoué seul avant d\'être 
   it('R4 — un rouge déjà présent à la ligne de base n\'est pas rejoué (déjà exclu du compte)', async () => {
     const log = LOG();
     const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const test = `f() { if [ -n "$1" ]; then echo "$@" >> ${log}; exit 0; fi; echo " FAIL  test/a.test.ts > ancien"; exit 1; }; f`;
+    // Au sha de départ le test est rouge, seul compris (vraiment déjà rouge) ; dans le lot, un rejeu seul écrirait dans le journal.
+    const test = `f() { case "$PWD" in *cadence-baseline*) echo " FAIL  test/a.test.ts > ancien"; exit 1;; esac; if [ -n "$1" ]; then echo "$@" >> ${log}; exit 0; fi; echo " FAIL  test/a.test.ts > ancien"; exit 1; }; f "$@"`;
     const c = h.lot('L1', {}, { test });
     await runLot(c);
     expect(existsSync(log)).toBe(false);
     expect(c.lot.status).toBe('ready');
+  });
+  it('R4 — ligne de base comprise : un rouge de la ligne de base vert rejoué seul au sha de départ n\'excuse pas le lot, le même test rouge seul dans le lot est corrigé', async () => {
+    const log = LOG();
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    // Au sha de départ : a.test.ts rouge dans la suite entière (charge), vert rejoué seul. Dans le lot : rouge partout (vraie régression).
+    const test = `f() { case "$PWD" in *cadence-baseline*) if [ -n "$1" ]; then echo "base $PWD $@" >> ${log}; exit 0; fi; echo ' FAIL  test/a.test.ts > charge'; exit 1;; esac; [ -f b.txt ] && exit 0; if [ -n "$1" ]; then echo "lot $@" >> ${log}; fi; echo ' FAIL  test/a.test.ts > charge'; exit 1; }; f "$@"`;
+    const c = h.lot('L1', {}, { test });
+    await runLot(c);
+    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
+    expect(h.calls[1].brief).toContain('test/a.test.ts > charge');
+    expect(c.lot.baseline?.failures).toEqual([]);
+    expect(c.lot.instables ?? []).toEqual([]);
+    const lines = readFileSync(log, 'utf8').trim().split('\n');
+    expect(lines[0]).toMatch(/^base \S*cadence-baseline\S* test\/a\.test\.ts$/); // rejoué seul, dans le worktree jetable du sha de départ
+    expect(lines.filter((l) => l.startsWith('lot '))).toEqual(['lot test/a.test.ts', 'lot test/a.test.ts']);
+  });
+  it('R4 — ligne de base comprise : rouge aux deux rejeux seuls au sha de départ, le test reste « déjà rouge » et n\'est pas corrigé', async () => {
+    const log = LOG();
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const test = `f() { case "$PWD" in *cadence-baseline*) [ -n "$1" ] && echo "base $@" >> ${log}; echo ' FAIL  test/a.test.ts > ancien'; exit 1;; esac; echo ' FAIL  test/a.test.ts > ancien'; exit 1; }; f "$@"`;
+    const c = h.lot('L1', {}, { test });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(c.lot.baseline?.failures).toEqual(['test/a.test.ts > ancien']);
+    expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual(['base test/a.test.ts', 'base test/a.test.ts']);
   });
   it('R4 — un échec sans nom de fichier (rien à rejouer seul) est compté comme avant', async () => {
     const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });

@@ -4008,9 +4008,10 @@ lots:
     created: 2026-10-26
   - id: L364
     title: "intégration en mode worktree : quand l'avance rapide de main est refusée parce que main a bougé pendant l'intégration (commit de plan du lead, autre lot), refaire le rebase et les tests au nouveau sommet (une ou deux fois) au lieu de rendre le lot ; journal « main a avancé pendant l'intégration, rebase rejoué » ; test ; constat L347 du 26-10 (« Not possible to fast-forward », commit de clôture de L361 par le lead au même moment)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-26
+    started: 2026-10-26
   - id: L365
     title: "Node minimal : engines.node >=22.18 (Node 20 n'est plus maintenu depuis avril 2026 ; 22.18 exécute les .ts sans outil, ce dont les tests dépendent) ; CI tests.yml en matrice Node 22 et 24 ; CHANGELOG « Changed » avec avertissement explicite ; docs/stabilite.md : la version minimale de Node suit les LTS maintenues ; publication en version MINEURE avec avertissement (décision de Sylvain du 26-10) ; R5 de L360 passe alors sans contournement"
     status: doing

@@ -15,7 +15,7 @@ import { dirtyPaths, gitRoot, isTracked, readCommits, matchesHead, resolveCommit
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
-import { invalidResource, Plan, RafError, SCREENS, STATUSES, type Lot, type Screen, type Status } from './plan.js';
+import { invalidResource, Plan, RafError, SCREENS, STATUSES, setPlanNotice, type Lot, type Screen, type Status } from './plan.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
@@ -127,6 +127,7 @@ function legacyPlanLine(root: string, legacy: 'read' | 'ignored'): string {
 }
 
 export function run(argv: string[], io: Io): number | Promise<number> {
+  setPlanNotice(io.err);
   try {
     // orchestrate a ses propres options (--status et --resume prennent une valeur facultative, --answer en prend deux).
     if (argv[0] === 'orchestrate') {

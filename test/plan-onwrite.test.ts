@@ -124,6 +124,39 @@ describe('R3 — une commande en échec refuse l\'écriture et le dit', () => {
   });
 });
 
+describe('R3 bis — chemin mal déclaré et commande qui ne finit pas', () => {
+  it('R3 bis — une commande qui réussit sans produire le fichier déclaré : l\'écriture passe, l\'avertissement nomme le chemin', () => {
+    const dir = project(config(GENERATE, '[public/plan-data/plan.json]'));
+    const r = cadence(dir, 'add', 'chemin faux');
+    expect(r.code).toBe(0);
+    expect(r.err).toContain('plan.onWrite');
+    expect(r.err).toContain('public/plan-data/plan.json');
+    expect(r.err).toContain('absent');
+  });
+  it('R3 bis — un fichier déclaré bien produit : aucun avertissement', () => {
+    const dir = project(config(GENERATE));
+    expect(cadence(dir, 'add', 'chemin juste').err).toBe('');
+  });
+  it('R3 bis — délai dépassé : écriture refusée, le message dit le délai, plan inchangé', () => {
+    const dir = project('');
+    const path = join(dir, PLAN);
+    const before = readFileSync(path, 'utf8');
+    const plan = Plan.load(path, { onWrite: { command: 'sleep 5', files: [], cwd: dir, timeoutMs: 200 } });
+    plan.add('lent', '2026-10-26');
+    expect(() => plan.save()).toThrow(/délai de 0\.2 s dépassé.*plan inchangé/);
+    expect(readFileSync(path, 'utf8')).toBe(before);
+  });
+  it('R3 bis — commande qui ne démarre pas (cwd absent) : écriture refusée, la cause système est dite', () => {
+    const dir = project('');
+    const path = join(dir, PLAN);
+    const before = readFileSync(path, 'utf8');
+    const plan = Plan.load(path, { onWrite: { command: 'true', files: [], cwd: join(dir, 'nulle-part') } });
+    plan.add('x', '2026-10-26');
+    expect(() => plan.save()).toThrow(/plan\.onWrite en échec.*ENOENT.*plan inchangé/);
+    expect(readFileSync(path, 'utf8')).toBe(before);
+  });
+});
+
 describe('R4 — orchestrate lance la commande et commite ses fichiers avec le plan', () => {
   const withOnWrite = (command: string | ((parent: string) => string), worktrees = false) => {
     const { parent, repo } = setup([{ title: 'un' }], `worktrees: ${worktrees}\n`);

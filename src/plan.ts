@@ -7,6 +7,12 @@ import { isDay, toDay, type Day } from './dates.js';
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
 const ON_WRITE_TIMEOUT_MS = 120_000;
 
+/** Où va un avertissement de `save()` (la commande a réussi mais quelque chose cloche) : stderr, ou le `err` du CLI qui a lancé l'écriture. */
+let notice: (line: string) => void = (line) => void process.stderr.write(`${line}\n`);
+export function setPlanNotice(fn: (line: string) => void): void {
+  notice = fn;
+}
+
 export const STATUSES = ['todo', 'doing', 'done', 'dropped'] as const;
 export type Status = (typeof STATUSES)[number];
 
@@ -149,7 +155,7 @@ export interface PlanSettings {
    * `plan.onWrite` (L346) : commande lancée à la racine du dépôt (`cwd`, le dossier de cadence.yaml) après chaque écriture du plan, et fichiers qu'elle produit.
    * Ils sont tenus avec le plan (mêmes règles que `files`) et commités avec lui. Un échec de la commande refuse l'écriture.
    */
-  onWrite?: { command: string; files: string[]; cwd: string };
+  onWrite?: { command: string; files: string[]; cwd: string; timeoutMs?: number };
   /** Fichier d'attendus QA (clé `qa.expectations` de cadence.yaml) : tenu avec le plan, docs/qa/expectations.md par défaut. */
   qaExpectations?: string;
   format?: PlanFormat;
@@ -276,13 +282,19 @@ export class Plan {
     const kept = hook ? [this.path, ...hook.files.map((f) => resolve(hook.cwd, f))].map((p) => [p, existsSync(p) ? readFileSync(p) : null] as const) : [];
     writeFileSync(this.path, this.doc.toString({ lineWidth: 0, indentSeq: this.indentSeq }));
     if (!hook) return;
-    const r = spawnSync('sh', ['-c', hook.command], { cwd: hook.cwd, encoding: 'utf8', timeout: ON_WRITE_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'pipe'] });
-    if (r.status === 0) return;
+    const limit = hook.timeoutMs ?? ON_WRITE_TIMEOUT_MS;
+    const r = spawnSync('sh', ['-c', hook.command], { cwd: hook.cwd, encoding: 'utf8', timeout: limit, stdio: ['ignore', 'pipe', 'pipe'] });
+    if (r.status === 0) {
+      // Un chemin mal déclaré laisse le vrai fichier produit hors du commit du plan (le constat d'origine du lot) : le dire.
+      const missing = hook.files.filter((f) => !existsSync(resolve(hook.cwd, f)));
+      if (missing.length > 0) notice(`raf: plan.onWrite a réussi mais le fichier déclaré est absent : ${missing.join(', ')} — vérifier plan.onWrite.files dans cadence.yaml`);
+      return;
+    }
     for (const [p, content] of kept) {
       if (content === null) rmSync(p, { force: true });
       else writeFileSync(p, content);
     }
-    const why = r.error ? (r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT' ? `délai de ${ON_WRITE_TIMEOUT_MS / 1000} s dépassé` : r.error.message : `code ${r.status ?? r.signal}`;
+    const why = r.error ? (r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT' ? `délai de ${limit / 1000} s dépassé` : r.error.message : `code ${r.status ?? r.signal}`;
     const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-5).join(' | ');
     throw new RafError(`plan.onWrite en échec (${hook.command}, ${why})${tail ? ` : ${tail}` : ''} — écriture refusée, plan inchangé`);
   }

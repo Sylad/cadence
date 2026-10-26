@@ -3828,6 +3828,7 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "conforme (1 note mineure : `commentOf` replie à tort sur une chaîne contenant « # » suivie d'un commentaire) — orchestré (vague 2026-10-26-0930, 2 passe(s) de correction + passe des mineurs)", commit: fd6befafd4a0a5e014401a06db2dff24c01a9b7e, reporte: { de: f8ca3965ca70de51481d7d0b0d5e879de83ef427, vers: fd6befafd4a0a5e014401a06db2dff24c01a9b7e, patchId: 88b45c8c98911493d2828c2a8295d9245f7d5a03 } }
   - id: L343
     title: "orchestrate et raf : message des commits de plan réglable dans cadence.yaml (gabarit avec lot, action, vague ; défaut inchangé), appliqué à TOUS les commits de plan écrits par cadence (orchestrate, raf, spec reseal…) ; le dry-run passe chaque message au hook commit-msg réel du dépôt (core.hooksPath compris, husky) et nomme celui qui serait refusé ; doc, CHANGELOG, tests. Issue GitHub #15 : commitlint config-conventional refuse « plan: L17 démarré (orchestrate …) », le lot échoue avant toute session et le suivant est rendu (plan resté indexé)"
     status: todo

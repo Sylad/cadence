@@ -51,8 +51,8 @@ function readQa(qa: unknown, file: string, workRoot?: string): string | undefine
   return rel;
 }
 
-/** Clé `plan.onWrite` (L346) : la commande qui republie le plan après chaque écriture, et les fichiers qu'elle produit (relatifs au dépôt, jamais hors de lui). */
-function readOnWrite(v: unknown, file: string, bad: (what: string) => RafError): NonNullable<PlanSettings['onWrite']> {
+/** Clé `plan.onWrite` (L346) : la commande qui republie le plan après chaque écriture, lancée dans `cwd` (la racine du dépôt), et les fichiers qu'elle produit (relatifs au dépôt, jamais hors de lui). */
+function readOnWrite(v: unknown, cwd: string, bad: (what: string) => RafError): NonNullable<PlanSettings['onWrite']> {
   if (!isObject(v)) throw bad('onWrite doit être un objet { command, files }');
   for (const k of Object.keys(v)) if (!ON_WRITE_KEYS.includes(k)) throw bad(`onWrite.${k} inconnu (attendu : ${ON_WRITE_KEYS.join(', ')})`);
   if (typeof v.command !== 'string' || v.command.trim() === '') throw bad('onWrite.command doit être une commande');
@@ -61,7 +61,7 @@ function readOnWrite(v: unknown, file: string, bad: (what: string) => RafError):
     if (rel === '.' || rel === '..' || rel.startsWith('../') || isAbsolute(rel)) throw bad(`onWrite.files « ${f} » est hors du dépôt`);
     return rel;
   });
-  return { command: v.command, files, cwd: dirname(resolve(file)) };
+  return { command: v.command, files, cwd };
 }
 
 /**
@@ -95,7 +95,7 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   }
   if (p.ignore != null) settings.ignore = list(p.ignore);
   if (p.files != null) settings.files = list(p.files);
-  if (p.onWrite != null) settings.onWrite = readOnWrite(p.onWrite, file, bad);
+  if (p.onWrite != null) settings.onWrite = readOnWrite(p.onWrite, root ?? dirname(resolve(file)), bad);
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
   if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
   if (p.add != null && (typeof p.add !== 'string' || !p.add.includes('{title}'))) throw bad('add doit être une commande qui contient {title}');

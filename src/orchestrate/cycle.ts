@@ -219,9 +219,8 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
     // qui passe seul au départ rougirait ici et excuserait une vraie régression du lot (« déjà rouge au départ »). Un échec sans nom reste tel quel.
     const found = r.code === 0 ? [] : failedTests(r.output);
     const named = found.length && !hasUnnamedFailure(r.output) ? found : [];
-    const { red, unstable } = named.length ? await replayAlone(c, command, named, dir) : { red: found, unstable: [] as string[] };
+    const { red: failures, unstable } = named.length ? await replayAlone(c, command, named, dir) : { red: found, unstable: [] as string[] };
     if (unstable.length) c.wave.log(`${lotKey(l.project, l.lot)} · ligne de base ${sha.slice(0, 7)} : ${unstable.length} test(s) rouge(s) sous charge, vert(s) rejoué(s) seul(s), non retenu(s) comme déjà rouge(s) : ${unstable.join(' ; ')}`);
-    const failures = found.filter((t) => red.includes(t));
     l.baseline = { sha, command, failures, verified: true };
     save(c);
     return failures;

@@ -187,6 +187,15 @@ describe('cadence perf — fenêtres et débit', () => {
     expect(data.throughput.onBudget.current).toBeCloseTo(2 / 3);
   });
 
+  it("R5 — L349 : une escalade non jouée faute de budget ne libère pas la part, le lot qui l'a mangée reste hors budget", async () => {
+    const c = ctx();
+    // L'escalade est non jouée parce que les passes ordinaires ont débordé sur la part : le constat de L341/L342.
+    writeJournal(c.runs, 'w1', 'alpha', 'A', { budget: 775_000, escalationReserve: 175_000, escalation: { model: 'fable', stage: 'done', issue: 'non jouée' }, steps: [{ kind: 'implement', counted: 640_000, ended: at(CUR) }] });
+    writeJournal(c.runs, 'w1', 'alpha', 'B', { budget: 775_000, escalationReserve: 175_000, steps: [{ kind: 'implement', counted: 590_000, ended: at(CUR) }] });
+    const { data } = await json(c.root);
+    expect(data.throughput.onBudget.current).toBeCloseTo(1 / 2);
+  });
+
   it("R5 — L349 : un modèle d'escalade identique à celui d'étapes ordinaires ne sort pas ces étapes du compte", async () => {
     const c = ctx();
     // Escalade sur opus, modèle aussi de la revue complète : 400 k sonnet + 300 k de revue opus + 200 k de correction opus = 900 k pour 775 k de budget.

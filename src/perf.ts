@@ -376,8 +376,8 @@ export function computePerf(input: PerfInput): PerfResult {
   const withBudget = (w: Window) => rendered(w).filter((d) => d.j.budget !== undefined);
   const onBudget = both(windows, (w) => {
     const set = withBudget(w);
-    // Les passes ordinaires s'arrêtent avant la part d'escalade (L349) : sans escalade engagée, elles se comptent contre le budget moins cette part. Une escalade engagée (même non jouée) libère la part à l'exécution : le lot se compte alors tout entier contre son budget.
-    const within = (j: (typeof set)[number]['j']) => j.steps.reduce((sum, s) => sum + (s.counted ?? 0), 0) <= j.budget! - (j.escalation ? 0 : j.escalationReserve ?? 0);
+    // Les passes ordinaires s'arrêtent avant la part d'escalade (L349) : sans escalade engagée, elles se comptent contre le budget moins cette part. Une escalade engagée libère la part à l'exécution : le lot se compte alors tout entier contre son budget. Une escalade « non jouée » n'a rien engagé (les passes ordinaires ont mangé la part) : la part reste retenue.
+    const within = (j: (typeof set)[number]['j']) => j.steps.reduce((sum, s) => sum + (s.counted ?? 0), 0) <= j.budget! - (j.escalation && j.escalation.issue !== 'non jouée' ? 0 : j.escalationReserve ?? 0);
     return set.length === 0 ? null : set.filter((d) => within(d.j)).length / set.length;
   });
 

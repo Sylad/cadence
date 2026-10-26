@@ -3871,6 +3871,7 @@ lots:
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "conforme : 0 bloquant, 0 majeur, 2 notes mineures (liste JSON de docs/lead.md sans staleNotes ; mention d'un lot fini toujours signalée, même quand la note est exacte) — orchestré (vague 2026-10-26-1700, 0 passe(s) de correction)", commit: 768b74b051b57f1647d49e8eac11ba1020d4eadb, reporte: { de: 68969655e304a6a09ea62f20122d6b9a13cdccc5, vers: 768b74b051b57f1647d49e8eac11ba1020d4eadb, patchId: 1876b44d9c4fad9d21156c1092b14f858b6e6856 } }
   - id: L348
     title: "cadence verify --sha <sha> [--project p] : rejoue la porte du projet (orchestrate.test puis build) au sha dans un worktree jetable dont les dépendances non suivies (.venv, node_modules… liste dans cadence.yaml, orchestrate.worktreeDeps, ou la même que celle des worktrees de vague si elle existe) sont liées depuis l'arbre principal ; rend vert/rouge avec les suites en échec ; retire le worktree ; le skill lead l'emploie au point « re-vérifier » ; générique ; doc, tests. Constat du 26-10 : la re-vérification de B28.8 dans un worktree nu a donné 9 suites rouges dues aux dépendances absentes, refaite dans l'arbre partagé"
     status: doing

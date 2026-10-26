@@ -1,7 +1,11 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
+
+/** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
+const ON_WRITE_TIMEOUT_MS = 120_000;
 
 export const STATUSES = ['todo', 'doing', 'done', 'dropped'] as const;
 export type Status = (typeof STATUSES)[number];
@@ -141,6 +145,11 @@ export interface PlanSettings {
   ignore?: string[];
   /** Fichiers tenus avec le plan (journal…), relatifs à la racine : les toucher n'est pas travailler à un lot. */
   files?: string[];
+  /**
+   * `plan.onWrite` (L346) : commande lancée à la racine du dépôt (`cwd`, le dossier de cadence.yaml) après chaque écriture du plan, et fichiers qu'elle produit.
+   * Ils sont tenus avec le plan (mêmes règles que `files`) et commités avec lui. Un échec de la commande refuse l'écriture.
+   */
+  onWrite?: { command: string; files: string[]; cwd: string };
   /** Fichier d'attendus QA (clé `qa.expectations` de cadence.yaml) : tenu avec le plan, docs/qa/expectations.md par défaut. */
   qaExpectations?: string;
   format?: PlanFormat;
@@ -257,9 +266,25 @@ export class Plan {
     return Plan.load(this.path, this.settings);
   }
 
+  /**
+   * Écrit le plan, puis lance `plan.onWrite` s'il est déclaré. Chemin unique de toutes les écritures (raf, orchestrate, deliver, config set) :
+   * si la commande échoue, le plan et les fichiers qu'elle déclare reviennent tels qu'avant et l'erreur le dit (L346).
+   */
   save(): void {
     this.writable();
+    const hook = this.settings.onWrite;
+    const kept = hook ? [this.path, ...hook.files.map((f) => resolve(hook.cwd, f))].map((p) => [p, existsSync(p) ? readFileSync(p) : null] as const) : [];
     writeFileSync(this.path, this.doc.toString({ lineWidth: 0, indentSeq: this.indentSeq }));
+    if (!hook) return;
+    const r = spawnSync('sh', ['-c', hook.command], { cwd: hook.cwd, encoding: 'utf8', timeout: ON_WRITE_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'pipe'] });
+    if (r.status === 0) return;
+    for (const [p, content] of kept) {
+      if (content === null) rmSync(p, { force: true });
+      else writeFileSync(p, content);
+    }
+    const why = r.error ? (r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT' ? `délai de ${ON_WRITE_TIMEOUT_MS / 1000} s dépassé` : r.error.message : `code ${r.status ?? r.signal}`;
+    const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-5).join(' | ');
+    throw new RafError(`plan.onWrite en échec (${hook.command}, ${why})${tail ? ` : ${tail}` : ''} — écriture refusée, plan inchangé`);
   }
 
   get project(): string {
@@ -331,6 +356,11 @@ export class Plan {
     return this.settings.files ?? [];
   }
 
+  /** Fichiers que produit `plan.onWrite` (L346), relatifs à la racine du dépôt : à commiter avec le plan, même s'ils n'étaient pas encore suivis. */
+  get produced(): string[] {
+    return this.settings.onWrite?.files ?? [];
+  }
+
   /** Fichier d'attendus QA du `qa-reviewer`, relatif à la racine du dépôt. */
   get qaExpectations(): string {
     return this.settings.qaExpectations ?? 'docs/qa/expectations.md';
@@ -338,7 +368,7 @@ export class Plan {
 
   /** Tout ce qui est tenu avec le plan sans être du travail : plan.files et le fichier d'attendus QA. Source unique de l'audit et de l'orchestrateur. */
   get maintained(): string[] {
-    return [...this.files, this.qaExpectations];
+    return [...new Set([...this.files, ...this.produced, this.qaExpectations])];
   }
 
   /**

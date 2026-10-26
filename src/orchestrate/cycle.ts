@@ -10,7 +10,7 @@ import { readDocsConfig, type OrchestrateConfig } from '../config.js';
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
-import { changedFiles, gitCommonDir, isAncestor, readCommits, resolveCommit, type Commit } from '../git.js';
+import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, type Commit } from '../git.js';
 import { blockingLots, gitCommitsIn } from './table.js';
 import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
@@ -180,7 +180,9 @@ function trackedPaths(s: Snapshot): string[] {
 async function commitPlan(c: LotCtx, message: string, root = c.lot.repo): Promise<string | null> {
   const repo = root;
   const ownFile = planOwnFile(c, repo);
-  const dirty = trackedPaths(await snapshot(repo, { remote: false }));
+  // Les fichiers de plan.onWrite (L346) entrent même non suivis : le premier plan publié n'est pas encore au dépôt.
+  const produced = c.loadPlan().produced;
+  const dirty = [...new Set([...trackedPaths(await snapshot(repo, { remote: false })), ...(produced.length ? dirtyPaths(repo, produced) : [])])];
   if (dirty.length === 0) return null;
   const foreign = dirty.filter((f) => !ownFile(f));
   if (foreign.length) return `arbre sale (fichiers hors plan) : ${foreign.join(', ')}`;

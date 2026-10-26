@@ -16,7 +16,8 @@ export interface PlanConfig {
   settings: PlanSettings;
 }
 
-const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add'];
+const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite'];
+const ON_WRITE_KEYS = ['command', 'files'];
 const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates'];
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -50,6 +51,19 @@ function readQa(qa: unknown, file: string, workRoot?: string): string | undefine
   return rel;
 }
 
+/** Clé `plan.onWrite` (L346) : la commande qui republie le plan après chaque écriture, et les fichiers qu'elle produit (relatifs au dépôt, jamais hors de lui). */
+function readOnWrite(v: unknown, file: string, bad: (what: string) => RafError): NonNullable<PlanSettings['onWrite']> {
+  if (!isObject(v)) throw bad('onWrite doit être un objet { command, files }');
+  for (const k of Object.keys(v)) if (!ON_WRITE_KEYS.includes(k)) throw bad(`onWrite.${k} inconnu (attendu : ${ON_WRITE_KEYS.join(', ')})`);
+  if (typeof v.command !== 'string' || v.command.trim() === '') throw bad('onWrite.command doit être une commande');
+  const files = list(v.files).map((f) => {
+    const rel = posix.normalize(f.trim().replace(/\\/g, '/'));
+    if (rel === '.' || rel === '..' || rel.startsWith('../') || isAbsolute(rel)) throw bad(`onWrite.files « ${f} » est hors du dépôt`);
+    return rel;
+  });
+  return { command: v.command, files, cwd: dirname(resolve(file)) };
+}
+
 /**
  * Clé `plan:` de cadence.yaml : où est le plan et, s'il est tenu par un autre outil, comment le lire.
  * `root` : la racine du dépôt de travail (celle du CLI), d'où se résout un chemin absolu de `qa.expectations`.
@@ -81,6 +95,7 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   }
   if (p.ignore != null) settings.ignore = list(p.ignore);
   if (p.files != null) settings.files = list(p.files);
+  if (p.onWrite != null) settings.onWrite = readOnWrite(p.onWrite, file, bad);
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
   if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
   if (p.add != null && (typeof p.add !== 'string' || !p.add.includes('{title}'))) throw bad('add doit être une commande qui contient {title}');

@@ -3864,6 +3864,7 @@ lots:
     started: 2026-10-26
     notes:
       - { date: 2026-10-26, text: "26-10 (lead) — réponse à la question de la vague 1125 : ne pas poser plan.onWrite dans finance-tracker, ol-companion et warhammer40k ; le lead la posera lui-même avec cadence config set après la publication de la version et la mise à jour du cadence installé. Terminer le lot sans cette partie et le dire dans le CHANGELOG / la doc si elle l'annonce." }
+    review: { date: 2026-10-26, verdict: "conforme, 3 notes mineures (petit-fils survivant au délai de plan.onWrite, assertion R2 en >= qui ne peut pas échouer, aperçu --dry-run de config set qui omet les fichiers produits) — orchestré (vague 2026-10-26-1700, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main ne change que le contexte d'un import de src/cli.ts et la place de l'entrée du CHANGELOG sous [Unreleased] ; la résolution est correcte et L348/L361 n'interagissent pas avec plan.onWrite", commit: 3516f029cf7f90a63165b8a11c04a971c59b0b2b }
   - id: L347
     title: "lead tour et session start : une note de clôture qui cite un lot déjà done (ou dropped) est signalée « note périmée : L217 done le 24-10 » à côté de la note, au lieu d'être relayée telle quelle ; session-close propose de réécrire la note ; générique ; doc, tests. Constat du 26-10 : la note d'ol-companion « L217 à faire » a fait demander L217, livré deux jours plus tôt"
     status: doing

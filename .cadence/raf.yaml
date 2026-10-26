@@ -3858,27 +3858,30 @@ lots:
     finished: 2026-10-26
   - id: L346
     title: "plan.onWrite dans cadence.yaml : commande lancée par raf (add, start, done, note, ux, review, public…) et par orchestrate après chaque écriture du plan, dont les fichiers produits entrent dans le même commit que le plan (chemins déclarés, ex. plan.onWrite: { command: npm run plan, files: [frontend/public/plan-data/plan.json] }) ; échec de la commande = écriture refusée et dite, plan inchangé ; générique ; doc, CHANGELOG, tests ; puis la clé posée dans finance-tracker, ol-companion, warhammer40k (lots de config). Constat du 26-10 : plan.json de finance régénéré à la main sans --news, CI « Plan publié à jour » rouge, livraison relancée"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
     notes:
       - { date: 2026-10-26, text: "26-10 (lead) — réponse à la question de la vague 1125 : ne pas poser plan.onWrite dans finance-tracker, ol-companion et warhammer40k ; le lead la posera lui-même avec cadence config set après la publication de la version et la mise à jour du cadence installé. Terminer le lot sans cette partie et le dire dans le CHANGELOG / la doc si elle l'annonce." }
     review: { date: 2026-10-26, verdict: "conforme, 3 notes mineures (petit-fils survivant au délai de plan.onWrite, assertion R2 en >= qui ne peut pas échouer, aperçu --dry-run de config set qui omet les fichiers produits) — orchestré (vague 2026-10-26-1700, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main ne change que le contexte d'un import de src/cli.ts et la place de l'entrée du CHANGELOG sous [Unreleased] ; la résolution est correcte et L348/L361 n'interagissent pas avec plan.onWrite", commit: 3516f029cf7f90a63165b8a11c04a971c59b0b2b }
+    finished: 2026-10-26
   - id: L347
     title: "lead tour et session start : une note de clôture qui cite un lot déjà done (ou dropped) est signalée « note périmée : L217 done le 24-10 » à côté de la note, au lieu d'être relayée telle quelle ; session-close propose de réécrire la note ; générique ; doc, tests. Constat du 26-10 : la note d'ol-companion « L217 à faire » a fait demander L217, livré deux jours plus tôt"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "conforme : 0 bloquant, 0 majeur, 2 notes mineures (liste JSON de docs/lead.md sans staleNotes ; mention d'un lot fini toujours signalée, même quand la note est exacte) — orchestré (vague 2026-10-26-1700, 0 passe(s) de correction)", commit: 768b74b051b57f1647d49e8eac11ba1020d4eadb, reporte: { de: 68969655e304a6a09ea62f20122d6b9a13cdccc5, vers: 768b74b051b57f1647d49e8eac11ba1020d4eadb, patchId: 1876b44d9c4fad9d21156c1092b14f858b6e6856 } }
+    finished: 2026-10-26
   - id: L348
     title: "cadence verify --sha <sha> [--project p] : rejoue la porte du projet (orchestrate.test puis build) au sha dans un worktree jetable dont les dépendances non suivies (.venv, node_modules… liste dans cadence.yaml, orchestrate.worktreeDeps, ou la même que celle des worktrees de vague si elle existe) sont liées depuis l'arbre principal ; rend vert/rouge avec les suites en échec ; retire le worktree ; le skill lead l'emploie au point « re-vérifier » ; générique ; doc, tests. Constat du 26-10 : la re-vérification de B28.8 dans un worktree nu a donné 9 suites rouges dues aux dépendances absentes, refaite dans l'arbre partagé"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "conforme (1 note mineure : un processus d'arrière-plan qui garde la sortie retarde la fin de la commande jusqu'au délai) — orchestré (vague 2026-10-26-1700, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme", commit: 607af88cbc445532050a6796493170ad48407758 }
+    finished: 2026-10-26
   - id: L349
     title: "budget de lot : réserver l'escalade quand orchestrate.escalation est déclarée — la correction et la revue escaladées (mesurées sur les escalades jouées depuis L337, sinon une estimation déclarée et documentée) s'ajoutent au budget dérivé de l'estimate, comme les 155 k de la dernière passe ; le dry-run affiche le budget avec sa part d'escalade ; cadence perf compte les escalades non jouées faute de budget ; doc (orchestrate.md, le tableau des budgets), CHANGELOG, tests. Constat du 26-10 : L341 (494 k / 600 k) et L342 (572 k / 600 k) rendus avec « escalade fable non jouée (budget) » — l'escalade ajoutée par L337 n'a jamais reçu de budget, elle ne joue donc que sur les lots qui ont consommé peu, l'inverse de son but"
     status: done
@@ -3985,11 +3988,12 @@ lots:
     finished: 2026-10-26
   - id: L362
     title: "intégration en mode worktree : l'union du CHANGELOG range sous la version publiée les entrées d'un lot dont la branche est née avant la publication (son [Unreleased] devient [x.y.z] sur main) — les placer sous le [Unreleased] de main ; test ; constat L346 du 26-10 (intégration refusée, test changelog rouge au sommet, entrée déplacée à la main par le lead)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-26
     review: { date: 2026-10-26, verdict: "compliant after 3 notes: 0 blocking, 0 major (doc paragraph inserted mid-sentence in docs/orchestrate.md, substring match in moveToUnreleased, replacement commit without lot id) — orchestré (vague 2026-10-26-1700, 0 passe(s) de correction)", commit: b4a2b566f96c4a169b505594771f09720b865698 }
+    finished: 2026-10-26
   - id: L363
     title: "README et docs : « cadence avec vos outils » — pour une équipe déjà outillée (tracker type Linear, HANDOFF.md, ADR, convention de commits) : ce que cadence ne remplace pas, ce qui est optionnel (raf, session start/close), ce qui se branche sur l'existant (plan tenu par un autre outil en lecture seule via cadence.yaml, message des commits de plan réglable — ticket #15, docs existantes) et ce qu'il apporte en plus (vagues orchestrées avec revue automatique, deliver qui vérifie l'effet) ; README court avec un schéma, le détail dans docs/ ; générique. Retour d'adoption du 26-10 : « overlaps with Linear, HANDOFF.md and the ADRs, and its commit format conflicts with yours »"
     status: todo

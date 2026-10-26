@@ -3931,6 +3931,7 @@ lots:
     estimate: 0.1
     created: 2026-10-26
     started: 2026-10-26
+    review: { date: 2026-10-26, verdict: "compliant — aucun défaut relevé sur L356 : les deux tests R25 qui posent un porteur sont déterministes (porte ouverte par L1 après la pose du verrou, L2 attend cette porte), la borne waitMs 150 tient sans dépendre de l'ordre — orchestré (vague 2026-10-26-1345, 0 passe(s) de correction)", commit: cc6d9104232991e2abc27783cb8bc885fb0c3adc }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -15,11 +15,11 @@ const WHO = /\b(sylvain|humain|human|lead|utilisateur|user)\b/i;
 const DECIDED = /(décision|décid|tranch|valid|arbitr|demand|veut|voulu|exig|refus|interdi|decision|decided|approved|asked|wants|required|refused)/i;
 
 /**
- * Les notes que le programme écrit lui-même, reconnues à leur préfixe : une hypothèse de fiche (`hypothesisNote`, spec.ts : un choix que personne
+ * Les notes que le programme écrit lui-même, reconnues à leur préfixe (précédé de `[Lnn/tn] ` quand la note est posée sur une sous-tâche, `plan.note`) : une hypothèse de fiche (`hypothesisNote`, spec.ts : un choix que personne
  * n'a validé), un mineur de revue (`noteMinors`, cycle.ts), un titre remplacé (plan.ts : l'ancien titre, périmé), une remise en attente (plan.ts) ou
  * un abandon (cli.ts `drop --reason`). Elles citent souvent l'utilisateur ou le lead sans porter aucune décision de l'humain.
  */
-const PROGRAM_NOTE = /^(Hypothèses \(fiche |Revue de [^\n]{1,60}? — mineur : |titre remplacé : |remis en attente(\s*:|$)|abandonné : )/;
+const PROGRAM_NOTE = /^(\[[^\]\n]{1,40}\] )?(Hypothèses \(fiche |Revue de [^\n]{1,60}? — mineur : |titre remplacé : |remis en attente(\s*:|$)|abandonné : )/;
 
 const isDecision = (text: string): boolean => !PROGRAM_NOTE.test(text) && WHO.test(text) && DECIDED.test(text);
 

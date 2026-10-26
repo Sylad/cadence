@@ -118,4 +118,14 @@ describe('décisions de l\'humain dans le brief (L344)', () => {
     const l = lot('L9', [{ date: '2026-10-24', text: 'abandonné : Sylvain a refusé la migration, lot sans objet' }, decision]);
     expect(humanDecisions(l).map((d) => d.text)).toEqual([decision.text]);
   });
+
+  it('R17 — les notes posées sur une sous-tâche portent le préfixe « [Lnn/tn] » : « abandonné : », « remis en attente » et « titre remplacé : » restent écartés', () => {
+    const l = lot('L9', [
+      { date: '2026-10-24', text: '[L9/t1] abandonné : Sylvain a refusé la migration, sous-tâche sans objet' },
+      { date: '2026-10-24', text: '[L9/t2] remis en attente : le lead demande de livrer L8 d\'abord' },
+      { date: '2026-10-24', text: '[L9/t3] titre remplacé : « champs exclus selon la décision de Sylvain »' },
+      decision,
+    ]);
+    expect(humanDecisions(l).map((d) => d.text)).toEqual([decision.text]);
+  });
 });

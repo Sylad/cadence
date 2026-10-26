@@ -103,6 +103,15 @@ describe('candidats', () => {
     expect(draw(800_000)).toEqual(['L1', 'L2']);
     expect(draw(1_300_000)).toEqual(['L1', 'L2', 'L3']);
   });
+  it("L349 : un projet qui déclare orchestrate.escalation tire au budget du lot avec sa part d'escalade (775 k pour un lot de 0,5 j), les autres au budget ordinaire", () => {
+    const parent = tempDir();
+    const avec = project(parent, 'avec', [{ title: 'a', estimate: 0.5 }]);
+    project(parent, 'sans', [{ title: 'b', estimate: 0.5 }]);
+    writeFileSync(join(avec, 'cadence.yaml'), 'orchestrate:\n  escalation:\n    model: fable\n');
+    const draw = (remaining: number) => candidates(parent, { priority: [], exclude: new Set(), remaining }).map((c) => `${c.project}:${c.lot.id}`);
+    expect(draw(700_000)).toEqual(['sans:L1']);
+    expect(draw(775_000)).toEqual(['avec:L1', 'sans:L1']);
+  });
   it('un dossier de projet : lui seul', () => {
     const parent = tempDir();
     const dir = project(parent, 'cadence', [{ title: 'a' }, { title: 'b' }]);

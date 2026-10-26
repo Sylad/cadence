@@ -59,7 +59,7 @@ describe('L297 — la réponse du lead source la règle posée en question', () 
     answer(c);
     await runLot(c);
     const log = git(h.repo, 'log', '--format=%s', '--', FICHE).split('\n');
-    expect(log[0]).toMatch(/^spec\(L1\): R3 sourcée par la réponse du lead/);
+    expect(log[0]).toMatch(/^docs\(L1\): R3 sourcée par la réponse du lead/);
     const sha = git(h.repo, 'log', '-1', '--format=%H', '--', FICHE);
     expect(git(h.repo, 'show', '--name-only', '--format=', sha)).toBe(FICHE);
     expect(git(h.repo, 'status', '--porcelain', '--', FICHE)).toBe('');

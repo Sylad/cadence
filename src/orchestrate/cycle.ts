@@ -1497,7 +1497,7 @@ function sourceAnsweredRules(c: LotCtx): boolean {
     const ids = sourceRules(wd(c), fiche, l.specAskedRules, `${LEAD_SOURCE}, ${c.wave.today}, vague ${c.wave.id}`);
     if (!ids.length) return false;
     git(wd(c), 'add', '--', fiche);
-    git(wd(c), 'commit', '-q', '-m', `spec(${l.lot}): ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead (orchestrate ${c.wave.id})`, '--', fiche);
+    git(wd(c), 'commit', '-q', '-m', `docs(${l.lot}): ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead (orchestrate ${c.wave.id})`, '--', fiche);
     return false;
   } catch (e) {
     stop(c, 'handed-back', `réponse du lead non reportée dans la fiche ${fiche} : ${(e as Error).message.split('\n')[0]}`);

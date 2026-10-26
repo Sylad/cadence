@@ -1,13 +1,14 @@
 import { execSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { isNode, isScalar, parse, parseDocument, type Document } from 'yaml';
 import { defaultPlan, readDocsConfig, readHookConfig, readMigrateConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readReferencesConfig, readSessionConfig } from './config.js';
 import type { Day } from './dates.js';
 import { parseDeliverConfig } from './deliver.js';
 import { commitPaths, dirtyPaths, gitRoot } from './git.js';
-import { findProjects, isProject } from './lead.js';
+import { findProjects, isProject, readDepth, readLeadUx } from './lead.js';
+import { readPriority } from './orchestrate/continue.js';
 import { Plan, RafError, type PlanSettings } from './plan.js';
 
 const KEY = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/;
@@ -35,6 +36,9 @@ export function validateConfig(file: string, root: string): void {
   readDocsConfig(file);
   readReferencesConfig(file);
   readMigrateConfig(file);
+  readLeadUx(dirname(file));
+  readDepth(dirname(file));
+  readPriority(dirname(file));
   const text = readFileSync(file, 'utf8');
   if ((parse(text) as { deliver?: unknown } | null)?.deliver != null) parseDeliverConfig(text, file);
 }
@@ -79,13 +83,15 @@ export function setKey(text: string, key: string, value: Document): string | nul
     if (isNode(old) && isNode(next)) next.comment = old.comment;
     doc.setIn(path, next);
   }
-  return onlyChangedLines(text, baseline, doc.toString({ lineWidth: 0 }));
+  const full = doc.toString({ lineWidth: 0 });
+  const kept = onlyChangedLines(text, baseline, full);
+  return JSON.stringify(parse(kept)) === JSON.stringify(parse(full)) ? kept : full; // un report mal aligné change le sens du fichier : l'écriture entière de yaml
 }
 
 /**
  * La réécriture de yaml normalise tout le fichier (`[a, b]` devient `[ a, b ]`, les espaces avant un commentaire de fin de ligne) :
  * seules les lignes que la pose de la clé a changées (`baseline` → `changed`, deux écritures de yaml) sont reportées dans le texte d'origine.
- * Quand yaml a aussi changé le nombre de lignes du fichier non modifié, le report n'est pas sûr : l'écriture entière de yaml est rendue.
+ * Quand yaml a aussi changé le nombre de lignes du fichier non modifié, le report n'est pas sûr : l'écriture entière de yaml est rendue (`setKey` la rend aussi quand le report ne relit pas le même document).
  */
 function onlyChangedLines(original: string, baseline: string, changed: string): string {
   const o = original.split('\n');

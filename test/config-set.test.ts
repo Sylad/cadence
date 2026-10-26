@@ -144,11 +144,11 @@ describe('cadence config set --all (L342)', () => {
   it('R8 — un projet sans cadence.yaml en reçoit un ; un chemin qui traverse une valeur simple est sauté', () => {
     const parent = tempDir();
     const a = project(parent, 'alpha');
-    const b = project(parent, 'beta', { 'cadence.yaml': 'lead: human\n' });
+    const b = project(parent, 'beta', { 'cadence.yaml': 'foo: human\n' });
     expect(existsSync(join(a, 'cadence.yaml'))).toBe(false);
-    const r = cadence(parent, 'config', 'set', 'lead.ux', 'lead', '--all');
+    const r = cadence(parent, 'config', 'set', 'foo.ux', 'lead', '--all');
     expect(r.code).toBe(0);
-    expect(readFileSync(join(a, 'cadence.yaml'), 'utf8')).toBe('lead:\n  ux: lead\n');
+    expect(readFileSync(join(a, 'cadence.yaml'), 'utf8')).toBe('foo:\n  ux: lead\n');
     expect(r.out).toMatch(/beta.*sauté.*ne se pose pas/);
     expect(git(b, 'rev-list', '--count', 'HEAD').trim()).toBe('1');
   });
@@ -254,5 +254,29 @@ describe('config set — le fichier hors de la clé est gardé (L342)', () => {
     const out = setKey(INLINE, 'hook.cmd', parseDocument('ls'))!;
     expect(out.startsWith(INLINE)).toBe(true);
     expect(out).toContain('hook:\n  cmd: ls');
+  });
+});
+
+describe('config set — report décalé et clés lues par lead / orchestrate (L342)', () => {
+  const SHIFTED = 'orchestrate: # la porte\n  test: x\nlead:\n  ux: lead\ndocs:\n  sync:\n    paths: [src/**,\n      bin/*.js]\n';
+
+  it('un commentaire de clé et une liste sur deux lignes qui se compensent ne décalent pas la pose : la clé reste sous orchestrate', () => {
+    const out = setKey(SHIFTED, 'orchestrate.build', parseDocument('npx tsc --noEmit'))!;
+    const doc = parseDocument(out).toJS() as { orchestrate: Record<string, unknown>; lead: Record<string, unknown> };
+    expect(doc.orchestrate.build).toBe('npx tsc --noEmit');
+    expect(doc.lead).toEqual({ ux: 'lead' });
+  });
+
+  it('une valeur de lead.ux, depth ou priority que le chargeur refuse arrête le passage, rien n\'est écrit', () => {
+    for (const [key, value, message] of [['lead.ux', 'bogus', /lead\.ux/], ['depth', '0', /depth/], ['priority', '[]', /priority/]] as const) {
+      const parent = tempDir();
+      const a = project(parent, 'alpha', { 'cadence.yaml': COMMENTED });
+      const r = cadence(parent, 'config', 'set', key, value, '--all');
+      expect(r.code).toBe(1);
+      expect(r.out).toMatch(message);
+      expect(r.out).toMatch(/alpha.*arrêt/);
+      expect(readFileSync(join(a, 'cadence.yaml'), 'utf8')).toBe(COMMENTED);
+      expect(git(a, 'rev-list', '--count', 'HEAD').trim()).toBe('1');
+    }
   });
 });

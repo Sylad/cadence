@@ -12,7 +12,6 @@ import { Plan } from '../src/plan.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { claudeOut, commitFile, git, harness, kindOf, precheckReport, reviewReport, workReport } from './orchestrate-harness.js';
 import { removeDryRunBriefs, tempDir } from './helpers.js';
-import { yamlResolvedFrom } from './tmp-hygiene.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -337,9 +336,18 @@ describe('L355 — hermétique à l\'environnement de la session qui lance la su
     expect(() => createRequire(join(lone, 'package.json')).resolve('yaml')).toThrow();
   });
 
-  it('R2 — un paquet jetable de la racine privée ne résout pas « yaml » : sinon l\'échec nomme le fichier qui le fournit', () => {
+  it('R2 — un paquet jetable de la racine privée ne résout pas « yaml », d\'où qu\'il vienne : sinon l\'échec nomme le fichier qui le fournit', () => {
     const lone = tempDir();
     writeFileSync(join(lone, 'package.json'), '{"name":"x"}\n');
-    expect(yamlResolvedFrom(lone), `« yaml » se résout depuis ${lone} (NODE_PATH=${process.env.NODE_PATH ?? ''}, HOME=${process.env.HOME ?? ''})`).toBeUndefined();
+    // La résolution de Node elle-même (node_modules des dossiers parents, NODE_PATH, ~/.node_modules, ~/.node_libraries, <prefix>/lib/node),
+    // pas une relecture partielle : le fichier nommé est celui que resolveModulesDir (src/orchestrate/snapshot.ts) trouverait.
+    let found: string | undefined;
+    try {
+      found = createRequire(join(lone, 'package.json')).resolve('yaml');
+    } catch {
+      // attendu : rien ne fournit yaml
+    }
+    const globalPaths = (createRequire(import.meta.url)('node:module') as { globalPaths: string[] }).globalPaths;
+    expect(found, `« yaml » se résout depuis ${lone} : ${found} (NODE_PATH=${process.env.NODE_PATH ?? ''}, HOME=${process.env.HOME ?? ''}, node ${process.version} ${process.execPath}, chemins globaux : ${globalPaths.join(', ')})`).toBeUndefined();
   });
 });

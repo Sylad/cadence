@@ -225,4 +225,12 @@ describe('cadence config set --all (L342)', () => {
     const r = cadence(parent, 'config', 'set', 'orchestrate.build', 'x', '--all');
     expect(r.out).toMatch(/autre-outil.*sauté.*lecture seule.*plan\.add/);
   });
+
+  it('R16 — un plan.add sans {title} est refusé par le chargeur de config : le passage s\'arrête', () => {
+    const parent = tempDir();
+    project(parent, 'autre-outil', { 'cadence.yaml': "plan:\n  path: taches.yaml\n  lots: taches\n  add: mytool add\n", 'taches.yaml': 'taches:\n  - { id: T1, title: x, status: todo }\n' });
+    const r = cadence(parent, 'config', 'set', 'orchestrate.build', 'x', '--all');
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/autre-outil.*arrêt.*\{title\}/);
+  });
 });

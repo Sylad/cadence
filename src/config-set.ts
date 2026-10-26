@@ -178,7 +178,7 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
       writeFileSync(configFile, text);
       const title = `config cadence.yaml : ${key} = ${shown}`;
       let id: string;
-      if (found.add) {
+      if (found.readonly && found.add) {
         // La commande du plan crée le lot (et l'ouvre, si son outil le veut) : l'identifiant est le premier mot de sa sortie qui ressemble à un id de lot.
         const out = execSync(found.add.replaceAll('{title}', shellQuote(title)), { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
         id = /\b[A-Za-z]+-?\d+(?:\.\d+)?\b/.exec(out)?.[0] ?? '';

@@ -2760,6 +2760,29 @@ describe('ligne de base des tests (L213)', () => {
     expect(c.lot.baseline?.verified).toBe(false);
     expect(c.lot.warnings.join('\n')).toContain('aucun nouvel échec déclaré');
   });
+  const rouge = { commande: 'npm test', resultat: '24 failed', vert: false };
+  it('R1 — porte du programme verte (code 0), session vert:false, echecsDeBase non vide et nouveauxEchecs vide : pas de correction ni d\'escalade, lot en revue (L361)', async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { tests: rouge, echecsDeBase: ['autre-lot > cas ancien'], nouveauxEchecs: [] })], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'exit 0' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.pass).toBe(0);
+    expect(c.lot.warnings.join('\n')).toContain('porte du programme verte');
+  });
+  it('R2 — porte du programme verte mais nouveauxEchecs non vide : la correction a lieu (L361)', async () => {
+    const h = harness({ script: { implement: [impl('a.txt', { tests: rouge, echecsDeBase: ['autre-lot > cas ancien'], nouveauxEchecs: ['lot > nouveau'] })], fix: [fix('b.txt')], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'exit 0' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+  });
+  it('R3 — porte verte, session vert:false sans nouveauxEchecs (absent) ou sans echecsDeBase : la correction a lieu comme avant (L361)', async () => {
+    for (const extra of [{ echecsDeBase: ['autre-lot > cas ancien'] }, { nouveauxEchecs: [] as string[] }]) {
+      const h = harness({ script: { implement: [impl('a.txt', { tests: rouge, ...extra })], fix: [fix('b.txt')], review: [ok] } });
+      const c = h.lot('L1', {}, { test: 'exit 0' });
+      await runLot(c);
+      expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    }
+  });
   it('sans orchestrate.test : vert:false avec nouveauxEchecs non vide : correction, les nouveaux échecs dans le constat', async () => {
     const h = harness({ script: { implement: [impl('a.txt', { tests: { commande: 'npm test', resultat: '2 failed', vert: false }, echecsDeBase: ['autre-lot > cas ancien'], nouveauxEchecs: ['lot > nouveau'] })], fix: [fix('b.txt')], review: [ok] } });
     const c = h.lot('L1');

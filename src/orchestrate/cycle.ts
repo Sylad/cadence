@@ -2110,7 +2110,11 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   if (red.length === 0) await programChecks(c, red, runs);
   // La session annonçait des tests rouges et le programme ne les voit pas rouges au départ : l'annonce vaut.
-  if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && r.dejaRouges)) red.push(claimed);
+  // L361 : la porte du programme est verte (code 0) et la session n'annonce que des échecs de base (echecsDeBase non vide, nouveauxEchecs présent et vide) : rien de rouge pour le programme, rien de nouveau pour la session → revue, sans correction ni escalade.
+  const gateGreen = runs.some((r) => r.label === 'tests' && r.code === 0);
+  const baseOnly = declared.length > 0 && !!newFailures && !newFailures.length;
+  if (deferred && red.length === 0 && gateGreen && baseOnly) l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${c.config.test}, code 0) et aucun nouvel échec déclaré (nouveauxEchecs vide) : les échecs sont ceux de la base qu'elle déclare (${declared.length}) ; pas de correction`);
+  else if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && r.dejaRouges)) red.push(claimed);
   if (red.length) {
     toFix(c, red, 'tests rouges');
     return;

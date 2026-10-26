@@ -4016,9 +4016,10 @@ lots:
     created: 2026-10-26
   - id: L366
     title: "verrou d'acceptation : un lot d'écran clos à la main (raf done) avec acceptation-<lot>.json à vert: false bloque toutes les vagues suivantes du dépôt (« verrou des tests d'acceptation … premier commit fautif » sur des lots qui n'y touchent pas) — (1) cadence spec green <lot> : lance la commande d'acceptation du lot clos et, verte, pose vert: true comme le cycle (commit cité) ; (2) raf done d'un lot à vert: false avertit, refuse sans --force ; (3) le dry-run signale à l'avance une acceptation rouge d'un lot clos ; doc, CHANGELOG, tests. Issue GitHub #18"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-26
+    started: 2026-10-26
   - id: L367
     title: "couverture d'un document de référence : (1) chaque élément de inventaire.json a un id stable (page/zone/élément) ; (2) agent planificateur (propose seulement) : lit l'inventaire et le plan, propose des lots citant les ids couverts, faisable ou bloqué (donnée ou service manquant nommé), dépendances ; (3) cadence ref coverage <inventaire.json> (programme, sans modèle) : éléments sans lot, sans lot fait et sans exclusion écrite avec sa raison, code 1 s'il en reste ; (4) le brief du spec-writer porte les ids de son lot et justifie chaque élément non pris, le ux-reviewer les vérifie sur l'écran fini ; doc, CHANGELOG, tests. Issue GitHub #19"
     status: todo

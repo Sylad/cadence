@@ -136,6 +136,8 @@ export interface Journal {
   small: boolean;
   status: string;
   budget?: number;
+  /** Part de `budget` réservée à l'escalade de modèle (`escalationReserve` du journal, L349) ; absente d'un journal antérieur ou d'un lot sans escalade déclarée. */
+  escalationReserve?: number;
   /** Verdict du contrôle préalable (`precheckVerdict` du journal, L288) ; absent d'un journal ancien ou d'un lot sans contrôle. */
   precheck?: 'oui' | 'partiel' | 'non';
   /** Le rapport du précheck local était illisible (avertissement du journal, L322) : son étape est `ok` mais le lot est reparti sur Sonnet ; absent sinon. */
@@ -212,6 +214,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         small: !!rec.small,
         status: String(rec.status),
         ...(typeof rec.budget === 'number' ? { budget: rec.budget } : {}),
+        ...(typeof rec.escalationReserve === 'number' ? { escalationReserve: rec.escalationReserve } : {}),
         ...(precheck ? { precheck } : {}),
         ...(escalation ? { escalation } : {}),
         ...(Array.isArray(rec.warnings) && (rec.warnings as unknown[]).some((w) => typeof w === 'string' && w.startsWith(LOCAL_PRECHECK_UNREADABLE)) ? { localUnreadable: true as const } : {}),

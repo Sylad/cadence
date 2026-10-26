@@ -376,7 +376,9 @@ export function computePerf(input: PerfInput): PerfResult {
   const withBudget = (w: Window) => rendered(w).filter((d) => d.j.budget !== undefined);
   const onBudget = both(windows, (w) => {
     const set = withBudget(w);
-    return set.length === 0 ? null : set.filter((d) => d.j.steps.reduce((sum, s) => sum + (s.counted ?? 0), 0) <= d.j.budget!).length / set.length;
+    // Les passes ordinaires s'arrêtent avant la part d'escalade (L349) : elles se comptent contre le budget moins cette part, et les étapes du modèle d'escalade ne comptent pas contre elles.
+    const within = (j: (typeof set)[number]['j']) => j.steps.filter((s) => !j.escalationReserve || s.model !== j.escalation?.model).reduce((sum, s) => sum + (s.counted ?? 0), 0) <= j.budget! - (j.escalationReserve ?? 0);
+    return set.length === 0 ? null : set.filter((d) => within(d.j)).length / set.length;
   });
 
   // Défauts échappés (R9)

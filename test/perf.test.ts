@@ -175,6 +175,18 @@ describe('cadence perf — fenêtres et débit', () => {
     expect(data.throughput.onBudget.current).toBe(0.5);
   });
 
+  it("R5 — L349 : la part d'escalade du budget n'abrite pas les passes ordinaires, qui se comptent contre le budget moins cette part", async () => {
+    const c = ctx();
+    // 640 k de passes ordinaires pour 775 k de budget dont 175 k retenus : au-delà des 600 k des passes ordinaires, donc hors budget.
+    writeJournal(c.runs, 'w1', 'alpha', 'A', { budget: 775_000, escalationReserve: 175_000, steps: [{ kind: 'implement', counted: 640_000, ended: at(CUR) }] });
+    // 590 k pour le même budget : sur budget.
+    writeJournal(c.runs, 'w1', 'alpha', 'B', { budget: 775_000, escalationReserve: 175_000, steps: [{ kind: 'implement', counted: 590_000, ended: at(CUR) }] });
+    // Escalade jouée : ses jetons ne comptent pas contre la part des passes ordinaires, ils sont payés par la part retenue.
+    writeJournal(c.runs, 'w1', 'alpha', 'C', { budget: 775_000, escalationReserve: 175_000, escalation: { model: 'fable', stage: 'done', issue: 'rendu' }, steps: [{ kind: 'implement', counted: 590_000, ended: at(CUR) }, { kind: 'fix', counted: 150_000, model: 'fable', ended: at(CUR) }] });
+    const { data } = await json(c.root);
+    expect(data.throughput.onBudget.current).toBeCloseTo(2 / 3);
+  });
+
   it('R5 — un journal sans budget n\'entre pas au dénominateur', async () => {
     const c = ctx();
     journal(c, CUR, { budget: 100, counted: 50 });

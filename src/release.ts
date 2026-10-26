@@ -179,8 +179,12 @@ function plan(root: string, bump: Bump, today: Day): Planned {
 export function whatsNewIssues(text: string, version: string): string[] {
   const lines = text.split('\n');
   const issues: string[] = [];
-  const check = (form: string, absent: string, misplaced: string, pattern: RegExp, where: string, max?: number) => {
-    const hits = lines.map((l) => ({ l, v: pattern.exec(l)?.[1] })).filter((x) => x.v !== undefined);
+  // « Version by version » coupe le fichier : la liste courte est avant, les paragraphes longs sont après (sauf l'introduction, premier paragraphe de la section).
+  const heading = lines.findIndex((l) => /^##\s+Version by version\s*$/.test(l));
+  const split = heading < 0 ? lines.length : heading;
+  const intro = heading < 0 ? -1 : lines.findIndex((l, i) => i > heading && l.trim() !== '');
+  const check = (form: string, absent: string, misplaced: string, pattern: RegExp, from: number, to: number, where: string, max?: number) => {
+    const hits = lines.map((l, i) => ({ l, i, v: i >= from && i < to ? pattern.exec(l)?.[1] : undefined })).filter((x) => x.v !== undefined && x.i !== intro);
     const at = hits.findIndex((h) => h.v === version);
     if (at < 0) {
       issues.push(`${WHATS_NEW} : ${form} ${absent} — l'écrire ${where}`);
@@ -189,8 +193,8 @@ export function whatsNewIssues(text: string, version: string): string[] {
     if (at > 0) issues.push(`${WHATS_NEW} : ${form} ${misplaced} (après la version ${hits[at - 1].v} ; la plus récente va en premier) — la déplacer ${where}`);
     if (max !== undefined && hits[at].l.length > max) issues.push(`${WHATS_NEW} : ${form} trop longue (${hits[at].l.length} caractères, ${max} au plus)`);
   };
-  check('ligne de « In two lines »', 'manquante', 'mal placée', /^- \*\*(\d+\.\d+\.\d+)\*\*:/, 'en tête de la liste', SHORT_LINE_MAX);
-  check('paragraphe long', 'manquant', 'mal placé', /^\*\*(\d+\.\d+\.\d+)\*\*:/, 'juste après l’introduction de « Version by version »');
+  check('ligne de « In two lines »', 'manquante', 'mal placée', /^- \*\*(\d+\.\d+\.\d+)\*\*:/, 0, split, 'en tête de la liste', SHORT_LINE_MAX);
+  check('paragraphe long', 'manquant', 'mal placé', /^\*\*(\d+\.\d+\.\d+)\*\*:/, split, lines.length, 'juste après l’introduction de « Version by version »');
   return issues;
 }
 

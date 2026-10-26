@@ -3891,10 +3891,11 @@ lots:
     finished: 2026-10-26
   - id: L351
     title: "orchestrate : la porte (orchestrate.test, orchestrate.build, ligne de base comprise) et les autres commandes lancées par le programme tournent avec le même environnement Node que les sessions (lien node-bin/<version> du .nvmrc en tête du PATH) ; le dry-run signale un .nvmrc différent du Node du PATH quand une porte est déclarée ; doc, CHANGELOG, tests. Issue GitHub #17 : Node 24 demandé par .nvmrc, vague lancée sous Node 20, la porte échoue quoi que fasse le lot, passes de correction vides puis escalade pour rien"
-    status: todo
+    status: doing
     estimate: 0.25
     after: [ L350 ]
     created: 2026-10-26
+    started: 2026-10-26
   - id: L352
     title: "orchestrate : la détection de push ne coupe plus un lot quand le push est celui du lead pour livrer un lot prêt de la vague — le sha poussé est un ancêtre de HEAD et ne contient que des commits de lots prêts (ou du plan), c'est-à-dire le chemin « livrable jusqu'à <sha> » que le skill lead prescrit ; tout autre push reste un incident ; le journal dit « push du lead (livraison de <lot>) toléré » ; doc (orchestrate, skill lead), CHANGELOG, tests. Constat du 26-10 : le skill demande git push origin <sha>:main pendant la vague, le programme a tué maritime B28.9 en implémentation (26 min, 306 k) au même moment"
     status: done

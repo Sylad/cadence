@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 export interface Commit {
@@ -256,6 +257,14 @@ export function commitPaths(root: string, paths: string[], message: string): str
     throw new Error((err.stderr || err.stdout || err.message).trim().split('\n')[0]);
   }
   return tryGit(root, ['rev-parse', '--short', 'HEAD']) ?? '';
+}
+
+/** Remet `paths` comme à HEAD : un fichier suivi retrouve sa version commitée, un fichier que HEAD ne connaît pas est supprimé. */
+export function restorePaths(root: string, paths: string[]): void {
+  for (const f of paths) {
+    if (tryGit(root, ['cat-file', '-e', `HEAD:${f}`]) !== null) git(root, ['checkout', '-q', 'HEAD', '--', f]);
+    else rmSync(resolve(root, f), { force: true });
+  }
 }
 
 /** Un fichier SUIVI est-il modifié (indexé ou non) ? Les fichiers non suivis ne comptent pas : un commit à chemins explicites ne les embarque pas. `except` : chemins qu'on ne compte pas. */

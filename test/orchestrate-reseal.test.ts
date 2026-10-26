@@ -170,6 +170,18 @@ describe('cadence spec reseal <lot> <test> --reason', () => {
     expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
   });
 
+  it('L346 — avec plan.onWrite, le fichier produit part dans le commit de la note du lot', () => {
+    const { repo, a } = avecPlan();
+    writeFileSync(join(repo, 'cadence.yaml'), "plan:\n  onWrite: { command: 'wc -l < .cadence/raf.yaml > plan.json', files: [plan.json] }\n");
+    commitPaths(repo, 'chore: onWrite', 'cadence.yaml');
+    writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'le test contredit la fiche');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(git(repo, 'show', '--name-only', '--format=', 'HEAD').split('\n').filter(Boolean).sort()).toEqual(['.cadence/raf.yaml', 'plan.json']);
+    expect(git(repo, 'status', '--porcelain').trim()).toBe('');
+  });
+
   it('un plan tenu par un autre outil (lecture seule) : le rescellé réussit, la note du lot reste à la main du lead', () => {
     const { repo, a } = avecPlan();
     writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: .cadence/raf.yaml\n  lots: lots\n');

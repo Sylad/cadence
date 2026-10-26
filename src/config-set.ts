@@ -6,7 +6,7 @@ import { isNode, isScalar, parse, parseDocument, type Document } from 'yaml';
 import { defaultPlan, readDocsConfig, readHookConfig, readMigrateConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readReferencesConfig, readSessionConfig } from './config.js';
 import type { Day } from './dates.js';
 import { parseDeliverConfig } from './deliver.js';
-import { commitPaths, dirtyPaths, gitRoot } from './git.js';
+import { commitPaths, dirtyPaths, gitRoot, restorePaths } from './git.js';
 import { findProjects, isProject, readDepth, readLeadUx } from './lead.js';
 import { readPriority } from './orchestrate/continue.js';
 import { Plan, RafError, type PlanSettings } from './plan.js';
@@ -195,7 +195,8 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
       skip(`pas de plan à ${planRel}`);
       continue;
     }
-    const dirty = dirtyPaths(dir, ['cadence.yaml', planRel]);
+    const produced = found.settings.onWrite?.files ?? [];
+    const dirty = dirtyPaths(dir, ['cadence.yaml', planRel, ...produced]);
     if (dirty.length) {
       skip(`${dirty.join(', ')} non commité : le commit à chemin explicite l'emporterait`);
       continue;
@@ -207,7 +208,9 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
     }
 
     const planBefore = readFileSync(planPath, 'utf8');
+    // Ce que plan.onWrite produit est propre ici (vérifié plus haut) : le défaire, c'est le remettre à HEAD.
     const restore = () => {
+      restorePaths(dir, produced);
       if (before === null) {
         if (existsSync(configFile)) unlinkSync(configFile);
       } else writeFileSync(configFile, before);
@@ -227,7 +230,7 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
         plan.setStatus(id, 'doing', today);
         plan.save();
       }
-      const sha = commitPaths(dir, ['cadence.yaml', planRel], `chore${id ? `(${id})` : ''}: cadence.yaml — ${key} = ${shown}`);
+      const sha = commitPaths(dir, ['cadence.yaml', planRel, ...(produced.length ? dirtyPaths(dir, produced) : [])], `chore${id ? `(${id})` : ''}: cadence.yaml — ${key} = ${shown}`);
       done++;
       lines.push(`✓ ${name} · ${id || 'lot de config'} · ${key} = ${shown} · commit ${sha}`);
     } catch (e) {

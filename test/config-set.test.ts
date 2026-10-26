@@ -294,3 +294,27 @@ describe('config set — report décalé et clés lues par lead / orchestrate (L
     }
   });
 });
+
+describe('cadence config set avec plan.onWrite (L346)', () => {
+  const GENERATE = "mkdir -p public && wc -l < .cadence/raf.yaml > public/plan.json";
+  const ONWRITE = `plan:\n  onWrite: { command: '${GENERATE}', files: [public/plan.json] }\n`;
+  it('R5 — le lot de config écrit le plan, la commande tourne, le fichier produit entre dans le même commit', () => {
+    const parent = tempDir();
+    const a = project(parent, 'alpha', { 'cadence.yaml': ONWRITE });
+    const r = cadence(parent, 'config', 'set', 'orchestrate.escalation', '{ model: fable }', '--all');
+    expect(r.code, r.out + r.err).toBe(0);
+    const last = git(a, 'log', '-1', '--format=%s', '--name-only').trim().split('\n');
+    expect(last.slice(1).filter(Boolean).sort()).toEqual(['.cadence/raf.yaml', 'cadence.yaml', 'public/plan.json']);
+    expect(git(a, 'status', '--porcelain').trim()).toBe('');
+  });
+  it('R5 — commande en échec : rien n\'est commité, cadence.yaml, plan et fichier produit remis en l\'état, arrêt sur le projet', () => {
+    const parent = tempDir();
+    const a = project(parent, 'alpha', { 'cadence.yaml': "plan:\n  onWrite: { command: 'exit 4', files: [public/plan.json] }\n" });
+    const head = git(a, 'rev-parse', 'HEAD');
+    const r = cadence(parent, 'config', 'set', 'orchestrate.escalation', '{ model: fable }', '--all');
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('plan.onWrite');
+    expect(git(a, 'rev-parse', 'HEAD')).toBe(head);
+    expect(git(a, 'status', '--porcelain').trim()).toBe('');
+  });
+});

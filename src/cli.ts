@@ -11,7 +11,7 @@ import { deliver, parseDeliverConfig, realDeps, shellQuote } from './deliver.js'
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { verifyGate } from './verify-gate.js';
 import { ganttData, renderGantt } from './gantt.js';
-import { gitRoot, isTracked, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
+import { dirtyPaths, gitRoot, isTracked, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
@@ -782,6 +782,7 @@ function preCommit(load: (() => Plan) | null, mode: 'warn' | 'refuse' | 'start' 
     }
     plan.save();
     stage(root, file);
+    for (const f of plan.produced) stage(root, f);
   } catch {
     // Un hook ne doit jamais gêner un commit, hors refus.
   }
@@ -1021,11 +1022,14 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   plan.save();
   // La note du lot rejoint le dépôt dans la foulée (un dépôt sale arrêterait la vague suivante) ; un plan hors du dépôt ou non suivi reste à la main du lead.
   const planRel = relative(repo, plan.path);
+  const produced = plan.produced;
   const tracked = !planRel.startsWith('..') && git(repo, ['ls-files', '--', planRel]).trim() !== '';
   if (tracked) {
     try {
-      git(repo, ['add', '--', planRel]);
-      git(repo, ['commit', '-q', '-m', `plan: ${cite} test d'acceptation rescellé (${norm})`, '--', planRel]);
+      // Les fichiers de plan.onWrite (L346) partent avec la note : la commande a tourné à l'écriture du plan.
+      const withPlan = [planRel, ...(produced.length ? dirtyPaths(repo, produced) : [])];
+      git(repo, ['add', '--', ...withPlan]);
+      git(repo, ['commit', '-q', '-m', `plan: ${cite} test d'acceptation rescellé (${norm})`, '--', ...withPlan]);
     } catch (e) {
       // Le rescellé est fait (commit ${sha}) : on ne le défait pas, on dit où en est la note, au lieu d'une pile d'appels.
       const out = e as { stderr?: string; stdout?: string; message: string };

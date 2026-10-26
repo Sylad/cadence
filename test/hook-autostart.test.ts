@@ -139,6 +139,17 @@ describe('(L104) hook.autostart dans cadence.yaml', () => {
     expect(git(dir, 'reflog', '-1', '--format=%gs').stdout).toContain('commit');
   });
 
+  it('start (L346) : avec plan.onWrite, le fichier produit part dans le même commit que le plan', () => {
+    const { dir, env } = project('start');
+    writeFileSync(join(dir, 'cadence.yaml'), "hook:\n  autostart: start\nplan:\n  onWrite: { command: 'wc -l < .cadence/raf.yaml > plan.json', files: [plan.json] }\n");
+    git(dir, 'add', 'cadence.yaml');
+    expect(spawnSync('git', ['commit', '-qm', 'chore: onWrite'], { cwd: dir, env, encoding: 'utf8' }).status).toBe(0);
+    const r = work(dir, env, 'feat(L1): a');
+    expect(r.status).toBe(0);
+    expect(git(dir, 'show', '--name-only', '--format=', 'HEAD').stdout.split('\n').filter(Boolean).sort()).toEqual(['.cadence/raf.yaml', 'plan.json', 'src.txt']);
+    expect(git(dir, 'status', '--porcelain').stdout).toBe('');
+  });
+
   it('start : un lot déjà en cours, un commit sans lot ou du plan seul ne touchent pas au plan', () => {
     const { dir, env } = project('start');
     const plan = planText(dir);

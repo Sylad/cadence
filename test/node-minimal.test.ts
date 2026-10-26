@@ -17,10 +17,11 @@ describe('Node minimal (L365)', () => {
     expect(tests).not.toMatch(/node-version: 20/);
   });
 
-  it('R3 — le CHANGELOG annonce le changement sous [Unreleased] › Changed, avec un avertissement explicite', () => {
+  it('R3 — le CHANGELOG annonce le changement sous Changed, avec un avertissement explicite (dans [Unreleased] ou la version qui l\'a publié)', () => {
     const changelog = read('CHANGELOG.md');
-    const unreleased = changelog.slice(changelog.indexOf('## [Unreleased]'), changelog.indexOf('\n## [1.'));
-    const changed = unreleased.slice(unreleased.indexOf('### Changed'));
+    // La section qui porte l'entrée : [Unreleased] avant la publication, [x.y.z] après le commit de version (L368 : ne lire que [Unreleased] a rougi le run publish de 1.14.0).
+    const section = changelog.split(/\n(?=## \[)/).find((s) => s.startsWith('## [') && s.includes('(L365')) ?? '';
+    const changed = section.slice(section.indexOf('### Changed'));
     expect(changed).toMatch(/L365[^\n]*Node >=22\.18[^\n]*Node 20/);
     expect(changed).toMatch(/\*\*Warning[^*]*Node 20 is no longer supported\*\*/);
   });

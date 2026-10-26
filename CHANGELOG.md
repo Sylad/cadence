@@ -77,6 +77,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+1.14.0 was tagged but never reached npm: its publication stopped on a red test. 1.14.1 carries what 1.14.0 brought.
+
+### Fixed
+
+- The test of the Node minimum (`test/node-minimal.test.ts`, R3) read only the `[Unreleased]` section of `CHANGELOG.md`, which the version commit empties: green before the release, red in the publish run of 1.14.0, which stopped `npm publish` (L368). It now reads the section that carries the entry, `[Unreleased]` before the release or the published version after it.
+
 ## [1.14.0] - 2026-10-26
 
 ### Added

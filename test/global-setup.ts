@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runCompiler } from './run-tsc.js';
-import { PID_FILE, ROOT_PREFIX, leftovers, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
+import { PID_FILE, ROOT_PREFIX, leftovers, pickRootBase, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 
@@ -29,16 +29,17 @@ function buildThrowawayPackage(into: string): string {
  * un dossier temporaire sans le nettoyer ne passe plus inaperçu.
  */
 export default function setup(): () => void {
-  const realTmp = tmpdir();
+  // L355 : NODE_PATH (posé par une session de vague, jamais par un shell) fait résoudre « yaml » depuis n'importe quel paquet jetable :
+  // les tests « yaml introuvable » du fichier orchestrate-snapshot passaient au vert dans un shell et au rouge en session. Les workers héritent de l'environnement nettoyé.
+  const nodePath = process.env.NODE_PATH;
+  delete process.env.NODE_PATH;
+  // L360 : la cause qui restait — un TMPDIR sous un dépôt installé (node_modules/yaml dans un dossier parent). Sans candidat propre, la suite refuse de partir.
+  const realTmp = pickRootBase([...new Set([tmpdir(), '/tmp', '/var/tmp'])]);
   // Un run précédent interrompu (Ctrl-C, kill, OOM) a laissé sa racine : on le dit, une ligne, puis on la supprime.
   const stale = removeStaleRoots(realTmp);
   if (stale.length) {
     console.warn(`[tests] ${stale.length} racine(s) temporaire(s) d'un run interrompu supprimée(s) : ${stale.join(', ')}`);
   }
-  // L355 : NODE_PATH (posé par une session de vague, jamais par un shell) fait résoudre « yaml » depuis n'importe quel paquet jetable :
-  // les tests « yaml introuvable » du fichier orchestrate-snapshot passaient au vert dans un shell et au rouge en session. Les workers héritent de l'environnement nettoyé.
-  const nodePath = process.env.NODE_PATH;
-  delete process.env.NODE_PATH;
   const root = mkdtempSync(join(realTmp, ROOT_PREFIX));
   writeFileSync(join(root, PID_FILE), pidFileText());
   // os.tmpdir() lit TMPDIR sous POSIX mais TEMP puis TMP sous win32 : on pose les trois.

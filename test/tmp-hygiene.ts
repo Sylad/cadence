@@ -1,4 +1,5 @@
-import { chmodSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { chmodSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { hostname } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -57,6 +58,29 @@ function restoreRights(dir: string): void {
   } catch {
     // Déjà disparu, ou illisible malgré tout : rmSync dit ce qu'il reste à dire.
   }
+}
+
+/**
+ * Premier dossier de `candidates` où la racine privée de la suite peut vivre : il existe, et « yaml » ne s'y résout pas.
+ * Node remonte les dossiers parents en cherchant node_modules : un TMPDIR sous un dépôt installé (celui d'une session de vague,
+ * `<dépôt>/.cadence/runs/…`) faisait résoudre « yaml » depuis tout paquet jetable, et les tests « yaml introuvable » de
+ * orchestrate-snapshot passaient au vert dans un shell, au rouge en session. Aucun candidat propre : erreur qui les nomme.
+ */
+export function pickRootBase(candidates: string[]): string {
+  const seen: string[] = [];
+  for (const dir of candidates) {
+    try {
+      if (!statSync(dir).isDirectory()) continue;
+    } catch {
+      continue; // absent : sauté
+    }
+    try {
+      seen.push(`${dir} (« yaml » s'y résout : ${createRequire(join(dir, 'x.json')).resolve('yaml')})`);
+    } catch {
+      return dir;
+    }
+  }
+  throw new Error(`Aucun dossier temporaire d'où « yaml » ne se résout pas : les tests « yaml introuvable » seraient faussés. Écartés : ${seen.join(' ; ') || 'aucun dossier existant'}.`);
 }
 
 /** Préfixe des racines privées de la suite, et fichier qui y note le pid du run qui l'a créée. */

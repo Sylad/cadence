@@ -5,7 +5,7 @@ import { hostname, tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanupTempDirs, removeDryRunBriefs, tempDir } from './helpers.js';
-import { PID_FILE, ROOT_PREFIX, findStaleRoots, isStaleRoot, leftovers, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
+import { PID_FILE, ROOT_PREFIX, findStaleRoots, isStaleRoot, leftovers, pidFileText, pickRootBase, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
 /**
  * isStaleRoot dans un processus enfant à délai : un fichier pid FIFO ferait bloquer un readFileSync dans le worker,
@@ -276,3 +276,37 @@ function realTmpOutsideRoot(): string {
   expect(real).toBeTruthy();
   return real!;
 }
+
+describe('L360 — la racine temporaire ne dépend pas de l\'endroit où TMPDIR pointe', () => {
+  /** Un dossier d'où « yaml » se résout : un node_modules/yaml dans le dossier, comme celui d'un dépôt qui contient TMPDIR. */
+  function withYaml(): string {
+    const dirty = tempDir();
+    mkdirSync(join(dirty, 'node_modules/yaml'), { recursive: true });
+    writeFileSync(join(dirty, 'node_modules/yaml/package.json'), '{"name":"yaml","main":"index.js"}\n');
+    writeFileSync(join(dirty, 'node_modules/yaml/index.js'), 'module.exports = {};\n');
+    return dirty;
+  }
+
+  it('R1 — un TMPDIR sous un dossier qui a node_modules/yaml est écarté : la racine part du premier candidat d\'où « yaml » ne se résout pas', () => {
+    const dirty = withYaml();
+    const under = join(dirty, 'sous', 'tmp');
+    mkdirSync(under, { recursive: true });
+    const clean = tempDir();
+    expect(pickRootBase([under, clean])).toBe(clean);
+  });
+
+  it('R2 — un TMPDIR propre est gardé tel quel (premier candidat)', () => {
+    const clean = tempDir();
+    expect(pickRootBase([clean, tempDir()])).toBe(clean);
+  });
+
+  it('R3 — aucun candidat propre : erreur qui nomme les dossiers écartés, jamais une suite lancée sur un TMPDIR qui fausse les tests', () => {
+    const dirty = withYaml();
+    expect(() => pickRootBase([dirty])).toThrow(new RegExp(`yaml.*${dirty.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+  });
+
+  it('R4 — un candidat absent est sauté', () => {
+    const clean = tempDir();
+    expect(pickRootBase([join(clean, 'absent'), clean])).toBe(clean);
+  });
+});

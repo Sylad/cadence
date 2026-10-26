@@ -7,7 +7,7 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { readDocsConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
-import { PLAN_ACTIONS, planCommitMessage } from '../plan-commit.js';
+import { PLAN_ACTIONS, leadAnswerMessage, planCommitMessage } from '../plan-commit.js';
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
@@ -193,7 +193,13 @@ async function commitPlan(c: LotCtx, message: string, root = c.lot.repo): Promis
   const foreign = dirty.filter((f) => !ownFile(f));
   if (foreign.length) return `arbre sale (fichiers hors plan) : ${foreign.join(', ')}`;
   git(repo, 'add', '--', ...dirty);
-  git(repo, 'commit', '-q', '-m', message, '--', ...dirty);
+  try {
+    git(repo, 'commit', '-q', '-m', message, '--', ...dirty);
+  } catch (e) {
+    // Commit refusé (hook commit-msg…, L343) : le plan n'a pas à rester indexé ni modifié, le lot suivant y verrait un dépôt sale et serait rendu.
+    git(repo, 'restore', '--staged', '--worktree', '--source=HEAD', '--', ...dirty);
+    throw e;
+  }
   return null;
 }
 
@@ -1497,7 +1503,7 @@ function sourceAnsweredRules(c: LotCtx): boolean {
     const ids = sourceRules(wd(c), fiche, l.specAskedRules, `${LEAD_SOURCE}, ${c.wave.today}, vague ${c.wave.id}`);
     if (!ids.length) return false;
     git(wd(c), 'add', '--', fiche);
-    git(wd(c), 'commit', '-q', '-m', `docs(${l.lot}): ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead (orchestrate ${c.wave.id})`, '--', fiche);
+    git(wd(c), 'commit', '-q', '-m', leadAnswerMessage(l.lot, ids, c.wave.id), '--', fiche);
     return false;
   } catch (e) {
     stop(c, 'handed-back', `réponse du lead non reportée dans la fiche ${fiche} : ${(e as Error).message.split('\n')[0]}`);

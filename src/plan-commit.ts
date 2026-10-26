@@ -22,6 +22,11 @@ export const PLAN_ACTIONS = {
   resealed: (norm: string) => `test d'acceptation rescellé (${norm})`,
 };
 
+/** Le message du commit de la fiche sourcée par la réponse du lead : sujet en minuscule, `subject-case` de config-conventional refuse une majuscule initiale (L343). */
+export function leadAnswerMessage(lot: string, ids: string[], wave: string): string {
+  return `docs(${lot}): ${ids.length > 1 ? 'règles' : 'règle'} ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead (orchestrate ${wave})`;
+}
+
 /** Valide le gabarit `plan.commit` ; rend la raison du refus, null s'il est bon. */
 export function planCommitProblem(template: string): string | null {
   if (template.trim() === '') return 'est vide';

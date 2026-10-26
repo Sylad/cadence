@@ -5,7 +5,7 @@ import { availableParallelism, homedir, tmpdir } from 'node:os';
 import { testWorkersFrom } from './workers.js';
 import { basename, join, resolve } from 'node:path';
 import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
-import { PLAN_ACTIONS, commitMsgHook, commitMsgRefusal, planCommitMessage } from '../plan-commit.js';
+import { PLAN_ACTIONS, commitMsgHook, leadAnswerMessage, commitMsgRefusal, planCommitMessage } from '../plan-commit.js';
 import { isDay, toDay, type Day } from '../dates.js';
 import { gitRoot, hooksDir } from '../git.js';
 import { onTermination } from '../proc.js';
@@ -457,7 +457,7 @@ function matchesNvmrc(version: string, wanted: string): boolean {
 /** Les messages de commit de plan que la vague écrirait pour ce lot, passés au hook commit-msg réel du dépôt : un refus se lit ici, avant une vague payante (L343). */
 function planMessageLines(repo: string, lot: string, wave: string): string[] {
   const template = readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit;
-  const messages = [...new Set([PLAN_ACTIONS.started, PLAN_ACTIONS.hypotheses('<sujet>'), PLAN_ACTIONS.minors('<revue>'), PLAN_ACTIONS.reviewRecorded, PLAN_ACTIONS.reviewNoted].map((action) => planCommitMessage(template, { lot, action, wave })))];
+  const messages = [...new Set([PLAN_ACTIONS.started, PLAN_ACTIONS.hypotheses('<sujet>'), PLAN_ACTIONS.minors('<revue>'), PLAN_ACTIONS.reviewRecorded, PLAN_ACTIONS.reviewNoted].map((action) => planCommitMessage(template, { lot, action, wave })).concat(leadAnswerMessage(lot, ['R3'], wave)))];
   const hook = commitMsgHook(repo);
   if (!hook) return template ? [`  messages de plan : « ${messages[0]} » (gabarit plan.commit ; aucun hook commit-msg dans ce dépôt)`] : [];
   const refused = messages.map((m) => ({ m, why: commitMsgRefusal(repo, m) })).filter((r) => r.why !== null);

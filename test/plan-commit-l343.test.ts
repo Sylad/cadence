@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readPlanConfig } from '../src/config.js';
-import { commitMsgHook, commitMsgRefusal, planCommitMessage } from '../src/plan-commit.js';
+import { commitMsgHook, commitMsgRefusal, leadAnswerMessage, planCommitMessage } from '../src/plan-commit.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { run as cadence } from '../src/cli.js';
 import { gitRepo, removeDryRunBriefs, tempDir } from './helpers.js';
@@ -98,6 +98,31 @@ describe('R3 — le gabarit s\'applique à tous les commits de plan écrits par 
   });
 });
 
+describe('R5 — un refus du hook ne laisse pas le plan indexé, et le message de la réponse du lead est conforme', () => {
+  it('R5 — le commit de plan refusé par le hook désindexe le plan : le lot suivant ne trouve pas un dépôt sale', async () => {
+    const h = harness({ script: { implement: [impl], review: [ok] } });
+    hookConventionnel(h.repo, 'defaut');
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('failed');
+    expect(git(h.repo, 'status', '--porcelain', '--untracked-files=no')).toBe('');
+  });
+  it('R5 — le sujet de la réponse du lead commence en minuscule, comme l\'exige subject-case de config-conventional', () => {
+    expect(leadAnswerMessage('L1', ['R3'], 'w1')).toBe('docs(L1): règle R3 sourcée par la réponse du lead (orchestrate w1)');
+    expect(leadAnswerMessage('L1', ['R3', 'R5'], 'w1')).toBe('docs(L1): règles R3, R5 sourcées par la réponse du lead (orchestrate w1)');
+  });
+  it('R5 — le dry-run passe aussi le message de la réponse du lead au hook et nomme le refus', async () => {
+    const { parent, repo } = setup([{ title: 'un' }]);
+    const dir = join(repo, '.git/hooks');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'commit-msg'), '#!/bin/sh\nif head -n1 "$1" | grep -q "sourcée"; then echo "✖   subject must not be sentence-case [subject-case]" >&2; exit 1; fi\n');
+    chmodSync(join(dir, 'commit-msg'), 0o755);
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).toMatch(/✗ message de plan refusé par le hook commit-msg : « docs\(L1\): règle R3 sourcée .*subject-case/);
+  });
+});
+
 describe('R4 — le dry-run passe chaque message au hook commit-msg réel du dépôt', () => {
   it('R4 — le hook est trouvé par core.hooksPath (husky) comme dans .git/hooks, et absent sans hook', () => {
     const none = gitRepo();
@@ -135,7 +160,7 @@ describe('R4 — le dry-run passe chaque message au hook commit-msg réel du dé
     removeDryRunBriefs(r.out);
     expect(r.err).toBe('');
     expect(r.out).not.toContain('✗ message de plan');
-    expect(r.out).toMatch(/messages de plan : 5 message\(s\) acceptés par le hook commit-msg/);
+    expect(r.out).toMatch(/messages de plan : 6 message\(s\) acceptés par le hook commit-msg/);
   });
   it('R4 — sans hook, rien de plus dans le dry-run quand le gabarit est celui d\'avant', async () => {
     const { parent } = setup([{ title: 'un' }]);

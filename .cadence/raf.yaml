@@ -4164,6 +4164,7 @@ lots:
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
+    review: { date: 2026-10-27, verdict: "compliant : 2 minor notes (gantt dates and the exclusion of pre-adoption/acknowledged commits not documented; raf now before/after measurement not recorded), no blocking or major finding — orchestré (vague 2026-10-27-1420, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant after 1 fix: --no-renames dans preloadChangedFiles (lecture groupée équivalente à git diff-tree), 0 bloquant, 0 majeur", commit: db18a8ac520a0676a6ca95792acbde83fbb316fb }
   - id: L382
     title: "suites de L378 (connexion de Claude Code vérifiée avant un lot) : en --continue, preflight() relance claude auth status (jusqu'à 20 s) pour chaque lot candidat à chaque tour — une seule vérification par vague (ou mise en cache pour la vague) ; dans docs/quickstart.md:31,130 et docs/orchestrate.md:39 le message cité contient des backticks dans des backticks (rendu Markdown cassé) ; tests"
     status: done

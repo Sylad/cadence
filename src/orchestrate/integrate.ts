@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { gitCommonDir } from '../git.js';
 import { sharedStateDir } from '../state.js';
 import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
-import { mergeUnreleased, moveToUnreleased } from './changelog-merge.js';
+import { mergeUnreleased, moveToUnreleased, settleLotEntries, unreleasedSections } from './changelog-merge.js';
 import { mutexFor } from './mutex.js';
 import { Plan } from '../plan.js';
 import { parseDocument } from 'yaml';
@@ -64,7 +64,7 @@ export const repoBranch = (repo: string): string | null => tryGit(repo, 'symboli
 /** Point de départ de `rev` par rapport à la branche `base` : le dernier ancêtre commun. */
 export const mergeBase = (cwd: string, rev: string, base: string): string => git(cwd, 'merge-base', rev, `refs/heads/${base}`);
 
-export type Rebase = { kind: 'forwarded' } | { kind: 'rebased'; before: string; after: string; changelog: number; moved: number } | { kind: 'conflict'; files: string[]; detail: string };
+export type Rebase = { kind: 'forwarded' } | { kind: 'rebased'; before: string; after: string; changelog: number; moved: number; settled: boolean } | { kind: 'conflict'; files: string[]; detail: string };
 
 const CHANGELOG = 'CHANGELOG.md';
 const REBASE_ENV = { ...process.env, GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true' };
@@ -143,6 +143,29 @@ function moveOwnEntries(work: string, base: string, before: string, start: strin
   return fixed.moved;
 }
 
+/** Lignes d'entrée de `text` sous `[Unreleased]` (une entrée sur plusieurs lignes : le bloc entier), ou aucune sans bloc `[Unreleased]` lisible. */
+const entriesOf = (text: string): string[] => [...(unreleasedSections(text)?.values() ?? [])].flat();
+
+/**
+ * Après un rebase réussi : une seule entrée par lot, celle du sommet de sa branche (L369). Les entrées que les commits successifs du lot ont écrites sous
+ * `[Unreleased]` puis réécrites (absentes du sommet et du point de départ) sont retirées du résultat, celles du sommet qui y manquent remises, dans un commit
+ * à part. Rend vrai quand ce commit a eu lieu.
+ */
+function settleOwnEntries(work: string, base: string, before: string, start: string | undefined): boolean {
+  if (start === undefined || !existsSync(join(work, CHANGELOG))) return false;
+  const [tip, main] = [tryGit(work, 'show', `${before}:${CHANGELOG}`), tryGit(work, 'show', `refs/heads/${base}:${CHANGELOG}`)];
+  if (tip === null || main === null) return false;
+  const known = new Set(entriesOf(start));
+  const commits = (tryGit(work, 'rev-list', `${mergeBase(work, before, base)}..${before}`) ?? '').split('\n').filter(Boolean);
+  const written = commits.flatMap((c) => entriesOf(tryGit(work, 'show', `${c}:${CHANGELOG}`) ?? '')).filter((e) => !known.has(e));
+  const fixed = settleLotEntries(readFileSync(join(work, CHANGELOG), 'utf8'), tip, start, main, [...new Set(written)]);
+  if (fixed === null) return false;
+  writeFileSync(join(work, CHANGELOG), fixed);
+  run(work, 'add', '--', CHANGELOG);
+  run(work, 'commit', '--no-verify', '-q', '-m', 'docs: CHANGELOG — une entrée finale par lot, celle du sommet de sa branche (les versions intermédiaires écartées)');
+  return true;
+}
+
 /**
  * Rebase le worktree `work` sur la branche `base` (R6). Une branche qui descend déjà du sommet de `base` n'a rien à rebaser (fast-forward pur : aucun sha ne
  * change). Un conflit d'ajout pur dans le CHANGELOG est résolu par union à chaque commit qui le porte (L314, `changelog` les compte), un conflit du plan quand le commit n'y ajoute que des revues de lot (L370). Tout autre conflit — ou
@@ -175,7 +198,8 @@ export function rebaseOnto(work: string, base: string): Rebase {
     }
   }
   const moved = moveOwnEntries(work, base, before, start);
-  return { kind: 'rebased', before, after: git(work, 'rev-parse', 'HEAD'), changelog, moved };
+  const settled = settleOwnEntries(work, base, before, start);
+  return { kind: 'rebased', before, after: git(work, 'rev-parse', 'HEAD'), changelog, moved, settled };
 }
 
 /**

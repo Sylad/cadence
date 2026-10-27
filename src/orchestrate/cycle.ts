@@ -2726,6 +2726,7 @@ async function integrateLot(c: LotCtx): Promise<void> {
         }
         if (rebased.kind === 'rebased' && rebased.changelog > 0) c.wave.log(`${key} CHANGELOG.md : conflit d'ajout pur résolu par union sous [Unreleased] (${rebased.changelog} commit(s))`);
         if (rebased.kind === 'rebased' && rebased.moved > 0) c.wave.log(`${key} CHANGELOG.md : ${rebased.moved} entrée(s) du lot replacée(s) sous [Unreleased], une publication a eu lieu pendant la branche`);
+        if (rebased.kind === 'rebased' && rebased.settled) c.wave.log(`${key} CHANGELOG.md : une entrée finale par lot, les versions intermédiaires du lot écartées`);
         const tip = git(t.dir, 'rev-parse', 'HEAD');
         if (tip !== reviewed) {
           // Le rebase a changé les commits : tests et build rejoués au sommet rebasé, avant que la branche du dépôt ne bouge (R7).

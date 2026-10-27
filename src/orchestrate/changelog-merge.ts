@@ -73,23 +73,25 @@ export function mergeUnreleased(base: string, ours: string, theirs: string, star
   const st = start === undefined ? null : split(start);
   const startEntries = new Set([...(st ? (sections(st.block)?.values() ?? []) : [])].flat());
   const own = new Set<string>(start === undefined || !st ? [] : [...bs.values()].flat().filter((e) => !startEntries.has(e)));
+  // Une entrée de base que ours range sous une version publiée (la branche a été publiée pendant la vie du lot) n'a pas été retirée : elle a changé de place.
+  const released = (e: string) => o.tail !== b.tail && o.tail.includes(e) && !b.tail.includes(e);
   for (const [title, entries] of bs) {
     const kept = entries.filter((e) => !own.has(e));
-    if (!onlyAdds(kept, (os.get(title) ?? []).filter((e) => !own.has(e))) || !onlyAdds(entries, os.get(title) ?? []) || !onlyAdds(kept, ts.get(title) ?? [])) {
+    if (!onlyAdds(kept.filter((e) => !released(e)), (os.get(title) ?? []).filter((e) => !own.has(e))) || !onlyAdds(entries.filter((e) => !released(e)), os.get(title) ?? []) || !onlyAdds(kept, ts.get(title) ?? [])) {
       return null;
     }
   }
   const titles = [...new Set([...os.keys(), ...ts.keys()])];
   titles.sort((x, y) => rank(x) - rank(y));
-  const body = titles.map((title) => {
-    const entries = [...new Set([...(os.get(title) ?? []).filter((e) => !own.has(e)), ...(ts.get(title) ?? [])])];
-    return `### ${title}\n\n${entries.join('\n')}\n`;
+  const body = titles.flatMap((title) => {
+    const entries = [...new Set([...(os.get(title) ?? []).filter((e) => !own.has(e)), ...(ts.get(title) ?? []).filter((e) => !released(e))])];
+    return entries.length ? [`### ${title}\n\n${entries.join('\n')}\n`] : [];
   });
   return `${head}\n\n${body.join('\n')}\n${tail}`;
 }
 
 /** Entrées du bloc `[Unreleased]` de `text`, par section ; null sans bloc ou avec du texte hors entrée. */
-function unreleasedEntries(text: string): Sections | null {
+export function unreleasedSections(text: string): Sections | null {
   const s = split(text);
   return s ? sections(s.block) : null;
 }
@@ -102,7 +104,7 @@ function unreleasedEntries(text: string): Sections | null {
  */
 export function moveToUnreleased(rebased: string, lotTip: string, start: string, main: string): { text: string; moved: number } | null {
   const [r, mainSplit] = [split(rebased), split(main)];
-  const [tip, was] = [unreleasedEntries(lotTip), unreleasedEntries(start)];
+  const [tip, was] = [unreleasedSections(lotTip), unreleasedSections(start)];
   const [now, published] = [sections(r?.block ?? []), mainSplit ? mainSplit.tail : ''];
   if (!r || !tip || !was || !now) return null;
   const known = new Set([...was.values()].flat());
@@ -123,4 +125,47 @@ export function moveToUnreleased(rebased: string, lotTip: string, start: string,
   const titles = [...now.keys()].sort((x, y) => rank(x) - rank(y));
   const body = titles.map((title) => `### ${title}\n\n${(now.get(title) ?? []).join('\n')}\n`);
   return { text: `${r.head}\n\n${body.join('\n')}\n${tail}`, moved };
+}
+
+/**
+ * Une entrée finale par lot (L369) : après le rebase, le `[Unreleased]` ne porte du lot que ses entrées du sommet de sa branche. Les `intermediates` — les
+ * entrées que ses commits successifs ont écrites puis réécrites, absentes du sommet — en sont retirées (sous `[Unreleased]` comme sous une version), à moins
+ * que `main` ne les porte aussi : elles sont alors à elle. Une entrée du sommet absente du texte (ni sous `[Unreleased]`, ni sous une version, ni déjà publiée
+ * sur `main`) y est remise sous sa section. `lotTip`, `start`, `main` : comme pour `moveToUnreleased`. Rend le texte corrigé, ou null quand il n'y a rien à
+ * changer (ou que le fichier n'a pas la forme attendue).
+ */
+export function settleLotEntries(rebased: string, lotTip: string, start: string, main: string, intermediates: string[]): string | null {
+  const [r, mainSplit] = [split(rebased), split(main)];
+  const [tip, was] = [unreleasedSections(lotTip), unreleasedSections(start)];
+  const now = sections(r?.block ?? []);
+  if (!r || !mainSplit || !tip || !was || !now) return null;
+  const mainOwn = new Set([...(sections(mainSplit.block)?.values() ?? [])].flat());
+  const known = new Set([...was.values()].flat());
+  const final = new Set([...tip.values()].flat());
+  const stale = intermediates.filter((e) => !final.has(e) && !mainOwn.has(e) && !mainSplit.tail.includes(e));
+  let changed = false;
+  for (const [title, entries] of now) {
+    const kept = entries.filter((e) => !stale.includes(e));
+    if (kept.length !== entries.length) changed = true;
+    now.set(title, kept);
+  }
+  let tail = r.tail;
+  for (const e of stale) {
+    if (tail.includes(`${e}\n`)) {
+      tail = tail.replace(`${e}\n`, '');
+      changed = true;
+    }
+  }
+  const present = (e: string) => [...now.values()].some((v) => v.includes(e)) || tail.includes(e) || mainSplit.tail.includes(e);
+  for (const [title, entries] of tip) {
+    for (const e of entries.filter((x) => !known.has(x) && !present(x))) {
+      now.set(title, [...(now.get(title) ?? []), e]);
+      changed = true;
+    }
+  }
+  if (!changed) return null;
+  tail = tail.replace(/^### .+\n\n(\n|$)/gm, '');
+  const titles = [...now.keys()].filter((t) => (now.get(t) ?? []).length > 0).sort((x, y) => rank(x) - rank(y));
+  const body = titles.map((title) => `### ${title}\n\n${(now.get(title) ?? []).join('\n')}\n`);
+  return `${r.head}\n\n${body.join('\n')}\n${tail}`;
 }

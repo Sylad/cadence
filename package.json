@@ -44,6 +44,9 @@
     "docs/fonctionnement-lead-dark.svg",
     "docs/lead-workflow-light.svg",
     "docs/lead-workflow-dark.svg",
+    "docs/quickstart.md",
+    "docs/quickstart-light.svg",
+    "docs/quickstart-dark.svg",
     "docs/cycle-vague-light.svg",
     "docs/cycle-vague-dark.svg",
     "LICENSE"

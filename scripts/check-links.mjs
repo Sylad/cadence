@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 /** Les pages où part le contenu du README (L232), plus l'accueil : tout ce que le contrôle lit. */
 export const DOC_PAGES = ['docs/raf.md', 'docs/orchestrate.md', 'docs/deliver.md', 'docs/spec.md', 'docs/lead.md', 'docs/stabilite.md'];
-const AUTRES = ['docs/news.md', 'docs/session.md', 'docs/corrections.md', 'docs/skills.md', 'docs/cadence-hud.md', 'docs/releasing.md', 'docs/fonctionnement.md', 'docs/overview.md', 'docs/whats-new.md'];
+const AUTRES = ['docs/news.md', 'docs/session.md', 'docs/corrections.md', 'docs/skills.md', 'docs/cadence-hud.md', 'docs/releasing.md', 'docs/fonctionnement.md', 'docs/overview.md', 'docs/whats-new.md', 'docs/quickstart.md'];
 export const CHECKED = ['README.md', ...DOC_PAGES, ...AUTRES];
 
 /** Ancre GitHub d'un titre : minuscules, ponctuation retirée, espaces en tirets. */

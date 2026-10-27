@@ -1,0 +1,46 @@
+name: Bug
+description: Something cadence does is wrong, or its documentation says a command works and it does not.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. The quickest fix starts from the exact command and what it printed.
+        The [getting-started page](https://github.com/Sylad/cadence/blob/main/docs/quickstart.md) lists the usual stops.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `cadence --version`, and of `node --version`.
+      placeholder: "cadence 1.15.0, node v22.18.0"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      description: Linux, macOS, Windows with WSL, native Windows.
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: The commands, in order, copied as typed. A new empty repository is best.
+      render: sh
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The message as printed, not a summary.
+      render: text
+    validations:
+      required: true

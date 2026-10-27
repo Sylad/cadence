@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 190" width="1010" height="190" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#1f2328">
+<title>One lead, several projects, one wave</title>
+<desc>A parent folder holds the projects alpha and beta, each with its own plan. The lead session reads their tour and you choose the lots. A wave of fresh sessions does the work, then you review and deliver.</desc>
+<defs><marker id="arq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#57606a"/></marker></defs>
+<rect width="1010" height="190" fill="#ffffff"/>
+<text x="20" y="22" font-weight="600" font-size="13.5" fill="#1f2328">1. Parent folder</text>
+<rect x="20" y="32" width="220" height="140" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="130" y="52" text-anchor="middle" font-size="11.5" fill="#57606a">atelier/ (not a repository)</text>
+<rect x="40" y="64" width="180" height="42" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="130" y="83" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">alpha</text>
+<text x="130" y="98" text-anchor="middle" font-size="11" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">raf init · plan</text>
+<rect x="40" y="116" width="180" height="42" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="130" y="135" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">beta</text>
+<text x="130" y="150" text-anchor="middle" font-size="11" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">raf init · plan</text>
+<text x="300" y="22" font-weight="600" font-size="13.5" fill="#1f2328">2. The lead</text>
+<rect x="300" y="64" width="210" height="94" rx="6" fill="#ddf4ff" stroke="#0969da" stroke-width="2"/>
+<text x="405.0" y="96" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Lead session</text>
+<text x="405.0" y="114" text-anchor="middle" font-size="11.5" fill="#57606a">reads the tour, asks you</text>
+<text x="405.0" y="132" text-anchor="middle" font-size="11" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">/cadence:lead</text>
+<text x="570" y="22" font-weight="600" font-size="13.5" fill="#1f2328">3. The wave</text>
+<rect x="570" y="64" width="200" height="94" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="670.0" y="96" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Fresh sessions</text>
+<text x="670.0" y="114" text-anchor="middle" font-size="11.5" fill="#57606a">implement, then review</text>
+<text x="670.0" y="132" text-anchor="middle" font-size="11" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">cadence orchestrate</text>
+<text x="830" y="22" font-weight="600" font-size="13.5" fill="#1f2328">4. You</text>
+<rect x="830" y="64" width="160" height="94" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="910.0" y="96" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Review, deliver</text>
+<text x="910.0" y="114" text-anchor="middle" font-size="11.5" fill="#57606a">one project at a time</text>
+<text x="910.0" y="132" text-anchor="middle" font-size="11" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">/cadence:deliver</text>
+<polyline points="240,111 298,111" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arq)"/>
+<polyline points="510,111 568,111" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arq)"/>
+<polyline points="770,111 828,111" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arq)"/>
+</svg>

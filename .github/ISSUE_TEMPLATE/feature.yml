@@ -1,0 +1,25 @@
+name: Request
+description: Something you would like cadence to do, or a page of the documentation that is missing.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The situation first, in a few lines; the solution comes after.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: A command, a message or a page, as you imagine it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today
+      description: The workaround, if any, and what is wrong with it.
+    validations:
+      required: false

@@ -17,6 +17,12 @@ raf add "My first lot" --estimate 1
 
 Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are, `raf done L1` when it is finished.
 
+## Lead several projects in 10 minutes
+
+A parent folder, a plan in each project, a `/cadence:lead` session that picks the lots, a wave that does the work.
+[docs/quickstart.md](docs/quickstart.md) goes from install to the first wave, and lists the usual stops.
+Something broken or missing? [Open an issue](https://github.com/Sylad/cadence/issues/new/choose).
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/cycle-vague-dark.svg">
   <img alt="A lot goes through spec, mockup, accept, implement, review, ux and deliver; the lead picks the lots, answers the questions, re-verifies and delivers" src="docs/cycle-vague-light.svg">

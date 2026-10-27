@@ -26,7 +26,7 @@ cadence session context            # `ctx 42 % (84000/200000)`: the context of Y
 `session close` takes it as its window and names it in the section title: `Commits de la période (depuis
 l'ouverture de 09:12)` (with the date when it is not today). A close never moves the boundary, refused
 or not: run again without a `session start` in between (the `session-close` skill does, after fixing a
-point), it still reports since that opening instead of an empty period. With no recorded opening, or an
+point), it still reports since that opening instead of an empty period. The period journal (`Fait depuis`, `Commits de la période`) lists work commits only: plan commits (`plan: L1 démarré`) are left out, as in `raf commits`. With no recorded opening, or an
 unreadable file, the window is the current day, said as such (`depuis 2026-09-28 00:00`); `--since` is
 quoted as given. (A `session.json` written by 0.18.0 after a close, `depuis la clôture de …`, is still read.)
 

@@ -54,10 +54,12 @@ function projectFacts(ctx: SessionCtx, since: string): string[] {
 
 const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
 
-/** Commits de la fenêtre reliés aux lots, sans compter comme « sans lot » ceux qui ne touchent que le plan. */
+/** Commits de la fenêtre reliés aux lots : ceux qui ne touchent que le plan ne comptent ni « sans lot » ni comme travail d'un lot (comme `raf commits`). */
 function period(ctx: SessionCtx, since: string): Linked {
   const commits = planCommits(ctx.plan, ctx.root, { since });
-  const linked = exemptPlanOnly(linkCommits(ctx.plan.lots(), commits, ctx.plan.refs), ctx.plan, ctx.root);
+  const exempt = exemptPlanOnly(linkCommits(ctx.plan.lots(), commits, ctx.plan.refs), ctx.plan, ctx.root);
+  const byLot = new Map([...workByLot(ctx.plan, ctx.root, exempt)].filter(([, cs]) => cs.length > 0));
+  const linked = { ...exempt, byLot };
   // Comme raf check : un commit antérieur à l'adoption du plan n'avait pas à citer de lot.
   const adopted = ctx.plan.since;
   return adopted ? { ...linked, orphans: linked.orphans.filter((c) => c.day >= adopted) } : linked;

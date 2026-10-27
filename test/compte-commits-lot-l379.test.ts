@@ -61,4 +61,15 @@ describe('même compte de commits d’un lot partout (L379, accroc A8)', () => {
     expect((await cad(dir, 'lead', 'tour', dir)).out).toContain('L1 (1 commit');
     expect((await cad(dir, 'session', 'start', '--since', '2026-09-27')).out).toContain('(1 commit,');
   });
+
+  it('R5 — le journal de période (« Fait depuis », « Commits de la période ») ne liste pas le commit de plan, comme raf commits', async () => {
+    const dir = await planOnlyLot();
+    const start = (await cad(dir, 'session', 'start', '--since', '2026-09-27')).out;
+    expect(start).not.toContain('plan: L1 démarré');
+    expect(start).not.toContain('L1 — 1 commit(s)');
+    const close = (await cad(dir, 'session', 'close', '--since', '2026-09-27')).out;
+    expect(close).not.toContain('plan: L1 démarré');
+    withWork(dir);
+    expect((await cad(dir, 'session', 'start', '--since', '2026-09-27')).out).toMatch(/L1 — 1 commit\(s\) : feat\(L1\): cache\n/);
+  });
 });

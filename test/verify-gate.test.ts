@@ -426,6 +426,21 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     expect(here(r)).toContain('node_modules');
   });
 
+  it('L389 R3 — un lien relatif de node_modules (espace de travail) reste relatif dans la copie : la commande lit le paquet du sha, pas celui de l\'arbre principal', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: test "$(readlink node_modules/p)" = ../packages/p && grep -q v1 node_modules/p/index.js\n', true);
+    mkdirSync(join(repo, 'packages', 'p'), { recursive: true });
+    writeFileSync(join(repo, 'packages', 'p', 'index.js'), 'v1\n');
+    git(repo, 'add', 'packages');
+    git(repo, 'commit', '-q', '-m', 'paquet');
+    execFileSync('ln', ['-s', '../packages/p', join(repo, 'node_modules', 'p')]);
+    const au = git(repo, 'rev-parse', 'HEAD').trim();
+    writeFileSync(join(repo, 'packages', 'p', 'index.js'), 'modifié\n');
+    const r = await gate(repo, au);
+    expect(sha).not.toBe(au);
+    expect(here(r)).toMatch(/copie jetable/);
+    expect(r.code).toBe(0);
+  });
+
   it('L389 R3 — arbre principal propre mais à un autre sha : copie jetable, au sha demandé', async () => {
     const { repo, sha } = project('orchestrate:\n  test: grep -q v1 valeur.txt\n', true);
     writeFileSync(join(repo, 'valeur.txt'), 'v2\n');

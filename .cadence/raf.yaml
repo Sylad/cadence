@@ -4192,11 +4192,12 @@ lots:
     finished: 2026-10-27
   - id: L385
     title: "orchestrate : un .git/index.lock périmé (aucun processus git, ici laissé à 13:46 le 27-10 dans warhammer40k) fait échouer le commit du plan au démarrage du lot (L201 failed) puis rend le lot suivant pour « dépôt sale » (L200, plan laissé modifié) — le dry-run et le démarrage de vague signalent un index.lock présent (âge, aucun processus git) et refusent avant toute écriture, avec la commande pour le retirer ; un échec du commit de plan remet le plan comme avant ; tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant (0 bloquant, 0 majeur, 2 mineurs en notes : détection du processus git par `ps` sur macOS, désindexation avalée si le verrou arrive entre `add` et `commit`) — orchestré (vague 2026-10-27-1821, 0 passe(s) de correction)", commit: 483d80051b0692d399c2a825b8e2520449493510, reporte: { de: 7ca29d73447ceb266c9fbf44a011136b0c4a7647, vers: 483d80051b0692d399c2a825b8e2520449493510, patchId: fb9b67b69d17853dbcaf80453cf6359f76134fa8 } }
+    finished: 2026-10-27
   - id: L386
     title: "raf docs-ok refuse un plan tenu par un autre outil (lecture seule) : un lot de maritime dont le code laisse docs.sync en retard alors que la doc reste vraie n'a aucun moyen d'acquitter l'écart, la vague le rend (Q-ATTR1, 27-10) — garder l'acquittement hors du plan (fichier de cadence dans .cadence/) pour les plans en lecture seule, lu par raf check et orchestrate ; doc, CHANGELOG, tests"
     status: doing

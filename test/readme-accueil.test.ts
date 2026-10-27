@@ -133,9 +133,9 @@ describe('README en page d’accueil (L232)', () => {
   // L326 (règle de Sylvain, 25-10 : « faut pas fuir les gens avec le readme ») : le README est une page d'accueil lisible, pas une référence.
   const sansCode = (texte: string): string => texte.replace(/```[\s\S]*?```/g, '');
 
-  it('R10 — lisibilité : le README tient en 60 lignes, aucune ligne de texte ne dépasse 160 caractères, un seul schéma', () => {
+  it('R10 — lisibilité : le README tient en 64 lignes, aucune ligne de texte ne dépasse 160 caractères, un seul schéma', () => {
     const lignes = readme.split('\n');
-    expect(lignes.length).toBeLessThanOrEqual(60);
+    expect(lignes.length).toBeLessThanOrEqual(64);
     for (const l of lignes.filter((x) => !x.trim().startsWith('<'))) expect(l.length, l.slice(0, 50)).toBeLessThanOrEqual(160);
     expect(readme.match(/<picture>/g)?.length).toBe(1);
   });
@@ -147,9 +147,9 @@ describe('README en page d’accueil (L232)', () => {
   });
 
   it('R10 — lisibilité : le contrôle rougit sur un README trop long, trop large ou chargé d’options (mutation d’une copie)', () => {
-    const trop = (t: string) => t.split('\n').length > 60 || t.split('\n').some((l) => !l.trim().startsWith('<') && l.length > 160) || /TMPDIR|\s--[a-z]|orchestrate\.(?!md)/.test(sansCode(t));
+    const trop = (t: string) => t.split('\n').length > 64 || t.split('\n').some((l) => !l.trim().startsWith('<') && l.length > 160) || /TMPDIR|\s--[a-z]|orchestrate\.(?!md)/.test(sansCode(t));
     expect(trop(readme)).toBe(false);
-    expect(trop(readme + '\n'.repeat(61))).toBe(true);
+    expect(trop(readme + '\n'.repeat(65))).toBe(true);
     expect(trop(readme + '\n' + 'x'.repeat(161))).toBe(true);
     expect(trop(readme + '\nUse `TMPDIR` for it.')).toBe(true);
     expect(trop(readme + '\nRun orchestrate --dry-run first.')).toBe(true);

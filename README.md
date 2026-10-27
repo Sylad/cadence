@@ -28,6 +28,12 @@ Something broken or missing? [Open an issue](https://github.com/Sylad/cadence/is
   <img alt="A lot goes through spec, mockup, accept, implement, review, ux and deliver; the lead picks the lots, answers the questions, re-verifies and delivers" src="docs/cycle-vague-light.svg">
 </picture>
 
+## With the tools you already have
+
+Linear, a `HANDOFF.md`, ADRs, Conventional Commits? Keep them: cadence replaces none, and each part is optional.
+It can read a plan your tracker keeps (read-only) and write its plan commits in your format.
+[docs/with-your-tools.md](docs/with-your-tools.md): what stays, what is optional, what plugs in.
+
 ## Install as a Claude Code plugin
 
 ```

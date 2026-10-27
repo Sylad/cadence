@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 290" width="1010" height="290" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#e6edf3">
+<title>cadence next to the tools you already have</title>
+<desc>Your tools stay as they are: the tracker, HANDOFF.md, the ADRs and your commit convention. The plan can be read from your tracker's file, the plan commits follow your format and your docs are kept in step. On top, cadence adds orchestrated waves with an automatic review, and a deliver that verifies the effect.</desc>
+<defs><marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker></defs>
+<rect width="1010" height="290" fill="#0d1117"/>
+<text x="20" y="22" font-weight="600" font-size="13.5" fill="#e6edf3">1. Your tools (kept)</text>
+<rect x="20" y="36" width="290" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="165" y="57" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">Linear, Jira</text>
+<text x="165" y="74" text-anchor="middle" font-size="11.5" fill="#8b949e">tickets, board, assignment</text>
+<rect x="20" y="98" width="290" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="165" y="119" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">HANDOFF.md</text>
+<text x="165" y="136" text-anchor="middle" font-size="11.5" fill="#8b949e">your hand-over notes</text>
+<rect x="20" y="160" width="290" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="165" y="181" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">ADRs</text>
+<text x="165" y="198" text-anchor="middle" font-size="11.5" fill="#8b949e">your decisions</text>
+<rect x="20" y="222" width="290" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="165" y="243" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">Conventional Commits</text>
+<text x="165" y="260" text-anchor="middle" font-size="11.5" fill="#8b949e">your commits</text>
+<text x="360" y="22" font-weight="600" font-size="13.5" fill="#e6edf3">2. What plugs in</text>
+<rect x="360" y="36" width="290" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="505" y="57" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">plan: read-only</text>
+<text x="505" y="74" text-anchor="middle" font-size="11.5" fill="#8b949e">your tracker export is the plan</text>
+<rect x="360" y="98" width="290" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="505" y="119" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">plan.commit</text>
+<text x="505" y="136" text-anchor="middle" font-size="11.5" fill="#8b949e">plan commits in your format</text>
+<rect x="360" y="160" width="290" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="505" y="181" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">docs.sync</text>
+<text x="505" y="198" text-anchor="middle" font-size="11.5" fill="#8b949e">your docs kept in step</text>
+<rect x="360" y="222" width="290" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="505" y="243" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">commit-msg hook</text>
+<text x="505" y="260" text-anchor="middle" font-size="11.5" fill="#8b949e">checked before a wave runs</text>
+<text x="700" y="22" font-weight="600" font-size="13.5" fill="#e6edf3">3. What cadence adds</text>
+<rect x="700" y="36" width="290" height="100" rx="6" fill="#0c2d6b" stroke="#58a6ff" stroke-width="2"/>
+<text x="845" y="76" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">Orchestrated wave</text>
+<text x="845" y="96" text-anchor="middle" font-size="11.5" fill="#c9d1d9">fresh sessions, review in the loop</text>
+<rect x="700" y="148" width="290" height="100" rx="6" fill="#0c2d6b" stroke="#58a6ff" stroke-width="2"/>
+<text x="845" y="188" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">Deliver</text>
+<text x="845" y="208" text-anchor="middle" font-size="11.5" fill="#c9d1d9">waits for CI, verifies the effect</text>
+<polyline points="310,145 358,145" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arw)"/>
+<polyline points="650,145 698,145" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arw)"/>
+</svg>

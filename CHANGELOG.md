@@ -77,6 +77,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- A page for teams that already have a tracker, a `HANDOFF.md`, ADRs and a commit convention (L363, `docs/with-your-tools.md`, a short section of the README): what cadence does not replace, what is optional (`raf`, `session start|close`, the hook), what plugs into what you have (a plan kept by another tool, read-only, with your own ticket ids; `plan.commit` for the subject of the plan commits, GitHub issue #15; `docs.sync` for your docs) and what it adds (waves with an automatic review, a deliver that verifies the effect), with a figure.
+
 ## [1.15.1] - 2026-10-27
 
 ### Added

@@ -63,6 +63,36 @@ describe('R1 — un lot revu conforme hors vague est intégré par --integrate',
   });
 });
 
+describe('R3 — le plan du dépôt a bougé sur le lot pendant la correction du lead', () => {
+  it('R3 — une note du lead sur L1 dans le dépôt et la revue dans le worktree : pas de conflit, les deux sont gardées', async () => {
+    const { parent, repo, dir } = await handedBack();
+    leadFixes(dir, true);
+    const plan = planOf(repo);
+    plan.note('L1', 'à garder pour la suite', '2026-10-27');
+    plan.save();
+    git(repo, 'add', '--', '.cadence/raf.yaml');
+    git(repo, 'commit', '-q', '-m', 'plan: note du lead sur L1');
+    const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], fake());
+    expect(r.err).toBe('');
+    expect(store(parent).readLot('a', 'L1')!.status).toBe('ready');
+    const lot = planOf(repo).lot('L1');
+    expect(lot.review!.verdict).toContain('relu par le lead');
+    expect(JSON.stringify(lot)).toContain('à garder pour la suite');
+  });
+  it('R3 — la revue du dépôt a déjà bougé sur L1 : le conflit reste un conflit', async () => {
+    const { parent, repo, dir } = await handedBack();
+    leadFixes(dir, true);
+    const plan = planOf(repo);
+    plan.recordReview('L1', 'conforme : autre revue', '2026-10-27', null);
+    plan.save();
+    git(repo, 'add', '--', '.cadence/raf.yaml');
+    git(repo, 'commit', '-q', '-m', 'plan: autre revue');
+    const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], fake());
+    expect(store(parent).readLot('a', 'L1')!.status).toBe('handed-back');
+    expect(r.out).toContain('conflit en rebasant');
+  });
+});
+
 describe('R2 — sans revue du lead plus récente que le dernier commit, le refus reste', () => {
   it('R2 — aucune revue enregistrée : refus d\'avant, rien n\'est écrit', async () => {
     const { parent, repo, dir } = await handedBack();

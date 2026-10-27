@@ -6,6 +6,7 @@ import { sharedStateDir } from '../state.js';
 import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
 import { mergeUnreleased, moveToUnreleased } from './changelog-merge.js';
 import { mutexFor } from './mutex.js';
+import { Plan } from '../plan.js';
 import { git, gitFailure, tryGit } from './worktree.js';
 
 /** Verrou d'intégration d'un dépôt (L279, R10) : dans l'état commun aux worktrees, au format du verrou d'orchestration, sous un autre nom. */
@@ -89,6 +90,37 @@ function resolveChangelog(work: string, start: string | undefined): boolean {
 }
 
 /**
+ * Résout le conflit en cours quand c'est le plan seul et que le commit du lot rejoué n'y ajoute que des revues de lot (L370 : le `raf review` du lead dans
+ * le worktree) : le plan de la branche du dépôt est gardé, et chaque revue ajoutée est réécrite dessus par l'API du plan. Faux, sans rien toucher, si le
+ * commit change autre chose que des revues, ou si la branche du dépôt a elle-même changé une de ces revues.
+ */
+function resolvePlan(work: string): boolean {
+  const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
+  if (files.length !== 1) return false;
+  const file = files[0];
+  try {
+    const lots = (stage: number) => {
+      writeFileSync(join(work, file), run(work, 'show', `:${stage}:${file}`));
+      return Plan.load(join(work, file)).lots();
+    };
+    const [base, ours, theirs] = [lots(1), lots(2), lots(3)];
+    const bare = (l: { review?: unknown }) => JSON.stringify({ ...l, review: undefined });
+    const review = (l: { review?: unknown } | undefined) => JSON.stringify(l?.review ?? null);
+    const added = theirs.filter((t) => review(t) !== review(base.find((b) => b.id === t.id)));
+    if (!added.length || theirs.length !== base.length || theirs.some((t) => bare(t) !== bare(base.find((b) => b.id === t.id) ?? { review: 1 }))) return false;
+    if (added.some((t) => review(ours.find((o) => o.id === t.id)) !== review(base.find((b) => b.id === t.id)))) return false;
+    writeFileSync(join(work, file), run(work, 'show', `:2:${file}`));
+    const plan = Plan.load(join(work, file));
+    for (const t of added) plan.recordReview(t.id, t.review!.verdict, t.review!.date, t.review!.commit ?? null, t.review!.repos, t.review!.reporte);
+    plan.save();
+    run(work, 'add', '--', file);
+    return true;
+  } catch {
+    return false; // le fichier écrasé est restauré par le `rebase --abort` de l'appelant
+  }
+}
+
+/**
  * Après un rebase réussi : les entrées que le lot a ajoutées sous `[Unreleased]` et qu'une publication de la branche a laissées sous la version publiée
  * (git les y range sans conflit quand le bloc a été renommé) sont remises sous le `[Unreleased]` de la branche, dans un commit à part (L362). Rend leur nombre.
  */
@@ -106,7 +138,7 @@ function moveOwnEntries(work: string, base: string, before: string, start: strin
 
 /**
  * Rebase le worktree `work` sur la branche `base` (R6). Une branche qui descend déjà du sommet de `base` n'a rien à rebaser (fast-forward pur : aucun sha ne
- * change). Un conflit d'ajout pur dans le CHANGELOG est résolu par union à chaque commit qui le porte (L314, `changelog` les compte). Tout autre conflit — ou
+ * change). Un conflit d'ajout pur dans le CHANGELOG est résolu par union à chaque commit qui le porte (L314, `changelog` les compte), un conflit du plan quand le commit n'y ajoute que des revues de lot (L370). Tout autre conflit — ou
  * tout autre échec du rebase — est abandonné (`rebase --abort`) : la branche du lot et son arbre restent tels qu'avant, la branche du dépôt n'a pas été
  * touchée, personne ne résout le conflit à l'aveugle.
  */
@@ -121,7 +153,7 @@ export function rebaseOnto(work: string, base: string): Rebase {
     let failure = first;
     // Chaque tour règle le commit sur lequel le rebase s'est arrêté ; un lot ne porte pas des centaines de commits, la borne évite seulement une boucle sans fin.
     for (let turn = 0; ; turn++) {
-      if (turn >= 200 || !resolveChangelog(work, start)) {
+      if (turn >= 200 || !(resolveChangelog(work, start) || resolvePlan(work))) {
         const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
         tryGit(work, 'rebase', '--abort');
         return { kind: 'conflict', files, detail: gitFailure(failure) };

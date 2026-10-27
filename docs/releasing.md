@@ -3,7 +3,7 @@
 # Releasing
 
 A version exists in three places and is published in two; a release does all of it, in this order.
-`cadence release patch|minor|major [--dry-run]` (L341) prepares step 1 and prints steps 2 to 5 in order; it publishes nothing.
+`cadence release patch|minor|major [--dry-run]` (L341) prepares step 1 and prints steps 2 to 6 in order; it publishes nothing.
 
 1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and write the version's section of
@@ -16,15 +16,22 @@ A version exists in three places and is published in two; a release does all of 
    in that commit, not before the review. A commit that touches any other file
    — or another field of a manifest, or a dependency in `package-lock.json` — is work like any other and has
    to be reviewed.
-2. Run the plugin evaluation, `npm run eval:plugin` (billed, see [Evaluating the plugin](#evaluating-the-plugin-before-a-release)),
+2. Replay the project's gate on that commit: `cadence verify --gate --sha HEAD` (L380). The version commit empties
+   `## [Unreleased]` of `CHANGELOG.md`, and a test that read only that section would pass before it and fail after — the red
+   publish run of 1.14.0 (L368) and the stopped 1.15.2 (L380) — so the suite is run on the commit that will be tagged, before the
+   billed evaluation and before the tag. Red: fix it in a commit of its own and redo the version commit. A test that looks
+   for the entry of a lot in the CHANGELOG reads the section that carries it (`[Unreleased]` or the published version) through
+   `changelogSectionOf` (`test/changelog-section.ts`); `test/changelog-garde.test.ts` refuses a test that selects `## [Unreleased]`
+   of the repository's CHANGELOG itself.
+3. Run the plugin evaluation, `npm run eval:plugin` (billed, see [Evaluating the plugin](#evaluating-the-plugin-before-a-release)),
    on that version commit; a case below the threshold stops the release until you have read it in the report.
-3. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,
+4. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,
    which publishes to npm through Trusted Publishing (OIDC, no token stored anywhere): it checks the tag
    matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` and that `CHANGELOG.md` has a `## [x.y.z]` section for it (no section, no publication), then `npm publish --provenance`, where `prepublishOnly` runs the type-check and the
    tests and `prepare` builds `dist/`; a red suite stops the publication; then it creates the GitHub release with that CHANGELOG section as its text. The trusted publisher is declared
    once on npmjs.com (package settings → Trusted Publisher → GitHub Actions, `Sylad/cadence`, `publish.yml`).
-4. Watch the run: `gh run watch` (or `gh run list --workflow publish.yml`).
-5. Check the effect: `npm view @sylad/cadence version` answers the new version.
+5. Watch the run: `gh run watch` (or `gh run list --workflow publish.yml`).
+6. Check the effect: `npm view @sylad/cadence version` answers the new version.
    A run is safe to re-run, and two runs for one tag queue instead of racing (`concurrency` per ref, never cancelling the one that publishes):
    a version already on npm skips `npm publish`, and a GitHub release that is missing is created (`--verify-tag`)
    while an existing one is left alone. If the package is on npm but the release is still missing, re-run the job;
@@ -35,7 +42,7 @@ A version exists in three places and is published in two; a release does all of 
 The Claude Code plugin is read from the repository, so pushing `main` is what updates it; npm is what
 `npx @sylad/cadence` and a global install read, and only the tag publishes there. A missing tag, or a red
 publish run, leaves npm behind without any other error — 0.3.0 and 0.4.0 were never published — hence
-step 5.
+step 6.
 
 ## `cadence release`
 
@@ -70,6 +77,7 @@ introduction (the newest version first, as the file is read). Exit code 1 when a
 version files are written, the commit is not ready. `--dry-run` reads the forms the same way (nothing is written) and exits 1 on the same findings, so the forms can be checked before the real run.
 
 It prints the lead's steps, in order, and runs none: the `git add` of exactly the files of the version commit and the commit,
+`cadence verify --gate --sha HEAD` (always printed, before the evaluation and the tag),
 `npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script), `git tag v<x.y.z>`, `git push origin <branch> v<x.y.z>`,
 `gh run watch`, `npm view <package> version` (not for a private package) and, only with a `.claude-plugin/plugin.json`,
 the plugin update: `claude plugin marketplace update <marketplace>` first (without it the installed plugin stays at the old

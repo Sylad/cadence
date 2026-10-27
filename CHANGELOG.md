@@ -81,6 +81,14 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - A page for teams that already have a tracker, a `HANDOFF.md`, ADRs and a commit convention (L363, `docs/with-your-tools.md`, a short section of the README): what cadence does not replace, what is optional (`raf`, `session start|close`, the hook), what plugs into what you have (a plan kept by another tool, read-only, with your own ticket ids; `plan.commit` for the subject of the plan commits, which by default still read `plan: L12 démarré (orchestrate …)`, GitHub issue #15 (L375); `docs.sync` for your docs) and what it adds (waves with an automatic review, a deliver that verifies the effect), with a figure.
 
+### Changed
+
+- `cadence release` prints `cadence verify --gate --sha HEAD` right after the version commit, before the plugin evaluation and the tag, so the suite runs on the commit that will be published (L380, `docs/releasing.md`).
+
+### Fixed
+
+- A test that looks for the entry of a lot in `CHANGELOG.md` read `[Unreleased]` alone, which the version commit empties: the release 1.15.2 was stopped on it, as 1.14.0 had been (L380). They now read the section that carries the entry through one shared helper (`changelogSectionOf`), and a guard test refuses a test that selects `## [Unreleased]` of the repository's changelog by itself.
+
 ## [1.15.1] - 2026-10-27
 
 ### Added

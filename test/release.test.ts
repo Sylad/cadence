@@ -287,13 +287,14 @@ describe('cadence release — rien n’est publié', () => {
     expect(git(dir, 'tag', '--list')).toBe('');
   });
 
-  it('R9 — elle imprime les étapes du lead dans l’ordre : commit, éval --trust-plugin, tag, push, run publish, npm view, marketplace update, plugin update, /reload-plugins', () => {
+  it('R9 — elle imprime les étapes du lead dans l’ordre : commit, porte du projet rejouée sur le commit de version (L380), éval --trust-plugin, tag, push, run publish, npm view, marketplace update, plugin update, /reload-plugins', () => {
     const dir = project({ whatsNew: WHATS_NEW_DONE });
     const r = release(dir, 'patch');
     expect(r.code).toBe(0);
     const order = [
       'git add package.json package-lock.json .claude-plugin/plugin.json .claude-plugin/marketplace.json CHANGELOG.md docs/whats-new.md',
       'git commit',
+      'cadence verify --gate --sha HEAD',
       'npm run eval:plugin -- --trust-plugin',
       'git tag v1.2.4',
       'git push origin main v1.2.4',
@@ -481,6 +482,8 @@ describe('cadence release — mises en forme et dépôts atypiques', () => {
     git(dir, 'commit', '-qam', 'chore: private');
     const r = release(dir, 'patch');
     expect(r.out).toContain('git tag v1.2.4');
+    expect(r.out.indexOf('cadence verify --gate --sha HEAD'), 'la porte reste avant le tag sans étape d’éval').toBeGreaterThan(r.out.indexOf('git commit'));
+    expect(r.out.indexOf('cadence verify --gate --sha HEAD')).toBeLessThan(r.out.indexOf('git tag v1.2.4'));
     expect(r.out).not.toMatch(/eval:plugin/);
     expect(r.out).not.toMatch(/npm view/);
   });

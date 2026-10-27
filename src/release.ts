@@ -214,6 +214,7 @@ function steps(p: Planned, files: string[], branch: string): string[] {
   const tag = `v${p.version}`;
   const out = [
     `git add ${files.join(' ')} && git commit -m "release: ${p.version}"`,
+    'cadence verify --gate --sha HEAD    (la suite et le build rejoués sur le commit de version, où le CHANGELOG n\'a plus de [Unreleased] plein ; rouge = pas d\'éval ni de tag)',
     ...(p.hasEvalScript ? ['npm run eval:plugin -- --trust-plugin    (facturé ; un cas sous le seuil arrête la release)'] : []),
     `git tag ${tag}`,
     `git push origin ${branch} ${tag}    (le tag lance le workflow de publication)`,

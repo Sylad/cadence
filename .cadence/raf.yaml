@@ -4133,9 +4133,10 @@ lots:
     started: 2026-10-27
   - id: L378
     title: "cadence orchestrate vérifie avant de démarrer un lot que claude est installé et connecté (claude auth status ou équivalent sans modèle) : sinon refus avant toute écriture dans le plan (pas de raf start, pas de commit), message qui dit quoi faire (/login) ; le dry-run le signale ; README/quickstart : prérequis « Claude Code installé et connecté » ; doc, CHANGELOG, tests — accroc A7 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-27
+    started: 2026-10-27
   - id: L379
     title: "même compte de commits d'un lot dans raf now, cadence lead tour, session start et raf commits : les commits de plan (plan: …, et ceux que plan.commit produit) exclus partout (aujourd'hui raf now et le tour comptent « plan: L1 démarré » et affichent 1 commit quand raf commits n'en liste aucun) ; doc, CHANGELOG, tests — accroc A8 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md"
     status: todo

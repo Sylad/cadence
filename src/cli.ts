@@ -756,9 +756,9 @@ function describe(l: Lot, commits: number): string {
 function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): number {
   const lots = plan.lots();
   const linked = linkCommits(lots, planCommits(plan, root), plan.refs);
-  const work = workByLot(plan, root, linked);
-  const count = (id: string) => work.get(id)?.length ?? 0;
   const { doing, ready, blocked } = nextUp(lots);
+  const work = workByLot(plan, root, linked, [...doing, ...ready.slice(0, 5)].map((l) => l.id));
+  const count = (id: string) => work.get(id)?.length ?? 0;
   io.out(`${plan.project} — ${today}`);
 
   io.out('\nEn cours');

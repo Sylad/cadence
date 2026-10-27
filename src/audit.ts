@@ -257,9 +257,13 @@ export function lotCommits(plan: Plan, root: string, lotId: string): Commit[] {
   return linkCommits(plan.lots(), planCommits(plan, root), plan.refs).byLot.get(lotId) ?? [];
 }
 
-/** Commits de travail de chaque lot d'un rapprochement déjà fait (cf. lotWork) : le compte que montrent `raf now`, le tour et `session start`. */
-export function workByLot(plan: Plan, root: string, linked: Linked): Map<string, Commit[]> {
-  return new Map([...linked.byLot].map(([id, commits]) => [id, workCommits(plan, root, commits)]));
+/**
+ * Commits de travail des lots d'un rapprochement déjà fait (cf. lotWork) : le compte que montrent `raf now`, le tour et `session start`.
+ * `ids` : les seuls lots dont l'écran affiche un compte — chaque commit filtré coûte des `git diff-tree`, inutiles pour les autres.
+ */
+export function workByLot(plan: Plan, root: string, linked: Linked, ids?: string[]): Map<string, Commit[]> {
+  const wanted = ids ? new Set(ids) : null;
+  return new Map([...linked.byLot].filter(([id]) => !wanted || wanted.has(id)).map(([id, commits]) => [id, workCommits(plan, root, commits)]));
 }
 
 /** Commits à relire d'un lot, du plus récent au plus ancien — ce que compte la porte de revue de code et que liste `raf commits`. */

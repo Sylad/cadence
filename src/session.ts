@@ -135,8 +135,8 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   const lock = lockStatus(ctx.shared);
   if (lock) out(`\n${lock.line}`);
 
-  const work = workByLot(plan, ctx.root, all);
   const { doing, ready, blocked } = nextUp(lots);
+  const work = workByLot(plan, ctx.root, all, doing.map((l) => l.id));
   out('\nEn cours');
   if (doing.length === 0) out('  (rien)');
   for (const l of doing) {

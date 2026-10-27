@@ -135,8 +135,8 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     const plan = planLoader(root)();
     const lots = plan.lots();
     const all = linkCommits(lots, planCommits(plan, root), plan.refs);
-    const work = workByLot(plan, root, all);
     const { doing, ready, blocked } = nextUp(lots);
+    const work = workByLot(plan, root, all, doing.map((l) => l.id));
 
     row.doing = doing.map((l) => {
       const count = work.get(l.id)?.length ?? 0;

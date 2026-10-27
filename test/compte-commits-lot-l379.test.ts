@@ -3,6 +3,9 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
+import { planCommits, workByLot } from '../src/audit.js';
+import { planLoader } from '../src/config.js';
+import { linkCommits } from '../src/link.js';
 import { commit, gitRepo } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -71,5 +74,15 @@ describe('même compte de commits d’un lot partout (L379, accroc A8)', () => {
     expect(close).not.toContain('plan: L1 démarré');
     withWork(dir);
     expect((await cad(dir, 'session', 'start', '--since', '2026-09-27')).out).toMatch(/L1 — 1 commit\(s\) : feat\(L1\): cache\n/);
+  });
+
+  it('R6 — le compte ne filtre que les lots demandés (ceux que l’écran affiche), pas tout l’historique des lots', async () => {
+    const dir = await planOnlyLot();
+    await cad(dir, 'add', 'Autre');
+    withWork(dir);
+    const plan = planLoader(dir)();
+    const linked = linkCommits(plan.lots(), planCommits(plan, dir), plan.refs);
+    expect([...workByLot(plan, dir, linked, ['L1']).keys()]).toEqual(['L1']);
+    expect(workByLot(plan, dir, linked, ['L1']).get('L1')).toHaveLength(1);
   });
 });

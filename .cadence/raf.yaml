@@ -4112,11 +4112,12 @@ lots:
     finished: 2026-10-27
   - id: L375
     title: "docs/with-your-tools.md:69 : « Those commits used to read plan: L12 démarré (orchestrate …) » laisse croire que le sujet par défaut des commits de plan a changé ; il reste plan: {lot} {action} tant que plan.commit n'est pas posé (src/plan-commit.ts:8,10, docs/raf.md:158) — dire « by default they still read … ; set plan.commit », sinon une équipe commitlint retrouve le refus du ticket #15 (mineur de la revue de L363)"
-    status: doing
+    status: done
     estimate: 0.05
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant — orchestré (vague 2026-10-27-1200, 0 passe(s) de correction)", commit: 0f037cc80a7f8ccf90cebd384074ee2158c4d608 }
+    finished: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

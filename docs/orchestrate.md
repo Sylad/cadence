@@ -584,7 +584,7 @@ nothing below applies and the wave behaves as before; any other value is refused
      published version was **moved by the release, not removed**, so it does not count as a removal and is not written again under `[Unreleased]`.
      **One final entry per lot** (L369): the lot's commits may write then reword their entry several times (L360 on 2026-10-26: four contradictory entries
      stacked). After the rebase the program lists the entries the lot's commits wrote under `[Unreleased]` that are neither at the starting point nor at
-     the lot's tip, drops them from the result (under `[Unreleased]` and under a version), and puts back an entry of the tip that is missing, in a commit of
+     the lot's tip (nor under a version the tip itself carries: an entry the lot published itself is final), drops them from the result (under `[Unreleased]` and under a version), and puts back an entry of the tip that is missing, in a commit of
      its own (`docs: CHANGELOG — une entrée finale par lot …`); an entry the repository's branch also carries is left alone. The journal says
      `<project>:<lot> CHANGELOG.md : une entrée finale par lot, les versions intermédiaires du lot écartées`. Anything else — an entry that
      was already there removed or reworded, free text under `[Unreleased]`, the rest of the

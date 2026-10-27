@@ -4148,6 +4148,7 @@ lots:
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
+    review: { date: 2026-10-27, verdict: "compliant (3 mineurs : test R6 qui ne peut pas échouer, raf gantt compte encore les commits de plan, coût de period() en session start/close) — orchestré (vague 2026-10-27-1230, 2 passe(s) de correction)", commit: 9f649fefaa63b580a738fdd0f5069c23ac11c03c, reporte: { de: 42e5a0c1e6f31ef5237c8b41157397efb6ba1279, vers: 9f649fefaa63b580a738fdd0f5069c23ac11c03c, patchId: 55900dbadfcabfcf5f8d0d61341a3b5b2e606223 } }
   - id: L380
     title: "⚡ release 1.15.2 arrêtée (27-10) : test/avec-vos-outils.test.ts R10 ne lit que [Unreleased], que le commit de version vide — même classe que L368 (1.14.0 rouge au run publish) ; (1) R10 et tout autre test qui cherche l'entrée d'un lot lisent la section qui la porte ([Unreleased] ou la version publiée), via un seul utilitaire partagé ; (2) mécanisme : un test de garde refuse un test qui cherche l'entrée d'un lot dans [Unreleased] seul hors de cet utilitaire, et les étapes imprimées par cadence release (docs/releasing.md) placent cadence verify --gate --sha HEAD après le commit de version, avant l'éval et le tag ; doc, CHANGELOG, tests"
     status: done

@@ -19,6 +19,8 @@ export const PLAN_ACTIONS = {
   started: 'démarré',
   hypotheses: (sujet: string) => `hypothèses de la fiche ${sujet} notées`,
   minors: (label: string) => `mineurs de la revue de ${label} notés`,
+  /** `raf done` ne commite pas : l'action de la commande de commit qu'il propose (L371). */
+  done: 'terminé',
   reviewRecorded: 'revue de code enregistrée',
   reviewNoted: 'revue de code notée',
   /** `spec green` (L366) : jamais la liste des tests rescellés, elle va dans le corps du commit (header-max-length de commitlint). */

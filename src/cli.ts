@@ -12,7 +12,7 @@ import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './veri
 import { verifyGate } from './verify-gate.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
-import { dirtyPaths, gitRoot, isTracked, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
+import { dirtyPaths, gitRoot, tryGit, isTracked, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
@@ -405,6 +405,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         if (lot.visible && !loadEntries(newsDir).some((e) => e.lots.includes(lot.id))) {
           io.out(`${lot.id} est visible : écrire l'entrée : cadence news new ${lot.id}`);
         }
+        const uncommitted = uncommittedPlanCommand(plan, root, lot.id, planConfig?.commit);
+        if (uncommitted) io.out(uncommitted);
       }
       return 0;
     }
@@ -716,6 +718,22 @@ function knownLot(plan: Plan, id: string, subtask: string): Lot {
   const lot = plan.lots().find((l) => l.id === id);
   if (!lot) throw new RafError(id.includes('/') ? `${subtask} : ${id}` : `lot inconnu : ${id}`);
   return lot;
+}
+
+/**
+ * `raf done` écrit le plan et ne le commite jamais (voulu : raf n'a pas de réglage qui commite, docs/raf.md) : la commande de commit du plan et des fichiers
+ * que `plan.onWrite` produit, au gabarit `plan.commit` du projet (L371). Null hors d'un dépôt git ou quand rien n'est à commiter.
+ */
+function uncommittedPlanCommand(plan: Plan, root: string, lot: string, template: string | undefined): string | null {
+  const repo = gitRoot(root);
+  if (!repo) return null;
+  const paths = [relative(repo, plan.path), ...plan.files, ...plan.produced];
+  const dirty = tryGit(repo, ['status', '--porcelain', '--', ...paths]);
+  if (!dirty?.trim()) return null;
+  const quote = (t: string) => (/^[\w./-]+$/.test(t) ? t : `'${t.replaceAll("'", "'\\''")}'`);
+  const message = planCommitMessage(template, { lot, action: PLAN_ACTIONS.done });
+  const list = paths.map(quote).join(' ');
+  return `plan non commité : raf ne commite jamais (voulu, ce n'est pas un réglage), à commiter :\n  git add -- ${list} && git commit -m ${quote(message)} -- ${list}`;
 }
 
 function describe(l: Lot, commits: number): string {

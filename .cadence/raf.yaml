@@ -4140,9 +4140,10 @@ lots:
     started: 2026-10-27
   - id: L379
     title: "même compte de commits d'un lot dans raf now, cadence lead tour, session start et raf commits : les commits de plan (plan: …, et ceux que plan.commit produit) exclus partout (aujourd'hui raf now et le tour comptent « plan: L1 démarré » et affichent 1 commit quand raf commits n'en liste aucun) ; doc, CHANGELOG, tests — accroc A8 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-27
+    started: 2026-10-27
   - id: L380
     title: "⚡ release 1.15.2 arrêtée (27-10) : test/avec-vos-outils.test.ts R10 ne lit que [Unreleased], que le commit de version vide — même classe que L368 (1.14.0 rouge au run publish) ; (1) R10 et tout autre test qui cherche l'entrée d'un lot lisent la section qui la porte ([Unreleased] ou la version publiée), via un seul utilitaire partagé ; (2) mécanisme : un test de garde refuse un test qui cherche l'entrée d'un lot dans [Unreleased] seul hors de cet utilitaire, et les étapes imprimées par cadence release (docs/releasing.md) placent cadence verify --gate --sha HEAD après le commit de version, avant l'éval et le tag ; doc, CHANGELOG, tests"
     status: doing

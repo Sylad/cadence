@@ -4131,6 +4131,7 @@ lots:
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
+    review: { date: 2026-10-27, verdict: "compliant : 0 bloquant, 0 majeur, 1 mineur (note : le garde de pré-commit garde sa propre définition du commit de plan) — orchestré (vague 2026-10-27-1230, 0 passe(s) de correction)", commit: 35ff868ea59efa4cfae53b0a28c6f96db6a1d71e, reporte: { de: 124599f751c3592a333959447333f1c6f2f8943b, vers: 35ff868ea59efa4cfae53b0a28c6f96db6a1d71e, patchId: d7f0796ee06a7ca4f5562396322f9709ba73a7a6 } }
   - id: L378
     title: "cadence orchestrate vérifie avant de démarrer un lot que claude est installé et connecté (claude auth status ou équivalent sans modèle) : sinon refus avant toute écriture dans le plan (pas de raf start, pas de commit), message qui dit quoi faire (/login) ; le dry-run le signale ; README/quickstart : prérequis « Claude Code installé et connecté » ; doc, CHANGELOG, tests — accroc A7 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md"
     status: doing

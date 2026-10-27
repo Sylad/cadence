@@ -4066,6 +4066,7 @@ lots:
     estimate: 0.25
     created: 2026-10-26
     started: 2026-10-27
+    review: { date: 2026-10-27, verdict: "conforme : 0 bloquant, 0 majeur, 2 mineurs (notes : cas budget sans test dédié, commentaire périmé l. 61 du test) — orchestré (vague 2026-10-27-0800, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme", commit: aa5849405313c22179084231d7b3efb5c3f62af8 }
   - id: L371
     title: "raf done dans le dépôt cadence n'a pas commité le plan (26-10, L365 : plan resté modifié, mise en service refusée) : établir si c'est voulu (réglage) ou un défaut, et le dire dans le message de raf done ; aligner avec plan.commit"
     status: done

@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-10-27
+
 ### Fixed
 
 - `raf now`, `cadence lead tour` and `cadence session start` count the commits of a lot as `raf commits` does (L379, `docs/raf.md`, `docs/lead.md`, `docs/session.md`; snag A8 of the new-user walkthrough): the plan commits (`plan: L1 démarré`, and what `plan.commit` produces, which touch only plan files) are left out everywhere. A lot just started used to read `1 commit(s)` in `raf now` and `en cours L1 (1 commit)` in the tour while `raf commits L1` listed nothing; it now reads no commit and `0 commit`. The « dernière activité » date still counts them. The period journal of `session start` (« Fait depuis ») and `session close` (« Commits de la période ») leaves them out too, so one output never says `0 commit` then lists one.

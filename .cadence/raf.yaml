@@ -4233,11 +4233,14 @@ lots:
     created: 2026-10-27
   - id: L391
     title: "⚡ un test non hermétique a commité 14 fois « feat(?): travail » (a.txt à la racine) dans le vrai dépôt cadence pendant la vague 2026-10-27-1230 (13:19, entre L379 et L378), intégré puis poussé avec 1.16.x — trouver le test (test/orchestrate-e2e.test.ts : impl { file: 'a.txt', message: 'feat({lot}): travail' }, {lot} non résolu → cwd réel), le rendre hermétique (dossier temporaire imposé, garde qui refuse un cwd dans le dépôt), retirer a.txt ; test de garde"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant : garde du faux claude correcte (cwd dans le dépôt, hors dossier temporaire, lot « ? »), a.txt retiré, e2e verts ; 2 notes mineures sur la couverture du test de garde — orchestré (vague 2026-10-27-2130, 0 passe(s) de correction)", commit: 774deabc4878b15180287542f961cf6efc308bee }
+    notes:
+      - { date: 2026-10-27, text: "Revue 27-10 (mineurs, notes) : la branche « cwd hors de tmpdir et /tmp » de la garde n'est atteinte par aucun test (le seul refus par cwd passe le dépôt, déjà refusé) ; le test « accepte un dossier temporaire » ne vérifie ni le code de sortie ni a.txt créé. Porte rejouée au sha ea05a1d : 1er passage rouge sur un crash V8 (SIGTRAP TurboFan, Node 22.22.3) dans un processus enfant, 2e vert." }
+    finished: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

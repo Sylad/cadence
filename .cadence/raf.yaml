@@ -4233,9 +4233,10 @@ lots:
     created: 2026-10-27
   - id: L391
     title: "⚡ un test non hermétique a commité 14 fois « feat(?): travail » (a.txt à la racine) dans le vrai dépôt cadence pendant la vague 2026-10-27-1230 (13:19, entre L379 et L378), intégré puis poussé avec 1.16.x — trouver le test (test/orchestrate-e2e.test.ts : impl { file: 'a.txt', message: 'feat({lot}): travail' }, {lot} non résolu → cwd réel), le rendre hermétique (dossier temporaire imposé, garde qui refuse un cwd dans le dépôt), retirer a.txt ; test de garde"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-27
+    started: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

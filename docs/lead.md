@@ -90,6 +90,7 @@ picture, not its source.
 | The UX verdict is the human's unless `lead.ux: lead` (parent `cadence.yaml`, default `human`) | then the lead decides from the report and the captures, and brings any doubt to the human |
 | A session cannot ask the human anything | it stops and reports; the lead brings the question back |
 | Never push or deliver HEAD above a handed-back lot | HEAD holds code that was not reviewed |
+| A lot handed back for its budget or a non-compliant review that the lead had corrected outside the wave is integrated by `cadence orchestrate --resume --wave <wave> --integrate <project>:<lot>` (L370, [`--integrate`](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279)): the fix is made in the kept worktree, then `raf review <lot> "conforme : …"` is run in that worktree and its plan committed there, after the last work commit of the lot; the program rebases, replays the checks, keeps the verdict or makes a short review, and advances the branch | never by hand (L367, 26-10), and never a review recorded in the main repository's plan: `--integrate` reads the worktree's plan and would keep refusing |
 | A plan kept by another tool is read-only for `raf` | its own commands record the lot's state |
 
 ## Exit codes

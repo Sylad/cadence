@@ -4120,9 +4120,10 @@ lots:
     finished: 2026-10-27
   - id: L376
     title: raf --version et raf -v répondent la version comme cadence --version (aujourd'hui « Unknown option '--version' ») ; cadence orchestrate <projet>:<lot> dont le dossier est introuvable dit que <projet> est un sous-dossier du dossier courant et que, dans un dépôt, « .:<lot> » marche ; doc, CHANGELOG, tests — accrocs A3 et A9 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-27
+    started: 2026-10-27
   - id: L377
     title: "raf init : le commit qui ajoute .cadence/ juste après raf init n'ouvre pas d'écart « commit sans lot » (raf check, tour, colonne dérive) — par exemple raf init écrit le plan et propose le commit de plan au format plan.commit, ou raf check tient pour plan un commit qui ne touche que les fichiers du plan ; doc, CHANGELOG, tests — accroc A5 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md"
     status: todo

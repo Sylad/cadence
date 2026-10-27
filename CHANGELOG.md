@@ -79,7 +79,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- `cadence deliver --sha` during a wave commits the plan it wrote for the article to refresh (`plan.commit` template, `docs/news.md`) instead of leaving it modified in the tree a session of the wave works in, which handed that lot back as « dépôt sale après implement » (L388, warhammer40k L14 on 27-10). Outside a wave, or when the plan already had uncommitted changes, nothing changes.
+- `cadence deliver --sha` during a wave commits the plan it wrote for the article to refresh (`plan.commit` template, `docs/news.md`) instead of leaving it modified in the tree a session of the wave works in, which handed that lot back as « dépôt sale après implement » (L388, warhammer40k L14 on 27-10), with the files `plan.onWrite` produces. Outside a wave, or when the plan or those files already had uncommitted changes, nothing changes.
 
 ## [1.17.0] - 2026-10-27
 

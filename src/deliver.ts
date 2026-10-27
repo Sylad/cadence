@@ -611,8 +611,8 @@ function deliveredLots(ctx: DeliverCtx, ids: string[], prev: string | null, sha:
 
 /**
  * Livraison verte (L144) : les lots livrés dont le titre est public changent ce que les articles externes racontent, on ouvre
- * donc le lot qui les rafraîchit. Hors vague le plan est écrit mais pas commité ; pendant une vague (L388) il est commité seul, avec
- * le gabarit `plan.commit`, pour ne pas laisser le plan modifié dans l'arbre où une session de la vague travaille — sauf s'il l'était
+ * donc le lot qui les rafraîchit. Hors vague le plan est écrit mais pas commité ; pendant une vague (L388) il est commité avec les fichiers que produit `plan.onWrite`, avec
+ * le gabarit `plan.commit`, pour ne pas laisser le plan modifié dans l'arbre où une session de la vague travaille — sauf si le plan ou ces fichiers l'étaient
  * déjà avant l'écriture (le lead y a des modifications que ce commit emporterait). Une erreur ici ne défait pas une livraison déjà faite.
  */
 function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
@@ -621,7 +621,8 @@ function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
     // Relu : le script du projet a pu fermer des lots ou commiter le plan depuis le départ de la livraison, save() ne doit pas l'écraser.
     const plan = ctx.plan.reloaded();
     const planFile = relative(ctx.root, plan.path);
-    const wasDirty = dirtyPaths(ctx.root, [planFile]).length > 0;
+    const held = [planFile, ...plan.produced];
+    const wasDirty = dirtyPaths(ctx.root, held).length > 0;
     const wanted = new Set(ids);
     const r = openArticleLots({
       plan,
@@ -641,7 +642,7 @@ function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
     } else if (touched.length && ctx.duringWave) {
       const message = planCommitMessage(ctx.planCommit, { lot: touched.join(', '), action: r.opened.length ? PLAN_ACTIONS.articleOpened : PLAN_ACTIONS.articleNoted, wave: ctx.waveId });
       try {
-        state = `plan commité ${commitPaths(ctx.root, [planFile], message)}`;
+        state = `plan commité ${commitPaths(ctx.root, [planFile, ...dirtyPaths(ctx.root, plan.produced)], message)}`;
       } catch (e) {
         state = `commit du plan refusé (${(e as Error).message}), plan modifié, à commiter`;
       }

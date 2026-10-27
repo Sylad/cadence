@@ -162,6 +162,15 @@ describe('deliver pendant une vague (L388) : le plan écrit pour l\'article est 
     expect(out.join('\n')).toContain('plan déjà modifié avant la livraison');
   });
 
+  it('R6 — plan.onWrite : les fichiers produits partent avec le plan, l\'arbre reste propre', async () => {
+    const { dir, base, deps } = await prete();
+    const planPath = join(dir, '.cadence/raf.yaml');
+    const onWrite = { command: 'cp .cadence/raf.yaml docs-plan.yaml', files: ['docs-plan.yaml'], cwd: dir };
+    expect(await deliver({ ...base, plan: Plan.load(planPath, { onWrite }), duringWave: true, waveId: 'W9' }, deps)).toBe(0);
+    expect(status(dir)).toBe('');
+    expect(execFileSync('git', ['show', '--stat', '--format=', 'HEAD'], { cwd: dir, encoding: 'utf8' })).toContain('docs-plan.yaml');
+  });
+
   it('R5 — commit refusé (hook commit-msg) : le plan reste écrit, la livraison reste verte et le dit', async () => {
     const { dir, base, deps, out } = await prete();
     writeFileSync(join(dir, '.git/hooks/commit-msg'), '#!/bin/sh\necho refusé >&2\nexit 1\n', { mode: 0o755 });

@@ -29,15 +29,15 @@ async function handedBack() {
   return { parent, repo, l, dir: lotTreeDir(store(parent).dir, 'a', 'L1', repo) };
 }
 
-/** Le lead corrige dans le worktree, puis enregistre sa revue (plan commité : une reprise refuse un fichier suivi modifié). */
-function leadFixes(repo: string, dir: string, review: boolean) {
+/** Le lead corrige dans le worktree, puis y enregistre sa revue avec `raf review` (le plan du worktree, commité : une reprise refuse un fichier suivi modifié). */
+function leadFixes(dir: string, review: boolean) {
   commitFile(dir, 'lead.txt', 'fix(L1): correction du lead hors vague');
   if (!review) return;
-  const plan = Plan.load(join(repo, '.cadence/raf.yaml'));
+  const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
   plan.recordReview('L1', 'conforme : relu par le lead', '2026-10-27', git(dir, 'rev-parse', 'HEAD'));
   plan.save();
-  git(repo, 'add', '--', '.cadence/raf.yaml');
-  git(repo, 'commit', '-q', '-m', 'plan: revue du lead L1');
+  git(dir, 'add', '--', '.cadence/raf.yaml');
+  git(dir, 'commit', '-q', '-m', 'plan: revue du lead L1');
 }
 
 describe('R1 — un lot revu conforme hors vague est intégré par --integrate', () => {
@@ -45,7 +45,7 @@ describe('R1 — un lot revu conforme hors vague est intégré par --integrate',
     const { parent, repo, l, dir } = await handedBack();
     expect(l.status).toBe('handed-back');
     expect(l.next ?? null).toBeNull();
-    leadFixes(repo, dir, true);
+    leadFixes(dir, true);
     writeFileSync(join(repo, 'autre.txt'), 'le lead avance\n');
     git(repo, 'add', '--', 'autre.txt');
     git(repo, 'commit', '-q', '-m', 'chore: le lead avance'); // le rebase a quelque chose à faire
@@ -59,14 +59,14 @@ describe('R1 — un lot revu conforme hors vague est intégré par --integrate',
     const review = planOf(repo).lot('L1').review!;
     expect(review.verdict).toContain('relu par le lead');
     expect(review.commit).toBe(git(repo, 'log', '-n1', '--format=%H', '--grep=correction du lead')); // verdict reporté au sha rebasé
-    expect(review.reporte).toBeDefined();
+    expect(review.verdict).toContain('revue courte du diff rebasé'); // le commit de plan du worktree change le diff relu : revue courte, pas de report
   });
 });
 
 describe('R2 — sans revue du lead plus récente que le dernier commit, le refus reste', () => {
   it('R2 — aucune revue enregistrée : refus d\'avant, rien n\'est écrit', async () => {
     const { parent, repo, dir } = await handedBack();
-    leadFixes(repo, dir, false);
+    leadFixes(dir, false);
     const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], fake());
     expect(r.code).toBe(2);
     expect(r.err).toContain("--integrate a:L1 : le lot n'est pas rendu à l'étape d'intégration");
@@ -74,7 +74,7 @@ describe('R2 — sans revue du lead plus récente que le dernier commit, le refu
   });
   it('R2 — un commit postérieur à la revue du lead : refus', async () => {
     const { parent, repo, dir } = await handedBack();
-    leadFixes(repo, dir, true);
+    leadFixes(dir, true);
     commitFile(dir, 'apres.txt', 'fix(L1): encore un commit');
     const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], fake());
     expect(r.code).toBe(2);
@@ -82,7 +82,7 @@ describe('R2 — sans revue du lead plus récente que le dernier commit, le refu
   });
   it('R2 — --replay ne prend pas ce chemin', async () => {
     const { parent, repo, dir } = await handedBack();
-    leadFixes(repo, dir, true);
+    leadFixes(dir, true);
     const r = await run(parent, ['--resume', WAVE, '--replay', 'a:L1'], fake());
     expect(r.code).toBe(2);
   });

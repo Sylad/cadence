@@ -1389,7 +1389,9 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     else if (answered.includes(l)) refusals.push(`${opt} ${key} : lot aussi visé par --answer`);
     else if (budgeted.includes(l)) refusals.push(`${opt} ${key} : lot aussi visé par --budget`);
     else if (!t.replay && l.next !== 'integrate' && (() => {
-      const r = leadReviewedHandBack(l, projectEnv(l.repo).loadPlan(), lotTreeDir(store.dir, l.project, l.lot, l.repo));
+      // La revue du lead est écrite par `raf review` lancé dans le worktree : c'est le plan du worktree qui la porte, pas celui du dépôt principal.
+      const tree = lotTreeDir(store.dir, l.project, l.lot, l.repo);
+      const r = existsSync(join(tree, '.git')) ? leadReviewedHandBack(l, planLoader(tree)(), tree) : null;
       if (r) leadReviewed.set(l, r);
       return r;
     })()) integ.push(l);

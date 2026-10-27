@@ -4226,6 +4226,7 @@ lots:
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
+    review: { date: 2026-10-27, verdict: "conforme après 1 correctif mineur (ordre de la ligne « où ») ; 3 notes mineures — orchestré (vague 2026-10-27-1950, 3 passe(s) de correction)", commit: 60706e34f34af09a57de11481a619c82bb45372b }
   - id: L390
     title: orchestrate --continue tire le premier lot prêt du plan, même un gros lot sans spécification ni sous-tâche (maritime B6 « Profils verticaux, coupes (10) », effort L, tiré le 27-10 puis retiré par le lead) — réglage de tirage par projet (continue.maxEstimate, continue.exclude ou lots marqués non tirables) appliqué au tirage et affiché par le dry-run ; doc, tests
     status: todo

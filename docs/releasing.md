@@ -39,6 +39,8 @@ A version exists in three places and is published in two; a release does all of 
 
 `.github/workflows/tests.yml` runs the type-check and the test suite on the same runner image and `npm ci` as the publish job, in a matrix of Node 22 and 24 (the minimum `engines.node` allows, and the Node the publish job uses), and never publishes: start it with `gh workflow run tests.yml --ref <branch>` or by pushing a `diag/**` branch, to see on the runner what a red publish run saw.
 
+The suite runs the same way on your machine as on that runner, **without `raf` or `cadence` installed** (L384): `test/global-setup.ts` replaces, in the `PATH` of the tests, every folder outside the repository that carries a `raf` or a `cadence` (`~/.local/bin`, the global npm folder, the plugin's `bin/`) by a mirror of that folder without those two names — the other tools stay, `node` included. A test that relies on the installed tool turns red on the lead's machine and in the gate, not only in the publish run: the 1.16.0 publication failed because the post-commit hook of `test/raf-init-commit.test.ts` (R2) found `raf` in the developer's `PATH` and not on the runner. A test that needs `raf` (a hook, a script) builds its own from the sources (`CADENCE_TEST_PACKAGE`).
+
 The Claude Code plugin is read from the repository, so pushing `main` is what updates it; npm is what
 `npx @sylad/cadence` and a global install read, and only the tag publishes there. A missing tag, or a red
 publish run, leaves npm behind without any other error — 0.3.0 and 0.4.0 were never published — hence

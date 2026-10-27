@@ -79,6 +79,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- The test suite no longer depends on a `raf` or a `cadence` installed on the machine (L384, `docs/releasing.md`): the publication of 1.16.0 failed at the publish run (npm stayed on 1.15.1) because the post-commit hook of `test/raf-init-commit.test.ts` (R2 of L377) found `raf` in the developer's `PATH` and not on the runner. That test now has its hook run `raf` from the sources, and the suite removes from the `PATH` of the tests every installed `raf` and `cadence` (the other tools of the folder stay), so such a test is red on the lead's machine and in the gate, not only at publication. 1.16.1 carries 1.16.0.
 - With `--continue`, `cadence orchestrate` reads `claude auth status` once per launch (L382, `docs/orchestrate.md`): `preflight()` used to run it again, up to 20 s each, for every candidate lot of every round. The message quoted in `docs/quickstart.md` and `docs/orchestrate.md` no longer nests backticks inside backticks, which broke the Markdown rendering.
 
 - `cadence orchestrate` integration in worktree mode resolves a `CHANGELOG.md` conflict where one lot adds a section under `[Unreleased]` (`### Fixed`) with its entry and the other a bare entry, without a section (L383, `docs/orchestrate.md`): the bare entry is filed under the section the other side added, one section title, one entry per lot, instead of handing the lot back (L381 on 2026-10-27 was merged by hand). With no single section to file it under, the conflict stays by hand.

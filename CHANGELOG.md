@@ -77,6 +77,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- The commit that follows `raf init` no longer opens a « commit sans lot » gap (L377, `docs/raf.md`, `docs/quickstart.md`, snag A5 of the new-user walkthrough): what `raf init` writes (the plan, `.cadence/notes/.gitkeep`, the `.playwright-mcp/` line of `.gitignore`) and a `cadence.yaml` created in the same commit with only `plan:` and `orchestrate:` keys count as plan files, so `raf check`, the hook and the tour's drift column leave that commit out. A code file, another `.gitignore` line, a `deliver:` key or a later edit of `cadence.yaml` in it keeps it a gap. The getting-started page drops its `raf ignore` workaround.
+
 ### Added
 
 - A page for teams that already have a tracker, a `HANDOFF.md`, ADRs and a commit convention (L363, `docs/with-your-tools.md`, a short section of the README): what cadence does not replace, what is optional (`raf`, `session start|close`, the hook), what plugs into what you have (a plan kept by another tool, read-only, with your own ticket ids; `plan.commit` for the subject of the plan commits, which by default still read `plan: L12 démarré (orchestrate …)`, GitHub issue #15 (L375); `docs.sync` for your docs) and what it adds (waves with an automatic review, a deliver that verifies the effect), with a figure.

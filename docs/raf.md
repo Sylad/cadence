@@ -130,6 +130,10 @@ then the legacy `docs/plan/raf.yaml`.
 - `raf init` creates `.cadence/raf.yaml` and `.cadence/notes/` (with a `.gitkeep`, so git tracks the empty folder). It refuses
   when a plan already exists where it would create one, a legacy `docs/plan/raf.yaml` included: it never creates a second plan
   beside it. With `plan: path` in `cadence.yaml`, or `--file`, the plan and nothing else is created there.
+  The commit that follows `raf init` opens no « commit sans lot » gap (L377): the plan, `.cadence/notes/.gitkeep`, the
+  `.playwright-mcp/` line of `.gitignore` and a `cadence.yaml` created in the same commit with only `plan:` and `orchestrate:` keys are plan files, so such a commit is
+  a plan-only commit for `raf check`, the hook and the tour. Any other file in it, another `.gitignore` line, a `deliver:` or `session:` key
+  in a new `cadence.yaml` or a later edit of it keeps it a commit like any other.
 - A project that still has `docs/plan/raf.yaml` (and no `.cadence/raf.yaml`) keeps working, read and written as before. Every command
   that loads the plan prints one line on **stderr** (standard output, `--json` included, is unchanged) with the move to do —
   `cd <repository root> && mkdir -p .cadence && git mv docs/plan/raf.yaml .cadence/raf.yaml` (`mv` outside a git repository or when git does not track the file, where `git mv` would fail; the root is spelled out, quoted if

@@ -28,6 +28,7 @@ export function ownFiles(plan: Plan, root: string): Set<string> {
   if (relative(root, plan.path) === PLAN_DEFAULT) {
     own.add(PLAN_LEGACY);
     own.add(join(dirname(PLAN_LEGACY), 'gantt.html'));
+    own.add(join(dirname(PLAN_DEFAULT), 'notes/.gitkeep')); // ce que `raf init` pose avec le plan (L377)
   }
   return own;
 }
@@ -49,6 +50,33 @@ function onlyPlanKeyChanged(root: string, sha: string, file: string): boolean {
   return before !== null && before === after;
 }
 
+/** Les lignes que `raf init` ajoute à .gitignore (L377) ; le fichier est un fichier du plan quand un commit n'y ajoute que celles-là. */
+const INIT_GITIGNORE = ['.playwright-mcp/'];
+
+function gitignoreLines(text: string | null): string[] {
+  return (text ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+}
+
+/** Le commit ne change de .gitignore que les lignes de `raf init` ? Rien n'est retiré, aucune autre ligne n'est ajoutée. */
+function onlyInitGitignore(root: string, sha: string, file: string): boolean {
+  const before = gitignoreLines(fileAt(root, `${sha}^`, file));
+  const added = gitignoreLines(fileAt(root, sha, file));
+  const kept = added.filter((l) => !INIT_GITIGNORE.includes(l) || before.includes(l));
+  return before.every((l) => added.includes(l)) && kept.length === before.length;
+}
+
+/** Les clés d'un cadence.yaml qui naît dans le commit d'init : le plan et la porte de tests de la vague ; deliver:, session:… sont du travail. */
+const INIT_CONFIG_KEYS = ['plan', 'orchestrate'];
+
+function onlyInitKeys(text: string | null): boolean {
+  try {
+    const doc = parse(text ?? '') as unknown;
+    return doc !== null && typeof doc === 'object' && !Array.isArray(doc) && Object.keys(doc).every((k) => INIT_CONFIG_KEYS.includes(k));
+  } catch {
+    return false;
+  }
+}
+
 /** Commits du dépôt sans les commits automatiques (motifs `ignore`) : ni audités ni comptés pour un lot. */
 export function planCommits(plan: Plan, root: string, opts: { since?: string; range?: string } = {}): Commit[] {
   const { patterns } = plan.ignore;
@@ -59,14 +87,17 @@ export function planCommits(plan: Plan, root: string, opts: { since?: string; ra
 /**
  * Commit d'entretien du plan : TOUS ses fichiers sont des fichiers du plan (le plan, sa page Gantt,
  * plan.files — son plan publié par exemple —, les attendus QA et la configuration lue, mais celle-ci seulement quand la
- * clé `plan:` est la seule à changer : deliver/session/… sont du travail). Les fichiers décident,
+ * clé `plan:` est la seule à changer, ou qu'elle naît dans le commit avec les seules clés `plan:` et `orchestrate:` : deliver/session/… modifiés sont du travail ; et, de ce que `raf init` écrit, .cadence/notes/.gitkeep
+ * et les lignes qu'il ajoute à .gitignore, pour que le commit qui suit `raf init` n'ouvre pas d'écart, L377). Les fichiers décident,
  * jamais le sujet : « chore(plan): … » qui touche un fichier source est un commit comme un autre.
  */
 export function isPlanOnly(sha: string, plan: Plan, root: string): boolean {
   const own = ownFiles(plan, root);
   const config = configRel(plan, root);
   const files = changedFiles(root, sha);
-  return files.length > 0 && files.every((f) => own.has(f) && (f !== config || onlyPlanKeyChanged(root, sha, f)));
+  const created = (f: string) => fileAt(root, `${sha}^`, f) === null && onlyInitKeys(fileAt(root, sha, f)); // cadence.yaml naît avec le plan : `raf init` puis la porte de tests, un seul commit (L377)
+  const initScaffold = (f: string) => f === '.gitignore' && onlyInitGitignore(root, sha, f);
+  return files.length > 0 && files.every((f) => initScaffold(f) || (own.has(f) && (f !== config || created(f) || onlyPlanKeyChanged(root, sha, f))));
 }
 
 /** Fichiers d'une version : manifestes JSON (dont seul le champ `version` bouge) et CHANGELOG. */

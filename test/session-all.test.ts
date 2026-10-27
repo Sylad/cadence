@@ -52,6 +52,8 @@ describe('cadence session start|close --all', () => {
     await project(join(root, 'alpha'), 'alpha');
     await project(join(root, 'beta'), 'beta');
     writeFileSync(join(root, 'beta', 'sale.txt'), 'x');
+    git(join(root, 'beta'), 'add', 'sale.txt');
+    commit(join(root, 'beta'), 'chore: code sans lot', '2026-09-28T11:00:00');
     const open = await cad(root, 'session', 'close', '--all');
     expect(open.out.split('\n').filter((l) => l.startsWith('## '))).toEqual(['## alpha', '## beta']);
     expect(open.code).toBe(1);

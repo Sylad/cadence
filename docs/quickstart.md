@@ -70,14 +70,13 @@ orchestrate:
   test: test -f hello.txt        # passes once the first lot has created hello.txt
 EOF
 git add -A && git commit -m "chore: init raf"
-raf ignore $(git rev-parse --short HEAD)
-git add .cadence/raf.yaml && git commit -m "plan: acknowledge init"
 cd ..
 ```
 
 What it does: `raf init` writes the plan (`.cadence/raf.yaml`), a commit hook and a `.gitignore` line. The commit
-that adds the plan cites no lot, so `raf` warns `commit sans lot` and `raf check` would list it as a gap: `raf ignore`
-acknowledges it once, and the plan records that. `cadence.yaml` is the project's settings file; its single
+that adds them cites no lot and is no gap: like any commit that touches only the plan files, it is left out of `raf check`
+and of the tour's drift column (what `raf init` writes counts as plan files, `cadence.yaml` created in the same commit
+with its `orchestrate.test` line included; a code file in it would make it a `commit sans lot` again). `cadence.yaml` is the project's settings file; its single
 `orchestrate.test` line is the minimum the wave needs, and without it the tour warns `porte de tests absente`.
 The folder is empty, so the gate here is `test -f hello.txt`, which the toy lot satisfies. On a project that already exists,
 put its own test command there (`npm test`, `pytest`, `go test ./...`): `npm test` in a folder without `package.json` fails.

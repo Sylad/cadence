@@ -47,9 +47,9 @@ describe('démarrage « lead multi-projets » en 10 minutes (L358)', () => {
     expect(page).toContain('EACCES');
   });
 
-  it('R4 — le cadence.yaml minimal (la porte de tests) est écrit dans la page, et le premier commit de raf init est acquitté avec raf ignore', () => {
+  it('R4 — le cadence.yaml minimal (la porte de tests) est écrit dans la page, et le premier commit de raf init ne demande plus raf ignore (L377)', () => {
     expect(page).toMatch(/orchestrate:\n\s+test:/);
-    expect(page).toContain('raf ignore');
+    expect(page).not.toContain('raf ignore');
     expect(page).toContain('.:L1');
   });
 
@@ -71,8 +71,8 @@ describe('démarrage « lead multi-projets » en 10 minutes (L358)', () => {
   });
 
   it('R7 — les commandes du bloc « dans chaque projet » rejouées telles qu\'écrites dans un dépôt neuf laissent un plan cohérent (raf check vert)', () => {
-    const bloc = blocs(page).find((b) => b.includes('raf init') && b.includes('raf ignore'));
-    expect(bloc, 'bloc « raf init … raf ignore » absent').toBeDefined();
+    const bloc = blocs(page).find((b) => b.includes('raf init') && b.includes('cadence.yaml'));
+    expect(bloc, 'bloc « raf init … cadence.yaml » absent').toBeDefined();
     const d = tempDir();
     const bin = join(d, 'bin');
     mkdirSync(bin);

@@ -24,7 +24,7 @@
   does not start a `todo` lot, does not make a code review stale, is not in the commit
   count that `raf now`, `cadence lead tour` and `cadence session start` show for a lot in
   progress (the same count as `raf commits` and `raf show`: after `plan: L1 démarré` alone,
-  `raf now` prints no commit and the tour `L1 (0 commit)`, L379), and
+  `raf now` prints no commit and the tour `L1 (0 commit)`, L379; the commit column and the tooltip of `raf gantt` read the same count, L381), and
   `cadence deliver` does not announce the lots it cites as delivered. The files
   decide, never the subject: a `chore(plan): …` commit that touches a source
   file is a commit like any other.

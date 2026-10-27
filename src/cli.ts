@@ -599,7 +599,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const linked = linkCommits(lots, planCommits(plan, root), plan.refs);
       const stamp = io.now();
       const html = renderGantt(
-        ganttData(plan.project, schedule(lots, linked.byLot, today), today, `${toDay(stamp)} ${stamp.toTimeString().slice(0, 5)}`),
+        ganttData(plan.project, schedule(lots, workByLot(plan, root, linked), today), today, `${toDay(stamp)} ${stamp.toTimeString().slice(0, 5)}`),
       );
       const out = resolve(io.cwd, values.output ?? join(dirname(planPath), 'gantt.html'));
       mkdirSync(dirname(out), { recursive: true });

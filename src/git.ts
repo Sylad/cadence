@@ -109,8 +109,35 @@ export function syncIndexWithHead(cwd: string, file: string): void {
  * le commit supprime (`--diff-filter=d`) : un fichier supprimé n'est plus du code à tester.
  */
 export function changedFiles(cwd: string, sha: string, opts: { withoutDeleted?: boolean } = {}): string[] {
+  const known = opts.withoutDeleted ? undefined : filesCache.get(`${cwd}\0${sha}`);
+  if (known) return known;
   // -z : noms séparés par NUL, jamais échappés ; quotepath=off en plus pour les sorties qui citeraient quand même.
   return git(cwd, ['-c', 'core.quotepath=off', 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', ...(opts.withoutDeleted ? ['--diff-filter=d'] : []), sha]).split('\0').filter(Boolean);
+}
+
+/** Fichiers modifiés par commit (hors suppressions écartées), par dépôt : un sha ne change jamais de contenu. */
+const filesCache = new Map<string, string[]>();
+
+/**
+ * Lit d'un seul appel git les fichiers modifiés de ces commits, pour que `changedFiles` ne lance pas un `git diff-tree` par commit
+ * (L381 : filtrer les milliers de commits liés du gantt coûtait ~20 s). Même résultat que `changedFiles` ; un commit de fusion n'a
+ * aucun fichier, comme avec `diff-tree`. Sans effet sur un dépôt illisible : `changedFiles` retombe sur `git diff-tree`.
+ */
+export function preloadChangedFiles(cwd: string, shas: string[]): void {
+  const missing = shas.filter((sha) => !filesCache.has(`${cwd}\0${sha}`));
+  if (missing.length < 2) return;
+  let out: string;
+  try {
+    out = execFileSync('git', ['-c', 'core.quotepath=off', 'log', '--no-walk=unsorted', '--stdin', '--root', '--format=%x01%H', '--name-only', '-z'], {
+      cwd, encoding: 'utf8', input: missing.join('\n') + '\n', stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 1024,
+    });
+  } catch {
+    return;
+  }
+  for (const block of out.split('\x01').slice(1)) {
+    const [sha, ...files] = block.split('\0');
+    filesCache.set(`${cwd}\0${sha}`, files.map((f) => f.replace(/^\n/, '')).filter(Boolean));
+  }
 }
 
 /** Contenu d'un fichier à un commit (`<sha>^` pour l'état d'avant) ; null s'il n'existe pas à ce commit. */

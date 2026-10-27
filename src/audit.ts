@@ -3,7 +3,7 @@ import { dirname, join, relative } from 'node:path';
 import { check } from './check.js';
 import type { Day } from './dates.js';
 import { parse } from 'yaml';
-import { changedFiles, fileAt, readCommits, type Commit } from './git.js';
+import { changedFiles, fileAt, preloadChangedFiles, readCommits, type Commit } from './git.js';
 import { citedRefs, linkCommits, scopeOf, type Linked } from './link.js';
 import { PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readNewsConfig, readOrchestrateConfig } from './config.js';
 import { ficheHypotheses } from './spec.js';
@@ -263,7 +263,9 @@ export function lotCommits(plan: Plan, root: string, lotId: string): Commit[] {
  */
 export function workByLot(plan: Plan, root: string, linked: Linked, ids?: string[]): Map<string, Commit[]> {
   const wanted = ids ? new Set(ids) : null;
-  return new Map([...linked.byLot].filter(([id]) => !wanted || wanted.has(id)).map(([id, commits]) => [id, workCommits(plan, root, commits)]));
+  const shown = [...linked.byLot].filter(([id]) => !wanted || wanted.has(id));
+  preloadChangedFiles(root, shown.flatMap(([, commits]) => commits.map((c) => c.sha)));
+  return new Map(shown.map(([id, commits]) => [id, workCommits(plan, root, commits)]));
 }
 
 /** Commits à relire d'un lot, du plus récent au plus ancien — ce que compte la porte de revue de code et que liste `raf commits`. */

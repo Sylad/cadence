@@ -79,9 +79,14 @@ describe('même compte de commits d’un lot partout (L379, accroc A8)', () => {
   it('R6 — le compte ne filtre que les lots demandés (ceux que l’écran affiche), pas tout l’historique des lots', async () => {
     const dir = await planOnlyLot();
     await cad(dir, 'add', 'Autre');
+    await cad(dir, 'start', 'L2');
+    git(dir, 'add', '.cadence');
+    commit(dir, 'plan: L2 démarré', '2026-09-28T09:30:00');
     withWork(dir);
     const plan = planLoader(dir)();
     const linked = linkCommits(plan.lots(), planCommits(plan, dir), plan.refs);
+    // L2 est cité par un commit : sans la liste des lots demandés, il serait filtré lui aussi (le garde-fou du test).
+    expect([...workByLot(plan, dir, linked).keys()].sort()).toEqual(['L1', 'L2']);
     expect([...workByLot(plan, dir, linked, ['L1']).keys()]).toEqual(['L1']);
     expect(workByLot(plan, dir, linked, ['L1']).get('L1')).toHaveLength(1);
   });

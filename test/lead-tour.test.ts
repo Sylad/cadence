@@ -37,7 +37,7 @@ async function parent() {
   commit(alpha, 'chore: plan', '2026-09-20T09:00:00');
   await cad(alpha, 'start', 'L1');
   const plan = join(alpha, '.cadence/raf.yaml');
-  writeFileSync(plan, readFileSync(plan, 'utf8').replace('started: 2026-09-28', 'started: 2026-09-22'));
+  writeFileSync(plan, readFileSync(plan, 'utf8').replace('started: 2026-09-28', 'started: 2026-09-22').replace('since: 2026-09-28', 'since: 2026-09-20'));
   git(alpha, 'commit', '-qam', 'chore: plan');
   commit(alpha, 'feat(L1): cache', '2026-09-24T10:00:00');
   writeNext(stateDir(alpha), '2026-09-27', ['finir L1 puis livrer']);

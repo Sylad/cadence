@@ -21,7 +21,10 @@
   the plan, a journal), or the QA expectations file (`docs/qa/expectations.md`,
   or the file named by `qa.expectations`; the lead commits the `qa-reviewer`'s draft of it). Such a commit is never a "commit without a lot", and it
   does not count as work on the lots it cites: it is absent from `raf commits`,
-  does not start a `todo` lot, does not make a code review stale, and
+  does not start a `todo` lot, does not make a code review stale, is not in the commit
+  count that `raf now`, `cadence lead tour` and `cadence session start` show for a lot in
+  progress (the same count as `raf commits` and `raf show`: after `plan: L1 démarré` alone,
+  `raf now` prints no commit and the tour `L1 (0 commit)`, L379), and
   `cadence deliver` does not announce the lots it cites as delivered. The files
   decide, never the subject: a `chore(plan): …` commit that touches a source
   file is a commit like any other.

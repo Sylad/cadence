@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, relative, sep } from 'node:path';
-import { audit, gateWaiting, nextUp, planCommits } from './audit.js';
+import { audit, gateWaiting, nextUp, planCommits, workByLot } from './audit.js';
 import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readPlanConfig } from './config.js';
 import { diffDays, type Day } from './dates.js';
 import { gitRoot, repoStatus } from './git.js';
@@ -135,14 +135,15 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     const plan = planLoader(root)();
     const lots = plan.lots();
     const all = linkCommits(lots, planCommits(plan, root), plan.refs);
+    const work = workByLot(plan, root, all);
     const { doing, ready, blocked } = nextUp(lots);
 
     row.doing = doing.map((l) => {
-      const commits = all.byLot.get(l.id) ?? [];
-      const last = lastActivity(l, commits);
-      if (!last) return { id: l.id, commits: commits.length, noActivity: true as const };
+      const count = work.get(l.id)?.length ?? 0;
+      const last = lastActivity(l, all.byLot.get(l.id) ?? []);
+      if (!last) return { id: l.id, commits: count, noActivity: true as const };
       const days = diffDays(last, today);
-      return days > idle ? { id: l.id, commits: commits.length, silentDays: days } : { id: l.id, commits: commits.length };
+      return days > idle ? { id: l.id, commits: count, silentDays: days } : { id: l.id, commits: count };
     });
     row.drift = audit(plan, root, join(root, 'docs/nouveautes'), today).map((i) => `${i.warning ? '⚠' : '✗'} ${i.message}`);
     row.notes = readNext(stateDir(root))?.lines ?? [];

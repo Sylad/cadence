@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { CLEAN_DAYS, scanStale } from './clean.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
-import { audit, exemptPlanOnly, gateWaiting, nextUp, planCommits } from './audit.js';
+import { audit, exemptPlanOnly, gateWaiting, nextUp, planCommits, workByLot } from './audit.js';
 import { diffDays, maxDay, type Day } from './dates.js';
 import { repoStatus, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
@@ -133,6 +133,7 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   const lock = lockStatus(ctx.shared);
   if (lock) out(`\n${lock.line}`);
 
+  const work = workByLot(plan, ctx.root, all);
   const { doing, ready, blocked } = nextUp(lots);
   out('\nEn cours');
   if (doing.length === 0) out('  (rien)');
@@ -141,7 +142,7 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
     const last = lastActivity(l, commits);
     const idle = last ? diffDays(last, today) : 0;
     const state = last ? `dernière activité ${last}${idle > opts.idle ? `, silencieux depuis ${idle} j` : ''}` : 'aucune activité';
-    out(`  ${l.id}  ${l.title}  (${commitCount(commits.length)}, ${state})`);
+    out(`  ${l.id}  ${l.title}  (${commitCount(work.get(l.id)?.length ?? 0)}, ${state})`);
   }
 
   section(out, 'En attente', gateWaiting(lots, blocked).map(({ lot, text }) => `${lot.id}  ${lot.title}  (${text})`));

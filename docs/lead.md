@@ -156,6 +156,8 @@ alpha · en cours L1 (1 commit, silencieux 4j) · dérive 1 (✗ L2 a 1 commit(s
 beta · en cours rien · dérive aucune · notes : aucune · prochain T2 Second · dépôt propre
 ```
 
+The commit count of a lot in progress is the one of `raf commits`: plan commits (`plan: L1 démarré` and the like, which touch only plan files) are left out, so a lot just started reads `L1 (0 commit)` (L379).
+
 | Column | Content |
 |---|---|
 | `en cours` | ids of the lots in progress, each with its number of commits (`0 commit` included: a close note on a lot without commit is not « done, `raf done` forgotten »); then `aucune activité` when it has no activity at all, `silencieux Nj` when the lot's last activity (commit, note or start) is more than `--idle` days old (default 3) |

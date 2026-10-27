@@ -4,7 +4,7 @@ import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
-import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork } from './audit.js';
+import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps, shellQuote } from './deliver.js';
@@ -756,7 +756,8 @@ function describe(l: Lot, commits: number): string {
 function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): number {
   const lots = plan.lots();
   const linked = linkCommits(lots, planCommits(plan, root), plan.refs);
-  const count = (id: string) => linked.byLot.get(id)?.length ?? 0;
+  const work = workByLot(plan, root, linked);
+  const count = (id: string) => work.get(id)?.length ?? 0;
   const { doing, ready, blocked } = nextUp(lots);
   io.out(`${plan.project} — ${today}`);
 

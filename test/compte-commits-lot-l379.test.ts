@@ -1,0 +1,64 @@
+import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { run } from '../src/cli.js';
+import { commit, gitRepo } from './helpers.js';
+
+const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
+
+async function cad(dir: string, ...argv: string[]) {
+  const out: string[] = [];
+  const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-09-28' }, out: (l) => out.push(l), err: () => {}, now: () => new Date('2026-09-28T18:30:00') });
+  return { code, out: out.join('\n') };
+}
+
+/** L1 démarré, dont le seul commit est celui du plan (« plan: L1 démarré ») : le lot n'a aucun commit de travail. */
+async function planOnlyLot() {
+  const dir = gitRepo();
+  await cad(dir, 'init', '--project', 'demo', '--no-hook');
+  await cad(dir, 'add', 'Cache');
+  git(dir, 'add', '.');
+  commit(dir, 'chore: plan', '2026-09-27T09:00:00');
+  await cad(dir, 'start', 'L1');
+  git(dir, 'add', '.cadence');
+  commit(dir, 'plan: L1 démarré', '2026-09-28T09:00:00');
+  return dir;
+}
+
+const withWork = (dir: string) => {
+  writeFileSync(join(dir, 'cache.ts'), 'export {};\n');
+  git(dir, 'add', 'cache.ts');
+  commit(dir, 'feat(L1): cache', '2026-09-28T10:00:00');
+};
+
+describe('même compte de commits d’un lot partout (L379, accroc A8)', () => {
+  it('R1 — raf now ne compte pas le commit de plan : « plan: L1 démarré » seul, aucun commit affiché', async () => {
+    const dir = await planOnlyLot();
+    expect((await cad(dir, 'commits', 'L1')).out).toBe('');
+    const { out } = await cad(dir, 'now');
+    expect(out).toContain('L1  Cache  (1 j)');
+    expect(out).not.toContain('commit(s)');
+  });
+
+  it('R2 — cadence lead tour ne compte pas le commit de plan : « L1 (0 commit) »', async () => {
+    const dir = await planOnlyLot();
+    const { out } = await cad(dir, 'lead', 'tour', dir);
+    expect(out).toContain('L1 (0 commit');
+  });
+
+  it('R3 — session start ne compte pas le commit de plan : « 0 commit »', async () => {
+    const dir = await planOnlyLot();
+    const { out } = await cad(dir, 'session', 'start', '--since', '2026-09-27');
+    expect(out).toContain('(0 commit,');
+  });
+
+  it('R4 — un commit de travail est compté une fois, et par raf now, le tour, session start et raf commits', async () => {
+    const dir = await planOnlyLot();
+    withWork(dir);
+    expect((await cad(dir, 'commits', 'L1')).out.split('\n')).toHaveLength(1);
+    expect((await cad(dir, 'now')).out).toContain('1 commit(s)');
+    expect((await cad(dir, 'lead', 'tour', dir)).out).toContain('L1 (1 commit');
+    expect((await cad(dir, 'session', 'start', '--since', '2026-09-27')).out).toContain('(1 commit,');
+  });
+});

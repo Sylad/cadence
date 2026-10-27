@@ -23,8 +23,8 @@ async function cad(dir: string, ...argv: string[]) {
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
 
-/** Plan commité : L1 en cours (silencieux), L2 à faire, L3 gain rapide, L4 bloqué par L2. */
-async function project() {
+/** Plan commité (adopté le `since`, avant le commit de L1 : un commit antérieur ne compte pas, comme dans raf commits) : L1 en cours (silencieux), L2 à faire, L3 gain rapide, L4 bloqué par L2. */
+async function project(since = '2026-09-20') {
   const dir = gitRepo();
   await cad(dir, 'init', '--project', 'demo', '--no-hook');
   await cad(dir, 'add', 'Cache', '--estimate', '2');
@@ -35,7 +35,7 @@ async function project() {
   commit(dir, 'chore: plan', '2026-09-20T09:00:00');
   await cad(dir, 'start', 'L1');
   const plan = join(dir, '.cadence/raf.yaml');
-  writeFileSync(plan, readFileSync(plan, 'utf8').replace('started: 2026-09-28', 'started: 2026-09-22'));
+  writeFileSync(plan, readFileSync(plan, 'utf8').replace('started: 2026-09-28', 'started: 2026-09-22').replace('since: 2026-09-28', `since: ${since}`));
   git(dir, 'commit', '-qam', 'chore: plan');
   commit(dir, 'feat(L1): cache', '2026-09-24T10:00:00');
   return dir;
@@ -80,7 +80,7 @@ describe('session start', () => {
 
 describe('session start : adoption du plan', () => {
   it('ne compte pas comme « sans lot » un commit antérieur à l’adoption', async () => {
-    const dir = await project();
+    const dir = await project('2026-09-28');
     commit(dir, 'vieux commit sans lot', '2026-09-26T09:00:00');
     const { out } = await cad(dir, 'session', 'start', '--since', '2026-09-25');
     expect(out).not.toContain('sans lot');

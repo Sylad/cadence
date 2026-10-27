@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.15.1] - 2026-10-27
+
 ### Added
 
 - A getting-started page for a lead of several projects (L358, `docs/quickstart.md`, a section of the README): install, the parent folder, `raf init` in each project with the minimal `cadence.yaml`, the tour, `/cadence:lead`, the first wave, and a table of the usual stops (no Node, `EACCES`, no git identity, Claude Code not logged in), from the walkthrough measured on a clean machine.

@@ -4195,6 +4195,16 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-27
+  - id: L386
+    title: "raf docs-ok refuse un plan tenu par un autre outil (lecture seule) : un lot de maritime dont le code laisse docs.sync en retard alors que la doc reste vraie n'a aucun moyen d'acquitter l'écart, la vague le rend (Q-ATTR1, 27-10) — garder l'acquittement hors du plan (fichier de cadence dans .cadence/) pour les plans en lecture seule, lu par raf check et orchestrate ; doc, CHANGELOG, tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-27
+  - id: L387
+    title: "cadence verify --gate : un rouge sous charge qui ne nomme aucun test (vu 3 fois le 27-10 : L380, B28.17, puis vert au rejeu) — imprimer la fin de la sortie de l'étape rouge quand aucun nom de test n'est extrait, et appliquer orchestrate.testReplay comme la porte des vagues ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -91,6 +91,15 @@ describe('verifyGate : la porte rejouée au sha dans un worktree jetable (L348)'
     expect(r.text).toContain('boom');
   });
 
+  it('L387 R1 — rouge sans test nommé : seules les 10 dernières lignes de la sortie sont imprimées, préfixées', async () => {
+    const { repo, sha } = project(`orchestrate:\n  test: "seq 1 30; exit 1"\n`);
+    const r = await gate(repo, sha);
+    expect(r.text).toContain('  | 30');
+    expect(r.text).toContain('  | 21');
+    expect(r.text).not.toContain('  | 20\n');
+    expect(r.text).not.toMatch(/\| 5\b/);
+  });
+
   it('le build passe avant les tests, comme dans la porte de la vague, et les deux sont rejoués même si le premier est rouge', async () => {
     const { repo, sha } = project('orchestrate:\n  build: "touch dist-ok; exit 1"\n  test: test -f dist-ok\n');
     const r = await gate(repo, sha);
@@ -275,5 +284,67 @@ describe('cadence verify --gate (L348)', () => {
     const { repo, sha } = project('orchestrate:\n  test: "true"\n');
     const c = io(repo);
     expect(await run(['verify', '--gate', '--sha', sha, '--retry', '5'], c.io)).toBe(2);
+  });
+});
+
+/** Porte `sh gate.sh` : la suite entière rouge sur deux tests, un rejeu (`sh gate.sh <fichiers>`) vert ou rouge selon `alone`. */
+function replayProject(alone: 'vert' | 'rouge', extra = ''): { repo: string; sha: string } {
+  const { repo } = project(`orchestrate:\n  test: sh gate.sh\n  testReplay: sh gate.sh {files}\n${extra}`);
+  const lines = alone === 'vert'
+    ? 'echo " ✓ $*"; exit 0'
+    : 'echo " FAIL  test/a.test.ts > charge"; exit 1';
+  writeFileSync(join(repo, 'gate.sh'), `if [ -n "$1" ]; then ${lines}; fi\necho " FAIL  test/a.test.ts > charge"\necho " FAIL  test/b.test.ts > autre"\nexit 1\n`);
+  git(repo, 'add', 'gate.sh');
+  git(repo, 'commit', '-q', '-m', 'gate');
+  return { repo, sha: git(repo, 'rev-parse', 'HEAD').trim() };
+}
+
+describe('verify --gate applique orchestrate.testReplay comme la porte des vagues (L387)', () => {
+  it('R2 — rouge sous charge, vert rejoué seul : la porte est verte et nomme les tests instables', async () => {
+    const { repo, sha } = replayProject('vert');
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(0);
+    expect(r.text).toContain('instable');
+    expect(r.text).toContain('test/a.test.ts > charge');
+    expect(r.text).toContain('test/b.test.ts > autre');
+    expect(r.text).toContain('vert');
+  });
+
+  it('R2 — rouge aussi rejoué seul : la porte reste rouge et ne nomme que ce qui reste rouge', async () => {
+    const { repo, sha } = replayProject('rouge');
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(1);
+    expect(r.text).toContain('  - test/a.test.ts > charge');
+    expect(r.text).not.toContain('instable');
+  });
+
+  it('R2 — sans orchestrate.testReplay rien n\'est rejoué : le rouge est compté tel quel', async () => {
+    const { repo } = project('orchestrate:\n  test: sh gate.sh\n');
+    writeFileSync(join(repo, 'gate.sh'), 'if [ -n "$1" ]; then exit 0; fi\necho " FAIL  test/a.test.ts > charge"\nexit 1\n');
+    git(repo, 'add', 'gate.sh');
+    git(repo, 'commit', '-q', '-m', 'gate');
+    const r = await gate(repo, git(repo, 'rev-parse', 'HEAD').trim());
+    expect(r.code).toBe(1);
+    expect(r.text).not.toContain('instable');
+  });
+
+  it('R2 — un échec que la sortie ne rattache à aucun test n\'est pas rejoué : rouge', async () => {
+    const { repo } = project('orchestrate:\n  test: sh gate.sh\n  testReplay: sh gate.sh {files}\n');
+    writeFileSync(join(repo, 'gate.sh'), 'if [ -n "$1" ]; then echo " ✓ $*"; exit 0; fi\necho " FAIL  test/a.test.ts > charge"\necho "Unhandled Errors"\nexit 1\n');
+    git(repo, 'add', 'gate.sh');
+    git(repo, 'commit', '-q', '-m', 'gate');
+    const r = await gate(repo, git(repo, 'rev-parse', 'HEAD').trim());
+    expect(r.code).toBe(1);
+    expect(r.text).not.toContain('instable');
+  });
+
+  it('R2 — le rejeu qui n\'a exécuté aucun test ne prouve rien : le test reste rouge', async () => {
+    const { repo } = project('orchestrate:\n  test: sh gate.sh\n  testReplay: sh gate.sh {files}\n');
+    writeFileSync(join(repo, 'gate.sh'), 'if [ -n "$1" ]; then echo "No test files found, exiting with code 0"; exit 0; fi\necho " FAIL  test/a.test.ts > charge"\nexit 1\n');
+    git(repo, 'add', 'gate.sh');
+    git(repo, 'commit', '-q', '-m', 'gate');
+    const r = await gate(repo, git(repo, 'rev-parse', 'HEAD').trim());
+    expect(r.code).toBe(1);
+    expect(r.text).toContain('  - test/a.test.ts > charge');
   });
 });

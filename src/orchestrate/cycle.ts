@@ -17,8 +17,8 @@ import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, RafError, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
-import { compareBaseline, failedTests, hasUnnamedFailure, jestTestFiles } from './baseline.js';
-import { replayFile, replayRanFile, shellArg, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
+import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
+import { replayRed, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
@@ -2023,33 +2023,12 @@ async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promi
   }
 }
 
-/** Sortie d'un lanceur qui n'a trouvé aucun test à rejouer : la ligne de fin du lanceur (vitest « No test files found, exiting with code », jest « No tests found, exiting with code », pytest « no tests ran in »), en début de ligne — pas ces mots cités dans le titre ou la sortie d'un test. */
-const NO_TEST_RAN = /^\W*(?:no test files? found, exiting with code|no tests? found, exiting with code|no tests ran in)\b/im;
-
-/** Rejeux d'un test rouge de la porte, seul (L354) : rouge aux deux, il est compté. */
-const REPLAYS = 2;
-
 /**
  * Rejoue SEULS (la commande `orchestrate.testReplay` où `{files}` devient les fichiers de ces tests, dans `cwd` : le worktree du lot, ou celui de la ligne de base) les tests rouges d'une suite entière (L354). Le 26-10, vitest à 31 workers par suite sur une machine à 4 sessions rougissait des tests
- * qui passaient seuls : quatre corrections vides (4 à 11 min chacune). Un test vert à un rejeu est `unstable` ; rouge aux `REPLAYS` rejeux, ou sans fichier désignable (rien à rejouer seul), il reste dans `red`.
+ * qui passaient seuls : quatre corrections vides (4 à 11 min chacune). Un test vert à un rejeu est `unstable` ; rouge aux rejeux, ou sans fichier désignable (rien à rejouer seul), il reste dans `red`. Le rejeu lui-même est `replayRed` (workers.ts), partagé avec `verify --gate` (L387).
  */
-async function replayAlone(c: LotCtx, template: string, names: string[], output: string, cwd = wd(c)): Promise<{ red: string[]; unstable: string[] }> {
-  const jest = jestTestFiles(output);
-  const fileOf = (n: string): string | null => replayFile(n) ?? jest.get(n) ?? null;
-  let red = names;
-  const unstable: string[] = [];
-  for (let i = 0; i < REPLAYS; i++) {
-    const replayable = red.filter((n) => fileOf(n));
-    const files = [...new Set(replayable.map((n) => fileOf(n)!))];
-    if (!files.length) break;
-    const r = await sh(c, template.replaceAll('{files}', () => files.map(shellArg).join(' ')), undefined, undefined, cwd);
-    // Seul un rejeu qui sort en 0 en ayant exécuté le FICHIER du test vaut vert. Un rejeu en échec ne conclut rien pour un test qu'il ne nomme pas : sur une porte composée (`a && b`) les fichiers n'atteignent que le dernier lanceur, un premier lanceur qui rougit coupe avant lui. Un rejeu sans test exécuté (filtre sans fichier, `passWithNoTests`) sort en 0 sans rien prouver, et un lanceur qui ignore sans rien dire un fichier qu'il ne trouve pas (vitest d'un autre espace de travail) sort en 0 sans l'avoir joué : le fichier doit figurer, chemin entier, sur une ligne du lanceur de la sortie du rejeu, hors écho de la commande par npm/pnpm/yarn (`replayRanFile`).
-    const ran = r.code === 0 && !NO_TEST_RAN.test(r.output);
-    const passed = ran ? replayable.filter((n) => replayRanFile(r.output, fileOf(n)!)) : [];
-    unstable.push(...passed);
-    red = red.filter((n) => !passed.includes(n));
-  }
-  return { red, unstable };
+function replayAlone(c: LotCtx, template: string, names: string[], output: string, cwd = wd(c)): Promise<{ red: string[]; unstable: string[] }> {
+  return replayRed((command) => sh(c, command, undefined, undefined, cwd), template, names, output);
 }
 
 /** Trace des tests instables sous charge (L354) : le lot (`instables`, journal et `cadence perf`), un avertissement du lot (tableau de fin de vague) et une ligne du journal de la vague. */

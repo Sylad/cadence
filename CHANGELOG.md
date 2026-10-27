@@ -84,6 +84,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
   `docs.sync` gap is written to `.cadence/docs-ok.yaml` (`L12: { date, reason }`, next to the project's
   `cadence.yaml`), the plan is never touched, and `raf check`, `raf show`, `cadence lead tour` and
   `cadence orchestrate` read it; the librarian's brief names that file to commit (L386).
+- `cadence verify --gate` applies `orchestrate.testReplay` like the gate of a wave (L387, `docs/deliver.md`): a red test the output names is replayed alone, twice at most, and a test that passes alone is reported as unstable under load instead of turning the gate red (L380 and B28.17 on 27-10 were red under load, green on replay). A red step that names no test prints the last 10 lines of its output, prefixed `  | `.
 
 ## [1.16.1] - 2026-10-27
 

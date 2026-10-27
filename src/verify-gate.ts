@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { OrchestrateConfig } from './config.js';
 import { onTermination } from './proc.js';
 import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
+import { replayRed } from './orchestrate/workers.js';
 import { git, gitFailure, linkDeclared, linkIgnored } from './orchestrate/worktree.js';
 
 /** Délai de chaque commande de la porte : celui du rejeu de la ligne de base de la vague. */
@@ -122,15 +123,28 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
         out(`✓ ${step.name} (${step.cmd})`);
         continue;
       }
-      red++;
-      out(`✗ ${step.name} (${step.cmd}) — code ${r.code}`);
       const tests = step.name === 'tests';
       const names = tests ? failedTests(r.output) : [];
       const unloaded = tests ? unloadedSuites(r.output) : [];
-      for (const n of names) out(`  - ${n}`);
+      // `orchestrate.testReplay` comme la porte d'une vague (L354, L387) : un rouge nommé est rejoué seul avant d'être compté ; vert au rejeu, il est instable sous charge.
+      // Un échec que la sortie ne rattache à aucun test, ou un fichier qui ne se charge pas, n'est jamais rejoué.
+      const replayable = tests && config.testReplay && names.length > 0 && unloaded.length === 0 && !hasUnnamedFailure(r.output);
+      const { red: still, unstable } = replayable ? await replayRed((c) => sh(c, dir, ctx.timeoutMs ?? GATE_TIMEOUT_MS, group), config.testReplay!, names, r.output) : { red: names, unstable: [] as string[] };
+      if (replayable && still.length === 0) {
+        out(`✓ ${step.name} (${step.cmd}) — ${unstable.length} test(s) rouge(s) sous charge, verts rejoués seuls (instables sous charge) :`);
+        for (const n of unstable) out(`  - ${n}`);
+        continue;
+      }
+      red++;
+      out(`✗ ${step.name} (${step.cmd}) — code ${r.code}`);
+      for (const n of still) out(`  - ${n}`);
       for (const n of unloaded) out(`  - ${n} (ne se charge pas)`);
-      if (names.length + unloaded.length === 0 || hasUnnamedFailure(r.output, true)) {
-        if (names.length + unloaded.length) out('  (au moins un échec que la sortie ne rattache à aucun test)');
+      if (unstable.length) {
+        out(`  ${unstable.length} autre(s) test(s) rouge(s) sous charge, verts rejoués seuls (instables sous charge) :`);
+        for (const n of unstable) out(`    - ${n}`);
+      }
+      if (still.length + unloaded.length === 0 || hasUnnamedFailure(r.output, true)) {
+        if (still.length + unloaded.length) out('  (au moins un échec que la sortie ne rattache à aucun test)');
         if (r.output.trim()) for (const l of r.output.trimEnd().split('\n').slice(-TAIL_LINES)) out(`  | ${l}`);
       }
     }

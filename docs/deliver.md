@@ -305,7 +305,8 @@ verify --gate 6b0d9aa : rouge (1 étape sur 2)
 ```
 
 Both commands always run, even when the first is red, so the report is whole. A red step lists the failing
-tests the output names (the same reading as the wave's baseline) and the test files that do not load (`- test/a.test.ts (ne se charge pas)`, the typical sign of a missing dependency); with none identifiable, the last 10 lines of the output.
+tests the output names (the same reading as the wave's baseline) and the test files that do not load (`- test/a.test.ts (ne se charge pas)`, the typical sign of a missing dependency); with none identifiable (or when an unnamed failure is mixed with them), the last 10 lines of the output, each prefixed `  | `: a red that names no test, seen three times under load on 27-10 (L380, B28.17), is no longer a bare exit code.
+With `orchestrate.testReplay` declared (`docs/orchestrate.md`, « A red test is replayed alone »), the gate does what a wave does: a red test the output names is **replayed alone, twice at most**, in the same throwaway worktree. Green at a replay it is *unstable under load*: the step prints `✓ tests (…) — N test(s) rouge(s) sous charge, verts rejoués seuls (instables sous charge) :` with the names and does not make the gate red; the tests still red stay listed and the unstable ones follow, under a line of their own. A failure the output ties to no test, or a file that does not load, is never replayed and stays red. Without `testReplay` nothing is replayed.
 Each command has 30 minutes (then its whole process group is killed, code 124). Ctrl-C, SIGTERM or a hangup received by cadence kills the running command and removes the worktree before cadence dies.
 `--sha` is required (the moving head of a wave is not a sha to re-verify) and `--retry` does not apply. Exit code:
 **0** green · **1** red · **2** nothing to replay (neither `orchestrate.build` nor `orchestrate.test`), unknown sha or a worktree that cannot be made.

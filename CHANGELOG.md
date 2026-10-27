@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.16.1] - 2026-10-27
+
 ### Fixed
 
 - The test suite no longer depends on a `raf` or a `cadence` installed on the machine (L384, `docs/releasing.md`): the publication of 1.16.0 failed at the publish run (npm stayed on 1.15.1) because the post-commit hook of `test/raf-init-commit.test.ts` (R2 of L377) found `raf` in the developer's `PATH` and not on the runner. That test now has its hook run `raf` from the sources, and the suite removes from the `PATH` of the tests every installed `raf` and `cadence` (the other tools of the folder stay), so such a test is red on the lead's machine and in the gate, not only at publication. 1.16.1 carries 1.16.0.

@@ -10,15 +10,14 @@ import { removeDryRunBriefs, tempDir } from './helpers.js';
 
 // L378 (accroc A7) — claude installé mais non connecté : refus avant toute écriture dans le plan, jamais un lot laissé « doing ».
 
-function projet() {
-  const parent = tempDir();
-  const dir = join(parent, 'alpha');
+function projet(parent = tempDir(), name = 'alpha') {
+  const dir = join(parent, name);
   mkdirSync(dir, { recursive: true });
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
-  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'alpha', 'L', '2026-09-01');
+  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), name, 'L', '2026-09-01');
   plan.add('un lot', '2026-10-01', { estimate: 1 });
   plan.save();
   writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
@@ -89,5 +88,32 @@ describe('lecture de `claude auth status` (L378)', () => {
     expect(parseAuthStatus('')).toBeNull();
     expect(parseAuthStatus('error: unknown command auth')).toBeNull();
     expect(parseAuthStatus('{"autre": 1}')).toBeNull();
+  });
+});
+
+describe('une seule vérification par vague (L382)', () => {
+  it('R5 — --continue, claude connecté, plusieurs lots candidats sur plusieurs tours : `claude auth status` n\'est lancé qu\'une fois', async () => {
+    const parent = tempDir();
+    for (const n of ['a', 'b', 'c']) projet(parent, n);
+    let appels = 0;
+    const r = await lancer(parent, ['--continue', '--max-sessions', '1'], () => {
+      appels++;
+      return { loggedIn: true };
+    });
+    expect(r.sessions.length + appels).toBeGreaterThan(1); // la session factice échoue : plusieurs tirages ont eu lieu
+    expect(appels).toBe(1);
+  });
+
+  it('R6 — le refus « non connecté » reste vu à chaque tirage de la vague avec une seule vérification', async () => {
+    const parent = tempDir();
+    for (const n of ['a', 'b', 'c']) projet(parent, n);
+    let appels = 0;
+    const r = await lancer(parent, ['--continue', '--max-sessions', '1'], () => {
+      appels++;
+      return { loggedIn: false };
+    });
+    expect(appels).toBe(1);
+    expect(r.code).toBe(2);
+    expect(r.sessions).toEqual([]);
   });
 });

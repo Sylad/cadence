@@ -724,8 +724,17 @@ function removeWorktree(args: Args, io: OrchestrateIo): number {
   return 0;
 }
 
+/** L382 : `claude auth status` peut durer jusqu'à 20 s ; en --continue, preflight() le relancerait pour chaque lot candidat de chaque tour. Une seule lecture par lancement (une vague). */
+function onceAuth(deps: OrchestrateDeps): OrchestrateDeps {
+  const read = deps.claudeAuth;
+  if (!read) return deps;
+  let cached: { value: ReturnType<typeof read> } | undefined;
+  return { ...deps, claudeAuth: () => (cached ??= { value: read() }).value };
+}
+
 /** Point d'entrée de `cadence orchestrate`. 0 prêts · 1 rendus au lead · 2 refus avant d'agir · 3 suspendue (budget, quota). */
 export async function orchestrate(argv: string[], io: OrchestrateIo, deps: OrchestrateDeps): Promise<number> {
+  deps = onceAuth(deps);
   const args = parseOrchestrateArgs(argv);
   const launch = io.cwd;
   const today: Day = io.env.RAF_TODAY && isDay(io.env.RAF_TODAY) ? io.env.RAF_TODAY : toDay(io.now());

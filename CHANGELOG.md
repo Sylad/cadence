@@ -77,6 +77,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- With `--continue`, `cadence orchestrate` reads `claude auth status` once per launch (L382, `docs/orchestrate.md`): `preflight()` used to run it again, up to 20 s each, for every candidate lot of every round. The message quoted in `docs/quickstart.md` and `docs/orchestrate.md` no longer nests backticks inside backticks, which broke the Markdown rendering.
+
 ## [1.16.0] - 2026-10-27
 
 ### Fixed

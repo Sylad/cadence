@@ -27,7 +27,7 @@ import { costlyHypotheses, specScreen, specText } from './spec.js';
 import { fichesDuDossier } from '../spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
 import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, leadReviewedHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
-import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
+import { canInstallPrePush, gitProcessRunning, indexLockRefusal, installPrePush, longDuration, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
@@ -58,6 +58,8 @@ export interface OrchestrateDeps {
   claudeInfo: () => { version: string; jsonSchema: boolean } | null;
   /** Connexion de claude (`claude auth status`, sans modèle) ; null si l'état est illisible, absent : non vérifié (L378). */
   claudeAuth?: () => { loggedIn: boolean } | null;
+  /** Un processus git tourne-t-il (L385) ? null s'il est illisible ; défaut : `ps` ; injectable pour les tests. */
+  gitRunning?: () => boolean | null;
   agentsDir: string;
   templatesDir?: string;
   claudeHome?: string;
@@ -400,6 +402,8 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       repoChecked.add(repo);
       const dirty = await trackedDirty(repo);
       if (dirty.length) refusals.push(`${basename(repo)} : arbre sale, ${dirty.length} fichier(s) suivi(s) modifié(s) : ${dirty.join(', ')}`);
+      const locked = indexLockRefusal(repo, io.now(), deps.gitRunning ?? gitProcessRunning);
+      if (locked) refusals.push(`${basename(repo)} : ${locked}`);
       const hook = canInstallPrePush(repo);
       if (hook) refusals.push(`${basename(repo)} : ${hook}`);
       const busy = activeLock(join(sharedStateDir(repo), REPO_LOCK));
@@ -639,15 +643,6 @@ export function liveLines(cap = DEFAULT_MAX_SESSIONS, now = new Date()): string[
   const lines = [`vagues en cours : ${waves.length} · sessions en cours : ${slots}${lead} · créneaux libres : ${freeSlots(waves, cap, holds.length)} sur ${cap}`];
   for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · plafond ${w.cap ?? '?'} · dépôts : ${w.repos.join(', ')}`);
   return lines;
-}
-
-/** Durée à la minute : « 12 min », « 5 h 10 min », « 2 j 3 h ». */
-function longDuration(ms: number): string {
-  const m = Math.max(0, Math.floor(ms / 60_000));
-  if (m < 60) return `${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} h ${String(m % 60).padStart(2, '0')} min`;
-  return `${Math.floor(h / 24)} j ${h % 24} h`;
 }
 
 /** Une ligne ⚠ par session du lead dont le TTL est échu et qui n'a pas été rendue (L278) : vide sans session échue. */

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 export interface Commit {
@@ -292,6 +292,28 @@ export function restorePaths(root: string, paths: string[]): void {
     if (tryGit(root, ['cat-file', '-e', `HEAD:${f}`]) !== null) git(root, ['checkout', '-q', 'HEAD', '--', f]);
     else rmSync(resolve(root, f), { force: true });
   }
+}
+
+/**
+ * Remet `paths` comme à HEAD dans l'arbre de travail seulement, sans toucher à l'index : possible quand un `index.lock` bloque
+ * tout ce qui l'écrit (`restorePaths`, `git checkout`). Un fichier que HEAD ne connaît pas est supprimé.
+ */
+export function restoreWorktree(root: string, paths: string[]): void {
+  for (const f of paths) {
+    let text: Buffer;
+    try {
+      text = execFileSync('git', ['show', `HEAD:${f}`], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 1024 });
+    } catch {
+      rmSync(resolve(root, f), { force: true });
+      continue;
+    }
+    writeFileSync(resolve(root, f), text);
+  }
+}
+
+/** Chemin du verrou de l'index de `repo` (`<git-dir>/index.lock`, celui du worktree s'il en est un). */
+export function indexLockPath(repo: string): string {
+  return resolve(repo, git(repo, ['rev-parse', '--git-path', 'index.lock']).trim());
 }
 
 /** Un fichier SUIVI est-il modifié (indexé ou non) ? Les fichiers non suivis ne comptent pas : un commit à chemins explicites ne les embarque pas. `except` : chemins qu'on ne compte pas. */

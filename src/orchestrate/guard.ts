@@ -1,8 +1,8 @@
-import { chmodSync, existsSync, lstatSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, readdirSync, statSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFile, execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
-import { gitCommonDir, gitRoot, hooksDir } from '../git.js';
+import { gitCommonDir, gitRoot, hooksDir, indexLockPath } from '../git.js';
 
 const MARK = '# cadence orchestrate — hook pre-push temporaire (retiré à la fin de la vague)';
 
@@ -324,4 +324,44 @@ export function remoteAdvances(before: Snapshot, after: Snapshot): RemoteAdvance
   if ([...was.keys()].some((ref) => !now.has(ref))) return null;
   const moved = [...now].filter(([ref, sha]) => was.get(ref) !== sha).map(([ref, to]) => ({ ref, from: was.get(ref) ?? null, to }));
   return moved.length > 0 ? moved : null;
+}
+
+/** Processus git en cours sur la machine ; null quand `ps` n'est pas lisible. */
+export function gitProcessRunning(): boolean | null {
+  try {
+    const out = execFileSync('ps', ['-A', '-o', 'comm='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000 });
+    return out.split('\n').some((l) => l.trim() === 'git');
+  } catch {
+    return null;
+  }
+}
+
+/** Durée à la minute : « 12 min », « 5 h 10 min », « 2 j 3 h ». */
+export function longDuration(ms: number): string {
+  const m = Math.max(0, Math.floor(ms / 60_000));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h ${String(m % 60).padStart(2, '0')} min`;
+  return `${Math.floor(h / 24)} j ${h % 24} h`;
+}
+
+/**
+ * Un `index.lock` dans `repo` (L385) : tout commit y échoue, dont celui du plan au démarrage d'un lot, et le plan resterait modifié pour le lot suivant.
+ * Rend le refus (âge du verrou, processus git en cours ou non, commande pour le retirer), null s'il n'y en a pas. `gitRunning` : null = illisible.
+ */
+export function indexLockRefusal(repo: string, now: Date, gitRunning: () => boolean | null): string | null {
+  let lock: string;
+  let mtime: Date;
+  try {
+    lock = indexLockPath(repo);
+    mtime = statSync(lock).mtime;
+  } catch {
+    return null;
+  }
+  const hhmm = `${String(mtime.getHours()).padStart(2, '0')}:${String(mtime.getMinutes()).padStart(2, '0')}`;
+  const seen = `.git/index.lock présent depuis ${hhmm} (${longDuration(now.getTime() - mtime.getTime())})`;
+  const running = gitRunning();
+  if (running === true) return `${seen}, un processus git tourne : attendre sa fin, puis relancer`;
+  const state = running === false ? 'aucun processus git en cours : verrou périmé' : 'processus git non vérifiable (ps illisible) : vérifier qu\'aucun ne tourne';
+  return `${seen}, ${state} ; le retirer avec \`rm ${lock}\` puis relancer`;
 }

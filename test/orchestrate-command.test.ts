@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { lotSlug } from '../src/orchestrate/state.js';
 import { ESCALATION_RESERVE } from '../src/orchestrate/cycle.js';
@@ -484,6 +484,47 @@ describe('refus avant d\'agir (code 2)', () => {
     writeFileSync(join(dirs.a, '.git/hooks/pre-push'), '#!/bin/sh\nexit 0\n');
     expect((await run(parent, ['a:L1'])).err.join()).toContain('hook pre-push existe déjà');
     expect((await run(parent, ['a:L1'], undefined, { CADENCE_ORCHESTRATED: 'w0' })).err.join()).toContain('depuis une session orchestrée');
+  });
+
+  it('L385 R1 — un .git/index.lock sans processus git : refus avant toute écriture, avec l\'âge, le constat et la commande pour le retirer', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const lock = join(dirs.a, '.git/index.lock');
+    writeFileSync(lock, '');
+    const t = new Date('2026-10-04T09:00:00');
+    utimesSync(lock, t, t);
+    const deps = fakeDeps({}, { gitRunning: () => false }).deps;
+    for (const argv of [['a:L1'], ['a:L1', '--dry-run']]) {
+      const r = await run(parent, argv, deps);
+      expect(r.code).toBe(2);
+      const msg = r.err.join('\n');
+      expect(msg).toContain('a : .git/index.lock présent depuis 09:00 (5 h 12 min)');
+      expect(msg).toContain('aucun processus git');
+      expect(msg).toContain(`rm ${realpathSync(lock)}`);
+    }
+    expect(git(dirs.a, 'status', '--porcelain', '--untracked-files=no')).toBe('');
+    expect(existsSync(join(dirs.a, '.cadence/runs'))).toBe(false);
+    expect(Plan.load(join(dirs.a, 'docs/plan/raf.yaml')).lot('L1').status).toBe('todo');
+  });
+
+  it('L385 R1 — un processus git en cours : le refus le dit et ne propose pas de retirer le verrou', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    writeFileSync(join(dirs.a, '.git/index.lock'), '');
+    const r = await run(parent, ['a:L1', '--dry-run'], fakeDeps({}, { gitRunning: () => true }).deps);
+    expect(r.code).toBe(2);
+    expect(r.err.join('\n')).toMatch(/a : \.git\/index\.lock présent .*un processus git tourne/);
+    expect(r.err.join('\n')).not.toContain('rm ');
+  });
+
+  it('L385 R1 — sans .git/index.lock, ni refus ni recherche de processus git', async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    let asked = 0;
+    const r = await run(parent, ['a:L1', '--dry-run'], fakeDeps({}, { gitRunning: () => (asked++, false) }).deps);
+    try {
+      expect(r.code).toBe(0);
+      expect(asked).toBe(0);
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
   });
 
   it('plan en lecture seule et lot à faire sans orchestrate.start', async () => {

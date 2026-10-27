@@ -11,7 +11,7 @@ import { PLAN_ACTIONS, leadAnswerMessage, planCommitMessage } from '../plan-comm
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import type { Day } from '../dates.js';
-import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, restorePaths, type Commit } from '../git.js';
+import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, restoreWorktree, tryGit, type Commit } from '../git.js';
 import { blockingLots, gitCommitsIn } from './table.js';
 import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
@@ -217,16 +217,16 @@ async function commitPlan(c: LotCtx, message: string, root = c.lot.repo, before:
   if (dirty.length === 0) return null;
   const foreign = dirty.filter((f) => !ownFile(f));
   if (foreign.length) return `arbre sale (fichiers hors plan) : ${foreign.join(', ')}`;
-  git(repo, 'add', '--', ...dirty);
   try {
+    git(repo, 'add', '--', ...dirty);
     git(repo, 'commit', '-q', '-m', message, '--', ...dirty);
   } catch (e) {
-    // Commit refusé (hook commit-msg…, L343) : le plan n'a pas à rester indexé ni modifié par cadence, le lot suivant y verrait un dépôt sale et serait rendu.
+    // Commit refusé (hook commit-msg…, L343) ou index verrouillé (L385) : le plan n'a pas à rester indexé ni modifié par cadence, le lot suivant y verrait un dépôt sale et serait rendu.
     // Ce que le lead avait modifié sans commiter (raf add, raf note pendant la session) est remis, pas effacé.
-    git(repo, 'restore', '--staged', '--', ...dirty);
+    // Un index.lock bloque aussi la désindexation et le checkout : le désindexage est tenté sans plus, et l'arbre de travail est remis sans passer par l'index.
+    tryGit(repo, ['restore', '--staged', '--', ...dirty]);
     const own = dirty.filter((f) => !before.has(f));
-    // restorePaths : un fichier de plan.onWrite (L346) pas encore au dépôt est retiré, `git restore --source=HEAD` échouerait sur lui (pathspec) et laisserait le plan modifié.
-    if (own.length) restorePaths(repo, own);
+    if (own.length) restoreWorktree(repo, own);
     for (const [f, text] of before) {
       if (!dirty.includes(f)) continue;
       if (text === null) rmSync(join(repo, f), { force: true });

@@ -4222,9 +4222,10 @@ lots:
     started: 2026-10-27
   - id: L389
     title: "cadence verify --gate rougit à tort dans sa copie jetable : avatar-pandora (Astro) refuse de charger node_modules lié depuis l'arbre principal (« Could not load …/node_modules/astro/… »), finance-tracker rougit ux-demo.spec (chemins data-local/data vus depuis /tmp) — verts tous deux dans l'arbre principal le 27-10 ; quand l'arbre principal est propre et à ce sha, y jouer la porte, sinon copier node_modules (ou réglage verify.inPlace), et dire dans la sortie où la porte a tourné ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-27
+    started: 2026-10-27
   - id: L390
     title: orchestrate --continue tire le premier lot prêt du plan, même un gros lot sans spécification ni sous-tâche (maritime B6 « Profils verticaux, coupes (10) », effort L, tiré le 27-10 puis retiré par le lead) — réglage de tirage par projet (continue.maxEstimate, continue.exclude ou lots marqués non tirables) appliqué au tirage et affiché par le dry-run ; doc, tests
     status: todo

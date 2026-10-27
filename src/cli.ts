@@ -72,7 +72,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf list [--status todo|doing|done|dropped]
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
-  raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot (ou citant un id inconnu) sans réécrire l'historique ; raf check --ignored les liste
+  raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot, citant un id inconnu ou des lots sans y travailler, sans réécrire l'historique ; raf check --ignored les liste
   raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
   raf gantt [-o .cadence/gantt.html]
   cadence config set <clé> <valeur> --all [--dry-run] [--depth n]   pose la même clé dans le cadence.yaml de chaque projet du dossier (ceux de lead tour), commentaires et ordre gardés, un lot de config qui la cite (raf add + start) et un commit à chemin explicite par projet ; ne pousse pas ; liste ce qui est fait et sauté (dépôt sale, déjà posée, plan en lecture seule) ; s'arrête sur une config qui ne se relit pas

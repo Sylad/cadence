@@ -161,6 +161,8 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
   const linked = exemptPlanOnly(linkCommits(lots, planCommits(plan, root, { since: auditSince(plan, opts.since) }), plan.refs), plan, root);
   // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
   const all = linkCommits(lots, planCommits(plan, root), plan.refs);
+  // Un commit acquitté (`raf ignore`) qui cite des lots connus ne compte pour aucun : ni commencé, ni actif, ni à relire.
+  for (const [id, cs] of all.byLot) all.byLot.set(id, cs.filter((c) => !isAcknowledged(plan, c)));
   // Planifier un lot (commit qui ne touche que le plan) n'est pas y travailler : un lot « todo »
   // cité seulement par de tels commits n'a pas à être démarré. Ni par des commits antérieurs à
   // l'adoption du plan : citer un identifiant n'engageait alors à rien.
@@ -213,10 +215,10 @@ export function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commi
     .flatMap((l) => docSyncGaps(sync, filesOf(root, workCommits(plan, root, byLot.get(l.id) ?? []))).map((g) => ({ message: gapMessage(l.id, g) })));
 }
 
-/** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni réduits au plan, ni une simple version. */
+/** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni acquittés (`raf ignore`), ni réduits au plan, ni une simple version. */
 function workCommits(plan: Plan, root: string, commits: Commit[]): Commit[] {
   const adopted = plan.since;
-  return commits.filter((c) => (!adopted || c.day >= adopted) && !isPlanOnly(c.sha, plan, root) && !isReleaseOnly(c.sha, root));
+  return commits.filter((c) => (!adopted || c.day >= adopted) && !isAcknowledged(plan, c) && !isPlanOnly(c.sha, plan, root) && !isReleaseOnly(c.sha, root));
 }
 
 /** Commits liés à un lot, du plus récent au plus ancien, avant tout tri : commits de plan et d'avant l'adoption compris. */

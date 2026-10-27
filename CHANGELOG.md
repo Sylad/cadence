@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.17.1] - 2026-10-27
+
 ### Fixed
 
 - The suite no longer commits into the real repository (L391: a test's fake `claude` committed `feat(?): travail` fourteen times, `a.txt` at the root, during the wave of 27-10 — `{lot}` unresolved, cwd the real repository). The fake now refuses, before touching anything, to write or commit outside a temporary folder, inside the cadence repository, or when the brief resolves no lot; the stray `a.txt` is removed.

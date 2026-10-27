@@ -46,6 +46,9 @@ function onlyAdds(base: string[], side: string[]): boolean {
   return i === base.length;
 }
 
+/** `text` porte l'entrée `e` entière, sur ses propres lignes : « - Fix typo » n'est pas dans « - Fix typo in README ». */
+const hasEntry = (text: string, e: string) => `\n${text}\n`.includes(`\n${e}\n`);
+
 /** Un côté qui n'a pas bougé laisse l'autre gagner ; deux côtés qui ont bougé de la même façon aussi ; sinon, pas de réponse. */
 function pick(base: string, ours: string, theirs: string): string | null {
   if (ours === theirs) return ours;
@@ -74,8 +77,10 @@ export function mergeUnreleased(base: string, ours: string, theirs: string, star
   const startEntries = new Set([...(st ? (sections(st.block)?.values() ?? []) : [])].flat());
   const own = new Set<string>(start === undefined || !st ? [] : [...bs.values()].flat().filter((e) => !startEntries.has(e)));
   // Une entrée de base que ours range sous une version publiée (la branche a été publiée pendant la vie du lot) n'a pas été retirée : elle a changé de place.
+  // Seule une entrée de base compte, entière : une entrée nouvelle de theirs qui est un bout d'une entrée publiée n'est pas la même, elle reste au lot.
   // Les entrées du lot (`own`) ne comptent pas dans l'ordre de ours : l'union d'un commit précédent les y a recasées en fin de section.
-  const released = (e: string) => o.tail !== b.tail && o.tail.includes(e) && !b.tail.includes(e);
+  const baseEntries = new Set([...bs.values()].flat());
+  const released = (e: string) => baseEntries.has(e) && o.tail !== b.tail && hasEntry(o.tail, e) && !hasEntry(b.tail, e);
   for (const [title, entries] of bs) {
     const kept = entries.filter((e) => !own.has(e));
     if (!onlyAdds(kept.filter((e) => !released(e)), (os.get(title) ?? []).filter((e) => !own.has(e))) || !onlyAdds(kept, ts.get(title) ?? [])) {
@@ -114,8 +119,8 @@ export function moveToUnreleased(rebased: string, lotTip: string, start: string,
   const added = new Map<string, string[]>();
   for (const [title, entries] of tip) {
     for (const e of entries) {
-      if (known.has(e) || published.includes(e) || (now.get(title) ?? []).includes(e) || !tail.includes(e)) continue;
-      tail = tail.replace(`${e}\n`, '');
+      if (known.has(e) || hasEntry(published, e) || (now.get(title) ?? []).includes(e) || !hasEntry(tail, e)) continue;
+      tail = tail.replace(`\n${e}\n`, '\n');
       added.set(title, [...(added.get(title) ?? []), e]);
       moved++;
     }
@@ -145,7 +150,7 @@ export function settleLotEntries(rebased: string, lotTip: string, start: string,
   const final = new Set([...tip.values()].flat());
   // Une entrée que le sommet du lot porte sous une version (le lot l'a publiée lui-même) est finale, pas intermédiaire.
   const tipTail = split(lotTip)?.tail ?? '';
-  const stale = intermediates.filter((e) => !final.has(e) && !tipTail.includes(e) && !mainOwn.has(e) && !mainSplit.tail.includes(e));
+  const stale = intermediates.filter((e) => !final.has(e) && !hasEntry(tipTail, e) && !mainOwn.has(e) && !hasEntry(mainSplit.tail, e));
   let changed = false;
   for (const [title, entries] of now) {
     const kept = entries.filter((e) => !stale.includes(e));
@@ -154,12 +159,12 @@ export function settleLotEntries(rebased: string, lotTip: string, start: string,
   }
   let tail = r.tail;
   for (const e of stale) {
-    if (tail.includes(`${e}\n`)) {
-      tail = tail.replace(`${e}\n`, '');
+    if (hasEntry(tail, e)) {
+      tail = tail.replace(`\n${e}\n`, '\n');
       changed = true;
     }
   }
-  const present = (e: string) => [...now.values()].some((v) => v.includes(e)) || tail.includes(e) || mainSplit.tail.includes(e);
+  const present = (e: string) => [...now.values()].some((v) => v.includes(e)) || hasEntry(tail, e) || hasEntry(mainSplit.tail, e);
   for (const [title, entries] of tip) {
     for (const e of entries.filter((x) => !known.has(x) && !present(x))) {
       now.set(title, [...(now.get(title) ?? []), e]);

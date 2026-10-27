@@ -581,7 +581,7 @@ nothing below applies and the wave behaves as before; any other value is refused
      there on the repository's branch, back under the repository's `## [Unreleased]`, in a commit of its own (`docs: CHANGELOG — les entrées du lot replacées
      sous [Unreleased] …`); the journal says `<project>:<lot> CHANGELOG.md : <n> entrée(s) du lot replacée(s) sous [Unreleased], …`. When the release and the
      lot's addition touch the same lines, the conflict is resolved too (L369): an entry of the commit's parent that the repository's branch now keeps under a
-     published version was **moved by the release, not removed**, so it does not count as a removal and is not written again under `[Unreleased]`.
+     published version was **moved by the release, not removed**, so it does not count as a removal and is not written again under `[Unreleased]`. Only an entry of the parent, whole, counts as moved: a new entry of the lot whose text is a fragment of a published one (« Fix typo » when the release carries « Fix typo in README ») is not that entry, it stays under `[Unreleased]`, and the same whole-entry match applies when the program looks for a lot's entry in the published part.
      **One final entry per lot** (L369): the lot's commits may write then reword their entry several times (L360 on 2026-10-26: four contradictory entries
      stacked). After the rebase the program lists the entries the lot's commits wrote under `[Unreleased]` that are neither at the starting point nor at
      the lot's tip (nor under a version the tip itself carries: an entry the lot published itself is final), drops them from the result (under `[Unreleased]` and under a version), and puts back an entry of the tip that is missing, in a commit of

@@ -51,6 +51,32 @@ describe('R1 — une publication de la branche du dépôt n\'est pas un retrait'
   });
 });
 
+describe('R1 — une entrée n\'est « déplacée par la publication » que si elle est de base, et en égalité exacte', () => {
+  // La publication 1.1.0 porte « Fix typo in README » ; le lot ajoute « Fix typo », dont le texte est un préfixe de la première : ce n'est pas la même entrée.
+  const START = log('');
+  const RELEASED_TAIL = `## [1.1.0] - 2026-02-01\n\n### Added\n\n- Fix typo in README\n\n${PUBLISHED}`;
+  const LOT = log('### Added\n\n- Fix typo\n');
+  it('R1 — mergeUnreleased : l\'entrée du lot, préfixe d\'une entrée publiée par ours, reste sous [Unreleased]', () => {
+    expect(mergeUnreleased(START, log('', RELEASED_TAIL), LOT, START)).toBe(log('### Added\n\n- Fix typo\n', RELEASED_TAIL));
+  });
+  it('R1 — mergeUnreleased : une entrée de base sous-chaîne d\'une entrée publiée par ours n\'est pas « déplacée » : conflit', () => {
+    const base = log('### Added\n\n- Fix typo\n');
+    expect(mergeUnreleased(base, log('', RELEASED_TAIL), log('### Added\n\n- Fix typo\n- ajout\n'), base)).toBeNull();
+  });
+  it('R1 — settleLotEntries : une entrée du sommet absente du résultat y est remise même si une entrée publiée de main la contient', () => {
+    const rebased = log('', RELEASED_TAIL);
+    expect(settleLotEntries(rebased, LOT, START, rebased, [])).toBe(log('### Added\n\n- Fix typo\n', RELEASED_TAIL));
+  });
+  it('R1 — au rebase : la publication porte une entrée qui contient celle du lot, le lot est intégré et son entrée est sous [Unreleased]', () => {
+    const { repo, t, put } = setup(START);
+    put(t.dir, LOT, 'feat(L1): lot');
+    put(repo, log('', RELEASED_TAIL), 'release 1.1.0');
+    expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased' });
+    expect(read(t.dir)).toBe(log('### Added\n\n- Fix typo\n', RELEASED_TAIL));
+    expect(git(t.dir, 'status', '--porcelain')).toBe('');
+  });
+});
+
 describe('R1 — la publication et un lot qui réécrit son entrée', () => {
   it('R1 — au rebase : deux commits du lot (le second précise l\'entrée du premier) sur une publication qui touche le même endroit : une seule entrée, la finale', () => {
     const START = log('### Added\n\n- autre lot\n');

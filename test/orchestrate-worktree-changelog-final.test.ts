@@ -52,10 +52,11 @@ describe('R1 — une publication de la branche du dépôt n\'est pas un retrait'
 });
 
 describe('R1 — une entrée n\'est « déplacée par la publication » que si elle est de base, et en égalité exacte', () => {
-  // La publication 1.1.0 porte « Fix typo in README » ; le lot ajoute « Fix typo », dont le texte est un préfixe de la première : ce n'est pas la même entrée.
-  const START = log('');
-  const RELEASED_TAIL = `## [1.1.0] - 2026-02-01\n\n### Added\n\n- Fix typo in README\n\n${PUBLISHED}`;
-  const LOT = log('### Added\n\n- Fix typo\n');
+  // La publication 1.1.0 range « autre lot » et porte « Fix typo in README » ; le lot ajoute « Fix typo » juste sous « autre lot » : son texte est un
+  // préfixe de l'entrée publiée, ce n'est pas la même entrée. Les deux côtés touchent les mêmes lignes : le rebase passe par la résolution du programme.
+  const START = log('### Added\n\n- autre lot\n');
+  const RELEASED_TAIL = `## [1.1.0] - 2026-02-01\n\n### Added\n\n- autre lot\n- Fix typo in README\n\n${PUBLISHED}`;
+  const LOT = log('### Added\n\n- autre lot\n- Fix typo\n');
   it('R1 — mergeUnreleased : l\'entrée du lot, préfixe d\'une entrée publiée par ours, reste sous [Unreleased]', () => {
     expect(mergeUnreleased(START, log('', RELEASED_TAIL), LOT, START)).toBe(log('### Added\n\n- Fix typo\n', RELEASED_TAIL));
   });
@@ -71,7 +72,7 @@ describe('R1 — une entrée n\'est « déplacée par la publication » que si e
     const { repo, t, put } = setup(START);
     put(t.dir, LOT, 'feat(L1): lot');
     put(repo, log('', RELEASED_TAIL), 'release 1.1.0');
-    expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased' });
+    expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased', changelog: 1 });
     expect(read(t.dir)).toBe(log('### Added\n\n- Fix typo\n', RELEASED_TAIL));
     expect(git(t.dir, 'status', '--porcelain')).toBe('');
   });

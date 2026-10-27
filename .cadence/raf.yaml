@@ -4128,18 +4128,20 @@ lots:
     finished: 2026-10-27
   - id: L377
     title: "raf init : le commit qui ajoute .cadence/ juste après raf init n'ouvre pas d'écart « commit sans lot » (raf check, tour, colonne dérive) — par exemple raf init écrit le plan et propose le commit de plan au format plan.commit, ou raf check tient pour plan un commit qui ne touche que les fichiers du plan ; doc, CHANGELOG, tests — accroc A5 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant : 0 bloquant, 0 majeur, 1 mineur (note : le garde de pré-commit garde sa propre définition du commit de plan) — orchestré (vague 2026-10-27-1230, 0 passe(s) de correction)", commit: 35ff868ea59efa4cfae53b0a28c6f96db6a1d71e, reporte: { de: 124599f751c3592a333959447333f1c6f2f8943b, vers: 35ff868ea59efa4cfae53b0a28c6f96db6a1d71e, patchId: d7f0796ee06a7ca4f5562396322f9709ba73a7a6 } }
+    finished: 2026-10-27
   - id: L378
     title: "cadence orchestrate vérifie avant de démarrer un lot que claude est installé et connecté (claude auth status ou équivalent sans modèle) : sinon refus avant toute écriture dans le plan (pas de raf start, pas de commit), message qui dit quoi faire (/login) ; le dry-run le signale ; README/quickstart : prérequis « Claude Code installé et connecté » ; doc, CHANGELOG, tests — accroc A7 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant (2 minor notes) — orchestré (vague 2026-10-27-1230, 0 passe(s) de correction)", commit: 6e2ec57b4d2e1bfac34e63956a97d2995535af54, reporte: { de: fd404f8f7b0d48b61bee318a3079375d67946e22, vers: 6e2ec57b4d2e1bfac34e63956a97d2995535af54, patchId: ae98d7e236b84e7f8a34d89efa9350984d4bf4d3 } }
+    finished: 2026-10-27
   - id: L379
     title: "même compte de commits d'un lot dans raf now, cadence lead tour, session start et raf commits : les commits de plan (plan: …, et ceux que plan.commit produit) exclus partout (aujourd'hui raf now et le tour comptent « plan: L1 démarré » et affichent 1 commit quand raf commits n'en liste aucun) ; doc, CHANGELOG, tests — accroc A8 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md"
     status: doing

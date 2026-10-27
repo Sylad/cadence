@@ -75,7 +75,11 @@ describe('démarrage « lead multi-projets » en 10 minutes (L358)', () => {
     const d = tempDir();
     const bin = join(d, 'bin');
     mkdirSync(bin);
-    writeFileSync(join(bin, 'raf'), `#!/bin/sh\nexec node ${join(root, 'bin/raf.js')} "$@"\n`);
+    // raf lancé depuis les sources (vite-node), comme les autres tests : bin/raf.js importe dist/, absent d'un arbre sans build
+    const raf = join(d, 'raf-sources.ts');
+    writeFileSync(raf, `import { run } from '${join(root, 'src/cli.ts')}';\nprocess.exitCode = await run(process.argv.slice(2), { cwd: process.cwd(), env: process.env, out: (l) => console.log(l), err: (l) => console.error(l), now: () => new Date() });\n`);
+    const viteNode = join(root, 'node_modules/.bin/vite-node');
+    writeFileSync(join(bin, 'raf'), `#!/bin/sh\nexec ${viteNode} ${raf} -- "$@"\n`);
     chmodSync(join(bin, 'raf'), 0o755);
     const env = {
       ...process.env, PATH: `${bin}:${process.env.PATH}`, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t',
@@ -84,7 +88,7 @@ describe('démarrage « lead multi-projets » en 10 minutes (L358)', () => {
     // le bloc crée le dossier du projet (« mkdir alpha && cd alpha ») : on l'exécute depuis le dossier parent
     execFileSync('bash', ['-e', '-c', bloc!], { cwd: d, env, encoding: 'utf8', stdio: 'pipe' });
     const projet = join(d, 'alpha');
-    expect(execFileSync('node', [join(root, 'bin/raf.js'), 'check'], { cwd: projet, env, encoding: 'utf8' })).toContain('cohérents');
+    expect(execFileSync(join(bin, 'raf'), ['check'], { cwd: projet, env, encoding: 'utf8' })).toContain('cohérents');
     expect(execFileSync('git', ['status', '--short'], { cwd: projet, env, encoding: 'utf8' })).toBe('');
     expect(existsSync(join(projet, 'cadence.yaml'))).toBe(true);
   });

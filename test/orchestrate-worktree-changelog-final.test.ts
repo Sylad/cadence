@@ -93,3 +93,33 @@ describe('R2 — une entrée finale par lot, prise au sommet de sa branche', () 
     expect(git(t.dir, 'log', '--format=%s', 'main..HEAD').split('\n')).toHaveLength(4);
   });
 });
+
+describe('R2 — une entrée que le lot a rangée lui-même sous une version n\'est pas une intermédiaire', () => {
+  const START = log('### Added\n\n- base\n');
+  it('R2 — au rebase : le lot écrit une entrée sous [Unreleased] puis la range sous une nouvelle version, elle reste sous cette version', () => {
+    const { repo, t, put } = setup(START);
+    put(t.dir, log('### Added\n\n- base\n- entrée E du lot\n'), 'feat(L1): lot');
+    const released = log('', `## [1.1.0] - 2026-02-01\n\n### Added\n\n- base\n- entrée E du lot\n\n${PUBLISHED}`);
+    put(t.dir, released, 'chore(L1): release 1.1.0');
+    writeFileSync(join(repo, 'autre.txt'), 'x');
+    git(repo, 'add', '--', 'autre.txt');
+    git(repo, 'commit', '-q', '-m', 'autre fichier');
+    expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased', settled: false });
+    expect(read(t.dir)).toBe(released);
+  });
+  it('R2 — au rebase : le lot range son entrée sous la version 1.0.0 existante, elle y reste', () => {
+    const { repo, t, put } = setup(START);
+    put(t.dir, log('### Added\n\n- base\n- entrée E du lot\n'), 'feat(L1): lot');
+    const released = log('', `## [1.0.0] - 2026-01-01\n\n### Added\n\n- première version\n- base\n- entrée E du lot\n`);
+    put(t.dir, released, 'chore(L1): release');
+    writeFileSync(join(repo, 'autre.txt'), 'x');
+    git(repo, 'add', '--', 'autre.txt');
+    git(repo, 'commit', '-q', '-m', 'autre fichier');
+    expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased' });
+    expect(read(t.dir)).toBe(released);
+  });
+  it('R2 — settleLotEntries : une entrée du sommet rangée sous une version n\'est pas écartée', () => {
+    const tip = log('', `## [1.1.0] - 2026-02-01\n\n### Added\n\n- base\n- entrée E du lot\n\n${PUBLISHED}`);
+    expect(settleLotEntries(tip, tip, START, START, ['- entrée E du lot'])).toBeNull();
+  });
+});

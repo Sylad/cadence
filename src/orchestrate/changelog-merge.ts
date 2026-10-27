@@ -129,7 +129,7 @@ export function moveToUnreleased(rebased: string, lotTip: string, start: string,
 
 /**
  * Une entrée finale par lot (L369) : après le rebase, le `[Unreleased]` ne porte du lot que ses entrées du sommet de sa branche. Les `intermediates` — les
- * entrées que ses commits successifs ont écrites puis réécrites, absentes du sommet — en sont retirées (sous `[Unreleased]` comme sous une version), à moins
+ * entrées que ses commits successifs ont écrites puis réécrites, absentes du sommet comme de ses versions publiées — en sont retirées (sous `[Unreleased]` comme sous une version), à moins
  * que `main` ne les porte aussi : elles sont alors à elle. Une entrée du sommet absente du texte (ni sous `[Unreleased]`, ni sous une version, ni déjà publiée
  * sur `main`) y est remise sous sa section. `lotTip`, `start`, `main` : comme pour `moveToUnreleased`. Rend le texte corrigé, ou null quand il n'y a rien à
  * changer (ou que le fichier n'a pas la forme attendue).
@@ -142,7 +142,9 @@ export function settleLotEntries(rebased: string, lotTip: string, start: string,
   const mainOwn = new Set([...(sections(mainSplit.block)?.values() ?? [])].flat());
   const known = new Set([...was.values()].flat());
   const final = new Set([...tip.values()].flat());
-  const stale = intermediates.filter((e) => !final.has(e) && !mainOwn.has(e) && !mainSplit.tail.includes(e));
+  // Une entrée que le sommet du lot porte sous une version (le lot l'a publiée lui-même) est finale, pas intermédiaire.
+  const tipTail = split(lotTip)?.tail ?? '';
+  const stale = intermediates.filter((e) => !final.has(e) && !tipTail.includes(e) && !mainOwn.has(e) && !mainSplit.tail.includes(e));
   let changed = false;
   for (const [title, entries] of now) {
     const kept = entries.filter((e) => !stale.includes(e));

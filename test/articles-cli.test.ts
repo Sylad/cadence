@@ -171,6 +171,23 @@ describe('deliver pendant une vague (L388) : le plan écrit pour l\'article est 
     expect(execFileSync('git', ['show', '--stat', '--format=', 'HEAD'], { cwd: dir, encoding: 'utf8' })).toContain('docs-plan.yaml');
   });
 
+  it('R7 — fichier produit par plan.onWrite déjà modifié par le lead : rien n\'est commité à sa place, la ligne le dit', async () => {
+    const { dir, base, deps, out } = await prete();
+    const planPath = join(dir, '.cadence/raf.yaml');
+    write(dir, 'docs-plan.yaml', 'publié\n');
+    git(dir, 'add', '--', 'docs-plan.yaml');
+    commit(dir, 'docs: plan publié');
+    git(dir, 'push', '-q');
+    writeFileSync(join(dir, 'docs-plan.yaml'), 'publié\n# note du lead\n');
+    const head = subject(dir);
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim(); // --sha : l'arbre sale ne refuse pas la livraison
+    const onWrite = { command: 'cp .cadence/raf.yaml docs-plan.yaml', files: ['docs-plan.yaml'], cwd: dir };
+    expect(await deliver({ ...base, plan: Plan.load(planPath, { onWrite }), sha, duringWave: true, waveId: 'W9' }, deps)).toBe(0);
+    expect(subject(dir)).toBe(head);
+    expect(status(dir)).toContain('docs-plan.yaml');
+    expect(out.join('\n')).toContain('plan déjà modifié avant la livraison');
+  });
+
   it('R5 — commit refusé (hook commit-msg) : le plan reste écrit, la livraison reste verte et le dit', async () => {
     const { dir, base, deps, out } = await prete();
     writeFileSync(join(dir, '.git/hooks/commit-msg'), '#!/bin/sh\necho refusé >&2\nexit 1\n', { mode: 0o755 });

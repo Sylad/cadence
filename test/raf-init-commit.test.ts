@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 import { run } from '../src/cli.js';
-import { cleanupTempDirs, gitRepo } from './helpers.js';
+import { cleanupTempDirs, gitRepo, tempDir } from './helpers.js';
 
 afterAll(cleanupTempDirs);
 
@@ -15,6 +15,18 @@ function raf(dir: string, args: string[]) {
 }
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+
+/**
+ * Un `raf` à lui pour le hook : le paquet construit depuis les sources (CADENCE_TEST_PACKAGE, global-setup.ts), placé en tête du PATH du seul `git commit`.
+ * Le hook ne dépend ainsi pas d'un raf installé sur la machine (L384 : absent en CI, le run publish de 1.16.0 était rouge).
+ */
+function envWithSourceRaf(): NodeJS.ProcessEnv {
+  const bin = join(tempDir(), 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'raf'), `#!/bin/sh\nexec "${process.execPath}" "${join(process.env.CADENCE_TEST_PACKAGE!, 'bin/raf.js')}" "$@"\n`);
+  chmodSync(join(bin, 'raf'), 0o755);
+  return { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` };
+}
 
 /** Un dépôt neuf où `raf init` vient de passer ; le premier commit est celui que le parcours du nouvel utilisateur écrit. */
 function initialised(withHook = false) {
@@ -36,12 +48,13 @@ describe('le commit qui suit raf init n\'ouvre pas d\'écart (L377, accroc A5)',
   it('R2 — le hook post-commit ne dit pas « commit sans lot » après ce commit', () => {
     const dir = initialised(true);
     git(dir, 'add', '.cadence', '.gitignore');
-    const out = execFileSync('git', ['commit', '-m', 'chore: init raf'], { cwd: dir, encoding: 'utf8', stdio: 'pipe' });
+    const env = envWithSourceRaf();
+    const out = execFileSync('git', ['commit', '-m', 'chore: init raf'], { cwd: dir, env, encoding: 'utf8', stdio: 'pipe' });
     expect(out).not.toContain('commit sans lot');
     // le hook parle bel et bien : un commit de code sans lot, lui, est signalé
     writeFileSync(join(dir, 'index.js'), 'console.log(1)\n');
     git(dir, 'add', 'index.js');
-    const code = spawnSync('git', ['commit', '-m', 'chore: code'], { cwd: dir, encoding: 'utf8' });
+    const code = spawnSync('git', ['commit', '-m', 'chore: code'], { cwd: dir, env, encoding: 'utf8' });
     expect(code.stdout + code.stderr).toContain('commit sans lot');
   });
 

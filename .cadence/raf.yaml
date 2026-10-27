@@ -4067,10 +4067,11 @@ lots:
     created: 2026-10-26
   - id: L371
     title: "raf done dans le dépôt cadence n'a pas commité le plan (26-10, L365 : plan resté modifié, mise en service refusée) : établir si c'est voulu (réglage) ou un défaut, et le dire dans le message de raf done ; aligner avec plan.commit"
-    status: todo
+    status: doing
     estimate: 0.25
     quickwin: true
     created: 2026-10-26
+    started: 2026-10-27
   - id: L372
     title: "raf check : un commit de plan du lead qui cite des lots sans y travailler (création de lots, réglage cité entre parenthèses) les compte comme commencés ou à revoir (L369 L371 « 1 commit mais todo », L354 « commit postérieur à sa revue » le 27-10, commit cd91064) et raf ignore ne l'acquitte pas (il ne couvre que les commits sans lot) — raf ignore acquitte aussi un commit qui cite des lots connus (les écarts de commits de ces lots tombent, raf check --ignored le liste) ; doc, CHANGELOG, tests"
     status: todo

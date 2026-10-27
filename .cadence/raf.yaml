@@ -3969,12 +3969,14 @@ lots:
     finished: 2026-10-26
   - id: L358
     title: "README : démarrage « lead multi-projets » en 10 minutes (installation, dossier parent, raf init, /lead, première vague), schéma simple, le détail dans docs/ ; modèles de tickets GitHub (bug, demande) ; d'après le parcours mesuré sur mini-blue"
-    status: doing
+    status: done
     estimate: 0.25
     visible: true
     created: 2026-10-26
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "conforme, avec 2 remarques mineures (overview.md ne liste pas quickstart.md ; contraste 4,26:1 dans le schéma sombre) — orchestré (vague 2026-10-27-1020, 1 passe(s) de correction)", commit: 957e8e63a91918ba19a938aff72a8148f1657a3c }
+    ux: { date: 2026-10-27, verdict: "lead (captures regardées, schémas clair et sombre lisibles, parcours en 4 étapes conforme au promis) : conforme, avec 2 mineurs suivis en L374 (contraste 4,26:1 dans le schéma sombre, quickstart absent de la carte d'overview.md)" }
+    finished: 2026-10-27
   - id: L359
     title: "cadence release : l'étape 7 imprimée omet « claude plugin marketplace update cadence » avant « claude plugin update cadence@cadence » (sans elle le plugin installé reste à l'ancienne version) et « /reload-plugins » ; constat de la publication 1.13.0 (26-10)"
     status: done
@@ -4091,8 +4093,16 @@ lots:
     finished: 2026-10-27
   - id: L373
     title: "publication npm par Trusted Publishing (OIDC) : le workflow publish publie sans NPM_TOKEN (permissions id-token: write, npm récent, provenance gardée) ; docs/releasing.md donne le réglage à faire une fois sur npmjs.com (éditeur de confiance : dépôt, workflow, environnement) et le retrait du jeton ensuite ; un test lit le workflow (aucun NPM_TOKEN, id-token: write). Avertissement du run 1.15.0 du 27-10 : les jetons npm qui contournent la 2FA sont restreints pour la publication directe"
-    status: todo
+    status: dropped
     estimate: 0.25
+    created: 2026-10-27
+    finished: 2026-10-27
+    notes:
+      - { date: 2026-10-27, text: "abandonné : inutile : Trusted Publishing (OIDC) déjà en place depuis L22 (aucun secret npm, id-token: write, npm ≥ 11.5.1, 1.15.0 publiée sans jeton) ; l'avertissement du run est générique" }
+  - id: L374
+    title: "L358 suites : (1) test/demarrage-lead.test.ts R7 lance bin/raf.js, qui importe dist/ : rouge dans un arbre sans build (cadence verify --gate, worktree jetable) — lancer raf depuis les sources comme les autres tests ; (2) docs/quickstart-dark.svg : textes gris sur le fond bleu de « Lead session » à 4,26:1 (< 4,5:1 WCAG 2.2 AA 1.4.3) ; (3) docs/overview.md : la carte des pages ne cite pas docs/quickstart.md"
+    status: todo
+    estimate: 0.1
     created: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

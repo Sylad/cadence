@@ -4160,9 +4160,10 @@ lots:
     finished: 2026-10-27
   - id: L381
     title: "suites de L379 (compte de commits d'un lot sans les commits de plan) : raf gantt (colonne et infobulle, src/schedule.ts:25 via linked.byLot) et session start/close (« Fait depuis », « Commits de la période », src/session.ts:61) comptent encore les commits de plan ; même compte que raf commits ; le test R6 de test/compte-commits-lot-l379.test.ts ne peut pas échouer (L2 n'est cité par aucun commit) — le rendre discriminant ; mesurer raf now avant/après (la revue a vu 15 → 29,5 s sous charge, le lead 13,7 s au repos) et ne calculer les commits de travail que des lots affichés si l'écart se confirme ; doc, CHANGELOG, tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-27
+    started: 2026-10-27
   - id: L382
     title: "suites de L378 (connexion de Claude Code vérifiée avant un lot) : en --continue, preflight() relance claude auth status (jusqu'à 20 s) pour chaque lot candidat à chaque tour — une seule vérification par vague (ou mise en cache pour la vague) ; dans docs/quickstart.md:31,130 et docs/orchestrate.md:39 le message cité contient des backticks dans des backticks (rendu Markdown cassé) ; tests"
     status: todo

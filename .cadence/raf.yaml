@@ -4056,9 +4056,10 @@ lots:
     finished: 2026-10-26
   - id: L369
     title: "intégration en mode worktree : un conflit d'ajout dans CHANGELOG.md (deux lots ajoutent chacun leur entrée) est résolu par le programme (union, une entrée finale par lot, prise au sommet de la branche du lot) au lieu de rendre le lot ; jamais d'entrées intermédiaires empilées (cas L360 du 26-10 : 4 entrées contradictoires) ; vu 4 fois le 26-10 (L354 L360 L366 L367)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-26
+    started: 2026-10-27
   - id: L370
     title: "cadence orchestrate --integrate accepte un lot rendu pour son budget (ou une revue non conforme) dont le lead a fait corriger puis revoir le travail hors vague (raf review conforme plus récent que son dernier commit) : rebase, revue courte, avance ; aujourd'hui refusé (« pas rendu à l'étape d'intégration »), le lead intègre à la main (L367 du 26-10)"
     status: todo

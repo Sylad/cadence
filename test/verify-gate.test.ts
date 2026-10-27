@@ -482,6 +482,34 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     expect(() => readVerifyConfig(join(repo, 'cadence.yaml'))).toThrow(/verify\.inPlace/);
   });
 
+  it('L389 R3 — sans worktreeDeps, seuls les node_modules sont copiés : les autres dossiers ignorés (.venv, données) restent des liens', async () => {
+    const { repo } = project('orchestrate:\n  test: test -L .venv && test -L donnees && test ! -L node_modules && test -f donnees/secret.txt\n', true);
+    writeFileSync(join(repo, '.gitignore'), 'node_modules/\n.venv/\ndonnees/\n');
+    git(repo, 'add', '.gitignore');
+    git(repo, 'commit', '-q', '-m', 'ignore donnees');
+    mkdirSync(join(repo, 'donnees'));
+    writeFileSync(join(repo, 'donnees', 'secret.txt'), 'x');
+    writeFileSync(join(repo, 'valeur.txt'), 'sale\n');
+    const r = await gate(repo, git(repo, 'rev-parse', 'HEAD').trim());
+    expect(here(r)).toMatch(/copie jetable/);
+    expect(here(r)).toMatch(/dépendances copiées : node_modules$/);
+    expect(r.code).toBe(0);
+  });
+
+  it('L389 R6 — l\'arbre principal bouge pendant la porte en place (HEAD avancé par une intégration) : le verdict est dit non probant, code 2', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: git commit -q --allow-empty -m integre\n', true);
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(2);
+    expect(r.text).toMatch(/non probant/);
+  });
+
+  it('L389 R6 — l\'arbre principal ne bouge pas pendant la porte en place : le verdict reste probant', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: "true"\n', true);
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(0);
+    expect(r.text).not.toMatch(/non probant/);
+  });
+
   it('L389 R5 — la copie ne touche pas aux dépendances de l\'arbre principal', async () => {
     const { repo, sha } = project('orchestrate:\n  test: rm -rf node_modules/dep\n');
     await gate(repo, sha);

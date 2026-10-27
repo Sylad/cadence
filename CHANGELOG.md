@@ -85,7 +85,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- `cadence orchestrate` integration in worktree mode no longer hands a lot back for a `CHANGELOG.md` conflict when the repository's branch was released while the lot lived, and leaves one final entry per lot (L369, `docs/orchestrate.md`): an entry of the base that the release moved under the published version is no longer read as a removal, and after the rebase the entries the lot's commits wrote then reworded (four contradictory entries stacked for L360 on 2026-10-26) are dropped in favour of the version at the tip of the lot's branch.
+- `cadence orchestrate` integration in worktree mode no longer hands a lot back for a `CHANGELOG.md` conflict when the repository's branch was released while the lot lived, and leaves one final entry per lot (L369, `docs/orchestrate.md`): an entry of the base that the release moved under the published version is no longer read as a removal, and after the rebase the entries the lot's commits wrote then reworded (four contradictory entries stacked for L360 on 2026-10-26) are dropped in favour of the version at the tip of the lot's branch, wherever the lot put its entry in the section (an entry placed at the top of a section then reworded used to hand the lot back from the second replayed commit, as L360 and L366 would have again).
 
 ## [1.14.1] - 2026-10-26
 

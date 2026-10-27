@@ -141,3 +141,22 @@ describe('R2 — le réglage final fait son commit', () => {
     expect(git(t.dir, 'status', '--porcelain')).toBe('');
   });
 });
+
+describe('R2 — un lot qui place son entrée en tête de section puis la réécrit', () => {
+  const START = log('### Fixed\n\n- a\n- b\n');
+  it('R2 — mergeUnreleased : une entrée du lot que l\'union a recasée en fin de section dans ours ne bloque pas la réécriture du lot', () => {
+    const base = log('### Fixed\n\n- E v1\n- a\n- b\n');
+    const ours = log('### Fixed\n\n- M\n- a\n- b\n- E v1\n');
+    const theirs = log('### Fixed\n\n- E v2\n- a\n- b\n');
+    expect(mergeUnreleased(base, ours, theirs, START)).toBe(log('### Fixed\n\n- M\n- a\n- b\n- E v2\n'));
+  });
+  it('R2 — au rebase : le lot écrit son entrée en tête de section puis la réécrit pendant que main ajoute la sienne, le lot n\'est pas rendu, une seule entrée du lot reste', () => {
+    const { repo, t, put } = setup(START);
+    put(t.dir, log('### Fixed\n\n- E v1\n- a\n- b\n'), 'feat(L1): v1');
+    put(t.dir, log('### Fixed\n\n- E v2\n- a\n- b\n'), 'fix(L1): v2');
+    put(repo, log('### Fixed\n\n- M\n- a\n- b\n'), 'feat(L2): autre lot');
+    expect(rebaseOnto(t.dir, 'main')).toMatchObject({ kind: 'rebased' });
+    expect(read(t.dir)).toBe(log('### Fixed\n\n- M\n- a\n- b\n- E v2\n'));
+    expect(git(t.dir, 'status', '--porcelain')).toBe('');
+  });
+});

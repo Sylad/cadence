@@ -74,10 +74,11 @@ export function mergeUnreleased(base: string, ours: string, theirs: string, star
   const startEntries = new Set([...(st ? (sections(st.block)?.values() ?? []) : [])].flat());
   const own = new Set<string>(start === undefined || !st ? [] : [...bs.values()].flat().filter((e) => !startEntries.has(e)));
   // Une entrée de base que ours range sous une version publiée (la branche a été publiée pendant la vie du lot) n'a pas été retirée : elle a changé de place.
+  // Les entrées du lot (`own`) ne comptent pas dans l'ordre de ours : l'union d'un commit précédent les y a recasées en fin de section.
   const released = (e: string) => o.tail !== b.tail && o.tail.includes(e) && !b.tail.includes(e);
   for (const [title, entries] of bs) {
     const kept = entries.filter((e) => !own.has(e));
-    if (!onlyAdds(kept.filter((e) => !released(e)), (os.get(title) ?? []).filter((e) => !own.has(e))) || !onlyAdds(entries.filter((e) => !released(e)), os.get(title) ?? []) || !onlyAdds(kept, ts.get(title) ?? [])) {
+    if (!onlyAdds(kept.filter((e) => !released(e)), (os.get(title) ?? []).filter((e) => !own.has(e))) || !onlyAdds(kept, ts.get(title) ?? [])) {
       return null;
     }
   }

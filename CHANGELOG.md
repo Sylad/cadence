@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-10-27
+
 ### Changed
 
 - `raf ignore` also acknowledges a commit that cites known lots (L372). A lead's plan commit that creates lots or cites a setting in parentheses was counted as work on those lots (« 1 commit mais est encore todo » on L369 and L371, « commit(s) postérieur(s) à sa revue » on L354, commit cd91064) and `raf ignore`, which only covered commits without a lot, could not clear it. An acknowledged commit now counts for no lot: not as started, not as activity, not as a commit to review (`raf commits` no longer lists it); `raf check --ignored` lists it.

@@ -130,6 +130,13 @@ describe('cadence avec vos outils (L363)', () => {
     expect(checkLinks(root)).toEqual([]);
   });
 
+  it('R9b — (L375) la page dit que, par défaut, les commits de plan lisent encore « plan: » et qu\'il faut poser plan.commit', () => {
+    const para = page.split('\n').find((l) => l.startsWith('**The subject of the plan commits.**')) ?? '';
+    expect(para).not.toMatch(/used to read/);
+    expect(para).toMatch(/by default they still read `plan: L12 démarré \(orchestrate …\)`/i);
+    expect(para).toMatch(/set `plan\.commit`/i);
+  });
+
   it('R10 — le CHANGELOG annonce la page sous [Unreleased]', () => {
     const non = read('CHANGELOG.md').split(/\n(?=## \[)/).find((s) => s.startsWith('## [Unreleased]')) ?? '';
     expect(non).toMatch(/L363[^\n]*with-your-tools|with-your-tools[^\n]*L363/);

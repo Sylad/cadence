@@ -66,7 +66,7 @@ plan:
 
 All the keys (`add`, `files`, `ignore`, sub-tasks, `repos`…) are in [docs/raf.md](raf.md#a-plan-elsewhere-or-in-another-format).
 
-**The subject of the plan commits.** A wave commits the plan itself (the lot started, the review recorded). Those commits used to read `plan: L12 démarré (orchestrate …)`, which a commitlint `config-conventional` hook refuses: `plan` is not one of its types (GitHub issue #15). `plan.commit` in `cadence.yaml` sets the subject of all of them, and `cadence orchestrate --dry-run` runs each one through your real `commit-msg` hook before the wave starts:
+**The subject of the plan commits.** A wave commits the plan itself (the lot started, the review recorded). By default they still read `plan: L12 démarré (orchestrate …)`, which a commitlint `config-conventional` hook refuses: `plan` is not one of its types (GitHub issue #15). Set `plan.commit` in `cadence.yaml` to change the subject of all of them, and `cadence orchestrate --dry-run` runs each one through your real `commit-msg` hook before the wave starts:
 
 ```yaml
 plan:

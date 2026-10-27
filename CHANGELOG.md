@@ -77,6 +77,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-10-27
+
 ### Fixed
 
 - `cadence orchestrate` and `--dry-run` refuse a repository holding a `.git/index.lock` before writing anything (L385, `docs/orchestrate.md`): the message gives the age of the lock, whether a git process is running, and the `rm` command to remove a stale one. A plan commit that fails (stale lock, refusing hook) now puts the plan back as it was even when the lock blocks the index: the next lot used to be handed back as a « dépôt sale » (L201 failed, then L200 on 27-10).

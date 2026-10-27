@@ -88,6 +88,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - A test that looks for the entry of a lot in `CHANGELOG.md` read `[Unreleased]` alone, which the version commit empties: the release 1.15.2 was stopped on it, as 1.14.0 had been (L380). They now read the section that carries the entry through one shared helper (`changelogSectionOf`), and a guard test refuses a test that selects `## [Unreleased]` of the repository's changelog by itself.
+- `raf --version` and `raf -v` print the version, as `cadence --version` does, instead of `Unknown option '--version'` (L376, `docs/raf.md`, README; snag A3 of the new-user walkthrough). Only as the first argument: `raf show --version` stays an unknown option. `cadence --version` now goes through the same code.
+- `cadence orchestrate alpha:L1` launched from inside `alpha` says why the folder is not found: the project is a sub-folder of the current folder, and inside a repository `.:L1` works (L376, `docs/orchestrate.md`; snag A9).
 
 ## [1.15.1] - 2026-10-27
 

@@ -16,6 +16,7 @@ raf add "My first lot" --estimate 1
 ```
 
 Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are, `raf done L1` when it is finished.
+`raf -v` prints the installed version. Every command is in [docs/raf.md](docs/raf.md).
 
 ## Lead several projects in 10 minutes
 

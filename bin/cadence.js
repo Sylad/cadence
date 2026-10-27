@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
 import { run } from '../dist/cli.js';
 
 const [tool, ...args] = process.argv.slice(2);
@@ -16,8 +15,7 @@ if (tool === 'raf') {
 } else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref', 'config', 'release'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
-  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  console.log(pkg.version);
+  process.exitCode = await run([tool], io);
 } else {
   console.log(`cadence — une méthode de travail qui vit dans le dépôt
 

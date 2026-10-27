@@ -296,7 +296,7 @@ function resolveTargets(args: Args, io: OrchestrateIo, refusals: string[]): Targ
     }
     seen.add(key);
     if (!existsSync(projectDir) || !statSync(projectDir).isDirectory()) {
-      refusals.push(`${key} : ${l.project ? `dossier ${projectDir} introuvable` : 'dossier courant illisible'}`);
+      refusals.push(`${key} : ${l.project ? `dossier ${projectDir} introuvable (le projet est un sous-dossier du dossier courant ; dans un dépôt, \`.:${l.lot}\`)` : 'dossier courant illisible'}`);
       continue;
     }
     if (!isProject(projectDir)) {

@@ -129,9 +129,19 @@ function legacyPlanLine(root: string, legacy: 'read' | 'ignored'): string {
   return `raf: ${PLAN_LEGACY} est l'ancien emplacement du plan ; le déplacer : cd ${shellQuote(root)} && mkdir -p ${dirname(PLAN_DEFAULT)} && ${gitRoot(root) && isTracked(root, PLAN_LEGACY) ? 'git mv' : 'mv'} ${PLAN_LEGACY} ${PLAN_DEFAULT}`;
 }
 
+/** La version du paquet (`package.json` est à côté de `src/` comme de `dist/`). */
+function packageVersion(): string {
+  return (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version;
+}
+
 export function run(argv: string[], io: Io): number | Promise<number> {
   setPlanNotice(io.err);
   try {
+    // Comme `cadence --version` (L376) : en premier argument seulement, ailleurs c'est une option comme une autre.
+    if (argv[0] === '--version' || argv[0] === '-v') {
+      io.out(packageVersion());
+      return 0;
+    }
     // orchestrate a ses propres options (--status et --resume prennent une valeur facultative, --answer en prend deux).
     if (argv[0] === 'orchestrate') {
       return orchestrate(argv.slice(1), io, realOrchestrateDeps(io.env)).catch((e: unknown) => failure(e, io));

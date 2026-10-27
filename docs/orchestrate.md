@@ -11,6 +11,7 @@ exception is a **formatting retry** (below).
 ```sh
 cadence orchestrate finance-tracker:L41 ol-companion:L22 cadence:L18@haiku
 cadence orchestrate L18                      # from inside a project
+cadence orchestrate .:L18                    # the same, with the project named « . » (inside a repository)
 cadence orchestrate maritime-atlas:Q4/accueil-4-ux12@haiku   # a lot id may contain "/" (sub-tasks of read-only plans)
 cadence orchestrate maritime:B28.4 --goal "…"   # the goal replaces the stale title as the objective of the briefs (below)
 cadence orchestrate … --budget 1.5M          # 1500000, 1.5M, 800k; default 2M
@@ -34,6 +35,8 @@ cadence orchestrate --resume … --dry-run                         # refused: a 
 cadence orchestrate --drop ccc:L29 [--wave <wave>]   # from another terminal: take a lot out of the running wave
 cadence orchestrate --stop-after-current [--wave <wave>]   # from another terminal: let the running sessions finish, start nothing else
 ```
+
+A `<project>` is a sub-folder of the current folder. Launched from inside `alpha`, `alpha:L1` looks for `alpha/alpha` and is refused: `alpha:L1 : dossier …/alpha/alpha introuvable (le projet est un sous-dossier du dossier courant ; dans un dépôt, `.:L1`)` (L376). Inside a repository, `.:L1` or `L1` names the lot of the repository itself.
 
 **`--drop` and `--stop-after-current` — steering a running wave (L79)**: both are run from the folder the wave was launched
 from (`--wave <id>` when several waves run from it), and write a request in the wave's state folder

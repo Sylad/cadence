@@ -4184,11 +4184,12 @@ lots:
     finished: 2026-10-27
   - id: L384
     title: "⚡ publication 1.16.0 rouge au run publish (27-10, tag poussé, npm resté en 1.15.1, plugin déjà en 1.16.0) : test/raf-init-commit.test.ts R2 (L377) suppose le hook post-commit capable de lancer raf, qu'il trouve dans le PATH de la machine du développeur (~/.local/bin/raf) mais pas en CI — (1) R2 hermétique : le hook du test lance raf depuis les sources ; (2) mécanisme : la suite de tests tourne en local comme en CI, sans raf ni cadence installés dans le PATH (setup global qui retire du PATH des tests tout dossier qui porte un raf ou un cadence hors du dépôt), pour qu'un test qui dépend de l'outil installé rougisse sur la machine du lead et dans la porte, pas seulement au run publish ; publier ensuite 1.16.1 qui porte 1.16.0 ; doc, CHANGELOG, tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant — orchestré (vague 2026-10-27-1500, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: e840174a251995a12d2d1d3f18f271b1c2429e14 }
+    finished: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

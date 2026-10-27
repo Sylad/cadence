@@ -3969,10 +3969,11 @@ lots:
     finished: 2026-10-26
   - id: L358
     title: "README : démarrage « lead multi-projets » en 10 minutes (installation, dossier parent, raf init, /lead, première vague), schéma simple, le détail dans docs/ ; modèles de tickets GitHub (bug, demande) ; d'après le parcours mesuré sur mini-blue"
-    status: todo
+    status: doing
     estimate: 0.25
     visible: true
     created: 2026-10-26
+    started: 2026-10-27
   - id: L359
     title: "cadence release : l'étape 7 imprimée omet « claude plugin marketplace update cadence » avant « claude plugin update cadence@cadence » (sans elle le plugin installé reste à l'ancienne version) et « /reload-plugins » ; constat de la publication 1.13.0 (26-10)"
     status: done

@@ -4216,9 +4216,10 @@ lots:
     finished: 2026-10-27
   - id: L388
     title: "cadence deliver pendant une vague (--sha) écrit la note de l'article à rafraîchir dans le plan sans la commiter : le plan reste modifié dans l'arbre où une session de la vague travaille, et la vague rend ce lot « dépôt sale après implement » (warhammer40k L14, 27-10, après la livraison de L207) — commiter cette écriture du plan comme les autres écritures du programme (plan.commit) quand une vague tient le dépôt, ou la différer à la fin de la vague ; test"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-27
+    started: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

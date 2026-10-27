@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { rebaseOnto } from '../src/orchestrate/integrate.js';
+import { rebaseOnto, settleOwnEntries } from '../src/orchestrate/integrate.js';
 import { mergeUnreleased, settleLotEntries } from '../src/orchestrate/changelog-merge.js';
 import { lotBranch, lotTreeDir, prepareTree } from '../src/orchestrate/worktree.js';
 import { RunStore } from '../src/orchestrate/state.js';
@@ -121,5 +121,23 @@ describe('R2 — une entrée que le lot a rangée lui-même sous une version n\'
   it('R2 — settleLotEntries : une entrée du sommet rangée sous une version n\'est pas écartée', () => {
     const tip = log('', `## [1.1.0] - 2026-02-01\n\n### Added\n\n- base\n- entrée E du lot\n\n${PUBLISHED}`);
     expect(settleLotEntries(tip, tip, START, START, ['- entrée E du lot'])).toBeNull();
+  });
+});
+
+describe('R2 — le réglage final fait son commit', () => {
+  it('R2 — settleOwnEntries : les intermédiaires empilées dans le résultat du rebase sont retirées dans un commit « une entrée finale par lot »', () => {
+    const START = log('### Added\n\n- base\n');
+    const { repo, t, put } = setup(START);
+    put(t.dir, log('### Added\n\n- base\n- version 1\n'), 'feat(L1): v1');
+    put(t.dir, log('### Added\n\n- base\n- version finale\n'), 'fix(L1): finale');
+    put(repo, log('### Added\n\n- base\n- main\n'), 'feat(L2): autre lot');
+    const before = git(t.dir, 'rev-parse', 'HEAD');
+    // L'état que le rebase laisserait si rien ne réglait les versions intermédiaires (cas L360 du 26-10).
+    git(t.dir, 'reset', '-q', '--hard', 'main');
+    put(t.dir, log('### Added\n\n- base\n- main\n- version 1\n- version finale\n'), 'feat(L1): lot rejoué');
+    expect(settleOwnEntries(t.dir, 'main', before, START)).toBe(true);
+    expect(read(t.dir)).toBe(log('### Added\n\n- base\n- main\n- version finale\n'));
+    expect(git(t.dir, 'log', '-1', '--format=%s')).toMatch(/^docs: CHANGELOG — une entrée finale par lot/);
+    expect(git(t.dir, 'status', '--porcelain')).toBe('');
   });
 });

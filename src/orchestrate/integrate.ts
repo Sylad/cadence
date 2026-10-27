@@ -151,7 +151,7 @@ const entriesOf = (text: string): string[] => [...(unreleasedSections(text)?.val
  * `[Unreleased]` puis réécrites (absentes du sommet et du point de départ) sont retirées du résultat, celles du sommet qui y manquent remises, dans un commit
  * à part. Rend vrai quand ce commit a eu lieu.
  */
-function settleOwnEntries(work: string, base: string, before: string, start: string | undefined): boolean {
+export function settleOwnEntries(work: string, base: string, before: string, start: string | undefined): boolean {
   if (start === undefined || !existsSync(join(work, CHANGELOG))) return false;
   const [tip, main] = [tryGit(work, 'show', `${before}:${CHANGELOG}`), tryGit(work, 'show', `refs/heads/${base}:${CHANGELOG}`)];
   if (tip === null || main === null) return false;

@@ -4120,11 +4120,12 @@ lots:
     finished: 2026-10-27
   - id: L376
     title: raf --version et raf -v répondent la version comme cadence --version (aujourd'hui « Unknown option '--version' ») ; cadence orchestrate <projet>:<lot> dont le dossier est introuvable dit que <projet> est un sous-dossier du dossier courant et que, dans un dépôt, « .:<lot> » marche ; doc, CHANGELOG, tests — accrocs A3 et A9 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant — orchestré (vague 2026-10-27-1230, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 18c3bc281774a8a0e1a138e75fa919ae9fac779f }
+    finished: 2026-10-27
   - id: L377
     title: "raf init : le commit qui ajoute .cadence/ juste après raf init n'ouvre pas d'écart « commit sans lot » (raf check, tour, colonne dérive) — par exemple raf init écrit le plan et propose le commit de plan au format plan.commit, ou raf check tient pour plan un commit qui ne touche que les fichiers du plan ; doc, CHANGELOG, tests — accroc A5 de docs/mesures/parcours-nouvel-utilisateur-2026-10-26.md"
     status: doing
@@ -4146,11 +4147,12 @@ lots:
     started: 2026-10-27
   - id: L380
     title: "⚡ release 1.15.2 arrêtée (27-10) : test/avec-vos-outils.test.ts R10 ne lit que [Unreleased], que le commit de version vide — même classe que L368 (1.14.0 rouge au run publish) ; (1) R10 et tout autre test qui cherche l'entrée d'un lot lisent la section qui la porte ([Unreleased] ou la version publiée), via un seul utilitaire partagé ; (2) mécanisme : un test de garde refuse un test qui cherche l'entrée d'un lot dans [Unreleased] seul hors de cet utilitaire, et les étapes imprimées par cadence release (docs/releasing.md) placent cadence verify --gate --sha HEAD après le commit de version, avant l'éval et le tag ; doc, CHANGELOG, tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant (1 mineur : le détecteur de la garde est étroit, noté sans sous-tâche) — orchestré (vague 2026-10-27-1230, 0 passe(s) de correction)", commit: 18d5ad11d7bd48940ea139160fb05cf2f184e386, reporte: { de: df3f4196359150505b141a7dc3bfc49514d29dd3, vers: 18d5ad11d7bd48940ea139160fb05cf2f184e386, patchId: 46750d7bd0d5531681fb867468269bcefc1cd4cb } }
+    finished: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

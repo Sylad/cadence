@@ -727,9 +727,9 @@ function knownLot(plan: Plan, id: string, subtask: string): Lot {
 function uncommittedPlanCommand(plan: Plan, root: string, lot: string, template: string | undefined): string | null {
   const repo = gitRoot(root);
   if (!repo) return null;
-  const paths = [relative(repo, plan.path), ...plan.files, ...plan.produced];
-  const dirty = tryGit(repo, ['status', '--porcelain', '--', ...paths]);
-  if (!dirty?.trim()) return null;
+  // Seuls les chemins que git voit modifiés : `git add` d'un chemin absent ou ignoré est fatal.
+  const paths = dirtyPaths(repo, [relative(repo, plan.path), ...plan.files, ...plan.produced]);
+  if (paths.length === 0) return null;
   const quote = (t: string) => (/^[\w./-]+$/.test(t) ? t : `'${t.replaceAll("'", "'\\''")}'`);
   const message = planCommitMessage(template, { lot, action: PLAN_ACTIONS.done });
   const list = paths.map(quote).join(' ');

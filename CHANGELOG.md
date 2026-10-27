@@ -79,7 +79,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- `raf done <lot>` says that it did not commit the plan (L371). It never has: `raf` only writes the plan file, so the plan stays modified after the command: on 26-10, closing L365, the plan stayed modified and the commissioning was refused. That is intended, not a setting, and nothing makes `raf done` commit. When the plan or a file `plan.onWrite` produces has changes, the message now prints the `git add` and `git commit` that take them, the subject following the project's `plan.commit` template (`chore(L12): terminé`; `plan: L12 terminé` without one).
+- `raf done <lot>` says that it did not commit the plan (L371). It never has: `raf` only writes the plan file, so the plan stays modified after the command: on 26-10, closing L365, the plan stayed modified and the commissioning was refused. That is intended, not a setting, and nothing makes `raf done` commit. When the plan or a file `plan.onWrite` produces has changes, the message now prints the `git add` and `git commit` that take them, the subject following the project's `plan.commit` template (`chore(L12): terminé`; `plan: L12 terminé` without one). Only the paths git sees as changed are listed: a `plan.files` entry not written yet, or ignored by `.gitignore`, would make `git add` fail (fatal pathspec) and nothing would be committed.
 
 ## [1.14.1] - 2026-10-26
 

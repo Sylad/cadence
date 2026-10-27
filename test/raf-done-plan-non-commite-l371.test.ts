@@ -77,4 +77,18 @@ describe('raf done dit que le plan n\'est pas commité (L371)', () => {
     cli(hors, 'add', 'Lot un');
     expect(cli(hors, 'done', 'L1').out).not.toContain('plan non commité');
   });
+
+  it('R7 — un fichier de plan.files absent ou ignoré n\'entre pas dans la commande, qui s\'exécute et commite le plan', () => {
+    const repo = depot("plan:\n  files: [docs/journal.md, docs/ignore.md]\n");
+    writeFileSync(join(repo, '.gitignore'), 'docs/ignore.md\n');
+    mkdirSync(join(repo, 'docs'), { recursive: true });
+    writeFileSync(join(repo, 'docs/ignore.md'), 'x');
+    git(repo, 'add', '.gitignore');
+    git(repo, 'commit', '-q', '-m', 'chore: ignore');
+    const r = cli(repo, 'done', 'L1');
+    const cmd = r.out.split('\n').find((l) => l.includes('git add'))!.trim();
+    expect(cmd).not.toContain('docs/');
+    execFileSync('sh', ['-c', cmd], { cwd: repo, stdio: 'ignore' });
+    expect(git(repo, 'status', '--porcelain')).toBe('');
+  });
 });

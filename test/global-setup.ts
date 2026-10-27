@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runCompiler } from './run-tsc.js';
+import { sanitizePath } from './path-hygiene.js';
 import { PID_FILE, ROOT_PREFIX, leftovers, pickRootBase, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -48,6 +49,11 @@ export default function setup(): () => void {
   const previous = Object.fromEntries(names.map((n) => [n, process.env[n]]));
   for (const n of names) process.env[n] = n === 'NODE_DISABLE_COMPILE_CACHE' ? '1' : root;
   process.env.CADENCE_TEST_TMP_ROOT = root;
+  // L384 : ni raf ni cadence installés dans le PATH des tests (voir path-hygiene.ts) ; les miroirs vivent sous la racine privée et sont retirés avant le contrôle des restes.
+  const previousPath = process.env.PATH;
+  const mirrors = join(root, 'path-miroirs');
+  mkdirSync(mirrors);
+  if (previousPath !== undefined) process.env.PATH = sanitizePath(previousPath, REPO, mirrors).path;
   process.env.CADENCE_TEST_PACKAGE = buildThrowawayPackage(root);
   process.env.CADENCE_TEST_REAL_TMP = realTmp;
   return () => {
@@ -57,6 +63,8 @@ export default function setup(): () => void {
       else process.env[n] = previous[n];
     }
     delete process.env.CADENCE_TEST_PACKAGE;
+    if (previousPath !== undefined) process.env.PATH = previousPath;
+    removeTree(mirrors);
     removeTree(join(root, 'package-jetable'));
     const left = leftovers(root);
     removeTree(root);

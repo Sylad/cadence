@@ -2657,6 +2657,17 @@ const MINORS_HANDBACK = 'notes des mineurs de la revue de ';
  */
 export const planNoteHandBack = (l: LotState): boolean => l.status === 'handed-back' && l.next !== null && l.next !== undefined && !!l.outcome && (l.outcome.startsWith(HYPOTHESES_HANDBACK) || l.outcome.startsWith(MINORS_HANDBACK));
 
+/**
+ * Un lot rendu hors de l'étape d'intégration (budget, revue non conforme…) que le lead a fait corriger puis revoir hors vague (L370) : sa revue de code du plan
+ * porte le dernier commit de travail du lot dans son worktree, donc rien n'a été commité après elle. Rend le sha relu et le verdict du lead, ou null.
+ */
+export function leadReviewedHandBack(l: LotState, plan: Plan, treeDir: string): { head: string; verdict: string } | null {
+  if (l.status !== 'handed-back' || l.next === 'integrate' || planNoteHandBack(l) || !existsSync(join(treeDir, '.git'))) return null;
+  const review = plan.lots().find((x) => x.id === l.lot)?.review;
+  const tip = lotWork(plan, treeDir, l.lot)[0]?.sha;
+  return review?.commit && tip && review.commit === tip ? { head: tip, verdict: review.verdict } : null;
+}
+
 /** Une écriture de plan refusée rend le lot au lead ; en worktree, il garde l'étape atteinte pour la reprise (R26), sinon `stop` la vide comme avant. */
 function handBackPlan(c: LotCtx, why: string): void {
   if (c.tree) transition(c, 'handed-back', why);

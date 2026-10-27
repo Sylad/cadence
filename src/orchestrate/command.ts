@@ -26,7 +26,7 @@ import { maquetteText } from './maquette.js';
 import { costlyHypotheses, specScreen, specText } from './spec.js';
 import { fichesDuDossier } from '../spec.js';
 import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
-import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
+import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, leadReviewedHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, installPrePush, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
@@ -1371,6 +1371,8 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   }
   // --resume --integrate projet:lot (L279, R27) : un lot rendu à l'étape d'intégration (next: integrate) n'est rejoué que si le lead le nomme. Ni --resume seul, ni --drop, --answer ou --budget ne le rejouent.
   const integ: LotState[] = [];
+  // L370 : un lot rendu hors de l'intégration que le lead a fait corriger puis revoir hors vague (revue conforme au dernier commit du worktree) est repris à l'intégration avec ce verdict.
+  const leadReviewed = new Map<LotState, { head: string; verdict: string }>();
   const budgeted = args.lotBudgets.map((b) => lots.filter((x) => x.lot === b.lot && (b.project ? x.project === b.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
   for (const t of args.integrate) {
     const matches = lots.filter((x) => x.lot === t.lot && (t.project ? x.project === t.project : true));
@@ -1386,6 +1388,11 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     else if (dropped.includes(l)) refusals.push(`${opt} ${key} : lot aussi retiré par --drop`);
     else if (answered.includes(l)) refusals.push(`${opt} ${key} : lot aussi visé par --answer`);
     else if (budgeted.includes(l)) refusals.push(`${opt} ${key} : lot aussi visé par --budget`);
+    else if (!t.replay && l.next !== 'integrate' && (() => {
+      const r = leadReviewedHandBack(l, projectEnv(l.repo).loadPlan(), lotTreeDir(store.dir, l.project, l.lot, l.repo));
+      if (r) leadReviewed.set(l, r);
+      return r;
+    })()) integ.push(l);
     else if (l.status !== 'handed-back' || (l.next !== 'integrate' && !(t.replay && planNoteHandBack(l)))) refusals.push(`${opt} ${key} : le lot n'est pas rendu ${t.replay ? "à l'étape d'intégration ni sur une écriture de plan refusée" : "à l'étape d'intégration"} (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})`);
     else integ.push(l);
   }
@@ -1460,11 +1467,19 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   }
   for (const l of integ) {
     const k = lotKey(l.project, l.lot);
+    const lead = leadReviewed.get(l);
+    if (lead) {
+      // La revue du lead tient lieu de revue du lot : le rebase reporte son verdict (même patch-id) ou joue la revue courte du diff rebasé.
+      l.next = 'integrate';
+      l.code = { conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: lead.verdict, sousTaches: [], nonVerifie: [], head: lead.head };
+      l.verdict = lead.verdict;
+      l.constats = [];
+    }
     const planNote = l.next !== 'integrate'; // rendu sur une écriture de plan refusée (--replay) : le lot repart de l'étape gardée
     if (planNote && l.outcome?.startsWith(HYPOTHESES_HANDBACK)) l.hypotheses = undefined; // les notes d'hypothèses se posent de nouveau (sans doublon) à l'entrée de l'étape
     l.status = 'suspended';
     l.outcome = null;
-    const text = planNote ? `écriture du plan reprise à l'étape ${l.next} (--resume --replay)` : 'intégration reprise (--resume --integrate)';
+    const text = lead ? `intégration reprise (--resume --integrate) : revue conforme du lead hors vague, ${lead.head.slice(0, 7)}` : planNote ? `écriture du plan reprise à l'étape ${l.next} (--resume --replay)` : 'intégration reprise (--resume --integrate)';
     store.journal(`${k} → suspended — ${text}`);
     io.out(`${k} → suspended — ${text}`);
   }

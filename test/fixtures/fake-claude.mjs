@@ -4,10 +4,13 @@
 // action : { commits: [{file, message}], structured, tokens, exit, garbage, sleepMs, push, usageLimit, noStructured, resumeNoStructured, resumeUsageLimit }
 // noStructured : réponse réussie en texte, sans structured_output ; l'appel suivant en --resume de cette session rend alors
 // le rapport au format (resumeNoStructured : il n'y arrive pas non plus ; resumeUsageLimit : la relance se heurte au quota). Un --resume est journalisé (resume: true).
-// "{lot}" dans un message est remplacé par le lot du brief. Chaque appel est journalisé (FAKE_CLAUDE_LOG).
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+// Hermétique (L391) : il n'écrit ni ne commite que dans un dossier temporaire (os.tmpdir() ou /tmp : le TMPDIR d'une session de vague en est un autre) hors du dépôt cadence, avec un lot résolu du brief ;
+// sinon il refuse (sortie 3) avant d'avoir rien touché. "{lot}" dans un message est remplacé par le lot du brief. Chaque appel est journalisé (FAKE_CLAUDE_LOG).
+import { appendFileSync, existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, relative, isAbsolute, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const argv = process.argv.slice(2);
 if (argv[0] === '--version') {
@@ -41,6 +44,19 @@ const action = resumeId ? { structured: used.pending[resumeId]?.structured, noSt
 
 const entry = { kind, lot, cwd: process.cwd(), model: flag('--model'), orchestrated: process.env.CADENCE_ORCHESTRATED ?? null, leaked: ['CADENCE_SNAPSHOT', 'CADENCE_WAVE_RESERVED'].filter((k) => k in process.env), path: process.env.PATH ?? null, resume: argv.includes('--resume'), resumeId: resumeId ?? null, sessionId: flag('--session-id'), schema: flag('--json-schema') ?? null, argv };
 entry.which = Object.fromEntries(['raf', 'cadence'].map((n) => [n, spawnSync('sh', ['-c', `command -v ${n}`], { encoding: 'utf8' }).stdout.trim()]));
+const dedans = (parent, enfant) => { const r = relative(parent, enfant); return r === '' || (!r.startsWith('..') && !isAbsolute(r)); };
+if ((action.commits ?? []).length > 0) {
+  const cwd = realpathSync(process.cwd());
+  const depot = realpathSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..'));
+  if (dedans(depot, cwd) || ![tmpdir(), '/tmp'].some((t) => existsSync(t) && dedans(realpathSync(t), cwd))) {
+    console.error(`faux claude hermétique : refuse de commiter dans ${cwd} (hors d'un dossier temporaire ou dans le dépôt cadence)`);
+    process.exit(3);
+  }
+  if (lot === '?') {
+    console.error('faux claude hermétique : lot non résolu dans le brief, {lot} deviendrait « ? »');
+    process.exit(3);
+  }
+}
 const commits = [];
 for (const c of action.commits ?? []) {
   writeFileSync(join(process.cwd(), c.file), `${Math.random()}\n`);

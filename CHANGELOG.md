@@ -79,6 +79,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- The suite no longer commits into the real repository (L391: a test's fake `claude` committed `feat(?): travail` fourteen times, `a.txt` at the root, during the wave of 27-10 — `{lot}` unresolved, cwd the real repository). The fake now refuses, before touching anything, to write or commit outside a temporary folder, inside the cadence repository, or when the brief resolves no lot; the stray `a.txt` is removed.
 - `cadence verify --gate` no longer turns red in its throwaway copy for reasons of the copy itself (L389: avatar-pandora, Astro, refused a `node_modules` linked from the main tree; finance-tracker's ux-demo.spec saw its data paths from `/tmp`). When the main tree is clean and at the sha, the gate runs there; otherwise it runs in a throwaway worktree whose dependencies are **copied**, not linked. The first line of the output says where it ran. New `verify.inPlace` in `cadence.yaml` (`true`: main tree required, `false`: always the copy; `docs/deliver.md`).
 - `cadence deliver --sha` during a wave commits the plan it wrote for the article to refresh (`plan.commit` template, `docs/news.md`) instead of leaving it modified in the tree a session of the wave works in, which handed that lot back as « dépôt sale après implement » (L388, warhammer40k L14 on 27-10), with the files `plan.onWrite` produces. Outside a wave, or when the plan or those files already had uncommitted changes, nothing changes.
 

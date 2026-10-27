@@ -61,6 +61,7 @@ The two plugins are independent. `cadence@cadence` carries the rituals, which ca
 
 | Page | What it covers |
 |---|---|
+| [docs/quickstart.md](quickstart.md) | getting started as a lead of several projects, in 10 minutes: install, the parent folder, `raf init`, the tour, the first wave |
 | [docs/raf.md](raf.md) | the plan: commands, plan file, foreign plan formats, Gantt |
 | [docs/orchestrate.md](orchestrate.md) | waves of sessions: budgets, spec, accept and review steps, neighbouring repositories, one worktree per lot (`orchestrate.worktrees: true`, on in cadence's own `cadence.yaml`, off by default elsewhere; `--integrate`, `--replay`, `--remove-worktree`; recovery of a handed-back lot's branch and the `CHANGELOG.md` union at the integration are described there) |
 | [docs/deliver.md](deliver.md) | delivery: wait for CI, deploy, verify the effect |

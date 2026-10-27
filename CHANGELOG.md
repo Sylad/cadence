@@ -82,6 +82,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - A getting-started page for a lead of several projects (L358, `docs/quickstart.md`, a section of the README): install, the parent folder, `raf init` in each project with the minimal `cadence.yaml`, the tour, `/cadence:lead`, the first wave, and a table of the usual stops (no Node, `EACCES`, no git identity, Claude Code not logged in), from the walkthrough measured on a clean machine.
 - Two GitHub issue templates, bug and request, as forms, and a `config.yml` that turns off blank issues and points to the getting-started page (L358, `.github/ISSUE_TEMPLATE/`). The bug form asks for `cadence --version`, the steps and what was printed.
 
+### Fixed
+
+- The dark getting-started figure (`docs/quickstart-dark.svg`) draws the grey texts of « Lead session » in a lighter grey: 4.26:1 on the blue, now above the 4.5:1 of WCAG 2.2 AA (L374). `docs/overview.md` lists `docs/quickstart.md` in its map of the pages (L374).
+
 ## [1.15.0] - 2026-10-27
 
 ### Changed

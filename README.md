@@ -7,7 +7,7 @@ cadence keeps both in plain files next to the code, and [Claude Code](https://cl
 
 ## Start
 
-Needs Node 22.18 or later (see [docs/stabilite.md](docs/stabilite.md)).
+Needs Node 22.18 or later (see [docs/stabilite.md](docs/stabilite.md)); waves also need Claude Code installed and logged in.
 
 ```sh
 npm install -g @sylad/cadence

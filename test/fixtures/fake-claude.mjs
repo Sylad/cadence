@@ -14,6 +14,10 @@ if (argv[0] === '--version') {
   console.log('9.9.9 (Fake Claude Code)');
   process.exit(0);
 }
+if (argv[0] === 'auth' && argv[1] === 'status') {
+  console.log(JSON.stringify({ loggedIn: true, authMethod: 'fake' })); // L378 : la vérification de connexion n'est pas une étape journalisée
+  process.exit(0);
+}
 if (argv[0] === '--help') {
   console.log('  --json-schema <schema>   JSON Schema for structured output');
   process.exit(0);

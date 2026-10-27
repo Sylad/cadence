@@ -56,6 +56,8 @@ export interface OrchestrateDeps {
   slotPollMs?: number;
   /** Version de claude et présence de --json-schema ; null si claude est absent. */
   claudeInfo: () => { version: string; jsonSchema: boolean } | null;
+  /** Connexion de claude (`claude auth status`, sans modèle) ; null si l'état est illisible, absent : non vérifié (L378). */
+  claudeAuth?: () => { loggedIn: boolean } | null;
   agentsDir: string;
   templatesDir?: string;
   claudeHome?: string;
@@ -325,6 +327,11 @@ function olderThanEffort(version: string): boolean {
   return a < 2 || (a === 2 && (b < 1 || (b === 1 && c < 284)));
 }
 
+/** L378 : claude installé mais non connecté échoue à la première session, après le démarrage du lot dans le plan. Null si connecté ou état illisible. */
+function notLoggedIn(deps: OrchestrateDeps): string | null {
+  return deps.claudeAuth?.()?.loggedIn === false ? "claude n'est pas connecté : lancer `claude` puis /login (état : `claude auth status`)" : null;
+}
+
 /** Préconditions : tout ce qui peut être refusé l'est ici, avant d'agir, sans verrou ni écriture. */
 async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
   const refusals: string[] = [];
@@ -332,6 +339,8 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
   const info = deps.claudeInfo();
   if (!info) refusals.push('claude introuvable (CADENCE_CLAUDE_BIN, ou claude dans le PATH)');
   else if (!info.jsonSchema) refusals.push(`claude ${info.version} n'a pas --json-schema : mettre claude à jour`);
+  const login = info && !args.dryRun ? notLoggedIn(deps) : null; // la simulation n'ouvre pas de session : elle le signale (dryRun) sans refuser
+  if (login) refusals.push(login);
 
   const lots: LotState[] = [];
   const repoChecked = new Set<string>();
@@ -510,6 +519,8 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-orchestrate-'));
   const agents = agentsOf(deps);
   io.out(`vague ${id} — simulation, rien n'est lancé (budget ${budget} tokens comptés)`);
+  const login = notLoggedIn(deps);
+  if (login) io.out(`⚠ ${login} — sans cela le vrai lancement est refusé`);
   const repos = [...new Set(lots.map((l) => l.repo))];
   const noTestSaid = new Set<string>();
   const redSaid = new Set<string>();
@@ -1521,6 +1532,16 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   return continueRounds(await execute(wave, live, store, io, deps, today, maxSessions(args, io), lots), wave, lots, store, io, deps, today, args, launch);
 }
 
+/** `loggedIn` de la sortie JSON de `claude auth status` ; null si elle n'est pas lisible (versions sans cette commande : pas de refus). */
+export function parseAuthStatus(text: string): { loggedIn: boolean } | null {
+  try {
+    const v = JSON.parse(text) as { loggedIn?: unknown };
+    return typeof v.loggedIn === 'boolean' ? { loggedIn: v.loggedIn } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Dépendances réelles : `claude` (ou CADENCE_CLAUDE_BIN), agents et gabarits du paquet, journaux de ~/.claude. */
 export function realOrchestrateDeps(env: NodeJS.ProcessEnv): OrchestrateDeps {
   const bin = env.CADENCE_CLAUDE_BIN || 'claude';
@@ -1536,6 +1557,15 @@ export function realOrchestrateDeps(env: NodeJS.ProcessEnv): OrchestrateDeps {
         return { version, jsonSchema: help.includes('--json-schema') };
       } catch {
         return null;
+      }
+    },
+    claudeAuth: () => {
+      try {
+        // `auth status` sort en 1 quand claude n'est pas connecté, et imprime quand même le JSON.
+        const text = execFileSync(bin, ['auth', 'status'], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 20_000 });
+        return parseAuthStatus(text);
+      } catch (e) {
+        return parseAuthStatus(String((e as { stdout?: unknown }).stdout ?? ''));
       }
     },
     agentsDir: AGENTS_DIR,

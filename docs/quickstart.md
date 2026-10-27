@@ -27,7 +27,8 @@ You need four things; the page says how to check each.
   ```
 
 - **Claude Code, installed and logged in.** `claude auth status` must print `"loggedIn": true`. A wave opens
-  `claude -p` sessions and stops at the first one with `Not logged in · Please run /login` otherwise.
+  `claude -p` sessions; `cadence orchestrate` checks `claude auth status` first and, when Claude Code is not logged in,
+  is refused before it writes anything in the plan (`claude n'est pas connecté : lancer `claude` puis /login`).
   Install it from [claude.com/claude-code](https://claude.com/claude-code), then run `claude` once and log in.
 - **A test command** for each project (`npm test`, `pytest`, `go test ./...`). The wave runs it after every change.
 
@@ -125,7 +126,7 @@ The sessions of a wave never push and never deliver. You read the table, answer 
 | `npm: command not found` | no Node | install Node 22.18+ (above) |
 | `EACCES: permission denied, mkdir '/usr/lib/node_modules/@sylad'` | system-owned Node | `npm config set prefix ~/.npm-global` (above) |
 | `fatal: empty ident name … not allowed` | no git identity | the two `git config --global` lines (above) |
-| `Not logged in · Please run /login` | Claude Code not logged in | `claude`, log in, then `claude auth status` |
+| `claude n'est pas connecté : lancer `claude` puis /login` | Claude Code not logged in | `claude`, log in, then `claude auth status` |
 | `porte de tests absente` | no `orchestrate.test` | the `cadence.yaml` line of the project block |
 | `alpha:L1 … introuvable` | launched from inside `alpha` | use `.:L1` |
 

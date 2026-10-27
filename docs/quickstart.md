@@ -64,10 +64,10 @@ Run the block once per project (here `alpha`, then `beta`):
 mkdir alpha && cd alpha
 git init -b main
 raf init
-raf add "Say hello" --estimate 0.25
+raf add "Create hello.txt containing hello" --estimate 0.25
 cat > cadence.yaml <<'EOF'
 orchestrate:
-  test: npm test        # your test command
+  test: test -f hello.txt        # passes once the first lot has created hello.txt
 EOF
 git add -A && git commit -m "chore: init raf"
 raf ignore $(git rev-parse --short HEAD)
@@ -79,6 +79,8 @@ What it does: `raf init` writes the plan (`.cadence/raf.yaml`), a commit hook an
 that adds the plan cites no lot, so `raf` warns `commit sans lot` and `raf check` would list it as a gap: `raf ignore`
 acknowledges it once, and the plan records that. `cadence.yaml` is the project's settings file; its single
 `orchestrate.test` line is the minimum the wave needs, and without it the tour warns `porte de tests absente`.
+The folder is empty, so the gate here is `test -f hello.txt`, which the toy lot satisfies. On a project that already exists,
+put its own test command there (`npm test`, `pytest`, `go test ./...`): `npm test` in a folder without `package.json` fails.
 The reference for every other key is [orchestrate](orchestrate.md) and [deliver](deliver.md).
 
 Then, from the parent folder:
@@ -88,7 +90,7 @@ cadence lead tour
 ```
 
 It prints one line per project: lots in progress, drift, next lot, repository state. Expect `alpha · en cours rien ·
-dérive aucune · … · prochain L1 Say hello · dépôt propre`, and the same for `beta`. This is the table the lead reads.
+dérive aucune · … · prochain L1 Create hello.txt containing hello · dépôt propre`, and the same for `beta`. This is the table the lead reads.
 
 ## Start the lead
 

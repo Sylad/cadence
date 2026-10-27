@@ -347,4 +347,50 @@ describe('verify --gate applique orchestrate.testReplay comme la porte des vague
     expect(r.code).toBe(1);
     expect(r.text).toContain('  - test/a.test.ts > charge');
   });
+
+  // Revue de L387 : le rejeu écrit `--maxWorkers=$CADENCE_TEST_WORKERS` (cadence.yaml, docs/orchestrate.md) ; variable absente, vitest sort en erreur et rien n'est tenu pour vert.
+  const workersProject = () => {
+    const { repo } = project('orchestrate:\n  test: sh gate.sh\n  testReplay: sh gate.sh {files}\n');
+    writeFileSync(
+      join(repo, 'gate.sh'),
+      'if [ -n "$1" ]; then\n  [ -n "$CADENCE_TEST_WORKERS" ] || { echo "--maxWorkers= vide"; exit 2; }\n  echo " ✓ $* (workers=$CADENCE_TEST_WORKERS)"; exit 0\nfi\n' +
+        'echo "suite workers=$CADENCE_TEST_WORKERS"\necho " FAIL  test/a.test.ts > charge"\nexit 1\n',
+    );
+    git(repo, 'add', 'gate.sh');
+    git(repo, 'commit', '-q', '-m', 'gate');
+    return { repo, sha: git(repo, 'rev-parse', 'HEAD').trim() };
+  };
+  const gateIn = async (repo: string, sha: string, env: Record<string, string | undefined>, cores = 16) => {
+    const lines: string[] = [];
+    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), out: (l) => lines.push(l), env: { PATH: process.env.PATH, ...env }, cores });
+    return { code, text: lines.join('\n') };
+  };
+
+  it('R2 — CADENCE_TEST_WORKERS absent de l\'environnement : la porte et le rejeu la reçoivent (cœurs ÷ plafond de sessions, comme une vague)', async () => {
+    const { repo, sha } = workersProject();
+    const r = await gateIn(repo, sha, {}, 16); // plafond par défaut 2 : 8
+    expect(r.code).toBe(0);
+    expect(r.text).toContain('instable');
+  });
+
+  it('R2 — la part suit CADENCE_MAX_SESSIONS quand le plafond est réglé', async () => {
+    const probe = project('orchestrate:\n  test: "echo w=$CADENCE_TEST_WORKERS; exit 1"\n');
+    const red = await gateIn(probe.repo, probe.sha, { CADENCE_MAX_SESSIONS: '4' }, 32);
+    expect(red.text).toContain('| w=8');
+  });
+
+  it('R2 — une valeur CADENCE_TEST_WORKERS déjà posée par l\'humain n\'est pas écrasée', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: "echo w=$CADENCE_TEST_WORKERS; exit 1"\n');
+    const r = await gateIn(repo, sha, { CADENCE_TEST_WORKERS: '3' }, 32);
+    expect(r.text).toContain('| w=3');
+  });
+
+  it('R2 — un rejeu qui ne confirme rien le dit : un rejeu a eu lieu, son code, et ce qu\'il n\'a pas prouvé', async () => {
+    const { repo, sha } = replayProject('rouge');
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(1);
+    expect(r.text).toMatch(/rejeu seul.*2 rejeu/);
+    expect(r.text).toMatch(/dernier code 1/);
+    expect(r.text).toContain('0 test(s) confirmé(s) vert(s) sur 2');
+  });
 });

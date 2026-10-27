@@ -16,8 +16,14 @@ function split(text: string): Split | null {
   return { head: lines.slice(0, at + 1).join('\n'), block: lines.slice(at + 1, end), tail: lines.slice(end).join('\n') };
 }
 
-/** Sections du bloc `[Unreleased]` : une entrée est une ligne `- ` et ses lignes de suite. Deux titres identiques sont fondus. Du texte hors entrée : null. */
-function sections(block: string[]): Sections | null {
+/** Clé des entrées nues (avant tout `### `) quand `sections` les accepte ; aucun titre réel n'est vide. */
+const BARE = '';
+
+/**
+ * Sections du bloc `[Unreleased]` : une entrée est une ligne `- ` et ses lignes de suite. Deux titres identiques sont fondus. Du texte hors entrée : null.
+ * Une entrée avant tout titre est refusée (null), sauf avec `allowBare` : elle est alors rangée sous la clé `BARE`.
+ */
+function sections(block: string[], allowBare = false): Sections | null {
   const out: Sections = new Map();
   let current: string[] | null = null;
   for (const line of block) {
@@ -26,6 +32,10 @@ function sections(block: string[]): Sections | null {
     if (title) {
       current = out.get(title) ?? [];
       out.set(title, current);
+    } else if (!current && allowBare && line.startsWith('- ')) {
+      current = out.get(BARE) ?? [];
+      out.set(BARE, current);
+      current.push(line);
     } else if (!current) {
       return null;
     } else if (line.startsWith('- ')) {
@@ -37,6 +47,25 @@ function sections(block: string[]): Sections | null {
     }
   }
   return out;
+}
+
+/**
+ * Range les entrées nues des trois côtés sous une rubrique (L383) : celle que les côtés ont ajoutée à la base si elle est seule, sinon la seule rubrique qu'ils
+ * portent. Aucune rubrique, ou plusieurs candidates : le choix serait le nôtre, on rend false et le conflit reste à la main.
+ */
+function fileBare(base: Sections, ours: Sections, theirs: Sections): boolean {
+  if (![base, ours, theirs].some((s) => s.has(BARE))) return true;
+  const titles = [...new Set([...ours.keys(), ...theirs.keys()])].filter((t) => t !== BARE);
+  const added = titles.filter((t) => !base.has(t));
+  const target = added.length === 1 ? added[0] : titles.length === 1 ? titles[0] : null;
+  if (target === null) return false;
+  for (const side of [base, ours, theirs]) {
+    const bare = side.get(BARE);
+    if (!bare) continue;
+    side.delete(BARE);
+    side.set(target, [...(side.get(target) ?? []), ...bare]);
+  }
+  return true;
 }
 
 /** `base` est une sous-suite de `side` : rien n'a été retiré ni modifié, seul de l'ajout s'y est glissé. */
@@ -61,7 +90,8 @@ function pick(base: string, ours: string, theirs: string): string | null {
  * Fusion à trois du CHANGELOG quand deux lots y ont chacun ajouté une entrée sous `[Unreleased]` (L314) : union par section, un seul titre par section,
  * sections dans l'ordre de Keep a Changelog, les entrées de `ours` puis celles de `theirs` qui n'y sont pas déjà. Le reste du fichier suit le côté qui l'a
  * changé. Rend null quand ce n'est pas de l'ajout pur — une entrée de base retirée ou modifiée, du texte libre sous `[Unreleased]`, le reste du fichier
- * changé des deux côtés, pas de section `[Unreleased]` — : le conflit reste alors à la main.
+ * changé des deux côtés, pas de section `[Unreleased]` — : le conflit reste alors à la main. Une entrée nue (sans rubrique) d'un côté est rangée sous la
+ * rubrique que l'autre a ajoutée (L383) ; sans rubrique unique où la ranger, le conflit reste à la main.
  *
  * `start` est le CHANGELOG du point de départ de la branche rejouée (L323). Une entrée de `base` qui n'y était pas a été ajoutée par un commit précédent du
  * lot lui-même : `theirs` peut la modifier ou la retirer, sa version gagne (l'ancienne est écartée de `ours`). Sans `start`, aucune entrée n'est au lot.
@@ -71,10 +101,10 @@ export function mergeUnreleased(base: string, ours: string, theirs: string, star
   if (!b || !o || !t) return null;
   const head = pick(b.head, o.head, t.head);
   const tail = pick(b.tail, o.tail, t.tail);
-  const [bs, os, ts] = [sections(b.block), sections(o.block), sections(t.block)];
-  if (head === null || tail === null || !bs || !os || !ts) return null;
+  const [bs, os, ts] = [sections(b.block, true), sections(o.block, true), sections(t.block, true)];
+  if (head === null || tail === null || !bs || !os || !ts || !fileBare(bs, os, ts)) return null;
   const st = start === undefined ? null : split(start);
-  const startEntries = new Set([...(st ? (sections(st.block)?.values() ?? []) : [])].flat());
+  const startEntries = new Set([...(st ? (sections(st.block, true)?.values() ?? []) : [])].flat());
   const own = new Set<string>(start === undefined || !st ? [] : [...bs.values()].flat().filter((e) => !startEntries.has(e)));
   // Une entrée de base que ours range sous une version publiée (la branche a été publiée pendant la vie du lot) n'a pas été retirée : elle a changé de place.
   // Seule une entrée de base compte, entière : une entrée nouvelle de theirs qui est un bout d'une entrée publiée n'est pas la même, elle reste au lot.

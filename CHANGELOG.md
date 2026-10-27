@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - With `--continue`, `cadence orchestrate` reads `claude auth status` once per launch (L382, `docs/orchestrate.md`): `preflight()` used to run it again, up to 20 s each, for every candidate lot of every round. The message quoted in `docs/quickstart.md` and `docs/orchestrate.md` no longer nests backticks inside backticks, which broke the Markdown rendering.
 
+- `cadence orchestrate` integration in worktree mode resolves a `CHANGELOG.md` conflict where one lot adds a section under `[Unreleased]` (`### Fixed`) with its entry and the other a bare entry, without a section (L383, `docs/orchestrate.md`): the bare entry is filed under the section the other side added, one section title, one entry per lot, instead of handing the lot back (L381 on 2026-10-27 was merged by hand). With no single section to file it under, the conflict stays by hand.
+
 - `raf gantt` counts the commits of a lot as `raf commits` does (L381, `docs/raf.md`): the plan commits no longer inflate the commit column nor the tooltip of a bar, and a lot whose only commit is `plan: L1 démarré` reads 0. The filter reads the files of the commits in one `git log` call instead of one `git diff-tree` per commit (about 20 s down to 2 s on 2,700 commits for the Gantt page, which shows every lot). `cadence session start` and `close` already left the plan commits out of « Fait depuis » and « Commits de la période » since L379; a test now holds it for the Gantt too, and the test that held `raf now` to the lots it shows (R6 of L379) can now fail.
 
 ## [1.16.0] - 2026-10-27

@@ -3974,6 +3974,7 @@ lots:
     visible: true
     created: 2026-10-26
     started: 2026-10-27
+    review: { date: 2026-10-27, verdict: "conforme, avec 2 remarques mineures (overview.md ne liste pas quickstart.md ; contraste 4,26:1 dans le schéma sombre) — orchestré (vague 2026-10-27-1020, 1 passe(s) de correction)", commit: 957e8e63a91918ba19a938aff72a8148f1657a3c }
   - id: L359
     title: "cadence release : l'étape 7 imprimée omet « claude plugin marketplace update cadence » avant « claude plugin update cadence@cadence » (sans elle le plugin installé reste à l'ancienne version) et « /reload-plugins » ; constat de la publication 1.13.0 (26-10)"
     status: done

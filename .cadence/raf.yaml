@@ -4077,11 +4077,12 @@ lots:
     finished: 2026-10-27
   - id: L372
     title: "raf check : un commit de plan du lead qui cite des lots sans y travailler (création de lots, réglage cité entre parenthèses) les compte comme commencés ou à revoir (L369 L371 « 1 commit mais todo », L354 « commit postérieur à sa revue » le 27-10, commit cd91064) et raf ignore ne l'acquitte pas (il ne couvre que les commits sans lot) — raf ignore acquitte aussi un commit qui cite des lots connus (les écarts de commits de ces lots tombent, raf check --ignored le liste) ; doc, CHANGELOG, tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant (0 bloquant, 0 majeur, 2 notes mineures) — orchestré (vague 2026-10-27-0800, 0 passe(s) de correction)", commit: abf580f6cdae3d884ad9b7a69f01db9d4ae23786, reporte: { de: 6e4719fddc5ba613cc266f102ce152a15df8de78, vers: abf580f6cdae3d884ad9b7a69f01db9d4ae23786, patchId: e0697d5ecc855a09200853c4e10aaad03f9a1e5e } }
+    finished: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

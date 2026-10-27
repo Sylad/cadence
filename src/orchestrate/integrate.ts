@@ -7,6 +7,7 @@ import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
 import { mergeUnreleased, moveToUnreleased } from './changelog-merge.js';
 import { mutexFor } from './mutex.js';
 import { Plan } from '../plan.js';
+import { parseDocument } from 'yaml';
 import { git, gitFailure, tryGit } from './worktree.js';
 
 /** Verrou d'intégration d'un dépôt (L279, R10) : dans l'état commun aux worktrees, au format du verrou d'orchestration, sous un autre nom. */
@@ -92,18 +93,24 @@ function resolveChangelog(work: string, start: string | undefined): boolean {
 /**
  * Résout le conflit en cours quand c'est le plan seul et que le commit du lot rejoué n'y ajoute que des revues de lot (L370 : le `raf review` du lead dans
  * le worktree) : le plan de la branche du dépôt est gardé, et chaque revue ajoutée est réécrite dessus par l'API du plan. Faux, sans rien toucher, si le
- * commit change autre chose que des revues, ou si la branche du dépôt a elle-même changé une de ces revues.
+ * commit change autre chose que des revues — un autre champ d'un lot, un lot ajouté ou retiré, ou la tête du plan hors `lots` (`acknowledged:` après un
+ * `raf ignore`, `reviewSince`, un réglage) : repris tel quel, le plan du dépôt perdrait ce changement sans message —, ou si la branche du dépôt a elle-même
+ * changé une de ces revues.
  */
 function resolvePlan(work: string): boolean {
   const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
   if (files.length !== 1) return false;
   const file = files[0];
   try {
-    const lots = (stage: number) => {
-      writeFileSync(join(work, file), run(work, 'show', `:${stage}:${file}`));
-      return Plan.load(join(work, file)).lots();
+    const stage = (n: number) => {
+      const text = run(work, 'show', `:${n}:${file}`);
+      writeFileSync(join(work, file), text);
+      const head = parseDocument(text).toJSON() as Record<string, unknown> | null;
+      return { lots: Plan.load(join(work, file)).lots(), head: JSON.stringify({ ...(head ?? {}), lots: undefined }) };
     };
-    const [base, ours, theirs] = [lots(1), lots(2), lots(3)];
+    const [b, o, t] = [stage(1), stage(2), stage(3)];
+    const [base, ours, theirs] = [b.lots, o.lots, t.lots];
+    if (t.head !== b.head) return false;
     const bare = (l: { review?: unknown }) => JSON.stringify({ ...l, review: undefined });
     const review = (l: { review?: unknown } | undefined) => JSON.stringify(l?.review ?? null);
     const added = theirs.filter((t) => review(t) !== review(base.find((b) => b.id === t.id)));

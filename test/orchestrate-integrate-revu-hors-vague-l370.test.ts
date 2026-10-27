@@ -79,6 +79,25 @@ describe('R3 — le plan du dépôt a bougé sur le lot pendant la correction du
     expect(lot.review!.verdict).toContain('relu par le lead');
     expect(JSON.stringify(lot)).toContain('à garder pour la suite');
   });
+  it('R3 — le commit de plan du lead change aussi la tête du plan (un acquittement) : le conflit reste un conflit, rien n\'est perdu en silence', async () => {
+    const { parent, repo, dir } = await handedBack();
+    commitFile(dir, 'lead.txt', 'fix(L1): correction du lead hors vague');
+    const wt = Plan.load(join(dir, '.cadence/raf.yaml'));
+    wt.recordReview('L1', 'conforme : relu par le lead', '2026-10-27', git(dir, 'rev-parse', 'HEAD'));
+    wt.acknowledge({ sha: 'b'.repeat(40), date: '2026-10-27', reason: 'commit hors lot' }); // même commit de plan que la revue
+    wt.save();
+    git(dir, 'add', '--', '.cadence/raf.yaml');
+    git(dir, 'commit', '-q', '-m', 'plan: revue du lead L1 et acquittement');
+    const plan = planOf(repo);
+    plan.note('L1', 'à garder pour la suite', '2026-10-27');
+    plan.save();
+    git(repo, 'add', '--', '.cadence/raf.yaml');
+    git(repo, 'commit', '-q', '-m', 'plan: note du lead sur L1');
+    const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], fake());
+    expect(store(parent).readLot('a', 'L1')!.status).toBe('handed-back');
+    expect(r.out).toContain('conflit en rebasant');
+    expect(planOf(repo).acknowledged.some((a) => a.sha === 'b'.repeat(40))).toBe(false); // le dépôt n'a pas été touché
+  });
   it('R3 — la revue du dépôt a déjà bougé sur L1 : le conflit reste un conflit', async () => {
     const { parent, repo, dir } = await handedBack();
     leadFixes(dir, true);

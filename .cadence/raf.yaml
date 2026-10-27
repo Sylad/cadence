@@ -4101,11 +4101,12 @@ lots:
       - { date: 2026-10-27, text: "abandonné : inutile : Trusted Publishing (OIDC) déjà en place depuis L22 (aucun secret npm, id-token: write, npm ≥ 11.5.1, 1.15.0 publiée sans jeton) ; l'avertissement du run est générique" }
   - id: L374
     title: "L358 suites : (1) test/demarrage-lead.test.ts R7 lance bin/raf.js, qui importe dist/ : rouge dans un arbre sans build (cadence verify --gate, worktree jetable) — lancer raf depuis les sources comme les autres tests ; (2) docs/quickstart-dark.svg : textes gris sur le fond bleu de « Lead session » à 4,26:1 (< 4,5:1 WCAG 2.2 AA 1.4.3) ; (3) docs/overview.md : la carte des pages ne cite pas docs/quickstart.md"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant — orchestré (vague 2026-10-27-1110, 0 passe(s) de correction)", commit: b244c1b1cdb7eeb560623bb0598af02699e3a4af }
+    finished: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -4018,6 +4018,7 @@ lots:
     after: [ L343 ]
     created: 2026-10-26
     started: 2026-10-27
+    review: { date: 2026-10-27, verdict: "compliant (1 minor : la page doit dire que le sujet `plan: …` reste le défaut sans `plan.commit`) — orchestré (vague 2026-10-27-1140, 0 passe(s) de correction)", commit: 336cc7969e4dd3c1a0840dbe18a1c30d48ea5407 }
   - id: L364
     title: "intégration en mode worktree : quand l'avance rapide de main est refusée parce que main a bougé pendant l'intégration (commit de plan du lead, autre lot), refaire le rebase et les tests au nouveau sommet (une ou deux fois) au lieu de rendre le lot ; journal « main a avancé pendant l'intégration, rebase rejoué » ; test ; constat L347 du 26-10 (« Not possible to fast-forward », commit de clôture de L361 par le lead au même moment)"
     status: done

@@ -151,8 +151,9 @@ export function ignoredDeps(repo: string): string[] {
 
 /**
  * Copie dans le worktree `dir` ces dépendances du dépôt vivant (L389), au lieu de les y relier : un outil qui refuse de charger un `node_modules` lié depuis
- * un autre arbre (Astro : « Could not load … ») les trouve chez lui. Les liens relatifs du dossier (espaces de travail) sont copiés tels quels : ils
- * pointent dans la copie. Rend les chemins copiés ; un chemin dont le parent n'existe pas dans le worktree est passé.
+ * un autre arbre (Astro : « Could not load … ») les trouve chez lui. Les liens relatifs du dossier qui restent dans le dépôt (espaces de travail) sont
+ * copiés tels quels : ils pointent dans la copie. Ceux qui en sortent (`file:../voisin`, `link:`) pointeraient dans le vide depuis `dir` : ils sont refaits
+ * vers leur cible vivante. Rend les chemins copiés ; un chemin dont le parent n'existe pas dans le worktree est passé.
  */
 export function copyDeps(repo: string, dir: string, names: readonly string[]): string[] {
   const copied: string[] = [];
@@ -160,9 +161,32 @@ export function copyDeps(repo: string, dir: string, names: readonly string[]): s
     const to = join(dir, name);
     if (existsSync(to) || !existsSync(dirname(to))) continue;
     cpSync(join(repo, name), to, { recursive: true, verbatimSymlinks: true });
+    relinkOutside(realpathSync(repo), join(repo, name), to);
     copied.push(name);
   }
   return copied;
+}
+
+/** Dans la copie `to` de `live`, refait vers leur cible vivante les liens relatifs dont la cible sort du dépôt `repoReal`. */
+function relinkOutside(repoReal: string, live: string, to: string): void {
+  for (const e of readdirSync(live, { withFileTypes: true })) {
+    const liveEntry = join(live, e.name);
+    const copy = join(to, e.name);
+    if (e.isSymbolicLink()) {
+      let real: string;
+      try {
+        real = realpathSync(liveEntry);
+      } catch {
+        continue; // lien mort : recopié tel quel
+      }
+      if (relative(repoReal, real).startsWith('..')) {
+        rmSync(copy);
+        symlinkSync(real, copy);
+      }
+    } else if (e.isDirectory()) {
+      relinkOutside(repoReal, liveEntry, copy);
+    }
+  }
 }
 
 function linkNames(repo: string, dir: string, names: readonly string[]): string[] {

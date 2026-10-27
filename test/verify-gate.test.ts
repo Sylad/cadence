@@ -441,6 +441,27 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     expect(r.code).toBe(0);
   });
 
+  it('L389 R3 — un lien de node_modules qui sort du dépôt (file:../voisin) reste résolvable dans la copie : il pointe le voisin vivant', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: grep -q voisin node_modules/x/i.js\n');
+    const voisin = join(repo, '..', `voisin-${process.pid}`);
+    mkdirSync(voisin, { recursive: true });
+    writeFileSync(join(voisin, 'i.js'), 'voisin\n');
+    execFileSync('ln', ['-s', `../../voisin-${process.pid}`, join(repo, 'node_modules', 'x')]);
+    // La copie jetable est posée ailleurs que le dépôt : un lien relatif recopié tel quel ne retrouverait pas le voisin.
+    const ailleurs = tempDir();
+    const avant = process.env.TMPDIR;
+    process.env.TMPDIR = ailleurs;
+    try {
+      const r = await gate(repo, sha);
+      expect(here(r)).toMatch(/copie jetable/);
+      expect(r.code).toBe(0);
+    } finally {
+      if (avant === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = avant;
+      execFileSync('rm', ['-rf', voisin]);
+    }
+  });
+
   it('L389 R3 — arbre principal propre mais à un autre sha : copie jetable, au sha demandé', async () => {
     const { repo, sha } = project('orchestrate:\n  test: grep -q v1 valeur.txt\n', true);
     writeFileSync(join(repo, 'valeur.txt'), 'v2\n');

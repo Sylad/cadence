@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { changelogSectionOf } from './changelog-section.js';
 import { parse } from 'yaml';
 import { tempDir } from './helpers.js';
 import { checkLinks, CHECKED } from '../scripts/check-links.mjs';
@@ -111,7 +112,7 @@ describe('démarrage « lead multi-projets » en 10 minutes (L358)', () => {
   });
 
   it('R9 — le CHANGELOG annonce le démarrage et les modèles de tickets', () => {
-    const section = read('CHANGELOG.md').split(/\n(?=## \[)/).find((s) => s.startsWith('## [') && s.includes('(L358')) ?? '';
+    const section = changelogSectionOf(read('CHANGELOG.md'), '(L358');
     expect(section).toMatch(/L358[^\n]*quickstart/);
     expect(section).toMatch(/L358[^\n]*issue/i);
   });

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { changelogSectionOf } from './changelog-section.js';
 
 const root = join(import.meta.dirname, '..');
 const read = (f: string) => readFileSync(join(root, f), 'utf8');
@@ -20,7 +21,7 @@ describe('Node minimal (L365)', () => {
   it('R3 — le CHANGELOG annonce le changement sous Changed, avec un avertissement explicite (dans [Unreleased] ou la version qui l\'a publié)', () => {
     const changelog = read('CHANGELOG.md');
     // La section qui porte l'entrée : [Unreleased] avant la publication, [x.y.z] après le commit de version (L368 : ne lire que [Unreleased] a rougi le run publish de 1.14.0).
-    const section = changelog.split(/\n(?=## \[)/).find((s) => s.startsWith('## [') && s.includes('(L365')) ?? '';
+    const section = changelogSectionOf(changelog, '(L365');
     const changed = section.slice(section.indexOf('### Changed'));
     expect(changed).toMatch(/L365[^\n]*Node >=22\.18[^\n]*Node 20/);
     expect(changed).toMatch(/\*\*Warning[^*]*Node 20 is no longer supported\*\*/);

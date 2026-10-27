@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
+import { changelogSectionOf } from './changelog-section.js';
 import { tempDir } from './helpers.js';
 import { checkLinks, CHECKED } from '../scripts/check-links.mjs';
 import { readOrchestrateConfig, readPlanConfig } from '../src/config.js';
@@ -137,8 +138,8 @@ describe('cadence avec vos outils (L363)', () => {
     expect(para).toMatch(/set `plan\.commit`/i);
   });
 
-  it('R10 — le CHANGELOG annonce la page sous [Unreleased]', () => {
-    const non = read('CHANGELOG.md').split(/\n(?=## \[)/).find((s) => s.startsWith('## [Unreleased]')) ?? '';
+  it('R10 — le CHANGELOG annonce la page (dans [Unreleased] ou la version qui l\'a publiée)', () => {
+    const non = changelogSectionOf(read('CHANGELOG.md'), 'L363');
     expect(non).toMatch(/L363[^\n]*with-your-tools|with-your-tools[^\n]*L363/);
   });
 

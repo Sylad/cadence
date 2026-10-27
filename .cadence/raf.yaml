@@ -4204,6 +4204,7 @@ lots:
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-27
+    review: { date: 2026-10-27, verdict: "compliant (4 minor notes: misplaced docstring on foreignLots, docs/news.md still describes only the docs_ok key, a misleading R4 title, a possible gap between plan.files and the --config location) — orchestré (vague 2026-10-27-1821, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant (3 notes mineures : chemin du fichier selon --config, JSDoc détachée, docs/news.md)", commit: 22338bcd5a75944cb491c0722a9a89aa44e2c3d8 }
   - id: L387
     title: "cadence verify --gate : un rouge sous charge qui ne nomme aucun test (vu 3 fois le 27-10 : L380, B28.17, puis vert au rejeu) — imprimer la fin de la sortie de l'étape rouge quand aucun nom de test n'est extrait, et appliquer orchestrate.testReplay comme la porte des vagues ; tests"
     status: doing

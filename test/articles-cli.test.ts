@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
 import { deliver, parseDeliverConfig, type DeliverDeps } from '../src/deliver.js';
@@ -103,5 +103,70 @@ describe('deliver : le script du projet écrit le plan', () => {
     const after = Plan.load(join(dir, '.cadence/raf.yaml'));
     expect(after.lot('L2').status).toBe('done');
     expect(after.lot('L3').title).toBe('Article demo à rafraîchir');
+  });
+});
+
+describe('deliver pendant une vague (L388) : le plan écrit pour l\'article est commité', () => {
+  /** Un dépôt avec une livraison de départ faite et un commit `feat(L1)` poussé, prêt à être livré par `deliverOnce`. */
+  async function prete(): Promise<{ dir: string; base: Parameters<typeof deliver>[0]; deps: DeliverDeps; out: string[] }> {
+    const dir = pushed();
+    let clock = 0;
+    const deps: DeliverDeps = { exec: () => 0, gh: () => [], ghReady: () => null, fetch: async () => ({ status: 200, text: 'ok' }), sleep: async (ms) => { clock += ms; }, now: () => clock };
+    const out: string[] = [];
+    const config = parseDeliverConfig('deliver:\n  ci: none\n  verify:\n    - command: "true"\n', 'cadence.yaml');
+    const base = { root: dir, state: stateDir(dir), plan: Plan.load(join(dir, '.cadence/raf.yaml')), config, today: '2026-10-09', dryRun: false, args: [] as string[], out: (l: string) => out.push(l), err: (l: string) => out.push(l), articles: [{ repo: '../codex', file: 'cas.md' }], publicTitle: (l: { public?: string }) => l.public ?? 'Alertes météo plus claires' };
+    expect(await deliver(base, deps)).toBe(0); // point de départ
+    write(dir, 'src/a.ts', 'x');
+    git(dir, 'add', '--', 'src/a.ts');
+    commit(dir, 'feat(L1): alertes');
+    git(dir, 'push', '-q');
+    out.length = 0;
+    return { dir, base: { ...base, plan: Plan.load(join(dir, '.cadence/raf.yaml')) }, deps, out };
+  }
+  const status = (dir: string) => execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' }).trim();
+  const subject = (dir: string) => execFileSync('git', ['log', '-1', '--format=%s'], { cwd: dir, encoding: 'utf8' }).trim();
+
+  it('R1 — vague qui tient le dépôt : le lot de l\'article ouvert est commité, l\'arbre reste propre', async () => {
+    const { dir, base, deps, out } = await prete();
+    expect(await deliver({ ...base, duringWave: true, waveId: '2026-10-27-1950' }, deps)).toBe(0);
+    expect(status(dir)).toBe('');
+    expect(subject(dir)).toBe('plan: L2 article à rafraîchir ouvert (orchestrate 2026-10-27-1950)');
+    expect(out.join('\n')).toContain('article à rafraîchir : L2');
+    expect(out.join('\n')).not.toContain('à commiter');
+  });
+
+  it('R2 — le message du commit suit le gabarit plan.commit du projet', async () => {
+    const { dir, base, deps } = await prete();
+    expect(await deliver({ ...base, duringWave: true, waveId: 'W9', planCommit: 'chore({lot}): {action} [{vague}]' }, deps)).toBe(0);
+    expect(subject(dir)).toBe('chore(L2): article à rafraîchir ouvert [W9]');
+  });
+
+  it('R3 — hors vague : le plan reste écrit sans être commité, comme avant', async () => {
+    const { dir, base, deps, out } = await prete();
+    const head = subject(dir);
+    expect(await deliver(base, deps)).toBe(0);
+    expect(status(dir)).toBe('M .cadence/raf.yaml');
+    expect(subject(dir)).toBe(head);
+    expect(out.join('\n')).toContain('plan modifié, à commiter');
+  });
+
+  it('R4 — plan déjà modifié par le lead avant la livraison : rien n\'est commité à sa place, la ligne le dit', async () => {
+    const { dir, base, deps, out } = await prete();
+    const p = join(dir, '.cadence/raf.yaml');
+    writeFileSync(p, `${readFileSync(p, 'utf8')}# note du lead\n`);
+    const head = subject(dir);
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim(); // --sha : l'arbre sale ne refuse pas la livraison
+    expect(await deliver({ ...base, plan: Plan.load(p), sha, duringWave: true, waveId: 'W9' }, deps)).toBe(0);
+    expect(subject(dir)).toBe(head);
+    expect(status(dir)).toBe('M .cadence/raf.yaml');
+    expect(out.join('\n')).toContain('plan déjà modifié avant la livraison');
+  });
+
+  it('R5 — commit refusé (hook commit-msg) : le plan reste écrit, la livraison reste verte et le dit', async () => {
+    const { dir, base, deps, out } = await prete();
+    writeFileSync(join(dir, '.git/hooks/commit-msg'), '#!/bin/sh\necho refusé >&2\nexit 1\n', { mode: 0o755 });
+    expect(await deliver({ ...base, duringWave: true, waveId: 'W9' }, deps)).toBe(0);
+    expect(status(dir)).toBe('M .cadence/raf.yaml');
+    expect(out.join('\n')).toContain('commit du plan refusé');
   });
 });

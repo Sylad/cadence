@@ -661,7 +661,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const articles = readDocsConfig(configPath).articles;
       // Sans public: d'un lot visible, le site reprend le titre de sa Nouveauté la plus récente.
       const publicTitle = (lot: Lot) => lot.public ?? (lot.visible ? loadEntries(newsDir).find((e) => e.lots.includes(lot.id))?.title : undefined);
-      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], sha: values.sha, duringWave: !!orchestrating, args: rest, articles, publicTitle, out: io.out, err: io.err };
+      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], sha: values.sha, duringWave: !!orchestrating, waveId: orchestrating?.wave, planCommit: readPlanConfig(configPath, root)?.commit, args: rest, articles, publicTitle, out: io.out, err: io.err };
       return deliver(ctx, realDeps(root));
     }
     case 'verify': {

@@ -1,12 +1,13 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { constants } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { parse } from 'yaml';
 import { onTermination, readProcs, SIGNAL_GRACE_MS, SIGNAL_PENDING_MS, TreeTracker } from './proc.js';
 import type { Day } from './dates.js';
 import { isPlanOnly } from './audit.js';
-import { headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
+import { commitPaths, dirtyPaths, headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
+import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
 import { citedRefs } from './link.js';
 import { describeArticle, openArticleLots, type ArticleRule } from './articles.js';
 import { RafError, type Lot, type Plan } from './plan.js';
@@ -88,6 +89,10 @@ export interface DeliverCtx {
    * le script déclare ce qu'il a déployé (CADENCE_DEPLOYED_FILE).
    */
   duringWave?: boolean;
+  /** Identifiant de la vague qui tient le dépôt (cité par le commit du plan écrit pour un article, L388). */
+  waveId?: string;
+  /** Gabarit `plan.commit` du projet (L343) : le message du commit du plan écrit pour un article pendant une vague. */
+  planCommit?: string;
   /** Arguments de la ligne de commande, ajoutés au script du projet. */
   args: string[];
   /** Articles d'un dépôt voisin à rafraîchir après une livraison verte (clé `docs.articles`, L144). */
@@ -606,14 +611,17 @@ function deliveredLots(ctx: DeliverCtx, ids: string[], prev: string | null, sha:
 
 /**
  * Livraison verte (L144) : les lots livrés dont le titre est public changent ce que les articles externes racontent, on ouvre
- * donc le lot qui les rafraîchit. Le plan est écrit mais pas commité (deliver ne commite jamais) ; une erreur ici ne défait pas
- * une livraison déjà faite.
+ * donc le lot qui les rafraîchit. Hors vague le plan est écrit mais pas commité ; pendant une vague (L388) il est commité seul, avec
+ * le gabarit `plan.commit`, pour ne pas laisser le plan modifié dans l'arbre où une session de la vague travaille — sauf s'il l'était
+ * déjà avant l'écriture (le lead y a des modifications que ce commit emporterait). Une erreur ici ne défait pas une livraison déjà faite.
  */
 function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
   if (!ctx.plan || !ctx.articles?.length || !ids.length) return;
   try {
     // Relu : le script du projet a pu fermer des lots ou commiter le plan depuis le départ de la livraison, save() ne doit pas l'écraser.
     const plan = ctx.plan.reloaded();
+    const planFile = relative(ctx.root, plan.path);
+    const wasDirty = dirtyPaths(ctx.root, [planFile]).length > 0;
     const wanted = new Set(ids);
     const r = openArticleLots({
       plan,
@@ -626,8 +634,20 @@ function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
     });
     for (const w of r.warnings) ctx.err(`deliver : ${w}`);
     if (r.opened.length || r.noted.length) plan.save();
-    for (const id of r.opened) ctx.out(`article à rafraîchir : ${id} « ${plan.lot(id).title} » ouvert (plan modifié, à commiter) — à jouer dans une vague ordinaire`);
-    for (const id of r.noted) ctx.out(`article à rafraîchir : ${id} déjà ouvert, titres livrés ajoutés en note (plan modifié, à commiter)`);
+    const touched = [...r.opened, ...r.noted];
+    let state = 'plan modifié, à commiter';
+    if (touched.length && ctx.duringWave && wasDirty) {
+      state = 'plan déjà modifié avant la livraison, non commité : à commiter avec vos modifications';
+    } else if (touched.length && ctx.duringWave) {
+      const message = planCommitMessage(ctx.planCommit, { lot: touched.join(', '), action: r.opened.length ? PLAN_ACTIONS.articleOpened : PLAN_ACTIONS.articleNoted, wave: ctx.waveId });
+      try {
+        state = `plan commité ${commitPaths(ctx.root, [planFile], message)}`;
+      } catch (e) {
+        state = `commit du plan refusé (${(e as Error).message}), plan modifié, à commiter`;
+      }
+    }
+    for (const id of r.opened) ctx.out(`article à rafraîchir : ${id} « ${plan.lot(id).title} » ouvert (${state}) — à jouer dans une vague ordinaire`);
+    for (const id of r.noted) ctx.out(`article à rafraîchir : ${id} déjà ouvert, titres livrés ajoutés en note (${state})`);
     for (const m of r.manual) ctx.out(`article à rafraîchir : ${m}`);
   } catch (e) {
     ctx.err(`deliver : article à rafraîchir non ouvert — ${(e as Error).message}`);

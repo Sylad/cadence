@@ -23,6 +23,9 @@ export const PLAN_ACTIONS = {
   done: 'terminé',
   reviewRecorded: 'revue de code enregistrée',
   reviewNoted: 'revue de code notée',
+  /** `cadence deliver` pendant une vague (L388) : le lot de l'article ouvert, ou ses titres ajoutés en note. */
+  articleOpened: 'article à rafraîchir ouvert',
+  articleNoted: 'article à rafraîchir : titres livrés notés',
   /** `spec green` (L366) : jamais la liste des tests rescellés, elle va dans le corps du commit (header-max-length de commitlint). */
   specGreen: 'acceptation verte, vert: true posé par cadence spec green',
   resealed: (norm: string) => `test d'acceptation rescellé (${norm})`,

@@ -143,7 +143,7 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   commits (see "Plan upkeep needs no lot") are skipped in that list: they cite
   lots without delivering anything.
 - With [`docs.articles`](news.md#an-article-elsewhere-that-follows-the-delivery), a green delivery of lots with a
-  public title also opens the lot `Article <project> à rafraîchir` in the plan.
+  public title also opens the lot `Article <project> à rafraîchir` in the plan (committed on its own when a wave holds the repository, L388).
 
 ## A project with its own delivery script
 

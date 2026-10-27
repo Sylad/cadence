@@ -4060,6 +4060,7 @@ lots:
     estimate: 0.5
     created: 2026-10-26
     started: 2026-10-27
+    review: { date: 2026-10-27, verdict: "conforme — 2 mineurs (bord : une entrée au texte déjà présent dans une ancienne version n'est ni reconnue comme déplacée par la publication, ni écartée comme intermédiaire), aucune correction requise avant intégration — orchestré (vague 2026-10-27-0800, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: d29942d73b2fb863468f9c113b8267c4640e5420 }
   - id: L370
     title: "cadence orchestrate --integrate accepte un lot rendu pour son budget (ou une revue non conforme) dont le lead a fait corriger puis revoir le travail hors vague (raf review conforme plus récent que son dernier commit) : rebase, revue courte, avance ; aujourd'hui refusé (« pas rendu à l'étape d'intégration »), le lead intègre à la main (L367 du 26-10)"
     status: done

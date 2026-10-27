@@ -4176,9 +4176,10 @@ lots:
     finished: 2026-10-27
   - id: L383
     title: "intégration en worktree : un conflit de CHANGELOG où un côté ajoute sous [Unreleased] une rubrique (### Fixed) avec son entrée et l'autre une entrée nue n'est pas résolu par l'union de L369 — L381 rendu à l'intégration le 27-10 (union faite à la main par le lead : l'entrée nue rangée sous la rubrique ajoutée par l'autre lot) ; résoudre ce cas (rubriques fusionnées, une entrée par lot), test"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-27
+    started: 2026-10-27
   - id: L384
     title: "⚡ publication 1.16.0 rouge au run publish (27-10, tag poussé, npm resté en 1.15.1, plugin déjà en 1.16.0) : test/raf-init-commit.test.ts R2 (L377) suppose le hook post-commit capable de lancer raf, qu'il trouve dans le PATH de la machine du développeur (~/.local/bin/raf) mais pas en CI — (1) R2 hermétique : le hook du test lance raf depuis les sources ; (2) mécanisme : la suite de tests tourne en local comme en CI, sans raf ni cadence installés dans le PATH (setup global qui retire du PATH des tests tout dossier qui porte un raf ou un cadence hors du dépôt), pour qu'un test qui dépend de l'outil installé rougisse sur la machine du lead et dans la porte, pas seulement au run publish ; publier ensuite 1.16.1 qui porte 1.16.0 ; doc, CHANGELOG, tests"
     status: doing

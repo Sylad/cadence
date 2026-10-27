@@ -202,9 +202,9 @@ implementer rewrites the article in the neighbouring repository, the review chec
 of that title is still open, it receives a note instead of a duplicate. Two entries with the same name (the same
 project told in two neighbouring repositories) share one lot, which declares both repositories in `repos:`. Internal lots (no public title) open nothing;
 a red delivery opens nothing; `cadence deliver --dry-run` announces the articles. Outside a wave the plan is written but **not
-committed**: the line `article à rafraîchir : L9 …` says so. During a wave (`cadence deliver --sha`), the plan is committed on its own
-with the `plan.commit` template (`plan: L9 article à rafraîchir ouvert (orchestrate <wave>)` by default), so no plan change is left in the tree a session
-of the wave works in; if the plan already had uncommitted changes, or the commit is refused (a `commit-msg` hook), it stays written and the line says so. With a plan kept by another
+committed**: the line `article à rafraîchir : L9 …` says so. During a wave (`cadence deliver --sha`), the plan is committed with the files that `plan.onWrite` produces from it,
+using the `plan.commit` template (`plan: L9 article à rafraîchir ouvert (orchestrate <wave>)` by default), so no plan change is left in the tree a session
+of the wave works in; if the plan or one of those files already had uncommitted changes (the commit would carry them away), or the commit is refused (a `commit-msg` hook), nothing is committed, it stays written and the line says so. With a plan kept by another
 tool (read-only), the same line carries the instruction to open the lot with that tool. This replaces the manual
 `sync-site-docs` skill.
 

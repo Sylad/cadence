@@ -4166,11 +4166,12 @@ lots:
     started: 2026-10-27
   - id: L382
     title: "suites de L378 (connexion de Claude Code vérifiée avant un lot) : en --continue, preflight() relance claude auth status (jusqu'à 20 s) pour chaque lot candidat à chaque tour — une seule vérification par vague (ou mise en cache pour la vague) ; dans docs/quickstart.md:31,130 et docs/orchestrate.md:39 le message cité contient des backticks dans des backticks (rendu Markdown cassé) ; tests"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-10-27
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "compliant — orchestré (vague 2026-10-27-1420, 0 passe(s) de correction)", commit: 95f2baee0b899af84f6bbdb53eb480643da23344 }
+    finished: 2026-10-27
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

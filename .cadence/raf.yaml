@@ -4068,12 +4068,13 @@ lots:
     started: 2026-10-27
   - id: L371
     title: "raf done dans le dépôt cadence n'a pas commité le plan (26-10, L365 : plan resté modifié, mise en service refusée) : établir si c'est voulu (réglage) ou un défaut, et le dire dans le message de raf done ; aligner avec plan.commit"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-10-26
     started: 2026-10-27
     review: { date: 2026-10-27, verdict: "conforme après 2 corrections mineures (plan.files hors dépôt fait planter raf done ; la commande imprimée échoue depuis un sous-dossier) — orchestré (vague 2026-10-27-0800, 1 passe(s) de correction)", commit: cb7e551c1c46fa68f6a9d740e61589fcf967a505, reporte: { de: 9537c6f6033dcfafd0e636d4dba87c40c3b5e244, vers: cb7e551c1c46fa68f6a9d740e61589fcf967a505, patchId: c4f220a9195621bb74ded6a918d6dccc3a10dada } }
+    finished: 2026-10-27
   - id: L372
     title: "raf check : un commit de plan du lead qui cite des lots sans y travailler (création de lots, réglage cité entre parenthèses) les compte comme commencés ou à revoir (L369 L371 « 1 commit mais todo », L354 « commit postérieur à sa revue » le 27-10, commit cd91064) et raf ignore ne l'acquitte pas (il ne couvre que les commits sans lot) — raf ignore acquitte aussi un commit qui cite des lots connus (les écarts de commits de ces lots tombent, raf check --ignored le liste) ; doc, CHANGELOG, tests"
     status: doing

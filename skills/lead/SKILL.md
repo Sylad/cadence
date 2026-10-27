@@ -193,7 +193,7 @@ is always recorded by the lead's own `raf ux`, never by a subagent.
 2. **The lead re-verifies itself**: `git log` shows the commits, the test suite and build pass when
    run by the lead, `raf check` is clean. During a wave, or in any tree that is not the lead's own, replay the gate at the lot's last sha with
    `cadence verify --gate --sha <sha> [--project <dir>]` (exit 0 green, 1 red with the failing tests, 2 nothing to replay): a bare
-   `git worktree add` has no `node_modules` or `.venv` and reddens suites that only miss their dependencies. A subagent is green on what it *could* test; say plainly
+   `git worktree add` has no `node_modules` or `.venv` and reddens suites that only miss their dependencies; the gate runs in the main tree when it is clean at the sha and in a throwaway copy with copied dependencies otherwise, and the first line of the output says which. A subagent is green on what it *could* test; say plainly
    what nobody could verify.
 3. Fix or re-delegate what the review found; then record the verdict, `raf review <lot> "…"` with
    the code reviewer's last line brought up to date (and `raf ux <lot> "…"` for a visible lot, with

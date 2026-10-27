@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
-import { readOrchestrateConfig } from '../src/config.js';
+import { readOrchestrateConfig, readVerifyConfig } from '../src/config.js';
 import { verifyGate } from '../src/verify-gate.js';
 import { cleanupTempDirs, gitRepo, tempDir } from './helpers.js';
 
@@ -13,9 +13,10 @@ afterEach(cleanupTempDirs);
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 
 /** Dépôt dont `.gitignore` écarte node_modules et .venv, avec une dépendance présente dans l'arbre principal seulement. */
-function project(yaml: string): { repo: string; sha: string } {
+function project(yaml: string, inPlace = false): { repo: string; sha: string } {
   const repo = gitRepo();
-  writeFileSync(join(repo, 'cadence.yaml'), yaml);
+  // Les tests de la copie jetable (L348) forcent `verify.inPlace: false` : l'arbre est propre au sha, la porte jouerait sinon dans l'arbre principal (L389).
+  writeFileSync(join(repo, 'cadence.yaml'), inPlace ? yaml : `${yaml}verify:\n  inPlace: false\n`);
   writeFileSync(join(repo, '.gitignore'), 'node_modules/\n.venv/\n');
   writeFileSync(join(repo, 'valeur.txt'), 'v1\n');
   git(repo, 'add', '.');
@@ -28,7 +29,7 @@ function project(yaml: string): { repo: string; sha: string } {
 
 async function gate(repo: string, sha: string) {
   const lines: string[] = [];
-  const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), out: (l) => lines.push(l) });
+  const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), verify: readVerifyConfig(join(repo, 'cadence.yaml')), out: (l) => lines.push(l) });
   return { code, text: lines.join('\n') };
 }
 
@@ -145,7 +146,7 @@ describe('verifyGate : délai, noms des suites, signal (L348)', () => {
     const { repo, sha } = project('orchestrate:\n  test: "sleep 30"\n');
     const lines: string[] = [];
     const t0 = Date.now();
-    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), out: (l) => lines.push(l), timeoutMs: 300 });
+    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), verify: readVerifyConfig(join(repo, 'cadence.yaml')), out: (l) => lines.push(l), timeoutMs: 300 });
     expect(Date.now() - t0).toBeLessThan(10_000);
     expect(code).toBe(1);
     expect(lines.join('\n')).toContain('code 124');
@@ -166,7 +167,7 @@ describe('verifyGate : délai, noms des suites, signal (L348)', () => {
   it('une commande qui laisse un processus en arrière-plan : il est tué à la fin de la commande', async () => {
     const pidFile = join(tempDir(), 'bg.pid');
     const { repo, sha } = project(`orchestrate:\n  test: "sleep 30 >/dev/null 2>&1 & echo $! > ${pidFile}"\n`);
-    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), out: () => {} });
+    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), verify: readVerifyConfig(join(repo, 'cadence.yaml')), out: () => {} });
     expect(code).toBe(0);
     const pid = Number(readFileSync(pidFile, 'utf8'));
     const alive = () => {
@@ -182,14 +183,14 @@ describe('verifyGate : délai, noms des suites, signal (L348)', () => {
     expect(alive()).toBe(false);
   });
 
-  it.each(['SIGINT', 'SIGTERM'] as const)('%s reçu par cadence : la commande de la porte meurt et le worktree est retiré', async (sig) => {
-    const { repo, sha } = project('orchestrate:\n  test: "echo $$ > pid.txt; exec sleep 30"\n');
+  it.each([['SIGINT', false], ['SIGTERM', false], ['SIGINT', true]] as const)('%s reçu par cadence (en place : %s) : la commande de la porte meurt et le worktree est retiré', async (sig, inPlace) => {
+    const { repo, sha } = project('orchestrate:\n  test: "echo $$ > pid.txt; exec sleep 30"\n', inPlace);
     const probe = join(tempDir(), 'probe.ts');
     writeFileSync(
       probe,
       `import { verifyGate } from ${JSON.stringify(join(process.cwd(), 'src/verify-gate.ts'))};\n` +
-        `import { readOrchestrateConfig } from ${JSON.stringify(join(process.cwd(), 'src/config.ts'))};\n` +
-        `process.exitCode = await verifyGate({ repo: ${JSON.stringify(repo)}, sha: ${JSON.stringify(sha)}, config: readOrchestrateConfig(${JSON.stringify(join(repo, 'cadence.yaml'))}), out: (l) => console.log(l) });\n`,
+        `import { readOrchestrateConfig, readVerifyConfig } from ${JSON.stringify(join(process.cwd(), 'src/config.ts'))};\n` +
+        `process.exitCode = await verifyGate({ repo: ${JSON.stringify(repo)}, sha: ${JSON.stringify(sha)}, config: readOrchestrateConfig(${JSON.stringify(join(repo, 'cadence.yaml'))}), verify: readVerifyConfig(${JSON.stringify(join(repo, 'cadence.yaml'))}), out: (l) => console.log(l) });\n`,
     );
     const child = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
     let said = '';
@@ -210,7 +211,7 @@ describe('verifyGate : délai, noms des suites, signal (L348)', () => {
     };
     let cmdPid = 0;
     try {
-      const pidFile = () => readdirSync(tmpdir()).map((n) => join(tmpdir(), n, 'pid.txt')).find((f) => f.includes('cadence-verify-') && existsSync(f));
+      const pidFile = () => (inPlace ? [join(repo, 'pid.txt')] : readdirSync(tmpdir()).map((n) => join(tmpdir(), n, 'pid.txt')).filter((f) => f.includes('cadence-verify-'))).find((f) => existsSync(f));
       expect(await wait(() => !!pidFile() && readFileSync(pidFile()!, 'utf8').trim() !== '', 20_000)).toBe(true);
       cmdPid = Number(readFileSync(pidFile()!, 'utf8').trim());
       process.kill(child.pid!, sig);
@@ -362,7 +363,7 @@ describe('verify --gate applique orchestrate.testReplay comme la porte des vague
   };
   const gateIn = async (repo: string, sha: string, env: Record<string, string | undefined>, cores = 16) => {
     const lines: string[] = [];
-    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), out: (l) => lines.push(l), env: { PATH: process.env.PATH, ...env }, cores });
+    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), verify: readVerifyConfig(join(repo, 'cadence.yaml')), out: (l) => lines.push(l), env: { PATH: process.env.PATH, ...env }, cores });
     return { code, text: lines.join('\n') };
   };
 
@@ -392,5 +393,83 @@ describe('verify --gate applique orchestrate.testReplay comme la porte des vague
     expect(r.text).toMatch(/rejeu seul.*2 rejeu/);
     expect(r.text).toMatch(/dernier code 1/);
     expect(r.text).toContain('0 test(s) confirmé(s) vert(s) sur 2');
+  });
+});
+
+describe('verifyGate : où la porte tourne (L389)', () => {
+  const here = (r: { text: string }) => r.text.split('\n')[0];
+
+  it('L389 R1 — arbre principal propre et au sha : la porte y est jouée, sans worktree, et la sortie le dit', async () => {
+    const { repo, sha } = project(`orchestrate:\n  test: test -f node_modules/dep/index.js && test ! -L node_modules/dep\n`, true);
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(0);
+    expect(here(r)).toMatch(/arbre principal/);
+    expect(here(r)).toContain(repo);
+    expect(r.text).not.toMatch(/copie jetable/);
+  });
+
+  it('L389 R2 — en place, la commande tourne dans la racine du dépôt', async () => {
+    const out = join(tempDir(), 'cwd.txt');
+    const { repo, sha } = project(`orchestrate:\n  test: pwd > ${out}\n`, true);
+    await gate(repo, sha);
+    expect(readFileSync(out, 'utf8').trim()).toBe(execFileSync('pwd', { cwd: repo, encoding: 'utf8' }).trim());
+    expect(existsSync(join(repo, 'valeur.txt'))).toBe(true);
+  });
+
+  it('L389 R3 — arbre principal modifié : copie jetable, node_modules copié (pas un lien) et la sortie le dit', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: test -f node_modules/dep/index.js && test ! -L node_modules/dep && test ! -L node_modules\n', true);
+    writeFileSync(join(repo, 'valeur.txt'), 'modifié\n');
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(0);
+    expect(here(r)).toMatch(/copie jetable/);
+    expect(here(r)).toMatch(/modifications/);
+    expect(here(r)).toContain('node_modules');
+  });
+
+  it('L389 R3 — arbre principal propre mais à un autre sha : copie jetable, au sha demandé', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: grep -q v1 valeur.txt\n', true);
+    writeFileSync(join(repo, 'valeur.txt'), 'v2\n');
+    git(repo, 'commit', '-q', '-a', '-m', 'v2');
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(0);
+    expect(here(r)).toMatch(/copie jetable/);
+    expect(here(r)).toMatch(/sha/);
+  });
+
+  it('L389 R3 — un fichier non suivi (hors ignorés) rend l\'arbre non propre', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: "true"\n', true);
+    writeFileSync(join(repo, 'nouveau.txt'), 'x');
+    expect(here(await gate(repo, sha))).toMatch(/copie jetable/);
+  });
+
+  it('L389 R4 — verify.inPlace: false : copie jetable même si l\'arbre est propre au sha', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: "true"\n');
+    expect(here(await gate(repo, sha))).toMatch(/copie jetable/);
+  });
+
+  it('L389 R4 — verify.inPlace: true : arbre non propre → refus, code 2, rien n\'est joué', async () => {
+    const mark = join(tempDir(), 'ran');
+    const { repo, sha } = project(`orchestrate:\n  test: touch ${mark}\nverify:\n  inPlace: true\n`, true);
+    writeFileSync(join(repo, 'valeur.txt'), 'modifié\n');
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(2);
+    expect(r.text).toContain('verify.inPlace');
+    expect(existsSync(mark)).toBe(false);
+  });
+
+  it('L389 R4 — verify.inPlace: true : arbre propre au sha → joué en place', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: "true"\nverify:\n  inPlace: true\n', true);
+    expect(here(await gate(repo, sha))).toMatch(/arbre principal/);
+  });
+
+  it('L389 R4 — verify.inPlace doit être un booléen', () => {
+    const { repo } = project('verify:\n  inPlace: parfois\n', true);
+    expect(() => readVerifyConfig(join(repo, 'cadence.yaml'))).toThrow(/verify\.inPlace/);
+  });
+
+  it('L389 R5 — la copie ne touche pas aux dépendances de l\'arbre principal', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: rm -rf node_modules/dep\n');
+    await gate(repo, sha);
+    expect(existsSync(join(repo, 'node_modules', 'dep', 'index.js'))).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { Plan } from '../plan.js';
 import { lotSlug } from './state.js';
@@ -141,17 +141,28 @@ export function mirrorNodeModules(repo: string, dir: string, name: string, links
  * fichier ignoré le plus haut ; son parent doit exister dans le worktree (sinon rien où le relier). Rend les liens créés.
  */
 export function linkIgnored(repo: string, dir: string): string[] {
-  const ignored = git(repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.startsWith('.cadence') && !f.split('/').some((p) => OUTPUT_DIRS.has(p)));
-  return linkNames(repo, dir, ignored);
+  return linkNames(repo, dir, ignoredDeps(repo));
+}
+
+/** Les dossiers et fichiers ignorés du dépôt vivant les plus hauts, hors `.cadence` et sorties de build : ce que les worktrees relient et que `verify --gate` copie. */
+export function ignoredDeps(repo: string): string[] {
+  return git(repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.startsWith('.cadence') && !f.split('/').some((p) => OUTPUT_DIRS.has(p)));
 }
 
 /**
- * Relie dans le worktree `dir` les dépendances que le dépôt vivant déclare (`orchestrate.worktreeDeps`, L348), par leur chemin relatif. Celles qui n'existent pas
- * dans le dépôt vivant ne sont pas liées et sont rendues dans `missing`. Rend aussi les liens créés.
+ * Copie dans le worktree `dir` ces dépendances du dépôt vivant (L389), au lieu de les y relier : un outil qui refuse de charger un `node_modules` lié depuis
+ * un autre arbre (Astro : « Could not load … ») les trouve chez lui. Les liens relatifs du dossier (espaces de travail) sont copiés tels quels : ils
+ * pointent dans la copie. Rend les chemins copiés ; un chemin dont le parent n'existe pas dans le worktree est passé.
  */
-export function linkDeclared(repo: string, dir: string, names: readonly string[]): { links: string[]; missing: string[] } {
-  const present = names.filter((n) => lstatSync(join(repo, n), { throwIfNoEntry: false }));
-  return { links: linkNames(repo, dir, present), missing: names.filter((n) => !present.includes(n)) };
+export function copyDeps(repo: string, dir: string, names: readonly string[]): string[] {
+  const copied: string[] = [];
+  for (const name of names) {
+    const to = join(dir, name);
+    if (existsSync(to) || !existsSync(dirname(to))) continue;
+    cpSync(join(repo, name), to, { recursive: true, verbatimSymlinks: true });
+    copied.push(name);
+  }
+  return copied;
 }
 
 function linkNames(repo: string, dir: string, names: readonly string[]): string[] {

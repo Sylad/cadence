@@ -280,24 +280,33 @@ project without `deliver.verify`.
 replays the *gate* of the project, `orchestrate.build` then `orchestrate.test` of `cadence.yaml`
 (the order of the wave's gate: the tests read what the build produces), at one commit, for the
 lead's re-verification (« the lead re-verifies itself », skill `lead`). It never touches the shared
-tree, which holds the lots still running.
+tree while it holds uncommitted work (the lots still running): it then replays in a throwaway copy.
 
 ```sh
 cadence verify --gate --sha 6b0d9aa                  # in the project
 cadence verify --gate --sha 6b0d9aa --project app    # from the parent folder, the project `app` (its own git repository)
 ```
 
-It adds a throwaway worktree of the sha under the OS temporary folder (`cadence-verify-…`), links
-the **untracked dependencies** of the main tree into it, runs the commands there, and removes the worktree
-whatever the result. A bare worktree has no `node_modules` or `.venv`: on 26-10 the re-verification of a lot
-in one gave nine red suites that were only missing dependencies. Which dependencies:
+**Where the gate runs (L389).** The first line of the output says it:
+
+- the main tree is **clean and at the sha** (`git status --porcelain` empty, `HEAD` equal to the sha): the gate runs **there**, in the repository itself, with its own `node_modules` and its real paths (`verify --gate 6b0d9aa : porte jouée dans l'arbre principal /path/app (propre, au sha)`). A tool that refuses a `node_modules` linked from another tree (Astro: « Could not load …/node_modules/astro/… »), or a test that reads files by a path relative to the checkout, is red in a copy for reasons that have nothing to do with the sha; on 27-10 avatar-pandora and finance-tracker's ux-demo.spec were both green in the main tree and red in the copy. The commands may write their usual ignored outputs there (`dist`, caches);
+- otherwise (uncommitted changes, untracked files, or another commit checked out: a wave's lots may be working in it): a throwaway worktree of the sha under the OS temporary folder (`cadence-verify-…`), removed whatever the result, where the **untracked dependencies of the main tree are copied** (not linked: a copied `node_modules` is a real one for the tools that refuse a link; workspace links, relative, are copied as they are and point inside the copy). The line names the worktree, why the main tree was not used, and the copied dependencies (`… porte jouée dans une copie jetable /tmp/cadence-verify-x (l'arbre principal a des modifications non validées ou des fichiers non suivis) ; dépendances copiées : node_modules`). The copy of a large `node_modules` takes time: this is the price of a gate that does not lie.
+
+```yaml
+# cadence.yaml
+verify:
+  inPlace: false   # always the throwaway copy, even when the main tree is clean at the sha
+  # inPlace: true  # the main tree or nothing: not clean at the sha → exit 2, nothing is run
+```
+
+Absent, `verify.inPlace` chooses as above. Which dependencies are copied into the throwaway worktree:
 
 - `orchestrate.worktreeDeps: [node_modules, .venv, front/node_modules]` in `cadence.yaml`: those paths, relative to the repository
   (no absolute path, no `..`); one that does not exist in the main tree is reported and skipped;
-- absent: the same folders as the worktrees of a wave (the ignored folders of every level, `node_modules`, `.venv`…; build outputs such as `dist` excluded). The
-  workspace links of a `node_modules` are made again towards the worktree, so the code run is the sha's.
+- absent: the same folders as the worktrees of a wave (the ignored folders of every level, `node_modules`, `.venv`…; build outputs such as `dist` excluded). A bare worktree has no `node_modules` or `.venv`: on 26-10 the re-verification of a lot in one gave nine red suites that were only missing dependencies.
 
 ```
+verify --gate 6b0d9aa : porte jouée dans l'arbre principal /path/app (propre, au sha)
 ✓ build (npx tsc --noEmit)
 ✗ tests (npx vitest run) — code 1
   - test/a.test.ts > R3 — …
@@ -309,5 +318,5 @@ tests the output names (the same reading as the wave's baseline) and the test fi
 With `orchestrate.testReplay` declared (`docs/orchestrate.md`, « A red test is replayed alone »), the gate does what a wave does: a red test the output names is **replayed alone, twice at most**, in the same throwaway worktree. Green at a replay it is *unstable under load*: the step prints `✓ tests (…) — N test(s) rouge(s) sous charge, verts rejoués seuls (instables sous charge) :` with the names and does not make the gate red; the tests still red stay listed and the unstable ones follow, under a line of their own. A failure the output ties to no test, or a file that does not load, is never replayed and stays red. When a replay took place and the step stays red, one line says so (`rejeu seul (orchestrate.testReplay) : N rejeu(x), dernier code C — k test(s) confirmé(s) vert(s) sur n`): a replay that fails or runs no test confirms nothing, and the line tells a real red from a replay that could not run. Without `testReplay` nothing is replayed.
 Each command has 30 minutes (then its whole process group is killed, code 124). Ctrl-C, SIGTERM or a hangup received by cadence kills the running command and removes the worktree before cadence dies.
 `--sha` is required (the moving head of a wave is not a sha to re-verify) and `--retry` does not apply. Exit code:
-**0** green · **1** red · **2** nothing to replay (neither `orchestrate.build` nor `orchestrate.test`), unknown sha or a worktree that cannot be made.
+**0** green · **1** red · **2** nothing to replay (neither `orchestrate.build` nor `orchestrate.test`), unknown sha, a worktree that cannot be made, or `verify.inPlace: true` with a main tree not clean at the sha.
 The Node of the `.nvmrc` is not selected here: the commands run with the environment of the caller (`PATH` included). `CADENCE_TEST_WORKERS` is set for the build, the tests and the replays, as a wave does (`docs/orchestrate.md`, L350): the value of the caller's environment when it is a positive integer, otherwise cores ÷ session cap (`CADENCE_MAX_SESSIONS`, 2 by default), so a `testReplay` such as `--maxWorkers=$CADENCE_TEST_WORKERS` works from a plain shell.

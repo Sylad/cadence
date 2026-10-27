@@ -308,7 +308,7 @@ export interface OrchestrateConfig {
   /** Commande de build du projet, lancée par l'orchestrateur après les tests, et dont le résultat est passé au relecteur. */
   build?: string;
   /**
-   * Dépendances non suivies à relier dans un worktree jetable de `cadence verify --gate` (L348), chemins relatifs au dépôt (`node_modules`, `.venv`, `front/node_modules`…).
+   * Dépendances non suivies à copier dans le worktree jetable de `cadence verify --gate` (L348, L389), chemins relatifs au dépôt (`node_modules`, `.venv`, `front/node_modules`…).
    * Absente : les dossiers ignorés de tout niveau, comme pour les worktrees de vague.
    */
   worktreeDeps?: string[];
@@ -379,6 +379,33 @@ const EFFORTS = ['default', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = (typeof EFFORTS)[number];
 export const EFFORT_STEPS = ['precheck', 'spec', 'maquette', 'fiche', 'accept', 'implement', 'fix', 'review', 'ux'] as const;
 export type EffortStep = (typeof EFFORT_STEPS)[number];
+
+/** Clé `verify:` de cadence.yaml (L389). */
+export interface VerifyConfig {
+  /**
+   * Où `cadence verify --gate` joue la porte : absent, dans l'arbre principal quand il est propre et à ce sha, sinon dans une copie jetable aux dépendances copiées ;
+   * `true` exige l'arbre principal (refus s'il n'est pas propre au sha), `false` joue toujours dans la copie jetable.
+   */
+  inPlace?: boolean;
+}
+
+/** Clé `verify:` de cadence.yaml. Absente : `{}`. */
+export function readVerifyConfig(file: string): VerifyConfig {
+  if (!existsSync(file)) return {};
+  let raw: unknown;
+  try {
+    raw = parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
+  }
+  const v = (raw as { verify?: unknown } | null)?.verify;
+  if (v == null) return {};
+  if (!isObject(v)) throw new RafError(`${file} : verify doit être un objet { inPlace }`);
+  for (const k of Object.keys(v)) if (k !== 'inPlace') throw new RafError(`${file} : verify.${k} inconnu (attendu : inPlace)`);
+  if (v.inPlace == null) return {};
+  if (typeof v.inPlace !== 'boolean') throw new RafError(`${file} : verify.inPlace : true ou false attendu`);
+  return { inPlace: v.inPlace };
+}
 
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 

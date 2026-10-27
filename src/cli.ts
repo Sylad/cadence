@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { execFileSync } from 'node:child_process';
 import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig } from './config.js';
+import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig, readVerifyConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
 import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
 import { short } from './check.js';
@@ -1315,7 +1315,7 @@ async function verifyGateCommand(values: { sha?: string; project?: string; retry
   const configPath = resolve(io.cwd, values.config ?? join(top, 'cadence.yaml'));
   const sha = resolveCommit(top, values.sha);
   if (!sha) throw new RafError(`verify --gate : --sha ${values.sha} : commit introuvable dans ${top}`);
-  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), out: io.out });
+  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), out: io.out });
 }
 
 /** `session start|close --all [--depth n]` : la commande jouée dans chaque projet sous le dossier courant, une section par projet. */

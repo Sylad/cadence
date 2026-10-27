@@ -73,7 +73,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf list [--status todo|doing|done|dropped]
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot, citant un id inconnu ou des lots sans y travailler, sans réécrire l'historique ; raf check --ignored les liste
-  raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
+  raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle (plan en lecture seule : .cadence/docs-ok.yaml, le plan n'est pas touché) ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
   raf gantt [-o .cadence/gantt.html]
   cadence config set <clé> <valeur> --all [--dry-run] [--depth n]   pose la même clé dans le cadence.yaml de chaque projet du dossier (ceux de lead tour), commentaires et ordre gardés, un lot de config qui la cite (raf add + start) et un commit à chemin explicite par projet ; ne pousse pas ; liste ce qui est fait et sauté (dépôt sale, déjà posée, plan en lecture seule) ; s'arrête sur une config qui ne se relit pas
   raf migrate [--dry-run]   déplace docs/plan/raf.yaml vers .cadence/raf.yaml (git mv) et réécrit les lecteurs du chemin dans le dépôt ; --dry-run les liste sans rien toucher ; refus tant qu'un lecteur n'est pas traité (migrate.keep de cadence.yaml pour ceux qui ne lisent pas le plan) ; rejouable
@@ -572,8 +572,12 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       knownLot(plan, rest[0], 'docs-ok se pose sur un lot, pas sur une sous-tâche');
       plan.setDocsOk(rest[0], values.reason ?? '', today);
-      plan.save();
-      io.out(`${rest[0]} : écart docs.sync acquitté`);
+      // Un plan en lecture seule n'est pas écrit : l'acquittement est dans .cadence/docs-ok.yaml, à commiter à la place du plan (L386).
+      if (plan.readonly) io.out(`${rest[0]} : écart docs.sync acquitté dans .cadence/docs-ok.yaml (le plan n'est pas touché) — commiter ce fichier`);
+      else {
+        plan.save();
+        io.out(`${rest[0]} : écart docs.sync acquitté`);
+      }
       return 0;
     }
     case 'check': {

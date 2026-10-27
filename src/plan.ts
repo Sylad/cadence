@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
 
@@ -363,9 +363,9 @@ export class Plan {
     return this.settings.config ?? null;
   }
 
-  /** Fichiers tenus avec le plan, relatifs à la racine du dépôt. */
+  /** Fichiers tenus avec le plan, relatifs à la racine du dépôt (le fichier d'acquittement docs-ok d'un plan en lecture seule en est un, L386). */
   get files(): string[] {
-    return this.settings.files ?? [];
+    return [...(this.settings.files ?? []), ...(this.readonly && this.settings.config ? [DOCS_OK_FILE] : [])];
   }
 
   /** Fichiers que produit `plan.onWrite` (L346), relatifs à la racine du dépôt : à commiter avec le plan, même s'ils n'étaient pas encore suivis. */
@@ -469,8 +469,16 @@ export class Plan {
     this.lotNode(lotId).set(key, node);
   }
 
+  /** Chemin du fichier d'acquittement docs-ok d'un plan en lecture seule : `.cadence/docs-ok.yaml` à côté du cadence.yaml lu (L386) ; null sans cadence.yaml. */
+  private get docsOkFile(): string | null {
+    return this.settings.config ? join(dirname(this.settings.config), DOCS_OK_FILE) : null;
+  }
+
   lots(): Lot[] {
-    if (this.settings.format) return this.read().lots;
+    if (this.settings.format) {
+      const ack = readDocsOkFile(this.docsOkFile);
+      return this.read().lots.map((l) => (l.docsOk || !ack[l.id] ? l : { ...l, docsOk: ack[l.id] }));
+    }
     const raw = (this.doc.get('lots') as YAMLSeq).toJSON() as Record<string, unknown>[];
     return raw.map((r) => normalizeLot(r));
   }
@@ -540,10 +548,25 @@ export class Plan {
 
   /** Acquitte l'écart `docs.sync` d'un lot (L317) : clé `docs_ok: { date, reason }`, la raison est obligatoire. Jamais sur une sous-tâche. */
   setDocsOk(ref: string, reason: string, today: Day): void {
-    this.writable();
     if (ref.includes('/')) throw new RafError(`docs-ok se pose sur un lot, pas sur une sous-tâche : ${ref}`);
     const why = reason.trim();
     if (!why) throw new RafError('docs-ok exige une raison : raf docs-ok <lot> --reason "pourquoi la documentation reste telle quelle"');
+    if (this.readonly) {
+      // Le plan est tenu par un autre outil : l'acquittement va dans un fichier de cadence, le plan n'est pas touché (L386).
+      const file = this.docsOkFile;
+      if (!file) throw new RafError(`plan en lecture seule : ${this.path} est tenu par un autre outil — pas de cadence.yaml lu, donc pas de ${DOCS_OK_FILE} où acquitter`);
+      if (!this.lots().some((l) => l.id === ref)) throw new RafError(`lot inconnu : ${ref}`);
+      const doc = existsSync(file) ? parseDocument(readFileSync(file, 'utf8')) : new Document({});
+      if (doc.errors.length > 0) throw new RafError(`${file} : ${doc.errors[0].message}`);
+      if (!isMap(doc.contents)) doc.contents = doc.createNode({}) as YAMLMap;
+      const entry = doc.createNode({ date: today, reason: why }) as YAMLMap;
+      entry.flow = true;
+      doc.set(ref, entry);
+      if (!existsSync(file)) doc.commentBefore = ' Écarts docs.sync acquittés (raf docs-ok) pour un plan tenu par un autre outil, lu par raf check et cadence orchestrate.';
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, doc.toString({ lineWidth: 0 }));
+      return;
+    }
     const node = this.doc.createNode({ date: today, reason: why }) as YAMLMap;
     node.flow = true;
     this.lotNode(ref).set('docs_ok', node);
@@ -769,6 +792,25 @@ export class Plan {
 }
 
 /** Lit une liste écrite dans un autre format : champs traduits, entrées à parent repliées en sous-tâches. */
+/** Fichier d'acquittement docs-ok d'un plan en lecture seule, relatif à la racine du dépôt (L386). */
+const DOCS_OK_FILE = '.cadence/docs-ok.yaml';
+
+/** Les acquittements du fichier : lot → { date, reason }. Une entrée sans raison n'acquitte rien ; un fichier illisible est une erreur qui le nomme. */
+function readDocsOkFile(file: string | null): Record<string, { date: Day; reason: string }> {
+  if (!file || !existsSync(file)) return {};
+  const doc = parseDocument(readFileSync(file, 'utf8'));
+  if (doc.errors.length > 0) throw new RafError(`${file} : ${doc.errors[0].message}`);
+  const raw = doc.toJSON() as unknown;
+  if (raw == null) return {};
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new RafError(`${file} : la racine doit être un objet (lot → { date, reason })`);
+  const out: Record<string, { date: Day; reason: string }> = {};
+  for (const [id, v] of Object.entries(raw)) {
+    const e = v as { date?: unknown; reason?: unknown } | null;
+    if (e && typeof e === 'object' && typeof e.reason === 'string' && e.reason.trim() !== '') out[id] = { date: String(e.date ?? ''), reason: e.reason.trim() };
+  }
+  return out;
+}
+
 function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] {
   const entries = raw.map((r, i) => {
     if (!r || typeof r !== 'object' || Array.isArray(r)) throw new RafError(`entrée n° ${i + 1} du plan : un objet est attendu`);

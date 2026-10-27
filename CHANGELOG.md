@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - `cadence orchestrate` and `--dry-run` refuse a repository holding a `.git/index.lock` before writing anything (L385, `docs/orchestrate.md`): the message gives the age of the lock, whether a git process is running, and the `rm` command to remove a stale one. A plan commit that fails (stale lock, refusing hook) now puts the plan back as it was even when the lock blocks the index: the next lot used to be handed back as a « dépôt sale » (L201 failed, then L200 on 27-10).
+- `raf docs-ok` no longer refuses a plan kept by another tool (read-only): the acknowledgement of a
+  `docs.sync` gap is written to `.cadence/docs-ok.yaml` (`L12: { date, reason }`, next to the project's
+  `cadence.yaml`), the plan is never touched, and `raf check`, `raf show`, `cadence lead tour` and
+  `cadence orchestrate` read it; the librarian's brief names that file to commit (L386).
 
 ## [1.16.1] - 2026-10-27
 

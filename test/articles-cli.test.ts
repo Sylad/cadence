@@ -188,6 +188,19 @@ describe('deliver pendant une vague (L388) : le plan écrit pour l\'article est 
     expect(out.join('\n')).toContain('plan déjà modifié avant la livraison');
   });
 
+  it('R8 — projet sans plan.onWrite, arbre sale ailleurs : le commit « plan: » ne contient que le plan, les autres fichiers restent tels quels', async () => {
+    const { dir, base, deps } = await prete();
+    write(dir, 'brouillon-du-lead.txt', 'à ne pas commiter\n'); // non suivi
+    writeFileSync(join(dir, 'src/a.ts'), 'x modifié'); // suivi, modifié
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim(); // --sha : l'arbre sale ne refuse pas la livraison
+    expect(await deliver({ ...base, sha, duringWave: true, waveId: 'W9' }, deps)).toBe(0);
+    expect(subject(dir)).toBe('plan: L2 article à rafraîchir ouvert (orchestrate W9)');
+    expect(execFileSync('git', ['show', '--name-only', '--format=', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim()).toBe('.cadence/raf.yaml');
+    expect(execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' }).trimEnd().split('\n').sort()).toEqual([' M src/a.ts', '?? brouillon-du-lead.txt']);
+    expect(readFileSync(join(dir, 'brouillon-du-lead.txt'), 'utf8')).toBe('à ne pas commiter\n');
+    expect(readFileSync(join(dir, 'src/a.ts'), 'utf8')).toBe('x modifié');
+  });
+
   it('R5 — commit refusé (hook commit-msg) : le plan reste écrit, la livraison reste verte et le dit', async () => {
     const { dir, base, deps, out } = await prete();
     writeFileSync(join(dir, '.git/hooks/commit-msg'), '#!/bin/sh\necho refusé >&2\nexit 1\n', { mode: 0o755 });

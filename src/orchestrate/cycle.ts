@@ -213,7 +213,7 @@ async function commitPlan(c: LotCtx, message: string, root = c.lot.repo, before:
   const ownFile = planOwnFile(c, repo);
   // Les fichiers de plan.onWrite (L346) entrent même non suivis : le premier plan publié n'est pas encore au dépôt.
   const produced = c.loadPlan().produced;
-  const dirty = [...new Set([...trackedPaths(await snapshot(repo, { remote: false })), ...(produced.length ? dirtyPaths(repo, produced) : [])])];
+  const dirty = [...new Set([...trackedPaths(await snapshot(repo, { remote: false })), ...dirtyPaths(repo, produced)])];
   if (dirty.length === 0) return null;
   const foreign = dirty.filter((f) => !ownFile(f));
   if (foreign.length) return `arbre sale (fichiers hors plan) : ${foreign.join(', ')}`;

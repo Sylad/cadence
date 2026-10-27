@@ -267,8 +267,9 @@ export function addedTimes(dir: string): Map<string, number> {
   return times;
 }
 
-/** Chemins parmi `paths` (relatifs à la racine) que git voit modifiés, stagés ou non suivis. */
+/** Chemins parmi `paths` (relatifs à la racine) que git voit modifiés, stagés ou non suivis. Liste vide → rien (sans pathspec, git listerait tout l'arbre). */
 export function dirtyPaths(root: string, paths: string[]): string[] {
+  if (paths.length === 0) return [];
   const out = git(root, ['-c', 'core.quotepath=off', 'status', '--porcelain', '-z', '--', ...paths]);
   return out.split('\0').filter(Boolean).map((l) => l.slice(3));
 }

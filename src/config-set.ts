@@ -230,7 +230,7 @@ export function configSet(parent: string, key: string, valueText: string, opts: 
         plan.setStatus(id, 'doing', today);
         plan.save();
       }
-      const sha = commitPaths(dir, ['cadence.yaml', planRel, ...(produced.length ? dirtyPaths(dir, produced) : [])], `chore${id ? `(${id})` : ''}: cadence.yaml — ${key} = ${shown}`);
+      const sha = commitPaths(dir, ['cadence.yaml', planRel, ...dirtyPaths(dir, produced)], `chore${id ? `(${id})` : ''}: cadence.yaml — ${key} = ${shown}`);
       done++;
       lines.push(`✓ ${name} · ${id || 'lot de config'} · ${key} = ${shown} · commit ${sha}`);
     } catch (e) {

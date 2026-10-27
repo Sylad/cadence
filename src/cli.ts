@@ -1164,7 +1164,7 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   if (tracked) {
     try {
       // Les fichiers de plan.onWrite (L346) partent avec la note : la commande a tourné à l'écriture du plan.
-      const withPlan = [planRel, ...(produced.length ? dirtyPaths(repo, produced) : [])];
+      const withPlan = [planRel, ...dirtyPaths(repo, produced)];
       git(repo, ['add', '--', ...withPlan]);
       git(repo, ['commit', '-q', '-m', planCommitMessage(readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit, { lot: cite, action: PLAN_ACTIONS.resealed(norm) }), '--', ...withPlan]);
     } catch (e) {

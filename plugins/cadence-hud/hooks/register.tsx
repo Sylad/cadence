@@ -10,8 +10,6 @@ import { buildPanel, ellipsize, parseLotsBoard, readTime, stampsSignature } from
 const PLUGIN = 'cadence-hud'
 /** Id du panneau des lots (`/hud lots`). */
 const LOTS_PANE = 'lots'
-/** Largeur de terminal sous laquelle le panneau n'est pas placé quand le lead le demande (API Pane : 110 colonnes une fois demandé). */
-const LOTS_MIN_COLUMNS = 110
 const REFRESH_MS = 5_000
 
 const usage = atom({ plugin: 'cadence-hud', key: 'usage' } as const, null)
@@ -275,8 +273,7 @@ export const register: Register = on => {
         await $.ui.close({ id: LOTS_PANE })
         return { text: 'panneau des lots fermé.' }
       }
-      // le panneau est un panneau latéral : sous 110 colonnes le moteur ne le place pas
-      if (e.presentation !== undefined && e.presentation.columns < LOTS_MIN_COLUMNS) return { text: `terminal trop étroit pour le panneau (${LOTS_MIN_COLUMNS} colonnes au moins)` }
+      // demandé par la commande, le panneau est placé à toute largeur : c'est le moteur qui décide (`presentation.columns` ne décrit pas la place d'un panneau, sur desktop notamment)
       const opened = await $.ui.open({ id: LOTS_PANE, title: 'Lots' })
       if (!opened.isPlaced) return { text: `panneau des lots non placé : ${opened.reason}` }
       void readTourNow?.()

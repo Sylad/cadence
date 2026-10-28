@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; stamps?: () => string } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; stamps?: () => string; refuse?: string } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -42,6 +42,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
   on('agent.list', () => ({ value: [] }) as never)
   on('ui.open', (_$, e) => {
     opened.push(e)
+    if (setup.refuse !== undefined) return { value: { isPlaced: false, reason: setup.refuse } } as never
     open.add(e.id)
     return { value: { isPlaced: true } } as never
   })
@@ -114,11 +115,17 @@ test('R16 — argument inconnu : la réponse cite lots', async ($, on) => {
   expect(s.opened).toEqual([])
 })
 
-test('R19 — terminal trop étroit : message, rien ne s’ouvre', async ($, on) => {
+test('R19 — à 60 colonnes la commande ouvre quand même le panneau : le moteur le place', async ($, on) => {
   const s = await session($, on)
-  expect((await s.hud('lots', 109)).text).toBe('terminal trop étroit pour le panneau (110 colonnes au moins)')
-  expect(s.opened).toEqual([])
-  expect((await s.hud('lots', 110)).text).toMatch(/ouvert/)
+  expect((await s.hud('lots', 60)).text).toMatch(/ouvert/)
+  expect(s.opened).toMatchObject([{ id: 'lots', title: 'Lots' }])
+  expect(s.open.has('lots')).toBe(true)
+})
+
+test('R19 — le moteur ne place pas le panneau : la commande donne sa raison, rien n’est ouvert', async ($, on) => {
+  const s = await session($, on, { refuse: 'pas de place' })
+  expect((await s.hud('lots', 140)).text).toBe('panneau des lots non placé : pas de place')
+  expect(s.open.has('lots')).toBe(false)
 })
 
 test('R19 — un panneau déjà ouvert se ferme même si le terminal s’est rétréci', async ($, on) => {

@@ -97,6 +97,25 @@ describe('raf archive (L396)', () => {
     expect(bad.err).toContain('--before');
   });
 
+  it("R5 — un plan en lecture seule (tenu par un autre outil) refuse d'archiver et ne porte pas d'archive", () => {
+    const dir = tempDir();
+    const file = join(dir, 'taches.yaml');
+    writeFileSync(file, 'lots:\n  - id: A1\n    title: t\n    status: done\n');
+    const format = { lots: 'lots', fields: { id: ['id'], title: ['title'], status: ['status'] }, statuses: { done: 'done' as const }, estimates: {} };
+    const plan = Plan.load(file, { format });
+    expect(() => plan.archive('2026-10-28')).toThrow(/lecture seule/);
+    expect(plan.archived()).toEqual([]);
+  });
+
+  it("R2 — un lot sans date de fin reste quand --before est donné, et part sans --before", async () => {
+    const r = repoWithPlan();
+    writeFileSync(r.plan, readFileSync(r.plan, 'utf8').replace(/    finished: 2025-06-10\n/, ''));
+    await r.raf('archive', '--before', '2030-01-01');
+    expect(Plan.load(r.plan).lots().map((l) => l.id)).toEqual(['L1', 'L4', 'L5']);
+    await r.raf('archive');
+    expect(Plan.load(r.plan).lots().map((l) => l.id)).toEqual(['L4', 'L5']);
+  });
+
   it('R6 — show et commits lisent un lot archivé, commits compris', async () => {
     const r = repoWithPlan();
     commit(r.dir, 'feat(L1): travail ancien', '2025-06-01T10:00:00');

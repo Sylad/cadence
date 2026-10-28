@@ -792,6 +792,20 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.pass).toBe(1);
     expect(c.lot.warnings).toContain('fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)');
     expect(c.lot.choix).toContain('le constat est faux : le cas est couvert par a.txt');
+    expect(h.calls[3].brief).toContain('le constat est faux : le cas est couvert par a.txt'); // la revue neuve la lit
+  });
+
+  it("L406 R1b — une correction reprise après une question, sans commit ni choix, a pour raison la réponse du lead", async () => {
+    const ask: Handler = () => claudeOut(workReport({ questions: ['le constat est-il faux ?'] }));
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [ask, () => claudeOut(workReport())] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('question');
+    c.lot.pendingAnswer = 'le constat est faux, ne change rien';
+    c.lot.answers.push('le constat est faux, ne change rien');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'fix', 'review']);
+    expect(c.lot.status).toBe('ready');
   });
 
   it('L406 R2 — une correction sans commit ni raison est rendue au lead : pas de revue à l\'identique, passe non comptée', async () => {

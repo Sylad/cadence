@@ -761,6 +761,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   const playwright = !!mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright;
   if (playwright) l.uxCaptures = join(dirname(mcpConfig), 'playwright');
   const answerInBrief = l.pendingAnswer; // gardée pour la rendre si la session ne part jamais (créneau abandonné, L332)
+  if (answerInBrief && kind === 'fix') step.answered = true;
   l.pendingAnswer = null; // la réponse est dans le brief : elle ne repart pas avec la session suivante
   const tmpDir = w.store.tmpDir(l.project, l.lot); // TMPDIR de la session, aussi en --add-dir : hors du cwd, un Write y serait refusé en `claude -p`
   // Délai (L298) : l'étape d'écriture est proportionnée à l'estimate et à la fiche du lot, puis prolongée à chaque échéance où elle a commité.
@@ -2195,7 +2196,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     return;
   }
   // L406 : une correction qui ne commite rien doit dire pourquoi (« choix », lu par la revue). Sans raison, la revue relirait les mêmes commits et rendrait les mêmes constats : la passe ne compte pas (toFix l'avait comptée), le lot est rendu.
-  const reason = (rep.choix ?? []).some((x) => x.trim());
+  const reason = (rep.choix ?? []).some((x) => x.trim()) || !!done.step.answered; // la réponse du lead, que la session a lue dans son brief, vaut raison
   if (kind === 'fix' && made === 0 && !headMoved && !docsPass && !reason) {
     l.pass = Math.max(0, l.pass - 1);
     stop(c, 'handed-back', 'fix sans commit ni raison (choix vide) : la revue aurait relu les mêmes commits');

@@ -43,6 +43,8 @@ export interface StepState {
   tokens?: Tokens;
   peakContext?: number | null;
   headBefore?: string;
+  /** La réponse du lead était dans le brief de cette session (L406 : elle vaut raison d'une correction sans commit). */
+  answered?: boolean;
   headAfter?: string;
   commits?: string[];
   /** Fichier de la sortie JSON de la session, dans le dossier du lot. */

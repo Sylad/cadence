@@ -4264,6 +4264,7 @@ lots:
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-28
+    review: { date: 2026-10-28, verdict: "conforme : relecture de HEAD et de git status après les étapes, message qui nomme ce qui a bougé, code 2 y compris pour un rouge, ligne vert/rouge supprimée, 3 tests L393 verts, docs/deliver.md et CHANGELOG à jour ; les 5 choix d'interprétation de l'auteur tiennent, aucun défaut — orchestré (vague 2026-10-28-1530, 0 passe(s) de correction)", commit: 454a926a30c6aad92f199b3c370cac7ff3d7d228 }
   - id: L394
     title: "raf check et raf now : un seul git log --name-only pour les fichiers de tous les commits au lieu d'un git par commit (89 % du temps : raf check 20 s, raf now 15 s, session start 25 s à ~2 250 commits) → lead tour --json 35 s dépasse le délai de 20 s de la bande, liste des projets vide ; mesure avant/après, tests"
     status: done

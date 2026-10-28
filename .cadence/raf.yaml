@@ -108,13 +108,15 @@ lots:
   - id: L410
     title: "Panneau des lots : dans chaque projet, les lots en cours (doing, ou dans une vague : en implémentation, revue, question, rendu) en tête, puis les prêts, puis le reste (ordre du plan conservé dans chaque groupe) ; un sous-lot reste sous son parent, et un parent dont un sous-lot est en cours remonte avec lui — demande de Sylvain le 28-10 (on ne voyait que 2 projets)"
     public: Les lots en cours en tête de chaque projet dans le panneau
-    status: doing
+    status: done
     estimate: 0.25
     visible: true
     screen: component
     created: 2026-10-28
     started: 2026-10-28
     review: { date: 2026-10-28, verdict: "conforme : aucun constat — orchestré (vague 2026-10-28-2210, 2 passe(s) de correction)", commit: 98ce59f703f3548fddaa3d359d38875cd5c32ce6, reporte: { de: ab966ac69d2aca2e6cbddbc38e0e1d0cfc1fb4bc, vers: 98ce59f703f3548fddaa3d359d38875cd5c32ce6, patchId: c2b5fa5c6c818e57f9fa1c32d0f7da41d0154c4b } }
+    ux: { date: 2026-10-28, verdict: "conforme sur pièces (revue de la vague conforme, tests de rendu du mod verts) ; contrôle à l'œil par Sylvain dans l'app desktop après la mise en service de la vague" }
+    finished: 2026-10-28
   - id: L411
     title: "Panneau des lots : au plus 5 lots par projet (les premiers dans l'ordre affiché, en cours d'abord après L410), bouton « + N lots » qui déplie le reste du projet et « moins » qui le replie ; un lot qui a des sous-lots se plie/déplie d'un clic (replié par défaut, compte des sous-lots visible) ; états gardés entre deux ouvertures — demande de Sylvain le 28-10"
     public: Cinq lots par projet, et le reste à la demande

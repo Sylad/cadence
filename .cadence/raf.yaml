@@ -21,7 +21,7 @@ lots:
     estimate: 0.5
     visible: true
     screen: page
-    goal: "Un panneau Pane du mod plugins/cadence-hud (charger la skill plugin-authoring, prendre la bande existante comme modèle) qui montre, pour chaque projet du dossier parent, l'arbre de ses lots non clos (parent → sous-lots) avec leur état et les liens after:, lu par cadence lead tour --json ou le même code ; lecture seule, rafraîchi quand un plan ou une vague change ; test du rendu (claude plugin test) et doc"
+    goal: "Un panneau Pane du mod plugins/cadence-hud (charger la skill plugin-authoring, prendre la bande existante comme modèle) qui montre, pour chaque projet du dossier parent, l'arbre de ses lots non clos (parent → sous-lots) avec leur état et les liens after:, lu par cadence lead tour --json ou le même code ; lecture seule, rafraîchi quand un plan ou une vague change ; test du rendu (claude plugin test) et doc. Décision du lead (28-10, après la 2e revue de la fiche) : dans un plan natif, les sous-tâches (lot.tasks, id <lot>/<n>) sont les sous-lots du panneau — elles entrent dans le champ lots de lead tour --json avec parent: <lot> et leur état ; les sous-tâches closes sont exclues comme les lots clos ; dans un plan tenu par un autre outil, Lot.parent reste la source. La maquette est validée par Sylvain."
     created: 2026-10-28
     started: 2026-10-28
     notes:
@@ -45,6 +45,11 @@ lots:
     status: todo
     estimate: 0.5
     spec: true
+    created: 2026-10-28
+  - id: L404
+    title: "test/etape-spec-back-fiche.test.ts:15 lit .cadence/raf.yaml en direct : rouge depuis raf archive (B1–B5 archivés) — lire le plan par le chargeur (lots actifs + archivés), garde contre tout test qui relit le plan réel sans le chargeur"
+    status: todo
+    estimate: 0.1
     created: 2026-10-28
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

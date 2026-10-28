@@ -79,7 +79,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- `raf archive [--before date] [--dry-run]` moves the `done` and `dropped` lots out of the plan into `.cadence/archive/<year>.yaml` (L396, `docs/raf.md`): the cadence plan weighed 559 KB (≈ 150 k tokens) for sessions that need a dozen lots. `raf show`, `raf commits`, `raf check`, `cadence news` and `cadence perf` still find an archived lot by its id (a commit or a News entry citing it is not « inconnu »), `raf add` never reuses its id, the briefs tell the sessions never to read the archive. A lot named in `after:` by a lot that stays, or counted by an open `gate:`, stays in the plan with the reason printed; replaying moves nothing twice.
+- `raf archive [--before date] [--dry-run]` moves the `done` and `dropped` lots out of the plan into `.cadence/archive/<year>.yaml` (L396, `docs/raf.md`): the cadence plan weighed 559 KB (≈ 150 k tokens) for sessions that need a dozen lots. `raf show`, `raf commits`, `raf check`, `cadence news` and `cadence perf` still find an archived lot by its id (a commit or a News entry citing it is not « inconnu »), `raf add` never reuses its id, the briefs (implementation, sheets, code review, pre-check) tell the sessions never to read the archive, and the orchestrate pre-check still knows the archived ids. `raf archive` warns, when `plan.onWrite` is declared, that the published plan generator must also read `.cadence/archive/*.yaml`. A lot named in `after:` by a lot that stays, or counted by an open `gate:`, stays in the plan with the reason printed; replaying moves nothing twice.
 
 ### Changed
 

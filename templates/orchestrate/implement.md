@@ -1,5 +1,5 @@
 Work in `{{chemin}}` on lot `{{lot}}` — "{{titre}}" — of its plan
-(`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`; read the lot, its notes and sub-tasks, and the project's CLAUDE.md first).
+(`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`; never read `.cadence/archive/`, the closed lots moved out of the plan; read the lot, its notes and sub-tasks, and the project's CLAUDE.md first).
 Goal: {{objectif}}
 {{repos}}
 {{fiche}}

@@ -1,7 +1,7 @@
 Spec of the screen of lot `{{lot}}` — "{{titre}}" — in `{{chemin}}`, as the spec writer: you write a static mockup and a machine-readable sheet BEFORE any code, so that the later steps (UX review of the mockup, acceptance tests, implementation) share one reference.
 Goal of the lot: {{objectif}}
 {{repos}}
-Read the lot, its notes and sub-tasks in the plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`), the project's CLAUDE.md, its charter (existing CSS and variables, neighbouring components, `docs/qa/expectations.md`) and the routes and API contracts already present.
+Read the lot, its notes and sub-tasks in the plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`; never read `.cadence/archive/`, the closed lots moved out of the plan), the project's CLAUDE.md, its charter (existing CSS and variables, neighbouring components, `docs/qa/expectations.md`) and the routes and API contracts already present.
 {{spec}}
 
 What you produce, in `<dir>/<écran>/`:

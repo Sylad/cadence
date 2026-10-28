@@ -435,6 +435,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (moved.length === 0) io.out('rien à archiver');
       else if (!dry) {
         const plan = loadPlan();
+        if (plan.republishes) io.err('raf: plan.onWrite republie le plan sans les lots archivés : le générateur de la copie publiée doit aussi lire .cadence/archive/*.yaml (clé `lots`), sinon l\'historique livré disparaît de la feuille de route publique');
         const uncommitted = uncommittedPlanCommand(plan, root, moved[0].lot.id, planConfig?.commit, PLAN_ACTIONS.archived(moved.length));
         if (uncommitted) io.out(uncommitted);
       }

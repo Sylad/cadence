@@ -1306,7 +1306,7 @@ export function needsPrecheck(config: { precheck: boolean; precheckLocal?: boole
   if (config.precheckLocal) return true;
   const l = plan.lot(lot);
   const text = [l.title, l.goal, goal].filter(Boolean).join('\n');
-  return citesPriorWork(text, lot, plan.lots().map((x) => x.id));
+  return citesPriorWork(text, lot, plan.everyLot().map((x) => x.id));
 }
 
 /**
@@ -1334,7 +1334,7 @@ export function precheckNothingToFind(plan: Plan, root: string, lot: string, rep
     if (!code) return null;
     if (createdAt <= Number(code[1])) return null;
     const l = plan.lot(lot);
-    const { ids, foreign } = citedLots([l.title, l.goal, goal].filter(Boolean).join('\n'), lot, plan.lots().map((x) => x.id));
+    const { ids, foreign } = citedLots([l.title, l.goal, goal].filter(Boolean).join('\n'), lot, plan.everyLot().map((x) => x.id));
     if (foreign || ids.some((id) => lotWork(plan, root, id).length > 0)) return null;
     return `lot créé après le dernier commit de code du dépôt (${code[0]!.slice(0, 7)}) : rien à retrouver`;
   } catch {

@@ -1,7 +1,7 @@
 Spec of the behaviour of lot `{{lot}}` — "{{titre}}" — in `{{chemin}}`, as the spec writer: you write a machine-readable sheet (use cases, rules, contracts, data) BEFORE any code, so that the later steps (review of the sheet, acceptance tests, implementation) share one reference. There is no screen part: only the sheet.
 Goal of the lot: {{objectif}}
 {{repos}}
-Read the lot, its notes and sub-tasks in the plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`), the project's CLAUDE.md, and the code and tests of the modules the lot touches (the services, controllers or jobs, their tests, the API contracts and error messages already present): the rules already coded are sources, and a new rule must not contradict them.
+Read the lot, its notes and sub-tasks in the plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`; never read `.cadence/archive/`, the closed lots moved out of the plan), the project's CLAUDE.md, and the code and tests of the modules the lot touches (the services, controllers or jobs, their tests, the API contracts and error messages already present): the rules already coded are sources, and a new rule must not contradict them.
 {{spec}}
 
 What you produce, in `<dir>/<sujet>/`:

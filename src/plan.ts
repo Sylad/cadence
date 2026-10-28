@@ -496,6 +496,11 @@ export class Plan {
     return join(dirname(this.path), ARCHIVE_DIR);
   }
 
+  /** Vrai quand `plan.onWrite` republie une copie du plan à chaque écriture (L346) : elle ne voit que le plan actif, jamais l'archive. */
+  get republishes(): boolean {
+    return !!this.settings.onWrite;
+  }
+
   /** Fichiers `<année>.yaml` de l'archive, absolus ; vide pour un plan en lecture seule (son outil tient son propre historique). */
   archiveFiles(): string[] {
     return this.readonly ? [] : archiveFiles(this.archiveDir);

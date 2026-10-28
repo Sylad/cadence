@@ -16,8 +16,8 @@
     },
     {
       "name": "cadence-hud",
-      "description": "A status band above the Claude Code prompt: context, 5 h / 7 d quota windows, cost per model, agents of the session and the running cadence orchestrate waves. Works without the cadence CLI, except the per-project plan progress, which needs `cadence` on the PATH.",
-      "version": "0.5.0",
+      "description": "A status band above the Claude Code prompt: context, 5 h / 7 d quota windows, cost per model, agents of the session and the running cadence orchestrate waves, plus a read-only lots panel (`/hud lots`). Works without the cadence CLI, except the per-project plan progress and the lots panel, which need `cadence` on the PATH.",
+      "version": "0.6.0",
       "source": "./plugins/cadence-hud",
       "author": {
         "name": "Sylvain Ladoire"

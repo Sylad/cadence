@@ -96,7 +96,23 @@ tronqués en fin de ligne.
   statut), sinon **toutes les minutes** ; un `cadence` absent ou en échec garde le dernier tableau lu, sans message
   d'erreur dans la bande. **`/hud projets`** replie la liste sur une ligne grise (`▸ projets (2)`) et la rouvre.
 
-`/hud` masque ou réaffiche la bande ; `/hud cmd` liste les commandes d'arrière-plan comptées (voir `N cmd`) ; `/hud projets` replie ou rouvre la liste des projets ; tout autre argument répond `argument inconnu : … (attendu : cmd, projets)` sans masquer la bande.
+`/hud` masque ou réaffiche la bande ; `/hud cmd` liste les commandes d'arrière-plan comptées (voir `N cmd`) ; `/hud projets` replie ou rouvre la liste des projets ; `/hud lots` ouvre (ou ferme) le panneau des lots ; tout autre argument répond `argument inconnu : … (attendu : cmd, projets, lots)` sans masquer la bande.
+
+### Panneau des lots (`/hud lots`, L401)
+
+Un `Pane` en lecture seule, ouvert **uniquement** par la commande (le moteur ne place pas un panneau que le mod ouvre seul sous 144 colonnes ; la commande, demandée par le lead, le place dès 110 : en dessous elle répond `terminal trop étroit pour le panneau (110 colonnes au moins)` et n'ouvre rien). Par projet du dossier (ordre de `priority:`) : son nom, son nombre de lots non clos (sous-lots de `parent:` compris, sous-tâches natives non), puis l'arbre de ses lots non clos — un sous-lot sous son lot avec `├`/`└`, la profondeur libre ; un parent clos ou inconnu, un cycle ou un id en double laissent le lot au premier niveau.
+
+| État | Mot | Couleur |
+|---|---|---|
+| plan `doing` | `▶ en cours` | claude |
+| plan `todo`, aucun `after:` ouvert | `○ libre` | texte |
+| plan `todo`, un `after:` ouvert | `⊘ bloqué` | subtle |
+| vague (l'emporte sur le plan) | `… en attente`, `⟳ implémente`, `⟳ relit`, `⟳ corrige`, `? QUESTION`, `✔ prêt`, `↩ rendu`, `✖ échec`, `⏸ suspendu` (statut inconnu : `⟳ <statut>`) | ceux de la bande (`colorOfLot`) |
+| sous-tâche native `doing` / `todo` | `▶ en cours` / `○ à faire` (jamais un état de vague, jamais `after:`) | claude / texte |
+
+Les liens `after:` suivent le titre (`after: L400 L401`) ; un id clos ou inconnu est barré et ne bloque pas. Sous 60 colonnes de corps (le panneau latéral compte 45 % du terminal au plus, 24 au moins) la liste `after:` passe sur une ligne à part et le titre est tronqué par `…`, jamais l'id ni l'état. Au-dessus du prompt le panneau tient en un tiers de la hauteur : au-delà, `… +N lots de plus`.
+
+Les données sont le champ `lots` de `cadence lead tour <dossier> --json` (même appel que la bande, même dossier : celui de la vague, sinon celui de la session). Il est relu à chaque transition de vague et au plus toutes les minutes, et dès qu'un fichier de plan (`.cadence/raf.yaml` et `cadence.yaml` du dossier et de ses sous-dossiers directs) change de date de modification : le script `PLAN_STAMPS` (collect.ts, python3) fait un `os.stat` par plan à chaque minuteur de 5 s, tant que le panneau est ouvert et seulement alors. Un plan à l'ancien emplacement ou tenu par un autre outil n'est surveillé que par son `cadence.yaml` ; sa modification est vue à la relecture de la minute. Messages : `Lecture des plans…` (avant la première lecture), `Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute.` (aucun tableau lu et `cadence` absent, muet ou illisible ; une relecture en échec garde le dernier tableau), `Lots indisponibles : cadence est trop ancien, mettez-le à jour.` (aucune ligne ne porte `lots`), `Aucun lot non clos dans les projets de ce dossier.`, `illisible : <erreur>` sur un projet que le tour n'a pas lu (la ligne `cadence.yaml` du tour s'affiche de même). Le pied dit `/hud lots pour fermer` dans tous les états. Le rendu est testé par `tests/lots-pane.test.ts` (intégration : commande, lectures, panneau monté) et `tests/lots.test.ts` (arbre, états, mise en page).
 
 Les vagues sont lues sur disque (`~/.cadence/orchestrate/waves/<pid>.json`, puis `<cwd>/.cadence/runs/<vague>/`),
 par le script python de `hooks/collect.ts` ; aucune commande cadence n'est lancée pour elles. Seul l'avancement des plans

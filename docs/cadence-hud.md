@@ -55,7 +55,29 @@ Install it as a plugin from the same marketplace:
 `/hud` hides or shows the band. `/hud cmd` lists the background commands being counted (id, tool,
 origin `session` or `agent <id>`, age, name; `(sans fin vue)` on the ones above). Any other argument
 `/hud projets` folds the project list to one line, and opens it again. Any other argument
-answers `argument inconnu : … (attendu : cmd, projets)` and leaves the band as it is. The source lives in [`plugins/cadence-hud`](../plugins/cadence-hud/README.md)
+answers `argument inconnu : … (attendu : cmd, projets, lots)` and leaves the band as it is.
+
+### The lots panel (`/hud lots`, L401)
+
+`/hud lots` opens a read-only **panel** beside the conversation (inline above the prompt on the main screen); the same command closes it. It is never opened on its own, and a terminal under 110 columns answers `terminal trop étroit pour le panneau (110 colonnes au moins)` and opens nothing. For each project of the folder (the order of `priority:`) it draws the open lots as a tree, with their state and their `after:` links:
+
+```
+Lots  lecture seule  lu à 15:52
+cadence  7 lots non clos
+  L401        Panneau des lots (mod cadence-hud, Pane)       ▶ en cours
+  ├ L401/2    Écrire le panneau et son rafraîchissement      ▶ en cours
+  └ L401/3    Test du rendu (claude plugin test) et doc      ○ à faire
+  L402        Réordonner par glisser-déposer  after: L400 L401   ⊘ bloqué
+ol  1 lot non clos
+  L80         Calendrier des matchs                          ⟳ relit
+/hud lots pour fermer
+```
+
+States: `▶ en cours` (doing), `○ libre` (todo, no open `after:`), `⊘ bloqué` (todo, an `after:` is still open); a lot in a wave takes the wave's state and words, as the band writes them (`… en attente`, `⟳ implémente`, `⟳ relit`, `⟳ corrige`, `? QUESTION`, `✔ prêt`, `↩ rendu`, `✖ échec`, `⏸ suspendu`). In a native plan the sub-tasks of an open lot (`L401/2`) are its sub-lots (`├`/`└`); they only read `▶ en cours` or `○ à faire`, and are not counted in the project's `N lots non clos`. In a plan kept by another tool the sub-lots come from `parent:`. An `after:` id that is closed or unknown is struck through and blocks nothing. A project the tour could not read shows `illisible : <error>`; the others stay.
+
+Before the first reading the panel says `Lecture des plans…`; if `cadence lead tour` does not answer it says `Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute.` (a failed re-reading keeps the last table); a `cadence` too old to give the `lots` field says `Lots indisponibles : cadence est trop ancien, mettez-le à jour.`; with no open lot, `Aucun lot non clos dans les projets de ce dossier.`. A tree taller than the panel ends with `… +N lots de plus`. Under 60 columns the `after:` list moves to its own line and the title is cut with `…`, never the id or the state.
+
+The data is the `lots` field of `cadence lead tour --json` ([lead tour](lead.md#lead-tour)), read together with the band's `progress` (same call, same folder). While the panel is open, the modification date of each plan (`.cadence/raf.yaml` and `cadence.yaml` of the folder and of its direct sub-folders) is read every 5 s, one `stat` each: a changed plan, like a wave transition, triggers a new reading before the minute is over. The source lives in [`plugins/cadence-hud`](../plugins/cadence-hud/README.md)
 (its own README has the details of every cell); it is not part of the npm package. To work on it:
 `claude plugin validate plugins/cadence-hud`, `claude plugin test plugins/cadence-hud`, and
 `tsc -p plugins/cadence-hud` once Claude Code has loaded the plugin at least once (it generates

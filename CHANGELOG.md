@@ -80,6 +80,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.21.1] - 2026-10-28
+
 ### Fixed
 
 - `cadence orchestrate`: a correction (`fix`) session that makes no commit must say why under `choix` (L406, `docs/orchestrate.md`). With a reason, the fresh review runs as before (it reads the reason; warning `fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)`) and the pass counts. Without one, the review would reread the same commits and return the same findings: the lot is handed back as `fix sans commit ni raison (choix vide) : la revue aurait relu les mêmes commits`, and the pass is not counted. Measured over the wave states of `developpeur`, `cadence` and `maritime-atlas` (`structured` field of the `N-fix.json`): 68 `fix` sessions made no commit, only 5 of them (L4, L92, L122, L190, L215) with an empty `choix`, so the rule changes about 7 % of those cases. It does not change the two L401 passes of 2026-10-28 (`7-fix.json`, `8-fix.json`): both gave a reason under `choix` (a contested finding, "aucune correction codée"), and it was the test gate, not a review, that relaunched the correction; they stay counted. The « after » side rests on tests R1 to R3 of L406.

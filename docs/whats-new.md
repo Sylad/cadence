@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.21.1**: `/hud lots` opens on the desktop app whatever the width; a correction session that makes no commit must say why, or the lot is handed back.
 - **1.21.0**: `/hud lots` opens a panel beside the conversation with the open lots of every project; the pre-push hook of a wave refuses a push that carries a lot not ready.
 - **1.20.0**: `raf move <id> --before|--after <id>` reorders a lot or a sub-task in the plan, refused during a wave of the repository and on a plan kept by another tool.
 - **1.19.1**: `cadence verify --gate` in the main tree reads `HEAD` and `git status` again after the steps, says what moved and prints no green or red verdict that is not the sha's.
@@ -45,6 +46,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.21.1**: `/hud lots` opened nothing on the desktop app, even on a very wide screen (« terminal trop étroit », L408): the mod checked 110 columns itself, while a panel the person asks for is placed at any width; the engine now decides, and says « non placé » with its reason otherwise (cadence-hud 0.6.1). In a wave, a correction session that makes no commit must give its reason under `choix`; without one the lot is handed back instead of replaying the same review (L406, `docs/orchestrate.md`).
 
 **1.21.0**: what is in progress, project by project, is now visible beside the conversation. `/hud lots` (cadence-hud 0.6.0, L401, `docs/cadence-hud.md`) opens a read-only panel with, for each project of the parent folder, the tree of its open lots and native sub-tasks, their state (in progress, ready, blocked, in a wave, handed back, in question) and their `after:` links, crossed out once satisfied; it reads `cadence lead tour --json`, which now carries a `lots` field (measured 7.0–8.4 s on ten projects, as before). The temporary `pre-push` hook of a wave also refuses a push of the lead or of a hand-started session that carries a commit of a lot not ready, names the lot and gives the safe command `git push <remote> <sha>:<branch>`; for a tag it refuses without a command, since a tag must name its own commit (L405, `docs/orchestrate.md`).
 

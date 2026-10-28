@@ -441,3 +441,10 @@ test('R4 — un bouton coupé avec son projet compte les lots qu’il cachait da
   const behindButtons = buttons(p).reduce((n, l) => n + (l.kind === 'more' ? l.hidden : 0), 0)
   expect(visible + p.more + behindButtons).toBe(24)
 })
+
+test('L411 — la coupe compte les sous-lots d’un lot replié qu’elle retire : aucun lot ne disparaît sans être compté', () => {
+  const rows = [{ project: 's', lots: [lot('S1'), lot('S2'), lot('S3', 'todo', { parent: 'S1' }), lot('S4', 'todo', { parent: 'S1' })] }]
+  const p = buildPanel({ rows, columns: 70, height: 4, waves: [] })
+  expect(p.lines.filter(l => l.kind === 'lot')).toHaveLength(0)
+  expect(p.more).toBe(4)
+})

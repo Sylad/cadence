@@ -258,5 +258,7 @@ export const buildPanel = (input: {
   const droppedLots = dropped.reduce((n, l) => n + (l.kind === 'project' ? l.count : 0), 0)
   // un bouton replié coupé avec son projet cachait des lots qu'aucune ligne ne compte : ils passent dans « … +N » comme les autres
   const cutButtons = lines.slice(kept).filter(l => l.kind === 'more' && l !== button && !l.expanded).reduce((n, l) => n + (l.kind === 'more' ? l.hidden : 0), 0)
-  return { lines: fits.map(({ height: _h, ...l }) => l as PanelLine), more: lines.slice(kept).filter(l => l.kind === 'lot').length + droppedLots + cutButtons }
+  // un lot replié que la coupure retire emporte ses sous-lots, qui ne sont plus des lignes : ils passent dans « … +N » avec lui
+  const cutLots = lines.slice(kept).reduce((n, l) => n + (l.kind === 'lot' ? 1 + (l.subs && !l.subs.open ? l.subs.count : 0) : 0), 0)
+  return { lines: fits.map(({ height: _h, ...l }) => l as PanelLine), more: cutLots + droppedLots + cutButtons }
 }

@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; stamps?: () => string; refuse?: string; kv?: [string, unknown][] } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; stamps?: () => string; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -60,6 +60,10 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
   on('process.run', async (_$, e) => {
     const argv = (e as unknown as { argv: string[] }).argv
     runs.push(argv)
+    if (argv[0] === 'raf') {
+      const r = (setup.raf ?? (() => ({ exitCode: 0, stderr: '' })))(argv, (e as unknown as { init?: { cwd?: string } }).init?.cwd)
+      return { value: { exitCode: r.exitCode, stdout: '', stderr: r.stderr } } as never
+    }
     if (argv[0] === 'cadence') {
       const r = await tour.current()
       return { value: { ...r, stderr: '' } } as never
@@ -80,6 +84,13 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await clock.advance(ms)
     await settle()
   }
+  /** Les textes du panneau monté, ceux que dessinent les régions Client (un projet chacune) comprises. */
+  const textsOf = async (ui: Awaited<ReturnType<typeof $.ui.mount>>) => {
+    await ui.drawn() // le dessin suit les écritures d'état avant la lecture
+    const own = (await ui.findAll({ type: 'Text' })).map(t => t.text ?? '')
+    const regions = await Promise.all((await ui.findAll({ type: 'Client' })).map(async c => (await ui.findAll({ type: 'Text', in: c.key } as never)).map(t => t.text ?? '')))
+    return [...own, ...regions.flat()]
+  }
   const draw = async (bodyColumns = 70, bodyRows = 30) => {
     const ui = await $.ui.mount({
       plugin: PLUGIN,
@@ -88,7 +99,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
       requestId: 'lots',
       props: { title: 'Lots', isFocused: false, bodyColumns, placement: 'dock', scroll: { offset: 0, bodyRows }, view: {} },
     } as never)
-    const texts = (await ui.findAll({ type: 'Text' })).map(t => t.text ?? '')
+    const texts = await textsOf(ui)
     const buttons = await ui.findAll({ type: 'Button' })
     await ui.unmount()
     return { texts, text: [...buttons.map(b => b.text ?? ''), ...texts].join('\n'), buttons }
@@ -119,7 +130,34 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await ui.unmount()
     await settle()
   }
-  return { kv, press, pressKey, store, open, opened, runs, tours, tour, stamps, waves, hud, advance, draw }
+  const rafs = () => runs.filter(a => a[0] === 'raf')
+  /** Joue des gestes sur le panneau monté, comme la personne : chaque région Client reçoit sa taille, puis `act` ; rend le texte dessiné à la fin. */
+  const gestures = async (act: (ui: Awaited<ReturnType<typeof $.ui.mount>>) => Promise<void>, surface: 'terminal' | 'desktop' | 'mobile' | 'vscode' = 'desktop') => {
+    const ui = await $.ui.mount({
+      plugin: PLUGIN,
+      surface,
+      component: 'Pane',
+      requestId: 'lots',
+      props: { title: 'Lots', isFocused: true, bodyColumns: 70, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
+    } as never)
+    if (surface === 'desktop' || surface === 'terminal') await ui.resize({ columns: 70, rows: 4, in: 'lots:cadence' } as never)
+    await act(ui)
+    await settle()
+    // le montage ne suit pas les écritures d'état (comme `press`, qui remonte pour relire) : le résultat est lu sur un montage neuf, les régions Client sur celui des gestes
+    const live = await textsOf(ui)
+    await ui.unmount()
+    const fresh = await $.ui.mount({
+      plugin: PLUGIN,
+      surface,
+      component: 'Pane',
+      requestId: 'lots',
+      props: { title: 'Lots', isFocused: true, bodyColumns: 70, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
+    } as never)
+    const text = [...live, ...(await textsOf(fresh))].join('\n')
+    await fresh.unmount()
+    return text
+  }
+  return { rafs, gestures, kv, press, pressKey, store, open, opened, runs, tours, tour, stamps, waves, hud, advance, draw }
 }
 
 const CLOSE_HELP = '/hud lots pour fermer'
@@ -253,13 +291,13 @@ test('R5 — l’état de la vague l’emporte sur celui du plan, dans le pannea
   expect((await s.draw()).text).toContain('⟳ relit')
 })
 
-test('R8 — lecture seule : pas d’action sur les lots, seuls les noms de projet et les lots à sous-lots se plient (L409, L411)', async ($, on) => {
+test('R8 — les lots n’ont pas de bouton (leur région Client réordonne), seuls les noms de projet se replient (L409, L402)', async ($, on) => {
   const s = await session($, on)
   await s.hud('lots')
   await settle()
   const d = await s.draw()
-  expect(d.buttons.map(b => b.key)).toEqual(['fold:cadence', 'open:cadence#L401', 'fold:ol'])
-  expect(d.text).toContain('lecture seule')
+  expect(d.buttons.map(b => b.key)).toEqual(['fold:cadence', 'fold:ol'])
+  expect(d.text).toContain('glisser un lot, ou Alt+↑ / Alt+↓')
 })
 
 test('R8 — l’heure de dernière lecture est affichée', async ($, on) => {
@@ -500,4 +538,181 @@ test('R4 — une nouvelle session relit les états gardés ; un magasin illisibl
   const text = (await kept.draw(70, 80)).text
   expect(text).toMatch(/D10\b/)
   expect(text).not.toMatch(/L401\/2/)
+
+// ── L402 : réordonner dans le panneau ─────────────────────────────────────────────────────────────────────────
+
+// lignes du projet « cadence » de TOUR, dans la région Client : L401 (y 0), L401/1 (1), L401/2 (2), L402 (3)
+const down = (y: number) => ({ type: 'down', x: 4, y, button: 'left', in: 'lots:cadence' }) as never
+const move = (y: number) => ({ type: 'move', x: 4, y, button: 'left', in: 'lots:cadence' }) as never
+const up = (y: number) => ({ type: 'up', x: 4, y, button: 'left', in: 'lots:cadence' }) as never
+const altKey = (key: 'up' | 'down') => ({ key, meta: true, in: 'lots:cadence' }) as never
+
+test('R22 — glisser un lot sur un autre : raf move dans le projet, puis le panneau se relit et dit que le plan est à commiter', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  const before = s.tours().length
+  const text = await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(move(0))
+    await ui.pointer(up(0))
+  })
+  expect(s.rafs()).toEqual([['raf', 'move', 'L402', '--before', 'L401']])
+  expect(s.tours().length).toBe(before + 1)
+  expect(text).toMatch(/L402 placé avant L401 — le plan est modifié, à commiter/)
+})
+
+test('R22 — le dossier de raf est celui du projet', async ($, on) => {
+  const cwds: (string | undefined)[] = []
+  const s = await session($, on, { raf: (_argv, cwd) => (cwds.push(cwd), { exitCode: 0, stderr: '' }) })
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(up(0))
+  })
+  expect(cwds).toEqual(['/x/cadence'])
+})
+
+test('R22 — glisser vers le bas place après la cible', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.pointer(down(0))
+    await ui.pointer(up(3))
+  })
+  expect(s.rafs()).toEqual([['raf', 'move', 'L401', '--after', 'L402']])
+})
+
+test('R22 — pendant le glisser, un repère marque la position d’arrivée ; relâché au même endroit, rien ne bouge', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  const during = await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(move(0))
+  })
+  expect(during).toMatch(/⇡/)
+  const still = await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(move(0))
+    await ui.pointer(move(3))
+    await ui.pointer(up(3))
+  })
+  expect(still).not.toMatch(/⇡/)
+  expect(s.rafs()).toEqual([])
+})
+
+test('R22 — au clavier : sélection, puis Alt+↑ / Alt+↓ place le lot avant le précédent / après le suivant (les sous-tâches du lot voisin ne comptent pas)', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(up(3))
+    await ui.key(altKey('up'))
+  })
+  await s.gestures(async ui => {
+    await ui.pointer(down(0))
+    await ui.pointer(up(0))
+    await ui.key(altKey('down'))
+  })
+  expect(s.rafs()).toEqual([['raf', 'move', 'L402', '--before', 'L401'], ['raf', 'move', 'L401', '--after', 'L402']])
+})
+
+test('R22 — au clavier, ↑ / ↓ seuls changent la sélection ; rien sans sélection ; aux bords rien ne part', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.key(altKey('up'))
+    await ui.key({ key: 'down', in: 'lots:cadence' } as never)
+    await ui.key({ key: 'down', in: 'lots:cadence' } as never)
+    await ui.key({ key: 'down', in: 'lots:cadence' } as never)
+    await ui.key({ key: 'down', in: 'lots:cadence' } as never)
+    await ui.key(altKey('down'))
+  })
+  expect(s.rafs()).toEqual([])
+})
+
+test('R22 — une sous-tâche se réordonne par glisser parmi celles de son lot', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.pointer(down(2))
+    await ui.pointer(up(1))
+  })
+  expect(s.rafs()).toEqual([['raf', 'move', 'L401/2', '--before', 'L401/1']])
+})
+
+test('R23 — parents différents : refusé avec sa raison, raf n’est pas appelé et le tableau n’est pas relu', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  const before = s.tours().length
+  const text = await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(up(2))
+  })
+  expect(s.rafs()).toEqual([])
+  expect(text).toMatch(/L402 et L401\/2 n'ont pas le même parent/)
+  expect(s.tours().length).toBe(before)
+})
+
+for (const reason of ['move : orchestration en cours (vague w1, pid 3) — attendre', 'plan en lecture seule : maritime — le modifier avec l’outil du projet', 'move : L402 est archivé']) {
+  test(`R23 — un refus de raf est montré avec sa raison, sans relecture : ${reason.split(' — ')[0]}`, async ($, on) => {
+    const s = await session($, on, { raf: () => ({ exitCode: 2, stderr: `raf: ${reason}\n` }) })
+    await s.hud('lots')
+    const before = s.tours().length
+    const text = await s.gestures(async ui => {
+      await ui.pointer(down(3))
+      await ui.pointer(up(0))
+    })
+    expect(text).toContain(reason)
+    expect(text).not.toMatch(/à commiter/)
+    expect(s.tours().length).toBe(before)
+  })
+}
+
+test('R23 — raf introuvable : le panneau le dit', async ($, on) => {
+  const s = await session($, on, { raf: () => { throw new Error('ENOENT') } })
+  await s.hud('lots')
+  const text = await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(up(0))
+  })
+  expect(text).toMatch(/raf move n’a pas pu être lancé/)
+})
+
+test('R22 — une demande forgée (projet ou lot inconnu) est ignorée', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.post({ kind: 'move', project: 'zzz', id: 'L402', target: 'L401', place: 'before' }, { in: 'lots:cadence' } as never)
+    await ui.post({ kind: 'move', project: 'cadence', id: 'L402', target: 'L9', place: 'before' }, { in: 'lots:cadence' } as never)
+    await ui.post('n’importe quoi', { in: 'lots:cadence' } as never)
+  })
+  expect(s.rafs()).toEqual([])
+})
+
+test('R22 — sur une surface sans Client (mobile, éditeur) le panneau se dessine, sans glisser', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  for (const surface of ['mobile', 'vscode'] as const) expect(await s.gestures(async () => undefined, surface)).toContain('L402')
+})
+
+test('R22 — le clavier fonctionne aussi dans le terminal', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(up(3))
+    await ui.key(altKey('up'))
+  }, 'terminal')
+  expect(s.rafs()).toEqual([['raf', 'move', 'L402', '--before', 'L401']])
+})
+
+test('R23 — pendant le glisser, un repère dit qu’une arrivée chez un autre parent sera refusée', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  const during = await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(move(2))
+  })
+  expect(during).toMatch(/⊘/)
+  expect(during).not.toMatch(/⇡/)
 })

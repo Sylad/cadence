@@ -1,11 +1,13 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
+import type { ClientProps, ElementConstructor, EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
-import type { AgentsSummary, CommandInfo, LeadHold, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
+import type { AgentsSummary, CommandInfo, LeadHold, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
 import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
-import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, readTime, stampsSignature, subsText } from './lots'
+import { lotRow } from './lot-row'
+import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, planMove, projectDir, readTime, refusalReason, stampsSignature, subsText } from './lots'
+import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
 /** Id du panneau des lots (`/hud lots`). */
@@ -31,6 +33,7 @@ const lotsBoard = atom({ plugin: 'cadence-hud', key: 'lotsBoard' } as const, nul
 const lotsFailed = atom({ plugin: 'cadence-hud', key: 'lotsFailed' } as const, false)
 const lotsFolds = atom({ plugin: 'cadence-hud', key: 'lotsFolds' } as const, {})
 const lotsViews = atom({ plugin: 'cadence-hud', key: 'lotsViews' } as const, {})
+const lotsNotice = atom({ plugin: 'cadence-hud', key: 'lotsNotice' } as const, null)
 const lotsAt = atom({ plugin: 'cadence-hud', key: 'lotsAt' } as const, 0)
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
@@ -80,6 +83,9 @@ const toggleView = async ($: EngineInterface, key: string): Promise<void> => {
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const onlyBooleans = (v: Record<string, unknown>): Record<string, boolean> => Object.fromEntries(Object.entries(v).filter((e): e is [string, boolean] => typeof e[1] === 'boolean'))
 
+/** Garde le dernier mot du panneau sur un déplacement (fait, ou refusé avec sa raison) : il s'affiche sous le titre. */
+const say = ($: EngineInterface, text: string, refused: boolean): Promise<void> => update($, lotsNotice, () => ({ text, refused }) satisfies LotsNotice)
+
 export const register: Register = on => {
   let timer: Timer | undefined
   let isRefreshing = false
@@ -90,6 +96,7 @@ export const register: Register = on => {
   // le cwd de session.start tel quel : c'est lui que `cadence session context` retrouve (le dossier de lancement ne sert qu'à l'avancement)
   let startCwd: string | undefined
   let readTourNow: (() => Promise<void>) | undefined
+  let isMoving = false
 
   on('session.start', async ($, e, next) => {
     // Le dossier du tableau est celui de lancement, pas le dossier courant du shell : un cd du lead dans un sous-projet
@@ -662,16 +669,52 @@ export const register: Register = on => {
     )
   })
 
+  // Le dépôt d'un lot (ou d'une sous-tâche) posté par la région Client du panneau (L402) : contrôlé contre le tableau lu, puis `raf move` dans le projet.
+  on('ui.message', async ($, e, next) => {
+    if (e.requestId !== LOTS_PANE) return next(e)
+    const ask = parseMoveAsk(e.data)
+    const board = await read($, lotsBoard)
+    const project = board?.rows.find(r => r.project === ask?.project && !r.error)
+    if (!ask || !board || !project || isMoving) return {}
+    const plan = planMove(project.lots ?? [], ask)
+    if (!plan) return {}
+    if (!plan.ok) {
+      await say($, plan.reason, true)
+      return {}
+    }
+    const folder = tourFolder(await read($, waves), sessionCwd)
+    if (!folder) {
+      await say($, 'dossier des plans inconnu : rien n\'a été déplacé', true)
+      return {}
+    }
+    isMoving = true
+    try {
+      const r = await $.process.run(plan.argv, { cwd: projectDir(folder, ask.project, board.rows), timeoutMs: 10_000 }).catch(() => undefined)
+      if (!r) await say($, `raf move n’a pas pu être lancé (raf absent du PATH ou sans réponse) : rien n’a été déplacé`, true)
+      else if (r.exitCode !== 0) await say($, refusalReason(r.stderr, r.exitCode), true)
+      else {
+        await say($, `${ask.id} placé ${ask.place === 'before' ? 'avant' : 'après'} ${ask.target} — le plan est modifié, à commiter (raf move ne commite pas)`, false)
+        void readTourNow?.()
+      }
+    } finally {
+      isMoving = false
+    }
+    return {}
+  })
+
   // Le panneau des lots (L401) : lecture seule, l'arbre des lots non clos de chaque projet du dossier (lead tour --json).
   on('ui.render', { component: 'Pane', requestId: LOTS_PANE }, async ($, e) => {
-    const [board, failed, readAt, allWaves, at, folds, views] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, now), read($, lotsFolds), read($, lotsViews)])
-    const { Box, Text, Button } = $.ui.resolve(e)
+    const [board, failed, readAt, allWaves, at, folds, views, notice] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice)])
+    const table = $.ui.resolve(e)
+    const { Box, Text, Button } = table
+    // les surfaces sans région Client (mobile, éditeur) dessinent les lots sans les réordonner
+    const Client: ElementConstructor<ClientProps> | undefined = e.surface === 'terminal' || e.surface === 'desktop' ? (table as { Client: ElementConstructor<ClientProps> }).Client : undefined
     const columns = Math.max(20, e.props.bodyColumns)
     const header = (
       <Text key="header" wrap="truncate-end">
         <Text bold>Lots</Text>
         <Text dimColor>
-          {'  '}lecture seule{board ? `  lu à ${readTime(readAt)}` : ''}
+          {'  '}{Client ? 'glisser un lot, ou Alt+↑ / Alt+↓' : 'lecture seule'}{board ? `  lu à ${readTime(readAt)}` : ''}
         </Text>
       </Text>
     )
@@ -698,90 +741,67 @@ export const register: Register = on => {
       if (panel.lines.length === 0) {
         body = message('Aucun lot non clos dans les projets de ce dossier.', 'subtle')
       } else {
-        const rows = panel.lines.map((line, i) => {
-          if (line.kind === 'project') {
-            return (
-              <Box key={`p${i}`} flexDirection="row">
-                {line.folded === undefined ? (
-                  <Text bold wrap="truncate-end">
-                    {line.name}
-                  </Text>
-                ) : (
-                  <Button key={`fold:${line.name}`} plain onPress={() => void toggleFold($, line.name)}>
-                    {`${line.folded ? '▸' : '▾'} ${line.name}`}
-                  </Button>
-                )}
-                {line.error ? (
-                  <Text color="error" wrap="truncate-end">
-                    {'  '}
-                    {ellipsize(line.error, columns - line.name.length - 2)}
-                  </Text>
-                ) : (
-                  <Text dimColor wrap="truncate-end">
-                    {'  '}
-                    {line.count} lot{line.count > 1 ? 's' : ''} non clos{line.folded ? ` · ${line.doing} en cours` : ''}
-                  </Text>
-                )}
+        // une région Client par projet : on ne réordonne qu'à l'intérieur de son projet
+        const rows: RenderChildren[] = []
+        let run: PanelLot[] = []
+        let runProject = ''
+        const flush = () => {
+          if (run.length === 0) return
+          rows.push(
+            Client ? (
+              <Client key={`lots:${runProject}`} module="./lots-list.tsx" props={{ project: runProject, lines: run }} width="100%" />
+            ) : (
+              <Box key={`r${rows.length}`} flexDirection="column">
+                {run.map((l, j) => lotRow(table, l, `l${j}`))}
               </Box>
-            )
+            ),
+          )
+          run = []
+        }
+        panel.lines.forEach((line, i) => {
+          if (line.kind === 'lot') {
+            run.push(line)
+            return
           }
+          flush()
+          // le bouton « + N lots » / « moins » du reste d'un projet (L411) ferme la région de ses lots : les lots cachés derrière lui ne sont pas des lignes, on ne les vise pas
           if (line.kind === 'more') {
-            return (
+            rows.push(
               <Box key={`m${i}`} paddingLeft={2}>
                 <Button key={`more:${line.project}`} plain onPress={() => void toggleView($, moreKey(line.project))}>
                   {moreText(line.hidden, line.expanded)}
                 </Button>
-              </Box>
+              </Box>,
             )
+            return
           }
-          const after = line.after.length > 0 && (
-            <Text color="subtle">
-              after:{' '}
-              {line.after.map((a, j) => (
-                <Text key={a.id} strikethrough={a.struck}>
-                  {j > 0 ? ' ' : ''}
-                  {a.id}
+          runProject = line.name
+          rows.push(
+            <Box key={`p${i}`} flexDirection="row">
+              {line.folded === undefined ? (
+                <Text bold wrap="truncate-end">
+                  {line.name}
                 </Text>
-              ))}
-            </Text>
-          )
-          return (
-            <Box key={`l${i}`} flexDirection="column">
-              <Box flexDirection="row">
-                <Box width={line.idWidth} flexShrink={0}>
-                  {line.subs ? (
-                    <Button key={line.subs.key} plain onPress={() => void toggleView($, line.subs!.key)}>
-                      {`${line.lead}${line.id}`}
-                    </Button>
-                  ) : (
-                    <Text wrap="truncate-end">
-                      <Text dimColor>{line.lead}</Text>
-                      {line.id}
-                    </Text>
-                  )}
-                </Box>
-                <Box paddingLeft={2} flexGrow={1} flexShrink={1}>
-                  <Text wrap="truncate-end">
-                    {line.title}
-                    {line.subs && <Text dimColor>{`  ${subsText(line.subs.count)}`}</Text>}
-                    {!line.afterOwnLine && after && '  '}
-                    {!line.afterOwnLine && after}
-                  </Text>
-                </Box>
-                <Box paddingLeft={2} width={line.stateWidth + 2} flexShrink={0}>
-                  <Text wrap="truncate-end" color={line.state.color}>
-                    {line.state.text}
-                  </Text>
-                </Box>
-              </Box>
-              {line.afterOwnLine && (
-                <Box paddingLeft={line.idWidth}>
-                  <Text wrap="truncate-end">{after}</Text>
-                </Box>
+              ) : (
+                <Button key={`fold:${line.name}`} plain onPress={() => void toggleFold($, line.name)}>
+                  {`${line.folded ? '▸' : '▾'} ${line.name}`}
+                </Button>
               )}
-            </Box>
+              {line.error ? (
+                <Text color="error" wrap="truncate-end">
+                  {'  '}
+                  {ellipsize(line.error, columns - line.name.length - 2)}
+                </Text>
+              ) : (
+                <Text dimColor wrap="truncate-end">
+                  {'  '}
+                  {line.count} lot{line.count > 1 ? 's' : ''} non clos{line.folded ? ` · ${line.doing} en cours` : ''}
+                </Text>
+              )}
+            </Box>,
           )
         })
+        flush()
         body = (
           <Box key="tree" flexDirection="column">
             {rows}
@@ -794,9 +814,16 @@ export const register: Register = on => {
         )
       }
     }
+    const result = notice && (
+      <Text key="notice" color={notice.refused ? 'error' : 'success'} wrap="wrap">
+        {notice.refused ? '✖ ' : '✔ '}
+        {notice.text}
+      </Text>
+    )
     return (
       <Box flexDirection="column">
         {header}
+        {result}
         {body}
         {footer}
       </Box>

@@ -297,3 +297,14 @@ export const buildPanel = (input: {
   const cutLots = lines.slice(kept).reduce((n, l) => n + (l.kind === 'lot' ? 1 + hides(l) : 0), 0)
   return { lines: fits.map(({ height: _h, ...l }) => l as PanelLine), more: cutLots + droppedLots + cutButtons }
 }
+
+/** Une ligne de lot du panneau, telle que le dessin la porte ; le projet la date. */
+export type PanelLot = Extract<PanelLine, { kind: 'lot' }>
+
+/** Lit ce que la région Client a posté : un déplacement d'un projet, ou rien (la donnée vient du dessin, elle n'est pas crue). Les ids sont vérifiés plus loin, contre le tableau lu. */
+export const parseMoveAsk = (data: unknown): (MoveAsk & { project: string }) | undefined => {
+  if (typeof data !== 'object' || data === null) return undefined
+  const d = data as Record<string, unknown>
+  if (d.kind !== 'move' || typeof d.project !== 'string' || typeof d.id !== 'string' || typeof d.target !== 'string') return undefined
+  return d.place === 'before' || d.place === 'after' ? { project: d.project, id: d.id, target: d.target, place: d.place } : undefined
+}

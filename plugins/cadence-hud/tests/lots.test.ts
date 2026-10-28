@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, planMove, projectDir, readTime, refusalReason } from '../hooks/lots'
+import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, planMove, projectDir, readTime, refusalReason } from '../hooks/lots'
 import type { LotsRow, TourLot } from '../types'
 
 const lot = (id: string, status: 'todo' | 'doing' = 'todo', extra: Partial<TourLot> = {}): TourLot => ({ id, title: `Titre ${id}`, status, after: [], ...extra })
@@ -578,4 +578,11 @@ test('R20 — le dossier d’un projet du tour : le dossier lui-même pour un pr
 test('R20 — chaque ligne de lot du panneau porte son groupe de frères', () => {
   const panel = buildPanel({ rows: [{ project: 'p', lots: PLAN }], columns: 80, height: 30, waves: [] })
   expect(panel.lines.flatMap(l => (l.kind === 'lot' ? [`${l.id}:${l.group}`] : []))).toEqual(['L1:', 'L2:', 'L2/1:L2', 'L2/2:L2', 'L3:'])
+})
+
+test('R22 — ce que la région Client poste est vérifié : seule une demande complète passe', () => {
+  expect(parseMoveAsk({ kind: 'move', project: 'p', id: 'L1', target: 'L2', place: 'after' })).toEqual({ project: 'p', id: 'L1', target: 'L2', place: 'after' })
+  for (const bad of [null, 'move', 7, {}, { kind: 'move', project: 'p', id: 'L1', target: 'L2', place: 'beside' }, { kind: 'move', project: 'p', id: 1, target: 'L2', place: 'after' }, { kind: 'other', project: 'p', id: 'L1', target: 'L2', place: 'after' }]) {
+    expect(parseMoveAsk(bad)).toBeUndefined()
+  }
 })

@@ -4295,9 +4295,10 @@ lots:
     finished: 2026-10-28
   - id: L398
     title: "Sessions de vague sans contexte inutile : 29 à 60 k tokens au premier tour (liste de toutes les skills, hook superpowers, CLAUDE.md) pour des sessions qui n'utilisent que Bash ; lancer sans plugins ni skills utilisateur non voulus, mesurer contexte initial et tokens par étape avant/après sur 2 vagues ; doc, tests"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-28
+    started: 2026-10-28
   - id: L399
     title: "Tests rouges à la porte après une implémentation qui se disait verte : 30 passes sur 205 du 22 au 28-10 (cadence 17) ; diagnostiquer par lot (commande de la session ≠ orchestrate.test, test instable, dépendances du worktree) depuis les journaux, puis supprimer la cause mesurée ; doc, tests"
     status: done

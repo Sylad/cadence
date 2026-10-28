@@ -313,7 +313,7 @@ test('R17 — le panneau coupe l’arbre à la hauteur du corps : « … +N lots
   await s.hud('lots')
   await settle()
   const d = await s.draw(70, 6)
-  expect(d.text).toContain('… +10 lots de plus')
+  expect(d.text).toContain('… +11 lots de plus')
   expect(d.text).toContain(CLOSE_HELP)
 })
 

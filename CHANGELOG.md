@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Changed
 
 - Lots panel (`/hud lots`): in each project the lots in progress come first (`doing`, or in a wave being implemented, reviewed, corrected, in question, ready or handed back), then the free ones, then the rest, plan order kept in each group; a sub-lot stays under its parent and a parent with a sub-lot in progress rises with it (L410).
-- Lots panel (`/hud lots`): a project shows at most 5 lots; a `+ N lots` button opens the rest of the project and `moins` closes it again. A lot that has sub-lots shows their count, is closed by default, and opens or closes with a click. Both choices are kept between two openings of the panel and between sessions (L411).
+- Lots panel (`/hud lots`): a project shows at most 5 lots; a `+ N lots` button opens the rest of the project and `moins` closes it again. A lot that has sub-lots shows their count, is closed by default, and opens or closes with a click. Both choices are kept between two openings of the panel and between sessions; on a short panel the button keeps its line and the lots give way, so `moins` never disappears and no lot goes missing without being counted in `… +N lots de plus` (L411).
 
 ## [1.22.1] - 2026-10-28
 

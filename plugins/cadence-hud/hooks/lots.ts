@@ -173,7 +173,7 @@ const sameProject = (row: string, wave: string): boolean => row === wave || row.
 
 /**
  * Les lignes du panneau pour `columns` colonnes de corps et `height` lignes de corps : le titre et le pied en prennent deux ;
- * si l'arbre est plus haut, les premières lignes restent et `more` compte les lots que la ligne « … +N lots de plus » (une ligne de plus) remplace ; un projet replié placé après la coupure garde sa ligne.
+ * si l'arbre est plus haut, les premières lignes restent et `more` compte les lots que la ligne « … +N lots de plus » (une ligne de plus) remplace ; un projet replié placé après la coupure garde sa ligne, de même que le bouton « + N lots » / « moins » du projet que la coupure traverse.
  */
 export const buildPanel = (input: {
   rows: readonly LotsRow[]
@@ -240,15 +240,23 @@ export const buildPanel = (input: {
   if (total <= room) return { lines: lines.map(({ height: _h, ...l }) => l as PanelLine), more: 0 }
   const isFoldedLine = (l: PanelLine) => l.kind === 'project' && !!l.folded
   const tail = (from: number) => lines.slice(from).filter(isFoldedLine) // les projets repliés après la coupure gardent leur ligne
+  // le bouton « + N lots » / « moins » du projet que la coupure traverse garde sa ligne, comme un projet replié : il n'est jamais coupé avec les lots
+  const pending = (n: number) => {
+    const next = lines.slice(n).findIndex(l => l.kind !== 'lot')
+    const last = lines[n - 1]
+    return last && last.kind === 'lot' && next >= 0 && lines[n + next]!.kind === 'more' ? (lines[n + next] as PanelLine & { height: number }) : undefined
+  }
+  const cost = (n: number) => lines.slice(0, n).reduce((s, l) => s + l.height, 0) + (pending(n) ? 1 : 0) + tail(n).length
   let kept = 0
-  let used = 0
-  while (kept < lines.length && used + lines[kept]!.height <= room - 1) used += lines[kept++]!.height
-  const cost = (n: number) => lines.slice(0, n).reduce((s, l) => s + l.height, 0) + tail(n).length
+  while (kept < lines.length && cost(kept + 1) <= room - 1) kept++
   while (kept > 0 && (cost(kept) > room - 1 || (lines[kept - 1]!.kind === 'project' && !isFoldedLine(lines[kept - 1]!)))) kept-- // un nom de projet sans aucun de ses lots n'apprend rien
-  const shownLines = [...lines.slice(0, kept), ...tail(kept)]
+  const button = pending(kept)
+  const shownLines = [...lines.slice(0, kept), ...(button ? [button] : []), ...tail(kept)]
   // des projets repliés plus nombreux que la place : on garde ce qui tient avec le pied, les lots des lignes retirées passent dans « … +N »
   const fits = shownLines.slice(0, Math.max(0, room - 1))
   const dropped = shownLines.slice(fits.length)
   const droppedLots = dropped.reduce((n, l) => n + (l.kind === 'project' ? l.count : 0), 0)
-  return { lines: fits.map(({ height: _h, ...l }) => l as PanelLine), more: lines.slice(kept).filter(l => l.kind === 'lot').length + droppedLots }
+  // un bouton replié coupé avec son projet cachait des lots qu'aucune ligne ne compte : ils passent dans « … +N » comme les autres
+  const cutButtons = lines.slice(kept).filter(l => l.kind === 'more' && l !== button && !l.expanded).reduce((n, l) => n + (l.kind === 'more' ? l.hidden : 0), 0)
+  return { lines: fits.map(({ height: _h, ...l }) => l as PanelLine), more: lines.slice(kept).filter(l => l.kind === 'lot').length + droppedLots + cutButtons }
 }

@@ -183,11 +183,11 @@ test('R17 — titre long : tronqué sur une ligne', () => {
 
 test('R17 — arbre plus haut que le panneau : « … +N lots de plus »', () => {
   const many = { project: 'p', lots: Array.from({ length: 12 }, (_, i) => lot(`L${i + 1}`)) }
-  // 6 lignes de corps : titre, pied, la ligne « … +N » et le nom du projet laissent 2 lots
+  // 6 lignes de corps : titre, pied, la ligne « … +N », le nom du projet et le bouton « moins » (L411) laissent 1 lot
   const p = build({ rows: [many], columns: 70, height: 6, waves: [] })
   const shown = p.lines.filter(l => l.kind === 'lot')
-  expect(shown).toHaveLength(2)
-  expect(p.more).toBe(10)
+  expect(shown).toHaveLength(1)
+  expect(p.more).toBe(11)
 })
 
 test('R17 — sous-tâches comprises dans les lignes comptées de « de plus »', () => {
@@ -417,8 +417,27 @@ test('R4 — un projet replié (L409) ne montre ni lots ni bouton', () => {
   expect(moreLine(p)).toBeDefined()
 })
 
-test('R4 — le bouton « + N lots » reste affiché quand la hauteur coupe plus bas : « … +N » ne compte que des lots', () => {
-  const p = buildPanel({ rows: [{ project: 'p', lots: Array.from({ length: 12 }, (_, i) => lot(`L${i + 1}`)) }], columns: 70, height: 6, waves: [], views: {} })
-  expect(p.lines.filter(l => l.kind === 'lot')).toHaveLength(2)
-  expect(p.more).toBe(3)
+const twelve = (name: string) => ({ project: name, lots: Array.from({ length: 12 }, (_, i) => lot(`L${i + 1}`)) })
+const buttons = (p: ReturnType<typeof buildPanel>) => p.lines.filter(l => l.kind === 'more')
+
+test('R4 — le bouton « + N lots » reste affiché quand la hauteur coupe les lots : les lots coupés passent dans « … +N », jamais le bouton', () => {
+  const p = buildPanel({ rows: [twelve('p')], columns: 70, height: 6, waves: [], views: {} })
+  expect(p.lines.filter(l => l.kind === 'lot').map(l => l.kind === 'lot' && l.id)).toEqual(['L1'])
+  expect(buttons(p)).toEqual([{ kind: 'more', project: 'p', hidden: 7, expanded: false }])
+  expect(p.more).toBe(4) // L2 à L5 coupés ; les 7 autres sont derrière le bouton, qui les annonce
+})
+
+test('R4 — « moins » reste affiché quand la hauteur coupe le reste déplié : le projet se replie toujours', () => {
+  const p = buildPanel({ rows: [twelve('p')], columns: 70, height: 10, waves: [], views: { [moreKey('p')]: true } })
+  expect(buttons(p)).toEqual([{ kind: 'more', project: 'p', hidden: 7, expanded: true }])
+  expect(p.lines.filter(l => l.kind === 'lot')).toHaveLength(5)
+  expect(p.more).toBe(7)
+})
+
+test('R4 — un bouton coupé avec son projet compte les lots qu’il cachait dans « … +N »', () => {
+  const p = buildPanel({ rows: [twelve('a'), twelve('b')], columns: 70, height: 12, waves: [], views: {} })
+  const visible = p.lines.filter(l => l.kind === 'lot').length
+  // 24 lots en tout : ce que le panneau montre + ce que « … +N » annonce + ce que les boutons affichés annoncent
+  const behindButtons = buttons(p).reduce((n, l) => n + (l.kind === 'more' ? l.hidden : 0), 0)
+  expect(visible + p.more + behindButtons).toBe(24)
 })

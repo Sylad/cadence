@@ -8,7 +8,7 @@ import { AGENTS_DIR } from '../src/skills.js';
 import type { ClaudeFn } from '../src/orchestrate/launch.js';
 import { claudeOut, commitFile, harness, kindOf, precheckReport, reviewReport, workReport } from './orchestrate-harness.js';
 import { tempDir } from './helpers.js';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Plan } from '../src/plan.js';
 import { execFileSync } from 'node:child_process';
@@ -236,10 +236,12 @@ describe('orchestrate --drop / --stop-after-current sur une vague vivante', () =
   it("L332 — la relance d'une revue coupée doit vraiment attendre un créneau et voit --stop-after-current : étape en échec, session coupée gardée, relance non faite", async () => {
     const parent = parentWith(['a']);
     const home = cadenceHome();
-    let x: (() => void) | undefined;
+    const xFile = join(home, 'slots/slot-7.lock');
     const { d, calls } = cutReviewDeps(async () => {
-      // Une autre vague prend le créneau pendant que la revue tourne : la relance devra attendre.
-      x = await acquireSlot(home, 2, { wave: 'x' });
+      // Une autre vague (un autre processus : le pid du parent) prend un créneau pendant que la revue tourne : la relance devra attendre.
+      // Posé à la main : au plafond commun (L395), `acquireSlot` ne le donnerait pas à côté de cette vague au plafond 1.
+      mkdirSync(join(home, 'slots'), { recursive: true });
+      writeFileSync(xFile, JSON.stringify({ pid: process.ppid, wave: 'x', started: new Date().toISOString() }));
     });
     const r = io(parent);
     const done = orchestrate(['a:L1', '--max-sessions', '1'], r.io, d);
@@ -253,7 +255,7 @@ describe('orchestrate --drop / --stop-after-current sur une vague vivante', () =
       const code = await Promise.race([done, new Promise<string>((res) => setTimeout(() => res('toujours en attente'), 5_000))]);
       expect(code).not.toBe('toujours en attente');
     } finally {
-      x?.();
+      rmSync(xFile, { force: true });
       await done.catch(() => undefined);
     }
     expect(calls.map((c) => c.kind)).toEqual(['implement', 'review']); // la relance n'est pas partie

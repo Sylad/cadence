@@ -175,5 +175,9 @@ export const buildPanel = (input: {
   const cost = (n: number) => lines.slice(0, n).reduce((s, l) => s + l.height, 0) + tail(n).length
   while (kept > 0 && (cost(kept) > room - 1 || (lines[kept - 1]!.kind === 'project' && !isFoldedLine(lines[kept - 1]!)))) kept-- // un nom de projet sans aucun de ses lots n'apprend rien
   const shownLines = [...lines.slice(0, kept), ...tail(kept)]
-  return { lines: shownLines.map(({ height: _h, ...l }) => l as PanelLine), more: lines.slice(kept).filter(l => l.kind === 'lot').length }
+  // des projets repliés plus nombreux que la place : on garde ce qui tient avec le pied, les lots des lignes retirées passent dans « … +N »
+  const fits = shownLines.slice(0, Math.max(0, room - 1))
+  const dropped = shownLines.slice(fits.length)
+  const droppedLots = dropped.reduce((n, l) => n + (l.kind === 'project' ? l.count : 0), 0)
+  return { lines: fits.map(({ height: _h, ...l }) => l as PanelLine), more: lines.slice(kept).filter(l => l.kind === 'lot').length + droppedLots }
 }

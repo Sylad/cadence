@@ -247,6 +247,14 @@ test('R3 — un projet replié placé après la coupure garde sa ligne : jamais 
   expect(p.more).toBeGreaterThan(0)
 })
 
+test('R3 — des projets repliés plus nombreux que la place : le corps ne dépasse pas sa hauteur, les lots des lignes retirées sont comptés', () => {
+  const rows = Array.from({ length: 6 }, (_, i) => ({ project: `P${i + 1}`, lots: many(25) }))
+  const p = buildPanel({ rows, columns: 70, height: 6, waves: [], folds: {} })
+  // height 6 : room 4, dont une ligne pour « … +N » ; les lots des trois projets retirés (3 × 25) y sont comptés
+  expect(p.lines.map(l => l.kind === 'project' && l.name)).toEqual(['P1', 'P2', 'P3'])
+  expect(p.more).toBe(75)
+})
+
 test('R3 — un lot caché derrière un projet ouvert et un replié : le replié reste, le pied compte les lots ouverts cachés', () => {
   const rows = [{ project: 'maritime', lots: many(159) }, { project: 'B', lots: many(25) }, { project: 'ol', lots: many(3) }]
   const p = buildPanel({ rows, columns: 70, height: 22, waves: [], folds: { maritime: false } })

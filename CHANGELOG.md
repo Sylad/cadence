@@ -77,14 +77,18 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- All live waves apply the same session cap, the lowest one declared (L395, `docs/orchestrate.md`): a wave at 3 next to a wave at 4 no longer waits behind a total of « 4/3 en cours » (L51 waited 16 min 28 s on 28-10). The cap is re-read at every turn, and the wait line and `créneaux libres` use it.
-- The program's test gate is a visible step (L395, `docs/orchestrate.md`): while `orchestrate.build` / `orchestrate.test` runs with no session, `--status` prints `porte tests (3 min)` and the `cadence-hud` band `porte@tests 3 min`, instead of `implémentation` / `→ implement` (5 silent minutes on L392, 28-10). `cadence orchestrate --status --wave <wave>` shows that wave's table, not the last wave of the folder's (two different ids are refused).
+- `raf archive [--before date] [--dry-run]` moves the `done` and `dropped` lots out of the plan into `.cadence/archive/<year>.yaml` (L396, `docs/raf.md`): the cadence plan weighed 559 KB (≈ 150 k tokens) for sessions that need a dozen lots. `raf show`, `raf commits`, `raf check`, `cadence news` and `cadence perf` still find an archived lot by its id (a commit or a News entry citing it is not « inconnu »), `raf add` never reuses its id, the briefs tell the sessions never to read the archive. A lot named in `after:` by a lot that stays, or counted by an open `gate:`, stays in the plan with the reason printed; replaying moves nothing twice.
 
 ### Changed
 
 - `cadence orchestrate`: sessions (and `cadence ref analyse` ones) start with `--settings '{"enabledPlugins":{"<id>":false,…}}'` naming the plugins enabled in the user's `$CLAUDE_CONFIG_DIR/settings.json` (fallback `~/.claude/settings.json`) and the project's `.claude/settings.json` / `settings.local.json`, so they no longer load those plugins' hooks and skills — checked in a real session: the plugin's `SessionStart` hook is not registered and its skills disappear; the first turn of an `implement` session measured **42 541 → 38 330 tokens** (−4.2 k, −9.9 %, same command line, `docs/mesures/contexte-session-2026-10-28.md`). Nothing else of the user's or the project's settings is touched or relayed (`permissions`, `autoMode`, `language`, `env`, hooks, provider and authentication keep their normal precedence); the JSON carries plugin ids only, inline; without an enabled plugin no flag is added; the `ux` step keeps its Playwright MCP, the reviewers their agents, the sandbox is unchanged (L398).
+
+### Fixed
+
+- All live waves apply the same session cap, the lowest one declared (L395, `docs/orchestrate.md`): a wave at 3 next to a wave at 4 no longer waits behind a total of « 4/3 en cours » (L51 waited 16 min 28 s on 28-10). The cap is re-read at every turn, and the wait line and `créneaux libres` use it.
+- The program's test gate is a visible step (L395, `docs/orchestrate.md`): while `orchestrate.build` / `orchestrate.test` runs with no session, `--status` prints `porte tests (3 min)` and the `cadence-hud` band `porte@tests 3 min`, instead of `implémentation` / `→ implement` (5 silent minutes on L392, 28-10). `cadence orchestrate --status --wave <wave>` shows that wave's table, not the last wave of the folder's (two different ids are refused).
 
 ## [1.18.0] - 2026-10-28
 

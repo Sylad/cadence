@@ -21,6 +21,8 @@ export const PLAN_ACTIONS = {
   minors: (label: string) => `mineurs de la revue de ${label} notés`,
   /** `raf done` ne commite pas : l'action de la commande de commit qu'il propose (L371). */
   done: 'terminé',
+  /** `raf archive` (L396) : le nombre de lots déplacés dans l'archive. */
+  archived: (n: number) => `${n} lot(s) archivé(s)`,
   reviewRecorded: 'revue de code enregistrée',
   reviewNoted: 'revue de code notée',
   /** `cadence deliver` pendant une vague (L388) : le lot de l'article ouvert, ou ses titres ajoutés en note. */

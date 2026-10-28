@@ -74,6 +74,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot, citant un id inconnu ou des lots sans y travailler, sans réécrire l'historique ; raf check --ignored les liste
   raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle (plan en lecture seule : .cadence/docs-ok.yaml, le plan n'est pas touché) ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
+  raf archive [--before date] [--dry-run]   déplace les lots done et dropped (terminés avant la date, s'il y en a une) vers .cadence/archive/<année>.yaml ; show, commits, check, news et perf les y retrouvent, les sessions ne les lisent jamais ; reste dans le plan un lot cité par un lot resté (after) ou compté par un gate ouvert ; rejouable
   raf gantt [-o .cadence/gantt.html]
   cadence config set <clé> <valeur> --all [--dry-run] [--depth n]   pose la même clé dans le cadence.yaml de chaque projet du dossier (ceux de lead tour), commentaires et ordre gardés, un lot de config qui la cite (raf add + start) et un commit à chemin explicite par projet ; ne pousse pas ; liste ce qui est fait et sauté (dépôt sale, déjà posée, plan en lecture seule) ; s'arrête sur une config qui ne se relit pas
   raf migrate [--dry-run]   déplace docs/plan/raf.yaml vers .cadence/raf.yaml (git mv) et réécrit les lecteurs du chemin dans le dépôt ; --dry-run les liste sans rien toucher ; refus tant qu'un lecteur n'est pas traité (migrate.keep de cadence.yaml pour ceux qui ne lisent pas le plan) ; rejouable
@@ -191,6 +192,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       porteur: { type: 'string' },
       status: { type: 'string' },
       since: { type: 'string' },
+      before: { type: 'string' },
       idle: { type: 'string' },
       ttl: { type: 'string' },
       session: { type: 'string' },
@@ -420,6 +422,24 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
       return 0;
     }
+    case 'archive': {
+      if (values.before !== undefined && !isDay(values.before)) throw new RafError(`--before invalide : ${values.before} (attendu AAAA-MM-JJ)`);
+      const dry = !!values['dry-run'];
+      const { moved, kept } = loadPlan().archive(today, { before: values.before, dryRun: dry });
+      const files = [...new Set(moved.map((m) => m.file))];
+      for (const f of files) {
+        const ids = moved.filter((m) => m.file === f).map((m) => m.lot.id);
+        io.out(`${dry ? 'à archiver' : 'archivé'} dans ${relative(io.cwd, f)} : ${ids.join(', ')}`);
+      }
+      for (const k of kept) io.out(`${k.id} reste dans le plan : ${k.why}`);
+      if (moved.length === 0) io.out('rien à archiver');
+      else if (!dry) {
+        const plan = loadPlan();
+        const uncommitted = uncommittedPlanCommand(plan, root, moved[0].lot.id, planConfig?.commit, PLAN_ACTIONS.archived(moved.length));
+        if (uncommitted) io.out(uncommitted);
+      }
+      return 0;
+    }
     case 'todo': {
       need(1, 'todo <id> [--reason texte]');
       const plan = loadPlan();
@@ -504,7 +524,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       knownLot(plan, id, 'les commits se listent par lot, pas par sous-tâche');
       // Une lecture : le même ensemble que « raf done » et « raf check », plan en lecture seule compris.
       for (const c of lotWork(plan, root, id).reverse()) io.out(short(c));
-      for (const line of repoSections(plan, root, plan.lot(id))) io.out(line);
+      for (const line of repoSections(plan, root, plan.anyLot(id))) io.out(line);
       return 0;
     }
     case 'show': {
@@ -600,7 +620,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     case 'gantt': {
       const plan = loadPlan();
       const lots = plan.lots();
-      const linked = linkCommits(lots, planCommits(plan, root), plan.refs);
+      const linked = linkCommits(plan.everyLot(), planCommits(plan, root), plan.refs);
       const stamp = io.now();
       const html = renderGantt(
         ganttData(plan.project, schedule(lots, workByLot(plan, root, linked), today), today, `${toDay(stamp)} ${stamp.toTimeString().slice(0, 5)}`),
@@ -729,7 +749,7 @@ function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, ro
 }
 
 function knownLot(plan: Plan, id: string, subtask: string): Lot {
-  const lot = plan.lots().find((l) => l.id === id);
+  const lot = plan.everyLot().find((l) => l.id === id);
   if (!lot) throw new RafError(id.includes('/') ? `${subtask} : ${id}` : `lot inconnu : ${id}`);
   return lot;
 }
@@ -738,14 +758,14 @@ function knownLot(plan: Plan, id: string, subtask: string): Lot {
  * `raf done` écrit le plan et ne le commite jamais (voulu : raf n'a pas de réglage qui commite, docs/raf.md) : la commande de commit du plan et des fichiers
  * que `plan.onWrite` produit, au gabarit `plan.commit` du projet (L371). Null hors d'un dépôt git ou quand rien n'est à commiter.
  */
-function uncommittedPlanCommand(plan: Plan, root: string, lot: string, template: string | undefined): string | null {
+function uncommittedPlanCommand(plan: Plan, root: string, lot: string, template: string | undefined, action: string = PLAN_ACTIONS.done): string | null {
   const repo = gitRoot(root);
   if (!repo) return null;
   // Seuls les chemins que git voit modifiés : `git add` d'un chemin absent ou ignoré est fatal.
-  const paths = dirtyPaths(repo, [relative(repo, plan.path), ...plan.files, ...plan.produced]);
+  const paths = dirtyPaths(repo, [relative(repo, plan.path), ...plan.files, ...plan.produced, ...plan.archiveFiles().map((f) => relative(repo, f))]);
   if (paths.length === 0) return null;
   const quote = (t: string) => (/^[\w./-]+$/.test(t) ? t : `'${t.replaceAll("'", "'\\''")}'`);
-  const message = planCommitMessage(template, { lot, action: PLAN_ACTIONS.done });
+  const message = planCommitMessage(template, { lot, action });
   const list = paths.map(quote).join(' ');
   return `plan non commité : raf ne commite jamais (voulu, ce n'est pas un réglage), à commiter :\n  git add -- ${list} && git commit -m ${quote(message)} -- ${list}`;
 }
@@ -759,7 +779,7 @@ function describe(l: Lot, commits: number): string {
 
 function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): number {
   const lots = plan.lots();
-  const linked = linkCommits(lots, planCommits(plan, root), plan.refs);
+  const linked = linkCommits(plan.everyLot(), planCommits(plan, root), plan.refs);
   const { doing, ready, blocked } = nextUp(lots);
   const work = workByLot(plan, root, linked, [...doing, ...ready.slice(0, 5)].map((l) => l.id));
   const count = (id: string) => work.get(id)?.length ?? 0;
@@ -899,9 +919,9 @@ function news(
   switch (sub) {
     case 'new': {
       if (args.length === 0) throw new RafError('usage : cadence news new <lot…> [--title t]');
-      for (const id of args) plan.lot(id);
+      for (const id of args) plan.anyLot(id);
       // Mesuré comme newEntry l'écrit : espaces fusionnés.
-      const title = (values.title ?? plan.lot(args[0]).public ?? plan.lot(args[0]).title).replace(/\s+/g, ' ').trim();
+      const title = (values.title ?? plan.anyLot(args[0]).public ?? plan.anyLot(args[0]).title).replace(/\s+/g, ' ').trim();
       refuseLongTitle(title, values.title === undefined ? ' — donner un titre court : cadence news new <lot> --title "…"' : '');
       io.out(newEntry(dir, args, title, today, io.now()));
       return 0;
@@ -918,7 +938,7 @@ function news(
     case 'check':
     case 'build': {
       const entries = loadEntries(dir);
-      const issues = newsIssues(lots, entries, dir, sub === 'check' ? hypotheses() : undefined);
+      const issues = newsIssues(lots, entries, dir, sub === 'check' ? hypotheses() : undefined, plan.archived());
       for (const i of issues) io.out(`✗ ${i.message}`);
       // Le build refuse seulement ce qu'il ne saurait pas publier : entrée illisible, capture absente.
       const blocking = sub === 'check' ? issues : issues.filter((i) => i.kind === 'bad-entry' || i.kind === 'missing-capture');

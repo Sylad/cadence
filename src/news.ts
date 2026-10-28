@@ -174,9 +174,10 @@ function hypothesisLines(body: string): string[] | null {
  * `hypotheses` : par lot, les règles `hypothese` de sa fiche (L174, `ficheHypotheses`). L'entrée d'un lot qui en a doit se terminer
  * par une section `## Hypothèses` avec une ligne `- Rn — …` par règle.
  */
-export function newsIssues(lots: Lot[], entries: Entry[], dir: string, hypotheses: Map<string, string[]> = new Map()): NewsIssue[] {
+export function newsIssues(lots: Lot[], entries: Entry[], dir: string, hypotheses: Map<string, string[]> = new Map(), archived: Lot[] = []): NewsIssue[] {
   const issues: NewsIssue[] = [];
-  const ids = new Set(lots.map((l) => l.id));
+  // Un lot archivé (L396) reste cité à bon droit par ses Nouveautés, mais n'est plus à couvrir : c'est fait ou jamais voulu.
+  const ids = new Set([...lots, ...archived].map((l) => l.id));
   const covered = new Set(entries.flatMap((e) => e.lots));
   for (const e of entries) {
     for (const p of e.problems) issues.push({ kind: 'bad-entry', message: `${e.file} : ${p}` });

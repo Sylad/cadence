@@ -112,7 +112,7 @@ export function shotsText(captureDir: string): string {
 }
 
 /** Précheck : la session lit le lot dans le plan (Sonnet, qui a la place pour un plan de plusieurs centaines de ko). */
-export const PLAN_READING = 'Read the lot, its notes and sub-tasks in the plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`),';
+export const PLAN_READING = 'Read the lot, its notes and sub-tasks in the plan (`.cadence/raf.yaml`, the legacy `docs/plan/raf.yaml`, or the file named by `plan:` in `cadence.yaml`; never read `.cadence/archive/`, the closed lots moved out of the plan),';
 
 /**
  * Précheck sur le modèle local (L322) : le lot est dans le brief et la session n'ouvre pas le plan. Un plan de 474 ko lu en entier remplissait la fenêtre de 64 k

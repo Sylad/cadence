@@ -18,4 +18,4 @@ Dans le panneau des lots (`/hud lots`), chaque projet peut maintenant être repl
 ## Hypothèses
 
 - R1 — le seuil est de plus de 20 lots non clos (sous-tâches non comptées) ; seule la valeur change si c'est faux.
-- R5 — la « touche » est celle du bouton (Entrée sous le focus) et la commande `/hud lots <projet>` ; une touche par projet n'est pas posée, faute de pouvoir la réserver sans gêner la frappe dans l'invite.
+- R5 — la « touche » est celle du bouton (Entrée sous le focus) et la commande `/hud lots <projet>` ; une touche par projet n'est pas posée : Entrée sous le focus suffit, et `/hud lots <projet>` couvre le clavier sans donner le focus au panneau. Pour donner le focus au panneau : un clic dedans, ou ctrl+x puis tab.
